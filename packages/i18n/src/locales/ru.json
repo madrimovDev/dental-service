@@ -11,12 +11,79 @@
     "cancel": "Отмена",
     "delete": "Удалить",
     "edit": "Редактировать",
+    "create": "Создать",
     "search": "Поиск",
-    "language": "Язык"
+    "language": "Язык",
+    "name": "Название",
+    "yes": "Да",
+    "no": "Нет"
   },
   "health": {
     "title": "Состояние системы",
     "ok": "Всё в порядке",
     "db": "База данных"
+  },
+  "auth": {
+    "login": {
+      "title": "Вход",
+      "identifier": "Email или телефон",
+      "password": "Пароль",
+      "submit": "Войти",
+      "forgot": "Забыли пароль?",
+      "register_clinic": "Регистрация клиники"
+    },
+    "register": {
+      "title": "Регистрация клиники",
+      "clinic_name": "Название клиники",
+      "owner_full_name": "ФИО владельца",
+      "email": "Email",
+      "phone": "Телефон",
+      "password": "Пароль",
+      "password_hint": "Минимум 12 символов",
+      "language": "Основной язык",
+      "submit": "Зарегистрироваться",
+      "have_account": "Уже есть аккаунт — войти"
+    },
+    "select_workspace": {
+      "title": "Выберите workspace",
+      "no_workspaces": "У вас нет клиник. Первый шаг — зарегистрируйте клинику.",
+      "all_branches": "Все филиалы"
+    }
+  },
+  "layout": {
+    "switch_workspace": "Сменить workspace",
+    "logout": "Выйти"
+  },
+  "nav": {
+    "dashboard": "Панель управления",
+    "patients": "Пациенты",
+    "appointments": "Записи",
+    "settings": "Настройки",
+    "tenant_settings": "Клиника",
+    "branches": "Филиалы",
+    "roles": "Роли",
+    "users": "Сотрудники"
+  },
+  "dashboard": {
+    "welcome": "Здравствуйте, {{name}}!",
+    "your_role": "Ваша роль",
+    "role_staff": "Сотрудник",
+    "owner_desc": "Владелец клиники — все права",
+    "permissions_count": "{{count}} разрешений",
+    "phase_1": "Этап проекта",
+    "quick_start": "Быстрый старт",
+    "tip_branches": "Настройки → Филиалы — добавьте новый филиал",
+    "tip_users": "Настройки → Сотрудники — пригласите сотрудников",
+    "tip_roles": "Настройки → Роли — настройте роли для сотрудников"
+  },
+  "branches": {
+    "title": "Филиалы",
+    "create": "Новый филиал",
+    "edit": "Редактировать филиал",
+    "name": "Название филиала",
+    "address": "Адрес",
+    "phone": "Телефон",
+    "empty": "Пока нет филиалов. Добавьте первый филиал.",
+    "confirm_delete": "Подтверждаете удаление филиала?"
   }
 }

@@ -1,3 +1,5 @@
-// @dental/api-client — typed client auto-generated from OpenAPI spec
-// M1.4 da to'ldiriladi (orval yoki openapi-typescript-codegen orqali)
-export {};
+export type { ApiClient, ApiClientConfig } from './client.ts';
+export { ApiError, createApiClient } from './client.ts';
+export type { Endpoints } from './endpoints.ts';
+export { createEndpoints } from './endpoints.ts';
+export * from './types.ts';

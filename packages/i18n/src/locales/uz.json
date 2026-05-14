@@ -11,12 +11,79 @@
     "cancel": "Bekor qilish",
     "delete": "O'chirish",
     "edit": "Tahrirlash",
+    "create": "Yaratish",
     "search": "Qidirish",
-    "language": "Til"
+    "language": "Til",
+    "name": "Nom",
+    "yes": "Ha",
+    "no": "Yo'q"
   },
   "health": {
     "title": "Tizim holati",
     "ok": "Hammasi joyida",
     "db": "Ma'lumotlar bazasi"
+  },
+  "auth": {
+    "login": {
+      "title": "Kirish",
+      "identifier": "Email yoki telefon",
+      "password": "Parol",
+      "submit": "Kirish",
+      "forgot": "Parolni unutdingizmi?",
+      "register_clinic": "Klinika ro'yxatdan o'tish"
+    },
+    "register": {
+      "title": "Klinikani ro'yxatdan o'tkazish",
+      "clinic_name": "Klinika nomi",
+      "owner_full_name": "Egasining to'liq ismi",
+      "email": "Email",
+      "phone": "Telefon",
+      "password": "Parol",
+      "password_hint": "Kamida 12 belgi",
+      "language": "Asosiy til",
+      "submit": "Ro'yxatdan o'tish",
+      "have_account": "Hisobim bor — kirish"
+    },
+    "select_workspace": {
+      "title": "Workspace tanlash",
+      "no_workspaces": "Sizda hech qanday klinika yo'q. Birinchi qadam — klinikani ro'yxatdan o'tkazing.",
+      "all_branches": "Barcha filiallar"
+    }
+  },
+  "layout": {
+    "switch_workspace": "Workspace o'zgartirish",
+    "logout": "Chiqish"
+  },
+  "nav": {
+    "dashboard": "Boshqaruv paneli",
+    "patients": "Bemorlar",
+    "appointments": "Yozilishlar",
+    "settings": "Sozlamalar",
+    "tenant_settings": "Klinika",
+    "branches": "Filiallar",
+    "roles": "Rollar",
+    "users": "Xodimlar"
+  },
+  "dashboard": {
+    "welcome": "Salom, {{name}}!",
+    "your_role": "Sizning rolingiz",
+    "role_staff": "Xodim",
+    "owner_desc": "Klinika egasi — barcha ruxsatlarga ega",
+    "permissions_count": "{{count}} ta ruxsatga ega",
+    "phase_1": "Loyiha bosqichi",
+    "quick_start": "Tez boshlash",
+    "tip_branches": "Sozlamalar → Filiallar — yangi filial qo'shing",
+    "tip_users": "Sozlamalar → Xodimlar — xodimlarni taklif qiling",
+    "tip_roles": "Sozlamalar → Rollar — xodimlar uchun rollarni sozlang"
+  },
+  "branches": {
+    "title": "Filiallar",
+    "create": "Yangi filial",
+    "edit": "Filialni tahrirlash",
+    "name": "Filial nomi",
+    "address": "Manzil",
+    "phone": "Telefon",
+    "empty": "Hali filiallar yo'q. Birinchi filialni qo'shing.",
+    "confirm_delete": "Filialni o'chirishni tasdiqlaysizmi?"
   }
 }
