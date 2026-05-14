@@ -1,6 +1,11 @@
 import { createApp } from './app.ts';
+import { seedPermissions } from './db/boot-seed.ts';
+import { db } from './db/client.ts';
 import { env } from './lib/env.ts';
 import { logger } from './lib/logger.ts';
+
+// Boot seed — idempotent permissions catalog
+await seedPermissions(db);
 
 const app = createApp();
 

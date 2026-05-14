@@ -4,6 +4,7 @@ import { db } from './db/client.ts';
 import { env } from './lib/env.ts';
 import { errorHandler } from './middleware/error-handler.ts';
 import { requestId } from './middleware/request-id.ts';
+import { authRoutes } from './modules/auth/index.ts';
 import { healthRoutes } from './modules/health/index.ts';
 
 export const createApp = () => {
@@ -19,8 +20,9 @@ export const createApp = () => {
     }),
   );
 
-  // Routes
+  // Public routes
   app.route('/api/health', healthRoutes({ db }));
+  app.route('/api/auth', authRoutes({ db }));
 
   // Error handler
   app.onError(errorHandler);

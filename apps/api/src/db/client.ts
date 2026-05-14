@@ -1,4 +1,7 @@
 import * as schema from '@dental/db-schema';
+import type { ExtractTablesWithRelations } from 'drizzle-orm';
+import type { PgTransaction } from 'drizzle-orm/pg-core';
+import type { PostgresJsQueryResultHKT } from 'drizzle-orm/postgres-js';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { env } from '../lib/env.ts';
@@ -11,4 +14,16 @@ const queryClient = postgres(env.DATABASE_URL, {
 });
 
 export const db = drizzle(queryClient, { schema });
+
+/** Top-level Database (pool connection) */
 export type Database = typeof db;
+
+/** Transaction instance — har RLS-scoped request bunda ishlaydi */
+export type DbTransaction = PgTransaction<
+  PostgresJsQueryResultHKT,
+  typeof schema,
+  ExtractTablesWithRelations<typeof schema>
+>;
+
+/** Service factories shu type'ni qabul qiladi — pool yoki transaction farq qilmaydi */
+export type DbOrTx = Database | DbTransaction;

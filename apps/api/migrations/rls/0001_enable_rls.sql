@@ -43,12 +43,40 @@ CREATE POLICY role_permissions_tenant_isolation ON role_permissions
   );
 
 -- ===== USER_ASSIGNMENTS =====
+-- Ikki context:
+--   1. Auth flow (login dan keyin, workspace switch oldin): foydalanuvchi o'z
+--      assignmentlarini ko'rishi kerak. RLS: user_id = current_user_id.
+--   2. Tenant flow (workspace tanlanagach): tenant ichidagi barcha assignmentlar.
+--      RLS: tenant_id = current_tenant_id.
+-- Permissive policies OR'd: SELECT ikkalasidan birortasi mos kelishi yetadi.
 ALTER TABLE user_assignments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_assignments FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY user_assignments_tenant_isolation ON user_assignments
+CREATE POLICY user_assignments_self_view ON user_assignments
+  FOR SELECT
+  USING (
+    user_id = NULLIF(current_setting('app.current_user_id', true), '')::uuid
+  );
+
+CREATE POLICY user_assignments_tenant_view ON user_assignments
+  FOR SELECT
+  USING (
+    tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid
+  );
+
+-- INSERT/UPDATE/DELETE faqat tenant context'da (admin operations)
+CREATE POLICY user_assignments_tenant_insert ON user_assignments
+  FOR INSERT
+  WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid);
+
+CREATE POLICY user_assignments_tenant_update ON user_assignments
+  FOR UPDATE
   USING (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid)
   WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid);
+
+CREATE POLICY user_assignments_tenant_delete ON user_assignments
+  FOR DELETE
+  USING (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid);
 
 -- ===== AUDIT_LOG =====
 -- SELECT: faqat tenant'ning o'z eventlari (platform events tenant_id=NULL ko'rinmaydi)
