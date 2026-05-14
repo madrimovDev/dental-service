@@ -1,0 +1,4 @@
+ALTER TABLE "refresh_tokens" ADD COLUMN "active_tenant_id" uuid;--> statement-breakpoint
+ALTER TABLE "refresh_tokens" ADD COLUMN "active_branch_id" uuid;--> statement-breakpoint
+ALTER TABLE "refresh_tokens" ADD CONSTRAINT "refresh_tokens_active_tenant_id_tenants_id_fk" FOREIGN KEY ("active_tenant_id") REFERENCES "public"."tenants"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "refresh_tokens" ADD CONSTRAINT "refresh_tokens_active_branch_id_branches_id_fk" FOREIGN KEY ("active_branch_id") REFERENCES "public"."branches"("id") ON DELETE set null ON UPDATE no action;

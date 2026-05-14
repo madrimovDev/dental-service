@@ -85,7 +85,7 @@ export const createEndpoints = (api: ApiClient) => ({
 
     me: () => api.get<MembershipsResponse>('/api/auth/me'),
 
-    switchWorkspace: (body: { tenantId: string; branchId?: string }) =>
+    switchWorkspace: (body: { tenantId: string; branchId?: string; refreshToken: string }) =>
       api.post<SwitchWorkspaceResponse>('/api/auth/switch-workspace', body),
 
     requestPasswordReset: (identifier: string) =>

@@ -38,6 +38,9 @@ export type RefreshInput = z.infer<typeof refreshSchema>;
 export const switchWorkspaceSchema = z.object({
   tenantId: z.uuid(),
   branchId: z.uuid().optional(),
+  // Refresh token majburiy — chain rotation uchun.
+  // Switch endi yangi access + yangi refresh chiqaradi (workspace context bilan).
+  refreshToken: z.string().min(1),
 });
 export type SwitchWorkspaceInput = z.infer<typeof switchWorkspaceSchema>;
 

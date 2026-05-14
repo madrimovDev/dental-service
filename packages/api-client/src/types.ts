@@ -38,6 +38,7 @@ export type MembershipsResponse = {
 
 export type SwitchWorkspaceResponse = {
   accessToken: string;
+  refreshToken: string;
   accessExpiresAt: string;
 };
 

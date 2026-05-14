@@ -98,10 +98,25 @@ export const authRoutes = (deps: { db: Database }) => {
       throw new HTTPException(400, { message: 'Invalid input' });
     }
     const result = await service.switchWorkspace(user.id, body.data);
-    if (!result) {
-      return c.json(fail('auth.no_workspace_access', "Bu workspace'da assignment yo'q"), 403);
+    if (!result.ok) {
+      const msgs: Record<string, [string, number]> = {
+        'auth.invalid_refresh': ["Refresh token noto'g'ri yoki muddati tugagan", 401],
+        'auth.refresh_mismatch': ['Refresh token boshqa foydalanuvchiniki', 401],
+        'auth.refresh_revoked': ['Refresh token allaqachon revoke qilingan', 401],
+        'auth.no_workspace_access': ["Bu workspace'da ruxsat yo'q", 403],
+        'auth.invalid_branch': ['Filial bu klinikaga tegishli emas', 400],
+        'auth.user_not_found': ['Foydalanuvchi topilmadi', 404],
+      };
+      const [msg, status] = msgs[result.code] ?? ['Workspace switch failed', 403];
+      return c.json(fail(result.code, msg), status as 400 | 401 | 403 | 404);
     }
-    return c.json(ok(result));
+    return c.json(
+      ok({
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+        accessExpiresAt: result.accessExpiresAt,
+      }),
+    );
   });
 
   // POST /auth/password-reset-request — public, mock OTP

@@ -30,7 +30,7 @@ type WorkspaceOption = {
 export function SelectWorkspacePage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { accessToken, setTokens, setContext } = useAuthStore();
+  const { accessToken, refreshToken, setTokens, setContext } = useAuthStore();
 
   const meQuery = useQuery({
     queryKey: ['auth', 'me'],
@@ -39,7 +39,11 @@ export function SelectWorkspacePage() {
   });
 
   const switchMut = useMutation({
-    mutationFn: (input: { tenantId: string; branchId?: string }) => api.auth.switchWorkspace(input),
+    mutationFn: (input: { tenantId: string; branchId?: string }) => {
+      const rt = useAuthStore.getState().refreshToken;
+      if (!rt) throw new Error('No refresh token');
+      return api.auth.switchWorkspace({ ...input, refreshToken: rt });
+    },
     onSuccess: (data) => {
       // Decode JWT to get perms (simple base64 — production: jose lib)
       const payload = JSON.parse(atob(data.accessToken.split('.')[1] ?? '')) as {
@@ -47,7 +51,8 @@ export function SelectWorkspacePage() {
         abid: string | null;
         perms: string[];
       };
-      setTokens(data.accessToken, useAuthStore.getState().refreshToken ?? '');
+      // Switch endi yangi refresh ham qaytaradi — rotation chain'i davom etadi
+      setTokens(data.accessToken, data.refreshToken);
       setContext(payload.atid, payload.abid, payload.perms);
       navigate('/');
     },
@@ -55,7 +60,7 @@ export function SelectWorkspacePage() {
 
   // Auto-select if single workspace
   useEffect(() => {
-    if (!meQuery.data) return;
+    if (!meQuery.data || !refreshToken) return;
     const options = collectOptions(meQuery.data);
     if (options.length === 1 && options[0]) {
       switchMut.mutate({
@@ -63,7 +68,7 @@ export function SelectWorkspacePage() {
         branchId: options[0].branchId ?? undefined,
       });
     }
-  }, [meQuery.data, switchMut]);
+  }, [meQuery.data, refreshToken, switchMut]);
 
   if (meQuery.isLoading) {
     return (

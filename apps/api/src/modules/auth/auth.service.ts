@@ -318,19 +318,44 @@ export const createAuthService = (deps: AuthServiceDeps) => {
   }
 
   async function switchWorkspace(userId: string, input: SwitchWorkspaceInput) {
-    // 1. User shu tenant'da owner yoki assignment'i bormi tekshirish
+    // 1. Refresh tokenni validatsiya — chain identifikatori sifatida
+    let claims: { sub: string; jti: string };
+    try {
+      claims = await verifyRefresh(input.refreshToken);
+    } catch {
+      return { ok: false as const, code: 'auth.invalid_refresh' };
+    }
+    if (claims.sub !== userId) return { ok: false as const, code: 'auth.refresh_mismatch' };
+
+    const oldHash = await hashToken(input.refreshToken);
+    const [existingRefresh] = await db
+      .select()
+      .from(refreshTokens)
+      .where(eq(refreshTokens.tokenHash, oldHash));
+    if (!existingRefresh) return { ok: false as const, code: 'auth.invalid_refresh' };
+    if (existingRefresh.revokedAt) {
+      // Replay — butun chain'ni revoke qilish
+      await db
+        .update(refreshTokens)
+        .set({ revokedAt: new Date() })
+        .where(eq(refreshTokens.userId, userId));
+      logger.warn({ userId }, 'Switch-workspace: revoked refresh used — chain killed');
+      return { ok: false as const, code: 'auth.refresh_revoked' };
+    }
+
+    // 2. User shu tenant'da owner yoki assignment'i bormi
     const [tenant] = await db.select().from(tenants).where(eq(tenants.id, input.tenantId));
-
-    if (!tenant) return null;
-
+    if (!tenant) return { ok: false as const, code: 'auth.no_workspace_access' };
     const isOwner = tenant.ownerUserId === userId;
 
     if (!isOwner) {
-      // Active assignment tekshirish
       const now = new Date();
+      // Branch filter: agar input.branchId berilgan bo'lsa, user shu branchga yoki
+      // tenant-wide (branchId IS NULL) assignment'ga ega bo'lishi kerak. Agar input.branchId
+      // bo'lmasa, user'ning istalgan assignment'i (branch-specific yoki tenant-wide) ishlatiladi.
       const branchFilter = input.branchId
         ? or(isNull(userAssignments.branchId), eq(userAssignments.branchId, input.branchId))
-        : isNull(userAssignments.branchId);
+        : undefined;
 
       const [assignment] = await db
         .select()
@@ -341,14 +366,25 @@ export const createAuthService = (deps: AuthServiceDeps) => {
             eq(userAssignments.tenantId, input.tenantId),
             eq(userAssignments.isActive, true),
             or(isNull(userAssignments.validTo), gt(userAssignments.validTo, now)),
-            branchFilter,
+            ...(branchFilter ? [branchFilter] : []),
           ),
         );
 
-      if (!assignment) return null;
+      if (!assignment) return { ok: false as const, code: 'auth.no_workspace_access' };
     }
 
-    // 2. Permissions ro'yxati
+    // 3. branchId tenant ichida ekanligini tekshirish (security: cross-tenant branch oldini olish)
+    if (input.branchId) {
+      const [branch] = await db
+        .select({ tenantId: branches.tenantId })
+        .from(branches)
+        .where(eq(branches.id, input.branchId));
+      if (!branch || branch.tenantId !== input.tenantId) {
+        return { ok: false as const, code: 'auth.invalid_branch' };
+      }
+    }
+
+    // 4. Permissions
     const perms = await buildPermissionsForContext(
       db,
       userId,
@@ -356,20 +392,44 @@ export const createAuthService = (deps: AuthServiceDeps) => {
       input.branchId ?? null,
     );
 
-    // 3. User lang
+    // 5. User lang
     const [user] = await db.select().from(users).where(eq(users.id, userId));
-    if (!user) return null;
+    if (!user) return { ok: false as const, code: 'auth.user_not_found' };
 
-    // 4. New JWT
-    const access = await signAccess({
-      sub: userId,
-      atid: input.tenantId,
-      abid: input.branchId ?? null,
-      perms: perms as Permission[],
-      lang: (user.preferredLanguage as 'uz' | 'ru') ?? 'uz',
+    // 6. Rotate: revoke old refresh + issue new refresh (workspace bilan) + new access
+    return await db.transaction(async (tx) => {
+      const newRefresh = await signRefresh(userId);
+      const newAccess = await signAccess({
+        sub: userId,
+        atid: input.tenantId,
+        abid: input.branchId ?? null,
+        perms: perms as Permission[],
+        lang: (user.preferredLanguage as 'uz' | 'ru') ?? 'uz',
+      });
+
+      const [newRow] = await tx
+        .insert(refreshTokens)
+        .values({
+          userId,
+          tokenHash: await hashToken(newRefresh.token),
+          expiresAt: newRefresh.expiresAt,
+          activeTenantId: input.tenantId,
+          activeBranchId: input.branchId ?? null,
+        })
+        .returning({ id: refreshTokens.id });
+
+      await tx
+        .update(refreshTokens)
+        .set({ revokedAt: new Date(), replacedById: newRow?.id })
+        .where(eq(refreshTokens.id, existingRefresh.id));
+
+      return {
+        ok: true as const,
+        accessToken: newAccess.token,
+        refreshToken: newRefresh.token,
+        accessExpiresAt: newAccess.expiresAt,
+      };
     });
-
-    return { accessToken: access.token, accessExpiresAt: access.expiresAt };
   }
 
   async function refresh(input: RefreshInput) {
@@ -388,9 +448,8 @@ export const createAuthService = (deps: AuthServiceDeps) => {
 
     if (!existing) return null;
 
-    // Replay detection — bu token allaqachon revoke qilingan
+    // Replay detection
     if (existing.revokedAt) {
-      // Butun chain revoke qilish — replaced_by_id bo'yicha kelajakdagi tokenlarni
       await db
         .update(refreshTokens)
         .set({ revokedAt: new Date() })
@@ -399,17 +458,39 @@ export const createAuthService = (deps: AuthServiceDeps) => {
       return null;
     }
 
-    // Rotate: eski token revoke + yangi yaratish
+    // User lang uchun
+    const [user] = await db.select().from(users).where(eq(users.id, claims.sub));
+    if (!user) return null;
+
+    // Workspace context — refresh row'dan
+    const activeTenantId = existing.activeTenantId;
+    const activeBranchId = existing.activeBranchId;
+
+    // Permissions re-derive (workspace bo'lsa). Yo'q bo'lsa empty.
+    let perms: string[] = [];
+    if (activeTenantId) {
+      perms = await buildPermissionsForContext(db, claims.sub, activeTenantId, activeBranchId);
+      // Edge case: agar foydalanuvchi shu tenantdan o'chirilgan bo'lsa (assignment revoked yoki owner transferred)
+      // perms = [] qaytadi va atid yangi tokenda null'ga tushadi (workspace tushib qoladi).
+      if (perms.length === 0) {
+        logger.warn(
+          { userId: claims.sub, tenantId: activeTenantId },
+          'Refresh: user no longer has access to active workspace — clearing context',
+        );
+      }
+    }
+
+    const hasWorkspace = activeTenantId && perms.length > 0;
+
     return await db.transaction(async (tx) => {
       const newRefresh = await signRefresh(claims.sub);
-      const newAccessClaims = {
+      const newAccess = await signAccess({
         sub: claims.sub,
-        atid: null,
-        abid: null,
-        perms: [] as Permission[],
-        lang: 'uz' as const,
-      };
-      const newAccess = await signAccess(newAccessClaims);
+        atid: hasWorkspace ? activeTenantId : null,
+        abid: hasWorkspace ? activeBranchId : null,
+        perms: (hasWorkspace ? perms : []) as Permission[],
+        lang: (user.preferredLanguage as 'uz' | 'ru') ?? 'uz',
+      });
 
       const [newRow] = await tx
         .insert(refreshTokens)
@@ -417,6 +498,8 @@ export const createAuthService = (deps: AuthServiceDeps) => {
           userId: claims.sub,
           tokenHash: await hashToken(newRefresh.token),
           expiresAt: newRefresh.expiresAt,
+          activeTenantId: hasWorkspace ? activeTenantId : null,
+          activeBranchId: hasWorkspace ? activeBranchId : null,
         })
         .returning({ id: refreshTokens.id });
 

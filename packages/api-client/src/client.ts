@@ -12,55 +12,134 @@ export class ApiError extends Error {
   }
 }
 
+export type RefreshResult = {
+  accessToken: string;
+  refreshToken: string;
+};
+
 export type ApiClientConfig = {
   baseUrl?: string;
   getAccessToken: () => string | null;
+  getRefreshToken?: () => string | null;
+  /**
+   * Refresh token bilan yangi access olish funksiyasi.
+   * Bo'lsa — 401 da auto-retry, bo'lmasa — to'g'ridan-to'g'ri onUnauthorized chaqiriladi.
+   * Frontend bu funksiyani api-client setup'da auth-store bilan bog'laydi.
+   */
+  refreshTokens?: (refreshToken: string) => Promise<RefreshResult>;
+  /** Refresh muvaffaqiyatli bo'lganda yangi tokenlarni saqlash uchun callback */
+  onTokensRefreshed?: (tokens: RefreshResult) => void;
+  /** Refresh ham fail bo'lsa yoki refresh tools mavjud bo'lmasa chaqiriladi */
   onUnauthorized?: () => void;
 };
 
 export const createApiClient = (config: ApiClientConfig) => {
-  const handleResponse = async <T>(res: Response): Promise<T> => {
+  // Single-flight: bir vaqtda faqat bitta refresh ishlasin.
+  // Bir nechta concurrent 401 bo'lsa, hammasi bitta refresh natijasini kutsin.
+  let refreshPromise: Promise<RefreshResult | null> | null = null;
+
+  const tryRefresh = async (): Promise<RefreshResult | null> => {
+    if (!config.refreshTokens || !config.getRefreshToken) return null;
+    const rt = config.getRefreshToken();
+    if (!rt) return null;
+
+    if (!refreshPromise) {
+      refreshPromise = (async () => {
+        try {
+          const result = await config.refreshTokens?.(rt);
+          if (result) config.onTokensRefreshed?.(result);
+          return result ?? null;
+        } catch {
+          return null;
+        } finally {
+          // Allow next refresh after this resolves
+          setTimeout(() => {
+            refreshPromise = null;
+          }, 0);
+        }
+      })();
+    }
+    return refreshPromise;
+  };
+
+  const parseResponse = async <T>(res: Response): Promise<ApiResponse<T>> => {
     const parsed = (await res.json().catch(() => null)) as ApiResponse<T> | null;
     if (!parsed) {
       throw new ApiError('http.invalid_response', 'Invalid response from server', res.status);
     }
+    return parsed;
+  };
+
+  const handleParsed = <T>(parsed: ApiResponse<T>, status: number): T => {
     if (!parsed.success) {
-      if (res.status === 401 && parsed.error.code === 'auth.invalid_token') {
-        config.onUnauthorized?.();
-      }
-      throw new ApiError(parsed.error.code, parsed.error.message, res.status, parsed.error.details);
+      throw new ApiError(parsed.error.code, parsed.error.message, status, parsed.error.details);
     }
     return parsed.data;
   };
 
-  const request = async <T>(method: string, path: string, body?: unknown): Promise<T> => {
+  const fetchWithAuth = async (method: string, path: string, body?: unknown): Promise<Response> => {
     const headers = new Headers();
     if (body !== undefined) headers.set('Content-Type', 'application/json');
     const token = config.getAccessToken();
     if (token) headers.set('Authorization', `Bearer ${token}`);
-
-    const res = await fetch(`${config.baseUrl ?? ''}${path}`, {
+    return fetch(`${config.baseUrl ?? ''}${path}`, {
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
       credentials: 'include',
     });
-
-    return handleResponse<T>(res);
   };
 
-  const upload = async <T>(path: string, form: FormData): Promise<T> => {
+  const fetchUpload = async (path: string, form: FormData): Promise<Response> => {
     const headers = new Headers();
-    // NB: don't set Content-Type — browser sets multipart boundary
     const token = config.getAccessToken();
     if (token) headers.set('Authorization', `Bearer ${token}`);
-    const res = await fetch(`${config.baseUrl ?? ''}${path}`, {
+    return fetch(`${config.baseUrl ?? ''}${path}`, {
       method: 'POST',
       headers,
       body: form,
       credentials: 'include',
     });
-    return handleResponse<T>(res);
+  };
+
+  const request = async <T>(method: string, path: string, body?: unknown): Promise<T> => {
+    let res = await fetchWithAuth(method, path, body);
+    let parsed = await parseResponse<T>(res);
+
+    // 401 + auth.invalid_token + refresh available → try refresh once
+    if (!parsed.success && res.status === 401 && parsed.error.code === 'auth.invalid_token') {
+      // /api/auth/refresh o'zi 401 bersa qayta retry qilmaymiz (cycle oldini olish)
+      if (path !== '/api/auth/refresh') {
+        const refreshed = await tryRefresh();
+        if (refreshed) {
+          res = await fetchWithAuth(method, path, body);
+          parsed = await parseResponse<T>(res);
+        } else {
+          config.onUnauthorized?.();
+        }
+      } else {
+        config.onUnauthorized?.();
+      }
+    }
+
+    return handleParsed<T>(parsed, res.status);
+  };
+
+  const upload = async <T>(path: string, form: FormData): Promise<T> => {
+    let res = await fetchUpload(path, form);
+    let parsed = await parseResponse<T>(res);
+
+    if (!parsed.success && res.status === 401 && parsed.error.code === 'auth.invalid_token') {
+      const refreshed = await tryRefresh();
+      if (refreshed) {
+        res = await fetchUpload(path, form);
+        parsed = await parseResponse<T>(res);
+      } else {
+        config.onUnauthorized?.();
+      }
+    }
+
+    return handleParsed<T>(parsed, res.status);
   };
 
   return {
