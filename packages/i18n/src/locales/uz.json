@@ -18,7 +18,9 @@
     "yes": "Ha",
     "no": "Yo'q",
     "back": "Orqaga",
-    "select": "Tanlang"
+    "select": "Tanlang",
+    "active": "Faol",
+    "inactive": "Faol emas"
   },
   "health": {
     "title": "Tizim holati",
@@ -79,7 +81,10 @@
     "tenant_settings": "Klinika",
     "branches": "Filiallar",
     "roles": "Rollar",
-    "users": "Xodimlar"
+    "users": "Xodimlar",
+    "queue": "Navbat",
+    "cashier": "Kassa",
+    "services": "Xizmatlar"
   },
   "dashboard": {
     "welcome": "Salom, {{name}}!",
@@ -373,5 +378,94 @@
     "max_size": "Maksimal 30 MB",
     "supported_formats": "JPEG, PNG, WebP, HEIC, DICOM",
     "confirm_delete": "Rasmni o'chirishni tasdiqlaysizmi?"
+  },
+  "appointments": {
+    "title": "Yozilishlar",
+    "create": "Yangi yozilish",
+    "branch": "Filial",
+    "filter_branch": "Filial bo'yicha filter",
+    "doctor": "Shifokor",
+    "patient": "Bemor",
+    "start_time": "Boshlanish vaqti",
+    "end_time": "Tugash vaqti",
+    "services": "Xizmatlar",
+    "notes": "Eslatma",
+    "empty_week": "Bu hafta yozilishlar yo'q",
+    "cancel_reason": "Bekor qilish sababi",
+    "status": {
+      "scheduled": "Rejalashtirilgan",
+      "confirmed": "Tasdiqlangan",
+      "in_progress": "Davom etmoqda",
+      "completed": "Bajarilgan",
+      "no_show": "Kelmagan",
+      "cancelled": "Bekor qilingan"
+    }
+  },
+  "queue": {
+    "title": "Bugungi navbat",
+    "select_branch": "Filialni tanlang",
+    "select_branch_hint": "Navbat ko'rish uchun filial tanlang",
+    "add": "Navbatga qo'shish",
+    "new_ticket": "Yangi navbat",
+    "patient": "Bemor",
+    "service": "Xizmat",
+    "waiting": "Kutmoqda",
+    "in_progress": "Davom etmoqda",
+    "done": "Tugatildi",
+    "completed": "Bajarilgan",
+    "called_at": "Chaqirilgan"
+  },
+  "services": {
+    "title": "Xizmatlar katalogi",
+    "create": "Yangi xizmat",
+    "edit": "Tahrirlash",
+    "code": "Kod",
+    "name": "Nomi",
+    "name_uz": "Nomi (O'zbek)",
+    "name_ru": "Nomi (Rus)",
+    "category": "Kategoriya",
+    "duration": "Davomiyligi",
+    "duration_minutes": "Davomiyligi (daqiqa)",
+    "minutes": "daq",
+    "price": "Narxi",
+    "set_price": "Narx belgilash",
+    "prices_per_branch": "Filiallar bo'yicha narxlar",
+    "no_prices": "Narxlar belgilanmagan",
+    "initial_price": "Boshlang'ich narx",
+    "initial_branch": "Boshlang'ich filial",
+    "branch": "Filial",
+    "status": "Status",
+    "empty": "Xizmatlar yo'q. Birinchi xizmatni qo'shing.",
+    "confirm_delete": "Xizmatni o'chirishni tasdiqlaysizmi?"
+  },
+  "cashier": {
+    "title": "Kassa",
+    "branch": "Filial",
+    "new_payment": "Yangi to'lov",
+    "add_service": "Xizmat qo'shish",
+    "search_service": "Xizmatni qidirish...",
+    "discount": "Chegirma",
+    "payment_method": "To'lov turi",
+    "method": {
+      "cash": "Naqd pul",
+      "card": "Karta",
+      "transfer": "O'tkazma",
+      "other": "Boshqa"
+    },
+    "method_short": "Tur",
+    "paid_amount": "To'langan summa",
+    "notes": "Eslatma",
+    "total": "Jami",
+    "charge": "To'lovni qabul qilish",
+    "today_transactions": "Bugungi operatsiyalar",
+    "no_transactions_today": "Bugun operatsiyalar yo'q",
+    "amount": "Summa",
+    "status": "Status",
+    "receipt": "Chek raqami",
+    "daily_summary": "Kunlik xulosa",
+    "confirm_refund": "To'lovni qaytarishni tasdiqlaysizmi?",
+    "type": {
+      "refund": "Qaytarish"
+    }
   }
 }

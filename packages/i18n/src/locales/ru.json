@@ -18,7 +18,9 @@
     "yes": "Да",
     "no": "Нет",
     "back": "Назад",
-    "select": "Выберите"
+    "select": "Выберите",
+    "active": "Активен",
+    "inactive": "Не активен"
   },
   "health": {
     "title": "Состояние системы",
@@ -79,7 +81,10 @@
     "tenant_settings": "Клиника",
     "branches": "Филиалы",
     "roles": "Роли",
-    "users": "Сотрудники"
+    "users": "Сотрудники",
+    "queue": "Очередь",
+    "cashier": "Касса",
+    "services": "Услуги"
   },
   "dashboard": {
     "welcome": "Здравствуйте, {{name}}!",
@@ -373,5 +378,94 @@
     "max_size": "Макс. 30 МБ",
     "supported_formats": "JPEG, PNG, WebP, HEIC, DICOM",
     "confirm_delete": "Подтвердите удаление снимка"
+  },
+  "appointments": {
+    "title": "Записи",
+    "create": "Новая запись",
+    "branch": "Филиал",
+    "filter_branch": "Фильтр по филиалу",
+    "doctor": "Врач",
+    "patient": "Пациент",
+    "start_time": "Время начала",
+    "end_time": "Время окончания",
+    "services": "Услуги",
+    "notes": "Заметка",
+    "empty_week": "На этой неделе записей нет",
+    "cancel_reason": "Причина отмены",
+    "status": {
+      "scheduled": "Запланирован",
+      "confirmed": "Подтверждён",
+      "in_progress": "В процессе",
+      "completed": "Завершён",
+      "no_show": "Не пришёл",
+      "cancelled": "Отменён"
+    }
+  },
+  "queue": {
+    "title": "Очередь на сегодня",
+    "select_branch": "Выберите филиал",
+    "select_branch_hint": "Выберите филиал чтобы увидеть очередь",
+    "add": "Добавить в очередь",
+    "new_ticket": "Новый талон",
+    "patient": "Пациент",
+    "service": "Услуга",
+    "waiting": "В ожидании",
+    "in_progress": "В работе",
+    "done": "Завершён",
+    "completed": "Выполнен",
+    "called_at": "Вызван"
+  },
+  "services": {
+    "title": "Каталог услуг",
+    "create": "Новая услуга",
+    "edit": "Редактировать",
+    "code": "Код",
+    "name": "Название",
+    "name_uz": "Название (узбекский)",
+    "name_ru": "Название (русский)",
+    "category": "Категория",
+    "duration": "Длительность",
+    "duration_minutes": "Длительность (мин)",
+    "minutes": "мин",
+    "price": "Цена",
+    "set_price": "Установить цену",
+    "prices_per_branch": "Цены по филиалам",
+    "no_prices": "Цены не установлены",
+    "initial_price": "Начальная цена",
+    "initial_branch": "Начальный филиал",
+    "branch": "Филиал",
+    "status": "Статус",
+    "empty": "Услуг нет. Добавьте первую услугу.",
+    "confirm_delete": "Подтвердить удаление услуги?"
+  },
+  "cashier": {
+    "title": "Касса",
+    "branch": "Филиал",
+    "new_payment": "Новый платёж",
+    "add_service": "Добавить услугу",
+    "search_service": "Поиск услуги...",
+    "discount": "Скидка",
+    "payment_method": "Способ оплаты",
+    "method": {
+      "cash": "Наличные",
+      "card": "Карта",
+      "transfer": "Перевод",
+      "other": "Другое"
+    },
+    "method_short": "Тип",
+    "paid_amount": "Оплачено",
+    "notes": "Заметка",
+    "total": "Итого",
+    "charge": "Принять оплату",
+    "today_transactions": "Операции за сегодня",
+    "no_transactions_today": "Сегодня операций нет",
+    "amount": "Сумма",
+    "status": "Статус",
+    "receipt": "Номер чека",
+    "daily_summary": "Дневной отчёт",
+    "confirm_refund": "Подтвердить возврат?",
+    "type": {
+      "refund": "Возврат"
+    }
   }
 }
