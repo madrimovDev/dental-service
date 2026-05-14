@@ -3,8 +3,9 @@ import { z } from 'zod';
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 
-  // Database
+  // Database — app uses non-superuser, migrations use admin
   DATABASE_URL: z.url(),
+  DATABASE_ADMIN_URL: z.url().optional(), // faqat migrate task uchun
 
   // Redis
   REDIS_URL: z.url(),
