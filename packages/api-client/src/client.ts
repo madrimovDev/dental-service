@@ -19,6 +19,20 @@ export type ApiClientConfig = {
 };
 
 export const createApiClient = (config: ApiClientConfig) => {
+  const handleResponse = async <T>(res: Response): Promise<T> => {
+    const parsed = (await res.json().catch(() => null)) as ApiResponse<T> | null;
+    if (!parsed) {
+      throw new ApiError('http.invalid_response', 'Invalid response from server', res.status);
+    }
+    if (!parsed.success) {
+      if (res.status === 401 && parsed.error.code === 'auth.invalid_token') {
+        config.onUnauthorized?.();
+      }
+      throw new ApiError(parsed.error.code, parsed.error.message, res.status, parsed.error.details);
+    }
+    return parsed.data;
+  };
+
   const request = async <T>(method: string, path: string, body?: unknown): Promise<T> => {
     const headers = new Headers();
     if (body !== undefined) headers.set('Content-Type', 'application/json');
@@ -32,20 +46,21 @@ export const createApiClient = (config: ApiClientConfig) => {
       credentials: 'include',
     });
 
-    const parsed = (await res.json().catch(() => null)) as ApiResponse<T> | null;
+    return handleResponse<T>(res);
+  };
 
-    if (!parsed) {
-      throw new ApiError('http.invalid_response', 'Invalid response from server', res.status);
-    }
-
-    if (!parsed.success) {
-      if (res.status === 401 && parsed.error.code === 'auth.invalid_token') {
-        config.onUnauthorized?.();
-      }
-      throw new ApiError(parsed.error.code, parsed.error.message, res.status, parsed.error.details);
-    }
-
-    return parsed.data;
+  const upload = async <T>(path: string, form: FormData): Promise<T> => {
+    const headers = new Headers();
+    // NB: don't set Content-Type — browser sets multipart boundary
+    const token = config.getAccessToken();
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+    const res = await fetch(`${config.baseUrl ?? ''}${path}`, {
+      method: 'POST',
+      headers,
+      body: form,
+      credentials: 'include',
+    });
+    return handleResponse<T>(res);
   };
 
   return {
@@ -54,6 +69,7 @@ export const createApiClient = (config: ApiClientConfig) => {
     patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, body),
     put: <T>(path: string, body?: unknown) => request<T>('PUT', path, body),
     delete: <T>(path: string) => request<T>('DELETE', path),
+    upload,
   };
 };
 

@@ -23,8 +23,12 @@ import {
   IconArrowLeft,
   IconClipboardList,
   IconDental,
+  IconFlask,
   IconHeart,
   IconNotes,
+  IconPhoto,
+  IconPill,
+  IconSignature,
   IconUser,
 } from '@tabler/icons-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -33,6 +37,10 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 import { z } from 'zod';
+import { ConsentTab } from '@/components/clinical/ConsentTab.tsx';
+import { LabOrdersTab } from '@/components/clinical/LabOrdersTab.tsx';
+import { PatientImagesTab } from '@/components/clinical/PatientImagesTab.tsx';
+import { PrescriptionsTab } from '@/components/clinical/PrescriptionsTab.tsx';
 import { ToothChartTab } from '@/components/clinical/ToothChartTab.tsx';
 import { TreatmentPlansTab } from '@/components/clinical/TreatmentPlansTab.tsx';
 import { VisitNotesTab } from '@/components/clinical/VisitNotesTab.tsx';
@@ -223,6 +231,26 @@ export function PatientDetailPage() {
                   {t('patients.tab_tooth_chart')}
                 </Tabs.Tab>
               </>
+            )}
+            {hasPermission('prescription.view') && (
+              <Tabs.Tab value="prescriptions" leftSection={<IconPill size={16} />}>
+                {t('patients.tab_prescriptions')}
+              </Tabs.Tab>
+            )}
+            {hasPermission('consent.view') && (
+              <Tabs.Tab value="consent" leftSection={<IconSignature size={16} />}>
+                {t('patients.tab_consent')}
+              </Tabs.Tab>
+            )}
+            {hasPermission('lab_order.view') && (
+              <Tabs.Tab value="lab" leftSection={<IconFlask size={16} />}>
+                {t('patients.tab_lab_orders')}
+              </Tabs.Tab>
+            )}
+            {hasPermission('patient_image.view') && (
+              <Tabs.Tab value="images" leftSection={<IconPhoto size={16} />}>
+                {t('patients.tab_images')}
+              </Tabs.Tab>
             )}
           </Tabs.List>
 
@@ -432,6 +460,26 @@ export function PatientDetailPage() {
                 <ToothChartTab patientId={id ?? ''} />
               </Tabs.Panel>
             </>
+          )}
+          {hasPermission('prescription.view') && (
+            <Tabs.Panel value="prescriptions" pt="lg">
+              <PrescriptionsTab patientId={id ?? ''} />
+            </Tabs.Panel>
+          )}
+          {hasPermission('consent.view') && (
+            <Tabs.Panel value="consent" pt="lg">
+              <ConsentTab patientId={id ?? ''} />
+            </Tabs.Panel>
+          )}
+          {hasPermission('lab_order.view') && (
+            <Tabs.Panel value="lab" pt="lg">
+              <LabOrdersTab patientId={id ?? ''} />
+            </Tabs.Panel>
+          )}
+          {hasPermission('patient_image.view') && (
+            <Tabs.Panel value="images" pt="lg">
+              <PatientImagesTab patientId={id ?? ''} />
+            </Tabs.Panel>
           )}
         </Tabs>
       </Stack>

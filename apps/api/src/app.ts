@@ -10,9 +10,13 @@ import { authRoutes } from './modules/auth/index.ts';
 import { branchRoutes } from './modules/branches/index.ts';
 import { cashierRoutes } from './modules/cashier/index.ts';
 import { clinicalRoutes } from './modules/clinical/index.ts';
+import { consentRoutes } from './modules/consent/index.ts';
 import { healthRoutes } from './modules/health/index.ts';
+import { labOrdersRoutes } from './modules/lab-orders/index.ts';
+import { patientImagesRoutes } from './modules/patient-images/index.ts';
 import { patientRoutes } from './modules/patients/index.ts';
 import { permissionRoutes } from './modules/permissions/index.ts';
+import { prescriptionsRoutes } from './modules/prescriptions/index.ts';
 import { queueRoutes } from './modules/queue/index.ts';
 import { roleRoutes } from './modules/roles/index.ts';
 import { serviceRoutes } from './modules/services/index.ts';
@@ -50,6 +54,11 @@ export const createApp = () => {
   app.route('/api/queue', queueRoutes({ db, audit }));
   // Clinical: /api/diagnoses, /api/treatment-plans, /api/visit-notes, /api/tooth-charts
   app.route('/api', clinicalRoutes({ db, audit }));
+  // M5 clinical extras
+  app.route('/api/prescriptions', prescriptionsRoutes({ db, audit }));
+  app.route('/api/consent', consentRoutes({ db, audit }));
+  app.route('/api/lab-orders', labOrdersRoutes({ db, audit }));
+  app.route('/api', patientImagesRoutes({ db, audit }));
 
   // Error handler
   app.onError(errorHandler);

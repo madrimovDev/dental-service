@@ -305,6 +305,56 @@ export const PERMISSIONS = [
     descriptionUz: "Ish haqi hisobotlarini ko'rish",
     descriptionRu: 'Просмотр зарплат',
   },
+
+  // ===== M5 shell permissions (prescriptions, consent, lab orders, patient images) =====
+  {
+    code: 'prescription.view',
+    category: 'clinical',
+    descriptionUz: "Reseptlarni ko'rish",
+    descriptionRu: 'Просмотр рецептов',
+  },
+  {
+    code: 'prescription.manage',
+    category: 'clinical',
+    descriptionUz: 'Reseptlarni yaratish/tahrirlash',
+    descriptionRu: 'Управление рецептами',
+  },
+  {
+    code: 'consent.view',
+    category: 'clinical',
+    descriptionUz: "Konsent (rozilik) formalarini ko'rish",
+    descriptionRu: 'Просмотр согласий',
+  },
+  {
+    code: 'consent.manage',
+    category: 'clinical',
+    descriptionUz: 'Konsent shablonlarini va imzolarni boshqarish',
+    descriptionRu: 'Управление согласиями',
+  },
+  {
+    code: 'lab_order.view',
+    category: 'clinical',
+    descriptionUz: "Laboratoriya buyurtmalarini ko'rish",
+    descriptionRu: 'Просмотр лаб. заказов',
+  },
+  {
+    code: 'lab_order.manage',
+    category: 'clinical',
+    descriptionUz: 'Laboratoriya buyurtmalarini yaratish/yangilash',
+    descriptionRu: 'Управление лаб. заказами',
+  },
+  {
+    code: 'patient_image.view',
+    category: 'clinical',
+    descriptionUz: "Bemor rasmlarini (X-ray va boshqa) ko'rish",
+    descriptionRu: 'Просмотр снимков пациента',
+  },
+  {
+    code: 'patient_image.upload',
+    category: 'clinical',
+    descriptionUz: 'Bemor rasmlarini yuklash va boshqarish',
+    descriptionRu: 'Загрузка снимков пациента',
+  },
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number]['code'];

@@ -40,6 +40,21 @@ import type {
   ServiceWithPrices,
 } from './types-m3.ts';
 import type {
+  ConsentForm,
+  ConsentTemplate,
+  ConsentType,
+  CreateLabOrderInput,
+  CreatePrescriptionInput,
+  CreateTemplateInput,
+  LabOrder,
+  LabOrderStatus,
+  LabOrderType,
+  PatientImage,
+  PatientImageType,
+  Prescription,
+  SignFormInput,
+} from './types-m5.ts';
+import type {
   AllergyEntry,
   MedicalRecord,
   Patient,
@@ -313,6 +328,82 @@ export const createEndpoints = (api: ApiClient) => ({
       api.get<ToothChartWithStates | null>(`/api/patients/${patientId}/tooth-charts/latest`),
     createToothChart: (body: CreateToothChartInput) =>
       api.post<ToothChartWithStates>('/api/tooth-charts', body),
+  },
+
+  prescriptions: {
+    list: (patientId?: string) => {
+      const qs = patientId ? `?patientId=${patientId}` : '';
+      return api.get<Prescription[]>(`/api/prescriptions${qs}`);
+    },
+    get: (id: string) => api.get<Prescription>(`/api/prescriptions/${id}`),
+    create: (body: CreatePrescriptionInput) => api.post<Prescription>('/api/prescriptions', body),
+    update: (id: string, body: Partial<CreatePrescriptionInput>) =>
+      api.patch<Prescription>(`/api/prescriptions/${id}`, body),
+    remove: (id: string) => api.delete<{ deleted: true }>(`/api/prescriptions/${id}`),
+  },
+
+  consent: {
+    listTemplates: (type?: ConsentType, activeOnly = true) => {
+      const params = new URLSearchParams();
+      if (type) params.set('type', type);
+      if (!activeOnly) params.set('active', 'false');
+      const qs = params.toString();
+      return api.get<ConsentTemplate[]>(`/api/consent/templates${qs ? `?${qs}` : ''}`);
+    },
+    createTemplate: (body: CreateTemplateInput) =>
+      api.post<ConsentTemplate>('/api/consent/templates', body),
+    updateTemplate: (id: string, body: Partial<CreateTemplateInput>) =>
+      api.patch<ConsentTemplate>(`/api/consent/templates/${id}`, body),
+    listForms: (patientId?: string) => {
+      const qs = patientId ? `?patientId=${patientId}` : '';
+      return api.get<ConsentForm[]>(`/api/consent/forms${qs}`);
+    },
+    signForm: (body: SignFormInput) => api.post<ConsentForm>('/api/consent/forms', body),
+  },
+
+  labOrders: {
+    list: (query?: { patientId?: string; status?: LabOrderStatus }) => {
+      const params = new URLSearchParams();
+      if (query?.patientId) params.set('patientId', query.patientId);
+      if (query?.status) params.set('status', query.status);
+      const qs = params.toString();
+      return api.get<LabOrder[]>(`/api/lab-orders${qs ? `?${qs}` : ''}`);
+    },
+    get: (id: string) => api.get<LabOrder>(`/api/lab-orders/${id}`),
+    create: (body: CreateLabOrderInput) => api.post<LabOrder>('/api/lab-orders', body),
+    update: (
+      id: string,
+      body: {
+        status?: LabOrderStatus;
+        labName?: string;
+        orderType?: LabOrderType;
+        expectedDate?: string | null;
+        deliveredDate?: string | null;
+        cost?: number | null;
+        notes?: string | null;
+      },
+    ) => api.patch<LabOrder>(`/api/lab-orders/${id}`, body),
+  },
+
+  patientImages: {
+    list: (patientId: string) => api.get<PatientImage[]>(`/api/patients/${patientId}/images`),
+    get: (id: string) => api.get<PatientImage>(`/api/patient-images/${id}`),
+    upload: async (form: FormData) => {
+      // Special: multipart upload bypasses JSON helpers
+      const res = await api.upload<PatientImage>('/api/patient-images', form);
+      return res;
+    },
+    update: (
+      id: string,
+      body: {
+        type?: PatientImageType;
+        title?: string | null;
+        description?: string | null;
+        toothNumbers?: number[] | null;
+        takenDate?: string | null;
+      },
+    ) => api.patch<PatientImage>(`/api/patient-images/${id}`, body),
+    remove: (id: string) => api.delete<{ deleted: true }>(`/api/patient-images/${id}`),
   },
 });
 
