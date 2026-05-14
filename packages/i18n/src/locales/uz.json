@@ -48,6 +48,21 @@
       "title": "Workspace tanlash",
       "no_workspaces": "Sizda hech qanday klinika yo'q. Birinchi qadam — klinikani ro'yxatdan o'tkazing.",
       "all_branches": "Barcha filiallar"
+    },
+    "forgot": {
+      "title": "Parolni qaytarish",
+      "submit": "Reset kod yuborish",
+      "sent": "Reset kod yuborildi (agar email mavjud bo'lsa).",
+      "mock_otp_notice": "Hozir kod faqat server console'da log qilinadi. SMS/email keyingi bosqichda.",
+      "back_to_login": "Kirish sahifasiga qaytish"
+    },
+    "reset": {
+      "title": "Yangi parol o'rnatish",
+      "code": "Reset kod",
+      "code_hint": "Console log yoki SMS'dan olingan 6-raqamli kod",
+      "new_password": "Yangi parol",
+      "submit": "Parolni yangilash",
+      "invalid": "Kod noto'g'ri yoki muddati tugagan"
     }
   },
   "layout": {
@@ -85,5 +100,40 @@
     "phone": "Telefon",
     "empty": "Hali filiallar yo'q. Birinchi filialni qo'shing.",
     "confirm_delete": "Filialni o'chirishni tasdiqlaysizmi?"
+  },
+  "tenant_settings": {
+    "name": "Klinika nomi",
+    "slug": "Slug (URL)",
+    "default_language": "Asosiy til",
+    "readonly_notice": "Sizda klinika sozlamalarini o'zgartirish ruxsati yo'q (faqat ko'rish)"
+  },
+  "users": {
+    "invite": "Xodim taklif qilish",
+    "full_name": "To'liq ism",
+    "email": "Email",
+    "phone": "Telefon",
+    "role": "Rol",
+    "branch": "Filial",
+    "all_branches": "Barcha filiallar",
+    "branch_hint": "Tanlamasangiz — barcha filiallarga (tenant-wide)",
+    "status": "Status",
+    "active": "Faol",
+    "inactive": "Faol emas",
+    "empty": "Hali xodimlar yo'q. Birinchi xodimni taklif qiling.",
+    "send_invite": "Taklif yuborish",
+    "confirm_remove": "Xodimni klinikadan chiqarishni tasdiqlaysizmi?",
+    "invited_successfully": "Xodim muvaffaqiyatli taklif qilindi!",
+    "temp_password_notice": "Vaqtinchalik parol (xodimga yuboring — production'da SMS/email orqali yuboriladi):"
+  },
+  "roles": {
+    "create": "Yangi rol",
+    "edit": "Rolni tahrirlash",
+    "description": "Tavsif",
+    "type": "Turi",
+    "system": "Tizim",
+    "custom": "Maxsus",
+    "permissions": "Ruxsatlar",
+    "selected_count": "{{count}} ta tanlangan",
+    "confirm_delete": "Rolni o'chirishni tasdiqlaysizmi?"
   }
 }

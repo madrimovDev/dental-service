@@ -7,12 +7,23 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute.tsx';
 import { AppLayout } from '@/components/layout/AppLayout.tsx';
 import { i18n } from '@/lib/i18n.ts';
 import { queryClient } from '@/lib/query-client.ts';
+import { ForgotPasswordPage } from '@/pages/auth/forgot-password.page.tsx';
 import { LoginPage } from '@/pages/auth/login.page.tsx';
 import { RegisterTenantPage } from '@/pages/auth/register-tenant.page.tsx';
+import { ResetPasswordPage } from '@/pages/auth/reset-password.page.tsx';
 import { SelectWorkspacePage } from '@/pages/auth/select-workspace.page.tsx';
 import { DashboardPage } from '@/pages/dashboard.page.tsx';
 import { BranchesPage } from '@/pages/settings/branches.page.tsx';
+import { RolesSettingsPage } from '@/pages/settings/roles.page.tsx';
+import { TenantSettingsPage } from '@/pages/settings/tenant.page.tsx';
+import { UsersSettingsPage } from '@/pages/settings/users.page.tsx';
 import { mantineTheme } from '@/theme/mantine-theme.ts';
+
+const Protected = ({ children }: { children: React.ReactNode }) => (
+  <ProtectedRoute>
+    <AppLayout>{children}</AppLayout>
+  </ProtectedRoute>
+);
 
 export function App() {
   return (
@@ -25,27 +36,49 @@ export function App() {
               {/* Public */}
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register-tenant" element={<RegisterTenantPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
               <Route path="/select-workspace" element={<SelectWorkspacePage />} />
 
               {/* Protected */}
               <Route
                 path="/"
                 element={
-                  <ProtectedRoute>
-                    <AppLayout>
-                      <DashboardPage />
-                    </AppLayout>
-                  </ProtectedRoute>
+                  <Protected>
+                    <DashboardPage />
+                  </Protected>
+                }
+              />
+              <Route
+                path="/settings/tenant"
+                element={
+                  <Protected>
+                    <TenantSettingsPage />
+                  </Protected>
                 }
               />
               <Route
                 path="/settings/branches"
                 element={
-                  <ProtectedRoute>
-                    <AppLayout>
-                      <BranchesPage />
-                    </AppLayout>
-                  </ProtectedRoute>
+                  <Protected>
+                    <BranchesPage />
+                  </Protected>
+                }
+              />
+              <Route
+                path="/settings/roles"
+                element={
+                  <Protected>
+                    <RolesSettingsPage />
+                  </Protected>
+                }
+              />
+              <Route
+                path="/settings/users"
+                element={
+                  <Protected>
+                    <UsersSettingsPage />
+                  </Protected>
                 }
               />
 
