@@ -11,7 +11,7 @@ import {
   UnstyledButton,
 } from '@mantine/core';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/api.ts';
@@ -30,7 +30,10 @@ type WorkspaceOption = {
 export function SelectWorkspacePage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { accessToken, refreshToken, setTokens, setContext } = useAuthStore();
+  const { accessToken, setTokens, setContext } = useAuthStore();
+
+  // Auto-select faqat bir marta ishlasin (loop oldini olish).
+  const autoSelectedRef = useRef(false);
 
   const meQuery = useQuery({
     queryKey: ['auth', 'me'],
@@ -56,19 +59,26 @@ export function SelectWorkspacePage() {
       setContext(payload.atid, payload.abid, payload.perms);
       navigate('/');
     },
+    onError: () => {
+      // Auto-select fail bo'lsa, foydalanuvchi qo'lda tanlay olsin
+      autoSelectedRef.current = false;
+    },
   });
 
-  // Auto-select if single workspace
+  // Auto-select if single workspace — useRef bilan faqat 1 marta
+  // biome-ignore lint/correctness/useExhaustiveDependencies: switchMut stable mutate ishlatamiz
   useEffect(() => {
-    if (!meQuery.data || !refreshToken) return;
+    if (autoSelectedRef.current) return;
+    if (!meQuery.data) return;
     const options = collectOptions(meQuery.data);
     if (options.length === 1 && options[0]) {
+      autoSelectedRef.current = true;
       switchMut.mutate({
         tenantId: options[0].tenantId,
         branchId: options[0].branchId ?? undefined,
       });
     }
-  }, [meQuery.data, refreshToken, switchMut]);
+  }, [meQuery.data]);
 
   if (meQuery.isLoading) {
     return (
