@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 
 export type AuthUser = {
   id: string;
-  email: string;
+  phone: string;
   fullName: string | null;
   lang: string;
 };

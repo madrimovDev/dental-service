@@ -10,7 +10,7 @@ export function DashboardPage() {
   return (
     <Container size="lg">
       <Stack gap="lg">
-        <Title order={2}>{t('dashboard.welcome', { name: user?.fullName ?? user?.email })}</Title>
+        <Title order={2}>{t('dashboard.welcome', { name: user?.fullName ?? user?.phone })}</Title>
 
         <Grid>
           <Grid.Col span={{ base: 12, sm: 6, md: 4 }}>

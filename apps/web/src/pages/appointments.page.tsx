@@ -136,7 +136,7 @@ export function AppointmentsPage() {
   const doctorOptions =
     users.data
       ?.filter((a) => a.roleName.toLowerCase().includes('doctor') || a.isActive)
-      .map((a) => ({ value: a.userId, label: a.userFullName ?? a.userEmail })) ?? [];
+      .map((a) => ({ value: a.userId, label: a.userFullName ?? a.userPhone })) ?? [];
   const uniqueDoctors = Array.from(new Map(doctorOptions.map((d) => [d.value, d])).values());
 
   return (
@@ -186,7 +186,7 @@ export function AppointmentsPage() {
                       </Group>
                       <Text size="sm">{patient?.fullName ?? '—'}</Text>
                       <Text size="xs" c="dimmed">
-                        {doctor?.userFullName ?? doctor?.userEmail ?? '—'}
+                        {doctor?.userFullName ?? doctor?.userPhone ?? '—'}
                       </Text>
                     </Stack>
                     {hasPermission('appointment.cancel') &&

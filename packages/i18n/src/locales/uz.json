@@ -30,7 +30,7 @@
   "auth": {
     "login": {
       "title": "Kirish",
-      "identifier": "Email yoki telefon",
+      "phone": "Telefon raqami",
       "password": "Parol",
       "submit": "Kirish",
       "forgot": "Parolni unutdingizmi?",
@@ -40,8 +40,7 @@
       "title": "Klinikani ro'yxatdan o'tkazish",
       "clinic_name": "Klinika nomi",
       "owner_full_name": "Egasining to'liq ismi",
-      "email": "Email",
-      "phone": "Telefon",
+      "phone": "Telefon raqami",
       "password": "Parol",
       "password_hint": "Kamida 12 belgi",
       "language": "Asosiy til",
@@ -58,8 +57,8 @@
     "forgot": {
       "title": "Parolni qaytarish",
       "submit": "Reset kod yuborish",
-      "sent": "Reset kod yuborildi (agar email mavjud bo'lsa).",
-      "mock_otp_notice": "Hozir kod faqat server console'da log qilinadi. SMS/email keyingi bosqichda.",
+      "sent": "Reset kod yuborildi (agar telefon mavjud bo'lsa).",
+      "mock_otp_notice": "Hozir kod faqat server console'da log qilinadi. SMS keyingi bosqichda.",
       "back_to_login": "Kirish sahifasiga qaytish"
     },
     "reset": {
@@ -119,7 +118,6 @@
   "users": {
     "invite": "Xodim qo'shish",
     "full_name": "To'liq ism",
-    "email": "Email",
     "phone": "Telefon",
     "role": "Rol",
     "branch": "Filial",
@@ -132,8 +130,8 @@
     "send_invite": "Qo'shish va parol olish",
     "confirm_remove": "Xodimni klinikadan chiqarishni tasdiqlaysizmi?",
     "invited_successfully": "Xodim muvaffaqiyatli qo'shildi! Parolni quyida ko'ring va xodimga bering.",
-    "temp_password_notice": "⚠️ Bu parol faqat shu yerda ko'rsatiladi. Xodimga (Telegram, qo'lda yoki boshqa kanal orqali) yuboring va kopiyalab oling. Kelajakda SMS/email orqali avtomatik yuboriladi.",
-    "invite_hint": "Bu yerda xodim akkaunti darhol yaratiladi. Email yuborilmaydi — vaqtinchalik parol sizga ko'rsatiladi va xodimga qo'lda yuborasiz.",
+    "temp_password_notice": "⚠️ Bu parol faqat shu yerda ko'rsatiladi. Xodimga (Telegram, qo'lda yoki boshqa kanal orqali) yuboring va kopiyalab oling. Kelajakda SMS orqali avtomatik yuboriladi.",
+    "invite_hint": "Bu yerda xodim akkaunti darhol yaratiladi. SMS hozircha yuborilmaydi — vaqtinchalik parol sizga ko'rsatiladi va xodimga qo'lda yuborasiz.",
     "reset_password": "Parolni qayta tiklash",
     "reset_password_confirm": "Xodim parolini qayta tiklash? Yangi vaqtinchalik parol generatsiya qilinadi va xodim barcha qurilmalardan chiqariladi.",
     "reset_password_success": "Yangi parol generatsiya qilindi. Xodimga bering — eski parol endi ishlamaydi.",

@@ -22,12 +22,7 @@ import { api } from '@/lib/api.ts';
 
 const schema = z.object({
   tenantName: z.string().min(2, 'Kamida 2 belgi').max(120),
-  ownerEmail: z.email("Noto'g'ri email"),
-  ownerPhone: z
-    .string()
-    .regex(/^\+?\d{9,15}$/, "Noto'g'ri telefon")
-    .optional()
-    .or(z.literal('')),
+  ownerPhone: z.string().regex(/^\+?\d{9,15}$/, "Telefon raqami noto'g'ri formatda"),
   ownerFullName: z.string().min(2, 'Kamida 2 belgi').max(120),
   ownerPassword: z.string().min(12, 'Kamida 12 belgi'),
   defaultLanguage: z.enum(['uz', 'ru']),
@@ -43,7 +38,6 @@ export function RegisterTenantPage() {
   const form = useForm<FormValues>({
     initialValues: {
       tenantName: '',
-      ownerEmail: '',
       ownerPhone: '',
       ownerFullName: '',
       ownerPassword: '',
@@ -56,8 +50,7 @@ export function RegisterTenantPage() {
     mutationFn: (values: FormValues) =>
       api.auth.registerTenant({
         tenantName: values.tenantName,
-        ownerEmail: values.ownerEmail,
-        ownerPhone: values.ownerPhone || undefined,
+        ownerPhone: values.ownerPhone,
         ownerFullName: values.ownerFullName,
         ownerPassword: values.ownerPassword,
         defaultLanguage: values.defaultLanguage,
@@ -67,7 +60,7 @@ export function RegisterTenantPage() {
     },
     onError: (err: ApiError) => {
       if (err.code === 'auth.email_or_phone_taken') {
-        setError("Bu email yoki telefon allaqachon ro'yxatdan o'tgan");
+        setError("Bu telefon raqami allaqachon ro'yxatdan o'tgan");
       } else {
         setError(err.message);
       }
@@ -108,15 +101,10 @@ export function RegisterTenantPage() {
               {...form.getInputProps('ownerFullName')}
             />
             <TextInput
-              label={t('auth.register.email')}
-              type="email"
-              placeholder="owner@klinika.uz"
-              required
-              {...form.getInputProps('ownerEmail')}
-            />
-            <TextInput
               label={t('auth.register.phone')}
-              placeholder="+998901234567 (ixtiyoriy)"
+              placeholder="+998 90 123 45 67"
+              autoComplete="tel"
+              required
               {...form.getInputProps('ownerPhone')}
             />
             <PasswordInput

@@ -3,21 +3,21 @@ import { z } from 'zod';
 /**
  * Auth endpoint Zod schemalar.
  * Frontend ham shu schemalardan validatsiya qiladi (api-client paketda re-export).
+ *
+ * ⚠️ M-phone: Identity faqat telefon raqami orqali. Email olib tashlandi.
+ * Phone formati: +998XXXXXXXXX (9-15 raqam, ixtiyoriy + bilan).
  */
 
-const emailOrPhone = z
-  .union([z.email(), z.string().regex(/^\+?\d{9,15}$/)])
-  .describe('Email yoki telefon raqami (+998 ... yoki email)');
+const phone = z
+  .string()
+  .regex(/^\+?\d{9,15}$/)
+  .describe('Telefon raqami (+998 ... yoki 998... format)');
 
 const password = z.string().min(12).max(128);
 
 export const registerTenantSchema = z.object({
   tenantName: z.string().min(2).max(120),
-  ownerEmail: z.email(),
-  ownerPhone: z
-    .string()
-    .regex(/^\+?\d{9,15}$/)
-    .optional(),
+  ownerPhone: phone,
   ownerFullName: z.string().min(2).max(120),
   ownerPassword: password,
   defaultLanguage: z.enum(['uz', 'ru']).default('uz'),
@@ -25,7 +25,7 @@ export const registerTenantSchema = z.object({
 export type RegisterTenantInput = z.infer<typeof registerTenantSchema>;
 
 export const loginSchema = z.object({
-  identifier: emailOrPhone,
+  phone,
   password,
 });
 export type LoginInput = z.infer<typeof loginSchema>;
@@ -45,7 +45,7 @@ export const switchWorkspaceSchema = z.object({
 export type SwitchWorkspaceInput = z.infer<typeof switchWorkspaceSchema>;
 
 export const passwordResetRequestSchema = z.object({
-  identifier: emailOrPhone,
+  phone,
 });
 export type PasswordResetRequestInput = z.infer<typeof passwordResetRequestSchema>;
 

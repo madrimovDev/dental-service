@@ -146,13 +146,12 @@ export const createAuthService = (deps: AuthServiceDeps) => {
       const [user] = await tx
         .insert(users)
         .values({
-          email: input.ownerEmail,
-          phone: input.ownerPhone ?? null,
+          phone: input.ownerPhone,
           passwordHash,
           fullName: input.ownerFullName,
           preferredLanguage: input.defaultLanguage,
         })
-        .returning({ id: users.id, email: users.email });
+        .returning({ id: users.id, phone: users.phone });
 
       if (!user) throw new Error('User insert failed');
 
@@ -206,16 +205,10 @@ export const createAuthService = (deps: AuthServiceDeps) => {
   }
 
   async function login(input: LoginInput) {
-    const isEmail = input.identifier.includes('@');
     const [user] = await db
       .select()
       .from(users)
-      .where(
-        and(
-          isEmail ? eq(users.email, input.identifier) : eq(users.phone, input.identifier),
-          isNull(users.deletedAt),
-        ),
-      );
+      .where(and(eq(users.phone, input.phone), isNull(users.deletedAt)));
 
     if (!user) return null;
 
@@ -241,7 +234,7 @@ export const createAuthService = (deps: AuthServiceDeps) => {
     return {
       user: {
         id: user.id,
-        email: user.email,
+        phone: user.phone,
         fullName: user.fullName,
         lang: user.preferredLanguage,
       },
@@ -541,11 +534,7 @@ export const createAuthService = (deps: AuthServiceDeps) => {
   }
 
   async function requestPasswordReset(input: PasswordResetRequestInput) {
-    const isEmail = input.identifier.includes('@');
-    const [user] = await db
-      .select()
-      .from(users)
-      .where(isEmail ? eq(users.email, input.identifier) : eq(users.phone, input.identifier));
+    const [user] = await db.select().from(users).where(eq(users.phone, input.phone));
 
     // Security: invalid user uchun ham success qaytaramiz (enumeration oldini olish)
     if (!user) return { sent: true };
@@ -562,7 +551,7 @@ export const createAuthService = (deps: AuthServiceDeps) => {
 
     // MOCK OTP — Phase 1 da SMS yo'q, kodni log'ga yozamiz (M3 da Eskiz)
     logger.warn(
-      { userId: user.id, email: user.email, code },
+      { userId: user.id, phone: user.phone, code },
       `🔐 Mock OTP — bu console'da production'da SMS bilan yuboriladi`,
     );
 

@@ -4,7 +4,7 @@
  */
 
 export type LoginResponse = {
-  user: { id: string; email: string; fullName: string | null; lang: string };
+  user: { id: string; phone: string; fullName: string | null; lang: string };
   accessToken: string;
   refreshToken: string;
   accessExpiresAt: string;
@@ -95,8 +95,8 @@ export type PermissionDef = {
 export type UserAssignment = {
   assignmentId: string;
   userId: string;
-  userEmail: string;
-  userPhone: string | null;
+  userEmail: string | null;
+  userPhone: string;
   userFullName: string | null;
   branchId: string | null;
   branchName: string | null;

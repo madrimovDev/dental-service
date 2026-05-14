@@ -43,6 +43,13 @@
       "when": 1778760750439,
       "tag": "0005_dear_giant_girl",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1778764133859,
+      "tag": "0006_outstanding_puff_adder",
+      "breakpoints": true
     }
   ]
 }

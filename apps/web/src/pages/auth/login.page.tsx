@@ -21,7 +21,7 @@ import { api } from '@/lib/api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
 
 const schema = z.object({
-  identifier: z.string().min(1, 'Email yoki telefon kerak'),
+  phone: z.string().regex(/^\+?\d{9,15}$/, "Telefon raqami noto'g'ri formatda"),
   password: z.string().min(1, 'Parol kerak'),
 });
 
@@ -32,7 +32,7 @@ export function LoginPage() {
   const { setTokens, setUser } = useAuthStore();
 
   const form = useForm({
-    initialValues: { identifier: '', password: '' },
+    initialValues: { phone: '', password: '' },
     validate: zodResolver(schema),
   });
 
@@ -46,7 +46,7 @@ export function LoginPage() {
     },
     onError: (err: ApiError) => {
       setError(
-        err.code === 'auth.invalid_credentials' ? "Email yoki parol noto'g'ri" : err.message,
+        err.code === 'auth.invalid_credentials' ? "Telefon yoki parol noto'g'ri" : err.message,
       );
     },
   });
@@ -73,11 +73,11 @@ export function LoginPage() {
             )}
 
             <TextInput
-              label={t('auth.login.identifier')}
-              placeholder="email@example.com yoki +998..."
-              autoComplete="username"
+              label={t('auth.login.phone')}
+              placeholder="+998 90 123 45 67"
+              autoComplete="tel"
               required
-              {...form.getInputProps('identifier')}
+              {...form.getInputProps('phone')}
             />
             <PasswordInput
               label={t('auth.login.password')}

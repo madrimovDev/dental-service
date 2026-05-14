@@ -8,18 +8,18 @@ import { z } from 'zod';
 import { api } from '@/lib/api.ts';
 
 const schema = z.object({
-  identifier: z.string().min(1),
+  phone: z.string().regex(/^\+?\d{9,15}$/, "Telefon raqami noto'g'ri formatda"),
 });
 
 export function ForgotPasswordPage() {
   const { t } = useTranslation();
   const form = useForm({
-    initialValues: { identifier: '' },
+    initialValues: { phone: '' },
     validate: zodResolver(schema),
   });
 
   const mut = useMutation({
-    mutationFn: (v: { identifier: string }) => api.auth.requestPasswordReset(v.identifier),
+    mutationFn: (v: { phone: string }) => api.auth.requestPasswordReset(v.phone),
   });
 
   return (
@@ -41,10 +41,11 @@ export function ForgotPasswordPage() {
             )}
 
             <TextInput
-              label={t('auth.login.identifier')}
-              placeholder="email@example.com yoki +998..."
+              label={t('auth.login.phone')}
+              placeholder="+998 90 123 45 67"
+              autoComplete="tel"
               required
-              {...form.getInputProps('identifier')}
+              {...form.getInputProps('phone')}
             />
 
             <Button type="submit" loading={mut.isPending} fullWidth>

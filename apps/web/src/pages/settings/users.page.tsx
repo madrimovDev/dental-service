@@ -27,12 +27,7 @@ import { api } from '@/lib/api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
 
 const schema = z.object({
-  email: z.email(),
-  phone: z
-    .string()
-    .regex(/^\+?\d{9,15}$/)
-    .optional()
-    .or(z.literal('')),
+  phone: z.string().regex(/^\+?\d{9,15}$/, "Telefon raqami noto'g'ri formatda"),
   fullName: z.string().min(2).max(120),
   roleId: z.string().min(1),
   branchId: z.string().optional(),
@@ -45,7 +40,7 @@ export function UsersSettingsPage() {
   const qc = useQueryClient();
   const [opened, { open, close }] = useDisclosure(false);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
-  const [resetResult, setResetResult] = useState<{ email: string; tempPassword: string } | null>(
+  const [resetResult, setResetResult] = useState<{ phone: string; tempPassword: string } | null>(
     null,
   );
 
@@ -57,15 +52,14 @@ export function UsersSettingsPage() {
   const branches = useQuery({ queryKey: ['branches'], queryFn: api.branches.list });
 
   const form = useForm<FormValues>({
-    initialValues: { email: '', phone: '', fullName: '', roleId: '', branchId: '' },
+    initialValues: { phone: '', fullName: '', roleId: '', branchId: '' },
     validate: zodResolver(schema),
   });
 
   const inviteMut = useMutation({
     mutationFn: (v: FormValues) =>
       api.users.invite({
-        email: v.email,
-        phone: v.phone || undefined,
+        phone: v.phone,
         fullName: v.fullName,
         roleId: v.roleId,
         branchId: v.branchId || undefined,
@@ -89,7 +83,7 @@ export function UsersSettingsPage() {
   const resetPasswordMut = useMutation({
     mutationFn: api.users.resetPassword,
     onSuccess: (data) => {
-      setResetResult({ email: data.email, tempPassword: data.tempPassword });
+      setResetResult({ phone: data.phone, tempPassword: data.tempPassword });
     },
     onError: (err) => {
       notifications.show({
@@ -125,7 +119,7 @@ export function UsersSettingsPage() {
             <Table.Thead>
               <Table.Tr>
                 <Table.Th>{t('users.full_name')}</Table.Th>
-                <Table.Th>{t('users.email')}</Table.Th>
+                <Table.Th>{t('users.phone')}</Table.Th>
                 <Table.Th>{t('users.role')}</Table.Th>
                 <Table.Th>{t('users.branch')}</Table.Th>
                 <Table.Th>{t('users.status')}</Table.Th>
@@ -136,7 +130,7 @@ export function UsersSettingsPage() {
               {assignments.data.map((a) => (
                 <Table.Tr key={a.assignmentId}>
                   <Table.Td>{a.userFullName ?? '—'}</Table.Td>
-                  <Table.Td>{a.userEmail}</Table.Td>
+                  <Table.Td>{a.userPhone}</Table.Td>
                   <Table.Td>{a.roleName}</Table.Td>
                   <Table.Td>{a.branchName ?? t('users.all_branches')}</Table.Td>
                   <Table.Td>
@@ -209,14 +203,10 @@ export function UsersSettingsPage() {
                 {...form.getInputProps('fullName')}
               />
               <TextInput
-                label={t('users.email')}
-                type="email"
-                required
-                {...form.getInputProps('email')}
-              />
-              <TextInput
                 label={t('users.phone')}
-                placeholder="+998... (ixtiyoriy)"
+                placeholder="+998 90 123 45 67"
+                autoComplete="tel"
+                required
                 {...form.getInputProps('phone')}
               />
               <Select
@@ -258,7 +248,7 @@ export function UsersSettingsPage() {
             <Alert color="teal" variant="light">
               <Text fw={600}>{t('users.reset_password_success')}</Text>
               <Text size="sm" mt="xs">
-                {resetResult.email}
+                {resetResult.phone}
               </Text>
               <Text size="sm">{t('users.temp_password_notice')}</Text>
               <Text mt="sm" fw={700} ff="monospace" size="lg">

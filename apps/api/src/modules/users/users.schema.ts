@@ -1,11 +1,7 @@
 import { z } from 'zod';
 
 export const inviteUserSchema = z.object({
-  email: z.email(),
-  phone: z
-    .string()
-    .regex(/^\+?\d{9,15}$/)
-    .optional(),
+  phone: z.string().regex(/^\+?\d{9,15}$/),
   fullName: z.string().min(2).max(120),
   roleId: z.uuid(),
   branchId: z.uuid().optional(),

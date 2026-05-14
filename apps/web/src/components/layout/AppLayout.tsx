@@ -99,7 +99,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
                 </ActionIcon>
               </Menu.Target>
               <Menu.Dropdown>
-                <Menu.Label>{user?.fullName ?? user?.email}</Menu.Label>
+                <Menu.Label>{user?.fullName ?? user?.phone}</Menu.Label>
                 <Menu.Item
                   leftSection={<IconUser size={16} />}
                   onClick={() => navigate('/profile')}

@@ -67,14 +67,13 @@ export const createEndpoints = (api: ApiClient) => ({
   auth: {
     registerTenant: (body: {
       tenantName: string;
-      ownerEmail: string;
-      ownerPhone?: string;
+      ownerPhone: string;
       ownerFullName: string;
       ownerPassword: string;
       defaultLanguage?: 'uz' | 'ru';
     }) => api.post<RegisterTenantResponse>('/api/auth/register-tenant', body),
 
-    login: (body: { identifier: string; password: string }) =>
+    login: (body: { phone: string; password: string }) =>
       api.post<LoginResponse>('/api/auth/login', body),
 
     refresh: (refreshToken: string) =>
@@ -88,8 +87,8 @@ export const createEndpoints = (api: ApiClient) => ({
     switchWorkspace: (body: { tenantId: string; branchId?: string; refreshToken: string }) =>
       api.post<SwitchWorkspaceResponse>('/api/auth/switch-workspace', body),
 
-    requestPasswordReset: (identifier: string) =>
-      api.post<{ sent: true }>('/api/auth/password-reset-request', { identifier }),
+    requestPasswordReset: (phone: string) =>
+      api.post<{ sent: true }>('/api/auth/password-reset-request', { phone }),
 
     resetPassword: (token: string, newPassword: string) =>
       api.post<{ ok: true }>('/api/auth/password-reset', { token, newPassword }),
@@ -136,17 +135,12 @@ export const createEndpoints = (api: ApiClient) => ({
 
   users: {
     listAssignments: () => api.get<UserAssignment[]>('/api/users/assignments'),
-    invite: (body: {
-      email: string;
-      phone?: string;
-      fullName: string;
-      roleId: string;
-      branchId?: string;
-    }) => api.post<InviteUserResponse>('/api/users/invite', body),
+    invite: (body: { phone: string; fullName: string; roleId: string; branchId?: string }) =>
+      api.post<InviteUserResponse>('/api/users/invite', body),
     removeAssignment: (assignmentId: string) =>
       api.delete<{ deleted: true }>(`/api/users/assignments/${assignmentId}`),
     resetPassword: (userId: string) =>
-      api.post<{ ok: true; userId: string; email: string; tempPassword: string }>(
+      api.post<{ ok: true; userId: string; phone: string; tempPassword: string }>(
         `/api/users/${userId}/reset-password`,
       ),
   },

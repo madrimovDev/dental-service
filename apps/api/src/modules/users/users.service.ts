@@ -67,7 +67,7 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
       // Tenant context'ni saqlash (transaction ichida)
       await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);
 
-      let [user] = await tx.select().from(users).where(eq(users.email, input.email));
+      let [user] = await tx.select().from(users).where(eq(users.phone, input.phone));
       let tempPassword: string | null = null;
 
       if (!user) {
@@ -78,8 +78,7 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
         const [created] = await tx
           .insert(users)
           .values({
-            email: input.email,
-            phone: input.phone ?? null,
+            phone: input.phone,
             passwordHash,
             fullName: input.fullName,
           })
@@ -88,10 +87,10 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
         if (!created) return { ok: false as const, code: 'user.create_failed' };
         user = created;
 
-        // Mock OTP — console'ga password log qilinadi (M3 da SMS/email)
+        // Mock OTP — console'ga password log qilinadi (M3 da SMS)
         logger.warn(
-          { userId: user.id, email: user.email, tempPassword },
-          `🔐 Mock invite — production'da bemorga SMS/email orqali parol yuboriladi`,
+          { userId: user.id, phone: user.phone, tempPassword },
+          `🔐 Mock invite — production'da SMS orqali parol yuboriladi`,
         );
       }
 
@@ -306,18 +305,18 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
         action: 'password_reset_by_admin',
         resourceType: 'user',
         resourceId: targetUserId,
-        after: { email: target.email, by: actor.id },
+        after: { phone: target.phone, by: actor.id },
       });
 
       logger.warn(
-        { adminId: actor.id, userId: targetUserId, email: target.email, newPassword },
-        `🔐 Admin reset password — production'da SMS/email orqali yuboriladi`,
+        { adminId: actor.id, userId: targetUserId, phone: target.phone, newPassword },
+        `🔐 Admin reset password — production'da SMS orqali yuboriladi`,
       );
 
       return {
         ok: true as const,
         userId: targetUserId,
-        email: target.email,
+        phone: target.phone,
         tempPassword: newPassword,
       };
     });

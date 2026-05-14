@@ -85,10 +85,10 @@ export function ProfilePage() {
         <Paper withBorder p="lg" radius="md">
           <Stack gap="md">
             <Group>
-              <Text fw={600}>{user?.fullName ?? user?.email}</Text>
+              <Text fw={600}>{user?.fullName ?? user?.phone}</Text>
             </Group>
             <Text size="sm" c="dimmed">
-              {user?.email}
+              {user?.phone}
             </Text>
           </Stack>
         </Paper>

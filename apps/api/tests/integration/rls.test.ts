@@ -43,7 +43,7 @@ describe('RLS — Multi-tenant isolation', () => {
     const [userA] = await db
       .insert(users)
       .values({
-        email: 'owner-a@test.local',
+        phone: '+998900000001',
         passwordHash: 'fake',
         fullName: 'Owner A',
       })
@@ -52,7 +52,7 @@ describe('RLS — Multi-tenant isolation', () => {
     const [userB] = await db
       .insert(users)
       .values({
-        email: 'owner-b@test.local',
+        phone: '+998900000002',
         passwordHash: 'fake',
         fullName: 'Owner B',
       })
