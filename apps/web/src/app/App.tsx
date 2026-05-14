@@ -7,17 +7,21 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute.tsx';
 import { AppLayout } from '@/components/layout/AppLayout.tsx';
 import { i18n } from '@/lib/i18n.ts';
 import { queryClient } from '@/lib/query-client.ts';
+import { AppointmentsPage } from '@/pages/appointments.page.tsx';
 import { ForgotPasswordPage } from '@/pages/auth/forgot-password.page.tsx';
 import { LoginPage } from '@/pages/auth/login.page.tsx';
 import { RegisterTenantPage } from '@/pages/auth/register-tenant.page.tsx';
 import { ResetPasswordPage } from '@/pages/auth/reset-password.page.tsx';
 import { SelectWorkspacePage } from '@/pages/auth/select-workspace.page.tsx';
+import { CashierPage } from '@/pages/cashier.page.tsx';
 import { DashboardPage } from '@/pages/dashboard.page.tsx';
 import { PatientDetailPage } from '@/pages/patients/detail.page.tsx';
 import { PatientsListPage } from '@/pages/patients/list.page.tsx';
 import { NewPatientPage } from '@/pages/patients/new.page.tsx';
+import { QueuePage } from '@/pages/queue.page.tsx';
 import { BranchesPage } from '@/pages/settings/branches.page.tsx';
 import { RolesSettingsPage } from '@/pages/settings/roles.page.tsx';
+import { ServicesSettingsPage } from '@/pages/settings/services.page.tsx';
 import { TenantSettingsPage } from '@/pages/settings/tenant.page.tsx';
 import { UsersSettingsPage } from '@/pages/settings/users.page.tsx';
 import { mantineTheme } from '@/theme/mantine-theme.ts';
@@ -73,6 +77,38 @@ export function App() {
                 element={
                   <Protected>
                     <PatientDetailPage />
+                  </Protected>
+                }
+              />
+              <Route
+                path="/appointments"
+                element={
+                  <Protected>
+                    <AppointmentsPage />
+                  </Protected>
+                }
+              />
+              <Route
+                path="/queue"
+                element={
+                  <Protected>
+                    <QueuePage />
+                  </Protected>
+                }
+              />
+              <Route
+                path="/cashier"
+                element={
+                  <Protected>
+                    <CashierPage />
+                  </Protected>
+                }
+              />
+              <Route
+                path="/settings/services"
+                element={
+                  <Protected>
+                    <ServicesSettingsPage />
                   </Protected>
                 }
               />

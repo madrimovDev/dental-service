@@ -13,6 +13,19 @@ import type {
   UserAssignment,
 } from './types.ts';
 import type {
+  Appointment,
+  AppointmentStatus,
+  CashierListResponse,
+  CashierTransactionWithItems,
+  DailySummary,
+  PaymentMethod,
+  QueueStatus,
+  QueueTicket,
+  Service,
+  ServicePrice,
+  ServiceWithPrices,
+} from './types-m3.ts';
+import type {
   AllergyEntry,
   MedicalRecord,
   Patient,
@@ -138,6 +151,117 @@ export const createEndpoints = (api: ApiClient) => ({
         testResults?: TestResults;
       },
     ) => api.patch<MedicalRecord>(`/api/patients/${id}/medical`, body),
+  },
+
+  services: {
+    list: () => api.get<Service[]>('/api/services'),
+    get: (id: string) => api.get<ServiceWithPrices>(`/api/services/${id}`),
+    create: (body: {
+      code: string;
+      nameUz: string;
+      nameRu?: string;
+      category?: string;
+      durationMinutes?: number;
+      requiredRole?: string;
+      isActive?: boolean;
+      initialPrice?: number;
+      initialBranchId?: string;
+    }) => api.post<Service>('/api/services', body),
+    update: (id: string, body: Partial<Service>) => api.patch<Service>(`/api/services/${id}`, body),
+    remove: (id: string) => api.delete<{ deleted: true }>(`/api/services/${id}`),
+    setPrice: (id: string, body: { branchId: string; price: number; currency?: string }) =>
+      api.post<ServicePrice>(`/api/services/${id}/prices`, body),
+  },
+
+  cashier: {
+    list: (query?: {
+      branchId?: string;
+      patientId?: string;
+      from?: string;
+      to?: string;
+      page?: number;
+      pageSize?: number;
+    }) => {
+      const params = new URLSearchParams();
+      if (query?.branchId) params.set('branchId', query.branchId);
+      if (query?.patientId) params.set('patientId', query.patientId);
+      if (query?.from) params.set('from', query.from);
+      if (query?.to) params.set('to', query.to);
+      if (query?.page) params.set('page', String(query.page));
+      if (query?.pageSize) params.set('pageSize', String(query.pageSize));
+      const qs = params.toString();
+      return api.get<CashierListResponse>(`/api/cashier/transactions${qs ? `?${qs}` : ''}`);
+    },
+    get: (id: string) => api.get<CashierTransactionWithItems>(`/api/cashier/transactions/${id}`),
+    create: (body: {
+      branchId: string;
+      patientId?: string;
+      items: Array<{
+        serviceId: string;
+        serviceName: string;
+        quantity: number;
+        unitPrice: number;
+      }>;
+      discount?: number;
+      paidAmount: number;
+      paymentMethod: PaymentMethod;
+      notes?: string;
+    }) => api.post<CashierTransactionWithItems>('/api/cashier/transactions', body),
+    refund: (id: string) =>
+      api.post<CashierTransactionWithItems>(`/api/cashier/transactions/${id}/refund`),
+    dailySummary: (branchId: string, date: string) =>
+      api.get<DailySummary>(`/api/cashier/daily-summary?branchId=${branchId}&date=${date}`),
+  },
+
+  appointments: {
+    list: (query?: {
+      branchId?: string;
+      doctorId?: string;
+      patientId?: string;
+      from?: string;
+      to?: string;
+    }) => {
+      const params = new URLSearchParams();
+      if (query?.branchId) params.set('branchId', query.branchId);
+      if (query?.doctorId) params.set('doctorId', query.doctorId);
+      if (query?.patientId) params.set('patientId', query.patientId);
+      if (query?.from) params.set('from', query.from);
+      if (query?.to) params.set('to', query.to);
+      const qs = params.toString();
+      return api.get<Appointment[]>(`/api/appointments${qs ? `?${qs}` : ''}`);
+    },
+    get: (id: string) => api.get<Appointment>(`/api/appointments/${id}`),
+    create: (body: {
+      branchId: string;
+      patientId: string;
+      doctorId: string;
+      assistantId?: string;
+      startTime: string;
+      endTime: string;
+      serviceIds?: string[];
+      notes?: string;
+    }) => api.post<Appointment>('/api/appointments', body),
+    update: (
+      id: string,
+      body: {
+        startTime?: string;
+        endTime?: string;
+        doctorId?: string;
+        status?: AppointmentStatus;
+        serviceIds?: string[];
+        notes?: string;
+      },
+    ) => api.patch<Appointment>(`/api/appointments/${id}`, body),
+    cancel: (id: string, reason?: string) =>
+      api.post<Appointment>(`/api/appointments/${id}/cancel`, { reason }),
+  },
+
+  queue: {
+    today: (branchId: string) => api.get<QueueTicket[]>(`/api/queue?branchId=${branchId}`),
+    create: (body: { branchId: string; patientId?: string; serviceId?: string }) =>
+      api.post<QueueTicket>('/api/queue', body),
+    updateStatus: (id: string, status: QueueStatus, doctorId?: string) =>
+      api.patch<QueueTicket>(`/api/queue/${id}/status`, { status, doctorId }),
   },
 });
 

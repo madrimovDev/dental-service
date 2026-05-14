@@ -2,7 +2,6 @@ import {
   ActionIcon,
   AppShell,
   Avatar,
-  Badge,
   Burger,
   Group,
   Menu,
@@ -15,12 +14,15 @@ import { useDisclosure } from '@mantine/hooks';
 import {
   IconBuilding,
   IconCalendar,
+  IconCash,
   IconChevronDown,
+  IconClipboardList,
   IconDashboard,
   IconLogout,
   IconRefresh,
   IconSettings,
   IconShieldLock,
+  IconStethoscope,
   IconUsers,
 } from '@tabler/icons-react';
 import type { ReactNode } from 'react';
@@ -129,12 +131,33 @@ export function AppLayout({ children }: { children: ReactNode }) {
               active={location.pathname.startsWith('/patients')}
             />
           )}
-          <NavLink
-            label={t('nav.appointments')}
-            leftSection={<IconCalendar size={20} />}
-            disabled
-            description={<Badge size="xs">M3</Badge>}
-          />
+          {hasPermission('appointment.view') && (
+            <NavLink
+              component={Link}
+              to="/appointments"
+              label={t('nav.appointments')}
+              leftSection={<IconCalendar size={20} />}
+              active={location.pathname.startsWith('/appointments')}
+            />
+          )}
+          {hasPermission('queue.view') && (
+            <NavLink
+              component={Link}
+              to="/queue"
+              label={t('nav.queue')}
+              leftSection={<IconClipboardList size={20} />}
+              active={location.pathname.startsWith('/queue')}
+            />
+          )}
+          {hasPermission('cashier.view') && (
+            <NavLink
+              component={Link}
+              to="/cashier"
+              label={t('nav.cashier')}
+              leftSection={<IconCash size={20} />}
+              active={location.pathname.startsWith('/cashier')}
+            />
+          )}
 
           <NavLink
             label={t('nav.settings')}
@@ -157,6 +180,15 @@ export function AppLayout({ children }: { children: ReactNode }) {
                 label={t('nav.branches')}
                 leftSection={<IconBuilding size={16} />}
                 active={location.pathname === '/settings/branches'}
+              />
+            )}
+            {hasPermission('service.view') && (
+              <NavLink
+                component={Link}
+                to="/settings/services"
+                label={t('nav.services')}
+                leftSection={<IconStethoscope size={16} />}
+                active={location.pathname === '/settings/services'}
               />
             )}
             {hasPermission('role.view') && (
