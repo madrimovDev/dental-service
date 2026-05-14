@@ -95,7 +95,7 @@
     "phase_1": "Loyiha bosqichi",
     "quick_start": "Tez boshlash",
     "tip_branches": "Sozlamalar → Filiallar — yangi filial qo'shing",
-    "tip_users": "Sozlamalar → Xodimlar — xodimlarni taklif qiling",
+    "tip_users": "Sozlamalar → Xodimlar — xodim akkaunti yarating",
     "tip_roles": "Sozlamalar → Rollar — xodimlar uchun rollarni sozlang"
   },
   "branches": {
@@ -115,7 +115,7 @@
     "readonly_notice": "Sizda klinika sozlamalarini o'zgartirish ruxsati yo'q (faqat ko'rish)"
   },
   "users": {
-    "invite": "Xodim taklif qilish",
+    "invite": "Xodim qo'shish",
     "full_name": "To'liq ism",
     "email": "Email",
     "phone": "Telefon",
@@ -126,11 +126,12 @@
     "status": "Status",
     "active": "Faol",
     "inactive": "Faol emas",
-    "empty": "Hali xodimlar yo'q. Birinchi xodimni taklif qiling.",
-    "send_invite": "Taklif yuborish",
+    "empty": "Hali xodimlar yo'q. Birinchi xodimni qo'shing.",
+    "send_invite": "Qo'shish va parol olish",
     "confirm_remove": "Xodimni klinikadan chiqarishni tasdiqlaysizmi?",
-    "invited_successfully": "Xodim muvaffaqiyatli taklif qilindi!",
-    "temp_password_notice": "Vaqtinchalik parol (xodimga yuboring — production'da SMS/email orqali yuboriladi):"
+    "invited_successfully": "Xodim muvaffaqiyatli qo'shildi! Parolni quyida ko'ring va xodimga bering.",
+    "temp_password_notice": "⚠️ Bu parol faqat shu yerda ko'rsatiladi. Xodimga (Telegram, qo'lda yoki boshqa kanal orqali) yuboring va kopiyalab oling. Kelajakda SMS/email orqali avtomatik yuboriladi.",
+    "invite_hint": "Bu yerda xodim akkaunti darhol yaratiladi. Email yuborilmaydi — vaqtinchalik parol sizga ko'rsatiladi va xodimga qo'lda yuborasiz."
   },
   "roles": {
     "create": "Yangi rol",

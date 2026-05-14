@@ -164,6 +164,9 @@ export function UsersSettingsPage() {
         ) : (
           <form onSubmit={form.onSubmit((values) => inviteMut.mutate(values))}>
             <Stack gap="md">
+              <Alert color="blue" variant="light">
+                <Text size="sm">{t('users.invite_hint')}</Text>
+              </Alert>
               <TextInput
                 label={t('users.full_name')}
                 required
