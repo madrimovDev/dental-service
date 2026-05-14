@@ -1,0 +1,11 @@
+{
+  "name": "@dental/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "echo 'Desktop app — to be implemented in M6'",
+    "build": "echo 'Desktop app — to be implemented in M6'",
+    "typecheck": "echo 'Skipped — desktop M6'"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "noEmit": true,
+    "lib": ["ESNext"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@dental/core": ["../../packages/core/src/index.ts"],
+      "@dental/core/*": ["../../packages/core/src/*"],
+      "@dental/db-schema": ["../../packages/db-schema/src/index.ts"],
+      "@dental/db-schema/*": ["../../packages/db-schema/src/*"]
+    }
+  },
+  "include": ["src/**/*", "drizzle.config.ts"]
+}

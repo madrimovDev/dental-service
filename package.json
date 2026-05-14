@@ -1,0 +1,31 @@
+{
+  "name": "dental-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.2.21",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "check": "biome check --write .",
+    "test": "turbo run test",
+    "db:generate": "bun --filter @dental/api db:generate",
+    "db:migrate": "bun --filter @dental/api db:migrate",
+    "db:studio": "bun --filter @dental/api db:studio",
+    "db:seed": "bun --filter @dental/api db:seed",
+    "prepare": "git config core.hooksPath .githooks || true"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.15",
+    "bun-types": "latest",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2"
+  }
+}

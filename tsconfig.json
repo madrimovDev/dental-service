@@ -1,0 +1,42 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": false,
+    "noEmit": true,
+    "types": ["bun-types"],
+    "baseUrl": ".",
+    "paths": {
+      "@dental/core": ["./packages/core/src/index.ts"],
+      "@dental/core/*": ["./packages/core/src/*"],
+      "@dental/db-schema": ["./packages/db-schema/src/index.ts"],
+      "@dental/db-schema/*": ["./packages/db-schema/src/*"],
+      "@dental/i18n": ["./packages/i18n/src/index.ts"],
+      "@dental/i18n/*": ["./packages/i18n/src/*"],
+      "@dental/ui": ["./packages/ui/src/index.ts"],
+      "@dental/ui/*": ["./packages/ui/src/*"],
+      "@dental/api-client": ["./packages/api-client/src/index.ts"],
+      "@dental/api-client/*": ["./packages/api-client/src/*"],
+      "@dental/odontogram": ["./packages/odontogram/src/index.ts"],
+      "@dental/odontogram/*": ["./packages/odontogram/src/*"],
+      "@dental/fiscal": ["./packages/fiscal/src/index.ts"],
+      "@dental/fiscal/*": ["./packages/fiscal/src/*"],
+      "@dental/notifications": ["./packages/notifications/src/index.ts"],
+      "@dental/notifications/*": ["./packages/notifications/src/*"]
+    }
+  },
+  "exclude": ["node_modules", "dist", "build", ".turbo"]
+}

@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "noEmit": true,
+    "lib": ["ESNext", "DOM"],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@dental/core": ["../core/src/index.ts"],
+      "@dental/core/*": ["../core/src/*"]
+    }
+  },
+  "include": ["src/**/*"]
+}

@@ -1,0 +1,22 @@
+{
+  "app": {
+    "name": "Dental Service",
+    "tagline": "Stomatologiya klinikalari uchun SaaS boshqaruv tizimi"
+  },
+  "common": {
+    "loading": "Yuklanmoqda...",
+    "error": "Xatolik yuz berdi",
+    "retry": "Qayta urinish",
+    "save": "Saqlash",
+    "cancel": "Bekor qilish",
+    "delete": "O'chirish",
+    "edit": "Tahrirlash",
+    "search": "Qidirish",
+    "language": "Til"
+  },
+  "health": {
+    "title": "Tizim holati",
+    "ok": "Hammasi joyida",
+    "db": "Ma'lumotlar bazasi"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "noEmit": true,
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "types": ["vite/client"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@dental/core": ["../../packages/core/src/index.ts"],
+      "@dental/core/*": ["../../packages/core/src/*"],
+      "@dental/i18n": ["../../packages/i18n/src/index.ts"],
+      "@dental/i18n/*": ["../../packages/i18n/src/*"],
+      "@dental/ui": ["../../packages/ui/src/index.ts"],
+      "@dental/ui/*": ["../../packages/ui/src/*"],
+      "@dental/api-client": ["../../packages/api-client/src/index.ts"],
+      "@dental/api-client/*": ["../../packages/api-client/src/*"]
+    }
+  },
+  "include": ["src/**/*", "vite.config.ts"]
+}

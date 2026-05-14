@@ -1,0 +1,19 @@
+{
+  "name": "@dental/db-schema",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@dental/core": "workspace:*",
+    "drizzle-orm": "^0.45.2"
+  }
+}

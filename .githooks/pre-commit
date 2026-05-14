@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Dental Service — pre-commit hook
+# Faqat o'zgartirilgan fayllar ustida lint + typecheck.
+# Bu hook git repo'da saqlanadi (core.hooksPath=.githooks).
+# Yangi clone'dan keyin `bun install` `prepare` script orqali avtomatik
+# core.hooksPath'ni o'rnatadi.
+
+set -euo pipefail
+
+# Staged fayllar (faqat ts/tsx/json)
+STAGED=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(ts|tsx|json|jsonc)$' || true)
+
+if [ -z "$STAGED" ]; then
+  exit 0
+fi
+
+echo "[pre-commit] biome check (staged fayllar)..."
+# shellcheck disable=SC2086
+bun biome check --no-errors-on-unmatched $STAGED
+
+echo "[pre-commit] typecheck (turbo)..."
+bun run typecheck
+
+echo "[pre-commit] OK"
