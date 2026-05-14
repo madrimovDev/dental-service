@@ -8,6 +8,13 @@
       "when": 1778749726367,
       "tag": "0000_bright_cyclops",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1778754071683,
+      "tag": "0001_lying_zombie",
+      "breakpoints": true
     }
   ]
 }

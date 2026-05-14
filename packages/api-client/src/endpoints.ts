@@ -12,6 +12,14 @@ import type {
   Tenant,
   UserAssignment,
 } from './types.ts';
+import type {
+  AllergyEntry,
+  MedicalRecord,
+  Patient,
+  PatientListResponse,
+  PregnancyStatus,
+  TestResults,
+} from './types-patients.ts';
 
 export const createEndpoints = (api: ApiClient) => ({
   auth: {
@@ -92,6 +100,44 @@ export const createEndpoints = (api: ApiClient) => ({
     }) => api.post<InviteUserResponse>('/api/users/invite', body),
     removeAssignment: (assignmentId: string) =>
       api.delete<{ deleted: true }>(`/api/users/assignments/${assignmentId}`),
+  },
+
+  patients: {
+    list: (query?: { search?: string; archived?: boolean; page?: number; pageSize?: number }) => {
+      const params = new URLSearchParams();
+      if (query?.search) params.set('search', query.search);
+      if (query?.archived) params.set('archived', 'true');
+      if (query?.page) params.set('page', String(query.page));
+      if (query?.pageSize) params.set('pageSize', String(query.pageSize));
+      const qs = params.toString();
+      return api.get<PatientListResponse>(`/api/patients${qs ? `?${qs}` : ''}`);
+    },
+    get: (id: string) => api.get<Patient>(`/api/patients/${id}`),
+    create: (body: {
+      fullName: string;
+      dateOfBirth?: string;
+      gender?: 'male' | 'female' | 'other';
+      phone?: string;
+      phoneSecondary?: string;
+      passport?: string;
+      address?: string;
+      notes?: string;
+    }) => api.post<Patient>('/api/patients', body),
+    update: (id: string, body: Partial<Patient>) => api.patch<Patient>(`/api/patients/${id}`, body),
+    archive: (id: string) => api.delete<{ archived: true; id: string }>(`/api/patients/${id}`),
+    getMedical: (id: string) => api.get<MedicalRecord>(`/api/patients/${id}/medical`),
+    updateMedical: (
+      id: string,
+      body: {
+        anamnez?: string;
+        chronicConditions?: string[];
+        currentMedications?: string[];
+        allergies?: AllergyEntry[];
+        bloodType?: string;
+        pregnancyStatus?: PregnancyStatus;
+        testResults?: TestResults;
+      },
+    ) => api.patch<MedicalRecord>(`/api/patients/${id}/medical`, body),
   },
 });
 

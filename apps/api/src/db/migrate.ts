@@ -26,14 +26,35 @@ async function applyRlsMigrations() {
     return;
   }
 
+  // Tracking table — qaysi RLS fayllar apply qilingani
+  await adminDb.execute(sql`
+    CREATE TABLE IF NOT EXISTS _rls_migrations (
+      filename text PRIMARY KEY,
+      applied_at timestamptz NOT NULL DEFAULT now()
+    )
+  `);
+
   const sqlFiles = files.filter((f) => f.endsWith('.sql')).sort();
+  let applied = 0;
+  let skipped = 0;
+
   for (const file of sqlFiles) {
+    const existing = await adminDb.execute(
+      sql`SELECT filename FROM _rls_migrations WHERE filename = ${file}`,
+    );
+    if (existing.length > 0) {
+      skipped++;
+      continue;
+    }
+
     const path = join(rlsDir, file);
     const ddl = await readFile(path, 'utf8');
     logger.info({ file }, 'Applying RLS migration');
     await adminDb.execute(sql.raw(ddl));
+    await adminDb.execute(sql`INSERT INTO _rls_migrations (filename) VALUES (${file})`);
+    applied++;
   }
-  logger.info({ count: sqlFiles.length }, 'RLS migrations applied');
+  logger.info({ applied, skipped, total: sqlFiles.length }, 'RLS migrations done');
 }
 
 async function runMigrations() {

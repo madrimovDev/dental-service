@@ -16,7 +16,9 @@
     "language": "Til",
     "name": "Nom",
     "yes": "Ha",
-    "no": "Yo'q"
+    "no": "Yo'q",
+    "back": "Orqaga",
+    "select": "Tanlang"
   },
   "health": {
     "title": "Tizim holati",
@@ -135,5 +137,53 @@
     "permissions": "Ruxsatlar",
     "selected_count": "{{count}} ta tanlangan",
     "confirm_delete": "Rolni o'chirishni tasdiqlaysizmi?"
+  },
+  "patients": {
+    "title": "Bemorlar",
+    "create": "Yangi bemor",
+    "search_placeholder": "F.I.SH, telefon yoki pasport bo'yicha qidirish...",
+    "show_archived": "Arxivlangan",
+    "empty": "Bemorlar yo'q",
+    "full_name": "F.I.SH",
+    "phone": "Telefon",
+    "phone_secondary": "Qo'shimcha telefon",
+    "passport": "Pasport",
+    "address": "Manzil",
+    "notes": "Eslatma",
+    "dob": "Tug'ilgan sana",
+    "gender": "Jinsi",
+    "gender_male": "Erkak",
+    "gender_female": "Ayol",
+    "gender_other": "Boshqa",
+    "status": "Status",
+    "active": "Faol",
+    "archived": "Arxivlangan",
+    "confirm_archive": "Bemorni arxivlash uchun tasdiqlaysizmi?",
+    "not_found": "Bemor topilmadi",
+    "tab_profile": "Profil",
+    "tab_medical": "Tibbiy karta",
+    "severe_allergy_warning": "DIQQAT — anestetik allergiyasi!",
+    "no_medical_permission": "Sizda tibbiy kartani ko'rish ruxsati yo'q"
+  },
+  "medical": {
+    "anamnez": "Anamnez (umumiy salomatlik tarixi)",
+    "chronic_conditions": "Surunkali kasalliklar",
+    "current_medications": "Hozirgi dorilar",
+    "comma_separated": "Vergul bilan ajrating (masalan: diabetes, hypertension)",
+    "allergies": "Allergiya",
+    "add_allergy": "Allergiya qo'shish",
+    "no_allergies": "Allergiya qaydlanmagan",
+    "blood_type": "Qon guruhi",
+    "pregnancy_status": "Homiladorlik holati",
+    "pregnancy": {
+      "not_applicable": "Tegishli emas",
+      "pregnant": "Homilador",
+      "planning": "Rejalashtirilmoqda",
+      "lactating": "Emizish"
+    }
+  },
+  "common2": {
+    "back": "Orqaga",
+    "select": "Tanlang"
   }
 }

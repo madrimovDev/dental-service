@@ -13,6 +13,9 @@ import { RegisterTenantPage } from '@/pages/auth/register-tenant.page.tsx';
 import { ResetPasswordPage } from '@/pages/auth/reset-password.page.tsx';
 import { SelectWorkspacePage } from '@/pages/auth/select-workspace.page.tsx';
 import { DashboardPage } from '@/pages/dashboard.page.tsx';
+import { PatientDetailPage } from '@/pages/patients/detail.page.tsx';
+import { PatientsListPage } from '@/pages/patients/list.page.tsx';
+import { NewPatientPage } from '@/pages/patients/new.page.tsx';
 import { BranchesPage } from '@/pages/settings/branches.page.tsx';
 import { RolesSettingsPage } from '@/pages/settings/roles.page.tsx';
 import { TenantSettingsPage } from '@/pages/settings/tenant.page.tsx';
@@ -46,6 +49,30 @@ export function App() {
                 element={
                   <Protected>
                     <DashboardPage />
+                  </Protected>
+                }
+              />
+              <Route
+                path="/patients"
+                element={
+                  <Protected>
+                    <PatientsListPage />
+                  </Protected>
+                }
+              />
+              <Route
+                path="/patients/new"
+                element={
+                  <Protected>
+                    <NewPatientPage />
+                  </Protected>
+                }
+              />
+              <Route
+                path="/patients/:id"
+                element={
+                  <Protected>
+                    <PatientDetailPage />
                   </Protected>
                 }
               />

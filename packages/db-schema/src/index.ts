@@ -10,7 +10,9 @@
 
 export * from './tables/audit-log.ts';
 export * from './tables/branches.ts';
+export * from './tables/medical-records.ts';
 export * from './tables/password-reset-tokens.ts';
+export * from './tables/patients.ts';
 export * from './tables/permissions.ts';
 export * from './tables/refresh-tokens.ts';
 export * from './tables/role-permissions.ts';

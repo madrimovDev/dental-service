@@ -120,13 +120,15 @@ export function AppLayout({ children }: { children: ReactNode }) {
             active={location.pathname === '/'}
           />
 
-          {/* M2+ — hozircha placeholder */}
-          <NavLink
-            label={t('nav.patients')}
-            leftSection={<IconUsers size={20} />}
-            disabled
-            description={<Badge size="xs">M2</Badge>}
-          />
+          {hasPermission('patient.view') && (
+            <NavLink
+              component={Link}
+              to="/patients"
+              label={t('nav.patients')}
+              leftSection={<IconUsers size={20} />}
+              active={location.pathname.startsWith('/patients')}
+            />
+          )}
           <NavLink
             label={t('nav.appointments')}
             leftSection={<IconCalendar size={20} />}

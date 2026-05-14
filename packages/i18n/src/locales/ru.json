@@ -16,7 +16,9 @@
     "language": "Язык",
     "name": "Название",
     "yes": "Да",
-    "no": "Нет"
+    "no": "Нет",
+    "back": "Назад",
+    "select": "Выберите"
   },
   "health": {
     "title": "Состояние системы",
@@ -135,5 +137,53 @@
     "permissions": "Разрешения",
     "selected_count": "{{count}} выбрано",
     "confirm_delete": "Подтверждаете удаление роли?"
+  },
+  "patients": {
+    "title": "Пациенты",
+    "create": "Новый пациент",
+    "search_placeholder": "Поиск по ФИО, телефону или паспорту...",
+    "show_archived": "Архивные",
+    "empty": "Нет пациентов",
+    "full_name": "ФИО",
+    "phone": "Телефон",
+    "phone_secondary": "Доп. телефон",
+    "passport": "Паспорт",
+    "address": "Адрес",
+    "notes": "Примечание",
+    "dob": "Дата рождения",
+    "gender": "Пол",
+    "gender_male": "Мужской",
+    "gender_female": "Женский",
+    "gender_other": "Другой",
+    "status": "Статус",
+    "active": "Активен",
+    "archived": "В архиве",
+    "confirm_archive": "Подтверждаете архивирование пациента?",
+    "not_found": "Пациент не найден",
+    "tab_profile": "Профиль",
+    "tab_medical": "Медкарта",
+    "severe_allergy_warning": "ВНИМАНИЕ — аллергия на анестетик!",
+    "no_medical_permission": "У вас нет прав на просмотр медкарты"
+  },
+  "medical": {
+    "anamnez": "Анамнез (общая история здоровья)",
+    "chronic_conditions": "Хронические заболевания",
+    "current_medications": "Текущие препараты",
+    "comma_separated": "Через запятую (пример: diabetes, hypertension)",
+    "allergies": "Аллергия",
+    "add_allergy": "Добавить аллергию",
+    "no_allergies": "Аллергий не зарегистрировано",
+    "blood_type": "Группа крови",
+    "pregnancy_status": "Беременность",
+    "pregnancy": {
+      "not_applicable": "Не применимо",
+      "pregnant": "Беременна",
+      "planning": "Планирование",
+      "lactating": "Кормление"
+    }
+  },
+  "common2": {
+    "back": "Назад",
+    "select": "Выберите"
   }
 }

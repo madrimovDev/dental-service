@@ -8,6 +8,7 @@ import { requestId } from './middleware/request-id.ts';
 import { authRoutes } from './modules/auth/index.ts';
 import { branchRoutes } from './modules/branches/index.ts';
 import { healthRoutes } from './modules/health/index.ts';
+import { patientRoutes } from './modules/patients/index.ts';
 import { permissionRoutes } from './modules/permissions/index.ts';
 import { roleRoutes } from './modules/roles/index.ts';
 import { tenantRoutes } from './modules/tenants/index.ts';
@@ -37,6 +38,7 @@ export const createApp = () => {
   app.route('/api/branches', branchRoutes({ db, audit }));
   app.route('/api/roles', roleRoutes({ db, audit }));
   app.route('/api/users', userRoutes({ db, audit }));
+  app.route('/api/patients', patientRoutes({ db, audit }));
 
   // Error handler
   app.onError(errorHandler);
