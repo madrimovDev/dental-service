@@ -51,7 +51,9 @@
     "select_workspace": {
       "title": "Workspace tanlash",
       "no_workspaces": "Sizda hech qanday klinika yo'q. Birinchi qadam — klinikani ro'yxatdan o'tkazing.",
-      "all_branches": "Barcha filiallar"
+      "all_branches": "Barcha filiallar",
+      "session_expired_title": "Sessiya muddati tugadi",
+      "session_expired_message": "Iltimos, qayta login qiling. Eski refresh token endi yaroqsiz."
     },
     "forgot": {
       "title": "Parolni qaytarish",

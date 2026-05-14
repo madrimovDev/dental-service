@@ -1,3 +1,4 @@
+import { ApiError } from '@dental/api-client';
 import {
   Alert,
   Badge,
@@ -10,6 +11,7 @@ import {
   Title,
   UnstyledButton,
 } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -30,7 +32,7 @@ type WorkspaceOption = {
 export function SelectWorkspacePage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { accessToken, setTokens, setContext } = useAuthStore();
+  const { accessToken, clear, setTokens, setContext } = useAuthStore();
 
   // Auto-select faqat bir marta ishlasin (loop oldini olish).
   const autoSelectedRef = useRef(false);
@@ -59,9 +61,30 @@ export function SelectWorkspacePage() {
       setContext(payload.atid, payload.abid, payload.perms);
       navigate('/');
     },
-    onError: () => {
-      // Auto-select fail bo'lsa, foydalanuvchi qo'lda tanlay olsin
-      autoSelectedRef.current = false;
+    onError: (err) => {
+      // Refresh token o'lik bo'lsa (eski sessiya yoki race) — to'g'ridan-to'g'ri logout
+      const code = err instanceof ApiError ? err.code : null;
+      if (
+        code === 'auth.refresh_revoked' ||
+        code === 'auth.invalid_refresh' ||
+        code === 'auth.refresh_mismatch'
+      ) {
+        notifications.show({
+          title: t('auth.select_workspace.session_expired_title'),
+          message: t('auth.select_workspace.session_expired_message'),
+          color: 'red',
+        });
+        clear();
+        navigate('/login', { replace: true });
+        return;
+      }
+      // Boshqa xatolar uchun — error toast + autoSelect qayta urinishini tiyish
+      notifications.show({
+        title: t('common.error'),
+        message: err instanceof ApiError ? err.message : 'Switch workspace failed',
+        color: 'red',
+      });
+      // autoSelectedRef ni TRUE qoldiramiz — auto qayta urinmaslik
     },
   });
 
@@ -69,6 +92,7 @@ export function SelectWorkspacePage() {
   // biome-ignore lint/correctness/useExhaustiveDependencies: switchMut stable mutate ishlatamiz
   useEffect(() => {
     if (autoSelectedRef.current) return;
+    if (switchMut.isPending) return; // qo'l bilan tanlash davom etmoqda — auto qo'shilmasin
     if (!meQuery.data) return;
     const options = collectOptions(meQuery.data);
     if (options.length === 1 && options[0]) {
@@ -109,12 +133,13 @@ export function SelectWorkspacePage() {
         {options.map((opt) => (
           <UnstyledButton
             key={`${opt.tenantId}-${opt.branchId ?? 'all'}-${opt.roleName}`}
-            onClick={() =>
+            onClick={() => {
+              if (switchMut.isPending) return;
               switchMut.mutate({
                 tenantId: opt.tenantId,
                 branchId: opt.branchId ?? undefined,
-              })
-            }
+              });
+            }}
             disabled={switchMut.isPending}
           >
             <Card withBorder padding="md" radius="md">
