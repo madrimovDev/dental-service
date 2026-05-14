@@ -1,9 +1,9 @@
 import { defineConfig } from 'drizzle-kit';
 
-const databaseUrl = Bun.env.DATABASE_URL;
-if (!databaseUrl) {
-  throw new Error('DATABASE_URL environment variable is required');
-}
+// Drizzle-kit ba'zan `bun --env-file` ni inherit qilmaydi (bun x orqali).
+// `.env` mavjud bo'lsa process.env ishlatiladi, fallback — local dev defaults.
+const databaseUrl =
+  process.env.DATABASE_URL ?? 'postgres://dental:dental_local_dev@localhost:5432/dental';
 
 export default defineConfig({
   schema: '../../packages/db-schema/src/index.ts',

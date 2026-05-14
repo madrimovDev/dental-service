@@ -33,8 +33,9 @@ bun-debug.log*
 coverage/
 .nyc_output/
 
-# Drizzle
-apps/api/drizzle/
+# Drizzle artifacts (snapshots tracked, journal not)
+# Migration SQL fayllar VERSIONED (commit qilinadi)
+# Faqat tmp/cache yo'qotiladi
 
 # Turbo
 .turbo/

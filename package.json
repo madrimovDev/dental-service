@@ -16,6 +16,7 @@
     "format": "biome format --write .",
     "check": "biome check --write .",
     "test": "turbo run test",
+    "check:rls": "bun run scripts/check-rls-coverage.ts",
     "db:generate": "bun --filter @dental/api db:generate",
     "db:migrate": "bun --filter @dental/api db:migrate",
     "db:studio": "bun --filter @dental/api db:studio",

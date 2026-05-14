@@ -1,0 +1,209 @@
+import type { Permission } from './permissions.ts';
+
+/**
+ * System role templates — yangi tenant ro'yxatdan o'tganda seed qilinadi.
+ *
+ * Har template `roles` jadvalda `is_template=true, is_system=true` bilan qatnashadi.
+ * Tenant admin templates'ni clone qilib custom rol yarata oladi, yoki to'g'ridan-to'g'ri ishlatadi.
+ *
+ * ⚠️ Tenant Owner uchun template YO'Q — owner implicit superuser
+ * (hardcoded check `tenants.owner_user_id` orqali).
+ */
+
+export type RoleTemplate = {
+  name: string;
+  descriptionUz: string;
+  descriptionRu: string;
+  permissions: readonly Permission[];
+};
+
+export const ROLE_TEMPLATES = [
+  {
+    name: 'Tenant Admin',
+    descriptionUz: 'Klinika administratori — egasidan boshqa hamma narsani qila oladi',
+    descriptionRu: 'Администратор клиники — все права, кроме передачи владения',
+    permissions: [
+      'tenant.view',
+      'tenant.edit',
+      // tenant.delete va tenant.transfer_ownership — owner-only, role da emas
+      'tenant_settings.view',
+      'tenant_settings.edit',
+      'branch.view',
+      'branch.create',
+      'branch.edit',
+      'branch.delete',
+      'role.view',
+      'role.manage',
+      'permission.view',
+      'user.view',
+      'user.invite',
+      'user.manage',
+      'user.deactivate',
+      'audit_log.view',
+      'notification.view',
+      'notification.manage',
+      // M2+ shell perms
+      'patient.view',
+      'patient.create',
+      'patient.edit',
+      'patient.delete',
+      'patient.view_pii',
+      'medical_record.view',
+      'medical_record.edit',
+      'staff.view',
+      'staff.invite',
+      'staff.edit',
+      'staff.delete',
+      'appointment.view',
+      'appointment.create',
+      'appointment.edit',
+      'appointment.cancel',
+      'queue.view',
+      'queue.create',
+      'queue.manage',
+      'service.view',
+      'service.manage',
+      'cashier.view',
+      'cashier.create_transaction',
+      'cashier.refund',
+      'cashier.void',
+      'report.view',
+      'salary.view',
+    ],
+  },
+  {
+    name: 'Branch Manager',
+    descriptionUz: 'Filial mudiri — filial ichida hamma narsani boshqaradi',
+    descriptionRu: 'Менеджер филиала',
+    permissions: [
+      'tenant.view',
+      'branch.view',
+      'branch.edit',
+      'user.view',
+      'user.invite',
+      'audit_log.view',
+      'patient.view',
+      'patient.create',
+      'patient.edit',
+      'patient.view_pii',
+      'staff.view',
+      'appointment.view',
+      'appointment.create',
+      'appointment.edit',
+      'appointment.cancel',
+      'queue.view',
+      'queue.create',
+      'queue.manage',
+      'service.view',
+      'cashier.view',
+      'report.view',
+    ],
+  },
+  {
+    name: 'Doctor',
+    descriptionUz: 'Doktor — klinik ish',
+    descriptionRu: 'Врач — клиническая работа',
+    permissions: [
+      'tenant.view',
+      'branch.view',
+      'patient.view',
+      'patient.edit',
+      'patient.view_pii',
+      'medical_record.view',
+      'medical_record.edit',
+      'appointment.view',
+      'appointment.create',
+      'appointment.edit',
+      'queue.view',
+      'service.view',
+    ],
+  },
+  {
+    name: 'Doctor + Assistant',
+    descriptionUz:
+      'Doktor + asistent ishlari (kichik klinikalarda asistent alohida login bermaslik mumkin)',
+    descriptionRu: 'Врач + ассистент (для малых клиник без отдельного логина ассистента)',
+    permissions: [
+      'tenant.view',
+      'branch.view',
+      'patient.view',
+      'patient.create',
+      'patient.edit',
+      'patient.view_pii',
+      'medical_record.view',
+      'medical_record.edit',
+      'appointment.view',
+      'appointment.create',
+      'appointment.edit',
+      'appointment.cancel',
+      'queue.view',
+      'queue.create',
+      'service.view',
+    ],
+  },
+  {
+    name: 'Nurse',
+    descriptionUz: 'Hamshira — bemor tayyorlash',
+    descriptionRu: 'Медсестра',
+    permissions: [
+      'tenant.view',
+      'branch.view',
+      'patient.view',
+      'medical_record.view',
+      'appointment.view',
+      'queue.view',
+    ],
+  },
+  {
+    name: 'Receptionist',
+    descriptionUz: 'Resepsioner — yozilish va kassa',
+    descriptionRu: 'Администратор приёма',
+    permissions: [
+      'tenant.view',
+      'branch.view',
+      'patient.view',
+      'patient.create',
+      'patient.edit',
+      'patient.view_pii',
+      'appointment.view',
+      'appointment.create',
+      'appointment.edit',
+      'appointment.cancel',
+      'queue.view',
+      'queue.create',
+      'queue.manage',
+      'service.view',
+      'cashier.view',
+      'cashier.create_transaction',
+    ],
+  },
+  {
+    name: 'Accountant',
+    descriptionUz: 'Buxgalter — moliyaviy hisob-kitob',
+    descriptionRu: 'Бухгалтер',
+    permissions: [
+      'tenant.view',
+      'branch.view',
+      'patient.view',
+      'service.view',
+      'cashier.view',
+      'cashier.refund',
+      'cashier.void',
+      'report.view',
+      'salary.view',
+    ],
+  },
+  {
+    name: 'Technician',
+    descriptionUz: 'Texnik (laborant) — laboratoriya buyurtmalari',
+    descriptionRu: 'Зубной техник',
+    permissions: [
+      'tenant.view',
+      'branch.view',
+      'patient.view',
+      // M5 da: lab_order.view, lab_order.edit
+    ],
+  },
+] as const satisfies readonly RoleTemplate[];
+
+export type RoleTemplateName = (typeof ROLE_TEMPLATES)[number]['name'];

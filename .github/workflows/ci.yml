@@ -63,5 +63,11 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
+      - name: RLS coverage check
+        run: bun run check:rls
+
+      - name: Apply migrations (Drizzle + RLS DDL)
+        run: bun run db:migrate
+
       - name: Test
         run: bun run test
