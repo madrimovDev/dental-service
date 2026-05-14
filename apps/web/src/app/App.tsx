@@ -18,6 +18,7 @@ import { DashboardPage } from '@/pages/dashboard.page.tsx';
 import { PatientDetailPage } from '@/pages/patients/detail.page.tsx';
 import { PatientsListPage } from '@/pages/patients/list.page.tsx';
 import { NewPatientPage } from '@/pages/patients/new.page.tsx';
+import { ProfilePage } from '@/pages/profile.page.tsx';
 import { QueuePage } from '@/pages/queue.page.tsx';
 import { BranchesPage } from '@/pages/settings/branches.page.tsx';
 import { RolesSettingsPage } from '@/pages/settings/roles.page.tsx';
@@ -101,6 +102,14 @@ export function App() {
                 element={
                   <Protected>
                     <CashierPage />
+                  </Protected>
+                }
+              />
+              <Route
+                path="/profile"
+                element={
+                  <Protected>
+                    <ProfilePage />
                   </Protected>
                 }
               />

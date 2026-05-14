@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
-import { branches, roles, userAssignments, users } from '@dental/db-schema';
-import { and, eq, sql } from 'drizzle-orm';
+import { branches, refreshTokens, roles, tenants, userAssignments, users } from '@dental/db-schema';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { Database } from '../../db/client.ts';
 import { getDb } from '../../db/scoped.ts';
@@ -234,7 +234,103 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
     return before;
   }
 
-  return { listAssignments, invite, addAssignment, updateAssignment, removeAssignment };
+  /**
+   * Admin tomonidan xodim parolini qayta tiklash.
+   *  - User joriy tenantda assignment yoki owner bo'lishi kerak (cross-tenant zarbasiz)
+   *  - Yangi 16-belgili vaqtinchalik parol generate qilinadi (login validator min 12)
+   *  - Foydalanuvchining hamma refresh tokenlari revoke qilinadi (logout boshqa qurilmalardan)
+   *  - Audit yoziladi
+   *  - Yangi parol qaytariladi (UI'da admin'ga ko'rsatiladi, u xodimga beradi)
+   */
+  async function resetUserPassword(c: Context, targetUserId: string) {
+    const dbContext = getDb(c);
+    const tenantId = c.get('activeTenantId');
+    const actor = c.get('user');
+    if (!tenantId || !actor) throw new Error('No tenant context');
+
+    // Target user shu tenantda ekanligini tekshirish (assignment yoki owner)
+    return await dbContext.transaction(async (tx) => {
+      await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);
+
+      // Owner check (cross-tenant)
+      const [tenant] = await tx
+        .select({ ownerUserId: tenants.ownerUserId })
+        .from(tenants)
+        .where(eq(tenants.id, tenantId));
+      const isOwner = tenant?.ownerUserId === targetUserId;
+
+      let hasAssignment = false;
+      if (!isOwner) {
+        const [a] = await tx
+          .select()
+          .from(userAssignments)
+          .where(
+            and(
+              eq(userAssignments.userId, targetUserId),
+              eq(userAssignments.tenantId, tenantId),
+              eq(userAssignments.isActive, true),
+            ),
+          );
+        hasAssignment = !!a;
+      }
+
+      if (!isOwner && !hasAssignment) {
+        return { ok: false as const, code: 'user.not_in_tenant' };
+      }
+
+      // Tenant owner parolini faqat o'zi yoki tenant owner reset qila oladi
+      // (boshqa adminlar tenant owner'ning parolini o'zgartira olmaydi — xavfsizlik)
+      if (isOwner && actor.id !== tenant?.ownerUserId) {
+        return { ok: false as const, code: 'user.cannot_reset_owner' };
+      }
+
+      const [target] = await tx.select().from(users).where(eq(users.id, targetUserId));
+      if (!target) return { ok: false as const, code: 'user.not_found' };
+
+      const newPassword = randomBytes(12).toString('base64url'); // 16 belgi
+      const newHash = await hashPassword(newPassword);
+      const now = new Date();
+
+      await tx
+        .update(users)
+        .set({ passwordHash: newHash, updatedAt: now })
+        .where(eq(users.id, targetUserId));
+
+      // Barcha refresh tokenlarni revoke (boshqa qurilmalardan logout)
+      await tx
+        .update(refreshTokens)
+        .set({ revokedAt: now })
+        .where(and(eq(refreshTokens.userId, targetUserId), isNull(refreshTokens.revokedAt)));
+
+      await deps.audit.record(c, {
+        action: 'password_reset_by_admin',
+        resourceType: 'user',
+        resourceId: targetUserId,
+        after: { email: target.email, by: actor.id },
+      });
+
+      logger.warn(
+        { adminId: actor.id, userId: targetUserId, email: target.email, newPassword },
+        `🔐 Admin reset password — production'da SMS/email orqali yuboriladi`,
+      );
+
+      return {
+        ok: true as const,
+        userId: targetUserId,
+        email: target.email,
+        tempPassword: newPassword,
+      };
+    });
+  }
+
+  return {
+    listAssignments,
+    invite,
+    addAssignment,
+    updateAssignment,
+    removeAssignment,
+    resetUserPassword,
+  };
 };
 
 export type UsersService = ReturnType<typeof createUsersService>;

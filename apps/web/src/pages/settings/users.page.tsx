@@ -1,3 +1,4 @@
+import { ApiError } from '@dental/api-client';
 import {
   ActionIcon,
   Alert,
@@ -15,7 +16,8 @@ import {
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
-import { IconPlus, IconTrash } from '@tabler/icons-react';
+import { notifications } from '@mantine/notifications';
+import { IconKey, IconPlus, IconTrash } from '@tabler/icons-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from 'mantine-form-zod-resolver';
 import { useState } from 'react';
@@ -39,10 +41,13 @@ type FormValues = z.infer<typeof schema>;
 
 export function UsersSettingsPage() {
   const { t } = useTranslation();
-  const { hasPermission } = useAuthStore();
+  const { hasPermission, user: currentUser } = useAuthStore();
   const qc = useQueryClient();
   const [opened, { open, close }] = useDisclosure(false);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
+  const [resetResult, setResetResult] = useState<{ email: string; tempPassword: string } | null>(
+    null,
+  );
 
   const assignments = useQuery({
     queryKey: ['users', 'assignments'],
@@ -79,6 +84,20 @@ export function UsersSettingsPage() {
   const deleteAssignmentMut = useMutation({
     mutationFn: api.users.removeAssignment,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['users', 'assignments'] }),
+  });
+
+  const resetPasswordMut = useMutation({
+    mutationFn: api.users.resetPassword,
+    onSuccess: (data) => {
+      setResetResult({ email: data.email, tempPassword: data.tempPassword });
+    },
+    onError: (err) => {
+      notifications.show({
+        title: t('common.error'),
+        message: err instanceof ApiError ? err.message : 'Reset failed',
+        color: 'red',
+      });
+    },
   });
 
   const closeAll = () => {
@@ -126,19 +145,36 @@ export function UsersSettingsPage() {
                     </Badge>
                   </Table.Td>
                   <Table.Td>
-                    {hasPermission('user.manage') && (
-                      <ActionIcon
-                        variant="subtle"
-                        color="red"
-                        onClick={() => {
-                          if (confirm(t('users.confirm_remove'))) {
-                            deleteAssignmentMut.mutate(a.assignmentId);
-                          }
-                        }}
-                      >
-                        <IconTrash size={16} />
-                      </ActionIcon>
-                    )}
+                    <Group gap="xs" wrap="nowrap" justify="flex-end">
+                      {hasPermission('user.manage') && a.userId !== currentUser?.id && (
+                        <ActionIcon
+                          variant="subtle"
+                          color="blue"
+                          onClick={() => {
+                            if (confirm(t('users.reset_password_confirm'))) {
+                              resetPasswordMut.mutate(a.userId);
+                            }
+                          }}
+                          loading={resetPasswordMut.isPending}
+                          title={t('users.reset_password')}
+                        >
+                          <IconKey size={16} />
+                        </ActionIcon>
+                      )}
+                      {hasPermission('user.manage') && (
+                        <ActionIcon
+                          variant="subtle"
+                          color="red"
+                          onClick={() => {
+                            if (confirm(t('users.confirm_remove'))) {
+                              deleteAssignmentMut.mutate(a.assignmentId);
+                            }
+                          }}
+                        >
+                          <IconTrash size={16} />
+                        </ActionIcon>
+                      )}
+                    </Group>
                   </Table.Td>
                 </Table.Tr>
               ))}
@@ -208,6 +244,31 @@ export function UsersSettingsPage() {
               </Group>
             </Stack>
           </form>
+        )}
+      </Modal>
+
+      {/* Reset password result modal */}
+      <Modal
+        opened={!!resetResult}
+        onClose={() => setResetResult(null)}
+        title={t('users.reset_password')}
+      >
+        {resetResult && (
+          <Stack gap="md">
+            <Alert color="teal" variant="light">
+              <Text fw={600}>{t('users.reset_password_success')}</Text>
+              <Text size="sm" mt="xs">
+                {resetResult.email}
+              </Text>
+              <Text size="sm">{t('users.temp_password_notice')}</Text>
+              <Text mt="sm" fw={700} ff="monospace" size="lg">
+                {resetResult.tempPassword}
+              </Text>
+            </Alert>
+            <Button onClick={() => setResetResult(null)} fullWidth>
+              {t('common.cancel')}
+            </Button>
+          </Stack>
         )}
       </Modal>
     </Container>

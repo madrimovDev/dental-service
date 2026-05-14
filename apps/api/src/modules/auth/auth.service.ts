@@ -18,6 +18,7 @@ import { signAccess, signRefresh, verifyRefresh } from '../../lib/jwt.ts';
 import { logger } from '../../lib/logger.ts';
 import { hashPassword, verifyPassword } from '../../lib/password.ts';
 import type {
+  ChangePasswordInput,
   LoginInput,
   PasswordResetInput,
   PasswordResetRequestInput,
@@ -591,12 +592,42 @@ export const createAuthService = (deps: AuthServiceDeps) => {
     return { ok: true };
   }
 
+  async function changePassword(userId: string, input: ChangePasswordInput) {
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
+    if (!user) return { ok: false as const, code: 'auth.user_not_found' };
+
+    const valid = await verifyPassword(input.currentPassword, user.passwordHash);
+    if (!valid) return { ok: false as const, code: 'auth.invalid_current_password' };
+
+    if (input.currentPassword === input.newPassword) {
+      return { ok: false as const, code: 'auth.same_password' };
+    }
+
+    const newHash = await hashPassword(input.newPassword);
+    const now = new Date();
+
+    await db.transaction(async (tx) => {
+      await tx
+        .update(users)
+        .set({ passwordHash: newHash, updatedAt: now })
+        .where(eq(users.id, userId));
+      // Barcha boshqa refresh tokenlarni revoke (xavfsizlik: boshqa qurilmalardan logout)
+      await tx
+        .update(refreshTokens)
+        .set({ revokedAt: now })
+        .where(and(eq(refreshTokens.userId, userId), isNull(refreshTokens.revokedAt)));
+    });
+
+    return { ok: true as const };
+  }
+
   return {
     registerTenant,
     login,
     getMemberships,
     switchWorkspace,
     refresh,
+    changePassword,
     logout,
     requestPasswordReset,
     resetPassword,

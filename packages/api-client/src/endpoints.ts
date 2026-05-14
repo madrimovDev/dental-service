@@ -93,6 +93,9 @@ export const createEndpoints = (api: ApiClient) => ({
 
     resetPassword: (token: string, newPassword: string) =>
       api.post<{ ok: true }>('/api/auth/password-reset', { token, newPassword }),
+
+    changePassword: (currentPassword: string, newPassword: string) =>
+      api.post<{ changed: true }>('/api/auth/change-password', { currentPassword, newPassword }),
   },
 
   tenant: {
@@ -142,6 +145,10 @@ export const createEndpoints = (api: ApiClient) => ({
     }) => api.post<InviteUserResponse>('/api/users/invite', body),
     removeAssignment: (assignmentId: string) =>
       api.delete<{ deleted: true }>(`/api/users/assignments/${assignmentId}`),
+    resetPassword: (userId: string) =>
+      api.post<{ ok: true; userId: string; email: string; tempPassword: string }>(
+        `/api/users/${userId}/reset-password`,
+      ),
   },
 
   patients: {

@@ -4,6 +4,7 @@ import { HTTPException } from 'hono/http-exception';
 import type { Database } from '../../db/client.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import {
+  changePasswordSchema,
   loginSchema,
   passwordResetRequestSchema,
   passwordResetSchema,
@@ -140,6 +141,28 @@ export const authRoutes = (deps: { db: Database }) => {
       return c.json(fail('auth.invalid_reset_token', "Token noto'g'ri yoki muddati tugagan"), 400);
     }
     return c.json(ok(result));
+  });
+
+  // POST /auth/change-password — authenticated, joriy parol bilan
+  app.post('/change-password', authMiddleware(), async (c) => {
+    const user = c.get('user');
+    if (!user) return c.json(fail('auth.required', 'Authentication required'), 401);
+
+    const body = changePasswordSchema.safeParse(await c.req.json());
+    if (!body.success) {
+      throw new HTTPException(400, { message: 'Invalid input' });
+    }
+    const result = await service.changePassword(user.id, body.data);
+    if (!result.ok) {
+      const msgs: Record<string, [string, number]> = {
+        'auth.invalid_current_password': ["Joriy parol noto'g'ri", 400],
+        'auth.same_password': ['Yangi parol joriy parolga teng', 400],
+        'auth.user_not_found': ['Foydalanuvchi topilmadi', 404],
+      };
+      const [msg, status] = msgs[result.code] ?? ['Change password failed', 400];
+      return c.json(fail(result.code, msg), status as 400 | 404);
+    }
+    return c.json(ok({ changed: true }));
   });
 
   return app;

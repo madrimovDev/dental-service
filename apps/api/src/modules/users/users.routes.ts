@@ -63,5 +63,20 @@ export const userRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     return c.json(ok({ deleted: true }));
   });
 
+  // POST /api/users/:userId/reset-password — admin generated new temp password
+  app.post('/:userId/reset-password', requirePermission('user.manage'), async (c) => {
+    const result = await service.resetUserPassword(c, c.req.param('userId'));
+    if (!result.ok) {
+      const msgs: Record<string, [string, number]> = {
+        'user.not_in_tenant': ['Foydalanuvchi bu klinikaga tegishli emas', 403],
+        'user.cannot_reset_owner': ["Klinika egasi parolini boshqa admin o'zgartira olmaydi", 403],
+        'user.not_found': ['Foydalanuvchi topilmadi', 404],
+      };
+      const [msg, status] = msgs[result.code] ?? ['Reset failed', 400];
+      return c.json(fail(result.code, msg), status as 400 | 403 | 404);
+    }
+    return c.json(ok(result));
+  });
+
   return app;
 };

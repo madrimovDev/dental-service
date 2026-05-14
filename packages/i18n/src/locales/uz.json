@@ -133,7 +133,26 @@
     "confirm_remove": "Xodimni klinikadan chiqarishni tasdiqlaysizmi?",
     "invited_successfully": "Xodim muvaffaqiyatli qo'shildi! Parolni quyida ko'ring va xodimga bering.",
     "temp_password_notice": "⚠️ Bu parol faqat shu yerda ko'rsatiladi. Xodimga (Telegram, qo'lda yoki boshqa kanal orqali) yuboring va kopiyalab oling. Kelajakda SMS/email orqali avtomatik yuboriladi.",
-    "invite_hint": "Bu yerda xodim akkaunti darhol yaratiladi. Email yuborilmaydi — vaqtinchalik parol sizga ko'rsatiladi va xodimga qo'lda yuborasiz."
+    "invite_hint": "Bu yerda xodim akkaunti darhol yaratiladi. Email yuborilmaydi — vaqtinchalik parol sizga ko'rsatiladi va xodimga qo'lda yuborasiz.",
+    "reset_password": "Parolni qayta tiklash",
+    "reset_password_confirm": "Xodim parolini qayta tiklash? Yangi vaqtinchalik parol generatsiya qilinadi va xodim barcha qurilmalardan chiqariladi.",
+    "reset_password_success": "Yangi parol generatsiya qilindi. Xodimga bering — eski parol endi ishlamaydi.",
+    "cannot_reset_self": "O'z parolingizni boshqa xodimlar qatorida tiklab bo'lmaydi. Profil sahifasidan o'zgartiring."
+  },
+  "profile": {
+    "title": "Profil",
+    "account": "Akkaunt",
+    "change_password": "Parolni o'zgartirish",
+    "current_password": "Joriy parol",
+    "new_password": "Yangi parol",
+    "new_password_hint": "Kamida 12 belgi",
+    "confirm_password": "Yangi parolni tasdiqlash",
+    "passwords_not_match": "Parollar mos kelmadi",
+    "save": "Parolni yangilash",
+    "password_changed": "Parol muvaffaqiyatli yangilandi. Boshqa qurilmalardan chiqarildingiz.",
+    "change_password_warning": "⚠️ Parol o'zgartirilganda barcha boshqa qurilmalardan avtomatik chiqib ketasiz va shu yerda ham qayta login qilishingiz kerak.",
+    "invalid_current": "Joriy parol noto'g'ri",
+    "same_password": "Yangi parol joriy parolga teng — boshqa parol tanlang"
   },
   "roles": {
     "create": "Yangi rol",

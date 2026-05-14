@@ -23,6 +23,7 @@ import {
   IconSettings,
   IconShieldLock,
   IconStethoscope,
+  IconUser,
   IconUsers,
 } from '@tabler/icons-react';
 import type { ReactNode } from 'react';
@@ -99,6 +100,12 @@ export function AppLayout({ children }: { children: ReactNode }) {
               </Menu.Target>
               <Menu.Dropdown>
                 <Menu.Label>{user?.fullName ?? user?.email}</Menu.Label>
+                <Menu.Item
+                  leftSection={<IconUser size={16} />}
+                  onClick={() => navigate('/profile')}
+                >
+                  {t('profile.title')}
+                </Menu.Item>
                 <Menu.Item leftSection={<IconRefresh size={16} />} onClick={switchWorkspace}>
                   {t('layout.switch_workspace')}
                 </Menu.Item>
