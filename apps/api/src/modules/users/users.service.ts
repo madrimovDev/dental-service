@@ -71,8 +71,8 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
       let tempPassword: string | null = null;
 
       if (!user) {
-        // Yangi user — temporary password
-        tempPassword = randomBytes(8).toString('base64url');
+        // Yangi user — temporary password (12 bytes → 16 base64url chars, login validatori min(12) ni qondiradi)
+        tempPassword = randomBytes(12).toString('base64url');
         const passwordHash = await hashPassword(tempPassword);
 
         const [created] = await tx
