@@ -15,6 +15,13 @@
       "when": 1778754071683,
       "tag": "0001_lying_zombie",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778754903725,
+      "tag": "0002_tidy_nocturne",
+      "breakpoints": true
     }
   ]
 }

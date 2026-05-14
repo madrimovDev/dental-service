@@ -8,15 +8,20 @@
 //
 // audit_log alohida: tenant_id NULLABLE (platform event'lar uchun)
 
+export * from './tables/appointments.ts';
 export * from './tables/audit-log.ts';
 export * from './tables/branches.ts';
+export * from './tables/cashier.ts';
 export * from './tables/medical-records.ts';
 export * from './tables/password-reset-tokens.ts';
 export * from './tables/patients.ts';
 export * from './tables/permissions.ts';
+export * from './tables/queue-tickets.ts';
 export * from './tables/refresh-tokens.ts';
 export * from './tables/role-permissions.ts';
 export * from './tables/roles.ts';
+export * from './tables/service-prices.ts';
+export * from './tables/services.ts';
 export * from './tables/tenants.ts';
 export * from './tables/user-assignments.ts';
 export * from './tables/users.ts';
