@@ -9,6 +9,7 @@ import { appointmentRoutes } from './modules/appointments/index.ts';
 import { authRoutes } from './modules/auth/index.ts';
 import { branchRoutes } from './modules/branches/index.ts';
 import { cashierRoutes } from './modules/cashier/index.ts';
+import { clinicalRoutes } from './modules/clinical/index.ts';
 import { healthRoutes } from './modules/health/index.ts';
 import { patientRoutes } from './modules/patients/index.ts';
 import { permissionRoutes } from './modules/permissions/index.ts';
@@ -47,6 +48,8 @@ export const createApp = () => {
   app.route('/api/cashier', cashierRoutes({ db, audit }));
   app.route('/api/appointments', appointmentRoutes({ db, audit }));
   app.route('/api/queue', queueRoutes({ db, audit }));
+  // Clinical: /api/diagnoses, /api/treatment-plans, /api/visit-notes, /api/tooth-charts
+  app.route('/api', clinicalRoutes({ db, audit }));
 
   // Error handler
   app.onError(errorHandler);

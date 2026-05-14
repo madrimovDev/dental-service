@@ -1,14 +1,15 @@
-import { PERMISSIONS } from '@dental/core';
-import { permissions } from '@dental/db-schema';
+import { DIAGNOSES_SEED, PERMISSIONS } from '@dental/core';
+import { diagnoses, permissions } from '@dental/db-schema';
 import { logger } from '../lib/logger.ts';
 import type { Database } from './client.ts';
 
 /**
- * Boot vaqtida permissions katalogini idempotent upsert.
+ * Boot vaqtida platform-level kataloglarni idempotent upsert.
  *
- * `packages/core/src/permissions.ts` — source of truth.
- * Yangi permission qo'shilganda deploy → boot → DB sinxron.
- * Tenant'lar yangi rol/role tahrirlash orqali yangi permissionlarni ishlatadi.
+ * - PERMISSIONS — packages/core/src/permissions.ts
+ * - DIAGNOSES (ICD-10) — packages/core/src/diagnoses-seed.ts
+ *
+ * Yangi entry qo'shilganda deploy → boot → DB sinxron.
  */
 export async function seedPermissions(db: Database): Promise<void> {
   let upserted = 0;
@@ -34,4 +35,30 @@ export async function seedPermissions(db: Database): Promise<void> {
   }
 
   logger.info({ count: upserted }, 'Permissions catalog seeded');
+}
+
+export async function seedDiagnoses(db: Database): Promise<void> {
+  let upserted = 0;
+
+  for (const d of DIAGNOSES_SEED) {
+    await db
+      .insert(diagnoses)
+      .values({
+        code: d.code,
+        category: d.category,
+        nameUz: d.nameUz,
+        nameRu: d.nameRu,
+      })
+      .onConflictDoUpdate({
+        target: diagnoses.code,
+        set: {
+          category: d.category,
+          nameUz: d.nameUz,
+          nameRu: d.nameRu,
+        },
+      });
+    upserted++;
+  }
+
+  logger.info({ count: upserted }, 'ICD-10 dental diagnoses seeded');
 }
