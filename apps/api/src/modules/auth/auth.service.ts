@@ -82,7 +82,7 @@ async function buildPermissionsForContext(
   tenantId: string,
   branchId: string | null,
 ): Promise<string[]> {
-  // Owner check
+  // Owner check (tenants jadvalida RLS yo'q)
   const [tenant] = await db
     .select({ ownerUserId: tenants.ownerUserId })
     .from(tenants)
@@ -92,39 +92,43 @@ async function buildPermissionsForContext(
     return ['@owner'];
   }
 
-  // User's active assignments in this tenant (branch-specific yoki tenant-wide)
-  const now = new Date();
-  const branchFilter = branchId
-    ? or(isNull(userAssignments.branchId), eq(userAssignments.branchId, branchId))
-    : isNull(userAssignments.branchId);
+  // RLS context (current_tenant_id) ichida — user_assignments + role_permissions + permissions
+  // tenant_isolation policy orqali filterlanadi. Transaction-scoped.
+  return await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);
 
-  const assignments = await db
-    .select({ roleId: userAssignments.roleId })
-    .from(userAssignments)
-    .where(
-      and(
-        eq(userAssignments.userId, userId),
-        eq(userAssignments.tenantId, tenantId),
-        eq(userAssignments.isActive, true),
-        or(isNull(userAssignments.validTo), gt(userAssignments.validTo, now)),
-        branchFilter,
-      ),
-    );
+    const now = new Date();
+    const branchFilter = branchId
+      ? or(isNull(userAssignments.branchId), eq(userAssignments.branchId, branchId))
+      : isNull(userAssignments.branchId);
 
-  if (assignments.length === 0) return [];
+    const assignments = await tx
+      .select({ roleId: userAssignments.roleId })
+      .from(userAssignments)
+      .where(
+        and(
+          eq(userAssignments.userId, userId),
+          eq(userAssignments.tenantId, tenantId),
+          eq(userAssignments.isActive, true),
+          or(isNull(userAssignments.validTo), gt(userAssignments.validTo, now)),
+          branchFilter,
+        ),
+      );
 
-  const roleIds = assignments.map((a) => a.roleId);
+    if (assignments.length === 0) return [];
 
-  const perms = await db
-    .selectDistinct({ code: permissionsTable.code })
-    .from(rolePermissions)
-    .innerJoin(permissionsTable, eq(rolePermissions.permissionId, permissionsTable.id))
-    .where(inArray(rolePermissions.roleId, roleIds));
+    const roleIds = assignments.map((a) => a.roleId);
 
-  // Owner-only permissions ni filterlash (xavfsizlik)
-  return perms
-    .map((p) => p.code)
-    .filter((code) => !(OWNER_ONLY_PERMISSIONS as readonly string[]).includes(code));
+    const perms = await tx
+      .selectDistinct({ code: permissionsTable.code })
+      .from(rolePermissions)
+      .innerJoin(permissionsTable, eq(rolePermissions.permissionId, permissionsTable.id))
+      .where(inArray(rolePermissions.roleId, roleIds));
+
+    return perms
+      .map((p) => p.code)
+      .filter((code) => !(OWNER_ONLY_PERMISSIONS as readonly string[]).includes(code));
+  });
 }
 
 export type AuthServiceDeps = {
@@ -349,40 +353,51 @@ export const createAuthService = (deps: AuthServiceDeps) => {
     if (!tenant) return { ok: false as const, code: 'auth.no_workspace_access' };
     const isOwner = tenant.ownerUserId === userId;
 
-    if (!isOwner) {
-      const now = new Date();
-      // Branch filter: agar input.branchId berilgan bo'lsa, user shu branchga yoki
-      // tenant-wide (branchId IS NULL) assignment'ga ega bo'lishi kerak. Agar input.branchId
-      // bo'lmasa, user'ning istalgan assignment'i (branch-specific yoki tenant-wide) ishlatiladi.
-      const branchFilter = input.branchId
-        ? or(isNull(userAssignments.branchId), eq(userAssignments.branchId, input.branchId))
-        : undefined;
+    // 3-4. Assignment va branch validation — bitta transaction'da RLS context bilan.
+    // current_tenant_id = input.tenantId o'rnatib, user_assignments va branches'ga
+    // standart tenant_isolation policy orqali kira olamiz.
+    const validationResult = await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${input.tenantId}, true)`);
+      await tx.execute(sql`SELECT set_config('app.current_user_id', ${userId}, true)`);
 
-      const [assignment] = await db
-        .select()
-        .from(userAssignments)
-        .where(
-          and(
-            eq(userAssignments.userId, userId),
-            eq(userAssignments.tenantId, input.tenantId),
-            eq(userAssignments.isActive, true),
-            or(isNull(userAssignments.validTo), gt(userAssignments.validTo, now)),
-            ...(branchFilter ? [branchFilter] : []),
-          ),
-        );
+      if (!isOwner) {
+        const now = new Date();
+        const branchFilter = input.branchId
+          ? or(isNull(userAssignments.branchId), eq(userAssignments.branchId, input.branchId))
+          : undefined;
 
-      if (!assignment) return { ok: false as const, code: 'auth.no_workspace_access' };
-    }
+        const [assignment] = await tx
+          .select()
+          .from(userAssignments)
+          .where(
+            and(
+              eq(userAssignments.userId, userId),
+              eq(userAssignments.tenantId, input.tenantId),
+              eq(userAssignments.isActive, true),
+              or(isNull(userAssignments.validTo), gt(userAssignments.validTo, now)),
+              ...(branchFilter ? [branchFilter] : []),
+            ),
+          );
 
-    // 3. branchId tenant ichida ekanligini tekshirish (security: cross-tenant branch oldini olish)
-    if (input.branchId) {
-      const [branch] = await db
-        .select({ tenantId: branches.tenantId })
-        .from(branches)
-        .where(eq(branches.id, input.branchId));
-      if (!branch || branch.tenantId !== input.tenantId) {
-        return { ok: false as const, code: 'auth.invalid_branch' };
+        if (!assignment) return { code: 'auth.no_workspace_access' as const };
       }
+
+      // branchId tenant ichida ekanligini tekshirish (defense in depth)
+      if (input.branchId) {
+        const [branch] = await tx
+          .select({ tenantId: branches.tenantId })
+          .from(branches)
+          .where(eq(branches.id, input.branchId));
+        if (!branch || branch.tenantId !== input.tenantId) {
+          return { code: 'auth.invalid_branch' as const };
+        }
+      }
+
+      return { code: null };
+    });
+
+    if (validationResult.code) {
+      return { ok: false as const, code: validationResult.code };
     }
 
     // 4. Permissions
