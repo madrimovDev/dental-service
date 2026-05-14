@@ -13,6 +13,20 @@ import type {
   UserAssignment,
 } from './types.ts';
 import type {
+  CreateToothChartInput,
+  CreateTreatmentPlanInput,
+  CreateVisitNoteInput,
+  Diagnosis,
+  ToothChart,
+  ToothChartWithStates,
+  TreatmentPlan,
+  TreatmentPlanStatus,
+  TreatmentPlanWithStages,
+  TreatmentStage,
+  TreatmentStageStatus,
+  VisitNote,
+} from './types-clinical.ts';
+import type {
   Appointment,
   AppointmentStatus,
   CashierListResponse,
@@ -262,6 +276,43 @@ export const createEndpoints = (api: ApiClient) => ({
       api.post<QueueTicket>('/api/queue', body),
     updateStatus: (id: string, status: QueueStatus, doctorId?: string) =>
       api.patch<QueueTicket>(`/api/queue/${id}/status`, { status, doctorId }),
+  },
+
+  clinical: {
+    listDiagnoses: (search?: string) => {
+      const qs = search ? `?search=${encodeURIComponent(search)}` : '';
+      return api.get<Diagnosis[]>(`/api/diagnoses${qs}`);
+    },
+
+    listPlans: (patientId?: string) => {
+      const qs = patientId ? `?patientId=${patientId}` : '';
+      return api.get<TreatmentPlan[]>(`/api/treatment-plans${qs}`);
+    },
+    getPlan: (id: string) => api.get<TreatmentPlanWithStages>(`/api/treatment-plans/${id}`),
+    createPlan: (body: CreateTreatmentPlanInput) =>
+      api.post<TreatmentPlanWithStages>('/api/treatment-plans', body),
+    updatePlan: (
+      id: string,
+      body: { title?: string; notes?: string; status?: TreatmentPlanStatus },
+    ) => api.patch<TreatmentPlan>(`/api/treatment-plans/${id}`, body),
+    updateStage: (id: string, body: { status?: TreatmentStageStatus; notes?: string }) =>
+      api.patch<TreatmentStage>(`/api/treatment-stages/${id}`, body),
+
+    listVisitNotes: (patientId?: string) => {
+      const qs = patientId ? `?patientId=${patientId}` : '';
+      return api.get<VisitNote[]>(`/api/visit-notes${qs}`);
+    },
+    getVisitNote: (id: string) => api.get<VisitNote>(`/api/visit-notes/${id}`),
+    createVisitNote: (body: CreateVisitNoteInput) => api.post<VisitNote>('/api/visit-notes', body),
+    updateVisitNote: (id: string, body: Partial<CreateVisitNoteInput>) =>
+      api.patch<VisitNote>(`/api/visit-notes/${id}`, body),
+
+    listToothCharts: (patientId: string) =>
+      api.get<ToothChart[]>(`/api/patients/${patientId}/tooth-charts`),
+    getLatestToothChart: (patientId: string) =>
+      api.get<ToothChartWithStates | null>(`/api/patients/${patientId}/tooth-charts/latest`),
+    createToothChart: (body: CreateToothChartInput) =>
+      api.post<ToothChartWithStates>('/api/tooth-charts', body),
   },
 });
 

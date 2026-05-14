@@ -18,13 +18,24 @@ import {
   Title,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { IconAlertTriangle, IconArrowLeft, IconHeart, IconUser } from '@tabler/icons-react';
+import {
+  IconAlertTriangle,
+  IconArrowLeft,
+  IconClipboardList,
+  IconDental,
+  IconHeart,
+  IconNotes,
+  IconUser,
+} from '@tabler/icons-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from 'mantine-form-zod-resolver';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 import { z } from 'zod';
+import { ToothChartTab } from '@/components/clinical/ToothChartTab.tsx';
+import { TreatmentPlansTab } from '@/components/clinical/TreatmentPlansTab.tsx';
+import { VisitNotesTab } from '@/components/clinical/VisitNotesTab.tsx';
 import { api } from '@/lib/api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
 
@@ -200,6 +211,19 @@ export function PatientDetailPage() {
             <Tabs.Tab value="medical" leftSection={<IconHeart size={16} />}>
               {t('patients.tab_medical')}
             </Tabs.Tab>
+            {hasPermission('medical_record.view') && (
+              <>
+                <Tabs.Tab value="plans" leftSection={<IconClipboardList size={16} />}>
+                  {t('patients.tab_treatment_plans')}
+                </Tabs.Tab>
+                <Tabs.Tab value="visits" leftSection={<IconNotes size={16} />}>
+                  {t('patients.tab_visit_notes')}
+                </Tabs.Tab>
+                <Tabs.Tab value="chart" leftSection={<IconDental size={16} />}>
+                  {t('patients.tab_tooth_chart')}
+                </Tabs.Tab>
+              </>
+            )}
           </Tabs.List>
 
           <Tabs.Panel value="profile" pt="lg">
@@ -395,6 +419,20 @@ export function PatientDetailPage() {
               </Paper>
             )}
           </Tabs.Panel>
+
+          {hasPermission('medical_record.view') && (
+            <>
+              <Tabs.Panel value="plans" pt="lg">
+                <TreatmentPlansTab patientId={id ?? ''} />
+              </Tabs.Panel>
+              <Tabs.Panel value="visits" pt="lg">
+                <VisitNotesTab patientId={id ?? ''} />
+              </Tabs.Panel>
+              <Tabs.Panel value="chart" pt="lg">
+                <ToothChartTab patientId={id ?? ''} />
+              </Tabs.Panel>
+            </>
+          )}
         </Tabs>
       </Stack>
     </Container>
