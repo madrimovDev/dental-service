@@ -18,6 +18,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
+import { PhoneInput } from '@/components/PhoneInput.tsx';
 import { api } from '@/lib/api.ts';
 
 const schema = z.object({
@@ -100,10 +101,8 @@ export function RegisterTenantPage() {
               required
               {...form.getInputProps('ownerFullName')}
             />
-            <TextInput
+            <PhoneInput
               label={t('auth.register.phone')}
-              placeholder="+998 90 123 45 67"
-              autoComplete="tel"
               required
               {...form.getInputProps('ownerPhone')}
             />

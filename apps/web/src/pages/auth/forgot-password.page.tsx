@@ -1,10 +1,11 @@
-import { Alert, Anchor, Button, Container, Paper, Stack, TextInput, Title } from '@mantine/core';
+import { Alert, Anchor, Button, Container, Paper, Stack, Title } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useMutation } from '@tanstack/react-query';
 import { zodResolver } from 'mantine-form-zod-resolver';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { z } from 'zod';
+import { PhoneInput } from '@/components/PhoneInput.tsx';
 import { api } from '@/lib/api.ts';
 
 const schema = z.object({
@@ -40,13 +41,7 @@ export function ForgotPasswordPage() {
               </Alert>
             )}
 
-            <TextInput
-              label={t('auth.login.phone')}
-              placeholder="+998 90 123 45 67"
-              autoComplete="tel"
-              required
-              {...form.getInputProps('phone')}
-            />
+            <PhoneInput label={t('auth.login.phone')} required {...form.getInputProps('phone')} />
 
             <Button type="submit" loading={mut.isPending} fullWidth>
               {t('auth.forgot.submit')}

@@ -7,7 +7,6 @@ import {
   Paper,
   PasswordInput,
   Stack,
-  TextInput,
   Title,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
@@ -17,6 +16,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
+import { PhoneInput } from '@/components/PhoneInput.tsx';
 import { api } from '@/lib/api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
 
@@ -72,13 +72,7 @@ export function LoginPage() {
               </Alert>
             )}
 
-            <TextInput
-              label={t('auth.login.phone')}
-              placeholder="+998 90 123 45 67"
-              autoComplete="tel"
-              required
-              {...form.getInputProps('phone')}
-            />
+            <PhoneInput label={t('auth.login.phone')} required {...form.getInputProps('phone')} />
             <PasswordInput
               label={t('auth.login.password')}
               placeholder="••••••••"

@@ -23,6 +23,7 @@ import { zodResolver } from 'mantine-form-zod-resolver';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
+import { PhoneInput } from '@/components/PhoneInput.tsx';
 import { api } from '@/lib/api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
 
@@ -202,13 +203,7 @@ export function UsersSettingsPage() {
                 required
                 {...form.getInputProps('fullName')}
               />
-              <TextInput
-                label={t('users.phone')}
-                placeholder="+998 90 123 45 67"
-                autoComplete="tel"
-                required
-                {...form.getInputProps('phone')}
-              />
+              <PhoneInput label={t('users.phone')} required {...form.getInputProps('phone')} />
               <Select
                 label={t('users.role')}
                 data={roles.data?.map((r) => ({ value: r.id, label: r.name })) ?? []}

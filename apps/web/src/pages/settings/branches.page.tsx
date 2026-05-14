@@ -19,6 +19,7 @@ import { zodResolver } from 'mantine-form-zod-resolver';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
+import { PhoneInput } from '@/components/PhoneInput.tsx';
 import { api } from '@/lib/api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
 
@@ -157,11 +158,7 @@ export function BranchesPage() {
           <Stack gap="md">
             <TextInput label={t('branches.name')} required {...form.getInputProps('name')} />
             <TextInput label={t('branches.address')} {...form.getInputProps('address')} />
-            <TextInput
-              label={t('branches.phone')}
-              placeholder="+998..."
-              {...form.getInputProps('phone')}
-            />
+            <PhoneInput label={t('branches.phone')} {...form.getInputProps('phone')} />
             <Group justify="flex-end">
               <Button variant="default" onClick={close}>
                 {t('common.cancel')}

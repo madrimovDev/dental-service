@@ -16,6 +16,7 @@ import { zodResolver } from 'mantine-form-zod-resolver';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
+import { PhoneInput } from '@/components/PhoneInput.tsx';
 import { api } from '@/lib/api.ts';
 
 const schema = z.object({
@@ -106,14 +107,9 @@ export function NewPatientPage() {
               </SimpleGrid>
 
               <SimpleGrid cols={{ base: 1, sm: 2 }}>
-                <TextInput
-                  label={t('patients.phone')}
-                  placeholder="+998..."
-                  {...form.getInputProps('phone')}
-                />
-                <TextInput
+                <PhoneInput label={t('patients.phone')} {...form.getInputProps('phone')} />
+                <PhoneInput
                   label={t('patients.phone_secondary')}
-                  placeholder="+998... (ixtiyoriy)"
                   {...form.getInputProps('phoneSecondary')}
                 />
               </SimpleGrid>

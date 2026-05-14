@@ -44,6 +44,7 @@ import { PrescriptionsTab } from '@/components/clinical/PrescriptionsTab.tsx';
 import { ToothChartTab } from '@/components/clinical/ToothChartTab.tsx';
 import { TreatmentPlansTab } from '@/components/clinical/TreatmentPlansTab.tsx';
 import { VisitNotesTab } from '@/components/clinical/VisitNotesTab.tsx';
+import { PhoneInput } from '@/components/PhoneInput.tsx';
 import { api } from '@/lib/api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
 
@@ -283,12 +284,12 @@ export function PatientDetailPage() {
                     />
                   </SimpleGrid>
                   <SimpleGrid cols={{ base: 1, sm: 2 }}>
-                    <TextInput
+                    <PhoneInput
                       label={t('patients.phone')}
                       disabled={!hasPermission('patient.edit')}
                       {...profileForm.getInputProps('phone')}
                     />
-                    <TextInput
+                    <PhoneInput
                       label={t('patients.phone_secondary')}
                       disabled={!hasPermission('patient.edit')}
                       {...profileForm.getInputProps('phoneSecondary')}
