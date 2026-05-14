@@ -36,6 +36,12 @@ export const requirePermission =
       );
     }
 
+    // @owner sentinel — Tenant Owner uchun barcha permissions allow (OWNER_ONLY tashqari)
+    if (claims.perms.includes('@owner')) {
+      await next();
+      return;
+    }
+
     if (!claims.perms.includes(code)) {
       return c.json(fail('permission.denied', `Permission required: ${code}`), 403);
     }
