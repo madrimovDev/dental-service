@@ -59,7 +59,7 @@ export function RegisterTenantPage() {
       navigate('/login');
     },
     onError: (err: ApiError) => {
-      if (err.code === 'auth.email_or_phone_taken') {
+      if (err.code === 'auth.phone_taken' || err.code === 'auth.email_or_phone_taken') {
         setError("Bu telefon raqami allaqachon ro'yxatdan o'tgan");
       } else {
         setError(err.message);

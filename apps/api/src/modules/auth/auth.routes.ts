@@ -28,10 +28,14 @@ export const authRoutes = (deps: { db: Database }) => {
       const result = await service.registerTenant(body.data);
       return c.json(ok(result), 201);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'unknown';
-      if (msg.includes('users_email_unique') || msg.includes('users_phone_unique')) {
+      // Drizzle DrizzleQueryError'da haqiqiy postgres xato cause ichida bo'ladi
+      const stack =
+        err instanceof Error
+          ? `${err.message}\n${(err as Error & { cause?: unknown }).cause ?? ''}`
+          : 'unknown';
+      if (stack.includes('users_phone_unique') || stack.includes('users_email_unique')) {
         return c.json(
-          fail('auth.email_or_phone_taken', "Email yoki telefon allaqachon ro'yxatdan o'tgan"),
+          fail('auth.phone_taken', "Bu telefon raqami allaqachon ro'yxatdan o'tgan"),
           409,
         );
       }
