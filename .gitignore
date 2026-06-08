@@ -2,6 +2,9 @@
 node_modules/
 bun.lockb
 
+# Brainstorming visual companion
+.superpowers/
+
 # Build outputs
 dist/
 build/
