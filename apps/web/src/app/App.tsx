@@ -1,3 +1,4 @@
+import { cssVarsResolver, mantineTheme } from '@dental/ui';
 import { MantineProvider } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -25,7 +26,6 @@ import { RolesSettingsPage } from '@/pages/settings/roles.page.tsx';
 import { ServicesSettingsPage } from '@/pages/settings/services.page.tsx';
 import { TenantSettingsPage } from '@/pages/settings/tenant.page.tsx';
 import { UsersSettingsPage } from '@/pages/settings/users.page.tsx';
-import { mantineTheme } from '@/theme/mantine-theme.ts';
 
 const Protected = ({ children }: { children: React.ReactNode }) => (
   <ProtectedRoute>
@@ -35,7 +35,11 @@ const Protected = ({ children }: { children: React.ReactNode }) => (
 
 export function App() {
   return (
-    <MantineProvider theme={mantineTheme} defaultColorScheme="auto">
+    <MantineProvider
+      theme={mantineTheme}
+      cssVariablesResolver={cssVarsResolver}
+      defaultColorScheme="light"
+    >
       <Notifications position="top-right" />
       <I18nextProvider i18n={i18n}>
         <QueryClientProvider client={queryClient}>
