@@ -10,7 +10,7 @@ Shablon: [`0000-template.md`](./0000-template.md). Yaxlit manzara: [`../architec
 |---|---|---|---|---|
 | [0001](./0001-extensibility-vertical-model.md) | Extensibility / vertikal model | cross | to'liq | ✅ Accepted |
 | [0002](./0002-frontend-architecture.md) | Frontend arxitektura (folder, data-fetch, state, packages/ui) | R0/R1 | to'liq | ✅ Accepted |
-| 0003 | Design system & theming (teal↔Mantine, dark mode) | R0 | qaror+oqibat | — |
+| [0003](./0003-design-system-theming.md) | Design system & theming (teal↔Mantine, dark mode) | R0 | qaror+oqibat | ✅ Accepted |
 | 0004 | App shell & rol-adaptive nav | R1 | qaror+oqibat | — |
 | 0005 | Patient balance / ledger (computed vs materialized) | R3 | real (ochiq tanlov) | — |
 | 0006 | Reporting & aggregation (dashboard/KPI) | R3 | real (ochiq tanlov) | — |
