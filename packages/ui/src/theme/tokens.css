@@ -1,0 +1,82 @@
+/* @dental/ui — design tokens (clinik "Teal").
+   Vizual haqiqat manbasi. Mantine theme + cssVariablesResolver bularga ergashadi.
+   Dark mode: [data-mantine-color-scheme="dark"] (Mantine qo'yadi). */
+
+:root {
+  /* --- primary: teal scale --- */
+  --teal-50:#E9F8F4; --teal-100:#C9F0E7; --teal-200:#9FE4D5; --teal-300:#6FD7C7;
+  --teal-400:#2FC6B2; --teal-500:#14B8A6; --teal-600:#0E9384; --teal-700:#0B7268;
+  --teal-800:#0A5A52; --teal-900:#0A4A44;
+
+  /* --- neutral: cool slate w/ faint teal undertone --- */
+  --neutral-0:#FFFFFF; --neutral-50:#F4F9F8; --neutral-100:#E9F2EF; --neutral-200:#DCE7E4;
+  --neutral-300:#C4D6D2; --neutral-400:#8AA39E; --neutral-500:#5E7C77; --neutral-600:#41605B;
+  --neutral-700:#2C4641; --neutral-800:#16302C; --neutral-900:#0E1F1D;
+
+  /* --- raw status hues --- */
+  --green-600:#15803D; --green-bg:#E6F4EA; --amber-600:#B45309; --amber-bg:#FAEFDB;
+  --red-600:#DC2626; --red-bg:#FBE6E5; --cyan-600:#0E7490; --cyan-bg:#E0F0F3;
+
+  /* --- semantic aliases (light) --- */
+  --bg:#F3F8F7; --surface:#FFFFFF; --surface-2:#E9F2EF; --surface-raised:#FFFFFF;
+  --border:#DCE7E4; --border-subtle:#EAF1EF; --border-strong:#C4D6D2;
+  --text:#0E1F1D; --text-2:#41605B; --text-3:#869E9A; --text-on-primary:#FFFFFF;
+  --primary:var(--teal-600); --primary-hover:var(--teal-700);
+  --primary-tint:#E9F8F4; --primary-tint-2:#D2F0E8;
+  --focus-ring:color-mix(in srgb, var(--teal-600) 40%, transparent);
+  --success:var(--green-600); --success-bg:var(--green-bg);
+  --warning:var(--amber-600); --warning-bg:var(--amber-bg);
+  --danger:var(--red-600); --danger-bg:var(--red-bg);
+  --info:var(--cyan-600); --info-bg:var(--cyan-bg);
+
+  /* --- spacing (4px base) --- */
+  --space-0:0; --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px;
+  --space-5:20px; --space-6:24px; --space-8:32px; --space-10:40px; --space-12:48px;
+
+  /* --- radius --- */
+  --radius-xs:5px; --radius-sm:6px; --radius:8px; --radius-md:9px;
+  --radius-lg:12px; --radius-xl:14px; --radius-pill:999px;
+
+  /* --- elevation (light) --- */
+  --shadow-sm:0 1px 2px rgba(14,31,29,.05), 0 1px 3px rgba(14,31,29,.04);
+  --shadow:0 1px 2px rgba(14,31,29,.05), 0 6px 16px -4px rgba(14,31,29,.08);
+  --shadow-lg:0 16px 40px -10px rgba(14,31,29,.22);
+
+  /* --- motion --- */
+  --ease:cubic-bezier(.2,.6,.2,1); --dur-fast:.12s; --dur:.2s;
+
+  /* --- layout --- */
+  --topbar-h:58px; --sidebar-w:244px;
+
+  /* --- typography --- */
+  --font-sans:'IBM Plex Sans', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono:'IBM Plex Mono', ui-monospace, "SF Mono", Menlo, monospace;
+  --text-2xs:10px; --text-xs:11px; --text-sm:12.5px; --text-base:13.5px; --text-md:14.5px;
+  --text-lg:16px; --text-xl:19px; --text-2xl:22px; --text-display:27px;
+  --fw-regular:400; --fw-medium:500; --fw-semibold:600; --fw-bold:700;
+  --lh-tight:1.15; --lh-snug:1.35; --lh-normal:1.55;
+  --ls-tight:-0.02em; --ls-label:0.06em;
+  --num:"tnum" 1;
+}
+
+[data-mantine-color-scheme="dark"] {
+  --bg:#0A1817; --surface:#102220; --surface-2:#16302C; --surface-raised:#16302C;
+  --border:#21352F; --border-subtle:#172E2A; --border-strong:#2C4641;
+  --text:#E4F0ED; --text-2:#9DB8B3; --text-3:#65827D; --text-on-primary:#04201C;
+  --primary:var(--teal-400); --primary-hover:#36D3C3;
+  --primary-tint:#15302C; --primary-tint-2:#1B3D38;
+  --focus-ring:color-mix(in srgb, var(--teal-400) 45%, transparent);
+  --success:#5FD68B; --success-bg:#15331F; --warning:#E8B765; --warning-bg:#33270F;
+  --danger:#F08A82; --danger-bg:#371917; --info:#5FC4D8; --info-bg:#0E2A30;
+
+  --shadow-sm:0 1px 2px rgba(0,0,0,.4);
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 20px -6px rgba(0,0,0,.5);
+  --shadow-lg:0 20px 48px -12px rgba(0,0,0,.7);
+}
+
+/* opt-in typography helpers (primitivlar var() ishlatadi, bular qulaylik uchun) */
+.t-display{font-family:var(--font-sans);font-size:var(--text-display);font-weight:var(--fw-bold);letter-spacing:var(--ls-tight);line-height:var(--lh-tight);}
+.t-title{font-size:var(--text-2xl);font-weight:var(--fw-bold);letter-spacing:var(--ls-tight);}
+.t-body{font-size:var(--text-base);line-height:var(--lh-normal);}
+.t-label{font-family:var(--font-mono);font-size:var(--text-2xs);font-weight:var(--fw-semibold);letter-spacing:var(--ls-label);text-transform:uppercase;}
+.t-mono{font-family:var(--font-mono);font-feature-settings:var(--num);}
