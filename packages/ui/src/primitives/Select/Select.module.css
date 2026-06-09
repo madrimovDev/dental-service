@@ -1,0 +1,25 @@
+.input {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  color: var(--text);
+  border-radius: var(--radius);
+  min-height: 36px;
+}
+.input::placeholder {
+  color: var(--text-3);
+}
+.dropdown {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.option {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  border-radius: var(--radius-sm);
+}
+.option[data-checked] {
+  background: var(--primary-tint);
+  color: var(--primary-hover);
+}
