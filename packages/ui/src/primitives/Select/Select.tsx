@@ -10,7 +10,7 @@ export interface SelectProps {
   data: ComponentProps<typeof MantineSelect>['data'];
 }
 
-export function Select({ label, value, onChange, placeholder = 'Tanlang', data }: SelectProps) {
+export function Select({ label, value, onChange, placeholder, data }: SelectProps) {
   return (
     <MantineSelect
       label={label}
