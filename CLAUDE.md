@@ -2,6 +2,10 @@
 
 Bu fayl Claude Code uchun loyiha konteksti. Har yangi sessiyada birinchi o'qiladi.
 
+> ⚠️ **REDESIGN FAOL (2026-06-09).** Loyiha "Dental SaaS" → **kengaytiriladigan klinika platformasi + rolga moslashuvchi UX** ga qayta yo'naltirildi. M1–M5 yadro qurilgan va saqlanadi (gibrid: ko'chiriladi, qayta qurilmaydi).
+> **Joriy reja:** Obsidian `05-Redesign.md` + Linear (Dental Service — Redesign, team CLI) — milestone'lar M0–M8 (R0–R5 + Foundation + OpenAPI). Quyidagi **§8 Phasing eskirgan** (eski M1–M7) — 05-Redesign'ga qarang.
+> **Arxitektura qarorlari:** `docs/rfcs/` (RFC 001–010) + `docs/architecture.md`.
+
 **Joriy arxitektura:** [`docs/architecture.md`](./docs/architecture.md) + [`docs/rfcs/`](./docs/rfcs/) (RFC 001–010) · UX/IA: [`docs/ux-ia-concept.md`](./docs/ux-ia-concept.md)
 Konsept (⚠️ historical, dental-only): [`CONCEPT.md`](./CONCEPT.md) — redesign bilan almashtirildi (2026-06-09)
 Qarorlar tarixi: `~/Документы/Obsidian Vault/Projects/dental-service/01-Qarorlar.md`
@@ -357,6 +361,8 @@ docker compose -f infra/docker-compose.yml down
 ---
 
 ## 8. Phasing — qisqa esdalik
+
+> ⚠️ **ESKIRGAN (2026-06-09 redesign).** Quyidagi Phase 1/M1–M7 — eski reja. M1–M5 qurildi, keyin redesign boshlandi. **Joriy reja: R0–R5 milestone'lar** (Obsidian `05-Redesign.md` + Linear). Bu bo'lim tarixiy esdalik sifatida qoldirilgan.
 
 > **Revised:** Phase 1+2 birlashtirildi (real mijoz to'liq dental dasturni xohlagani sababli). Eski Phase 3 endi Phase 2.
 
