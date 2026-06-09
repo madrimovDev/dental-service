@@ -15,6 +15,6 @@ Shablon: [`0000-template.md`](./0000-template.md). Yaxlit manzara: [`../architec
 | [0005](./0005-patient-balance-ledger.md) | Patient balance / ledger (computed vs materialized) | R3 | real (ochiq tanlov) | ✅ Accepted |
 | [0006](./0006-reporting-aggregation.md) | Reporting & aggregation (dashboard/KPI) | R3 | real (ochiq tanlov) | ✅ Accepted |
 | [0007](./0007-erp-modules-data-model.md) | Yangi ERP modullar data model (ombor/xarajat/payroll) | R4 | stub | ✅ Accepted (yo'nalish) |
-| 0008 | Notifications (kanal abstraksiya + Eskiz) | R4 | stub | — |
+| [0008](./0008-notifications.md) | Notifications (kanal abstraksiya + Eskiz) | R4 | stub | ✅ Accepted (yo'nalish) |
 
 > Chuqurlik yetuklikka qarab: yaqin epiklar (R0/R1) to'liq; uzoq epiklar (R3/R4) qisqaroq — talablar o'zgarishi mumkin. RFC-ma-RFC yoziladi va ko'rib chiqiladi.
