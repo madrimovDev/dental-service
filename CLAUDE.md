@@ -279,13 +279,17 @@ dental-service/
 - Response: `{ data: ..., meta: { page, pageSize, total } }`
 - Errors: `{ error: { code, message, details? } }` + HTTP status
 
-### Frontend
-- Sahifa komponentlari `apps/web/src/pages/` da
-- Shared komponentlar `packages/ui/` da
-- Server state — TanStack Query (`useQuery`, `useMutation`)
-- Client state — Zustand (kichik store'lar, per feature)
-- Forms — `@mantine/form` + Zod
-- Hech qachon `fetch()` to'g'ridan-to'g'ri — `api-client` orqali
+### Frontend (feature-folder qatlamli — RFC-0010)
+- **Feature struktura** `apps/web/src/features/<feature>/`: `index` · `<f>.api.ts` (Query hooks) · `<f>.keys.ts` (query-key factory) · `<f>.schema.ts` (Zod form) · `<f>.mappers.ts` (DTO↔view-model, MAJBURIY) · `<f>.types.ts` · `components/`
+- **Qatlam:** `components → api.ts (hooks) → generated api-client`. Komponent api-client'ni bevosita chaqirmaydi.
+- **Pages** `apps/web/src/pages/` — yupqa route entry (feature screen'ni ulaydi)
+- **Shared:** `packages/ui` (dizayn-tizim primitivlari) → `apps/web/src/components` (ilova-shared) → feature `components/`
+- Server state — TanStack Query (faqat feature hooks orqali); query-key `[feature, scope, params]`
+- Client state — Zustand (global `stores/`: auth, ui/shell); server data dublirlanmaydi
+- Forms — `@mantine/form` + `mantine-form-zod-resolver`
+- API tiplari — **generated `packages/api-client`** (OpenAPI, qo'lda emas; RFC-0002 §4)
+- Hech qachon `fetch()` to'g'ridan-to'g'ri — generated `api-client` orqali
+- Tafsilot: [`docs/rfcs/0010-frontend-feature-architecture.md`](./docs/rfcs/0010-frontend-feature-architecture.md)
 
 ### Testing
 - Unit: `*.test.ts` har feature folder ichida
