@@ -1,0 +1,43 @@
+.list {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--border);
+}
+.tab {
+  padding: 9px 13px;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-2);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--dur-fast);
+}
+.tab:hover {
+  color: var(--text);
+}
+.tab[data-active] {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+  font-weight: var(--fw-semibold);
+}
+
+/* pill variant — root'dagi data-variant orqali */
+[data-variant="pill"] .list {
+  border: none;
+  gap: 6px;
+}
+[data-variant="pill"] .tab {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  margin-bottom: 0;
+}
+[data-variant="pill"] .tab[data-active] {
+  background: var(--primary-tint);
+  border-color: var(--primary);
+  color: var(--primary-hover);
+}
