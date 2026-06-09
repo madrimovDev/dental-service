@@ -1,0 +1,46 @@
+.root {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  position: relative;
+  transition: background var(--dur-fast);
+}
+.root:hover {
+  background: var(--surface-2);
+}
+.root:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+.root[data-bordered="true"] {
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.root svg {
+  width: 18px;
+  height: 18px;
+}
+.root[data-size="sm"] {
+  width: 30px;
+  height: 30px;
+}
+.root[data-size="sm"] svg {
+  width: 15px;
+  height: 15px;
+}
+.dot {
+  position: absolute;
+  top: 8px;
+  right: 9px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 1.5px solid var(--surface);
+}
