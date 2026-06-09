@@ -1,0 +1,26 @@
+.root {
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  font-family: var(--font-sans);
+  font-weight: var(--fw-semibold);
+  flex: none;
+}
+.root[data-size="sm"] {
+  width: 30px;
+  height: 30px;
+  font-size: 11px;
+}
+.root[data-size="md"] {
+  width: 36px;
+  height: 36px;
+  font-size: 13px;
+}
+.root[data-size="lg"] {
+  width: 46px;
+  height: 46px;
+  font-size: 15px;
+}
