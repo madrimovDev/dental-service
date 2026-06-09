@@ -16,6 +16,7 @@ import { ResetPasswordPage } from '@/pages/auth/reset-password.page.tsx';
 import { SelectWorkspacePage } from '@/pages/auth/select-workspace.page.tsx';
 import { CashierPage } from '@/pages/cashier.page.tsx';
 import { DashboardPage } from '@/pages/dashboard.page.tsx';
+import { DesignSystemPage } from '@/pages/dev/DesignSystemPage.tsx';
 import { PatientDetailPage } from '@/pages/patients/detail.page.tsx';
 import { PatientsListPage } from '@/pages/patients/list.page.tsx';
 import { NewPatientPage } from '@/pages/patients/new.page.tsx';
@@ -157,6 +158,9 @@ export function App() {
                   </Protected>
                 }
               />
+
+              {/* Dev-only */}
+              {import.meta.env.DEV && <Route path="/dev/ds" element={<DesignSystemPage />} />}
 
               {/* Fallback */}
               <Route path="*" element={<Navigate to="/" replace />} />
