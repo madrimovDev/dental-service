@@ -2,7 +2,8 @@
 
 Bu fayl Claude Code uchun loyiha konteksti. Har yangi sessiyada birinchi o'qiladi.
 
-To'liq konsept: [`CONCEPT.md`](./CONCEPT.md)
+**Joriy arxitektura:** [`docs/architecture.md`](./docs/architecture.md) + [`docs/rfcs/`](./docs/rfcs/) (RFC 001–010) · UX/IA: [`docs/ux-ia-concept.md`](./docs/ux-ia-concept.md)
+Konsept (⚠️ historical, dental-only): [`CONCEPT.md`](./CONCEPT.md) — redesign bilan almashtirildi (2026-06-09)
 Qarorlar tarixi: `~/Документы/Obsidian Vault/Projects/dental-service/01-Qarorlar.md`
 
 ---

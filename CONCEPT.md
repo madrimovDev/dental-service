@@ -1,10 +1,15 @@
 # Dental Service — Loyiha Konsepti
 
+> [!warning] ⚠️ HISTORICAL / SUPERSEDED (2026-06-09)
+> Bu — loyihaning **dastlabki** konsepti (dental-only SaaS). 2026-06-09 redesign yo'nalishni o'zgartirdi → **kengaytiriladigan klinika platformasi + rolga moslashuvchi UX**.
+> **Joriy manbalar:** [`docs/architecture.md`](./docs/architecture.md), [`docs/rfcs/`](./docs/rfcs/), [`docs/ux-ia-concept.md`](./docs/ux-ia-concept.md).
+> Bu fayl **tarixiy kontekst** va ba'zi RFC iqtiboslari (NotificationChannel, 1C, mahsulot vizyoni) uchun saqlanadi — qaror manbasi emas.
+
 > O'zbekistondagi stomatologiya klinikalari uchun SaaS boshqaruv tizimi. Multi-tenant + multi-branch arxitektura. To'liq klinik ish jarayoni va biznes boshqaruvi bir tizimda.
 
 **Versiya:** 0.1 (concept)
 **Boshlangan:** 2026-05-14
-**Status:** Rejalashtirilmoqda
+**Status:** ⚠️ Historical — redesign bilan almashtirildi (2026-06-09)
 
 ---
 
