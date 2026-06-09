@@ -1,15 +1,10 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "rootDir": "./src",
-    "outDir": "./dist",
-    "noEmit": true,
-    "lib": ["ESNext", "DOM"],
     "jsx": "react-jsx",
-    "types": [],
-    "paths": {
-      "@/*": ["./src/*"]
-    }
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "types": ["vitest/globals", "@testing-library/jest-dom"],
+    "noEmit": true
   },
-  "include": ["src/**/*"]
+  "include": ["src"]
 }
