@@ -12,7 +12,7 @@ Shablon: [`0000-template.md`](./0000-template.md). Yaxlit manzara: [`../architec
 | [0002](./0002-frontend-architecture.md) | Frontend arxitektura (folder, data-fetch, state, packages/ui) | R0/R1 | to'liq | ✅ Accepted |
 | [0003](./0003-design-system-theming.md) | Design system & theming (teal↔Mantine, dark mode) | R0 | qaror+oqibat | ✅ Accepted |
 | [0004](./0004-app-shell-navigation.md) | App shell & rol-adaptive nav | R1 | qaror+oqibat | ✅ Accepted |
-| 0005 | Patient balance / ledger (computed vs materialized) | R3 | real (ochiq tanlov) | — |
+| [0005](./0005-patient-balance-ledger.md) | Patient balance / ledger (computed vs materialized) | R3 | real (ochiq tanlov) | ✅ Accepted |
 | 0006 | Reporting & aggregation (dashboard/KPI) | R3 | real (ochiq tanlov) | — |
 | 0007 | Yangi ERP modullar data model (ombor/xarajat/payroll) | R4 | stub | — |
 | 0008 | Notifications (kanal abstraksiya + Eskiz) | R4 | stub | — |
