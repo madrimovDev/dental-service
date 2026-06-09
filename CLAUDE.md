@@ -90,13 +90,13 @@ app.delete('/patients/:id',
 
 Yangi permission code kerak bo'lsa — `permissions` katalogiga qo'sh va seed migration yangila. Hech qachon code ichida hardcode qilma.
 
-### 3.4 Multi-tenant izolyatsiya — belt and suspenders
+### 3.4 Multi-tenant izolyatsiya — RLS-only + CI lint (RFC-0009)
 
-**Ikki qatla himoya:**
+**Himoya modeli:**
 
-1. **Postgres RLS** — har tenant-scoped jadvalda RLS yoqilgan, har query'ga `WHERE tenant_id = current_setting('app.current_tenant_id')` qo'shiladi. Hono middleware har auth'lanagan request da **transaction ochib** `SET LOCAL app.current_tenant_id = '...'` chaqiradi (`SET LOCAL` faqat transaction ichida ishlaydi). Service factories `db` ni `c.get('db')` orqali oladi (transaction-bound), hech qachon to'g'ridan-to'g'ri import qilmaydi.
+1. **Postgres RLS (yagona runtime qatlam)** — har tenant-scoped jadvalda `FORCE ROW LEVEL SECURITY` yoqilgan; policy `WHERE tenant_id = current_setting('app.current_tenant_id')`. Hono middleware har auth'langan request da **transaction ochib** `SET LOCAL app.current_tenant_id = '...'` chaqiradi. Service/repository `db` ni `getDb(c)` (`apps/api/src/db/scoped.ts`) orqali oladi — transaction-bound, hech qachon to'g'ridan import qilmaydi. **Query'da explicit `WHERE tenant_id` YOZILMAYDI** — RLS filtrlaydi.
 
-2. **`tenantScopedQuery` helper** — `apps/api/src/db/scoped.ts` da hand-rolled helper. **⚠️ Drizzle'da query interceptor YO'Q** — "magic middleware filter" mavjud emas. Bizning helper explicit `WHERE tenant_id = c.get('activeTenantId')` qo'shadi. Servis kodi shu helper orqali query qiladi, dev-time xato'larni code review'da tutadi.
+2. **`check-rls-coverage` CI lint (kompilyatsiya-vaqti kafolat)** — har tenant-scoped jadval `FORCE RLS`'ga ega ekanini majburlaydi. Bu — qo'lda per-query `tenantScopedQuery` helper o'rniga (helper **ishlatilmaydi**, bekor qilindi).
 
 **Hech qachon RLS ni o'tib ketma.** Agar query qila olmasang, RLS o'rnatilganmi yoki yo'qmi, tekshir. Cross-tenant query qilish uchun maxsus admin tool kerak bo'lsa — alohida service account yarat.
 
@@ -236,15 +236,17 @@ dental-service/
 └── CLAUDE.md              # Bu fayl
 ```
 
-**Backend feature folder pattern (`apps/api/src/modules/<feature>/`):**
+**Backend feature folder pattern (`apps/api/src/modules/<feature>/`) — 6 fayl qatlamli (RFC-0009):**
 ```
 <feature>/
-├── <feature>.routes.ts     # Hono routes
-├── <feature>.service.ts    # Factory function (business logic)
-├── <feature>.queries.ts    # Drizzle queries
-├── <feature>.schema.ts     # Zod schemalar (DTO, response)
-└── index.ts                # Public exports
+├── <feature>.routes.ts       # HTTP: OpenAPIHono createRoute + middleware + ok/fail
+├── <feature>.service.ts      # Biznes mantiq: factory(deps); repository+mapper orkestratsiya; audit
+├── <feature>.repository.ts   # Ma'lumotga kirish: Drizzle, getDb(c) (RLS-bound), biznes mantiqsiz
+├── <feature>.schema.ts       # Zod DTO (request/response) — zod-openapi OpenAPI manbasi
+├── <feature>.mapper.ts       # Transformatsiya: DB row ↔ DTO (PII mask, javob shakli)
+└── index.ts                  # Public eksport (routes factory)
 ```
+> Qatlam: `routes → service → repository`; `mapper` sof transformatsiya. Trivial CRUD'da repository/mapper yengil. Mavjud 4-fayl modullar bosqichma-bosqich konvergatsiya qiladi (zod-openapi migratsiyasi bilan, CLI-92). Tafsilot: [`docs/rfcs/0009-backend-module-architecture.md`](./docs/rfcs/0009-backend-module-architecture.md).
 
 ---
 
