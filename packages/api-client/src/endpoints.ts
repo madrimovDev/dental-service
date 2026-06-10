@@ -165,6 +165,9 @@ export const createEndpoints = (api: ApiClient) => ({
       passport?: string;
       address?: string;
       notes?: string;
+      tags?: string[];
+      source?: string;
+      insurance?: { provider: string; policyNumber: string } | null;
     }) => api.post<Patient>('/api/patients', body),
     update: (id: string, body: Partial<Patient>) => api.patch<Patient>(`/api/patients/${id}`, body),
     archive: (id: string) => api.delete<{ archived: true; id: string }>(`/api/patients/${id}`),

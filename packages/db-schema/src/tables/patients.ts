@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { date, index, pgEnum, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { date, index, jsonb, pgEnum, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { tenants } from './tenants.ts';
 
 export const genderEnum = pgEnum('patient_gender', ['male', 'female', 'other']);
@@ -34,6 +34,11 @@ export const patients = pgTable(
 
     photoUrl: text('photo_url'),
     notes: text('notes'),
+
+    // R2: teg / manba / sug'urta (CLI-38)
+    tags: text('tags').array().notNull().default(sql`'{}'`),
+    source: text('source'),
+    insurance: jsonb('insurance').$type<{ provider: string; policyNumber: string } | null>(),
 
     archivedAt: timestamp('archived_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

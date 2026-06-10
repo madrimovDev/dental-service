@@ -121,6 +121,9 @@ export const createPatientsService = (deps: { audit: AuditLogger }) => {
           passport: input.passport ?? null,
           address: input.address ?? null,
           notes: input.notes ?? null,
+          tags: input.tags ?? [],
+          source: input.source ?? null,
+          insurance: input.insurance ?? null,
         })
         .returning();
 

@@ -27,6 +27,12 @@ export const createPatientSchema = z.object({
   passport: z.string().max(64).optional(),
   address: z.string().max(500).optional(),
   notes: z.string().max(2000).optional(),
+  tags: z.array(z.string().min(1).max(40)).max(20).optional(),
+  source: z.string().max(80).optional(),
+  insurance: z
+    .object({ provider: z.string().min(1).max(120), policyNumber: z.string().min(1).max(80) })
+    .nullable()
+    .optional(),
 });
 export type CreatePatientInput = z.infer<typeof createPatientSchema>;
 

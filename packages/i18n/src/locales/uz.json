@@ -20,7 +20,9 @@
     "back": "Orqaga",
     "select": "Tanlang",
     "active": "Faol",
-    "inactive": "Faol emas"
+    "inactive": "Faol emas",
+    "view": "Ko'rish",
+    "archive": "Arxivlash"
   },
   "health": {
     "title": "Tizim holati",
@@ -206,7 +208,11 @@
     "address": "Manzil",
     "notes": "Eslatma",
     "dob": "Tug'ilgan sana",
-    "gender": "Jinsi",
+    "gender": {
+      "male": "Erkak",
+      "female": "Ayol",
+      "other": "Boshqa"
+    },
     "gender_male": "Erkak",
     "gender_female": "Ayol",
     "gender_other": "Boshqa",
@@ -224,6 +230,41 @@
     "tab_consent": "Konsent",
     "tab_lab_orders": "Lab buyurtmalar",
     "tab_images": "Rasmlar",
+    "tab": {
+      "general": "Umumiy",
+      "medical": "Tibbiy karta",
+      "odontogram": "Odontogram",
+      "plan": "Davolash rejasi",
+      "visits": "Vizitlar",
+      "rx": "Reseptlar",
+      "images": "Rasmlar",
+      "lab": "Lab",
+      "consent": "Konsent",
+      "payments": "To'lovlar"
+    },
+    "payments_empty": "Bu bemor uchun to'lovlar yo'q",
+    "form": {
+      "section_main": "Asosiy ma'lumot",
+      "full_name": "To'liq ism",
+      "date_of_birth": "Tug'ilgan sana",
+      "gender_label": "Jins",
+      "phone": "Telefon",
+      "phone_secondary": "Qo'shimcha telefon",
+      "passport": "Passport",
+      "address": "Manzil",
+      "notes": "Izoh",
+      "tags": "Teglar",
+      "source": "Manba",
+      "insurance": "Sug'urta",
+      "insurance_provider": "Sug'urta kompaniyasi",
+      "insurance_policy": "Polis raqami"
+    },
+    "source": {
+      "referral": "Tavsiya",
+      "ad": "Reklama",
+      "repeat": "Qayta",
+      "other": "Boshqa"
+    },
     "severe_allergy_warning": "DIQQAT — anestetik allergiyasi!",
     "no_medical_permission": "Sizda tibbiy kartani ko'rish ruxsati yo'q"
   },
@@ -509,6 +550,7 @@
     "charge": "To'lovni qabul qilish",
     "today_transactions": "Bugungi operatsiyalar",
     "no_transactions_today": "Bugun operatsiyalar yo'q",
+    "date": "Sana",
     "amount": "Summa",
     "status": "Status",
     "receipt": "Chek raqami",
