@@ -25,7 +25,7 @@ export function PaymentsTab({ patientId }: { patientId: string }) {
         <Table striped highlightOnHover>
           <Table.Thead>
             <Table.Tr>
-              <Table.Th>{t('patients.form.date_of_birth')}</Table.Th>
+              <Table.Th>{t('cashier.date')}</Table.Th>
               <Table.Th>{t('cashier.receipt')}</Table.Th>
               <Table.Th>{t('cashier.amount')}</Table.Th>
               <Table.Th>{t('cashier.payment_method')}</Table.Th>

@@ -4,22 +4,11 @@ import { useForm } from '@mantine/form';
 import { zodResolver } from 'mantine-form-zod-resolver';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { z } from 'zod';
 import { PhoneInput } from '@/components/PhoneInput.tsx';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { usePatientRaw, useUpdatePatient } from '../../patients.api';
+import { patientEditSchema } from '../../patients.schema';
 import type { PatientDetail } from '../../patients.types';
-
-const profileSchema = z.object({
-  fullName: z.string().min(2).max(120),
-  dateOfBirth: z.string().optional(),
-  gender: z.enum(['male', 'female', 'other']).optional(),
-  phone: z.string().optional(),
-  phoneSecondary: z.string().optional(),
-  passport: z.string().optional(),
-  address: z.string().optional(),
-  notes: z.string().optional(),
-});
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -124,7 +113,7 @@ function GeneralEditForm({ patientId }: { patientId: string }) {
       address: '',
       notes: '',
     },
-    validate: zodResolver(profileSchema),
+    validate: zodResolver(patientEditSchema),
   });
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: form.setValues stable
@@ -185,9 +174,9 @@ function GeneralEditForm({ patientId }: { patientId: string }) {
                 form.setFieldValue('gender', (v as 'male' | 'female' | 'other' | null) ?? undefined)
               }
               data={[
-                { value: 'male', label: t('patients.gender_male') },
-                { value: 'female', label: t('patients.gender_female') },
-                { value: 'other', label: t('patients.gender_other') },
+                { value: 'male', label: t('patients.gender.male') },
+                { value: 'female', label: t('patients.gender.female') },
+                { value: 'other', label: t('patients.gender.other') },
               ]}
             />
           </SimpleGrid>

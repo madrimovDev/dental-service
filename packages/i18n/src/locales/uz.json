@@ -550,6 +550,7 @@
     "charge": "To'lovni qabul qilish",
     "today_transactions": "Bugungi operatsiyalar",
     "no_transactions_today": "Bugun operatsiyalar yo'q",
+    "date": "Sana",
     "amount": "Summa",
     "status": "Status",
     "receipt": "Chek raqami",

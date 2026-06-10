@@ -550,6 +550,7 @@
     "charge": "Принять оплату",
     "today_transactions": "Операции за сегодня",
     "no_transactions_today": "Сегодня операций нет",
+    "date": "Дата",
     "amount": "Сумма",
     "status": "Статус",
     "receipt": "Номер чека",

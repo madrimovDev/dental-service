@@ -16,17 +16,9 @@ import { useForm } from '@mantine/form';
 import { zodResolver } from 'mantine-form-zod-resolver';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { z } from 'zod';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { useMedicalRecord, useUpdateMedicalRecord } from '../../patients.api';
-
-const medicalSchema = z.object({
-  anamnez: z.string().optional(),
-  chronicConditionsText: z.string().optional(),
-  currentMedicationsText: z.string().optional(),
-  bloodType: z.string().optional(),
-  pregnancyStatus: z.enum(['not_applicable', 'pregnant', 'planning', 'lactating']).optional(),
-});
+import { medicalRecordFormSchema } from '../../patients.schema';
 
 export function MedicalTab({ patientId }: { patientId: string }) {
   const { t } = useTranslation();
@@ -46,7 +38,7 @@ export function MedicalTab({ patientId }: { patientId: string }) {
       bloodType: '',
       pregnancyStatus: 'not_applicable' as 'not_applicable' | 'pregnant' | 'planning' | 'lactating',
     },
-    validate: zodResolver(medicalSchema),
+    validate: zodResolver(medicalRecordFormSchema),
   });
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: form.setValues stable
