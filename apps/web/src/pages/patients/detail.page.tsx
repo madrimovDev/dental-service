@@ -272,7 +272,7 @@ export function PatientDetailPage() {
                       {...profileForm.getInputProps('dateOfBirth')}
                     />
                     <Select
-                      label={t('patients.gender')}
+                      label={t('patients.form.gender_label')}
                       data={[
                         { value: 'male', label: t('patients.gender_male') },
                         { value: 'female', label: t('patients.gender_female') },
