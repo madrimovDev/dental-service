@@ -30,6 +30,26 @@ export function usePatient(id: string) {
   });
 }
 
+export function usePatientRaw(id: string) {
+  return useQuery({
+    queryKey: patientKeys.raw(id),
+    queryFn: () => api.patients.get(id),
+    enabled: !!id,
+  });
+}
+
+export function useUpdatePatient(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Parameters<typeof api.patients.update>[1]) => api.patients.update(id, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: patientKeys.detail(id) });
+      qc.invalidateQueries({ queryKey: patientKeys.raw(id) });
+      qc.invalidateQueries({ queryKey: patientKeys.all });
+    },
+  });
+}
+
 export function useCreatePatient() {
   const qc = useQueryClient();
   return useMutation({

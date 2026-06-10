@@ -13,7 +13,6 @@ import {
   Textarea,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { IconAlertTriangle } from '@tabler/icons-react';
 import { zodResolver } from 'mantine-form-zod-resolver';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -72,8 +71,6 @@ export function MedicalTab({ patientId }: { patientId: string }) {
     return <Text>{t('common.loading')}</Text>;
   }
 
-  const severeAllergy = allergies.find((a) => a.severity === 'severe' && a.type === 'anesthetic');
-
   const submit = form.onSubmit((values) =>
     updateMut.mutate({
       anamnez: values.anamnez || undefined,
@@ -97,16 +94,6 @@ export function MedicalTab({ patientId }: { patientId: string }) {
 
   return (
     <Stack gap="md">
-      {severeAllergy && (
-        <Alert color="red" icon={<IconAlertTriangle size={20} />} variant="filled">
-          <Text fw={700}>⚠️ {t('patients.severe_allergy_warning')}</Text>
-          <Text size="sm">
-            {severeAllergy.substance} ({severeAllergy.severity})
-            {severeAllergy.notes && ` — ${severeAllergy.notes}`}
-          </Text>
-        </Alert>
-      )}
-
       <Paper withBorder p="xl" radius="md">
         <form onSubmit={submit}>
           <Stack gap="md">

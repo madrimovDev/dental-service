@@ -25,6 +25,8 @@ vi.mock('../patients.api', () => ({
   }),
   useMedicalRecord: () => ({ data: null }),
   useUpdateMedicalRecord: () => ({ mutate: vi.fn() }),
+  usePatientRaw: () => ({ data: null }),
+  useUpdatePatient: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 describe('PatientCard', () => {

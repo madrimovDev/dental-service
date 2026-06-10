@@ -1,7 +1,25 @@
-import { Card, Mono } from '@dental/ui';
-import { Badge, Group, SimpleGrid, Stack, Text } from '@mantine/core';
+import { Button, Card, Input, Mono, Select } from '@dental/ui';
+import { Badge, Group, SimpleGrid, Stack, Text, Textarea } from '@mantine/core';
+import { useForm } from '@mantine/form';
+import { zodResolver } from 'mantine-form-zod-resolver';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { z } from 'zod';
+import { PhoneInput } from '@/components/PhoneInput.tsx';
+import { useAuthStore } from '@/stores/auth-store.ts';
+import { usePatientRaw, useUpdatePatient } from '../../patients.api';
 import type { PatientDetail } from '../../patients.types';
+
+const profileSchema = z.object({
+  fullName: z.string().min(2).max(120),
+  dateOfBirth: z.string().optional(),
+  gender: z.enum(['male', 'female', 'other']).optional(),
+  phone: z.string().optional(),
+  phoneSecondary: z.string().optional(),
+  passport: z.string().optional(),
+  address: z.string().optional(),
+  notes: z.string().optional(),
+});
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -14,7 +32,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-export function GeneralTab({ patient }: { patient: PatientDetail }) {
+function GeneralReadOnly({ patient }: { patient: PatientDetail }) {
   const { t } = useTranslation();
   const dash = '—';
 
@@ -88,4 +106,136 @@ export function GeneralTab({ patient }: { patient: PatientDetail }) {
       )}
     </Stack>
   );
+}
+
+function GeneralEditForm({ patientId }: { patientId: string }) {
+  const { t } = useTranslation();
+  const rawQuery = usePatientRaw(patientId);
+  const updateMut = useUpdatePatient(patientId);
+
+  const form = useForm({
+    initialValues: {
+      fullName: '',
+      dateOfBirth: '',
+      gender: undefined as 'male' | 'female' | 'other' | undefined,
+      phone: '',
+      phoneSecondary: '',
+      passport: '',
+      address: '',
+      notes: '',
+    },
+    validate: zodResolver(profileSchema),
+  });
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: form.setValues stable
+  useEffect(() => {
+    if (rawQuery.data) {
+      const p = rawQuery.data;
+      form.setValues({
+        fullName: p.fullName,
+        dateOfBirth: p.dateOfBirth ?? '',
+        gender: p.gender ?? undefined,
+        phone: p.phone ?? '',
+        phoneSecondary: p.phoneSecondary ?? '',
+        passport: p.passport ?? '',
+        address: p.address ?? '',
+        notes: p.notes ?? '',
+      });
+    }
+  }, [rawQuery.data]);
+
+  if (!rawQuery.data) {
+    return <Text>{t('common.loading')}</Text>;
+  }
+
+  const submit = form.onSubmit((values) =>
+    updateMut.mutate({
+      fullName: values.fullName,
+      gender: values.gender ?? null,
+      dateOfBirth: values.dateOfBirth || null,
+      phone: values.phone || null,
+      phoneSecondary: values.phoneSecondary || null,
+      passport: values.passport || null,
+      address: values.address || null,
+      notes: values.notes || null,
+    }),
+  );
+
+  return (
+    <Card title={t('patients.form.section_main')}>
+      <form onSubmit={submit}>
+        <Stack gap="md">
+          <Input
+            label={t('patients.form.full_name')}
+            value={form.values.fullName}
+            invalid={!!form.errors.fullName}
+            onChange={(v) => form.setFieldValue('fullName', v)}
+          />
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+            <Input
+              label={t('patients.form.date_of_birth')}
+              type="date"
+              value={form.values.dateOfBirth}
+              onChange={(v) => form.setFieldValue('dateOfBirth', v)}
+            />
+            <Select
+              label={t('patients.form.gender_label')}
+              value={form.values.gender ?? null}
+              onChange={(v) =>
+                form.setFieldValue('gender', (v as 'male' | 'female' | 'other' | null) ?? undefined)
+              }
+              data={[
+                { value: 'male', label: t('patients.gender_male') },
+                { value: 'female', label: t('patients.gender_female') },
+                { value: 'other', label: t('patients.gender_other') },
+              ]}
+            />
+          </SimpleGrid>
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+            <PhoneInput
+              label={t('patients.form.phone')}
+              value={form.values.phone}
+              onChange={(v) => form.setFieldValue('phone', v)}
+            />
+            <PhoneInput
+              label={t('patients.form.phone_secondary')}
+              value={form.values.phoneSecondary}
+              onChange={(v) => form.setFieldValue('phoneSecondary', v)}
+            />
+          </SimpleGrid>
+          <Input
+            label={t('patients.form.passport')}
+            value={form.values.passport}
+            onChange={(v) => form.setFieldValue('passport', v)}
+          />
+          <Input
+            label={t('patients.form.address')}
+            value={form.values.address}
+            onChange={(v) => form.setFieldValue('address', v)}
+          />
+          <Textarea
+            label={t('patients.form.notes')}
+            rows={3}
+            value={form.values.notes}
+            onChange={(e) => form.setFieldValue('notes', e.currentTarget.value)}
+          />
+          <Group justify="flex-end">
+            <Button type="submit" variant="primary" disabled={updateMut.isPending}>
+              {t('common.save')}
+            </Button>
+          </Group>
+        </Stack>
+      </form>
+    </Card>
+  );
+}
+
+export function GeneralTab({ patient }: { patient: PatientDetail }) {
+  const { hasPermission } = useAuthStore();
+
+  if (hasPermission('patient.edit')) {
+    return <GeneralEditForm patientId={patient.id} />;
+  }
+
+  return <GeneralReadOnly patient={patient} />;
 }
