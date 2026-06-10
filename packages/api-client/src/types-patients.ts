@@ -12,6 +12,9 @@ export type Patient = {
   address: string | null;
   photoUrl: string | null;
   notes: string | null;
+  tags: string[];
+  source: string | null;
+  insurance: { provider: string; policyNumber: string } | null;
   archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
