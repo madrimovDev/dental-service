@@ -75,17 +75,47 @@
     "logout": "Выйти"
   },
   "nav": {
-    "dashboard": "Панель управления",
-    "patients": "Пациенты",
-    "appointments": "Записи",
-    "settings": "Настройки",
-    "tenant_settings": "Клиника",
+    "dashboard": "Главный экран",
+    "patients": "Список пациентов",
+    "patient_new": "Новый пациент",
+    "appointments": "Календарь",
+    "queue": "Табло очереди",
+    "cashier": "Касса",
+    "transactions": "Транзакции",
+    "expenses": "Расходы",
+    "payroll": "Зарплата",
+    "plans": "Планы лечения",
+    "lab": "Лаб. заказы",
+    "rx": "Рецепты",
+    "kpi": "Дашборд / KPI",
+    "reports": "Отчёты",
+    "services": "Услуги и цены",
     "branches": "Филиалы",
     "roles": "Роли",
-    "users": "Сотрудники",
-    "queue": "Очередь",
-    "cashier": "Касса",
-    "services": "Услуги"
+    "users": "Пользователи",
+    "stock": "Склад",
+    "audit": "Журнал аудита",
+    "settings": "Настройки",
+    "tenant_settings": "Настройки",
+    "group": {
+      "today": "Сегодня",
+      "patients": "Пациенты",
+      "clinic": "Клиника",
+      "finance": "Финансы",
+      "management": "Управление"
+    }
+  },
+  "shell": {
+    "search_placeholder": "Пациент, запись, услуга, сотрудник…",
+    "notifications": "Уведомления",
+    "theme_light": "Светлая",
+    "theme_dark": "Тёмная",
+    "coming_soon": "Скоро"
+  },
+  "error": {
+    "403_title": "Нет доступа",
+    "403_message": "У вас нет прав для доступа к этой странице.",
+    "403_back": "На главный экран"
   },
   "dashboard": {
     "welcome": "Здравствуйте, {{name}}!",

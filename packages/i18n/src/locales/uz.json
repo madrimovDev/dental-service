@@ -75,17 +75,47 @@
     "logout": "Chiqish"
   },
   "nav": {
-    "dashboard": "Boshqaruv paneli",
-    "patients": "Bemorlar",
-    "appointments": "Yozilishlar",
-    "settings": "Sozlamalar",
-    "tenant_settings": "Klinika",
+    "dashboard": "Bosh ekran",
+    "patients": "Bemorlar ro'yxati",
+    "patient_new": "Yangi bemor",
+    "appointments": "Kalendar",
+    "queue": "Navbat tablosi",
+    "cashier": "Kassa",
+    "transactions": "Tranzaksiyalar",
+    "expenses": "Xarajatlar",
+    "payroll": "Ish haqi",
+    "plans": "Davolash rejalari",
+    "lab": "Lab buyurtmalari",
+    "rx": "Reseptlar",
+    "kpi": "Dashboard / KPI",
+    "reports": "Hisobotlar",
+    "services": "Xizmatlar va narxlar",
     "branches": "Filiallar",
     "roles": "Rollar",
-    "users": "Xodimlar",
-    "queue": "Navbat",
-    "cashier": "Kassa",
-    "services": "Xizmatlar"
+    "users": "Foydalanuvchilar",
+    "stock": "Ombor",
+    "audit": "Audit log",
+    "settings": "Sozlamalar",
+    "tenant_settings": "Sozlamalar",
+    "group": {
+      "today": "Bugun",
+      "patients": "Bemorlar",
+      "clinic": "Klinika",
+      "finance": "Moliya",
+      "management": "Boshqaruv"
+    }
+  },
+  "shell": {
+    "search_placeholder": "Bemor, yozuv, xizmat, xodim…",
+    "notifications": "Bildirishnomalar",
+    "theme_light": "Yorug'",
+    "theme_dark": "Qorong'i",
+    "coming_soon": "Tez orada"
+  },
+  "error": {
+    "403_title": "Ruxsat yo'q",
+    "403_message": "Bu sahifaga kirish uchun ruxsatingiz yo'q.",
+    "403_back": "Bosh ekranga qaytish"
   },
   "dashboard": {
     "welcome": "Salom, {{name}}!",
