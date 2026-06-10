@@ -45,3 +45,28 @@ export function useArchivePatient() {
     onSuccess: () => qc.invalidateQueries({ queryKey: patientKeys.all }),
   });
 }
+
+export function useMedicalRecord(id: string) {
+  return useQuery({
+    queryKey: patientKeys.medical(id),
+    queryFn: () => api.patients.getMedical(id),
+    enabled: !!id,
+  });
+}
+
+export function useUpdateMedicalRecord(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Parameters<typeof api.patients.updateMedical>[1]) =>
+      api.patients.updateMedical(id, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: patientKeys.medical(id) }),
+  });
+}
+
+export function usePatientPayments(id: string) {
+  return useQuery({
+    queryKey: patientKeys.payments(id),
+    queryFn: () => api.cashier.list({ patientId: id, pageSize: 50 }),
+    enabled: !!id,
+  });
+}
