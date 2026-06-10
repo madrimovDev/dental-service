@@ -1,3 +1,5 @@
-// @dental/ui — shared React komponentlar (Mantine wrappers + custom dental komponentlar)
-// M2+ da to'ldiriladi
-export {};
+// @dental/ui — theme + primitivlar public API
+
+export * from './patterns';
+export * from './primitives';
+export * from './theme';

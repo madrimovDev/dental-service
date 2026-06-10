@@ -1,0 +1,4 @@
+.mono {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum";
+}

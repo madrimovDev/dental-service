@@ -1,3 +1,4 @@
+import { cssVarsResolver, mantineTheme } from '@dental/ui';
 import { MantineProvider } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -15,6 +16,7 @@ import { ResetPasswordPage } from '@/pages/auth/reset-password.page.tsx';
 import { SelectWorkspacePage } from '@/pages/auth/select-workspace.page.tsx';
 import { CashierPage } from '@/pages/cashier.page.tsx';
 import { DashboardPage } from '@/pages/dashboard.page.tsx';
+import { DesignSystemPage } from '@/pages/dev/DesignSystemPage.tsx';
 import { PatientDetailPage } from '@/pages/patients/detail.page.tsx';
 import { PatientsListPage } from '@/pages/patients/list.page.tsx';
 import { NewPatientPage } from '@/pages/patients/new.page.tsx';
@@ -25,7 +27,6 @@ import { RolesSettingsPage } from '@/pages/settings/roles.page.tsx';
 import { ServicesSettingsPage } from '@/pages/settings/services.page.tsx';
 import { TenantSettingsPage } from '@/pages/settings/tenant.page.tsx';
 import { UsersSettingsPage } from '@/pages/settings/users.page.tsx';
-import { mantineTheme } from '@/theme/mantine-theme.ts';
 
 const Protected = ({ children }: { children: React.ReactNode }) => (
   <ProtectedRoute>
@@ -35,7 +36,11 @@ const Protected = ({ children }: { children: React.ReactNode }) => (
 
 export function App() {
   return (
-    <MantineProvider theme={mantineTheme} defaultColorScheme="auto">
+    <MantineProvider
+      theme={mantineTheme}
+      cssVariablesResolver={cssVarsResolver}
+      defaultColorScheme="light"
+    >
       <Notifications position="top-right" />
       <I18nextProvider i18n={i18n}>
         <QueryClientProvider client={queryClient}>
@@ -153,6 +158,9 @@ export function App() {
                   </Protected>
                 }
               />
+
+              {/* Dev-only */}
+              {import.meta.env.DEV && <Route path="/dev/ds" element={<DesignSystemPage />} />}
 
               {/* Fallback */}
               <Route path="*" element={<Navigate to="/" replace />} />

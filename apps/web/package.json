@@ -13,6 +13,7 @@
   "dependencies": {
     "@dental/core": "workspace:*",
     "@dental/i18n": "workspace:*",
+    "@dental/ui": "workspace:*",
     "@mantine/core": "^7.15.2",
     "@mantine/dates": "^7.15.2",
     "@mantine/form": "^7.15.2",

@@ -1,0 +1,31 @@
+.root {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.title {
+  font-size: var(--text-md);
+  font-weight: var(--fw-semibold);
+  color: var(--text);
+}
+.sub {
+  font-size: var(--text-sm);
+  color: var(--text-3);
+}
+.actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+.body {
+  padding: 16px;
+}
