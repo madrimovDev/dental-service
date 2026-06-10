@@ -7,6 +7,9 @@ vi.mock('../appointments.api', () => ({
   useCreateAppointment: () => ({ mutate: vi.fn(), isPending: false }),
   useDoctors: () => ({ data: [{ id: 'd1', name: 'Dr. Ali' }] }),
 }));
+vi.mock('@/features/patients', () => ({
+  usePatients: () => ({ data: { items: [], meta: {} } }),
+}));
 vi.mock('@/lib/api.ts', () => ({
   api: {
     patients: { list: vi.fn(() => Promise.resolve({ data: [], meta: {} })) },

@@ -2,9 +2,11 @@ import { Button } from '@dental/ui';
 import { MultiSelect, Select, Stack, Stepper, Text } from '@mantine/core';
 import { DateTimePicker } from '@mantine/dates';
 import { useForm } from '@mantine/form';
+import { useQuery } from '@tanstack/react-query';
 import { zodResolver } from 'mantine-form-zod-resolver';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { usePatients } from '@/features/patients';
 import { api } from '@/lib/api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { useCreateAppointment, useDoctors } from '../appointments.api';
@@ -16,11 +18,17 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   const { activeBranchId } = useAuthStore();
   const [active, setActive] = useState(0);
-  const [patients, setPatients] = useState<Option[]>([]);
-  const [services, setServices] = useState<Option[]>([]);
   const [error, setError] = useState<string | null>(null);
   const { data: doctors } = useDoctors();
+  const { data: patientsData } = usePatients({ page: 1, pageSize: 100 });
+  const { data: servicesData } = useQuery({ queryKey: ['services'], queryFn: api.services.list });
   const createMut = useCreateAppointment();
+
+  const patients: Option[] = (patientsData?.items ?? []).map((p) => ({
+    value: p.id,
+    label: p.fullName,
+  }));
+  const services: Option[] = (servicesData ?? []).map((s) => ({ value: s.id, label: s.nameUz }));
 
   const form = useForm<WizardValues>({
     initialValues: {
@@ -34,23 +42,6 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
     },
     validate: zodResolver(wizardSchema),
   });
-
-  useEffect(() => {
-    let cancelled = false;
-    void api.patients.list({ pageSize: 100 }).then((res) => {
-      if (!cancelled) {
-        setPatients(res.data.map((p) => ({ value: p.id, label: p.fullName })));
-      }
-    });
-    void api.services.list().then((res) => {
-      if (!cancelled) {
-        setServices(res.map((s) => ({ value: s.id, label: s.nameUz })));
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const doctorOptions: Option[] = (doctors ?? []).map((d) => ({ value: d.id, label: d.name }));
 

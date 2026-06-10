@@ -1,11 +1,15 @@
-import { Button, PageHead, Tabs } from '@dental/ui';
-import { Modal } from '@mantine/core';
+import { Button, Mono, PageHead, StatusPill, Tabs } from '@dental/ui';
+import { Modal, Stack, Text, Textarea } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
+import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { usePatients } from '@/features/patients';
+import { api } from '@/lib/api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
-import { useAppointments, useDoctors } from '../appointments.api';
+import { useAppointments, useCancelAppointment, useDoctors } from '../appointments.api';
 import { localDateKey } from '../appointments.mappers';
+import type { AppointmentStatus, CalendarEvent } from '../appointments.types';
 import { CalendarGrid } from './CalendarGrid';
 import { NewAppointmentWizard } from './NewAppointmentWizard';
 import { WeekGrid } from './WeekGrid';
@@ -20,12 +24,29 @@ function startOfWeek(date: Date): Date {
   return d;
 }
 
+/** AppointmentStatus → R0 StatusPill semantik variant. */
+const statusVariant: Record<AppointmentStatus, StatusPillVariant> = {
+  scheduled: 'accent',
+  confirmed: 'info',
+  in_progress: 'warning',
+  completed: 'success',
+  no_show: 'danger',
+  cancelled: 'neutral',
+};
+
+type StatusPillVariant = 'neutral' | 'success' | 'warning' | 'danger' | 'info' | 'accent';
+
+const fmtTime = (iso: string) =>
+  new Date(iso).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
+
 export function CalendarScreen() {
   const { t } = useTranslation();
   const { hasPermission, activeBranchId } = useAuthStore();
   const [view, setView] = useState<'day' | 'week'>('day');
   const [date, setDate] = useState(() => new Date());
   const [opened, { open, close }] = useDisclosure(false);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
 
   const { rangeStart, rangeEnd, dayKeys } = useMemo(() => {
     if (view === 'week') {
@@ -52,6 +73,23 @@ export function CalendarScreen() {
     to: rangeEnd.toISOString(),
   });
   const { data: doctors } = useDoctors();
+  const { data: patientsData } = usePatients({ page: 1, pageSize: 100 });
+  const { data: servicesData } = useQuery({ queryKey: ['services'], queryFn: api.services.list });
+  const cancelMut = useCancelAppointment();
+
+  const patientNameMap = useMemo(() => {
+    return new Map((patientsData?.items ?? []).map((p) => [p.id, p.fullName]));
+  }, [patientsData]);
+  const patientName = (patientId: string) => patientNameMap.get(patientId) ?? '—';
+
+  const doctorNameMap = useMemo(
+    () => new Map((doctors ?? []).map((d) => [d.id, d.name])),
+    [doctors],
+  );
+  const serviceNameMap = useMemo(
+    () => new Map((servicesData ?? []).map((s) => [s.id, s.nameUz])),
+    [servicesData],
+  );
 
   const shift = (delta: number) => {
     setDate((prev) => {
@@ -61,8 +99,26 @@ export function CalendarScreen() {
     });
   };
 
-  // patientName lookup — QueryClientProvider yo'q test harness'da (placeholder; Task 6 da real).
-  const patientName = () => '—';
+  const openDetail = (event: CalendarEvent) => {
+    setCancelReason('');
+    setSelectedEvent(event);
+  };
+  const closeDetail = () => setSelectedEvent(null);
+
+  const appt = selectedEvent?.appointment;
+  const canCancel =
+    appt != null &&
+    hasPermission('appointment.cancel') &&
+    appt.status !== 'cancelled' &&
+    appt.status !== 'completed';
+
+  const confirmCancel = () => {
+    if (appt == null) return;
+    cancelMut.mutate(
+      { id: appt.id, reason: cancelReason.trim() || undefined },
+      { onSuccess: closeDetail },
+    );
+  };
 
   return (
     <div>
@@ -112,13 +168,56 @@ export function CalendarScreen() {
             appointments={appts ?? []}
             doctors={doctors ?? []}
             patientName={patientName}
+            onSlotClick={openDetail}
           />
         ) : (
-          <WeekGrid appointments={appts ?? []} dayKeys={dayKeys} patientName={patientName} />
+          <WeekGrid
+            appointments={appts ?? []}
+            dayKeys={dayKeys}
+            patientName={patientName}
+            onSlotClick={openDetail}
+          />
         )}
       </div>
       <Modal opened={opened} onClose={close} title={t('appointments.create')} size="lg">
         <NewAppointmentWizard onClose={close} />
+      </Modal>
+      <Modal opened={appt != null} onClose={closeDetail} title={t('appointments.title')} size="md">
+        {appt != null && (
+          <Stack gap="sm">
+            <Mono>
+              {fmtTime(appt.startTime)} — {fmtTime(appt.endTime)}
+            </Mono>
+            <Text size="sm">
+              {t('appointments.patient')}: {patientName(appt.patientId)}
+            </Text>
+            <Text size="sm">
+              {t('appointments.doctor')}: {doctorNameMap.get(appt.doctorId) ?? '—'}
+            </Text>
+            <Text size="sm">
+              {t('appointments.services')}:{' '}
+              {(appt.serviceIds ?? []).map((id) => serviceNameMap.get(id) ?? id).join(', ') || '—'}
+            </Text>
+            <div>
+              <StatusPill status={statusVariant[appt.status]}>
+                {t(`appointments.status.${appt.status}`)}
+              </StatusPill>
+            </div>
+            {canCancel && (
+              <Stack gap="xs" mt="sm">
+                <Textarea
+                  label={t('appointments.cancel_reason')}
+                  rows={2}
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.currentTarget.value)}
+                />
+                <Button variant="danger" disabled={cancelMut.isPending} onClick={confirmCancel}>
+                  {t('common.cancel')}
+                </Button>
+              </Stack>
+            )}
+          </Stack>
+        )}
       </Modal>
     </div>
   );

@@ -8,12 +8,16 @@ vi.mock('../appointments.api', () => ({
   useDoctors: () => ({ data: [{ id: 'd1', name: 'Dr. Ali' }] }),
   useCancelAppointment: () => ({ mutate: vi.fn() }),
 }));
+vi.mock('@/features/patients', () => ({
+  usePatients: () => ({ data: { items: [], meta: {} } }),
+}));
 vi.mock('@/stores/auth-store.ts', () => ({
   useAuthStore: () => ({ hasPermission: () => true, activeBranchId: 'b1' }),
 }));
 vi.mock('@/lib/api.ts', () => ({
   api: {
     patients: { list: vi.fn(() => Promise.resolve({ data: [], meta: {} })) },
+    services: { list: vi.fn(() => Promise.resolve([])) },
     branches: { list: vi.fn(() => Promise.resolve([])) },
   },
 }));
