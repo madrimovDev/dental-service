@@ -63,6 +63,7 @@ export type CalendarEvent = {
 };
 
 export type DoctorColumn = { doctor: Doctor; events: CalendarEvent[] };
+export type DayColumn = { dateKey: string; events: CalendarEvent[] };
 
 export const GRID = {
   dayStartHour: 8,
@@ -78,7 +79,7 @@ export type { Appointment, AppointmentStatus };
 
 ```ts
 import { describe, it, expect } from 'vitest';
-import { localMinutes, toSlotPosition, assignLanes } from './appointments.mappers';
+import { localMinutes, toSlotPosition, assignLanes, groupByDay } from './appointments.mappers';
 import { GRID } from './appointments.types';
 import type { Appointment } from '@dental/api-client';
 
@@ -103,15 +104,25 @@ describe('appointments.mappers — timezone + grid', () => {
     expect(pos.height).toBe(40); // 30 min × 40/30
   });
 
-  it('assignLanes: overlapping events get separate lanes', () => {
+  it('assignLanes: overlap cluster lane + per-cluster laneCount', () => {
     const a = { startMin: 600, endMin: 660 };
     const b = { startMin: 630, endMin: 690 }; // overlaps a
-    const c = { startMin: 700, endMin: 730 }; // no overlap
+    const c = { startMin: 700, endMin: 730 }; // alohida klaster (overlap yo'q)
     const laned = assignLanes([a, b, c]);
     expect(laned[0].lane).toBe(0);
-    expect(laned[1].lane).toBe(1); // overlaps a → lane 1
-    expect(laned[1].laneCount).toBe(2);
-    expect(laned[2].lane).toBe(0); // no overlap → lane 0
+    expect(laned[1].lane).toBe(1);        // a bilan overlap → lane 1
+    expect(laned[1].laneCount).toBe(2);   // {a,b} klasteri → 2
+    expect(laned[2].lane).toBe(0);        // alohida → lane 0
+    expect(laned[2].laneCount).toBe(1);   // KRITIK: alohida klaster → laneCount 1 (to'liq kenglik)
+  });
+
+  it('groupByDay: kun bo\'yicha guruhlaydi (week view)', () => {
+    const a1 = appt('2026-06-10T05:00:00Z', '2026-06-10T05:30:00Z', 'a1');
+    const a2 = appt('2026-06-11T05:00:00Z', '2026-06-11T05:30:00Z', 'a2');
+    const cols = groupByDay([a1, a2], ['2026-06-10', '2026-06-11']);
+    expect(cols[0].dateKey).toBe('2026-06-10');
+    expect(cols[0].events).toHaveLength(1);
+    expect(cols[1].events).toHaveLength(1);
   });
 });
 ```
@@ -122,7 +133,7 @@ describe('appointments.mappers — timezone + grid', () => {
 
 ```ts
 import type { Appointment } from '@dental/api-client';
-import type { CalendarEvent, Doctor, DoctorColumn } from './appointments.types';
+import type { CalendarEvent, DayColumn, Doctor, DoctorColumn } from './appointments.types';
 import { GRID } from './appointments.types';
 
 const TZ = 'Asia/Tashkent';
@@ -158,19 +169,38 @@ export function toSlotPosition(startMin: number, endMin: number, grid = GRID) {
   return { top, height };
 }
 
-/** Overlap lane tayinlash: ustma-ust eventlar yonma-yon lane. */
+/**
+ * Overlap lane tayinlash — PER-KLASTER laneCount.
+ * Connected overlap klaster (a∩b, b∩c → bitta klaster) ichida greedy lane;
+ * laneCount = SHU klaster lane soni (overlap'siz event → laneCount 1, to'liq kenglik).
+ */
 export function assignLanes<T extends { startMin: number; endMin: number }>(events: T[]): Laned<T>[] {
-  const sorted = [...events].sort((a, b) => a.startMin - b.startMin);
-  const laneEnds: number[] = []; // har lane oxirgi endMin
-  const out: Laned<T>[] = sorted.map((e) => {
-    let lane = laneEnds.findIndex((end) => end <= e.startMin);
-    if (lane === -1) { lane = laneEnds.length; laneEnds.push(e.endMin); }
-    else laneEnds[lane] = e.endMin;
-    return { ...e, lane, laneCount: 1 };
-  });
-  // laneCount = overlap klasterdagi maksimal lane+1 (sodda: umumiy lane soni)
-  const total = laneEnds.length || 1;
-  for (const e of out) e.laneCount = total;
+  const out: Laned<T>[] = [...events]
+    .sort((a, b) => a.startMin - b.startMin)
+    .map((e) => ({ ...e, lane: 0, laneCount: 1 }));
+
+  let i = 0;
+  while (i < out.length) {
+    // klaster: ketma-ket eventlar startMin < running max endMin
+    let clusterEnd = out[i].endMin;
+    let j = i;
+    while (j + 1 < out.length && out[j + 1].startMin < clusterEnd) {
+      j += 1;
+      clusterEnd = Math.max(clusterEnd, out[j].endMin);
+    }
+    const cluster = out.slice(i, j + 1);
+    // greedy lane (klaster ichida)
+    const laneEnds: number[] = [];
+    for (const e of cluster) {
+      let lane = laneEnds.findIndex((end) => end <= e.startMin);
+      if (lane === -1) { lane = laneEnds.length; laneEnds.push(e.endMin); }
+      else laneEnds[lane] = e.endMin;
+      e.lane = lane;
+    }
+    const count = laneEnds.length;
+    for (const e of cluster) e.laneCount = count;
+    i = j + 1;
+  }
   return out;
 }
 
@@ -194,9 +224,17 @@ export function groupByDoctor(appts: Appointment[], doctors: Doctor[], grid = GR
     events: toDoctorEvents(appts.filter((a) => a.doctorId === doctor.id), grid),
   }));
 }
+
+/** Week view: kun (local sana) bo'yicha ustunlar. `dayKeys` — YYYY-MM-DD (Asia/Tashkent) ro'yxati. */
+export function groupByDay(appts: Appointment[], dayKeys: string[], grid = GRID): DayColumn[] {
+  return dayKeys.map((dateKey) => ({
+    dateKey,
+    events: toDoctorEvents(appts.filter((a) => localDateKey(a.startTime) === dateKey), grid),
+  }));
+}
 ```
 
-- [ ] **Step 6: Test pass** — Run: `cd apps/web && bunx vitest run src/features/appointments/appointments.mappers` → 3 PASS.
+- [ ] **Step 6: Test pass** — Run: `cd apps/web && bunx vitest run src/features/appointments/appointments.mappers` → 4 PASS (timezone, position, lane-cluster, groupByDay).
 
 - [ ] **Step 7: Commit**
 
@@ -643,9 +681,9 @@ git commit -m "feat(web): NewAppointmentWizard (4 qadam Stepper + manual binding
 > Mavjud `appointments.page` capability (R2-A saboq — yo'qotilmaydi): **cancel**, **status**, **branch filter**, **create**. Status grid'da (data-status rangi — Task 3 ✅). Filter + create CalendarScreen'da (Task 4/5). Bu task: **cancel** + slot detail + wizard ulash + page thin.
 
 - [ ] **Step 1: Slot click → detail modal (cancel)** — `CalendarScreen.tsx`:
-  - `selectedEvent` state; slot click → Mantine `Modal` (appointment detail: vaqt `Mono`, bemor, doktor, xizmatlar, status `StatusPill`).
-  - **Cancel:** `useCancelAppointment()`, `appointment.cancel` permission, status≠cancelled/completed. Reason — Mantine `Textarea`/R0 `Input` (mavjud `prompt` o'rniga). Tasdiqdan keyin mutate + modal yopish.
-  - **Wizard ulash:** "Yangi yozuv" → `NewAppointmentWizard` Modal (Task 5).
+  - `selectedEvent` state; slot click → Mantine `Modal` (appointment detail: vaqt `Mono`, bemor, doktor, xizmatlar, **status → R0 `StatusPill`** spec §5/§7 bo'yicha).
+  - **Cancel:** `useCancelAppointment()`, `appointment.cancel` permission, status≠cancelled/completed. **`prompt()`/`alert()`/`confirm()` ISHLATILMAYDI** (bloklovchi browser dialog, dizayn-tizimni buzadi — sifat bari). Reason — Mantine `Textarea` (modal ichida) yoki R0 `Input`. Tasdiqlash modal ichida (Bekor qil tugmasi). Mutate'dan keyin modal yopish + invalidate.
+  - **Wizard ulash:** "Yangi yozuv" → `NewAppointmentWizard` Mantine `Modal` (Task 5).
 
 - [ ] **Step 2: `appointments.page.tsx` → thin entry**
 
