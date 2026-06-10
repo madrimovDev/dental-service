@@ -2,14 +2,12 @@ import { Button } from '@dental/ui';
 import { MultiSelect, Select, Stack, Stepper, Text } from '@mantine/core';
 import { DateTimePicker } from '@mantine/dates';
 import { useForm } from '@mantine/form';
-import { useQuery } from '@tanstack/react-query';
 import { zodResolver } from 'mantine-form-zod-resolver';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePatients } from '@/features/patients';
-import { api } from '@/lib/api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
-import { useCreateAppointment, useDoctors } from '../appointments.api';
+import { useCreateAppointment, useDoctors, useServices } from '../appointments.api';
 import { type WizardValues, wizardSchema } from '../appointments.schema';
 
 type Option = { value: string; label: string };
@@ -21,7 +19,7 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const { data: doctors } = useDoctors();
   const { data: patientsData } = usePatients({ page: 1, pageSize: 100 });
-  const { data: servicesData } = useQuery({ queryKey: ['services'], queryFn: api.services.list });
+  const { data: servicesData } = useServices();
   const createMut = useCreateAppointment();
 
   const patients: Option[] = (patientsData?.items ?? []).map((p) => ({

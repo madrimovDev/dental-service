@@ -25,6 +25,16 @@ export function useDoctors() {
   });
 }
 
+/** Branch xizmatlari ro'yxati (MultiSelect opsiyalari uchun). */
+export function useServices() {
+  return useQuery({ queryKey: ['services'], queryFn: api.services.list });
+}
+
+/** Tenant filiallari (branch filter Select uchun). */
+export function useBranches() {
+  return useQuery({ queryKey: ['branches'], queryFn: api.branches.list });
+}
+
 export function useCreateAppointment() {
   const qc = useQueryClient();
   return useMutation({

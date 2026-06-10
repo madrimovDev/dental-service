@@ -1,14 +1,18 @@
 import { Button, Mono, PageHead, StatusPill, Tabs } from '@dental/ui';
-import { Modal, Stack, Text, Textarea } from '@mantine/core';
+import { Modal, Select, Stack, Text, Textarea } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePatients } from '@/features/patients';
-import { api } from '@/lib/api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
-import { useAppointments, useCancelAppointment, useDoctors } from '../appointments.api';
-import { localDateKey } from '../appointments.mappers';
+import {
+  useAppointments,
+  useBranches,
+  useCancelAppointment,
+  useDoctors,
+  useServices,
+} from '../appointments.api';
+import { localDateKey, localTimeLabel } from '../appointments.mappers';
 import type { AppointmentStatus, CalendarEvent } from '../appointments.types';
 import { CalendarGrid } from './CalendarGrid';
 import { NewAppointmentWizard } from './NewAppointmentWizard';
@@ -36,13 +40,11 @@ const statusVariant: Record<AppointmentStatus, StatusPillVariant> = {
 
 type StatusPillVariant = 'neutral' | 'success' | 'warning' | 'danger' | 'info' | 'accent';
 
-const fmtTime = (iso: string) =>
-  new Date(iso).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
-
 export function CalendarScreen() {
   const { t } = useTranslation();
   const { hasPermission, activeBranchId } = useAuthStore();
   const [view, setView] = useState<'day' | 'week'>('day');
+  const [branchId, setBranchId] = useState<string | null>(activeBranchId);
   const [date, setDate] = useState(() => new Date());
   const [opened, { open, close }] = useDisclosure(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
@@ -68,14 +70,20 @@ export function CalendarScreen() {
   }, [view, date]);
 
   const { data: appts } = useAppointments({
-    branchId: activeBranchId ?? undefined,
+    branchId: branchId ?? undefined,
     from: rangeStart.toISOString(),
     to: rangeEnd.toISOString(),
   });
   const { data: doctors } = useDoctors();
   const { data: patientsData } = usePatients({ page: 1, pageSize: 100 });
-  const { data: servicesData } = useQuery({ queryKey: ['services'], queryFn: api.services.list });
+  const { data: servicesData } = useServices();
+  const { data: branchesData } = useBranches();
   const cancelMut = useCancelAppointment();
+
+  const branchOptions = useMemo(
+    () => (branchesData ?? []).map((b) => ({ value: b.id, label: b.name })),
+    [branchesData],
+  );
 
   const patientNameMap = useMemo(() => {
     return new Map((patientsData?.items ?? []).map((p) => [p.id, p.fullName]));
@@ -151,6 +159,14 @@ export function CalendarScreen() {
           ]}
         />
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Select
+            label={t('appointments.filter_branch')}
+            placeholder={t('appointments.filter_branch')}
+            clearable
+            data={branchOptions}
+            value={branchId}
+            onChange={setBranchId}
+          />
           <Button variant="default" onClick={() => shift(-1)}>
             ←
           </Button>
@@ -186,7 +202,7 @@ export function CalendarScreen() {
         {appt != null && (
           <Stack gap="sm">
             <Mono>
-              {fmtTime(appt.startTime)} — {fmtTime(appt.endTime)}
+              {localTimeLabel(appt.startTime)} — {localTimeLabel(appt.endTime)}
             </Mono>
             <Text size="sm">
               {t('appointments.patient')}: {patientName(appt.patientId)}
