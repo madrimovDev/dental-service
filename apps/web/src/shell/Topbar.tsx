@@ -70,7 +70,7 @@ export function Topbar({
 
       <Menu shadow="md" width={140}>
         <Menu.Target>
-          <button type="button" className={classes.lang} aria-label="Language">
+          <button type="button" className={classes.lang} aria-label={t('common.language')}>
             <b>{i18n.language === 'ru' ? 'RU' : 'UZ'}</b>
             <span>{i18n.language === 'ru' ? 'UZ' : 'RU'}</span>
           </button>

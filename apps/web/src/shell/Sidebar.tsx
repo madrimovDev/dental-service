@@ -4,9 +4,12 @@ import { useAuthStore } from '@/stores/auth-store.ts';
 import { type NavItem, visibleGroups } from './nav-config';
 import classes from './Sidebar.module.css';
 
-function isActive(pathname: string, path: string): boolean {
+function isActive(pathname: string, path: string, allPaths: string[]): boolean {
   if (path === '/') return pathname === '/';
-  return pathname === path || pathname.startsWith(`${path}/`);
+  if (pathname === path) return true;
+  // Boshqa nav element shu yo'lni aniq egasi bo'lsa (masalan /patients/new), parent (/patients) yonmaydi
+  if (allPaths.some((p) => p !== path && pathname === p)) return false;
+  return pathname.startsWith(`${path}/`);
 }
 
 export function Sidebar() {
@@ -14,6 +17,7 @@ export function Sidebar() {
   const { hasPermission } = useAuthStore();
   const { pathname } = useLocation();
   const groups = visibleGroups(hasPermission);
+  const allPaths = groups.flatMap((g) => g.items.filter((i) => !i.disabled).map((i) => i.path));
 
   const renderItem = (item: NavItem) => {
     const Icon = item.icon;
@@ -37,7 +41,7 @@ export function Sidebar() {
         key={item.key}
         to={item.path}
         className={classes.item}
-        data-active={isActive(pathname, item.path)}
+        data-active={isActive(pathname, item.path, allPaths)}
       >
         <Icon />
         {label}
