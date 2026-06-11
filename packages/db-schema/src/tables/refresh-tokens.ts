@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { index, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { type AnyPgColumn, index, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { branches } from './branches.ts';
 import { tenants } from './tenants.ts';
 import { users } from './users.ts';
@@ -29,7 +29,9 @@ export const refreshTokens = pgTable(
     tokenHash: text('token_hash').notNull().unique(),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
-    replacedById: uuid('replaced_by_id'), // self-ref (FK migration'da yoziladi)
+    replacedById: uuid('replaced_by_id').references((): AnyPgColumn => refreshTokens.id, {
+      onDelete: 'cascade',
+    }),
 
     // Workspace context — shu refresh chain'ning joriy holati
     activeTenantId: uuid('active_tenant_id').references(() => tenants.id, {
@@ -44,6 +46,7 @@ export const refreshTokens = pgTable(
   (t) => [
     index('refresh_tokens_user_idx').on(t.userId),
     index('refresh_tokens_expires_idx').on(t.expiresAt),
+    index('refresh_tokens_replaced_by_idx').on(t.replacedById),
   ],
 );
 

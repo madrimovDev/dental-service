@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   index,
   integer,
   jsonb,
@@ -53,7 +54,10 @@ export const cashierTransactions = pgTable(
 
     paymentMethod: paymentMethodEnum('payment_method').notNull(),
     type: transactionTypeEnum('type').notNull().default('payment'),
-    parentTransactionId: uuid('parent_transaction_id'),
+    parentTransactionId: uuid('parent_transaction_id').references(
+      (): AnyPgColumn => cashierTransactions.id,
+      { onDelete: 'restrict' },
+    ),
 
     status: transactionStatusEnum('status').notNull().default('completed'),
     notes: text('notes'),
@@ -97,7 +101,10 @@ export const cashierTransactionItems = pgTable(
     unitPrice: numeric('unit_price', { precision: 14, scale: 2 }).notNull(),
     subtotal: numeric('subtotal', { precision: 14, scale: 2 }).notNull(),
   },
-  (t) => [index('cashier_items_tx_idx').on(t.transactionId)],
+  (t) => [
+    index('cashier_items_tx_idx').on(t.transactionId),
+    index('cashier_tx_items_service_idx').on(t.serviceId),
+  ],
 );
 
 export type CashierTransactionItem = typeof cashierTransactionItems.$inferSelect;

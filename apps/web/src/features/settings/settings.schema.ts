@@ -40,6 +40,13 @@ export const tenantSchema = z.object({
 });
 export type TenantFormValues = z.infer<typeof tenantSchema>;
 
+export const tenantSettingsSchema = z.object({
+  vertical: z.enum(['dental']),
+  currency: z.string().min(1).max(8),
+  reminderLeadHours: z.number().int().min(0).max(168),
+});
+export type TenantSettingsFormValues = z.infer<typeof tenantSettingsSchema>;
+
 export const transferSchema = z.object({
   newOwnerUserId: z.string().min(1),
   currentPassword: z.string().min(1),

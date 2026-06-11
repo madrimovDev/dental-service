@@ -7,4 +7,5 @@ export const settingsKeys = {
   staffProfile: (userId: string) => ['settings', 'staff-profile', userId] as const,
   branches: () => ['settings', 'branches'] as const,
   tenant: () => ['settings', 'tenant'] as const,
+  tenantSettings: () => ['tenant-settings'] as const,
 };

@@ -37,6 +37,7 @@ export * from './tables/services.ts';
 export * from './tables/staff-profiles.ts';
 export * from './tables/stock-items.ts';
 export * from './tables/stock-movements.ts';
+export * from './tables/tenant-settings.ts';
 export * from './tables/tenants.ts';
 export * from './tables/tooth-charts.ts';
 export * from './tables/treatment-plans.ts';

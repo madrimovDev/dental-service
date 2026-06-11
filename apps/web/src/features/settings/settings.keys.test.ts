@@ -10,5 +10,6 @@ describe('settingsKeys', () => {
     expect(settingsKeys.users()).toEqual(['settings', 'users']);
     expect(settingsKeys.branches()).toEqual(['settings', 'branches']);
     expect(settingsKeys.tenant()).toEqual(['settings', 'tenant']);
+    expect(settingsKeys.tenantSettings()).toEqual(['tenant-settings']);
   });
 });
