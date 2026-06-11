@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { index, integer, pgEnum, pgTable, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
+import { appointments } from './appointments.ts';
 import { branches } from './branches.ts';
 import { patients } from './patients.ts';
 import { services } from './services.ts';
@@ -26,6 +27,9 @@ export const queueTickets = pgTable(
     patientId: uuid('patient_id').references(() => patients.id, { onDelete: 'set null' }),
     serviceId: uuid('service_id').references(() => services.id, { onDelete: 'set null' }),
     doctorId: uuid('doctor_id').references(() => users.id, { onDelete: 'set null' }),
+    appointmentId: uuid('appointment_id').references(() => appointments.id, {
+      onDelete: 'set null',
+    }),
 
     queueNumber: integer('queue_number').notNull(),
     ticketDate: timestamp('ticket_date', { withTimezone: true }).notNull().defaultNow(),
@@ -45,6 +49,7 @@ export const queueTickets = pgTable(
       t.queueNumber,
     ),
     index('queue_branch_status_idx').on(t.branchId, t.status),
+    index('queue_appointment_idx').on(t.appointmentId),
   ],
 );
 
