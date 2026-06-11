@@ -12,6 +12,7 @@ import type { Permission } from './permissions.ts';
 
 export type RoleTemplate = {
   name: string;
+  templateKey: string;
   descriptionUz: string;
   descriptionRu: string;
   permissions: readonly Permission[];
@@ -20,6 +21,7 @@ export type RoleTemplate = {
 export const ROLE_TEMPLATES = [
   {
     name: 'Tenant Admin',
+    templateKey: 'tenant_admin',
     descriptionUz: 'Klinika administratori — egasidan boshqa hamma narsani qila oladi',
     descriptionRu: 'Администратор клиники — все права, кроме передачи владения',
     permissions: [
@@ -73,6 +75,7 @@ export const ROLE_TEMPLATES = [
   },
   {
     name: 'Branch Manager',
+    templateKey: 'branch_manager',
     descriptionUz: 'Filial mudiri — filial ichida hamma narsani boshqaradi',
     descriptionRu: 'Менеджер филиала',
     permissions: [
@@ -101,6 +104,7 @@ export const ROLE_TEMPLATES = [
   },
   {
     name: 'Doctor',
+    templateKey: 'doctor',
     descriptionUz: 'Doktor — klinik ish',
     descriptionRu: 'Врач — клиническая работа',
     permissions: [
@@ -120,6 +124,7 @@ export const ROLE_TEMPLATES = [
   },
   {
     name: 'Doctor + Assistant',
+    templateKey: 'doctor_assistant',
     descriptionUz:
       'Doktor + asistent ishlari (kichik klinikalarda asistent alohida login bermaslik mumkin)',
     descriptionRu: 'Врач + ассистент (для малых клиник без отдельного логина ассистента)',
@@ -143,6 +148,7 @@ export const ROLE_TEMPLATES = [
   },
   {
     name: 'Nurse',
+    templateKey: 'nurse',
     descriptionUz: 'Hamshira — bemor tayyorlash',
     descriptionRu: 'Медсестра',
     permissions: [
@@ -156,6 +162,7 @@ export const ROLE_TEMPLATES = [
   },
   {
     name: 'Receptionist',
+    templateKey: 'receptionist',
     descriptionUz: 'Resepsioner — yozilish va kassa',
     descriptionRu: 'Администратор приёма',
     permissions: [
@@ -179,6 +186,7 @@ export const ROLE_TEMPLATES = [
   },
   {
     name: 'Accountant',
+    templateKey: 'accountant',
     descriptionUz: 'Buxgalter — moliyaviy hisob-kitob',
     descriptionRu: 'Бухгалтер',
     permissions: [
@@ -195,6 +203,7 @@ export const ROLE_TEMPLATES = [
   },
   {
     name: 'Technician',
+    templateKey: 'technician',
     descriptionUz: 'Texnik (laborant) — laboratoriya buyurtmalari',
     descriptionRu: 'Зубной техник',
     permissions: [

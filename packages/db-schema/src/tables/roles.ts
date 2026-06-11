@@ -19,6 +19,7 @@ export const roles = pgTable(
       .references(() => tenants.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     description: text('description'),
+    templateKey: text('template_key'), // system template barqaror key (custom rol → null)
     isTemplate: boolean('is_template').notNull().default(false),
     isSystem: boolean('is_system').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

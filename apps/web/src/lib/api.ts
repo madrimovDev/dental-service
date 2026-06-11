@@ -34,9 +34,10 @@ const apiClient = createApiClient({
         atid: string | null;
         abid: string | null;
         perms: string[];
+        roleKey?: string | null;
       };
       store.setTokens(accessToken, refreshToken);
-      store.setContext(payload.atid, payload.abid, payload.perms);
+      store.setContext(payload.atid, payload.abid, payload.perms, payload.roleKey ?? null);
     } catch {
       // Decode fail → faqat tokenlarni saqlash
       store.setTokens(accessToken, refreshToken);

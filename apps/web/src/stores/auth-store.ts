@@ -15,10 +15,16 @@ interface AuthState {
   activeTenantId: string | null;
   activeBranchId: string | null;
   permissions: string[];
+  roleKey: string | null;
 
   setTokens: (access: string, refresh: string) => void;
   setUser: (user: AuthUser) => void;
-  setContext: (tenantId: string | null, branchId: string | null, perms: string[]) => void;
+  setContext: (
+    tenantId: string | null,
+    branchId: string | null,
+    perms: string[],
+    roleKey?: string | null,
+  ) => void;
   hasPermission: (code: string) => boolean;
   clear: () => void;
 }
@@ -32,11 +38,17 @@ export const useAuthStore = create<AuthState>()(
       activeTenantId: null,
       activeBranchId: null,
       permissions: [],
+      roleKey: null,
 
       setTokens: (access, refresh) => set({ accessToken: access, refreshToken: refresh }),
       setUser: (user) => set({ user }),
-      setContext: (tenantId, branchId, perms) =>
-        set({ activeTenantId: tenantId, activeBranchId: branchId, permissions: perms }),
+      setContext: (tenantId, branchId, perms, roleKey = null) =>
+        set({
+          activeTenantId: tenantId,
+          activeBranchId: branchId,
+          permissions: perms,
+          roleKey,
+        }),
 
       hasPermission: (code) => {
         const { permissions } = get();
@@ -51,6 +63,7 @@ export const useAuthStore = create<AuthState>()(
           activeTenantId: null,
           activeBranchId: null,
           permissions: [],
+          roleKey: null,
         }),
     }),
     { name: 'dental-auth' },
