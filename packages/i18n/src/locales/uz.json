@@ -627,7 +627,45 @@
     "daily_summary": "Kunlik xulosa",
     "confirm_refund": "To'lovni qaytarishni tasdiqlaysizmi?",
     "type": {
-      "refund": "Qaytarish"
+      "refund": "Qaytarish",
+      "payment": "To'lov",
+      "void": "Bekor qilingan"
+    },
+    "patient": "Bemor",
+    "select_patient": "Bemorni tanlash...",
+    "no_patient": "Bemorsiz (walk-in)",
+    "quantity": "Soni",
+    "price": "Narx",
+    "remove": "O'chirish",
+    "method_label": "To'lov turi",
+    "mode": {
+      "payment": "Erkin to'lov",
+      "plan": "Davolash rejasi"
+    },
+    "plan_billing": {
+      "select_plan": "Davolash rejasini tanlang",
+      "no_plans": "Bemorda davolash rejasi yo'q",
+      "select_patient_first": "Avval bemorni tanlang",
+      "stage": "Bosqich",
+      "cost": "Narxi",
+      "paid": "To'langan",
+      "remaining": "Qoldiq",
+      "pay_selected": "Tanlanganlarni to'lash",
+      "no_stages_selected": "To'lov uchun bosqich tanlang",
+      "balance": "Balans",
+      "total_cost": "Umumiy narx",
+      "total_paid": "Jami to'langan",
+      "state": {
+        "paid": "To'langan",
+        "partial": "Qisman",
+        "unpaid": "To'lanmagan"
+      }
+    },
+    "refund_modal": {
+      "title": "To'lovni qaytarish",
+      "body": "Bu to'lovni qaytarishni tasdiqlaysizmi? Amal qaytarib bo'lmaydi.",
+      "confirm": "Qaytarish",
+      "cancel": "Bekor qilish"
     }
   }
 }
