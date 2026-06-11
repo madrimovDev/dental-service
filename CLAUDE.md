@@ -4,7 +4,8 @@ Bu fayl Claude Code uchun loyiha konteksti. Har yangi sessiyada birinchi o'qilad
 
 > ⚠️ **REDESIGN FAOL (2026-06-09).** Loyiha "Dental SaaS" → **kengaytiriladigan klinika platformasi + rolga moslashuvchi UX** ga qayta yo'naltirildi. M1–M5 yadro qurilgan va saqlanadi (gibrid: ko'chiriladi, qayta qurilmaydi).
 > **Joriy reja:** Obsidian `05-Redesign.md` + Linear (Dental Service — Redesign, team CLI) — milestone'lar M0–M8 (R0–R5 + Foundation + OpenAPI). Quyidagi **§8 Phasing eskirgan** (eski M1–M7) — 05-Redesign'ga qarang.
-> **Arxitektura qarorlari:** `docs/rfcs/` (RFC 001–010) + `docs/architecture.md`.
+> **Progress (2026-06-11):** ✅ R0 (poydevor) + R1 (shell) + **R2 (7 ekran re-skin + Billing poydevori)** TUGADI. ⏭️ **Keyingi: R3** (bemor balansi + dashboard + hisobot). Billing poydevori (`treatment_stage_payments` allocation + computed balans, Qaror #11) R3 balansiga asos.
+> **Arxitektura qarorlari:** `docs/rfcs/` (RFC 001–010) + `docs/architecture.md` + Obsidian `01-Qarorlar.md` (#11 billing, #12 zod4Resolver).
 
 **Joriy arxitektura:** [`docs/architecture.md`](./docs/architecture.md) + [`docs/rfcs/`](./docs/rfcs/) (RFC 001–010) · UX/IA: [`docs/ux-ia-concept.md`](./docs/ux-ia-concept.md)
 Konsept (⚠️ historical, dental-only): [`CONCEPT.md`](./CONCEPT.md) — redesign bilan almashtirildi (2026-06-09)
@@ -291,7 +292,7 @@ dental-service/
 - **Shared:** `packages/ui` (dizayn-tizim primitivlari) → `apps/web/src/components` (ilova-shared) → feature `components/`
 - Server state — TanStack Query (faqat feature hooks orqali); query-key `[feature, scope, params]`
 - Client state — Zustand (global `stores/`: auth, ui/shell); server data dublirlanmaydi
-- Forms — `@mantine/form` + `mantine-form-zod-resolver`
+- Forms — `@mantine/form` + **`zod4Resolver`** (`mantine-form-zod-resolver`). ⚠️ Loyiha **Zod 4** — plain `zodResolver` `error.errors`ni (v3) o'qib invalid submit'da CRASH qiladi; doim `zod4Resolver` (`.issues`) ishlat (Qaror #12).
 - API tiplari — **generated `packages/api-client`** (OpenAPI, qo'lda emas; RFC-0002 §4)
 - Hech qachon `fetch()` to'g'ridan-to'g'ri — generated `api-client` orqali
 - Tafsilot: [`docs/rfcs/0010-frontend-feature-architecture.md`](./docs/rfcs/0010-frontend-feature-architecture.md)
