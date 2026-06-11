@@ -3,6 +3,29 @@
     "name": "Dental Service",
     "tagline": "Stomatologiya klinikalari uchun SaaS boshqaruv tizimi"
   },
+  "audit": {
+    "title": "Audit log",
+    "from": "Sanadan",
+    "to": "Sanagacha",
+    "action": "Amal",
+    "action_placeholder": "masalan, patient.create",
+    "resource_type": "Resurs turi",
+    "resource_type_placeholder": "masalan, patient",
+    "user": "Foydalanuvchi",
+    "all_users": "Barcha foydalanuvchilar",
+    "system": "Tizim",
+    "empty": "Yozuvlar topilmadi",
+    "detail": "Tafsilot",
+    "before": "Oldin",
+    "after": "Keyin",
+    "col": {
+      "when": "Qachon",
+      "who": "Kim",
+      "action": "Amal",
+      "resource": "Resurs",
+      "resource_id": "Resurs ID"
+    }
+  },
   "common": {
     "currency": "so'm",
     "loading": "Yuklanmoqda...",
@@ -131,7 +154,30 @@
     "quick_start": "Tez boshlash",
     "tip_branches": "Sozlamalar → Filiallar — yangi filial qo'shing",
     "tip_users": "Sozlamalar → Xodimlar — xodim akkaunti yarating",
-    "tip_roles": "Sozlamalar → Rollar — xodimlar uchun rollarni sozlang"
+    "tip_roles": "Sozlamalar → Rollar — xodimlar uchun rollarni sozlang",
+    "no_branch": "Avval filial tanlang",
+    "empty": "Ma'lumot yo'q",
+    "today_appointments": "Bugungi qabullar",
+    "today_total": "Bugun jami",
+    "no_show": "Kelmaganlar",
+    "queue": "Navbat",
+    "revenue_total": "Umumiy daromad",
+    "appointments_total": "Qabullar (davr)",
+    "no_show_rate": "No-show foizi",
+    "slot_utilization": "Slot bandligi",
+    "plan_completion": "Reja bajarilishi",
+    "revenue_by_branch": "Filial bo'yicha daromad",
+    "revenue_by_service": "Xizmat bo'yicha daromad",
+    "top_doctors": "Doktorlar yuklamasi",
+    "daily_cash": "Kunlik kassa",
+    "lab_queue": "Laboratoriya navbati",
+    "assistant_tasks": "Vazifalar",
+    "assistant_tasks_placeholder": "Vazifalar moduli hali ulanmagan",
+    "doctor_pending": "Tugallanmagan ishlar",
+    "doctor_pending_placeholder": "Tugallanmagan ishlar agregati hali yo'q",
+    "no_lab_orders": "Faol laboratoriya buyurtmalari yo'q",
+    "no_appointments": "Bugun qabullar yo'q",
+    "no_queue": "Navbat bo'sh"
   },
   "branches": {
     "title": "Filiallar",
@@ -680,5 +726,28 @@
       "voided": "Bekor qilingan",
       "pending": "Kutilmoqda"
     }
+  },
+  "reports": {
+    "title": "Hisobotlar",
+    "date_range": "Sana oraligʻi",
+    "branch": "Filial",
+    "all_branches": "Barcha filiallar",
+    "revenue": "Daromad",
+    "appointments": "Qabullar",
+    "doctor_workload": "Shifokorlar yuklamasi",
+    "plan_completion": "Davolash rejalari",
+    "total": "Jami",
+    "currency": "soʻm",
+    "no_show": "Kelmaganlar",
+    "utilization": "Bandlik",
+    "status": "Status",
+    "count": "Soni",
+    "doctor": "Shifokor",
+    "completed": "Yakunlangan",
+    "total_stages": "Bosqichlar",
+    "rate": "Bajarilish",
+    "empty": "Maʼlumot yoʻq",
+    "export_csv": "CSV",
+    "export_excel": "Excel"
   }
 }

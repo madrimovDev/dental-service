@@ -3,6 +3,29 @@
     "name": "Dental Service",
     "tagline": "SaaS-система управления стоматологическими клиниками"
   },
+  "audit": {
+    "title": "Журнал аудита",
+    "from": "С даты",
+    "to": "По дату",
+    "action": "Действие",
+    "action_placeholder": "например, patient.create",
+    "resource_type": "Тип ресурса",
+    "resource_type_placeholder": "например, patient",
+    "user": "Пользователь",
+    "all_users": "Все пользователи",
+    "system": "Система",
+    "empty": "Записи не найдены",
+    "detail": "Подробности",
+    "before": "До",
+    "after": "После",
+    "col": {
+      "when": "Когда",
+      "who": "Кто",
+      "action": "Действие",
+      "resource": "Ресурс",
+      "resource_id": "ID ресурса"
+    }
+  },
   "common": {
     "currency": "сум",
     "loading": "Загрузка...",
@@ -131,7 +154,30 @@
     "quick_start": "Быстрый старт",
     "tip_branches": "Настройки → Филиалы — добавьте новый филиал",
     "tip_users": "Настройки → Сотрудники — создайте аккаунты сотрудников",
-    "tip_roles": "Настройки → Роли — настройте роли для сотрудников"
+    "tip_roles": "Настройки → Роли — настройте роли для сотрудников",
+    "no_branch": "Сначала выберите филиал",
+    "empty": "Нет данных",
+    "today_appointments": "Приёмы на сегодня",
+    "today_total": "Всего сегодня",
+    "no_show": "Неявки",
+    "queue": "Очередь",
+    "revenue_total": "Общий доход",
+    "appointments_total": "Приёмы (период)",
+    "no_show_rate": "Процент неявок",
+    "slot_utilization": "Загрузка слотов",
+    "plan_completion": "Выполнение планов",
+    "revenue_by_branch": "Доход по филиалам",
+    "revenue_by_service": "Доход по услугам",
+    "top_doctors": "Загрузка врачей",
+    "daily_cash": "Касса за день",
+    "lab_queue": "Очередь лаборатории",
+    "assistant_tasks": "Задачи",
+    "assistant_tasks_placeholder": "Модуль задач ещё не подключён",
+    "doctor_pending": "Незавершённые работы",
+    "doctor_pending_placeholder": "Агрегат незавершённых работ пока отсутствует",
+    "no_lab_orders": "Нет активных заказов лаборатории",
+    "no_appointments": "Сегодня нет приёмов",
+    "no_queue": "Очередь пуста"
   },
   "branches": {
     "title": "Филиалы",
@@ -680,5 +726,28 @@
       "voided": "Отменён",
       "pending": "В ожидании"
     }
+  },
+  "reports": {
+    "title": "Отчёты",
+    "date_range": "Период",
+    "branch": "Филиал",
+    "all_branches": "Все филиалы",
+    "revenue": "Выручка",
+    "appointments": "Приёмы",
+    "doctor_workload": "Загрузка врачей",
+    "plan_completion": "Планы лечения",
+    "total": "Всего",
+    "currency": "сум",
+    "no_show": "Неявки",
+    "utilization": "Загрузка",
+    "status": "Статус",
+    "count": "Кол-во",
+    "doctor": "Врач",
+    "completed": "Завершено",
+    "total_stages": "Этапы",
+    "rate": "Выполнение",
+    "empty": "Нет данных",
+    "export_csv": "CSV",
+    "export_excel": "Excel"
   }
 }
