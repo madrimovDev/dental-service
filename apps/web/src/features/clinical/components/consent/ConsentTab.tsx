@@ -1,6 +1,6 @@
 import type { ConsentTemplate, ConsentType } from '@dental/api-client';
+import { Mono, Tag } from '@dental/ui';
 import {
-  Badge,
   Button,
   Card,
   Group,
@@ -14,12 +14,17 @@ import {
   Title,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconPlus, IconWriting } from '@tabler/icons-react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { IconFileText, IconPlus, IconWriting } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { api } from '@/lib/api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
+import {
+  useConsentForms,
+  useConsentTemplates,
+  useCreateConsentTemplate,
+  useSignConsent,
+} from '../../clinical.api';
+import { templateBodyForLang, toConsentFormVM } from '../../clinical.mappers';
 
 type Props = { patientId: string };
 
@@ -34,7 +39,6 @@ const TYPE_OPTIONS: ConsentType[] = [
 export function ConsentTab({ patientId }: Props) {
   const { t, i18n } = useTranslation();
   const { hasPermission } = useAuthStore();
-  const qc = useQueryClient();
   const [signOpened, signCtl] = useDisclosure(false);
   const [tplOpened, tplCtl] = useDisclosure(false);
 
@@ -49,37 +53,47 @@ export function ConsentTab({ patientId }: Props) {
   const [tplBodyUz, setTplBodyUz] = useState('');
   const [tplBodyRu, setTplBodyRu] = useState('');
 
-  const tplQuery = useQuery({
-    queryKey: ['consent-templates'],
-    queryFn: () => api.consent.listTemplates(),
-  });
+  const tplQuery = useConsentTemplates();
+  const formsQuery = useConsentForms(patientId);
+  const createTplMut = useCreateConsentTemplate();
+  const signMut = useSignConsent(patientId);
 
-  const formsQuery = useQuery({
-    queryKey: ['consent-forms', patientId],
-    queryFn: () => api.consent.listForms(patientId),
-  });
+  const canManage = hasPermission('consent.manage');
+  const canView = hasPermission('consent.view');
 
-  const createTplMut = useMutation({
-    mutationFn: () =>
-      api.consent.createTemplate({
+  if (!canView) return <Text c="dimmed">{t('patients.no_medical_permission')}</Text>;
+
+  const lang = i18n.language === 'ru' ? 'ru' : 'uz';
+
+  const applyTemplate = (tpl: ConsentTemplate) => {
+    setSelectedTplId(tpl.id);
+    setSignType(tpl.type);
+    setSignTitle(tpl.title);
+    setSignBody(templateBodyForLang(tpl, lang));
+  };
+
+  const createTemplate = () => {
+    createTplMut.mutate(
+      {
         type: tplType,
         title: tplTitle,
         bodyUz: tplBodyUz,
         bodyRu: tplBodyRu || undefined,
-      }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['consent-templates'] });
-      setTplTitle('');
-      setTplBodyUz('');
-      setTplBodyRu('');
-      tplCtl.close();
-    },
-  });
+      },
+      {
+        onSuccess: () => {
+          setTplTitle('');
+          setTplBodyUz('');
+          setTplBodyRu('');
+          tplCtl.close();
+        },
+      },
+    );
+  };
 
-  const signMut = useMutation({
-    mutationFn: () => {
-      const lang = i18n.language === 'ru' ? 'ru' : 'uz';
-      return api.consent.signForm({
+  const sign = () => {
+    signMut.mutate(
+      {
         patientId,
         templateId: selectedTplId ?? undefined,
         type: signType,
@@ -87,29 +101,17 @@ export function ConsentTab({ patientId }: Props) {
         bodyText: signBody,
         language: lang,
         patientSignatureName: signSignature || undefined,
-      });
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['consent-forms', patientId] });
-      setSelectedTplId(null);
-      setSignTitle('');
-      setSignBody('');
-      setSignSignature('');
-      signCtl.close();
-    },
-  });
-
-  const canManage = hasPermission('consent.manage');
-  const canView = hasPermission('consent.view');
-
-  if (!canView) return <Text c="dimmed">{t('patients.no_medical_permission')}</Text>;
-
-  const applyTemplate = (tpl: ConsentTemplate) => {
-    setSelectedTplId(tpl.id);
-    setSignType(tpl.type);
-    setSignTitle(tpl.title);
-    const lang = i18n.language === 'ru' ? 'ru' : 'uz';
-    setSignBody((lang === 'ru' ? tpl.bodyRu : null) || tpl.bodyUz);
+      },
+      {
+        onSuccess: () => {
+          setSelectedTplId(null);
+          setSignTitle('');
+          setSignBody('');
+          setSignSignature('');
+          signCtl.close();
+        },
+      },
+    );
   };
 
   return (
@@ -137,25 +139,25 @@ export function ConsentTab({ patientId }: Props) {
         </Paper>
       )}
 
-      {formsQuery.data?.map((form) => (
-        <Card key={form.id} withBorder padding="md">
+      {formsQuery.data?.map(toConsentFormVM).map((vm) => (
+        <Card key={vm.id} withBorder padding="md">
           <Stack gap="xs">
             <Group justify="space-between">
-              <Text fw={700}>📝 {form.title}</Text>
+              <Group gap={6}>
+                <IconFileText size={16} />
+                <Text fw={700}>{vm.title}</Text>
+              </Group>
               <Group gap="xs">
-                <Badge variant="light">{t(`consent.type_${form.type}`)}</Badge>
-                <Badge variant="light" color="cyan">
-                  {form.language.toUpperCase()}
-                </Badge>
+                <Tag>{t(vm.typeLabelKey)}</Tag>
+                <Mono>{vm.languageUpper}</Mono>
               </Group>
             </Group>
             <Text size="xs" c="dimmed">
-              {t('consent.signed_at')}: {new Date(form.signedAt).toLocaleString()}
-              {form.patientSignatureName && ` — ${form.patientSignatureName}`}
+              {t('consent.signed_at')}: {vm.signedAtText}
+              {vm.signerName && ` — ${vm.signerName}`}
             </Text>
             <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
-              {form.bodyText.slice(0, 240)}
-              {form.bodyText.length > 240 && '...'}
+              {vm.bodyPreview}
             </Text>
           </Stack>
         </Card>
@@ -214,7 +216,7 @@ export function ConsentTab({ patientId }: Props) {
               {t('common.cancel')}
             </Button>
             <Button
-              onClick={() => signMut.mutate()}
+              onClick={sign}
               loading={signMut.isPending}
               disabled={!signTitle || signBody.length < 10}
             >
@@ -262,7 +264,7 @@ export function ConsentTab({ patientId }: Props) {
               {t('common.cancel')}
             </Button>
             <Button
-              onClick={() => createTplMut.mutate()}
+              onClick={createTemplate}
               loading={createTplMut.isPending}
               disabled={!tplTitle || tplBodyUz.length < 10}
             >

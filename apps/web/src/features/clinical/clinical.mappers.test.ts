@@ -17,6 +17,7 @@ import {
   parseToothNumbers,
   planStatusToTone,
   stageStatusToTone,
+  templateBodyForLang,
   toConsentFormVM,
   toDiagnosisOptions,
   toLabOrderVM,
@@ -296,5 +297,18 @@ describe('formatBytes / toPatientImageVM', () => {
     } as unknown as PatientImage);
     expect(dicom.displayTitle).toBe('CBCT');
     expect(dicom.isImage).toBe(false);
+  });
+});
+
+// ---- B: consent template body for lang ----
+describe('templateBodyForLang', () => {
+  const tpl = {
+    bodyUz: 'UZ matn',
+    bodyRu: 'RU matn',
+  } as import('@dental/api-client').ConsentTemplate;
+  it("ru bo'lsa bodyRu, yo'q bo'lsa bodyUz", () => {
+    expect(templateBodyForLang(tpl, 'ru')).toBe('RU matn');
+    expect(templateBodyForLang({ ...tpl, bodyRu: null } as never, 'ru')).toBe('UZ matn');
+    expect(templateBodyForLang(tpl, 'uz')).toBe('UZ matn');
   });
 });
