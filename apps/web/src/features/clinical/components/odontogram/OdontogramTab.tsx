@@ -1,4 +1,4 @@
-import type { CreateToothStateInput, ToothState } from '@dental/api-client';
+import type { CreateToothStateInput, ToothState, ToothStateEntry } from '@dental/api-client';
 import {
   Alert,
   Button,
@@ -11,12 +11,13 @@ import {
   Textarea,
   Title,
 } from '@mantine/core';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { IconDental } from '@tabler/icons-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { api } from '@/lib/api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
-import { Odontogram } from './Odontogram.tsx';
+import { useCreateToothChart, useLatestToothChart } from '../../clinical.api';
+import { draftStatesToCreateInput, toToothStateMap } from '../../clinical.mappers';
+import { Odontogram } from './Odontogram';
 
 type Props = { patientId: string };
 
@@ -33,11 +34,13 @@ const TOOTH_STATE_OPTIONS: ToothState[] = [
   'veneer',
 ];
 
-export function ToothChartTab({ patientId }: Props) {
+export function OdontogramTab({ patientId }: Props) {
   const { t } = useTranslation();
   const { hasPermission } = useAuthStore();
-  const qc = useQueryClient();
   const canEdit = hasPermission('medical_record.edit');
+
+  const chartQuery = useLatestToothChart(patientId);
+  const createMut = useCreateToothChart(patientId);
 
   const [isPrimary, setIsPrimary] = useState(false);
   const [selectedTooth, setSelectedTooth] = useState<number | null>(null);
@@ -45,58 +48,32 @@ export function ToothChartTab({ patientId }: Props) {
   const [draftNotes, setDraftNotes] = useState('');
   const [dirty, setDirty] = useState(false);
 
-  const chartQuery = useQuery({
-    queryKey: ['tooth-chart-latest', patientId],
-    queryFn: () => api.clinical.getLatestToothChart(patientId),
-  });
-
-  // Initialize draft from latest snapshot
   useEffect(() => {
     if (!chartQuery.data) return;
-    const map = new Map<number, ToothState>();
-    for (const s of chartQuery.data.states) {
-      if (s.surface === 'whole') map.set(s.toothNumber, s.state);
-    }
-    setDraftStates(map);
+    setDraftStates(toToothStateMap(chartQuery.data));
     setIsPrimary(chartQuery.data.isPrimaryDentition);
     setDirty(false);
   }, [chartQuery.data]);
 
-  const createMut = useMutation({
-    mutationFn: () => {
-      const states: CreateToothStateInput[] = Array.from(draftStates.entries()).map(
-        ([n, state]) => ({
-          toothNumber: n,
-          state,
-          surface: 'whole',
-        }),
-      );
-      return api.clinical.createToothChart({
-        patientId,
-        isPrimaryDentition: isPrimary,
-        notes: draftNotes || undefined,
-        states,
-      });
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['tooth-chart-latest', patientId] });
-      setDraftNotes('');
-      setDirty(false);
-    },
-  });
+  const statesArray: ToothStateEntry[] = useMemo(
+    () =>
+      Array.from(draftStates.entries()).map(([toothNumber, state]) => ({
+        id: `draft-${toothNumber}`,
+        toothChartId: 'draft',
+        toothNumber,
+        surface: 'whole' as const,
+        state,
+        diagnosisId: null,
+        notes: null,
+        createdAt: new Date().toISOString(),
+      })),
+    [draftStates],
+  );
 
-  const statesArray = useMemo(() => {
-    return Array.from(draftStates.entries()).map(([toothNumber, state]) => ({
-      id: `draft-${toothNumber}`,
-      toothChartId: 'draft',
-      toothNumber,
-      surface: 'whole' as const,
-      state,
-      diagnosisId: null,
-      notes: null,
-      createdAt: new Date().toISOString(),
-    }));
-  }, [draftStates]);
+  const selectTooth = (n: number) => {
+    setSelectedTooth(n);
+    setDirty(true);
+  };
 
   const setToothState = (state: ToothState) => {
     if (selectedTooth === null) return;
@@ -106,22 +83,33 @@ export function ToothChartTab({ patientId }: Props) {
     setDirty(true);
   };
 
+  const save = () => {
+    const states: CreateToothStateInput[] = draftStatesToCreateInput(draftStates);
+    createMut.mutate(
+      { patientId, isPrimaryDentition: isPrimary, notes: draftNotes || undefined, states },
+      {
+        onSuccess: () => {
+          setDraftNotes('');
+          setDirty(false);
+        },
+      },
+    );
+  };
+
   return (
     <Stack gap="md">
       <Group justify="space-between">
         <Title order={4}>{t('tooth_chart.title')}</Title>
-        <Group>
-          <Switch
-            label={t('tooth_chart.primary_dentition')}
-            checked={isPrimary}
-            onChange={(e) => {
-              setIsPrimary(e.currentTarget.checked);
-              setDraftStates(new Map());
-              setDirty(true);
-            }}
-            disabled={!canEdit}
-          />
-        </Group>
+        <Switch
+          label={t('tooth_chart.primary_dentition')}
+          checked={isPrimary}
+          onChange={(e) => {
+            setIsPrimary(e.currentTarget.checked);
+            setDraftStates(new Map());
+            setDirty(true);
+          }}
+          disabled={!canEdit}
+        />
       </Group>
 
       {!chartQuery.data && !chartQuery.isLoading && (
@@ -133,16 +121,19 @@ export function ToothChartTab({ patientId }: Props) {
           states={statesArray}
           isPrimaryDentition={isPrimary}
           selectedTooth={selectedTooth}
-          onSelectTooth={setSelectedTooth}
+          onSelectTooth={selectTooth}
         />
       </Paper>
 
       {canEdit && selectedTooth !== null && (
         <Paper withBorder p="md">
           <Stack gap="sm">
-            <Text fw={600}>
-              {t('tooth_chart.selected_tooth')}: 🦷 <strong>{selectedTooth}</strong>
-            </Text>
+            <Group gap={6}>
+              <IconDental size={18} />
+              <Text fw={600}>
+                {t('tooth_chart.selected_tooth')}: <strong>{selectedTooth}</strong>
+              </Text>
+            </Group>
             <Select
               label={t('tooth_chart.set_state')}
               value={draftStates.get(selectedTooth) ?? 'healthy'}
@@ -163,15 +154,12 @@ export function ToothChartTab({ patientId }: Props) {
               label={t('treatment_plan.notes')}
               placeholder={t('tooth_chart.notes_placeholder')}
               value={draftNotes}
-              onChange={(e) => {
-                setDraftNotes(e.currentTarget.value);
-                setDirty(true);
-              }}
+              onChange={(e) => setDraftNotes(e.currentTarget.value)}
               rows={2}
             />
             <Group justify="flex-end">
               <Button
-                onClick={() => createMut.mutate()}
+                onClick={save}
                 loading={createMut.isPending}
                 disabled={!dirty && draftStates.size === 0}
               >

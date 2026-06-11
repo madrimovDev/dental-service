@@ -13,30 +13,38 @@ const PaymentsTab = lazy(() =>
   import('./tabs/PaymentsTab').then((m) => ({ default: m.PaymentsTab })),
 );
 
-const ToothChartTab = lazy(() =>
-  import('@/components/clinical/ToothChartTab.tsx').then((m) => ({ default: m.ToothChartTab })),
+const OdontogramTab = lazy(() =>
+  import('@/features/clinical/components/odontogram/OdontogramTab').then((m) => ({
+    default: m.OdontogramTab,
+  })),
 );
 const TreatmentPlansTab = lazy(() =>
-  import('@/components/clinical/TreatmentPlansTab.tsx').then((m) => ({
+  import('@/features/clinical/components/treatment-plans/TreatmentPlansTab').then((m) => ({
     default: m.TreatmentPlansTab,
   })),
 );
 const VisitNotesTab = lazy(() =>
-  import('@/components/clinical/VisitNotesTab.tsx').then((m) => ({ default: m.VisitNotesTab })),
+  import('@/features/clinical/components/visit-notes/VisitNotesTab').then((m) => ({
+    default: m.VisitNotesTab,
+  })),
 );
 const PrescriptionsTab = lazy(() =>
-  import('@/components/clinical/PrescriptionsTab.tsx').then((m) => ({
+  import('@/features/clinical/components/prescriptions/PrescriptionsTab').then((m) => ({
     default: m.PrescriptionsTab,
   })),
 );
 const ConsentTab = lazy(() =>
-  import('@/components/clinical/ConsentTab.tsx').then((m) => ({ default: m.ConsentTab })),
+  import('@/features/clinical/components/consent/ConsentTab').then((m) => ({
+    default: m.ConsentTab,
+  })),
 );
 const LabOrdersTab = lazy(() =>
-  import('@/components/clinical/LabOrdersTab.tsx').then((m) => ({ default: m.LabOrdersTab })),
+  import('@/features/clinical/components/lab-orders/LabOrdersTab').then((m) => ({
+    default: m.LabOrdersTab,
+  })),
 );
 const PatientImagesTab = lazy(() =>
-  import('@/components/clinical/PatientImagesTab.tsx').then((m) => ({
+  import('@/features/clinical/components/images/PatientImagesTab').then((m) => ({
     default: m.PatientImagesTab,
   })),
 );
@@ -98,7 +106,7 @@ export function PatientCard() {
         <Suspense fallback={null}>
           {active === 'gen' && patient && <GeneralTab patient={patient} />}
           {active === 'med' && <MedicalTab patientId={id} />}
-          {active === 'odo' && <ToothChartTab patientId={id} />}
+          {active === 'odo' && <OdontogramTab patientId={id} />}
           {active === 'plan' && <TreatmentPlansTab patientId={id} />}
           {active === 'vis' && <VisitNotesTab patientId={id} />}
           {active === 'rx' && <PrescriptionsTab patientId={id} />}

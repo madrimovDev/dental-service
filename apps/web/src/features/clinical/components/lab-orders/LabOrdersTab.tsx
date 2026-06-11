@@ -1,7 +1,7 @@
 import type { LabOrderItem, LabOrderStatus, LabOrderType } from '@dental/api-client';
+import { Mono, StatusPill, Tag } from '@dental/ui';
 import {
   ActionIcon,
-  Badge,
   Box,
   Button,
   Card,
@@ -17,12 +17,12 @@ import {
   Title,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconPlus, IconTrash } from '@tabler/icons-react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { IconDental, IconPlus, IconTrash } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { api } from '@/lib/api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
+import { useCreateLabOrder, useLabOrders, useUpdateLabOrderStatus } from '../../clinical.api';
+import { parseToothNumbers, toLabOrderVM } from '../../clinical.mappers';
 
 type Props = { patientId: string };
 
@@ -45,21 +45,11 @@ const STATUS_OPTIONS: LabOrderStatus[] = [
   'cancelled',
 ];
 
-const STATUS_COLORS: Record<LabOrderStatus, string> = {
-  draft: 'gray',
-  sent: 'blue',
-  in_progress: 'orange',
-  ready: 'green',
-  delivered: 'teal',
-  cancelled: 'red',
-};
-
 type ItemDraft = LabOrderItem & { toothNumbersText: string };
 
 export function LabOrdersTab({ patientId }: Props) {
   const { t } = useTranslation();
   const { user, hasPermission } = useAuthStore();
-  const qc = useQueryClient();
   const [opened, { open, close }] = useDisclosure(false);
 
   const [labName, setLabName] = useState('');
@@ -69,53 +59,9 @@ export function LabOrdersTab({ patientId }: Props) {
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<ItemDraft[]>([]);
 
-  const listQuery = useQuery({
-    queryKey: ['lab-orders', patientId],
-    queryFn: () => api.labOrders.list({ patientId }),
-  });
-
-  const createMut = useMutation({
-    mutationFn: () => {
-      if (!user) throw new Error('No user');
-      return api.labOrders.create({
-        patientId,
-        doctorId: user.id,
-        labName,
-        orderType,
-        items: items.map((i) => ({
-          description: i.description,
-          toothNumbers: i.toothNumbersText
-            ? i.toothNumbersText
-                .split(',')
-                .map((n) => Number(n.trim()))
-                .filter((n) => !Number.isNaN(n))
-            : undefined,
-          material: i.material,
-          shade: i.shade,
-          quantity: i.quantity,
-        })),
-        expectedDate: expectedDate || undefined,
-        cost: cost,
-        notes: notes || undefined,
-      });
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['lab-orders', patientId] });
-      setLabName('');
-      setOrderType('crown');
-      setExpectedDate('');
-      setCost(undefined);
-      setNotes('');
-      setItems([]);
-      close();
-    },
-  });
-
-  const updateStatusMut = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: LabOrderStatus }) =>
-      api.labOrders.update(id, { status }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['lab-orders', patientId] }),
-  });
+  const listQuery = useLabOrders(patientId);
+  const createMut = useCreateLabOrder(patientId);
+  const updateStatusMut = useUpdateLabOrderStatus(patientId);
 
   const canManage = hasPermission('lab_order.manage');
   const canView = hasPermission('lab_order.view');
@@ -124,6 +70,43 @@ export function LabOrdersTab({ patientId }: Props) {
 
   const addItem = () => {
     setItems([...items, { description: '', toothNumbersText: '' }]);
+  };
+
+  const resetForm = () => {
+    setLabName('');
+    setOrderType('crown');
+    setExpectedDate('');
+    setCost(undefined);
+    setNotes('');
+    setItems([]);
+  };
+
+  const submit = () => {
+    if (!user) return;
+    createMut.mutate(
+      {
+        patientId,
+        doctorId: user.id,
+        labName,
+        orderType,
+        items: items.map((i) => ({
+          description: i.description,
+          toothNumbers: i.toothNumbersText ? parseToothNumbers(i.toothNumbersText) : undefined,
+          material: i.material,
+          shade: i.shade,
+          quantity: i.quantity,
+        })),
+        expectedDate: expectedDate || undefined,
+        cost,
+        notes: notes || undefined,
+      },
+      {
+        onSuccess: () => {
+          resetForm();
+          close();
+        },
+      },
+    );
   };
 
   return (
@@ -144,21 +127,22 @@ export function LabOrdersTab({ patientId }: Props) {
         </Paper>
       )}
 
-      {listQuery.data?.map((order) => (
-        <Card key={order.id} withBorder padding="md">
+      {listQuery.data?.map(toLabOrderVM).map((vm) => (
+        <Card key={vm.id} withBorder padding="md">
           <Stack gap="xs">
             <Group justify="space-between">
               <Box>
-                <Text fw={700}>🦷 {order.labName}</Text>
+                <Group gap={6}>
+                  <IconDental size={16} />
+                  <Text fw={700}>{vm.labName}</Text>
+                </Group>
                 <Group gap="xs" mt={4}>
-                  <Badge variant="light">{t(`lab_order.type_${order.orderType}`)}</Badge>
-                  <Badge color={STATUS_COLORS[order.status]}>
-                    {t(`lab_order.status_${order.status}`)}
-                  </Badge>
-                  {order.cost && (
-                    <Text size="sm" c="dimmed">
-                      {Number(order.cost).toLocaleString()} {order.currency}
-                    </Text>
+                  <Tag>{t(vm.typeLabelKey)}</Tag>
+                  <StatusPill status={vm.statusTone}>{t(vm.statusLabelKey)}</StatusPill>
+                  {vm.costText && (
+                    <Mono>
+                      {vm.costText} {vm.currency}
+                    </Mono>
                   )}
                 </Group>
               </Box>
@@ -166,9 +150,9 @@ export function LabOrdersTab({ patientId }: Props) {
                 <Select
                   size="xs"
                   w={150}
-                  value={order.status}
+                  value={vm.status}
                   onChange={(v) =>
-                    v && updateStatusMut.mutate({ id: order.id, status: v as LabOrderStatus })
+                    v && updateStatusMut.mutate({ id: vm.id, status: v as LabOrderStatus })
                   }
                   data={STATUS_OPTIONS.map((s) => ({
                     value: s,
@@ -177,25 +161,24 @@ export function LabOrdersTab({ patientId }: Props) {
                 />
               )}
             </Group>
-            {order.items.map((it, i) => (
+            {vm.items.map((it, i) => (
               // biome-ignore lint/suspicious/noArrayIndexKey: stable items from server-side row
-              <Text key={`${order.id}-item-${i}`} size="sm" pl="md">
+              <Text key={`${vm.id}-item-${i}`} size="sm" pl="md">
                 • {it.description}
-                {it.toothNumbers &&
-                  it.toothNumbers.length > 0 &&
-                  ` (tish: ${it.toothNumbers.join(', ')})`}
+                {it.toothNumbers.length > 0 &&
+                  ` ${t('lab_order.teeth_inline', { teeth: it.toothNumbers.join(', ') })}`}
                 {it.material && `, ${it.material}`}
                 {it.shade && `, shade: ${it.shade}`}
                 {it.quantity && it.quantity > 1 && ` x${it.quantity}`}
               </Text>
             ))}
-            {order.sentDate && (
+            {vm.sentDateText && (
               <Text size="xs" c="dimmed">
-                {t('lab_order.sent_date')}: {new Date(order.sentDate).toLocaleDateString()}
-                {order.expectedDate &&
-                  ` · ${t('lab_order.expected_date')}: ${new Date(order.expectedDate).toLocaleDateString()}`}
-                {order.deliveredDate &&
-                  ` · ${t('lab_order.delivered_date')}: ${new Date(order.deliveredDate).toLocaleDateString()}`}
+                {t('lab_order.sent_date')}: {vm.sentDateText}
+                {vm.expectedDateText &&
+                  ` · ${t('lab_order.expected_date')}: ${vm.expectedDateText}`}
+                {vm.deliveredDateText &&
+                  ` · ${t('lab_order.delivered_date')}: ${vm.deliveredDateText}`}
               </Text>
             )}
           </Stack>
@@ -323,7 +306,7 @@ export function LabOrdersTab({ patientId }: Props) {
               {t('common.cancel')}
             </Button>
             <Button
-              onClick={() => createMut.mutate()}
+              onClick={submit}
               loading={createMut.isPending}
               disabled={!labName || items.length === 0 || items.some((i) => !i.description)}
             >
