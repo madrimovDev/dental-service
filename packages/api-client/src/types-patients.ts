@@ -20,8 +20,16 @@ export type Patient = {
   updatedAt: string;
 };
 
+export type PatientListItem = Patient & { balance: number };
+
+export type PatientBalance = {
+  balance: number;
+  planDebt: number;
+  nonPlanBalance: number;
+};
+
 export type PatientListResponse = {
-  data: Patient[];
+  data: PatientListItem[];
   meta: { page: number; pageSize: number; total: number };
 };
 
