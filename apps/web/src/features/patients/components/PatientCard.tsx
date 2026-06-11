@@ -37,7 +37,9 @@ const ConsentTab = lazy(() =>
   import('@/components/clinical/ConsentTab.tsx').then((m) => ({ default: m.ConsentTab })),
 );
 const LabOrdersTab = lazy(() =>
-  import('@/components/clinical/LabOrdersTab.tsx').then((m) => ({ default: m.LabOrdersTab })),
+  import('@/features/clinical/components/lab-orders/LabOrdersTab').then((m) => ({
+    default: m.LabOrdersTab,
+  })),
 );
 const PatientImagesTab = lazy(() =>
   import('@/components/clinical/PatientImagesTab.tsx').then((m) => ({
