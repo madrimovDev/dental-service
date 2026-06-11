@@ -1,5 +1,7 @@
+import { sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { DbOrTx } from './client.ts';
+import { db } from './client.ts';
 
 /**
  * Context'dan transaction-bound `db` ni oladi (RLS middleware o'rnatgan).
@@ -27,3 +29,23 @@ export const getDb = (c: Context): DbOrTx => {
   }
   return db;
 };
+
+/**
+ * Request'siz tenant kontekstida transaction ochadi (RLS uchun `set_config`).
+ *
+ * HTTP konteksti yo'q joylarda ishlatiladi (masalan, BullMQ worker job).
+ * `getDb(c)` o'rniga — bunda Context bo'lmaydi.
+ *
+ * Usage:
+ * ```ts
+ * await withTenant(tenantId, async (tx) => {
+ *   const rows = await tx.select().from(appointments); // RLS avtomatik filterlanadi
+ * });
+ * ```
+ */
+export async function withTenant<T>(tenantId: string, fn: (tx: DbOrTx) => Promise<T>): Promise<T> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);
+    return fn(tx);
+  });
+}
