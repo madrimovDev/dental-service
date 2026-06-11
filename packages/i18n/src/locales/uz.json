@@ -4,6 +4,7 @@
     "tagline": "Stomatologiya klinikalari uchun SaaS boshqaruv tizimi"
   },
   "common": {
+    "currency": "so'm",
     "loading": "Yuklanmoqda...",
     "error": "Xatolik yuz berdi",
     "retry": "Qayta urinish",
@@ -147,6 +148,42 @@
     "slug": "Slug (URL)",
     "default_language": "Asosiy til",
     "readonly_notice": "Sizda klinika sozlamalarini o'zgartirish ruxsati yo'q (faqat ko'rish)"
+  },
+  "settings": {
+    "title": "Sozlamalar",
+    "subtitle": "Klinika, rollar, filiallar va xodimlar",
+    "nav_tenant": "Klinika",
+    "nav_roles": "Rollar",
+    "nav_branches": "Filiallar",
+    "nav_users": "Xodimlar",
+    "perm_group_title": "Ruxsatlar (resurs bo'yicha)",
+    "perm_group_toggle_all": "Hammasini tanlash",
+    "users_search": "Ism yoki telefon bo'yicha qidirish",
+    "users_filter_branch": "Filial bo'yicha",
+    "users_filter_role": "Rol bo'yicha",
+    "users_filter_all": "Barchasi",
+    "confirm_title": "Tasdiqlang",
+    "confirm_ok": "Tasdiqlash",
+    "transfer_ownership": "Egalikni o'tkazish",
+    "reset_failed": "Parolni tiklash amalga oshmadi",
+    "transfer_failed": "Egalikni o'tkazish amalga oshmadi",
+    "transfer_new_owner": "Yangi egasi (xodim)",
+    "transfer_current_password": "Joriy parolingiz",
+    "transfer_confirm": "Egalik boshqa xodimga o'tkaziladi. Bu amalni qaytarib bo'lmaydi. Davom etasizmi?",
+    "transfer_hint": "Egalikni o'tkazsangiz — superuser huquqlari yangi egaga o'tadi.",
+    "perm_group": {
+      "patient": "Bemorlar",
+      "appointment": "Yozuvlar",
+      "queue": "Navbat",
+      "cashier": "Kassa",
+      "service": "Xizmatlar",
+      "branch": "Filiallar",
+      "role": "Rollar",
+      "user": "Xodimlar",
+      "tenant": "Klinika",
+      "report": "Hisobotlar",
+      "audit": "Audit"
+    }
   },
   "users": {
     "invite": "Xodim qo'shish",
@@ -336,7 +373,10 @@
     "plan": "Reja (Treatment plan)",
     "free_notes": "Qo'shimcha izoh",
     "empty": "Vizit yozuvlari yo'q",
-    "save": "Yozuvni saqlash"
+    "save": "Yozuvni saqlash",
+    "appointment": "Yozuv (uchrashuv)",
+    "no_appointment": "Yozuvsiz",
+    "selected_tooth": "Tanlangan tish"
   },
   "tooth_chart": {
     "title": "Tish kartasi (Odontogram)",
@@ -384,7 +424,8 @@
     "empty": "Reseptlar yo'q",
     "save": "Reseptni saqlash",
     "print": "Chop etish",
-    "remove_item": "Olib tashlash"
+    "remove_item": "Olib tashlash",
+    "duration_days_suffix": "{{days}} kun"
   },
   "consent": {
     "title": "Konsent formalar",
@@ -444,7 +485,8 @@
     "cost": "Narxi",
     "notes": "Eslatma",
     "save": "Saqlash",
-    "empty": "Buyurtmalar yo'q"
+    "empty": "Buyurtmalar yo'q",
+    "teeth_inline": "tish: {{teeth}}"
   },
   "image": {
     "title": "Bemor rasmlari",
@@ -469,7 +511,9 @@
     "drop_zone": "Faylni shu yerga tashlang yoki tanlash uchun bosing",
     "max_size": "Maksimal 30 MB",
     "supported_formats": "JPEG, PNG, WebP, HEIC, DICOM",
-    "confirm_delete": "Rasmni o'chirishni tasdiqlaysizmi?"
+    "confirm_delete": "Rasmni o'chirishni tasdiqlaysizmi?",
+    "download": "Yuklab olish",
+    "non_image_file": "Fayl"
   },
   "appointments": {
     "title": "Yozilishlar",
@@ -531,6 +575,7 @@
     "name_uz": "Nomi (O'zbek)",
     "name_ru": "Nomi (Rus)",
     "category": "Kategoriya",
+    "category_placeholder": "Terapevtika / Ortopediya / ...",
     "duration": "Davomiyligi",
     "duration_minutes": "Davomiyligi (daqiqa)",
     "minutes": "daq",
@@ -543,7 +588,20 @@
     "branch": "Filial",
     "status": "Status",
     "empty": "Xizmatlar yo'q. Birinchi xizmatni qo'shing.",
-    "confirm_delete": "Xizmatni o'chirishni tasdiqlaysizmi?"
+    "confirm_delete": "Xizmatni o'chirishni tasdiqlaysizmi?",
+    "tab_info": "Ma'lumot",
+    "tab_prices": "Narxlar",
+    "search": "Nom yoki kod bo'yicha qidirish...",
+    "other": "Boshqa",
+    "required_role": "Talab qilinadigan rol",
+    "role_none": "Belgilanmagan",
+    "role_doctor": "Shifokor",
+    "role_assistant": "Yordamchi",
+    "role_technician": "Texnik",
+    "description_uz": "Tavsif (O'zbek)",
+    "description_ru": "Tavsif (Rus)",
+    "is_active": "Faol",
+    "save_first": "Narx qo'shish uchun avval xizmatni saqlang"
   },
   "cashier": {
     "title": "Kassa",
@@ -573,7 +631,50 @@
     "daily_summary": "Kunlik xulosa",
     "confirm_refund": "To'lovni qaytarishni tasdiqlaysizmi?",
     "type": {
-      "refund": "Qaytarish"
+      "refund": "Qaytarish",
+      "payment": "To'lov",
+      "void": "Bekor qilingan"
+    },
+    "patient": "Bemor",
+    "select_patient": "Bemorni tanlash...",
+    "no_patient": "Bemorsiz (walk-in)",
+    "quantity": "Soni",
+    "price": "Narx",
+    "remove": "O'chirish",
+    "method_label": "To'lov turi",
+    "mode": {
+      "payment": "Erkin to'lov",
+      "plan": "Davolash rejasi"
+    },
+    "plan_billing": {
+      "select_plan": "Davolash rejasini tanlang",
+      "no_plans": "Bemorda davolash rejasi yo'q",
+      "select_patient_first": "Avval bemorni tanlang",
+      "stage": "Bosqich",
+      "cost": "Narxi",
+      "paid": "To'langan",
+      "remaining": "Qoldiq",
+      "pay_selected": "Tanlanganlarni to'lash",
+      "no_stages_selected": "To'lov uchun bosqich tanlang",
+      "balance": "Balans",
+      "total_cost": "Umumiy narx",
+      "total_paid": "Jami to'langan",
+      "state": {
+        "paid": "To'langan",
+        "partial": "Qisman",
+        "unpaid": "To'lanmagan"
+      }
+    },
+    "refund_modal": {
+      "title": "To'lovni qaytarish",
+      "body": "Bu to'lovni qaytarishni tasdiqlaysizmi? Amal qaytarib bo'lmaydi.",
+      "confirm": "Qaytarish",
+      "cancel": "Bekor qilish"
+    },
+    "status_label": {
+      "completed": "Yakunlangan",
+      "voided": "Bekor qilingan",
+      "pending": "Kutilmoqda"
     }
   }
 }

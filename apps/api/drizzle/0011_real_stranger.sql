@@ -1,0 +1,2 @@
+CREATE UNIQUE INDEX "cashier_tx_receipt_unique" ON "cashier_transactions" USING btree ("receipt_number");--> statement-breakpoint
+CREATE UNIQUE INDEX "cashier_tx_parent_unique" ON "cashier_transactions" USING btree ("parent_transaction_id");

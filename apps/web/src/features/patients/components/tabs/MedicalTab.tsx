@@ -13,7 +13,7 @@ import {
   Textarea,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { zodResolver } from 'mantine-form-zod-resolver';
+import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth-store.ts';
@@ -38,7 +38,7 @@ export function MedicalTab({ patientId }: { patientId: string }) {
       bloodType: '',
       pregnancyStatus: 'not_applicable' as 'not_applicable' | 'pregnant' | 'planning' | 'lactating',
     },
-    validate: zodResolver(medicalRecordFormSchema),
+    validate: zod4Resolver(medicalRecordFormSchema),
   });
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: form.setValues stable

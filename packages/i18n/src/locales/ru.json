@@ -4,6 +4,7 @@
     "tagline": "SaaS-система управления стоматологическими клиниками"
   },
   "common": {
+    "currency": "сум",
     "loading": "Загрузка...",
     "error": "Произошла ошибка",
     "retry": "Повторить",
@@ -147,6 +148,42 @@
     "slug": "Slug (URL)",
     "default_language": "Основной язык",
     "readonly_notice": "У вас нет прав на редактирование настроек клиники (только просмотр)"
+  },
+  "settings": {
+    "title": "Настройки",
+    "subtitle": "Клиника, роли, филиалы и сотрудники",
+    "nav_tenant": "Клиника",
+    "nav_roles": "Роли",
+    "nav_branches": "Филиалы",
+    "nav_users": "Сотрудники",
+    "perm_group_title": "Разрешения (по ресурсам)",
+    "perm_group_toggle_all": "Выбрать все",
+    "users_search": "Поиск по имени или телефону",
+    "users_filter_branch": "По филиалу",
+    "users_filter_role": "По роли",
+    "users_filter_all": "Все",
+    "confirm_title": "Подтвердите",
+    "confirm_ok": "Подтвердить",
+    "transfer_ownership": "Передать владение",
+    "reset_failed": "Не удалось сбросить пароль",
+    "transfer_failed": "Не удалось передать владение",
+    "transfer_new_owner": "Новый владелец (сотрудник)",
+    "transfer_current_password": "Ваш текущий пароль",
+    "transfer_confirm": "Владение будет передано другому сотруднику. Это действие необратимо. Продолжить?",
+    "transfer_hint": "При передаче владения права суперпользователя переходят новому владельцу.",
+    "perm_group": {
+      "patient": "Пациенты",
+      "appointment": "Записи",
+      "queue": "Очередь",
+      "cashier": "Касса",
+      "service": "Услуги",
+      "branch": "Филиалы",
+      "role": "Роли",
+      "user": "Сотрудники",
+      "tenant": "Клиника",
+      "report": "Отчёты",
+      "audit": "Аудит"
+    }
   },
   "users": {
     "invite": "Добавить сотрудника",
@@ -336,7 +373,10 @@
     "plan": "План (Treatment plan)",
     "free_notes": "Доп. комментарий",
     "empty": "Записей визитов нет",
-    "save": "Сохранить запись"
+    "save": "Сохранить запись",
+    "appointment": "Запись (визит)",
+    "no_appointment": "Без записи",
+    "selected_tooth": "Выбранный зуб"
   },
   "tooth_chart": {
     "title": "Карта зубов (Одонтограмма)",
@@ -384,7 +424,8 @@
     "empty": "Рецептов нет",
     "save": "Сохранить рецепт",
     "print": "Печать",
-    "remove_item": "Удалить"
+    "remove_item": "Удалить",
+    "duration_days_suffix": "{{days}} дн."
   },
   "consent": {
     "title": "Согласия",
@@ -444,7 +485,8 @@
     "cost": "Стоимость",
     "notes": "Заметки",
     "save": "Сохранить",
-    "empty": "Заказов нет"
+    "empty": "Заказов нет",
+    "teeth_inline": "зуб: {{teeth}}"
   },
   "image": {
     "title": "Снимки пациента",
@@ -469,7 +511,9 @@
     "drop_zone": "Перетащите файл сюда или нажмите для выбора",
     "max_size": "Макс. 30 МБ",
     "supported_formats": "JPEG, PNG, WebP, HEIC, DICOM",
-    "confirm_delete": "Подтвердите удаление снимка"
+    "confirm_delete": "Подтвердите удаление снимка",
+    "download": "Скачать",
+    "non_image_file": "Файл"
   },
   "appointments": {
     "title": "Записи",
@@ -531,6 +575,7 @@
     "name_uz": "Название (узбекский)",
     "name_ru": "Название (русский)",
     "category": "Категория",
+    "category_placeholder": "Терапия / Ортопедия / ...",
     "duration": "Длительность",
     "duration_minutes": "Длительность (мин)",
     "minutes": "мин",
@@ -543,7 +588,20 @@
     "branch": "Филиал",
     "status": "Статус",
     "empty": "Услуг нет. Добавьте первую услугу.",
-    "confirm_delete": "Подтвердить удаление услуги?"
+    "confirm_delete": "Подтвердить удаление услуги?",
+    "tab_info": "Информация",
+    "tab_prices": "Цены",
+    "search": "Поиск по названию или коду...",
+    "other": "Прочее",
+    "required_role": "Требуемая роль",
+    "role_none": "Не указано",
+    "role_doctor": "Врач",
+    "role_assistant": "Ассистент",
+    "role_technician": "Техник",
+    "description_uz": "Описание (узбекский)",
+    "description_ru": "Описание (русский)",
+    "is_active": "Активна",
+    "save_first": "Сначала сохраните услугу, чтобы добавить цену"
   },
   "cashier": {
     "title": "Касса",
@@ -573,7 +631,50 @@
     "daily_summary": "Дневной отчёт",
     "confirm_refund": "Подтвердить возврат?",
     "type": {
-      "refund": "Возврат"
+      "refund": "Возврат",
+      "payment": "Платёж",
+      "void": "Отменён"
+    },
+    "patient": "Пациент",
+    "select_patient": "Выбрать пациента...",
+    "no_patient": "Без пациента (walk-in)",
+    "quantity": "Кол-во",
+    "price": "Цена",
+    "remove": "Удалить",
+    "method_label": "Способ оплаты",
+    "mode": {
+      "payment": "Свободный платёж",
+      "plan": "План лечения"
+    },
+    "plan_billing": {
+      "select_plan": "Выберите план лечения",
+      "no_plans": "У пациента нет плана лечения",
+      "select_patient_first": "Сначала выберите пациента",
+      "stage": "Этап",
+      "cost": "Стоимость",
+      "paid": "Оплачено",
+      "remaining": "Остаток",
+      "pay_selected": "Оплатить выбранные",
+      "no_stages_selected": "Выберите этапы для оплаты",
+      "balance": "Баланс",
+      "total_cost": "Общая стоимость",
+      "total_paid": "Всего оплачено",
+      "state": {
+        "paid": "Оплачено",
+        "partial": "Частично",
+        "unpaid": "Не оплачено"
+      }
+    },
+    "refund_modal": {
+      "title": "Возврат платежа",
+      "body": "Подтвердить возврат этого платежа? Действие необратимо.",
+      "confirm": "Вернуть",
+      "cancel": "Отмена"
+    },
+    "status_label": {
+      "completed": "Завершён",
+      "voided": "Отменён",
+      "pending": "В ожидании"
     }
   }
 }
