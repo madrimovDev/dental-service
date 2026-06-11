@@ -88,7 +88,7 @@ export function TenantSettingsScreen() {
         closeConfirm();
         notifications.show({
           title: t('common.error'),
-          message: err instanceof ApiError ? err.message : 'Transfer failed',
+          message: err instanceof ApiError ? err.message : t('settings.transfer_failed'),
           color: 'red',
         });
       },

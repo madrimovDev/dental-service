@@ -92,13 +92,16 @@ export const createServicesService = (deps: { audit: AuditLogger }) => {
 
   async function update(c: Context, id: string, input: UpdateServiceInput) {
     const db = getDb(c);
-    const [before] = await db.select().from(services).where(eq(services.id, id));
+    const [before] = await db
+      .select()
+      .from(services)
+      .where(and(eq(services.id, id), isNull(services.deletedAt)));
     if (!before) return null;
 
     const [updated] = await db
       .update(services)
       .set({ ...input, updatedAt: new Date() })
-      .where(eq(services.id, id))
+      .where(and(eq(services.id, id), isNull(services.deletedAt)))
       .returning();
 
     if (updated) {

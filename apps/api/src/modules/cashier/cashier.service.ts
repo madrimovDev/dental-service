@@ -98,8 +98,9 @@ export const createCashierService = (deps: { audit: AuditLogger }) => {
     const user = c.get('user');
     if (!tenantId) throw new Error('No tenant context');
 
-    const totalAmount = input.items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
-    const netTotal = totalAmount - input.discount;
+    const itemsGross = input.items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
+    // Erkin POS: jami − chegirma. Plan-billing (items bo'sh): allocation yig'indisi = paidAmount.
+    const netTotal = input.items.length > 0 ? itemsGross - input.discount : input.paidAmount;
 
     // Allocation yig'indisi paidAmount'dan oshmasligi shart (qisman ruxsat, oshib ketish RAD).
     if (input.allocations && input.allocations.length > 0) {
@@ -195,7 +196,8 @@ export const createCashierService = (deps: { audit: AuditLogger }) => {
       .from(cashierTransactions)
       .where(eq(cashierTransactions.id, id));
     if (!original) return null;
-    if (original.type === 'refund') return null; // refund of refund — not allowed
+    // Refund of refund yoki allaqachon void qilingan (ikki marta refund) — RAD.
+    if (original.type === 'refund' || original.status === 'voided') return null;
 
     return await db.transaction(async (tx) => {
       const [refundTx] = await tx

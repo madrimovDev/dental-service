@@ -278,7 +278,7 @@ export function UsersSettingsScreen() {
               setToReset(null);
               notifications.show({
                 title: t('common.error'),
-                message: err instanceof ApiError ? err.message : 'Reset failed',
+                message: err instanceof ApiError ? err.message : t('settings.reset_failed'),
                 color: 'red',
               });
             },

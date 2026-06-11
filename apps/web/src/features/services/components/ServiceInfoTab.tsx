@@ -29,7 +29,7 @@ export function ServiceInfoTab({
       />
       <TextInput
         label={t('services.category')}
-        placeholder="Terapevtika / Ortopediya / ..."
+        placeholder={t('services.category_placeholder')}
         {...form.getInputProps('category')}
       />
       <TextInput label={t('services.name_uz')} required {...form.getInputProps('nameUz')} />
