@@ -9,5 +9,6 @@ export * from './types-erp.ts';
 export * from './types-hr.ts';
 export * from './types-m3.ts';
 export * from './types-m5.ts';
+export * from './types-notifications.ts';
 export * from './types-patients.ts';
 export * from './types-reports.ts';

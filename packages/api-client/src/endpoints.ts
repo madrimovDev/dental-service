@@ -68,6 +68,7 @@ import type {
   Prescription,
   SignFormInput,
 } from './types-m5.ts';
+import type { NotificationsFeed } from './types-notifications.ts';
 import type {
   AllergyEntry,
   MedicalRecord,
@@ -413,6 +414,19 @@ export const createEndpoints = (api: ApiClient) => ({
     createBom: (body: { serviceId: string; itemId: string; qtyPerService: number }) =>
       api.post<ServiceMaterial>('/api/stock/bom', body),
     removeBom: (id: string) => api.delete<{ deleted: true }>(`/api/stock/bom/${id}`),
+  },
+
+  notifications: {
+    list: (query?: { page?: number; pageSize?: number }) => {
+      const p = new URLSearchParams();
+      if (query?.page) p.set('page', String(query.page));
+      if (query?.pageSize) p.set('pageSize', String(query.pageSize));
+      const qs = p.toString();
+      return api.get<NotificationsFeed>(`/api/notifications${qs ? `?${qs}` : ''}`);
+    },
+    markRead: (id: string) =>
+      api.post<{ read: boolean; id: string | null }>(`/api/notifications/${id}/read`),
+    markAllRead: () => api.post<{ count: number }>('/api/notifications/read-all'),
   },
 
   payroll: {

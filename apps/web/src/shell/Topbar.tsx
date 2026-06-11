@@ -1,8 +1,9 @@
 import { Avatar, IconButton } from '@dental/ui';
 import { Burger, Menu, useMantineColorScheme } from '@mantine/core';
-import { Bell, LogOut, Moon, Repeat, Search, Sun, User } from 'lucide-react';
+import { LogOut, Moon, Repeat, Search, Sun, User } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import { NotificationBell } from '@/features/notifications/components/NotificationBell.tsx';
 import { api } from '@/lib/api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import classes from './Topbar.module.css';
@@ -64,9 +65,7 @@ export function Topbar({
         {colorScheme === 'dark' ? <Sun /> : <Moon />}
       </IconButton>
 
-      <IconButton label={t('shell.notifications')} dot>
-        <Bell />
-      </IconButton>
+      <NotificationBell />
 
       <Menu shadow="md" width={140}>
         <Menu.Target>

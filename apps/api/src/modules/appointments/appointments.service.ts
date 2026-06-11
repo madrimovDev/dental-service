@@ -3,13 +3,17 @@ import { and, asc, between, eq, gte, lt, lte, ne } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { reminderDelayMs } from '../../lib/reminder-delay.ts';
 import type {
   CreateAppointmentInput,
   ListAppointmentsQuery,
   UpdateAppointmentInput,
 } from './appointments.schema.ts';
 
-export const createAppointmentsService = (deps: { audit: AuditLogger }) => {
+export const createAppointmentsService = (deps: {
+  audit: AuditLogger;
+  enqueueReminder?: (tenantId: string, appointmentId: string, delayMs: number) => Promise<void>;
+}) => {
   async function checkConflict(
     c: Context,
     doctorId: string,
@@ -104,6 +108,9 @@ export const createAppointmentsService = (deps: { audit: AuditLogger }) => {
       resourceId: appt.id,
       after: appt,
     });
+
+    const delay = reminderDelayMs(start, new Date());
+    if (delay != null) await deps.enqueueReminder?.(tenantId, appt.id, delay);
 
     return { ok: true as const, appointment: appt };
   }

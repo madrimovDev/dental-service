@@ -23,6 +23,10 @@ const envSchema = z.object({
   JWT_REFRESH_EXPIRES: z.string().default('7d'),
   WEB_ORIGIN: z.url(),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
+
+  // Eskiz SMS (optional — yo'q bo'lsa NoOp kanal ishlatiladi)
+  ESKIZ_EMAIL: z.string().optional(),
+  ESKIZ_PASSWORD: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(Bun.env);

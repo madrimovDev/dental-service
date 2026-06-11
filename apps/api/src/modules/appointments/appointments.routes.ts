@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { reminderQueue } from '../../lib/queue.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
@@ -18,7 +19,16 @@ export const appointmentRoutes = (deps: { db: Database; audit: AuditLogger }) =>
   app.use('*', authMiddleware());
   app.use('*', rlsMiddleware(deps.db));
 
-  const service = createAppointmentsService({ audit: deps.audit });
+  const service = createAppointmentsService({
+    audit: deps.audit,
+    enqueueReminder: async (tenantId, appointmentId, delayMs) => {
+      await reminderQueue.add(
+        'appointment-reminder',
+        { tenantId, appointmentId },
+        { delay: delayMs },
+      );
+    },
+  });
 
   app.get('/', requirePermission('appointment.view'), async (c) => {
     const query = listAppointmentsQuery.safeParse(

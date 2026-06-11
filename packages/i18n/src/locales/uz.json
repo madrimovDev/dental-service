@@ -139,6 +139,11 @@
     "theme_dark": "Qorong'i",
     "coming_soon": "Tez orada"
   },
+  "notifications": {
+    "title": "Bildirishnomalar",
+    "mark_all_read": "Hammasini o'qilgan deb belgilash",
+    "empty": "Bildirishnomalar yo'q"
+  },
   "error": {
     "403_title": "Ruxsat yo'q",
     "403_message": "Bu sahifaga kirish uchun ruxsatingiz yo'q.",

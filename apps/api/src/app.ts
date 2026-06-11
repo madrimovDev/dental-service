@@ -1,3 +1,4 @@
+import { createSmsChannel } from '@dental/notifications';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { db } from './db/client.ts';
@@ -15,6 +16,7 @@ import { consentRoutes } from './modules/consent/index.ts';
 import { expensesRoutes } from './modules/expenses/index.ts';
 import { healthRoutes } from './modules/health/index.ts';
 import { labOrdersRoutes } from './modules/lab-orders/index.ts';
+import { notificationsRoutes } from './modules/notifications/index.ts';
 import { patientImagesRoutes } from './modules/patient-images/index.ts';
 import { patientRoutes } from './modules/patients/index.ts';
 import { payrollRoutes } from './modules/payroll/index.ts';
@@ -70,6 +72,13 @@ export const createApp = () => {
   app.route('/api', expensesRoutes({ db, audit }));
   app.route('/api/stock', stockRoutes({ db, audit }));
   app.route('/api/payroll', payrollRoutes({ db, audit }));
+  app.route(
+    '/api/notifications',
+    notificationsRoutes({
+      db,
+      sms: createSmsChannel({ eskizEmail: env.ESKIZ_EMAIL, eskizPassword: env.ESKIZ_PASSWORD }),
+    }),
+  );
 
   // Error handler
   app.onError(errorHandler);

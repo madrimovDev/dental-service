@@ -11,6 +11,12 @@ vi.mock('@/stores/auth-store.ts', () => ({
   }),
 }));
 
+vi.mock('@/features/notifications/notifications.api.ts', () => ({
+  useNotifications: () => ({ data: { data: [], unreadCount: 0 }, isLoading: false }),
+  useMarkRead: () => ({ mutate: vi.fn(), isPending: false }),
+  useMarkAllRead: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+
 describe('Topbar', () => {
   it("foydalanuvchi ismini va qidiruvni ko'rsatadi", () => {
     renderApp(<Topbar onBurger={() => {}} burgerOpened={false} />);
