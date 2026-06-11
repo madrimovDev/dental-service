@@ -197,6 +197,8 @@ export const createEndpoints = (api: ApiClient) => ({
       category?: string;
       durationMinutes?: number;
       requiredRole?: string;
+      descriptionUz?: string;
+      descriptionRu?: string;
       isActive?: boolean;
       initialPrice?: number;
       initialBranchId?: string;

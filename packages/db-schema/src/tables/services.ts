@@ -37,11 +37,13 @@ export const services = pgTable(
 
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
   (t) => [
     unique('services_tenant_code_unique').on(t.tenantId, t.code),
     index('services_tenant_idx').on(t.tenantId),
     index('services_tenant_category_idx').on(t.tenantId, t.category),
+    index('services_tenant_deleted_idx').on(t.tenantId, t.deletedAt),
   ],
 );
 

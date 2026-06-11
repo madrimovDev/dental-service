@@ -12,6 +12,7 @@ export type Service = {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  deletedAt: string | null;
 };
 
 export type ServicePrice = {

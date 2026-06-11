@@ -12,12 +12,19 @@ import type {
 export const createServicesService = (deps: { audit: AuditLogger }) => {
   async function list(c: Context) {
     const db = getDb(c);
-    return db.select().from(services).orderBy(services.category, services.nameUz);
+    return db
+      .select()
+      .from(services)
+      .where(isNull(services.deletedAt))
+      .orderBy(services.category, services.nameUz);
   }
 
   async function findById(c: Context, id: string) {
     const db = getDb(c);
-    const [service] = await db.select().from(services).where(eq(services.id, id));
+    const [service] = await db
+      .select()
+      .from(services)
+      .where(and(eq(services.id, id), isNull(services.deletedAt)));
     if (!service) return null;
 
     // Per-branch active prices
@@ -108,10 +115,16 @@ export const createServicesService = (deps: { audit: AuditLogger }) => {
 
   async function remove(c: Context, id: string) {
     const db = getDb(c);
-    const [before] = await db.select().from(services).where(eq(services.id, id));
+    const [before] = await db
+      .select()
+      .from(services)
+      .where(and(eq(services.id, id), isNull(services.deletedAt)));
     if (!before) return null;
 
-    await db.delete(services).where(eq(services.id, id));
+    await db
+      .update(services)
+      .set({ deletedAt: new Date(), updatedAt: new Date() })
+      .where(eq(services.id, id));
 
     await deps.audit.record(c, {
       action: 'deleted',
