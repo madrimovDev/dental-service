@@ -44,7 +44,7 @@ const LabOrdersTab = lazy(() =>
   })),
 );
 const PatientImagesTab = lazy(() =>
-  import('@/components/clinical/PatientImagesTab.tsx').then((m) => ({
+  import('@/features/clinical/components/images/PatientImagesTab').then((m) => ({
     default: m.PatientImagesTab,
   })),
 );
