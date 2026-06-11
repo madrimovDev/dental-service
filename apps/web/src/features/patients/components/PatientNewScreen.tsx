@@ -1,7 +1,7 @@
 import { Button, Card, Input, PageHead, Select } from '@dental/ui';
 import { Group, TagsInput, Textarea } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { zodResolver } from 'mantine-form-zod-resolver';
+import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { PhoneInput } from '@/components/PhoneInput.tsx';
@@ -28,7 +28,7 @@ export function PatientNewScreen() {
       source: '',
       insurance: { provider: '', policyNumber: '' },
     },
-    validate: zodResolver(patientFormSchema),
+    validate: zod4Resolver(patientFormSchema),
   });
 
   const submit = form.onSubmit((values) => {

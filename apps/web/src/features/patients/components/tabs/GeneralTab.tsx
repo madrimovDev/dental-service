@@ -1,7 +1,7 @@
 import { Button, Card, Input, Mono, Select } from '@dental/ui';
 import { Badge, Group, SimpleGrid, Stack, Text, Textarea } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { zodResolver } from 'mantine-form-zod-resolver';
+import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PhoneInput } from '@/components/PhoneInput.tsx';
@@ -113,7 +113,7 @@ function GeneralEditForm({ patientId }: { patientId: string }) {
       address: '',
       notes: '',
     },
-    validate: zodResolver(patientEditSchema),
+    validate: zod4Resolver(patientEditSchema),
   });
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: form.setValues stable

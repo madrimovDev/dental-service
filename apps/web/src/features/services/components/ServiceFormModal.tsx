@@ -1,7 +1,7 @@
 import type { Service } from '@dental/api-client';
 import { Button, Group, Modal, Stack, Tabs } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { zodResolver } from 'mantine-form-zod-resolver';
+import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useBranches, useServiceDetail, useSetPrice, useUpsertService } from '../services.api';
@@ -43,7 +43,7 @@ export function ServiceFormModal({
 
   const form = useForm<ServiceFormValues>({
     initialValues: EMPTY,
-    validate: zodResolver(serviceFormSchema),
+    validate: zod4Resolver(serviceFormSchema),
   });
 
   // editing o'zgarganda formani to'ldirish / tozalash

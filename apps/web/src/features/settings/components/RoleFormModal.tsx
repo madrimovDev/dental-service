@@ -1,7 +1,7 @@
 import type { Role } from '@dental/api-client';
 import { Button, Divider, Group, Modal, Stack, Text, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { zodResolver } from 'mantine-form-zod-resolver';
+import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePermissions, useRole, useUpsertRole } from '../settings.api';
@@ -25,7 +25,7 @@ export function RoleFormModal({
 
   const form = useForm<RoleFormValues>({
     initialValues: { name: '', description: '' },
-    validate: zodResolver(roleSchema),
+    validate: zod4Resolver(roleSchema),
   });
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: faqat opened/editing/detail o'zgarganda

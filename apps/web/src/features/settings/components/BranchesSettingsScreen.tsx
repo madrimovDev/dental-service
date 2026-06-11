@@ -3,7 +3,7 @@ import { ActionIcon, Button, Group, Modal, Stack, Table, Text, TextInput } from 
 import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
 import { IconEdit, IconPlus, IconTrash } from '@tabler/icons-react';
-import { zodResolver } from 'mantine-form-zod-resolver';
+import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PhoneInput } from '@/components/PhoneInput.tsx';
@@ -25,7 +25,7 @@ export function BranchesSettingsScreen() {
 
   const form = useForm<BranchFormValues>({
     initialValues: { name: '', address: '', phone: '' },
-    validate: zodResolver(branchSchema),
+    validate: zod4Resolver(branchSchema),
   });
 
   const openCreate = () => {
