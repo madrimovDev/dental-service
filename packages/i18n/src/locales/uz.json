@@ -4,6 +4,7 @@
     "tagline": "Stomatologiya klinikalari uchun SaaS boshqaruv tizimi"
   },
   "common": {
+    "currency": "so'm",
     "loading": "Yuklanmoqda...",
     "error": "Xatolik yuz berdi",
     "retry": "Qayta urinish",

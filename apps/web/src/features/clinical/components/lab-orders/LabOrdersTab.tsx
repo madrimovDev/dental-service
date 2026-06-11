@@ -168,7 +168,7 @@ export function LabOrdersTab({ patientId }: Props) {
                 {it.toothNumbers.length > 0 &&
                   ` ${t('lab_order.teeth_inline', { teeth: it.toothNumbers.join(', ') })}`}
                 {it.material && `, ${it.material}`}
-                {it.shade && `, shade: ${it.shade}`}
+                {it.shade && `, ${t('lab_order.shade')}: ${it.shade}`}
                 {it.quantity && it.quantity > 1 && ` x${it.quantity}`}
               </Text>
             ))}

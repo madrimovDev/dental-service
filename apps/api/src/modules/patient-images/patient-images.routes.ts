@@ -56,7 +56,7 @@ export const patientImagesRoutes = (deps: { db: Database; audit: AuditLogger }) 
       ? toothNumbersRaw
           .split(',')
           .map((s) => Number(s.trim()))
-          .filter((n) => !Number.isNaN(n))
+          .filter((n) => Number.isInteger(n) && n > 0)
       : undefined;
 
     const body = await file.arrayBuffer();

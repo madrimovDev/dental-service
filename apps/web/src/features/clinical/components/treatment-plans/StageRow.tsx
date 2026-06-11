@@ -35,7 +35,7 @@ export function StageRow({
               </Group>
             )}
             <Text size="sm" c="dimmed">
-              {vm.costText} UZS
+              {vm.costText} {t('common.currency')}
             </Text>
             <StatusPill status={vm.statusTone}>{t(vm.statusLabelKey)}</StatusPill>
           </Group>
