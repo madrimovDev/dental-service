@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { renderApp } from '../../../test-utils';
 import { ServicesScreen } from './ServicesScreen';
@@ -40,7 +40,9 @@ describe('ServicesScreen', () => {
     renderApp(<ServicesScreen />);
     expect(screen.getByText('Xizmatlar katalogi')).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/qidir/i)).toBeInTheDocument();
-    expect(screen.getByText('Terapevtika')).toBeInTheDocument();
-    expect(screen.getByText('Plomba')).toBeInTheDocument();
+    // "Terapevtika" kategoriya Select option'ida ham bor — jadvalga scope qilamiz
+    const table = screen.getByRole('table');
+    expect(within(table).getByText('Terapevtika')).toBeInTheDocument();
+    expect(within(table).getByText('Plomba')).toBeInTheDocument();
   });
 });
