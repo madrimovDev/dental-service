@@ -21,6 +21,7 @@ export type AccessClaims = {
   atid: string | null;
   abid: string | null;
   perms: string[];
+  roleKey: string | null; // aktiv kontekstdagi birlamchi rol templateKey'i (owner / no-context → null)
   lang: 'uz' | 'ru';
   iat: number;
   exp: number;

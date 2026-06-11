@@ -2,7 +2,8 @@ import { Card, Container, Grid, Stack, Text, Title } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth-store.ts';
 
-export function DashboardPage() {
+/** Fallback dashboard — noma'lum/rolsiz kontekst uchun (eski DashboardPage mazmuni). */
+export function GenericDashboard() {
   const { t } = useTranslation();
   const { user, permissions } = useAuthStore();
   const isOwner = permissions.includes('@owner');

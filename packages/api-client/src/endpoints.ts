@@ -12,6 +12,7 @@ import type {
   Tenant,
   UserAssignment,
 } from './types.ts';
+import type { AuditListResponse } from './types-audit.ts';
 import type {
   CreateToothChartInput,
   CreateTreatmentPlanInput,
@@ -280,6 +281,23 @@ export const createEndpoints = (api: ApiClient) => ({
       const p = new URLSearchParams({ from: q.from, to: q.to });
       if (q.branchId) p.set('branchId', q.branchId);
       return api.get<PlanCompletionReport>(`/api/reports/treatment-plans?${p.toString()}`);
+    },
+  },
+
+  audit: {
+    list: (q?: {
+      from?: string;
+      to?: string;
+      action?: string;
+      resourceType?: string;
+      userId?: string;
+      page?: number;
+      pageSize?: number;
+    }) => {
+      const p = new URLSearchParams();
+      for (const [k, v] of Object.entries(q ?? {})) if (v != null) p.set(k, String(v));
+      const qs = p.toString();
+      return api.get<AuditListResponse>(`/api/audit${qs ? `?${qs}` : ''}`);
     },
   },
 

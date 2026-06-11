@@ -53,6 +53,7 @@ async function seedSystemRolesInTx(tx: DbTransaction, tenantId: string): Promise
         tenantId,
         name: template.name,
         description: `${template.descriptionUz} / ${template.descriptionRu}`,
+        templateKey: template.templateKey,
         isTemplate: true,
         isSystem: true,
       })
@@ -76,12 +77,18 @@ async function seedSystemRolesInTx(tx: DbTransaction, tenantId: string): Promise
   return createdRoleIds;
 }
 
+type ContextPermissions = {
+  perms: string[];
+  /** Aktiv kontekstdagi birlamchi rol templateKey'i; owner / no-assignment / custom rol → null. */
+  roleKey: string | null;
+};
+
 async function buildPermissionsForContext(
   db: Database,
   userId: string,
   tenantId: string,
   branchId: string | null,
-): Promise<string[]> {
+): Promise<ContextPermissions> {
   // Owner check (tenants jadvalida RLS yo'q)
   const [tenant] = await db
     .select({ ownerUserId: tenants.ownerUserId })
@@ -89,7 +96,7 @@ async function buildPermissionsForContext(
     .where(eq(tenants.id, tenantId));
 
   if (tenant?.ownerUserId === userId) {
-    return ['@owner'];
+    return { perms: ['@owner'], roleKey: null };
   }
 
   // RLS context (current_tenant_id) ichida — user_assignments + role_permissions + permissions
@@ -103,8 +110,9 @@ async function buildPermissionsForContext(
       : isNull(userAssignments.branchId);
 
     const assignments = await tx
-      .select({ roleId: userAssignments.roleId })
+      .select({ roleId: userAssignments.roleId, templateKey: roles.templateKey })
       .from(userAssignments)
+      .innerJoin(roles, eq(roles.id, userAssignments.roleId))
       .where(
         and(
           eq(userAssignments.userId, userId),
@@ -115,8 +123,10 @@ async function buildPermissionsForContext(
         ),
       );
 
-    if (assignments.length === 0) return [];
+    if (assignments.length === 0) return { perms: [], roleKey: null };
 
+    // Birlamchi rol — birinchi assignment templateKey'i (custom rol → null).
+    const roleKey = assignments[0]?.templateKey ?? null;
     const roleIds = assignments.map((a) => a.roleId);
 
     const perms = await tx
@@ -125,9 +135,12 @@ async function buildPermissionsForContext(
       .innerJoin(permissionsTable, eq(rolePermissions.permissionId, permissionsTable.id))
       .where(inArray(rolePermissions.roleId, roleIds));
 
-    return perms
-      .map((p) => p.code)
-      .filter((code) => !(OWNER_ONLY_PERMISSIONS as readonly string[]).includes(code));
+    return {
+      perms: perms
+        .map((p) => p.code)
+        .filter((code) => !(OWNER_ONLY_PERMISSIONS as readonly string[]).includes(code)),
+      roleKey,
+    };
   });
 }
 
@@ -221,6 +234,7 @@ export const createAuthService = (deps: AuthServiceDeps) => {
       atid: null,
       abid: null,
       perms: [],
+      roleKey: null,
       lang: (user.preferredLanguage as 'uz' | 'ru') ?? 'uz',
     });
     const refresh = await signRefresh(user.id);
@@ -394,7 +408,7 @@ export const createAuthService = (deps: AuthServiceDeps) => {
     }
 
     // 4. Permissions
-    const perms = await buildPermissionsForContext(
+    const { perms, roleKey } = await buildPermissionsForContext(
       db,
       userId,
       input.tenantId,
@@ -413,6 +427,7 @@ export const createAuthService = (deps: AuthServiceDeps) => {
         atid: input.tenantId,
         abid: input.branchId ?? null,
         perms: perms as Permission[],
+        roleKey,
         lang: (user.preferredLanguage as 'uz' | 'ru') ?? 'uz',
       });
 
@@ -477,8 +492,14 @@ export const createAuthService = (deps: AuthServiceDeps) => {
 
     // Permissions re-derive (workspace bo'lsa). Yo'q bo'lsa empty.
     let perms: string[] = [];
+    let roleKey: string | null = null;
     if (activeTenantId) {
-      perms = await buildPermissionsForContext(db, claims.sub, activeTenantId, activeBranchId);
+      ({ perms, roleKey } = await buildPermissionsForContext(
+        db,
+        claims.sub,
+        activeTenantId,
+        activeBranchId,
+      ));
       // Edge case: agar foydalanuvchi shu tenantdan o'chirilgan bo'lsa (assignment revoked yoki owner transferred)
       // perms = [] qaytadi va atid yangi tokenda null'ga tushadi (workspace tushib qoladi).
       if (perms.length === 0) {
@@ -498,6 +519,7 @@ export const createAuthService = (deps: AuthServiceDeps) => {
         atid: hasWorkspace ? activeTenantId : null,
         abid: hasWorkspace ? activeBranchId : null,
         perms: (hasWorkspace ? perms : []) as Permission[],
+        roleKey: hasWorkspace ? roleKey : null,
         lang: (user.preferredLanguage as 'uz' | 'ru') ?? 'uz',
       });
 

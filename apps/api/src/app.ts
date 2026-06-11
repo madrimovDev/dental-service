@@ -6,6 +6,7 @@ import { env } from './lib/env.ts';
 import { errorHandler } from './middleware/error-handler.ts';
 import { requestId } from './middleware/request-id.ts';
 import { appointmentRoutes } from './modules/appointments/index.ts';
+import { auditRoutes } from './modules/audit/index.ts';
 import { authRoutes } from './modules/auth/index.ts';
 import { branchRoutes } from './modules/branches/index.ts';
 import { cashierRoutes } from './modules/cashier/index.ts';
@@ -52,6 +53,7 @@ export const createApp = () => {
   app.route('/api/services', serviceRoutes({ db, audit }));
   app.route('/api/cashier', cashierRoutes({ db, audit }));
   app.route('/api/reports', reportsRoutes({ db }));
+  app.route('/api/audit', auditRoutes({ db }));
   app.route('/api/appointments', appointmentRoutes({ db, audit }));
   app.route('/api/queue', queueRoutes({ db, audit }));
   // Clinical: /api/diagnoses, /api/treatment-plans, /api/visit-notes, /api/tooth-charts

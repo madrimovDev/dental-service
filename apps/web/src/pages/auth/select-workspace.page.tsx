@@ -55,10 +55,11 @@ export function SelectWorkspacePage() {
         atid: string | null;
         abid: string | null;
         perms: string[];
+        roleKey?: string | null;
       };
       // Switch endi yangi refresh ham qaytaradi — rotation chain'i davom etadi
       setTokens(data.accessToken, data.refreshToken);
-      setContext(payload.atid, payload.abid, payload.perms);
+      setContext(payload.atid, payload.abid, payload.perms, payload.roleKey ?? null);
       navigate('/');
     },
     onError: (err) => {

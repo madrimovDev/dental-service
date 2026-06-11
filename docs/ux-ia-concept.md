@@ -243,6 +243,7 @@ Vizual stilni dizayner tanlaydi, lekin quyidagilar struktura/his talablari:
 ## 8. Ochiq savollar
 
 - Bir foydalanuvchida bir nechta rol bo'lsa, default bosh ekran qanday tanlanadi? (taklif: oxirgi ishlatilgan rol)
+  - ✅ **Qaror (2026-06-11, R3):** **birlamchi rol** tanlandi — aktiv kontekstdagi birinchi assignment'ning `templateKey`'i JWT `roleKey` claim'i orqali landing'ni belgilaydi (owner → menejer dashboard). "Oxirgi ishlatilgan rol" rad etildi (YAGNI: qo'shimcha holat saqlash kerak, foyda kam). Sidebar barcha ruxsatlarni beradi.
 - Asistent ko'p hollarda doktor ostida ishlaydimi yoki ko'p klinikada mustaqil hisob kerakmi?
 - ⌘K qidiruv qanchalik kuchli bo'lsin — faqat navigatsiya, yoki to'liq command palette (amallar ham)?
 - Dashboard widget'lari sozlanuvchimi (drag/yashirish) yoki rolga fikslanganmi? (taklif: v1 da fikslangan)
