@@ -18,6 +18,7 @@ export * from './tables/expense-categories.ts';
 export * from './tables/expenses.ts';
 export * from './tables/lab-orders.ts';
 export * from './tables/medical-records.ts';
+export * from './tables/notifications.ts';
 export * from './tables/password-reset-tokens.ts';
 export * from './tables/patient-images.ts';
 export * from './tables/patient-relatives.ts';
