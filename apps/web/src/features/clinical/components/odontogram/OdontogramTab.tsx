@@ -46,13 +46,11 @@ export function OdontogramTab({ patientId }: Props) {
   const [selectedTooth, setSelectedTooth] = useState<number | null>(null);
   const [draftStates, setDraftStates] = useState<Map<number, ToothState>>(new Map());
   const [draftNotes, setDraftNotes] = useState('');
-  const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
     if (!chartQuery.data) return;
     setDraftStates(toToothStateMap(chartQuery.data));
     setIsPrimary(chartQuery.data.isPrimaryDentition);
-    setDirty(false);
   }, [chartQuery.data]);
 
   const statesArray: ToothStateEntry[] = useMemo(
@@ -72,7 +70,6 @@ export function OdontogramTab({ patientId }: Props) {
 
   const selectTooth = (n: number) => {
     setSelectedTooth(n);
-    setDirty(true);
   };
 
   const setToothState = (state: ToothState) => {
@@ -80,7 +77,6 @@ export function OdontogramTab({ patientId }: Props) {
     const next = new Map(draftStates);
     next.set(selectedTooth, state);
     setDraftStates(next);
-    setDirty(true);
   };
 
   const save = () => {
@@ -90,7 +86,6 @@ export function OdontogramTab({ patientId }: Props) {
       {
         onSuccess: () => {
           setDraftNotes('');
-          setDirty(false);
         },
       },
     );
@@ -106,7 +101,7 @@ export function OdontogramTab({ patientId }: Props) {
           onChange={(e) => {
             setIsPrimary(e.currentTarget.checked);
             setDraftStates(new Map());
-            setDirty(true);
+            setSelectedTooth(null);
           }}
           disabled={!canEdit}
         />
@@ -161,7 +156,7 @@ export function OdontogramTab({ patientId }: Props) {
               <Button
                 onClick={save}
                 loading={createMut.isPending}
-                disabled={!dirty && draftStates.size === 0}
+                disabled={draftStates.size === 0}
               >
                 {t('tooth_chart.save_snapshot')}
               </Button>
