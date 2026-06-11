@@ -19,7 +19,7 @@ const OdontogramTab = lazy(() =>
   })),
 );
 const TreatmentPlansTab = lazy(() =>
-  import('@/components/clinical/TreatmentPlansTab.tsx').then((m) => ({
+  import('@/features/clinical/components/treatment-plans/TreatmentPlansTab').then((m) => ({
     default: m.TreatmentPlansTab,
   })),
 );
