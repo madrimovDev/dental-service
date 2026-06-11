@@ -25,6 +25,15 @@ export const inviteSchema = z.object({
 });
 export type InviteFormValues = z.infer<typeof inviteSchema>;
 
+export const staffProfileSchema = z.object({
+  specialty: z.string().max(120).optional().or(z.literal('')),
+  employmentStatus: z.enum(['active', 'on_leave', 'inactive']),
+  startedAt: z.string().optional().or(z.literal('')),
+  baseSalary: z.number().min(0),
+  commissionPercent: z.number().min(0).max(100),
+});
+export type StaffProfileFormValues = z.infer<typeof staffProfileSchema>;
+
 export const tenantSchema = z.object({
   name: z.string().min(2).max(120),
   defaultLanguage: z.enum(['uz', 'ru']),

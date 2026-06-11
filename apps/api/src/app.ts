@@ -17,6 +17,7 @@ import { healthRoutes } from './modules/health/index.ts';
 import { labOrdersRoutes } from './modules/lab-orders/index.ts';
 import { patientImagesRoutes } from './modules/patient-images/index.ts';
 import { patientRoutes } from './modules/patients/index.ts';
+import { payrollRoutes } from './modules/payroll/index.ts';
 import { permissionRoutes } from './modules/permissions/index.ts';
 import { prescriptionsRoutes } from './modules/prescriptions/index.ts';
 import { queueRoutes } from './modules/queue/index.ts';
@@ -68,6 +69,7 @@ export const createApp = () => {
   // R4 Guruh A: xarajatlar (/api/expense-categories, /api/expenses), ombor (/api/stock)
   app.route('/api', expensesRoutes({ db, audit }));
   app.route('/api/stock', stockRoutes({ db, audit }));
+  app.route('/api/payroll', payrollRoutes({ db, audit }));
 
   // Error handler
   app.onError(errorHandler);

@@ -381,6 +381,20 @@ export const PERMISSIONS = [
     descriptionUz: 'Ombor harakatlari va material normalarini boshqarish',
     descriptionRu: 'Управление складом и нормами материалов',
   },
+
+  // ===== R4 Guruh B permissions (payroll) =====
+  {
+    code: 'payroll.view',
+    category: 'payroll',
+    descriptionUz: "Ish haqi (payroll) hisob-kitoblarini ko'rish",
+    descriptionRu: 'Просмотр расчётов заработной платы',
+  },
+  {
+    code: 'payroll.manage',
+    category: 'payroll',
+    descriptionUz: 'Ish haqi hisoblash (run) yaratish va yakunlash',
+    descriptionRu: 'Создание и финализация расчётов заработной платы',
+  },
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number]['code'];

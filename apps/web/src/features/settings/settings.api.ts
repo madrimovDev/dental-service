@@ -77,6 +77,32 @@ export function useResetPassword() {
   return useMutation({ mutationFn: (userId: string) => api.users.resetPassword(userId) });
 }
 
+// --- Staff profile (users sub-resource) ---
+export function useStaffProfile(userId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: settingsKeys.staffProfile(userId ?? ''),
+    queryFn: () => api.users.profile.get(userId ?? ''),
+    enabled: enabled && !!userId,
+  });
+}
+
+export function useUpsertProfile(userId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      specialty?: string;
+      employmentStatus?: 'active' | 'on_leave' | 'inactive';
+      startedAt?: string;
+      baseSalary: number;
+      commissionPercent: number;
+    }) => api.users.profile.put(userId, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: settingsKeys.staffProfile(userId) });
+      qc.invalidateQueries({ queryKey: settingsKeys.users() });
+    },
+  });
+}
+
 // --- Branches ---
 export function useBranches() {
   return useQuery({ queryKey: settingsKeys.branches(), queryFn: api.branches.list });

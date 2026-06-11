@@ -1,5 +1,13 @@
 import { randomBytes } from 'node:crypto';
-import { branches, refreshTokens, roles, tenants, userAssignments, users } from '@dental/db-schema';
+import {
+  branches,
+  refreshTokens,
+  roles,
+  staffProfiles,
+  tenants,
+  userAssignments,
+  users,
+} from '@dental/db-schema';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { Database } from '../../db/client.ts';
@@ -11,6 +19,7 @@ import type {
   CreateAssignmentInput,
   InviteUserInput,
   UpdateAssignmentInput,
+  UpsertProfileInput,
 } from './users.schema.ts';
 
 export const createUsersService = (deps: { db: Database; audit: AuditLogger }) => {
@@ -322,6 +331,70 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
     });
   }
 
+  /**
+   * Xodim employment profilini olish (tenant+user). Hali yaratilmagan bo'lsa — `null`
+   * (bu normal holat; frontend bo'sh formani ko'rsatadi). RLS tenant'ni filtrlaydi.
+   */
+  async function getProfile(c: Context, userId: string) {
+    const db = getDb(c);
+    const [profile] = await db.select().from(staffProfiles).where(eq(staffProfiles.userId, userId));
+    return profile ?? null;
+  }
+
+  /**
+   * Xodim profilini upsert qiladi (PUT — to'liq almashtirish).
+   * `(tenant_id, user_id)` unique konfliktida UPDATE; aks holda INSERT.
+   * Ixtiyoriy maydonlar berilmasa null/default'ga tushadi (merge emas).
+   * Eslatma: RLS faqat joriy tenant_id'ni tekshiradi — userId aynan shu tenantga
+   * a'zo ekanligi bu yerda tasdiqlanmaydi (tenant-membership tekshiruvi keyinga qoldirilgan).
+   */
+  async function upsertProfile(c: Context, userId: string, input: UpsertProfileInput) {
+    const db = getDb(c);
+    const tenantId = c.get('activeTenantId');
+    if (!tenantId) throw new Error('No tenant context');
+
+    const before = await getProfile(c, userId);
+    const now = new Date();
+
+    const values = {
+      tenantId,
+      userId,
+      specialty: input.specialty ?? null,
+      employmentStatus: input.employmentStatus ?? ('active' as const),
+      startedAt: input.startedAt ?? null,
+      baseSalary: String(input.baseSalary),
+      commissionPercent: String(input.commissionPercent),
+    };
+
+    const [profile] = await db
+      .insert(staffProfiles)
+      .values(values)
+      .onConflictDoUpdate({
+        target: [staffProfiles.tenantId, staffProfiles.userId],
+        set: {
+          specialty: values.specialty,
+          employmentStatus: values.employmentStatus,
+          startedAt: values.startedAt,
+          baseSalary: values.baseSalary,
+          commissionPercent: values.commissionPercent,
+          updatedAt: now,
+        },
+      })
+      .returning();
+
+    if (profile) {
+      await deps.audit.record(c, {
+        action: before ? 'updated' : 'created',
+        resourceType: 'staff_profile',
+        resourceId: profile.id,
+        before: before ?? undefined,
+        after: profile,
+      });
+    }
+
+    return profile;
+  }
+
   return {
     listAssignments,
     invite,
@@ -329,6 +402,8 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
     updateAssignment,
     removeAssignment,
     resetUserPassword,
+    getProfile,
+    upsertProfile,
   };
 };
 

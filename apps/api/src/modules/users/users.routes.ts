@@ -10,6 +10,7 @@ import {
   createAssignmentSchema,
   inviteUserSchema,
   updateAssignmentSchema,
+  upsertProfileSchema,
 } from './users.schema.ts';
 import { createUsersService } from './users.service.ts';
 
@@ -76,6 +77,20 @@ export const userRoutes = (deps: { db: Database; audit: AuditLogger }) => {
       return c.json(fail(result.code, msg), status as 400 | 403 | 404);
     }
     return c.json(ok(result));
+  });
+
+  // GET /api/users/:userId/profile — xodim employment profili (yo'q bo'lsa null)
+  app.get('/:userId/profile', requirePermission('user.view'), async (c) => {
+    const profile = await service.getProfile(c, c.req.param('userId'));
+    return c.json(ok(profile));
+  });
+
+  // PUT /api/users/:userId/profile — profilni upsert (to'liq almashtirish)
+  app.put('/:userId/profile', requirePermission('user.manage'), async (c) => {
+    const body = upsertProfileSchema.safeParse(await c.req.json());
+    if (!body.success) throw new HTTPException(400, { message: 'Invalid input' });
+    const profile = await service.upsertProfile(c, c.req.param('userId'), body.data);
+    return c.json(ok(profile));
   });
 
   return app;

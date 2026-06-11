@@ -23,6 +23,7 @@ import { ForbiddenPage } from '@/pages/forbidden.page.tsx';
 import { PatientDetailPage } from '@/pages/patients/detail.page.tsx';
 import { PatientsListPage } from '@/pages/patients/list.page.tsx';
 import { NewPatientPage } from '@/pages/patients/new.page.tsx';
+import { PayrollPage } from '@/pages/payroll.page.tsx';
 import { ProfilePage } from '@/pages/profile.page.tsx';
 import { QueuePage } from '@/pages/queue.page.tsx';
 import { ReportsPage } from '@/pages/reports.page.tsx';
@@ -78,6 +79,7 @@ export function App() {
                 <Route path="/audit" element={rp('audit_log.view', <AuditPage />)} />
                 <Route path="/expenses" element={rp('expense.view', <ExpensesPage />)} />
                 <Route path="/stock" element={rp('stock.view', <StockPage />)} />
+                <Route path="/payroll" element={rp('payroll.view', <PayrollPage />)} />
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route
                   path="/settings/services"

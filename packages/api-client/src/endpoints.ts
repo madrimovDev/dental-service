@@ -38,6 +38,7 @@ import type {
   StockItemWithLowStock,
   StockMovement,
 } from './types-erp.ts';
+import type { PayrollRun, PayrollRunWithLines, StaffProfile } from './types-hr.ts';
 import type {
   Appointment,
   AppointmentStatus,
@@ -163,6 +164,19 @@ export const createEndpoints = (api: ApiClient) => ({
       api.post<{ ok: true; userId: string; phone: string; tempPassword: string }>(
         `/api/users/${userId}/reset-password`,
       ),
+    profile: {
+      get: (userId: string) => api.get<StaffProfile | null>(`/api/users/${userId}/profile`),
+      put: (
+        userId: string,
+        body: {
+          specialty?: string;
+          employmentStatus?: 'active' | 'on_leave' | 'inactive';
+          startedAt?: string;
+          baseSalary: number;
+          commissionPercent: number;
+        },
+      ) => api.put<StaffProfile>(`/api/users/${userId}/profile`, body),
+    },
   },
 
   patients: {
@@ -399,6 +413,14 @@ export const createEndpoints = (api: ApiClient) => ({
     createBom: (body: { serviceId: string; itemId: string; qtyPerService: number }) =>
       api.post<ServiceMaterial>('/api/stock/bom', body),
     removeBom: (id: string) => api.delete<{ deleted: true }>(`/api/stock/bom/${id}`),
+  },
+
+  payroll: {
+    runs: () => api.get<PayrollRun[]>('/api/payroll/runs'),
+    getRun: (id: string) => api.get<PayrollRunWithLines>(`/api/payroll/runs/${id}`),
+    createRun: (body: { periodFrom: string; periodTo: string }) =>
+      api.post<PayrollRunWithLines>('/api/payroll/runs', body),
+    finalize: (id: string) => api.post<PayrollRun>(`/api/payroll/runs/${id}/finalize`),
   },
 
   appointments: {

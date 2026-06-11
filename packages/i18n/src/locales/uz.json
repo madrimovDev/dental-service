@@ -253,6 +253,18 @@
     "reset_password_success": "Yangi parol generatsiya qilindi. Xodimga bering — eski parol endi ishlamaydi.",
     "cannot_reset_self": "O'z parolingizni boshqa xodimlar qatorida tiklab bo'lmaydi. Profil sahifasidan o'zgartiring."
   },
+  "staff": {
+    "edit_profile": "Xodim profilini tahrirlash",
+    "profile_title": "Xodim profili",
+    "specialty": "Mutaxassislik",
+    "status": "Holat",
+    "status_active": "Faol",
+    "status_on_leave": "Ta'tilda",
+    "status_inactive": "Faol emas",
+    "started_at": "Ishga kirgan sana",
+    "base_salary": "Baza oylik",
+    "commission_percent": "Komissiya (%)"
+  },
   "profile": {
     "title": "Profil",
     "account": "Akkaunt",
@@ -822,5 +834,29 @@
     "bom_empty": "Bu xizmat uchun materiallar belgilanmagan",
     "material": "Material",
     "qty_per_service": "Xizmatga miqdor"
+  },
+  "payroll": {
+    "title": "Ish haqi",
+    "period": "Davr",
+    "period_placeholder": "Davrni tanlang",
+    "period_required": "Davr to'liq tanlanishi shart",
+    "create_run": "Run yaratish",
+    "runs": "Run ro'yxati",
+    "no_runs": "Hali run yaratilmagan",
+    "view_detail": "Batafsil",
+    "detail": "Run tafsiloti",
+    "no_lines": "Qatorlar yo'q",
+    "finalize": "Yakunlash",
+    "status": "Holat",
+    "status_label": {
+      "draft": "Qoralama",
+      "finalized": "Yakunlangan"
+    },
+    "employee": "Xodim",
+    "base_salary": "Baza oylik",
+    "attributed_revenue": "Tegishli daromad",
+    "commission_percent": "Komissiya %",
+    "commission_amount": "Komissiya",
+    "total": "Jami"
   }
 }

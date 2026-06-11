@@ -15,7 +15,7 @@ import {
 import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import { IconKey, IconPlus, IconSearch, IconTrash } from '@tabler/icons-react';
+import { IconKey, IconPlus, IconSearch, IconTrash, IconUserCog } from '@tabler/icons-react';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -34,6 +34,7 @@ import { type InviteFormValues, inviteSchema } from '../settings.schema';
 import type { UsersFilter } from '../settings.types';
 import { ConfirmModal } from './ConfirmModal';
 import { SettingsShell } from './SettingsShell';
+import { StaffProfileModal } from './StaffProfileModal';
 
 export function UsersSettingsScreen() {
   const { t } = useTranslation();
@@ -52,6 +53,7 @@ export function UsersSettingsScreen() {
   );
   const [toRemove, setToRemove] = useState<string | null>(null);
   const [toReset, setToReset] = useState<string | null>(null);
+  const [profileEdit, setProfileEdit] = useState<{ userId: string; name: string } | null>(null);
   const [filter, setFilter] = useState<UsersFilter>({ search: '', branchId: null, roleId: null });
 
   const filtered = useMemo(
@@ -144,6 +146,21 @@ export function UsersSettingsScreen() {
                   </Table.Td>
                   <Table.Td>
                     <Group gap="xs" wrap="nowrap" justify="flex-end">
+                      {hasPermission('user.manage') && (
+                        <ActionIcon
+                          variant="subtle"
+                          color="gray"
+                          onClick={() =>
+                            setProfileEdit({
+                              userId: a.userId,
+                              name: a.userFullName ?? a.userPhone,
+                            })
+                          }
+                          title={t('staff.edit_profile')}
+                        >
+                          <IconUserCog size={16} />
+                        </ActionIcon>
+                      )}
                       {hasPermission('user.manage') && a.userId !== currentUser?.id && (
                         <ActionIcon
                           variant="subtle"
@@ -288,6 +305,16 @@ export function UsersSettingsScreen() {
         confirmColor="blue"
         loading={resetPassword.isPending}
       />
+
+      {/* Staff profile edit */}
+      {profileEdit && (
+        <StaffProfileModal
+          key={profileEdit.userId}
+          userId={profileEdit.userId}
+          userName={profileEdit.name}
+          onClose={() => setProfileEdit(null)}
+        />
+      )}
     </SettingsShell>
   );
 }
