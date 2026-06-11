@@ -18,6 +18,7 @@ import { ResetPasswordPage } from '@/pages/auth/reset-password.page.tsx';
 import { SelectWorkspacePage } from '@/pages/auth/select-workspace.page.tsx';
 import { CashierPage } from '@/pages/cashier.page.tsx';
 import { DesignSystemPage } from '@/pages/dev/DesignSystemPage.tsx';
+import { ExpensesPage } from '@/pages/expenses.page.tsx';
 import { ForbiddenPage } from '@/pages/forbidden.page.tsx';
 import { PatientDetailPage } from '@/pages/patients/detail.page.tsx';
 import { PatientsListPage } from '@/pages/patients/list.page.tsx';
@@ -30,6 +31,7 @@ import { RolesSettingsPage } from '@/pages/settings/roles.page.tsx';
 import { ServicesSettingsPage } from '@/pages/settings/services.page.tsx';
 import { TenantSettingsPage } from '@/pages/settings/tenant.page.tsx';
 import { UsersSettingsPage } from '@/pages/settings/users.page.tsx';
+import { StockPage } from '@/pages/stock.page.tsx';
 import { AppShell, RequirePermission } from '@/shell';
 
 const rp = (perm: string, el: ReactNode) => <RequirePermission perm={perm}>{el}</RequirePermission>;
@@ -74,6 +76,8 @@ export function App() {
                 <Route path="/cashier" element={rp('cashier.view', <CashierPage />)} />
                 <Route path="/reports" element={rp('report.view', <ReportsPage />)} />
                 <Route path="/audit" element={rp('audit_log.view', <AuditPage />)} />
+                <Route path="/expenses" element={rp('expense.view', <ExpensesPage />)} />
+                <Route path="/stock" element={rp('stock.view', <StockPage />)} />
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route
                   path="/settings/services"

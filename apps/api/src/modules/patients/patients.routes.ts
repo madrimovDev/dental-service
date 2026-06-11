@@ -7,6 +7,7 @@ import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
 import {
+  addRelativeSchema,
   createPatientSchema,
   listQuerySchema,
   updateMedicalRecordSchema,
@@ -73,6 +74,25 @@ export const patientRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     const row = await service.updateMedicalRecord(c, c.req.param('id'), body.data);
     if (!row) return c.json(fail('medical_record.not_found', 'Medical record not found'), 404);
     return c.json(ok(row));
+  });
+
+  // ===== Patient relatives (oila) sub-resource =====
+
+  app.get('/:id/relatives', requirePermission('patient.edit'), async (c) => {
+    return c.json(ok(await service.listRelatives(c, c.req.param('id'))));
+  });
+
+  app.post('/:id/relatives', requirePermission('patient.edit'), async (c) => {
+    const body = addRelativeSchema.safeParse(await c.req.json());
+    if (!body.success) throw new HTTPException(400, { message: 'Invalid input' });
+    const row = await service.addRelative(c, c.req.param('id'), body.data);
+    return c.json(ok(row), 201);
+  });
+
+  app.delete('/:id/relatives/:relId', requirePermission('patient.edit'), async (c) => {
+    const row = await service.removeRelative(c, c.req.param('id'), c.req.param('relId'));
+    if (!row) return c.json(fail('patient_relative.not_found', 'Relative link not found'), 404);
+    return c.json(ok({ removed: true, id: row.id }));
   });
 
   return app;

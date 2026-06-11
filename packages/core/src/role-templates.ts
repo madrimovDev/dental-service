@@ -71,6 +71,10 @@ export const ROLE_TEMPLATES = [
       'cashier.void',
       'report.view',
       'salary.view',
+      'expense.view',
+      'expense.manage',
+      'stock.view',
+      'stock.manage',
     ],
   },
   {
@@ -100,6 +104,10 @@ export const ROLE_TEMPLATES = [
       'service.view',
       'cashier.view',
       'report.view',
+      'expense.view',
+      'expense.manage',
+      'stock.view',
+      'stock.manage',
     ],
   },
   {
@@ -120,6 +128,8 @@ export const ROLE_TEMPLATES = [
       'appointment.edit',
       'queue.view',
       'service.view',
+      'stock.view',
+      'stock.manage',
     ],
   },
   {
@@ -144,6 +154,8 @@ export const ROLE_TEMPLATES = [
       'queue.view',
       'queue.create',
       'service.view',
+      'stock.view',
+      'stock.manage',
     ],
   },
   {
@@ -158,6 +170,8 @@ export const ROLE_TEMPLATES = [
       'medical_record.view',
       'appointment.view',
       'queue.view',
+      'stock.view',
+      'stock.manage',
     ],
   },
   {
@@ -199,6 +213,8 @@ export const ROLE_TEMPLATES = [
       'cashier.void',
       'report.view',
       'salary.view',
+      'expense.view',
+      'expense.manage',
     ],
   },
   {

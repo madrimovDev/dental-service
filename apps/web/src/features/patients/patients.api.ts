@@ -98,3 +98,28 @@ export function usePatientBalance(id: string) {
     enabled: !!id,
   });
 }
+
+export function usePatientRelatives(id: string) {
+  return useQuery({
+    queryKey: patientKeys.relatives(id),
+    queryFn: () => api.patients.relatives.list(id),
+    enabled: !!id,
+  });
+}
+
+export function useAddRelative(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { relativePatientId: string; relationship: string }) =>
+      api.patients.relatives.add(id, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: patientKeys.relatives(id) }),
+  });
+}
+
+export function useRemoveRelative(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (relId: string) => api.patients.relatives.remove(id, relId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: patientKeys.relatives(id) }),
+  });
+}

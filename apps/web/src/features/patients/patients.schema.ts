@@ -52,3 +52,9 @@ export const medicalRecordFormSchema = z.object({
   pregnancyStatus: z.enum(['not_applicable', 'pregnant', 'planning', 'lactating']).optional(),
 });
 export type MedicalRecordFormValues = z.infer<typeof medicalRecordFormSchema>;
+
+export const addRelativeFormSchema = z.object({
+  relativePatientId: z.uuid(),
+  relationship: z.string().min(1).max(60),
+});
+export type AddRelativeFormValues = z.infer<typeof addRelativeFormSchema>;

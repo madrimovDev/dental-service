@@ -1,6 +1,7 @@
 import {
   cashierTransactions,
   medicalRecords,
+  patientRelatives,
   patients,
   treatmentPlans,
   treatmentStagePayments,
@@ -12,8 +13,10 @@ import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { computePatientBalance } from './patients.balance.ts';
 import type {
+  AddRelativeInput,
   CreatePatientInput,
   ListQuery,
+  PatientRelativeView,
   UpdateMedicalRecordInput,
   UpdatePatientInput,
 } from './patients.schema.ts';
@@ -380,6 +383,109 @@ export const createPatientsService = (deps: { audit: AuditLogger }) => {
     return updated;
   }
 
+  // ===== Patient relatives (oila) sub-resource =====
+
+  /**
+   * Bemor qarindoshlari — link row har ikki yo'nalishda topiladi
+   * (`patientId = X OR relativePatientId = X`). Har row uchun "boshqa" bemor
+   * va yo'nalish qaytariladi. RLS tenant orqali filtrlaydi.
+   */
+  async function listRelatives(c: Context, patientId: string): Promise<PatientRelativeView[]> {
+    const db = getDb(c);
+
+    const links = await db
+      .select()
+      .from(patientRelatives)
+      .where(
+        or(
+          eq(patientRelatives.patientId, patientId),
+          eq(patientRelatives.relativePatientId, patientId),
+        ),
+      )
+      .orderBy(desc(patientRelatives.createdAt));
+
+    if (links.length === 0) return [];
+
+    // Har link uchun "boshqa" bemor id'sini yig'ib, ismlarni bitta query bilan olamiz
+    const otherIds = links.map((l) =>
+      l.patientId === patientId ? l.relativePatientId : l.patientId,
+    );
+    const nameRows = await db
+      .select({ id: patients.id, fullName: patients.fullName })
+      .from(patients)
+      .where(inArray(patients.id, otherIds));
+    const nameById = new Map(nameRows.map((r) => [r.id, r.fullName]));
+
+    return links.map((l) => {
+      const otherId = l.patientId === patientId ? l.relativePatientId : l.patientId;
+      const direction: 'outgoing' | 'incoming' =
+        l.patientId === patientId ? 'outgoing' : 'incoming';
+      return {
+        id: l.id,
+        relativePatient: { id: otherId, fullName: nameById.get(otherId) ?? '' },
+        relationship: l.relationship,
+        direction,
+      };
+    });
+  }
+
+  async function addRelative(c: Context, patientId: string, input: AddRelativeInput) {
+    const db = getDb(c);
+    const tenantId = c.get('activeTenantId');
+    if (!tenantId) throw new Error('No tenant context');
+
+    const [link] = await db
+      .insert(patientRelatives)
+      .values({
+        tenantId,
+        patientId,
+        relativePatientId: input.relativePatientId,
+        relationship: input.relationship,
+      })
+      .returning();
+
+    if (link) {
+      await deps.audit.record(c, {
+        action: 'created',
+        resourceType: 'patient_relative',
+        resourceId: link.id,
+        after: link,
+      });
+    }
+
+    return link ?? null;
+  }
+
+  async function removeRelative(c: Context, patientId: string, relId: string) {
+    const db = getDb(c);
+
+    // Link har ikki yo'nalishdan ko'rinadi (outgoing/incoming), shuning uchun
+    // o'chirish ham :id bemor link'ning istalgan tomonida bo'lsa ruxsat.
+    const [deleted] = await db
+      .delete(patientRelatives)
+      .where(
+        and(
+          eq(patientRelatives.id, relId),
+          or(
+            eq(patientRelatives.patientId, patientId),
+            eq(patientRelatives.relativePatientId, patientId),
+          ),
+        ),
+      )
+      .returning();
+
+    if (deleted) {
+      await deps.audit.record(c, {
+        action: 'deleted',
+        resourceType: 'patient_relative',
+        resourceId: relId,
+        before: deleted,
+      });
+    }
+
+    return deleted ?? null;
+  }
+
   return {
     list,
     findById,
@@ -389,6 +495,9 @@ export const createPatientsService = (deps: { audit: AuditLogger }) => {
     archive,
     getMedicalRecord,
     updateMedicalRecord,
+    listRelatives,
+    addRelative,
+    removeRelative,
   };
 };
 

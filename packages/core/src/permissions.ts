@@ -355,6 +355,32 @@ export const PERMISSIONS = [
     descriptionUz: 'Bemor rasmlarini yuklash va boshqarish',
     descriptionRu: 'Загрузка снимков пациента',
   },
+
+  // ===== R4 Guruh A permissions (expenses, stock) =====
+  {
+    code: 'expense.view',
+    category: 'expense',
+    descriptionUz: "Xarajatlarni ko'rish",
+    descriptionRu: 'Просмотр расходов',
+  },
+  {
+    code: 'expense.manage',
+    category: 'expense',
+    descriptionUz: 'Xarajatlar va kategoriyalarni boshqarish',
+    descriptionRu: 'Управление расходами и категориями',
+  },
+  {
+    code: 'stock.view',
+    category: 'stock',
+    descriptionUz: "Ombor qoldiqlari va harakatlarini ko'rish",
+    descriptionRu: 'Просмотр склада и движений',
+  },
+  {
+    code: 'stock.manage',
+    category: 'stock',
+    descriptionUz: 'Ombor harakatlari va material normalarini boshqarish',
+    descriptionRu: 'Управление складом и нормами материалов',
+  },
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number]['code'];

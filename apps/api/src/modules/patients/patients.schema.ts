@@ -71,3 +71,18 @@ export const patientBalanceSchema = z.object({
   nonPlanBalance: z.number(),
 });
 export type PatientBalanceDto = z.infer<typeof patientBalanceSchema>;
+
+export const addRelativeSchema = z.object({
+  relativePatientId: z.uuid(),
+  relationship: z.string().min(1).max(60),
+});
+export type AddRelativeInput = z.infer<typeof addRelativeSchema>;
+
+/** Qarindosh ko'rinishi — har link row uchun "boshqa" bemor + yo'nalish. */
+export const patientRelativeViewSchema = z.object({
+  id: z.uuid(),
+  relativePatient: z.object({ id: z.uuid(), fullName: z.string() }),
+  relationship: z.string(),
+  direction: z.enum(['outgoing', 'incoming']),
+});
+export type PatientRelativeView = z.infer<typeof patientRelativeViewSchema>;

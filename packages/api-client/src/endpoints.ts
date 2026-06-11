@@ -28,6 +28,17 @@ import type {
   VisitNote,
 } from './types-clinical.ts';
 import type {
+  Expense,
+  ExpenseCategory,
+  ExpenseListResponse,
+  ExpenseSummary,
+  PatientRelativeView,
+  ServiceMaterial,
+  StockItem,
+  StockItemWithLowStock,
+  StockMovement,
+} from './types-erp.ts';
+import type {
   Appointment,
   AppointmentStatus,
   CashierListResponse,
@@ -194,6 +205,14 @@ export const createEndpoints = (api: ApiClient) => ({
         testResults?: TestResults;
       },
     ) => api.patch<MedicalRecord>(`/api/patients/${id}/medical`, body),
+    relatives: {
+      list: (patientId: string) =>
+        api.get<PatientRelativeView[]>(`/api/patients/${patientId}/relatives`),
+      add: (patientId: string, body: { relativePatientId: string; relationship: string }) =>
+        api.post<unknown>(`/api/patients/${patientId}/relatives`, body),
+      remove: (patientId: string, relId: string) =>
+        api.delete<{ removed: true; id: string }>(`/api/patients/${patientId}/relatives/${relId}`),
+    },
   },
 
   services: {
@@ -299,6 +318,87 @@ export const createEndpoints = (api: ApiClient) => ({
       const qs = p.toString();
       return api.get<AuditListResponse>(`/api/audit${qs ? `?${qs}` : ''}`);
     },
+  },
+
+  expenses: {
+    categories: () => api.get<ExpenseCategory[]>('/api/expense-categories'),
+    createCategory: (body: { name: string; nameRu?: string }) =>
+      api.post<ExpenseCategory>('/api/expense-categories', body),
+    updateCategory: (id: string, body: { name?: string; nameRu?: string }) =>
+      api.patch<ExpenseCategory>(`/api/expense-categories/${id}`, body),
+    removeCategory: (id: string) => api.delete<{ deleted: true }>(`/api/expense-categories/${id}`),
+    list: (q?: {
+      from?: string;
+      to?: string;
+      categoryId?: string;
+      branchId?: string;
+      page?: number;
+      pageSize?: number;
+    }) => {
+      const p = new URLSearchParams();
+      for (const [k, v] of Object.entries(q ?? {})) if (v != null) p.set(k, String(v));
+      const qs = p.toString();
+      return api.get<ExpenseListResponse>(`/api/expenses${qs ? `?${qs}` : ''}`);
+    },
+    create: (body: {
+      categoryId?: string;
+      branchId?: string;
+      amount: number;
+      date: string;
+      note?: string;
+    }) => api.post<Expense>('/api/expenses', body),
+    update: (
+      id: string,
+      body: Partial<{
+        categoryId: string;
+        branchId: string;
+        amount: number;
+        date: string;
+        note: string;
+      }>,
+    ) => api.patch<Expense>(`/api/expenses/${id}`, body),
+    remove: (id: string) => api.delete<{ deleted: true }>(`/api/expenses/${id}`),
+    summary: (q: { from: string; to: string; branchId?: string }) => {
+      const p = new URLSearchParams({ from: q.from, to: q.to });
+      if (q.branchId) p.set('branchId', q.branchId);
+      return api.get<ExpenseSummary>(`/api/expenses/summary?${p.toString()}`);
+    },
+  },
+
+  stock: {
+    items: (q?: { branchId?: string }) => {
+      const p = new URLSearchParams();
+      if (q?.branchId) p.set('branchId', q.branchId);
+      const qs = p.toString();
+      return api.get<StockItemWithLowStock[]>(`/api/stock/items${qs ? `?${qs}` : ''}`);
+    },
+    getItem: (id: string) => api.get<StockItemWithLowStock>(`/api/stock/items/${id}`),
+    createItem: (body: {
+      name: string;
+      unit: string;
+      branchId?: string;
+      quantity?: number;
+      minThreshold?: number;
+    }) => api.post<StockItem>('/api/stock/items', body),
+    updateItem: (id: string, body: Partial<{ name: string; unit: string; minThreshold: number }>) =>
+      api.patch<StockItem>(`/api/stock/items/${id}`, body),
+    movements: (itemId: string) =>
+      api.get<StockMovement[]>(`/api/stock/movements?itemId=${itemId}`),
+    createMovement: (body: {
+      itemId: string;
+      type: 'in' | 'out' | 'adjustment';
+      quantity: number;
+      reason?: string;
+    }) => api.post<StockMovement>('/api/stock/movements', body),
+    bom: (q?: { serviceId?: string }) => {
+      const p = new URLSearchParams();
+      if (q?.serviceId) p.set('serviceId', q.serviceId);
+      const qs = p.toString();
+      return api.get<ServiceMaterial[]>(`/api/stock/bom${qs ? `?${qs}` : ''}`);
+    },
+    createBom: (body: { serviceId: string; itemId: string; qtyPerService: number }) =>
+      api.post<ServiceMaterial>('/api/stock/bom', body),
+    removeBom: (id: string) => api.delete<{ deleted: true }>(`/api/stock/bom/${id}`),
   },
 
   appointments: {
