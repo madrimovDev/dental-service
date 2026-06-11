@@ -4,8 +4,9 @@ import { IconAlertTriangle } from '@tabler/icons-react';
 import { lazy, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
+import { BalanceBadge } from '@/components/BalanceBadge';
 import { useAuthStore } from '@/stores/auth-store.ts';
-import { useMedicalRecord, usePatient } from '../patients.api';
+import { useMedicalRecord, usePatient, usePatientBalance } from '../patients.api';
 
 const GeneralTab = lazy(() => import('./tabs/GeneralTab').then((m) => ({ default: m.GeneralTab })));
 const MedicalTab = lazy(() => import('./tabs/MedicalTab').then((m) => ({ default: m.MedicalTab })));
@@ -71,6 +72,7 @@ export function PatientCard() {
   const [active, setActive] = useState('gen');
   const { data: patient } = usePatient(id);
   const { data: medical } = useMedicalRecord(hasPermission('medical_record.view') ? id : '');
+  const balanceQuery = usePatientBalance(id);
 
   const visibleTabs = TABS.filter((tb) => !tb.permission || hasPermission(tb.permission));
   const tabItems = visibleTabs.map((tb) => ({ id: tb.key, label: t(tb.labelKey) }));
@@ -86,6 +88,7 @@ export function PatientCard() {
           <span style={{ alignItems: 'center', display: 'flex', gap: 12 }}>
             {patient && <Avatar name={patient.fullName} size="lg" />}
             {patient?.fullName ?? ''}
+            {balanceQuery.data && <BalanceBadge balance={balanceQuery.data.balance} size="md" />}
           </span>
         }
         subtitle={patient?.phone ? <Mono>{patient.phone}</Mono> : undefined}

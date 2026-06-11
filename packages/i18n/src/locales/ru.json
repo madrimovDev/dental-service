@@ -610,6 +610,7 @@
     "title": "Касса",
     "branch": "Филиал",
     "new_payment": "Новый платёж",
+    "previous_balance": "Старый баланс",
     "add_service": "Добавить услугу",
     "search_service": "Поиск услуги...",
     "discount": "Скидка",

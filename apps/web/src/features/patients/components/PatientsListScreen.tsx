@@ -4,6 +4,7 @@ import { Archive, Eye, Plus, Search } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import { BalanceBadge } from '@/components/BalanceBadge';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { useArchivePatient, usePatients } from '../patients.api';
 import classes from './PatientsListScreen.module.css';
@@ -68,6 +69,9 @@ export function PatientsListScreen() {
             {p.tags.map((tg) => (
               <Tag key={tg}>{tg}</Tag>
             ))}
+            <span title={t('patients.balance')}>
+              <BalanceBadge balance={p.balance} />
+            </span>
             {p.age != null && <span className={classes.age}>{p.age}</span>}
             <IconButton label={t('common.view')} onClick={() => navigate(`/patients/${p.id}`)}>
               <Eye size={16} />
