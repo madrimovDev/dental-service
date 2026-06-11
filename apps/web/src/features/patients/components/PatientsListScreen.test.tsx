@@ -15,6 +15,7 @@ vi.mock('../patients.api', () => ({
           age: 36,
           genderLabel: 'Erkak',
           tags: ['VIP'],
+          balance: 150000,
         },
       ],
       meta: { page: 1, pageSize: 20, total: 1 },
@@ -32,6 +33,12 @@ describe('PatientsListScreen', () => {
     renderApp(<PatientsListScreen />);
     expect(screen.getByText('Ali Valiyev')).toBeInTheDocument();
     expect(screen.getByText('VIP')).toBeInTheDocument();
+  });
+
+  it("bemor balansini ro'yxatda ko'rsatadi", () => {
+    renderApp(<PatientsListScreen />);
+    // BalanceBadge: 150000 → "150 000 so'm" (uz-UZ formatlash)
+    expect(screen.getByText(/150/)).toBeInTheDocument();
   });
 
   it('arxiv tugmasi mutatsiyani id bilan chaqiradi (behavioral)', () => {

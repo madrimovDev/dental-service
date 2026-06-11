@@ -281,6 +281,9 @@
       "payments": "To'lovlar"
     },
     "payments_empty": "Bu bemor uchun to'lovlar yo'q",
+    "balance": "Balans",
+    "balance_debt": "qarz",
+    "balance_credit": "kredit",
     "form": {
       "section_main": "Asosiy ma'lumot",
       "full_name": "To'liq ism",
@@ -607,6 +610,7 @@
     "title": "Kassa",
     "branch": "Filial",
     "new_payment": "Yangi to'lov",
+    "previous_balance": "Eski balans",
     "add_service": "Xizmat qo'shish",
     "search_service": "Xizmatni qidirish...",
     "discount": "Chegirma",

@@ -15,6 +15,8 @@ import { IconCash } from '@tabler/icons-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { BalanceBadge } from '@/components/BalanceBadge';
+import { usePatientBalance } from '@/features/patients/patients.api';
 import { fetchServicePrices, useCreateTransaction, useServices } from '../cashier.api';
 import { buildCreatePayload, computeNetTotal, findActivePrice } from '../cashier.mappers';
 import type { CartItem } from '../cashier.types';
@@ -32,6 +34,7 @@ export function PosPanel({ branchId, patientId }: PosPanelProps) {
   const qc = useQueryClient();
   const servicesQuery = useServices();
   const createMut = useCreateTransaction();
+  const balanceQuery = usePatientBalance(patientId ?? '');
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [discount, setDiscount] = useState<number | ''>(0);
@@ -100,6 +103,15 @@ export function PosPanel({ branchId, patientId }: PosPanelProps) {
     <Card withBorder padding="lg" radius="md">
       <Stack gap="md">
         <Title order={4}>{t('cashier.new_payment')}</Title>
+
+        {patientId && balanceQuery.data && (
+          <Group justify="space-between">
+            <Text size="sm" c="dimmed">
+              {t('cashier.previous_balance')}
+            </Text>
+            <BalanceBadge balance={balanceQuery.data.balance} />
+          </Group>
+        )}
 
         <Select
           label={t('cashier.add_service')}

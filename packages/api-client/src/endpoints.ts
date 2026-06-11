@@ -59,6 +59,7 @@ import type {
   AllergyEntry,
   MedicalRecord,
   Patient,
+  PatientBalance,
   PatientListResponse,
   PregnancyStatus,
   TestResults,
@@ -157,6 +158,7 @@ export const createEndpoints = (api: ApiClient) => ({
       return api.get<PatientListResponse>(`/api/patients${qs ? `?${qs}` : ''}`);
     },
     get: (id: string) => api.get<Patient>(`/api/patients/${id}`),
+    balance: (id: string) => api.get<PatientBalance>(`/api/patients/${id}/balance`),
     create: (body: {
       fullName: string;
       dateOfBirth?: string;

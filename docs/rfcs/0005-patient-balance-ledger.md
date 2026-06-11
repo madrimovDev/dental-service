@@ -4,6 +4,8 @@
 - **Sana:** 2026-06-09
 - **Bog'liq:** [`docs/design-architecture-gap-analysis.md`](../design-architecture-gap-analysis.md), R3 (CLI-65), Linear CLI-88
 
+> ⚠️ Yangilandi 2026-06-11 (CLI-67): plan-inclusive model qabul qilindi. Eski "faqat cashier SUM" formula superseded.
+
 ## Kontekst
 
 Dizaynda **bemor balansi** ko'p joyda: bemorlar ro'yxati (Balans ustuni), kassa ("eski balans" carry-forward + qisman to'lov), bemor kartasi (balans + to'lovlar tarixi). Backend'da **balans yo'q** — faqat `cashier_transactions` bor.
@@ -16,15 +18,28 @@ Ikki qaror kerak:
 
 ## Qaror
 
-### 1. Manba: `cashier_transactions`'dan olamiz (alohida ledger DEFER)
+### 1. Manba: `cashier_transactions` + qabul qilingan reja qarzi (plan-inclusive)
 
-**Balans = SUM per bemor**, tranzaksiya turiga qarab ishorali:
+**Balans = `planDebt + nonPlanBalance`** (plan-inclusive — Qaror #13, billing poydevori Qaror #11 bilan uyg'un):
 ```
-balance(patient) = Σ  (type=payment) : (totalAmount − paidAmount)   // qoldiq qarz +
-                      (type=refund)  : −(refund summasi)            // qaytarilgan
-                      (type=void)    : 0                            // bekor, hisobga olinmaydi
+patient_balance = planDebt + nonPlanBalance
 ```
-(`status=completed` lar; `pending`/`voided` chiqariladi. Aniq formula — implementatsiya tafsiloti, `discount` `totalAmount`'ga singdirilgan deb qabul qilinadi.)
+
+**planDebt** — qabul qilingan davolash rejalari qarzi (status ∈ {`accepted`, `in_progress`, `completed`}; `draft` / `presented` / `cancelled` chiqariladi):
+```
+planDebt = Σ(treatment_stages.cost)  −  Σ(treatment_stage_payments.amount)
+```
+
+**nonPlanBalance** — rejaga bog'lanmagan kassa qoldig'i (`type=payment` ∧ `status=completed` ∧ `treatment_plan_id IS NULL`):
+```
+nonPlanBalance = Σ (totalAmount − paidAmount)
+```
+
+`> 0` = qarz (qizil), `< 0` = kredit/oldindan to'lov (yashil), `0` = neytral. Valyuta UZS (yagona).
+
+**Refund:** alohida ayirish emas — *void + manfiy allocation* orqali nettlanadi. Plan qarzida refund manfiy `treatment_stage_payments` rowi sifatida `allocationSum`'ni kamaytiradi → qarz tiklanadi (Qaror #11). Plansiz qoldiqda asl tranzaksiya `voided` bo'ladi → yig'indidan avtomatik chiqib ketadi. Plan-linked (`treatment_plan_id IS NOT NULL`) va `refund`/`void` tipli tranzaksiyalar `nonPlanBalance`'da **sanalmaydi** → plan qarzi bilan double-count yo'q.
+
+> Eski formula (faqat `cashier_transactions` SUM, tranzaksiya turiga qarab ishorali) **superseded** — reja bosqichlariga taqsimlangan qarzni o'tkazib yuborardi. Pastdagi "Muqobillar" / "Oqibatlar" bo'limlari tarixiy kontekst sifatida saqlanadi.
 
 **Nega alohida ledger emas (hozir):** barcha chara'lar kassa orqali o'tadi (POS), demak `cashier_transactions` allaqachon charge+payment manbasi. Alohida `patient_account_entries` (debit/credit) jadvali — chara'lar kassadan tashqarida paydo bo'lganda yoki hisob tuzatishlari (write-off, manual adjustment) kerak bo'lganda kiritiladi. Hozir bu yo'q → YAGNI.
 

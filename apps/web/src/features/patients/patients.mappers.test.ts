@@ -31,11 +31,12 @@ describe('patients.mappers', () => {
     expect(formatDate('1990-06-08')).toBe('08.06.1990');
     expect(formatDate(null)).toBeNull();
   });
-  it('toPatientListItem gender label + tags', () => {
-    const vm = toPatientListItem(base, (k) => k);
+  it('toPatientListItem gender label + tags + balance', () => {
+    const vm = toPatientListItem({ ...base, balance: 150000 }, (k) => k);
     expect(vm.genderLabel).toBe('patients.gender.male');
     expect(vm.tags).toEqual(['VIP']);
     expect(vm.age).toBeGreaterThan(0);
+    expect(vm.balance).toBe(150000);
   });
   it("toPatientDetail sana formatlaydi va insurance o'tkazadi", () => {
     const vm = toPatientDetail(
