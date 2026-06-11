@@ -73,6 +73,8 @@ export function ImageCard({
             component="a"
             href={vm.url}
             target="_blank"
+            rel="noopener noreferrer"
+            download={vm.originalFilename}
             leftSection={<IconDownload size={12} />}
           >
             {t('image.download')}
