@@ -6,16 +6,17 @@ import type { ReactNode } from 'react';
 import { I18nextProvider } from 'react-i18next';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute.tsx';
+import { DashboardRouter } from '@/features/dashboard';
 import { i18n } from '@/lib/i18n.ts';
 import { queryClient } from '@/lib/query-client.ts';
 import { AppointmentsPage } from '@/pages/appointments.page.tsx';
+import { AuditPage } from '@/pages/audit.page.tsx';
 import { ForgotPasswordPage } from '@/pages/auth/forgot-password.page.tsx';
 import { LoginPage } from '@/pages/auth/login.page.tsx';
 import { RegisterTenantPage } from '@/pages/auth/register-tenant.page.tsx';
 import { ResetPasswordPage } from '@/pages/auth/reset-password.page.tsx';
 import { SelectWorkspacePage } from '@/pages/auth/select-workspace.page.tsx';
 import { CashierPage } from '@/pages/cashier.page.tsx';
-import { DashboardPage } from '@/pages/dashboard.page.tsx';
 import { DesignSystemPage } from '@/pages/dev/DesignSystemPage.tsx';
 import { ForbiddenPage } from '@/pages/forbidden.page.tsx';
 import { PatientDetailPage } from '@/pages/patients/detail.page.tsx';
@@ -23,6 +24,7 @@ import { PatientsListPage } from '@/pages/patients/list.page.tsx';
 import { NewPatientPage } from '@/pages/patients/new.page.tsx';
 import { ProfilePage } from '@/pages/profile.page.tsx';
 import { QueuePage } from '@/pages/queue.page.tsx';
+import { ReportsPage } from '@/pages/reports.page.tsx';
 import { BranchesPage } from '@/pages/settings/branches.page.tsx';
 import { RolesSettingsPage } from '@/pages/settings/roles.page.tsx';
 import { ServicesSettingsPage } from '@/pages/settings/services.page.tsx';
@@ -60,7 +62,7 @@ export function App() {
                   </ProtectedRoute>
                 }
               >
-                <Route path="/" element={<DashboardPage />} />
+                <Route path="/" element={<DashboardRouter />} />
                 <Route path="/patients" element={rp('patient.view', <PatientsListPage />)} />
                 <Route path="/patients/new" element={rp('patient.create', <NewPatientPage />)} />
                 <Route path="/patients/:id" element={rp('patient.view', <PatientDetailPage />)} />
@@ -70,6 +72,8 @@ export function App() {
                 />
                 <Route path="/queue" element={rp('queue.view', <QueuePage />)} />
                 <Route path="/cashier" element={rp('cashier.view', <CashierPage />)} />
+                <Route path="/reports" element={rp('report.view', <ReportsPage />)} />
+                <Route path="/audit" element={rp('audit_log.view', <AuditPage />)} />
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route
                   path="/settings/services"
