@@ -48,6 +48,15 @@ export function ConsentTab({ patientId }: Props) {
   const [signBody, setSignBody] = useState('');
   const [signSignature, setSignSignature] = useState('');
 
+  // Sign modalni yopganda formani tozalash (oldingi konsent ma'lumoti qolmasligi uchun).
+  const closeSign = () => {
+    signCtl.close();
+    setSignType('treatment');
+    setSignTitle('');
+    setSignBody('');
+    setSignSignature('');
+  };
+
   const [tplType, setTplType] = useState<ConsentType>('treatment');
   const [tplTitle, setTplTitle] = useState('');
   const [tplBodyUz, setTplBodyUz] = useState('');
@@ -105,10 +114,7 @@ export function ConsentTab({ patientId }: Props) {
       {
         onSuccess: () => {
           setSelectedTplId(null);
-          setSignTitle('');
-          setSignBody('');
-          setSignSignature('');
-          signCtl.close();
+          closeSign();
         },
       },
     );
@@ -164,7 +170,7 @@ export function ConsentTab({ patientId }: Props) {
       ))}
 
       {/* Sign form modal */}
-      <Modal opened={signOpened} onClose={signCtl.close} title={t('consent.sign_new')} size="xl">
+      <Modal opened={signOpened} onClose={closeSign} title={t('consent.sign_new')} size="xl">
         <Stack gap="md">
           {tplQuery.data && tplQuery.data.length > 0 ? (
             <Select
@@ -212,7 +218,7 @@ export function ConsentTab({ patientId }: Props) {
             onChange={(e) => setSignSignature(e.currentTarget.value)}
           />
           <Group justify="flex-end">
-            <Button variant="default" onClick={signCtl.close}>
+            <Button variant="default" onClick={closeSign}>
               {t('common.cancel')}
             </Button>
             <Button
