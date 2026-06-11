@@ -1,9 +1,15 @@
 import { randomBytes } from 'node:crypto';
-import { cashierTransactionItems, cashierTransactions } from '@dental/db-schema';
+import {
+  cashierTransactionItems,
+  cashierTransactions,
+  treatmentStagePayments,
+  treatmentStages,
+} from '@dental/db-schema';
 import { and, between, count, desc, eq, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { computePlanBalance } from './cashier.billing.ts';
 import type { CreateTransactionInput, ListTransactionsQuery } from './cashier.schema.ts';
 
 /**
@@ -31,6 +37,14 @@ const generateReceiptNumber = (): string => {
   const rnd = randomBytes(2).toString('hex').toUpperCase();
   return `R-${yyyymmdd}-${rnd}`;
 };
+
+/** Allocation yig'indisi paidAmount'dan oshganda — routes 400 ga aylantiradi. */
+export class AllocationExceedError extends Error {
+  constructor() {
+    super('Allocation sum exceeds paid amount');
+    this.name = 'AllocationExceedError';
+  }
+}
 
 export const createCashierService = (deps: { audit: AuditLogger }) => {
   const fiscal: FiscalProvider = noOpFiscalProvider;
@@ -86,6 +100,15 @@ export const createCashierService = (deps: { audit: AuditLogger }) => {
 
     const totalAmount = input.items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
     const netTotal = totalAmount - input.discount;
+
+    // Allocation yig'indisi paidAmount'dan oshmasligi shart (qisman ruxsat, oshib ketish RAD).
+    if (input.allocations && input.allocations.length > 0) {
+      const allocSum = input.allocations.reduce((s, a) => s + a.amount, 0);
+      if (allocSum > input.paidAmount) {
+        throw new AllocationExceedError();
+      }
+    }
+
     const receiptNumber = generateReceiptNumber();
 
     return await db.transaction(async (tx) => {
@@ -97,6 +120,7 @@ export const createCashierService = (deps: { audit: AuditLogger }) => {
           tenantId,
           branchId: input.branchId,
           patientId: input.patientId ?? null,
+          treatmentPlanId: input.treatmentPlanId ?? null,
           receiptNumber,
           totalAmount: String(netTotal),
           paidAmount: String(input.paidAmount),
@@ -123,6 +147,18 @@ export const createCashierService = (deps: { audit: AuditLogger }) => {
           })),
         )
         .returning();
+
+      // Per-bosqich allocation rowlar (ijobiy = to'lov). Bir tx ichida (RLS tx-bound).
+      if (input.allocations && input.allocations.length > 0) {
+        await tx.insert(treatmentStagePayments).values(
+          input.allocations.map((a) => ({
+            tenantId,
+            transactionId: transaction.id,
+            stageId: a.stageId,
+            amount: String(a.amount),
+          })),
+        );
+      }
 
       // Fiscal (NoOp — M3 da)
       const fiscalResult = await fiscal.createReceipt({
@@ -181,6 +217,23 @@ export const createCashierService = (deps: { audit: AuditLogger }) => {
         })
         .returning();
 
+      // Asl tranzaksiya allocation'larini negatsiya qilish (balansni tiklaydi).
+      const origAllocations = await tx
+        .select({ stageId: treatmentStagePayments.stageId, amount: treatmentStagePayments.amount })
+        .from(treatmentStagePayments)
+        .where(eq(treatmentStagePayments.transactionId, id));
+
+      if (refundTx && origAllocations.length > 0) {
+        await tx.insert(treatmentStagePayments).values(
+          origAllocations.map((a) => ({
+            tenantId: original.tenantId,
+            transactionId: refundTx.id,
+            stageId: a.stageId,
+            amount: String(-Number(a.amount)),
+          })),
+        );
+      }
+
       await tx
         .update(cashierTransactions)
         .set({ status: 'voided' })
@@ -224,7 +277,34 @@ export const createCashierService = (deps: { audit: AuditLogger }) => {
     return { date: dateStr, branchId, breakdown: rows };
   }
 
-  return { list, getById, create, refund, dailySummary };
+  /** Plan balansi — sof o'qish (treatment_stages + allocation yig'indilari). Saqlanmaydi. */
+  async function planBalance(c: Context, planId: string) {
+    const db = getDb(c);
+
+    // Plan bosqichlari (RLS tenant orqali filtrlaydi — explicit WHERE tenant_id YOZILMAYDI).
+    const stageRows = await db
+      .select({
+        id: treatmentStages.id,
+        serviceName: treatmentStages.serviceName,
+        cost: treatmentStages.cost,
+      })
+      .from(treatmentStages)
+      .where(eq(treatmentStages.treatmentPlanId, planId));
+
+    // Shu bosqichlarga tegishli allocation'lar.
+    const allocRows = await db
+      .select({
+        stageId: treatmentStagePayments.stageId,
+        amount: treatmentStagePayments.amount,
+      })
+      .from(treatmentStagePayments)
+      .innerJoin(treatmentStages, eq(treatmentStagePayments.stageId, treatmentStages.id))
+      .where(eq(treatmentStages.treatmentPlanId, planId));
+
+    return computePlanBalance(stageRows, allocRows);
+  }
+
+  return { list, getById, create, refund, dailySummary, planBalance };
 };
 
 export type CashierService = ReturnType<typeof createCashierService>;
