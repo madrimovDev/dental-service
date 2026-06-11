@@ -114,6 +114,7 @@ export type QueueTicket = {
   patientId: string | null;
   serviceId: string | null;
   doctorId: string | null;
+  appointmentId: string | null;
   queueNumber: number;
   ticketDate: string;
   status: QueueStatus;

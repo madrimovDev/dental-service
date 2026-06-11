@@ -514,7 +514,13 @@
     "in_progress": "В работе",
     "done": "Завершён",
     "completed": "Выполнен",
-    "called_at": "Вызван"
+    "called_at": "Вызван",
+    "call": "Вызвать",
+    "missed": "Не явился",
+    "from_appointment": "Из записи",
+    "walk_in": "Без записи",
+    "check_in": "В очередь",
+    "no_candidates": "Нет записей для регистрации сегодня"
   },
   "services": {
     "title": "Каталог услуг",

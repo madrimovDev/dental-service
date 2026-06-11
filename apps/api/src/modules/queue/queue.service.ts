@@ -1,5 +1,5 @@
-import { queueTickets } from '@dental/db-schema';
-import { and, asc, eq, gte, max, sql } from 'drizzle-orm';
+import { appointments, queueTickets } from '@dental/db-schema';
+import { and, asc, eq, gte, isNull, lt, max, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
@@ -60,6 +60,7 @@ export const createQueueService = (deps: { audit: AuditLogger }) => {
           patientId: input.patientId ?? null,
           serviceId: input.serviceId ?? null,
           queueNumber,
+          appointmentId: input.appointmentId ?? null,
         })
         .returning();
 
@@ -93,6 +94,41 @@ export const createQueueService = (deps: { audit: AuditLogger }) => {
       .where(eq(queueTickets.id, id))
       .returning();
 
+    // Appointment status sync (faqat bog'langan ticketlarda)
+    if (updated && before.appointmentId) {
+      const apptStatus =
+        input.status === 'in_progress'
+          ? ('in_progress' as const)
+          : input.status === 'done'
+            ? ('completed' as const)
+            : input.status === 'missed'
+              ? ('no_show' as const)
+              : null;
+
+      if (apptStatus) {
+        const [appt] = await db
+          .select({ id: appointments.id, status: appointments.status })
+          .from(appointments)
+          .where(eq(appointments.id, before.appointmentId));
+
+        // Terminal holatni qayta yozmaslik
+        if (appt && appt.status !== 'cancelled' && appt.status !== 'completed') {
+          await db
+            .update(appointments)
+            .set({ status: apptStatus, updatedAt: now })
+            .where(eq(appointments.id, before.appointmentId));
+
+          await deps.audit.record(c, {
+            action: 'status_synced',
+            resourceType: 'appointment',
+            resourceId: before.appointmentId,
+            before: { status: appt.status },
+            after: { status: apptStatus },
+          });
+        }
+      }
+    }
+
     if (updated) {
       await deps.audit.record(c, {
         action: 'status_changed',
@@ -105,7 +141,46 @@ export const createQueueService = (deps: { audit: AuditLogger }) => {
     return updated;
   }
 
-  return { todayList, nextNumber, create, updateStatus };
+  /** Bugungi scheduled/confirmed appointment'lar, navbatga olinmaganlari. */
+  async function checkInCandidates(c: Context, branchId: string) {
+    const db = getDb(c);
+    const todayStart = new Date();
+    todayStart.setUTCHours(0, 0, 0, 0);
+    const todayEnd = new Date(todayStart);
+    todayEnd.setUTCDate(todayEnd.getUTCDate() + 1);
+
+    return db
+      .select({
+        id: appointments.id,
+        tenantId: appointments.tenantId,
+        branchId: appointments.branchId,
+        patientId: appointments.patientId,
+        doctorId: appointments.doctorId,
+        assistantId: appointments.assistantId,
+        startTime: appointments.startTime,
+        endTime: appointments.endTime,
+        status: appointments.status,
+        serviceIds: appointments.serviceIds,
+        notes: appointments.notes,
+        cancellationReason: appointments.cancellationReason,
+        createdAt: appointments.createdAt,
+        updatedAt: appointments.updatedAt,
+      })
+      .from(appointments)
+      .leftJoin(queueTickets, eq(queueTickets.appointmentId, appointments.id))
+      .where(
+        and(
+          eq(appointments.branchId, branchId),
+          gte(appointments.startTime, todayStart),
+          lt(appointments.startTime, todayEnd),
+          isNull(queueTickets.id),
+          sql`${appointments.status} in ('scheduled','confirmed')`,
+        ),
+      )
+      .orderBy(asc(appointments.startTime));
+  }
+
+  return { todayList, nextNumber, create, updateStatus, checkInCandidates };
 };
 
 export type QueueService = ReturnType<typeof createQueueService>;

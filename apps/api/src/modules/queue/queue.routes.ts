@@ -22,6 +22,12 @@ export const queueRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     return c.json(ok(await service.todayList(c, branchId)));
   });
 
+  app.get('/check-in-candidates', requirePermission('queue.create'), async (c) => {
+    const branchId = c.req.query('branchId');
+    if (!branchId) return c.json(fail('query.missing', 'branchId required'), 400);
+    return c.json(ok(await service.checkInCandidates(c, branchId)));
+  });
+
   app.post('/', requirePermission('queue.create'), async (c) => {
     const body = createQueueTicketSchema.safeParse(await c.req.json());
     if (!body.success) throw new HTTPException(400, { message: 'Invalid input' });

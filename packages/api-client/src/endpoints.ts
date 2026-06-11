@@ -291,10 +291,16 @@ export const createEndpoints = (api: ApiClient) => ({
 
   queue: {
     today: (branchId: string) => api.get<QueueTicket[]>(`/api/queue?branchId=${branchId}`),
-    create: (body: { branchId: string; patientId?: string; serviceId?: string }) =>
-      api.post<QueueTicket>('/api/queue', body),
+    create: (body: {
+      branchId: string;
+      patientId?: string;
+      serviceId?: string;
+      appointmentId?: string;
+    }) => api.post<QueueTicket>('/api/queue', body),
     updateStatus: (id: string, status: QueueStatus, doctorId?: string) =>
       api.patch<QueueTicket>(`/api/queue/${id}/status`, { status, doctorId }),
+    checkInCandidates: (branchId: string) =>
+      api.get<Appointment[]>(`/api/queue/check-in-candidates?branchId=${branchId}`),
   },
 
   clinical: {
