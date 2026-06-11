@@ -13,8 +13,10 @@ const PaymentsTab = lazy(() =>
   import('./tabs/PaymentsTab').then((m) => ({ default: m.PaymentsTab })),
 );
 
-const ToothChartTab = lazy(() =>
-  import('@/components/clinical/ToothChartTab.tsx').then((m) => ({ default: m.ToothChartTab })),
+const OdontogramTab = lazy(() =>
+  import('@/features/clinical/components/odontogram/OdontogramTab').then((m) => ({
+    default: m.OdontogramTab,
+  })),
 );
 const TreatmentPlansTab = lazy(() =>
   import('@/components/clinical/TreatmentPlansTab.tsx').then((m) => ({
@@ -98,7 +100,7 @@ export function PatientCard() {
         <Suspense fallback={null}>
           {active === 'gen' && patient && <GeneralTab patient={patient} />}
           {active === 'med' && <MedicalTab patientId={id} />}
-          {active === 'odo' && <ToothChartTab patientId={id} />}
+          {active === 'odo' && <OdontogramTab patientId={id} />}
           {active === 'plan' && <TreatmentPlansTab patientId={id} />}
           {active === 'vis' && <VisitNotesTab patientId={id} />}
           {active === 'rx' && <PrescriptionsTab patientId={id} />}
