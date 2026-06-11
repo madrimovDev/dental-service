@@ -17,6 +17,7 @@ export function useCheckInCandidates(branchId: string | null) {
     queryKey: queueKeys.candidates(branchId ?? ''),
     queryFn: () => api.queue.checkInCandidates(branchId ?? ''),
     enabled: !!branchId,
+    refetchInterval: 10_000,
   });
 }
 
@@ -33,7 +34,12 @@ export function useUpdateQueueStatus() {
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: QueueStatus }) =>
       api.queue.updateStatus(id, status),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queueKeys.all }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queueKeys.all });
+      // Backend done→completed / missed→no_show appointment'ni sync qiladi —
+      // kalendar cache'ni ham yangilash kerak.
+      void qc.invalidateQueries({ queryKey: ['appointments'] });
+    },
   });
 }
 

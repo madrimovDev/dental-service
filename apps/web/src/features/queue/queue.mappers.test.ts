@@ -41,6 +41,11 @@ describe('queue.mappers', () => {
     expect(vm.serviceName).toBeNull();
   });
 
+  it("toQueueCardVM: serviceId bor, lookupda yo'q → null (xizmat yashirin)", () => {
+    const vm = toQueueCardVM(ticket({ serviceId: 'nomalum' }), lookups);
+    expect(vm.serviceName).toBeNull();
+  });
+
   it('groupByStatus: waiting / in_progress / completed(done+missed)', () => {
     const cols = groupByStatus([
       ticket({ id: 'a', status: 'waiting' }),
