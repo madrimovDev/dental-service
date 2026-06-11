@@ -543,7 +543,20 @@
     "branch": "Filial",
     "status": "Status",
     "empty": "Xizmatlar yo'q. Birinchi xizmatni qo'shing.",
-    "confirm_delete": "Xizmatni o'chirishni tasdiqlaysizmi?"
+    "confirm_delete": "Xizmatni o'chirishni tasdiqlaysizmi?",
+    "tab_info": "Ma'lumot",
+    "tab_prices": "Narxlar",
+    "search": "Nom yoki kod bo'yicha qidirish...",
+    "other": "Boshqa",
+    "required_role": "Talab qilinadigan rol",
+    "role_none": "Belgilanmagan",
+    "role_doctor": "Shifokor",
+    "role_assistant": "Yordamchi",
+    "role_technician": "Texnik",
+    "description_uz": "Tavsif (O'zbek)",
+    "description_ru": "Tavsif (Rus)",
+    "is_active": "Faol",
+    "save_first": "Narx qo'shish uchun avval xizmatni saqlang"
   },
   "cashier": {
     "title": "Kassa",
