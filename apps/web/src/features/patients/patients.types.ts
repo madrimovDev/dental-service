@@ -1,6 +1,6 @@
 import type { Patient } from '@dental/api-client';
 
-export type ListParams = { search?: string; archived?: boolean; page: number };
+export type ListParams = { search?: string; archived?: boolean; page: number; pageSize?: number };
 
 export type PatientListItem = {
   id: string;

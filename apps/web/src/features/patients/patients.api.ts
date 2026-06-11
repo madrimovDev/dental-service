@@ -14,7 +14,7 @@ export function usePatients(params: ListParams) {
         search: params.search || undefined,
         archived: params.archived,
         page: params.page,
-        pageSize: 20,
+        pageSize: params.pageSize ?? 20,
       });
       return { items: res.data.map((p) => toPatientListItem(p, t)), meta: res.meta };
     },
