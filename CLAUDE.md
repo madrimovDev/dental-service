@@ -4,7 +4,7 @@ Bu fayl Claude Code uchun loyiha konteksti. Har yangi sessiyada birinchi o'qilad
 
 > ⚠️ **REDESIGN FAOL (2026-06-09).** Loyiha "Dental SaaS" → **kengaytiriladigan klinika platformasi + rolga moslashuvchi UX** ga qayta yo'naltirildi. M1–M5 yadro qurilgan va saqlanadi (gibrid: ko'chiriladi, qayta qurilmaydi).
 > **Joriy reja:** Obsidian `05-Redesign.md` + Linear (Dental Service — Redesign, team CLI) — milestone'lar M0–M8 (R0–R5 + Foundation + OpenAPI). Quyidagi **§8 Phasing eskirgan** (eski M1–M7) — 05-Redesign'ga qarang.
-> **Progress (2026-06-11):** ✅ R0 (poydevor) + R1 (shell) + **R2 (7 ekran re-skin + Billing poydevori)** TUGADI. 🔧 **R3 boshlandi** (bemor balansi — CLI-67; keyin dashboard + hisobot). Billing poydevori (`treatment_stage_payments` allocation + computed balans, Qaror #11) R3 balansiga asos (plan-inclusive, Qaror #13).
+> **Progress (2026-06-11):** ✅ R0 (poydevor) + R1 (shell) + **R2 (7 ekran re-skin + Billing poydevori)** TUGADI. 🔧 **R3 boshlandi** (bemor balansi — CLI-67; ✅ **CLI-68 reports moduli** — query-time agregatsiya backend: revenue/appointmentStats/doctorWorkload/planCompletion, RFC-0006; keyin dashboard + hisobot ekrani). Billing poydevori (`treatment_stage_payments` allocation + computed balans, Qaror #11) R3 balansiga asos (plan-inclusive, Qaror #13).
 > **Arxitektura qarorlari:** `docs/rfcs/` (RFC 001–010) + `docs/architecture.md` + Obsidian `01-Qarorlar.md` (#11 billing, #12 zod4Resolver, #13 R3 balansi).
 
 **Joriy arxitektura:** [`docs/architecture.md`](./docs/architecture.md) + [`docs/rfcs/`](./docs/rfcs/) (RFC 001–010) · UX/IA: [`docs/ux-ia-concept.md`](./docs/ux-ia-concept.md)

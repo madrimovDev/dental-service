@@ -18,6 +18,7 @@ import { patientRoutes } from './modules/patients/index.ts';
 import { permissionRoutes } from './modules/permissions/index.ts';
 import { prescriptionsRoutes } from './modules/prescriptions/index.ts';
 import { queueRoutes } from './modules/queue/index.ts';
+import { reportsRoutes } from './modules/reports/index.ts';
 import { roleRoutes } from './modules/roles/index.ts';
 import { serviceRoutes } from './modules/services/index.ts';
 import { tenantRoutes } from './modules/tenants/index.ts';
@@ -50,6 +51,7 @@ export const createApp = () => {
   app.route('/api/patients', patientRoutes({ db, audit }));
   app.route('/api/services', serviceRoutes({ db, audit }));
   app.route('/api/cashier', cashierRoutes({ db, audit }));
+  app.route('/api/reports', reportsRoutes({ db }));
   app.route('/api/appointments', appointmentRoutes({ db, audit }));
   app.route('/api/queue', queueRoutes({ db, audit }));
   // Clinical: /api/diagnoses, /api/treatment-plans, /api/visit-notes, /api/tooth-charts

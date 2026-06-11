@@ -64,6 +64,12 @@ import type {
   PregnancyStatus,
   TestResults,
 } from './types-patients.ts';
+import type {
+  AppointmentStatsReport,
+  DoctorWorkloadRow,
+  PlanCompletionReport,
+  RevenueReport,
+} from './types-reports.ts';
 
 export const createEndpoints = (api: ApiClient) => ({
   auth: {
@@ -252,6 +258,29 @@ export const createEndpoints = (api: ApiClient) => ({
     dailySummary: (branchId: string, date: string) =>
       api.get<DailySummary>(`/api/cashier/daily-summary?branchId=${branchId}&date=${date}`),
     planBalance: (planId: string) => api.get<PlanBalance>(`/api/cashier/plan-balance/${planId}`),
+  },
+
+  reports: {
+    revenue: (q: { from: string; to: string; branchId?: string }) => {
+      const p = new URLSearchParams({ from: q.from, to: q.to });
+      if (q.branchId) p.set('branchId', q.branchId);
+      return api.get<RevenueReport>(`/api/reports/revenue?${p.toString()}`);
+    },
+    appointments: (q: { from: string; to: string; branchId?: string }) => {
+      const p = new URLSearchParams({ from: q.from, to: q.to });
+      if (q.branchId) p.set('branchId', q.branchId);
+      return api.get<AppointmentStatsReport>(`/api/reports/appointments?${p.toString()}`);
+    },
+    doctors: (q: { from: string; to: string; branchId?: string }) => {
+      const p = new URLSearchParams({ from: q.from, to: q.to });
+      if (q.branchId) p.set('branchId', q.branchId);
+      return api.get<DoctorWorkloadRow[]>(`/api/reports/doctors?${p.toString()}`);
+    },
+    treatmentPlans: (q: { from: string; to: string; branchId?: string }) => {
+      const p = new URLSearchParams({ from: q.from, to: q.to });
+      if (q.branchId) p.set('branchId', q.branchId);
+      return api.get<PlanCompletionReport>(`/api/reports/treatment-plans?${p.toString()}`);
+    },
   },
 
   appointments: {

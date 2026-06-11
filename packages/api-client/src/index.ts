@@ -7,3 +7,4 @@ export * from './types-clinical.ts';
 export * from './types-m3.ts';
 export * from './types-m5.ts';
 export * from './types-patients.ts';
+export * from './types-reports.ts';
