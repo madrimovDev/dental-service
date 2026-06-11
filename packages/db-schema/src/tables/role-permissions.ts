@@ -1,4 +1,4 @@
-import { pgTable, primaryKey, uuid } from 'drizzle-orm/pg-core';
+import { index, pgTable, primaryKey, uuid } from 'drizzle-orm/pg-core';
 import { permissions } from './permissions.ts';
 import { roles } from './roles.ts';
 
@@ -16,7 +16,10 @@ export const rolePermissions = pgTable(
       .notNull()
       .references(() => permissions.id, { onDelete: 'cascade' }),
   },
-  (t) => [primaryKey({ columns: [t.roleId, t.permissionId] })],
+  (t) => [
+    primaryKey({ columns: [t.roleId, t.permissionId] }),
+    index('role_permissions_permission_idx').on(t.permissionId),
+  ],
 );
 
 export type RolePermission = typeof rolePermissions.$inferSelect;

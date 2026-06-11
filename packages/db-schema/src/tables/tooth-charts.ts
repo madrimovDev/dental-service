@@ -90,7 +90,10 @@ export const toothStates = pgTable(
     diagnosisId: uuid('diagnosis_id').references(() => diagnoses.id, { onDelete: 'set null' }),
     notes: text('notes'),
   },
-  (t) => [index('tooth_states_chart_idx').on(t.toothChartId, t.toothNumber)],
+  (t) => [
+    index('tooth_states_chart_idx').on(t.toothChartId, t.toothNumber),
+    index('tooth_states_diagnosis_idx').on(t.diagnosisId),
+  ],
 );
 
 export type ToothState = typeof toothStates.$inferSelect;
