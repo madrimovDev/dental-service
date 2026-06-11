@@ -4,6 +4,7 @@ export const createQueueTicketSchema = z.object({
   branchId: z.uuid(),
   patientId: z.uuid().optional(),
   serviceId: z.uuid().optional(),
+  appointmentId: z.uuid().optional(),
 });
 export type CreateQueueTicketInput = z.infer<typeof createQueueTicketSchema>;
 
