@@ -29,7 +29,7 @@ const VisitNotesTab = lazy(() =>
   })),
 );
 const PrescriptionsTab = lazy(() =>
-  import('@/components/clinical/PrescriptionsTab.tsx').then((m) => ({
+  import('@/features/clinical/components/prescriptions/PrescriptionsTab').then((m) => ({
     default: m.PrescriptionsTab,
   })),
 );
