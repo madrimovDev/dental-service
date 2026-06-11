@@ -6,6 +6,7 @@ import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
+import { createStockService } from '../stock/stock.service.ts';
 import {
   createToothChartSchema,
   createTreatmentPlanSchema,
@@ -28,7 +29,13 @@ export const clinicalRoutes = (deps: { db: Database; audit: AuditLogger }) => {
   app.use('*', authMiddleware());
   app.use('*', rlsMiddleware(deps.db));
 
-  const service = createClinicalService(deps);
+  // Ombor chiqim hook'ini DI orqali inject — stock'ni faqat routes layer'da import qilamiz
+  // (cycle yo'q: stock clinical'ni import qilmaydi). Vizit yaratilganda BOM material yechiladi.
+  const stockService = createStockService({ audit: deps.audit });
+  const service = createClinicalService({
+    ...deps,
+    deductStock: stockService.deductForServices,
+  });
 
   // ===== Diagnoses (ICD-10 katalog) — read-only, faqat permission tekshiriladi =====
   app.get('/diagnoses', requirePermission('medical_record.view'), async (c) => {

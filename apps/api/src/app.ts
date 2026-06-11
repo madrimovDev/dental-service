@@ -12,6 +12,7 @@ import { branchRoutes } from './modules/branches/index.ts';
 import { cashierRoutes } from './modules/cashier/index.ts';
 import { clinicalRoutes } from './modules/clinical/index.ts';
 import { consentRoutes } from './modules/consent/index.ts';
+import { expensesRoutes } from './modules/expenses/index.ts';
 import { healthRoutes } from './modules/health/index.ts';
 import { labOrdersRoutes } from './modules/lab-orders/index.ts';
 import { patientImagesRoutes } from './modules/patient-images/index.ts';
@@ -22,6 +23,7 @@ import { queueRoutes } from './modules/queue/index.ts';
 import { reportsRoutes } from './modules/reports/index.ts';
 import { roleRoutes } from './modules/roles/index.ts';
 import { serviceRoutes } from './modules/services/index.ts';
+import { stockRoutes } from './modules/stock/index.ts';
 import { tenantRoutes } from './modules/tenants/index.ts';
 import { userRoutes } from './modules/users/index.ts';
 
@@ -63,6 +65,9 @@ export const createApp = () => {
   app.route('/api/consent', consentRoutes({ db, audit }));
   app.route('/api/lab-orders', labOrdersRoutes({ db, audit }));
   app.route('/api', patientImagesRoutes({ db, audit }));
+  // R4 Guruh A: xarajatlar (/api/expense-categories, /api/expenses), ombor (/api/stock)
+  app.route('/api', expensesRoutes({ db, audit }));
+  app.route('/api/stock', stockRoutes({ db, audit }));
 
   // Error handler
   app.onError(errorHandler);

@@ -20,7 +20,12 @@ import type {
   UpdateVisitNoteInput,
 } from './clinical.schema.ts';
 
-export const createClinicalService = (deps: { audit: AuditLogger; db: Database }) => {
+export const createClinicalService = (deps: {
+  audit: AuditLogger;
+  db: Database;
+  /** Vizit yozuvi yaratilganda BOM bo'yicha ombor avtomatik chiqim (DI — stock module). Ixtiyoriy. */
+  deductStock?: (c: Context, serviceIds: string[], visitNoteId: string) => Promise<void>;
+}) => {
   // ===== Diagnoses (platform-level, no RLS) =====
   async function listDiagnoses(search?: string) {
     if (search) {
@@ -204,6 +209,9 @@ export const createClinicalService = (deps: { audit: AuditLogger; db: Database }
       .returning();
 
     if (note) {
+      // BOM bo'yicha ombor chiqimi (DI dep) — shu request-tx ichida (RLS tx-bound).
+      await deps.deductStock?.(c, input.performedServices ?? [], note.id);
+
       await deps.audit.record(c, {
         action: 'created',
         resourceType: 'visit_note',
