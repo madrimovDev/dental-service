@@ -13,6 +13,7 @@ const MedicalTab = lazy(() => import('./tabs/MedicalTab').then((m) => ({ default
 const PaymentsTab = lazy(() =>
   import('./tabs/PaymentsTab').then((m) => ({ default: m.PaymentsTab })),
 );
+const FamilyTab = lazy(() => import('./tabs/FamilyTab').then((m) => ({ default: m.FamilyTab })));
 
 const OdontogramTab = lazy(() =>
   import('@/features/clinical/components/odontogram/OdontogramTab').then((m) => ({
@@ -62,6 +63,7 @@ const TABS: TabDef[] = [
   { key: 'img', labelKey: 'patients.tab.images', permission: 'patient_image.view' },
   { key: 'lab', labelKey: 'patients.tab.lab', permission: 'lab_order.view' },
   { key: 'cons', labelKey: 'patients.tab.consent', permission: 'consent.view' },
+  { key: 'fam', labelKey: 'patients.tab.family' },
   { key: 'pay', labelKey: 'patients.tab.payments' },
 ];
 
@@ -116,6 +118,7 @@ export function PatientCard() {
           {active === 'img' && <PatientImagesTab patientId={id} />}
           {active === 'lab' && <LabOrdersTab patientId={id} />}
           {active === 'cons' && <ConsentTab patientId={id} />}
+          {active === 'fam' && <FamilyTab patientId={id} />}
           {active === 'pay' && <PaymentsTab patientId={id} />}
         </Suspense>
       </div>
