@@ -39,7 +39,7 @@ export function parseToothNumbers(csv: string): number[] {
   return csv
     .split(',')
     .map((n) => Number(n.trim()))
-    .filter((n) => !Number.isNaN(n));
+    .filter((n) => Number.isInteger(n) && n > 0);
 }
 
 function dxLabel(d: Diagnosis, lang: Lang): string {
