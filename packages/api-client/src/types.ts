@@ -60,6 +60,16 @@ export type Tenant = {
   updatedAt: string;
 };
 
+export type TenantSettings = {
+  id: string;
+  tenantId: string;
+  vertical: string;
+  reminderLeadHours: number;
+  currency: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type Branch = {
   id: string;
   tenantId: string;

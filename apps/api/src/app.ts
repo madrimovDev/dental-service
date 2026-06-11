@@ -27,6 +27,7 @@ import { reportsRoutes } from './modules/reports/index.ts';
 import { roleRoutes } from './modules/roles/index.ts';
 import { serviceRoutes } from './modules/services/index.ts';
 import { stockRoutes } from './modules/stock/index.ts';
+import { tenantSettingsRoutes } from './modules/tenant-settings/index.ts';
 import { tenantRoutes } from './modules/tenants/index.ts';
 import { userRoutes } from './modules/users/index.ts';
 
@@ -51,6 +52,7 @@ export const createApp = () => {
   // Authenticated routes (auth + RLS middleware har module ichida mount qilingan)
   app.route('/api/permissions', permissionRoutes({ db }));
   app.route('/api/tenant', tenantRoutes({ db, audit }));
+  app.route('/api/tenant-settings', tenantSettingsRoutes({ db, audit }));
   app.route('/api/branches', branchRoutes({ db, audit }));
   app.route('/api/roles', roleRoutes({ db, audit }));
   app.route('/api/users', userRoutes({ db, audit }));
