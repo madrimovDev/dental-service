@@ -99,6 +99,13 @@
       "when": 1781188027839,
       "tag": "0013_funny_rattler",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1781190605449,
+      "tag": "0014_striped_sauron",
+      "breakpoints": true
     }
   ]
 }

@@ -75,6 +75,8 @@ export const ROLE_TEMPLATES = [
       'expense.manage',
       'stock.view',
       'stock.manage',
+      'payroll.view',
+      'payroll.manage',
     ],
   },
   {
@@ -108,6 +110,8 @@ export const ROLE_TEMPLATES = [
       'expense.manage',
       'stock.view',
       'stock.manage',
+      'payroll.view',
+      'payroll.manage',
     ],
   },
   {
@@ -215,6 +219,8 @@ export const ROLE_TEMPLATES = [
       'salary.view',
       'expense.view',
       'expense.manage',
+      'payroll.view',
+      'payroll.manage',
     ],
   },
   {
