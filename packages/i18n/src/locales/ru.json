@@ -253,6 +253,18 @@
     "reset_password_success": "Новый пароль сгенерирован. Передайте сотруднику — старый пароль больше не работает.",
     "cannot_reset_self": "Свой пароль нельзя сбросить здесь. Используйте страницу Профиль."
   },
+  "staff": {
+    "edit_profile": "Редактировать профиль сотрудника",
+    "profile_title": "Профиль сотрудника",
+    "specialty": "Специальность",
+    "status": "Статус",
+    "status_active": "Активен",
+    "status_on_leave": "В отпуске",
+    "status_inactive": "Неактивен",
+    "started_at": "Дата начала работы",
+    "base_salary": "Базовый оклад",
+    "commission_percent": "Комиссия (%)"
+  },
   "profile": {
     "title": "Профиль",
     "account": "Аккаунт",
@@ -822,5 +834,29 @@
     "bom_empty": "Для этой услуги материалы не заданы",
     "material": "Материал",
     "qty_per_service": "Количество на услугу"
+  },
+  "payroll": {
+    "title": "Зарплата",
+    "period": "Период",
+    "period_placeholder": "Выберите период",
+    "period_required": "Период должен быть выбран полностью",
+    "create_run": "Создать расчёт",
+    "runs": "Список расчётов",
+    "no_runs": "Расчёты ещё не созданы",
+    "view_detail": "Подробнее",
+    "detail": "Детали расчёта",
+    "no_lines": "Нет строк",
+    "finalize": "Завершить",
+    "status": "Статус",
+    "status_label": {
+      "draft": "Черновик",
+      "finalized": "Завершён"
+    },
+    "employee": "Сотрудник",
+    "base_salary": "Базовый оклад",
+    "attributed_revenue": "Привязанный доход",
+    "commission_percent": "Комиссия %",
+    "commission_amount": "Комиссия",
+    "total": "Итого"
   }
 }
