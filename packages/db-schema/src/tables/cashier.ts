@@ -8,6 +8,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { branches } from './branches.ts';
@@ -70,6 +71,10 @@ export const cashierTransactions = pgTable(
     index('cashier_tx_patient_idx').on(t.patientId),
     index('cashier_tx_status_idx').on(t.status),
     index('cashier_tx_treatment_plan_idx').on(t.treatmentPlanId),
+    // Receipt raqami noyob (jimgina dublikatning oldini oladi). NULL ko'p bo'lishi mumkin.
+    uniqueIndex('cashier_tx_receipt_unique').on(t.receiptNumber),
+    // Bitta tranzaksiyaga faqat bitta refund (TOCTOU backstop). To'lovlarda parent NULL.
+    uniqueIndex('cashier_tx_parent_unique').on(t.parentTransactionId),
   ],
 );
 

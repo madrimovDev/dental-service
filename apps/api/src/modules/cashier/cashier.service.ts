@@ -34,7 +34,7 @@ const noOpFiscalProvider: FiscalProvider = {
 const generateReceiptNumber = (): string => {
   const date = new Date();
   const yyyymmdd = `${date.getUTCFullYear()}${String(date.getUTCMonth() + 1).padStart(2, '0')}${String(date.getUTCDate()).padStart(2, '0')}`;
-  const rnd = randomBytes(2).toString('hex').toUpperCase();
+  const rnd = randomBytes(4).toString('hex').toUpperCase();
   return `R-${yyyymmdd}-${rnd}`;
 };
 
@@ -99,8 +99,9 @@ export const createCashierService = (deps: { audit: AuditLogger }) => {
     if (!tenantId) throw new Error('No tenant context');
 
     const itemsGross = input.items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
-    // Erkin POS: jami − chegirma. Plan-billing (items bo'sh): allocation yig'indisi = paidAmount.
-    const netTotal = input.items.length > 0 ? itemsGross - input.discount : input.paidAmount;
+    // Erkin POS: jami − chegirma (manfiy bo'lmaydi). Plan-billing (items bo'sh): allocation = paidAmount.
+    const netTotal =
+      input.items.length > 0 ? Math.max(0, itemsGross - input.discount) : input.paidAmount;
 
     // Allocation yig'indisi paidAmount'dan oshmasligi shart (qisman ruxsat, oshib ketish RAD).
     if (input.allocations && input.allocations.length > 0) {
@@ -134,23 +135,44 @@ export const createCashierService = (deps: { audit: AuditLogger }) => {
 
       if (!transaction) throw new Error('Transaction insert failed');
 
-      // Items
-      const items = await tx
-        .insert(cashierTransactionItems)
-        .values(
-          input.items.map((i) => ({
-            transactionId: transaction.id,
-            serviceId: i.serviceId,
-            serviceName: i.serviceName,
-            quantity: i.quantity,
-            unitPrice: String(i.unitPrice),
-            subtotal: String(i.unitPrice * i.quantity),
-          })),
-        )
-        .returning();
+      // Items — bo'sh massivni insert qilmaymiz (Drizzle throw qiladi). Plan-billing'da items bo'sh.
+      const items =
+        input.items.length > 0
+          ? await tx
+              .insert(cashierTransactionItems)
+              .values(
+                input.items.map((i) => ({
+                  transactionId: transaction.id,
+                  serviceId: i.serviceId,
+                  serviceName: i.serviceName,
+                  quantity: i.quantity,
+                  unitPrice: String(i.unitPrice),
+                  subtotal: String(i.unitPrice * i.quantity),
+                })),
+              )
+              .returning()
+          : [];
 
       // Per-bosqich allocation rowlar (ijobiy = to'lov). Bir tx ichida (RLS tx-bound).
       if (input.allocations && input.allocations.length > 0) {
+        // Per-bosqich overpay guard: existingPaid + amount ≤ stage.cost.
+        for (const a of input.allocations) {
+          const [stage] = await tx
+            .select({ cost: treatmentStages.cost })
+            .from(treatmentStages)
+            .where(eq(treatmentStages.id, a.stageId));
+          if (!stage) throw new AllocationExceedError();
+          const [paidRow] = await tx
+            .select({
+              paid: sql<string>`COALESCE(SUM(${treatmentStagePayments.amount}), 0)`,
+            })
+            .from(treatmentStagePayments)
+            .where(eq(treatmentStagePayments.stageId, a.stageId));
+          const existingPaid = Number(paidRow?.paid ?? 0);
+          if (existingPaid + a.amount > Number(stage.cost)) {
+            throw new AllocationExceedError();
+          }
+        }
         await tx.insert(treatmentStagePayments).values(
           input.allocations.map((a) => ({
             tenantId,
@@ -191,21 +213,25 @@ export const createCashierService = (deps: { audit: AuditLogger }) => {
 
   async function refund(c: Context, id: string) {
     const db = getDb(c);
-    const [original] = await db
-      .select()
-      .from(cashierTransactions)
-      .where(eq(cashierTransactions.id, id));
-    if (!original) return null;
-    // Refund of refund yoki allaqachon void qilingan (ikki marta refund) — RAD.
-    if (original.type === 'refund' || original.status === 'voided') return null;
 
     return await db.transaction(async (tx) => {
+      // Row-lock: ikki parallel refund poygasini oldini olish (TOCTOU). Guard tx ichida.
+      const [original] = await tx
+        .select()
+        .from(cashierTransactions)
+        .where(eq(cashierTransactions.id, id))
+        .for('update');
+      if (!original) return null;
+      // Refund of refund yoki allaqachon void qilingan (ikki marta refund) — RAD.
+      if (original.type === 'refund' || original.status === 'voided') return null;
+
       const [refundTx] = await tx
         .insert(cashierTransactions)
         .values({
           tenantId: original.tenantId,
           branchId: original.branchId,
           patientId: original.patientId,
+          treatmentPlanId: original.treatmentPlanId,
           receiptNumber: `${original.receiptNumber}-R`,
           totalAmount: original.totalAmount,
           paidAmount: original.paidAmount,
@@ -256,8 +282,9 @@ export const createCashierService = (deps: { audit: AuditLogger }) => {
   /** Daily summary for cashier close */
   async function dailySummary(c: Context, branchId: string, dateStr: string) {
     const db = getDb(c);
-    const start = new Date(`${dateStr}T00:00:00Z`);
-    const end = new Date(`${dateStr}T23:59:59Z`);
+    // Asia/Tashkent (UTC+5, DST yo'q) kun chegarasi — appointments bilan izchil (f73a785).
+    const start = new Date(`${dateStr}T00:00:00+05:00`);
+    const end = new Date(`${dateStr}T23:59:59.999+05:00`);
 
     const rows = await db
       .select({
