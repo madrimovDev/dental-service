@@ -30,6 +30,7 @@ export * from './tables/services.ts';
 export * from './tables/tenants.ts';
 export * from './tables/tooth-charts.ts';
 export * from './tables/treatment-plans.ts';
+export * from './tables/treatment-stage-payments.ts';
 export * from './tables/user-assignments.ts';
 export * from './tables/users.ts';
 export * from './tables/visit-notes.ts';
