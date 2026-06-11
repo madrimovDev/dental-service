@@ -36,6 +36,7 @@ export type CashierTransaction = {
   tenantId: string;
   branchId: string;
   patientId: string | null;
+  treatmentPlanId: string | null;
   receiptNumber: string | null;
   totalAmount: string;
   paidAmount: string;
@@ -78,6 +79,21 @@ export type DailySummary = {
     total: string;
     count: number;
   }>;
+};
+
+export type StageBalance = {
+  stageId: string;
+  serviceName: string;
+  cost: number;
+  paid: number;
+  remaining: number;
+};
+
+export type PlanBalance = {
+  totalCost: number;
+  totalPaid: number;
+  balance: number;
+  stages: StageBalance[];
 };
 
 export type AppointmentStatus =

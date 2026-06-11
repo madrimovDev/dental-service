@@ -7,7 +7,7 @@ import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
 import { createTransactionSchema, listTransactionsQuery } from './cashier.schema.ts';
-import { createCashierService } from './cashier.service.ts';
+import { AllocationExceedError, createCashierService } from './cashier.service.ts';
 
 export const cashierRoutes = (deps: { db: Database; audit: AuditLogger }) => {
   const app = new Hono();
@@ -27,8 +27,15 @@ export const cashierRoutes = (deps: { db: Database; audit: AuditLogger }) => {
   app.post('/transactions', requirePermission('cashier.create_transaction'), async (c) => {
     const body = createTransactionSchema.safeParse(await c.req.json());
     if (!body.success) throw new HTTPException(400, { message: 'Invalid input' });
-    const tx = await service.create(c, body.data);
-    return c.json(ok(tx), 201);
+    try {
+      const tx = await service.create(c, body.data);
+      return c.json(ok(tx), 201);
+    } catch (e) {
+      if (e instanceof AllocationExceedError) {
+        return c.json(fail('allocations.exceed', 'Allocation sum exceeds paid amount'), 400);
+      }
+      throw e;
+    }
   });
 
   app.get('/transactions/:id', requirePermission('cashier.view'), async (c) => {
@@ -48,6 +55,10 @@ export const cashierRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     const date = c.req.query('date') ?? new Date().toISOString().slice(0, 10);
     if (!branchId) return c.json(fail('query.missing', 'branchId required'), 400);
     return c.json(ok(await service.dailySummary(c, branchId, date)));
+  });
+
+  app.get('/plan-balance/:planId', requirePermission('cashier.view'), async (c) => {
+    return c.json(ok(await service.planBalance(c, c.req.param('planId'))));
   });
 
   return app;
