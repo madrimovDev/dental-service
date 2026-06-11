@@ -68,7 +68,7 @@ export function PatientImagesTab({ patientId }: Props) {
       <ImagePreviewModal image={previewImage} onClose={() => setPreviewId(null)} />
       <ImageUploadModal opened={uploadOpened} onClose={closeUpload} patientId={patientId} />
 
-      {/* Delete confirm — Mantine modal (native confirm() o'rniga) */}
+      {/* Delete tasdiqlash — Mantine modal (native dialog o'rniga) */}
       <Modal
         opened={!!deleteId}
         onClose={() => setDeleteId(null)}
