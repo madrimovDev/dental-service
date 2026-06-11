@@ -27,7 +27,7 @@ export function PlanCard({
           <Group gap="xs" mt={4}>
             <StatusPill status={vm.statusTone}>{t(vm.statusLabelKey)}</StatusPill>
             <Text size="sm" c="dimmed">
-              {t('treatment_plan.total_cost')}: {vm.totalCostText} UZS
+              {t('treatment_plan.total_cost')}: {vm.totalCostText} {t('common.currency')}
             </Text>
             <Text size="sm" c="dimmed">
               {t('treatment_plan.total_visits')}: {vm.totalVisits}
