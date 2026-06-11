@@ -33,6 +33,7 @@ import type {
   CashierTransactionWithItems,
   DailySummary,
   PaymentMethod,
+  PlanBalance,
   QueueStatus,
   QueueTicket,
   Service,
@@ -239,11 +240,14 @@ export const createEndpoints = (api: ApiClient) => ({
       paidAmount: number;
       paymentMethod: PaymentMethod;
       notes?: string;
+      treatmentPlanId?: string;
+      allocations?: Array<{ stageId: string; amount: number }>;
     }) => api.post<CashierTransactionWithItems>('/api/cashier/transactions', body),
     refund: (id: string) =>
       api.post<CashierTransactionWithItems>(`/api/cashier/transactions/${id}/refund`),
     dailySummary: (branchId: string, date: string) =>
       api.get<DailySummary>(`/api/cashier/daily-summary?branchId=${branchId}&date=${date}`),
+    planBalance: (planId: string) => api.get<PlanBalance>(`/api/cashier/plan-balance/${planId}`),
   },
 
   appointments: {

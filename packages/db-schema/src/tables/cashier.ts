@@ -14,6 +14,7 @@ import { branches } from './branches.ts';
 import { patients } from './patients.ts';
 import { services } from './services.ts';
 import { tenants } from './tenants.ts';
+import { treatmentPlans } from './treatment-plans.ts';
 import { users } from './users.ts';
 
 export const paymentMethodEnum = pgEnum('payment_method', ['cash', 'card', 'transfer', 'other']);
@@ -39,6 +40,9 @@ export const cashierTransactions = pgTable(
       .notNull()
       .references(() => branches.id, { onDelete: 'cascade' }),
     patientId: uuid('patient_id').references(() => patients.id, { onDelete: 'set null' }),
+    treatmentPlanId: uuid('treatment_plan_id').references(() => treatmentPlans.id, {
+      onDelete: 'set null',
+    }),
 
     receiptNumber: text('receipt_number'),
     totalAmount: numeric('total_amount', { precision: 14, scale: 2 }).notNull(),
@@ -65,6 +69,7 @@ export const cashierTransactions = pgTable(
     index('cashier_tx_tenant_branch_idx').on(t.tenantId, t.branchId, t.createdAt),
     index('cashier_tx_patient_idx').on(t.patientId),
     index('cashier_tx_status_idx').on(t.status),
+    index('cashier_tx_treatment_plan_idx').on(t.treatmentPlanId),
   ],
 );
 

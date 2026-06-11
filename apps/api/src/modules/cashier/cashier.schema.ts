@@ -17,6 +17,15 @@ export const createTransactionSchema = z.object({
   paidAmount: z.coerce.number().nonnegative(),
   paymentMethod: z.enum(['cash', 'card', 'transfer', 'other']),
   notes: z.string().max(1000).optional(),
+  treatmentPlanId: z.uuid().optional(),
+  allocations: z
+    .array(
+      z.object({
+        stageId: z.uuid(),
+        amount: z.coerce.number().positive(),
+      }),
+    )
+    .optional(),
 });
 export type CreateTransactionInput = z.infer<typeof createTransactionSchema>;
 
