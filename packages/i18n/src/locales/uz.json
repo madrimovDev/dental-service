@@ -666,6 +666,11 @@
       "body": "Bu to'lovni qaytarishni tasdiqlaysizmi? Amal qaytarib bo'lmaydi.",
       "confirm": "Qaytarish",
       "cancel": "Bekor qilish"
+    },
+    "status_label": {
+      "completed": "Yakunlangan",
+      "voided": "Bekor qilingan",
+      "pending": "Kutilmoqda"
     }
   }
 }

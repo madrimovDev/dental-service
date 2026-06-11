@@ -57,4 +57,17 @@ describe('TransactionsTable', () => {
     renderApp(<TransactionsTable transactions={[tx({ id: 'tx2', type: 'refund' })]} />);
     expect(screen.queryByLabelText("To'lovni qaytarish")).toBeNull();
   });
+
+  it('badge: voided payment → status (Bekor qilingan), refund → tur (Qaytarish)', () => {
+    renderApp(
+      <TransactionsTable
+        transactions={[
+          tx({ id: 'tx-voided', status: 'voided', type: 'payment' }),
+          tx({ id: 'tx-refund', type: 'refund' }),
+        ]}
+      />,
+    );
+    expect(screen.getByText('Bekor qilingan')).toBeTruthy();
+    expect(screen.getByText('Qaytarish')).toBeTruthy();
+  });
 });

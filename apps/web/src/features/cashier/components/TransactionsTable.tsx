@@ -65,7 +65,9 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
                     }
                     size="xs"
                   >
-                    {tx.type === 'refund' ? t('cashier.type.refund') : t(`cashier.type.${tx.type}`)}
+                    {tx.type === 'refund'
+                      ? t('cashier.type.refund')
+                      : t(`cashier.status_label.${tx.status}`)}
                   </Badge>
                 </Table.Td>
                 <Table.Td>
