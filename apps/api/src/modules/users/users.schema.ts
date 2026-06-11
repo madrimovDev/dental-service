@@ -23,3 +23,16 @@ export const updateAssignmentSchema = z.object({
   isActive: z.boolean().optional(),
 });
 export type UpdateAssignmentInput = z.infer<typeof updateAssignmentSchema>;
+
+/**
+ * Xodim employment profili upsert (PUT — to'liq almashtirish semantikasi).
+ * Ixtiyoriy maydonlar berilmasa — null/default'ga tushadi (replace, merge emas).
+ */
+export const upsertProfileSchema = z.object({
+  specialty: z.string().max(120).optional(),
+  employmentStatus: z.enum(['active', 'on_leave', 'inactive']).optional(),
+  startedAt: z.iso.date().optional(),
+  baseSalary: z.number().min(0),
+  commissionPercent: z.number().min(0).max(100),
+});
+export type UpsertProfileInput = z.infer<typeof upsertProfileSchema>;
