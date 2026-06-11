@@ -2,7 +2,7 @@ import { Button } from '@dental/ui';
 import { MultiSelect, Select, Stack, Stepper, Text } from '@mantine/core';
 import { DateTimePicker } from '@mantine/dates';
 import { useForm } from '@mantine/form';
-import { zodResolver } from 'mantine-form-zod-resolver';
+import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePatients } from '@/features/patients';
@@ -38,7 +38,7 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
       endTime: new Date(Date.now() + 30 * 60000),
       notes: '',
     },
-    validate: zodResolver(wizardSchema),
+    validate: zod4Resolver(wizardSchema),
   });
 
   const doctorOptions: Option[] = (doctors ?? []).map((d) => ({ value: d.id, label: d.name }));

@@ -14,7 +14,7 @@ import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { IconLock, IconUser } from '@tabler/icons-react';
 import { useMutation } from '@tanstack/react-query';
-import { zodResolver } from 'mantine-form-zod-resolver';
+import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
@@ -39,7 +39,7 @@ export function ProfilePage() {
 
   const form = useForm({
     initialValues: { currentPassword: '', newPassword: '', confirmPassword: '' },
-    validate: zodResolver(passwordSchema),
+    validate: zod4Resolver(passwordSchema),
   });
 
   const changeMut = useMutation({

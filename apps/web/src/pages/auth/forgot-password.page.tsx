@@ -1,7 +1,7 @@
 import { Alert, Anchor, Button, Container, Paper, Stack, Title } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useMutation } from '@tanstack/react-query';
-import { zodResolver } from 'mantine-form-zod-resolver';
+import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { z } from 'zod';
@@ -16,7 +16,7 @@ export function ForgotPasswordPage() {
   const { t } = useTranslation();
   const form = useForm({
     initialValues: { phone: '' },
-    validate: zodResolver(schema),
+    validate: zod4Resolver(schema),
   });
 
   const mut = useMutation({

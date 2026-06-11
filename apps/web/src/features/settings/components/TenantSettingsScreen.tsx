@@ -16,7 +16,7 @@ import {
 import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import { zodResolver } from 'mantine-form-zod-resolver';
+import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth-store.ts';
@@ -42,12 +42,12 @@ export function TenantSettingsScreen() {
 
   const form = useForm<TenantFormValues>({
     initialValues: { name: '', defaultLanguage: 'uz' },
-    validate: zodResolver(tenantSchema),
+    validate: zod4Resolver(tenantSchema),
   });
 
   const transferForm = useForm<TransferFormValues>({
     initialValues: { newOwnerUserId: '', currentPassword: '' },
-    validate: zodResolver(transferSchema),
+    validate: zod4Resolver(transferSchema),
   });
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: form.setValues stable

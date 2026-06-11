@@ -13,7 +13,7 @@ import {
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useMutation } from '@tanstack/react-query';
-import { zodResolver } from 'mantine-form-zod-resolver';
+import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
@@ -44,7 +44,7 @@ export function RegisterTenantPage() {
       ownerPassword: '',
       defaultLanguage: 'uz',
     },
-    validate: zodResolver(schema),
+    validate: zod4Resolver(schema),
   });
 
   const registerMut = useMutation({

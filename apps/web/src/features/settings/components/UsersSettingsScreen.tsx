@@ -16,7 +16,7 @@ import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { IconKey, IconPlus, IconSearch, IconTrash } from '@tabler/icons-react';
-import { zodResolver } from 'mantine-form-zod-resolver';
+import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PhoneInput } from '@/components/PhoneInput.tsx';
@@ -61,7 +61,7 @@ export function UsersSettingsScreen() {
 
   const form = useForm<InviteFormValues>({
     initialValues: { phone: '', fullName: '', roleId: '', branchId: '' },
-    validate: zodResolver(inviteSchema),
+    validate: zod4Resolver(inviteSchema),
   });
 
   const closeAll = () => {
