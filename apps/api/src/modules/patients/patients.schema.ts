@@ -64,3 +64,10 @@ export const listQuerySchema = z.object({
   pageSize: z.coerce.number().int().positive().max(100).default(20),
 });
 export type ListQuery = z.infer<typeof listQuerySchema>;
+
+export const patientBalanceSchema = z.object({
+  balance: z.number(),
+  planDebt: z.number(),
+  nonPlanBalance: z.number(),
+});
+export type PatientBalanceDto = z.infer<typeof patientBalanceSchema>;

@@ -41,6 +41,10 @@ export const patientRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     return c.json(ok(row));
   });
 
+  app.get('/:id/balance', requirePermission('patient.view'), async (c) => {
+    return c.json(ok(await service.balanceFor(c, c.req.param('id'))));
+  });
+
   app.patch('/:id', requirePermission('patient.edit'), async (c) => {
     const body = updatePatientSchema.safeParse(await c.req.json());
     if (!body.success) throw new HTTPException(400, { message: 'Invalid input' });
