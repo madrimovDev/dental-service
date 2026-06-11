@@ -1,6 +1,7 @@
 # RFC-0006: Reporting & aggregation (dashboard / KPI)
 
 - **Status:** Accepted
+  > ⚠️ Implemented 2026-06-11 (CLI-68).
 - **Sana:** 2026-06-09
 - **Bog'liq:** [RFC-0005](./0005-patient-balance-ledger.md), [`docs/ux-ia-concept.md`](../ux-ia-concept.md), R3 (CLI-65), Linear CLI-89
 
@@ -41,6 +42,14 @@ Materialized view / rollup jadval / cron job **kiritilmaydi**. Sabab: drift + ya
 | Plan completion % | `treatment_plans` + `treatment_stages` (status) |
 | Doktor yuklamasi | `appointments`/`visit_notes` (doktor bo'yicha) |
 | Top xizmatlar | `cashier_transaction_items` / `visit_notes.performedServices` |
+
+## Implementatsiya eslatmalari (CLI-68, 2026-06-11)
+
+Joriy implementatsiyada quyidagi taxminlar/cheklovlar mavjud — KPI'larni o'qishda hisobga olinadi:
+
+- **`byService` faqat itemli POS sotuvni qamraydi.** Daromad xizmat bo'yicha breakdown'i `cashier_transaction_items` (POS satrlari) ustidan agregatsiya qilinadi. Plan-billing tranzaksiyalarida `_items` yo'q (bosqich to'lovi `treatment_stage_payments` orqali allocate qilinadi), shu sababli plan tushumi xizmatlarga taqsimlanmaydi va `byService`'da ko'rinmaydi.
+- **`revenueByDoctor` faqat plan-linked tushumni doktorga bog'laydi.** `treatment_plan_id` mavjud tranzaksiyalar `treatment_plans.doctorId` orqali doktorga biriktiriladi; plansiz (walk-in) tushum doktorga bog'lanmaydi va `doctorId: null` ("Belgilanmagan") sifatida qaytariladi.
+- **`slotUtilization` ish-vaqti taxminiga tayanadi.** Capacity = `branches.workHours` (kalit konvensiyasi `sun`..`sat`; sozlanmagan kun → default 540 daqiqa = 09:00–18:00; `null` kun → 0/yopiq; butun `workHours` `null` → default) × shu davrda band bo'lgan distinct doktor soni (capacity proxy — real "ish o'rni/stul" modeli yo'q). Bu taxminiy ko'rsatkich.
 
 ## Muqobillar (ko'rib chiqilgan)
 
