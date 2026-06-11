@@ -7,6 +7,7 @@ import {
   Group,
   Loader,
   Modal,
+  NumberInput,
   PasswordInput,
   Select,
   Stack,
@@ -20,11 +21,20 @@ import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth-store.ts';
-import { useTenant, useTransferOwnership, useUpdateTenant, useUsers } from '../settings.api';
+import {
+  useTenant,
+  useTenantSettings,
+  useTransferOwnership,
+  useUpdateTenant,
+  useUpdateTenantSettings,
+  useUsers,
+} from '../settings.api';
 import {
   type TenantFormValues,
+  type TenantSettingsFormValues,
   type TransferFormValues,
   tenantSchema,
+  tenantSettingsSchema,
   transferSchema,
 } from '../settings.schema';
 import { ConfirmModal } from './ConfirmModal';
@@ -35,14 +45,22 @@ export function TenantSettingsScreen() {
   const { hasPermission } = useAuthStore();
   const tenant = useTenant();
   const update = useUpdateTenant();
+  const settings = useTenantSettings();
+  const updateSettings = useUpdateTenantSettings();
   const transfer = useTransferOwnership();
   const users = useUsers();
+  const canEditSettings = hasPermission('tenant_settings.edit');
   const [transferOpened, { open: openTransfer, close: closeTransfer }] = useDisclosure(false);
   const [confirmOpened, { open: openConfirm, close: closeConfirm }] = useDisclosure(false);
 
   const form = useForm<TenantFormValues>({
     initialValues: { name: '', defaultLanguage: 'uz' },
     validate: zod4Resolver(tenantSchema),
+  });
+
+  const settingsForm = useForm<TenantSettingsFormValues>({
+    initialValues: { vertical: 'dental', currency: 'UZS', reminderLeadHours: 24 },
+    validate: zod4Resolver(tenantSettingsSchema),
   });
 
   const transferForm = useForm<TransferFormValues>({
@@ -59,6 +77,17 @@ export function TenantSettingsScreen() {
       });
     }
   }, [tenant.data]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: form.setValues stable
+  useEffect(() => {
+    if (settings.data) {
+      settingsForm.setValues({
+        vertical: (settings.data.vertical as 'dental') ?? 'dental',
+        currency: settings.data.currency ?? 'UZS',
+        reminderLeadHours: settings.data.reminderLeadHours ?? 24,
+      });
+    }
+  }, [settings.data]);
 
   if (tenant.isLoading) {
     return (
@@ -144,6 +173,51 @@ export function TenantSettingsScreen() {
                 )}
               </Stack>
             </form>
+          </Stack>
+        </Card>
+
+        <Card withBorder padding="lg" radius="md">
+          <Stack gap="md">
+            <Text fw={600}>{t('tenant_settings.clinic_section')}</Text>
+            {!canEditSettings && (
+              <Alert color="yellow" variant="light">
+                {t('tenant_settings.readonly_notice')}
+              </Alert>
+            )}
+            {settings.isLoading ? (
+              <Loader />
+            ) : (
+              <form onSubmit={settingsForm.onSubmit((values) => updateSettings.mutate(values))}>
+                <Stack gap="md">
+                  <Select
+                    label={t('tenant_settings.vertical')}
+                    data={[{ value: 'dental', label: t('tenant_settings.vertical_dental') }]}
+                    disabled={!canEditSettings}
+                    {...settingsForm.getInputProps('vertical')}
+                  />
+                  <TextInput
+                    label={t('tenant_settings.currency')}
+                    required
+                    disabled={!canEditSettings}
+                    {...settingsForm.getInputProps('currency')}
+                  />
+                  <NumberInput
+                    label={t('tenant_settings.reminder_lead_hours')}
+                    min={0}
+                    max={168}
+                    disabled={!canEditSettings}
+                    {...settingsForm.getInputProps('reminderLeadHours')}
+                  />
+                  {canEditSettings && (
+                    <Group justify="flex-end">
+                      <Button type="submit" loading={updateSettings.isPending}>
+                        {t('common.save')}
+                      </Button>
+                    </Group>
+                  )}
+                </Stack>
+              </form>
+            )}
           </Stack>
         </Card>
 

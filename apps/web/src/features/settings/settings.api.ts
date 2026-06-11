@@ -144,6 +144,23 @@ export function useUpdateTenant() {
   });
 }
 
+// --- Tenant settings (klinika sozlamalari) ---
+export function useTenantSettings() {
+  return useQuery({
+    queryKey: settingsKeys.tenantSettings(),
+    queryFn: api.tenant.getSettings,
+  });
+}
+
+export function useUpdateTenantSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { vertical?: string; reminderLeadHours?: number; currency?: string }) =>
+      api.tenant.updateSettings(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: settingsKeys.tenantSettings() }),
+  });
+}
+
 export function useTransferOwnership() {
   const qc = useQueryClient();
   return useMutation({
