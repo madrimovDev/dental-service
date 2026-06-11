@@ -1,4 +1,4 @@
-import type { Patient } from '@dental/api-client';
+import type { Patient, PatientListItem as PatientListItemDto } from '@dental/api-client';
 import type { PatientDetail, PatientListItem } from './patients.types';
 
 type TFn = (key: string) => string;
@@ -26,7 +26,7 @@ function genderLabel(g: Patient['gender'], t: TFn): string {
   return g ? t(`patients.gender.${g}`) : '';
 }
 
-export function toPatientListItem(p: Patient, t: TFn): PatientListItem {
+export function toPatientListItem(p: PatientListItemDto, t: TFn): PatientListItem {
   return {
     id: p.id,
     fullName: p.fullName,
@@ -34,6 +34,7 @@ export function toPatientListItem(p: Patient, t: TFn): PatientListItem {
     age: calcAge(p.dateOfBirth),
     genderLabel: genderLabel(p.gender, t),
     tags: p.tags ?? [],
+    balance: p.balance,
   };
 }
 

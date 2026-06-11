@@ -281,6 +281,9 @@
       "payments": "Платежи"
     },
     "payments_empty": "У этого пациента нет платежей",
+    "balance": "Баланс",
+    "balance_debt": "долг",
+    "balance_credit": "кредит",
     "form": {
       "section_main": "Основная информация",
       "full_name": "Полное имя",

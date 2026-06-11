@@ -9,6 +9,7 @@ export type PatientListItem = {
   age: number | null;
   genderLabel: string;
   tags: string[];
+  balance: number;
 };
 
 export type PatientDetail = {

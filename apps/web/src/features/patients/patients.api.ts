@@ -90,3 +90,11 @@ export function usePatientPayments(id: string) {
     enabled: !!id,
   });
 }
+
+export function usePatientBalance(id: string) {
+  return useQuery({
+    queryKey: patientKeys.balance(id),
+    queryFn: () => api.patients.balance(id),
+    enabled: !!id,
+  });
+}

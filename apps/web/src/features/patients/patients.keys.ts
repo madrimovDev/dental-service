@@ -7,4 +7,5 @@ export const patientKeys = {
   raw: (id: string) => ['patients', 'raw', id] as const,
   medical: (id: string) => ['patients', 'medical', id] as const,
   payments: (id: string) => ['patients', 'payments', id] as const,
+  balance: (id: string) => ['patients', 'balance', id] as const,
 };

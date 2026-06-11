@@ -281,6 +281,9 @@
       "payments": "To'lovlar"
     },
     "payments_empty": "Bu bemor uchun to'lovlar yo'q",
+    "balance": "Balans",
+    "balance_debt": "qarz",
+    "balance_credit": "kredit",
     "form": {
       "section_main": "Asosiy ma'lumot",
       "full_name": "To'liq ism",
