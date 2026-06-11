@@ -336,7 +336,10 @@
     "plan": "План (Treatment plan)",
     "free_notes": "Доп. комментарий",
     "empty": "Записей визитов нет",
-    "save": "Сохранить запись"
+    "save": "Сохранить запись",
+    "appointment": "Запись (визит)",
+    "no_appointment": "Без записи",
+    "selected_tooth": "Выбранный зуб"
   },
   "tooth_chart": {
     "title": "Карта зубов (Одонтограмма)",
@@ -384,7 +387,8 @@
     "empty": "Рецептов нет",
     "save": "Сохранить рецепт",
     "print": "Печать",
-    "remove_item": "Удалить"
+    "remove_item": "Удалить",
+    "duration_days_suffix": "{{days}} дн."
   },
   "consent": {
     "title": "Согласия",
@@ -444,7 +448,8 @@
     "cost": "Стоимость",
     "notes": "Заметки",
     "save": "Сохранить",
-    "empty": "Заказов нет"
+    "empty": "Заказов нет",
+    "teeth_inline": "зуб: {{teeth}}"
   },
   "image": {
     "title": "Снимки пациента",
@@ -469,7 +474,9 @@
     "drop_zone": "Перетащите файл сюда или нажмите для выбора",
     "max_size": "Макс. 30 МБ",
     "supported_formats": "JPEG, PNG, WebP, HEIC, DICOM",
-    "confirm_delete": "Подтвердите удаление снимка"
+    "confirm_delete": "Подтвердите удаление снимка",
+    "download": "Скачать",
+    "non_image_file": "Файл"
   },
   "appointments": {
     "title": "Записи",

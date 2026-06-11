@@ -1,0 +1,99 @@
+import { z } from 'zod';
+
+// ===== A: tooth chart snapshot =====
+export const toothChartSnapshotSchema = z.object({
+  isPrimaryDentition: z.boolean(),
+  notes: z.string().optional(),
+});
+
+// ===== A: treatment plan =====
+export const stageSchema = z.object({
+  serviceName: z.string().min(1),
+  toothNumbersText: z.string(),
+  estimatedVisits: z.number().min(1),
+  estimatedDurationMinutes: z.number().optional(),
+  cost: z.number().min(0),
+  notes: z.string().optional(),
+});
+
+export const treatmentPlanFormSchema = z.object({
+  title: z.string().min(1),
+  notes: z.string().optional(),
+  stages: z.array(stageSchema).min(1),
+});
+export type TreatmentPlanFormValues = z.infer<typeof treatmentPlanFormSchema>;
+export type StageFormValues = z.infer<typeof stageSchema>;
+
+// ===== A: visit note =====
+export const visitNoteFormSchema = z.object({
+  subjective: z.string().optional(),
+  objective: z.string().optional(),
+  assessmentDiagnoses: z.array(z.string()),
+  plan: z.string().optional(),
+  freeNotes: z.string().optional(),
+  appointmentId: z.string().optional(),
+});
+export type VisitNoteFormValues = z.infer<typeof visitNoteFormSchema>;
+
+// ===== B: prescription =====
+export const prescriptionItemSchema = z.object({
+  medicationName: z.string().min(1),
+  dosage: z.string().min(1),
+  frequency: z.string(),
+  durationDays: z.number().optional(),
+  instructions: z.string().optional(),
+});
+
+export const prescriptionFormSchema = z.object({
+  diagnosis: z.string().optional(),
+  notes: z.string().optional(),
+  items: z.array(prescriptionItemSchema).min(1),
+});
+export type PrescriptionFormValues = z.infer<typeof prescriptionFormSchema>;
+
+// ===== B: lab order =====
+export const labOrderItemSchema = z.object({
+  description: z.string().min(1),
+  toothNumbersText: z.string(),
+  material: z.string().optional(),
+  shade: z.string().optional(),
+  quantity: z.number().optional(),
+});
+
+export const labOrderFormSchema = z.object({
+  labName: z.string().min(1),
+  orderType: z.string(),
+  expectedDate: z.string().optional(),
+  cost: z.number().optional(),
+  notes: z.string().optional(),
+  items: z.array(labOrderItemSchema).min(1),
+});
+export type LabOrderFormValues = z.infer<typeof labOrderFormSchema>;
+
+// ===== B: consent =====
+export const consentSignFormSchema = z.object({
+  templateId: z.string().optional(),
+  type: z.string(),
+  title: z.string().min(1),
+  bodyText: z.string().min(10),
+  patientSignatureName: z.string().optional(),
+});
+export type ConsentSignFormValues = z.infer<typeof consentSignFormSchema>;
+
+export const consentTemplateFormSchema = z.object({
+  type: z.string(),
+  title: z.string().min(1),
+  bodyUz: z.string().min(10),
+  bodyRu: z.string().optional(),
+});
+export type ConsentTemplateFormValues = z.infer<typeof consentTemplateFormSchema>;
+
+// ===== C: image upload =====
+export const uploadImageFormSchema = z.object({
+  type: z.string(),
+  title: z.string().optional(),
+  description: z.string().optional(),
+  toothNumbersText: z.string(),
+  takenDate: z.string().optional(),
+});
+export type UploadImageFormValues = z.infer<typeof uploadImageFormSchema>;

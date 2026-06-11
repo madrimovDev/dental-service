@@ -336,7 +336,10 @@
     "plan": "Reja (Treatment plan)",
     "free_notes": "Qo'shimcha izoh",
     "empty": "Vizit yozuvlari yo'q",
-    "save": "Yozuvni saqlash"
+    "save": "Yozuvni saqlash",
+    "appointment": "Yozuv (uchrashuv)",
+    "no_appointment": "Yozuvsiz",
+    "selected_tooth": "Tanlangan tish"
   },
   "tooth_chart": {
     "title": "Tish kartasi (Odontogram)",
@@ -384,7 +387,8 @@
     "empty": "Reseptlar yo'q",
     "save": "Reseptni saqlash",
     "print": "Chop etish",
-    "remove_item": "Olib tashlash"
+    "remove_item": "Olib tashlash",
+    "duration_days_suffix": "{{days}} kun"
   },
   "consent": {
     "title": "Konsent formalar",
@@ -444,7 +448,8 @@
     "cost": "Narxi",
     "notes": "Eslatma",
     "save": "Saqlash",
-    "empty": "Buyurtmalar yo'q"
+    "empty": "Buyurtmalar yo'q",
+    "teeth_inline": "tish: {{teeth}}"
   },
   "image": {
     "title": "Bemor rasmlari",
@@ -469,7 +474,9 @@
     "drop_zone": "Faylni shu yerga tashlang yoki tanlash uchun bosing",
     "max_size": "Maksimal 30 MB",
     "supported_formats": "JPEG, PNG, WebP, HEIC, DICOM",
-    "confirm_delete": "Rasmni o'chirishni tasdiqlaysizmi?"
+    "confirm_delete": "Rasmni o'chirishni tasdiqlaysizmi?",
+    "download": "Yuklab olish",
+    "non_image_file": "Fayl"
   },
   "appointments": {
     "title": "Yozilishlar",
