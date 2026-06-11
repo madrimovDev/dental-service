@@ -514,7 +514,13 @@
     "in_progress": "Davom etmoqda",
     "done": "Tugatildi",
     "completed": "Bajarilgan",
-    "called_at": "Chaqirilgan"
+    "called_at": "Chaqirilgan",
+    "call": "Chaqirish",
+    "missed": "Kelmadi",
+    "from_appointment": "Yozuvdan",
+    "walk_in": "Navbat (yozuvsiz)",
+    "check_in": "Navbatga olish",
+    "no_candidates": "Bugun check-in uchun yozuv yo'q"
   },
   "services": {
     "title": "Xizmatlar katalogi",
