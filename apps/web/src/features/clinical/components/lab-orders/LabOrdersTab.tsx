@@ -1,4 +1,4 @@
-import type { LabOrderItem, LabOrderStatus, LabOrderType } from '@dental/api-client';
+import type { LabOrderStatus, LabOrderType } from '@dental/api-client';
 import { Mono, StatusPill, Tag } from '@dental/ui';
 import {
   ActionIcon,
@@ -16,13 +16,15 @@ import {
   TextInput,
   Title,
 } from '@mantine/core';
+import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
 import { IconDental, IconPlus, IconTrash } from '@tabler/icons-react';
-import { useState } from 'react';
+import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { useCreateLabOrder, useLabOrders, useUpdateLabOrderStatus } from '../../clinical.api';
 import { parseToothNumbers, toLabOrderVM } from '../../clinical.mappers';
+import { type LabOrderFormValues, labOrderFormSchema } from '../../clinical.schema';
 
 type Props = { patientId: string };
 
@@ -45,19 +47,22 @@ const STATUS_OPTIONS: LabOrderStatus[] = [
   'cancelled',
 ];
 
-type ItemDraft = LabOrderItem & { toothNumbersText: string };
-
 export function LabOrdersTab({ patientId }: Props) {
   const { t } = useTranslation();
   const { user, hasPermission } = useAuthStore();
   const [opened, { open, close }] = useDisclosure(false);
 
-  const [labName, setLabName] = useState('');
-  const [orderType, setOrderType] = useState<LabOrderType>('crown');
-  const [expectedDate, setExpectedDate] = useState('');
-  const [cost, setCost] = useState<number | undefined>(undefined);
-  const [notes, setNotes] = useState('');
-  const [items, setItems] = useState<ItemDraft[]>([]);
+  const form = useForm<LabOrderFormValues>({
+    initialValues: {
+      labName: '',
+      orderType: 'crown',
+      expectedDate: '',
+      cost: undefined,
+      notes: '',
+      items: [],
+    },
+    validate: zod4Resolver(labOrderFormSchema),
+  });
 
   const listQuery = useLabOrders(patientId);
   const createMut = useCreateLabOrder(patientId);
@@ -69,45 +74,37 @@ export function LabOrdersTab({ patientId }: Props) {
   if (!canView) return <Text c="dimmed">{t('patients.no_medical_permission')}</Text>;
 
   const addItem = () => {
-    setItems([...items, { description: '', toothNumbersText: '' }]);
+    form.insertListItem('items', { description: '', toothNumbersText: '' });
   };
 
-  const resetForm = () => {
-    setLabName('');
-    setOrderType('crown');
-    setExpectedDate('');
-    setCost(undefined);
-    setNotes('');
-    setItems([]);
-  };
-
-  const submit = () => {
+  const submit = form.onSubmit((values) => {
     if (!user) return;
     createMut.mutate(
       {
         patientId,
         doctorId: user.id,
-        labName,
-        orderType,
-        items: items.map((i) => ({
+        labName: values.labName,
+        orderType: values.orderType as LabOrderType,
+        items: values.items.map((i) => ({
           description: i.description,
           toothNumbers: i.toothNumbersText ? parseToothNumbers(i.toothNumbersText) : undefined,
-          material: i.material,
-          shade: i.shade,
+          // bo'sh string → undefined (oldingi raw-useState xulqini saqlash).
+          material: i.material || undefined,
+          shade: i.shade || undefined,
           quantity: i.quantity,
         })),
-        expectedDate: expectedDate || undefined,
-        cost,
-        notes: notes || undefined,
+        expectedDate: values.expectedDate || undefined,
+        cost: values.cost,
+        notes: values.notes || undefined,
       },
       {
         onSuccess: () => {
-          resetForm();
+          form.reset();
           close();
         },
       },
     );
-  };
+  });
 
   return (
     <Stack gap="md">
@@ -186,134 +183,105 @@ export function LabOrdersTab({ patientId }: Props) {
       ))}
 
       <Modal opened={opened} onClose={close} title={t('lab_order.create')} size="xl">
-        <Stack gap="md">
-          <Group grow>
-            <TextInput
-              label={t('lab_order.lab_name')}
-              value={labName}
-              onChange={(e) => setLabName(e.currentTarget.value)}
-              required
-            />
-            <Select
-              label={t('lab_order.order_type')}
-              data={TYPE_OPTIONS.map((tp) => ({
-                value: tp,
-                label: t(`lab_order.type_${tp}`),
-              }))}
-              value={orderType}
-              onChange={(v) => v && setOrderType(v as LabOrderType)}
-            />
-          </Group>
-          <Group grow>
-            <TextInput
-              label={t('lab_order.expected_date')}
-              type="date"
-              value={expectedDate}
-              onChange={(e) => setExpectedDate(e.currentTarget.value)}
-            />
-            <NumberInput
-              label={t('lab_order.cost')}
-              min={0}
-              value={cost}
-              onChange={(v) => setCost(typeof v === 'number' ? v : undefined)}
-            />
-          </Group>
-          <Group justify="space-between">
-            <Text fw={600}>{t('lab_order.items')}</Text>
-            <Button
-              size="xs"
-              variant="light"
-              leftSection={<IconPlus size={14} />}
-              onClick={addItem}
-            >
-              {t('lab_order.add_item')}
-            </Button>
-          </Group>
-          {items.map((it, i) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: ephemeral draft list
-            <Card withBorder key={`item-${i}`} padding="sm">
-              <Stack gap="xs">
-                <Group justify="space-between">
-                  <Text fw={600}>#{i + 1}</Text>
-                  <ActionIcon
-                    color="red"
-                    variant="subtle"
-                    onClick={() => setItems(items.filter((_, idx) => idx !== i))}
-                  >
-                    <IconTrash size={16} />
-                  </ActionIcon>
-                </Group>
-                <TextInput
-                  label={t('lab_order.description')}
-                  value={it.description}
-                  onChange={(e) => {
-                    const next = [...items];
-                    next[i] = { ...it, description: e.currentTarget.value };
-                    setItems(next);
-                  }}
-                />
-                <Group grow>
+        <form onSubmit={submit}>
+          <Stack gap="md">
+            <Group grow>
+              <TextInput
+                label={t('lab_order.lab_name')}
+                required
+                {...form.getInputProps('labName')}
+              />
+              <Select
+                label={t('lab_order.order_type')}
+                data={TYPE_OPTIONS.map((tp) => ({
+                  value: tp,
+                  label: t(`lab_order.type_${tp}`),
+                }))}
+                {...form.getInputProps('orderType')}
+              />
+            </Group>
+            <Group grow>
+              <TextInput
+                label={t('lab_order.expected_date')}
+                type="date"
+                {...form.getInputProps('expectedDate')}
+              />
+              <NumberInput
+                label={t('lab_order.cost')}
+                min={0}
+                {...form.getInputProps('cost')}
+                onChange={(v) => form.setFieldValue('cost', typeof v === 'number' ? v : undefined)}
+              />
+            </Group>
+            <Group justify="space-between">
+              <Text fw={600}>{t('lab_order.items')}</Text>
+              <Button
+                size="xs"
+                variant="light"
+                leftSection={<IconPlus size={14} />}
+                onClick={addItem}
+              >
+                {t('lab_order.add_item')}
+              </Button>
+            </Group>
+            {form.values.items.map((_, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: ephemeral draft list
+              <Card withBorder key={`item-${i}`} padding="sm">
+                <Stack gap="xs">
+                  <Group justify="space-between">
+                    <Text fw={600}>#{i + 1}</Text>
+                    <ActionIcon
+                      color="red"
+                      variant="subtle"
+                      onClick={() => form.removeListItem('items', i)}
+                    >
+                      <IconTrash size={16} />
+                    </ActionIcon>
+                  </Group>
                   <TextInput
-                    label={t('lab_order.tooth_numbers')}
-                    placeholder="26, 27"
-                    value={it.toothNumbersText}
-                    onChange={(e) => {
-                      const next = [...items];
-                      next[i] = { ...it, toothNumbersText: e.currentTarget.value };
-                      setItems(next);
-                    }}
+                    label={t('lab_order.description')}
+                    {...form.getInputProps(`items.${i}.description`)}
                   />
-                  <TextInput
-                    label={t('lab_order.material')}
-                    value={it.material ?? ''}
-                    onChange={(e) => {
-                      const next = [...items];
-                      next[i] = { ...it, material: e.currentTarget.value || undefined };
-                      setItems(next);
-                    }}
-                  />
-                  <TextInput
-                    label={t('lab_order.shade')}
-                    value={it.shade ?? ''}
-                    onChange={(e) => {
-                      const next = [...items];
-                      next[i] = { ...it, shade: e.currentTarget.value || undefined };
-                      setItems(next);
-                    }}
-                  />
-                  <NumberInput
-                    label={t('lab_order.quantity')}
-                    min={1}
-                    value={it.quantity ?? 1}
-                    onChange={(v) => {
-                      const next = [...items];
-                      next[i] = { ...it, quantity: typeof v === 'number' ? v : 1 };
-                      setItems(next);
-                    }}
-                  />
-                </Group>
-              </Stack>
-            </Card>
-          ))}
-          <Textarea
-            label={t('lab_order.notes')}
-            value={notes}
-            onChange={(e) => setNotes(e.currentTarget.value)}
-            rows={2}
-          />
-          <Group justify="flex-end">
-            <Button variant="default" onClick={close}>
-              {t('common.cancel')}
-            </Button>
-            <Button
-              onClick={submit}
-              loading={createMut.isPending}
-              disabled={!labName || items.length === 0 || items.some((i) => !i.description)}
-            >
-              {t('lab_order.save')}
-            </Button>
-          </Group>
-        </Stack>
+                  <Group grow>
+                    <TextInput
+                      label={t('lab_order.tooth_numbers')}
+                      placeholder="26, 27"
+                      {...form.getInputProps(`items.${i}.toothNumbersText`)}
+                    />
+                    <TextInput
+                      label={t('lab_order.material')}
+                      {...form.getInputProps(`items.${i}.material`)}
+                    />
+                    <TextInput
+                      label={t('lab_order.shade')}
+                      {...form.getInputProps(`items.${i}.shade`)}
+                    />
+                    <NumberInput
+                      label={t('lab_order.quantity')}
+                      min={1}
+                      {...form.getInputProps(`items.${i}.quantity`)}
+                      onChange={(v) =>
+                        form.setFieldValue(
+                          `items.${i}.quantity`,
+                          typeof v === 'number' ? v : undefined,
+                        )
+                      }
+                    />
+                  </Group>
+                </Stack>
+              </Card>
+            ))}
+            <Textarea label={t('lab_order.notes')} rows={2} {...form.getInputProps('notes')} />
+            <Group justify="flex-end">
+              <Button variant="default" onClick={close}>
+                {t('common.cancel')}
+              </Button>
+              <Button type="submit" loading={createMut.isPending} disabled={!form.isValid()}>
+                {t('lab_order.save')}
+              </Button>
+            </Group>
+          </Stack>
+        </form>
       </Modal>
     </Stack>
   );

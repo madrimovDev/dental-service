@@ -32,4 +32,29 @@ describe('ConsentTab', () => {
     // consent.select_template = "Shablon tanlang" (modal portal — async)
     expect(await screen.findByText('Shablon tanlang')).toBeInTheDocument();
   });
+
+  // Characterization: sign submit hozirgi payload shaklini saqlaydi (CLI-117 refactor guard).
+  it("sign form submit → signConsent to'g'ri shape bilan", async () => {
+    signMutate.mockClear();
+    renderApp(<ConsentTab patientId="p1" />);
+    fireEvent.click(screen.getByText('Yangi konsent imzolash'));
+    // consent.template_title = "Shablon nomi", consent.body_text = "Matn (snapshot)"
+    fireEvent.change(await screen.findByLabelText(/Shablon nomi/), {
+      target: { value: 'Konsent A' },
+    });
+    fireEvent.change(screen.getByLabelText(/Matn/), {
+      target: { value: 'Yetarlicha uzun matn' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Imzolash' }));
+    expect(signMutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        patientId: 'p1',
+        type: 'treatment',
+        title: 'Konsent A',
+        bodyText: 'Yetarlicha uzun matn',
+        language: 'uz',
+      }),
+      expect.anything(),
+    );
+  });
 });

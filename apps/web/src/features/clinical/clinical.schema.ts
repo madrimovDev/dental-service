@@ -31,7 +31,8 @@ export const visitNoteFormSchema = z.object({
   assessmentDiagnoses: z.array(z.string()),
   plan: z.string().optional(),
   freeNotes: z.string().optional(),
-  appointmentId: z.string().optional(),
+  // Select clearable `null` qaytaradi — nullable (submit'da `?? undefined`).
+  appointmentId: z.string().nullable().optional(),
 });
 export type VisitNoteFormValues = z.infer<typeof visitNoteFormSchema>;
 
@@ -72,7 +73,8 @@ export type LabOrderFormValues = z.infer<typeof labOrderFormSchema>;
 
 // ===== B: consent =====
 export const consentSignFormSchema = z.object({
-  templateId: z.string().optional(),
+  // Select clearable `null` qaytaradi — nullable (submit'da `?? undefined`).
+  templateId: z.string().nullable().optional(),
   type: z.string(),
   title: z.string().min(1),
   bodyText: z.string().min(10),

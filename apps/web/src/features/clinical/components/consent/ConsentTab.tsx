@@ -13,9 +13,10 @@ import {
   TextInput,
   Title,
 } from '@mantine/core';
+import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
 import { IconFileText, IconPlus, IconWriting } from '@tabler/icons-react';
-import { useState } from 'react';
+import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import {
@@ -25,6 +26,12 @@ import {
   useSignConsent,
 } from '../../clinical.api';
 import { templateBodyForLang, toConsentFormVM } from '../../clinical.mappers';
+import {
+  type ConsentSignFormValues,
+  type ConsentTemplateFormValues,
+  consentSignFormSchema,
+  consentTemplateFormSchema,
+} from '../../clinical.schema';
 
 type Props = { patientId: string };
 
@@ -42,25 +49,27 @@ export function ConsentTab({ patientId }: Props) {
   const [signOpened, signCtl] = useDisclosure(false);
   const [tplOpened, tplCtl] = useDisclosure(false);
 
-  const [selectedTplId, setSelectedTplId] = useState<string | null>(null);
-  const [signType, setSignType] = useState<ConsentType>('treatment');
-  const [signTitle, setSignTitle] = useState('');
-  const [signBody, setSignBody] = useState('');
-  const [signSignature, setSignSignature] = useState('');
+  const signForm = useForm<ConsentSignFormValues>({
+    initialValues: {
+      templateId: null,
+      type: 'treatment',
+      title: '',
+      bodyText: '',
+      patientSignatureName: '',
+    },
+    validate: zod4Resolver(consentSignFormSchema),
+  });
+
+  const tplForm = useForm<ConsentTemplateFormValues>({
+    initialValues: { type: 'treatment', title: '', bodyUz: '', bodyRu: '' },
+    validate: zod4Resolver(consentTemplateFormSchema),
+  });
 
   // Sign modalni yopganda formani tozalash (oldingi konsent ma'lumoti qolmasligi uchun).
   const closeSign = () => {
     signCtl.close();
-    setSignType('treatment');
-    setSignTitle('');
-    setSignBody('');
-    setSignSignature('');
+    signForm.reset();
   };
-
-  const [tplType, setTplType] = useState<ConsentType>('treatment');
-  const [tplTitle, setTplTitle] = useState('');
-  const [tplBodyUz, setTplBodyUz] = useState('');
-  const [tplBodyRu, setTplBodyRu] = useState('');
 
   const tplQuery = useConsentTemplates();
   const formsQuery = useConsentForms(patientId);
@@ -75,50 +84,49 @@ export function ConsentTab({ patientId }: Props) {
   const lang = i18n.language === 'ru' ? 'ru' : 'uz';
 
   const applyTemplate = (tpl: ConsentTemplate) => {
-    setSelectedTplId(tpl.id);
-    setSignType(tpl.type);
-    setSignTitle(tpl.title);
-    setSignBody(templateBodyForLang(tpl, lang));
+    signForm.setValues({
+      templateId: tpl.id,
+      type: tpl.type,
+      title: tpl.title,
+      bodyText: templateBodyForLang(tpl, lang),
+    });
   };
 
-  const createTemplate = () => {
+  const createTemplate = tplForm.onSubmit((values) => {
     createTplMut.mutate(
       {
-        type: tplType,
-        title: tplTitle,
-        bodyUz: tplBodyUz,
-        bodyRu: tplBodyRu || undefined,
+        type: values.type as ConsentType,
+        title: values.title,
+        bodyUz: values.bodyUz,
+        bodyRu: values.bodyRu || undefined,
       },
       {
         onSuccess: () => {
-          setTplTitle('');
-          setTplBodyUz('');
-          setTplBodyRu('');
+          tplForm.reset();
           tplCtl.close();
         },
       },
     );
-  };
+  });
 
-  const sign = () => {
+  const sign = signForm.onSubmit((values) => {
     signMut.mutate(
       {
         patientId,
-        templateId: selectedTplId ?? undefined,
-        type: signType,
-        title: signTitle,
-        bodyText: signBody,
+        templateId: values.templateId ?? undefined,
+        type: values.type as ConsentType,
+        title: values.title,
+        bodyText: values.bodyText,
         language: lang,
-        patientSignatureName: signSignature || undefined,
+        patientSignatureName: values.patientSignatureName || undefined,
       },
       {
         onSuccess: () => {
-          setSelectedTplId(null);
           closeSign();
         },
       },
     );
-  };
+  });
 
   return (
     <Stack gap="md">
@@ -171,65 +179,59 @@ export function ConsentTab({ patientId }: Props) {
 
       {/* Sign form modal */}
       <Modal opened={signOpened} onClose={closeSign} title={t('consent.sign_new')} size="xl">
-        <Stack gap="md">
-          {tplQuery.data && tplQuery.data.length > 0 ? (
+        <form onSubmit={sign}>
+          <Stack gap="md">
+            {tplQuery.data && tplQuery.data.length > 0 ? (
+              <Select
+                label={t('consent.select_template')}
+                placeholder={t('common.select')}
+                data={tplQuery.data.map((tpl) => ({
+                  value: tpl.id,
+                  label: `${t(`consent.type_${tpl.type}`)} — ${tpl.title}`,
+                }))}
+                clearable
+                value={signForm.values.templateId}
+                onChange={(v) => {
+                  signForm.setFieldValue('templateId', v);
+                  if (v) {
+                    const tpl = tplQuery.data?.find((x) => x.id === v);
+                    if (tpl) applyTemplate(tpl);
+                  }
+                }}
+              />
+            ) : (
+              <Text c="dimmed">{t('consent.no_templates')}</Text>
+            )}
             <Select
-              label={t('consent.select_template')}
-              placeholder={t('common.select')}
-              data={tplQuery.data.map((tpl) => ({
-                value: tpl.id,
-                label: `${t(`consent.type_${tpl.type}`)} — ${tpl.title}`,
-              }))}
-              clearable
-              value={selectedTplId}
-              onChange={(v) => {
-                setSelectedTplId(v);
-                if (v) {
-                  const tpl = tplQuery.data?.find((x) => x.id === v);
-                  if (tpl) applyTemplate(tpl);
-                }
-              }}
+              label={t('consent.type')}
+              data={TYPE_OPTIONS.map((tp) => ({ value: tp, label: t(`consent.type_${tp}`) }))}
+              {...signForm.getInputProps('type')}
             />
-          ) : (
-            <Text c="dimmed">{t('consent.no_templates')}</Text>
-          )}
-          <Select
-            label={t('consent.type')}
-            data={TYPE_OPTIONS.map((tp) => ({ value: tp, label: t(`consent.type_${tp}`) }))}
-            value={signType}
-            onChange={(v) => v && setSignType(v as ConsentType)}
-          />
-          <TextInput
-            label={t('consent.template_title')}
-            value={signTitle}
-            onChange={(e) => setSignTitle(e.currentTarget.value)}
-            required
-          />
-          <Textarea
-            label={t('consent.body_text')}
-            value={signBody}
-            onChange={(e) => setSignBody(e.currentTarget.value)}
-            rows={10}
-            required
-          />
-          <TextInput
-            label={t('consent.patient_signature_name')}
-            value={signSignature}
-            onChange={(e) => setSignSignature(e.currentTarget.value)}
-          />
-          <Group justify="flex-end">
-            <Button variant="default" onClick={closeSign}>
-              {t('common.cancel')}
-            </Button>
-            <Button
-              onClick={sign}
-              loading={signMut.isPending}
-              disabled={!signTitle || signBody.length < 10}
-            >
-              {t('consent.sign')}
-            </Button>
-          </Group>
-        </Stack>
+            <TextInput
+              label={t('consent.template_title')}
+              required
+              {...signForm.getInputProps('title')}
+            />
+            <Textarea
+              label={t('consent.body_text')}
+              rows={10}
+              required
+              {...signForm.getInputProps('bodyText')}
+            />
+            <TextInput
+              label={t('consent.patient_signature_name')}
+              {...signForm.getInputProps('patientSignatureName')}
+            />
+            <Group justify="flex-end">
+              <Button variant="default" onClick={closeSign}>
+                {t('common.cancel')}
+              </Button>
+              <Button type="submit" loading={signMut.isPending} disabled={!signForm.isValid()}>
+                {t('consent.sign')}
+              </Button>
+            </Group>
+          </Stack>
+        </form>
       </Modal>
 
       {/* Template create modal */}
@@ -239,45 +241,35 @@ export function ConsentTab({ patientId }: Props) {
         title={t('consent.create_template')}
         size="xl"
       >
-        <Stack gap="md">
-          <Select
-            label={t('consent.type')}
-            data={TYPE_OPTIONS.map((tp) => ({ value: tp, label: t(`consent.type_${tp}`) }))}
-            value={tplType}
-            onChange={(v) => v && setTplType(v as ConsentType)}
-          />
-          <TextInput
-            label={t('consent.template_title')}
-            value={tplTitle}
-            onChange={(e) => setTplTitle(e.currentTarget.value)}
-            required
-          />
-          <Textarea
-            label={t('consent.body_uz')}
-            value={tplBodyUz}
-            onChange={(e) => setTplBodyUz(e.currentTarget.value)}
-            rows={8}
-            required
-          />
-          <Textarea
-            label={t('consent.body_ru')}
-            value={tplBodyRu}
-            onChange={(e) => setTplBodyRu(e.currentTarget.value)}
-            rows={8}
-          />
-          <Group justify="flex-end">
-            <Button variant="default" onClick={tplCtl.close}>
-              {t('common.cancel')}
-            </Button>
-            <Button
-              onClick={createTemplate}
-              loading={createTplMut.isPending}
-              disabled={!tplTitle || tplBodyUz.length < 10}
-            >
-              {t('common.save')}
-            </Button>
-          </Group>
-        </Stack>
+        <form onSubmit={createTemplate}>
+          <Stack gap="md">
+            <Select
+              label={t('consent.type')}
+              data={TYPE_OPTIONS.map((tp) => ({ value: tp, label: t(`consent.type_${tp}`) }))}
+              {...tplForm.getInputProps('type')}
+            />
+            <TextInput
+              label={t('consent.template_title')}
+              required
+              {...tplForm.getInputProps('title')}
+            />
+            <Textarea
+              label={t('consent.body_uz')}
+              rows={8}
+              required
+              {...tplForm.getInputProps('bodyUz')}
+            />
+            <Textarea label={t('consent.body_ru')} rows={8} {...tplForm.getInputProps('bodyRu')} />
+            <Group justify="flex-end">
+              <Button variant="default" onClick={tplCtl.close}>
+                {t('common.cancel')}
+              </Button>
+              <Button type="submit" loading={createTplMut.isPending} disabled={!tplForm.isValid()}>
+                {t('common.save')}
+              </Button>
+            </Group>
+          </Stack>
+        </form>
       </Modal>
     </Stack>
   );
