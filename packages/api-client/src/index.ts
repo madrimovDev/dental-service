@@ -2,6 +2,8 @@ export type { ApiClient, ApiClientConfig } from './client.ts';
 export { ApiError, createApiClient } from './client.ts';
 export type { Endpoints } from './endpoints.ts';
 export { createEndpoints } from './endpoints.ts';
+export type { CustomInstanceConfig } from './mutator.ts';
+export { configureClient, customInstance, isClientConfigured } from './mutator.ts';
 export * from './types.ts';
 export * from './types-audit.ts';
 export * from './types-clinical.ts';

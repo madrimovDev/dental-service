@@ -77,7 +77,12 @@ export const createApiClient = (config: ApiClientConfig) => {
     return parsed.data;
   };
 
-  const fetchWithAuth = async (method: string, path: string, body?: unknown): Promise<Response> => {
+  const fetchWithAuth = async (
+    method: string,
+    path: string,
+    body?: unknown,
+    signal?: AbortSignal,
+  ): Promise<Response> => {
     const headers = new Headers();
     if (body !== undefined) headers.set('Content-Type', 'application/json');
     const token = config.getAccessToken();
@@ -87,6 +92,7 @@ export const createApiClient = (config: ApiClientConfig) => {
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
       credentials: 'include',
+      signal,
     });
   };
 
@@ -107,14 +113,15 @@ export const createApiClient = (config: ApiClientConfig) => {
     method: string,
     path: string,
     body?: unknown,
+    signal?: AbortSignal,
   ): Promise<{ parsed: ApiResponse<T>; status: number }> => {
-    let res = await fetchWithAuth(method, path, body);
+    let res = await fetchWithAuth(method, path, body, signal);
     let parsed = await parseResponse<T>(res);
     if (!parsed.success && res.status === 401 && parsed.error.code === 'auth.invalid_token') {
       if (path !== '/api/auth/refresh') {
         const refreshed = await tryRefresh();
         if (refreshed) {
-          res = await fetchWithAuth(method, path, body);
+          res = await fetchWithAuth(method, path, body, signal);
           parsed = await parseResponse<T>(res);
         } else {
           config.onUnauthorized?.();
@@ -137,8 +144,9 @@ export const createApiClient = (config: ApiClientConfig) => {
     method: string,
     path: string,
     body?: unknown,
+    signal?: AbortSignal,
   ): Promise<{ success: true; data: T }> => {
-    const { parsed, status } = await fetchEnvelope<T>(method, path, body);
+    const { parsed, status } = await fetchEnvelope<T>(method, path, body, signal);
     if (!parsed.success) {
       throw new ApiError(parsed.error.code, parsed.error.message, status, parsed.error.details);
     }

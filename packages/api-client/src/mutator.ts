@@ -30,14 +30,14 @@ export const customInstance = async <T>(config: CustomInstanceConfig): Promise<T
     throw new Error("api-client not configured — configureClient() ni startup'da chaqiring");
   }
   const qs = config.params
-    ? `?${new URLSearchParams(
+    ? new URLSearchParams(
         Object.entries(config.params)
           .filter(([, v]) => v !== undefined)
           .map(([k, v]) => [k, String(v)]),
-      ).toString()}`
+      ).toString()
     : '';
-  const path = `${config.url}${qs}`;
+  const path = qs ? `${config.url}?${qs}` : config.url;
   const method = config.method.toUpperCase();
   // requestRaw `{success,data}` envelope qaytaradi — generated T = envelope.
-  return client.requestRaw(method, path, config.data) as Promise<T>;
+  return client.requestRaw(method, path, config.data, config.signal) as Promise<T>;
 };
