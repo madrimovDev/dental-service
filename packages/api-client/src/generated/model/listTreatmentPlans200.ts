@@ -4,9 +4,9 @@
  * Dental Service API
  * OpenAPI spec version: 0.1.0
  */
-import type { TreatmentPlan } from './treatmentPlan';
+import type { TreatmentPlanWithStages } from './treatmentPlanWithStages';
 
 export type ListTreatmentPlans200 = {
   success: boolean;
-  data: TreatmentPlan[];
+  data: TreatmentPlanWithStages[];
 };

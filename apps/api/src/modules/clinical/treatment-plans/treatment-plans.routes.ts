@@ -15,6 +15,7 @@ import {
   updateStageSchema,
   updateTreatmentPlanSchema,
 } from './treatment-plans.schema.ts';
+// CLI-114: list endi har planning stage'larini nested qaytaradi (N+1 oldini olish).
 import { createTreatmentPlansService } from './treatment-plans.service.ts';
 
 /** Standart 404 — plan not found */
@@ -48,13 +49,16 @@ export const treatmentPlansRoutes = (deps: { audit: AuditLogger }) => {
     request: {
       query: listPlansQuerySchema,
     },
-    responses: okJson(z.array(treatmentPlanDtoSchema), 'List of treatment plans'),
+    responses: okJson(
+      z.array(treatmentPlanWithStagesDtoSchema),
+      'List of treatment plans with nested stages',
+    ),
   });
 
   app.openapi(listRoute, async (c) => {
     const { patientId } = c.req.valid('query');
     const rows = await service.listPlans(c, patientId);
-    return c.json(ok(rows.map(toPlanDto)), 200);
+    return c.json(ok(rows.map(toPlanWithStagesDto)), 200);
   });
 
   // ─── POST /treatment-plans — create ───────────────────────────────────────

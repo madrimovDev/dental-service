@@ -12,11 +12,12 @@ vi.mock('../../clinical.api', () => ({
         status: 'in_progress',
         totalCost: '1500000',
         totalVisits: 3,
+        // CLI-114: stage'lar endi list javobida (PlanCard plan.stages o'qiydi).
+        stages: [],
       },
     ],
     isLoading: false,
   }),
-  usePlanDetail: () => ({ data: { stages: [] } }),
   useCreatePlan: () => ({ mutate: vi.fn(), isPending: false }),
   useUpdateStage: () => ({ mutate: vi.fn() }),
 }));

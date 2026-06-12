@@ -13,7 +13,6 @@ import {
   createVisitNote,
   deletePatientImage,
   getLatestToothChart,
-  getTreatmentPlan,
   type LabOrderStatus,
   listAppointments,
   listConsentForms,
@@ -60,13 +59,6 @@ export function useTreatmentPlans(patientId: string) {
   });
 }
 
-export function usePlanDetail(planId: string) {
-  return useQuery({
-    queryKey: clinicalKeys.planDetail(planId),
-    queryFn: () => getTreatmentPlan(planId).then((r) => r.data),
-  });
-}
-
 export function useCreatePlan(patientId: string) {
   const qc = useQueryClient();
   return useMutation({
@@ -81,8 +73,8 @@ export function useUpdateStage(patientId: string) {
     mutationFn: ({ id, status }: { id: string; status: TreatmentStageStatus }) =>
       updateTreatmentStage(id, { status }).then((r) => r.data),
     onSuccess: () => {
+      // CLI-114: stage'lar list javobida — plans'ni invalidatsiya qilish yetarli.
       void qc.invalidateQueries({ queryKey: clinicalKeys.plans(patientId) });
-      void qc.invalidateQueries({ queryKey: ['clinical', 'plan-detail'] });
     },
   });
 }
