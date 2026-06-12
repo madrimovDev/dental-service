@@ -1,4 +1,4 @@
-import { ApiError } from '@dental/api-client';
+import { ApiError, changePassword } from '@dental/api-client';
 import {
   Alert,
   Button,
@@ -18,7 +18,6 @@ import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
-import { api } from '@/lib/api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
 
 const passwordSchema = z
@@ -44,7 +43,10 @@ export function ProfilePage() {
 
   const changeMut = useMutation({
     mutationFn: (values: typeof form.values) =>
-      api.auth.changePassword(values.currentPassword, values.newPassword),
+      changePassword({
+        currentPassword: values.currentPassword,
+        newPassword: values.newPassword,
+      }).then((r) => r.data),
     onSuccess: () => {
       notifications.show({
         title: t('profile.title'),

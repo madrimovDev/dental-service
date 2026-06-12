@@ -1,4 +1,4 @@
-import type { ApiError } from '@dental/api-client';
+import { type ApiError, registerTenant } from '@dental/api-client';
 import {
   Alert,
   Anchor,
@@ -19,7 +19,6 @@ import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { PhoneInput } from '@/components/PhoneInput.tsx';
-import { api } from '@/lib/api.ts';
 
 const schema = z.object({
   tenantName: z.string().min(2, 'Kamida 2 belgi').max(120),
@@ -49,13 +48,13 @@ export function RegisterTenantPage() {
 
   const registerMut = useMutation({
     mutationFn: (values: FormValues) =>
-      api.auth.registerTenant({
+      registerTenant({
         tenantName: values.tenantName,
         ownerPhone: values.ownerPhone,
         ownerFullName: values.ownerFullName,
         ownerPassword: values.ownerPassword,
         defaultLanguage: values.defaultLanguage,
-      }),
+      }).then((r) => r.data),
     onSuccess: () => {
       navigate('/login');
     },

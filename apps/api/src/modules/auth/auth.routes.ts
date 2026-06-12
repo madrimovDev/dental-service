@@ -1,32 +1,74 @@
 import { fail, ok } from '@dental/core';
-import { Hono } from 'hono';
-import { HTTPException } from 'hono/http-exception';
+import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import type { Database } from '../../db/client.ts';
+import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import {
+  toLoginDto,
+  toMembershipsDto,
+  toRegisterTenantDto,
+  toTokenPairDto,
+} from './auth.mapper.ts';
+import {
+  changePasswordResponseSchema,
   changePasswordSchema,
+  loginResponseSchema,
   loginSchema,
+  logoutResponseSchema,
+  logoutSchema,
+  membershipsResponseSchema,
+  passwordResetRequestResponseSchema,
   passwordResetRequestSchema,
+  passwordResetResponseSchema,
   passwordResetSchema,
   refreshSchema,
+  registerTenantResponseSchema,
   registerTenantSchema,
   switchWorkspaceSchema,
+  tokenPairResponseSchema,
 } from './auth.schema.ts';
 import { createAuthService } from './auth.service.ts';
 
+/** Error response entry yasash helper'i (per-status declare uchun). */
+const errResp = (description: string) => ({
+  content: { 'application/json': { schema: errorResponseSchema } },
+  description,
+});
+
 export const authRoutes = (deps: { db: Database }) => {
-  const app = new Hono();
+  // ⚠️ Auth modul app-level rlsMiddleware ISHLATMAYDI. Public route'lar auth'siz;
+  // himoyalangan route'lar (/me, /switch-workspace, /change-password) PER-ROUTE
+  // authMiddleware() bilan.
+  const app = new OpenAPIHono();
   const service = createAuthService(deps);
 
-  // POST /auth/register-tenant — public
-  app.post('/register-tenant', async (c) => {
-    const body = registerTenantSchema.safeParse(await c.req.json());
-    if (!body.success) {
-      throw new HTTPException(400, { message: 'Invalid input' });
-    }
+  // ─── POST /register-tenant — public ──────────────────────────────────────
+
+  const registerTenantRoute = createRoute({
+    method: 'post',
+    path: '/register-tenant',
+    tags: ['auth'],
+    operationId: 'registerTenant',
+    request: {
+      body: { content: { 'application/json': { schema: registerTenantSchema } } },
+    },
+    responses: {
+      201: {
+        content: {
+          'application/json': { schema: apiResponseSchema(registerTenantResponseSchema) },
+        },
+        description: 'Tenant registered',
+      },
+      400: errResp('Validation error'),
+      409: errResp('Phone already registered'),
+    },
+  });
+
+  app.openapi(registerTenantRoute, async (c) => {
+    const body = c.req.valid('json');
     try {
-      const result = await service.registerTenant(body.data);
-      return c.json(ok(result), 201);
+      const result = await service.registerTenant(body);
+      return c.json(ok(toRegisterTenantDto(result)), 201);
     } catch (err: unknown) {
       // Drizzle DrizzleQueryError'da haqiqiy postgres xato cause ichida bo'ladi
       const stack =
@@ -43,66 +85,119 @@ export const authRoutes = (deps: { db: Database }) => {
     }
   });
 
-  // POST /auth/login — public
-  app.post('/login', async (c) => {
-    const body = loginSchema.safeParse(await c.req.json());
-    if (!body.success) {
-      throw new HTTPException(400, { message: 'Invalid input' });
-    }
-    const result = await service.login(body.data);
+  // ─── POST /login — public ────────────────────────────────────────────────
+
+  const loginRoute = createRoute({
+    method: 'post',
+    path: '/login',
+    tags: ['auth'],
+    operationId: 'login',
+    request: {
+      body: { content: { 'application/json': { schema: loginSchema } } },
+    },
+    responses: okJson(loginResponseSchema, 'Login successful'),
+  });
+
+  app.openapi(loginRoute, async (c) => {
+    const body = c.req.valid('json');
+    const result = await service.login(body);
     if (!result) {
       return c.json(fail('auth.invalid_credentials', "Email/telefon yoki parol noto'g'ri"), 401);
     }
-    return c.json(ok(result));
+    return c.json(ok(toLoginDto(result)), 200);
   });
 
-  // POST /auth/refresh — public (token bo'lsa)
-  app.post('/refresh', async (c) => {
-    const body = refreshSchema.safeParse(await c.req.json());
-    if (!body.success) {
-      throw new HTTPException(400, { message: 'Invalid input' });
-    }
-    const result = await service.refresh(body.data);
+  // ─── POST /refresh — public (token bo'lsa) ───────────────────────────────
+
+  const refreshRoute = createRoute({
+    method: 'post',
+    path: '/refresh',
+    tags: ['auth'],
+    operationId: 'refresh',
+    request: {
+      body: { content: { 'application/json': { schema: refreshSchema } } },
+    },
+    responses: okJson(tokenPairResponseSchema, 'Token refreshed'),
+  });
+
+  app.openapi(refreshRoute, async (c) => {
+    const body = c.req.valid('json');
+    const result = await service.refresh(body);
     if (!result) {
       return c.json(
         fail('auth.invalid_refresh', "Refresh token noto'g'ri yoki muddati tugagan"),
         401,
       );
     }
-    return c.json(ok(result));
+    return c.json(ok(toTokenPairDto(result)), 200);
   });
 
-  // POST /auth/logout — public (refresh token bilan)
-  app.post('/logout', async (c) => {
-    const body = refreshSchema.safeParse(await c.req.json());
-    if (!body.success) {
-      return c.json(ok({ loggedOut: true }));
+  // ─── POST /logout — public (refresh token bilan) ─────────────────────────
+
+  const logoutRoute = createRoute({
+    method: 'post',
+    path: '/logout',
+    tags: ['auth'],
+    operationId: 'logout',
+    request: {
+      body: { content: { 'application/json': { schema: logoutSchema } } },
+    },
+    responses: okJson(logoutResponseSchema, 'Logged out'),
+  });
+
+  app.openapi(logoutRoute, async (c) => {
+    // ⚠️ Tolerant: refreshToken yo'q bo'lsa ham 200 (hand `endpoints.ts` xulqi).
+    const body = c.req.valid('json');
+    if (body.refreshToken) {
+      await service.logout(body.refreshToken);
     }
-    await service.logout(body.data.refreshToken);
-    return c.json(ok({ loggedOut: true }));
+    return c.json(ok({ loggedOut: true as const }), 200);
   });
 
-  // GET /auth/me — auth required
-  app.get('/me', authMiddleware(), async (c) => {
+  // ─── GET /me — auth required ─────────────────────────────────────────────
+
+  const meRoute = createRoute({
+    method: 'get',
+    path: '/me',
+    tags: ['auth'],
+    operationId: 'getMe',
+    middleware: [authMiddleware()] as const,
+    responses: okJson(membershipsResponseSchema, 'Current user memberships'),
+  });
+
+  app.openapi(meRoute, async (c) => {
     const user = c.get('user');
     if (!user) {
       return c.json(fail('auth.required', 'Authentication required'), 401);
     }
     const memberships = await service.getMemberships(user.id);
-    return c.json(ok({ userId: user.id, ...memberships }));
+    return c.json(ok(toMembershipsDto(user.id, memberships)), 200);
   });
 
-  // POST /auth/switch-workspace — auth required (no workspace yet OK)
-  app.post('/switch-workspace', authMiddleware(), async (c) => {
+  // ─── POST /switch-workspace — auth required (no workspace yet OK) ─────────
+
+  const switchWorkspaceRoute = createRoute({
+    method: 'post',
+    path: '/switch-workspace',
+    tags: ['auth'],
+    operationId: 'switchWorkspace',
+    middleware: [authMiddleware()] as const,
+    request: {
+      body: { content: { 'application/json': { schema: switchWorkspaceSchema } } },
+    },
+    responses: {
+      ...okJson(tokenPairResponseSchema, 'Workspace switched'),
+      404: errResp('User not found'),
+    },
+  });
+
+  app.openapi(switchWorkspaceRoute, async (c) => {
     const user = c.get('user');
     if (!user) {
       return c.json(fail('auth.required', 'Authentication required'), 401);
     }
-    const body = switchWorkspaceSchema.safeParse(await c.req.json());
-    if (!body.success) {
-      throw new HTTPException(400, { message: 'Invalid input' });
-    }
-    const result = await service.switchWorkspace(user.id, body.data);
+    const body = c.req.valid('json');
+    const result = await service.switchWorkspace(user.id, body);
     if (!result.ok) {
       const msgs: Record<string, [string, number]> = {
         'auth.invalid_refresh': ["Refresh token noto'g'ri yoki muddati tugagan", 401],
@@ -115,48 +210,73 @@ export const authRoutes = (deps: { db: Database }) => {
       const [msg, status] = msgs[result.code] ?? ['Workspace switch failed', 403];
       return c.json(fail(result.code, msg), status as 400 | 401 | 403 | 404);
     }
-    return c.json(
-      ok({
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
-        accessExpiresAt: result.accessExpiresAt,
-      }),
-    );
+    return c.json(ok(toTokenPairDto(result)), 200);
   });
 
-  // POST /auth/password-reset-request — public, mock OTP
-  app.post('/password-reset-request', async (c) => {
-    const body = passwordResetRequestSchema.safeParse(await c.req.json());
-    if (!body.success) {
-      throw new HTTPException(400, { message: 'Invalid input' });
-    }
-    const result = await service.requestPasswordReset(body.data);
-    return c.json(ok(result));
+  // ─── POST /password-reset-request — public, mock OTP ─────────────────────
+
+  const passwordResetRequestRoute = createRoute({
+    method: 'post',
+    path: '/password-reset-request',
+    tags: ['auth'],
+    operationId: 'passwordResetRequest',
+    request: {
+      body: { content: { 'application/json': { schema: passwordResetRequestSchema } } },
+    },
+    responses: okJson(passwordResetRequestResponseSchema, 'Reset code sent (if user exists)'),
   });
 
-  // POST /auth/password-reset — public
-  app.post('/password-reset', async (c) => {
-    const body = passwordResetSchema.safeParse(await c.req.json());
-    if (!body.success) {
-      throw new HTTPException(400, { message: 'Invalid input' });
-    }
-    const result = await service.resetPassword(body.data);
+  app.openapi(passwordResetRequestRoute, async (c) => {
+    const body = c.req.valid('json');
+    await service.requestPasswordReset(body);
+    return c.json(ok({ sent: true as const }), 200);
+  });
+
+  // ─── POST /password-reset — public ───────────────────────────────────────
+
+  const passwordResetRoute = createRoute({
+    method: 'post',
+    path: '/password-reset',
+    tags: ['auth'],
+    operationId: 'passwordReset',
+    request: {
+      body: { content: { 'application/json': { schema: passwordResetSchema } } },
+    },
+    responses: okJson(passwordResetResponseSchema, 'Password reset'),
+  });
+
+  app.openapi(passwordResetRoute, async (c) => {
+    const body = c.req.valid('json');
+    const result = await service.resetPassword(body);
     if (!result) {
       return c.json(fail('auth.invalid_reset_token', "Token noto'g'ri yoki muddati tugagan"), 400);
     }
-    return c.json(ok(result));
+    return c.json(ok({ ok: true as const }), 200);
   });
 
-  // POST /auth/change-password — authenticated, joriy parol bilan
-  app.post('/change-password', authMiddleware(), async (c) => {
+  // ─── POST /change-password — authenticated, joriy parol bilan ────────────
+
+  const changePasswordRoute = createRoute({
+    method: 'post',
+    path: '/change-password',
+    tags: ['auth'],
+    operationId: 'changePassword',
+    middleware: [authMiddleware()] as const,
+    request: {
+      body: { content: { 'application/json': { schema: changePasswordSchema } } },
+    },
+    responses: {
+      ...okJson(changePasswordResponseSchema, 'Password changed'),
+      404: errResp('User not found'),
+    },
+  });
+
+  app.openapi(changePasswordRoute, async (c) => {
     const user = c.get('user');
     if (!user) return c.json(fail('auth.required', 'Authentication required'), 401);
 
-    const body = changePasswordSchema.safeParse(await c.req.json());
-    if (!body.success) {
-      throw new HTTPException(400, { message: 'Invalid input' });
-    }
-    const result = await service.changePassword(user.id, body.data);
+    const body = c.req.valid('json');
+    const result = await service.changePassword(user.id, body);
     if (!result.ok) {
       const msgs: Record<string, [string, number]> = {
         'auth.invalid_current_password': ["Joriy parol noto'g'ri", 400],
@@ -166,7 +286,7 @@ export const authRoutes = (deps: { db: Database }) => {
       const [msg, status] = msgs[result.code] ?? ['Change password failed', 400];
       return c.json(fail(result.code, msg), status as 400 | 404);
     }
-    return c.json(ok({ changed: true }));
+    return c.json(ok({ changed: true as const }), 200);
   });
 
   return app;

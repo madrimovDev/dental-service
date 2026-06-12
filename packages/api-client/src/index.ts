@@ -20,6 +20,29 @@ export {
 export type { ListAuditLogResult } from './generated/audit/audit.ts';
 // Generated (orval) — explicit re-export (coexistence: kolliziya nazorati)
 export { listAuditLog } from './generated/audit/audit.ts';
+// Generated (orval) — auth
+export type {
+  ChangePasswordResult,
+  GetMeResult,
+  LoginResult,
+  LogoutResult,
+  PasswordResetRequestResult,
+  PasswordResetResult,
+  RefreshResult,
+  RegisterTenantResult,
+  SwitchWorkspaceResult,
+} from './generated/auth/auth.ts';
+export {
+  changePassword,
+  getMe,
+  login,
+  logout,
+  passwordReset,
+  passwordResetRequest,
+  refresh,
+  registerTenant,
+  switchWorkspace,
+} from './generated/auth/auth.ts';
 export type {
   CreateBranchResult,
   DeleteBranchResult,

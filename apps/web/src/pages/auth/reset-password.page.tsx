@@ -1,3 +1,4 @@
+import { passwordReset } from '@dental/api-client';
 import {
   Alert,
   Anchor,
@@ -16,7 +17,6 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
-import { api } from '@/lib/api.ts';
 
 const schema = z.object({
   token: z.string().min(1),
@@ -35,7 +35,7 @@ export function ResetPasswordPage() {
 
   const mut = useMutation({
     mutationFn: (v: { token: string; newPassword: string }) =>
-      api.auth.resetPassword(v.token, v.newPassword),
+      passwordReset({ token: v.token, newPassword: v.newPassword }).then((r) => r.data),
     onSuccess: () => navigate('/login'),
     onError: () => setError(t('auth.reset.invalid')),
   });
