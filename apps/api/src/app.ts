@@ -1,5 +1,5 @@
 import { createSmsChannel } from '@dental/notifications';
-import { Hono } from 'hono';
+import { OpenAPIHono } from '@hono/zod-openapi';
 import { cors } from 'hono/cors';
 import { db } from './db/client.ts';
 import { createAuditLogger } from './lib/audit-logger.ts';
@@ -32,7 +32,7 @@ import { tenantRoutes } from './modules/tenants/index.ts';
 import { userRoutes } from './modules/users/index.ts';
 
 export const createApp = () => {
-  const app = new Hono();
+  const app = new OpenAPIHono();
   const audit = createAuditLogger({ db });
 
   // Global middleware
