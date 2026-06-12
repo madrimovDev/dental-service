@@ -135,6 +135,7 @@ export {
 // Generated model types — appointments, services, queue, notifications
 // QueueTicketStatus re-exported under both names for backward compatibility
 export type {
+  AllergyEntry,
   Appointment,
   AppointmentStatsReport,
   AppointmentStatus,
@@ -150,6 +151,10 @@ export type {
   BranchWorkHoursAnyOfTwo,
   CancelAppointment200,
   CancelAppointmentBody,
+  CashierTransaction,
+  CashierTransactionPaymentMethod as PaymentMethod,
+  CashierTransactionStatus as TransactionStatus,
+  CashierTransactionType as TransactionType,
   CheckInCandidate,
   CheckInCandidateStatus,
   ConsentForm,
@@ -191,6 +196,7 @@ export type {
   CreateTreatmentPlanBodyStagesItem,
   CreateVisitNote201,
   CreateVisitNoteBody,
+  DailySummary,
   DeleteAssignmentResult,
   DeleteBranch200,
   DeletePrescription200,
@@ -260,6 +266,9 @@ export type {
   NotificationMarkReadResult,
   NotificationsFeed,
   NotificationsFeedMeta,
+  Patient,
+  PatientGender as Gender,
+  PatientListItem,
   PatientRelativeView,
   PayrollLine,
   PayrollRun,
@@ -267,6 +276,7 @@ export type {
   PayrollRunWithLines,
   PayrollRunWithLinesAllOf,
   PermissionDef,
+  PlanBalance,
   PlanCompletionReport,
   Prescription,
   PrescriptionDeleteResult,
@@ -297,6 +307,7 @@ export type {
   SignConsentFormBodyType,
   StaffProfile,
   StaffProfileEmploymentStatus,
+  StageBalance,
   StockItem,
   StockItemWithLowStock,
   StockMovement,
@@ -612,6 +623,4 @@ export {
 export type { CustomInstanceConfig } from './mutator.ts';
 export { configureClient, customInstance, isClientConfigured } from './mutator.ts';
 export * from './types-clinical.ts';
-export * from './types-m3.ts';
 export * from './types-m5.ts';
-export * from './types-patients.ts';
