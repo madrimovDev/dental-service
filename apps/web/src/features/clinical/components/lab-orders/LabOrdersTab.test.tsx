@@ -1,9 +1,10 @@
-import { screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { renderApp } from '../../../../test-utils';
 import { LabOrdersTab } from './LabOrdersTab';
 
 const updateMutate = vi.fn();
+const createMutate = vi.fn();
 vi.mock('../../clinical.api', () => ({
   useLabOrders: () => ({
     data: [
@@ -29,7 +30,7 @@ vi.mock('../../clinical.api', () => ({
     ],
     isLoading: false,
   }),
-  useCreateLabOrder: () => ({ mutate: vi.fn(), isPending: false }),
+  useCreateLabOrder: () => ({ mutate: createMutate, isPending: false }),
   useUpdateLabOrderStatus: () => ({ mutate: updateMutate }),
 }));
 vi.mock('@/stores/auth-store.ts', () => ({
@@ -40,5 +41,28 @@ describe('LabOrdersTab', () => {
   it('lab nomini va status pill ni render qiladi', () => {
     renderApp(<LabOrdersTab patientId="p1" />);
     expect(screen.getByText('Lab X')).toBeInTheDocument();
+  });
+
+  // Characterization: create-modal submit hozirgi payload shaklini saqlaydi (CLI-117 refactor guard).
+  it("create form submit → createLabOrder to'g'ri shape bilan", async () => {
+    createMutate.mockClear();
+    renderApp(<LabOrdersTab patientId="p1" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Yangi buyurtma' }));
+    fireEvent.change(await screen.findByLabelText(/Laboratoriya nomi/), {
+      target: { value: 'Lab Z' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: "Element qo'shish" }));
+    fireEvent.change(screen.getByLabelText('Tavsif'), { target: { value: 'Koronka' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    expect(createMutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        patientId: 'p1',
+        doctorId: 'u1',
+        labName: 'Lab Z',
+        orderType: 'crown',
+        items: [expect.objectContaining({ description: 'Koronka' })],
+      }),
+      expect.anything(),
+    );
   });
 });

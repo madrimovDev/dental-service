@@ -1,8 +1,10 @@
 import type { CreateVisitNoteInput, Diagnosis } from '@dental/api-client';
 import { Button, Group, Modal, MultiSelect, Select, Stack, Textarea } from '@mantine/core';
-import { useState } from 'react';
+import { useForm } from '@mantine/form';
+import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useTranslation } from 'react-i18next';
 import { toDiagnosisOptions } from '../../clinical.mappers';
+import { type VisitNoteFormValues, visitNoteFormSchema } from '../../clinical.schema';
 
 export function VisitNoteFormModal({
   opened,
@@ -24,12 +26,17 @@ export function VisitNoteFormModal({
   pending: boolean;
 }) {
   const { t, i18n } = useTranslation();
-  const [subjective, setSubjective] = useState('');
-  const [objective, setObjective] = useState('');
-  const [dxIds, setDxIds] = useState<string[]>([]);
-  const [plan, setPlan] = useState('');
-  const [freeNotes, setFreeNotes] = useState('');
-  const [appointmentId, setAppointmentId] = useState<string | null>(null);
+  const form = useForm<VisitNoteFormValues>({
+    initialValues: {
+      subjective: '',
+      objective: '',
+      assessmentDiagnoses: [],
+      plan: '',
+      freeNotes: '',
+      appointmentId: null,
+    },
+    validate: zod4Resolver(visitNoteFormSchema),
+  });
 
   const dxOptions = toDiagnosisOptions(diagnoses, i18n.language === 'ru' ? 'ru' : 'uz');
   const apptOptions = appointments.map((a) => ({
@@ -37,95 +44,69 @@ export function VisitNoteFormModal({
     label: new Date(a.startTime).toLocaleString(),
   }));
 
-  const reset = () => {
-    setSubjective('');
-    setObjective('');
-    setDxIds([]);
-    setPlan('');
-    setFreeNotes('');
-    setAppointmentId(null);
+  const close = () => {
+    form.reset();
+    onClose();
   };
 
-  const submit = () => {
+  const submit = form.onSubmit((values) => {
     onCreate({
       patientId,
       doctorId,
-      subjective: subjective || undefined,
-      objective: objective || undefined,
-      assessmentDiagnoses: dxIds,
-      plan: plan || undefined,
-      freeNotes: freeNotes || undefined,
-      appointmentId: appointmentId ?? undefined,
+      subjective: values.subjective || undefined,
+      objective: values.objective || undefined,
+      assessmentDiagnoses: values.assessmentDiagnoses,
+      plan: values.plan || undefined,
+      freeNotes: values.freeNotes || undefined,
+      appointmentId: values.appointmentId ?? undefined,
     });
-  };
+  });
 
   return (
-    <Modal
-      opened={opened}
-      onClose={() => {
-        reset();
-        onClose();
-      }}
-      title={t('visit_note.create')}
-      size="xl"
-    >
-      <Stack gap="md">
-        <Select
-          label={t('visit_note.appointment')}
-          placeholder={t('visit_note.no_appointment')}
-          data={apptOptions}
-          value={appointmentId}
-          onChange={setAppointmentId}
-          clearable
-        />
-        <Textarea
-          label={`S: ${t('visit_note.subjective')}`}
-          rows={3}
-          value={subjective}
-          onChange={(e) => setSubjective(e.currentTarget.value)}
-        />
-        <Textarea
-          label={`O: ${t('visit_note.objective')}`}
-          rows={3}
-          value={objective}
-          onChange={(e) => setObjective(e.currentTarget.value)}
-        />
-        <MultiSelect
-          label={`A: ${t('visit_note.assessment')}`}
-          placeholder={t('visit_note.diagnosis_picker')}
-          searchable
-          data={dxOptions}
-          value={dxIds}
-          onChange={setDxIds}
-          limit={20}
-        />
-        <Textarea
-          label={`P: ${t('visit_note.plan')}`}
-          rows={3}
-          value={plan}
-          onChange={(e) => setPlan(e.currentTarget.value)}
-        />
-        <Textarea
-          label={t('visit_note.free_notes')}
-          rows={2}
-          value={freeNotes}
-          onChange={(e) => setFreeNotes(e.currentTarget.value)}
-        />
-        <Group justify="flex-end">
-          <Button
-            variant="default"
-            onClick={() => {
-              reset();
-              onClose();
-            }}
-          >
-            {t('common.cancel')}
-          </Button>
-          <Button onClick={submit} loading={pending}>
-            {t('visit_note.save')}
-          </Button>
-        </Group>
-      </Stack>
+    <Modal opened={opened} onClose={close} title={t('visit_note.create')} size="xl">
+      <form onSubmit={submit}>
+        <Stack gap="md">
+          <Select
+            label={t('visit_note.appointment')}
+            placeholder={t('visit_note.no_appointment')}
+            data={apptOptions}
+            clearable
+            {...form.getInputProps('appointmentId')}
+          />
+          <Textarea
+            label={`S: ${t('visit_note.subjective')}`}
+            rows={3}
+            {...form.getInputProps('subjective')}
+          />
+          <Textarea
+            label={`O: ${t('visit_note.objective')}`}
+            rows={3}
+            {...form.getInputProps('objective')}
+          />
+          <MultiSelect
+            label={`A: ${t('visit_note.assessment')}`}
+            placeholder={t('visit_note.diagnosis_picker')}
+            searchable
+            data={dxOptions}
+            limit={20}
+            {...form.getInputProps('assessmentDiagnoses')}
+          />
+          <Textarea label={`P: ${t('visit_note.plan')}`} rows={3} {...form.getInputProps('plan')} />
+          <Textarea
+            label={t('visit_note.free_notes')}
+            rows={2}
+            {...form.getInputProps('freeNotes')}
+          />
+          <Group justify="flex-end">
+            <Button variant="default" onClick={close}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="submit" loading={pending}>
+              {t('visit_note.save')}
+            </Button>
+          </Group>
+        </Stack>
+      </form>
     </Modal>
   );
 }
