@@ -1,4 +1,4 @@
-import type { ServiceWithPrices } from '@dental/api-client';
+import { listBranches, type ServiceWithPrices } from '@dental/api-client';
 import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api.ts';
 import { cashierKeys } from './cashier.keys';
@@ -30,7 +30,7 @@ export function useDailySummary(branchId: string | null) {
 }
 
 export function useBranches() {
-  return useQuery({ queryKey: ['branches'], queryFn: api.branches.list });
+  return useQuery({ queryKey: ['branches'], queryFn: () => listBranches().then((r) => r.data) });
 }
 
 export function useServices() {

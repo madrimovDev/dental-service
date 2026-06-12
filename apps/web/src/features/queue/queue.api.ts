@@ -1,4 +1,4 @@
-import type { QueueStatus } from '@dental/api-client';
+import { listBranches, type QueueStatus } from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api.ts';
 import { queueKeys } from './queue.keys';
@@ -56,5 +56,5 @@ export function useServices() {
 }
 
 export function useBranches() {
-  return useQuery({ queryKey: ['branches'], queryFn: api.branches.list });
+  return useQuery({ queryKey: ['branches'], queryFn: () => listBranches().then((r) => r.data) });
 }

@@ -6,6 +6,98 @@
   },
   "components": {
     "schemas": {
+      "Tenant": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "example": "Alfa Stomatologiya"
+          },
+          "slug": {
+            "type": "string",
+            "example": "alfa-stomatologiya"
+          },
+          "ownerUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "defaultLanguage": {
+            "type": "string",
+            "example": "uz"
+          },
+          "subscriptionStatus": {
+            "type": "string",
+            "enum": [
+              "trial",
+              "active",
+              "suspended",
+              "cancelled"
+            ],
+            "example": "trial"
+          },
+          "trialEndsAt": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-07-01T00:00:00.000Z"
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-06-12T10:00:00.000Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "example": "2026-06-12T10:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "ownerUserId",
+          "defaultLanguage",
+          "subscriptionStatus",
+          "trialEndsAt",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "details": {
+                "nullable": true
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "error"
+        ]
+      },
       "TenantSettings": {
         "type": "object",
         "properties": {
@@ -48,43 +140,461 @@
           "updatedAt"
         ]
       },
-      "ErrorResponse": {
+      "Branch": {
         "type": "object",
         "properties": {
-          "success": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "example": "Main Branch"
+          },
+          "address": {
+            "type": "string",
+            "nullable": true,
+            "example": "Toshkent, Chilonzor"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "example": "+998901234567"
+          },
+          "workHours": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "open": {
+                      "type": "string"
+                    },
+                    "close": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "open",
+                    "close"
+                  ]
+                },
+                {
+                  "nullable": true
+                }
+              ]
+            },
+            "example": null
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-06-12T10:00:00.000Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "example": "2026-06-12T10:00:00.000Z"
+          },
+          "deletedAt": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "name",
+          "address",
+          "phone",
+          "workHours",
+          "createdAt",
+          "updatedAt",
+          "deletedAt"
+        ]
+      },
+      "BranchDeleteResult": {
+        "type": "object",
+        "properties": {
+          "deleted": {
             "type": "boolean",
             "enum": [
-              false
+              true
             ]
           },
-          "error": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "deleted",
+          "id"
+        ]
+      },
+      "AuditListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditLogEntry"
+            }
+          },
+          "meta": {
             "type": "object",
             "properties": {
-              "code": {
-                "type": "string"
+              "page": {
+                "type": "integer"
               },
-              "message": {
-                "type": "string"
+              "pageSize": {
+                "type": "integer"
               },
-              "details": {
-                "nullable": true
+              "total": {
+                "type": "integer"
               }
             },
             "required": [
-              "code",
-              "message"
+              "page",
+              "pageSize",
+              "total"
             ]
           }
         },
         "required": [
-          "success",
-          "error"
+          "data",
+          "meta"
+        ]
+      },
+      "AuditLogEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "action": {
+            "type": "string",
+            "example": "created"
+          },
+          "resourceType": {
+            "type": "string",
+            "example": "patient"
+          },
+          "resourceId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "before": {
+            "nullable": true
+          },
+          "after": {
+            "nullable": true
+          },
+          "ip": {
+            "type": "string",
+            "nullable": true
+          },
+          "userAgent": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-06-12T10:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "userId",
+          "action",
+          "resourceType",
+          "resourceId",
+          "ip",
+          "userAgent",
+          "createdAt"
         ]
       }
     },
     "parameters": {}
   },
   "paths": {
+    "/api/tenant": {
+      "get": {
+        "tags": [
+          "tenant"
+        ],
+        "operationId": "getTenant",
+        "responses": {
+          "200": {
+            "description": "Current tenant",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Tenant"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Tenant not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "tenant"
+        ],
+        "operationId": "updateTenant",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 120
+                  },
+                  "defaultLanguage": {
+                    "type": "string",
+                    "enum": [
+                      "uz",
+                      "ru"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated tenant",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Tenant"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Tenant not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tenant/transfer-ownership": {
+      "post": {
+        "tags": [
+          "tenant"
+        ],
+        "operationId": "transferTenantOwnership",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "newOwnerUserId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "currentPassword": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "newOwnerUserId",
+                  "currentPassword"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tenant after ownership transfer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Tenant"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/tenant-settings": {
       "get": {
         "tags": [
@@ -195,6 +705,625 @@
                     },
                     "data": {
                       "$ref": "#/components/schemas/TenantSettings"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/branches": {
+      "get": {
+        "tags": [
+          "branches"
+        ],
+        "operationId": "listBranches",
+        "responses": {
+          "200": {
+            "description": "List of branches",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Branch"
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "branches"
+        ],
+        "operationId": "createBranch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 120
+                  },
+                  "address": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "phone": {
+                    "type": "string",
+                    "pattern": "^\\+?\\d{9,15}$"
+                  },
+                  "workHours": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "open": {
+                              "type": "string"
+                            },
+                            "close": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "open",
+                            "close"
+                          ]
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Branch created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Branch"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/branches/{id}": {
+      "get": {
+        "tags": [
+          "branches"
+        ],
+        "operationId": "getBranch",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Branch",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Branch"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Branch not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "branches"
+        ],
+        "operationId": "updateBranch",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 120
+                  },
+                  "address": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "phone": {
+                    "type": "string",
+                    "pattern": "^\\+?\\d{9,15}$"
+                  },
+                  "workHours": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "open": {
+                              "type": "string"
+                            },
+                            "close": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "open",
+                            "close"
+                          ]
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated branch",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Branch"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Branch not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "branches"
+        ],
+        "operationId": "deleteBranch",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Branch deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/BranchDeleteResult"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Branch not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/audit": {
+      "get": {
+        "tags": [
+          "audit"
+        ],
+        "operationId": "listAuditLog",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "required": false,
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "required": false,
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "action",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "resourceType",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "userId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "exclusiveMinimum": true,
+              "default": 1
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "exclusiveMinimum": true,
+              "maximum": 100,
+              "default": 50
+            },
+            "required": false,
+            "name": "pageSize",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated audit log entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AuditListResponse"
                     }
                   },
                   "required": [

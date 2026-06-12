@@ -1,3 +1,4 @@
+import { listAuditLog } from '@dental/api-client';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api.ts';
 import { auditKeys } from './audit.keys';
@@ -6,7 +7,7 @@ import type { AuditListParams } from './audit.types';
 export function useAuditLog(params: AuditListParams) {
   return useQuery({
     queryKey: auditKeys.list(params),
-    queryFn: () => api.audit.list(params),
+    queryFn: () => listAuditLog(params).then((r) => r.data),
   });
 }
 

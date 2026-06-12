@@ -1,3 +1,4 @@
+import { listBranches } from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api.ts';
 import { stockKeys } from './stock.keys';
@@ -29,7 +30,7 @@ export function useServiceMaterials(serviceId?: string) {
 
 /** Selektorlar uchun lookup'lar. */
 export function useBranches() {
-  return useQuery({ queryKey: ['branches'], queryFn: api.branches.list });
+  return useQuery({ queryKey: ['branches'], queryFn: () => listBranches().then((r) => r.data) });
 }
 
 export function useServices() {

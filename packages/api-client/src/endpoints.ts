@@ -1,6 +1,5 @@
 import type { ApiClient } from './client.ts';
 import type {
-  Branch,
   InviteUserResponse,
   LoginResponse,
   MembershipsResponse,
@@ -9,10 +8,8 @@ import type {
   RegisterTenantResponse,
   Role,
   SwitchWorkspaceResponse,
-  Tenant,
   UserAssignment,
 } from './types.ts';
-import type { AuditListResponse } from './types-audit.ts';
 import type {
   CreateToothChartInput,
   CreateTreatmentPlanInput,
@@ -117,24 +114,6 @@ export const createEndpoints = (api: ApiClient) => ({
 
     changePassword: (currentPassword: string, newPassword: string) =>
       api.post<{ changed: true }>('/api/auth/change-password', { currentPassword, newPassword }),
-  },
-
-  tenant: {
-    get: () => api.get<Tenant>('/api/tenant'),
-    update: (body: { name?: string; defaultLanguage?: 'uz' | 'ru' }) =>
-      api.patch<Tenant>('/api/tenant', body),
-    transferOwnership: (body: { newOwnerUserId: string; currentPassword: string }) =>
-      api.post<Tenant>('/api/tenant/transfer-ownership', body),
-  },
-
-  branches: {
-    list: () => api.get<Branch[]>('/api/branches'),
-    get: (id: string) => api.get<Branch>(`/api/branches/${id}`),
-    create: (body: { name: string; address?: string; phone?: string }) =>
-      api.post<Branch>('/api/branches', body),
-    update: (id: string, body: { name?: string; address?: string; phone?: string }) =>
-      api.patch<Branch>(`/api/branches/${id}`, body),
-    remove: (id: string) => api.delete<{ deleted: true; id: string }>(`/api/branches/${id}`),
   },
 
   roles: {
@@ -315,23 +294,6 @@ export const createEndpoints = (api: ApiClient) => ({
       const p = new URLSearchParams({ from: q.from, to: q.to });
       if (q.branchId) p.set('branchId', q.branchId);
       return api.get<PlanCompletionReport>(`/api/reports/treatment-plans?${p.toString()}`);
-    },
-  },
-
-  audit: {
-    list: (q?: {
-      from?: string;
-      to?: string;
-      action?: string;
-      resourceType?: string;
-      userId?: string;
-      page?: number;
-      pageSize?: number;
-    }) => {
-      const p = new URLSearchParams();
-      for (const [k, v] of Object.entries(q ?? {})) if (v != null) p.set(k, String(v));
-      const qs = p.toString();
-      return api.get<AuditListResponse>(`/api/audit${qs ? `?${qs}` : ''}`);
     },
   },
 

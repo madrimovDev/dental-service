@@ -1,3 +1,4 @@
+import { listBranches } from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api.ts';
 import { expensesKeys } from './expenses.keys';
@@ -35,7 +36,7 @@ export function useExpenseSummary(range: DateRange & { branchId?: string }) {
 }
 
 export function useBranches() {
-  return useQuery({ queryKey: ['branches'], queryFn: api.branches.list });
+  return useQuery({ queryKey: ['branches'], queryFn: () => listBranches().then((r) => r.data) });
 }
 
 export function useCreateExpense() {

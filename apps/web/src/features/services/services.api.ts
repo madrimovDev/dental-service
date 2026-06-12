@@ -1,4 +1,4 @@
-import type { Service } from '@dental/api-client';
+import { listBranches, type Service } from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api.ts';
 import { serviceKeys } from './services.keys';
@@ -17,7 +17,10 @@ export function useServiceDetail(id: string | null, enabled = true) {
 }
 
 export function useBranches() {
-  return useQuery({ queryKey: serviceKeys.branches(), queryFn: api.branches.list });
+  return useQuery({
+    queryKey: serviceKeys.branches(),
+    queryFn: () => listBranches().then((r) => r.data),
+  });
 }
 
 /** Create yoki update (editing bo'lsa update). */

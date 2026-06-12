@@ -48,30 +48,6 @@ export type RefreshResponse = {
   accessExpiresAt: string;
 };
 
-export type Tenant = {
-  id: string;
-  name: string;
-  slug: string;
-  ownerUserId: string;
-  defaultLanguage: string;
-  subscriptionStatus: 'trial' | 'active' | 'suspended' | 'cancelled';
-  trialEndsAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type Branch = {
-  id: string;
-  tenantId: string;
-  name: string;
-  address: string | null;
-  phone: string | null;
-  workHours: Record<string, { open: string; close: string } | null> | null;
-  createdAt: string;
-  updatedAt: string;
-  deletedAt: string | null;
-};
-
 export type Role = {
   id: string;
   tenantId: string;
