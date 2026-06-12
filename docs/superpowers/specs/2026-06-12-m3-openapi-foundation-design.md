@@ -133,6 +133,30 @@ Foundation yashil bo'lgach, CLI-121…129 modullar **create-only parallel agentl
 ko'chiriladi (M2 CLI-99 pattern): har modul disjoint fayllar, agentlar commit qilmaydi;
 orchestrator har to'lqindan keyin tsc=0 + integration yashil tekshiradi va commit qiladi.
 
+### 6.1 Wave-2 dan oldin hal qilinadigan follow-up'lar (yakuniy review'dan)
+Pilot yashil, lekin yakuniy holistik review (CLI-120) quyidagi compounding optimizatsiyalarni
+aniqladi — **wave 1 dan oldin** hal qilinsa 26 modulda foyda:
+- **orval generation mode (Important):** hozir `client: 'react-query'` har modulda ~520 qator
+  **o'lik hook** generatsiya qiladi (biz faqat plain funksiyalarni ishlatamiz, RFC-0010 feature
+  hooks orqali). `orval.config.ts` ni **functions-only mode**ga o'tkaz (`client: 'fetch'` + custom
+  mutator) — o'lik kodni yo'qotadi, barrel re-export'ni skriptlash mumkin bo'ladi. ⚠️ Bu generation
+  o'zgarishi — pilot'ni qayta generatsiya qilib plain funksiya nomlari (`getX`/`updateX`)
+  o'zgarmaganini va `getGetXQueryKey` helper'ga bog'liqlik yo'qligini tekshir.
+- **Coexistence collision intizomi (Important):** hand `types-*.ts` `export *` barrel'da, generated
+  model esa explicit. Modul ko'chganda hand tipni **xuddi shu commit**da o'chir (aks holda generated
+  nomi hand nomni jimgina shadow qiladi). Wave template'da majburiy qadam.
+- **Upload endpoint'lar (Minor):** `customInstance` `headers` ni qabul qiladi-yu forward qilmaydi
+  (transport Content-Type o'zi qo'yadi). `multipart/form-data` upload route'lar **generated mutator'ga
+  ko'chmaydi** — qo'lda `api.upload()` yo'lida qoladi (patient-images wave'da e'tibor ber).
+
+### 6.2 Foundation acceptance — yakuniy holat (✅ hammasi yashil)
+- 10 integration test pass (GET/PATCH 200, **403 permission.denied** — middleware enforcement
+  validatsiya qilindi, @owner-only emas), 401 yo'q-auth.
+- `generate:contract` **idempotent** (Biome generated artefaktlarni ignore qiladi — whitespace churn yo'q).
+- 3 typecheck (api / api-client / web) = 0; coexistence buzilmaydi (bitta `TenantSettings` = generated).
+- 14 commit: F1 (envelope helpers → OpenAPIHono → generate-openapi → mutator → orval) + F3 pilot
+  (schema → mapper → routes → generate → wiring → integration) + 2 review-fix.
+
 ## 7. Risklar va yumshatish
 | Risk | Holat / yumshatish |
 |---|---|
