@@ -1,65 +1,5 @@
-// ===== Treatment Plans =====
-export type TreatmentPlanStatus =
-  | 'draft'
-  | 'presented'
-  | 'accepted'
-  | 'in_progress'
-  | 'completed'
-  | 'cancelled';
-
-export type TreatmentStageStatus = 'pending' | 'in_progress' | 'completed' | 'skipped';
-
-export type TreatmentStage = {
-  id: string;
-  treatmentPlanId: string;
-  sequence: number;
-  serviceId: string | null;
-  serviceName: string;
-  toothNumbers: number[] | null;
-  estimatedVisits: number;
-  estimatedDurationMinutes: number | null;
-  cost: string;
-  status: TreatmentStageStatus;
-  notes: string | null;
-  completedAt: string | null;
-  createdAt: string;
-};
-
-export type TreatmentPlan = {
-  id: string;
-  tenantId: string;
-  patientId: string;
-  doctorId: string;
-  title: string;
-  status: TreatmentPlanStatus;
-  totalCost: string;
-  totalVisits: number;
-  notes: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type TreatmentPlanWithStages = TreatmentPlan & { stages: TreatmentStage[] };
-
-// ===== Visit Notes (SOAP) =====
-export type VisitNote = {
-  id: string;
-  tenantId: string;
-  patientId: string;
-  doctorId: string;
-  appointmentId: string | null;
-  visitDate: string;
-  subjective: string | null;
-  objective: string | null;
-  assessmentDiagnoses: string[];
-  plan: string | null;
-  performedServices: string[];
-  freeNotes: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
-// ===== Tooth Chart (Odontogram) =====
+// ===== Tooth Chart (Odontogram) — hand enums (generated uses ToothStateEntrySurface/ToothStateEntryState) =====
+// Kept because web components import these names directly (OdontogramTab, ToothCell, Odontogram, etc.)
 export type ToothSurface = 'whole' | 'M' | 'D' | 'B' | 'L' | 'O' | 'I';
 
 export type ToothState =
@@ -73,30 +13,6 @@ export type ToothState =
   | 'to_extract'
   | 'temporary'
   | 'veneer';
-
-export type ToothStateEntry = {
-  id: string;
-  toothChartId: string;
-  toothNumber: number;
-  surface: ToothSurface;
-  state: ToothState;
-  diagnosisId: string | null;
-  notes: string | null;
-  createdAt: string;
-};
-
-export type ToothChart = {
-  id: string;
-  tenantId: string;
-  patientId: string;
-  visitNoteId: string | null;
-  isPrimaryDentition: boolean;
-  notes: string | null;
-  createdBy: string | null;
-  createdAt: string;
-};
-
-export type ToothChartWithStates = ToothChart & { states: ToothStateEntry[] };
 
 // ===== Inputs =====
 export type CreateTreatmentStageInput = {

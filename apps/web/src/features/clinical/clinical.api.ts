@@ -5,11 +5,28 @@ import {
   type CreateToothChartInput,
   type CreateTreatmentPlanInput,
   type CreateVisitNoteInput,
+  createConsentTemplate,
+  createLabOrder,
+  createPrescription,
+  createToothChart,
+  createTreatmentPlan,
+  createVisitNote,
+  getLatestToothChart,
+  getTreatmentPlan,
   type LabOrderStatus,
   listAppointments,
+  listConsentForms,
+  listConsentTemplates,
   listDiagnoses,
+  listLabOrders,
+  listPrescriptions,
+  listTreatmentPlans,
+  listVisitNotes,
   type SignFormInput,
+  signConsentForm,
   type TreatmentStageStatus,
+  updateLabOrder,
+  updateTreatmentStage,
 } from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api.ts';
@@ -21,14 +38,14 @@ const HOUR = 1000 * 60 * 60;
 export function useLatestToothChart(patientId: string) {
   return useQuery({
     queryKey: clinicalKeys.toothChartLatest(patientId),
-    queryFn: () => api.clinical.getLatestToothChart(patientId),
+    queryFn: () => getLatestToothChart(patientId).then((r) => r.data),
   });
 }
 
 export function useCreateToothChart(patientId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: CreateToothChartInput) => api.clinical.createToothChart(body),
+    mutationFn: (body: CreateToothChartInput) => createToothChart(body).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: clinicalKeys.toothChartLatest(patientId) }),
   });
 }
@@ -37,21 +54,21 @@ export function useCreateToothChart(patientId: string) {
 export function useTreatmentPlans(patientId: string) {
   return useQuery({
     queryKey: clinicalKeys.plans(patientId),
-    queryFn: () => api.clinical.listPlans(patientId),
+    queryFn: () => listTreatmentPlans({ patientId }).then((r) => r.data),
   });
 }
 
 export function usePlanDetail(planId: string) {
   return useQuery({
     queryKey: clinicalKeys.planDetail(planId),
-    queryFn: () => api.clinical.getPlan(planId),
+    queryFn: () => getTreatmentPlan(planId).then((r) => r.data),
   });
 }
 
 export function useCreatePlan(patientId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: CreateTreatmentPlanInput) => api.clinical.createPlan(body),
+    mutationFn: (body: CreateTreatmentPlanInput) => createTreatmentPlan(body).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: clinicalKeys.plans(patientId) }),
   });
 }
@@ -60,7 +77,7 @@ export function useUpdateStage(patientId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: TreatmentStageStatus }) =>
-      api.clinical.updateStage(id, { status }),
+      updateTreatmentStage(id, { status }).then((r) => r.data),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: clinicalKeys.plans(patientId) });
       void qc.invalidateQueries({ queryKey: ['clinical', 'plan-detail'] });
@@ -72,14 +89,14 @@ export function useUpdateStage(patientId: string) {
 export function useVisitNotes(patientId: string) {
   return useQuery({
     queryKey: clinicalKeys.visitNotes(patientId),
-    queryFn: () => api.clinical.listVisitNotes(patientId),
+    queryFn: () => listVisitNotes({ patientId }).then((r) => r.data),
   });
 }
 
 export function useCreateVisitNote(patientId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: CreateVisitNoteInput) => api.clinical.createVisitNote(body),
+    mutationFn: (body: CreateVisitNoteInput) => createVisitNote(body).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: clinicalKeys.visitNotes(patientId) }),
   });
 }
@@ -103,14 +120,14 @@ export function usePatientAppointments(patientId: string) {
 export function usePrescriptions(patientId: string) {
   return useQuery({
     queryKey: clinicalKeys.prescriptions(patientId),
-    queryFn: () => api.prescriptions.list(patientId),
+    queryFn: () => listPrescriptions({ patientId }).then((r) => r.data),
   });
 }
 
 export function useCreatePrescription(patientId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: CreatePrescriptionInput) => api.prescriptions.create(body),
+    mutationFn: (body: CreatePrescriptionInput) => createPrescription(body).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: clinicalKeys.prescriptions(patientId) }),
   });
 }
@@ -119,14 +136,14 @@ export function useCreatePrescription(patientId: string) {
 export function useLabOrders(patientId: string) {
   return useQuery({
     queryKey: clinicalKeys.labOrders(patientId),
-    queryFn: () => api.labOrders.list({ patientId }),
+    queryFn: () => listLabOrders({ patientId }).then((r) => r.data),
   });
 }
 
 export function useCreateLabOrder(patientId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: CreateLabOrderInput) => api.labOrders.create(body),
+    mutationFn: (body: CreateLabOrderInput) => createLabOrder(body).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: clinicalKeys.labOrders(patientId) }),
   });
 }
@@ -135,7 +152,7 @@ export function useUpdateLabOrderStatus(patientId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: LabOrderStatus }) =>
-      api.labOrders.update(id, { status }),
+      updateLabOrder(id, { status }).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: clinicalKeys.labOrders(patientId) }),
   });
 }
@@ -144,21 +161,21 @@ export function useUpdateLabOrderStatus(patientId: string) {
 export function useConsentForms(patientId: string) {
   return useQuery({
     queryKey: clinicalKeys.consentForms(patientId),
-    queryFn: () => api.consent.listForms(patientId),
+    queryFn: () => listConsentForms({ patientId }).then((r) => r.data),
   });
 }
 
 export function useConsentTemplates() {
   return useQuery({
     queryKey: clinicalKeys.consentTemplates(),
-    queryFn: () => api.consent.listTemplates(),
+    queryFn: () => listConsentTemplates().then((r) => r.data),
   });
 }
 
 export function useSignConsent(patientId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: SignFormInput) => api.consent.signForm(body),
+    mutationFn: (body: SignFormInput) => signConsentForm(body).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: clinicalKeys.consentForms(patientId) }),
   });
 }
@@ -166,7 +183,7 @@ export function useSignConsent(patientId: string) {
 export function useCreateConsentTemplate() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: CreateTemplateInput) => api.consent.createTemplate(body),
+    mutationFn: (body: CreateTemplateInput) => createConsentTemplate(body).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: clinicalKeys.consentTemplates() }),
   });
 }

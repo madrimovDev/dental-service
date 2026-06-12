@@ -1,27 +1,11 @@
 import type { ApiClient } from './client.ts';
 import type {
-  InviteUserResponse,
   LoginResponse,
   MembershipsResponse,
   RefreshResponse,
   RegisterTenantResponse,
-  Role,
   SwitchWorkspaceResponse,
-  UserAssignment,
 } from './types.ts';
-import type {
-  CreateToothChartInput,
-  CreateTreatmentPlanInput,
-  CreateVisitNoteInput,
-  ToothChart,
-  ToothChartWithStates,
-  TreatmentPlan,
-  TreatmentPlanStatus,
-  TreatmentPlanWithStages,
-  TreatmentStage,
-  TreatmentStageStatus,
-  VisitNote,
-} from './types-clinical.ts';
 import type {
   Expense,
   ExpenseCategory,
@@ -33,7 +17,6 @@ import type {
   StockItemWithLowStock,
   StockMovement,
 } from './types-erp.ts';
-import type { PayrollRun, PayrollRunWithLines, StaffProfile } from './types-hr.ts';
 import type {
   CashierListResponse,
   CashierTransactionWithItems,
@@ -41,21 +24,7 @@ import type {
   PaymentMethod,
   PlanBalance,
 } from './types-m3.ts';
-import type {
-  ConsentForm,
-  ConsentTemplate,
-  ConsentType,
-  CreateLabOrderInput,
-  CreatePrescriptionInput,
-  CreateTemplateInput,
-  LabOrder,
-  LabOrderStatus,
-  LabOrderType,
-  PatientImage,
-  PatientImageType,
-  Prescription,
-  SignFormInput,
-} from './types-m5.ts';
+import type { PatientImage, PatientImageType } from './types-m5.ts';
 import type {
   AllergyEntry,
   MedicalRecord,
@@ -104,45 +73,6 @@ export const createEndpoints = (api: ApiClient) => ({
 
     changePassword: (currentPassword: string, newPassword: string) =>
       api.post<{ changed: true }>('/api/auth/change-password', { currentPassword, newPassword }),
-  },
-
-  roles: {
-    list: () => api.get<Role[]>('/api/roles'),
-    get: (id: string) => api.get<Role>(`/api/roles/${id}`),
-    create: (body: { name: string; description?: string; permissions?: string[] }) =>
-      api.post<Role>('/api/roles', body),
-    update: (id: string, body: { name?: string; description?: string }) =>
-      api.patch<Role>(`/api/roles/${id}`, body),
-    setPermissions: (id: string, permissions: string[]) =>
-      api.put<{ roleId: string; permissions: string[] }>(`/api/roles/${id}/permissions`, {
-        permissions,
-      }),
-    remove: (id: string) => api.delete<{ deleted: true }>(`/api/roles/${id}`),
-  },
-
-  users: {
-    listAssignments: () => api.get<UserAssignment[]>('/api/users/assignments'),
-    invite: (body: { phone: string; fullName: string; roleId: string; branchId?: string }) =>
-      api.post<InviteUserResponse>('/api/users/invite', body),
-    removeAssignment: (assignmentId: string) =>
-      api.delete<{ deleted: true }>(`/api/users/assignments/${assignmentId}`),
-    resetPassword: (userId: string) =>
-      api.post<{ ok: true; userId: string; phone: string; tempPassword: string }>(
-        `/api/users/${userId}/reset-password`,
-      ),
-    profile: {
-      get: (userId: string) => api.get<StaffProfile | null>(`/api/users/${userId}/profile`),
-      put: (
-        userId: string,
-        body: {
-          specialty?: string;
-          employmentStatus?: 'active' | 'on_leave' | 'inactive';
-          startedAt?: string;
-          baseSalary: number;
-          commissionPercent: number;
-        },
-      ) => api.put<StaffProfile>(`/api/users/${userId}/profile`, body),
-    },
   },
 
   patients: {
@@ -340,101 +270,6 @@ export const createEndpoints = (api: ApiClient) => ({
     createBom: (body: { serviceId: string; itemId: string; qtyPerService: number }) =>
       api.post<ServiceMaterial>('/api/stock/bom', body),
     removeBom: (id: string) => api.delete<{ deleted: true }>(`/api/stock/bom/${id}`),
-  },
-
-  payroll: {
-    runs: () => api.get<PayrollRun[]>('/api/payroll/runs'),
-    getRun: (id: string) => api.get<PayrollRunWithLines>(`/api/payroll/runs/${id}`),
-    createRun: (body: { periodFrom: string; periodTo: string }) =>
-      api.post<PayrollRunWithLines>('/api/payroll/runs', body),
-    finalize: (id: string) => api.post<PayrollRun>(`/api/payroll/runs/${id}/finalize`),
-  },
-
-  clinical: {
-    listPlans: (patientId?: string) => {
-      const qs = patientId ? `?patientId=${patientId}` : '';
-      return api.get<TreatmentPlan[]>(`/api/treatment-plans${qs}`);
-    },
-    getPlan: (id: string) => api.get<TreatmentPlanWithStages>(`/api/treatment-plans/${id}`),
-    createPlan: (body: CreateTreatmentPlanInput) =>
-      api.post<TreatmentPlanWithStages>('/api/treatment-plans', body),
-    updatePlan: (
-      id: string,
-      body: { title?: string; notes?: string; status?: TreatmentPlanStatus },
-    ) => api.patch<TreatmentPlan>(`/api/treatment-plans/${id}`, body),
-    updateStage: (id: string, body: { status?: TreatmentStageStatus; notes?: string }) =>
-      api.patch<TreatmentStage>(`/api/treatment-stages/${id}`, body),
-
-    listVisitNotes: (patientId?: string) => {
-      const qs = patientId ? `?patientId=${patientId}` : '';
-      return api.get<VisitNote[]>(`/api/visit-notes${qs}`);
-    },
-    getVisitNote: (id: string) => api.get<VisitNote>(`/api/visit-notes/${id}`),
-    createVisitNote: (body: CreateVisitNoteInput) => api.post<VisitNote>('/api/visit-notes', body),
-    updateVisitNote: (id: string, body: Partial<CreateVisitNoteInput>) =>
-      api.patch<VisitNote>(`/api/visit-notes/${id}`, body),
-
-    listToothCharts: (patientId: string) =>
-      api.get<ToothChart[]>(`/api/patients/${patientId}/tooth-charts`),
-    getLatestToothChart: (patientId: string) =>
-      api.get<ToothChartWithStates | null>(`/api/patients/${patientId}/tooth-charts/latest`),
-    createToothChart: (body: CreateToothChartInput) =>
-      api.post<ToothChartWithStates>('/api/tooth-charts', body),
-  },
-
-  prescriptions: {
-    list: (patientId?: string) => {
-      const qs = patientId ? `?patientId=${patientId}` : '';
-      return api.get<Prescription[]>(`/api/prescriptions${qs}`);
-    },
-    get: (id: string) => api.get<Prescription>(`/api/prescriptions/${id}`),
-    create: (body: CreatePrescriptionInput) => api.post<Prescription>('/api/prescriptions', body),
-    update: (id: string, body: Partial<CreatePrescriptionInput>) =>
-      api.patch<Prescription>(`/api/prescriptions/${id}`, body),
-    remove: (id: string) => api.delete<{ deleted: true }>(`/api/prescriptions/${id}`),
-  },
-
-  consent: {
-    listTemplates: (type?: ConsentType, activeOnly = true) => {
-      const params = new URLSearchParams();
-      if (type) params.set('type', type);
-      if (!activeOnly) params.set('active', 'false');
-      const qs = params.toString();
-      return api.get<ConsentTemplate[]>(`/api/consent/templates${qs ? `?${qs}` : ''}`);
-    },
-    createTemplate: (body: CreateTemplateInput) =>
-      api.post<ConsentTemplate>('/api/consent/templates', body),
-    updateTemplate: (id: string, body: Partial<CreateTemplateInput>) =>
-      api.patch<ConsentTemplate>(`/api/consent/templates/${id}`, body),
-    listForms: (patientId?: string) => {
-      const qs = patientId ? `?patientId=${patientId}` : '';
-      return api.get<ConsentForm[]>(`/api/consent/forms${qs}`);
-    },
-    signForm: (body: SignFormInput) => api.post<ConsentForm>('/api/consent/forms', body),
-  },
-
-  labOrders: {
-    list: (query?: { patientId?: string; status?: LabOrderStatus }) => {
-      const params = new URLSearchParams();
-      if (query?.patientId) params.set('patientId', query.patientId);
-      if (query?.status) params.set('status', query.status);
-      const qs = params.toString();
-      return api.get<LabOrder[]>(`/api/lab-orders${qs ? `?${qs}` : ''}`);
-    },
-    get: (id: string) => api.get<LabOrder>(`/api/lab-orders/${id}`),
-    create: (body: CreateLabOrderInput) => api.post<LabOrder>('/api/lab-orders', body),
-    update: (
-      id: string,
-      body: {
-        status?: LabOrderStatus;
-        labName?: string;
-        orderType?: LabOrderType;
-        expectedDate?: string | null;
-        deliveredDate?: string | null;
-        cost?: number | null;
-        notes?: string | null;
-      },
-    ) => api.patch<LabOrder>(`/api/lab-orders/${id}`, body),
   },
 
   patientImages: {

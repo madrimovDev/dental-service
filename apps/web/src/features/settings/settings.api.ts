@@ -1,32 +1,46 @@
 import {
   createBranch,
+  createRole,
   deleteBranch,
+  deleteRole,
+  deleteUserAssignment,
+  getRole,
   getTenant,
   getTenantSettings,
+  getUserProfile,
+  inviteUser,
   listBranches,
   listPermissions,
+  listRoles,
+  listUserAssignments,
+  resetUserPassword,
+  setRolePermissions,
   type TransferTenantOwnershipBody,
   transferTenantOwnership,
   type UpdateBranchBody,
   type UpdateTenantBody,
   type UpdateTenantSettingsBody,
   updateBranch,
+  updateRole,
   updateTenant,
   updateTenantSettings,
+  upsertUserProfile,
 } from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api.ts';
 import { settingsKeys } from './settings.keys';
 
 // --- Roles ---
 export function useRoles() {
-  return useQuery({ queryKey: settingsKeys.roles(), queryFn: api.roles.list });
+  return useQuery({
+    queryKey: settingsKeys.roles(),
+    queryFn: () => listRoles().then((r) => r.data),
+  });
 }
 
 export function useRole(id: string | null, enabled: boolean) {
   return useQuery({
     queryKey: settingsKeys.role(id ?? ''),
-    queryFn: () => api.roles.get(id ?? ''),
+    queryFn: () => getRole(id ?? '').then((r) => r.data),
     enabled: enabled && !!id,
   });
 }
@@ -48,11 +62,11 @@ export function useUpsertRole() {
       permissions: string[];
     }) => {
       if (input.id) {
-        await api.roles.update(input.id, { name: input.name, description: input.description });
-        await api.roles.setPermissions(input.id, input.permissions);
+        await updateRole(input.id, { name: input.name, description: input.description });
+        await setRolePermissions(input.id, { permissions: input.permissions });
         return;
       }
-      await api.roles.create({
+      await createRole({
         name: input.name,
         description: input.description,
         permissions: input.permissions,
@@ -65,21 +79,24 @@ export function useUpsertRole() {
 export function useDeleteRole() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api.roles.remove(id),
+    mutationFn: (id: string) => deleteRole(id).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: settingsKeys.roles() }),
   });
 }
 
 // --- Users / assignments ---
 export function useUsers() {
-  return useQuery({ queryKey: settingsKeys.users(), queryFn: api.users.listAssignments });
+  return useQuery({
+    queryKey: settingsKeys.users(),
+    queryFn: () => listUserAssignments().then((r) => r.data),
+  });
 }
 
 export function useInviteUser() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: { phone: string; fullName: string; roleId: string; branchId?: string }) =>
-      api.users.invite(body),
+      inviteUser(body).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: settingsKeys.users() }),
   });
 }
@@ -87,20 +104,22 @@ export function useInviteUser() {
 export function useRemoveAssignment() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (assignmentId: string) => api.users.removeAssignment(assignmentId),
+    mutationFn: (assignmentId: string) => deleteUserAssignment(assignmentId).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: settingsKeys.users() }),
   });
 }
 
 export function useResetPassword() {
-  return useMutation({ mutationFn: (userId: string) => api.users.resetPassword(userId) });
+  return useMutation({
+    mutationFn: (userId: string) => resetUserPassword(userId).then((r) => r.data),
+  });
 }
 
 // --- Staff profile (users sub-resource) ---
 export function useStaffProfile(userId: string | null, enabled: boolean) {
   return useQuery({
     queryKey: settingsKeys.staffProfile(userId ?? ''),
-    queryFn: () => api.users.profile.get(userId ?? ''),
+    queryFn: () => getUserProfile(userId ?? '').then((r) => r.data),
     enabled: enabled && !!userId,
   });
 }
@@ -114,7 +133,7 @@ export function useUpsertProfile(userId: string) {
       startedAt?: string;
       baseSalary: number;
       commissionPercent: number;
-    }) => api.users.profile.put(userId, body),
+    }) => upsertUserProfile(userId, body).then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: settingsKeys.staffProfile(userId) });
       qc.invalidateQueries({ queryKey: settingsKeys.users() });

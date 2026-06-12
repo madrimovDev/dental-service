@@ -1,3 +1,4 @@
+import { listUserAssignments } from '@dental/api-client';
 import {
   Badge,
   Button,
@@ -16,7 +17,6 @@ import { useQuery } from '@tanstack/react-query';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { api } from '@/lib/api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { useCreateRun, useFinalizeRun, usePayrollRun, usePayrollRuns } from '../payroll.api';
 import { formatUZS, toLocalDate, toPayrollLineVM, toPayrollRunVM } from '../payroll.mappers';
@@ -37,7 +37,7 @@ export function PayrollScreen() {
   // Xodim nomlarini yechish uchun (line faqat userId tashiydi).
   const assignments = useQuery({
     queryKey: ['users', 'assignments'],
-    queryFn: () => api.users.listAssignments(),
+    queryFn: () => listUserAssignments().then((r) => r.data),
   });
   const nameByUserId = useMemo(() => {
     const map = new Map<string, string>();

@@ -1,4 +1,10 @@
-import { getService, listBranches, listServices, type ServiceWithPrices } from '@dental/api-client';
+import {
+  getService,
+  listBranches,
+  listServices,
+  listTreatmentPlans,
+  type ServiceWithPrices,
+} from '@dental/api-client';
 import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api.ts';
 import { cashierKeys } from './cashier.keys';
@@ -49,7 +55,7 @@ export function usePatientsAll() {
 export function usePatientPlans(patientId: string | null) {
   return useQuery({
     queryKey: ['treatment-plans', 'by-patient', patientId ?? ''],
-    queryFn: () => api.clinical.listPlans(patientId ?? undefined),
+    queryFn: () => listTreatmentPlans(patientId ? { patientId } : undefined).then((r) => r.data),
     enabled: !!patientId,
   });
 }

@@ -1,25 +1,7 @@
-// ===== Prescriptions =====
-export type PrescriptionItem = {
-  medicationName: string;
-  dosage: string;
-  frequency: string;
-  durationDays?: number;
-  instructions?: string;
-};
+import type { PrescriptionItem } from './generated/model/index.ts';
 
-export type Prescription = {
-  id: string;
-  tenantId: string;
-  patientId: string;
-  doctorId: string;
-  visitNoteId: string | null;
-  issuedDate: string;
-  items: PrescriptionItem[];
-  diagnosis: string | null;
-  notes: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
+// ===== Prescriptions — Input types =====
+// PrescriptionItem: from generated (same shape, no re-export needed here — barrel adds it explicitly)
 
 export type CreatePrescriptionInput = {
   patientId: string;
@@ -31,36 +13,10 @@ export type CreatePrescriptionInput = {
   notes?: string;
 };
 
-// ===== Consent =====
+// ===== Consent — hand type aliases =====
+// ConsentType: kept because web components import it directly (ConsentTab uses ConsentType[])
+// Generated uses ConsentFormType / ConsentTemplateType (different names)
 export type ConsentType = 'treatment' | 'anesthesia' | 'photo' | 'data_processing' | 'other';
-
-export type ConsentTemplate = {
-  id: string;
-  tenantId: string;
-  type: ConsentType;
-  title: string;
-  bodyUz: string;
-  bodyRu: string | null;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type ConsentForm = {
-  id: string;
-  tenantId: string;
-  patientId: string;
-  templateId: string | null;
-  type: ConsentType;
-  title: string;
-  bodyText: string;
-  language: string;
-  signedAt: string;
-  signedByUserId: string;
-  patientSignatureName: string | null;
-  notes: string | null;
-  createdAt: string;
-};
 
 export type CreateTemplateInput = {
   type: ConsentType;
@@ -81,7 +37,9 @@ export type SignFormInput = {
   notes?: string;
 };
 
-// ===== Lab Orders =====
+// ===== Lab Orders — hand type aliases =====
+// LabOrderType: kept because web uses LabOrderType[] in UI, LabOrderVM.orderType typed as LabOrderType
+// Generated uses LabOrderOrderType (different name)
 export type LabOrderType =
   | 'crown'
   | 'bridge'
@@ -91,34 +49,14 @@ export type LabOrderType =
   | 'inlay_onlay'
   | 'other';
 
-export type LabOrderStatus = 'draft' | 'sent' | 'in_progress' | 'ready' | 'delivered' | 'cancelled';
-
+// LabOrderItem: kept because CreateLabOrderInput.items uses it and LabOrdersTab imports it
+// Generated uses LabOrderItemsItem (different name)
 export type LabOrderItem = {
   description: string;
   toothNumbers?: number[];
   material?: string;
   shade?: string;
   quantity?: number;
-};
-
-export type LabOrder = {
-  id: string;
-  tenantId: string;
-  patientId: string;
-  doctorId: string;
-  orderNumber: number | null;
-  labName: string;
-  orderType: LabOrderType;
-  status: LabOrderStatus;
-  items: LabOrderItem[];
-  sentDate: string | null;
-  expectedDate: string | null;
-  deliveredDate: string | null;
-  cost: string | null;
-  currency: string;
-  notes: string | null;
-  createdAt: string;
-  updatedAt: string;
 };
 
 export type CreateLabOrderInput = {
@@ -132,7 +70,7 @@ export type CreateLabOrderInput = {
   notes?: string;
 };
 
-// ===== Patient Images =====
+// ===== Patient Images — Wave C (NOT migrated yet, keep as-is) =====
 export type PatientImageType =
   | 'xray_panoramic'
   | 'xray_periapical'

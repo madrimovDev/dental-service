@@ -1,4 +1,4 @@
-import { listAppointments } from '@dental/api-client';
+import { listAppointments, listLabOrders } from '@dental/api-client';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api.ts';
 
@@ -60,7 +60,7 @@ export function useDoctorAppointments(
 export function useActiveLabOrders() {
   return useQuery({
     queryKey: ['dashboard', 'lab-orders'],
-    queryFn: () => api.labOrders.list(),
+    queryFn: () => listLabOrders().then((r) => r.data),
     select: (orders) => orders.filter((o) => o.status !== 'delivered' && o.status !== 'cancelled'),
   });
 }

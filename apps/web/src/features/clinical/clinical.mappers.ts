@@ -120,7 +120,7 @@ export function toVisitNoteVM(
     visitDateText: dts(note.visitDate),
     subjective: note.subjective || null,
     objective: note.objective || null,
-    diagnoses: note.assessmentDiagnoses.map((id) => {
+    diagnoses: (note.assessmentDiagnoses ?? []).map((id) => {
       const d = diagnosisMap.get(id);
       return d ? dxLabel(d, lang) : id;
     }),
