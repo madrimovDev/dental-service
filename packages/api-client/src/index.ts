@@ -5,7 +5,6 @@ export { createEndpoints } from './endpoints.ts';
 export type { TenantSettings, UpdateTenantSettingsBody } from './generated/model/index.ts';
 // Generated (orval) — explicit re-export (coexistence: kolliziya nazorati)
 export {
-  getGetTenantSettingsQueryKey,
   getTenantSettings,
   updateTenantSettings,
 } from './generated/tenant-settings/tenant-settings.ts';

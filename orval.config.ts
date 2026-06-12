@@ -9,15 +9,11 @@ export default defineConfig({
       mode: 'tags-split',
       target: './packages/api-client/src/generated/endpoints.ts',
       schemas: './packages/api-client/src/generated/model',
-      client: 'react-query',
+      client: 'axios-functions',
       override: {
         mutator: {
           path: './packages/api-client/src/mutator.ts',
           name: 'customInstance',
-        },
-        query: {
-          useQuery: true,
-          useMutation: true,
         },
       },
     },
