@@ -1,19 +1,61 @@
 import { fail, ok } from '@dental/core';
-import { Hono } from 'hono';
-import { HTTPException } from 'hono/http-exception';
+import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
 import {
+  toServiceMaterialDto,
+  toStockItemDto,
+  toStockItemWithLowStockDto,
+  toStockMovementDto,
+} from './stock.mapper.ts';
+import {
+  bomQuerySchema,
   createBomSchema,
   createItemSchema,
   createMovementSchema,
   listItemsQuerySchema,
+  movementsQuerySchema,
+  serviceMaterialDtoSchema,
+  stockBomDeleteResultSchema,
+  stockIdParamSchema,
+  stockItemDtoSchema,
+  stockItemWithLowStockDtoSchema,
+  stockMovementDtoSchema,
   updateItemSchema,
 } from './stock.schema.ts';
 import { createStockService } from './stock.service.ts';
+
+/** Standart 404 — get / patch / delete endpoint'lar uchun. */
+const notFoundResponse = {
+  404: {
+    content: { 'application/json': { schema: errorResponseSchema } },
+    description: 'Not found',
+  },
+};
+
+/** Create (201) + standart 4xx — okJson (200) o'rniga. */
+const createdResponses = <T extends z.ZodTypeAny>(schema: T, description: string) => ({
+  201: {
+    content: { 'application/json': { schema: apiResponseSchema(schema) } },
+    description,
+  },
+  400: {
+    content: { 'application/json': { schema: errorResponseSchema } },
+    description: 'Validation error',
+  },
+  401: {
+    content: { 'application/json': { schema: errorResponseSchema } },
+    description: 'Unauthorized',
+  },
+  403: {
+    content: { 'application/json': { schema: errorResponseSchema } },
+    description: 'Forbidden',
+  },
+});
 
 /**
  * Ombor routes:
@@ -22,70 +64,173 @@ import { createStockService } from './stock.service.ts';
  *   /api/stock/bom       (CRUD manage — service→material normalari)
  */
 export const stockRoutes = (deps: { db: Database; audit: AuditLogger }) => {
-  const app = new Hono();
+  const app = new OpenAPIHono();
   app.use('*', authMiddleware());
   app.use('*', rlsMiddleware(deps.db));
 
   const service = createStockService({ audit: deps.audit });
 
   // ===== Items =====
-  app.get('/items', requirePermission('stock.view'), async (c) => {
-    const query = listItemsQuerySchema.safeParse(
-      Object.fromEntries(new URL(c.req.url).searchParams),
-    );
-    if (!query.success) throw new HTTPException(400, { message: 'Invalid query' });
-    return c.json(ok(await service.listItems(c, query.data)));
+  const listItemsRoute = createRoute({
+    method: 'get',
+    path: '/items',
+    tags: ['stock'],
+    operationId: 'listStockItems',
+    middleware: [requirePermission('stock.view')] as const,
+    request: { query: listItemsQuerySchema },
+    responses: okJson(z.array(stockItemWithLowStockDtoSchema), 'List of stock items'),
   });
 
-  app.post('/items', requirePermission('stock.manage'), async (c) => {
-    const body = createItemSchema.safeParse(await c.req.json());
-    if (!body.success) throw new HTTPException(400, { message: 'Invalid input' });
-    return c.json(ok(await service.createItem(c, body.data)), 201);
+  app.openapi(listItemsRoute, async (c) => {
+    const query = c.req.valid('query');
+    const rows = await service.listItems(c, query);
+    return c.json(ok(rows.map(toStockItemWithLowStockDto)), 200);
   });
 
-  app.get('/items/:id', requirePermission('stock.view'), async (c) => {
-    const item = await service.getItem(c, c.req.param('id'));
+  const createItemRoute = createRoute({
+    method: 'post',
+    path: '/items',
+    tags: ['stock'],
+    operationId: 'createStockItem',
+    middleware: [requirePermission('stock.manage')] as const,
+    request: {
+      body: { content: { 'application/json': { schema: createItemSchema } } },
+    },
+    responses: createdResponses(stockItemDtoSchema, 'Stock item created'),
+  });
+
+  app.openapi(createItemRoute, async (c) => {
+    const body = c.req.valid('json');
+    const row = await service.createItem(c, body);
+    if (!row) throw new Error('Stock item creation failed');
+    return c.json(ok(toStockItemDto(row)), 201);
+  });
+
+  const getItemRoute = createRoute({
+    method: 'get',
+    path: '/items/{id}',
+    tags: ['stock'],
+    operationId: 'getStockItem',
+    middleware: [requirePermission('stock.view')] as const,
+    request: { params: stockIdParamSchema },
+    responses: { ...okJson(stockItemWithLowStockDtoSchema, 'Stock item'), ...notFoundResponse },
+  });
+
+  app.openapi(getItemRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const item = await service.getItem(c, id);
     if (!item) return c.json(fail('item.not_found', 'Stock item not found'), 404);
-    return c.json(ok(item));
+    return c.json(ok(toStockItemWithLowStockDto(item)), 200);
   });
 
-  app.patch('/items/:id', requirePermission('stock.manage'), async (c) => {
-    const body = updateItemSchema.safeParse(await c.req.json());
-    if (!body.success) throw new HTTPException(400, { message: 'Invalid input' });
-    const item = await service.updateItem(c, c.req.param('id'), body.data);
+  const updateItemRoute = createRoute({
+    method: 'patch',
+    path: '/items/{id}',
+    tags: ['stock'],
+    operationId: 'updateStockItem',
+    middleware: [requirePermission('stock.manage')] as const,
+    request: {
+      params: stockIdParamSchema,
+      body: { content: { 'application/json': { schema: updateItemSchema } } },
+    },
+    responses: { ...okJson(stockItemDtoSchema, 'Updated stock item'), ...notFoundResponse },
+  });
+
+  app.openapi(updateItemRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const body = c.req.valid('json');
+    const item = await service.updateItem(c, id, body);
     if (!item) return c.json(fail('item.not_found', 'Stock item not found'), 404);
-    return c.json(ok(item));
+    return c.json(ok(toStockItemDto(item)), 200);
   });
 
   // ===== Movements =====
-  app.get('/movements', requirePermission('stock.view'), async (c) => {
-    const itemId = c.req.query('itemId');
-    if (!itemId) return c.json(fail('query.missing', 'itemId required'), 400);
-    return c.json(ok(await service.listMovements(c, itemId)));
+  const listMovementsRoute = createRoute({
+    method: 'get',
+    path: '/movements',
+    tags: ['stock'],
+    operationId: 'listStockMovements',
+    middleware: [requirePermission('stock.view')] as const,
+    request: { query: movementsQuerySchema },
+    responses: okJson(z.array(stockMovementDtoSchema), 'List of stock movements'),
   });
 
-  app.post('/movements', requirePermission('stock.manage'), async (c) => {
-    const body = createMovementSchema.safeParse(await c.req.json());
-    if (!body.success) throw new HTTPException(400, { message: 'Invalid input' });
-    return c.json(ok(await service.createMovement(c, body.data)), 201);
+  app.openapi(listMovementsRoute, async (c) => {
+    const { itemId } = c.req.valid('query');
+    const rows = await service.listMovements(c, itemId);
+    return c.json(ok(rows.map(toStockMovementDto)), 200);
+  });
+
+  const createMovementRoute = createRoute({
+    method: 'post',
+    path: '/movements',
+    tags: ['stock'],
+    operationId: 'createStockMovement',
+    middleware: [requirePermission('stock.manage')] as const,
+    request: {
+      body: { content: { 'application/json': { schema: createMovementSchema } } },
+    },
+    responses: createdResponses(stockMovementDtoSchema, 'Stock movement created'),
+  });
+
+  app.openapi(createMovementRoute, async (c) => {
+    const body = c.req.valid('json');
+    const movement = await service.createMovement(c, body);
+    if (!movement) throw new Error('Stock movement creation failed');
+    return c.json(ok(toStockMovementDto(movement)), 201);
   });
 
   // ===== BOM =====
-  app.get('/bom', requirePermission('stock.view'), async (c) => {
-    const serviceId = c.req.query('serviceId') ?? undefined;
-    return c.json(ok(await service.listBom(c, serviceId)));
+  const listBomRoute = createRoute({
+    method: 'get',
+    path: '/bom',
+    tags: ['stock'],
+    operationId: 'listStockBom',
+    middleware: [requirePermission('stock.view')] as const,
+    request: { query: bomQuerySchema },
+    responses: okJson(z.array(serviceMaterialDtoSchema), 'List of service materials (BOM)'),
   });
 
-  app.post('/bom', requirePermission('stock.manage'), async (c) => {
-    const body = createBomSchema.safeParse(await c.req.json());
-    if (!body.success) throw new HTTPException(400, { message: 'Invalid input' });
-    return c.json(ok(await service.createBom(c, body.data)), 201);
+  app.openapi(listBomRoute, async (c) => {
+    const { serviceId } = c.req.valid('query');
+    const rows = await service.listBom(c, serviceId);
+    return c.json(ok(rows.map(toServiceMaterialDto)), 200);
   });
 
-  app.delete('/bom/:id', requirePermission('stock.manage'), async (c) => {
-    const bom = await service.removeBom(c, c.req.param('id'));
+  const createBomRoute = createRoute({
+    method: 'post',
+    path: '/bom',
+    tags: ['stock'],
+    operationId: 'createStockBom',
+    middleware: [requirePermission('stock.manage')] as const,
+    request: {
+      body: { content: { 'application/json': { schema: createBomSchema } } },
+    },
+    responses: createdResponses(serviceMaterialDtoSchema, 'Service material (BOM) created'),
+  });
+
+  app.openapi(createBomRoute, async (c) => {
+    const body = c.req.valid('json');
+    const bom = await service.createBom(c, body);
+    if (!bom) throw new Error('BOM creation failed');
+    return c.json(ok(toServiceMaterialDto(bom)), 201);
+  });
+
+  const removeBomRoute = createRoute({
+    method: 'delete',
+    path: '/bom/{id}',
+    tags: ['stock'],
+    operationId: 'removeStockBom',
+    middleware: [requirePermission('stock.manage')] as const,
+    request: { params: stockIdParamSchema },
+    responses: { ...okJson(stockBomDeleteResultSchema, 'BOM removed'), ...notFoundResponse },
+  });
+
+  app.openapi(removeBomRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const bom = await service.removeBom(c, id);
     if (!bom) return c.json(fail('bom.not_found', 'BOM not found'), 404);
-    return c.json(ok(bom));
+    return c.json(ok({ deleted: true as const }), 200);
   });
 
   return app;

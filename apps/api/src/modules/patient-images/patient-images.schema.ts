@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from '@hono/zod-openapi';
 
 export const imageType = z.enum([
   'xray_panoramic',
@@ -60,3 +60,31 @@ export function extFromContentType(ct: string): string {
   };
   return map[ct] ?? 'bin';
 }
+
+// --- Response DTO (zod-openapi contract manbasi) ---
+
+/** Hand `PatientImage` wire shakliga AYNAN mos response DTO. */
+export const patientImageSchema = z
+  .object({
+    id: z.uuid(),
+    tenantId: z.uuid(),
+    patientId: z.uuid(),
+    uploadedByUserId: z.uuid().nullable(),
+    type: imageType,
+    objectKey: z.string(),
+    originalFilename: z.string(),
+    contentType: z.string(),
+    sizeBytes: z.number().int(),
+    title: z.string().nullable(),
+    description: z.string().nullable(),
+    toothNumbers: z.array(z.number().int()).nullable(),
+    takenDate: z.iso.datetime().nullable(),
+    createdAt: z.iso.datetime(),
+    url: z.string(),
+  })
+  .openapi('PatientImage');
+
+export const patientImageDeleteSchema = z.object({ deleted: z.literal(true) });
+
+export const patientImageIdParamSchema = z.object({ id: z.uuid() });
+export const patientImagesByPatientParamSchema = z.object({ patientId: z.uuid() });

@@ -1,5 +1,10 @@
+import {
+  getAppointmentStatsReport,
+  getDoctorWorkloadReport,
+  getPlanCompletionReport,
+  getRevenueReport,
+} from '@dental/api-client';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api.ts';
 import { reportKeys } from './reports.keys';
 import type { ReportRange } from './reports.types';
 
@@ -12,27 +17,27 @@ const toQuery = (range: ReportRange) => ({
 export function useRevenueReport(range: ReportRange) {
   return useQuery({
     queryKey: reportKeys.revenue(range),
-    queryFn: () => api.reports.revenue(toQuery(range)),
+    queryFn: () => getRevenueReport(toQuery(range)).then((r) => r.data),
   });
 }
 
 export function useAppointmentStats(range: ReportRange) {
   return useQuery({
     queryKey: reportKeys.appointments(range),
-    queryFn: () => api.reports.appointments(toQuery(range)),
+    queryFn: () => getAppointmentStatsReport(toQuery(range)).then((r) => r.data),
   });
 }
 
 export function useDoctorWorkload(range: ReportRange) {
   return useQuery({
     queryKey: reportKeys.doctors(range),
-    queryFn: () => api.reports.doctors(toQuery(range)),
+    queryFn: () => getDoctorWorkloadReport(toQuery(range)).then((r) => r.data),
   });
 }
 
 export function usePlanCompletion(range: ReportRange) {
   return useQuery({
     queryKey: reportKeys.planCompletion(range),
-    queryFn: () => api.reports.treatmentPlans(toQuery(range)),
+    queryFn: () => getPlanCompletionReport(toQuery(range)).then((r) => r.data),
   });
 }

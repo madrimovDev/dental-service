@@ -20,7 +20,7 @@ export const isClientConfigured = (): boolean => client !== null;
 export type CustomInstanceConfig = {
   url: string;
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-  params?: Record<string, string | number | boolean | undefined>;
+  params?: Record<string, string | number | boolean | null | undefined>;
   // orval Content-Type yuboradi — transport o'zi qo'yadi, shuning uchun qabul qilinadi-yu forward qilinmaydi
   headers?: Record<string, string>;
   data?: unknown;
@@ -34,7 +34,7 @@ export const customInstance = async <T>(config: CustomInstanceConfig): Promise<T
   const qs = config.params
     ? new URLSearchParams(
         Object.entries(config.params)
-          .filter(([, v]) => v !== undefined)
+          .filter(([, v]) => v != null)
           .map(([k, v]) => [k, String(v)]),
       ).toString()
     : '';

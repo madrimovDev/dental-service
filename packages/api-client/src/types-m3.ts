@@ -24,23 +24,6 @@ export type CashierTransaction = {
   updatedAt: string;
 };
 
-export type CashierTransactionItem = {
-  id: string;
-  transactionId: string;
-  serviceId: string | null;
-  serviceName: string;
-  quantity: number;
-  unitPrice: string;
-  subtotal: string;
-};
-
-export type CashierTransactionWithItems = CashierTransaction & { items: CashierTransactionItem[] };
-
-export type CashierListResponse = {
-  data: CashierTransaction[];
-  meta: { page: number; pageSize: number; total: number };
-};
-
 export type DailySummary = {
   date: string;
   branchId: string;

@@ -1,10 +1,10 @@
+import { logout as apiLogout } from '@dental/api-client';
 import { Avatar, IconButton } from '@dental/ui';
 import { Burger, Menu, useMantineColorScheme } from '@mantine/core';
 import { LogOut, Moon, Repeat, Search, Sun, User } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { NotificationBell } from '@/features/notifications/components/NotificationBell.tsx';
-import { api } from '@/lib/api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import classes from './Topbar.module.css';
 
@@ -23,7 +23,7 @@ export function Topbar({
   const logout = async () => {
     if (refreshToken) {
       try {
-        await api.auth.logout(refreshToken);
+        await apiLogout({ refreshToken });
       } catch {
         /* silent */
       }

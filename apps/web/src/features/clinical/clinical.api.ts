@@ -11,6 +11,7 @@ import {
   createToothChart,
   createTreatmentPlan,
   createVisitNote,
+  deletePatientImage,
   getLatestToothChart,
   getTreatmentPlan,
   type LabOrderStatus,
@@ -19,6 +20,7 @@ import {
   listConsentTemplates,
   listDiagnoses,
   listLabOrders,
+  listPatientImages,
   listPrescriptions,
   listTreatmentPlans,
   listVisitNotes,
@@ -192,7 +194,7 @@ export function useCreateConsentTemplate() {
 export function usePatientImages(patientId: string) {
   return useQuery({
     queryKey: clinicalKeys.images(patientId),
-    queryFn: () => api.patientImages.list(patientId),
+    queryFn: () => listPatientImages(patientId).then((r) => r.data),
   });
 }
 
@@ -207,7 +209,7 @@ export function useUploadPatientImage(patientId: string) {
 export function useDeletePatientImage(patientId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api.patientImages.remove(id),
+    mutationFn: (id: string) => deletePatientImage(id).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: clinicalKeys.images(patientId) }),
   });
 }

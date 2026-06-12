@@ -1,13 +1,22 @@
-import { listBranches, listServices } from '@dental/api-client';
+import {
+  createStockBom,
+  createStockItem,
+  createStockMovement,
+  listBranches,
+  listServices,
+  listStockBom,
+  listStockItems,
+  listStockMovements,
+  removeStockBom,
+} from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api.ts';
 import { stockKeys } from './stock.keys';
 
 /** Ombor itemlari (qoldiq + lowStock). branchId ixtiyoriy filtr. */
 export function useStockItems(branchId?: string) {
   return useQuery({
     queryKey: stockKeys.items(branchId ?? ''),
-    queryFn: () => api.stock.items(branchId ? { branchId } : undefined),
+    queryFn: () => listStockItems(branchId ? { branchId } : undefined).then((r) => r.data),
   });
 }
 
@@ -15,7 +24,7 @@ export function useStockItems(branchId?: string) {
 export function useStockMovements(itemId: string | null) {
   return useQuery({
     queryKey: stockKeys.movements(itemId ?? ''),
-    queryFn: () => api.stock.movements(itemId ?? ''),
+    queryFn: () => listStockMovements({ itemId: itemId ?? '' }).then((r) => r.data),
     enabled: !!itemId,
   });
 }
@@ -24,7 +33,7 @@ export function useStockMovements(itemId: string | null) {
 export function useServiceMaterials(serviceId?: string) {
   return useQuery({
     queryKey: stockKeys.bom(serviceId ?? ''),
-    queryFn: () => api.stock.bom(serviceId ? { serviceId } : undefined),
+    queryFn: () => listStockBom(serviceId ? { serviceId } : undefined).then((r) => r.data),
   });
 }
 
@@ -40,7 +49,8 @@ export function useServices() {
 export function useCreateItem() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: Parameters<typeof api.stock.createItem>[0]) => api.stock.createItem(body),
+    mutationFn: (body: Parameters<typeof createStockItem>[0]) =>
+      createStockItem(body).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: stockKeys.all }),
   });
 }
@@ -48,8 +58,8 @@ export function useCreateItem() {
 export function useCreateMovement() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: Parameters<typeof api.stock.createMovement>[0]) =>
-      api.stock.createMovement(body),
+    mutationFn: (body: Parameters<typeof createStockMovement>[0]) =>
+      createStockMovement(body).then((r) => r.data),
     onSuccess: (_data, vars) => {
       // Harakat qoldiqni o'zgartiradi → item ro'yxati VA shu item harakatlari yangilanadi.
       void qc.invalidateQueries({ queryKey: stockKeys.all });
@@ -61,7 +71,8 @@ export function useCreateMovement() {
 export function useCreateBom() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: Parameters<typeof api.stock.createBom>[0]) => api.stock.createBom(body),
+    mutationFn: (body: Parameters<typeof createStockBom>[0]) =>
+      createStockBom(body).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: stockKeys.all }),
   });
 }
@@ -69,7 +80,7 @@ export function useCreateBom() {
 export function useRemoveBom() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api.stock.removeBom(id),
+    mutationFn: (id: string) => removeStockBom(id).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: stockKeys.all }),
   });
 }

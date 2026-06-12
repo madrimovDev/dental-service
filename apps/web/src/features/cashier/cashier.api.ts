@@ -1,12 +1,17 @@
 import {
+  createCashierTransaction,
+  getCashierDailySummary,
+  getCashierPlanBalance,
   getService,
   listBranches,
+  listCashierTransactions,
+  listPatients,
   listServices,
   listTreatmentPlans,
+  refundCashierTransaction,
   type ServiceWithPrices,
 } from '@dental/api-client';
 import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api.ts';
 import { cashierKeys } from './cashier.keys';
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -16,12 +21,12 @@ export function useTodayTransactions(branchId: string | null) {
     queryKey: cashierKeys.today(branchId ?? ''),
     queryFn: () => {
       const today = todayISO();
-      return api.cashier.list({
+      return listCashierTransactions({
         branchId: branchId ?? undefined,
         from: today,
         to: today,
         pageSize: 100,
-      });
+      }).then((r) => r.data);
     },
     enabled: !!branchId,
   });
@@ -30,7 +35,8 @@ export function useTodayTransactions(branchId: string | null) {
 export function useDailySummary(branchId: string | null) {
   return useQuery({
     queryKey: cashierKeys.summary(branchId ?? ''),
-    queryFn: () => api.cashier.dailySummary(branchId ?? '', todayISO()),
+    queryFn: () =>
+      getCashierDailySummary({ branchId: branchId ?? '', date: todayISO() }).then((r) => r.data),
     enabled: !!branchId,
   });
 }
@@ -47,7 +53,7 @@ export function useServices() {
 export function usePatientsAll() {
   return useQuery({
     queryKey: ['patients', 'list-all'],
-    queryFn: () => api.patients.list({ pageSize: 100 }),
+    queryFn: () => listPatients({ pageSize: 100 }).then((r) => r.data),
   });
 }
 
@@ -64,7 +70,7 @@ export function usePatientPlans(patientId: string | null) {
 export function usePlanBalance(planId: string | null) {
   return useQuery({
     queryKey: cashierKeys.planBalance(planId ?? ''),
-    queryFn: () => api.cashier.planBalance(planId ?? ''),
+    queryFn: () => getCashierPlanBalance(planId ?? '').then((r) => r.data),
     enabled: !!planId,
   });
 }
@@ -72,7 +78,8 @@ export function usePlanBalance(planId: string | null) {
 export function useCreateTransaction() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: Parameters<typeof api.cashier.create>[0]) => api.cashier.create(body),
+    mutationFn: (body: Parameters<typeof createCashierTransaction>[0]) =>
+      createCashierTransaction(body).then((r) => r.data),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: cashierKeys.all });
       // Plan billing → balans yangilanishi uchun.
@@ -84,7 +91,7 @@ export function useCreateTransaction() {
 export function useRefund() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api.cashier.refund(id),
+    mutationFn: (id: string) => refundCashierTransaction(id).then((r) => r.data),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: cashierKeys.all });
       // Refund allocation'larni negate qiladi → plan balans tiklanadi.

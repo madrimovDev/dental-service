@@ -1,4 +1,4 @@
-import type { ApiError } from '@dental/api-client';
+import { type ApiError, login } from '@dental/api-client';
 import {
   Alert,
   Anchor,
@@ -17,7 +17,6 @@ import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { PhoneInput } from '@/components/PhoneInput.tsx';
-import { api } from '@/lib/api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
 
 const schema = z.object({
@@ -37,7 +36,7 @@ export function LoginPage() {
   });
 
   const loginMut = useMutation({
-    mutationFn: api.auth.login,
+    mutationFn: (body: { phone: string; password: string }) => login(body).then((r) => r.data),
     onSuccess: async (data) => {
       setTokens(data.accessToken, data.refreshToken);
       setUser(data.user);

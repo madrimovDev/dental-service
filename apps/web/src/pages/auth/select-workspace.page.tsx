@@ -1,4 +1,4 @@
-import { ApiError } from '@dental/api-client';
+import { ApiError, getMe, switchWorkspace } from '@dental/api-client';
 import {
   Alert,
   Badge,
@@ -16,7 +16,6 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { api } from '@/lib/api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
 
 type WorkspaceOption = {
@@ -39,7 +38,7 @@ export function SelectWorkspacePage() {
 
   const meQuery = useQuery({
     queryKey: ['auth', 'me'],
-    queryFn: () => api.auth.me(),
+    queryFn: () => getMe().then((r) => r.data),
     enabled: !!accessToken,
   });
 
@@ -47,7 +46,7 @@ export function SelectWorkspacePage() {
     mutationFn: (input: { tenantId: string; branchId?: string }) => {
       const rt = useAuthStore.getState().refreshToken;
       if (!rt) throw new Error('No refresh token');
-      return api.auth.switchWorkspace({ ...input, refreshToken: rt });
+      return switchWorkspace({ ...input, refreshToken: rt }).then((r) => r.data);
     },
     onSuccess: (data) => {
       // Decode JWT to get perms (simple base64 — production: jose lib)

@@ -1,3 +1,4 @@
+import { passwordResetRequest } from '@dental/api-client';
 import { Alert, Anchor, Button, Container, Paper, Stack, Title } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useMutation } from '@tanstack/react-query';
@@ -6,7 +7,6 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { z } from 'zod';
 import { PhoneInput } from '@/components/PhoneInput.tsx';
-import { api } from '@/lib/api.ts';
 
 const schema = z.object({
   phone: z.string().regex(/^\+?\d{9,15}$/, "Telefon raqami noto'g'ri formatda"),
@@ -20,7 +20,8 @@ export function ForgotPasswordPage() {
   });
 
   const mut = useMutation({
-    mutationFn: (v: { phone: string }) => api.auth.requestPasswordReset(v.phone),
+    mutationFn: (v: { phone: string }) =>
+      passwordResetRequest({ phone: v.phone }).then((r) => r.data),
   });
 
   return (

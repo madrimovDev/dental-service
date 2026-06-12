@@ -20,11 +20,6 @@ export type Expense = {
   createdAt: string;
 };
 
-export type ExpenseListResponse = {
-  data: Expense[];
-  meta: { page: number; pageSize: number; total: number };
-};
-
 export type ExpenseSummary = {
   byCategory: Array<{ categoryId: string | null; total: string; count: number }>;
   grandTotal: number;
