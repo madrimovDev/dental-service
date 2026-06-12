@@ -3,9 +3,21 @@ import {
   finalizePayrollRun,
   getPayrollRun,
   listPayrollRuns,
+  listUserAssignments,
 } from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { payrollKeys } from './payroll.keys';
+
+/**
+ * UserId → ism xaritasi uchun (payroll line faqat userId tashiydi).
+ * `['users', 'assignments']` key audit feature bilan bir xil — cache bo'lishiladi.
+ */
+export function useUserAssignments() {
+  return useQuery({
+    queryKey: ['users', 'assignments'],
+    queryFn: () => listUserAssignments().then((r) => r.data),
+  });
+}
 
 /** Run ro'yxati (sana/status). */
 export function usePayrollRuns() {
