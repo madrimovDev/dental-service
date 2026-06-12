@@ -25,7 +25,7 @@ describe('mutator', () => {
     configureClient({ baseUrl: 'http://x', getAccessToken: () => null });
     const res = await customInstance<{ success: true; data: { ok: number } }>({
       url: '/api/things',
-      method: 'get',
+      method: 'GET',
       params: { search: undefined, page: undefined },
     });
 

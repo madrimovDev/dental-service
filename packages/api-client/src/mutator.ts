@@ -19,8 +19,10 @@ export const isClientConfigured = (): boolean => client !== null;
 
 export type CustomInstanceConfig = {
   url: string;
-  method: 'get' | 'post' | 'put' | 'patch' | 'delete';
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   params?: Record<string, string | number | boolean | undefined>;
+  // orval Content-Type yuboradi — transport o'zi qo'yadi, shuning uchun qabul qilinadi-yu forward qilinmaydi
+  headers?: Record<string, string>;
   data?: unknown;
   signal?: AbortSignal;
 };
@@ -37,7 +39,7 @@ export const customInstance = async <T>(config: CustomInstanceConfig): Promise<T
       ).toString()
     : '';
   const path = qs ? `${config.url}?${qs}` : config.url;
-  const method = config.method.toUpperCase();
+  const method = config.method;
   // requestRaw `{success,data}` envelope qaytaradi — generated T = envelope.
   return client.requestRaw(method, path, config.data, config.signal) as Promise<T>;
 };
