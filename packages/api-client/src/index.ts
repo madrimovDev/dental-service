@@ -598,7 +598,6 @@ export {
 } from './generated/visit-notes/visit-notes.ts';
 export type { CustomInstanceConfig } from './mutator.ts';
 export { configureClient, customInstance, isClientConfigured } from './mutator.ts';
-export * from './types.ts';
 export * from './types-clinical.ts';
 export * from './types-erp.ts';
 export * from './types-m3.ts';
