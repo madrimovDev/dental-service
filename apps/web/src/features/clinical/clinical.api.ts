@@ -1,13 +1,15 @@
-import type {
-  CreateLabOrderInput,
-  CreatePrescriptionInput,
-  CreateTemplateInput,
-  CreateToothChartInput,
-  CreateTreatmentPlanInput,
-  CreateVisitNoteInput,
-  LabOrderStatus,
-  SignFormInput,
-  TreatmentStageStatus,
+import {
+  type CreateLabOrderInput,
+  type CreatePrescriptionInput,
+  type CreateTemplateInput,
+  type CreateToothChartInput,
+  type CreateTreatmentPlanInput,
+  type CreateVisitNoteInput,
+  type LabOrderStatus,
+  listAppointments,
+  listDiagnoses,
+  type SignFormInput,
+  type TreatmentStageStatus,
 } from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api.ts';
@@ -85,7 +87,7 @@ export function useCreateVisitNote(patientId: string) {
 export function useDiagnoses() {
   return useQuery({
     queryKey: clinicalKeys.diagnoses(),
-    queryFn: () => api.clinical.listDiagnoses(),
+    queryFn: () => listDiagnoses().then((r) => r.data),
     staleTime: HOUR,
   });
 }
@@ -93,7 +95,7 @@ export function useDiagnoses() {
 export function usePatientAppointments(patientId: string) {
   return useQuery({
     queryKey: clinicalKeys.appointmentsForPatient(patientId),
-    queryFn: () => api.appointments.list({ patientId }),
+    queryFn: () => listAppointments({ patientId }).then((r) => r.data),
   });
 }
 

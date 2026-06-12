@@ -1,23 +1,18 @@
 import type { ApiClient } from './client.ts';
 import type {
-  Branch,
   InviteUserResponse,
   LoginResponse,
   MembershipsResponse,
-  PermissionDef,
   RefreshResponse,
   RegisterTenantResponse,
   Role,
   SwitchWorkspaceResponse,
-  Tenant,
   UserAssignment,
 } from './types.ts';
-import type { AuditListResponse } from './types-audit.ts';
 import type {
   CreateToothChartInput,
   CreateTreatmentPlanInput,
   CreateVisitNoteInput,
-  Diagnosis,
   ToothChart,
   ToothChartWithStates,
   TreatmentPlan,
@@ -40,18 +35,11 @@ import type {
 } from './types-erp.ts';
 import type { PayrollRun, PayrollRunWithLines, StaffProfile } from './types-hr.ts';
 import type {
-  Appointment,
-  AppointmentStatus,
   CashierListResponse,
   CashierTransactionWithItems,
   DailySummary,
   PaymentMethod,
   PlanBalance,
-  QueueStatus,
-  QueueTicket,
-  Service,
-  ServicePrice,
-  ServiceWithPrices,
 } from './types-m3.ts';
 import type {
   ConsentForm,
@@ -68,7 +56,6 @@ import type {
   Prescription,
   SignFormInput,
 } from './types-m5.ts';
-import type { NotificationsFeed } from './types-notifications.ts';
 import type {
   AllergyEntry,
   MedicalRecord,
@@ -119,24 +106,6 @@ export const createEndpoints = (api: ApiClient) => ({
       api.post<{ changed: true }>('/api/auth/change-password', { currentPassword, newPassword }),
   },
 
-  tenant: {
-    get: () => api.get<Tenant>('/api/tenant'),
-    update: (body: { name?: string; defaultLanguage?: 'uz' | 'ru' }) =>
-      api.patch<Tenant>('/api/tenant', body),
-    transferOwnership: (body: { newOwnerUserId: string; currentPassword: string }) =>
-      api.post<Tenant>('/api/tenant/transfer-ownership', body),
-  },
-
-  branches: {
-    list: () => api.get<Branch[]>('/api/branches'),
-    get: (id: string) => api.get<Branch>(`/api/branches/${id}`),
-    create: (body: { name: string; address?: string; phone?: string }) =>
-      api.post<Branch>('/api/branches', body),
-    update: (id: string, body: { name?: string; address?: string; phone?: string }) =>
-      api.patch<Branch>(`/api/branches/${id}`, body),
-    remove: (id: string) => api.delete<{ deleted: true; id: string }>(`/api/branches/${id}`),
-  },
-
   roles: {
     list: () => api.get<Role[]>('/api/roles'),
     get: (id: string) => api.get<Role>(`/api/roles/${id}`),
@@ -149,10 +118,6 @@ export const createEndpoints = (api: ApiClient) => ({
         permissions,
       }),
     remove: (id: string) => api.delete<{ deleted: true }>(`/api/roles/${id}`),
-  },
-
-  permissions: {
-    list: () => api.get<PermissionDef[]>('/api/permissions'),
   },
 
   users: {
@@ -230,28 +195,6 @@ export const createEndpoints = (api: ApiClient) => ({
     },
   },
 
-  services: {
-    list: () => api.get<Service[]>('/api/services'),
-    get: (id: string) => api.get<ServiceWithPrices>(`/api/services/${id}`),
-    create: (body: {
-      code: string;
-      nameUz: string;
-      nameRu?: string;
-      category?: string;
-      durationMinutes?: number;
-      requiredRole?: string;
-      descriptionUz?: string;
-      descriptionRu?: string;
-      isActive?: boolean;
-      initialPrice?: number;
-      initialBranchId?: string;
-    }) => api.post<Service>('/api/services', body),
-    update: (id: string, body: Partial<Service>) => api.patch<Service>(`/api/services/${id}`, body),
-    remove: (id: string) => api.delete<{ deleted: true }>(`/api/services/${id}`),
-    setPrice: (id: string, body: { branchId: string; price: number; currency?: string }) =>
-      api.post<ServicePrice>(`/api/services/${id}/prices`, body),
-  },
-
   cashier: {
     list: (query?: {
       branchId?: string;
@@ -315,23 +258,6 @@ export const createEndpoints = (api: ApiClient) => ({
       const p = new URLSearchParams({ from: q.from, to: q.to });
       if (q.branchId) p.set('branchId', q.branchId);
       return api.get<PlanCompletionReport>(`/api/reports/treatment-plans?${p.toString()}`);
-    },
-  },
-
-  audit: {
-    list: (q?: {
-      from?: string;
-      to?: string;
-      action?: string;
-      resourceType?: string;
-      userId?: string;
-      page?: number;
-      pageSize?: number;
-    }) => {
-      const p = new URLSearchParams();
-      for (const [k, v] of Object.entries(q ?? {})) if (v != null) p.set(k, String(v));
-      const qs = p.toString();
-      return api.get<AuditListResponse>(`/api/audit${qs ? `?${qs}` : ''}`);
     },
   },
 
@@ -416,19 +342,6 @@ export const createEndpoints = (api: ApiClient) => ({
     removeBom: (id: string) => api.delete<{ deleted: true }>(`/api/stock/bom/${id}`),
   },
 
-  notifications: {
-    list: (query?: { page?: number; pageSize?: number }) => {
-      const p = new URLSearchParams();
-      if (query?.page) p.set('page', String(query.page));
-      if (query?.pageSize) p.set('pageSize', String(query.pageSize));
-      const qs = p.toString();
-      return api.get<NotificationsFeed>(`/api/notifications${qs ? `?${qs}` : ''}`);
-    },
-    markRead: (id: string) =>
-      api.post<{ read: boolean; id: string | null }>(`/api/notifications/${id}/read`),
-    markAllRead: () => api.post<{ count: number }>('/api/notifications/read-all'),
-  },
-
   payroll: {
     runs: () => api.get<PayrollRun[]>('/api/payroll/runs'),
     getRun: (id: string) => api.get<PayrollRunWithLines>(`/api/payroll/runs/${id}`),
@@ -437,69 +350,7 @@ export const createEndpoints = (api: ApiClient) => ({
     finalize: (id: string) => api.post<PayrollRun>(`/api/payroll/runs/${id}/finalize`),
   },
 
-  appointments: {
-    list: (query?: {
-      branchId?: string;
-      doctorId?: string;
-      patientId?: string;
-      from?: string;
-      to?: string;
-    }) => {
-      const params = new URLSearchParams();
-      if (query?.branchId) params.set('branchId', query.branchId);
-      if (query?.doctorId) params.set('doctorId', query.doctorId);
-      if (query?.patientId) params.set('patientId', query.patientId);
-      if (query?.from) params.set('from', query.from);
-      if (query?.to) params.set('to', query.to);
-      const qs = params.toString();
-      return api.get<Appointment[]>(`/api/appointments${qs ? `?${qs}` : ''}`);
-    },
-    get: (id: string) => api.get<Appointment>(`/api/appointments/${id}`),
-    create: (body: {
-      branchId: string;
-      patientId: string;
-      doctorId: string;
-      assistantId?: string;
-      startTime: string;
-      endTime: string;
-      serviceIds?: string[];
-      notes?: string;
-    }) => api.post<Appointment>('/api/appointments', body),
-    update: (
-      id: string,
-      body: {
-        startTime?: string;
-        endTime?: string;
-        doctorId?: string;
-        status?: AppointmentStatus;
-        serviceIds?: string[];
-        notes?: string;
-      },
-    ) => api.patch<Appointment>(`/api/appointments/${id}`, body),
-    cancel: (id: string, reason?: string) =>
-      api.post<Appointment>(`/api/appointments/${id}/cancel`, { reason }),
-  },
-
-  queue: {
-    today: (branchId: string) => api.get<QueueTicket[]>(`/api/queue?branchId=${branchId}`),
-    create: (body: {
-      branchId: string;
-      patientId?: string;
-      serviceId?: string;
-      appointmentId?: string;
-    }) => api.post<QueueTicket>('/api/queue', body),
-    updateStatus: (id: string, status: QueueStatus, doctorId?: string) =>
-      api.patch<QueueTicket>(`/api/queue/${id}/status`, { status, doctorId }),
-    checkInCandidates: (branchId: string) =>
-      api.get<Appointment[]>(`/api/queue/check-in-candidates?branchId=${branchId}`),
-  },
-
   clinical: {
-    listDiagnoses: (search?: string) => {
-      const qs = search ? `?search=${encodeURIComponent(search)}` : '';
-      return api.get<Diagnosis[]>(`/api/diagnoses${qs}`);
-    },
-
     listPlans: (patientId?: string) => {
       const qs = patientId ? `?patientId=${patientId}` : '';
       return api.get<TreatmentPlan[]>(`/api/treatment-plans${qs}`);

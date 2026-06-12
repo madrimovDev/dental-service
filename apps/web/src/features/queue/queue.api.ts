@@ -1,4 +1,13 @@
-import type { QueueStatus } from '@dental/api-client';
+import {
+  type CreateQueueTicketBody,
+  createQueueTicket,
+  getCheckInCandidates,
+  getQueueToday,
+  listBranches,
+  listServices,
+  type QueueStatus,
+  updateQueueTicketStatus,
+} from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api.ts';
 import { queueKeys } from './queue.keys';
@@ -6,7 +15,7 @@ import { queueKeys } from './queue.keys';
 export function useQueueToday(branchId: string | null) {
   return useQuery({
     queryKey: queueKeys.today(branchId ?? ''),
-    queryFn: () => api.queue.today(branchId ?? ''),
+    queryFn: () => getQueueToday({ branchId: branchId ?? '' }).then((r) => r.data),
     enabled: !!branchId,
     refetchInterval: 10_000,
   });
@@ -15,7 +24,7 @@ export function useQueueToday(branchId: string | null) {
 export function useCheckInCandidates(branchId: string | null) {
   return useQuery({
     queryKey: queueKeys.candidates(branchId ?? ''),
-    queryFn: () => api.queue.checkInCandidates(branchId ?? ''),
+    queryFn: () => getCheckInCandidates({ branchId: branchId ?? '' }).then((r) => r.data),
     enabled: !!branchId,
     refetchInterval: 10_000,
   });
@@ -24,7 +33,7 @@ export function useCheckInCandidates(branchId: string | null) {
 export function useCreateTicket() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: Parameters<typeof api.queue.create>[0]) => api.queue.create(body),
+    mutationFn: (body: CreateQueueTicketBody) => createQueueTicket(body).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: queueKeys.all }),
   });
 }
@@ -33,7 +42,7 @@ export function useUpdateQueueStatus() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: QueueStatus }) =>
-      api.queue.updateStatus(id, status),
+      updateQueueTicketStatus(id, { status }).then((r) => r.data),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queueKeys.all });
       // Backend done→completed / missed→no_show appointment'ni sync qiladi —
@@ -52,9 +61,9 @@ export function usePatientsAll() {
 }
 
 export function useServices() {
-  return useQuery({ queryKey: ['services'], queryFn: api.services.list });
+  return useQuery({ queryKey: ['services'], queryFn: () => listServices().then((r) => r.data) });
 }
 
 export function useBranches() {
-  return useQuery({ queryKey: ['branches'], queryFn: api.branches.list });
+  return useQuery({ queryKey: ['branches'], queryFn: () => listBranches().then((r) => r.data) });
 }

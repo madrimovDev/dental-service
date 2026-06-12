@@ -1,14 +1,3 @@
-// ===== ICD-10 Diagnoses (platform-level) =====
-export type Diagnosis = {
-  id: string;
-  code: string;
-  nameUz: string;
-  nameRu: string;
-  category: string | null;
-  descriptionUz: string | null;
-  descriptionRu: string | null;
-};
-
 // ===== Treatment Plans =====
 export type TreatmentPlanStatus =
   | 'draft'

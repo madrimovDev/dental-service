@@ -1,6 +1,17 @@
 import {
+  createBranch,
+  deleteBranch,
+  getTenant,
   getTenantSettings,
+  listBranches,
+  listPermissions,
+  type TransferTenantOwnershipBody,
+  transferTenantOwnership,
+  type UpdateBranchBody,
+  type UpdateTenantBody,
   type UpdateTenantSettingsBody,
+  updateBranch,
+  updateTenant,
   updateTenantSettings,
 } from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -21,7 +32,10 @@ export function useRole(id: string | null, enabled: boolean) {
 }
 
 export function usePermissions() {
-  return useQuery({ queryKey: settingsKeys.permissions(), queryFn: api.permissions.list });
+  return useQuery({
+    queryKey: settingsKeys.permissions(),
+    queryFn: () => listPermissions().then((r) => r.data),
+  });
 }
 
 export function useUpsertRole() {
@@ -110,20 +124,27 @@ export function useUpsertProfile(userId: string) {
 
 // --- Branches ---
 export function useBranches() {
-  return useQuery({ queryKey: settingsKeys.branches(), queryFn: api.branches.list });
+  return useQuery({
+    queryKey: settingsKeys.branches(),
+    queryFn: () => listBranches().then((r) => r.data),
+  });
 }
 
 export function useUpsertBranch() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { id: string | null; name: string; address?: string; phone?: string }) =>
-      input.id
-        ? api.branches.update(input.id, {
-            name: input.name,
-            address: input.address,
-            phone: input.phone,
-          })
-        : api.branches.create({ name: input.name, address: input.address, phone: input.phone }),
+    mutationFn: (input: { id: string | null; name: string; address?: string; phone?: string }) => {
+      const body: UpdateBranchBody = {
+        name: input.name,
+        address: input.address,
+        phone: input.phone,
+      };
+      return input.id
+        ? updateBranch(input.id, body).then((r) => r.data)
+        : createBranch({ name: input.name, address: input.address, phone: input.phone }).then(
+            (r) => r.data,
+          );
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: settingsKeys.branches() }),
   });
 }
@@ -131,20 +152,23 @@ export function useUpsertBranch() {
 export function useDeleteBranch() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api.branches.remove(id),
+    mutationFn: (id: string) => deleteBranch(id).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: settingsKeys.branches() }),
   });
 }
 
 // --- Tenant ---
 export function useTenant() {
-  return useQuery({ queryKey: settingsKeys.tenant(), queryFn: api.tenant.get });
+  return useQuery({
+    queryKey: settingsKeys.tenant(),
+    queryFn: () => getTenant().then((r) => r.data),
+  });
 }
 
 export function useUpdateTenant() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { name?: string; defaultLanguage?: 'uz' | 'ru' }) => api.tenant.update(body),
+    mutationFn: (body: UpdateTenantBody) => updateTenant(body).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: settingsKeys.tenant() }),
   });
 }
@@ -169,8 +193,8 @@ export function useUpdateTenantSettings() {
 export function useTransferOwnership() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { newOwnerUserId: string; currentPassword: string }) =>
-      api.tenant.transferOwnership(body),
+    mutationFn: (body: TransferTenantOwnershipBody) =>
+      transferTenantOwnership(body).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: settingsKeys.tenant() }),
   });
 }

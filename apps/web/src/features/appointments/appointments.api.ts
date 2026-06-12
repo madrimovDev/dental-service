@@ -1,3 +1,11 @@
+import type { CreateAppointmentBody } from '@dental/api-client';
+import {
+  cancelAppointment,
+  createAppointment,
+  listAppointments,
+  listBranches,
+  listServices,
+} from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api.ts';
 import { appointmentKeys } from './appointments.keys';
@@ -7,7 +15,9 @@ export function useAppointments(range: { branchId?: string; from: string; to: st
   return useQuery({
     queryKey: appointmentKeys.list(range),
     queryFn: () =>
-      api.appointments.list({ branchId: range.branchId, from: range.from, to: range.to }),
+      listAppointments({ branchId: range.branchId, from: range.from, to: range.to }).then(
+        (r) => r.data,
+      ),
   });
 }
 
@@ -27,19 +37,18 @@ export function useDoctors() {
 
 /** Branch xizmatlari ro'yxati (MultiSelect opsiyalari uchun). */
 export function useServices() {
-  return useQuery({ queryKey: ['services'], queryFn: api.services.list });
+  return useQuery({ queryKey: ['services'], queryFn: () => listServices().then((r) => r.data) });
 }
 
 /** Tenant filiallari (branch filter Select uchun). */
 export function useBranches() {
-  return useQuery({ queryKey: ['branches'], queryFn: api.branches.list });
+  return useQuery({ queryKey: ['branches'], queryFn: () => listBranches().then((r) => r.data) });
 }
 
 export function useCreateAppointment() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: Parameters<typeof api.appointments.create>[0]) =>
-      api.appointments.create(body),
+    mutationFn: (body: CreateAppointmentBody) => createAppointment(body).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: appointmentKeys.all }),
   });
 }
@@ -48,7 +57,7 @@ export function useCancelAppointment() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
-      api.appointments.cancel(id, reason),
+      cancelAppointment(id, reason !== undefined ? { reason } : undefined).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: appointmentKeys.all }),
   });
 }

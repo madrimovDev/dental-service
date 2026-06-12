@@ -1,24 +1,43 @@
 import { ok } from '@dental/core';
-import { Hono } from 'hono';
-import { HTTPException } from 'hono/http-exception';
+import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import type { Database } from '../../db/client.ts';
+import { okJson } from '../../lib/openapi.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
-import { auditListQuerySchema } from './audit.schema.ts';
+import { toAuditLogEntryDto } from './audit.mapper.ts';
+import { auditListQuerySchema, auditListResponseDtoSchema } from './audit.schema.ts';
 import { createAuditService } from './audit.service.ts';
 
 export const auditRoutes = (deps: { db: Database }) => {
-  const app = new Hono();
+  const app = new OpenAPIHono();
   app.use('*', authMiddleware());
   app.use('*', rlsMiddleware(deps.db));
 
   const service = createAuditService();
 
-  app.get('/', requirePermission('audit_log.view'), async (c) => {
-    const q = auditListQuerySchema.safeParse(Object.fromEntries(new URL(c.req.url).searchParams));
-    if (!q.success) throw new HTTPException(400, { message: 'Invalid query' });
-    return c.json(ok(await service.list(c, q.data)));
+  const listRoute = createRoute({
+    method: 'get',
+    path: '/',
+    tags: ['audit'],
+    operationId: 'listAuditLog',
+    middleware: [requirePermission('audit_log.view')] as const,
+    request: {
+      query: auditListQuerySchema,
+    },
+    responses: okJson(auditListResponseDtoSchema, 'Paginated audit log entries'),
+  });
+
+  app.openapi(listRoute, async (c) => {
+    const q = c.req.valid('query');
+    const result = await service.list(c, q);
+    return c.json(
+      ok({
+        data: result.data.map(toAuditLogEntryDto),
+        meta: result.meta,
+      }),
+      200,
+    );
   });
 
   return app;

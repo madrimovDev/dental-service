@@ -17,3 +17,7 @@ const doc = app.getOpenAPIDocument({
 const outPath = resolve(import.meta.dir, '../../../packages/api-client/openapi.json');
 writeFileSync(outPath, `${JSON.stringify(doc, null, 2)}\n`);
 console.log(`✅ OpenAPI spec yozildi: ${outPath} (${Object.keys(doc.paths ?? {}).length} path)`);
+
+// `createApp()` `db/client.ts` ni import qiladi → `postgres()` pool ochiq handle qoldiradi
+// va event loop yopilmaydi (script osilib qoladi). Spec yozildi — majburan toza chiqamiz.
+process.exit(0);
