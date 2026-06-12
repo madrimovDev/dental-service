@@ -34,9 +34,39 @@ export {
   listBranches,
   updateBranch,
 } from './generated/branches/branches.ts';
+// Generated (orval) — consent
+export type {
+  CreateConsentTemplateResult,
+  GetConsentTemplateResult,
+  ListConsentFormsResult,
+  ListConsentTemplatesResult,
+  SignConsentFormResult,
+  UpdateConsentTemplateResult,
+} from './generated/consent/consent.ts';
+export {
+  createConsentTemplate,
+  getConsentTemplate,
+  listConsentForms,
+  listConsentTemplates,
+  signConsentForm,
+  updateConsentTemplate,
+} from './generated/consent/consent.ts';
 // Generated (orval) — diagnoses
 export type { ListDiagnosesResult } from './generated/diagnoses/diagnoses.ts';
 export { listDiagnoses } from './generated/diagnoses/diagnoses.ts';
+// Generated (orval) — lab-orders
+export type {
+  CreateLabOrderResult,
+  GetLabOrderResult,
+  ListLabOrdersResult,
+  UpdateLabOrderResult,
+} from './generated/lab-orders/lab-orders.ts';
+export {
+  createLabOrder,
+  getLabOrder,
+  listLabOrders,
+  updateLabOrder,
+} from './generated/lab-orders/lab-orders.ts';
 // Generated model types — appointments, services, queue, notifications
 // QueueTicketStatus re-exported under both names for backward compatibility
 export type {
@@ -56,6 +86,10 @@ export type {
   CancelAppointmentBody,
   CheckInCandidate,
   CheckInCandidateStatus,
+  ConsentForm,
+  ConsentFormType,
+  ConsentTemplate,
+  ConsentTemplateType,
   CreateAppointment201,
   CreateAppointmentBody,
   CreateBranch201,
@@ -63,32 +97,92 @@ export type {
   CreateBranchBodyWorkHours,
   CreateBranchBodyWorkHoursAnyOf,
   CreateBranchBodyWorkHoursAnyOfTwo,
+  CreateConsentTemplate201,
+  CreateConsentTemplateBody,
+  CreateConsentTemplateBodyType,
+  CreateLabOrder201,
+  CreateLabOrderBody,
+  CreateLabOrderBodyItemsItem,
+  CreateLabOrderBodyOrderType,
+  CreatePayrollRun201,
+  CreatePayrollRunBody,
+  CreatePrescription201,
+  CreatePrescriptionBody,
+  CreatePrescriptionBodyItemsItem,
   CreateQueueTicket201,
   CreateQueueTicketBody,
+  CreateRole201,
+  CreateRoleBody,
   CreateService201,
   CreateServiceBody,
+  CreateToothChart201,
+  CreateToothChartBody,
+  CreateToothChartBodyStatesItem,
+  CreateToothChartBodyStatesItemState,
+  CreateToothChartBodyStatesItemSurface,
+  CreateTreatmentPlan201,
+  CreateTreatmentPlanBody,
+  CreateTreatmentPlanBodyStagesItem,
+  CreateVisitNote201,
+  CreateVisitNoteBody,
+  DeleteAssignmentResult,
   DeleteBranch200,
+  DeletePrescription200,
+  DeleteRole200,
   DeleteService200,
+  DeleteUserAssignment200,
   Diagnosis,
+  ErrorResponse,
+  ErrorResponseError,
+  ErrorResponseErrorDetails,
+  FinalizePayrollRun200,
   GetAppointment200,
   GetBranch200,
   GetCheckInCandidates200,
   GetCheckInCandidatesParams,
+  GetConsentTemplate200,
+  GetLabOrder200,
+  GetLatestToothChart200,
+  GetPayrollRun200,
+  GetPrescription200,
   GetQueueToday200,
   GetQueueTodayParams,
+  GetRole200,
   GetService200,
   GetTenant200,
+  LabOrder,
+  LabOrderItemsItem,
+  LabOrderOrderType,
+  LabOrderStatus,
   ListAppointments200,
   ListAppointmentsParams,
   ListAuditLog200,
   ListAuditLogParams,
   ListBranches200,
+  ListConsentForms200,
+  ListConsentFormsParams,
+  ListConsentTemplates200,
+  ListConsentTemplatesParams,
+  ListConsentTemplatesType,
   ListDiagnoses200,
   ListDiagnosesParams,
+  ListLabOrders200,
+  ListLabOrdersParams,
+  ListLabOrdersStatus,
   ListNotifications200,
   ListNotificationsParams,
+  ListPayrollRuns200,
   ListPermissions200,
+  ListPrescriptions200,
+  ListPrescriptionsParams,
+  ListRoles200,
   ListServices200,
+  ListToothCharts200,
+  ListTreatmentPlans200,
+  ListTreatmentPlansParams,
+  ListUserAssignments200,
+  ListVisitNotes200,
+  ListVisitNotesParams,
   MarkAllNotificationsRead200,
   MarkNotificationRead200,
   Notification,
@@ -96,22 +190,56 @@ export type {
   NotificationMarkReadResult,
   NotificationsFeed,
   NotificationsFeedMeta,
+  PayrollLine,
+  PayrollRun,
+  PayrollRunStatus,
+  PayrollRunWithLines,
+  PayrollRunWithLinesAllOf,
   PermissionDef,
+  Prescription,
+  PrescriptionDeleteResult,
+  PrescriptionItem,
   QueueTicket,
   QueueTicketStatus,
   QueueTicketStatus as QueueStatus,
+  ResetPasswordResponse,
+  ResetUserPassword200,
+  Role,
+  RoleDeleteResult,
+  RolePermissionsResult,
+  RoleWithPermissions,
   Service,
   ServiceDeleteResult,
   ServicePrice,
   ServiceWithPrices,
   ServiceWithPricesAllOf,
+  SetRolePermissions200,
+  SetRolePermissionsBody,
   SetServicePrice201,
   SetServicePriceBody,
+  SignConsentForm201,
+  SignConsentFormBody,
+  SignConsentFormBodyLanguage,
+  SignConsentFormBodyType,
+  StaffProfile,
+  StaffProfileEmploymentStatus,
   Tenant,
   TenantSettings,
   TenantSubscriptionStatus,
+  ToothChart,
+  ToothChartWithStates,
+  ToothChartWithStatesAllOf,
+  ToothStateEntry,
+  ToothStateEntryState,
+  ToothStateEntrySurface,
   TransferTenantOwnership200,
   TransferTenantOwnershipBody,
+  TreatmentPlan,
+  TreatmentPlanStatus,
+  TreatmentPlanWithStages,
+  TreatmentPlanWithStagesAllOf,
+  TreatmentStage,
+  TreatmentStageStatus,
   UpdateAppointment200,
   UpdateAppointmentBody,
   UpdateAppointmentBodyStatus,
@@ -120,9 +248,22 @@ export type {
   UpdateBranchBodyWorkHours,
   UpdateBranchBodyWorkHoursAnyOf,
   UpdateBranchBodyWorkHoursAnyOfTwo,
+  UpdateConsentTemplate200,
+  UpdateConsentTemplateBody,
+  UpdateConsentTemplateBodyType,
+  UpdateLabOrder200,
+  UpdateLabOrderBody,
+  UpdateLabOrderBodyItemsItem,
+  UpdateLabOrderBodyOrderType,
+  UpdateLabOrderBodyStatus,
+  UpdatePrescription200,
+  UpdatePrescriptionBody,
+  UpdatePrescriptionBodyItemsItem,
   UpdateQueueTicketStatus200,
   UpdateQueueTicketStatusBody,
   UpdateQueueTicketStatusBodyStatus,
+  UpdateRole200,
+  UpdateRoleBody,
   UpdateService200,
   UpdateServiceBody,
   UpdateTenant200,
@@ -130,6 +271,22 @@ export type {
   UpdateTenantBodyDefaultLanguage,
   UpdateTenantSettings200,
   UpdateTenantSettingsBody,
+  UpdateTreatmentPlan200,
+  UpdateTreatmentPlanBody,
+  UpdateTreatmentPlanBodyStatus,
+  UpdateTreatmentStage200,
+  UpdateTreatmentStageBody,
+  UpdateTreatmentStageBodyStatus,
+  UpdateUserAssignment200,
+  UpdateUserAssignmentBody,
+  UpdateVisitNote200,
+  UpdateVisitNoteBody,
+  UpsertUserProfile200,
+  UpsertUserProfileBody,
+  UpsertUserProfileBodyEmploymentStatus,
+  UserAssignment,
+  UserAssignmentRow,
+  VisitNote,
 } from './generated/model/index.ts';
 // Generated (orval) — notifications
 export type {
@@ -142,9 +299,37 @@ export {
   markAllNotificationsRead,
   markNotificationRead,
 } from './generated/notifications/notifications.ts';
+// Generated (orval) — payroll
+export type {
+  CreatePayrollRunResult,
+  FinalizePayrollRunResult,
+  GetPayrollRunResult,
+  ListPayrollRunsResult,
+} from './generated/payroll/payroll.ts';
+export {
+  createPayrollRun,
+  finalizePayrollRun,
+  getPayrollRun,
+  listPayrollRuns,
+} from './generated/payroll/payroll.ts';
 // Generated (orval) — permissions
 export type { ListPermissionsResult } from './generated/permissions/permissions.ts';
 export { listPermissions } from './generated/permissions/permissions.ts';
+// Generated (orval) — prescriptions
+export type {
+  CreatePrescriptionResult,
+  DeletePrescriptionResult,
+  GetPrescriptionResult,
+  ListPrescriptionsResult,
+  UpdatePrescriptionResult,
+} from './generated/prescriptions/prescriptions.ts';
+export {
+  createPrescription,
+  deletePrescription,
+  getPrescription,
+  listPrescriptions,
+  updatePrescription,
+} from './generated/prescriptions/prescriptions.ts';
 // Generated (orval) — queue
 export type {
   CreateQueueTicketResult,
@@ -158,6 +343,23 @@ export {
   getQueueToday,
   updateQueueTicketStatus,
 } from './generated/queue/queue.ts';
+// Generated (orval) — roles
+export type {
+  CreateRoleResult,
+  DeleteRoleResult,
+  GetRoleResult,
+  ListRolesResult,
+  SetRolePermissionsResult,
+  UpdateRoleResult,
+} from './generated/roles/roles.ts';
+export {
+  createRole,
+  deleteRole,
+  getRole,
+  listRoles,
+  setRolePermissions,
+  updateRole,
+} from './generated/roles/roles.ts';
 // Generated (orval) — services
 export type {
   CreateServiceResult,
@@ -193,12 +395,71 @@ export {
   getTenantSettings,
   updateTenantSettings,
 } from './generated/tenant-settings/tenant-settings.ts';
+// Generated (orval) — tooth-charts
+export type {
+  CreateToothChartResult,
+  GetLatestToothChartResult,
+  ListToothChartsResult,
+} from './generated/tooth-charts/tooth-charts.ts';
+export {
+  createToothChart,
+  getLatestToothChart,
+  listToothCharts,
+} from './generated/tooth-charts/tooth-charts.ts';
+// Generated (orval) — treatment-plans
+export type {
+  CreateTreatmentPlanResult,
+  GetTreatmentPlanResult,
+  ListTreatmentPlansResult,
+  UpdateTreatmentPlanResult,
+  UpdateTreatmentStageResult,
+} from './generated/treatment-plans/treatment-plans.ts';
+export {
+  createTreatmentPlan,
+  getTreatmentPlan,
+  listTreatmentPlans,
+  updateTreatmentPlan,
+  updateTreatmentStage,
+} from './generated/treatment-plans/treatment-plans.ts';
+// Generated (orval) — users
+export type {
+  AddUserAssignmentResult,
+  DeleteUserAssignmentResult,
+  GetUserProfileResult,
+  InviteUserResult,
+  ListUserAssignmentsResult,
+  ResetUserPasswordResult,
+  UpdateUserAssignmentResult,
+  UpsertUserProfileResult,
+} from './generated/users/users.ts';
+export {
+  addUserAssignment,
+  deleteUserAssignment,
+  getUserProfile,
+  inviteUser,
+  listUserAssignments,
+  resetUserPassword,
+  updateUserAssignment,
+  upsertUserProfile,
+} from './generated/users/users.ts';
+// Generated (orval) — visit-notes
+export type {
+  CreateVisitNoteResult,
+  GetVisitNoteResult,
+  ListVisitNotesResult,
+  UpdateVisitNoteResult,
+} from './generated/visit-notes/visit-notes.ts';
+export {
+  createVisitNote,
+  getVisitNote,
+  listVisitNotes,
+  updateVisitNote,
+} from './generated/visit-notes/visit-notes.ts';
 export type { CustomInstanceConfig } from './mutator.ts';
 export { configureClient, customInstance, isClientConfigured } from './mutator.ts';
 export * from './types.ts';
 export * from './types-clinical.ts';
 export * from './types-erp.ts';
-export * from './types-hr.ts';
 export * from './types-m3.ts';
 export * from './types-m5.ts';
 export * from './types-patients.ts';

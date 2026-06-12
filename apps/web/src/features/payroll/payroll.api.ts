@@ -1,12 +1,17 @@
+import {
+  createPayrollRun,
+  finalizePayrollRun,
+  getPayrollRun,
+  listPayrollRuns,
+} from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api.ts';
 import { payrollKeys } from './payroll.keys';
 
 /** Run ro'yxati (sana/status). */
 export function usePayrollRuns() {
   return useQuery({
     queryKey: payrollKeys.runs(),
-    queryFn: () => api.payroll.runs(),
+    queryFn: () => listPayrollRuns().then((r) => r.data),
   });
 }
 
@@ -14,7 +19,7 @@ export function usePayrollRuns() {
 export function usePayrollRun(id: string | null) {
   return useQuery({
     queryKey: payrollKeys.run(id ?? ''),
-    queryFn: () => api.payroll.getRun(id ?? ''),
+    queryFn: () => getPayrollRun(id ?? '').then((r) => r.data),
     enabled: !!id,
   });
 }
@@ -23,7 +28,8 @@ export function usePayrollRun(id: string | null) {
 export function useCreateRun() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { periodFrom: string; periodTo: string }) => api.payroll.createRun(body),
+    mutationFn: (body: { periodFrom: string; periodTo: string }) =>
+      createPayrollRun(body).then((r) => r.data),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: payrollKeys.all });
     },
@@ -38,7 +44,7 @@ export function useCreateRun() {
 export function useFinalizeRun() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api.payroll.finalize(id),
+    mutationFn: (id: string) => finalizePayrollRun(id).then((r) => r.data),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: payrollKeys.all });
     },

@@ -77,7 +77,6 @@ function stage(over: Partial<TreatmentStage> = {}): TreatmentStage {
     status: 'pending',
     notes: null,
     completedAt: null,
-    createdAt: '2026-06-11T00:00:00Z',
     ...over,
   };
 }

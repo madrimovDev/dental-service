@@ -5,9 +5,9 @@ import {
   listAppointments,
   listBranches,
   listServices,
+  listUserAssignments,
 } from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api.ts';
 import { appointmentKeys } from './appointments.keys';
 import type { Doctor } from './appointments.types';
 
@@ -26,7 +26,8 @@ export function useDoctors() {
   return useQuery({
     queryKey: ['doctors', 'list'],
     queryFn: async (): Promise<Doctor[]> => {
-      const assignments = await api.users.listAssignments();
+      const result = await listUserAssignments();
+      const assignments = result.data;
       const docs = assignments
         .filter((a) => a.roleName.toLowerCase().includes('doctor'))
         .map((a) => ({ id: a.userId, name: a.userFullName ?? a.userPhone }));

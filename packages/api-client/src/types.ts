@@ -47,38 +47,3 @@ export type RefreshResponse = {
   refreshToken: string;
   accessExpiresAt: string;
 };
-
-export type Role = {
-  id: string;
-  tenantId: string;
-  name: string;
-  description: string | null;
-  isTemplate: boolean;
-  isSystem: boolean;
-  createdAt: string;
-  updatedAt: string;
-  permissions?: string[];
-};
-
-export type UserAssignment = {
-  assignmentId: string;
-  userId: string;
-  userEmail: string | null;
-  userPhone: string;
-  userFullName: string | null;
-  branchId: string | null;
-  branchName: string | null;
-  roleId: string;
-  roleName: string;
-  validFrom: string;
-  validTo: string | null;
-  isActive: boolean;
-};
-
-export type InviteUserResponse = {
-  ok: true;
-  userId: string;
-  assignmentId: string;
-  tempPassword: string | null;
-  alreadyExists: boolean;
-};
