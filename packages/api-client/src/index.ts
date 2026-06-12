@@ -202,6 +202,9 @@ export type {
   ErrorResponse,
   ErrorResponseError,
   ErrorResponseErrorDetails,
+  Expense,
+  ExpenseCategory,
+  ExpenseSummary,
   FinalizePayrollRun200,
   GetAppointment200,
   GetBranch200,
@@ -257,6 +260,7 @@ export type {
   NotificationMarkReadResult,
   NotificationsFeed,
   NotificationsFeedMeta,
+  PatientRelativeView,
   PayrollLine,
   PayrollRun,
   PayrollRunStatus,
@@ -279,6 +283,7 @@ export type {
   RoleWithPermissions,
   Service,
   ServiceDeleteResult,
+  ServiceMaterial,
   ServicePrice,
   ServiceWithPrices,
   ServiceWithPricesAllOf,
@@ -292,6 +297,10 @@ export type {
   SignConsentFormBodyType,
   StaffProfile,
   StaffProfileEmploymentStatus,
+  StockItem,
+  StockItemWithLowStock,
+  StockMovement,
+  StockMovementType,
   Tenant,
   TenantSettings,
   TenantSubscriptionStatus,
@@ -603,7 +612,6 @@ export {
 export type { CustomInstanceConfig } from './mutator.ts';
 export { configureClient, customInstance, isClientConfigured } from './mutator.ts';
 export * from './types-clinical.ts';
-export * from './types-erp.ts';
 export * from './types-m3.ts';
 export * from './types-m5.ts';
 export * from './types-patients.ts';
