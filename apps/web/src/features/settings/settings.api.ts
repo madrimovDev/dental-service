@@ -1,3 +1,8 @@
+import {
+  getTenantSettings,
+  type UpdateTenantSettingsBody,
+  updateTenantSettings,
+} from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api.ts';
 import { settingsKeys } from './settings.keys';
@@ -148,15 +153,15 @@ export function useUpdateTenant() {
 export function useTenantSettings() {
   return useQuery({
     queryKey: settingsKeys.tenantSettings(),
-    queryFn: api.tenant.getSettings,
+    queryFn: () => getTenantSettings().then((res) => res.data),
   });
 }
 
 export function useUpdateTenantSettings() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { vertical?: string; reminderLeadHours?: number; currency?: string }) =>
-      api.tenant.updateSettings(body),
+    mutationFn: (body: UpdateTenantSettingsBody) =>
+      updateTenantSettings(body).then((res) => res.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: settingsKeys.tenantSettings() }),
   });
 }

@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from '@hono/zod-openapi';
 
 /**
  * Tenant settings update DTO — barcha maydonlar optional (partial update).
@@ -14,3 +14,18 @@ export const updateSettingsSchema = z.object({
 });
 
 export type UpdateSettingsInput = z.infer<typeof updateSettingsSchema>;
+
+/** Response DTO — wire shakli (timestamp'lar ISO string). `.openapi()` ref komponent. */
+export const tenantSettingsDtoSchema = z
+  .object({
+    id: z.uuid(),
+    tenantId: z.uuid(),
+    vertical: z.string().openapi({ example: 'dental' }),
+    reminderLeadHours: z.number().int().openapi({ example: 24 }),
+    currency: z.string().openapi({ example: 'UZS' }),
+    createdAt: z.string().openapi({ example: '2026-06-12T10:00:00.000Z' }),
+    updatedAt: z.string().openapi({ example: '2026-06-12T10:00:00.000Z' }),
+  })
+  .openapi('TenantSettings');
+
+export type TenantSettingsDto = z.infer<typeof tenantSettingsDtoSchema>;

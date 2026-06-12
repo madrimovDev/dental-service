@@ -12,7 +12,8 @@
     "db:generate": "bun --env-file=../../.env x drizzle-kit generate",
     "db:migrate": "bun --env-file=../../.env run src/db/migrate.ts",
     "db:studio": "bun --env-file=../../.env x drizzle-kit studio",
-    "db:seed": "bun --env-file=../../.env run src/db/seed.ts"
+    "db:seed": "bun --env-file=../../.env run src/db/seed.ts",
+    "generate:openapi": "bun --env-file=../../.env run scripts/generate-openapi.ts"
   },
   "dependencies": {
     "@dental/core": "workspace:*",

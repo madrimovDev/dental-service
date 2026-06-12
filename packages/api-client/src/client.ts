@@ -77,7 +77,12 @@ export const createApiClient = (config: ApiClientConfig) => {
     return parsed.data;
   };
 
-  const fetchWithAuth = async (method: string, path: string, body?: unknown): Promise<Response> => {
+  const fetchWithAuth = async (
+    method: string,
+    path: string,
+    body?: unknown,
+    signal?: AbortSignal,
+  ): Promise<Response> => {
     const headers = new Headers();
     if (body !== undefined) headers.set('Content-Type', 'application/json');
     const token = config.getAccessToken();
@@ -87,6 +92,7 @@ export const createApiClient = (config: ApiClientConfig) => {
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
       credentials: 'include',
+      signal,
     });
   };
 
@@ -102,17 +108,20 @@ export const createApiClient = (config: ApiClientConfig) => {
     });
   };
 
-  const request = async <T>(method: string, path: string, body?: unknown): Promise<T> => {
-    let res = await fetchWithAuth(method, path, body);
+  // Shared: fetch + 401-refresh-retry. Returns parsed envelope + status (status needed for throw).
+  const fetchEnvelope = async <T>(
+    method: string,
+    path: string,
+    body?: unknown,
+    signal?: AbortSignal,
+  ): Promise<{ parsed: ApiResponse<T>; status: number }> => {
+    let res = await fetchWithAuth(method, path, body, signal);
     let parsed = await parseResponse<T>(res);
-
-    // 401 + auth.invalid_token + refresh available → try refresh once
     if (!parsed.success && res.status === 401 && parsed.error.code === 'auth.invalid_token') {
-      // /api/auth/refresh o'zi 401 bersa qayta retry qilmaymiz (cycle oldini olish)
       if (path !== '/api/auth/refresh') {
         const refreshed = await tryRefresh();
         if (refreshed) {
-          res = await fetchWithAuth(method, path, body);
+          res = await fetchWithAuth(method, path, body, signal);
           parsed = await parseResponse<T>(res);
         } else {
           config.onUnauthorized?.();
@@ -121,8 +130,27 @@ export const createApiClient = (config: ApiClientConfig) => {
         config.onUnauthorized?.();
       }
     }
+    return { parsed, status: res.status };
+  };
 
-    return handleParsed<T>(parsed, res.status);
+  // Legacy: unwrapped data (hand-written endpoints.ts depends on this — DO NOT change behavior).
+  const request = async <T>(method: string, path: string, body?: unknown): Promise<T> => {
+    const { parsed, status } = await fetchEnvelope<T>(method, path, body);
+    return handleParsed<T>(parsed, status);
+  };
+
+  // Generated client: returns the FULL success envelope (throws on !success / non-2xx).
+  const requestRaw = async <T>(
+    method: string,
+    path: string,
+    body?: unknown,
+    signal?: AbortSignal,
+  ): Promise<{ success: true; data: T }> => {
+    const { parsed, status } = await fetchEnvelope<T>(method, path, body, signal);
+    if (!parsed.success) {
+      throw new ApiError(parsed.error.code, parsed.error.message, status, parsed.error.details);
+    }
+    return parsed;
   };
 
   const upload = async <T>(path: string, form: FormData): Promise<T> => {
@@ -148,6 +176,7 @@ export const createApiClient = (config: ApiClientConfig) => {
     patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, body),
     put: <T>(path: string, body?: unknown) => request<T>('PUT', path, body),
     delete: <T>(path: string) => request<T>('DELETE', path),
+    requestRaw,
     upload,
   };
 };
