@@ -1,4 +1,9 @@
-import { createApiClient, createEndpoints } from '@dental/api-client';
+import {
+  type ApiClientConfig,
+  configureClient,
+  createApiClient,
+  createEndpoints,
+} from '@dental/api-client';
 import { useAuthStore } from '@/stores/auth-store.ts';
 
 /**
@@ -17,11 +22,11 @@ async function refreshTokens(refreshToken: string) {
     | { success: true; data: { accessToken: string; refreshToken: string } }
     | { success: false; error: { code: string; message: string } }
     | null;
-  if (!parsed || !parsed.success) throw new Error('refresh_failed');
+  if (!parsed?.success) throw new Error('refresh_failed');
   return parsed.data;
 }
 
-const apiClient = createApiClient({
+const apiClientConfig: ApiClientConfig = {
   baseUrl: import.meta.env.VITE_API_BASE_URL ?? '',
   getAccessToken: () => useAuthStore.getState().accessToken,
   getRefreshToken: () => useAuthStore.getState().refreshToken,
@@ -50,6 +55,8 @@ const apiClient = createApiClient({
       window.location.href = '/login';
     }
   },
-});
+};
 
+const apiClient = createApiClient(apiClientConfig);
+configureClient(apiClientConfig); // generated hooks/functions use this singleton
 export const api = createEndpoints(apiClient);

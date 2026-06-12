@@ -10,7 +10,6 @@ import type {
   Role,
   SwitchWorkspaceResponse,
   Tenant,
-  TenantSettings,
   UserAssignment,
 } from './types.ts';
 import type { AuditListResponse } from './types-audit.ts';
@@ -126,9 +125,6 @@ export const createEndpoints = (api: ApiClient) => ({
       api.patch<Tenant>('/api/tenant', body),
     transferOwnership: (body: { newOwnerUserId: string; currentPassword: string }) =>
       api.post<Tenant>('/api/tenant/transfer-ownership', body),
-    getSettings: () => api.get<TenantSettings>('/api/tenant-settings'),
-    updateSettings: (body: { vertical?: string; reminderLeadHours?: number; currency?: string }) =>
-      api.patch<TenantSettings>('/api/tenant-settings', body),
   },
 
   branches: {

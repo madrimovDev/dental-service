@@ -2,6 +2,13 @@ export type { ApiClient, ApiClientConfig } from './client.ts';
 export { ApiError, createApiClient } from './client.ts';
 export type { Endpoints } from './endpoints.ts';
 export { createEndpoints } from './endpoints.ts';
+export type { TenantSettings, UpdateTenantSettingsBody } from './generated/model/index.ts';
+// Generated (orval) — explicit re-export (coexistence: kolliziya nazorati)
+export {
+  getGetTenantSettingsQueryKey,
+  getTenantSettings,
+  updateTenantSettings,
+} from './generated/tenant-settings/tenant-settings.ts';
 export type { CustomInstanceConfig } from './mutator.ts';
 export { configureClient, customInstance, isClientConfigured } from './mutator.ts';
 export * from './types.ts';
