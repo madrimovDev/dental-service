@@ -60,14 +60,6 @@ export type Role = {
   permissions?: string[];
 };
 
-export type PermissionDef = {
-  id: string;
-  code: string;
-  category: string;
-  descriptionUz: string | null;
-  descriptionRu: string | null;
-};
-
 export type UserAssignment = {
   assignmentId: string;
   userId: string;

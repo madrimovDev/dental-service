@@ -3,7 +3,6 @@ import type {
   InviteUserResponse,
   LoginResponse,
   MembershipsResponse,
-  PermissionDef,
   RefreshResponse,
   RegisterTenantResponse,
   Role,
@@ -14,7 +13,6 @@ import type {
   CreateToothChartInput,
   CreateTreatmentPlanInput,
   CreateVisitNoteInput,
-  Diagnosis,
   ToothChart,
   ToothChartWithStates,
   TreatmentPlan,
@@ -120,10 +118,6 @@ export const createEndpoints = (api: ApiClient) => ({
         permissions,
       }),
     remove: (id: string) => api.delete<{ deleted: true }>(`/api/roles/${id}`),
-  },
-
-  permissions: {
-    list: () => api.get<PermissionDef[]>('/api/permissions'),
   },
 
   users: {
@@ -357,11 +351,6 @@ export const createEndpoints = (api: ApiClient) => ({
   },
 
   clinical: {
-    listDiagnoses: (search?: string) => {
-      const qs = search ? `?search=${encodeURIComponent(search)}` : '';
-      return api.get<Diagnosis[]>(`/api/diagnoses${qs}`);
-    },
-
     listPlans: (patientId?: string) => {
       const qs = patientId ? `?patientId=${patientId}` : '';
       return api.get<TreatmentPlan[]>(`/api/treatment-plans${qs}`);

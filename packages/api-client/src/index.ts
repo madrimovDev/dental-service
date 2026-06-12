@@ -34,6 +34,9 @@ export {
   listBranches,
   updateBranch,
 } from './generated/branches/branches.ts';
+// Generated (orval) — diagnoses
+export type { ListDiagnosesResult } from './generated/diagnoses/diagnoses.ts';
+export { listDiagnoses } from './generated/diagnoses/diagnoses.ts';
 // Generated model types — appointments, services, queue, notifications
 // QueueTicketStatus re-exported under both names for backward compatibility
 export type {
@@ -66,6 +69,7 @@ export type {
   CreateServiceBody,
   DeleteBranch200,
   DeleteService200,
+  Diagnosis,
   GetAppointment200,
   GetBranch200,
   GetCheckInCandidates200,
@@ -79,8 +83,11 @@ export type {
   ListAuditLog200,
   ListAuditLogParams,
   ListBranches200,
+  ListDiagnoses200,
+  ListDiagnosesParams,
   ListNotifications200,
   ListNotificationsParams,
+  ListPermissions200,
   ListServices200,
   MarkAllNotificationsRead200,
   MarkNotificationRead200,
@@ -89,6 +96,7 @@ export type {
   NotificationMarkReadResult,
   NotificationsFeed,
   NotificationsFeedMeta,
+  PermissionDef,
   QueueTicket,
   QueueTicketStatus,
   QueueTicketStatus as QueueStatus,
@@ -134,6 +142,9 @@ export {
   markAllNotificationsRead,
   markNotificationRead,
 } from './generated/notifications/notifications.ts';
+// Generated (orval) — permissions
+export type { ListPermissionsResult } from './generated/permissions/permissions.ts';
+export { listPermissions } from './generated/permissions/permissions.ts';
 // Generated (orval) — queue
 export type {
   CreateQueueTicketResult,

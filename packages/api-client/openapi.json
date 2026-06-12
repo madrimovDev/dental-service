@@ -6,6 +6,73 @@
   },
   "components": {
     "schemas": {
+      "PermissionDef": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "example": "patient.view"
+          },
+          "category": {
+            "type": "string",
+            "example": "patient"
+          },
+          "descriptionUz": {
+            "type": "string",
+            "nullable": true,
+            "example": "Bemorlarni ko'rish"
+          },
+          "descriptionRu": {
+            "type": "string",
+            "nullable": true,
+            "example": "Просмотр пациентов"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "category",
+          "descriptionUz",
+          "descriptionRu"
+        ]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "details": {
+                "nullable": true
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "error"
+        ]
+      },
       "Tenant": {
         "type": "object",
         "properties": {
@@ -63,39 +130,6 @@
           "trialEndsAt",
           "createdAt",
           "updatedAt"
-        ]
-      },
-      "ErrorResponse": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "enum": [
-              false
-            ]
-          },
-          "error": {
-            "type": "object",
-            "properties": {
-              "code": {
-                "type": "string"
-              },
-              "message": {
-                "type": "string"
-              },
-              "details": {
-                "nullable": true
-              }
-            },
-            "required": [
-              "code",
-              "message"
-            ]
-          }
-        },
-        "required": [
-          "success",
-          "error"
         ]
       },
       "TenantSettings": {
@@ -766,6 +800,51 @@
           "updatedAt"
         ]
       },
+      "Diagnosis": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "example": "K02.1"
+          },
+          "nameUz": {
+            "type": "string",
+            "example": "Tish kariesi"
+          },
+          "nameRu": {
+            "type": "string",
+            "example": "Кариес зубов"
+          },
+          "category": {
+            "type": "string",
+            "nullable": true,
+            "example": "K02"
+          },
+          "descriptionUz": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          },
+          "descriptionRu": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "nameUz",
+          "nameRu",
+          "category",
+          "descriptionUz",
+          "descriptionRu"
+        ]
+      },
       "NotificationsFeed": {
         "type": "object",
         "properties": {
@@ -891,6 +970,74 @@
     "parameters": {}
   },
   "paths": {
+    "/api/permissions": {
+      "get": {
+        "tags": [
+          "permissions"
+        ],
+        "operationId": "listPermissions",
+        "responses": {
+          "200": {
+            "description": "Platform permission catalog",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PermissionDef"
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/tenant": {
       "get": {
         "tags": [
@@ -3447,6 +3594,86 @@
           },
           "404": {
             "description": "Queue ticket not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/diagnoses": {
+      "get": {
+        "tags": [
+          "diagnoses"
+        ],
+        "operationId": "listDiagnoses",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Search by code or name"
+            },
+            "required": false,
+            "description": "Search by code or name",
+            "name": "search",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ICD-10 diagnosis catalog",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Diagnosis"
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
             "content": {
               "application/json": {
                 "schema": {

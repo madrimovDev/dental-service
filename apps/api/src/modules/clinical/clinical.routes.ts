@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { OpenAPIHono } from '@hono/zod-openapi';
 import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
@@ -17,7 +17,7 @@ import { visitNotesRoutes } from './visit-notes/index.ts';
  *   /api/tooth-charts (snapshot create + read)
  */
 export const clinicalRoutes = (deps: { db: Database; audit: AuditLogger }) => {
-  const app = new Hono();
+  const app = new OpenAPIHono();
   app.use('*', authMiddleware());
   app.use('*', rlsMiddleware(deps.db));
 

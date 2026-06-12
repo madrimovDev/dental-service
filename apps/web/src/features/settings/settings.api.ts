@@ -4,6 +4,7 @@ import {
   getTenant,
   getTenantSettings,
   listBranches,
+  listPermissions,
   type TransferTenantOwnershipBody,
   transferTenantOwnership,
   type UpdateBranchBody,
@@ -31,7 +32,10 @@ export function useRole(id: string | null, enabled: boolean) {
 }
 
 export function usePermissions() {
-  return useQuery({ queryKey: settingsKeys.permissions(), queryFn: api.permissions.list });
+  return useQuery({
+    queryKey: settingsKeys.permissions(),
+    queryFn: () => listPermissions().then((r) => r.data),
+  });
 }
 
 export function useUpsertRole() {

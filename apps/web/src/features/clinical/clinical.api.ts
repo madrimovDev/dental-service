@@ -7,6 +7,7 @@ import {
   type CreateVisitNoteInput,
   type LabOrderStatus,
   listAppointments,
+  listDiagnoses,
   type SignFormInput,
   type TreatmentStageStatus,
 } from '@dental/api-client';
@@ -86,7 +87,7 @@ export function useCreateVisitNote(patientId: string) {
 export function useDiagnoses() {
   return useQuery({
     queryKey: clinicalKeys.diagnoses(),
-    queryFn: () => api.clinical.listDiagnoses(),
+    queryFn: () => listDiagnoses().then((r) => r.data),
     staleTime: HOUR,
   });
 }
