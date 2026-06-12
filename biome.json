@@ -16,7 +16,9 @@
       "!**/.turbo",
       "!**/coverage",
       "!**/.next",
-      "!**/out"
+      "!**/out",
+      "!**/api-client/openapi.json",
+      "!**/api-client/src/generated"
     ]
   },
   "formatter": {

@@ -4,6 +4,10 @@
  * Dental Service API
  * OpenAPI spec version: 0.1.0
  */
+import {
+  useMutation,
+  useQuery
+} from '@tanstack/react-query';
 import type {
   MutationFunction,
   QueryFunction,
@@ -11,133 +15,138 @@ import type {
   UseMutationOptions,
   UseMutationResult,
   UseQueryOptions,
-  UseQueryResult,
+  UseQueryResult
 } from '@tanstack/react-query';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { customInstance } from '../../mutator';
+
 import type {
   ErrorResponse,
   GetTenantSettings200,
   UpdateTenantSettings200,
-  UpdateTenantSettingsBody,
+  UpdateTenantSettingsBody
 } from '.././model';
 
-export const getTenantSettings = (signal?: AbortSignal) => {
-  return customInstance<GetTenantSettings200>({
-    url: `/api/tenant-settings`,
-    method: 'GET',
-    signal,
-  });
-};
+import { customInstance } from '../../mutator';
+
+
+
+
+export const getTenantSettings = (
+    
+ signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<GetTenantSettings200>(
+      {url: `/api/tenant-settings`, method: 'GET', signal
+    },
+      );
+    }
+  
+
+
 
 export const getGetTenantSettingsQueryKey = () => {
-  return [`/api/tenant-settings`] as const;
-};
+    return [
+    `/api/tenant-settings`
+    ] as const;
+    }
 
-export const getGetTenantSettingsQueryOptions = <
-  TData = Awaited<ReturnType<typeof getTenantSettings>>,
-  TError = ErrorResponse,
->(options?: {
-  query?: UseQueryOptions<Awaited<ReturnType<typeof getTenantSettings>>, TError, TData>;
-}) => {
-  const { query: queryOptions } = options ?? {};
+    
+export const getGetTenantSettingsQueryOptions = <TData = Awaited<ReturnType<typeof getTenantSettings>>, TError = ErrorResponse>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTenantSettings>>, TError, TData>, }
+) => {
 
-  const queryKey = queryOptions?.queryKey ?? getGetTenantSettingsQueryKey();
+const {query: queryOptions} = options ?? {};
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getTenantSettings>>> = ({ signal }) =>
-    getTenantSettings(signal);
+  const queryKey =  queryOptions?.queryKey ?? getGetTenantSettingsQueryKey();
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getTenantSettings>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
+  
 
-export type GetTenantSettingsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getTenantSettings>>
->;
-export type GetTenantSettingsQueryError = ErrorResponse;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTenantSettings>>> = ({ signal }) => getTenantSettings(signal);
 
-export function useGetTenantSettings<
-  TData = Awaited<ReturnType<typeof getTenantSettings>>,
-  TError = ErrorResponse,
->(options?: {
-  query?: UseQueryOptions<Awaited<ReturnType<typeof getTenantSettings>>, TError, TData>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetTenantSettingsQueryOptions(options);
+      
 
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & { queryKey: QueryKey };
+      
 
-  query.queryKey = queryOptions.queryKey;
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTenantSettings>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetTenantSettingsQueryResult = NonNullable<Awaited<ReturnType<typeof getTenantSettings>>>
+export type GetTenantSettingsQueryError = ErrorResponse
+
+
+
+export function useGetTenantSettings<TData = Awaited<ReturnType<typeof getTenantSettings>>, TError = ErrorResponse>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTenantSettings>>, TError, TData>, }
+  
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetTenantSettingsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
 
-export const updateTenantSettings = (updateTenantSettingsBody: UpdateTenantSettingsBody) => {
-  return customInstance<UpdateTenantSettings200>({
-    url: `/api/tenant-settings`,
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    data: updateTenantSettingsBody,
-  });
-};
 
-export const getUpdateTenantSettingsMutationOptions = <
-  TError = ErrorResponse,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof updateTenantSettings>>,
-    TError,
-    { data: UpdateTenantSettingsBody },
-    TContext
-  >;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof updateTenantSettings>>,
-  TError,
-  { data: UpdateTenantSettingsBody },
-  TContext
-> => {
-  const mutationKey = ['updateTenantSettings'];
-  const { mutation: mutationOptions } = options
-    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey } };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof updateTenantSettings>>,
-    { data: UpdateTenantSettingsBody }
-  > = (props) => {
-    const { data } = props ?? {};
 
-    return updateTenantSettings(data);
-  };
+export const updateTenantSettings = (
+    updateTenantSettingsBody: UpdateTenantSettingsBody,
+ ) => {
+      
+      
+      return customInstance<UpdateTenantSettings200>(
+      {url: `/api/tenant-settings`, method: 'PATCH',
+      headers: {'Content-Type': 'application/json', },
+      data: updateTenantSettingsBody
+    },
+      );
+    }
+  
 
-  return { mutationFn, ...mutationOptions };
-};
 
-export type UpdateTenantSettingsMutationResult = NonNullable<
-  Awaited<ReturnType<typeof updateTenantSettings>>
->;
-export type UpdateTenantSettingsMutationBody = UpdateTenantSettingsBody;
-export type UpdateTenantSettingsMutationError = ErrorResponse;
+export const getUpdateTenantSettingsMutationOptions = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTenantSettings>>, TError,{data: UpdateTenantSettingsBody}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof updateTenantSettings>>, TError,{data: UpdateTenantSettingsBody}, TContext> => {
 
-export const useUpdateTenantSettings = <TError = ErrorResponse, TContext = unknown>(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof updateTenantSettings>>,
-    TError,
-    { data: UpdateTenantSettingsBody },
-    TContext
-  >;
-}): UseMutationResult<
-  Awaited<ReturnType<typeof updateTenantSettings>>,
-  TError,
-  { data: UpdateTenantSettingsBody },
-  TContext
-> => {
-  const mutationOptions = getUpdateTenantSettingsMutationOptions(options);
+const mutationKey = ['updateTenantSettings'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
 
-  return useMutation(mutationOptions);
-};
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateTenantSettings>>, {data: UpdateTenantSettingsBody}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateTenantSettings(data,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateTenantSettingsMutationResult = NonNullable<Awaited<ReturnType<typeof updateTenantSettings>>>
+    export type UpdateTenantSettingsMutationBody = UpdateTenantSettingsBody
+    export type UpdateTenantSettingsMutationError = ErrorResponse
+
+    export const useUpdateTenantSettings = <TError = ErrorResponse,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTenantSettings>>, TError,{data: UpdateTenantSettingsBody}, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateTenantSettings>>,
+        TError,
+        {data: UpdateTenantSettingsBody},
+        TContext
+      > => {
+
+      const mutationOptions = getUpdateTenantSettingsMutationOptions(options);
+
+      return useMutation(mutationOptions);
+    }
+    

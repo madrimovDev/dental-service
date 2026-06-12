@@ -21,8 +21,5 @@ export default defineConfig({
         },
       },
     },
-    hooks: {
-      afterAllFilesWrite: 'biome format --write',
-    },
   },
 });

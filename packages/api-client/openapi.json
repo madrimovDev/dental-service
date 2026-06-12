@@ -53,7 +53,9 @@
         "properties": {
           "success": {
             "type": "boolean",
-            "enum": [false]
+            "enum": [
+              false
+            ]
           },
           "error": {
             "type": "object",
@@ -68,10 +70,16 @@
                 "nullable": true
               }
             },
-            "required": ["code", "message"]
+            "required": [
+              "code",
+              "message"
+            ]
           }
         },
-        "required": ["success", "error"]
+        "required": [
+          "success",
+          "error"
+        ]
       }
     },
     "parameters": {}
@@ -79,7 +87,9 @@
   "paths": {
     "/api/tenant-settings": {
       "get": {
-        "tags": ["tenant-settings"],
+        "tags": [
+          "tenant-settings"
+        ],
         "operationId": "getTenantSettings",
         "responses": {
           "200": {
@@ -91,13 +101,18 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "data": {
                       "$ref": "#/components/schemas/TenantSettings"
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -135,7 +150,9 @@
         }
       },
       "patch": {
-        "tags": ["tenant-settings"],
+        "tags": [
+          "tenant-settings"
+        ],
         "operationId": "updateTenantSettings",
         "requestBody": {
           "content": {
@@ -172,13 +189,18 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "data": {
                       "$ref": "#/components/schemas/TenantSettings"
                     }
                   },
-                  "required": ["success", "data"]
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }

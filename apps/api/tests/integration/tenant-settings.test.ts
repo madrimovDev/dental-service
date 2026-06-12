@@ -202,4 +202,39 @@ describe('tenant-settings HTTP (CLI-120)', () => {
     const res = await app.request('/api/tenant-settings');
     expect(res.status).toBe(401);
   });
+
+  test('GET with explicit tenant_settings.view perm (non-owner) — 200', async () => {
+    const { token } = await signAccess({
+      sub: httpOwnerId,
+      atid: httpTenantId,
+      abid: null,
+      perms: ['tenant_settings.view'],
+      roleKey: null,
+      lang: 'uz',
+    });
+    const app = createApp();
+    const res = await app.request('/api/tenant-settings', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status).toBe(200);
+  });
+
+  test('GET without tenant_settings.view perm — 403 permission.denied', async () => {
+    const { token } = await signAccess({
+      sub: httpOwnerId,
+      atid: httpTenantId,
+      abid: null,
+      perms: [],
+      roleKey: null,
+      lang: 'uz',
+    });
+    const app = createApp();
+    const res = await app.request('/api/tenant-settings', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { success: boolean; error: { code: string } };
+    expect(body.success).toBe(false);
+    expect(body.error.code).toBe('permission.denied');
+  });
 });
