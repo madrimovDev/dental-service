@@ -1,8 +1,7 @@
-import type { TreatmentPlan, TreatmentStageStatus } from '@dental/api-client';
+import type { TreatmentPlanWithStages, TreatmentStageStatus } from '@dental/api-client';
 import { StatusPill } from '@dental/ui';
 import { Box, Group, Paper, Stack, Text } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
-import { usePlanDetail } from '../../clinical.api';
 import { toPlanCardVM } from '../../clinical.mappers';
 import { StageRow } from './StageRow';
 
@@ -11,13 +10,13 @@ export function PlanCard({
   canEdit,
   onUpdateStage,
 }: {
-  plan: TreatmentPlan;
+  // CLI-114: stage'lar endi list javobida keladi (har kartada usePlanDetail YO'Q).
+  plan: TreatmentPlanWithStages;
   canEdit: boolean;
   onUpdateStage: (stageId: string, status: TreatmentStageStatus) => void;
 }) {
   const { t } = useTranslation();
   const vm = toPlanCardVM(plan);
-  const detailQuery = usePlanDetail(plan.id);
 
   return (
     <Paper withBorder p="md">
@@ -34,7 +33,7 @@ export function PlanCard({
             </Text>
           </Group>
         </Box>
-        {detailQuery.data?.stages.map((stage) => (
+        {plan.stages.map((stage) => (
           <StageRow key={stage.id} stage={stage} canEdit={canEdit} onUpdateStage={onUpdateStage} />
         ))}
       </Stack>

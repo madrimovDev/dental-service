@@ -1,18 +1,45 @@
 import { treatmentPlans, treatmentStages } from '@dental/db-schema';
-import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../../db/scoped.ts';
 
 export const createTreatmentPlansRepository = () => {
+  /**
+   * Planlar ro'yxati + har planning stage'lari (nested).
+   * N+1 oldini olish uchun stage'lar BITTA `IN`-query bilan olinadi va
+   * xotirada plan bo'yicha guruhlanadi → jami 2 so'rov (plan-soni'dan mustaqil).
+   */
   async function listPlans(c: Context, patientId?: string) {
     const db = getDb(c);
     const filters = [];
     if (patientId) filters.push(eq(treatmentPlans.patientId, patientId));
-    return db
+    const plans = await db
       .select()
       .from(treatmentPlans)
       .where(filters.length > 0 ? and(...filters) : undefined)
       .orderBy(desc(treatmentPlans.createdAt));
+
+    if (plans.length === 0) return [];
+
+    const stages = await db
+      .select()
+      .from(treatmentStages)
+      .where(
+        inArray(
+          treatmentStages.treatmentPlanId,
+          plans.map((p) => p.id),
+        ),
+      )
+      .orderBy(asc(treatmentStages.sequence));
+
+    const stagesByPlan = new Map<string, (typeof stages)[number][]>();
+    for (const s of stages) {
+      const arr = stagesByPlan.get(s.treatmentPlanId);
+      if (arr) arr.push(s);
+      else stagesByPlan.set(s.treatmentPlanId, [s]);
+    }
+
+    return plans.map((p) => ({ ...p, stages: stagesByPlan.get(p.id) ?? [] }));
   }
 
   async function getPlanWithStages(c: Context, id: string) {

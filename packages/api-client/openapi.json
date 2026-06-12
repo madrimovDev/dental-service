@@ -2505,77 +2505,6 @@
           "descriptionRu"
         ]
       },
-      "TreatmentPlan": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "tenantId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "patientId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "doctorId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "title": {
-            "type": "string",
-            "example": "Kompleks davolash"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "draft",
-              "presented",
-              "accepted",
-              "in_progress",
-              "completed",
-              "cancelled"
-            ],
-            "example": "draft"
-          },
-          "totalCost": {
-            "type": "string",
-            "example": "450000.00"
-          },
-          "totalVisits": {
-            "type": "integer",
-            "example": 3
-          },
-          "notes": {
-            "type": "string",
-            "nullable": true,
-            "example": null
-          },
-          "createdAt": {
-            "type": "string",
-            "example": "2026-06-12T10:00:00.000Z"
-          },
-          "updatedAt": {
-            "type": "string",
-            "example": "2026-06-12T10:00:00.000Z"
-          }
-        },
-        "required": [
-          "id",
-          "tenantId",
-          "patientId",
-          "doctorId",
-          "title",
-          "status",
-          "totalCost",
-          "totalVisits",
-          "notes",
-          "createdAt",
-          "updatedAt"
-        ]
-      },
       "TreatmentPlanWithStages": {
         "allOf": [
           {
@@ -2680,6 +2609,77 @@
           "status",
           "notes",
           "completedAt"
+        ]
+      },
+      "TreatmentPlan": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "doctorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "example": "Kompleks davolash"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "presented",
+              "accepted",
+              "in_progress",
+              "completed",
+              "cancelled"
+            ],
+            "example": "draft"
+          },
+          "totalCost": {
+            "type": "string",
+            "example": "450000.00"
+          },
+          "totalVisits": {
+            "type": "integer",
+            "example": 3
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-06-12T10:00:00.000Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "example": "2026-06-12T10:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "patientId",
+          "doctorId",
+          "title",
+          "status",
+          "totalCost",
+          "totalVisits",
+          "notes",
+          "createdAt",
+          "updatedAt"
         ]
       },
       "VisitNote": {
@@ -11131,7 +11131,7 @@
         ],
         "responses": {
           "200": {
-            "description": "List of treatment plans",
+            "description": "List of treatment plans with nested stages",
             "content": {
               "application/json": {
                 "schema": {
@@ -11146,7 +11146,7 @@
                     "data": {
                       "type": "array",
                       "items": {
-                        "$ref": "#/components/schemas/TreatmentPlan"
+                        "$ref": "#/components/schemas/TreatmentPlanWithStages"
                       }
                     }
                   },
