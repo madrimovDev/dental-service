@@ -364,6 +364,19 @@ export {
   markAllNotificationsRead,
   markNotificationRead,
 } from './generated/notifications/notifications.ts';
+// Generated (orval) — patient-images (READ + JSON mutatsiya; upload hand `api.upload()`'da qoladi)
+export type {
+  DeletePatientImageResult,
+  GetPatientImageResult,
+  ListPatientImagesResult,
+  UpdatePatientImageResult,
+} from './generated/patient-images/patient-images.ts';
+export {
+  deletePatientImage,
+  getPatientImage,
+  listPatientImages,
+  updatePatientImage,
+} from './generated/patient-images/patient-images.ts';
 // Generated (orval) — patients
 export type {
   AddPatientRelativeResult,
