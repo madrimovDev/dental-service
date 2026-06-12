@@ -11,7 +11,7 @@ Redesign frontend'ni jiddiy qayta quradi (yangi shell + 30+ ekran). Kod yozishda
 **Hozirgi holat (`apps/web/src/`):**
 - `pages/` (route komponentlari) + `components/{auth,clinical,layout}` — **feature-folder yo'q**, kod tur bo'yicha ajratilgan.
 - `packages/ui` — **bo'sh placeholder** (dizayn-tizim komponent qatlami yo'q).
-- `packages/api-client` — **qo'lda yozilgan** `types-*.ts` (per-milestone). ⚠️ CLAUDE.md "OpenAPI'dan auto-generated" deydi, lekin `@hono/zod-openapi` o'rnatilgan bo'lsa-da **ishlatilmagan** (createRoute/OpenAPIHono yo'q, generate script yo'q).
+- `packages/api-client` — **qo'lda yozilgan** `types-*.ts` (per-milestone). ⚠️ CLAUDE.md "OpenAPI'dan auto-generated" deydi, lekin `@hono/zod-openapi` o'rnatilgan bo'lsa-da **ishlatilmagan** (createRoute/OpenAPIHono yo'q, generate script yo'q). _[Bu satr RFC yozilgan paytdagi (redesign boshi) holat. ✅ **2026-06-12: §4 qarori to'liq amalga oshdi** — M3/CLI-92 epik 29/29 tugadi, api-client endi OpenAPI-generated (response surface 100%); qasddan hand qolgan istisnolar: request `Create*Input`, multipart upload, refresh raw-fetch — Qaror #18.]_
 - State: Zustand (`stores/auth-store.ts`) + TanStack Query (`lib/query-client.ts`). Forms: `@mantine/form` + zod. i18n: `packages/i18n`.
 
 30+ ekran va ko'p modul uchun bu struktura yetarli emas — feature'lar bo'yicha tashkil qilish kerak.
