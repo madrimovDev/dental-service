@@ -4,12 +4,12 @@ import {
   getCheckInCandidates,
   getQueueToday,
   listBranches,
+  listPatients,
   listServices,
   type QueueStatus,
   updateQueueTicketStatus,
 } from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api.ts';
 import { queueKeys } from './queue.keys';
 
 export function useQueueToday(branchId: string | null) {
@@ -56,7 +56,7 @@ export function useUpdateQueueStatus() {
 export function usePatientsAll() {
   return useQuery({
     queryKey: ['patients', 'list-all'],
-    queryFn: () => api.patients.list({ pageSize: 100 }),
+    queryFn: () => listPatients({ pageSize: 100 }).then((r) => r.data),
   });
 }
 

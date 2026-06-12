@@ -1,35 +1,96 @@
 import { fail, ok } from '@dental/core';
-import { Hono } from 'hono';
-import { HTTPException } from 'hono/http-exception';
+import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
-import { createTransactionSchema, listTransactionsQuery } from './cashier.schema.ts';
+import { toCashierTransactionDto, toCashierTransactionWithItemsDto } from './cashier.mapper.ts';
+import {
+  cashierListResponseDtoSchema,
+  cashierTransactionWithItemsDtoSchema,
+  createTransactionSchema,
+  dailySummaryDtoSchema,
+  dailySummaryQuery,
+  listTransactionsQuery,
+  planBalanceDtoSchema,
+  planIdParamSchema,
+  transactionIdParamSchema,
+} from './cashier.schema.ts';
 import { AllocationExceedError, createCashierService } from './cashier.service.ts';
 
+/** Standart 404 — get by id uchun. */
+const notFoundResponse = {
+  404: {
+    content: { 'application/json': { schema: errorResponseSchema } },
+    description: 'Transaction not found',
+  },
+};
+
 export const cashierRoutes = (deps: { db: Database; audit: AuditLogger }) => {
-  const app = new Hono();
+  const app = new OpenAPIHono();
   app.use('*', authMiddleware());
   app.use('*', rlsMiddleware(deps.db));
 
   const service = createCashierService({ audit: deps.audit });
 
-  app.get('/transactions', requirePermission('cashier.view'), async (c) => {
-    const query = listTransactionsQuery.safeParse(
-      Object.fromEntries(new URL(c.req.url).searchParams),
-    );
-    if (!query.success) throw new HTTPException(400, { message: 'Invalid query' });
-    return c.json(ok(await service.list(c, query.data)));
+  // ─── GET /transactions — list (paginated) ────────────────────────────────
+
+  const listRoute = createRoute({
+    method: 'get',
+    path: '/transactions',
+    tags: ['cashier'],
+    operationId: 'listCashierTransactions',
+    middleware: [requirePermission('cashier.view')] as const,
+    request: { query: listTransactionsQuery },
+    responses: okJson(cashierListResponseDtoSchema, 'Paginated cashier transactions'),
   });
 
-  app.post('/transactions', requirePermission('cashier.create_transaction'), async (c) => {
-    const body = createTransactionSchema.safeParse(await c.req.json());
-    if (!body.success) throw new HTTPException(400, { message: 'Invalid input' });
+  app.openapi(listRoute, async (c) => {
+    const query = c.req.valid('query');
+    const result = await service.list(c, query);
+    return c.json(ok({ data: result.data.map(toCashierTransactionDto), meta: result.meta }), 200);
+  });
+
+  // ─── POST /transactions — create ─────────────────────────────────────────
+
+  const createTransactionRoute = createRoute({
+    method: 'post',
+    path: '/transactions',
+    tags: ['cashier'],
+    operationId: 'createCashierTransaction',
+    middleware: [requirePermission('cashier.create_transaction')] as const,
+    request: {
+      body: { content: { 'application/json': { schema: createTransactionSchema } } },
+    },
+    responses: {
+      201: {
+        content: {
+          'application/json': { schema: apiResponseSchema(cashierTransactionWithItemsDtoSchema) },
+        },
+        description: 'Transaction created',
+      },
+      400: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Validation error',
+      },
+      401: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Unauthorized',
+      },
+      403: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Forbidden',
+      },
+    },
+  });
+
+  app.openapi(createTransactionRoute, async (c) => {
+    const body = c.req.valid('json');
     try {
-      const tx = await service.create(c, body.data);
-      return c.json(ok(tx), 201);
+      const tx = await service.create(c, body);
+      return c.json(ok(toCashierTransactionWithItemsDto(tx, tx.items)), 201);
     } catch (e) {
       if (e instanceof AllocationExceedError) {
         return c.json(fail('allocations.exceed', 'Allocation sum exceeds paid amount'), 400);
@@ -38,27 +99,83 @@ export const cashierRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     }
   });
 
-  app.get('/transactions/:id', requirePermission('cashier.view'), async (c) => {
-    const tx = await service.getById(c, c.req.param('id'));
+  // ─── GET /transactions/{id} — get by id ──────────────────────────────────
+
+  const getRoute = createRoute({
+    method: 'get',
+    path: '/transactions/{id}',
+    tags: ['cashier'],
+    operationId: 'getCashierTransaction',
+    middleware: [requirePermission('cashier.view')] as const,
+    request: { params: transactionIdParamSchema },
+    responses: {
+      ...okJson(cashierTransactionWithItemsDtoSchema, 'Transaction with items'),
+      ...notFoundResponse,
+    },
+  });
+
+  app.openapi(getRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tx = await service.getById(c, id);
     if (!tx) return c.json(fail('transaction.not_found', 'Transaction not found'), 404);
-    return c.json(ok(tx));
+    return c.json(ok(toCashierTransactionWithItemsDto(tx, tx.items)), 200);
   });
 
-  app.post('/transactions/:id/refund', requirePermission('cashier.refund'), async (c) => {
-    const tx = await service.refund(c, c.req.param('id'));
+  // ─── POST /transactions/{id}/refund — refund ─────────────────────────────
+
+  const refundRoute = createRoute({
+    method: 'post',
+    path: '/transactions/{id}/refund',
+    tags: ['cashier'],
+    operationId: 'refundCashierTransaction',
+    middleware: [requirePermission('cashier.refund')] as const,
+    request: { params: transactionIdParamSchema },
+    responses: okJson(cashierTransactionWithItemsDtoSchema, 'Refund transaction'),
+  });
+
+  app.openapi(refundRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tx = await service.refund(c, id);
     if (!tx) return c.json(fail('refund.invalid', 'Cannot refund'), 400);
-    return c.json(ok(tx));
+    // refund row items'siz keladi — wire shaklida `items: []`.
+    return c.json(ok(toCashierTransactionWithItemsDto(tx)), 200);
   });
 
-  app.get('/daily-summary', requirePermission('cashier.view'), async (c) => {
-    const branchId = c.req.query('branchId');
-    const date = c.req.query('date') ?? new Date().toISOString().slice(0, 10);
-    if (!branchId) return c.json(fail('query.missing', 'branchId required'), 400);
-    return c.json(ok(await service.dailySummary(c, branchId, date)));
+  // ─── GET /daily-summary — kassa yopilishi ────────────────────────────────
+
+  const dailySummaryRoute = createRoute({
+    method: 'get',
+    path: '/daily-summary',
+    tags: ['cashier'],
+    operationId: 'getCashierDailySummary',
+    middleware: [requirePermission('cashier.view')] as const,
+    request: { query: dailySummaryQuery },
+    responses: okJson(dailySummaryDtoSchema, 'Daily cashier summary'),
   });
 
-  app.get('/plan-balance/:planId', requirePermission('cashier.view'), async (c) => {
-    return c.json(ok(await service.planBalance(c, c.req.param('planId'))));
+  app.openapi(dailySummaryRoute, async (c) => {
+    const { branchId, date } = c.req.valid('query');
+    const dateStr = date ?? new Date().toISOString().slice(0, 10);
+    const result = await service.dailySummary(c, branchId, dateStr);
+    return c.json(ok(result), 200);
+  });
+
+  // ─── GET /plan-balance/{planId} — plan balansi (sof o'qish) ───────────────
+
+  const planBalanceRoute = createRoute({
+    method: 'get',
+    path: '/plan-balance/{planId}',
+    tags: ['cashier'],
+    operationId: 'getCashierPlanBalance',
+    middleware: [requirePermission('cashier.view')] as const,
+    request: { params: planIdParamSchema },
+    responses: okJson(planBalanceDtoSchema, 'Treatment plan balance'),
+  });
+
+  app.openapi(planBalanceRoute, async (c) => {
+    const { planId } = c.req.valid('param');
+    const result = await service.planBalance(c, planId);
+    return c.json(ok(result), 200);
   });
 
   return app;

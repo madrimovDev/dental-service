@@ -1,6 +1,19 @@
+import {
+  addPatientRelative,
+  archivePatient,
+  createPatient,
+  getMedicalRecord,
+  getPatient,
+  getPatientBalance,
+  listCashierTransactions,
+  listPatientRelatives,
+  listPatients,
+  removePatientRelative,
+  updateMedicalRecord,
+  updatePatient,
+} from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { api } from '@/lib/api.ts';
 import { patientKeys } from './patients.keys';
 import { toPatientDetail, toPatientListItem } from './patients.mappers';
 import type { ListParams } from './patients.types';
@@ -10,12 +23,12 @@ export function usePatients(params: ListParams) {
   return useQuery({
     queryKey: patientKeys.list(params),
     queryFn: async () => {
-      const res = await api.patients.list({
+      const res = await listPatients({
         search: params.search || undefined,
         archived: params.archived,
         page: params.page,
         pageSize: params.pageSize ?? 20,
-      });
+      }).then((r) => r.data);
       return { items: res.data.map((p) => toPatientListItem(p, t)), meta: res.meta };
     },
   });
@@ -25,7 +38,7 @@ export function usePatient(id: string) {
   const { t } = useTranslation();
   return useQuery({
     queryKey: patientKeys.detail(id),
-    queryFn: async () => toPatientDetail(await api.patients.get(id), t),
+    queryFn: async () => toPatientDetail(await getPatient(id).then((r) => r.data), t),
     enabled: !!id,
   });
 }
@@ -33,7 +46,7 @@ export function usePatient(id: string) {
 export function usePatientRaw(id: string) {
   return useQuery({
     queryKey: patientKeys.raw(id),
-    queryFn: () => api.patients.get(id),
+    queryFn: () => getPatient(id).then((r) => r.data),
     enabled: !!id,
   });
 }
@@ -41,7 +54,8 @@ export function usePatientRaw(id: string) {
 export function useUpdatePatient(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: Parameters<typeof api.patients.update>[1]) => api.patients.update(id, body),
+    mutationFn: (body: Parameters<typeof updatePatient>[1]) =>
+      updatePatient(id, body).then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: patientKeys.detail(id) });
       qc.invalidateQueries({ queryKey: patientKeys.raw(id) });
@@ -53,7 +67,8 @@ export function useUpdatePatient(id: string) {
 export function useCreatePatient() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: Parameters<typeof api.patients.create>[0]) => api.patients.create(body),
+    mutationFn: (body: Parameters<typeof createPatient>[0]) =>
+      createPatient(body).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: patientKeys.all }),
   });
 }
@@ -61,7 +76,7 @@ export function useCreatePatient() {
 export function useArchivePatient() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api.patients.archive(id),
+    mutationFn: (id: string) => archivePatient(id).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: patientKeys.all }),
   });
 }
@@ -69,7 +84,7 @@ export function useArchivePatient() {
 export function useMedicalRecord(id: string) {
   return useQuery({
     queryKey: patientKeys.medical(id),
-    queryFn: () => api.patients.getMedical(id),
+    queryFn: () => getMedicalRecord(id).then((r) => r.data),
     enabled: !!id,
   });
 }
@@ -77,8 +92,8 @@ export function useMedicalRecord(id: string) {
 export function useUpdateMedicalRecord(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: Parameters<typeof api.patients.updateMedical>[1]) =>
-      api.patients.updateMedical(id, body),
+    mutationFn: (body: Parameters<typeof updateMedicalRecord>[1]) =>
+      updateMedicalRecord(id, body).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: patientKeys.medical(id) }),
   });
 }
@@ -86,7 +101,7 @@ export function useUpdateMedicalRecord(id: string) {
 export function usePatientPayments(id: string) {
   return useQuery({
     queryKey: patientKeys.payments(id),
-    queryFn: () => api.cashier.list({ patientId: id, pageSize: 50 }),
+    queryFn: () => listCashierTransactions({ patientId: id, pageSize: 50 }).then((r) => r.data),
     enabled: !!id,
   });
 }
@@ -94,7 +109,7 @@ export function usePatientPayments(id: string) {
 export function usePatientBalance(id: string) {
   return useQuery({
     queryKey: patientKeys.balance(id),
-    queryFn: () => api.patients.balance(id),
+    queryFn: () => getPatientBalance(id).then((r) => r.data),
     enabled: !!id,
   });
 }
@@ -102,7 +117,7 @@ export function usePatientBalance(id: string) {
 export function usePatientRelatives(id: string) {
   return useQuery({
     queryKey: patientKeys.relatives(id),
-    queryFn: () => api.patients.relatives.list(id),
+    queryFn: () => listPatientRelatives(id).then((r) => r.data),
     enabled: !!id,
   });
 }
@@ -111,7 +126,7 @@ export function useAddRelative(id: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: { relativePatientId: string; relationship: string }) =>
-      api.patients.relatives.add(id, body),
+      addPatientRelative(id, body).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: patientKeys.relatives(id) }),
   });
 }
@@ -119,7 +134,7 @@ export function useAddRelative(id: string) {
 export function useRemoveRelative(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (relId: string) => api.patients.relatives.remove(id, relId),
+    mutationFn: (relId: string) => removePatientRelative(id, relId).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: patientKeys.relatives(id) }),
   });
 }

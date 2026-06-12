@@ -1,6 +1,12 @@
-import { listAppointments, listLabOrders } from '@dental/api-client';
+import {
+  getAppointmentStatsReport,
+  getDoctorWorkloadReport,
+  getPlanCompletionReport,
+  getRevenueReport,
+  listAppointments,
+  listLabOrders,
+} from '@dental/api-client';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api.ts';
 
 const isoDate = (d: Date) => d.toISOString().slice(0, 10);
 
@@ -33,7 +39,7 @@ export function useRevenueReport(range: KpiRange) {
   const q = { from: range.from, to: range.to, branchId: range.branchId };
   return useQuery({
     queryKey: ['dashboard', 'revenue', q],
-    queryFn: () => api.reports.revenue(q),
+    queryFn: () => getRevenueReport(q).then((r) => r.data),
   });
 }
 
@@ -69,19 +75,19 @@ export function useManagerKpi(range: KpiRange) {
   const q = { from: range.from, to: range.to, branchId: range.branchId };
   const revenue = useQuery({
     queryKey: ['dashboard', 'manager-revenue', q],
-    queryFn: () => api.reports.revenue(q),
+    queryFn: () => getRevenueReport(q).then((r) => r.data),
   });
   const appointments = useQuery({
     queryKey: ['dashboard', 'manager-appointments', q],
-    queryFn: () => api.reports.appointments(q),
+    queryFn: () => getAppointmentStatsReport(q).then((r) => r.data),
   });
   const doctors = useQuery({
     queryKey: ['dashboard', 'manager-doctors', q],
-    queryFn: () => api.reports.doctors(q),
+    queryFn: () => getDoctorWorkloadReport(q).then((r) => r.data),
   });
   const treatmentPlans = useQuery({
     queryKey: ['dashboard', 'manager-plans', q],
-    queryFn: () => api.reports.treatmentPlans(q),
+    queryFn: () => getPlanCompletionReport(q).then((r) => r.data),
   });
   return { revenue, appointments, doctors, treatmentPlans };
 }

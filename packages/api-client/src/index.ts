@@ -34,6 +34,23 @@ export {
   listBranches,
   updateBranch,
 } from './generated/branches/branches.ts';
+// Generated (orval) — cashier
+export type {
+  CreateCashierTransactionResult,
+  GetCashierDailySummaryResult,
+  GetCashierPlanBalanceResult,
+  GetCashierTransactionResult,
+  ListCashierTransactionsResult,
+  RefundCashierTransactionResult,
+} from './generated/cashier/cashier.ts';
+export {
+  createCashierTransaction,
+  getCashierDailySummary,
+  getCashierPlanBalance,
+  getCashierTransaction,
+  listCashierTransactions,
+  refundCashierTransaction,
+} from './generated/cashier/cashier.ts';
 // Generated (orval) — consent
 export type {
   CreateConsentTemplateResult,
@@ -54,6 +71,31 @@ export {
 // Generated (orval) — diagnoses
 export type { ListDiagnosesResult } from './generated/diagnoses/diagnoses.ts';
 export { listDiagnoses } from './generated/diagnoses/diagnoses.ts';
+// Generated (orval) — expenses
+export type {
+  CreateExpenseCategoryResult,
+  CreateExpenseResult,
+  DeleteExpenseCategoryResult,
+  DeleteExpenseResult,
+  ExpenseSummaryResult,
+  GetExpenseResult,
+  ListExpenseCategoriesResult,
+  ListExpensesResult,
+  UpdateExpenseCategoryResult,
+  UpdateExpenseResult,
+} from './generated/expenses/expenses.ts';
+export {
+  createExpense,
+  createExpenseCategory,
+  deleteExpense,
+  deleteExpenseCategory,
+  expenseSummary,
+  getExpense,
+  listExpenseCategories,
+  listExpenses,
+  updateExpense,
+  updateExpenseCategory,
+} from './generated/expenses/expenses.ts';
 // Generated (orval) — lab-orders
 export type {
   CreateLabOrderResult,
@@ -299,6 +341,33 @@ export {
   markAllNotificationsRead,
   markNotificationRead,
 } from './generated/notifications/notifications.ts';
+// Generated (orval) — patients
+export type {
+  AddPatientRelativeResult,
+  ArchivePatientResult,
+  CreatePatientResult,
+  GetMedicalRecordResult,
+  GetPatientBalanceResult,
+  GetPatientResult,
+  ListPatientRelativesResult,
+  ListPatientsResult,
+  RemovePatientRelativeResult,
+  UpdateMedicalRecordResult,
+  UpdatePatientResult,
+} from './generated/patients/patients.ts';
+export {
+  addPatientRelative,
+  archivePatient,
+  createPatient,
+  getMedicalRecord,
+  getPatient,
+  getPatientBalance,
+  listPatientRelatives,
+  listPatients,
+  removePatientRelative,
+  updateMedicalRecord,
+  updatePatient,
+} from './generated/patients/patients.ts';
 // Generated (orval) — payroll
 export type {
   CreatePayrollRunResult,
@@ -343,6 +412,19 @@ export {
   getQueueToday,
   updateQueueTicketStatus,
 } from './generated/queue/queue.ts';
+// Generated (orval) — reports
+export type {
+  GetAppointmentStatsReportResult,
+  GetDoctorWorkloadReportResult,
+  GetPlanCompletionReportResult,
+  GetRevenueReportResult,
+} from './generated/reports/reports.ts';
+export {
+  getAppointmentStatsReport,
+  getDoctorWorkloadReport,
+  getPlanCompletionReport,
+  getRevenueReport,
+} from './generated/reports/reports.ts';
 // Generated (orval) — roles
 export type {
   CreateRoleResult,
@@ -377,6 +459,29 @@ export {
   setServicePrice,
   updateService,
 } from './generated/services/services.ts';
+// Generated (orval) — stock
+export type {
+  CreateStockBomResult,
+  CreateStockItemResult,
+  CreateStockMovementResult,
+  GetStockItemResult,
+  ListStockBomResult,
+  ListStockItemsResult,
+  ListStockMovementsResult,
+  RemoveStockBomResult,
+  UpdateStockItemResult,
+} from './generated/stock/stock.ts';
+export {
+  createStockBom,
+  createStockItem,
+  createStockMovement,
+  getStockItem,
+  listStockBom,
+  listStockItems,
+  listStockMovements,
+  removeStockBom,
+  updateStockItem,
+} from './generated/stock/stock.ts';
 export type {
   GetTenantResult,
   TransferTenantOwnershipResult,

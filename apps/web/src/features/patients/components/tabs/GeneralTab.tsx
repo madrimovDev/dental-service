@@ -140,13 +140,13 @@ function GeneralEditForm({ patientId }: { patientId: string }) {
   const submit = form.onSubmit((values) =>
     updateMut.mutate({
       fullName: values.fullName,
-      gender: values.gender ?? null,
-      dateOfBirth: values.dateOfBirth || null,
-      phone: values.phone || null,
-      phoneSecondary: values.phoneSecondary || null,
-      passport: values.passport || null,
-      address: values.address || null,
-      notes: values.notes || null,
+      gender: values.gender ?? undefined,
+      dateOfBirth: values.dateOfBirth || undefined,
+      phone: values.phone || undefined,
+      phoneSecondary: values.phoneSecondary || undefined,
+      passport: values.passport || undefined,
+      address: values.address || undefined,
+      notes: values.notes || undefined,
     }),
   );
 
