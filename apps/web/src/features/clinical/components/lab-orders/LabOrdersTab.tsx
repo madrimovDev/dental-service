@@ -74,7 +74,14 @@ export function LabOrdersTab({ patientId }: Props) {
   if (!canView) return <Text c="dimmed">{t('patients.no_medical_permission')}</Text>;
 
   const addItem = () => {
-    form.insertListItem('items', { description: '', toothNumbersText: '' });
+    // Barcha matn maydonlari '' bilan boshlanadi — getInputProps'siz undefined
+    // bo'lsa TextInput uncontrolled→controlled o'tib React warning beradi.
+    form.insertListItem('items', {
+      description: '',
+      toothNumbersText: '',
+      material: '',
+      shade: '',
+    });
   };
 
   const submit = form.onSubmit((values) => {
