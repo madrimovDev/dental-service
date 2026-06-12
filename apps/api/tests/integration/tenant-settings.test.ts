@@ -48,23 +48,27 @@ beforeAll(async () => {
     .insert(users)
     .values({ phone: '+998900000040', passwordHash: 'x', fullName: 'Owner A' })
     .returning({ id: users.id });
-  ownerAId = ownerA?.id;
+  if (!ownerA) throw new Error('seed failed: ownerA');
+  ownerAId = ownerA.id;
   const [ownerB] = await db
     .insert(users)
     .values({ phone: '+998900000041', passwordHash: 'x', fullName: 'Owner B' })
     .returning({ id: users.id });
-  ownerBId = ownerB?.id;
+  if (!ownerB) throw new Error('seed failed: ownerB');
+  ownerBId = ownerB.id;
 
   const [tenantA] = await db
     .insert(tenants)
     .values({ name: 'A', slug: 'a-clinic', ownerUserId: ownerAId })
     .returning({ id: tenants.id });
-  tenantAId = tenantA?.id;
+  if (!tenantA) throw new Error('seed failed: tenantA');
+  tenantAId = tenantA.id;
   const [tenantB] = await db
     .insert(tenants)
     .values({ name: 'B', slug: 'b-clinic', ownerUserId: ownerBId })
     .returning({ id: tenants.id });
-  tenantBId = tenantB?.id;
+  if (!tenantB) throw new Error('seed failed: tenantB');
+  tenantBId = tenantB.id;
 });
 
 afterAll(async () => {
