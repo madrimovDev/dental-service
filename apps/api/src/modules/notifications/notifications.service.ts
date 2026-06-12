@@ -4,11 +4,8 @@ import { and, count, desc, eq, isNull } from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { DbOrTx } from '../../db/client.ts';
 import { getDb } from '../../db/scoped.ts';
-import {
-  type ListNotificationsQuery,
-  type NotificationsFeed,
-  toNotificationDto,
-} from './notifications.schema.ts';
+import { toNotificationDto } from './notifications.mapper.ts';
+import type { ListNotificationsQuery, NotificationsFeed } from './notifications.schema.ts';
 
 /** notifyInTx payload — worker va HTTP konteksti ham shu shaklni ishlatadi. */
 export type NotifyPayload = {

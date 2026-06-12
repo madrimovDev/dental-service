@@ -37,18 +37,11 @@ import type {
 } from './types-erp.ts';
 import type { PayrollRun, PayrollRunWithLines, StaffProfile } from './types-hr.ts';
 import type {
-  Appointment,
-  AppointmentStatus,
   CashierListResponse,
   CashierTransactionWithItems,
   DailySummary,
   PaymentMethod,
   PlanBalance,
-  QueueStatus,
-  QueueTicket,
-  Service,
-  ServicePrice,
-  ServiceWithPrices,
 } from './types-m3.ts';
 import type {
   ConsentForm,
@@ -65,7 +58,6 @@ import type {
   Prescription,
   SignFormInput,
 } from './types-m5.ts';
-import type { NotificationsFeed } from './types-notifications.ts';
 import type {
   AllergyEntry,
   MedicalRecord,
@@ -207,28 +199,6 @@ export const createEndpoints = (api: ApiClient) => ({
       remove: (patientId: string, relId: string) =>
         api.delete<{ removed: true; id: string }>(`/api/patients/${patientId}/relatives/${relId}`),
     },
-  },
-
-  services: {
-    list: () => api.get<Service[]>('/api/services'),
-    get: (id: string) => api.get<ServiceWithPrices>(`/api/services/${id}`),
-    create: (body: {
-      code: string;
-      nameUz: string;
-      nameRu?: string;
-      category?: string;
-      durationMinutes?: number;
-      requiredRole?: string;
-      descriptionUz?: string;
-      descriptionRu?: string;
-      isActive?: boolean;
-      initialPrice?: number;
-      initialBranchId?: string;
-    }) => api.post<Service>('/api/services', body),
-    update: (id: string, body: Partial<Service>) => api.patch<Service>(`/api/services/${id}`, body),
-    remove: (id: string) => api.delete<{ deleted: true }>(`/api/services/${id}`),
-    setPrice: (id: string, body: { branchId: string; price: number; currency?: string }) =>
-      api.post<ServicePrice>(`/api/services/${id}/prices`, body),
   },
 
   cashier: {
@@ -378,82 +348,12 @@ export const createEndpoints = (api: ApiClient) => ({
     removeBom: (id: string) => api.delete<{ deleted: true }>(`/api/stock/bom/${id}`),
   },
 
-  notifications: {
-    list: (query?: { page?: number; pageSize?: number }) => {
-      const p = new URLSearchParams();
-      if (query?.page) p.set('page', String(query.page));
-      if (query?.pageSize) p.set('pageSize', String(query.pageSize));
-      const qs = p.toString();
-      return api.get<NotificationsFeed>(`/api/notifications${qs ? `?${qs}` : ''}`);
-    },
-    markRead: (id: string) =>
-      api.post<{ read: boolean; id: string | null }>(`/api/notifications/${id}/read`),
-    markAllRead: () => api.post<{ count: number }>('/api/notifications/read-all'),
-  },
-
   payroll: {
     runs: () => api.get<PayrollRun[]>('/api/payroll/runs'),
     getRun: (id: string) => api.get<PayrollRunWithLines>(`/api/payroll/runs/${id}`),
     createRun: (body: { periodFrom: string; periodTo: string }) =>
       api.post<PayrollRunWithLines>('/api/payroll/runs', body),
     finalize: (id: string) => api.post<PayrollRun>(`/api/payroll/runs/${id}/finalize`),
-  },
-
-  appointments: {
-    list: (query?: {
-      branchId?: string;
-      doctorId?: string;
-      patientId?: string;
-      from?: string;
-      to?: string;
-    }) => {
-      const params = new URLSearchParams();
-      if (query?.branchId) params.set('branchId', query.branchId);
-      if (query?.doctorId) params.set('doctorId', query.doctorId);
-      if (query?.patientId) params.set('patientId', query.patientId);
-      if (query?.from) params.set('from', query.from);
-      if (query?.to) params.set('to', query.to);
-      const qs = params.toString();
-      return api.get<Appointment[]>(`/api/appointments${qs ? `?${qs}` : ''}`);
-    },
-    get: (id: string) => api.get<Appointment>(`/api/appointments/${id}`),
-    create: (body: {
-      branchId: string;
-      patientId: string;
-      doctorId: string;
-      assistantId?: string;
-      startTime: string;
-      endTime: string;
-      serviceIds?: string[];
-      notes?: string;
-    }) => api.post<Appointment>('/api/appointments', body),
-    update: (
-      id: string,
-      body: {
-        startTime?: string;
-        endTime?: string;
-        doctorId?: string;
-        status?: AppointmentStatus;
-        serviceIds?: string[];
-        notes?: string;
-      },
-    ) => api.patch<Appointment>(`/api/appointments/${id}`, body),
-    cancel: (id: string, reason?: string) =>
-      api.post<Appointment>(`/api/appointments/${id}/cancel`, { reason }),
-  },
-
-  queue: {
-    today: (branchId: string) => api.get<QueueTicket[]>(`/api/queue?branchId=${branchId}`),
-    create: (body: {
-      branchId: string;
-      patientId?: string;
-      serviceId?: string;
-      appointmentId?: string;
-    }) => api.post<QueueTicket>('/api/queue', body),
-    updateStatus: (id: string, status: QueueStatus, doctorId?: string) =>
-      api.patch<QueueTicket>(`/api/queue/${id}/status`, { status, doctorId }),
-    checkInCandidates: (branchId: string) =>
-      api.get<Appointment[]>(`/api/queue/check-in-candidates?branchId=${branchId}`),
   },
 
   clinical: {

@@ -1,21 +1,41 @@
 import { fail, ok } from '@dental/core';
-import { Hono } from 'hono';
-import { HTTPException } from 'hono/http-exception';
+import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
 import { reminderQueue } from '../../lib/queue.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
+import { toAppointmentDto } from './appointments.mapper.ts';
 import {
+  appointmentDtoSchema,
+  appointmentIdParamSchema,
+  cancelAppointmentBodySchema,
   createAppointmentSchema,
   listAppointmentsQuery,
   updateAppointmentSchema,
 } from './appointments.schema.ts';
 import { createAppointmentsService } from './appointments.service.ts';
 
+/** Standart 404 response — get / patch / cancel endpoint'lar uchun. */
+const notFoundResponse = {
+  404: {
+    content: { 'application/json': { schema: errorResponseSchema } },
+    description: 'Appointment not found',
+  },
+};
+
+/** 409 Conflict response — create / patch endpoint'lar uchun (doctor_busy). */
+const conflictResponse = {
+  409: {
+    content: { 'application/json': { schema: errorResponseSchema } },
+    description: 'Doctor is busy (scheduling conflict)',
+  },
+};
+
 export const appointmentRoutes = (deps: { db: Database; audit: AuditLogger }) => {
-  const app = new Hono();
+  const app = new OpenAPIHono();
   app.use('*', authMiddleware());
   app.use('*', rlsMiddleware(deps.db));
 
@@ -30,50 +50,154 @@ export const appointmentRoutes = (deps: { db: Database; audit: AuditLogger }) =>
     },
   });
 
-  app.get('/', requirePermission('appointment.view'), async (c) => {
-    const query = listAppointmentsQuery.safeParse(
-      Object.fromEntries(new URL(c.req.url).searchParams),
-    );
-    if (!query.success) throw new HTTPException(400, { message: 'Invalid query' });
-    return c.json(ok(await service.list(c, query.data)));
+  // ─── GET / — list ─────────────────────────────────────────────────────────
+
+  const listRoute = createRoute({
+    method: 'get',
+    path: '/',
+    tags: ['appointments'],
+    operationId: 'listAppointments',
+    middleware: [requirePermission('appointment.view')] as const,
+    request: {
+      query: listAppointmentsQuery,
+    },
+    responses: okJson(z.array(appointmentDtoSchema), 'List of appointments'),
   });
 
-  app.post('/', requirePermission('appointment.create'), async (c) => {
-    const body = createAppointmentSchema.safeParse(await c.req.json());
-    if (!body.success) throw new HTTPException(400, { message: 'Invalid input' });
-    const result = await service.create(c, body.data);
+  app.openapi(listRoute, async (c) => {
+    const query = c.req.valid('query');
+    const rows = await service.list(c, query);
+    return c.json(ok(rows.map(toAppointmentDto)), 200);
+  });
+
+  // ─── POST / — create ──────────────────────────────────────────────────────
+
+  const createAppointmentRoute = createRoute({
+    method: 'post',
+    path: '/',
+    tags: ['appointments'],
+    operationId: 'createAppointment',
+    middleware: [requirePermission('appointment.create')] as const,
+    request: {
+      body: { content: { 'application/json': { schema: createAppointmentSchema } } },
+    },
+    responses: {
+      201: {
+        content: { 'application/json': { schema: apiResponseSchema(appointmentDtoSchema) } },
+        description: 'Appointment created',
+      },
+      400: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Validation error',
+      },
+      401: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Unauthorized',
+      },
+      403: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Forbidden',
+      },
+      ...conflictResponse,
+    },
+  });
+
+  app.openapi(createAppointmentRoute, async (c) => {
+    const body = c.req.valid('json');
+    const result = await service.create(c, body);
     if (!result.ok) {
-      const status = result.code === 'conflict.doctor_busy' ? 409 : 400;
-      return c.json(fail(result.code, result.code), status);
+      if (result.code === 'conflict.doctor_busy')
+        return c.json(fail(result.code, result.code), 409);
+      return c.json(fail(result.code, result.code), 400);
     }
-    return c.json(ok(result.appointment), 201);
+    if (!result.appointment)
+      return c.json(fail('insert.failed', 'Appointment creation failed'), 400);
+    return c.json(ok(toAppointmentDto(result.appointment)), 201);
   });
 
-  app.get('/:id', requirePermission('appointment.view'), async (c) => {
-    const row = await service.getById(c, c.req.param('id'));
+  // ─── GET /{id} — get by id ────────────────────────────────────────────────
+
+  const getRoute = createRoute({
+    method: 'get',
+    path: '/{id}',
+    tags: ['appointments'],
+    operationId: 'getAppointment',
+    middleware: [requirePermission('appointment.view')] as const,
+    request: {
+      params: appointmentIdParamSchema,
+    },
+    responses: { ...okJson(appointmentDtoSchema, 'Appointment'), ...notFoundResponse },
+  });
+
+  app.openapi(getRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const row = await service.getById(c, id);
     if (!row) return c.json(fail('appointment.not_found', 'Appointment not found'), 404);
-    return c.json(ok(row));
+    return c.json(ok(toAppointmentDto(row)), 200);
   });
 
-  app.patch('/:id', requirePermission('appointment.edit'), async (c) => {
-    const body = updateAppointmentSchema.safeParse(await c.req.json());
-    if (!body.success) throw new HTTPException(400, { message: 'Invalid input' });
-    const result = await service.update(c, c.req.param('id'), body.data);
+  // ─── PATCH /{id} — update ─────────────────────────────────────────────────
+
+  const updateRoute = createRoute({
+    method: 'patch',
+    path: '/{id}',
+    tags: ['appointments'],
+    operationId: 'updateAppointment',
+    middleware: [requirePermission('appointment.edit')] as const,
+    request: {
+      params: appointmentIdParamSchema,
+      body: { content: { 'application/json': { schema: updateAppointmentSchema } } },
+    },
+    responses: {
+      ...okJson(appointmentDtoSchema, 'Updated appointment'),
+      ...notFoundResponse,
+      ...conflictResponse,
+    },
+  });
+
+  app.openapi(updateRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const body = c.req.valid('json');
+    const result = await service.update(c, id, body);
     if (!result.ok) {
-      const status =
-        result.code === 'conflict.doctor_busy' ? 409 : result.code === 'not_found' ? 404 : 400;
-      return c.json(fail(result.code, result.code), status);
+      if (result.code === 'conflict.doctor_busy')
+        return c.json(fail(result.code, result.code), 409);
+      if (result.code === 'not_found') return c.json(fail(result.code, result.code), 404);
+      return c.json(fail(result.code, result.code), 400);
     }
-    return c.json(ok(result.appointment));
+    if (!result.appointment)
+      return c.json(fail('appointment.not_found', 'Appointment not found'), 404);
+    return c.json(ok(toAppointmentDto(result.appointment)), 200);
   });
 
-  app.post('/:id/cancel', requirePermission('appointment.cancel'), async (c) => {
-    const reason = (await c.req.json().catch(() => ({ reason: undefined }))) as {
-      reason?: string;
-    };
-    const result = await service.cancel(c, c.req.param('id'), reason.reason);
+  // ─── POST /{id}/cancel — cancel ───────────────────────────────────────────
+
+  const cancelRoute = createRoute({
+    method: 'post',
+    path: '/{id}/cancel',
+    tags: ['appointments'],
+    operationId: 'cancelAppointment',
+    middleware: [requirePermission('appointment.cancel')] as const,
+    request: {
+      params: appointmentIdParamSchema,
+      body: {
+        required: false,
+        content: { 'application/json': { schema: cancelAppointmentBodySchema } },
+      },
+    },
+    responses: {
+      ...okJson(appointmentDtoSchema, 'Cancelled appointment'),
+    },
+  });
+
+  app.openapi(cancelRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const body = c.req.valid('json');
+    const result = await service.cancel(c, id, body?.reason);
     if (!result.ok) return c.json(fail(result.code, result.code), 400);
-    return c.json(ok(result.appointment));
+    if (!result.appointment)
+      return c.json(fail('appointment.not_found', 'Appointment not found'), 400);
+    return c.json(ok(toAppointmentDto(result.appointment)), 200);
   });
 
   return app;

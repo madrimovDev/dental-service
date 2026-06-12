@@ -1,3 +1,4 @@
+import { listAppointments } from '@dental/api-client';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api.ts';
 
@@ -45,12 +46,12 @@ export function useDoctorAppointments(
   return useQuery({
     queryKey: ['dashboard', 'doctor-appointments', doctorId, branchId, range],
     queryFn: () =>
-      api.appointments.list({
+      listAppointments({
         branchId: branchId ?? undefined,
         doctorId,
         from: range.from,
         to: range.to,
-      }),
+      }).then((r) => r.data),
     enabled: !!doctorId,
   });
 }

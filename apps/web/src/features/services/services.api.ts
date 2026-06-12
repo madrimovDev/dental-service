@@ -1,17 +1,28 @@
-import { listBranches, type Service } from '@dental/api-client';
+import {
+  createService,
+  deleteService,
+  getService,
+  listBranches,
+  listServices,
+  type Service,
+  setServicePrice,
+  updateService,
+} from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api.ts';
 import { serviceKeys } from './services.keys';
 import type { ServiceFormValues } from './services.types';
 
 export function useServices() {
-  return useQuery({ queryKey: serviceKeys.list(), queryFn: api.services.list });
+  return useQuery({
+    queryKey: serviceKeys.list(),
+    queryFn: () => listServices().then((r) => r.data),
+  });
 }
 
 export function useServiceDetail(id: string | null, enabled = true) {
   return useQuery({
     queryKey: serviceKeys.detail(id ?? ''),
-    queryFn: () => api.services.get(id ?? ''),
+    queryFn: () => getService(id ?? '').then((r) => r.data),
     enabled: !!id && enabled,
   });
 }
@@ -29,18 +40,18 @@ export function useUpsertService(editing: Service | null) {
   return useMutation({
     mutationFn: (values: ServiceFormValues) => {
       if (editing) {
-        return api.services.update(editing.id, {
+        return updateService(editing.id, {
           nameUz: values.nameUz,
-          nameRu: values.nameRu || null,
-          category: values.category || null,
+          nameRu: values.nameRu || undefined,
+          category: values.category || undefined,
           durationMinutes: values.durationMinutes,
-          requiredRole: values.requiredRole || null,
-          descriptionUz: values.descriptionUz || null,
-          descriptionRu: values.descriptionRu || null,
+          requiredRole: values.requiredRole || undefined,
+          descriptionUz: values.descriptionUz || undefined,
+          descriptionRu: values.descriptionRu || undefined,
           isActive: values.isActive,
-        });
+        }).then((r) => r.data);
       }
-      return api.services.create({
+      return createService({
         code: values.code,
         nameUz: values.nameUz,
         nameRu: values.nameRu || undefined,
@@ -52,7 +63,7 @@ export function useUpsertService(editing: Service | null) {
         isActive: values.isActive,
         initialBranchId: values.initialBranchId || undefined,
         initialPrice: values.initialPrice,
-      });
+      }).then((r) => r.data);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: serviceKeys.all }),
   });
@@ -62,7 +73,7 @@ export function useSetPrice(serviceId: string | null) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ branchId, price }: { branchId: string; price: number }) =>
-      api.services.setPrice(serviceId ?? '', { branchId, price }),
+      setServicePrice(serviceId ?? '', { branchId, price }).then((r) => r.data),
     onSuccess: () => {
       if (serviceId) void qc.invalidateQueries({ queryKey: serviceKeys.detail(serviceId) });
     },
@@ -72,7 +83,7 @@ export function useSetPrice(serviceId: string | null) {
 export function useDeleteService() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api.services.remove(id),
+    mutationFn: (id: string) => deleteService(id).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: serviceKeys.all }),
   });
 }

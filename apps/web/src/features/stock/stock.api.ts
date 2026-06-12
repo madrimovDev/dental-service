@@ -1,4 +1,4 @@
-import { listBranches } from '@dental/api-client';
+import { listBranches, listServices } from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api.ts';
 import { stockKeys } from './stock.keys';
@@ -34,7 +34,7 @@ export function useBranches() {
 }
 
 export function useServices() {
-  return useQuery({ queryKey: ['services'], queryFn: api.services.list });
+  return useQuery({ queryKey: ['services'], queryFn: () => listServices().then((r) => r.data) });
 }
 
 export function useCreateItem() {

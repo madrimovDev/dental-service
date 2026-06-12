@@ -1,4 +1,4 @@
-import { listBranches, type ServiceWithPrices } from '@dental/api-client';
+import { getService, listBranches, listServices, type ServiceWithPrices } from '@dental/api-client';
 import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api.ts';
 import { cashierKeys } from './cashier.keys';
@@ -34,7 +34,7 @@ export function useBranches() {
 }
 
 export function useServices() {
-  return useQuery({ queryKey: ['services'], queryFn: api.services.list });
+  return useQuery({ queryKey: ['services'], queryFn: () => listServices().then((r) => r.data) });
 }
 
 /** Lookup: barcha bemorlar (selektor uchun). */
@@ -94,6 +94,6 @@ export function useRefund() {
 export function fetchServicePrices(qc: QueryClient, id: string): Promise<ServiceWithPrices> {
   return qc.fetchQuery({
     queryKey: ['services', 'detail', id],
-    queryFn: () => api.services.get(id),
+    queryFn: () => getService(id).then((r) => r.data),
   });
 }
