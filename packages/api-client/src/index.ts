@@ -136,6 +136,7 @@ export {
 // QueueTicketStatus re-exported under both names for backward compatibility
 export type {
   Appointment,
+  AppointmentStatsReport,
   AppointmentStatus,
   AuditListResponse,
   AuditListResponseMeta,
@@ -197,6 +198,7 @@ export type {
   DeleteService200,
   DeleteUserAssignment200,
   Diagnosis,
+  DoctorWorkloadRow,
   ErrorResponse,
   ErrorResponseError,
   ErrorResponseErrorDetails,
@@ -261,6 +263,7 @@ export type {
   PayrollRunWithLines,
   PayrollRunWithLinesAllOf,
   PermissionDef,
+  PlanCompletionReport,
   Prescription,
   PrescriptionDeleteResult,
   PrescriptionItem,
@@ -269,6 +272,7 @@ export type {
   QueueTicketStatus as QueueStatus,
   ResetPasswordResponse,
   ResetUserPassword200,
+  RevenueReport,
   Role,
   RoleDeleteResult,
   RolePermissionsResult,
@@ -603,4 +607,3 @@ export * from './types-erp.ts';
 export * from './types-m3.ts';
 export * from './types-m5.ts';
 export * from './types-patients.ts';
-export * from './types-reports.ts';
