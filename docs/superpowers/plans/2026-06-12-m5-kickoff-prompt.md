@@ -1,6 +1,8 @@
 # M5 kickoff prompt (keyingi sessiya uchun)
 
-> Bu faylni keyingi sessiyada to'liq nusxalab promptga joylashtiring (yoki "M5 ni boshla, `docs/superpowers/plans/2026-06-12-m5-kickoff-prompt.md` ni o'qi" deng).
+> ⚠️ **ESKIRGAN (2026-06-12).** Bu prompt xato taxminga asoslangan edi: "M3 endigina M5 ni unblock qildi, M5 ni boshlash kerak." Aslida **M5 (CLI-35 R2 ekran re-skin) M3'dan OLDIN (2026-06-10/11) qurilib merge qilingan** (PR #4 yozilish, #5 navbat, #6 batch, #7 "R2 tugadi"; Linear CLI-35 + sub-tasklar 36/37/39/46/49/52/60 Done). M5 **YOPILGAN** — bu fayl tarixiy esdalik sifatida qoldirilgan, kelajakdagi ish uchun emas. Joriy holat: CLAUDE.md §7-qator. **Qolgan ish:** M8 (R5 Sayqal) + 2 ochiq tech-debt (CLI-117 won't-fix, CLI-114 deferred).
+
+> ~~Bu faylni keyingi sessiyada to'liq nusxalab promptga joylashtiring (yoki "M5 ni boshla, `docs/superpowers/plans/2026-06-12-m5-kickoff-prompt.md` ni o'qi" deng).~~
 
 ---
 
