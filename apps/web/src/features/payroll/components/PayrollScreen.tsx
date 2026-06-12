@@ -1,4 +1,3 @@
-import { listUserAssignments } from '@dental/api-client';
 import {
   Badge,
   Button,
@@ -13,12 +12,17 @@ import {
 } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { useForm } from '@mantine/form';
-import { useQuery } from '@tanstack/react-query';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth-store.ts';
-import { useCreateRun, useFinalizeRun, usePayrollRun, usePayrollRuns } from '../payroll.api';
+import {
+  useCreateRun,
+  useFinalizeRun,
+  usePayrollRun,
+  usePayrollRuns,
+  useUserAssignments,
+} from '../payroll.api';
 import { formatUZS, toLocalDate, toPayrollLineVM, toPayrollRunVM } from '../payroll.mappers';
 import { periodFormSchema } from '../payroll.schema';
 
@@ -35,10 +39,7 @@ export function PayrollScreen() {
   const finalizeRun = useFinalizeRun();
 
   // Xodim nomlarini yechish uchun (line faqat userId tashiydi).
-  const assignments = useQuery({
-    queryKey: ['users', 'assignments'],
-    queryFn: () => listUserAssignments().then((r) => r.data),
-  });
+  const assignments = useUserAssignments();
   const nameByUserId = useMemo(() => {
     const map = new Map<string, string>();
     for (const a of assignments.data ?? []) {
