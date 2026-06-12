@@ -268,6 +268,7 @@ export type {
   NotificationsFeedMeta,
   Patient,
   PatientGender as Gender,
+  PatientImage,
   PatientListItem,
   PatientRelativeView,
   PayrollLine,

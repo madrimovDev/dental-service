@@ -1,5 +1,5 @@
 import type { ApiClient } from './client.ts';
-import type { PatientImage } from './types-m5.ts';
+import type { PatientImage } from './generated/model/index.ts';
 
 export const createEndpoints = (api: ApiClient) => ({
   // patient-images READ + JSON mutatsiya generated client'ga ko'chdi (CLI-145).
