@@ -135,7 +135,9 @@ export {
 // Generated model types — appointments, services, queue, notifications
 // QueueTicketStatus re-exported under both names for backward compatibility
 export type {
+  AllergyEntry,
   Appointment,
+  AppointmentStatsReport,
   AppointmentStatus,
   AuditListResponse,
   AuditListResponseMeta,
@@ -149,6 +151,10 @@ export type {
   BranchWorkHoursAnyOfTwo,
   CancelAppointment200,
   CancelAppointmentBody,
+  CashierTransaction,
+  CashierTransactionPaymentMethod as PaymentMethod,
+  CashierTransactionStatus as TransactionStatus,
+  CashierTransactionType as TransactionType,
   CheckInCandidate,
   CheckInCandidateStatus,
   ConsentForm,
@@ -190,6 +196,7 @@ export type {
   CreateTreatmentPlanBodyStagesItem,
   CreateVisitNote201,
   CreateVisitNoteBody,
+  DailySummary,
   DeleteAssignmentResult,
   DeleteBranch200,
   DeletePrescription200,
@@ -197,9 +204,13 @@ export type {
   DeleteService200,
   DeleteUserAssignment200,
   Diagnosis,
+  DoctorWorkloadRow,
   ErrorResponse,
   ErrorResponseError,
   ErrorResponseErrorDetails,
+  Expense,
+  ExpenseCategory,
+  ExpenseSummary,
   FinalizePayrollRun200,
   GetAppointment200,
   GetBranch200,
@@ -255,12 +266,19 @@ export type {
   NotificationMarkReadResult,
   NotificationsFeed,
   NotificationsFeedMeta,
+  Patient,
+  PatientGender as Gender,
+  PatientImage,
+  PatientListItem,
+  PatientRelativeView,
   PayrollLine,
   PayrollRun,
   PayrollRunStatus,
   PayrollRunWithLines,
   PayrollRunWithLinesAllOf,
   PermissionDef,
+  PlanBalance,
+  PlanCompletionReport,
   Prescription,
   PrescriptionDeleteResult,
   PrescriptionItem,
@@ -269,12 +287,14 @@ export type {
   QueueTicketStatus as QueueStatus,
   ResetPasswordResponse,
   ResetUserPassword200,
+  RevenueReport,
   Role,
   RoleDeleteResult,
   RolePermissionsResult,
   RoleWithPermissions,
   Service,
   ServiceDeleteResult,
+  ServiceMaterial,
   ServicePrice,
   ServiceWithPrices,
   ServiceWithPricesAllOf,
@@ -288,6 +308,11 @@ export type {
   SignConsentFormBodyType,
   StaffProfile,
   StaffProfileEmploymentStatus,
+  StageBalance,
+  StockItem,
+  StockItemWithLowStock,
+  StockMovement,
+  StockMovementType,
   Tenant,
   TenantSettings,
   TenantSubscriptionStatus,
@@ -599,8 +624,4 @@ export {
 export type { CustomInstanceConfig } from './mutator.ts';
 export { configureClient, customInstance, isClientConfigured } from './mutator.ts';
 export * from './types-clinical.ts';
-export * from './types-erp.ts';
-export * from './types-m3.ts';
 export * from './types-m5.ts';
-export * from './types-patients.ts';
-export * from './types-reports.ts';

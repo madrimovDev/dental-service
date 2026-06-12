@@ -81,20 +81,6 @@ export type PatientImageType =
   | 'before_after'
   | 'other';
 
-export type PatientImage = {
-  id: string;
-  tenantId: string;
-  patientId: string;
-  uploadedByUserId: string | null;
-  type: PatientImageType;
-  objectKey: string;
-  originalFilename: string;
-  contentType: string;
-  sizeBytes: number;
-  title: string | null;
-  description: string | null;
-  toothNumbers: number[] | null;
-  takenDate: string | null;
-  createdAt: string;
-  url: string;
-};
+// PatientImage RESPONSE tipi generated model'ga ko'chdi (CLI-146); barrel generated'dan
+// re-eksport qiladi. PatientImageType + request/enum tiplari shu yerda HAND qoladi
+// (web formlar va ImageUploadModal ishlatadi; generated *Body boshqa nom).
