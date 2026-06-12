@@ -3,6 +3,10 @@ import { ColorSchemeScript } from '@mantine/core';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { App } from './app/App.tsx';
+// Side-effect: api-client singleton'ini boot'da sozlaydi (configureClient).
+// Login/register sahifalari `@dental/api-client`'dan to'g'ridan import qiladi,
+// shuning uchun bu eager import bo'lmasa client sozlanmay qoladi.
+import './lib/api.ts';
 import './styles.css';
 
 const root = document.getElementById('root');
