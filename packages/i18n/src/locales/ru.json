@@ -132,6 +132,13 @@
       "management": "Управление"
     }
   },
+  "palette": {
+    "group": { "navigation": "Навигация", "actions": "Действия", "patients": "Пациенты" },
+    "new_patient": "Новый пациент",
+    "new_appointment": "Новая запись",
+    "open_cashier": "Открыть кассу",
+    "nothing_found": "Ничего не найдено"
+  },
   "shell": {
     "search_placeholder": "Пациент, запись, услуга, сотрудник…",
     "notifications": "Уведомления",

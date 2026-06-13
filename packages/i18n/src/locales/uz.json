@@ -132,6 +132,13 @@
       "management": "Boshqaruv"
     }
   },
+  "palette": {
+    "group": { "navigation": "Navigatsiya", "actions": "Amallar", "patients": "Bemorlar" },
+    "new_patient": "Yangi bemor",
+    "new_appointment": "Yangi yozilish",
+    "open_cashier": "Kassani ochish",
+    "nothing_found": "Hech narsa topilmadi"
+  },
   "shell": {
     "search_placeholder": "Bemor, yozuv, xizmat, xodim…",
     "notifications": "Bildirishnomalar",
