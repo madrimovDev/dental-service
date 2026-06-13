@@ -26,6 +26,7 @@ export { listAuditLog } from './generated/audit/audit.ts';
 export type {
   ChangePasswordResult,
   GetMeResult,
+  GetWorkspaceBranchesResult,
   LoginResult,
   LogoutResult,
   PasswordResetRequestResult,
@@ -37,6 +38,7 @@ export type {
 export {
   changePassword,
   getMe,
+  getWorkspaceBranches,
   login,
   logout,
   passwordReset,
@@ -136,6 +138,10 @@ export {
   listLabOrders,
   updateLabOrder,
 } from './generated/lab-orders/lab-orders.ts';
+export type {
+  WorkspaceBranches,
+  WorkspaceBranchesBranchesItem,
+} from './generated/model';
 // Generated model types — appointments, services, queue, notifications
 // QueueTicketStatus re-exported under both names for backward compatibility
 export type {

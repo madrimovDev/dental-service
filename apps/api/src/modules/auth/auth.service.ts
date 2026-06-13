@@ -329,6 +329,58 @@ export const createAuthService = (deps: AuthServiceDeps) => {
     });
   }
 
+  /**
+   * Joriy active tenant ichida user almasha oladigan filiallar ro'yxati.
+   * Topbar filial dropdown uchun — RBAC-safe: `requirePermission` SIZ (CLI-154/155 precedenti).
+   * Owner → tenantning barcha filiallari; xodim → faqat o'z aktiv assignment filiallari.
+   * `allowAllBranches` → "Barcha filiallar" (branchId=null) tanlash mumkinmi (owner yoki branch-siz assignment).
+   */
+  async function workspaceBranches(userId: string, tenantId: string) {
+    return await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);
+      await tx.execute(sql`SELECT set_config('app.current_user_id', ${userId}, true)`);
+
+      const [tenant] = await tx.select().from(tenants).where(eq(tenants.id, tenantId));
+      if (!tenant) return { branches: [], allowAllBranches: false };
+
+      const isOwner = tenant.ownerUserId === userId;
+
+      if (isOwner) {
+        const rows = await tx
+          .select({ id: branches.id, name: branches.name })
+          .from(branches)
+          .where(isNull(branches.deletedAt));
+        return { branches: rows, allowAllBranches: true };
+      }
+
+      // Xodim — faqat aktiv assignment'lardagi filiallar (switchWorkspace shu doirani majburlaydi)
+      const now = new Date();
+      const asg = await tx
+        .select({ branchId: userAssignments.branchId })
+        .from(userAssignments)
+        .where(
+          and(
+            eq(userAssignments.userId, userId),
+            eq(userAssignments.tenantId, tenantId),
+            eq(userAssignments.isActive, true),
+            or(isNull(userAssignments.validTo), gt(userAssignments.validTo, now)),
+          ),
+        );
+
+      const allowAllBranches = asg.some((a) => a.branchId === null);
+      const branchIds = [
+        ...new Set(asg.map((a) => a.branchId).filter((b): b is string => b !== null)),
+      ];
+      const rows = branchIds.length
+        ? await tx
+            .select({ id: branches.id, name: branches.name })
+            .from(branches)
+            .where(and(inArray(branches.id, branchIds), isNull(branches.deletedAt)))
+        : [];
+      return { branches: rows, allowAllBranches };
+    });
+  }
+
   async function switchWorkspace(userId: string, input: SwitchWorkspaceInput) {
     // 1. Refresh tokenni validatsiya — chain identifikatori sifatida
     let claims: { sub: string; jti: string };
@@ -651,6 +703,7 @@ export const createAuthService = (deps: AuthServiceDeps) => {
     registerTenant,
     login,
     getMemberships,
+    workspaceBranches,
     switchWorkspace,
     refresh,
     changePassword,

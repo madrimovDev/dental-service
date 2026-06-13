@@ -77,8 +77,21 @@ export function UsersSettingsScreen() {
       { phone: v.phone, fullName: v.fullName, roleId: v.roleId, branchId: v.branchId || undefined },
       {
         onSuccess: (data) => {
-          if (data.tempPassword) setTempPassword(data.tempPassword);
-          else closeAll();
+          if (data.alreadyExists) {
+            // Telefon raqami platform bo'yicha unique — mavjud foydalanuvchiga shunchaki
+            // yangi rol biriktirildi (yangi user/parol yaratilmadi). Jim yopilish o'rniga
+            // aniq xabar — admin "parol qani?" deb chalkashmasin (CLI-158).
+            notifications.show({
+              title: t('users.already_exists_title'),
+              message: t('users.already_exists_message'),
+              color: 'blue',
+            });
+            closeAll();
+          } else if (data.tempPassword) {
+            setTempPassword(data.tempPassword);
+          } else {
+            closeAll();
+          }
           form.reset();
         },
       },

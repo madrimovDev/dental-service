@@ -8,6 +8,7 @@ import type {
   ChangePassword200,
   ChangePasswordBody,
   GetMe200,
+  GetWorkspaceBranches200,
   Login200,
   LoginBody,
   Logout200,
@@ -76,6 +77,14 @@ import { customInstance } from '../../mutator';
     },
       );
     }
+  export const getWorkspaceBranches = (
+    
+ ) => {
+      return customInstance<GetWorkspaceBranches200>(
+      {url: `/api/auth/workspace-branches`, method: 'GET'
+    },
+      );
+    }
   export const switchWorkspace = (
     switchWorkspaceBody: SwitchWorkspaceBody,
  ) => {
@@ -121,6 +130,7 @@ export type LoginResult = NonNullable<Awaited<ReturnType<typeof login>>>
 export type RefreshResult = NonNullable<Awaited<ReturnType<typeof refresh>>>
 export type LogoutResult = NonNullable<Awaited<ReturnType<typeof logout>>>
 export type GetMeResult = NonNullable<Awaited<ReturnType<typeof getMe>>>
+export type GetWorkspaceBranchesResult = NonNullable<Awaited<ReturnType<typeof getWorkspaceBranches>>>
 export type SwitchWorkspaceResult = NonNullable<Awaited<ReturnType<typeof switchWorkspace>>>
 export type PasswordResetRequestResult = NonNullable<Awaited<ReturnType<typeof passwordResetRequest>>>
 export type PasswordResetResult = NonNullable<Awaited<ReturnType<typeof passwordReset>>>
