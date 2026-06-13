@@ -1,3 +1,4 @@
+import { StateView } from '@dental/ui';
 import { Container, Grid, SimpleGrid, Stack, Title } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { useDailySummary } from '@/features/cashier/cashier.api.ts';
@@ -22,35 +23,48 @@ export function AccountantDashboard() {
       <Stack gap="lg">
         <Title order={2}>{t('nav.dashboard')}</Title>
 
-        <SimpleGrid cols={{ base: 1, sm: 2 }}>
-          <StatCard
-            label={t('dashboard.revenue_total')}
-            value={rev ? fmtUZS(rev.total) : '—'}
-            color="teal"
+        {revenue.isLoading ? (
+          <StateView status="loading" skeleton="cards" />
+        ) : revenue.isError ? (
+          <StateView
+            status="error"
+            title={t('states.error_title')}
+            retryLabel={t('states.retry')}
+            onRetry={() => revenue.refetch()}
           />
-          <StatCard
-            label={t('dashboard.daily_cash')}
-            value={
-              summary.data
-                ? fmtUZS(summary.data.breakdown.reduce((s, b) => s + Number(b.total), 0))
-                : '—'
-            }
-          />
-        </SimpleGrid>
+        ) : (
+          <>
+            <SimpleGrid cols={{ base: 1, sm: 2 }}>
+              <StatCard
+                label={t('dashboard.revenue_total')}
+                value={rev ? fmtUZS(rev.total) : '—'}
+                color="teal"
+              />
+              <StatCard
+                label={t('dashboard.daily_cash')}
+                value={
+                  summary.data
+                    ? fmtUZS(summary.data.breakdown.reduce((s, b) => s + Number(b.total), 0))
+                    : '—'
+                }
+              />
+            </SimpleGrid>
 
-        <Grid>
-          <Grid.Col span={12}>
-            <MiniList
-              title={t('dashboard.daily_cash')}
-              items={(summary.data?.breakdown ?? []).map((b, i) => ({
-                id: `${b.paymentMethod}-${b.type}-${i}`,
-                label: `${b.paymentMethod} · ${b.type}`,
-                right: `${fmtUZS(Number(b.total))} (${b.count})`,
-              }))}
-              emptyText={t('dashboard.empty')}
-            />
-          </Grid.Col>
-        </Grid>
+            <Grid>
+              <Grid.Col span={12}>
+                <MiniList
+                  title={t('dashboard.daily_cash')}
+                  items={(summary.data?.breakdown ?? []).map((b, i) => ({
+                    id: `${b.paymentMethod}-${b.type}-${i}`,
+                    label: `${b.paymentMethod} · ${b.type}`,
+                    right: `${fmtUZS(Number(b.total))} (${b.count})`,
+                  }))}
+                  emptyText={t('dashboard.empty')}
+                />
+              </Grid.Col>
+            </Grid>
+          </>
+        )}
       </Stack>
     </Container>
   );
