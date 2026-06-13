@@ -11,7 +11,7 @@ export const updateSettingsSchema = z.object({
   vertical: z.string().min(1).optional(),
   reminderLeadHours: z.number().int().min(0).max(168).optional(),
   currency: z.string().min(1).max(8).optional(),
-  onboardingDismissedAt: z.string().datetime().nullable().optional(),
+  onboardingDismissedAt: z.iso.datetime().nullable().optional(),
 });
 
 export type UpdateSettingsInput = z.infer<typeof updateSettingsSchema>;
