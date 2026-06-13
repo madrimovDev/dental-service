@@ -5,6 +5,7 @@ export * from './IconButton';
 export * from './Input';
 export * from './Select';
 export * from './StatCard';
+export * from './StateView';
 export * from './StatusPill';
 export * from './Tabs';
 export * from './Tag';
