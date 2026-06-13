@@ -1,4 +1,9 @@
 {
+  "states": {
+    "error_title": "Yuklab bo'lmadi",
+    "retry": "Qayta urinish",
+    "empty_title": "Hozircha bo'sh"
+  },
   "app": {
     "name": "Dental Service",
     "tagline": "Stomatologiya klinikalari uchun SaaS boshqaruv tizimi"
@@ -132,6 +137,13 @@
       "management": "Boshqaruv"
     }
   },
+  "palette": {
+    "group": { "navigation": "Navigatsiya", "actions": "Amallar", "patients": "Bemorlar" },
+    "new_patient": "Yangi bemor",
+    "new_appointment": "Yangi yozilish",
+    "open_cashier": "Kassani ochish",
+    "nothing_found": "Hech narsa topilmadi"
+  },
   "shell": {
     "search_placeholder": "Bemor, yozuv, xizmat, xodim…",
     "notifications": "Bildirishnomalar",
@@ -144,10 +156,28 @@
     "mark_all_read": "Hammasini o'qilgan deb belgilash",
     "empty": "Bildirishnomalar yo'q"
   },
+  "onboarding": {
+    "title": "Klinikani sozlash",
+    "subtitle": "Ishni boshlash uchun quyidagilarni to'ldiring",
+    "dismiss": "Yopish",
+    "step": {
+      "branches": "Filial qo'shish",
+      "branches_desc": "Kamida bitta filial yarating",
+      "services": "Xizmatlar qo'shish",
+      "services_desc": "Narxlar bilan xizmatlar ro'yxati",
+      "staff": "Xodim qo'shish",
+      "staff_desc": "Doktor va boshqa xodimlarni taklif qiling"
+    }
+  },
   "error": {
     "403_title": "Ruxsat yo'q",
     "403_message": "Bu sahifaga kirish uchun ruxsatingiz yo'q.",
     "403_back": "Bosh ekranga qaytish"
+  },
+  "errors": {
+    "boundary_title": "Xatolik yuz berdi",
+    "boundary_desc": "Sahifani qayta yuklab ko'ring",
+    "reload": "Qayta yuklash"
   },
   "dashboard": {
     "welcome": "Salom, {{name}}!",
@@ -200,8 +230,10 @@
     "default_language": "Asosiy til",
     "readonly_notice": "Sizda klinika sozlamalarini o'zgartirish ruxsati yo'q (faqat ko'rish)",
     "clinic_section": "Klinika sozlamalari",
-    "vertical": "Yo'nalish",
+    "vertical": "Klinika turi",
+    "vertical_hint": "O'zgartirilsa, mos bo'lmagan modullar (masalan tish kartasi) yashiriladi — ma'lumot o'chmaydi.",
     "vertical_dental": "Stomatologiya",
+    "vertical_general": "Umumiy klinika",
     "currency": "Valyuta",
     "reminder_lead_hours": "Eslatma oldindan (soat)"
   },

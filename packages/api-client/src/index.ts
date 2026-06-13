@@ -326,6 +326,7 @@ export type {
   Tenant,
   TenantSettings,
   TenantSubscriptionStatus,
+  TenantVertical,
   ToothChart,
   ToothChartWithStates,
   ToothChartWithStatesAllOf,
@@ -565,10 +566,12 @@ export {
 } from './generated/tenant/tenant.ts';
 export type {
   GetTenantSettingsResult,
+  GetTenantVerticalResult,
   UpdateTenantSettingsResult,
 } from './generated/tenant-settings/tenant-settings.ts';
 export {
   getTenantSettings,
+  getTenantVertical,
   updateTenantSettings,
 } from './generated/tenant-settings/tenant-settings.ts';
 // Generated (orval) — tooth-charts

@@ -18,9 +18,10 @@ import { patientKeys } from './patients.keys';
 import { toPatientDetail, toPatientListItem } from './patients.mappers';
 import type { ListParams } from './patients.types';
 
-export function usePatients(params: ListParams) {
+export function usePatients(params: ListParams, options?: { enabled?: boolean }) {
   const { t } = useTranslation();
   return useQuery({
+    enabled: options?.enabled,
     queryKey: patientKeys.list(params),
     queryFn: async () => {
       const res = await listPatients({

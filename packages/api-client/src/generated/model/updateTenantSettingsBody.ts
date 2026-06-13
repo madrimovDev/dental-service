@@ -18,4 +18,6 @@ export type UpdateTenantSettingsBody = {
    * @maxLength 8
    */
   currency?: string;
+  /** @nullable */
+  onboardingDismissedAt?: string | null;
 };

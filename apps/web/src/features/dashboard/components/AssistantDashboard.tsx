@@ -1,3 +1,4 @@
+import { StateView } from '@dental/ui';
 import { Container, Grid, Stack, Text, Title } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { useAppointments } from '@/features/appointments/appointments.api.ts';
@@ -20,27 +21,38 @@ export function AssistantDashboard() {
       <Stack gap="lg">
         <Title order={2}>{t('nav.dashboard')}</Title>
 
-        <Grid>
-          <Grid.Col span={{ base: 12, md: 6 }}>
-            <MiniList
-              title={t('dashboard.today_appointments')}
-              items={appts.map((a) => ({
-                id: a.id,
-                label: `${fmtTime(a.startTime)} · ${t(`appointments.status.${a.status}`, a.status)}`,
-                to: `/appointments`,
-              }))}
-              emptyText={t('dashboard.no_appointments')}
-            />
-          </Grid.Col>
-          <Grid.Col span={{ base: 12, md: 6 }}>
-            <Stack gap="xs">
-              <Text fw={600}>{t('dashboard.assistant_tasks')}</Text>
-              <Text size="sm" c="dimmed">
-                {t('dashboard.assistant_tasks_placeholder')}
-              </Text>
-            </Stack>
-          </Grid.Col>
-        </Grid>
+        {appointments.isLoading ? (
+          <StateView status="loading" skeleton="cards" />
+        ) : appointments.isError ? (
+          <StateView
+            status="error"
+            title={t('states.error_title')}
+            retryLabel={t('states.retry')}
+            onRetry={() => appointments.refetch()}
+          />
+        ) : (
+          <Grid>
+            <Grid.Col span={{ base: 12, md: 6 }}>
+              <MiniList
+                title={t('dashboard.today_appointments')}
+                items={appts.map((a) => ({
+                  id: a.id,
+                  label: `${fmtTime(a.startTime)} · ${t(`appointments.status.${a.status}`, a.status)}`,
+                  to: `/appointments`,
+                }))}
+                emptyText={t('dashboard.no_appointments')}
+              />
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, md: 6 }}>
+              <Stack gap="xs">
+                <Text fw={600}>{t('dashboard.assistant_tasks')}</Text>
+                <Text size="sm" c="dimmed">
+                  {t('dashboard.assistant_tasks_placeholder')}
+                </Text>
+              </Stack>
+            </Grid.Col>
+          </Grid>
+        )}
       </Stack>
     </Container>
   );

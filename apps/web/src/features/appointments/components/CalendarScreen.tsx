@@ -1,4 +1,4 @@
-import { Button, Mono, PageHead, StatusPill, Tabs } from '@dental/ui';
+import { Button, Mono, PageHead, StateView, StatusPill, Tabs } from '@dental/ui';
 import { Modal, Select, Stack, Text, Textarea } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useMemo, useState } from 'react';
@@ -69,7 +69,12 @@ export function CalendarScreen() {
     return { rangeStart: start, rangeEnd: end, dayKeys: [localDateKey(start.toISOString())] };
   }, [view, date]);
 
-  const { data: appts } = useAppointments({
+  const {
+    data: appts,
+    isLoading: apptsLoading,
+    isError: apptsError,
+    refetch: refetchAppts,
+  } = useAppointments({
     branchId: branchId ?? undefined,
     from: rangeStart.toISOString(),
     to: rangeEnd.toISOString(),
@@ -179,7 +184,16 @@ export function CalendarScreen() {
         </div>
       </div>
       <div style={{ marginTop: 16 }}>
-        {view === 'day' ? (
+        {apptsLoading ? (
+          <StateView status="loading" skeleton="cards" />
+        ) : apptsError ? (
+          <StateView
+            status="error"
+            title={t('states.error_title')}
+            retryLabel={t('states.retry')}
+            onRetry={() => refetchAppts()}
+          />
+        ) : view === 'day' ? (
           <CalendarGrid
             appointments={appts ?? []}
             doctors={doctors ?? []}

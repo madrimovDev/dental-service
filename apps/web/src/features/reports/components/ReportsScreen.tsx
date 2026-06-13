@@ -1,9 +1,9 @@
+import { StateView } from '@dental/ui';
 import {
   Button,
   Card,
   Container,
   Group,
-  Loader,
   Select,
   SimpleGrid,
   Stack,
@@ -52,23 +52,29 @@ const defaultRange = (): [Date, Date] => {
 type SectionProps = {
   title: string;
   loading: boolean;
+  error?: boolean;
+  onRetry?: () => void;
   onCsv: () => void;
   onXlsx: () => void;
   exportLabel: { csv: string; xlsx: string };
   children: React.ReactNode;
   hasData: boolean;
   emptyText: string;
+  statesLabels: { errorTitle: string; retry: string; emptyTitle: string };
 };
 
 function ReportSection({
   title,
   loading,
+  error,
+  onRetry,
   onCsv,
   onXlsx,
   exportLabel,
   children,
   hasData,
   emptyText,
+  statesLabels,
 }: SectionProps) {
   return (
     <Card withBorder padding="lg">
@@ -97,15 +103,18 @@ function ReportSection({
           </Group>
         </Group>
         {loading ? (
-          <Group justify="center" py="md">
-            <Loader size="sm" />
-          </Group>
+          <StateView status="loading" skeleton="cards" />
+        ) : error ? (
+          <StateView
+            status="error"
+            title={statesLabels.errorTitle}
+            retryLabel={statesLabels.retry}
+            onRetry={onRetry}
+          />
         ) : hasData ? (
           children
         ) : (
-          <Text c="dimmed" size="sm">
-            {emptyText}
-          </Text>
+          <StateView status="empty" title={statesLabels.emptyTitle} description={emptyText} />
         )}
       </Stack>
     </Card>
@@ -140,6 +149,11 @@ export function ReportsScreen() {
   const exportLabel = {
     csv: t('reports.export_csv', { defaultValue: 'CSV' }),
     xlsx: t('reports.export_excel', { defaultValue: 'Excel' }),
+  };
+  const statesLabels = {
+    errorTitle: t('states.error_title'),
+    retry: t('states.retry'),
+    emptyTitle: t('states.empty_title'),
   };
   const suffix = `${range.from}_${range.to}`;
 
@@ -178,6 +192,9 @@ export function ReportsScreen() {
           <ReportSection
             title={t('reports.revenue', { defaultValue: 'Daromad' })}
             loading={revenue.isLoading}
+            error={revenue.isError}
+            onRetry={() => revenue.refetch()}
+            statesLabels={statesLabels}
             hasData={!!revenue.data}
             emptyText={t('reports.empty', { defaultValue: 'Ma’lumot yo‘q' })}
             onCsv={() =>
@@ -210,6 +227,9 @@ export function ReportsScreen() {
           <ReportSection
             title={t('reports.appointments', { defaultValue: 'Qabullar' })}
             loading={appointments.isLoading}
+            error={appointments.isError}
+            onRetry={() => appointments.refetch()}
+            statesLabels={statesLabels}
             hasData={!!appointments.data}
             emptyText={t('reports.empty', { defaultValue: 'Ma’lumot yo‘q' })}
             onCsv={() =>
@@ -261,6 +281,9 @@ export function ReportsScreen() {
           <ReportSection
             title={t('reports.doctor_workload', { defaultValue: 'Shifokorlar yuklamasi' })}
             loading={doctors.isLoading}
+            error={doctors.isError}
+            onRetry={() => doctors.refetch()}
+            statesLabels={statesLabels}
             hasData={!!doctors.data && doctors.data.length > 0}
             emptyText={t('reports.empty', { defaultValue: 'Ma’lumot yo‘q' })}
             onCsv={() =>
@@ -297,6 +320,9 @@ export function ReportsScreen() {
           <ReportSection
             title={t('reports.plan_completion', { defaultValue: 'Davolash rejalari' })}
             loading={plans.isLoading}
+            error={plans.isError}
+            onRetry={() => plans.refetch()}
+            statesLabels={statesLabels}
             hasData={!!plans.data}
             emptyText={t('reports.empty', { defaultValue: 'Ma’lumot yo‘q' })}
             onCsv={() =>

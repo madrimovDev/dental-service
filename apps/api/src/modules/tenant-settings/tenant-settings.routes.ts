@@ -7,7 +7,11 @@ import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
 import { toTenantSettingsDto } from './tenant-settings.mapper.ts';
-import { tenantSettingsDtoSchema, updateSettingsSchema } from './tenant-settings.schema.ts';
+import {
+  tenantSettingsDtoSchema,
+  tenantVerticalDtoSchema,
+  updateSettingsSchema,
+} from './tenant-settings.schema.ts';
 import { createTenantSettingsService } from './tenant-settings.service.ts';
 
 export const tenantSettingsRoutes = (deps: { db: Database; audit: AuditLogger }) => {
@@ -29,6 +33,21 @@ export const tenantSettingsRoutes = (deps: { db: Database; audit: AuditLogger })
   app.openapi(getRoute, async (c) => {
     const row = await service.getOrCreate(c);
     return c.json(ok(toTenantSettingsDto(row)), 200);
+  });
+
+  // CLI-80: vertical — har tenant a'zosi UI gating uchun o'qiydi (sezgir emas).
+  // `requirePermission` YO'Q (faqat auth + RLS). CLI-153 saboq: rolga mos yengil endpoint.
+  const verticalRoute = createRoute({
+    method: 'get',
+    path: '/vertical',
+    tags: ['tenant-settings'],
+    operationId: 'getTenantVertical',
+    responses: okJson(tenantVerticalDtoSchema, 'Tenant vertical (UI gating, no permission)'),
+  });
+
+  app.openapi(verticalRoute, async (c) => {
+    const row = await service.getOrCreate(c);
+    return c.json(ok({ vertical: row.vertical }), 200);
   });
 
   const patchRoute = createRoute({

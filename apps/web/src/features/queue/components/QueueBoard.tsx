@@ -1,4 +1,5 @@
 import type { QueueStatus } from '@dental/api-client';
+import { StateView } from '@dental/ui';
 import { Button, Container, Group, Select, Stack, Text, Title } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconPlus } from '@tabler/icons-react';
@@ -64,20 +65,30 @@ export function QueueBoard() {
 
         {!branchFilter && <Text c="dimmed">{t('queue.select_branch_hint')}</Text>}
 
-        {branchFilter && (
-          <Group align="flex-start" grow>
-            {columns.map((column) => (
-              <QueueColumn
-                key={column.key}
-                column={column}
-                title={t(titleKey[column.key])}
-                lookups={lookups}
-                canManage={canManage}
-                onStatus={onStatus}
-              />
-            ))}
-          </Group>
-        )}
+        {branchFilter &&
+          (queue.isLoading ? (
+            <StateView status="loading" skeleton="table" />
+          ) : queue.isError ? (
+            <StateView
+              status="error"
+              title={t('states.error_title')}
+              retryLabel={t('states.retry')}
+              onRetry={() => queue.refetch()}
+            />
+          ) : (
+            <Group align="flex-start" grow>
+              {columns.map((column) => (
+                <QueueColumn
+                  key={column.key}
+                  column={column}
+                  title={t(titleKey[column.key])}
+                  lookups={lookups}
+                  canManage={canManage}
+                  onStatus={onStatus}
+                />
+              ))}
+            </Group>
+          ))}
       </Stack>
 
       {branchFilter && <CheckInDialog opened={opened} onClose={close} branchId={branchFilter} />}

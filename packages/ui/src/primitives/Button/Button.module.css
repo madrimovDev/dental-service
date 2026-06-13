@@ -57,7 +57,7 @@
 }
 .root[data-variant="danger"] {
   background: var(--danger);
-  color: #fff;
+  color: var(--text-on-danger);
   border-color: transparent;
   box-shadow: none;
 }

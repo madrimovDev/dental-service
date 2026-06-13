@@ -1,6 +1,7 @@
 import { logout as apiLogout } from '@dental/api-client';
 import { Avatar, IconButton } from '@dental/ui';
 import { Burger, Menu, useMantineColorScheme } from '@mantine/core';
+import { spotlight } from '@mantine/spotlight';
 import { LogOut, Moon, Repeat, Search, Sun, User } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -44,17 +45,16 @@ export function Topbar({
         </span>
       </button>
 
-      <search className={classes.search}>
+      <button
+        type="button"
+        className={classes.search}
+        onClick={() => spotlight.open()}
+        aria-label={t('shell.search_placeholder')}
+      >
         <Search />
-        <input
-          type="text"
-          readOnly
-          className={classes.searchInput}
-          placeholder={t('shell.search_placeholder')}
-          aria-label={t('shell.search_placeholder')}
-        />
+        <span className={classes.searchInput}>{t('shell.search_placeholder')}</span>
         <span className={classes.kbd}>⌘K</span>
-      </search>
+      </button>
 
       <span className={classes.spacer} />
 

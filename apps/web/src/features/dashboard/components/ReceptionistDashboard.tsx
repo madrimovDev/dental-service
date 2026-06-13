@@ -1,3 +1,4 @@
+import { StateView } from '@dental/ui';
 import { Container, Grid, SimpleGrid, Stack, Title } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { useAppointments } from '@/features/appointments/appointments.api.ts';
@@ -25,37 +26,50 @@ export function ReceptionistDashboard() {
       <Stack gap="lg">
         <Title order={2}>{t('nav.dashboard')}</Title>
 
-        <SimpleGrid cols={{ base: 1, sm: 3 }}>
-          <StatCard label={t('dashboard.today_total')} value={appts.length} color="teal" />
-          <StatCard label={t('dashboard.no_show')} value={noShow} />
-          <StatCard label={t('dashboard.queue')} value={(queue.data ?? []).length} />
-        </SimpleGrid>
+        {appointments.isLoading ? (
+          <StateView status="loading" skeleton="cards" />
+        ) : appointments.isError ? (
+          <StateView
+            status="error"
+            title={t('states.error_title')}
+            retryLabel={t('states.retry')}
+            onRetry={() => appointments.refetch()}
+          />
+        ) : (
+          <>
+            <SimpleGrid cols={{ base: 1, sm: 3 }}>
+              <StatCard label={t('dashboard.today_total')} value={appts.length} color="teal" />
+              <StatCard label={t('dashboard.no_show')} value={noShow} />
+              <StatCard label={t('dashboard.queue')} value={(queue.data ?? []).length} />
+            </SimpleGrid>
 
-        <Grid>
-          <Grid.Col span={{ base: 12, md: 6 }}>
-            <MiniList
-              title={t('dashboard.today_appointments')}
-              items={appts.map((a) => ({
-                id: a.id,
-                label: `${fmtTime(a.startTime)} · ${t(`appointments.status.${a.status}`, a.status)}`,
-                to: `/appointments`,
-              }))}
-              emptyText={t('dashboard.no_appointments')}
-            />
-          </Grid.Col>
-          <Grid.Col span={{ base: 12, md: 6 }}>
-            <MiniList
-              title={t('dashboard.queue')}
-              items={(queue.data ?? []).map((q) => ({
-                id: q.id,
-                label: `#${q.queueNumber}`,
-                right: t(`queue.${q.status}`, q.status),
-                to: `/queue`,
-              }))}
-              emptyText={t('dashboard.no_queue')}
-            />
-          </Grid.Col>
-        </Grid>
+            <Grid>
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <MiniList
+                  title={t('dashboard.today_appointments')}
+                  items={appts.map((a) => ({
+                    id: a.id,
+                    label: `${fmtTime(a.startTime)} · ${t(`appointments.status.${a.status}`, a.status)}`,
+                    to: `/appointments`,
+                  }))}
+                  emptyText={t('dashboard.no_appointments')}
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <MiniList
+                  title={t('dashboard.queue')}
+                  items={(queue.data ?? []).map((q) => ({
+                    id: q.id,
+                    label: `#${q.queueNumber}`,
+                    right: t(`queue.${q.status}`, q.status),
+                    to: `/queue`,
+                  }))}
+                  emptyText={t('dashboard.no_queue')}
+                />
+              </Grid.Col>
+            </Grid>
+          </>
+        )}
       </Stack>
     </Container>
   );

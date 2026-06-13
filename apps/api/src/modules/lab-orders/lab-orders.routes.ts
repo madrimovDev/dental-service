@@ -4,6 +4,7 @@ import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
+import { requireFeature } from '../../middleware/require-feature.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
 import { toLabOrderDto } from './lab-orders.mapper.ts';
@@ -37,7 +38,7 @@ export const labOrdersRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     path: '/',
     tags: ['lab-orders'],
     operationId: 'listLabOrders',
-    middleware: [requirePermission('lab_order.view')] as const,
+    middleware: [requirePermission('lab_order.view'), requireFeature('labOrders')] as const,
     request: {
       query: z.object({
         patientId: z.uuid().optional(),
@@ -62,7 +63,7 @@ export const labOrdersRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     path: '/',
     tags: ['lab-orders'],
     operationId: 'createLabOrder',
-    middleware: [requirePermission('lab_order.manage')] as const,
+    middleware: [requirePermission('lab_order.manage'), requireFeature('labOrders')] as const,
     request: {
       body: { content: { 'application/json': { schema: createLabOrderSchema } } },
     },
@@ -100,7 +101,7 @@ export const labOrdersRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     path: '/{id}',
     tags: ['lab-orders'],
     operationId: 'getLabOrder',
-    middleware: [requirePermission('lab_order.view')] as const,
+    middleware: [requirePermission('lab_order.view'), requireFeature('labOrders')] as const,
     request: {
       params: labOrderIdParamSchema,
     },
@@ -121,7 +122,7 @@ export const labOrdersRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     path: '/{id}',
     tags: ['lab-orders'],
     operationId: 'updateLabOrder',
-    middleware: [requirePermission('lab_order.manage')] as const,
+    middleware: [requirePermission('lab_order.manage'), requireFeature('labOrders')] as const,
     request: {
       params: labOrderIdParamSchema,
       body: { content: { 'application/json': { schema: updateLabOrderSchema } } },

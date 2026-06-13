@@ -21,7 +21,8 @@ describe('Topbar', () => {
   it("foydalanuvchi ismini va qidiruvni ko'rsatadi", () => {
     renderApp(<Topbar onBurger={() => {}} burgerOpened={false} />);
     expect(screen.getByText('Firdavs Tursunov')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/Bemor, yozuv/)).toBeInTheDocument();
+    // Qidiruv endi ⌘K palette'ni ochuvchi tugma (placeholder input emas) — matn bo'yicha tekshiramiz
+    expect(screen.getByText(/Bemor, yozuv/)).toBeInTheDocument();
   });
 
   it('bildirishnoma va theme tugmalari (aria-label) bor', () => {

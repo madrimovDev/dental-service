@@ -21,6 +21,7 @@ export const tenantSettings = pgTable(
     vertical: text('vertical').notNull().default('dental'),
     reminderLeadHours: integer('reminder_lead_hours').notNull().default(24),
     currency: text('currency').notNull().default('UZS'),
+    onboardingDismissedAt: timestamp('onboarding_dismissed_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

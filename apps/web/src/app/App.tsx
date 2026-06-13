@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import { I18nextProvider } from 'react-i18next';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute.tsx';
+import { ErrorBoundary } from '@/components/ErrorBoundary.tsx';
 import { DashboardRouter } from '@/features/dashboard';
 import { i18n } from '@/lib/i18n.ts';
 import { queryClient } from '@/lib/query-client.ts';
@@ -48,56 +49,58 @@ export function App() {
       <I18nextProvider i18n={i18n}>
         <QueryClientProvider client={queryClient}>
           <BrowserRouter>
-            <Routes>
-              {/* Public — shell tashqarisida */}
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register-tenant" element={<RegisterTenantPage />} />
-              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-              <Route path="/reset-password" element={<ResetPasswordPage />} />
-              <Route path="/select-workspace" element={<SelectWorkspacePage />} />
-              {import.meta.env.DEV && <Route path="/dev/ds" element={<DesignSystemPage />} />}
+            <ErrorBoundary>
+              <Routes>
+                {/* Public — shell tashqarisida */}
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register-tenant" element={<RegisterTenantPage />} />
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
+                <Route path="/select-workspace" element={<SelectWorkspacePage />} />
+                {import.meta.env.DEV && <Route path="/dev/ds" element={<DesignSystemPage />} />}
 
-              {/* Protected — AppShell layout, Outlet */}
-              <Route
-                element={
-                  <ProtectedRoute>
-                    <AppShell />
-                  </ProtectedRoute>
-                }
-              >
-                <Route path="/" element={<DashboardRouter />} />
-                <Route path="/patients" element={rp('patient.view', <PatientsListPage />)} />
-                <Route path="/patients/new" element={rp('patient.create', <NewPatientPage />)} />
-                <Route path="/patients/:id" element={rp('patient.view', <PatientDetailPage />)} />
+                {/* Protected — AppShell layout, Outlet */}
                 <Route
-                  path="/appointments"
-                  element={rp('appointment.view', <AppointmentsPage />)}
-                />
-                <Route path="/queue" element={rp('queue.view', <QueuePage />)} />
-                <Route path="/cashier" element={rp('cashier.view', <CashierPage />)} />
-                <Route path="/reports" element={rp('report.view', <ReportsPage />)} />
-                <Route path="/audit" element={rp('audit_log.view', <AuditPage />)} />
-                <Route path="/expenses" element={rp('expense.view', <ExpensesPage />)} />
-                <Route path="/stock" element={rp('stock.view', <StockPage />)} />
-                <Route path="/payroll" element={rp('payroll.view', <PayrollPage />)} />
-                <Route path="/profile" element={<ProfilePage />} />
-                <Route
-                  path="/settings/services"
-                  element={rp('service.view', <ServicesSettingsPage />)}
-                />
-                <Route
-                  path="/settings/tenant"
-                  element={rp('tenant.view', <TenantSettingsPage />)}
-                />
-                <Route path="/settings/branches" element={rp('branch.view', <BranchesPage />)} />
-                <Route path="/settings/roles" element={rp('role.view', <RolesSettingsPage />)} />
-                <Route path="/settings/users" element={rp('user.view', <UsersSettingsPage />)} />
-                <Route path="/403" element={<ForbiddenPage />} />
-              </Route>
+                  element={
+                    <ProtectedRoute>
+                      <AppShell />
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route path="/" element={<DashboardRouter />} />
+                  <Route path="/patients" element={rp('patient.view', <PatientsListPage />)} />
+                  <Route path="/patients/new" element={rp('patient.create', <NewPatientPage />)} />
+                  <Route path="/patients/:id" element={rp('patient.view', <PatientDetailPage />)} />
+                  <Route
+                    path="/appointments"
+                    element={rp('appointment.view', <AppointmentsPage />)}
+                  />
+                  <Route path="/queue" element={rp('queue.view', <QueuePage />)} />
+                  <Route path="/cashier" element={rp('cashier.view', <CashierPage />)} />
+                  <Route path="/reports" element={rp('report.view', <ReportsPage />)} />
+                  <Route path="/audit" element={rp('audit_log.view', <AuditPage />)} />
+                  <Route path="/expenses" element={rp('expense.view', <ExpensesPage />)} />
+                  <Route path="/stock" element={rp('stock.view', <StockPage />)} />
+                  <Route path="/payroll" element={rp('payroll.view', <PayrollPage />)} />
+                  <Route path="/profile" element={<ProfilePage />} />
+                  <Route
+                    path="/settings/services"
+                    element={rp('service.view', <ServicesSettingsPage />)}
+                  />
+                  <Route
+                    path="/settings/tenant"
+                    element={rp('tenant.view', <TenantSettingsPage />)}
+                  />
+                  <Route path="/settings/branches" element={rp('branch.view', <BranchesPage />)} />
+                  <Route path="/settings/roles" element={rp('role.view', <RolesSettingsPage />)} />
+                  <Route path="/settings/users" element={rp('user.view', <UsersSettingsPage />)} />
+                  <Route path="/403" element={<ForbiddenPage />} />
+                </Route>
 
-              {/* Fallback */}
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
+                {/* Fallback */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </ErrorBoundary>
           </BrowserRouter>
         </QueryClientProvider>
       </I18nextProvider>

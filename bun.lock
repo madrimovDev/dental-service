@@ -48,6 +48,7 @@
         "@mantine/form": "^7.15.2",
         "@mantine/hooks": "^7.15.2",
         "@mantine/notifications": "^7.15.2",
+        "@mantine/spotlight": "^7.15.2",
         "@tabler/icons-react": "^3.26.0",
         "@tanstack/react-query": "^5.62.10",
         "dayjs": "^1.11.13",
@@ -377,6 +378,8 @@
     "@mantine/hooks": ["@mantine/hooks@7.17.8", "", { "peerDependencies": { "react": "^18.x || ^19.x" } }, "sha512-96qygbkTjRhdkzd5HDU8fMziemN/h758/EwrFu7TlWrEP10Vw076u+Ap/sG6OT4RGPZYYoHrTlT+mkCZblWHuw=="],
 
     "@mantine/notifications": ["@mantine/notifications@7.17.8", "", { "dependencies": { "@mantine/store": "7.17.8", "react-transition-group": "4.4.5" }, "peerDependencies": { "@mantine/core": "7.17.8", "@mantine/hooks": "7.17.8", "react": "^18.x || ^19.x", "react-dom": "^18.x || ^19.x" } }, "sha512-/YK16IZ198W6ru/IVecCtHcVveL08u2c8TbQTu/2p26LSIM9AbJhUkrU6H+AO0dgVVvmdmNdvPxcJnfq3S9TMg=="],
+
+    "@mantine/spotlight": ["@mantine/spotlight@7.17.8", "", { "dependencies": { "@mantine/store": "7.17.8" }, "peerDependencies": { "@mantine/core": "7.17.8", "@mantine/hooks": "7.17.8", "react": "^18.x || ^19.x", "react-dom": "^18.x || ^19.x" } }, "sha512-hBjajnPetyf95bEa4eHmqsqylCdsBBgYa2hiSuM+fMNwxx2mVR97Tvn7BiMZa+K0A/s5u5KM7+Yi6SnhUjZNQg=="],
 
     "@mantine/store": ["@mantine/store@7.17.8", "", { "peerDependencies": { "react": "^18.x || ^19.x" } }, "sha512-/FrB6PAVH4NEjQ1dsc9qOB+VvVlSuyjf4oOOlM9gscPuapDP/79Ryq7JkhHYfS55VWQ/YUlY24hDI2VV+VptXg=="],
 

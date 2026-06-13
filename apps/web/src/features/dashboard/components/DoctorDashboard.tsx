@@ -1,3 +1,4 @@
+import { StateView } from '@dental/ui';
 import { Container, Grid, SimpleGrid, Stack, Text, Title } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth-store.ts';
@@ -21,31 +22,44 @@ export function DoctorDashboard() {
       <Stack gap="lg">
         <Title order={2}>{t('nav.dashboard')}</Title>
 
-        <SimpleGrid cols={{ base: 1, sm: 2 }}>
-          <StatCard label={t('dashboard.today_total')} value={appts.length} color="teal" />
-        </SimpleGrid>
+        {appointments.isLoading ? (
+          <StateView status="loading" skeleton="cards" />
+        ) : appointments.isError ? (
+          <StateView
+            status="error"
+            title={t('states.error_title')}
+            retryLabel={t('states.retry')}
+            onRetry={() => appointments.refetch()}
+          />
+        ) : (
+          <>
+            <SimpleGrid cols={{ base: 1, sm: 2 }}>
+              <StatCard label={t('dashboard.today_total')} value={appts.length} color="teal" />
+            </SimpleGrid>
 
-        <Grid>
-          <Grid.Col span={{ base: 12, md: 6 }}>
-            <MiniList
-              title={t('dashboard.today_appointments')}
-              items={appts.map((a) => ({
-                id: a.id,
-                label: `${fmtTime(a.startTime)} · ${t(`appointments.status.${a.status}`, a.status)}`,
-                to: `/appointments`,
-              }))}
-              emptyText={t('dashboard.no_appointments')}
-            />
-          </Grid.Col>
-          <Grid.Col span={{ base: 12, md: 6 }}>
-            <Stack gap="xs">
-              <Text fw={600}>{t('dashboard.doctor_pending')}</Text>
-              <Text size="sm" c="dimmed">
-                {t('dashboard.doctor_pending_placeholder')}
-              </Text>
-            </Stack>
-          </Grid.Col>
-        </Grid>
+            <Grid>
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <MiniList
+                  title={t('dashboard.today_appointments')}
+                  items={appts.map((a) => ({
+                    id: a.id,
+                    label: `${fmtTime(a.startTime)} · ${t(`appointments.status.${a.status}`, a.status)}`,
+                    to: `/appointments`,
+                  }))}
+                  emptyText={t('dashboard.no_appointments')}
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <Stack gap="xs">
+                  <Text fw={600}>{t('dashboard.doctor_pending')}</Text>
+                  <Text size="sm" c="dimmed">
+                    {t('dashboard.doctor_pending_placeholder')}
+                  </Text>
+                </Stack>
+              </Grid.Col>
+            </Grid>
+          </>
+        )}
       </Stack>
     </Container>
   );

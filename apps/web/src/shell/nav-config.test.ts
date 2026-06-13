@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NAV_GROUPS, visibleGroups } from './nav-config';
+import { visibleGroups } from './nav-config';
 
 describe('nav-config', () => {
   it('LIVE element ruxsatsiz yashirin', () => {
@@ -36,7 +36,19 @@ describe('nav-config', () => {
     const items = groups.flatMap((g) => g.items);
     expect(items.find((i) => i.key === 'roles')).toBeDefined();
   });
-});
 
-// referenced to satisfy lint; NAV_GROUPS is the data source for visibleGroups
-void NAV_GROUPS;
+  it("vertical 'general' → labOrders nav element tushadi", () => {
+    const items = visibleGroups(() => true, 'general').flatMap((g) => g.items);
+    expect(items.find((i) => i.key === 'lab')).toBeUndefined();
+  });
+
+  it("vertical 'dental' → labOrders nav element ko'rinadi", () => {
+    const items = visibleGroups(() => true, 'dental').flatMap((g) => g.items);
+    expect(items.find((i) => i.key === 'lab')).toBeDefined();
+  });
+
+  it("vertical default 'dental' (parametr berilmasa) → lab ko'rinadi", () => {
+    const items = visibleGroups(() => true).flatMap((g) => g.items);
+    expect(items.find((i) => i.key === 'lab')).toBeDefined();
+  });
+});
