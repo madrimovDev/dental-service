@@ -1,17 +1,6 @@
 import type { AllergyEntry } from '@dental/api-client';
 import { Button, Input, Select } from '@dental/ui';
-import {
-  Alert,
-  Badge,
-  Card,
-  Group,
-  List,
-  Paper,
-  SimpleGrid,
-  Stack,
-  Text,
-  Textarea,
-} from '@mantine/core';
+import { Alert, Card, Group, Paper, SimpleGrid, Stack, Text, Textarea } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useEffect, useState } from 'react';
@@ -62,6 +51,9 @@ export function MedicalTab({ patientId }: { patientId: string }) {
   if (!medicalQuery.data) {
     return <Text>{t('common.loading')}</Text>;
   }
+
+  const updateAllergy = (index: number, patch: Partial<AllergyEntry>) =>
+    setAllergies((prev) => prev.map((a, idx) => (idx === index ? { ...a, ...patch } : a)));
 
   const submit = form.onSubmit((values) =>
     updateMut.mutate({
@@ -130,41 +122,50 @@ export function MedicalTab({ patientId }: { patientId: string }) {
                   )}
                 </Group>
                 {allergies.length === 0 && <Text c="dimmed">{t('medical.no_allergies')}</Text>}
-                {allergies.length > 0 && (
-                  <List spacing="xs">
-                    {allergies.map((a, i) => (
-                      // biome-ignore lint/suspicious/noArrayIndexKey: ephemeral list state
-                      <List.Item key={`allergy-${i}`}>
-                        <Group gap="xs">
-                          <Badge
-                            color={
-                              a.severity === 'severe'
-                                ? 'red'
-                                : a.severity === 'moderate'
-                                  ? 'orange'
-                                  : 'yellow'
-                            }
-                          >
-                            {a.severity}
-                          </Badge>
-                          <Text fw={500}>{a.substance || '(empty)'}</Text>
-                          <Text size="sm" c="dimmed">
-                            ({a.type})
-                          </Text>
-                          {canEdit && (
-                            <Button
-                              size="sm"
-                              variant="danger"
-                              onClick={() => setAllergies(allergies.filter((_, idx) => idx !== i))}
-                            >
-                              {t('common.delete')}
-                            </Button>
-                          )}
-                        </Group>
-                      </List.Item>
-                    ))}
-                  </List>
-                )}
+                {allergies.map((a, i) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: ephemeral list state
+                  <Group key={`allergy-${i}`} gap="xs" align="flex-end" wrap="nowrap">
+                    <Input
+                      label={i === 0 ? t('medical.allergy_substance') : undefined}
+                      placeholder={t('medical.allergy_substance')}
+                      value={a.substance}
+                      onChange={(v) => updateAllergy(i, { substance: v })}
+                    />
+                    <Select
+                      label={i === 0 ? t('medical.allergy_severity') : undefined}
+                      value={a.severity}
+                      onChange={(v) =>
+                        v && updateAllergy(i, { severity: v as AllergyEntry['severity'] })
+                      }
+                      data={[
+                        { value: 'mild', label: t('medical.severity.mild') },
+                        { value: 'moderate', label: t('medical.severity.moderate') },
+                        { value: 'severe', label: t('medical.severity.severe') },
+                      ]}
+                    />
+                    <Select
+                      label={i === 0 ? t('medical.allergy_type') : undefined}
+                      value={a.type}
+                      onChange={(v) => v && updateAllergy(i, { type: v as AllergyEntry['type'] })}
+                      data={[
+                        { value: 'anesthetic', label: t('medical.allergy_type_opt.anesthetic') },
+                        { value: 'medication', label: t('medical.allergy_type_opt.medication') },
+                        { value: 'material', label: t('medical.allergy_type_opt.material') },
+                        { value: 'food', label: t('medical.allergy_type_opt.food') },
+                        { value: 'other', label: t('medical.allergy_type_opt.other') },
+                      ]}
+                    />
+                    {canEdit && (
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        onClick={() => setAllergies(allergies.filter((_, idx) => idx !== i))}
+                      >
+                        {t('common.delete')}
+                      </Button>
+                    )}
+                  </Group>
+                ))}
               </Stack>
             </Card>
 

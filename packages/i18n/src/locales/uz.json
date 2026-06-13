@@ -400,6 +400,21 @@
     "allergies": "Allergiya",
     "add_allergy": "Allergiya qo'shish",
     "no_allergies": "Allergiya qaydlanmagan",
+    "allergy_substance": "Allergen (nomi)",
+    "allergy_severity": "Jiddiyligi",
+    "allergy_type": "Turi",
+    "severity": {
+      "mild": "Yengil",
+      "moderate": "O'rta",
+      "severe": "Og'ir"
+    },
+    "allergy_type_opt": {
+      "anesthetic": "Anestetik",
+      "medication": "Dori",
+      "material": "Material",
+      "food": "Oziq-ovqat",
+      "other": "Boshqa"
+    },
     "blood_type": "Qon guruhi",
     "pregnancy_status": "Homiladorlik holati",
     "pregnancy": {

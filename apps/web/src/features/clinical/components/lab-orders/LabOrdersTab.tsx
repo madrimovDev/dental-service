@@ -100,7 +100,9 @@ export function LabOrdersTab({ patientId }: Props) {
           shade: i.shade || undefined,
           quantity: i.quantity,
         })),
-        expectedDate: values.expectedDate || undefined,
+        // <input type="date"> date-only string beradi; backend timestamptz uchun
+        // ISO datetime kutadi (z.iso.datetime()) — yuborishdan oldin aylantiramiz (CLI-147).
+        expectedDate: values.expectedDate ? new Date(values.expectedDate).toISOString() : undefined,
         cost: values.cost,
         notes: values.notes || undefined,
       },
