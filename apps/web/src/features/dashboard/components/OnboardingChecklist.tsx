@@ -17,13 +17,16 @@ export function OnboardingChecklist() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { hasPermission } = useAuthStore();
-  const { data: settings } = useTenantSettings();
+  const settingsQuery = useTenantSettings();
+  const settings = settingsQuery.data;
   const update = useUpdateTenantSettings();
   const branches = useBranches();
   const services = useServices();
   const users = useUsers();
 
   if (!hasPermission('tenant_settings.edit')) return null;
+  // Settings yuklanmaguncha yashir — aks holda dismiss qilingan karta har yuklanishda miltillaydi.
+  if (settingsQuery.isLoading) return null;
   if (settings?.onboardingDismissedAt) return null;
 
   const steps = buildOnboardingSteps({
