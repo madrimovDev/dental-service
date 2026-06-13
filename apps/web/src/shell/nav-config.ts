@@ -173,23 +173,33 @@ export const NAV_GROUPS: NavGroup[] = [
 
 /**
  * Element ko'rinadimi: vertical feature yoqmasa → tushadi (disabled bo'lsa ham);
- * FUTURE (disabled) → har doim; LIVE → permissionsiz yoki hasPermission.
+ * FUTURE (disabled) → faqat owner (hali realizatsiya qilinmagan, boshqa rollarda
+ * butunlay yashiriladi); LIVE → permissionsiz yoki hasPermission.
  */
-function isVisible(item: NavItem, has: (p: string) => boolean, vertical: Vertical): boolean {
+function isVisible(
+  item: NavItem,
+  has: (p: string) => boolean,
+  vertical: Vertical,
+  isOwner: boolean,
+): boolean {
   if (item.feature && !hasFeature(vertical, item.feature)) return false;
-  if (item.disabled) return true;
+  if (item.disabled) return isOwner;
   if (!item.permission) return true;
   const perms = Array.isArray(item.permission) ? item.permission : [item.permission];
   return perms.some((p) => has(p));
 }
 
-/** Ruxsat + vertical bo'yicha filtrlangan guruhlar; bo'sh guruh tushiriladi. */
+/**
+ * Ruxsat + vertical bo'yicha filtrlangan guruhlar; bo'sh guruh tushiriladi.
+ * `isOwner` — FUTURE (disabled) elementlar faqat owner uchun ko'rsatiladi.
+ */
 export function visibleGroups(
   has: (p: string) => boolean,
   vertical: Vertical = 'dental',
+  isOwner = false,
 ): NavGroup[] {
   return NAV_GROUPS.map((g) => ({
     ...g,
-    items: g.items.filter((i) => isVisible(i, has, vertical)),
+    items: g.items.filter((i) => isVisible(i, has, vertical, isOwner)),
   })).filter((g) => g.items.length > 0);
 }

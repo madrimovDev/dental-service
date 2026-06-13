@@ -117,18 +117,18 @@
   overflow: hidden;
   font-family: var(--font-mono);
   font-size: 11px;
-  cursor: pointer;
 }
-.lang b {
-  padding: 6px 9px;
-  background: var(--primary-tint);
-  color: var(--primary-hover);
-  font-weight: 600;
-  border: none;
-}
-.lang span {
+.lang button {
   padding: 6px 9px;
   color: var(--text-3);
+  font-weight: 600;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+.lang button[data-active='true'] {
+  background: var(--primary-tint);
+  color: var(--primary-hover);
 }
 .prof {
   display: flex;

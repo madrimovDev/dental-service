@@ -70,18 +70,24 @@ export function Topbar({
 
       <NotificationBell />
 
-      <Menu shadow="md" width={140}>
-        <Menu.Target>
-          <button type="button" className={classes.lang} aria-label={t('common.language')}>
-            <b>{i18n.language === 'ru' ? 'RU' : 'UZ'}</b>
-            <span>{i18n.language === 'ru' ? 'UZ' : 'RU'}</span>
-          </button>
-        </Menu.Target>
-        <Menu.Dropdown>
-          <Menu.Item onClick={() => i18n.changeLanguage('uz')}>O'zbek</Menu.Item>
-          <Menu.Item onClick={() => i18n.changeLanguage('ru')}>Русский</Menu.Item>
-        </Menu.Dropdown>
-      </Menu>
+      <div className={classes.lang}>
+        <button
+          type="button"
+          data-active={i18n.language !== 'ru'}
+          aria-label="O'zbekcha"
+          onClick={() => i18n.changeLanguage('uz')}
+        >
+          UZ
+        </button>
+        <button
+          type="button"
+          data-active={i18n.language === 'ru'}
+          aria-label="Русский"
+          onClick={() => i18n.changeLanguage('ru')}
+        >
+          RU
+        </button>
+      </div>
 
       <Menu shadow="md" width={220}>
         <Menu.Target>
