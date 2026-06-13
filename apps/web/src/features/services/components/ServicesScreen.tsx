@@ -1,5 +1,5 @@
 import type { Service } from '@dental/api-client';
-import { PageHead } from '@dental/ui';
+import { PageHead, StateView } from '@dental/ui';
 import { Button, Container, Group, Modal, Select, Stack, Text, TextInput } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconPlus, IconSearch } from '@tabler/icons-react';
@@ -88,8 +88,22 @@ export function ServicesScreen() {
           />
         </Group>
 
-        {list.length === 0 && <Text c="dimmed">{t('services.empty')}</Text>}
-        {list.length > 0 && (
+        {services.isLoading ? (
+          <StateView status="loading" skeleton="table" />
+        ) : services.isError ? (
+          <StateView
+            status="error"
+            title={t('states.error_title')}
+            retryLabel={t('states.retry')}
+            onRetry={() => services.refetch()}
+          />
+        ) : list.length === 0 ? (
+          <StateView
+            status="empty"
+            title={t('states.empty_title')}
+            description={t('services.empty')}
+          />
+        ) : (
           <ServicesTable
             groups={groups}
             canManage={canManage}

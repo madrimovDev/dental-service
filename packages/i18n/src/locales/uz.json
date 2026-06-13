@@ -1,4 +1,9 @@
 {
+  "states": {
+    "error_title": "Yuklab bo'lmadi",
+    "retry": "Qayta urinish",
+    "empty_title": "Hozircha bo'sh"
+  },
   "app": {
     "name": "Dental Service",
     "tagline": "Stomatologiya klinikalari uchun SaaS boshqaruv tizimi"

@@ -1,4 +1,14 @@
-import { Avatar, Button, Card, IconButton, Input, Mono, PageHead, Tag } from '@dental/ui';
+import {
+  Avatar,
+  Button,
+  Card,
+  IconButton,
+  Input,
+  Mono,
+  PageHead,
+  StateView,
+  Tag,
+} from '@dental/ui';
 import { Pagination, Switch } from '@mantine/core';
 import { Archive, Eye, Plus, Search } from 'lucide-react';
 import { useState } from 'react';
@@ -16,8 +26,9 @@ export function PatientsListScreen() {
   const [search, setSearch] = useState('');
   const [archived, setArchived] = useState(false);
   const [page, setPage] = useState(1);
-  const { data } = usePatients({ search, archived, page });
+  const { data, isLoading, isError, refetch } = usePatients({ search, archived, page });
   const archiveMut = useArchivePatient();
+  const items = data?.items ?? [];
 
   return (
     <div>
@@ -58,32 +69,49 @@ export function PatientsListScreen() {
         />
       </div>
 
-      <Card bodyless>
-        {(data?.items ?? []).map((p) => (
-          <div key={p.id} className={classes.row}>
-            <Avatar name={p.fullName} size="md" />
-            <div className={classes.identity}>
-              <div className={classes.name}>{p.fullName}</div>
-              {p.phone && <Mono>{p.phone}</Mono>}
-            </div>
-            {p.tags.map((tg) => (
-              <Tag key={tg}>{tg}</Tag>
-            ))}
-            <span title={t('patients.balance')}>
-              <BalanceBadge balance={p.balance} />
-            </span>
-            {p.age != null && <span className={classes.age}>{p.age}</span>}
-            <IconButton label={t('common.view')} onClick={() => navigate(`/patients/${p.id}`)}>
-              <Eye size={16} />
-            </IconButton>
-            {hasPermission('patient.delete') && (
-              <IconButton label={t('common.archive')} onClick={() => archiveMut.mutate(p.id)}>
-                <Archive size={16} />
+      {isLoading ? (
+        <StateView status="loading" skeleton="table" />
+      ) : isError ? (
+        <StateView
+          status="error"
+          title={t('states.error_title')}
+          retryLabel={t('states.retry')}
+          onRetry={() => refetch()}
+        />
+      ) : items.length === 0 ? (
+        <StateView
+          status="empty"
+          title={t('states.empty_title')}
+          description={t('patients.empty')}
+        />
+      ) : (
+        <Card bodyless>
+          {items.map((p) => (
+            <div key={p.id} className={classes.row}>
+              <Avatar name={p.fullName} size="md" />
+              <div className={classes.identity}>
+                <div className={classes.name}>{p.fullName}</div>
+                {p.phone && <Mono>{p.phone}</Mono>}
+              </div>
+              {p.tags.map((tg) => (
+                <Tag key={tg}>{tg}</Tag>
+              ))}
+              <span title={t('patients.balance')}>
+                <BalanceBadge balance={p.balance} />
+              </span>
+              {p.age != null && <span className={classes.age}>{p.age}</span>}
+              <IconButton label={t('common.view')} onClick={() => navigate(`/patients/${p.id}`)}>
+                <Eye size={16} />
               </IconButton>
-            )}
-          </div>
-        ))}
-      </Card>
+              {hasPermission('patient.delete') && (
+                <IconButton label={t('common.archive')} onClick={() => archiveMut.mutate(p.id)}>
+                  <Archive size={16} />
+                </IconButton>
+              )}
+            </div>
+          ))}
+        </Card>
+      )}
 
       {data && data.meta.total > data.meta.pageSize && (
         <Pagination

@@ -1,4 +1,9 @@
 {
+  "states": {
+    "error_title": "Не удалось загрузить",
+    "retry": "Повторить",
+    "empty_title": "Пока пусто"
+  },
   "app": {
     "name": "Dental Service",
     "tagline": "SaaS-система управления стоматологическими клиниками"

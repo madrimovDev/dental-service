@@ -1,27 +1,32 @@
 import { fireEvent, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderApp } from '../../../test-utils';
 import { PatientsListScreen } from './PatientsListScreen';
 
 const archiveMock = vi.fn();
+const dataResult = {
+  data: {
+    items: [
+      {
+        id: 'p1',
+        fullName: 'Ali Valiyev',
+        phone: '+998901234567',
+        age: 36,
+        genderLabel: 'Erkak',
+        tags: ['VIP'],
+        balance: 150000,
+      },
+    ],
+    meta: { page: 1, pageSize: 20, total: 1 },
+  },
+  isLoading: false,
+  isError: false,
+  refetch: vi.fn(),
+};
+// biome-ignore lint/suspicious/noExplicitAny: test-only mutable mock result
+let patientsResult: any = dataResult;
 vi.mock('../patients.api', () => ({
-  usePatients: () => ({
-    data: {
-      items: [
-        {
-          id: 'p1',
-          fullName: 'Ali Valiyev',
-          phone: '+998901234567',
-          age: 36,
-          genderLabel: 'Erkak',
-          tags: ['VIP'],
-          balance: 150000,
-        },
-      ],
-      meta: { page: 1, pageSize: 20, total: 1 },
-    },
-    isLoading: false,
-  }),
+  usePatients: () => patientsResult,
   useArchivePatient: () => ({ mutate: archiveMock, isPending: false }),
 }));
 vi.mock('@/stores/auth-store.ts', () => ({
@@ -29,6 +34,16 @@ vi.mock('@/stores/auth-store.ts', () => ({
 }));
 
 describe('PatientsListScreen', () => {
+  beforeEach(() => {
+    patientsResult = dataResult;
+  });
+
+  it('loading holatida skeleton (aria-busy) render qiladi', () => {
+    patientsResult = { data: undefined, isLoading: true, isError: false, refetch: vi.fn() };
+    renderApp(<PatientsListScreen />);
+    expect(document.querySelector('[aria-busy="true"]')).not.toBeNull();
+  });
+
   it("bemorni ro'yxatda ko'rsatadi", () => {
     renderApp(<PatientsListScreen />);
     expect(screen.getByText('Ali Valiyev')).toBeInTheDocument();

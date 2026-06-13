@@ -1,4 +1,4 @@
-import { PageHead } from '@dental/ui';
+import { PageHead, StateView } from '@dental/ui';
 import {
   Container,
   Group,
@@ -84,7 +84,18 @@ export function CashierScreen() {
           <Stack gap="md">
             {summaryQuery.data && <DailySummaryCard summary={summaryQuery.data} />}
             <Paper withBorder p="lg" radius="md">
-              <TransactionsTable transactions={txQuery.data?.data ?? []} />
+              {txQuery.isLoading ? (
+                <StateView status="loading" skeleton="table" />
+              ) : txQuery.isError ? (
+                <StateView
+                  status="error"
+                  title={t('states.error_title')}
+                  retryLabel={t('states.retry')}
+                  onRetry={() => txQuery.refetch()}
+                />
+              ) : (
+                <TransactionsTable transactions={txQuery.data?.data ?? []} />
+              )}
             </Paper>
           </Stack>
         </SimpleGrid>
