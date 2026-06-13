@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePatients } from '@/features/patients';
 import { useAuthStore } from '@/stores/auth-store.ts';
-import { useCreateAppointment, useDoctors, useServices } from '../appointments.api';
+import { useBranches, useCreateAppointment, useDoctors, useServices } from '../appointments.api';
 import { type WizardValues, wizardSchema } from '../appointments.schema';
 
 type Option = { value: string; label: string };
@@ -20,7 +20,13 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
   const { data: doctors } = useDoctors();
   const { data: patientsData } = usePatients({ page: 1, pageSize: 100 });
   const { data: servicesData } = useServices();
+  const { data: branchesData } = useBranches();
   const createMut = useCreateAppointment();
+
+  // Tenant-wide foydalanuvchi (Owner / "Barcha filiallar") uchun activeBranchId=null —
+  // filialni wizard ichida tanlash kerak, aks holda branchId='' → 400 (CLI-151).
+  const needsBranchSelect = activeBranchId == null;
+  const branchOptions: Option[] = (branchesData ?? []).map((b) => ({ value: b.id, label: b.name }));
 
   const patients: Option[] = (patientsData?.items ?? []).map((p) => ({
     value: p.id,
@@ -73,6 +79,16 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
       <Stepper active={active} onStepClick={setActive}>
         <Stepper.Step label={t('appointments.step_patient')}>
           <Stack mt="md">
+            {needsBranchSelect && (
+              <Select
+                key="branch-select"
+                label={t('appointments.branch')}
+                placeholder={t('appointments.branch')}
+                searchable
+                data={branchOptions}
+                {...form.getInputProps('branchId')}
+              />
+            )}
             <Select
               key="patient-select"
               placeholder={t('appointments.patient')}
@@ -132,7 +148,11 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
           {active === 0 ? t('common.cancel') : t('common.back')}
         </Button>
         {active < 3 ? (
-          <Button variant="primary" onClick={next}>
+          <Button
+            variant="primary"
+            disabled={active === 0 && needsBranchSelect && !form.values.branchId}
+            onClick={next}
+          >
             {t('common.next')}
           </Button>
         ) : (
