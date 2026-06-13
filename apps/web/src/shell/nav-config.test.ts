@@ -16,12 +16,15 @@ describe('nav-config', () => {
     expect(items.find((i) => i.key === 'patients')).toBeDefined();
   });
 
-  it("FUTURE (disabled) element hamma uchun ko'rinadi", () => {
-    const groups = visibleGroups(() => false);
-    const items = groups.flatMap((g) => g.items);
-    const payroll = items.find((i) => i.key === 'payroll');
+  it("FUTURE (disabled) element faqat owner uchun ko'rinadi (CLI-161)", () => {
+    const asOwner = visibleGroups(() => true, 'dental', true).flatMap((g) => g.items);
+    const payroll = asOwner.find((i) => i.key === 'payroll');
     expect(payroll).toBeDefined();
     expect(payroll?.disabled).toBe(true);
+
+    // owner emas (hasPermission true bo'lsa ham) → FUTURE element butunlay yashirin
+    const asNonOwner = visibleGroups(() => true, 'dental', false).flatMap((g) => g.items);
+    expect(asNonOwner.find((i) => i.key === 'payroll')).toBeUndefined();
   });
 
   it("bo'sh guruh yashirin", () => {
@@ -37,18 +40,19 @@ describe('nav-config', () => {
     expect(items.find((i) => i.key === 'roles')).toBeDefined();
   });
 
+  // lab — FUTURE (disabled) + feature-gated; feature gatesini ajratish uchun isOwner=true
   it("vertical 'general' → labOrders nav element tushadi", () => {
-    const items = visibleGroups(() => true, 'general').flatMap((g) => g.items);
+    const items = visibleGroups(() => true, 'general', true).flatMap((g) => g.items);
     expect(items.find((i) => i.key === 'lab')).toBeUndefined();
   });
 
   it("vertical 'dental' → labOrders nav element ko'rinadi", () => {
-    const items = visibleGroups(() => true, 'dental').flatMap((g) => g.items);
+    const items = visibleGroups(() => true, 'dental', true).flatMap((g) => g.items);
     expect(items.find((i) => i.key === 'lab')).toBeDefined();
   });
 
   it("vertical default 'dental' (parametr berilmasa) → lab ko'rinadi", () => {
-    const items = visibleGroups(() => true).flatMap((g) => g.items);
+    const items = visibleGroups(() => true, undefined, true).flatMap((g) => g.items);
     expect(items.find((i) => i.key === 'lab')).toBeDefined();
   });
 });

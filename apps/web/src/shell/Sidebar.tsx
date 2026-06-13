@@ -15,10 +15,11 @@ function isActive(pathname: string, path: string, allPaths: string[]): boolean {
 
 export function Sidebar() {
   const { t } = useTranslation();
-  const { hasPermission } = useAuthStore();
+  const { hasPermission, permissions } = useAuthStore();
   const { pathname } = useLocation();
   const vertical = useVertical();
-  const groups = visibleGroups(hasPermission, vertical);
+  const isOwner = permissions.includes('@owner');
+  const groups = visibleGroups(hasPermission, vertical, isOwner);
   const allPaths = groups.flatMap((g) => g.items.filter((i) => !i.disabled).map((i) => i.path));
 
   const renderItem = (item: NavItem) => {
