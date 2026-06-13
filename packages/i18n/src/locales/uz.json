@@ -200,8 +200,10 @@
     "default_language": "Asosiy til",
     "readonly_notice": "Sizda klinika sozlamalarini o'zgartirish ruxsati yo'q (faqat ko'rish)",
     "clinic_section": "Klinika sozlamalari",
-    "vertical": "Yo'nalish",
+    "vertical": "Klinika turi",
+    "vertical_hint": "O'zgartirilsa, mos bo'lmagan modullar (masalan tish kartasi) yashiriladi — ma'lumot o'chmaydi.",
     "vertical_dental": "Stomatologiya",
+    "vertical_general": "Umumiy klinika",
     "currency": "Valyuta",
     "reminder_lead_hours": "Eslatma oldindan (soat)"
   },

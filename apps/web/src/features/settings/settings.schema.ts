@@ -41,7 +41,7 @@ export const tenantSchema = z.object({
 export type TenantFormValues = z.infer<typeof tenantSchema>;
 
 export const tenantSettingsSchema = z.object({
-  vertical: z.enum(['dental']),
+  vertical: z.enum(['dental', 'general']),
   currency: z.string().min(1).max(8),
   reminderLeadHours: z.number().int().min(0).max(168),
 });

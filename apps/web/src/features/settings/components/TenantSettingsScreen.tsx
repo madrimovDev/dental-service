@@ -82,7 +82,7 @@ export function TenantSettingsScreen() {
   useEffect(() => {
     if (settings.data) {
       settingsForm.setValues({
-        vertical: (settings.data.vertical as 'dental') ?? 'dental',
+        vertical: (settings.data.vertical as 'dental' | 'general') ?? 'dental',
         currency: settings.data.currency ?? 'UZS',
         reminderLeadHours: settings.data.reminderLeadHours ?? 24,
       });
@@ -191,7 +191,11 @@ export function TenantSettingsScreen() {
                 <Stack gap="md">
                   <Select
                     label={t('tenant_settings.vertical')}
-                    data={[{ value: 'dental', label: t('tenant_settings.vertical_dental') }]}
+                    description={t('tenant_settings.vertical_hint')}
+                    data={[
+                      { value: 'dental', label: t('tenant_settings.vertical_dental') },
+                      { value: 'general', label: t('tenant_settings.vertical_general') },
+                    ]}
                     disabled={!canEditSettings}
                     {...settingsForm.getInputProps('vertical')}
                   />
