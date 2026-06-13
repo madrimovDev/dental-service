@@ -70,9 +70,9 @@ export function StateView(props: StateViewProps) {
         {icon && <div className={classes.icon}>{icon}</div>}
         {title && <div className={classes.title}>{title}</div>}
         {description && <div className={classes.description}>{description}</div>}
-        {status === 'error' && onRetry && (
+        {status === 'error' && onRetry && retryLabel && (
           <button type="button" className={classes.retry} onClick={onRetry}>
-            {retryLabel ?? 'Retry'}
+            {retryLabel}
           </button>
         )}
         {action && <div className={classes.action}>{action}</div>}

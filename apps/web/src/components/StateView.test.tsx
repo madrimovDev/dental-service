@@ -6,7 +6,7 @@ import { renderApp } from '../test-utils';
 describe('StateView', () => {
   it('loading — skeleton render qiladi', () => {
     renderApp(<StateView status="loading" skeleton="table" />);
-    expect(document.querySelector('[data-state="loading"]')).not.toBeNull();
+    expect(document.querySelector('[aria-busy="true"]')).not.toBeNull();
   });
 
   it("empty — title/description/action ko'rsatadi", () => {
