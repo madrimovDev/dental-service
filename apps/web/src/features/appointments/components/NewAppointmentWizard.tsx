@@ -74,6 +74,7 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
         <Stepper.Step label={t('appointments.step_patient')}>
           <Stack mt="md">
             <Select
+              key="patient-select"
               placeholder={t('appointments.patient')}
               searchable
               data={patients}
@@ -84,6 +85,7 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
         <Stepper.Step label={t('appointments.step_service')}>
           <Stack mt="md">
             <Select
+              key="doctor-select"
               label={t('appointments.doctor')}
               searchable
               data={doctorOptions}
