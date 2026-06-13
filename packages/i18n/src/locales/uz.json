@@ -151,6 +151,19 @@
     "mark_all_read": "Hammasini o'qilgan deb belgilash",
     "empty": "Bildirishnomalar yo'q"
   },
+  "onboarding": {
+    "title": "Klinikani sozlash",
+    "subtitle": "Ishni boshlash uchun quyidagilarni to'ldiring",
+    "dismiss": "Yopish",
+    "step": {
+      "branches": "Filial qo'shish",
+      "branches_desc": "Kamida bitta filial yarating",
+      "services": "Xizmatlar qo'shish",
+      "services_desc": "Narxlar bilan xizmatlar ro'yxati",
+      "staff": "Xodim qo'shish",
+      "staff_desc": "Doktor va boshqa xodimlarni taklif qiling"
+    }
+  },
   "error": {
     "403_title": "Ruxsat yo'q",
     "403_message": "Bu sahifaga kirish uchun ruxsatingiz yo'q.",

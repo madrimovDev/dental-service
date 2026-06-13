@@ -6,6 +6,7 @@ import {
   useDoctorNames,
   useManagerKpi,
 } from '../dashboard.api.ts';
+import { OnboardingChecklist } from './OnboardingChecklist.tsx';
 import { BarMini } from './widgets/BarMini.tsx';
 import { MiniList } from './widgets/MiniList.tsx';
 import { StatCard } from './widgets/StatCard.tsx';
@@ -28,6 +29,8 @@ export function ManagerDashboard() {
     <Container size="lg">
       <Stack gap="lg">
         <Title order={2}>{t('nav.dashboard')}</Title>
+
+        <OnboardingChecklist />
 
         <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }}>
           <StatCard
