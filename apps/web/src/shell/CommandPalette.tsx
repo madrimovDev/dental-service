@@ -8,9 +8,9 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { usePatients } from '@/features/patients/patients.api.ts';
-import { useVertical } from '@/features/settings/settings.api.ts';
+import { useUsers, useVertical } from '@/features/settings/settings.api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
-import { buildQuickActions } from './command-actions';
+import { buildPatientActions, buildQuickActions, buildStaffActions } from './command-actions';
 import { visibleGroups } from './nav-config';
 
 export function CommandPalette() {
@@ -23,11 +23,16 @@ export function CommandPalette() {
   const [debounced] = useDebouncedValue(query, 250);
   const trimmed = debounced.trim();
   const canSearchPatients = hasPermission('patient.view');
+  const canSearchStaff = hasPermission('user.view');
+  const hasQuery = trimmed.length >= 2;
 
   const { data: patientsData } = usePatients(
     { search: trimmed, archived: false, page: 1, pageSize: 6 },
-    { enabled: canSearchPatients && trimmed.length >= 2 },
+    { enabled: canSearchPatients && hasQuery },
   );
+  // Xodimlar — listUserAssignments (user.view talab qiladi). RBAC: faqat ruxsat
+  // bo'lganda va query bo'lsa olinadi (ruxsatsiz rolda 403 oldini oladi).
+  const { data: staffData } = useUsers({ enabled: canSearchStaff && hasQuery });
 
   const navActions: SpotlightActionData[] = visibleGroups(hasPermission, vertical)
     .flatMap((g) => g.items)
@@ -49,17 +54,13 @@ export function CommandPalette() {
   }).map((a) => ({ id: a.id, label: a.label, onClick: a.onTrigger }));
 
   const patientActions: SpotlightActionData[] =
-    canSearchPatients && trimmed.length >= 2
-      ? (patientsData?.items ?? []).map((p) => ({
-          id: `patient-${p.id}`,
-          label: p.fullName,
-          description: p.phone ?? undefined,
-          // CLI-152: cross-language/transliteration backend search — keep server
-          // results visible past the client-side default filter.
-          keywords: trimmed,
-          onClick: () => navigate(`/patients/${p.id}`),
-        }))
+    canSearchPatients && hasQuery
+      ? buildPatientActions(patientsData?.items ?? [], trimmed, navigate)
       : [];
+
+  // Xodimlar — barcha assignment'lar olinadi, Spotlight client-side filtrlaydi.
+  const staffActions: SpotlightActionData[] =
+    canSearchStaff && hasQuery ? buildStaffActions(staffData ?? [], navigate) : [];
 
   const groups: SpotlightActionGroupData[] = [
     { group: t('palette.group.navigation'), actions: navActions },
@@ -67,6 +68,9 @@ export function CommandPalette() {
   ];
   if (canSearchPatients) {
     groups.push({ group: t('palette.group.patients'), actions: patientActions });
+  }
+  if (canSearchStaff) {
+    groups.push({ group: t('palette.group.staff'), actions: staffActions });
   }
 
   return (

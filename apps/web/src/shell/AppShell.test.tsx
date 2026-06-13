@@ -8,6 +8,7 @@ vi.mock('@/stores/auth-store.ts', () => ({
   useAuthStore: () => ({
     user: { fullName: 'F. Tursunov', phone: '+998901234567' },
     hasPermission: (p: string) => p === 'patient.view',
+    permissions: [],
     refreshToken: 'r',
     clear: vi.fn(),
     activeBranchId: 'b1',

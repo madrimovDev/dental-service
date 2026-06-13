@@ -138,7 +138,12 @@
     }
   },
   "palette": {
-    "group": { "navigation": "Navigatsiya", "actions": "Amallar", "patients": "Bemorlar" },
+    "group": {
+      "navigation": "Navigatsiya",
+      "actions": "Amallar",
+      "patients": "Bemorlar",
+      "staff": "Xodimlar"
+    },
     "new_patient": "Yangi bemor",
     "new_appointment": "Yangi yozilish",
     "open_cashier": "Kassani ochish",

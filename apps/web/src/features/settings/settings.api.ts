@@ -87,8 +87,9 @@ export function useDeleteRole() {
 }
 
 // --- Users / assignments ---
-export function useUsers() {
+export function useUsers(options?: { enabled?: boolean }) {
   return useQuery({
+    enabled: options?.enabled,
     queryKey: settingsKeys.users(),
     queryFn: () => listUserAssignments().then((r) => r.data),
   });
