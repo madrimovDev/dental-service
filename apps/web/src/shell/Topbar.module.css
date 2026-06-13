@@ -59,7 +59,7 @@
   background: var(--surface);
   color: var(--text-3);
   font-size: var(--text-sm);
-  cursor: text;
+  cursor: pointer;
 }
 .search svg {
   width: 16px;
@@ -73,11 +73,8 @@
   outline: none;
   color: var(--text);
   font-size: var(--text-sm);
-  cursor: text;
   min-width: 0;
-}
-.searchInput::placeholder {
-  color: var(--text-3);
+  text-align: left;
 }
 .kbd {
   margin-left: auto;
