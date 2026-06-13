@@ -76,7 +76,12 @@ export type UpdateMedicalRecordInput = z.infer<typeof updateMedicalRecordSchema>
 
 export const listQuerySchema = z.object({
   search: z.string().optional(),
-  archived: z.coerce.boolean().optional(),
+  // ⚠️ z.coerce.boolean() query-string uchun BUZUQ: Boolean("false") === true.
+  // "true"/"false" string'larini to'g'ri parse qilamiz (CLI-149).
+  archived: z
+    .union([z.boolean(), z.enum(['true', 'false'])])
+    .optional()
+    .transform((v) => v === true || v === 'true'),
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(100).default(20),
 });
