@@ -50,6 +50,7 @@
   --text-2: #41605b;
   --text-3: #869e9a;
   --text-on-primary: #ffffff;
+  --text-on-danger: #ffffff;
   --primary: var(--teal-600);
   --primary-hover: var(--teal-700);
   --primary-tint: #e9f8f4;
@@ -135,6 +136,7 @@
   --text-2: #9db8b3;
   --text-3: #65827d;
   --text-on-primary: #04201c;
+  --text-on-danger: #2a0f0d;
   --primary: var(--teal-400);
   --primary-hover: #36d3c3;
   --primary-tint: #15302c;
