@@ -400,6 +400,21 @@
     "allergies": "Аллергия",
     "add_allergy": "Добавить аллергию",
     "no_allergies": "Аллергий не зарегистрировано",
+    "allergy_substance": "Аллерген (название)",
+    "allergy_severity": "Тяжесть",
+    "allergy_type": "Тип",
+    "severity": {
+      "mild": "Лёгкая",
+      "moderate": "Средняя",
+      "severe": "Тяжёлая"
+    },
+    "allergy_type_opt": {
+      "anesthetic": "Анестетик",
+      "medication": "Лекарство",
+      "material": "Материал",
+      "food": "Пища",
+      "other": "Другое"
+    },
     "blood_type": "Группа крови",
     "pregnancy_status": "Беременность",
     "pregnancy": {
