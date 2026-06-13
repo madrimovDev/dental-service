@@ -1,7 +1,7 @@
 import { Avatar, Mono, PageHead, Tabs } from '@dental/ui';
 import { Alert, Text } from '@mantine/core';
 import { IconAlertTriangle } from '@tabler/icons-react';
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import { BalanceBadge } from '@/components/BalanceBadge';
@@ -84,6 +84,12 @@ export function PatientCard() {
 
   const visibleTabs = filterPatientTabs(TABS, hasPermission, vertical);
   const tabItems = visibleTabs.map((tb) => ({ id: tb.key, label: t(tb.labelKey) }));
+
+  // Faol tab endi ko'rinmasa (vertical o'zgardi yoki yashirilgan odo/lab tab) — 'gen'ga qaytar.
+  // Aks holda yashirilgan tab tarkibi render bo'lib qoladi (va backend'da 403 oladi).
+  useEffect(() => {
+    if (!visibleTabs.some((tb) => tb.key === active)) setActive('gen');
+  }, [visibleTabs, active]);
 
   const severeAllergy = (medical?.allergies ?? []).find(
     (a) => a.severity === 'severe' && a.type === 'anesthetic',

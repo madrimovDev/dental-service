@@ -31,3 +31,13 @@ export const tenantSettingsDtoSchema = z
   .openapi('TenantSettings');
 
 export type TenantSettingsDto = z.infer<typeof tenantSettingsDtoSchema>;
+
+/**
+ * Yengil DTO — faqat tenant vertikali. Har tenant a'zosi UI gating uchun o'qishi kerak
+ * (sezgir emas), shuning uchun `requirePermission` siz endpoint orqali qaytariladi (CLI-80).
+ */
+export const tenantVerticalDtoSchema = z
+  .object({ vertical: z.string().openapi({ example: 'dental' }) })
+  .openapi('TenantVertical');
+
+export type TenantVerticalDto = z.infer<typeof tenantVerticalDtoSchema>;

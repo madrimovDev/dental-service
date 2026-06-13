@@ -7,6 +7,7 @@ import {
   getRole,
   getTenant,
   getTenantSettings,
+  getTenantVertical,
   getUserProfile,
   inviteUser,
   listBranches,
@@ -201,10 +202,22 @@ export function useTenantSettings() {
   });
 }
 
-/** Joriy tenant verticali (settings yuklanmaguncha default 'dental'). */
+/**
+ * Tenant verticalini yengil (permission'siz) endpoint orqali o'qiydi — HAR rol chaqira oladi.
+ * `useTenantSettings` (`tenant_settings.view`) faqat Tenant Admin'da; UI gating har rolga kerak
+ * (CLI-80, CLI-153 takrori).
+ */
+export function useTenantVertical() {
+  return useQuery({
+    queryKey: settingsKeys.tenantVertical(),
+    queryFn: () => getTenantVertical().then((r) => r.data),
+  });
+}
+
+/** Joriy tenant verticali (yuklanmaguncha default 'dental'). */
 export function useVertical(): Vertical {
-  const { data: settings } = useTenantSettings();
-  return (settings?.vertical ?? 'dental') as Vertical;
+  const { data } = useTenantVertical();
+  return (data?.vertical ?? 'dental') as Vertical;
 }
 
 export function useUpdateTenantSettings() {

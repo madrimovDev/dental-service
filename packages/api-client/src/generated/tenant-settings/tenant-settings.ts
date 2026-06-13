@@ -6,6 +6,7 @@
  */
 import type {
   GetTenantSettings200,
+  GetTenantVertical200,
   UpdateTenantSettings200,
   UpdateTenantSettingsBody
 } from '.././model';
@@ -32,5 +33,14 @@ import { customInstance } from '../../mutator';
     },
       );
     }
+  export const getTenantVertical = (
+    
+ ) => {
+      return customInstance<GetTenantVertical200>(
+      {url: `/api/tenant-settings/vertical`, method: 'GET'
+    },
+      );
+    }
   export type GetTenantSettingsResult = NonNullable<Awaited<ReturnType<typeof getTenantSettings>>>
 export type UpdateTenantSettingsResult = NonNullable<Awaited<ReturnType<typeof updateTenantSettings>>>
+export type GetTenantVerticalResult = NonNullable<Awaited<ReturnType<typeof getTenantVertical>>>
