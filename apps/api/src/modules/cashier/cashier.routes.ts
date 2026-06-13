@@ -1,5 +1,5 @@
 import { fail, ok } from '@dental/core';
-import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
+import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
@@ -9,11 +9,13 @@ import { rlsMiddleware } from '../../middleware/rls.ts';
 import { toCashierTransactionDto, toCashierTransactionWithItemsDto } from './cashier.mapper.ts';
 import {
   cashierListResponseDtoSchema,
+  cashierPatientPlanDtoSchema,
   cashierTransactionWithItemsDtoSchema,
   createTransactionSchema,
   dailySummaryDtoSchema,
   dailySummaryQuery,
   listTransactionsQuery,
+  patientPlansQuery,
   planBalanceDtoSchema,
   planIdParamSchema,
   transactionIdParamSchema,
@@ -176,6 +178,24 @@ export const cashierRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     const { planId } = c.req.valid('param');
     const result = await service.planBalance(c, planId);
     return c.json(ok(result), 200);
+  });
+
+  // ─── GET /patient-plans — bemor rejalari (plan-billing selektori, CLI-155) ─
+
+  const patientPlansRoute = createRoute({
+    method: 'get',
+    path: '/patient-plans',
+    tags: ['cashier'],
+    operationId: 'listCashierPatientPlans',
+    middleware: [requirePermission('cashier.view')] as const,
+    request: { query: patientPlansQuery },
+    responses: okJson(z.array(cashierPatientPlanDtoSchema), 'Patient treatment plans for billing'),
+  });
+
+  app.openapi(patientPlansRoute, async (c) => {
+    const { patientId } = c.req.valid('query');
+    const rows = await service.listPatientPlans(c, patientId);
+    return c.json(ok(rows), 200);
   });
 
   return app;

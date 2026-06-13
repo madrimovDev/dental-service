@@ -12,6 +12,7 @@ import type {
   GetAppointment200,
   ListAppointments200,
   ListAppointmentsParams,
+  ListDoctors200,
   UpdateAppointment200,
   UpdateAppointmentBody
 } from '.././model';
@@ -36,6 +37,14 @@ import { customInstance } from '../../mutator';
       {url: `/api/appointments`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
       data: createAppointmentBody
+    },
+      );
+    }
+  export const listDoctors = (
+    
+ ) => {
+      return customInstance<ListDoctors200>(
+      {url: `/api/appointments/doctors`, method: 'GET'
     },
       );
     }
@@ -71,6 +80,7 @@ import { customInstance } from '../../mutator';
     }
   export type ListAppointmentsResult = NonNullable<Awaited<ReturnType<typeof listAppointments>>>
 export type CreateAppointmentResult = NonNullable<Awaited<ReturnType<typeof createAppointment>>>
+export type ListDoctorsResult = NonNullable<Awaited<ReturnType<typeof listDoctors>>>
 export type GetAppointmentResult = NonNullable<Awaited<ReturnType<typeof getAppointment>>>
 export type UpdateAppointmentResult = NonNullable<Awaited<ReturnType<typeof updateAppointment>>>
 export type CancelAppointmentResult = NonNullable<Awaited<ReturnType<typeof cancelAppointment>>>

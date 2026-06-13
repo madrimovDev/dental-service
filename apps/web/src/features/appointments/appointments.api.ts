@@ -4,12 +4,11 @@ import {
   createAppointment,
   listAppointments,
   listBranches,
+  listDoctors,
   listServices,
-  listUserAssignments,
 } from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { appointmentKeys } from './appointments.keys';
-import type { Doctor } from './appointments.types';
 
 export function useAppointments(range: { branchId?: string; from: string; to: string }) {
   return useQuery({
@@ -21,18 +20,16 @@ export function useAppointments(range: { branchId?: string; from: string; to: st
   });
 }
 
-/** Branch doktorlari — listAssignments (roleName ≈ doctor). */
+/**
+ * Yozilish uchun doktorlar — yengil `GET /appointments/doctors` (`appointment.view`).
+ * Avval `GET /users/assignments` (`user.view`) ishlatilardi — Receptionist'da o'sha
+ * ruxsat yo'q → 403 → dropdown bo'sh edi (CLI-154). Backend allaqachon `{id, name}`
+ * qaytaradi (doctor-rolli, dedupe).
+ */
 export function useDoctors() {
   return useQuery({
     queryKey: ['doctors', 'list'],
-    queryFn: async (): Promise<Doctor[]> => {
-      const result = await listUserAssignments();
-      const assignments = result.data;
-      const docs = assignments
-        .filter((a) => a.roleName.toLowerCase().includes('doctor'))
-        .map((a) => ({ id: a.userId, name: a.userFullName ?? a.userPhone }));
-      return Array.from(new Map(docs.map((d) => [d.id, d])).values());
-    },
+    queryFn: () => listDoctors().then((r) => r.data),
   });
 }
 

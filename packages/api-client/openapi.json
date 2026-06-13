@@ -1908,6 +1908,36 @@
           "remaining"
         ]
       },
+      "CashierPatientPlan": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "example": "Kompleks davolash"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "presented",
+              "accepted",
+              "in_progress",
+              "completed",
+              "cancelled"
+            ],
+            "example": "accepted"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "status"
+        ]
+      },
       "RevenueReport": {
         "type": "object",
         "properties": {
@@ -2284,6 +2314,23 @@
           "cancellationReason",
           "createdAt",
           "updatedAt"
+        ]
+      },
+      "DoctorListItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "example": "Dr. Aliyev"
+          }
+        },
+        "required": [
+          "id",
+          "name"
         ]
       },
       "QueueTicket": {
@@ -7142,8 +7189,18 @@
           },
           {
             "schema": {
-              "type": "boolean",
-              "nullable": true
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                }
+              ]
             },
             "required": false,
             "name": "archived",
@@ -9590,6 +9647,85 @@
         }
       }
     },
+    "/api/cashier/patient-plans": {
+      "get": {
+        "tags": [
+          "cashier"
+        ],
+        "operationId": "listCashierPatientPlans",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "patientId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Patient treatment plans for billing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CashierPatientPlan"
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/reports/revenue": {
       "get": {
         "tags": [
@@ -10330,6 +10466,74 @@
           },
           "409": {
             "description": "Doctor is busy (scheduling conflict)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/appointments/doctors": {
+      "get": {
+        "tags": [
+          "appointments"
+        ],
+        "operationId": "listDoctors",
+        "responses": {
+          "200": {
+            "description": "List of doctors for booking",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DoctorListItem"
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
             "content": {
               "application/json": {
                 "schema": {

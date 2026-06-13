@@ -13,6 +13,7 @@ import {
   appointmentIdParamSchema,
   cancelAppointmentBodySchema,
   createAppointmentSchema,
+  doctorListItemDtoSchema,
   listAppointmentsQuery,
   updateAppointmentSchema,
 } from './appointments.schema.ts';
@@ -113,6 +114,23 @@ export const appointmentRoutes = (deps: { db: Database; audit: AuditLogger }) =>
     if (!result.appointment)
       return c.json(fail('insert.failed', 'Appointment creation failed'), 400);
     return c.json(ok(toAppointmentDto(result.appointment)), 201);
+  });
+
+  // ─── GET /doctors — yozilish uchun doktorlar ro'yxati (CLI-154) ────────────
+  // Static path — `/{id}` dan OLDIN ro'yxatdan o'tadi (param bilan to'qnashmasin).
+
+  const listDoctorsRoute = createRoute({
+    method: 'get',
+    path: '/doctors',
+    tags: ['appointments'],
+    operationId: 'listDoctors',
+    middleware: [requirePermission('appointment.view')] as const,
+    responses: okJson(z.array(doctorListItemDtoSchema), 'List of doctors for booking'),
+  });
+
+  app.openapi(listDoctorsRoute, async (c) => {
+    const rows = await service.listDoctors(c);
+    return c.json(ok(rows), 200);
   });
 
   // ─── GET /{id} — get by id ────────────────────────────────────────────────

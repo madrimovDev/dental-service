@@ -4,10 +4,10 @@ import {
   getCashierPlanBalance,
   getService,
   listBranches,
+  listCashierPatientPlans,
   listCashierTransactions,
   listPatients,
   listServices,
-  listTreatmentPlans,
   refundCashierTransaction,
   type ServiceWithPrices,
 } from '@dental/api-client';
@@ -57,11 +57,16 @@ export function usePatientsAll() {
   });
 }
 
-/** Tanlangan bemorning treatment-plan(lar)i. */
+/**
+ * Tanlangan bemorning rejalari — yengil `GET /cashier/patient-plans` (`cashier.view`).
+ * Avval `GET /treatment-plans` (`medical_record.view`) ishlatilardi — kassa rollarida
+ * o'sha ruxsat yo'q → 403 → "reja yo'q" yanglish UI (CLI-155). Balans alohida
+ * `usePlanBalance` (ham `cashier.view`) orqali olinadi.
+ */
 export function usePatientPlans(patientId: string | null) {
   return useQuery({
     queryKey: ['treatment-plans', 'by-patient', patientId ?? ''],
-    queryFn: () => listTreatmentPlans(patientId ? { patientId } : undefined).then((r) => r.data),
+    queryFn: () => listCashierPatientPlans({ patientId: patientId ?? '' }).then((r) => r.data),
     enabled: !!patientId,
   });
 }
