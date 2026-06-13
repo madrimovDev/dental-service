@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NAV_GROUPS, visibleGroups } from './nav-config';
+import { visibleGroups } from './nav-config';
 
 describe('nav-config', () => {
   it('LIVE element ruxsatsiz yashirin', () => {
@@ -52,6 +52,3 @@ describe('nav-config', () => {
     expect(items.find((i) => i.key === 'lab')).toBeDefined();
   });
 });
-
-// referenced to satisfy lint; NAV_GROUPS is the data source for visibleGroups
-void NAV_GROUPS;

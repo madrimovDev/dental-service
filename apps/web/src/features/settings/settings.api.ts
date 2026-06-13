@@ -26,6 +26,7 @@ import {
   updateTenantSettings,
   upsertUserProfile,
 } from '@dental/api-client';
+import type { Vertical } from '@dental/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { settingsKeys } from './settings.keys';
 
@@ -198,6 +199,12 @@ export function useTenantSettings() {
     queryKey: settingsKeys.tenantSettings(),
     queryFn: () => getTenantSettings().then((res) => res.data),
   });
+}
+
+/** Joriy tenant verticali (settings yuklanmaguncha default 'dental'). */
+export function useVertical(): Vertical {
+  const { data: settings } = useTenantSettings();
+  return (settings?.vertical ?? 'dental') as Vertical;
 }
 
 export function useUpdateTenantSettings() {

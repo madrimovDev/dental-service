@@ -1,4 +1,3 @@
-import { hasFeature, type Vertical, type VerticalFeature } from '@dental/core';
 import { Avatar, Mono, PageHead, Tabs } from '@dental/ui';
 import { Alert, Text } from '@mantine/core';
 import { IconAlertTriangle } from '@tabler/icons-react';
@@ -6,9 +5,10 @@ import { lazy, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import { BalanceBadge } from '@/components/BalanceBadge';
-import { useTenantSettings } from '@/features/settings/settings.api.ts';
+import { useVertical } from '@/features/settings/settings.api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { useMedicalRecord, usePatient, usePatientBalance } from '../patients.api';
+import { filterPatientTabs, type PatientTabDef } from '../visible-tabs';
 
 const GeneralTab = lazy(() => import('./tabs/GeneralTab').then((m) => ({ default: m.GeneralTab })));
 const MedicalTab = lazy(() => import('./tabs/MedicalTab').then((m) => ({ default: m.MedicalTab })));
@@ -53,9 +53,7 @@ const PatientImagesTab = lazy(() =>
   })),
 );
 
-type TabDef = { key: string; labelKey: string; permission?: string; feature?: VerticalFeature };
-
-const TABS: TabDef[] = [
+const TABS: PatientTabDef[] = [
   { key: 'gen', labelKey: 'patients.tab.general' },
   { key: 'med', labelKey: 'patients.tab.medical' },
   {
@@ -82,14 +80,9 @@ export function PatientCard() {
   const { data: patient } = usePatient(id);
   const { data: medical } = useMedicalRecord(hasPermission('medical_record.view') ? id : '');
   const balanceQuery = usePatientBalance(id);
-  const { data: settings } = useTenantSettings();
-  const vertical = (settings?.vertical ?? 'dental') as Vertical;
+  const vertical = useVertical();
 
-  const visibleTabs = TABS.filter(
-    (tb) =>
-      (!tb.permission || hasPermission(tb.permission)) &&
-      (!tb.feature || hasFeature(vertical, tb.feature)),
-  );
+  const visibleTabs = filterPatientTabs(TABS, hasPermission, vertical);
   const tabItems = visibleTabs.map((tb) => ({ id: tb.key, label: t(tb.labelKey) }));
 
   const severeAllergy = (medical?.allergies ?? []).find(
