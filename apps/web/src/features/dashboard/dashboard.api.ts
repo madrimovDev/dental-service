@@ -12,10 +12,17 @@ import { useQuery } from '@tanstack/react-query';
 
 const isoDate = (d: Date) => d.toISOString().slice(0, 10);
 
-/** Bugungi (lokal) sana — `from`/`to` bir xil. */
+/**
+ * Bugungi (lokal) kun chegaralari — ISO datetime (kun boshi → kun oxiri).
+ * appointments `from`/`to` `z.iso.datetime()` kutadi (date-only → 400), shu sabab
+ * to'liq ISO datetime qaytariladi (CLI-160). Doctor/Receptionist/Assistant
+ * dashboardlari shu oraliqni listAppointments'ga uzatadi.
+ */
 export function useTodayRange() {
-  const today = isoDate(new Date());
-  return { from: today, to: today };
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  return { from: start.toISOString(), to: end.toISOString() };
 }
 
 /** Oxirgi 30 kunlik oraliq (KPI bloklari uchun default). */
