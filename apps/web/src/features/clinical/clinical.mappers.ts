@@ -31,8 +31,17 @@ type Lang = 'uz' | 'ru';
 
 // ===== shared =====
 const num = (raw: string | number) => Number(raw).toLocaleString();
-const dt = (iso: string) => new Date(iso).toLocaleDateString();
-const dts = (iso: string) => new Date(iso).toLocaleString();
+// O'zbek UI uchun deterministik format: DD.MM.YYYY va DD.MM.YYYY, HH:mm (24-soat).
+// `toLocaleString()` runtime locale'iga tayanardi → amerikacha M/D/YYYY AM/PM (CLI-152).
+const p2 = (n: number) => String(n).padStart(2, '0');
+const dt = (iso: string) => {
+  const d = new Date(iso);
+  return `${p2(d.getDate())}.${p2(d.getMonth() + 1)}.${d.getFullYear()}`;
+};
+const dts = (iso: string) => {
+  const d = new Date(iso);
+  return `${dt(iso)}, ${p2(d.getHours())}:${p2(d.getMinutes())}`;
+};
 
 export function parseToothNumbers(csv: string): number[] {
   if (!csv) return [];
@@ -131,6 +140,16 @@ export function toVisitNoteVM(
 
 export function toDiagnosisOptions(diagnoses: Diagnosis[], lang: Lang): DiagnosisOptionVM[] {
   return diagnoses.map((d) => ({ value: d.id, label: dxLabel(d, lang) }));
+}
+
+/** Diakritika-befarq normalizatsiya (ICD-10 qidiruv uchun). */
+export const normalizeSearch = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+/** ICD-10 picker filtri uchun id→qidiruv-indeks (`code + nameUz + nameRu`, normalizatsiyalangan). */
+export function diagnosisSearchIndex(diagnoses: Diagnosis[]): Map<string, string> {
+  return new Map(
+    diagnoses.map((d) => [d.id, normalizeSearch(`${d.code} ${d.nameUz} ${d.nameRu}`)]),
+  );
 }
 
 // ===== B: prescription =====
