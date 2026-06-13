@@ -1,5 +1,5 @@
-import { appointments } from '@dental/db-schema';
-import { and, asc, between, eq, gte, lt, lte, ne } from 'drizzle-orm';
+import { appointments, roles, userAssignments, users } from '@dental/db-schema';
+import { and, asc, between, eq, gte, lt, lte, ne, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
@@ -161,7 +161,33 @@ export const createAppointmentsService = (deps: {
     return update(c, id, { status: 'cancelled', cancellationReason: reason });
   }
 
-  return { list, getById, create, update, cancel };
+  /**
+   * Joriy tenant'dagi doktor-rolli xodimlar — yozilish wizardi uchun (CLI-154).
+   * `appointment.view` bilan ochiq (yengil) — `user.view` (HR `/users/assignments`)
+   * o'rniga, shunda Receptionist ham doktorlar ro'yxatini ko'radi.
+   * Rol nomi "doctor" o'z ichiga olganlar (`Doctor`, `Doctor + Assistant`) — mavjud
+   * frontend deteksiyasi (`roleName.includes('doctor')`) bilan izchil.
+   * RLS tenant'ni filtrlaydi; `selectDistinct` bir userni bir nechta filial
+   * assignment'idan dedupe qiladi.
+   */
+  async function listDoctors(c: Context) {
+    const db = getDb(c);
+    const rows = await db
+      .selectDistinct({
+        id: users.id,
+        fullName: users.fullName,
+        phone: users.phone,
+      })
+      .from(userAssignments)
+      .innerJoin(users, eq(users.id, userAssignments.userId))
+      .innerJoin(roles, eq(roles.id, userAssignments.roleId))
+      .where(and(eq(userAssignments.isActive, true), sql`lower(${roles.name}) like '%doctor%'`))
+      .orderBy(users.fullName);
+
+    return rows.map((r) => ({ id: r.id, name: r.fullName ?? r.phone }));
+  }
+
+  return { list, getById, create, update, cancel, listDoctors };
 };
 
 export type AppointmentsService = ReturnType<typeof createAppointmentsService>;

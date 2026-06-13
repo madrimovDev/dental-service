@@ -751,6 +751,7 @@
     "plan_billing": {
       "select_plan": "Davolash rejasini tanlang",
       "no_plans": "Bemorda davolash rejasi yo'q",
+      "load_error": "Rejalarni yuklab bo'lmadi (ruxsat yo'q yoki xatolik)",
       "select_patient_first": "Avval bemorni tanlang",
       "stage": "Bosqich",
       "cost": "Narxi",

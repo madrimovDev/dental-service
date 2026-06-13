@@ -162,9 +162,11 @@ export function PrescriptionsTab({ patientId }: Props) {
                     <NumberInput
                       label={t('prescription.duration_days')}
                       min={1}
-                      {...form.getInputProps(`items.${i}.durationDays`)}
-                      // '' default → controlled (undefined bo'lsa uncontrolled→controlled
-                      // warning chiqardi, CLI-152). onChange number|undefined ga coerce qiladi.
+                      // To'liq controlled (alohida value+onChange) — `getInputProps` spread'i
+                      // ishlatilmaydi, chunki u ham `value` keltiradi va bir xil prop ikki marta
+                      // berilishi mo'rt. value hech qachon `undefined` bo'lmaydi (`''` yoki number):
+                      // undefined↔number o'tishi NumberInput'da controlled→uncontrolled React
+                      // warning beradi (CLI-156). Reset/saqlash yo'lida ham `''` ga tushadi.
                       value={form.values.items[i]?.durationDays ?? ''}
                       onChange={(v) =>
                         form.setFieldValue(
@@ -172,6 +174,7 @@ export function PrescriptionsTab({ patientId }: Props) {
                           typeof v === 'number' ? v : undefined,
                         )
                       }
+                      error={form.errors[`items.${i}.durationDays`]}
                     />
                   </Group>
                   <Textarea

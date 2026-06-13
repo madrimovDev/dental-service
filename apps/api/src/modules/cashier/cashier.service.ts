@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import {
   cashierTransactionItems,
   cashierTransactions,
+  treatmentPlans,
   treatmentStagePayments,
   treatmentStages,
 } from '@dental/db-schema';
@@ -340,7 +341,25 @@ export const createCashierService = (deps: { audit: AuditLogger }) => {
     return computePlanBalance(stageRows, allocRows);
   }
 
-  return { list, getById, create, refund, dailySummary, planBalance };
+  /**
+   * Bemorning davolash rejalari — kassa plan-billing selektori uchun (CLI-155).
+   * Faqat `{id, title, status}` (yengil) — klinik detal YO'Q, `cashier.view` yetarli.
+   * RLS tenant'ni filtrlaydi (explicit WHERE tenant_id YOZILMAYDI).
+   */
+  async function listPatientPlans(c: Context, patientId: string) {
+    const db = getDb(c);
+    return db
+      .select({
+        id: treatmentPlans.id,
+        title: treatmentPlans.title,
+        status: treatmentPlans.status,
+      })
+      .from(treatmentPlans)
+      .where(eq(treatmentPlans.patientId, patientId))
+      .orderBy(desc(treatmentPlans.createdAt));
+  }
+
+  return { list, getById, create, refund, dailySummary, planBalance, listPatientPlans };
 };
 
 export type CashierService = ReturnType<typeof createCashierService>;

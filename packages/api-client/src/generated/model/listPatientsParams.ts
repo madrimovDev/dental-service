@@ -7,10 +7,7 @@
 
 export type ListPatientsParams = {
 search?: string;
-/**
- * @nullable
- */
-archived?: boolean | null;
+archived?: boolean | 'true' | 'false';
 /**
  * @minimum 0
  * @exclusiveMinimum

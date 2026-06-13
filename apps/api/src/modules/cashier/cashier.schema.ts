@@ -64,6 +64,12 @@ export const dailySummaryQuery = z.object({
 });
 export type DailySummaryQuery = z.infer<typeof dailySummaryQuery>;
 
+/** Patient-plans query — kassa plan-billing uchun bemor filtri (majburiy). */
+export const patientPlansQuery = z.object({
+  patientId: z.uuid(),
+});
+export type PatientPlansQuery = z.infer<typeof patientPlansQuery>;
+
 // ─── Response DTOs (money numeric → string; Date → ISO string) ───────────────
 
 const paymentMethodSchema = z.enum(['cash', 'card', 'transfer', 'other']);
@@ -168,3 +174,20 @@ export const planBalanceDtoSchema = z
   })
   .openapi('PlanBalance');
 export type PlanBalanceDto = z.infer<typeof planBalanceDtoSchema>;
+
+/**
+ * Bemor davolash rejasi — kassa plan-billing selektori uchun yengil DTO (CLI-155).
+ * `cashier.view` bilan ochiq (`medical_record.view` klinik-darajali emas) — shunda
+ * Receptionist/kassir reja bo'yicha to'lov qabul qila oladi. Balans alohida
+ * `GET /plan-balance/{planId}` (ham `cashier.view`) orqali olinadi.
+ */
+export const cashierPatientPlanDtoSchema = z
+  .object({
+    id: z.uuid(),
+    title: z.string().openapi({ example: 'Kompleks davolash' }),
+    status: z
+      .enum(['draft', 'presented', 'accepted', 'in_progress', 'completed', 'cancelled'])
+      .openapi({ example: 'accepted' }),
+  })
+  .openapi('CashierPatientPlan');
+export type CashierPatientPlanDto = z.infer<typeof cashierPatientPlanDtoSchema>;

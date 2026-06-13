@@ -109,7 +109,9 @@ export function PlanBillingPanel({ branchId, patientId }: PlanBillingPanelProps)
       <Stack gap="md">
         <Title order={4}>{t('cashier.mode.plan')}</Title>
 
-        {plans.length === 0 ? (
+        {plansQuery.isError ? (
+          <Text c="red">{t('cashier.plan_billing.load_error')}</Text>
+        ) : plans.length === 0 ? (
           <Text c="dimmed">{t('cashier.plan_billing.no_plans')}</Text>
         ) : (
           <Select

@@ -8,6 +8,7 @@ export type {
   CreateAppointmentResult,
   GetAppointmentResult,
   ListAppointmentsResult,
+  ListDoctorsResult,
   UpdateAppointmentResult,
 } from './generated/appointments/appointments.ts';
 export {
@@ -15,6 +16,7 @@ export {
   createAppointment,
   getAppointment,
   listAppointments,
+  listDoctors,
   updateAppointment,
 } from './generated/appointments/appointments.ts';
 export type { ListAuditLogResult } from './generated/audit/audit.ts';
@@ -63,6 +65,7 @@ export type {
   GetCashierDailySummaryResult,
   GetCashierPlanBalanceResult,
   GetCashierTransactionResult,
+  ListCashierPatientPlansResult,
   ListCashierTransactionsResult,
   RefundCashierTransactionResult,
 } from './generated/cashier/cashier.ts';
@@ -71,6 +74,7 @@ export {
   getCashierDailySummary,
   getCashierPlanBalance,
   getCashierTransaction,
+  listCashierPatientPlans,
   listCashierTransactions,
   refundCashierTransaction,
 } from './generated/cashier/cashier.ts';
@@ -151,6 +155,8 @@ export type {
   BranchWorkHoursAnyOfTwo,
   CancelAppointment200,
   CancelAppointmentBody,
+  CashierPatientPlan,
+  CashierPatientPlanStatus,
   CashierTransaction,
   CashierTransactionPaymentMethod as PaymentMethod,
   CashierTransactionStatus as TransactionStatus,
@@ -204,6 +210,7 @@ export type {
   DeleteService200,
   DeleteUserAssignment200,
   Diagnosis,
+  DoctorListItem,
   DoctorWorkloadRow,
   ErrorResponse,
   ErrorResponseError,
@@ -235,6 +242,8 @@ export type {
   ListAuditLog200,
   ListAuditLogParams,
   ListBranches200,
+  ListCashierPatientPlans200,
+  ListCashierPatientPlansParams,
   ListConsentForms200,
   ListConsentFormsParams,
   ListConsentTemplates200,
@@ -242,6 +251,7 @@ export type {
   ListConsentTemplatesType,
   ListDiagnoses200,
   ListDiagnosesParams,
+  ListDoctors200,
   ListLabOrders200,
   ListLabOrdersParams,
   ListLabOrdersStatus,

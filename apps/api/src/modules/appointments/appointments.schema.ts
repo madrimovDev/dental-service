@@ -74,3 +74,17 @@ export const appointmentDtoSchema = z
   .openapi('Appointment');
 
 export type AppointmentDto = z.infer<typeof appointmentDtoSchema>;
+
+/**
+ * Doctor list item — yozilish wizardi uchun yengil DTO.
+ * `appointment.view` bilan himoyalangan (`user.view`/HR-darajali emas) — CLI-154.
+ * `name` = `fullName ?? phone` (backend hisoblaydi); minimal PII.
+ */
+export const doctorListItemDtoSchema = z
+  .object({
+    id: z.uuid(),
+    name: z.string().openapi({ example: 'Dr. Aliyev' }),
+  })
+  .openapi('DoctorListItem');
+
+export type DoctorListItemDto = z.infer<typeof doctorListItemDtoSchema>;
