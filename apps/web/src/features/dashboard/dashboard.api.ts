@@ -4,7 +4,9 @@ import {
   getPlanCompletionReport,
   getRevenueReport,
   listAppointments,
+  listBranches,
   listLabOrders,
+  listUserAssignments,
 } from '@dental/api-client';
 import { useQuery } from '@tanstack/react-query';
 
@@ -68,6 +70,23 @@ export function useActiveLabOrders() {
     queryKey: ['dashboard', 'lab-orders'],
     queryFn: () => listLabOrders().then((r) => r.data),
     select: (orders) => orders.filter((o) => o.status !== 'delivered' && o.status !== 'cancelled'),
+  });
+}
+
+/** id→nom lookup'lar — dashboard'da UUID o'rniga nom ko'rsatish uchun (CLI-152). */
+export function useBranchNames() {
+  return useQuery({
+    queryKey: ['dashboard', 'branch-names'],
+    queryFn: () => listBranches().then((r) => r.data),
+    select: (rows) => new Map(rows.map((b) => [b.id, b.name])),
+  });
+}
+
+export function useDoctorNames() {
+  return useQuery({
+    queryKey: ['dashboard', 'doctor-names'],
+    queryFn: () => listUserAssignments().then((r) => r.data),
+    select: (rows) => new Map(rows.map((a) => [a.userId, a.userFullName ?? a.userPhone])),
   });
 }
 
