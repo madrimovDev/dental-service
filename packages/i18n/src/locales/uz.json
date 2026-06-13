@@ -169,6 +169,11 @@
     "403_message": "Bu sahifaga kirish uchun ruxsatingiz yo'q.",
     "403_back": "Bosh ekranga qaytish"
   },
+  "errors": {
+    "boundary_title": "Xatolik yuz berdi",
+    "boundary_desc": "Sahifani qayta yuklab ko'ring",
+    "reload": "Qayta yuklash"
+  },
   "dashboard": {
     "welcome": "Salom, {{name}}!",
     "your_role": "Sizning rolingiz",
