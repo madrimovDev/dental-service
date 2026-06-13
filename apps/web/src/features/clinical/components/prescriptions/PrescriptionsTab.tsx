@@ -163,6 +163,15 @@ export function PrescriptionsTab({ patientId }: Props) {
                       label={t('prescription.duration_days')}
                       min={1}
                       {...form.getInputProps(`items.${i}.durationDays`)}
+                      // '' default → controlled (undefined bo'lsa uncontrolled→controlled
+                      // warning chiqardi, CLI-152). onChange number|undefined ga coerce qiladi.
+                      value={form.values.items[i]?.durationDays ?? ''}
+                      onChange={(v) =>
+                        form.setFieldValue(
+                          `items.${i}.durationDays`,
+                          typeof v === 'number' ? v : undefined,
+                        )
+                      }
                     />
                   </Group>
                   <Textarea

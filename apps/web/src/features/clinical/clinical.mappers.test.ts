@@ -11,9 +11,11 @@ import type {
 } from '@dental/api-client';
 import { describe, expect, it } from 'vitest';
 import {
+  diagnosisSearchIndex,
   draftStatesToCreateInput,
   formatBytes,
   labOrderStatusToTone,
+  normalizeSearch,
   parseToothNumbers,
   planStatusToTone,
   stageStatusToTone,
@@ -309,5 +311,35 @@ describe('templateBodyForLang', () => {
     expect(templateBodyForLang(tpl, 'ru')).toBe('RU matn');
     expect(templateBodyForLang({ ...tpl, bodyRu: null } as never, 'ru')).toBe('UZ matn');
     expect(templateBodyForLang(tpl, 'uz')).toBe('UZ matn');
+  });
+});
+
+// ---- ICD-10 qidiruv indeksi (CLI-152) ----
+describe('diagnosisSearchIndex / normalizeSearch', () => {
+  const dx = [
+    {
+      id: 'd1',
+      code: 'K02.0',
+      nameUz: 'Emal kariyesi',
+      nameRu: 'Кариес эмали',
+    },
+  ] as unknown as Diagnosis[];
+  const idx = diagnosisSearchIndex(dx);
+  const entry = idx.get('d1') ?? '';
+
+  it("nomning bir qismi (uz) bo'yicha topadi — 'kariyes'", () => {
+    expect(entry.includes(normalizeSearch('kariyes'))).toBe(true);
+  });
+
+  it("kod bo'yicha topadi — 'k02'", () => {
+    expect(entry.includes(normalizeSearch('K02'))).toBe(true);
+  });
+
+  it('UI tili uz bo\'lsa ham ruscha nom bo\'yicha topadi — "кариес" (cross-language)', () => {
+    expect(entry.includes(normalizeSearch('Кариес'))).toBe(true);
+  });
+
+  it("transliteratsiya qamralmaydi (hujjatlangan cheklov) — 'karies' (y'siz) topmaydi", () => {
+    expect(entry.includes(normalizeSearch('karies'))).toBe(false);
   });
 });

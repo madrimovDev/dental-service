@@ -57,8 +57,15 @@ export const createCashierService = (deps: { audit: AuditLogger }) => {
     if (query.branchId) filters.push(eq(cashierTransactions.branchId, query.branchId));
     if (query.patientId) filters.push(eq(cashierTransactions.patientId, query.patientId));
     if (query.from && query.to) {
+      // from/to date-only (z.iso.date). Asia/Tashkent kun chegarasi — dailySummary bilan
+      // izchil. `new Date(query.to)` = UTC yarim tun bo'lib, o'sha kuni yaratilgan
+      // tranzaksiyalarni chiqarib tashlar edi (CLI-152: "bugungi operatsiyalar" bo'sh).
       filters.push(
-        between(cashierTransactions.createdAt, new Date(query.from), new Date(query.to)),
+        between(
+          cashierTransactions.createdAt,
+          new Date(`${query.from}T00:00:00+05:00`),
+          new Date(`${query.to}T23:59:59.999+05:00`),
+        ),
       );
     }
 

@@ -1,9 +1,11 @@
 import type { CreateVisitNoteInput, Diagnosis } from '@dental/api-client';
+import type { ComboboxItem, OptionsFilter } from '@mantine/core';
 import { Button, Group, Modal, MultiSelect, Select, Stack, Textarea } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { toDiagnosisOptions } from '../../clinical.mappers';
+import { diagnosisSearchIndex, normalizeSearch, toDiagnosisOptions } from '../../clinical.mappers';
 import { type VisitNoteFormValues, visitNoteFormSchema } from '../../clinical.schema';
 
 export function VisitNoteFormModal({
@@ -39,6 +41,18 @@ export function VisitNoteFormModal({
   });
 
   const dxOptions = toDiagnosisOptions(diagnoses, i18n.language === 'ru' ? 'ru' : 'uz');
+  // ICD-10 qidiruvi code + nameUz + nameRu bo'yicha (default filter faqat label/bitta tilni
+  // tekshirardi → boshqa tildagi nom topilmasdi, CLI-152). latin↔kirill transliteratsiya emas.
+  const dxFilter = useMemo<OptionsFilter>(() => {
+    const index = diagnosisSearchIndex(diagnoses);
+    return ({ options, search }) => {
+      const q = normalizeSearch(search.trim());
+      if (!q) return options;
+      return options.filter(
+        (o) => 'value' in o && (index.get((o as ComboboxItem).value)?.includes(q) ?? false),
+      );
+    };
+  }, [diagnoses]);
   const apptOptions = appointments.map((a) => ({
     value: a.id,
     label: new Date(a.startTime).toLocaleString(),
@@ -88,6 +102,7 @@ export function VisitNoteFormModal({
             placeholder={t('visit_note.diagnosis_picker')}
             searchable
             data={dxOptions}
+            filter={dxFilter}
             limit={20}
             {...form.getInputProps('assessmentDiagnoses')}
           />
