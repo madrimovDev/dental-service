@@ -1,3 +1,4 @@
+import { hasFeature, type Vertical, type VerticalFeature } from '@dental/core';
 import { Avatar, Mono, PageHead, Tabs } from '@dental/ui';
 import { Alert, Text } from '@mantine/core';
 import { IconAlertTriangle } from '@tabler/icons-react';
@@ -5,6 +6,7 @@ import { lazy, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import { BalanceBadge } from '@/components/BalanceBadge';
+import { useTenantSettings } from '@/features/settings/settings.api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { useMedicalRecord, usePatient, usePatientBalance } from '../patients.api';
 
@@ -51,17 +53,22 @@ const PatientImagesTab = lazy(() =>
   })),
 );
 
-type TabDef = { key: string; labelKey: string; permission?: string };
+type TabDef = { key: string; labelKey: string; permission?: string; feature?: VerticalFeature };
 
 const TABS: TabDef[] = [
   { key: 'gen', labelKey: 'patients.tab.general' },
   { key: 'med', labelKey: 'patients.tab.medical' },
-  { key: 'odo', labelKey: 'patients.tab.odontogram', permission: 'medical_record.view' },
+  {
+    key: 'odo',
+    labelKey: 'patients.tab.odontogram',
+    permission: 'medical_record.view',
+    feature: 'odontogram',
+  },
   { key: 'plan', labelKey: 'patients.tab.plan', permission: 'medical_record.view' },
   { key: 'vis', labelKey: 'patients.tab.visits', permission: 'medical_record.view' },
   { key: 'rx', labelKey: 'patients.tab.rx', permission: 'prescription.view' },
   { key: 'img', labelKey: 'patients.tab.images', permission: 'patient_image.view' },
-  { key: 'lab', labelKey: 'patients.tab.lab', permission: 'lab_order.view' },
+  { key: 'lab', labelKey: 'patients.tab.lab', permission: 'lab_order.view', feature: 'labOrders' },
   { key: 'cons', labelKey: 'patients.tab.consent', permission: 'consent.view' },
   { key: 'fam', labelKey: 'patients.tab.family' },
   { key: 'pay', labelKey: 'patients.tab.payments' },
@@ -75,8 +82,14 @@ export function PatientCard() {
   const { data: patient } = usePatient(id);
   const { data: medical } = useMedicalRecord(hasPermission('medical_record.view') ? id : '');
   const balanceQuery = usePatientBalance(id);
+  const { data: settings } = useTenantSettings();
+  const vertical = (settings?.vertical ?? 'dental') as Vertical;
 
-  const visibleTabs = TABS.filter((tb) => !tb.permission || hasPermission(tb.permission));
+  const visibleTabs = TABS.filter(
+    (tb) =>
+      (!tb.permission || hasPermission(tb.permission)) &&
+      (!tb.feature || hasFeature(vertical, tb.feature)),
+  );
   const tabItems = visibleTabs.map((tb) => ({ id: tb.key, label: t(tb.labelKey) }));
 
   const severeAllergy = (medical?.allergies ?? []).find(

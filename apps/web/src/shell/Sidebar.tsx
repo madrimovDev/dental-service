@@ -1,5 +1,7 @@
+import type { Vertical } from '@dental/core';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
+import { useTenantSettings } from '@/features/settings/settings.api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { type NavItem, visibleGroups } from './nav-config';
 import classes from './Sidebar.module.css';
@@ -16,7 +18,9 @@ export function Sidebar() {
   const { t } = useTranslation();
   const { hasPermission } = useAuthStore();
   const { pathname } = useLocation();
-  const groups = visibleGroups(hasPermission);
+  const { data: settings } = useTenantSettings();
+  const vertical = (settings?.vertical ?? 'dental') as Vertical;
+  const groups = visibleGroups(hasPermission, vertical);
   const allPaths = groups.flatMap((g) => g.items.filter((i) => !i.disabled).map((i) => i.path));
 
   const renderItem = (item: NavItem) => {

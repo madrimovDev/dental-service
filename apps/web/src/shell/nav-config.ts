@@ -1,3 +1,4 @@
+import { hasFeature, type Vertical, type VerticalFeature } from '@dental/core';
 import {
   ArrowLeftRight,
   BarChart3,
@@ -29,6 +30,8 @@ export type NavItem = {
   path: string;
   /** LIVE element — auth hasPermission bilan filtrlanadi. FUTURE element'da bo'lmaydi. */
   permission?: string | string[];
+  /** Vertical feature gate — tenant vertical bu feature'ni yoqmasa, element butunlay tushadi. */
+  feature?: VerticalFeature;
   /** FUTURE element (R3/R4) — hammaga ko'rinadi, bosib bo'lmaydi. */
   disabled?: true;
 };
@@ -78,7 +81,14 @@ export const NAV_GROUPS: NavGroup[] = [
     labelKey: 'nav.group.clinic',
     items: [
       { key: 'plans', labelKey: 'nav.plans', icon: FileText, path: '/plans', disabled: true },
-      { key: 'lab', labelKey: 'nav.lab', icon: FlaskConical, path: '/lab', disabled: true },
+      {
+        key: 'lab',
+        labelKey: 'nav.lab',
+        icon: FlaskConical,
+        path: '/lab',
+        feature: 'labOrders',
+        disabled: true,
+      },
       { key: 'rx', labelKey: 'nav.rx', icon: Pill, path: '/rx', disabled: true },
     ],
   },
@@ -161,17 +171,25 @@ export const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
-/** Element ko'rinadimi: FUTURE (disabled) → har doim; LIVE → permissionsiz yoki hasPermission. */
-function isVisible(item: NavItem, has: (p: string) => boolean): boolean {
+/**
+ * Element ko'rinadimi: vertical feature yoqmasa → tushadi (disabled bo'lsa ham);
+ * FUTURE (disabled) → har doim; LIVE → permissionsiz yoki hasPermission.
+ */
+function isVisible(item: NavItem, has: (p: string) => boolean, vertical: Vertical): boolean {
+  if (item.feature && !hasFeature(vertical, item.feature)) return false;
   if (item.disabled) return true;
   if (!item.permission) return true;
   const perms = Array.isArray(item.permission) ? item.permission : [item.permission];
   return perms.some((p) => has(p));
 }
 
-/** Ruxsat bo'yicha filtrlangan guruhlar; bo'sh guruh tushiriladi. */
-export function visibleGroups(has: (p: string) => boolean): NavGroup[] {
-  return NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => isVisible(i, has)) })).filter(
-    (g) => g.items.length > 0,
-  );
+/** Ruxsat + vertical bo'yicha filtrlangan guruhlar; bo'sh guruh tushiriladi. */
+export function visibleGroups(
+  has: (p: string) => boolean,
+  vertical: Vertical = 'dental',
+): NavGroup[] {
+  return NAV_GROUPS.map((g) => ({
+    ...g,
+    items: g.items.filter((i) => isVisible(i, has, vertical)),
+  })).filter((g) => g.items.length > 0);
 }
