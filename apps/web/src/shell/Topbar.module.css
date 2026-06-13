@@ -46,6 +46,27 @@
   font-size: 11px;
   color: var(--text-3);
 }
+.branch {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 11px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.branch:hover {
+  background: var(--surface-2);
+}
+.branch:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
 .search {
   display: flex;
   align-items: center;

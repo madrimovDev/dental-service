@@ -31,7 +31,7 @@ type WorkspaceOption = {
 export function SelectWorkspacePage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { accessToken, clear, setTokens, setContext } = useAuthStore();
+  const { accessToken, activeTenantId, clear, setTokens, setContext } = useAuthStore();
 
   // Auto-select faqat bir marta ishlasin (loop oldini olish).
   const autoSelectedRef = useRef(false);
@@ -88,10 +88,15 @@ export function SelectWorkspacePage() {
     },
   });
 
-  // Auto-select if single workspace — useRef bilan faqat 1 marta
+  // Auto-select if single workspace — useRef bilan faqat 1 marta.
+  // ⚠️ FAQAT login'dan keyin (active workspace HALI yo'q). Agar foydalanuvchi allaqachon
+  // workspace'da bo'lib, "workspace almashtirish"ni QASDDAN bossa — avto-redirect QILMAYMIZ,
+  // aks holda sahifa darhol bosh ekranga qaytib "ochilmaydi"dek tuyuladi (CLI-157). Filial
+  // almashtirish endi Topbar dropdown'da — bu sahifa faqat tenant tanlash uchun.
   // biome-ignore lint/correctness/useExhaustiveDependencies: switchMut stable mutate ishlatamiz
   useEffect(() => {
     if (autoSelectedRef.current) return;
+    if (activeTenantId) return; // allaqachon workspace tanlangan — qasddan kelgan, ko'rsatamiz
     if (switchMut.isPending) return; // qo'l bilan tanlash davom etmoqda — auto qo'shilmasin
     if (!meQuery.data) return;
     const options = collectOptions(meQuery.data);

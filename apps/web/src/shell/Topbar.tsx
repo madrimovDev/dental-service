@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { NotificationBell } from '@/features/notifications/components/NotificationBell.tsx';
 import { useAuthStore } from '@/stores/auth-store.ts';
+import { BranchSwitcher } from './BranchSwitcher.tsx';
 import classes from './Topbar.module.css';
 
 export function Topbar({
@@ -44,6 +45,8 @@ export function Topbar({
           <span>{user?.phone ?? ''}</span>
         </span>
       </button>
+
+      <BranchSwitcher />
 
       <button
         type="button"

@@ -149,7 +149,10 @@
     "notifications": "Bildirishnomalar",
     "theme_light": "Yorug'",
     "theme_dark": "Qorong'i",
-    "coming_soon": "Tez orada"
+    "coming_soon": "Tez orada",
+    "all_branches": "Barcha filiallar",
+    "select_branch": "Filialni tanlash",
+    "branch_switch_error": "Filialni almashtirib bo'lmadi"
   },
   "notifications": {
     "title": "Bildirishnomalar",
@@ -222,7 +225,9 @@
     "address": "Manzil",
     "phone": "Telefon",
     "empty": "Hali filiallar yo'q. Birinchi filialni qo'shing.",
-    "confirm_delete": "Filialni o'chirishni tasdiqlaysizmi?"
+    "confirm_delete": "Filialni o'chirishni tasdiqlaysizmi?",
+    "staff_count": "Xodimlar",
+    "staff_n": "{{n}} xodim"
   },
   "tenant_settings": {
     "name": "Klinika nomi",
@@ -290,6 +295,8 @@
     "invited_successfully": "Xodim muvaffaqiyatli qo'shildi! Parolni quyida ko'ring va xodimga bering.",
     "temp_password_notice": "⚠️ Bu parol faqat shu yerda ko'rsatiladi. Xodimga (Telegram, qo'lda yoki boshqa kanal orqali) yuboring va kopiyalab oling. Kelajakda SMS orqali avtomatik yuboriladi.",
     "invite_hint": "Bu yerda xodim akkaunti darhol yaratiladi. SMS hozircha yuborilmaydi — vaqtinchalik parol sizga ko'rsatiladi va xodimga qo'lda yuborasiz.",
+    "already_exists_title": "Foydalanuvchi allaqachon mavjud",
+    "already_exists_message": "Bu telefon raqami allaqachon ro'yxatdan o'tgan. Yangi parol yaratilmadi — mavjud foydalanuvchiga shu rol biriktirildi. U eski paroli bilan kiradi (yoki ro'yxatdan 🔑 orqali parolini qayta tiklang).",
     "reset_password": "Parolni qayta tiklash",
     "reset_password_confirm": "Xodim parolini qayta tiklash? Yangi vaqtinchalik parol generatsiya qilinadi va xodim barcha qurilmalardan chiqariladi.",
     "reset_password_success": "Yangi parol generatsiya qilindi. Xodimga bering — eski parol endi ishlamaydi.",

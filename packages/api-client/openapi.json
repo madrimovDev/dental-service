@@ -229,6 +229,37 @@
           "ownerTenants"
         ]
       },
+      "WorkspaceBranches": {
+        "type": "object",
+        "properties": {
+          "branches": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name"
+              ]
+            }
+          },
+          "allowAllBranches": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "branches",
+          "allowAllBranches"
+        ]
+      },
       "PasswordResetRequestResponse": {
         "type": "object",
         "properties": {
@@ -4490,6 +4521,71 @@
                     },
                     "data": {
                       "$ref": "#/components/schemas/MembershipsResponse"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/workspace-branches": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "getWorkspaceBranches",
+        "responses": {
+          "200": {
+            "description": "Switchable branches in active tenant",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/WorkspaceBranches"
                     }
                   },
                   "required": [

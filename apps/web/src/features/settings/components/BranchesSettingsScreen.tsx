@@ -1,14 +1,24 @@
 import type { Branch } from '@dental/api-client';
-import { ActionIcon, Button, Group, Modal, Stack, Table, Text, TextInput } from '@mantine/core';
+import {
+  ActionIcon,
+  Badge,
+  Button,
+  Group,
+  Modal,
+  Stack,
+  Table,
+  Text,
+  TextInput,
+} from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
 import { IconEdit, IconPlus, IconTrash } from '@tabler/icons-react';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PhoneInput } from '@/components/PhoneInput.tsx';
 import { useAuthStore } from '@/stores/auth-store.ts';
-import { useBranches, useDeleteBranch, useUpsertBranch } from '../settings.api';
+import { useBranches, useDeleteBranch, useUpsertBranch, useUsers } from '../settings.api';
 import { type BranchFormValues, branchSchema } from '../settings.schema';
 import { ConfirmModal } from './ConfirmModal';
 import { SettingsShell } from './SettingsShell';
@@ -17,8 +27,22 @@ export function BranchesSettingsScreen() {
   const { t } = useTranslation();
   const { hasPermission } = useAuthStore();
   const branches = useBranches();
+  const assignments = useUsers();
   const upsert = useUpsertBranch();
   const remove = useDeleteBranch();
+
+  // Filial bo'yicha aktiv xodim soni (CLI-159) — assignment'lardan client-side hisoblanadi.
+  // branchId=null ("barcha filiallar") biriktirilgan xodimlar har filialga tegishli sanaladi.
+  const { perBranch, allBranchesCount } = useMemo(() => {
+    const counts = new Map<string, number>();
+    let allCount = 0;
+    for (const a of assignments.data ?? []) {
+      if (!a.isActive) continue;
+      if (a.branchId) counts.set(a.branchId, (counts.get(a.branchId) ?? 0) + 1);
+      else allCount += 1;
+    }
+    return { perBranch: counts, allBranchesCount: allCount };
+  }, [assignments.data]);
   const [opened, { open, close }] = useDisclosure(false);
   const [editing, setEditing] = useState<Branch | null>(null);
   const [toDelete, setToDelete] = useState<Branch | null>(null);
@@ -76,31 +100,40 @@ export function BranchesSettingsScreen() {
                 <Table.Th>{t('common.name')}</Table.Th>
                 <Table.Th>{t('branches.address')}</Table.Th>
                 <Table.Th>{t('branches.phone')}</Table.Th>
+                <Table.Th>{t('branches.staff_count')}</Table.Th>
                 <Table.Th />
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {branches.data.map((b) => (
-                <Table.Tr key={b.id}>
-                  <Table.Td>{b.name}</Table.Td>
-                  <Table.Td>{b.address ?? '—'}</Table.Td>
-                  <Table.Td>{b.phone ?? '—'}</Table.Td>
-                  <Table.Td>
-                    <Group gap="xs" justify="flex-end">
-                      {hasPermission('branch.edit') && (
-                        <ActionIcon variant="subtle" onClick={() => openEdit(b)}>
-                          <IconEdit size={16} />
-                        </ActionIcon>
-                      )}
-                      {hasPermission('branch.delete') && (
-                        <ActionIcon variant="subtle" color="red" onClick={() => setToDelete(b)}>
-                          <IconTrash size={16} />
-                        </ActionIcon>
-                      )}
-                    </Group>
-                  </Table.Td>
-                </Table.Tr>
-              ))}
+              {branches.data.map((b) => {
+                const count = (perBranch.get(b.id) ?? 0) + allBranchesCount;
+                return (
+                  <Table.Tr key={b.id}>
+                    <Table.Td>{b.name}</Table.Td>
+                    <Table.Td>{b.address ?? '—'}</Table.Td>
+                    <Table.Td>{b.phone ?? '—'}</Table.Td>
+                    <Table.Td>
+                      <Badge variant="light" color={count > 0 ? 'teal' : 'gray'}>
+                        {t('branches.staff_n', { n: count })}
+                      </Badge>
+                    </Table.Td>
+                    <Table.Td>
+                      <Group gap="xs" justify="flex-end">
+                        {hasPermission('branch.edit') && (
+                          <ActionIcon variant="subtle" onClick={() => openEdit(b)}>
+                            <IconEdit size={16} />
+                          </ActionIcon>
+                        )}
+                        {hasPermission('branch.delete') && (
+                          <ActionIcon variant="subtle" color="red" onClick={() => setToDelete(b)}>
+                            <IconTrash size={16} />
+                          </ActionIcon>
+                        )}
+                      </Group>
+                    </Table.Td>
+                  </Table.Tr>
+                );
+              })}
             </Table.Tbody>
           </Table>
         )}

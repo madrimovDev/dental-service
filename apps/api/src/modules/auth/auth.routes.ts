@@ -26,6 +26,7 @@ import {
   registerTenantSchema,
   switchWorkspaceSchema,
   tokenPairResponseSchema,
+  workspaceBranchesResponseSchema,
 } from './auth.schema.ts';
 import { createAuthService } from './auth.service.ts';
 
@@ -172,6 +173,31 @@ export const authRoutes = (deps: { db: Database }) => {
     }
     const memberships = await service.getMemberships(user.id);
     return c.json(ok(toMembershipsDto(user.id, memberships)), 200);
+  });
+
+  // ─── GET /workspace-branches — auth required, RBAC-safe (no permission) ───
+  // Topbar filial dropdown manbasi. CLI-154/155 precedenti: rolga tegishli data
+  // tor auth-only endpoint orqali (requirePermission SIZ) — cross-domen 403 gap'siz.
+  const workspaceBranchesRoute = createRoute({
+    method: 'get',
+    path: '/workspace-branches',
+    tags: ['auth'],
+    operationId: 'getWorkspaceBranches',
+    middleware: [authMiddleware()] as const,
+    responses: okJson(workspaceBranchesResponseSchema, 'Switchable branches in active tenant'),
+  });
+
+  app.openapi(workspaceBranchesRoute, async (c) => {
+    const user = c.get('user');
+    if (!user) {
+      return c.json(fail('auth.required', 'Authentication required'), 401);
+    }
+    const tenantId = c.get('activeTenantId');
+    if (!tenantId) {
+      return c.json(ok({ branches: [], allowAllBranches: false }), 200);
+    }
+    const result = await service.workspaceBranches(user.id, tenantId);
+    return c.json(ok(result), 200);
   });
 
   // ─── POST /switch-workspace — auth required (no workspace yet OK) ─────────

@@ -47,6 +47,14 @@ export const logoutSchema = z.object({
 });
 export type LogoutInput = z.infer<typeof logoutSchema>;
 
+export const workspaceBranchesResponseSchema = z
+  .object({
+    branches: z.array(z.object({ id: z.uuid(), name: z.string() })),
+    allowAllBranches: z.boolean(),
+  })
+  .openapi('WorkspaceBranches');
+export type WorkspaceBranchesResponseDto = z.infer<typeof workspaceBranchesResponseSchema>;
+
 export const switchWorkspaceSchema = z.object({
   tenantId: z.uuid(),
   branchId: z.uuid().optional(),
