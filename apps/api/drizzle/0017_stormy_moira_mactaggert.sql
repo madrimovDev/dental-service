@@ -1,0 +1,1 @@
+ALTER TABLE "tenant_settings" ADD COLUMN "onboarding_dismissed_at" timestamp with time zone;

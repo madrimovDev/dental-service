@@ -11,6 +11,7 @@ export const updateSettingsSchema = z.object({
   vertical: z.string().min(1).optional(),
   reminderLeadHours: z.number().int().min(0).max(168).optional(),
   currency: z.string().min(1).max(8).optional(),
+  onboardingDismissedAt: z.string().datetime().nullable().optional(),
 });
 
 export type UpdateSettingsInput = z.infer<typeof updateSettingsSchema>;
@@ -23,6 +24,7 @@ export const tenantSettingsDtoSchema = z
     vertical: z.string().openapi({ example: 'dental' }),
     reminderLeadHours: z.number().int().openapi({ example: 24 }),
     currency: z.string().openapi({ example: 'UZS' }),
+    onboardingDismissedAt: z.string().nullable().openapi({ example: null }),
     createdAt: z.string().openapi({ example: '2026-06-12T10:00:00.000Z' }),
     updatedAt: z.string().openapi({ example: '2026-06-12T10:00:00.000Z' }),
   })

@@ -48,10 +48,14 @@ export const createTenantSettingsService = (deps: { audit: AuditLogger }) => {
     const db = getDb(c);
     const before = await getOrCreate(c);
 
-    const [updated] = await db
-      .update(tenantSettings)
-      .set({ ...input, updatedAt: new Date() })
-      .returning();
+    // `onboardingDismissedAt` wire'da ISO string keladi; Drizzle ustun Date kutadi.
+    const { onboardingDismissedAt, ...rest } = input;
+    const patch: Record<string, unknown> = { ...rest, updatedAt: new Date() };
+    if (onboardingDismissedAt !== undefined) {
+      patch.onboardingDismissedAt = onboardingDismissedAt ? new Date(onboardingDismissedAt) : null;
+    }
+
+    const [updated] = await db.update(tenantSettings).set(patch).returning();
 
     if (updated) {
       await deps.audit.record(c, {

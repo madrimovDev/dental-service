@@ -387,6 +387,11 @@
             "type": "string",
             "example": "UZS"
           },
+          "onboardingDismissedAt": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          },
           "createdAt": {
             "type": "string",
             "example": "2026-06-12T10:00:00.000Z"
@@ -402,6 +407,7 @@
           "vertical",
           "reminderLeadHours",
           "currency",
+          "onboardingDismissedAt",
           "createdAt",
           "updatedAt"
         ]
@@ -5304,6 +5310,11 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 8
+                  },
+                  "onboardingDismissedAt": {
+                    "type": "string",
+                    "nullable": true,
+                    "format": "date-time"
                   }
                 }
               }

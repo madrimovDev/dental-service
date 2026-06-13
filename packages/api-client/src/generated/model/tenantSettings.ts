@@ -11,6 +11,8 @@ export interface TenantSettings {
   vertical: string;
   reminderLeadHours: number;
   currency: string;
+  /** @nullable */
+  onboardingDismissedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

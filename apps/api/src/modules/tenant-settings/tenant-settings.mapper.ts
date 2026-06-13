@@ -8,6 +8,7 @@ export const toTenantSettingsDto = (row: TenantSettings): TenantSettingsDto => (
   vertical: row.vertical,
   reminderLeadHours: row.reminderLeadHours,
   currency: row.currency,
+  onboardingDismissedAt: row.onboardingDismissedAt ? row.onboardingDismissedAt.toISOString() : null,
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(),
 });
