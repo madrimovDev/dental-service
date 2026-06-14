@@ -1,27 +1,68 @@
-# CLI-178 — Mantine theme component convergence
+# CLI-178 — Tugma oilasi single-source (Button + IconButton → Mantine wrapper)
 
 **Sana:** 2026-06-14
 **Epik:** CLI-177 (UI komponent izchilligi)
-**Holat:** Spec — advisor approval kutilmoqda (solo dev oldindan tasdiqladi)
+**Holat:** ❌ BEKOR QILINDI (2026-06-14) — quyidagi addendum'ga qarang.
 
-## 1. Muammo
+---
 
-Audit (CLI-177) topdi: `@dental/ui` form-raqobatchi primitivlari chetlab o'tilgan — kodbaza ustun **raw Mantine** ishlatadi (Button 114, TextInput 48, ActionIcon 24). Lekin raw Mantine call-site'lar to'liq teal design system'ga ergashmaydi:
+## ⛔ ADDENDUM — task bekor qilindi (2026-06-14)
 
-- Raw Mantine `<Button variant="primary">` (masalan `DesignSystemPage.tsx`) — Mantine `primary` variantni **tanimaydi** (standart: filled/light/outline/subtle/default/transparent/white). `variantColorResolver` yo'q → variant-styling qo'llanmaydi.
-- `@dental/ui` Button (custom `UnstyledButton` + CSS module) `data-variant="primary|ghost|danger"` orqali teal beradi — lekin bu faqat primitiv ichida; raw Mantine'ga yetmaydi.
+Advisor review + gap-validatsiya quyi spec'ning asosini rad etdi:
 
-## 2. Qaror (CLI-177 epik darajasida qabul qilingan)
+1. **Button wrapper divergensiyani tuzatmaydi.** Audit topilmasi — *adoption* nisbati (Button 114 raw vs 7 primitiv). @dental/ui Button'ni Mantine wrapper qilish bu nisbatni o'zgartirmaydi: 114 raw raw bo'lib qoladi, 7 primitiv primitiv. Faqat 7 komponentning *ichki* tuzilishi o'zgaradi. Discriminating check: **CLI-178'dan keyin foydalanuvchi bitta ham pikselni boshqacha ko'rmaydi** (cssVarsResolver + `primaryColor: 'teal'` allaqachon raw va primitiv tugmani bir tokendan render qiladi). Bu churn, fix emas.
+2. **variantColorResolver'ning bugun iste'molchisi yo'q** (hech bir raw sayt `variant="primary/ghost/danger"` ishlatmaydi; @dental/ui Button o'z CSS'ida). YAGNI → **CLI-180'ga ko'chirildi**, u yerda `color="red"`→`variant="danger"` migration uni real talab qiladi.
+3. **Dual-Button** — hozircha *token-shared coexistence* sifatida qabul qilinadi (rewrite emas). Agar kelajakda primitiv Button'ga tegilsa — *retire* (Mantine re-export + resolver, custom CSS o'chirish) wrap'dan ko'ra asoslangan, lekin keyingi emas.
 
-**Theme-convergent** — primitivlarga ommaviy migration o'rniga design system'ni Mantine theme'ga suramiz. Bu task **Foundation** qatlami: raw Mantine'ni teal/izchil qiladi, qolgan tasklar (Input retire, lint, status) uning ustiga quriladi.
+**Natija:** CLI-177 arxitektura qarori (theme-convergent + lint) **saqlanadi**; bu faqat task-level scope tuzatish. Keyingi task → **CLI-179** (ko'rinmaydigan validatsiya xatosi — yagona kuzatilgan foydalanuvchi simptomi, CLI-178'dan mustaqil).
 
-## 3. Yechim
+> Quyidagi v2 spec tarixiy yozuv sifatida saqlanadi (qaror izi).
 
-`packages/ui/src/theme/mantine-theme.ts` ga ikki narsa qo'shiladi:
+---
 
-### 3.1 `variantColorResolver` — custom variantlar
+## 0. Spec v1 → v2 (nega qayta yo'naltirildi)
 
-`@dental/ui` Button CSS'dagi `primary`/`ghost`/`danger` semantikasini raw Mantine variant tizimiga ko'taradi. Mavjud `defaultVariantColorsResolver`'ni o'rab, faqat 3 custom variant qo'shadi:
+v1 "theme convergence" deb yozilgan edi — 186 raw Mantine sayt teal bo'lib qoladi degan farazga asoslangan. **Gap-validatsiya buni rad etdi:**
+
+- `primaryColor: 'teal'` + `cssVarsResolver` allaqachon raw Mantine Button/TextInput/Select/border/error'ni token-driven qiladi. "Bepul to'g'rilanadigan" raw sayt amalda **deyarli yo'q**.
+- `DesignSystemPage.tsx` o'qildi — bu **qasddan showcase** sahifa; barcha `variant="primary/ghost/danger"` `@dental/ui` Button'da; raw Mantine (`MButton` alias) faqat standart `variant="default"` (Menu/Modal bridge testi). variantColorResolver o'zича bitta ham buzilgan raw saytni tuzatmaydi.
+
+**Lekin haqiqiy nomuvofiqlik bor** (CLI-177 audit "ikki parallel tizim" ning yadrosi): tugma **ikki xil implementatsiyada** mavjud —
+1. `@dental/ui` Button/IconButton — custom `UnstyledButton` + CSS module (`data-variant`),
+2. raw Mantine `<Button>`/`<ActionIcon>` — Mantine variant tizimi.
+
+Ikkalasi qo'lda, umumiy tokenlar orqali sinxron tutiladi — bu aynan divergensiyani keltirib chiqargan **dual-maintenance kasalligi**. v2 buni davolaydi: **bitta manba** — Mantine + theme.
+
+## 1. Yechim
+
+### 1.1 `@dental/ui` Button → Mantine `Button` wrapper
+
+`UnstyledButton` + `Button.module.css` ni Mantine `Button` wrapper bilan almashtirish. Tashqi API **o'zgarmaydi** (7 ishlatuvchi + DesignSystemPage buzilmaydi):
+
+| `@dental/ui` Button prop | Mantine Button ga map |
+|---|---|
+| `variant: 'default'\|'primary'\|'ghost'\|'danger'` | `variant` (custom variantlar variantColorResolver orqali) |
+| `size: 'sm'\|'md'\|'lg'` | `size` (`sm`/`md`/`lg`) |
+| `block` | `fullWidth` |
+| `iconLeft` / `iconRight` | `leftSection` / `rightSection` |
+| `disabled`, `onClick`, `type`, `children` | bevosita |
+
+- CLI-175 hover-lift micro-interaction (`translateY(-1px)`) — `Button.extend` `classNames`/CSS module orqali saqlanadi (reduced-motion guard global `styles.css` da qoladi).
+- Primary glow shadow — `Button.extend` `styles` (props.variant==='primary') yoki classNames orqali.
+
+### 1.2 `@dental/ui` IconButton → Mantine `ActionIcon` wrapper
+
+| IconButton prop | ActionIcon ga map |
+|---|---|
+| `label` | `aria-label` + `title` |
+| `size: 'sm'\|'md'` | `size` |
+| `bordered` | `variant` (`default` bordered ↔ `subtle`/`transparent`) |
+| `dot` | qo'shimcha absolyut `<span>` (mavjud `IconButton.module.css` `.dot` saqlanadi) |
+| `disabled`, `onClick`, `children` | bevosita |
+
+### 1.3 `variantColorResolver` (theme)
+
+`mantine-theme.ts` `createTheme({ variantColorResolver })` — custom `primary`/`ghost`/`danger`. Endi **@dental/ui Button (Mantine wrapper bo'lgach)** + har qanday kelajak raw Mantine `variant="primary"` ikkalasi bir manbadan rang oladi:
 
 | variant | background | color | hover | border |
 |---|---|---|---|---|
@@ -29,50 +70,35 @@ Audit (CLI-177) topdi: `@dental/ui` form-raqobatchi primitivlari chetlab o'tilga
 | `ghost` | transparent | `var(--primary)` | `var(--primary-tint)` | transparent |
 | `danger` | `var(--danger)` | `var(--text-on-danger)` | `color-mix(in srgb, var(--danger) 88%, black)` | transparent |
 
-Boshqa barcha variantlar → `defaultVariantColorsResolver(input)` (o'zgarmaydi). `VariantColorsResolverResult` shakli: `{ background, hover, color, border, hoverColor? }`.
+Boshqa barcha variantlar → `defaultVariantColorsResolver(input)` (o'zgarmaydi — regressiya guard). `VariantColorsResolverResult`: `{ background, hover, color, border, hoverColor? }`. Token'lar scheme-agnostik (`tokens.css` light/dark o'zi almashadi) → resolver'da scheme tarmoqlanishi shart emas.
 
-> Token'lar light/dark scheme bo'yicha `tokens.css` da o'zi almashadi (`[data-mantine-color-scheme]`), shuning uchun `var(--token)` qiymatlari scheme-agnostik — resolver'da scheme tarmoqlanishi shart emas.
+> Mantine 7 API: `variantColorResolver` `createTheme()` ning xossasi (context7 snippet tasdiqlagan: `theme.variantColorResolver`). Implementatsiyada TDD birinchi qadam bilan tasdiqlanadi.
 
-### 3.2 `components` — `Component.extend` defaults/classNames
+## 2. Ko'lamdan tashqari
 
-Input oilasi uchun teal radius/focus va izchil o'lcham:
+- **Input oilasi** (custom Input → Mantine TextInput wrapper, Select pass-through, form-compat) → **CLI-179**.
+- Form error call-site bug fix → CLI-179.
+- Vocabulary lint (`color="red"` ban, size cheklash) + `loading` parity → CLI-180.
+- StatusPill/Tag/Badge → CLI-181.
+- Raw Mantine → primitiv ommaviy migration → **qilinmaydi** (single-source theme buni keraksiz qiladi).
 
-- **`TextInput` / `Textarea` / `NumberInput` / `Select` / `PasswordInput`** — `.extend({ classNames: { input: classes.input } })`, bu yerda `input` klassi teal `--radius`, `min-height: 36px`, `--text-sm`, focus-ring (`@dental/ui` Input/Select CSS bilan moslab). Bu mavjud `cssVarsResolver` (border/error/placeholder) ustiga vizual nozikliklarni qo'shadi.
-- **`Button`** — `defaultProps: { variant: 'default' }` (Mantine default `filled` o'rniga — teal'da `default` = surface tugma, `@dental/ui` Button default'iga mos). Primary glow shadow uchun `styles` (props.variant==='primary' bo'lsa `box-shadow`).
-- **`Badge`** — keyinroq Task 4 (status konsolidatsiya) hal qiladi; bu task'da faqat variantColorResolver'dan foyda oladi (agar `variant="danger"` ishlatilsa).
+## 3. Risk va guard
 
-> Aniq classNames ↔ CSS module bog'lanishi implementatsiyada (yangi `theme/components.module.css` yoki mavjud primitiv CSS qayta-ishlatish) hal qilinadi.
+- **Eng katta regressiya yuzasi:** Mantine Button standart variantlari (`default` 14+, `filled`, `light`, `subtle`) — `defaultVariantColorsResolver` fallback ularni AYNAN saqlashi shart. → resolver unit test guard.
+- **@dental/ui Button API regressiya** — 7 ishlatuvchi + DesignSystemPage showcase. Mavjud `Button.test.tsx`/`IconButton.test.tsx` characterization sifatida yashil qolishi shart; kerak bo'lsa kengaytiriladi (variant→Mantine variant, fullWidth, leftSection render).
+- **teal-sync.test.ts / css-variables-resolver.test.ts** — teal tuple va cssVarsResolver o'zgarmaydi → buzilmaydi.
+- **CLI-175 hover-lift** — wrapper'da yo'qolmasligi (test yoki manual).
 
-## 4. Primitiv ↔ raw Mantine vizual paritet
+## 4. Test strategiyasi
 
-`@dental/ui` Button (UnstyledButton) `variantColorResolver`'dan FOYDALANMAYDI — u o'z CSS module'ida qoladi. Ikkalasi vizual mos kelishi shart:
+1. `variant-color-resolver.test.ts` (yangi) — `primary`/`ghost`/`danger` to'g'ri `{background,color,hover,border}`; `filled`/`light`/`default` `defaultVariantColorsResolver` bilan AYNAN teng (regressiya guard).
+2. Mavjud `Button.test.tsx` / `IconButton.test.tsx` — wrapper'dan keyin yashil (API paritet); zarur bo'lsa yangi case (variant prop → Mantine'ga o'tadi, `block`→fullWidth, `iconLeft` render).
+3. `teal-sync` + `css-variables-resolver` testlar yashil.
+4. Manual (Playwright ixtiyoriy): `DesignSystemPage` Buttons kartasi v1 bilan vizual mos (primary/ghost/danger/default/sizes/disabled + IconButton dot/bordered); hover-lift saqlangan.
 
-- Bir xil token manbai (`--primary`, `--text-on-primary`…) → ranglar avtomatik mos.
-- Farq xavfi: primary glow shadow (`0 2px 8px` — `@dental/ui` Button'da bor). Raw Mantine'da `Button.extend` styles orqali qo'shiladi → paritet.
-- Padding/radius/size shkalasi: bu task ularni *to'liq birlashtirmaydi* (vocabulary Task 3). Faqat ranglar + radius + focus.
+## 5. DoD
 
-## 5. Risk va guard
-
-- **teal-sync.test.ts** — teal tuple ↔ tokens.css drift guard. variantColorResolver teal tuple'ni o'zgartirmaydi → buzilmaydi. Test ishga tushirib tasdiqlanadi.
-- **css-variables-resolver.test.ts** — `cssVarsResolver` o'zgarmaydi → buzilmaydi.
-- **Regressiya xavfi:** raw Mantine `variant="filled"`/`"light"`/`"subtle"`/`"default"` ishlatuvchi 100+ Button — `defaultVariantColorsResolver` fallback ularni o'zgartirmasligi SHART. Bu eng katta regressiya yuzasi → snapshot/visual emas, balki resolver unit test (`primary`/`ghost`/`danger` custom qaytaradi, qolganlar default'ga teng).
-- **`variantColorResolver` joylashuvi** — `createTheme({ variantColorResolver })` ichidami yoki `MantineProvider` propimi: implementatsiyada Mantine 7 API context7 bilan tasdiqlanadi (TDD birinchi qadam).
-
-## 6. Test strategiyasi
-
-1. **`variant-color-resolver.test.ts`** (yangi) — `primary`/`ghost`/`danger` to'g'ri `{background,color,hover,border}` qaytaradi; `filled`/`light`/`default` `defaultVariantColorsResolver` bilan AYNAN bir xil (regressiya guard).
-2. Mavjud `teal-sync.test.ts` + `css-variables-resolver.test.ts` yashil qoladi.
-3. Manual: `DesignSystemPage` da raw Mantine `variant="primary"` teal ko'rinadi; bir necha ekranda raw Button/TextInput regressiyasiz.
-
-## 7. Ko'lamdan tashqari (boshqa tasklar)
-
-- Vocabulary lint + `color="red"` migration → CLI-180
-- Custom Input retire + form-compat → CLI-179
-- StatusPill/Tag/Badge konsolidatsiya → CLI-181
-- Raw Mantine → primitiv ommaviy migration → **qilinmaydi** (theme convergence buni keraksiz qiladi)
-
-## 8. DoD
-
-- `mantine-theme.ts` ga variantColorResolver + component extend qo'shildi.
-- `variant-color-resolver.test.ts` + mavjud theme testlar yashil; `bun test` (ui) o'tadi; typecheck toza.
-- `DesignSystemPage` raw `variant="primary"` teal; regressiya yo'q.
+- `@dental/ui` Button/IconButton Mantine wrapper; `UnstyledButton`+`Button.module.css` custom variant CSS retire (yoki `Button.extend` ga ko'chirildi).
+- `variantColorResolver` theme'da; `variant-color-resolver.test.ts` + mavjud theme/primitiv testlar yashil.
+- `bun test` (ui paketi) o'tadi; `tsc` toza.
+- DesignSystemPage showcase regressiyasiz; CLI-175 hover-lift bor.
