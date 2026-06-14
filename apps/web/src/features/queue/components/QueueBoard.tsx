@@ -42,6 +42,8 @@ export function QueueBoard() {
   const canManage = hasPermission('queue.manage');
 
   const onStatus = (id: string, status: QueueStatus) => updateStatus.mutate({ id, status });
+  // Faqat hozir o'zgartirilayotgan karta tugmalarini bloklash (per-card), butun board emas.
+  const busyId = updateStatus.isPending ? updateStatus.variables?.id : undefined;
 
   return (
     <Container size="xl">
@@ -85,6 +87,7 @@ export function QueueBoard() {
                   title={t(titleKey[column.key])}
                   lookups={lookups}
                   canManage={canManage}
+                  busyId={busyId}
                   onStatus={onStatus}
                 />
               ))}

@@ -18,10 +18,12 @@ function hhmm(iso: string) {
 export function QueueCard({
   vm,
   canManage,
+  busy = false,
   onStatus,
 }: {
   vm: QueueCardVM;
   canManage: boolean;
+  busy?: boolean;
   onStatus: (status: QueueStatus) => void;
 }) {
   const { t } = useTranslation();
@@ -37,7 +39,9 @@ export function QueueCard({
             >
               #{vm.queueNumber}
             </Badge>
-            <Text size="sm">{vm.patientName}</Text>
+            <Text size="sm" lineClamp={1}>
+              {vm.patientName}
+            </Text>
           </Group>
           {vm.serviceName && (
             <Text size="xs" c="dimmed">
@@ -53,6 +57,7 @@ export function QueueCard({
         {canManage && vm.status === 'waiting' && (
           <ActionIcon
             color="blue"
+            disabled={busy}
             onClick={() => onStatus('in_progress')}
             aria-label={t('queue.call')}
           >
@@ -61,12 +66,13 @@ export function QueueCard({
         )}
         {canManage && vm.status === 'in_progress' && (
           <Group gap="xs" wrap="nowrap">
-            <Button size="xs" color="teal" onClick={() => onStatus('done')}>
+            <Button size="xs" color="teal" disabled={busy} onClick={() => onStatus('done')}>
               {t('queue.done')}
             </Button>
             <ActionIcon
               color="red"
               variant="subtle"
+              disabled={busy}
               onClick={() => onStatus('missed')}
               aria-label={t('queue.missed')}
             >

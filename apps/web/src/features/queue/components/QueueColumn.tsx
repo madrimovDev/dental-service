@@ -15,12 +15,14 @@ export function QueueColumn({
   title,
   lookups,
   canManage,
+  busyId,
   onStatus,
 }: {
   column: QueueColumnVM;
   title: string;
   lookups: QueueLookups;
   canManage: boolean;
+  busyId?: string;
   onStatus: (id: string, status: QueueStatus) => void;
 }) {
   return (
@@ -39,6 +41,7 @@ export function QueueColumn({
             key={ticket.id}
             vm={toQueueCardVM(ticket, lookups)}
             canManage={canManage}
+            busy={busyId === ticket.id}
             onStatus={(status) => onStatus(ticket.id, status)}
           />
         ))}
