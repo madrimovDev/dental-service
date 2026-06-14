@@ -1,12 +1,11 @@
 import { consentForms, consentTemplates } from '@dental/db-schema';
 import { and, desc, eq } from 'drizzle-orm';
 import type { Context } from 'hono';
-import type { Database } from '../../db/client.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import type { CreateTemplateInput, SignFormInput, UpdateTemplateInput } from './consent.schema.ts';
 
-export const createConsentService = (deps: { audit: AuditLogger; db: Database }) => {
+export const createConsentService = (deps: { audit: AuditLogger }) => {
   // ===== Templates =====
   async function listTemplates(c: Context, type?: string, activeOnly = true) {
     const db = getDb(c);
