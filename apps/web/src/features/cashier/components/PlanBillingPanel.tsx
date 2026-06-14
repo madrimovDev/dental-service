@@ -172,6 +172,7 @@ export function PlanBillingPanel({ branchId, patientId }: PlanBillingPanelProps)
                             w={130}
                             size="xs"
                             thousandSeparator=" "
+                            suffix={` ${t('common.currency')}`}
                           />
                         )}
                       </Table.Td>

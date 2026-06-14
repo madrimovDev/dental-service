@@ -13,7 +13,7 @@ import {
 } from '@mantine/core';
 import { IconCash } from '@tabler/icons-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BalanceBadge } from '@/components/BalanceBadge';
 import { usePatientBalance } from '@/features/patients/patients.api';
@@ -26,9 +26,11 @@ import { CartTable } from './CartTable';
 export interface PosPanelProps {
   branchId: string;
   patientId: string | null;
+  /** Savat bo'sh emasligini ota-komponentga bildiradi (rejim almashganda ogohlantirish uchun). */
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
-export function PosPanel({ branchId, patientId }: PosPanelProps) {
+export function PosPanel({ branchId, patientId, onDirtyChange }: PosPanelProps) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const servicesQuery = useServices();
@@ -43,6 +45,11 @@ export function PosPanel({ branchId, patientId }: PosPanelProps) {
 
   const discountNum = typeof discount === 'number' ? discount : 0;
   const netTotal = computeNetTotal(cart, discountNum);
+
+  // Savat holatini ota-komponentga bildirish (rejim almashganda yo'qotishni ogohlantirish uchun).
+  useEffect(() => {
+    onDirtyChange?.(cart.length > 0);
+  }, [cart.length, onDirtyChange]);
 
   const addService = async (service: Service) => {
     setCart((prev) => {
@@ -184,7 +191,7 @@ export function PosPanel({ branchId, patientId }: PosPanelProps) {
             leftSection={<IconCash size={18} />}
             size="md"
             color="teal"
-            disabled={cart.length === 0}
+            disabled={cart.length === 0 || netTotal <= 0}
             loading={createMut.isPending}
             onClick={handleCharge}
           >
