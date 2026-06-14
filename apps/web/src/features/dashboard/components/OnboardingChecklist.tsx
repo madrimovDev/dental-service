@@ -60,7 +60,19 @@ export function OnboardingChecklist() {
               key={s.id}
               justify="space-between"
               wrap="nowrap"
+              role={s.done ? undefined : 'button'}
+              tabIndex={s.done ? undefined : 0}
               onClick={() => !s.done && navigate(s.path)}
+              onKeyDown={
+                s.done
+                  ? undefined
+                  : (e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        navigate(s.path);
+                      }
+                    }
+              }
               style={{ cursor: s.done ? 'default' : 'pointer' }}
             >
               <Group gap="sm" wrap="nowrap">

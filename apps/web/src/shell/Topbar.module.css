@@ -19,6 +19,10 @@
 .ws:hover {
   background: var(--surface-2);
 }
+.ws:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
 .wsLogo {
   width: 26px;
   height: 26px;
@@ -63,6 +67,10 @@
 .branch:hover {
   background: var(--surface-2);
 }
+.branch:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
 .branch:disabled {
   opacity: 0.6;
   cursor: default;
@@ -81,6 +89,10 @@
   color: var(--text-3);
   font-size: var(--text-sm);
   cursor: pointer;
+}
+.search:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
 }
 .search svg {
   width: 16px;
@@ -126,9 +138,13 @@
   background: none;
   cursor: pointer;
 }
-.lang button[data-active='true'] {
+.lang button[data-active="true"] {
   background: var(--primary-tint);
   color: var(--primary-hover);
+}
+.lang button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
 }
 .prof {
   display: flex;
@@ -142,6 +158,10 @@
 }
 .prof:hover {
   background: var(--surface-2);
+}
+.prof:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
 }
 .profName {
   display: flex;

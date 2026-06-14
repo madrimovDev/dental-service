@@ -73,6 +73,7 @@ export function StockScreen() {
               <Group>
                 <Select
                   placeholder={t('stock.all_branches')}
+                  aria-label={t('stock.all_branches')}
                   data={branchOptions}
                   value={branchId}
                   onChange={(v) => {

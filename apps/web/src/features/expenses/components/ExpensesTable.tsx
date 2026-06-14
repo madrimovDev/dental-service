@@ -37,7 +37,12 @@ export function ExpensesTable({ expenses, canManage, onDelete }: ExpensesTablePr
             <Table.Td c="dimmed">{e.note ?? '—'}</Table.Td>
             {canManage && (
               <Table.Td>
-                <ActionIcon color="red" variant="subtle" onClick={() => onDelete(e)}>
+                <ActionIcon
+                  color="red"
+                  variant="subtle"
+                  onClick={() => onDelete(e)}
+                  aria-label={t('common.delete')}
+                >
                   <IconTrash size={16} />
                 </ActionIcon>
               </Table.Td>

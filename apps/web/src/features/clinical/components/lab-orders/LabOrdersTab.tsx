@@ -248,6 +248,7 @@ export function LabOrdersTab({ patientId }: Props) {
                       color="red"
                       variant="subtle"
                       onClick={() => form.removeListItem('items', i)}
+                      aria-label={t('common.delete')}
                     >
                       <IconTrash size={16} />
                     </ActionIcon>

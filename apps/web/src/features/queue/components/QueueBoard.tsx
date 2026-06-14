@@ -54,6 +54,7 @@ export function QueueBoard() {
               value={branchFilter}
               onChange={setBranchFilter}
               placeholder={t('queue.select_branch')}
+              aria-label={t('queue.select_branch')}
             />
             {hasPermission('queue.create') && (
               <Button leftSection={<IconPlus size={18} />} onClick={open} disabled={!branchFilter}>

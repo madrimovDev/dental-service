@@ -20,6 +20,9 @@ export function ImageCard({
     <Card withBorder padding="sm">
       <Card.Section>
         <Box
+          role="button"
+          tabIndex={0}
+          aria-label={t('image.zoom')}
           style={{
             position: 'relative',
             cursor: 'pointer',
@@ -28,6 +31,12 @@ export function ImageCard({
             background: 'var(--mantine-color-gray-1)',
           }}
           onClick={onPreview}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onPreview();
+            }
+          }}
         >
           {vm.isImage ? (
             <Image src={vm.url} alt={vm.displayTitle} height="100%" fit="cover" />
@@ -40,8 +49,11 @@ export function ImageCard({
             </Stack>
           )}
           <ActionIcon
+            component="div"
             variant="filled"
             color="dark"
+            aria-hidden
+            tabIndex={-1}
             style={{ position: 'absolute', top: 8, right: 8, opacity: 0.7 }}
           >
             <IconZoomIn size={16} />
