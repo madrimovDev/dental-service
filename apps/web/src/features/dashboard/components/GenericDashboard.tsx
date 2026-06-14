@@ -33,21 +33,6 @@ export function GenericDashboard() {
           <Grid.Col span={{ base: 12, sm: 6, md: 4 }}>
             <Card withBorder shadow="sm" padding="lg" radius="md">
               <Stack gap="xs">
-                <Title order={4}>📋 {t('dashboard.phase_1')}</Title>
-                <Text size="sm">M1: Auth + RBAC ✅</Text>
-                <Text size="sm" c="dimmed">
-                  M2: Patient + Staff (kelajakda)
-                </Text>
-                <Text size="sm" c="dimmed">
-                  M3: Appointment + Cashier
-                </Text>
-              </Stack>
-            </Card>
-          </Grid.Col>
-
-          <Grid.Col span={{ base: 12, sm: 6, md: 4 }}>
-            <Card withBorder shadow="sm" padding="lg" radius="md">
-              <Stack gap="xs">
                 <Title order={4}>🚀 {t('dashboard.quick_start')}</Title>
                 <Text size="sm">{t('dashboard.tip_branches')}</Text>
                 <Text size="sm">{t('dashboard.tip_users')}</Text>

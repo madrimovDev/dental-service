@@ -6,7 +6,8 @@ import { Sidebar } from './Sidebar';
 let mockPermissions: string[] = [];
 vi.mock('@/stores/auth-store.ts', () => ({
   useAuthStore: () => ({
-    hasPermission: (p: string) => mockPermissions.includes('@owner') || p === 'patient.view',
+    hasPermission: (p: string) =>
+      mockPermissions.includes('@owner') || mockPermissions.includes(p) || p === 'patient.view',
     permissions: mockPermissions,
     activeBranchId: 'b1',
   }),
@@ -25,14 +26,22 @@ describe('Sidebar', () => {
 
   it('FUTURE (disabled) element non-owner uchun yashirin (CLI-161)', () => {
     renderApp(<Sidebar />);
-    expect(screen.queryByText('Ish haqi')).toBeNull(); // payroll FUTURE — owner emas
+    expect(screen.queryByText('Tranzaksiyalar')).toBeNull(); // transactions FUTURE — owner emas
   });
 
   it("FUTURE (disabled) element owner uchun aria-disabled bilan ko'rinadi (CLI-161)", () => {
     mockPermissions = ['@owner'];
     renderApp(<Sidebar />);
+    const transactions = screen.getByText('Tranzaksiyalar');
+    expect(transactions.closest('[aria-disabled="true"]')).not.toBeNull();
+  });
+
+  it("R4 LIVE element permission bilan haqiqiy link sifatida ko'rinadi (FUTURE emas)", () => {
+    mockPermissions = ['payroll.view'];
+    renderApp(<Sidebar />);
     const payroll = screen.getByText('Ish haqi');
-    expect(payroll.closest('[aria-disabled="true"]')).not.toBeNull();
+    expect(payroll.closest('a')).not.toBeNull(); // <Link> — bosib bo'ladi
+    expect(payroll.closest('[aria-disabled="true"]')).toBeNull(); // disabled EMAS
   });
 
   it("guruh sarlavhasini ko'rsatadi", () => {
