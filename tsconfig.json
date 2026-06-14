@@ -30,8 +30,6 @@
       "@dental/ui/*": ["./packages/ui/src/*"],
       "@dental/api-client": ["./packages/api-client/src/index.ts"],
       "@dental/api-client/*": ["./packages/api-client/src/*"],
-      "@dental/odontogram": ["./packages/odontogram/src/index.ts"],
-      "@dental/odontogram/*": ["./packages/odontogram/src/*"],
       "@dental/fiscal": ["./packages/fiscal/src/index.ts"],
       "@dental/fiscal/*": ["./packages/fiscal/src/*"],
       "@dental/notifications": ["./packages/notifications/src/index.ts"],
