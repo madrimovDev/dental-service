@@ -1,4 +1,4 @@
-import { PageHead } from '@dental/ui';
+import { PageHead, StateView } from '@dental/ui';
 import { Button, Container, Group, Modal, Select, Stack, Text, TextInput } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconCategory, IconPlus } from '@tabler/icons-react';
@@ -143,8 +143,15 @@ export function ExpensesScreen() {
 
         <ExpenseSummaryCard rows={summaryRows} grandTotal={summary.data?.grandTotal ?? 0} />
 
-        {expenses.isLoading ? (
-          <Text c="dimmed">{t('common.loading')}</Text>
+        {expenses.isError ? (
+          <StateView
+            status="error"
+            title={t('states.error_title')}
+            retryLabel={t('states.retry')}
+            onRetry={() => expenses.refetch()}
+          />
+        ) : expenses.isLoading ? (
+          <StateView status="loading" skeleton="table" />
         ) : (
           <ExpensesTable expenses={expenseVMs} canManage={canManage} onDelete={setPendingDelete} />
         )}

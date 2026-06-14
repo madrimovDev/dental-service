@@ -1,5 +1,5 @@
 import type { LabOrderStatus, LabOrderType } from '@dental/api-client';
-import { Mono, StatusPill, Tag } from '@dental/ui';
+import { Mono, StateView, StatusPill, Tag } from '@dental/ui';
 import {
   ActionIcon,
   Box,
@@ -8,7 +8,6 @@ import {
   Group,
   Modal,
   NumberInput,
-  Paper,
   Select,
   Stack,
   Text,
@@ -126,70 +125,76 @@ export function LabOrdersTab({ patientId }: Props) {
         )}
       </Group>
 
-      {listQuery.isLoading && <Text>{t('common.loading')}</Text>}
-      {!listQuery.isLoading && listQuery.data?.length === 0 && (
-        <Paper withBorder p="md">
-          <Text c="dimmed">{t('lab_order.empty')}</Text>
-        </Paper>
-      )}
-
-      {listQuery.data?.map(toLabOrderVM).map((vm) => (
-        <Card key={vm.id} withBorder padding="md">
-          <Stack gap="xs">
-            <Group justify="space-between">
-              <Box>
-                <Group gap={6}>
-                  <IconDental size={16} />
-                  <Text fw={700}>{vm.labName}</Text>
-                </Group>
-                <Group gap="xs" mt={4}>
-                  <Tag>{t(vm.typeLabelKey)}</Tag>
-                  <StatusPill status={vm.statusTone}>{t(vm.statusLabelKey)}</StatusPill>
-                  {vm.costText && (
-                    <Mono>
-                      {vm.costText} {vm.currency}
-                    </Mono>
-                  )}
-                </Group>
-              </Box>
-              {canManage && (
-                <Select
-                  size="xs"
-                  w={150}
-                  value={vm.status}
-                  onChange={(v) =>
-                    v && updateStatusMut.mutate({ id: vm.id, status: v as LabOrderStatus })
-                  }
-                  data={STATUS_OPTIONS.map((s) => ({
-                    value: s,
-                    label: t(`lab_order.status_${s}`),
-                  }))}
-                />
+      {listQuery.isError ? (
+        <StateView
+          status="error"
+          title={t('states.error_title')}
+          retryLabel={t('states.retry')}
+          onRetry={() => listQuery.refetch()}
+        />
+      ) : listQuery.isLoading ? (
+        <StateView status="loading" skeleton="cards" />
+      ) : (listQuery.data?.length ?? 0) === 0 ? (
+        <StateView status="empty" title={t('lab_order.empty')} />
+      ) : (
+        listQuery.data?.map(toLabOrderVM).map((vm) => (
+          <Card key={vm.id} withBorder padding="md">
+            <Stack gap="xs">
+              <Group justify="space-between">
+                <Box>
+                  <Group gap={6}>
+                    <IconDental size={16} />
+                    <Text fw={700}>{vm.labName}</Text>
+                  </Group>
+                  <Group gap="xs" mt={4}>
+                    <Tag>{t(vm.typeLabelKey)}</Tag>
+                    <StatusPill status={vm.statusTone}>{t(vm.statusLabelKey)}</StatusPill>
+                    {vm.costText && (
+                      <Mono>
+                        {vm.costText} {vm.currency}
+                      </Mono>
+                    )}
+                  </Group>
+                </Box>
+                {canManage && (
+                  <Select
+                    size="xs"
+                    w={150}
+                    value={vm.status}
+                    onChange={(v) =>
+                      v && updateStatusMut.mutate({ id: vm.id, status: v as LabOrderStatus })
+                    }
+                    data={STATUS_OPTIONS.map((s) => ({
+                      value: s,
+                      label: t(`lab_order.status_${s}`),
+                    }))}
+                  />
+                )}
+              </Group>
+              {vm.items.map((it, i) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: stable items from server-side row
+                <Text key={`${vm.id}-item-${i}`} size="sm" pl="md">
+                  • {it.description}
+                  {it.toothNumbers.length > 0 &&
+                    ` ${t('lab_order.teeth_inline', { teeth: it.toothNumbers.join(', ') })}`}
+                  {it.material && `, ${it.material}`}
+                  {it.shade && `, ${t('lab_order.shade')}: ${it.shade}`}
+                  {it.quantity && it.quantity > 1 && ` x${it.quantity}`}
+                </Text>
+              ))}
+              {vm.sentDateText && (
+                <Text size="xs" c="dimmed">
+                  {t('lab_order.sent_date')}: {vm.sentDateText}
+                  {vm.expectedDateText &&
+                    ` · ${t('lab_order.expected_date')}: ${vm.expectedDateText}`}
+                  {vm.deliveredDateText &&
+                    ` · ${t('lab_order.delivered_date')}: ${vm.deliveredDateText}`}
+                </Text>
               )}
-            </Group>
-            {vm.items.map((it, i) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: stable items from server-side row
-              <Text key={`${vm.id}-item-${i}`} size="sm" pl="md">
-                • {it.description}
-                {it.toothNumbers.length > 0 &&
-                  ` ${t('lab_order.teeth_inline', { teeth: it.toothNumbers.join(', ') })}`}
-                {it.material && `, ${it.material}`}
-                {it.shade && `, ${t('lab_order.shade')}: ${it.shade}`}
-                {it.quantity && it.quantity > 1 && ` x${it.quantity}`}
-              </Text>
-            ))}
-            {vm.sentDateText && (
-              <Text size="xs" c="dimmed">
-                {t('lab_order.sent_date')}: {vm.sentDateText}
-                {vm.expectedDateText &&
-                  ` · ${t('lab_order.expected_date')}: ${vm.expectedDateText}`}
-                {vm.deliveredDateText &&
-                  ` · ${t('lab_order.delivered_date')}: ${vm.deliveredDateText}`}
-              </Text>
-            )}
-          </Stack>
-        </Card>
-      ))}
+            </Stack>
+          </Card>
+        ))
+      )}
 
       <Modal opened={opened} onClose={close} title={t('lab_order.create')} size="xl">
         <form onSubmit={submit}>

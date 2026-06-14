@@ -1,5 +1,6 @@
 import type { TreatmentStageStatus } from '@dental/api-client';
-import { Button, Group, Paper, Stack, Text, Title } from '@mantine/core';
+import { StateView } from '@dental/ui';
+import { Button, Group, Stack, Title } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconPlus } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
@@ -34,16 +35,22 @@ export function TreatmentPlansTab({ patientId }: Props) {
         )}
       </Group>
 
-      {plansQuery.isLoading && <Text>{t('common.loading')}</Text>}
-      {!plansQuery.isLoading && plansQuery.data?.length === 0 && (
-        <Paper withBorder p="md">
-          <Text c="dimmed">{t('treatment_plan.empty')}</Text>
-        </Paper>
+      {plansQuery.isError ? (
+        <StateView
+          status="error"
+          title={t('states.error_title')}
+          retryLabel={t('states.retry')}
+          onRetry={() => plansQuery.refetch()}
+        />
+      ) : plansQuery.isLoading ? (
+        <StateView status="loading" skeleton="cards" />
+      ) : (plansQuery.data?.length ?? 0) === 0 ? (
+        <StateView status="empty" title={t('treatment_plan.empty')} />
+      ) : (
+        plansQuery.data?.map((plan) => (
+          <PlanCard key={plan.id} plan={plan} canEdit={canEdit} onUpdateStage={onUpdateStage} />
+        ))
       )}
-
-      {plansQuery.data?.map((plan) => (
-        <PlanCard key={plan.id} plan={plan} canEdit={canEdit} onUpdateStage={onUpdateStage} />
-      ))}
 
       {user && (
         <PlanFormModal

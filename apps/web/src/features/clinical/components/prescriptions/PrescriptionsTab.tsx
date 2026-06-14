@@ -1,4 +1,4 @@
-import { Mono } from '@dental/ui';
+import { Mono, StateView } from '@dental/ui';
 import {
   ActionIcon,
   Box,
@@ -7,7 +7,6 @@ import {
   Group,
   Modal,
   NumberInput,
-  Paper,
   Stack,
   Text,
   Textarea,
@@ -73,46 +72,52 @@ export function PrescriptionsTab({ patientId }: Props) {
         )}
       </Group>
 
-      {listQuery.isLoading && <Text>{t('common.loading')}</Text>}
-      {!listQuery.isLoading && listQuery.data?.length === 0 && (
-        <Paper withBorder p="md">
-          <Text c="dimmed">{t('prescription.empty')}</Text>
-        </Paper>
-      )}
-
-      {listQuery.data?.map(toPrescriptionVM).map((rx) => (
-        <Card key={rx.id} withBorder padding="md">
-          <Stack gap="xs">
-            <Group justify="space-between">
-              <Group gap={6}>
-                <IconPill size={16} />
-                <Mono>{rx.issuedDateText}</Mono>
+      {listQuery.isError ? (
+        <StateView
+          status="error"
+          title={t('states.error_title')}
+          retryLabel={t('states.retry')}
+          onRetry={() => listQuery.refetch()}
+        />
+      ) : listQuery.isLoading ? (
+        <StateView status="loading" skeleton="cards" />
+      ) : (listQuery.data?.length ?? 0) === 0 ? (
+        <StateView status="empty" title={t('prescription.empty')} />
+      ) : (
+        listQuery.data?.map(toPrescriptionVM).map((rx) => (
+          <Card key={rx.id} withBorder padding="md">
+            <Stack gap="xs">
+              <Group justify="space-between">
+                <Group gap={6}>
+                  <IconPill size={16} />
+                  <Mono>{rx.issuedDateText}</Mono>
+                </Group>
+                {rx.diagnosis && (
+                  <Text size="sm" c="dimmed">
+                    {t('prescription.diagnosis')}: {rx.diagnosis}
+                  </Text>
+                )}
               </Group>
-              {rx.diagnosis && (
+              <Box>
+                {rx.items.map((it, i) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: stable items from server-side row
+                  <Text key={`rx-${rx.id}-${i}`} size="sm">
+                    <strong>{it.medicationName}</strong> — {it.dosage}, {it.frequency}
+                    {it.durationDays != null &&
+                      `, ${t('prescription.duration_days_suffix', { days: it.durationDays })}`}
+                    {it.instructions && ` (${it.instructions})`}
+                  </Text>
+                ))}
+              </Box>
+              {rx.notes && (
                 <Text size="sm" c="dimmed">
-                  {t('prescription.diagnosis')}: {rx.diagnosis}
+                  {rx.notes}
                 </Text>
               )}
-            </Group>
-            <Box>
-              {rx.items.map((it, i) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: stable items from server-side row
-                <Text key={`rx-${rx.id}-${i}`} size="sm">
-                  <strong>{it.medicationName}</strong> — {it.dosage}, {it.frequency}
-                  {it.durationDays != null &&
-                    `, ${t('prescription.duration_days_suffix', { days: it.durationDays })}`}
-                  {it.instructions && ` (${it.instructions})`}
-                </Text>
-              ))}
-            </Box>
-            {rx.notes && (
-              <Text size="sm" c="dimmed">
-                {rx.notes}
-              </Text>
-            )}
-          </Stack>
-        </Card>
-      ))}
+            </Stack>
+          </Card>
+        ))
+      )}
 
       <Modal opened={opened} onClose={close} title={t('prescription.create')} size="xl">
         <form onSubmit={submit}>
