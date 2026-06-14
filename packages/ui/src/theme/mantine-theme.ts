@@ -14,11 +14,28 @@ export const teal: MantineColorsTuple = [
   '#0A4A44',
 ];
 
+// danger red — Mantine default red (red-6 ≈ #fa5252) o'rniga token-anchored.
+// primaryShade {light:6, dark:4} bo'yicha `color="red"` filled shu shadelarni oladi:
+// red[6] = light --danger (tokens.css --red-600 = #dc2626), red[4] = dark --danger (#f08a82).
+// danger-red-sync.test.ts drift'ni guard qiladi.
+export const red: MantineColorsTuple = [
+  '#fef2f2',
+  '#fee2e2',
+  '#fecaca',
+  '#fca5a5',
+  '#f08a82',
+  '#ef4444',
+  '#dc2626',
+  '#b91c1c',
+  '#991b1b',
+  '#7f1d1d',
+];
+
 export const mantineTheme = createTheme({
   primaryColor: 'teal',
   // light → index 6 (#0E9384), dark → index 4 (#2FC6B2)
   primaryShade: { light: 6, dark: 4 },
-  colors: { teal },
+  colors: { teal, red },
   fontFamily: 'var(--font-sans)',
   fontFamilyMonospace: 'var(--font-mono)',
   headings: { fontFamily: 'var(--font-sans)', fontWeight: '600' },
