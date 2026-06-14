@@ -18,10 +18,19 @@
   transition:
     background var(--dur-fast) var(--ease),
     border-color var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease),
     opacity var(--dur-fast);
 }
 .root:hover {
   background: var(--surface-2);
+}
+/* micro-interaction (CLI-175): yengil ko'tarilish — bosilganda qaytadi.
+   prefers-reduced-motion global guard (styles.css) bilan o'chiriladi. */
+.root:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+.root:active:not(:disabled) {
+  transform: translateY(0);
 }
 .root:focus-visible {
   outline: 2px solid var(--focus-ring);
