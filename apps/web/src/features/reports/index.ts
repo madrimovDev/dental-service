@@ -5,3 +5,4 @@ export {
   usePlanCompletion,
   useRevenueReport,
 } from './reports.api';
+export { reportsRoutes } from './reports.routes';

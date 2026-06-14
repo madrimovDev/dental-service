@@ -51,7 +51,7 @@
 ## 4. Frontend ([RFC-0002](./rfcs/0002-frontend-architecture.md))
 
 - **Monorepo:** `apps/web` + `packages/{ui, api-client, core, i18n, odontogram}`.
-- **Struktura:** `app/` (router/providers) · `shell/` (topbar+sidebar, [RFC-0004](./rfcs/0004-app-shell-navigation.md)) · `features/<feature>/` (backend modullariga oyna) · `pages/` (yupqa entry).
+- **Struktura:** `app/` (App.tsx route map + `routes.tsx` yig'uvchi + providers) · `shell/` (topbar+sidebar, [RFC-0004](./rfcs/0004-app-shell-navigation.md)) · `features/<feature>/` (backend modullariga oyna; har biri `<feature>.routes.tsx` registry, real logikali sahifa `pages/` subfolder'da). Alohida `pages/` papkasi bekor (2026-06-14, [RFC-0010 §6](./rfcs/0010-frontend-feature-architecture.md)).
 - **Data:** TanStack Query (faqat api-client orqali) · **State:** Zustand (auth, ui/shell) — server state faqat Query'da.
 - **Dizayn-tizim:** `packages/ui` teal primitivlari, Mantine theme tokenlarga moslangan, dark mode ([RFC-0003](./rfcs/0003-design-system-theming.md)).
 - **Rol-adaptive shell:** deklarativ nav-config, `hasPermission` filtr, rol landing, ikki qatlam ruxsat ([RFC-0004](./rfcs/0004-app-shell-navigation.md)).
