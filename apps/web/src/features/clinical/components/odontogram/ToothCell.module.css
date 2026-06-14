@@ -1,0 +1,31 @@
+.cell {
+  width: 36px;
+  height: 48px;
+  border-radius: 6px 6px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  cursor: pointer;
+  user-select: none;
+  padding: 2px;
+  transition: transform 0.1s var(--ease, ease);
+}
+
+.cell:hover {
+  transform: scale(1.1);
+}
+
+.cell:focus-visible {
+  outline: 2px solid var(--focus-ring, var(--mantine-color-teal-6));
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cell {
+    transition: none;
+  }
+  .cell:hover {
+    transform: none;
+  }
+}
