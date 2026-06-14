@@ -1,5 +1,6 @@
 import { Alert, Anchor, Button, Container, Paper, Stack, Title } from '@mantine/core';
 import { useForm } from '@mantine/form';
+import type { TFunction } from 'i18next';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -7,15 +8,16 @@ import { z } from 'zod';
 import { PhoneInput } from '@/components/PhoneInput.tsx';
 import { usePasswordResetRequest } from '../auth.api';
 
-const schema = z.object({
-  phone: z.string().regex(/^\+?\d{9,15}$/, "Telefon raqami noto'g'ri formatda"),
-});
+const makeSchema = (t: TFunction) =>
+  z.object({
+    phone: z.string().regex(/^\+?\d{9,15}$/, t('validation.phone_invalid')),
+  });
 
 export function ForgotPasswordPage() {
   const { t } = useTranslation();
   const form = useForm({
     initialValues: { phone: '' },
-    validate: zod4Resolver(schema),
+    validate: zod4Resolver(makeSchema(t)),
   });
 
   const mut = usePasswordResetRequest();

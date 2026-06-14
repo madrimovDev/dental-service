@@ -11,6 +11,7 @@ import {
   Title,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
+import type { TFunction } from 'i18next';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -19,15 +20,22 @@ import { z } from 'zod';
 import { PhoneInput } from '@/components/PhoneInput.tsx';
 import { useRegisterTenant } from '../auth.api';
 
-const schema = z.object({
-  tenantName: z.string().min(2, 'Kamida 2 belgi').max(120),
-  ownerPhone: z.string().regex(/^\+?\d{9,15}$/, "Telefon raqami noto'g'ri formatda"),
-  ownerFullName: z.string().min(2, 'Kamida 2 belgi').max(120),
-  ownerPassword: z.string().min(12, 'Kamida 12 belgi'),
-  defaultLanguage: z.enum(['uz', 'ru']),
-});
+const makeSchema = (t: TFunction) =>
+  z.object({
+    tenantName: z
+      .string()
+      .min(2, t('validation.min_chars', { count: 2 }))
+      .max(120),
+    ownerPhone: z.string().regex(/^\+?\d{9,15}$/, t('validation.phone_invalid')),
+    ownerFullName: z
+      .string()
+      .min(2, t('validation.min_chars', { count: 2 }))
+      .max(120),
+    ownerPassword: z.string().min(12, t('validation.min_chars', { count: 12 })),
+    defaultLanguage: z.enum(['uz', 'ru']),
+  });
 
-type FormValues = z.infer<typeof schema>;
+type FormValues = z.infer<ReturnType<typeof makeSchema>>;
 
 export function RegisterTenantPage() {
   const { t } = useTranslation();
@@ -42,7 +50,7 @@ export function RegisterTenantPage() {
       ownerPassword: '',
       defaultLanguage: 'uz',
     },
-    validate: zod4Resolver(schema),
+    validate: zod4Resolver(makeSchema(t)),
   });
 
   const registerMut = useRegisterTenant({
@@ -51,7 +59,7 @@ export function RegisterTenantPage() {
     },
     onError: (err) => {
       if (err.code === 'auth.phone_taken' || err.code === 'auth.email_or_phone_taken') {
-        setError("Bu telefon raqami allaqachon ro'yxatdan o'tgan");
+        setError(t('auth.register.phone_taken'));
       } else {
         setError(err.message);
       }
@@ -81,13 +89,13 @@ export function RegisterTenantPage() {
 
             <TextInput
               label={t('auth.register.clinic_name')}
-              placeholder="Mening klinika"
+              placeholder={t('auth.register.clinic_name_placeholder')}
               required
               {...form.getInputProps('tenantName')}
             />
             <TextInput
               label={t('auth.register.owner_full_name')}
-              placeholder="Aliyev Aziz"
+              placeholder={t('auth.register.owner_name_placeholder')}
               required
               {...form.getInputProps('ownerFullName')}
             />
@@ -98,7 +106,7 @@ export function RegisterTenantPage() {
             />
             <PasswordInput
               label={t('auth.register.password')}
-              placeholder="Kamida 12 belgi"
+              placeholder={t('auth.register.password_hint')}
               description={t('auth.register.password_hint')}
               required
               {...form.getInputProps('ownerPassword')}

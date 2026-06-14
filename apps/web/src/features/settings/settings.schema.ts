@@ -1,3 +1,4 @@
+import type { TFunction } from 'i18next';
 import { z } from 'zod';
 
 export const roleSchema = z.object({
@@ -17,13 +18,14 @@ export const branchSchema = z.object({
 });
 export type BranchFormValues = z.infer<typeof branchSchema>;
 
-export const inviteSchema = z.object({
-  phone: z.string().regex(/^\+?\d{9,15}$/, "Telefon raqami noto'g'ri formatda"),
-  fullName: z.string().min(2).max(120),
-  roleId: z.string().min(1),
-  branchId: z.string().optional(),
-});
-export type InviteFormValues = z.infer<typeof inviteSchema>;
+export const makeInviteSchema = (t: TFunction) =>
+  z.object({
+    phone: z.string().regex(/^\+?\d{9,15}$/, t('validation.phone_invalid')),
+    fullName: z.string().min(2).max(120),
+    roleId: z.string().min(1),
+    branchId: z.string().optional(),
+  });
+export type InviteFormValues = z.infer<ReturnType<typeof makeInviteSchema>>;
 
 export const staffProfileSchema = z.object({
   specialty: z.string().max(120).optional().or(z.literal('')),

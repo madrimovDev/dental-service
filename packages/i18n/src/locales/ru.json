@@ -59,6 +59,11 @@
     "ok": "Всё в порядке",
     "db": "База данных"
   },
+  "validation": {
+    "phone_invalid": "Неверный формат номера телефона",
+    "password_required": "Введите пароль",
+    "min_chars": "Минимум {{count}} символов"
+  },
   "auth": {
     "login": {
       "title": "Вход",
@@ -66,7 +71,8 @@
       "password": "Пароль",
       "submit": "Войти",
       "forgot": "Забыли пароль?",
-      "register_clinic": "Регистрация клиники"
+      "register_clinic": "Регистрация клиники",
+      "invalid_credentials": "Неверный телефон или пароль"
     },
     "register": {
       "title": "Регистрация клиники",
@@ -77,14 +83,18 @@
       "password_hint": "Минимум 12 символов",
       "language": "Основной язык",
       "submit": "Зарегистрироваться",
-      "have_account": "Уже есть аккаунт — войти"
+      "have_account": "Уже есть аккаунт — войти",
+      "phone_taken": "Этот номер телефона уже зарегистрирован",
+      "clinic_name_placeholder": "Моя клиника",
+      "owner_name_placeholder": "Алиев Азиз"
     },
     "select_workspace": {
       "title": "Выберите workspace",
       "no_workspaces": "У вас нет клиник. Первый шаг — зарегистрируйте клинику.",
       "all_branches": "Все филиалы",
       "session_expired_title": "Сессия истекла",
-      "session_expired_message": "Пожалуйста, войдите снова. Старый refresh token больше не действителен."
+      "session_expired_message": "Пожалуйста, войдите снова. Старый refresh token больше не действителен.",
+      "switch_failed": "Не удалось сменить рабочее пространство"
     },
     "forgot": {
       "title": "Восстановление пароля",
@@ -99,7 +109,8 @@
       "code_hint": "6-значный код из консоли или SMS",
       "new_password": "Новый пароль",
       "submit": "Обновить пароль",
-      "invalid": "Код неверный или истёк"
+      "invalid": "Код неверный или истёк",
+      "password_placeholder": "Минимум 12 символов"
     }
   },
   "layout": {
@@ -157,7 +168,9 @@
     "coming_soon": "Скоро",
     "all_branches": "Все филиалы",
     "select_branch": "Выбрать филиал",
-    "branch_switch_error": "Не удалось сменить филиал"
+    "branch_switch_error": "Не удалось сменить филиал",
+    "lang_uz": "Узбекский",
+    "lang_ru": "Русский"
   },
   "notifications": {
     "title": "Уведомления",
