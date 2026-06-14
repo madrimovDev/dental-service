@@ -18,4 +18,9 @@ describe('Select', () => {
     expect(screen.getByText('Doktor')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Tanlang')).toBeInTheDocument();
   });
+
+  it('error matnni korsatadi', () => {
+    renderUI(<Select label="Jins" error="Tanlang" data={[{ value: 'm', label: 'Erkak' }]} />);
+    expect(screen.getByText('Tanlang')).toBeInTheDocument();
+  });
 });

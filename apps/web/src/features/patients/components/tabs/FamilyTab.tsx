@@ -56,7 +56,7 @@ function AddRelativeForm({ patientId }: { patientId: string }) {
             label={t('patients.relatives.relationship')}
             placeholder={t('patients.relatives.relationship_placeholder')}
             value={form.values.relationship}
-            invalid={!!form.errors.relationship}
+            error={form.errors.relationship}
             onChange={(v) => form.setFieldValue('relationship', v)}
           />
           <Group justify="flex-end">

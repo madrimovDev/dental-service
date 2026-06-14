@@ -1,5 +1,5 @@
 import { fireEvent, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderApp } from '../../../test-utils';
 import { PatientNewScreen } from './PatientNewScreen';
 
@@ -9,6 +9,8 @@ vi.mock('../patients.api', () => ({
 }));
 
 describe('PatientNewScreen', () => {
+  beforeEach(() => createMock.mockClear());
+
   it("form maydonlari + teg/manba/sug'urta ko'rsatadi", () => {
     renderApp(<PatientNewScreen />);
     // i18n default uz → tarjima qiymatlari (uz.json'dan)
@@ -29,5 +31,13 @@ describe('PatientNewScreen', () => {
       expect.objectContaining({ fullName: 'Yangi Bemor' }),
       expect.anything(),
     );
+  });
+
+  it('bosh ism bilan submit qilsa validatsiya xabari korinadi (CLI-179 bug guard)', async () => {
+    renderApp(<PatientNewScreen />);
+    fireEvent.click(screen.getByText('Saqlash'));
+    // fullName '' → min(2) buziladi → form.errors.fullName → Input error render
+    await vi.waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+    expect(createMock).not.toHaveBeenCalled();
   });
 });

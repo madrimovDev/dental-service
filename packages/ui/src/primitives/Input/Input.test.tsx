@@ -21,4 +21,16 @@ describe('Input', () => {
     renderUI(<Input invalid />);
     expect(screen.getByRole('textbox').closest('[data-invalid]')).not.toBeNull();
   });
+
+  it('error matnni role=alert bilan korsatadi va data-invalid avtomatik', () => {
+    renderUI(<Input label="Ism" error="Ism majburiy" />);
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('Ism majburiy');
+    expect(screen.getByRole('textbox').closest('[data-invalid]')).not.toBeNull();
+  });
+
+  it('disabled holatda input ochirilgan', () => {
+    renderUI(<Input label="Ism" disabled />);
+    expect(screen.getByRole('textbox')).toBeDisabled();
+  });
 });

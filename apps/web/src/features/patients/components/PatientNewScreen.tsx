@@ -60,7 +60,7 @@ export function PatientNewScreen() {
           <Input
             label={t('patients.form.full_name')}
             value={form.values.fullName}
-            invalid={!!form.errors.fullName}
+            error={form.errors.fullName}
             onChange={(v) => form.setFieldValue('fullName', v)}
           />
 
@@ -69,12 +69,14 @@ export function PatientNewScreen() {
               label={t('patients.form.date_of_birth')}
               type="date"
               value={form.values.dateOfBirth ?? ''}
+              error={form.errors.dateOfBirth}
               onChange={(v) => form.setFieldValue('dateOfBirth', v)}
             />
             <Select
               label={t('patients.form.gender_label')}
               placeholder={t('common.select')}
               value={form.values.gender ?? null}
+              error={form.errors.gender}
               onChange={(v) =>
                 form.setFieldValue('gender', (v as PatientFormValues['gender']) ?? undefined)
               }
@@ -97,11 +99,13 @@ export function PatientNewScreen() {
           <Input
             label={t('patients.form.passport')}
             value={form.values.passport ?? ''}
+            error={form.errors.passport}
             onChange={(v) => form.setFieldValue('passport', v)}
           />
           <Input
             label={t('patients.form.address')}
             value={form.values.address ?? ''}
+            error={form.errors.address}
             onChange={(v) => form.setFieldValue('address', v)}
           />
           <Textarea label={t('patients.form.notes')} rows={3} {...form.getInputProps('notes')} />
@@ -112,6 +116,7 @@ export function PatientNewScreen() {
             label={t('patients.form.source')}
             placeholder={t('common.select')}
             value={form.values.source ?? null}
+            error={form.errors.source}
             onChange={(v) => form.setFieldValue('source', v ?? '')}
             data={[
               { value: 'referral', label: t('patients.source.referral') },
@@ -126,11 +131,13 @@ export function PatientNewScreen() {
               label={t('patients.form.insurance')}
               placeholder={t('patients.form.insurance_provider')}
               value={form.values.insurance?.provider ?? ''}
+              error={form.errors['insurance.provider']}
               onChange={(v) => form.setFieldValue('insurance.provider', v)}
             />
             <Input
               label={t('patients.form.insurance_policy')}
               value={form.values.insurance?.policyNumber ?? ''}
+              error={form.errors['insurance.policyNumber']}
               onChange={(v) => form.setFieldValue('insurance.policyNumber', v)}
             />
           </div>
