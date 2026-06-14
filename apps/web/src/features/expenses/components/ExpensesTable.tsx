@@ -1,9 +1,8 @@
 import { ActionIcon, Table, Text } from '@mantine/core';
 import { IconTrash } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
+import { formatCurrency } from '@/lib/format';
 import type { ExpenseVM } from '../expenses.types';
-
-const formatUZS = (n: number) => `${new Intl.NumberFormat('uz-UZ').format(n)} so'm`;
 
 export interface ExpensesTableProps {
   expenses: ExpenseVM[];
@@ -34,7 +33,7 @@ export function ExpensesTable({ expenses, canManage, onDelete }: ExpensesTablePr
           <Table.Tr key={e.id}>
             <Table.Td>{e.date}</Table.Td>
             <Table.Td>{e.categoryName}</Table.Td>
-            <Table.Td fw={600}>{formatUZS(e.amount)}</Table.Td>
+            <Table.Td fw={600}>{formatCurrency(e.amount, t)}</Table.Td>
             <Table.Td c="dimmed">{e.note ?? '—'}</Table.Td>
             {canManage && (
               <Table.Td>

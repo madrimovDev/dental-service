@@ -1,9 +1,8 @@
 import { Paper, Stack, Table, Text, Title } from '@mantine/core';
 import { IconChartBar } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
+import { formatCurrency } from '@/lib/format';
 import type { SummaryRowVM } from '../expenses.types';
-
-const formatUZS = (n: number) => `${new Intl.NumberFormat('uz-UZ').format(n)} so'm`;
 
 export interface ExpenseSummaryCardProps {
   rows: SummaryRowVM[];
@@ -36,13 +35,13 @@ export function ExpenseSummaryCard({ rows, grandTotal }: ExpenseSummaryCardProps
                 <Table.Tr key={r.categoryId ?? '__uncategorized__'}>
                   <Table.Td>{r.categoryName}</Table.Td>
                   <Table.Td>{r.count}</Table.Td>
-                  <Table.Td fw={600}>{formatUZS(r.total)}</Table.Td>
+                  <Table.Td fw={600}>{formatCurrency(r.total, t)}</Table.Td>
                 </Table.Tr>
               ))}
               <Table.Tr>
                 <Table.Td fw={700}>{t('expenses.grand_total')}</Table.Td>
                 <Table.Td />
-                <Table.Td fw={700}>{formatUZS(grandTotal)}</Table.Td>
+                <Table.Td fw={700}>{formatCurrency(grandTotal, t)}</Table.Td>
               </Table.Tr>
             </Table.Tbody>
           </Table>

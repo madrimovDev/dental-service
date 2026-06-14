@@ -4,6 +4,7 @@ import { useDisclosure } from '@mantine/hooks';
 import { IconCategory, IconPlus } from '@tabler/icons-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { formatCurrency } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import {
   useBranches,
@@ -166,9 +167,7 @@ export function ExpensesScreen() {
         <Stack gap="md">
           <Text size="sm">
             {pendingDelete?.categoryName} —{' '}
-            {pendingDelete
-              ? `${new Intl.NumberFormat('uz-UZ').format(pendingDelete.amount)} so'm`
-              : ''}
+            {pendingDelete ? formatCurrency(pendingDelete.amount, t) : ''}
           </Text>
           <Group justify="flex-end">
             <Button variant="default" onClick={() => setPendingDelete(null)}>

@@ -3,9 +3,7 @@ import { Mono } from '@dental/ui';
 import { Button, Group, NumberInput, Select, Stack, Table, Text } from '@mantine/core';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
-const formatUZS = (n: string | number) =>
-  `${new Intl.NumberFormat('uz-UZ').format(typeof n === 'string' ? Number(n) : n)} so'm`;
+import { formatCurrency } from '@/lib/format';
 
 export function ServicePricesTab({
   isEditing,
@@ -46,7 +44,7 @@ export function ServicePricesTab({
               <Table.Tr key={p.id}>
                 <Table.Td>{branches.find((b) => b.id === p.branchId)?.name ?? p.branchId}</Table.Td>
                 <Table.Td>
-                  <Mono>{formatUZS(p.price)}</Mono>
+                  <Mono>{formatCurrency(Number(p.price), t)}</Mono>
                 </Table.Td>
               </Table.Tr>
             ))}
@@ -66,7 +64,7 @@ export function ServicePricesTab({
           label={t('services.price')}
           min={0}
           step={1000}
-          suffix=" so'm"
+          suffix={` ${t('common.currency')}`}
           value={price}
           onChange={(v) => setPrice(typeof v === 'number' ? v : Number(v))}
           flex={1}

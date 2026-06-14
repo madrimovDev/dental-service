@@ -4,11 +4,10 @@ import { ActionIcon, Badge, Button, Group, Modal, Stack, Table, Text, Title } fr
 import { IconReceipt, IconRefresh } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { formatCurrency } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { useRefund } from '../cashier.api';
 import { toTransactionVM } from '../cashier.mappers';
-
-const formatUZS = (n: number) => `${new Intl.NumberFormat('uz-UZ').format(n)} so'm`;
 
 export interface TransactionsTableProps {
   transactions: CashierTransaction[];
@@ -56,7 +55,7 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
                 <Table.Td>
                   <Mono>{tx.receiptNumber ?? '—'}</Mono>
                 </Table.Td>
-                <Table.Td>{formatUZS(tx.totalAmount)}</Table.Td>
+                <Table.Td>{formatCurrency(tx.totalAmount, t)}</Table.Td>
                 <Table.Td>{t(`cashier.method.${tx.paymentMethod}`)}</Table.Td>
                 <Table.Td>
                   <Badge

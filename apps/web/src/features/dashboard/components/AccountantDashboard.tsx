@@ -2,12 +2,11 @@ import { StateView } from '@dental/ui';
 import { Container, Grid, SimpleGrid, Stack, Title } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { useDailySummary } from '@/features/cashier/cashier.api.ts';
+import { formatCurrency } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { useDefaultPeriod, useRevenueReport } from '../dashboard.api.ts';
 import { MiniList } from './widgets/MiniList.tsx';
 import { StatCard } from './widgets/StatCard.tsx';
-
-const fmtUZS = (n: number) => `${new Intl.NumberFormat('uz-UZ').format(Math.round(n))} so'm`;
 
 export function AccountantDashboard() {
   const { t } = useTranslation();
@@ -37,14 +36,17 @@ export function AccountantDashboard() {
             <SimpleGrid cols={{ base: 1, sm: 2 }}>
               <StatCard
                 label={t('dashboard.revenue_total')}
-                value={rev ? fmtUZS(rev.total) : '—'}
+                value={rev ? formatCurrency(rev.total, t) : '—'}
                 color="teal"
               />
               <StatCard
                 label={t('dashboard.daily_cash')}
                 value={
                   summary.data
-                    ? fmtUZS(summary.data.breakdown.reduce((s, b) => s + Number(b.total), 0))
+                    ? formatCurrency(
+                        summary.data.breakdown.reduce((s, b) => s + Number(b.total), 0),
+                        t,
+                      )
                     : '—'
                 }
               />
@@ -57,7 +59,7 @@ export function AccountantDashboard() {
                   items={(summary.data?.breakdown ?? []).map((b, i) => ({
                     id: `${b.paymentMethod}-${b.type}-${i}`,
                     label: `${b.paymentMethod} · ${b.type}`,
-                    right: `${fmtUZS(Number(b.total))} (${b.count})`,
+                    right: `${formatCurrency(Number(b.total), t)} (${b.count})`,
                   }))}
                   emptyText={t('dashboard.empty')}
                 />

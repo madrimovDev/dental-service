@@ -33,11 +33,6 @@ export function toPayrollRunVM(run: PayrollRun): PayrollRunVM {
   };
 }
 
-/** Pul ko'rsatish — UZS formati. */
-export function formatUZS(n: number): string {
-  return `${new Intl.NumberFormat('uz-UZ').format(n)} so'm`;
-}
-
 /** Local (Tashkent) sana → YYYY-MM-DD; toISOString UTC siljishidan qochish. */
 export function toLocalDate(d: Date): string {
   const y = d.getFullYear();
