@@ -291,6 +291,7 @@ dental-service/
 - **Routing (2026-06-14):** alohida `pages/` papkasi **YO'Q**. Har feature `<f>.routes.tsx` da `AppRoute[]` (`{path, perm?, element}`, tip `@/shell`) eksport qiladi; `app/routes.tsx` `publicRoutes`/`protectedRoutes` ga yig'adi; `App.tsx` map qiladi. Yupqa wrapper'lar o'chirildi — registry to'g'ridan Screen'ni ishlatadi (`element: <CalendarScreen/>`). `perm` bo'lsa `RequirePermission` o'raydi. RFC-0010 §1/§6.
 - **Shared:** `packages/ui` (dizayn-tizim primitivlari) → `apps/web/src/components` (ilova-shared) → feature `components/`
 - Server state — TanStack Query (faqat feature hooks orqali); query-key `[feature, scope, params]`
+- **Mutation xato feedback (CLI-165):** global `MutationCache.onError` (`lib/query-client.ts`) defaultda red toast (`@mantine/notifications`, `i18n.t('common.error')`). Per-mutation `onError` bor bo'lsa default jim — qo'shimcha toast yozma; faqat maxsus xulq kerak bo'lsa o'z `onError`'ingni ber.
 - Client state — Zustand (global `stores/`: auth, ui/shell); server data dublirlanmaydi
 - Forms — `@mantine/form` + **`zod4Resolver`** (`mantine-form-zod-resolver`). ⚠️ Loyiha **Zod 4** — plain `zodResolver` `error.errors`ni (v3) o'qib invalid submit'da CRASH qiladi; doim `zod4Resolver` (`.issues`) ishlat (Qaror #12).
 - API tiplari — **generated `packages/api-client`** (OpenAPI, qo'lda emas; RFC-0002 §4)
