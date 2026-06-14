@@ -25,14 +25,24 @@ export function BranchSwitcher() {
 
   const switchMut = useSwitchWorkspace({
     onSuccess: (data) => {
-      const payload = JSON.parse(atob(data.accessToken.split('.')[1] ?? '')) as {
-        atid: string | null;
-        abid: string | null;
-        perms: string[];
-        roleKey?: string | null;
-      };
+      // Token hamisha saqlanadi; payload decode (base64url) xato bo'lsa ham login buzilmasin.
       setTokens(data.accessToken, data.refreshToken);
-      setContext(payload.atid, payload.abid, payload.perms, payload.roleKey ?? null);
+      try {
+        const seg = data.accessToken.split('.')[1] ?? '';
+        const b64 = seg
+          .replace(/-/g, '+')
+          .replace(/_/g, '/')
+          .padEnd(Math.ceil(seg.length / 4) * 4, '=');
+        const payload = JSON.parse(atob(b64)) as {
+          atid: string | null;
+          abid: string | null;
+          perms: string[];
+          roleKey?: string | null;
+        };
+        setContext(payload.atid, payload.abid, payload.perms, payload.roleKey ?? null);
+      } catch {
+        /* malformed JWT payload — kontekst keyingi auth bootstrap'da o'rnatiladi */
+      }
       // Filial-scoped data (navbat, yozilish, hisobotlar) yangi kontekstni aks ettirsin.
       queryClient.clear();
       navigate('/');

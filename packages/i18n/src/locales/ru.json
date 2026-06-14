@@ -161,6 +161,7 @@
     "nothing_found": "Ничего не найдено"
   },
   "shell": {
+    "skip_to_content": "Перейти к содержимому",
     "search_placeholder": "Пациент, запись, услуга, сотрудник…",
     "notifications": "Уведомления",
     "theme_light": "Светлая",
