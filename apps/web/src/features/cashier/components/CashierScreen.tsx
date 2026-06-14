@@ -67,7 +67,7 @@ export function CashierScreen() {
           }
         />
 
-        <Group align="flex-end">
+        <Group align="flex-end" wrap="wrap">
           <Select
             label={t('cashier.patient')}
             placeholder={t('cashier.select_patient')}

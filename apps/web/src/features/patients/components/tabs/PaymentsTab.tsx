@@ -30,40 +30,42 @@ export function PaymentsTab({ patientId }: { patientId: string }) {
             <BalanceBadge balance={balanceQuery.data.balance} size="md" />
           </Group>
         )}
-        <Table striped highlightOnHover>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>{t('cashier.date')}</Table.Th>
-              <Table.Th>{t('cashier.receipt')}</Table.Th>
-              <Table.Th>{t('cashier.amount')}</Table.Th>
-              <Table.Th>{t('cashier.payment_method')}</Table.Th>
-              <Table.Th>{t('cashier.status')}</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {rows.map((tx) => (
-              <Table.Tr key={tx.id}>
-                <Table.Td>
-                  <Mono>{new Date(tx.createdAt).toLocaleDateString()}</Mono>
-                </Table.Td>
-                <Table.Td>{tx.receiptNumber ? <Mono>{tx.receiptNumber}</Mono> : '—'}</Table.Td>
-                <Table.Td>
-                  <Mono>
-                    {Number(tx.paidAmount).toLocaleString()} {tx.currency}
-                  </Mono>
-                </Table.Td>
-                <Table.Td>{t(`cashier.method.${tx.paymentMethod}`)}</Table.Td>
-                <Table.Td>
-                  <Group gap="xs">
-                    <Badge variant="light" color={tx.type === 'refund' ? 'red' : 'green'}>
-                      {tx.status}
-                    </Badge>
-                  </Group>
-                </Table.Td>
+        <Table.ScrollContainer minWidth={700}>
+          <Table striped highlightOnHover>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>{t('cashier.date')}</Table.Th>
+                <Table.Th>{t('cashier.receipt')}</Table.Th>
+                <Table.Th>{t('cashier.amount')}</Table.Th>
+                <Table.Th>{t('cashier.payment_method')}</Table.Th>
+                <Table.Th>{t('cashier.status')}</Table.Th>
               </Table.Tr>
-            ))}
-          </Table.Tbody>
-        </Table>
+            </Table.Thead>
+            <Table.Tbody>
+              {rows.map((tx) => (
+                <Table.Tr key={tx.id}>
+                  <Table.Td>
+                    <Mono>{new Date(tx.createdAt).toLocaleDateString()}</Mono>
+                  </Table.Td>
+                  <Table.Td>{tx.receiptNumber ? <Mono>{tx.receiptNumber}</Mono> : '—'}</Table.Td>
+                  <Table.Td>
+                    <Mono>
+                      {Number(tx.paidAmount).toLocaleString()} {tx.currency}
+                    </Mono>
+                  </Table.Td>
+                  <Table.Td>{t(`cashier.method.${tx.paymentMethod}`)}</Table.Td>
+                  <Table.Td>
+                    <Group gap="xs">
+                      <Badge variant="light" color={tx.type === 'refund' ? 'red' : 'green'}>
+                        {tx.status}
+                      </Badge>
+                    </Group>
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        </Table.ScrollContainer>
       </Stack>
     </Paper>
   );

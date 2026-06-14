@@ -32,35 +32,37 @@ export function MovementHistory({ itemName, movements }: MovementHistoryProps) {
       {vms.length === 0 ? (
         <Text c="dimmed">{t('stock.no_movements')}</Text>
       ) : (
-        <Table verticalSpacing="xs">
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>{t('stock.type')}</Table.Th>
-              <Table.Th>{t('stock.quantity')}</Table.Th>
-              <Table.Th>{t('stock.reason')}</Table.Th>
-              <Table.Th>{t('stock.date')}</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {vms.map((m) => (
-              <Table.Tr key={m.id}>
-                <Table.Td>
-                  <Badge color={TYPE_COLOR[m.type]} size="sm" variant="light">
-                    {t(`stock.type_label.${m.type}`)}
-                  </Badge>
-                </Table.Td>
-                <Table.Td>
-                  {m.type === 'out' ? '−' : m.type === 'in' ? '+' : ''}
-                  {formatQty(m.quantity)}
-                </Table.Td>
-                <Table.Td>
-                  {m.sourceVisitNoteId ? t('stock.reason_visit') : (m.reason ?? '—')}
-                </Table.Td>
-                <Table.Td>{new Date(m.createdAt).toLocaleDateString('uz-UZ')}</Table.Td>
+        <Table.ScrollContainer minWidth={600}>
+          <Table verticalSpacing="xs">
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>{t('stock.type')}</Table.Th>
+                <Table.Th>{t('stock.quantity')}</Table.Th>
+                <Table.Th>{t('stock.reason')}</Table.Th>
+                <Table.Th>{t('stock.date')}</Table.Th>
               </Table.Tr>
-            ))}
-          </Table.Tbody>
-        </Table>
+            </Table.Thead>
+            <Table.Tbody>
+              {vms.map((m) => (
+                <Table.Tr key={m.id}>
+                  <Table.Td>
+                    <Badge color={TYPE_COLOR[m.type]} size="sm" variant="light">
+                      {t(`stock.type_label.${m.type}`)}
+                    </Badge>
+                  </Table.Td>
+                  <Table.Td>
+                    {m.type === 'out' ? '−' : m.type === 'in' ? '+' : ''}
+                    {formatQty(m.quantity)}
+                  </Table.Td>
+                  <Table.Td>
+                    {m.sourceVisitNoteId ? t('stock.reason_visit') : (m.reason ?? '—')}
+                  </Table.Td>
+                  <Table.Td>{new Date(m.createdAt).toLocaleDateString('uz-UZ')}</Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        </Table.ScrollContainer>
       )}
     </Stack>
   );

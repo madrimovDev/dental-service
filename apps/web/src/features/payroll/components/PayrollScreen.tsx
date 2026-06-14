@@ -175,32 +175,34 @@ export function PayrollScreen() {
               ) : lineVMs.length === 0 ? (
                 <StateView status="empty" title={t('payroll.no_lines')} />
               ) : (
-                <Table>
-                  <Table.Thead>
-                    <Table.Tr>
-                      <Table.Th>{t('payroll.employee')}</Table.Th>
-                      <Table.Th ta="right">{t('payroll.base_salary')}</Table.Th>
-                      <Table.Th ta="right">{t('payroll.attributed_revenue')}</Table.Th>
-                      <Table.Th ta="right">{t('payroll.commission_percent')}</Table.Th>
-                      <Table.Th ta="right">{t('payroll.commission_amount')}</Table.Th>
-                      <Table.Th ta="right">{t('payroll.total')}</Table.Th>
-                    </Table.Tr>
-                  </Table.Thead>
-                  <Table.Tbody>
-                    {lineVMs.map((l) => (
-                      <Table.Tr key={l.id}>
-                        <Table.Td>{l.employeeName}</Table.Td>
-                        <Table.Td ta="right">{formatCurrency(l.baseSalary, t)}</Table.Td>
-                        <Table.Td ta="right">{formatCurrency(l.attributedRevenue, t)}</Table.Td>
-                        <Table.Td ta="right">{l.commissionPercent}%</Table.Td>
-                        <Table.Td ta="right">{formatCurrency(l.commissionAmount, t)}</Table.Td>
-                        <Table.Td ta="right" fw={600}>
-                          {formatCurrency(l.total, t)}
-                        </Table.Td>
+                <Table.ScrollContainer minWidth={800}>
+                  <Table>
+                    <Table.Thead>
+                      <Table.Tr>
+                        <Table.Th>{t('payroll.employee')}</Table.Th>
+                        <Table.Th ta="right">{t('payroll.base_salary')}</Table.Th>
+                        <Table.Th ta="right">{t('payroll.attributed_revenue')}</Table.Th>
+                        <Table.Th ta="right">{t('payroll.commission_percent')}</Table.Th>
+                        <Table.Th ta="right">{t('payroll.commission_amount')}</Table.Th>
+                        <Table.Th ta="right">{t('payroll.total')}</Table.Th>
                       </Table.Tr>
-                    ))}
-                  </Table.Tbody>
-                </Table>
+                    </Table.Thead>
+                    <Table.Tbody>
+                      {lineVMs.map((l) => (
+                        <Table.Tr key={l.id}>
+                          <Table.Td>{l.employeeName}</Table.Td>
+                          <Table.Td ta="right">{formatCurrency(l.baseSalary, t)}</Table.Td>
+                          <Table.Td ta="right">{formatCurrency(l.attributedRevenue, t)}</Table.Td>
+                          <Table.Td ta="right">{l.commissionPercent}%</Table.Td>
+                          <Table.Td ta="right">{formatCurrency(l.commissionAmount, t)}</Table.Td>
+                          <Table.Td ta="right" fw={600}>
+                            {formatCurrency(l.total, t)}
+                          </Table.Td>
+                        </Table.Tr>
+                      ))}
+                    </Table.Tbody>
+                  </Table>
+                </Table.ScrollContainer>
               )}
             </Stack>
           </Card>
