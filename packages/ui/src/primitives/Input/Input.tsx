@@ -28,6 +28,7 @@ export function Input({
         type={type}
         value={value}
         placeholder={placeholder}
+        aria-invalid={invalid || undefined}
         onChange={onChange ? (e) => onChange(e.target.value, e) : undefined}
       />
     </div>

@@ -120,12 +120,21 @@ export function BranchesSettingsScreen() {
                     <Table.Td>
                       <Group gap="xs" justify="flex-end">
                         {hasPermission('branch.edit') && (
-                          <ActionIcon variant="subtle" onClick={() => openEdit(b)}>
+                          <ActionIcon
+                            variant="subtle"
+                            onClick={() => openEdit(b)}
+                            aria-label={t('common.edit')}
+                          >
                             <IconEdit size={16} />
                           </ActionIcon>
                         )}
                         {hasPermission('branch.delete') && (
-                          <ActionIcon variant="subtle" color="red" onClick={() => setToDelete(b)}>
+                          <ActionIcon
+                            variant="subtle"
+                            color="red"
+                            onClick={() => setToDelete(b)}
+                            aria-label={t('common.delete')}
+                          >
                             <IconTrash size={16} />
                           </ActionIcon>
                         )}

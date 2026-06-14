@@ -74,12 +74,14 @@ export function ServicesScreen() {
           <TextInput
             leftSection={<IconSearch size={16} />}
             placeholder={t('services.search')}
+            aria-label={t('services.search')}
             value={search}
             onChange={(e) => setSearch(e.currentTarget.value)}
             flex={1}
           />
           <Select
             placeholder={t('services.category')}
+            aria-label={t('services.category')}
             data={categoryOptions}
             value={category}
             onChange={setCategory}

@@ -647,6 +647,7 @@
   },
   "image": {
     "title": "Bemor rasmlari",
+    "zoom": "Kattalashtirib ko'rish",
     "upload": "Yuklash",
     "select_file": "Fayl tanlash",
     "uploading": "Yuklanmoqda...",

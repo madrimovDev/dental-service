@@ -97,6 +97,7 @@ export function PlanFormModal({
                     color="red"
                     variant="subtle"
                     onClick={() => form.removeListItem('stages', i)}
+                    aria-label={t('common.delete')}
                   >
                     <IconTrash size={16} />
                   </ActionIcon>

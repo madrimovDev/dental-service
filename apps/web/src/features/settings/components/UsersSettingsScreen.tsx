@@ -110,12 +110,14 @@ export function UsersSettingsScreen() {
           <TextInput
             leftSection={<IconSearch size={16} />}
             placeholder={t('settings.users_search')}
+            aria-label={t('settings.users_search')}
             value={filter.search}
             onChange={(e) => setFilter((f) => ({ ...f, search: e.currentTarget.value }))}
             style={{ flex: 1 }}
           />
           <Select
             placeholder={t('settings.users_filter_branch')}
+            aria-label={t('settings.users_filter_branch')}
             clearable
             data={branches.data?.map((b) => ({ value: b.id, label: b.name })) ?? []}
             value={filter.branchId}
@@ -123,6 +125,7 @@ export function UsersSettingsScreen() {
           />
           <Select
             placeholder={t('settings.users_filter_role')}
+            aria-label={t('settings.users_filter_role')}
             clearable
             data={roles.data?.map((r) => ({ value: r.id, label: r.name })) ?? []}
             value={filter.roleId}
@@ -170,6 +173,7 @@ export function UsersSettingsScreen() {
                             })
                           }
                           title={t('staff.edit_profile')}
+                          aria-label={t('staff.edit_profile')}
                         >
                           <IconUserCog size={16} />
                         </ActionIcon>
@@ -180,6 +184,7 @@ export function UsersSettingsScreen() {
                           color="blue"
                           onClick={() => setToReset(a.userId)}
                           title={t('users.reset_password')}
+                          aria-label={t('users.reset_password')}
                         >
                           <IconKey size={16} />
                         </ActionIcon>
@@ -189,6 +194,7 @@ export function UsersSettingsScreen() {
                           variant="subtle"
                           color="red"
                           onClick={() => setToRemove(a.assignmentId)}
+                          aria-label={t('common.delete')}
                         >
                           <IconTrash size={16} />
                         </ActionIcon>

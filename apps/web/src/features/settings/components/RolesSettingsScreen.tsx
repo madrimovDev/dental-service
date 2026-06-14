@@ -65,12 +65,21 @@ export function RolesSettingsScreen() {
                   <Table.Td>
                     <Group gap="xs" justify="flex-end">
                       {hasPermission('role.manage') && (
-                        <ActionIcon variant="subtle" onClick={() => openEdit(r)}>
+                        <ActionIcon
+                          variant="subtle"
+                          onClick={() => openEdit(r)}
+                          aria-label={t('common.edit')}
+                        >
                           <IconEdit size={16} />
                         </ActionIcon>
                       )}
                       {hasPermission('role.manage') && !r.isSystem && (
-                        <ActionIcon variant="subtle" color="red" onClick={() => setToDelete(r)}>
+                        <ActionIcon
+                          variant="subtle"
+                          color="red"
+                          onClick={() => setToDelete(r)}
+                          aria-label={t('common.delete')}
+                        >
                           <IconTrash size={16} />
                         </ActionIcon>
                       )}

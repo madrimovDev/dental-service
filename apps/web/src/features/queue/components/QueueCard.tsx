@@ -30,7 +30,11 @@ export function QueueCard({
       <Group justify="space-between" wrap="nowrap">
         <Stack gap={2}>
           <Group gap="xs">
-            <Badge size="lg" color={statusColor[vm.status]}>
+            <Badge
+              size="lg"
+              color={statusColor[vm.status]}
+              aria-label={`#${vm.queueNumber} — ${t(`queue.${vm.status}`)}`}
+            >
               #{vm.queueNumber}
             </Badge>
             <Text size="sm">{vm.patientName}</Text>

@@ -41,7 +41,14 @@ export function StockItemsTable({
         {items.map((item) => (
           <Table.Tr
             key={item.id}
+            tabIndex={0}
             onClick={() => onSelect(item.id)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onSelect(item.id);
+              }
+            }}
             style={{ cursor: 'pointer' }}
             bg={selectedId === item.id ? 'var(--mantine-color-blue-light)' : undefined}
           >

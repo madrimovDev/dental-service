@@ -61,6 +61,9 @@
   border-color: transparent;
   box-shadow: none;
 }
+.root[data-variant="danger"]:hover {
+  background: color-mix(in srgb, var(--danger) 88%, black);
+}
 
 .root[data-size="sm"] {
   padding: 6px 11px;

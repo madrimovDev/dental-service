@@ -63,6 +63,7 @@ export function CategoryManagerModal({ opened, onClose, categories }: CategoryMa
                     variant="subtle"
                     loading={remove.isPending}
                     onClick={() => remove.mutate(c.id)}
+                    aria-label={t('common.delete')}
                   >
                     <IconTrash size={16} />
                   </ActionIcon>
