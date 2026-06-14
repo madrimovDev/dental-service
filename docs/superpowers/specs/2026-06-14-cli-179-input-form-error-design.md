@@ -49,22 +49,29 @@ Shuning uchun:
 
 `Select.tsx` Mantine `Select` wrapper — `error?: ReactNode` va `disabled?: boolean` props qo'shib bevosita Mantine'ga uzatish (Mantine Select ikkalasini ham native qo'llab-quvvatlaydi, error matn + styling bepul).
 
-### 3.3 Call-site migration (faqat form-bog'liq)
+> **Qayd (audit root-cause takrori):** `FamilyTab` raw Mantine `Select` ishlatadi, chunki `searchable`/`searchValue`/`onSearchChange`/`nothingFoundMessage` kerak — `@dental/ui` Select wrapper bu props'larni ochmaydi (under-featured primitiv — auditning asl sababi). Bu task'da qoldiriladi; kelajak kengaytirish (CLI-181-yondosh yoki yangi task) uchun qayd.
 
-| Fayl | O'zgarish |
-|---|---|
-| `GeneralTab.tsx` | 4 Input `invalid={!!form.errors.X}` → `error={form.errors.X}`; 1 Select `error={form.errors.gender}` qo'shish |
-| `PatientNewScreen.tsx` | 6 Input → `error={form.errors.X}`; 2 Select → `error` |
-| `FamilyTab.tsx` | 1 Input → `error={form.errors.relationship}` (raw Mantine Select allaqachon `error` bilan — qoldiriladi) |
-| `MedicalTab.tsx` | form-bog'liq Input (`bloodType` va sh.k.) → `error`; **allergy ro'yxati (non-form) O'ZGARMAYDI** |
+### 3.3 Call-site migration (FAQAT schema xato ishlab chiqaradigan maydonlar)
 
-> `invalid` boshqa joyda (DesignSystemPage showcase) qoladi — orqaga moslik saqlanadi.
+⚠️ **Schema-tekshirildi** (advisor must-fix — `form.errors.X` doim undefined bo'lsa wire foydasiz):
+
+| Fayl | Schema | O'zgarish |
+|---|---|---|
+| `GeneralTab.tsx` | `patientEditSchema`: `fullName` min(2) ✓ | `fullName` Input `invalid` → `error={form.errors.fullName}` (asosiy). Boshqalar (dateOfBirth/passport/address optional yoki max-only) `error` qo'shiladi — **zararsiz, kelajakka tayyor**, lekin test'da guard qilinmaydi |
+| `PatientNewScreen.tsx` | `patientFormSchema`: `fullName` min(2) ✓, `insurance` refine→`policyNumber` ✓ | `fullName` + `insurance.provider`/`insurance.policyNumber` Input → `error` (validatsiya qiladi); qolgan Input/Select → `error` (zararsiz) |
+| `FamilyTab.tsx` | `addRelativeFormSchema`: `relationship` min(1) ✓ | `relationship` Input → `error={form.errors.relationship}` (raw Mantine Select allaqachon `error` — qoldiriladi, §3.2 note) |
+| `MedicalTab.tsx` | `medicalRecordFormSchema`: **barchasi `optional`** | ❌ **O'ZGARMAYDI** — hech bir maydon validatsiya xatosi bermaydi → `error` wire foydasiz. Allergy ro'yxati ham non-form. MedicalTab bu task'dan tashqarida |
+
+> `invalid` boshqa joyda (DesignSystemPage showcase) qoladi — orqaga moslik. Yangi kodda `error` afzal (mini-inconsistency, lekin ikkalasi yashaydi).
 
 ## 4. Test strategiyasi
 
-1. `Input.test.tsx` — mavjud 3 test (label/placeholder, `onChange(value)` signature, `invalid` data-attr) **yashil qoladi** (signature buzilmaydi). Yangi: `error` matnni render qiladi + `role="alert"` + `data-invalid` avtomatik.
-2. `Select.test.tsx` — yangi: `error` propi Mantine error matnini ko'rsatadi.
-3. Manual (Playwright ixtiyoriy): PatientNewScreen'da bo'sh `fullName` bilan submit → validatsiya XABARI ko'rinadi (avval faqat ramka edi).
+1. **Form-level guard (advisor must-fix — ASOSIY)** — `PatientNewScreen` (yoki kamroq bog'liqlikli GeneralTab) render, bo'sh `fullName` bilan submit, validatsiya XABARI DOM'da paydo bo'lishini assert. ⚠️ Bu **bugun fail bo'ladi, fix'dan keyin pass** — chunki bug integration-level (call-site `invalid` o'rniga `error` uzatadi). Component test buni guard QILMAYDI (0 call-site migrate qilinса ham o'tadi). Implementatsiyada `apps/web` test-utils provider'lari (router/i18n/query) tekshiriladi; validatsiya fail submit'ni bloklaydi → API mock shart emas.
+2. `Input.test.tsx` — mavjud 3 test (label/placeholder, `onChange(value)` signature, `invalid` data-attr) **yashil qoladi** (signature buzilmaydi). Yangi: `error` matnni render qiladi + `role="alert"` + `data-invalid` avtomatik.
+3. `Select.test.tsx` — yangi: `error` propi Mantine error matnini ko'rsatadi.
+4. Manual (Playwright ixtiyoriy): PatientNewScreen'da bo'sh `fullName` submit → xabar ko'rinadi.
+
+> Test darsi (CLI-153 precedent): real xulqni guard qil, komponent qobiliyatini emas. Form-level test #1 = bug'ning haqiqiy guard'i.
 
 ## 5. Ko'lamdan tashqari
 - Input'ni Mantine TextInput'ga to'liq retire → qilinmaydi (YAGNI, churn).
