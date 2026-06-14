@@ -15,6 +15,7 @@ import { DatePickerInput } from '@mantine/dates';
 import { IconFileSpreadsheet, IconFileTypeCsv } from '@tabler/icons-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useDoctors } from '@/features/appointments/appointments.api';
 import { useBranches } from '@/features/queue/queue.api.ts';
 import { formatCurrency, formatNumber } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth-store.ts';
@@ -144,6 +145,14 @@ export function ReportsScreen() {
   const appointments = useAppointmentStats(range);
   const doctors = useDoctorWorkload(range);
   const plans = usePlanCompletion(range);
+
+  // doctorId → ism (workload jadvali xom UUID o'rniga ism ko'rsatadi; CSV/XLSX ham)
+  const doctorList = useDoctors();
+  const doctorName = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const d of doctorList.data ?? []) map.set(d.id, d.name);
+    return (id: string) => map.get(id) ?? id.slice(0, 8);
+  }, [doctorList.data]);
 
   const fmt = (n: number) => formatNumber(n);
   const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
@@ -288,10 +297,12 @@ export function ReportsScreen() {
             hasData={!!doctors.data && doctors.data.length > 0}
             emptyText={t('reports.empty', { defaultValue: 'Ma’lumot yo‘q' })}
             onCsv={() =>
-              doctors.data && downloadCsv(doctorsToRows(doctors.data), `shifokorlar_${suffix}`)
+              doctors.data &&
+              downloadCsv(doctorsToRows(doctors.data, doctorName), `shifokorlar_${suffix}`)
             }
             onXlsx={() =>
-              doctors.data && downloadXlsx(doctorsToRows(doctors.data), `shifokorlar_${suffix}`)
+              doctors.data &&
+              downloadXlsx(doctorsToRows(doctors.data, doctorName), `shifokorlar_${suffix}`)
             }
             exportLabel={exportLabel}
           >
@@ -307,7 +318,7 @@ export function ReportsScreen() {
                 <Table.Tbody>
                   {doctors.data.map((d) => (
                     <Table.Tr key={d.doctorId}>
-                      <Table.Td>{d.doctorId}</Table.Td>
+                      <Table.Td>{doctorName(d.doctorId)}</Table.Td>
                       <Table.Td>{fmt(d.total)}</Table.Td>
                       <Table.Td>{fmt(d.completed)}</Table.Td>
                     </Table.Tr>
