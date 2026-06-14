@@ -15,6 +15,7 @@ import { useForm } from '@mantine/form';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { formatCurrency } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import {
   useCreateRun,
@@ -23,7 +24,7 @@ import {
   usePayrollRuns,
   useUserAssignments,
 } from '../payroll.api';
-import { formatUZS, toLocalDate, toPayrollLineVM, toPayrollRunVM } from '../payroll.mappers';
+import { toLocalDate, toPayrollLineVM, toPayrollRunVM } from '../payroll.mappers';
 import { periodFormSchema } from '../payroll.schema';
 
 export function PayrollScreen() {
@@ -193,12 +194,12 @@ export function PayrollScreen() {
                     {lineVMs.map((l) => (
                       <Table.Tr key={l.id}>
                         <Table.Td>{l.employeeName}</Table.Td>
-                        <Table.Td ta="right">{formatUZS(l.baseSalary)}</Table.Td>
-                        <Table.Td ta="right">{formatUZS(l.attributedRevenue)}</Table.Td>
+                        <Table.Td ta="right">{formatCurrency(l.baseSalary, t)}</Table.Td>
+                        <Table.Td ta="right">{formatCurrency(l.attributedRevenue, t)}</Table.Td>
                         <Table.Td ta="right">{l.commissionPercent}%</Table.Td>
-                        <Table.Td ta="right">{formatUZS(l.commissionAmount)}</Table.Td>
+                        <Table.Td ta="right">{formatCurrency(l.commissionAmount, t)}</Table.Td>
                         <Table.Td ta="right" fw={600}>
-                          {formatUZS(l.total)}
+                          {formatCurrency(l.total, t)}
                         </Table.Td>
                       </Table.Tr>
                     ))}

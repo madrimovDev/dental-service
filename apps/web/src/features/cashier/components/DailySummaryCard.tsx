@@ -2,9 +2,7 @@ import type { DailySummary } from '@dental/api-client';
 import { Badge, Paper, Stack, Table, Text, Title } from '@mantine/core';
 import { IconChartBar } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
-
-const formatUZS = (n: string | number) =>
-  `${new Intl.NumberFormat('uz-UZ').format(typeof n === 'string' ? Number(n) : n)} so'm`;
+import { formatCurrency } from '@/lib/format';
 
 export interface DailySummaryCardProps {
   summary: DailySummary;
@@ -34,7 +32,7 @@ export function DailySummaryCard({ summary }: DailySummaryCardProps) {
                     </Badge>
                   </Table.Td>
                   <Table.Td>{b.count}</Table.Td>
-                  <Table.Td fw={600}>{formatUZS(b.total)}</Table.Td>
+                  <Table.Td fw={600}>{formatCurrency(Number(b.total), t)}</Table.Td>
                 </Table.Tr>
               ))}
             </Table.Tbody>

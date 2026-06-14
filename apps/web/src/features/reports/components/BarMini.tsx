@@ -1,4 +1,5 @@
 import { Box, Group, Stack, Text } from '@mantine/core';
+import { formatNumber } from '@/lib/format';
 
 export type BarMiniDatum = { label: string; value: number };
 
@@ -23,7 +24,7 @@ export function BarMini({ data }: { data: BarMiniDatum[] }) {
             />
           </Box>
           <Text size="sm" style={{ width: 90, flexShrink: 0, textAlign: 'right' }}>
-            {new Intl.NumberFormat('uz-UZ').format(d.value)}
+            {formatNumber(d.value)}
           </Text>
         </Group>
       ))}

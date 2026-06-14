@@ -1,6 +1,7 @@
 import { StateView } from '@dental/ui';
 import { Container, Grid, SimpleGrid, Stack, Title } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
+import { formatCurrency } from '@/lib/format';
 import {
   useBranchNames,
   useDefaultPeriod,
@@ -12,7 +13,6 @@ import { BarMini } from './widgets/BarMini.tsx';
 import { MiniList } from './widgets/MiniList.tsx';
 import { StatCard } from './widgets/StatCard.tsx';
 
-const fmtUZS = (n: number) => `${new Intl.NumberFormat('uz-UZ').format(Math.round(n))} so'm`;
 const fmtPct = (n: number) => `${Math.round(n * 100)}%`;
 
 export function ManagerDashboard() {
@@ -47,7 +47,7 @@ export function ManagerDashboard() {
             <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }}>
               <StatCard
                 label={t('dashboard.revenue_total')}
-                value={rev ? fmtUZS(rev.total) : '—'}
+                value={rev ? formatCurrency(rev.total, t) : '—'}
                 color="teal"
               />
               <StatCard
@@ -71,7 +71,7 @@ export function ManagerDashboard() {
                   items={(rev?.byBranch ?? []).map((b) => ({
                     id: b.branchId,
                     label: branchNames.data?.get(b.branchId) ?? b.branchId,
-                    right: fmtUZS(b.total),
+                    right: formatCurrency(b.total, t),
                   }))}
                   emptyText={t('dashboard.empty')}
                 />
@@ -92,7 +92,7 @@ export function ManagerDashboard() {
                   data={(rev?.byService ?? []).slice(0, 8).map((s) => ({
                     label: s.serviceName,
                     value: s.total,
-                    display: fmtUZS(s.total),
+                    display: formatCurrency(s.total, t),
                   }))}
                 />
               </Grid.Col>

@@ -37,7 +37,7 @@ export function CartTable({ cart, onUpdate, onRemove }: CartTableProps) {
             w={130}
             size="xs"
             thousandSeparator=" "
-            suffix=" so'm"
+            suffix={` ${t('common.currency')}`}
           />
           <ActionIcon
             color="red"

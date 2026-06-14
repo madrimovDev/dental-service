@@ -15,11 +15,10 @@ import {
 import { IconCash } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { formatCurrency } from '@/lib/format';
 import { useCreateTransaction, usePatientPlans, usePlanBalance } from '../cashier.api';
 import { buildAllocationPayload, toPlanBalanceVM } from '../cashier.mappers';
 import type { StageState } from '../cashier.types';
-
-const formatUZS = (n: number) => `${new Intl.NumberFormat('uz-UZ').format(n)} so'm`;
 
 const STATE_TONE: Record<StageState, 'success' | 'warning' | 'danger'> = {
   paid: 'success',
@@ -154,8 +153,8 @@ export function PlanBillingPanel({ branchId, patientId }: PlanBillingPanelProps)
                         />
                       </Table.Td>
                       <Table.Td>{s.serviceName}</Table.Td>
-                      <Table.Td>{formatUZS(s.cost)}</Table.Td>
-                      <Table.Td>{formatUZS(s.remaining)}</Table.Td>
+                      <Table.Td>{formatCurrency(s.cost, t)}</Table.Td>
+                      <Table.Td>{formatCurrency(s.remaining, t)}</Table.Td>
                       <Table.Td>
                         <StatusPill status={STATE_TONE[s.state]}>
                           {t(`cashier.plan_billing.state.${s.state}`)}
@@ -184,7 +183,7 @@ export function PlanBillingPanel({ branchId, patientId }: PlanBillingPanelProps)
 
             <Group justify="space-between">
               <Text size="sm" c="dimmed">
-                {t('cashier.plan_billing.balance')}: {formatUZS(balanceVM.balance)}
+                {t('cashier.plan_billing.balance')}: {formatCurrency(balanceVM.balance, t)}
               </Text>
             </Group>
 

@@ -1,6 +1,6 @@
 import type { PayrollLine, PayrollRun } from '@dental/api-client';
 import { describe, expect, it } from 'vitest';
-import { formatUZS, toLocalDate, toPayrollLineVM, toPayrollRunVM } from './payroll.mappers';
+import { toLocalDate, toPayrollLineVM, toPayrollRunVM } from './payroll.mappers';
 
 function line(over: Partial<PayrollLine> = {}): PayrollLine {
   return {
@@ -68,13 +68,6 @@ describe('toPayrollRunVM', () => {
       status: 'draft',
       createdAt: '2026-06-11T05:00:00Z',
     });
-  });
-});
-
-describe('formatUZS', () => {
-  it('UZS son formatlaydi', () => {
-    expect(formatUZS(600000)).toContain("so'm");
-    expect(formatUZS(0)).toContain('0');
   });
 });
 

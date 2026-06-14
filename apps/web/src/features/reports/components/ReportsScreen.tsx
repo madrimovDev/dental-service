@@ -16,6 +16,7 @@ import { IconFileSpreadsheet, IconFileTypeCsv } from '@tabler/icons-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useBranches } from '@/features/queue/queue.api.ts';
+import { formatCurrency, formatNumber } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import {
   useAppointmentStats,
@@ -144,7 +145,7 @@ export function ReportsScreen() {
   const doctors = useDoctorWorkload(range);
   const plans = usePlanCompletion(range);
 
-  const fmt = (n: number) => new Intl.NumberFormat('uz-UZ').format(n);
+  const fmt = (n: number) => formatNumber(n);
   const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
   const exportLabel = {
     csv: t('reports.export_csv', { defaultValue: 'CSV' }),
@@ -208,8 +209,8 @@ export function ReportsScreen() {
             {revenue.data && (
               <Stack gap="md">
                 <Text fw={600}>
-                  {t('reports.total', { defaultValue: 'Jami' })}: {fmt(revenue.data.total)}{' '}
-                  {t('reports.currency', { defaultValue: 'so‘m' })}
+                  {t('reports.total', { defaultValue: 'Jami' })}:{' '}
+                  {formatCurrency(revenue.data.total, t)}
                 </Text>
                 {revenue.data.byService.length > 0 && (
                   <BarMini

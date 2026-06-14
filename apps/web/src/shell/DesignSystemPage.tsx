@@ -15,8 +15,10 @@ import {
 import { Button as MButton, Menu, Modal, useMantineColorScheme } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export function DesignSystemPage() {
+  const { t } = useTranslation();
   const { toggleColorScheme } = useMantineColorScheme();
   const [tab, setTab] = useState('info');
   return (
@@ -83,7 +85,7 @@ export function DesignSystemPage() {
           <StatCard
             label="Kassa (bugun)"
             value={<Mono>2 400</Mono>}
-            unit="ming so'm"
+            unit={`ming ${t('common.currency')}`}
             delta="12%"
             deltaDir="up"
             accent

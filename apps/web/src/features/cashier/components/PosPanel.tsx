@@ -17,12 +17,11 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BalanceBadge } from '@/components/BalanceBadge';
 import { usePatientBalance } from '@/features/patients/patients.api';
+import { formatCurrency } from '@/lib/format';
 import { fetchServicePrices, useCreateTransaction, useServices } from '../cashier.api';
 import { buildCreatePayload, computeNetTotal, findActivePrice } from '../cashier.mappers';
 import type { CartItem } from '../cashier.types';
 import { CartTable } from './CartTable';
-
-const formatUZS = (n: number) => `${new Intl.NumberFormat('uz-UZ').format(n)} so'm`;
 
 export interface PosPanelProps {
   branchId: string;
@@ -143,7 +142,7 @@ export function PosPanel({ branchId, patientId }: PosPanelProps) {
           min={0}
           step={1000}
           thousandSeparator=" "
-          suffix=" so'm"
+          suffix={` ${t('common.currency')}`}
         />
 
         <Group grow>
@@ -165,7 +164,7 @@ export function PosPanel({ branchId, patientId }: PosPanelProps) {
             min={0}
             step={1000}
             thousandSeparator=" "
-            suffix=" so'm"
+            suffix={` ${t('common.currency')}`}
           />
         </Group>
 
@@ -179,7 +178,7 @@ export function PosPanel({ branchId, patientId }: PosPanelProps) {
         <Divider />
         <Group justify="space-between">
           <Text fw={700} size="lg">
-            {t('cashier.total')}: {formatUZS(netTotal)}
+            {t('cashier.total')}: {formatCurrency(netTotal, t)}
           </Text>
           <Button
             leftSection={<IconCash size={18} />}
