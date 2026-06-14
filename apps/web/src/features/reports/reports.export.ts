@@ -48,11 +48,16 @@ export function appointmentsToRows(r: AppointmentStatsReport): string[][] {
   return rows;
 }
 
-export function doctorsToRows(rows: DoctorWorkloadRow[]): string[][] {
+export function doctorsToRows(
+  rows: DoctorWorkloadRow[],
+  nameOf?: (id: string) => string,
+): string[][] {
   const out: string[][] = [];
   out.push(['Shifokorlar yuklamasi']);
   out.push(['Shifokor', 'Jami', 'Yakunlangan']);
-  for (const r of rows) out.push([r.doctorId, String(r.total), String(r.completed)]);
+  for (const r of rows) {
+    out.push([nameOf ? nameOf(r.doctorId) : r.doctorId, String(r.total), String(r.completed)]);
+  }
   return out;
 }
 
