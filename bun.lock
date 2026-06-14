@@ -121,16 +121,6 @@
         "@dental/core": "workspace:*",
       },
     },
-    "packages/odontogram": {
-      "name": "@dental/odontogram",
-      "version": "0.1.0",
-      "dependencies": {
-        "@dental/core": "workspace:*",
-      },
-      "peerDependencies": {
-        "react": "^18.3.1",
-      },
-    },
     "packages/ui": {
       "name": "@dental/ui",
       "version": "0.1.0",
@@ -260,8 +250,6 @@
     "@dental/i18n": ["@dental/i18n@workspace:packages/i18n"],
 
     "@dental/notifications": ["@dental/notifications@workspace:packages/notifications"],
-
-    "@dental/odontogram": ["@dental/odontogram@workspace:packages/odontogram"],
 
     "@dental/ui": ["@dental/ui@workspace:packages/ui"],
 
