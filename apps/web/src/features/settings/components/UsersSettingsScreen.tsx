@@ -151,7 +151,11 @@ export function UsersSettingsScreen() {
             <Table.Tbody>
               {filtered.map((a) => (
                 <Table.Tr key={a.assignmentId}>
-                  <Table.Td>{a.userFullName ?? '—'}</Table.Td>
+                  <Table.Td>
+                    <Text truncate maw={220}>
+                      {a.userFullName ?? '—'}
+                    </Text>
+                  </Table.Td>
                   <Table.Td>{a.userPhone}</Table.Td>
                   <Table.Td>{a.roleName}</Table.Td>
                   <Table.Td>{a.branchName ?? t('users.all_branches')}</Table.Td>

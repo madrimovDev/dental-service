@@ -23,10 +23,14 @@
 
 .identity {
   flex: 1;
+  min-width: 0;
 }
 
 .name {
   font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .age {

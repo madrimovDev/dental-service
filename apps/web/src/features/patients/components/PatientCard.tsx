@@ -101,7 +101,9 @@ export function PatientCard() {
         title={
           <span style={{ alignItems: 'center', display: 'flex', gap: 12 }}>
             {patient && <Avatar name={patient.fullName} size="lg" />}
-            {patient?.fullName ?? ''}
+            <Text component="span" truncate maw={480}>
+              {patient?.fullName ?? ''}
+            </Text>
             {balanceQuery.data && <BalanceBadge balance={balanceQuery.data.balance} size="md" />}
           </span>
         }

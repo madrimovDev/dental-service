@@ -104,7 +104,11 @@ export function PatientsListScreen() {
                 <Eye size={16} />
               </IconButton>
               {hasPermission('patient.delete') && (
-                <IconButton label={t('common.archive')} onClick={() => archiveMut.mutate(p.id)}>
+                <IconButton
+                  label={t('common.archive')}
+                  disabled={archiveMut.isPending}
+                  onClick={() => archiveMut.mutate(p.id)}
+                >
                   <Archive size={16} />
                 </IconButton>
               )}

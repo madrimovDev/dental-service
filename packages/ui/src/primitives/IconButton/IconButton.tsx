@@ -8,6 +8,7 @@ export interface IconButtonProps {
   size?: 'sm' | 'md';
   bordered?: boolean;
   dot?: boolean;
+  disabled?: boolean;
   onClick?: (e: MouseEvent<HTMLButtonElement>) => void;
 }
 
@@ -17,6 +18,7 @@ export function IconButton({
   size = 'md',
   bordered = false,
   dot = false,
+  disabled = false,
   onClick,
 }: IconButtonProps) {
   return (
@@ -25,6 +27,7 @@ export function IconButton({
       type="button"
       aria-label={label}
       title={label}
+      disabled={disabled}
       onClick={onClick}
       className={classes.root}
       data-size={size}
