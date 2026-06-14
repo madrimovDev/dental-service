@@ -1,10 +1,11 @@
-import { ApiError, getWorkspaceBranches, switchWorkspace } from '@dental/api-client';
+import { ApiError } from '@dental/api-client';
 import { Menu } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { Building2, Check, ChevronDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import { useSwitchWorkspace, useWorkspaceBranches } from '@/features/auth';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import classes from './Topbar.module.css';
 
@@ -20,20 +21,9 @@ export function BranchSwitcher() {
   const queryClient = useQueryClient();
   const { activeTenantId, activeBranchId, setTokens, setContext, clear } = useAuthStore();
 
-  const branchesQuery = useQuery({
-    queryKey: ['auth', 'workspace-branches', activeTenantId],
-    queryFn: () => getWorkspaceBranches().then((r) => r.data),
-    enabled: !!activeTenantId,
-  });
+  const branchesQuery = useWorkspaceBranches();
 
-  const switchMut = useMutation({
-    mutationFn: (branchId: string | undefined) => {
-      const rt = useAuthStore.getState().refreshToken;
-      if (!activeTenantId || !rt) throw new Error('No active workspace');
-      return switchWorkspace({ tenantId: activeTenantId, branchId, refreshToken: rt }).then(
-        (r) => r.data,
-      );
-    },
+  const switchMut = useSwitchWorkspace({
     onSuccess: (data) => {
       const payload = JSON.parse(atob(data.accessToken.split('.')[1] ?? '')) as {
         atid: string | null;
@@ -70,8 +60,8 @@ export function BranchSwitcher() {
 
   const data = branchesQuery.data;
   const totalChoices = (data?.branches.length ?? 0) + (data?.allowAllBranches ? 1 : 0);
-  // Tanlov yo'q — switcher'ni umuman ko'rsatmaymiz.
-  if (!data || totalChoices <= 1) return null;
+  // Tanlov yo'q (yoki active workspace yo'q) — switcher'ni umuman ko'rsatmaymiz.
+  if (!data || totalChoices <= 1 || !activeTenantId) return null;
 
   const currentName = activeBranchId
     ? (data.branches.find((b) => b.id === activeBranchId)?.name ?? t('shell.select_branch'))
@@ -95,7 +85,7 @@ export function BranchSwitcher() {
         {data.allowAllBranches && (
           <Menu.Item
             leftSection={!activeBranchId ? <Check size={16} /> : <span style={{ width: 16 }} />}
-            onClick={() => activeBranchId && switchMut.mutate(undefined)}
+            onClick={() => activeBranchId && switchMut.mutate({ tenantId: activeTenantId })}
           >
             {t('shell.all_branches')}
           </Menu.Item>
@@ -106,7 +96,10 @@ export function BranchSwitcher() {
             leftSection={
               activeBranchId === b.id ? <Check size={16} /> : <span style={{ width: 16 }} />
             }
-            onClick={() => activeBranchId !== b.id && switchMut.mutate(b.id)}
+            onClick={() =>
+              activeBranchId !== b.id &&
+              switchMut.mutate({ tenantId: activeTenantId, branchId: b.id })
+            }
           >
             {b.name}
           </Menu.Item>

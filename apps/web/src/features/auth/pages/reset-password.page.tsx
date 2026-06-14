@@ -1,4 +1,3 @@
-import { passwordReset } from '@dental/api-client';
 import {
   Alert,
   Anchor,
@@ -11,12 +10,12 @@ import {
   Title,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { useMutation } from '@tanstack/react-query';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
+import { usePasswordReset } from '../auth.api';
 
 const schema = z.object({
   token: z.string().min(1),
@@ -33,9 +32,7 @@ export function ResetPasswordPage() {
     validate: zod4Resolver(schema),
   });
 
-  const mut = useMutation({
-    mutationFn: (v: { token: string; newPassword: string }) =>
-      passwordReset({ token: v.token, newPassword: v.newPassword }).then((r) => r.data),
+  const mut = usePasswordReset({
     onSuccess: () => navigate('/login'),
     onError: () => setError(t('auth.reset.invalid')),
   });
