@@ -30,7 +30,7 @@ import {
   useUsers,
 } from '../settings.api';
 import { filterAssignments } from '../settings.mappers';
-import { type InviteFormValues, inviteSchema } from '../settings.schema';
+import { type InviteFormValues, makeInviteSchema } from '../settings.schema';
 import type { UsersFilter } from '../settings.types';
 import { ConfirmModal } from './ConfirmModal';
 import { SettingsShell } from './SettingsShell';
@@ -63,7 +63,7 @@ export function UsersSettingsScreen() {
 
   const form = useForm<InviteFormValues>({
     initialValues: { phone: '', fullName: '', roleId: '', branchId: '' },
-    validate: zod4Resolver(inviteSchema),
+    validate: zod4Resolver(makeInviteSchema(t)),
   });
 
   const closeAll = () => {

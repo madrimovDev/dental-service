@@ -72,7 +72,7 @@ export function SelectWorkspacePage() {
       // Boshqa xatolar uchun — error toast + autoSelect qayta urinishini tiyish
       notifications.show({
         title: t('common.error'),
-        message: err instanceof ApiError ? err.message : 'Switch workspace failed',
+        message: err instanceof ApiError ? err.message : t('auth.select_workspace.switch_failed'),
         color: 'red',
       });
       // autoSelectedRef ni TRUE qoldiramiz — auto qayta urinmaslik

@@ -66,7 +66,7 @@ export function ResetPasswordPage() {
             />
             <PasswordInput
               label={t('auth.reset.new_password')}
-              placeholder="Kamida 12 belgi"
+              placeholder={t('auth.reset.password_placeholder')}
               required
               {...form.getInputProps('newPassword')}
             />

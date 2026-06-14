@@ -74,7 +74,7 @@ export function Topbar({
         <button
           type="button"
           data-active={i18n.language !== 'ru'}
-          aria-label="O'zbekcha"
+          aria-label={t('shell.lang_uz')}
           onClick={() => i18n.changeLanguage('uz')}
         >
           UZ
@@ -82,7 +82,7 @@ export function Topbar({
         <button
           type="button"
           data-active={i18n.language === 'ru'}
-          aria-label="Русский"
+          aria-label={t('shell.lang_ru')}
           onClick={() => i18n.changeLanguage('ru')}
         >
           RU
