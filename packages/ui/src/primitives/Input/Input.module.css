@@ -8,6 +8,19 @@
   font-weight: var(--fw-medium);
   color: var(--text-2);
 }
+.error {
+  font-size: var(--text-sm);
+  color: var(--danger);
+  margin-top: 2px;
+}
+.req {
+  color: var(--danger);
+}
+.wrap[data-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--surface-2);
+}
 
 .wrap {
   display: flex;
