@@ -1,4 +1,3 @@
-import { type ApiError, login } from '@dental/api-client';
 import {
   Alert,
   Anchor,
@@ -10,7 +9,6 @@ import {
   Title,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { useMutation } from '@tanstack/react-query';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -18,6 +16,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { PhoneInput } from '@/components/PhoneInput.tsx';
 import { useAuthStore } from '@/stores/auth-store.ts';
+import { useLogin } from '../auth.api';
 
 const schema = z.object({
   phone: z.string().regex(/^\+?\d{9,15}$/, "Telefon raqami noto'g'ri formatda"),
@@ -35,15 +34,14 @@ export function LoginPage() {
     validate: zod4Resolver(schema),
   });
 
-  const loginMut = useMutation({
-    mutationFn: (body: { phone: string; password: string }) => login(body).then((r) => r.data),
-    onSuccess: async (data) => {
+  const loginMut = useLogin({
+    onSuccess: (data) => {
       setTokens(data.accessToken, data.refreshToken);
       setUser(data.user);
       // After login, check memberships and route appropriately
       navigate('/select-workspace');
     },
-    onError: (err: ApiError) => {
+    onError: (err) => {
       setError(
         err.code === 'auth.invalid_credentials' ? "Telefon yoki parol noto'g'ri" : err.message,
       );

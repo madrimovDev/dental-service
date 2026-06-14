@@ -1,4 +1,4 @@
-import { ApiError, changePassword } from '@dental/api-client';
+import { ApiError } from '@dental/api-client';
 import {
   Alert,
   Button,
@@ -13,12 +13,12 @@ import {
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { IconLock, IconUser } from '@tabler/icons-react';
-import { useMutation } from '@tanstack/react-query';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { useAuthStore } from '@/stores/auth-store.ts';
+import { useChangePassword } from '../profile.api';
 
 const passwordSchema = z
   .object({
@@ -41,12 +41,7 @@ export function ProfilePage() {
     validate: zod4Resolver(passwordSchema),
   });
 
-  const changeMut = useMutation({
-    mutationFn: (values: typeof form.values) =>
-      changePassword({
-        currentPassword: values.currentPassword,
-        newPassword: values.newPassword,
-      }).then((r) => r.data),
+  const changeMut = useChangePassword({
     onSuccess: () => {
       notifications.show({
         title: t('profile.title'),
@@ -96,7 +91,14 @@ export function ProfilePage() {
         </Paper>
 
         <Paper withBorder p="lg" radius="md">
-          <form onSubmit={form.onSubmit((values) => changeMut.mutate(values))}>
+          <form
+            onSubmit={form.onSubmit((values) =>
+              changeMut.mutate({
+                currentPassword: values.currentPassword,
+                newPassword: values.newPassword,
+              }),
+            )}
+          >
             <Stack gap="md">
               <Group>
                 <IconLock size={20} />

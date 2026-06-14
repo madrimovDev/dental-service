@@ -1,4 +1,3 @@
-import { type ApiError, registerTenant } from '@dental/api-client';
 import {
   Alert,
   Anchor,
@@ -12,13 +11,13 @@ import {
   Title,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { useMutation } from '@tanstack/react-query';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { PhoneInput } from '@/components/PhoneInput.tsx';
+import { useRegisterTenant } from '../auth.api';
 
 const schema = z.object({
   tenantName: z.string().min(2, 'Kamida 2 belgi').max(120),
@@ -46,19 +45,11 @@ export function RegisterTenantPage() {
     validate: zod4Resolver(schema),
   });
 
-  const registerMut = useMutation({
-    mutationFn: (values: FormValues) =>
-      registerTenant({
-        tenantName: values.tenantName,
-        ownerPhone: values.ownerPhone,
-        ownerFullName: values.ownerFullName,
-        ownerPassword: values.ownerPassword,
-        defaultLanguage: values.defaultLanguage,
-      }).then((r) => r.data),
+  const registerMut = useRegisterTenant({
     onSuccess: () => {
       navigate('/login');
     },
-    onError: (err: ApiError) => {
+    onError: (err) => {
       if (err.code === 'auth.phone_taken' || err.code === 'auth.email_or_phone_taken') {
         setError("Bu telefon raqami allaqachon ro'yxatdan o'tgan");
       } else {

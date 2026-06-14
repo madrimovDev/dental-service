@@ -1,4 +1,4 @@
-import { ApiError, getMe, switchWorkspace } from '@dental/api-client';
+import { ApiError } from '@dental/api-client';
 import {
   Alert,
   Badge,
@@ -12,11 +12,11 @@ import {
   UnstyledButton,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth-store.ts';
+import { useMe, useSwitchWorkspace } from '../auth.api';
 
 type WorkspaceOption = {
   tenantId: string;
@@ -31,23 +31,14 @@ type WorkspaceOption = {
 export function SelectWorkspacePage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { accessToken, activeTenantId, clear, setTokens, setContext } = useAuthStore();
+  const { activeTenantId, clear, setTokens, setContext } = useAuthStore();
 
   // Auto-select faqat bir marta ishlasin (loop oldini olish).
   const autoSelectedRef = useRef(false);
 
-  const meQuery = useQuery({
-    queryKey: ['auth', 'me'],
-    queryFn: () => getMe().then((r) => r.data),
-    enabled: !!accessToken,
-  });
+  const meQuery = useMe();
 
-  const switchMut = useMutation({
-    mutationFn: (input: { tenantId: string; branchId?: string }) => {
-      const rt = useAuthStore.getState().refreshToken;
-      if (!rt) throw new Error('No refresh token');
-      return switchWorkspace({ ...input, refreshToken: rt }).then((r) => r.data);
-    },
+  const switchMut = useSwitchWorkspace({
     onSuccess: (data) => {
       // Decode JWT to get perms (simple base64 — production: jose lib)
       const payload = JSON.parse(atob(data.accessToken.split('.')[1] ?? '')) as {
