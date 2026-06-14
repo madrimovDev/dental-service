@@ -160,38 +160,40 @@ export function AuditScreen() {
           ) : rows.length === 0 ? (
             <StateView status="empty" title={t('audit.empty')} />
           ) : (
-            <Table verticalSpacing="xs" striped highlightOnHover>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>{t('audit.col.when')}</Table.Th>
-                  <Table.Th>{t('audit.col.who')}</Table.Th>
-                  <Table.Th>{t('audit.col.action')}</Table.Th>
-                  <Table.Th>{t('audit.col.resource')}</Table.Th>
-                  <Table.Th>{t('audit.col.resource_id')}</Table.Th>
-                  <Table.Th />
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {rows.map((r) => (
-                  <Table.Tr key={r.id}>
-                    <Table.Td>{r.whenText}</Table.Td>
-                    <Table.Td>{whoLabel(r.userId)}</Table.Td>
-                    <Table.Td>
-                      <Code>{r.action}</Code>
-                    </Table.Td>
-                    <Table.Td>{r.resourceType}</Table.Td>
-                    <Table.Td>{r.resourceId ? <Mono>{r.resourceId}</Mono> : '—'}</Table.Td>
-                    <Table.Td>
-                      {r.hasDetail && (
-                        <Button variant="subtle" size="compact-xs" onClick={() => setDetail(r)}>
-                          {t('audit.detail')}
-                        </Button>
-                      )}
-                    </Table.Td>
+            <Table.ScrollContainer minWidth={800}>
+              <Table verticalSpacing="xs" striped highlightOnHover>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>{t('audit.col.when')}</Table.Th>
+                    <Table.Th>{t('audit.col.who')}</Table.Th>
+                    <Table.Th>{t('audit.col.action')}</Table.Th>
+                    <Table.Th>{t('audit.col.resource')}</Table.Th>
+                    <Table.Th>{t('audit.col.resource_id')}</Table.Th>
+                    <Table.Th />
                   </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
+                </Table.Thead>
+                <Table.Tbody>
+                  {rows.map((r) => (
+                    <Table.Tr key={r.id}>
+                      <Table.Td>{r.whenText}</Table.Td>
+                      <Table.Td>{whoLabel(r.userId)}</Table.Td>
+                      <Table.Td>
+                        <Code>{r.action}</Code>
+                      </Table.Td>
+                      <Table.Td>{r.resourceType}</Table.Td>
+                      <Table.Td>{r.resourceId ? <Mono>{r.resourceId}</Mono> : '—'}</Table.Td>
+                      <Table.Td>
+                        {r.hasDetail && (
+                          <Button variant="subtle" size="compact-xs" onClick={() => setDetail(r)}>
+                            {t('audit.detail')}
+                          </Button>
+                        )}
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </Table.ScrollContainer>
           )}
 
           {meta && meta.total > meta.pageSize && (

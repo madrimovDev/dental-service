@@ -25,6 +25,11 @@
 .cols {
   display: flex;
   flex: 1;
+  /* min-width:0 lets this flex item shrink below its content width so the
+     overflowing doctor/day columns scroll here instead of being clipped by
+     .grid's overflow:hidden (which is kept for the rounded corners). */
+  min-width: 0;
+  overflow-x: auto;
 }
 
 .col {

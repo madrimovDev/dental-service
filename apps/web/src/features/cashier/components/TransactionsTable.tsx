@@ -40,52 +40,54 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
       {vms.length === 0 ? (
         <Text c="dimmed">{t('cashier.no_transactions_today')}</Text>
       ) : (
-        <Table verticalSpacing="xs">
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>{t('cashier.receipt')}</Table.Th>
-              <Table.Th>{t('cashier.amount')}</Table.Th>
-              <Table.Th>{t('cashier.method_short')}</Table.Th>
-              <Table.Th>{t('cashier.status')}</Table.Th>
-              <Table.Th />
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {vms.map((tx) => (
-              <Table.Tr key={tx.id}>
-                <Table.Td>
-                  <Mono>{tx.receiptNumber ?? '—'}</Mono>
-                </Table.Td>
-                <Table.Td>{formatCurrency(tx.totalAmount, t)}</Table.Td>
-                <Table.Td>{t(`cashier.method.${tx.paymentMethod}`)}</Table.Td>
-                <Table.Td>
-                  <Badge
-                    color={
-                      tx.type === 'refund' ? 'orange' : tx.status === 'voided' ? 'red' : 'teal'
-                    }
-                    size="xs"
-                  >
-                    {tx.type === 'refund'
-                      ? t('cashier.type.refund')
-                      : t(`cashier.status_label.${tx.status}`)}
-                  </Badge>
-                </Table.Td>
-                <Table.Td>
-                  {canRefund && tx.refundable && (
-                    <ActionIcon
-                      variant="subtle"
-                      color="orange"
-                      aria-label={t('cashier.refund_modal.title')}
-                      onClick={() => setConfirmId(tx.id)}
-                    >
-                      <IconRefresh size={14} />
-                    </ActionIcon>
-                  )}
-                </Table.Td>
+        <Table.ScrollContainer minWidth={600}>
+          <Table verticalSpacing="xs">
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>{t('cashier.receipt')}</Table.Th>
+                <Table.Th>{t('cashier.amount')}</Table.Th>
+                <Table.Th>{t('cashier.method_short')}</Table.Th>
+                <Table.Th>{t('cashier.status')}</Table.Th>
+                <Table.Th />
               </Table.Tr>
-            ))}
-          </Table.Tbody>
-        </Table>
+            </Table.Thead>
+            <Table.Tbody>
+              {vms.map((tx) => (
+                <Table.Tr key={tx.id}>
+                  <Table.Td>
+                    <Mono>{tx.receiptNumber ?? '—'}</Mono>
+                  </Table.Td>
+                  <Table.Td>{formatCurrency(tx.totalAmount, t)}</Table.Td>
+                  <Table.Td>{t(`cashier.method.${tx.paymentMethod}`)}</Table.Td>
+                  <Table.Td>
+                    <Badge
+                      color={
+                        tx.type === 'refund' ? 'orange' : tx.status === 'voided' ? 'red' : 'teal'
+                      }
+                      size="xs"
+                    >
+                      {tx.type === 'refund'
+                        ? t('cashier.type.refund')
+                        : t(`cashier.status_label.${tx.status}`)}
+                    </Badge>
+                  </Table.Td>
+                  <Table.Td>
+                    {canRefund && tx.refundable && (
+                      <ActionIcon
+                        variant="subtle"
+                        color="orange"
+                        aria-label={t('cashier.refund_modal.title')}
+                        onClick={() => setConfirmId(tx.id)}
+                      >
+                        <IconRefresh size={14} />
+                      </ActionIcon>
+                    )}
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        </Table.ScrollContainer>
       )}
 
       <Modal

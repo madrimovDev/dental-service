@@ -137,78 +137,80 @@ export function UsersSettingsScreen() {
           <Text c="dimmed">{t('users.empty')}</Text>
         )}
         {filtered.length > 0 && (
-          <Table verticalSpacing="md">
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>{t('users.full_name')}</Table.Th>
-                <Table.Th>{t('users.phone')}</Table.Th>
-                <Table.Th>{t('users.role')}</Table.Th>
-                <Table.Th>{t('users.branch')}</Table.Th>
-                <Table.Th>{t('users.status')}</Table.Th>
-                <Table.Th />
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {filtered.map((a) => (
-                <Table.Tr key={a.assignmentId}>
-                  <Table.Td>
-                    <Text truncate maw={220}>
-                      {a.userFullName ?? '—'}
-                    </Text>
-                  </Table.Td>
-                  <Table.Td>{a.userPhone}</Table.Td>
-                  <Table.Td>{a.roleName}</Table.Td>
-                  <Table.Td>{a.branchName ?? t('users.all_branches')}</Table.Td>
-                  <Table.Td>
-                    <Badge color={a.isActive ? 'teal' : 'gray'}>
-                      {a.isActive ? t('users.active') : t('users.inactive')}
-                    </Badge>
-                  </Table.Td>
-                  <Table.Td>
-                    <Group gap="xs" wrap="nowrap" justify="flex-end">
-                      {hasPermission('user.manage') && (
-                        <ActionIcon
-                          variant="subtle"
-                          color="gray"
-                          onClick={() =>
-                            setProfileEdit({
-                              userId: a.userId,
-                              name: a.userFullName ?? a.userPhone,
-                            })
-                          }
-                          title={t('staff.edit_profile')}
-                          aria-label={t('staff.edit_profile')}
-                        >
-                          <IconUserCog size={16} />
-                        </ActionIcon>
-                      )}
-                      {hasPermission('user.manage') && a.userId !== currentUser?.id && (
-                        <ActionIcon
-                          variant="subtle"
-                          color="blue"
-                          onClick={() => setToReset(a.userId)}
-                          title={t('users.reset_password')}
-                          aria-label={t('users.reset_password')}
-                        >
-                          <IconKey size={16} />
-                        </ActionIcon>
-                      )}
-                      {hasPermission('user.manage') && (
-                        <ActionIcon
-                          variant="subtle"
-                          color="red"
-                          onClick={() => setToRemove(a.assignmentId)}
-                          aria-label={t('common.delete')}
-                        >
-                          <IconTrash size={16} />
-                        </ActionIcon>
-                      )}
-                    </Group>
-                  </Table.Td>
+          <Table.ScrollContainer minWidth={750}>
+            <Table verticalSpacing="md">
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>{t('users.full_name')}</Table.Th>
+                  <Table.Th>{t('users.phone')}</Table.Th>
+                  <Table.Th>{t('users.role')}</Table.Th>
+                  <Table.Th>{t('users.branch')}</Table.Th>
+                  <Table.Th>{t('users.status')}</Table.Th>
+                  <Table.Th />
                 </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
+              </Table.Thead>
+              <Table.Tbody>
+                {filtered.map((a) => (
+                  <Table.Tr key={a.assignmentId}>
+                    <Table.Td>
+                      <Text truncate maw={220}>
+                        {a.userFullName ?? '—'}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td>{a.userPhone}</Table.Td>
+                    <Table.Td>{a.roleName}</Table.Td>
+                    <Table.Td>{a.branchName ?? t('users.all_branches')}</Table.Td>
+                    <Table.Td>
+                      <Badge color={a.isActive ? 'teal' : 'gray'}>
+                        {a.isActive ? t('users.active') : t('users.inactive')}
+                      </Badge>
+                    </Table.Td>
+                    <Table.Td>
+                      <Group gap="xs" wrap="nowrap" justify="flex-end">
+                        {hasPermission('user.manage') && (
+                          <ActionIcon
+                            variant="subtle"
+                            color="gray"
+                            onClick={() =>
+                              setProfileEdit({
+                                userId: a.userId,
+                                name: a.userFullName ?? a.userPhone,
+                              })
+                            }
+                            title={t('staff.edit_profile')}
+                            aria-label={t('staff.edit_profile')}
+                          >
+                            <IconUserCog size={16} />
+                          </ActionIcon>
+                        )}
+                        {hasPermission('user.manage') && a.userId !== currentUser?.id && (
+                          <ActionIcon
+                            variant="subtle"
+                            color="blue"
+                            onClick={() => setToReset(a.userId)}
+                            title={t('users.reset_password')}
+                            aria-label={t('users.reset_password')}
+                          >
+                            <IconKey size={16} />
+                          </ActionIcon>
+                        )}
+                        {hasPermission('user.manage') && (
+                          <ActionIcon
+                            variant="subtle"
+                            color="red"
+                            onClick={() => setToRemove(a.assignmentId)}
+                            aria-label={t('common.delete')}
+                          >
+                            <IconTrash size={16} />
+                          </ActionIcon>
+                        )}
+                      </Group>
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          </Table.ScrollContainer>
         )}
       </Stack>
 
