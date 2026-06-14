@@ -9,6 +9,8 @@ import {
   listUserAssignments,
 } from '@dental/api-client';
 import { useQuery } from '@tanstack/react-query';
+import { dashboardKeys } from './dashboard.keys';
+import { filterActiveLabOrders, toBranchNameMap, toDoctorNameMap } from './dashboard.mappers';
 
 const isoDate = (d: Date) => d.toISOString().slice(0, 10);
 
@@ -47,7 +49,7 @@ export interface KpiRange {
 export function useRevenueReport(range: KpiRange) {
   const q = { from: range.from, to: range.to, branchId: range.branchId };
   return useQuery({
-    queryKey: ['dashboard', 'revenue', q],
+    queryKey: dashboardKeys.revenue(q),
     queryFn: () => getRevenueReport(q).then((r) => r.data),
   });
 }
@@ -59,7 +61,7 @@ export function useDoctorAppointments(
   range: { from: string; to: string },
 ) {
   return useQuery({
-    queryKey: ['dashboard', 'doctor-appointments', doctorId, branchId, range],
+    queryKey: dashboardKeys.doctorAppointments(doctorId, branchId, range),
     queryFn: () =>
       listAppointments({
         branchId: branchId ?? undefined,
@@ -74,45 +76,45 @@ export function useDoctorAppointments(
 /** Faol (delivered/cancelled bo'lmagan) lab buyurtmalari — texnik navbati. */
 export function useActiveLabOrders() {
   return useQuery({
-    queryKey: ['dashboard', 'lab-orders'],
+    queryKey: dashboardKeys.labOrders(),
     queryFn: () => listLabOrders().then((r) => r.data),
-    select: (orders) => orders.filter((o) => o.status !== 'delivered' && o.status !== 'cancelled'),
+    select: filterActiveLabOrders,
   });
 }
 
 /** id→nom lookup'lar — dashboard'da UUID o'rniga nom ko'rsatish uchun (CLI-152). */
 export function useBranchNames() {
   return useQuery({
-    queryKey: ['dashboard', 'branch-names'],
+    queryKey: dashboardKeys.branchNames(),
     queryFn: () => listBranches().then((r) => r.data),
-    select: (rows) => new Map(rows.map((b) => [b.id, b.name])),
+    select: toBranchNameMap,
   });
 }
 
 export function useDoctorNames() {
   return useQuery({
-    queryKey: ['dashboard', 'doctor-names'],
+    queryKey: dashboardKeys.doctorNames(),
     queryFn: () => listUserAssignments().then((r) => r.data),
-    select: (rows) => new Map(rows.map((a) => [a.userId, a.userFullName ?? a.userPhone])),
+    select: toDoctorNameMap,
   });
 }
 
 export function useManagerKpi(range: KpiRange) {
   const q = { from: range.from, to: range.to, branchId: range.branchId };
   const revenue = useQuery({
-    queryKey: ['dashboard', 'manager-revenue', q],
+    queryKey: dashboardKeys.managerRevenue(q),
     queryFn: () => getRevenueReport(q).then((r) => r.data),
   });
   const appointments = useQuery({
-    queryKey: ['dashboard', 'manager-appointments', q],
+    queryKey: dashboardKeys.managerAppointments(q),
     queryFn: () => getAppointmentStatsReport(q).then((r) => r.data),
   });
   const doctors = useQuery({
-    queryKey: ['dashboard', 'manager-doctors', q],
+    queryKey: dashboardKeys.managerDoctors(q),
     queryFn: () => getDoctorWorkloadReport(q).then((r) => r.data),
   });
   const treatmentPlans = useQuery({
-    queryKey: ['dashboard', 'manager-plans', q],
+    queryKey: dashboardKeys.managerPlans(q),
     queryFn: () => getPlanCompletionReport(q).then((r) => r.data),
   });
   return { revenue, appointments, doctors, treatmentPlans };

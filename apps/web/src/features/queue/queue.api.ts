@@ -10,6 +10,8 @@ import {
   updateQueueTicketStatus,
 } from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { appointmentKeys } from '@/features/appointments/appointments.keys';
+import { lookupKeys } from '@/lib/lookup-keys';
 import { queueKeys } from './queue.keys';
 
 export function useQueueToday(branchId: string | null) {
@@ -47,7 +49,7 @@ export function useUpdateQueueStatus() {
       void qc.invalidateQueries({ queryKey: queueKeys.all });
       // Backend done→completed / missed→no_show appointment'ni sync qiladi —
       // kalendar cache'ni ham yangilash kerak.
-      void qc.invalidateQueries({ queryKey: ['appointments'] });
+      void qc.invalidateQueries({ queryKey: appointmentKeys.all });
     },
   });
 }
@@ -55,15 +57,21 @@ export function useUpdateQueueStatus() {
 /** Lookup ma'lumotlari (bemor/xizmat nomlari + branch ro'yxati). */
 export function usePatientsAll() {
   return useQuery({
-    queryKey: ['patients', 'list-all'],
+    queryKey: lookupKeys.patientsAll(),
     queryFn: () => listPatients({ pageSize: 100 }).then((r) => r.data),
   });
 }
 
 export function useServices() {
-  return useQuery({ queryKey: ['services'], queryFn: () => listServices().then((r) => r.data) });
+  return useQuery({
+    queryKey: lookupKeys.services(),
+    queryFn: () => listServices().then((r) => r.data),
+  });
 }
 
 export function useBranches() {
-  return useQuery({ queryKey: ['branches'], queryFn: () => listBranches().then((r) => r.data) });
+  return useQuery({
+    queryKey: lookupKeys.branches(),
+    queryFn: () => listBranches().then((r) => r.data),
+  });
 }

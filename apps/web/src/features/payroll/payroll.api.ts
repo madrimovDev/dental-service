@@ -6,15 +6,17 @@ import {
   listUserAssignments,
 } from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { lookupKeys } from '@/lib/lookup-keys';
 import { payrollKeys } from './payroll.keys';
 
 /**
  * UserId → ism xaritasi uchun (payroll line faqat userId tashiydi).
- * `['users', 'assignments']` key audit feature bilan bir xil — cache bo'lishiladi.
+ * `lookupKeys.userAssignments()` (`['users','assignments']`) audit feature bilan bir xil
+ * key — cache ATAYLAB bo'lishiladi.
  */
 export function useUserAssignments() {
   return useQuery({
-    queryKey: ['users', 'assignments'],
+    queryKey: lookupKeys.userAssignments(),
     queryFn: () => listUserAssignments().then((r) => r.data),
   });
 }

@@ -46,7 +46,9 @@ components  →  api.ts (Query hooks)  →  generated api-client
 
 ### 3. Query-key factory konvensiyasi
 
-`[feature, scope, params]` — masalan `patientKeys.list({page,search})` → `['patients','list',{page,search}]`, `patientKeys.detail(id)` → `['patients','detail',id]`. Invalidatsiya `patientKeys.all` (`['patients']`) bo'yicha.
+`[feature, scope, params]` — masalan `patientKeys.list({page,search})` → `['patients','list',{page,search}]`, `patientKeys.detail(id)` → `['patients','detail',id]`. Invalidatsiya `patientKeys.all` (`['patients']`) bo'yicha. **Inline ad-hoc key (`useQuery({ queryKey: ['x'] })`) yozilmaydi — doim factory orqali** (CI/review tekshiradi).
+
+**Cross-feature lookup'lar (2026-06-14):** bir nechta feature'da bir xil key bilan ishlatiladigan lookup'lar (filiallar, xizmatlar, barcha bemorlar, xodim assignment'lari) — cache ATAYLAB bo'lishiladi. Ular `apps/web/src/lib/lookup-keys.ts` dagi yagona `lookupKeys` factory'da (feature-namespace'ga bo'linmaydi, key'lar byte-identical). Bir feature ikkinchisining query'sini invalidatsiya qilsa (masalan queue→`appointmentKeys.all`), o'sha feature'ning key factory'sini import qiladi, inline literal yozmaydi.
 
 ### 4. Data qatlam — feature hooks MAJBURIY
 

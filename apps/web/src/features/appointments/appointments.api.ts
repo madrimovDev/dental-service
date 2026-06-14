@@ -8,6 +8,7 @@ import {
   listServices,
 } from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { lookupKeys } from '@/lib/lookup-keys';
 import { appointmentKeys } from './appointments.keys';
 
 export function useAppointments(range: { branchId?: string; from: string; to: string }) {
@@ -28,19 +29,25 @@ export function useAppointments(range: { branchId?: string; from: string; to: st
  */
 export function useDoctors() {
   return useQuery({
-    queryKey: ['doctors', 'list'],
+    queryKey: appointmentKeys.doctors(),
     queryFn: () => listDoctors().then((r) => r.data),
   });
 }
 
 /** Branch xizmatlari ro'yxati (MultiSelect opsiyalari uchun). */
 export function useServices() {
-  return useQuery({ queryKey: ['services'], queryFn: () => listServices().then((r) => r.data) });
+  return useQuery({
+    queryKey: lookupKeys.services(),
+    queryFn: () => listServices().then((r) => r.data),
+  });
 }
 
 /** Tenant filiallari (branch filter Select uchun). */
 export function useBranches() {
-  return useQuery({ queryKey: ['branches'], queryFn: () => listBranches().then((r) => r.data) });
+  return useQuery({
+    queryKey: lookupKeys.branches(),
+    queryFn: () => listBranches().then((r) => r.data),
+  });
 }
 
 export function useCreateAppointment() {

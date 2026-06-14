@@ -12,6 +12,8 @@ import {
   type ServiceWithPrices,
 } from '@dental/api-client';
 import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { serviceKeys } from '@/features/services/services.keys';
+import { lookupKeys } from '@/lib/lookup-keys';
 import { cashierKeys } from './cashier.keys';
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -42,17 +44,23 @@ export function useDailySummary(branchId: string | null) {
 }
 
 export function useBranches() {
-  return useQuery({ queryKey: ['branches'], queryFn: () => listBranches().then((r) => r.data) });
+  return useQuery({
+    queryKey: lookupKeys.branches(),
+    queryFn: () => listBranches().then((r) => r.data),
+  });
 }
 
 export function useServices() {
-  return useQuery({ queryKey: ['services'], queryFn: () => listServices().then((r) => r.data) });
+  return useQuery({
+    queryKey: lookupKeys.services(),
+    queryFn: () => listServices().then((r) => r.data),
+  });
 }
 
 /** Lookup: barcha bemorlar (selektor uchun). */
 export function usePatientsAll() {
   return useQuery({
-    queryKey: ['patients', 'list-all'],
+    queryKey: lookupKeys.patientsAll(),
     queryFn: () => listPatients({ pageSize: 100 }).then((r) => r.data),
   });
 }
@@ -65,7 +73,7 @@ export function usePatientsAll() {
  */
 export function usePatientPlans(patientId: string | null) {
   return useQuery({
-    queryKey: ['treatment-plans', 'by-patient', patientId ?? ''],
+    queryKey: cashierKeys.patientPlans(patientId ?? ''),
     queryFn: () => listCashierPatientPlans({ patientId: patientId ?? '' }).then((r) => r.data),
     enabled: !!patientId,
   });
@@ -88,7 +96,7 @@ export function useCreateTransaction() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: cashierKeys.all });
       // Plan billing → balans yangilanishi uchun.
-      void qc.invalidateQueries({ queryKey: ['treatment-plans'] });
+      void qc.invalidateQueries({ queryKey: cashierKeys.plans });
     },
   });
 }
@@ -100,7 +108,7 @@ export function useRefund() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: cashierKeys.all });
       // Refund allocation'larni negate qiladi → plan balans tiklanadi.
-      void qc.invalidateQueries({ queryKey: ['treatment-plans'] });
+      void qc.invalidateQueries({ queryKey: cashierKeys.plans });
     },
   });
 }
@@ -111,7 +119,7 @@ export function useRefund() {
  */
 export function fetchServicePrices(qc: QueryClient, id: string): Promise<ServiceWithPrices> {
   return qc.fetchQuery({
-    queryKey: ['services', 'detail', id],
+    queryKey: serviceKeys.detail(id),
     queryFn: () => getService(id).then((r) => r.data),
   });
 }
