@@ -286,9 +286,9 @@ dental-service/
 - Errors: `{ error: { code, message, details? } }` + HTTP status
 
 ### Frontend (feature-folder qatlamli — RFC-0010)
-- **Feature struktura** `apps/web/src/features/<feature>/`: `index` · `<f>.api.ts` (Query hooks) · `<f>.keys.ts` (query-key factory) · `<f>.schema.ts` (Zod form) · `<f>.mappers.ts` (DTO↔view-model, MAJBURIY) · `<f>.types.ts` · `components/`
+- **Feature struktura** `apps/web/src/features/<feature>/`: `index` · `<f>.routes.tsx` (route registry `AppRoute[]`) · `<f>.api.ts` (Query hooks) · `<f>.keys.ts` (query-key factory) · `<f>.schema.ts` (Zod form) · `<f>.mappers.ts` (DTO↔view-model, MAJBURIY) · `<f>.types.ts` · `components/` · `pages/` (IXTIYORIY — faqat real logikali sahifa: auth, profile)
 - **Qatlam:** `components → api.ts (hooks) → generated api-client`. Komponent api-client'ni bevosita chaqirmaydi.
-- **Pages** `apps/web/src/pages/` — yupqa route entry (feature screen'ni ulaydi)
+- **Routing (2026-06-14):** alohida `pages/` papkasi **YO'Q**. Har feature `<f>.routes.tsx` da `AppRoute[]` (`{path, perm?, element}`, tip `@/shell`) eksport qiladi; `app/routes.tsx` `publicRoutes`/`protectedRoutes` ga yig'adi; `App.tsx` map qiladi. Yupqa wrapper'lar o'chirildi — registry to'g'ridan Screen'ni ishlatadi (`element: <CalendarScreen/>`). `perm` bo'lsa `RequirePermission` o'raydi. RFC-0010 §1/§6.
 - **Shared:** `packages/ui` (dizayn-tizim primitivlari) → `apps/web/src/components` (ilova-shared) → feature `components/`
 - Server state — TanStack Query (faqat feature hooks orqali); query-key `[feature, scope, params]`
 - Client state — Zustand (global `stores/`: auth, ui/shell); server data dublirlanmaydi

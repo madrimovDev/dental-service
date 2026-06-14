@@ -35,20 +35,22 @@ Redesign frontend'ni jiddiy qayta quradi (yangi shell + 30+ ekran). Kod yozishda
 
 ```
 apps/web/src/
-├── app/                    # App.tsx, router, providers (Query, Mantine, i18n)
-├── shell/                  # Topbar + sidebar + rol-landing (RFC-0004)
+├── app/                    # App.tsx (route registrylarni map qiladi), routes.tsx (yig'uvchi), providers
+├── shell/                  # Topbar + sidebar + rol-landing (RFC-0004) + AppRoute tip, ForbiddenPage, DesignSystemPage
 ├── features/<feature>/     # Biznes modullari (backend modullariga oyna)
-│   ├── components/         # Feature UI
+│   ├── components/         # Feature UI (ekranlar + sub-komponentlar)
+│   ├── <feature>.routes.tsx # Route registry — AppRoute[] (path, perm?, element); app/routes.tsx yig'adi
+│   ├── pages/              # IXTIYORIY — faqat real logikali sahifa (auth, profile)
 │   ├── api.ts              # TanStack Query hooks (useX, useXMutation) — feature bo'yicha
-│   ├── forms/              # @mantine/form + zod
-│   ├── <feature>.types.ts
-│   └── index.ts
+│   ├── <feature>.keys.ts / .mappers.ts / .schema.ts / .types.ts
+│   └── index.ts            # public eksport (screenlar, hooks, routes)
 ├── components/             # Ilova darajasidagi umumiy komponentlar (PhoneInput…)
 ├── lib/                    # api client instance, query-client, i18n init, helpers
 ├── stores/                 # Zustand (auth, ui/shell) — kichik, per-concern
-├── theme/                  # Mantine theme (R0)
-└── pages/                  # Yupqa route entry'lar (feature komponentini ulaydi)
+└── theme/                  # Mantine theme (R0)
 ```
+
+> **Routing (2026-06-14 tuzatish):** alohida `pages/` papkasi **bekor qilindi**. Routing feature ichida — har feature `<feature>.routes.tsx` da `AppRoute[]` eksport qiladi, `app/routes.tsx` `publicRoutes`/`protectedRoutes` ga yig'adi. Yupqa wrapper'lar o'chirildi (registry to'g'ridan Screen). Faqat real logikali sahifa feature `pages/` subfolder'da. Tafsilot: [RFC-0010 §1/§6](./0010-frontend-feature-architecture.md).
 
 **Feature ro'yxati** (backend modullariga mos): `patients`, `appointments`, `queue`, `cashier`, `services`, `clinical` (dental seam), `lab` (seam), `prescriptions` (seam), `consent`, `images`, `staff`, `roles`, `branches`, `reports`, `dashboards`, `settings`, `audit`, `inventory`, `expenses`, `payroll`, `notifications`.
 
@@ -105,4 +107,4 @@ Bemor kartasi — eng katta kompozit ekran (10 tab). Har tab — alohida feature
 
 ## Ochiq savollar
 
-- `pages/` qatlamini saqlaymizmi (yupqa entry) yoki feature ichidan to'g'ridan route qilamizmi? — Taklif: yupqa `pages/` entry, feature mantig'i feature'da.
+- ~~`pages/` qatlamini saqlaymizmi (yupqa entry) yoki feature ichidan to'g'ridan route qilamizmi?~~ ✅ **Hal qilindi (2026-06-14):** alohida `pages/` bekor — feature ichida `<feature>.routes.tsx` registry, yupqa wrapper'lar o'chirildi. Real logikali sahifa feature `pages/` subfolder'da. RFC-0010 §1/§6.
