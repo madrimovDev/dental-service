@@ -829,13 +829,17 @@
       "title": "To'lovni qaytarish",
       "body": "Bu to'lovni qaytarishni tasdiqlaysizmi? Amal qaytarib bo'lmaydi.",
       "confirm": "Qaytarish",
-      "cancel": "Bekor qilish"
+      "cancel": "Bekor qilish",
+      "detail_receipt": "Chek raqami",
+      "detail_amount": "Summa",
+      "detail_method": "To'lov usuli"
     },
     "status_label": {
       "completed": "Yakunlangan",
       "voided": "Bekor qilingan",
       "pending": "Kutilmoqda"
-    }
+    },
+    "switch_mode_confirm": "Savatda saqlanmagan satrlar bor. Rejimni almashtirsangiz ular yo'qoladi. Davom etasizmi?"
   },
   "reports": {
     "title": "Hisobotlar",

@@ -8,7 +8,7 @@ import {
   SimpleGrid,
   Stack,
 } from '@mantine/core';
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { useBranches, useDailySummary, usePatientsAll, useTodayTransactions } from '../cashier.api';
@@ -25,6 +25,24 @@ export function CashierScreen() {
   const [branchId, setBranchId] = useState<string | null>(activeBranchId);
   const [patientId, setPatientId] = useState<string | null>(null);
   const [mode, setMode] = useState<CashierMode>('payment');
+  // POS savatida to'ldirilmagan satr borligini kuzatadi (rejim almashganda yo'qotishni ogohlantirish).
+  const posCartDirty = useRef(false);
+
+  const handleModeChange = useCallback(
+    (v: string) => {
+      const next = v as CashierMode;
+      // Faqat to'lov rejimidan chiqayotganda va savat bo'sh emas bo'lsa ogohlantiramiz.
+      if (next !== 'payment' && posCartDirty.current) {
+        if (!window.confirm(t('cashier.switch_mode_confirm'))) return;
+      }
+      setMode(next);
+    },
+    [t],
+  );
+
+  const handlePosDirtyChange = useCallback((dirty: boolean) => {
+    posCartDirty.current = dirty;
+  }, []);
 
   const branchesQuery = useBranches();
   const patientsQuery = usePatientsAll();
@@ -62,7 +80,7 @@ export function CashierScreen() {
           />
           <SegmentedControl
             value={mode}
-            onChange={(v) => setMode(v as CashierMode)}
+            onChange={handleModeChange}
             data={[
               { value: 'payment', label: t('cashier.mode.payment') },
               { value: 'plan', label: t('cashier.mode.plan') },
@@ -75,7 +93,11 @@ export function CashierScreen() {
           {canCreate &&
             branchId &&
             (mode === 'payment' ? (
-              <PosPanel branchId={branchId} patientId={patientId} />
+              <PosPanel
+                branchId={branchId}
+                patientId={patientId}
+                onDirtyChange={handlePosDirtyChange}
+              />
             ) : (
               <PlanBillingPanel branchId={branchId} patientId={patientId} />
             ))}

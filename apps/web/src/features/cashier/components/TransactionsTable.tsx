@@ -21,6 +21,7 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
 
   const canRefund = hasPermission('cashier.refund');
   const vms = transactions.map(toTransactionVM);
+  const selected = vms.find((v) => v.id === confirmId);
 
   const confirmRefund = () => {
     if (confirmId) {
@@ -95,6 +96,28 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
       >
         <Stack gap="md">
           <Text>{t('cashier.refund_modal.body')}</Text>
+          {selected && (
+            <Stack gap={4}>
+              <Group justify="space-between">
+                <Text size="sm" c="dimmed">
+                  {t('cashier.refund_modal.detail_receipt')}
+                </Text>
+                <Mono>{selected.receiptNumber ?? '—'}</Mono>
+              </Group>
+              <Group justify="space-between">
+                <Text size="sm" c="dimmed">
+                  {t('cashier.refund_modal.detail_amount')}
+                </Text>
+                <Text fw={600}>{formatCurrency(selected.totalAmount, t)}</Text>
+              </Group>
+              <Group justify="space-between">
+                <Text size="sm" c="dimmed">
+                  {t('cashier.refund_modal.detail_method')}
+                </Text>
+                <Text>{t(`cashier.method.${selected.paymentMethod}`)}</Text>
+              </Group>
+            </Stack>
+          )}
           <Group justify="flex-end">
             <Button variant="default" onClick={() => setConfirmId(null)}>
               {t('cashier.refund_modal.cancel')}
