@@ -161,6 +161,7 @@
     "nothing_found": "Hech narsa topilmadi"
   },
   "shell": {
+    "skip_to_content": "Asosiy kontentga o'tish",
     "search_placeholder": "Bemor, yozuv, xizmat, xodim…",
     "notifications": "Bildirishnomalar",
     "theme_light": "Yorug'",

@@ -1,7 +1,7 @@
 import { createTheme, type MantineColorsTuple } from '@mantine/core';
 
-// clinik teal 50→900 (tokens.css bilan AYNAN bir xil bo'lishi shart)
-const teal: MantineColorsTuple = [
+// clinik teal 50→900 (tokens.css bilan AYNAN bir xil bo'lishi shart — teal-sync.test.ts guard qiladi)
+export const teal: MantineColorsTuple = [
   '#E9F8F4',
   '#C9F0E7',
   '#9FE4D5',

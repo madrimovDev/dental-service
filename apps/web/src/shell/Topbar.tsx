@@ -21,6 +21,7 @@ export function Topbar({
   const navigate = useNavigate();
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
   const { user, refreshToken, clear } = useAuthStore();
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent);
 
   const logout = async () => {
     if (refreshToken) {
@@ -56,7 +57,7 @@ export function Topbar({
       >
         <Search />
         <span className={classes.searchInput}>{t('shell.search_placeholder')}</span>
-        <span className={classes.kbd}>⌘K</span>
+        <span className={classes.kbd}>{isMac ? '⌘K' : 'Ctrl K'}</span>
       </button>
 
       <span className={classes.spacer} />
