@@ -1,11 +1,10 @@
-import { Mono, PageHead } from '@dental/ui';
+import { Mono, PageHead, StateView } from '@dental/ui';
 import {
   Button,
   Code,
   Container,
   Group,
   JsonInput,
-  Loader,
   Modal,
   Pagination,
   Paper,
@@ -149,12 +148,17 @@ export function AuditScreen() {
         </Paper>
 
         <Paper withBorder p="lg" radius="md">
-          {query.isLoading ? (
-            <Group justify="center" py="xl">
-              <Loader />
-            </Group>
+          {query.isError ? (
+            <StateView
+              status="error"
+              title={t('states.error_title')}
+              retryLabel={t('states.retry')}
+              onRetry={() => query.refetch()}
+            />
+          ) : query.isLoading ? (
+            <StateView status="loading" skeleton="table" />
           ) : rows.length === 0 ? (
-            <Text c="dimmed">{t('audit.empty')}</Text>
+            <StateView status="empty" title={t('audit.empty')} />
           ) : (
             <Table verticalSpacing="xs" striped highlightOnHover>
               <Table.Thead>

@@ -1,4 +1,5 @@
-import { Button, Group, Modal, Paper, SimpleGrid, Stack, Text, Title } from '@mantine/core';
+import { StateView } from '@dental/ui';
+import { Button, Group, Modal, SimpleGrid, Stack, Text, Title } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconPhotoPlus } from '@tabler/icons-react';
 import { useMemo, useState } from 'react';
@@ -46,24 +47,30 @@ export function PatientImagesTab({ patientId }: Props) {
         )}
       </Group>
 
-      {listQuery.isLoading && <Text>{t('common.loading')}</Text>}
-      {!listQuery.isLoading && vms.length === 0 && (
-        <Paper withBorder p="md">
-          <Text c="dimmed">{t('image.empty')}</Text>
-        </Paper>
+      {listQuery.isError ? (
+        <StateView
+          status="error"
+          title={t('states.error_title')}
+          retryLabel={t('states.retry')}
+          onRetry={() => listQuery.refetch()}
+        />
+      ) : listQuery.isLoading ? (
+        <StateView status="loading" skeleton="cards" />
+      ) : vms.length === 0 ? (
+        <StateView status="empty" title={t('image.empty')} />
+      ) : (
+        <SimpleGrid cols={{ base: 1, sm: 2, md: 3, lg: 4 }} spacing="md">
+          {vms.map((vm) => (
+            <ImageCard
+              key={vm.id}
+              vm={vm}
+              canUpload={canUpload}
+              onPreview={() => setPreviewId(vm.id)}
+              onRequestDelete={() => setDeleteId(vm.id)}
+            />
+          ))}
+        </SimpleGrid>
       )}
-
-      <SimpleGrid cols={{ base: 1, sm: 2, md: 3, lg: 4 }} spacing="md">
-        {vms.map((vm) => (
-          <ImageCard
-            key={vm.id}
-            vm={vm}
-            canUpload={canUpload}
-            onPreview={() => setPreviewId(vm.id)}
-            onRequestDelete={() => setDeleteId(vm.id)}
-          />
-        ))}
-      </SimpleGrid>
 
       <ImagePreviewModal image={previewImage} onClose={() => setPreviewId(null)} />
       <ImageUploadModal opened={uploadOpened} onClose={closeUpload} patientId={patientId} />

@@ -1,11 +1,10 @@
 import type { ConsentTemplate, ConsentType } from '@dental/api-client';
-import { Mono, Tag } from '@dental/ui';
+import { Mono, StateView, Tag } from '@dental/ui';
 import {
   Button,
   Card,
   Group,
   Modal,
-  Paper,
   Select,
   Stack,
   Text,
@@ -146,36 +145,42 @@ export function ConsentTab({ patientId }: Props) {
         </Group>
       </Group>
 
-      {formsQuery.isLoading && <Text>{t('common.loading')}</Text>}
-      {!formsQuery.isLoading && formsQuery.data?.length === 0 && (
-        <Paper withBorder p="md">
-          <Text c="dimmed">{t('consent.empty')}</Text>
-        </Paper>
+      {formsQuery.isError ? (
+        <StateView
+          status="error"
+          title={t('states.error_title')}
+          retryLabel={t('states.retry')}
+          onRetry={() => formsQuery.refetch()}
+        />
+      ) : formsQuery.isLoading ? (
+        <StateView status="loading" skeleton="cards" />
+      ) : (formsQuery.data?.length ?? 0) === 0 ? (
+        <StateView status="empty" title={t('consent.empty')} />
+      ) : (
+        formsQuery.data?.map(toConsentFormVM).map((vm) => (
+          <Card key={vm.id} withBorder padding="md">
+            <Stack gap="xs">
+              <Group justify="space-between">
+                <Group gap={6}>
+                  <IconFileText size={16} />
+                  <Text fw={700}>{vm.title}</Text>
+                </Group>
+                <Group gap="xs">
+                  <Tag>{t(vm.typeLabelKey)}</Tag>
+                  <Mono>{vm.languageUpper}</Mono>
+                </Group>
+              </Group>
+              <Text size="xs" c="dimmed">
+                {t('consent.signed_at')}: {vm.signedAtText}
+                {vm.signerName && ` — ${vm.signerName}`}
+              </Text>
+              <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
+                {vm.bodyPreview}
+              </Text>
+            </Stack>
+          </Card>
+        ))
       )}
-
-      {formsQuery.data?.map(toConsentFormVM).map((vm) => (
-        <Card key={vm.id} withBorder padding="md">
-          <Stack gap="xs">
-            <Group justify="space-between">
-              <Group gap={6}>
-                <IconFileText size={16} />
-                <Text fw={700}>{vm.title}</Text>
-              </Group>
-              <Group gap="xs">
-                <Tag>{t(vm.typeLabelKey)}</Tag>
-                <Mono>{vm.languageUpper}</Mono>
-              </Group>
-            </Group>
-            <Text size="xs" c="dimmed">
-              {t('consent.signed_at')}: {vm.signedAtText}
-              {vm.signerName && ` — ${vm.signerName}`}
-            </Text>
-            <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
-              {vm.bodyPreview}
-            </Text>
-          </Stack>
-        </Card>
-      ))}
 
       {/* Sign form modal */}
       <Modal opened={signOpened} onClose={closeSign} title={t('consent.sign_new')} size="xl">

@@ -1,15 +1,5 @@
-import {
-  Badge,
-  Button,
-  Card,
-  Container,
-  Group,
-  Loader,
-  Stack,
-  Table,
-  Text,
-  Title,
-} from '@mantine/core';
+import { StateView } from '@dental/ui';
+import { Badge, Button, Card, Container, Group, Stack, Table, Title } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { useForm } from '@mantine/form';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
@@ -110,14 +100,17 @@ export function PayrollScreen() {
         <Card withBorder padding="lg">
           <Stack gap="md">
             <Title order={4}>{t('payroll.runs')}</Title>
-            {runs.isLoading ? (
-              <Group justify="center" py="md">
-                <Loader size="sm" />
-              </Group>
+            {runs.isError ? (
+              <StateView
+                status="error"
+                title={t('states.error_title')}
+                retryLabel={t('states.retry')}
+                onRetry={() => runs.refetch()}
+              />
+            ) : runs.isLoading ? (
+              <StateView status="loading" skeleton="table" />
             ) : runRows.length === 0 ? (
-              <Text c="dimmed" size="sm">
-                {t('payroll.no_runs')}
-              </Text>
+              <StateView status="empty" title={t('payroll.no_runs')} />
             ) : (
               <Table highlightOnHover>
                 <Table.Thead>
@@ -170,14 +163,17 @@ export function PayrollScreen() {
                 )}
               </Group>
 
-              {runDetail.isLoading ? (
-                <Group justify="center" py="md">
-                  <Loader size="sm" />
-                </Group>
+              {runDetail.isError ? (
+                <StateView
+                  status="error"
+                  title={t('states.error_title')}
+                  retryLabel={t('states.retry')}
+                  onRetry={() => runDetail.refetch()}
+                />
+              ) : runDetail.isLoading ? (
+                <StateView status="loading" skeleton="table" />
               ) : lineVMs.length === 0 ? (
-                <Text c="dimmed" size="sm">
-                  {t('payroll.no_lines')}
-                </Text>
+                <StateView status="empty" title={t('payroll.no_lines')} />
               ) : (
                 <Table>
                   <Table.Thead>

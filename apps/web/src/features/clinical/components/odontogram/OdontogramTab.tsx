@@ -1,4 +1,5 @@
 import type { CreateToothStateInput, ToothState, ToothStateEntry } from '@dental/api-client';
+import { StateView } from '@dental/ui';
 import {
   Alert,
   Button,
@@ -107,7 +108,16 @@ export function OdontogramTab({ patientId }: Props) {
         />
       </Group>
 
-      {!chartQuery.data && !chartQuery.isLoading && (
+      {chartQuery.isError && (
+        <StateView
+          status="error"
+          title={t('states.error_title')}
+          retryLabel={t('states.retry')}
+          onRetry={() => chartQuery.refetch()}
+        />
+      )}
+
+      {!chartQuery.data && !chartQuery.isLoading && !chartQuery.isError && (
         <Alert color="gray">{t('tooth_chart.no_chart')}</Alert>
       )}
 

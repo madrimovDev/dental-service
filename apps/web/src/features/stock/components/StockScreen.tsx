@@ -1,4 +1,4 @@
-import { PageHead } from '@dental/ui';
+import { PageHead, StateView } from '@dental/ui';
 import { Button, Card, Container, Grid, Group, Select, Stack, Tabs } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconBox, IconList, IconPlus } from '@tabler/icons-react';
@@ -87,13 +87,24 @@ export function StockScreen() {
               <Grid>
                 <Grid.Col span={{ base: 12, md: 7 }}>
                   <Card withBorder padding="md">
-                    <StockItemsTable
-                      items={itemVMs}
-                      selectedId={selectedId}
-                      onSelect={setSelectedId}
-                      canManage={canManage}
-                      onMovement={handleMovement}
-                    />
+                    {items.isError ? (
+                      <StateView
+                        status="error"
+                        title={t('states.error_title')}
+                        retryLabel={t('states.retry')}
+                        onRetry={() => items.refetch()}
+                      />
+                    ) : items.isLoading ? (
+                      <StateView status="loading" skeleton="table" />
+                    ) : (
+                      <StockItemsTable
+                        items={itemVMs}
+                        selectedId={selectedId}
+                        onSelect={setSelectedId}
+                        canManage={canManage}
+                        onMovement={handleMovement}
+                      />
+                    )}
                   </Card>
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, md: 5 }}>

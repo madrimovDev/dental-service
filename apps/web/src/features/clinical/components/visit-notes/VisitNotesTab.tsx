@@ -1,5 +1,6 @@
 import type { Diagnosis } from '@dental/api-client';
-import { Button, Group, Paper, Stack, Text, Title } from '@mantine/core';
+import { StateView } from '@dental/ui';
+import { Button, Group, Stack, Title } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconPlus } from '@tabler/icons-react';
 import { useMemo } from 'react';
@@ -44,16 +45,22 @@ export function VisitNotesTab({ patientId }: Props) {
         )}
       </Group>
 
-      {notesQuery.isLoading && <Text>{t('common.loading')}</Text>}
-      {!notesQuery.isLoading && notesQuery.data?.length === 0 && (
-        <Paper withBorder p="md">
-          <Text c="dimmed">{t('visit_note.empty')}</Text>
-        </Paper>
+      {notesQuery.isError ? (
+        <StateView
+          status="error"
+          title={t('states.error_title')}
+          retryLabel={t('states.retry')}
+          onRetry={() => notesQuery.refetch()}
+        />
+      ) : notesQuery.isLoading ? (
+        <StateView status="loading" skeleton="cards" />
+      ) : (notesQuery.data?.length ?? 0) === 0 ? (
+        <StateView status="empty" title={t('visit_note.empty')} />
+      ) : (
+        notesQuery.data?.map((note) => (
+          <VisitNoteCard key={note.id} note={note} diagnosisMap={diagnosisMap} />
+        ))
       )}
-
-      {notesQuery.data?.map((note) => (
-        <VisitNoteCard key={note.id} note={note} diagnosisMap={diagnosisMap} />
-      ))}
 
       {user && (
         <VisitNoteFormModal
