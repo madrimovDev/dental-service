@@ -1,7 +1,6 @@
 import { patientImages } from '@dental/db-schema';
 import { desc, eq } from 'drizzle-orm';
 import type { Context } from 'hono';
-import type { Database } from '../../db/client.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { deleteObject, patientImageKey, presignedGetUrl, uploadObject } from '../../lib/s3.ts';
@@ -28,7 +27,7 @@ export type UploadInput = {
   body: ArrayBuffer;
 };
 
-export const createPatientImagesService = (deps: { audit: AuditLogger; db: Database }) => {
+export const createPatientImagesService = (deps: { audit: AuditLogger }) => {
   async function list(c: Context, patientId: string) {
     const db = getDb(c);
     const rows = await db

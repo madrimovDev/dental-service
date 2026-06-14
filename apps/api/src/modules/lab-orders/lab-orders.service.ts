@@ -1,12 +1,11 @@
 import { labOrders } from '@dental/db-schema';
 import { and, desc, eq } from 'drizzle-orm';
 import type { Context } from 'hono';
-import type { Database } from '../../db/client.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import type { CreateLabOrderInput, UpdateLabOrderInput } from './lab-orders.schema.ts';
 
-export const createLabOrdersService = (deps: { audit: AuditLogger; db: Database }) => {
+export const createLabOrdersService = (deps: { audit: AuditLogger }) => {
   async function list(c: Context, patientId?: string, status?: string) {
     const db = getDb(c);
     const filters = [];
