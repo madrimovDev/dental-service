@@ -11,6 +11,7 @@ import {
   updateExpenseCategory,
 } from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { lookupKeys } from '@/lib/lookup-keys';
 import { expensesKeys } from './expenses.keys';
 import type { DateRange } from './expenses.types';
 
@@ -46,7 +47,10 @@ export function useExpenseSummary(range: DateRange & { branchId?: string }) {
 }
 
 export function useBranches() {
-  return useQuery({ queryKey: ['branches'], queryFn: () => listBranches().then((r) => r.data) });
+  return useQuery({
+    queryKey: lookupKeys.branches(),
+    queryFn: () => listBranches().then((r) => r.data),
+  });
 }
 
 export function useCreateExpense() {

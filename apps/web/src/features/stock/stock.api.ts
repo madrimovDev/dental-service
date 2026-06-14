@@ -10,6 +10,7 @@ import {
   removeStockBom,
 } from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { lookupKeys } from '@/lib/lookup-keys';
 import { stockKeys } from './stock.keys';
 
 /** Ombor itemlari (qoldiq + lowStock). branchId ixtiyoriy filtr. */
@@ -39,11 +40,17 @@ export function useServiceMaterials(serviceId?: string) {
 
 /** Selektorlar uchun lookup'lar. */
 export function useBranches() {
-  return useQuery({ queryKey: ['branches'], queryFn: () => listBranches().then((r) => r.data) });
+  return useQuery({
+    queryKey: lookupKeys.branches(),
+    queryFn: () => listBranches().then((r) => r.data),
+  });
 }
 
 export function useServices() {
-  return useQuery({ queryKey: ['services'], queryFn: () => listServices().then((r) => r.data) });
+  return useQuery({
+    queryKey: lookupKeys.services(),
+    queryFn: () => listServices().then((r) => r.data),
+  });
 }
 
 export function useCreateItem() {
