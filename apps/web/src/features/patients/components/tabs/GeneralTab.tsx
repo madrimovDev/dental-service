@@ -157,7 +157,7 @@ function GeneralEditForm({ patientId }: { patientId: string }) {
           <Input
             label={t('patients.form.full_name')}
             value={form.values.fullName}
-            invalid={!!form.errors.fullName}
+            error={form.errors.fullName}
             onChange={(v) => form.setFieldValue('fullName', v)}
           />
           <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
@@ -165,11 +165,13 @@ function GeneralEditForm({ patientId }: { patientId: string }) {
               label={t('patients.form.date_of_birth')}
               type="date"
               value={form.values.dateOfBirth}
+              error={form.errors.dateOfBirth}
               onChange={(v) => form.setFieldValue('dateOfBirth', v)}
             />
             <Select
               label={t('patients.form.gender_label')}
               value={form.values.gender ?? null}
+              error={form.errors.gender}
               onChange={(v) =>
                 form.setFieldValue('gender', (v as 'male' | 'female' | 'other' | null) ?? undefined)
               }
@@ -195,11 +197,13 @@ function GeneralEditForm({ patientId }: { patientId: string }) {
           <Input
             label={t('patients.form.passport')}
             value={form.values.passport}
+            error={form.errors.passport}
             onChange={(v) => form.setFieldValue('passport', v)}
           />
           <Input
             label={t('patients.form.address')}
             value={form.values.address}
+            error={form.errors.address}
             onChange={(v) => form.setFieldValue('address', v)}
           />
           <Textarea
