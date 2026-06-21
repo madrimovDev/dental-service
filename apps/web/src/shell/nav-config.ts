@@ -4,6 +4,7 @@ import {
   BarChart3,
   Building2,
   Calendar,
+  CalendarClock,
   Coins,
   FileText,
   FlaskConical,
@@ -48,6 +49,13 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: Calendar,
         path: '/appointments',
         permission: 'appointment.view',
+      },
+      {
+        key: 'schedule',
+        labelKey: 'nav.schedule',
+        icon: CalendarClock,
+        path: '/schedule',
+        permission: 'schedule.view',
       },
       {
         key: 'queue',
