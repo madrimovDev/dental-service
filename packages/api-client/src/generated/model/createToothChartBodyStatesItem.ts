@@ -8,10 +8,6 @@ import type { CreateToothChartBodyStatesItemSurface } from './createToothChartBo
 import type { CreateToothChartBodyStatesItemState } from './createToothChartBodyStatesItemState';
 
 export type CreateToothChartBodyStatesItem = {
-  /**
-   * @minimum 11
-   * @maximum 85
-   */
   toothNumber: number;
   surface?: CreateToothChartBodyStatesItemSurface;
   state: CreateToothChartBodyStatesItemState;

@@ -2953,54 +2953,6 @@
           "deleted"
         ]
       },
-      "ToothChart": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "tenantId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "patientId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "visitNoteId": {
-            "type": "string",
-            "nullable": true,
-            "format": "uuid"
-          },
-          "isPrimaryDentition": {
-            "type": "boolean"
-          },
-          "notes": {
-            "type": "string",
-            "nullable": true
-          },
-          "createdBy": {
-            "type": "string",
-            "nullable": true,
-            "format": "uuid"
-          },
-          "createdAt": {
-            "type": "string",
-            "example": "2026-06-12T10:00:00.000Z"
-          }
-        },
-        "required": [
-          "id",
-          "tenantId",
-          "patientId",
-          "visitNoteId",
-          "isPrimaryDentition",
-          "notes",
-          "createdBy",
-          "createdAt"
-        ]
-      },
       "ToothChartWithStates": {
         "allOf": [
           {
@@ -3008,7 +2960,6 @@
           },
           {
             "type": "object",
-            "nullable": true,
             "properties": {
               "states": {
                 "type": "array",
@@ -3085,6 +3036,54 @@
           "state",
           "diagnosisId",
           "notes"
+        ]
+      },
+      "ToothChart": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "visitNoteId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "isPrimaryDentition": {
+            "type": "boolean"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-06-12T10:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "patientId",
+          "visitNoteId",
+          "isPrimaryDentition",
+          "notes",
+          "createdBy",
+          "createdAt"
         ]
       },
       "Prescription": {
@@ -12972,7 +12971,7 @@
         ],
         "responses": {
           "200": {
-            "description": "List of tooth chart snapshots",
+            "description": "List of tooth chart snapshots with states",
             "content": {
               "application/json": {
                 "schema": {
@@ -12987,7 +12986,7 @@
                     "data": {
                       "type": "array",
                       "items": {
-                        "$ref": "#/components/schemas/ToothChart"
+                        "$ref": "#/components/schemas/ToothChartWithStates"
                       }
                     }
                   },
@@ -13144,9 +13143,7 @@
                       "type": "object",
                       "properties": {
                         "toothNumber": {
-                          "type": "integer",
-                          "minimum": 11,
-                          "maximum": 85
+                          "type": "integer"
                         },
                         "surface": {
                           "type": "string",
