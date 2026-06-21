@@ -12,7 +12,6 @@
 # Routing model: single public host. `/api/*` → api service, everything else →
 # the web SPA static server. Because the SPA is served from the same origin, the
 # frontend can use a RELATIVE `/api` base (VITE_API_BASE_URL="") with no CORS.
-
 {
 	email {$ACME_EMAIL}
 	# Uncomment for staging certs while testing to avoid LE rate limits:
