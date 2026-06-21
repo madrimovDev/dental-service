@@ -4,6 +4,7 @@ export const clinicalKeys = {
   all: ['clinical'] as const,
   // A — odontogram
   toothChartLatest: (patientId: string) => ['clinical', 'tooth-chart-latest', patientId] as const,
+  toothCharts: (patientId: string) => ['clinical', 'tooth-charts', patientId] as const,
   // A — treatment plans
   plans: (patientId: string) => ['clinical', 'plans', patientId] as const,
   planDetail: (planId: string) => ['clinical', 'plan-detail', planId] as const,

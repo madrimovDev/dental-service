@@ -13,6 +13,7 @@ import {
   createVisitNote,
   deletePatientImage,
   getLatestToothChart,
+  getService,
   type LabOrderStatus,
   listAppointments,
   listConsentForms,
@@ -21,16 +22,20 @@ import {
   listLabOrders,
   listPatientImages,
   listPrescriptions,
+  listServices,
+  listToothCharts,
   listTreatmentPlans,
   listVisitNotes,
+  type ServiceWithPrices,
   type SignFormInput,
   signConsentForm,
   type TreatmentStageStatus,
   updateLabOrder,
   updateTreatmentStage,
 } from '@dental/api-client';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api.ts';
+import { lookupKeys } from '@/lib/lookup-keys.ts';
 import { clinicalKeys } from './clinical.keys';
 
 const HOUR = 1000 * 60 * 60;
@@ -43,11 +48,22 @@ export function useLatestToothChart(patientId: string) {
   });
 }
 
+// CLI-191: barcha snapshot'lar (states bilan) — tarix ko'rgichi uchun.
+export function useToothChartHistory(patientId: string) {
+  return useQuery({
+    queryKey: clinicalKeys.toothCharts(patientId),
+    queryFn: () => listToothCharts(patientId).then((r) => r.data),
+  });
+}
+
 export function useCreateToothChart(patientId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: CreateToothChartInput) => createToothChart(body).then((r) => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: clinicalKeys.toothChartLatest(patientId) }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: clinicalKeys.toothChartLatest(patientId) });
+      void qc.invalidateQueries({ queryKey: clinicalKeys.toothCharts(patientId) });
+    },
   });
 }
 
@@ -64,6 +80,26 @@ export function useCreatePlan(patientId: string) {
   return useMutation({
     mutationFn: (body: CreateTreatmentPlanInput) => createTreatmentPlan(body).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: clinicalKeys.plans(patientId) }),
+  });
+}
+
+// CLI-188: davolash reja bosqichi uchun xizmat katalogi (lookup — cache bo'lishiladi).
+export function useServiceCatalog() {
+  return useQuery({
+    queryKey: lookupKeys.services(),
+    queryFn: () => listServices().then((r) => r.data),
+    staleTime: HOUR,
+  });
+}
+
+/**
+ * Xizmat narxini imperativ (one-shot) oladi — bosqichga xizmat tanlanganda
+ * cost'ni avto-to'ldirish uchun. Detail prices cache'lanadi.
+ */
+export function fetchServicePrices(qc: QueryClient, id: string): Promise<ServiceWithPrices> {
+  return qc.fetchQuery({
+    queryKey: ['services', 'detail', id],
+    queryFn: () => getService(id).then((r) => r.data),
   });
 }
 

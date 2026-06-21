@@ -4,11 +4,10 @@ import type { AuditLogger } from '../../../lib/audit-logger.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../../lib/openapi.ts';
 import { requireFeature } from '../../../middleware/require-feature.ts';
 import { requirePermission } from '../../../middleware/require-permission.ts';
-import { toToothChartDto, toToothChartWithStatesDto } from './tooth-charts.mapper.ts';
+import { toToothChartWithStatesDto } from './tooth-charts.mapper.ts';
 import {
   createToothChartSchema,
   patientIdParamSchema,
-  toothChartDtoSchema,
   toothChartWithStatesDtoSchema,
 } from './tooth-charts.schema.ts';
 import { createToothChartsService } from './tooth-charts.service.ts';
@@ -28,13 +27,16 @@ export const toothChartsRoutes = (deps: { audit: AuditLogger }) => {
     request: {
       params: patientIdParamSchema,
     },
-    responses: okJson(z.array(toothChartDtoSchema), 'List of tooth chart snapshots'),
+    responses: okJson(
+      z.array(toothChartWithStatesDtoSchema),
+      'List of tooth chart snapshots with states',
+    ),
   });
 
   app.openapi(listRoute, async (c) => {
     const { patientId } = c.req.valid('param');
     const rows = await service.list(c, patientId);
-    return c.json(ok(rows.map(toToothChartDto)), 200);
+    return c.json(ok(rows.map(toToothChartWithStatesDto)), 200);
   });
 
   // ─── GET /patients/{patientId}/tooth-charts/latest — latest with states ─────

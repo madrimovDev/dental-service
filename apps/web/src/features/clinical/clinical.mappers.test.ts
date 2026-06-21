@@ -4,6 +4,7 @@ import type {
   LabOrder,
   PatientImage,
   Prescription,
+  ServicePrice,
   ToothChartWithStates,
   TreatmentPlan,
   TreatmentStage,
@@ -12,7 +13,10 @@ import type {
 import { describe, expect, it } from 'vitest';
 import {
   diagnosisSearchIndex,
+  draftMapToCreateInput,
+  draftMapToStateMap,
   draftStatesToCreateInput,
+  findActivePrice,
   formatBytes,
   labOrderStatusToTone,
   normalizeSearch,
@@ -27,6 +31,7 @@ import {
   toPlanCardVM,
   toPrescriptionVM,
   toStageRowVM,
+  toToothDraftMap,
   toToothStateMap,
   toVisitNoteVM,
 } from './clinical.mappers';
@@ -52,6 +57,89 @@ describe('toToothStateMap / draftStatesToCreateInput', () => {
     >;
     const states = draftStatesToCreateInput(map);
     expect(states).toEqual([{ toothNumber: 11, state: 'caries', surface: 'whole' }]);
+  });
+});
+
+// ---- CLI-189: per-surface + diagnosis draft round-trip ----
+describe('toToothDraftMap / draftMapToCreateInput (CLI-189)', () => {
+  it('non-whole surface va diagnosisId round-trip da yo‘qolmaydi', () => {
+    const chart = {
+      states: [
+        { toothNumber: 16, surface: 'O', state: 'filling', diagnosisId: 'dx-1' },
+        { toothNumber: 21, surface: 'M', state: 'caries', diagnosisId: null },
+      ],
+    } as unknown as ToothChartWithStates;
+    const draft = toToothDraftMap(chart);
+    expect(draft.get(16)).toEqual({ state: 'filling', surface: 'O', diagnosisId: 'dx-1' });
+    expect(draft.get(21)).toEqual({ state: 'caries', surface: 'M', diagnosisId: null });
+
+    const input = draftMapToCreateInput(draft);
+    expect(input).toContainEqual({
+      toothNumber: 16,
+      state: 'filling',
+      surface: 'O',
+      diagnosisId: 'dx-1',
+    });
+    // diagnosisId null → input'da undefined (optional)
+    expect(input).toContainEqual({
+      toothNumber: 21,
+      state: 'caries',
+      surface: 'M',
+      diagnosisId: undefined,
+    });
+  });
+
+  it("'whole' yozuvi bir xil tish uchun afzal", () => {
+    const chart = {
+      states: [
+        { toothNumber: 16, surface: 'O', state: 'filling', diagnosisId: null },
+        { toothNumber: 16, surface: 'whole', state: 'crown', diagnosisId: 'dx-2' },
+      ],
+    } as unknown as ToothChartWithStates;
+    const draft = toToothDraftMap(chart);
+    expect(draft.get(16)).toEqual({ state: 'crown', surface: 'whole', diagnosisId: 'dx-2' });
+  });
+
+  it('draftMapToStateMap odontogram uchun tish→holat', () => {
+    const draft = new Map([
+      [16, { state: 'filling' as const, surface: 'O' as const, diagnosisId: null }],
+    ]);
+    expect(draftMapToStateMap(draft).get(16)).toBe('filling');
+  });
+});
+
+// ---- CLI-188: findActivePrice ----
+describe('findActivePrice (CLI-188)', () => {
+  const price = (over: Partial<ServicePrice> = {}): ServicePrice => ({
+    id: 'p1',
+    serviceId: 'svc1',
+    branchId: 'b1',
+    price: '50000',
+    currency: 'UZS',
+    validFrom: '2026-01-01T00:00:00Z',
+    validTo: null,
+    createdAt: '2026-01-01T00:00:00Z',
+    ...over,
+  });
+
+  it('filial mos + validTo===null → Number(price)', () => {
+    expect(findActivePrice([price({ price: '50000' })], 'b1')).toBe(50000);
+  });
+  it('boshqa filial → null (fallback)', () => {
+    expect(findActivePrice([price({ branchId: 'b2' })], 'b1')).toBeNull();
+  });
+  it('validTo set → null', () => {
+    expect(findActivePrice([price({ validTo: '2026-05-01T00:00:00Z' })], 'b1')).toBeNull();
+  });
+  it('bir nechta active → eng oxirgi validFrom', () => {
+    const top = findActivePrice(
+      [
+        price({ id: 'a', price: '40000', validFrom: '2026-01-01T00:00:00Z' }),
+        price({ id: 'b', price: '60000', validFrom: '2026-03-01T00:00:00Z' }),
+      ],
+      'b1',
+    );
+    expect(top).toBe(60000);
   });
 });
 

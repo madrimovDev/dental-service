@@ -516,7 +516,10 @@
     "stage_status_pending": "Ожидает",
     "stage_status_in_progress": "В работе",
     "stage_status_completed": "Завершён",
-    "stage_status_skipped": "Пропущен"
+    "stage_status_skipped": "Пропущен",
+    "service_catalog": "Услуга из каталога",
+    "service_catalog_placeholder": "Выберите услугу (цена авто)",
+    "no_services": "Услуги не найдены"
   },
   "visit_note": {
     "title": "Записи визитов",
@@ -563,7 +566,26 @@
     "upper_right": "Верх. правая",
     "upper_left": "Верх. левая",
     "lower_left": "Ниж. левая",
-    "lower_right": "Ниж. правая"
+    "lower_right": "Ниж. правая",
+    "set_surface": "Поверхность зуба",
+    "set_diagnosis": "Диагноз (МКБ-10)",
+    "no_diagnosis": "Без диагноза",
+    "diagnosis_placeholder": "Выберите или найдите диагноз",
+    "history": "История",
+    "snapshot_at": "Дата снимка",
+    "view_history": "Посмотреть историю",
+    "return_to_current": "Вернуться к текущему",
+    "viewing_snapshot": "Просмотр старого снимка (только чтение)",
+    "no_history": "Нет истории снимков",
+    "surfaces": {
+      "whole": "Весь зуб",
+      "M": "Мезиальная (M)",
+      "D": "Дистальная (D)",
+      "B": "Буккальная (B)",
+      "L": "Лингвальная (L)",
+      "O": "Окклюзионная (O)",
+      "I": "Режущая (I)"
+    }
   },
   "prescription": {
     "title": "Рецепты",
