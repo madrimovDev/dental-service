@@ -1,4 +1,4 @@
-import { patients, type RecallInsert, recalls } from '@dental/db-schema';
+import { patients, type RecallInsert, recalls, tenantSettings } from '@dental/db-schema';
 import { and, desc, eq, inArray, lte, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
@@ -143,6 +143,19 @@ export const createRecallsRepository = () => {
     return findById(c, row.id);
   }
 
+  /**
+   * Tenant default recall intervali (oy). tenant_settings row bo'lmasa schema
+   * default (6) qaytaradi — auto-create boot'dan oldin row yo'qligida ham ishlasin.
+   */
+  async function getDefaultIntervalMonths(c: Context): Promise<number> {
+    const db = getDb(c);
+    const [row] = await db
+      .select({ months: tenantSettings.defaultRecallIntervalMonths })
+      .from(tenantSettings)
+      .limit(1);
+    return row?.months ?? 6;
+  }
+
   return {
     list,
     listByPatient,
@@ -152,6 +165,7 @@ export const createRecallsRepository = () => {
     hasOpenByReason,
     findOpenByPatient,
     update,
+    getDefaultIntervalMonths,
   };
 };
 

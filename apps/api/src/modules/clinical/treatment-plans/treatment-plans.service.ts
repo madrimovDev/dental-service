@@ -7,7 +7,26 @@ import type {
   UpdateTreatmentPlanInput,
 } from './treatment-plans.schema.ts';
 
-export const createTreatmentPlansService = (deps: { audit: AuditLogger }) => {
+/**
+ * Recalls modulidan inject qilinadigan narrow dep (B4, RFC-0011 §5). Bog'liqlik
+ * yo'nalishi: treatment-plans → recalls (factory injection, to'g'ridan import emas).
+ */
+export type RecallStageHook = {
+  autoCreateFromStage: (
+    c: Context,
+    args: {
+      patientId: string;
+      sourceStageId: string;
+      treatmentPlanId?: string | null;
+      branchId?: string | null;
+    },
+  ) => Promise<void>;
+};
+
+export const createTreatmentPlansService = (deps: {
+  audit: AuditLogger;
+  recall?: RecallStageHook;
+}) => {
   const repo = createTreatmentPlansRepository();
 
   const listPlans = (c: Context, patientId?: string) => repo.listPlans(c, patientId);
@@ -86,6 +105,21 @@ export const createTreatmentPlansService = (deps: { audit: AuditLogger }) => {
         resourceId: stageId,
         after: { status: input.status },
       });
+
+      // B4: bosqich completed → treatment_followup recall (idempotent). Plan'dan
+      // patientId/branchId kerak (stage'da yo'q). Transition guard: faqat shu
+      // chaqiruvda status='completed' bo'lsa (re-PATCH'da onConflictDoNothing
+      // baribir dedupe qiladi — partial unique index).
+      if (input.status === 'completed' && deps.recall) {
+        const plan = await repo.findPlan(c, updated.treatmentPlanId);
+        if (plan) {
+          await deps.recall.autoCreateFromStage(c, {
+            patientId: plan.patientId,
+            sourceStageId: updated.id,
+            treatmentPlanId: plan.id,
+          });
+        }
+      }
     }
     return updated;
   }

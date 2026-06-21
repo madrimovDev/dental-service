@@ -15,7 +15,6 @@ import { createRecallsService } from '../../src/modules/recalls/recalls.service.
 
 let tenantId: string;
 let ownerId: string;
-let branchId: string;
 let patientId: string;
 
 const ctx = (tx: DbOrTx, tId: string): Context =>
@@ -56,11 +55,7 @@ beforeAll(async () => {
 
   await db.transaction(async (tx) => {
     await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
-    const [b] = await tx
-      .insert(branches)
-      .values({ tenantId, name: 'B' })
-      .returning({ id: branches.id });
-    branchId = b!.id;
+    await tx.insert(branches).values({ tenantId, name: 'B' }).returning({ id: branches.id });
     const [p] = await tx
       .insert(patients)
       .values({ tenantId, fullName: 'Ali Valiyev', phone: '+998901112233' })
@@ -154,5 +149,97 @@ describe('B3 recalls CRUD', () => {
   test('getById of missing → null', async () => {
     const r = await run(tenantId, (c) => svc.getById(c, crypto.randomUUID()));
     expect(r).toBeNull();
+  });
+});
+
+describe('B4 auto-create triggers', () => {
+  beforeEach(clearRecalls);
+
+  test('autoCreateFromStage → exactly one (idempotent on repeat — partial unique index)', async () => {
+    const stageId = crypto.randomUUID();
+    await run(tenantId, (c) => svc.autoCreateFromStage(c, { patientId, sourceStageId: stageId }));
+    // Takror chaqiruv — onConflictDoNothing → ikkinchi yozuv YO'Q.
+    await run(tenantId, (c) => svc.autoCreateFromStage(c, { patientId, sourceStageId: stageId }));
+
+    const all = await run(tenantId, (c) => svc.listByPatient(c, patientId));
+    const followups = all.filter((r) => r.sourceStageId === stageId);
+    expect(followups.length).toBe(1);
+    expect(followups[0]!.reason).toBe('treatment_followup');
+    expect(followups[0]!.source).toBe('treatment_stage');
+    expect(followups[0]!.intervalMonths).toBe(6);
+    // dueDate ~ today + 6 months (yil/oy mavjud).
+    expect(followups[0]!.dueDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  test('different stages → distinct recalls (no false dedupe)', async () => {
+    await run(tenantId, (c) =>
+      svc.autoCreateFromStage(c, { patientId, sourceStageId: crypto.randomUUID() }),
+    );
+    await run(tenantId, (c) =>
+      svc.autoCreateFromStage(c, { patientId, sourceStageId: crypto.randomUUID() }),
+    );
+    const all = await run(tenantId, (c) => svc.listByPatient(c, patientId));
+    expect(all.filter((r) => r.reason === 'treatment_followup').length).toBe(2);
+  });
+
+  test('autoCreatePreventive → one open preventive per patient (service open-check dedupe)', async () => {
+    await run(tenantId, (c) => svc.autoCreatePreventive(c, { patientId }));
+    // Takror — ochiq preventive bor → skip.
+    await run(tenantId, (c) => svc.autoCreatePreventive(c, { patientId }));
+    const all = await run(tenantId, (c) => svc.listByPatient(c, patientId));
+    const prev = all.filter((r) => r.reason === 'preventive');
+    expect(prev.length).toBe(1);
+    expect(prev[0]!.source).toBe('appointment');
+  });
+
+  test('autoCreatePreventive after previous closed → new one allowed', async () => {
+    const first = await run(tenantId, (c) => svc.autoCreatePreventive(c, { patientId }));
+    const all1 = await run(tenantId, (c) => svc.listByPatient(c, patientId));
+    const openId = all1.find((r) => r.reason === 'preventive')!.id;
+    // Yopamiz (completed) → endi ochiq preventive yo'q.
+    await run(tenantId, (c) => svc.update(c, openId, { status: 'completed' }));
+    await run(tenantId, (c) => svc.autoCreatePreventive(c, { patientId }));
+    const all2 = await run(tenantId, (c) => svc.listByPatient(c, patientId));
+    expect(all2.filter((r) => r.reason === 'preventive').length).toBe(2);
+    expect(first).toBeUndefined(); // void return
+  });
+});
+
+describe('B5 rebook linkage (closeOpenOnRebook)', () => {
+  beforeEach(clearRecalls);
+
+  test('open recalls → scheduled + scheduledAppointmentId on rebook', async () => {
+    await run(tenantId, (c) =>
+      svc.create(c, { patientId, reason: 'manual', dueDate: '2026-06-01' }),
+    );
+    await run(tenantId, (c) =>
+      svc.autoCreateFromStage(c, { patientId, sourceStageId: crypto.randomUUID() }),
+    );
+    const apptId = crypto.randomUUID();
+    await run(tenantId, (c) => svc.closeOpenOnRebook(c, patientId, apptId));
+
+    const all = await run(tenantId, (c) => svc.listByPatient(c, patientId));
+    expect(all.length).toBe(2);
+    for (const r of all) {
+      expect(r.status).toBe('scheduled');
+      expect(r.scheduledAppointmentId).toBe(apptId);
+      expect(r.closedBy).toBe(ownerId);
+    }
+  });
+
+  test('no open recalls → no-op (does not throw)', async () => {
+    await run(tenantId, (c) => svc.closeOpenOnRebook(c, patientId, crypto.randomUUID()));
+    const all = await run(tenantId, (c) => svc.listByPatient(c, patientId));
+    expect(all.length).toBe(0);
+  });
+
+  test('already-scheduled recall not touched (only pending/contacted closed)', async () => {
+    const r = await run(tenantId, (c) =>
+      svc.create(c, { patientId, reason: 'manual', dueDate: '2026-06-01' }),
+    );
+    await run(tenantId, (c) => svc.update(c, r!.id, { status: 'dismissed' }));
+    await run(tenantId, (c) => svc.closeOpenOnRebook(c, patientId, crypto.randomUUID()));
+    const after = await run(tenantId, (c) => svc.getById(c, r!.id));
+    expect(after!.status).toBe('dismissed');
   });
 });

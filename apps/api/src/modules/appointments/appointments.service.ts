@@ -32,11 +32,26 @@ export type SchedulePredicates = {
   ) => Promise<boolean>;
 };
 
+/**
+ * Recalls modulidan inject qilinadigan narrow dep (B4/B5, RFC-0011 §5).
+ * Bog'liqlik yo'nalishi: appointments → recalls (factory injection).
+ */
+export type RecallAppointmentHook = {
+  /** Yozilish completed → profilaktik recall (transition guard chaqiruvchida). */
+  autoCreatePreventive: (
+    c: Context,
+    args: { patientId: string; branchId?: string | null },
+  ) => Promise<void>;
+  /** Yangi yozilish → bemorning ochiq recall'larini scheduled qiladi (rebook). */
+  closeOpenOnRebook: (c: Context, patientId: string, newAppointmentId: string) => Promise<void>;
+};
+
 export const createAppointmentsService = (deps: {
   audit: AuditLogger;
   schedule?: SchedulePredicates;
   enqueueReminder?: (tenantId: string, appointmentId: string, delayMs: number) => Promise<void>;
   removeReminder?: (appointmentId: string) => Promise<void>;
+  recall?: RecallAppointmentHook;
 }) => {
   async function checkConflict(
     c: Context,
@@ -164,6 +179,10 @@ export const createAppointmentsService = (deps: {
     const delay = reminderDelayMs(start, new Date());
     if (delay != null) await deps.enqueueReminder?.(tenantId, appt.id, delay);
 
+    // B5: yangi yozilish — bemorning ochiq recall'larini scheduled qiladi va
+    // shu yozilishga bog'laydi (rebook linkage). Ochiq recall yo'q bo'lsa no-op.
+    await deps.recall?.closeOpenOnRebook(c, appt.patientId, appt.id);
+
     return { ok: true as const, appointment: appt };
   }
 
@@ -210,6 +229,16 @@ export const createAppointmentsService = (deps: {
         before,
         after: updated,
       });
+
+      // B4: yozilish completed'ga O'TGANDA profilaktik recall (transition guard —
+      // before.status != completed && yangi == completed; re-PATCH qayta yoqmaydi).
+      // Preventive sourceStageId NULL → service'da open-check bilan dedupe.
+      if (input.status === 'completed' && before.status !== 'completed' && deps.recall) {
+        await deps.recall.autoCreatePreventive(c, {
+          patientId: updated.patientId,
+          branchId: updated.branchId,
+        });
+      }
 
       // Reschedule eslatma hayot-sikli (CLI-186): startTime o'zgarsa, eski
       // (eski vaqtli) job'ni o'chir, keyin yangi delay > 0 bo'lsa qayta enqueue.

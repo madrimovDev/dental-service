@@ -16,7 +16,7 @@ import {
   updateTreatmentPlanSchema,
 } from './treatment-plans.schema.ts';
 // CLI-114: list endi har planning stage'larini nested qaytaradi (N+1 oldini olish).
-import { createTreatmentPlansService } from './treatment-plans.service.ts';
+import { createTreatmentPlansService, type RecallStageHook } from './treatment-plans.service.ts';
 
 /** Standart 404 — plan not found */
 const planNotFound = {
@@ -34,7 +34,7 @@ const stageNotFound = {
   },
 };
 
-export const treatmentPlansRoutes = (deps: { audit: AuditLogger }) => {
+export const treatmentPlansRoutes = (deps: { audit: AuditLogger; recall?: RecallStageHook }) => {
   const app = new OpenAPIHono();
   const service = createTreatmentPlansService(deps);
 
