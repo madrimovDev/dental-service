@@ -409,6 +409,20 @@ export const PERMISSIONS = [
     descriptionUz: 'Ish jadvali va time-off yozuvlarini boshqarish',
     descriptionRu: 'Управление графиком работы и отгулами',
   },
+
+  // ===== Recall / Revisit (qayta chaqirish) =====
+  {
+    code: 'recall.view',
+    category: 'recall',
+    descriptionUz: "Qayta chaqirish (recall) ro'yxatini ko'rish",
+    descriptionRu: 'Просмотр списка повторных вызовов (recall)',
+  },
+  {
+    code: 'recall.manage',
+    category: 'recall',
+    descriptionUz: 'Qayta chaqirishlarni yaratish/boshqarish (chaqirildi, yozildi, bekor)',
+    descriptionRu: 'Создание и управление повторными вызовами',
+  },
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number]['code'];

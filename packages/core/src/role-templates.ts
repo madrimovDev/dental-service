@@ -79,6 +79,8 @@ export const ROLE_TEMPLATES = [
       'payroll.manage',
       'schedule.view',
       'schedule.manage',
+      'recall.view',
+      'recall.manage',
     ],
   },
   {
@@ -116,6 +118,8 @@ export const ROLE_TEMPLATES = [
       'payroll.manage',
       'schedule.view',
       'schedule.manage',
+      'recall.view',
+      'recall.manage',
     ],
   },
   {
@@ -139,6 +143,7 @@ export const ROLE_TEMPLATES = [
       'stock.view',
       'stock.manage',
       'schedule.view',
+      'recall.view',
     ],
   },
   {
@@ -208,6 +213,8 @@ export const ROLE_TEMPLATES = [
       'cashier.create_transaction',
       'schedule.view',
       'schedule.manage',
+      'recall.view',
+      'recall.manage',
     ],
   },
   {
