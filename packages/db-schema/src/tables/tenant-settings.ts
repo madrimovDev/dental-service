@@ -22,6 +22,11 @@ export const tenantSettings = pgTable(
     reminderLeadHours: integer('reminder_lead_hours').notNull().default(24),
     currency: text('currency').notNull().default('UZS'),
     onboardingDismissedAt: timestamp('onboarding_dismissed_at', { withTimezone: true }),
+    // Recall subsystem (RFC-0011): default interval (oy), klinika vaqt zonasi va
+    // recall SMS yuborish soati (klinika-local). Scheduler shu sozlamalarga amal qiladi.
+    defaultRecallIntervalMonths: integer('default_recall_interval_months').notNull().default(6),
+    timezone: text('timezone').notNull().default('Asia/Tashkent'),
+    recallSendHourLocal: integer('recall_send_hour_local').notNull().default(10),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

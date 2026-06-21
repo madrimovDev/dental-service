@@ -7,6 +7,7 @@ import { createStockService } from '../stock/stock.service.ts';
 import { diagnosesRoutes } from './diagnoses/index.ts';
 import { toothChartsRoutes } from './tooth-charts/index.ts';
 import { treatmentPlansRoutes } from './treatment-plans/index.ts';
+import type { RecallStageHook } from './treatment-plans/treatment-plans.service.ts';
 import { visitNotesRoutes, visitNoteTemplatesRoutes } from './visit-notes/index.ts';
 
 /**
@@ -17,7 +18,11 @@ import { visitNotesRoutes, visitNoteTemplatesRoutes } from './visit-notes/index.
  *   /api/visit-note-templates (CRUD, isShared/owner visibility)
  *   /api/tooth-charts (snapshot create + read)
  */
-export const clinicalRoutes = (deps: { db: Database; audit: AuditLogger }) => {
+export const clinicalRoutes = (deps: {
+  db: Database;
+  audit: AuditLogger;
+  recall?: RecallStageHook;
+}) => {
   const app = new OpenAPIHono();
   app.use('*', authMiddleware());
   app.use('*', rlsMiddleware(deps.db));
@@ -26,7 +31,8 @@ export const clinicalRoutes = (deps: { db: Database; audit: AuditLogger }) => {
   const stockService = createStockService({ audit: deps.audit });
 
   app.route('/', diagnosesRoutes({ db: deps.db }));
-  app.route('/', treatmentPlansRoutes({ audit: deps.audit }));
+  // B4: bosqich completed → treatment_followup recall (factory injection).
+  app.route('/', treatmentPlansRoutes({ audit: deps.audit, recall: deps.recall }));
   app.route(
     '/',
     visitNotesRoutes({ audit: deps.audit, deductStock: stockService.deductForServices }),

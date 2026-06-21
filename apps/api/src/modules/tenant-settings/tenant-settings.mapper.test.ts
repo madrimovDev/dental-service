@@ -10,6 +10,9 @@ describe('toTenantSettingsDto', () => {
       reminderLeadHours: 24,
       currency: 'UZS',
       onboardingDismissedAt: null,
+      defaultRecallIntervalMonths: 6,
+      timezone: 'Asia/Tashkent',
+      recallSendHourLocal: 10,
       createdAt: new Date('2026-06-12T10:00:00.000Z'),
       updatedAt: new Date('2026-06-12T11:00:00.000Z'),
     };
@@ -28,6 +31,9 @@ describe('toTenantSettingsDto', () => {
       reminderLeadHours: 24,
       currency: 'UZS',
       onboardingDismissedAt: new Date('2026-06-13T08:30:00.000Z'),
+      defaultRecallIntervalMonths: 6,
+      timezone: 'Asia/Tashkent',
+      recallSendHourLocal: 10,
       createdAt: new Date('2026-06-12T10:00:00.000Z'),
       updatedAt: new Date('2026-06-12T11:00:00.000Z'),
     };

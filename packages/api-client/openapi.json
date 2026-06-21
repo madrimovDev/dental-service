@@ -2841,6 +2841,268 @@
           "updatedAt"
         ]
       },
+      "RecallDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branchId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid",
+            "example": null
+          },
+          "patientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patientName": {
+            "type": "string",
+            "example": "Aliyev Vali"
+          },
+          "patientPhone": {
+            "type": "string",
+            "nullable": true,
+            "example": "+998901234567"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "preventive",
+              "treatment_followup",
+              "post_op_check",
+              "manual"
+            ],
+            "example": "preventive"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "contacted",
+              "scheduled",
+              "completed",
+              "dismissed"
+            ],
+            "example": "pending"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "treatment_stage",
+              "appointment",
+              "manual",
+              "scheduler"
+            ],
+            "example": "scheduler"
+          },
+          "dueDate": {
+            "type": "string",
+            "example": "2026-12-21"
+          },
+          "intervalMonths": {
+            "type": "integer",
+            "nullable": true,
+            "example": 6
+          },
+          "sourceStageId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid",
+            "example": null
+          },
+          "treatmentPlanId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid",
+            "example": null
+          },
+          "scheduledAppointmentId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid",
+            "example": null
+          },
+          "assignedDoctorId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid",
+            "example": null
+          },
+          "lastContactedAt": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          },
+          "contactAttempts": {
+            "type": "integer",
+            "example": 0
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid",
+            "example": null
+          },
+          "closedBy": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid",
+            "example": null
+          },
+          "closedAt": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-06-21T10:00:00.000Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "example": "2026-06-21T10:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "branchId",
+          "patientId",
+          "patientName",
+          "patientPhone",
+          "reason",
+          "status",
+          "source",
+          "dueDate",
+          "intervalMonths",
+          "sourceStageId",
+          "treatmentPlanId",
+          "scheduledAppointmentId",
+          "assignedDoctorId",
+          "lastContactedAt",
+          "contactAttempts",
+          "notes",
+          "createdBy",
+          "closedBy",
+          "closedAt",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CreateRecall": {
+        "type": "object",
+        "properties": {
+          "patientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branchId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "preventive",
+              "treatment_followup",
+              "post_op_check",
+              "manual"
+            ],
+            "default": "manual"
+          },
+          "dueDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "intervalMonths": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 1,
+            "maximum": 120
+          },
+          "treatmentPlanId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "assignedDoctorId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "patientId",
+          "dueDate"
+        ]
+      },
+      "UpdateRecall": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "contacted",
+              "scheduled",
+              "completed",
+              "dismissed"
+            ]
+          },
+          "dueDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "branchId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "assignedDoctorId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "scheduledAppointmentId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 1000
+          }
+        }
+      },
+      "MarkRecallContacted": {
+        "type": "object",
+        "properties": {
+          "notes": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 1000
+          }
+        }
+      },
       "Diagnosis": {
         "type": "object",
         "properties": {
@@ -12348,6 +12610,431 @@
           },
           "404": {
             "description": "Queue ticket not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recalls": {
+      "get": {
+        "tags": [
+          "recalls"
+        ],
+        "operationId": "listRecalls",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "example": "2026-06-21"
+            },
+            "required": false,
+            "name": "date",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "contacted",
+                "scheduled",
+                "completed",
+                "dismissed"
+              ]
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recall list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RecallDto"
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "recalls"
+        ],
+        "operationId": "createRecall",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRecall"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Recall created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/RecallDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recalls/patient/{id}": {
+      "get": {
+        "tags": [
+          "recalls"
+        ],
+        "operationId": "listPatientRecalls",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Patient recall list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RecallDto"
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recalls/{id}": {
+      "patch": {
+        "tags": [
+          "recalls"
+        ],
+        "operationId": "updateRecall",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRecall"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Recall updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/RecallDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recall not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recalls/{id}/contact": {
+      "post": {
+        "tags": [
+          "recalls"
+        ],
+        "operationId": "markRecallContacted",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkRecallContacted"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Recall marked contacted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/RecallDto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recall not found",
             "content": {
               "application/json": {
                 "schema": {

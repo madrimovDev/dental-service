@@ -25,6 +25,7 @@ import { payrollRoutes } from './modules/payroll/index.ts';
 import { permissionRoutes } from './modules/permissions/index.ts';
 import { prescriptionsRoutes } from './modules/prescriptions/index.ts';
 import { queueRoutes } from './modules/queue/index.ts';
+import { createRecallsService, recallRoutes } from './modules/recalls/index.ts';
 import { reportsRoutes } from './modules/reports/index.ts';
 import { roleRoutes } from './modules/roles/index.ts';
 import { createScheduleService, scheduleRoutes } from './modules/schedule/index.ts';
@@ -95,11 +96,16 @@ export const createApp = () => {
   // Epic A: doktor jadvali + time-off + availability. Service'ni bir marta
   // yaratamiz va predikatlarini appointmentRoutes'ga inject qilamiz (A6).
   const schedule = createScheduleService({ audit });
-  app.route('/api/appointments', appointmentRoutes({ db, audit, schedule }));
+  // Epic B: recalls service bir marta — narrow hook'larini appointments (B4
+  // preventive + B5 rebook) va clinical/treatment-plans (B4 stage-followup) ga
+  // inject qilamiz (RFC-0009 §4 sof factory DI; to'g'ridan import emas).
+  const recall = createRecallsService({ audit });
+  app.route('/api/appointments', appointmentRoutes({ db, audit, schedule, recall }));
   app.route('/api/schedule', scheduleRoutes({ db, audit }));
   app.route('/api/queue', queueRoutes({ db, audit }));
+  app.route('/api/recalls', recallRoutes({ db, audit }));
   // Clinical: /api/diagnoses, /api/treatment-plans, /api/visit-notes, /api/tooth-charts
-  app.route('/api', clinicalRoutes({ db, audit }));
+  app.route('/api', clinicalRoutes({ db, audit, recall }));
   // M5 clinical extras
   app.route('/api/prescriptions', prescriptionsRoutes({ db, audit }));
   app.route('/api/consent', consentRoutes({ db, audit }));

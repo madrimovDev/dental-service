@@ -3,7 +3,9 @@ import { seedDiagnoses, seedPermissions } from './db/boot-seed.ts';
 import { db, dbClient } from './db/client.ts';
 import { env } from './lib/env.ts';
 import { logger } from './lib/logger.ts';
-import { reminderQueue } from './lib/queue.ts';
+import { recallQueue, reminderQueue } from './lib/queue.ts';
+import { registerRecallScheduler } from './lib/recall-scheduler.ts';
+import { startRecallWorker } from './lib/recall-worker.ts';
 import { startReminderWorker } from './lib/reminder-worker.ts';
 import { initSentry } from './lib/sentry.ts';
 
@@ -29,6 +31,13 @@ const server = Bun.serve({
 const inProcessWorker =
   env.NODE_ENV !== 'test' && env.RUN_REMINDER_WORKER ? startReminderWorker() : null;
 
+// Epic B: recall scan worker + daily scheduler. Same gating as the reminder
+// worker — dev (RUN_REMINDER_WORKER=true) runs everything in one `bun dev`; prod
+// api sets it false and the dedicated worker process owns the queue (worker.ts).
+const inProcessRecall =
+  env.NODE_ENV !== 'test' && env.RUN_REMINDER_WORKER ? startRecallWorker() : null;
+if (inProcessRecall) await registerRecallScheduler();
+
 logger.info(`🚀 API listening on http://localhost:${server.port}`);
 
 // Graceful shutdown (CLI-237 / D6): on SIGTERM/SIGINT, stop accepting new
@@ -43,7 +52,9 @@ async function shutdown(signal: string): Promise<void> {
     // stop() rejects new conns + waits for in-flight requests to finish.
     await server.stop();
     if (inProcessWorker) await inProcessWorker.close();
+    if (inProcessRecall) await inProcessRecall.close();
     await reminderQueue.close();
+    await recallQueue.close();
     await dbClient.end({ timeout: 5 });
   } catch (err) {
     logger.error({ err }, 'Error during shutdown');

@@ -30,6 +30,8 @@ export * from './tables/payroll-runs.ts';
 export * from './tables/permissions.ts';
 export * from './tables/prescriptions.ts';
 export * from './tables/queue-tickets.ts';
+export * from './tables/recall-logs.ts';
+export * from './tables/recalls.ts';
 export * from './tables/refresh-tokens.ts';
 export * from './tables/role-permissions.ts';
 export * from './tables/roles.ts';

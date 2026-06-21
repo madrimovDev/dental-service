@@ -17,7 +17,11 @@ import {
   listAppointmentsQuery,
   updateAppointmentSchema,
 } from './appointments.schema.ts';
-import { createAppointmentsService, type SchedulePredicates } from './appointments.service.ts';
+import {
+  createAppointmentsService,
+  type RecallAppointmentHook,
+  type SchedulePredicates,
+} from './appointments.service.ts';
 
 /** Standart 404 response — get / patch / cancel endpoint'lar uchun. */
 const notFoundResponse = {
@@ -43,6 +47,7 @@ export const appointmentRoutes = (deps: {
   db: Database;
   audit: AuditLogger;
   schedule?: SchedulePredicates;
+  recall?: RecallAppointmentHook;
 }) => {
   const app = new OpenAPIHono();
   app.use('*', authMiddleware());
@@ -51,6 +56,7 @@ export const appointmentRoutes = (deps: {
   const service = createAppointmentsService({
     audit: deps.audit,
     schedule: deps.schedule,
+    recall: deps.recall,
     enqueueReminder: async (tenantId, appointmentId, delayMs) => {
       await reminderQueue.add(
         'appointment-reminder',
