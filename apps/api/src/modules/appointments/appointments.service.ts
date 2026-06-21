@@ -1,5 +1,5 @@
 import { appointments, roles, userAssignments, users } from '@dental/db-schema';
-import { and, asc, between, eq, gte, lt, lte, ne, sql } from 'drizzle-orm';
+import { and, asc, between, eq, gt, gte, lt, lte, ne, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
@@ -25,9 +25,11 @@ export const createAppointmentsService = (deps: {
     const filters = [
       eq(appointments.doctorId, doctorId),
       ne(appointments.status, 'cancelled' as const),
-      // Overlap: existing.start < new.end AND existing.end > new.start
+      // Yarim-ochiq [start, end): existing.start < new.end AND existing.end > new.start.
+      // `gt` (gte EMAS) — back-to-back (oldingi 11:00 tugaydi, yangi 11:00 boshlanadi)
+      // konflikt EMAS.
       lt(appointments.startTime, end),
-      gte(appointments.endTime, start),
+      gt(appointments.endTime, start),
     ];
     if (excludeId) filters.push(ne(appointments.id, excludeId));
 
