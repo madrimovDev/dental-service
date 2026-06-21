@@ -69,3 +69,36 @@ export function renderReminderSms(input: ReminderSmsInput): RenderedSms {
     body: name ? `Bemor: ${name}, ${when}` : `Qabul: ${when}`,
   };
 }
+
+export type RecallSmsInput = {
+  lang: SmsLang;
+  patientName: string;
+  /** Klinika nomi — SMS'da kim chaqirayotganini bildiradi. */
+  clinicName: string;
+};
+
+/**
+ * Recall (qayta chaqirish) SMS — uz/ru (M10-B8, RFC-0011 §2.3). Bemorga
+ * yuboriladi (yozilish eslatmasidan farqli — vaqt yo'q, profilaktik taklif).
+ * `title` + `body` shakli reminder bilan izchil (SMS = `title — body`).
+ */
+export function renderRecallSms(input: RecallSmsInput): RenderedSms {
+  const name = input.patientName.trim();
+  const clinic = input.clinicName.trim();
+
+  if (input.lang === 'ru') {
+    return {
+      title: 'Приглашение на приём',
+      body: name
+        ? `Уважаемый(ая) ${name}, пора пройти профилактический осмотр. ${clinic}`
+        : `Пора пройти профилактический осмотр. ${clinic}`,
+    };
+  }
+  // default: uz (Lotin)
+  return {
+    title: 'Qayta tashrif taklifi',
+    body: name
+      ? `Hurmatli ${name}, profilaktik ko‘rikdan o‘tish vaqti keldi. ${clinic}`
+      : `Profilaktik ko‘rikdan o‘tish vaqti keldi. ${clinic}`,
+  };
+}
