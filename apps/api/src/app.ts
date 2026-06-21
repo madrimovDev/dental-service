@@ -1,6 +1,7 @@
 import { createSmsChannel } from '@dental/notifications';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { cors } from 'hono/cors';
+import { secureHeaders } from 'hono/secure-headers';
 import { db } from './db/client.ts';
 import { createAuditLogger } from './lib/audit-logger.ts';
 import { env } from './lib/env.ts';
@@ -37,6 +38,27 @@ export const createApp = () => {
 
   // Global middleware
   app.use('*', requestId());
+
+  // Security headers — early in the chain. This is a JSON API serving a separate
+  // SPA (no HTML/docs UI served at runtime), so the CSP locks everything down.
+  // CORS is handled separately below; secureHeaders does not touch CORS headers.
+  app.use(
+    '*',
+    secureHeaders({
+      // No HTML is served → forbid all sub-resource loading and framing.
+      contentSecurityPolicy: {
+        defaultSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+      },
+      xFrameOptions: 'DENY',
+      xContentTypeOptions: 'nosniff',
+      // HSTS only in production (over real HTTPS) — emitting it on http://localhost
+      // would poison the browser's HSTS cache for local dev.
+      strictTransportSecurity:
+        env.NODE_ENV === 'production' ? 'max-age=31536000; includeSubDomains; preload' : false,
+    }),
+  );
+
   app.use(
     '*',
     cors({
