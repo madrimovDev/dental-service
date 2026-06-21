@@ -3,7 +3,7 @@ import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
-import { reminderQueue } from '../../lib/queue.ts';
+import { reminderJobId, reminderQueue } from '../../lib/queue.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
@@ -46,8 +46,11 @@ export const appointmentRoutes = (deps: { db: Database; audit: AuditLogger }) =>
       await reminderQueue.add(
         'appointment-reminder',
         { tenantId, appointmentId },
-        { delay: delayMs },
+        { delay: delayMs, jobId: reminderJobId(appointmentId) },
       );
+    },
+    removeReminder: async (appointmentId) => {
+      await reminderQueue.remove(reminderJobId(appointmentId));
     },
   });
 

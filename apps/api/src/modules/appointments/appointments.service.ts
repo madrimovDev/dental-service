@@ -13,6 +13,7 @@ import type {
 export const createAppointmentsService = (deps: {
   audit: AuditLogger;
   enqueueReminder?: (tenantId: string, appointmentId: string, delayMs: number) => Promise<void>;
+  removeReminder?: (appointmentId: string) => Promise<void>;
 }) => {
   async function checkConflict(
     c: Context,
@@ -155,6 +156,20 @@ export const createAppointmentsService = (deps: {
         before,
         after: updated,
       });
+
+      // Reschedule eslatma hayot-sikli (CLI-186): startTime o'zgarsa, eski
+      // (eski vaqtli) job'ni o'chir, keyin yangi delay > 0 bo'lsa qayta enqueue.
+      // BullMQ jobId bo'yicha dedupe qiladi — `add` qayta yozMAYDI, shuning uchun
+      // `remove` MAJBURIY. Yangi vaqt o'tgan/lead ichida → faqat o'chir (delay null).
+      // Doktor-only o'zgarish re-enqueue talab qilmaydi (worker doctorId'ni live o'qiydi).
+      if (input.startTime) {
+        const tenantId = c.get('activeTenantId');
+        if (tenantId) {
+          await deps.removeReminder?.(id);
+          const delay = reminderDelayMs(new Date(updated.startTime), new Date());
+          if (delay != null) await deps.enqueueReminder?.(tenantId, id, delay);
+        }
+      }
     }
     return { ok: true as const, appointment: updated };
   }
