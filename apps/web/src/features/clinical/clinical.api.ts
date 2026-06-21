@@ -159,9 +159,16 @@ export function useAcceptAllStages(patientId: string) {
         stageIds.map((id) => updateTreatmentStage(id, { acceptance: 'accepted' })),
       );
       const rejected = results.filter((r) => r.status === 'rejected').length;
-      return { total: stageIds.length, rejected };
+      // planId — fulfilled javobdan (barcha stage bitta rejaga tegishli).
+      const fulfilled = results.find((r) => r.status === 'fulfilled');
+      const planId =
+        fulfilled?.status === 'fulfilled' ? fulfilled.value.data.treatmentPlanId : null;
+      return { total: stageIds.length, rejected, planId };
     },
-    onSuccess: () => invalidatePlanFinancials(qc, patientId),
+    onSuccess: ({ planId }) => {
+      invalidatePlanFinancials(qc, patientId);
+      if (planId) void qc.invalidateQueries({ queryKey: clinicalKeys.planEstimate(planId) });
+    },
   });
 }
 

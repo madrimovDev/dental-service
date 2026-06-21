@@ -1,11 +1,25 @@
-import type { TreatmentStageStatus } from '@dental/api-client';
+import {
+  ApiError,
+  type SignTreatmentPlanConsentBody,
+  type TreatmentStageAcceptance,
+  type TreatmentStageStatus,
+} from '@dental/api-client';
 import { StateView } from '@dental/ui';
 import { Button, Group, Stack, Title } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
+import { notifications } from '@mantine/notifications';
 import { IconPlus } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth-store.ts';
-import { useCreatePlan, useTreatmentPlans, useUpdateStage } from '../../clinical.api';
+import {
+  useAcceptAllStages,
+  useCreatePlan,
+  useSignPlanConsent,
+  useTreatmentPlans,
+  useUpdatePlanStatus,
+  useUpdateStage,
+  useUpdateStageAcceptance,
+} from '../../clinical.api';
 import { PlanCard } from './PlanCard';
 import { PlanFormModal } from './PlanFormModal';
 
@@ -20,9 +34,53 @@ export function TreatmentPlansTab({ patientId }: Props) {
   const plansQuery = useTreatmentPlans(patientId);
   const createMut = useCreatePlan(patientId);
   const updateStageMut = useUpdateStage(patientId);
+  const acceptanceMut = useUpdateStageAcceptance(patientId);
+  const acceptAllMut = useAcceptAllStages(patientId);
+  const planStatusMut = useUpdatePlanStatus(patientId);
+  const consentMut = useSignPlanConsent(patientId);
 
   const onUpdateStage = (id: string, status: TreatmentStageStatus) =>
     updateStageMut.mutate({ id, status });
+
+  const onSetAcceptance = (id: string, acceptance: TreatmentStageAcceptance) =>
+    acceptanceMut.mutate({ id, acceptance });
+
+  const onAcceptAll = (stageIds: string[]) =>
+    acceptAllMut.mutate(stageIds, {
+      onSuccess: ({ total, rejected }) => {
+        if (rejected > 0) {
+          notifications.show({
+            color: 'red',
+            message: t('treatment_plan.accept_all_partial', { rejected }),
+          });
+        } else {
+          notifications.show({
+            color: 'teal',
+            message: t('treatment_plan.accept_all_result', { accepted: total }),
+          });
+        }
+      },
+    });
+
+  const onPresentPlan = (id: string) => planStatusMut.mutate({ id, status: 'presented' });
+
+  const onAcceptPlan = (id: string) =>
+    planStatusMut.mutate(
+      { id, status: 'accepted' },
+      {
+        // Consent-required 400'ni aniq xabar bilan ko'rsatamiz (global toast generik — CLI-165).
+        onError: (err) => {
+          const message =
+            err instanceof ApiError && err.code === 'plan.consent_required'
+              ? t('treatment_plan.consent_required')
+              : t('common.error');
+          notifications.show({ color: 'red', message });
+        },
+      },
+    );
+
+  const onSignConsent = (id: string, body: SignTreatmentPlanConsentBody) =>
+    consentMut.mutate({ id, body });
 
   return (
     <Stack gap="md">
@@ -48,7 +106,21 @@ export function TreatmentPlansTab({ patientId }: Props) {
         <StateView status="empty" title={t('treatment_plan.empty')} />
       ) : (
         plansQuery.data?.map((plan) => (
-          <PlanCard key={plan.id} plan={plan} canEdit={canEdit} onUpdateStage={onUpdateStage} />
+          <PlanCard
+            key={plan.id}
+            plan={plan}
+            canEdit={canEdit}
+            onUpdateStage={onUpdateStage}
+            onSetAcceptance={onSetAcceptance}
+            acceptancePending={acceptanceMut.isPending}
+            onAcceptAll={onAcceptAll}
+            acceptAllPending={acceptAllMut.isPending}
+            onPresentPlan={onPresentPlan}
+            onAcceptPlan={onAcceptPlan}
+            planStatusPending={planStatusMut.isPending}
+            onSignConsent={onSignConsent}
+            consentPending={consentMut.isPending}
+          />
         ))
       )}
 

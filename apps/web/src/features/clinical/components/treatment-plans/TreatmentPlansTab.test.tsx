@@ -20,6 +20,12 @@ vi.mock('../../clinical.api', () => ({
   }),
   useCreatePlan: () => ({ mutate: vi.fn(), isPending: false }),
   useUpdateStage: () => ({ mutate: vi.fn() }),
+  // CLI-224: acceptance/consent/plan-status hook'lari.
+  useUpdateStageAcceptance: () => ({ mutate: vi.fn(), isPending: false }),
+  useAcceptAllStages: () => ({ mutate: vi.fn(), isPending: false }),
+  useUpdatePlanStatus: () => ({ mutate: vi.fn(), isPending: false }),
+  useSignPlanConsent: () => ({ mutate: vi.fn(), isPending: false }),
+  useTreatmentPlanEstimate: () => ({ data: undefined, isLoading: false, isError: false }),
   // CLI-188: PlanFormModal xizmat katalogi + narx fetch ishlatadi.
   useServiceCatalog: () => ({ data: [] }),
   fetchServicePrices: vi.fn(),
