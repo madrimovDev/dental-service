@@ -58,11 +58,15 @@ services:
     depends_on:
       minio:
         condition: service_healthy
+    # Bucket stays PRIVATE (no anonymous policy). Patient medical images are PII —
+    # the app serves every object exclusively via short-lived presigned GET URLs
+    # (see apps/api/src/lib/s3.ts → presignedGetUrl, 5-min expiry). Direct
+    # unauthenticated object access must be denied; do NOT add `mc anonymous set`.
+    # Prod policy: keep bucket private + access only through presigned URLs.
     entrypoint: >
       /bin/sh -c "
       mc alias set local http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD};
       mc mb --ignore-existing local/$${MINIO_BUCKET};
-      mc anonymous set download local/$${MINIO_BUCKET};
       exit 0;
       "
     environment:
