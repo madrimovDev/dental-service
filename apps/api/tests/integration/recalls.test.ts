@@ -6,16 +6,27 @@
  *   cd apps/api && bun test tests/integration/recalls.test.ts --env-file=../../.env
  */
 import { beforeAll, beforeEach, describe, expect, test } from 'bun:test';
-import { branches, patients, recalls, tenants, users } from '@dental/db-schema';
-import { sql } from 'drizzle-orm';
+import {
+  branches,
+  patients,
+  recalls,
+  tenants,
+  treatmentPlans,
+  treatmentStages,
+  users,
+} from '@dental/db-schema';
+import { eq, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { DbOrTx } from '../../src/db/client.ts';
 import { db } from '../../src/db/client.ts';
+import { createAppointmentsService } from '../../src/modules/appointments/appointments.service.ts';
+import { createTreatmentPlansService } from '../../src/modules/clinical/treatment-plans/treatment-plans.service.ts';
 import { createRecallsService } from '../../src/modules/recalls/recalls.service.ts';
 
 let tenantId: string;
 let ownerId: string;
 let patientId: string;
+let branchId: string;
 
 const ctx = (tx: DbOrTx, tId: string): Context =>
   ({
@@ -55,7 +66,11 @@ beforeAll(async () => {
 
   await db.transaction(async (tx) => {
     await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
-    await tx.insert(branches).values({ tenantId, name: 'B' }).returning({ id: branches.id });
+    const [b] = await tx
+      .insert(branches)
+      .values({ tenantId, name: 'B' })
+      .returning({ id: branches.id });
+    branchId = b!.id;
     const [p] = await tx
       .insert(patients)
       .values({ tenantId, fullName: 'Ali Valiyev', phone: '+998901112233' })
@@ -241,5 +256,82 @@ describe('B5 rebook linkage (closeOpenOnRebook)', () => {
     await run(tenantId, (c) => svc.closeOpenOnRebook(c, patientId, crypto.randomUUID()));
     const after = await run(tenantId, (c) => svc.getById(c, r!.id));
     expect(after!.status).toBe('dismissed');
+  });
+});
+
+// End-to-end trigger wiring — recall hook injected into the REAL appointment /
+// treatment-plan services (transition guard + findPlan lookup that hook-only
+// tests can't exercise).
+describe('B4/B5 trigger wiring (through real services)', () => {
+  const apptSvc = createAppointmentsService({ audit: noopAudit, recall: svc });
+  const tpSvc = createTreatmentPlansService({ audit: noopAudit, recall: svc });
+
+  beforeEach(clearRecalls);
+
+  test('appointment update status→completed → preventive recall (transition guard)', async () => {
+    const future = new Date(Date.now() + 100 * 3600_000);
+    const created = await run(tenantId, (c) =>
+      apptSvc.create(c, {
+        branchId,
+        patientId,
+        doctorId: ownerId,
+        startTime: future.toISOString(),
+        endTime: new Date(future.getTime() + 3600_000).toISOString(),
+        serviceIds: [],
+      }),
+    );
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    const apptId = created.appointment.id;
+
+    await run(tenantId, (c) => apptSvc.update(c, apptId, { status: 'completed' }));
+    let prev = await run(tenantId, (c) => svc.listByPatient(c, patientId));
+    expect(prev.filter((r) => r.reason === 'preventive').length).toBe(1);
+
+    // Re-PATCH completed→completed → transition guard: NO duplicate.
+    await run(tenantId, (c) => apptSvc.update(c, apptId, { status: 'completed', notes: 'x' }));
+    prev = await run(tenantId, (c) => svc.listByPatient(c, patientId));
+    expect(prev.filter((r) => r.reason === 'preventive').length).toBe(1);
+  });
+
+  test('stage update status→completed → treatment_followup recall (findPlan lookup, idempotent)', async () => {
+    // Plan + stage seed (RLS context).
+    const stageId = await run(tenantId, async (c) => {
+      const tx = c.get('db') as DbOrTx;
+      const [plan] = await tx
+        .insert(treatmentPlans)
+        .values({ tenantId, patientId, doctorId: ownerId, title: 'Plan', totalCost: '0' })
+        .returning({ id: treatmentPlans.id });
+      const [stage] = await tx
+        .insert(treatmentStages)
+        .values({
+          treatmentPlanId: plan!.id,
+          sequence: 1,
+          serviceName: 'Plomba',
+          cost: '100',
+        })
+        .returning({ id: treatmentStages.id });
+      return stage!.id;
+    });
+
+    await run(tenantId, (c) => tpSvc.updateStage(c, stageId, { status: 'completed' }));
+    let fu = await run(tenantId, (c) => svc.listByPatient(c, patientId));
+    const followups = fu.filter((r) => r.reason === 'treatment_followup');
+    expect(followups.length).toBe(1);
+    expect(followups[0]!.sourceStageId).toBe(stageId);
+
+    // Re-complete same stage → idempotent (partial unique index): still 1.
+    await run(tenantId, (c) => tpSvc.updateStage(c, stageId, { status: 'completed' }));
+    fu = await run(tenantId, (c) => svc.listByPatient(c, patientId));
+    expect(fu.filter((r) => r.reason === 'treatment_followup').length).toBe(1);
+
+    // Verify the stage itself is completed (sanity).
+    const stageRow = await run(tenantId, (c) =>
+      (c.get('db') as DbOrTx)
+        .select({ status: treatmentStages.status })
+        .from(treatmentStages)
+        .where(eq(treatmentStages.id, stageId)),
+    );
+    expect(stageRow[0]!.status).toBe('completed');
   });
 });

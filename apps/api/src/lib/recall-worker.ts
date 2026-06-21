@@ -91,6 +91,10 @@ export async function processRecallScan(deps: RecallScanDeps): Promise<RecallSca
       result.skipped++;
       continue;
     }
+    // ⚠️ Effektiv shift: kunlik cron 11:00 Tashkent'da ishlaydi (B6). Agar tenant
+    // recallSendHourLocal'ni cron soatidan YUQORI qo'ysa (>11), gate har siklda
+    // skip qiladi va recall hech qachon yuborilmaydi (kunlik trigger soddaligi
+    // bahosi). Default 10 ≤ 11 → doim o'tadi.
     if (localHour(tz, now) < sendHour) {
       result.skipped++;
       continue;

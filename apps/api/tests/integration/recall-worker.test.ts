@@ -85,6 +85,10 @@ beforeEach(async () => {
 });
 
 const yesterday = '2020-01-01'; // o'tmish — har doim due.
+// Fixed `now` = 07:00 UTC = 12:00 Asia/Tashkent — recallSendHourLocal (default 10)
+// gate'idan o'tadi. Wall-clock'ga bog'liq emas (CI UTC-ertalab oynasida ham
+// barqaror); aks holda 00:00–09:59 Tashkent'da gate skip qiladi.
+const now = new Date('2026-06-21T07:00:00Z');
 
 describe('B7 processRecallScan cross-tenant', () => {
   test('scans across tenants (admin conn) → SMS sent + status=contacted + log', async () => {
@@ -99,7 +103,7 @@ describe('B7 processRecallScan cross-tenant', () => {
       patientName: 'Иван',
     });
 
-    const res = await processRecallScan({ adminDb: admin.db, sms, withTenant });
+    const res = await processRecallScan({ adminDb: admin.db, sms, withTenant, now });
     expect(res.scanned).toBe(2);
     expect(res.sent).toBe(2);
 
@@ -126,17 +130,17 @@ describe('B7 processRecallScan cross-tenant', () => {
 
   test('already-contacted skipped (idempotent re-scan)', async () => {
     await seedRecall(tA, { dueDate: yesterday, phone: '+998901112233' });
-    await processRecallScan({ adminDb: admin.db, sms, withTenant });
+    await processRecallScan({ adminDb: admin.db, sms, withTenant, now });
     smsSent = [];
     // Ikkinchi scan — endi pending yo'q → 0 SMS.
-    const res2 = await processRecallScan({ adminDb: admin.db, sms, withTenant });
+    const res2 = await processRecallScan({ adminDb: admin.db, sms, withTenant, now });
     expect(res2.scanned).toBe(0);
     expect(smsSent.length).toBe(0);
   });
 
   test('no phone → failed + no_phone log, status stays pending', async () => {
     const r = await seedRecall(tA, { dueDate: yesterday, phone: null });
-    const res = await processRecallScan({ adminDb: admin.db, sms, withTenant });
+    const res = await processRecallScan({ adminDb: admin.db, sms, withTenant, now });
     expect(res.failed).toBe(1);
     expect(smsSent.length).toBe(0);
     const s = await withTenant(tA, (tx) =>
@@ -151,7 +155,7 @@ describe('B7 processRecallScan cross-tenant', () => {
 
   test('future dueDate not scanned', async () => {
     await seedRecall(tA, { dueDate: '2099-01-01', phone: '+998901112233' });
-    const res = await processRecallScan({ adminDb: admin.db, sms, withTenant });
+    const res = await processRecallScan({ adminDb: admin.db, sms, withTenant, now });
     expect(res.scanned).toBe(0);
     expect(smsSent.length).toBe(0);
   });
