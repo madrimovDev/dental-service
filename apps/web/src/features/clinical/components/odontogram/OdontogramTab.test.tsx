@@ -68,6 +68,31 @@ describe('OdontogramTab', () => {
     });
   });
 
+  it('CLI-189: tish tanlab surface + diagnoz tanlash → save payload (entry interaction)', () => {
+    // Bo'sh chart: tish tanlanadi, surface 'D' + diagnoz UI orqali kiritiladi
+    renderApp(<OdontogramTab patientId="p1" />);
+    fireEvent.click(screen.getByText('16'));
+
+    // Surface Select ochiladi → 'D' (Distal) tanlanadi
+    const surfaceSelect = screen.getByRole('textbox', { name: /Tish yuzasi/i });
+    fireEvent.click(surfaceSelect);
+    fireEvent.click(screen.getByText(/Distal \(D\)/i));
+
+    // Diagnoz Select → mock diagnoz tanlanadi
+    const dxSelect = screen.getByRole('textbox', { name: /Diagnoz/i });
+    fireEvent.click(dxSelect);
+    fireEvent.click(screen.getByText(/K02\.1/));
+
+    fireEvent.click(saveButton());
+    const arg = mutate.mock.calls[0]?.[0];
+    expect(arg.states).toContainEqual({
+      toothNumber: 16,
+      state: 'healthy',
+      surface: 'D',
+      diagnosisId: 'dx-1',
+    });
+  });
+
   it('CLI-191: eski snapshot tanlanganda read-only (Save paneli yo‘q)', () => {
     mockChart = {
       isPrimaryDentition: false,
@@ -88,7 +113,8 @@ describe('OdontogramTab', () => {
     // eski snapshot tanlash → read-only banner + "return to current"
     const historySelect = screen.getByPlaceholderText(/Tarix|истори/i);
     fireEvent.click(historySelect);
-    fireEvent.click(screen.getByText(/01\.01\.2026|01\.2026|2026/));
+    // Yagona snapshot opsiyasi — rol bo'yicha tanlaymiz (TZ/locale formatiga bog'liq emas)
+    fireEvent.click(screen.getByRole('option'));
     expect(screen.getByText(/qaytish|вернуться/i)).toBeTruthy();
   });
 });
