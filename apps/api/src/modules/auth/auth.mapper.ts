@@ -14,7 +14,7 @@ import type { AuthService } from './auth.service.ts';
  * `accessExpiresAt` Date → ISO string (wire tip `string`). Qolgani passthrough.
  */
 
-type LoginResult = NonNullable<Awaited<ReturnType<AuthService['login']>>>;
+type LoginResult = Extract<Awaited<ReturnType<AuthService['login']>>, { ok: true }>;
 type SwitchOkResult = Extract<Awaited<ReturnType<AuthService['switchWorkspace']>>, { ok: true }>;
 type RefreshResult = NonNullable<Awaited<ReturnType<AuthService['refresh']>>>;
 type RegisterResult = Awaited<ReturnType<AuthService['registerTenant']>>;

@@ -127,6 +127,13 @@
       "when": 1781351790388,
       "tag": "0017_stormy_moira_mactaggert",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1782031545937,
+      "tag": "0018_cli226_reset_attempts",
+      "breakpoints": true
     }
   ]
 }

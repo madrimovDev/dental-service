@@ -1,7 +1,10 @@
 import { fail, ok } from '@dental/core';
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import type { Database } from '../../db/client.ts';
+import { createAuditLogger } from '../../lib/audit-logger.ts';
+import { env } from '../../lib/env.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
+import { rateLimit } from '../../lib/rate-limit.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import {
   toLoginDto,
@@ -40,8 +43,43 @@ export const authRoutes = (deps: { db: Database }) => {
   // ⚠️ Auth modul app-level rlsMiddleware ISHLATMAYDI. Public route'lar auth'siz;
   // himoyalangan route'lar (/me, /switch-workspace, /change-password) PER-ROUTE
   // authMiddleware() bilan.
+  // ⚠️ app.ts faqat `{ db }` uzatadi (uni o'zgartira olmaymiz) — qolgan deps (sms,
+  // audit) shu yerda env'dan quriladi (reminder-worker precedenti).
   const app = new OpenAPIHono();
   const service = createAuthService(deps);
+  const audit = createAuditLogger({ db: deps.db });
+
+  // ─── Rate limiting (CLI-227) — Redis fixed-window, IP+telefon ────────────────
+  const window = env.AUTH_RATE_LIMIT_WINDOW_SEC;
+  const phoneKey = (b: unknown): string | undefined =>
+    typeof b === 'object' && b !== null && typeof (b as { phone?: unknown }).phone === 'string'
+      ? (b as { phone: string }).phone
+      : undefined;
+
+  const loginRateLimit = rateLimit({
+    name: 'login',
+    limit: env.AUTH_LOGIN_RATE_LIMIT,
+    windowSeconds: window,
+    keyFromBody: phoneKey,
+  });
+  const refreshRateLimit = rateLimit({
+    name: 'refresh',
+    limit: env.AUTH_REFRESH_RATE_LIMIT,
+    windowSeconds: window,
+    // refresh body'da telefon yo'q → faqat IP bo'yicha.
+  });
+  const resetRequestRateLimit = rateLimit({
+    name: 'reset-request',
+    limit: env.AUTH_RESET_RATE_LIMIT,
+    windowSeconds: window,
+    keyFromBody: phoneKey,
+  });
+  const resetRateLimit = rateLimit({
+    name: 'reset',
+    limit: env.AUTH_RESET_RATE_LIMIT,
+    windowSeconds: window,
+    keyFromBody: phoneKey,
+  });
 
   // ─── POST /register-tenant — public ──────────────────────────────────────
 
@@ -93,18 +131,41 @@ export const authRoutes = (deps: { db: Database }) => {
     path: '/login',
     tags: ['auth'],
     operationId: 'login',
+    middleware: [loginRateLimit] as const,
     request: {
       body: { content: { 'application/json': { schema: loginSchema } } },
     },
-    responses: okJson(loginResponseSchema, 'Login successful'),
+    responses: {
+      ...okJson(loginResponseSchema, 'Login successful'),
+      429: errResp('Too many requests'),
+    },
   });
 
   app.openapi(loginRoute, async (c) => {
     const body = c.req.valid('json');
     const result = await service.login(body);
-    if (!result) {
+
+    // CLI-227: login audit — muvaffaqiyat va MUVAFFAQIYATSIZLIK ham (kim, qachon, ip, ua).
+    // Platform-level event → tenantIdOverride: null. Failed login KO'RINADIGAN bo'lishi shart.
+    if (!result.ok) {
+      if (result.userId) c.set('user', { id: result.userId });
+      await audit.record(c, {
+        action: 'login.failed',
+        resourceType: 'auth',
+        resourceId: result.userId ?? null,
+        after: { phone: body.phone, reason: result.reason },
+        tenantIdOverride: null,
+      });
       return c.json(fail('auth.invalid_credentials', "Email/telefon yoki parol noto'g'ri"), 401);
     }
+
+    c.set('user', { id: result.userId });
+    await audit.record(c, {
+      action: 'login.success',
+      resourceType: 'auth',
+      resourceId: result.userId,
+      tenantIdOverride: null,
+    });
     return c.json(ok(toLoginDto(result)), 200);
   });
 
@@ -115,10 +176,14 @@ export const authRoutes = (deps: { db: Database }) => {
     path: '/refresh',
     tags: ['auth'],
     operationId: 'refresh',
+    middleware: [refreshRateLimit] as const,
     request: {
       body: { content: { 'application/json': { schema: refreshSchema } } },
     },
-    responses: okJson(tokenPairResponseSchema, 'Token refreshed'),
+    responses: {
+      ...okJson(tokenPairResponseSchema, 'Token refreshed'),
+      429: errResp('Too many requests'),
+    },
   });
 
   app.openapi(refreshRoute, async (c) => {
@@ -246,10 +311,14 @@ export const authRoutes = (deps: { db: Database }) => {
     path: '/password-reset-request',
     tags: ['auth'],
     operationId: 'passwordResetRequest',
+    middleware: [resetRequestRateLimit] as const,
     request: {
       body: { content: { 'application/json': { schema: passwordResetRequestSchema } } },
     },
-    responses: okJson(passwordResetRequestResponseSchema, 'Reset code sent (if user exists)'),
+    responses: {
+      ...okJson(passwordResetRequestResponseSchema, 'Reset code sent (if user exists)'),
+      429: errResp('Too many requests'),
+    },
   });
 
   app.openapi(passwordResetRequestRoute, async (c) => {
@@ -265,10 +334,14 @@ export const authRoutes = (deps: { db: Database }) => {
     path: '/password-reset',
     tags: ['auth'],
     operationId: 'passwordReset',
+    middleware: [resetRateLimit] as const,
     request: {
       body: { content: { 'application/json': { schema: passwordResetSchema } } },
     },
-    responses: okJson(passwordResetResponseSchema, 'Password reset'),
+    responses: {
+      ...okJson(passwordResetResponseSchema, 'Password reset'),
+      429: errResp('Too many requests'),
+    },
   });
 
   app.openapi(passwordResetRoute, async (c) => {

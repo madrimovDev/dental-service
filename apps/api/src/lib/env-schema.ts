@@ -49,6 +49,12 @@ export const envSchema = z
     // Eskiz SMS (optional — yo'q bo'lsa NoOp kanal ishlatiladi)
     ESKIZ_EMAIL: z.string().optional(),
     ESKIZ_PASSWORD: z.string().optional(),
+
+    // Auth rate limiting (CLI-227) — IP+telefon bo'yicha fixed-window. Sane defaults.
+    AUTH_RATE_LIMIT_WINDOW_SEC: z.coerce.number().int().positive().default(900), // 15 daqiqa
+    AUTH_LOGIN_RATE_LIMIT: z.coerce.number().int().positive().default(10),
+    AUTH_REFRESH_RATE_LIMIT: z.coerce.number().int().positive().default(60),
+    AUTH_RESET_RATE_LIMIT: z.coerce.number().int().positive().default(5),
   })
   // Reject known-placeholder secrets in production. Dev/test intentionally keep
   // the placeholder so local boot + `bun test --env-file=../../.env` work.

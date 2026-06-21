@@ -12,8 +12,10 @@ import {
   userAssignments,
   users,
 } from '@dental/db-schema';
-import { and, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm';
+import { createSmsChannel, type NotificationChannel } from '@dental/notifications';
+import { and, desc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm';
 import type { Database, DbTransaction } from '../../db/client.ts';
+import { env } from '../../lib/env.ts';
 import { signAccess, signRefresh, verifyRefresh } from '../../lib/jwt.ts';
 import { logger } from '../../lib/logger.ts';
 import { hashPassword, verifyPassword } from '../../lib/password.ts';
@@ -146,10 +148,23 @@ async function buildPermissionsForContext(
 
 export type AuthServiceDeps = {
   db: Database;
+  /**
+   * SMS kanal (CLI-226 — reset kodi yetkazish). Berilmasa env'dan Eskiz/NoOp
+   * quriladi (reminder-worker precedenti). Test capturing kanal in'ektsiya qiladi.
+   */
+  sms?: NotificationChannel;
 };
+
+/** Reset kodi uchun maksimal noto'g'ri urinishlar (CLI-226 brute-force limiti). */
+const MAX_RESET_ATTEMPTS = 5;
+/** Reset kodi amal qilish muddati (daqiqa). */
+const RESET_TOKEN_TTL_MIN = 30;
 
 export const createAuthService = (deps: AuthServiceDeps) => {
   const { db } = deps;
+  const sms =
+    deps.sms ??
+    createSmsChannel({ eskizEmail: env.ESKIZ_EMAIL, eskizPassword: env.ESKIZ_PASSWORD });
 
   async function registerTenant(input: RegisterTenantInput) {
     // Atomic transaction: user + tenant + branch + 8 role templates + (no owner assignment row)
@@ -217,16 +232,33 @@ export const createAuthService = (deps: AuthServiceDeps) => {
     });
   }
 
-  async function login(input: LoginInput) {
+  /**
+   * Login natijasi — diskriminatsiyalangan union (CLI-227 audit uchun outcome+userId).
+   *  - success: token juftligi + user.
+   *  - failure: sabab ('no_user' | 'bad_password') + (mavjud bo'lsa) userId — audit'da
+   *    KIM urinib ko'rdi yozish uchun.
+   */
+  type LoginResult =
+    | {
+        ok: true;
+        userId: string;
+        user: { id: string; phone: string; fullName: string | null; lang: string };
+        accessToken: string;
+        refreshToken: string;
+        accessExpiresAt: Date;
+      }
+    | { ok: false; reason: 'no_user' | 'bad_password'; userId: string | null };
+
+  async function login(input: LoginInput): Promise<LoginResult> {
     const [user] = await db
       .select()
       .from(users)
       .where(and(eq(users.phone, input.phone), isNull(users.deletedAt)));
 
-    if (!user) return null;
+    if (!user) return { ok: false, reason: 'no_user', userId: null };
 
-    const ok = await verifyPassword(input.password, user.passwordHash);
-    if (!ok) return null;
+    const valid = await verifyPassword(input.password, user.passwordHash);
+    if (!valid) return { ok: false, reason: 'bad_password', userId: user.id };
 
     // JWT — no workspace context yet (atid/abid null, empty perms)
     const access = await signAccess({
@@ -246,6 +278,8 @@ export const createAuthService = (deps: AuthServiceDeps) => {
     });
 
     return {
+      ok: true,
+      userId: user.id,
       user: {
         id: user.id,
         phone: user.phone,
@@ -613,9 +647,19 @@ export const createAuthService = (deps: AuthServiceDeps) => {
     // Security: invalid user uchun ham success qaytaramiz (enumeration oldini olish)
     if (!user) return { sent: true };
 
+    const now = new Date();
+
+    // CLI-226: avvalgi ishlatilmagan tokenlarni bekor qilish — bitta foydalanuvchida
+    // bir vaqtning o'zida faqat BITTA aktiv reset token bo'lsin (userId bo'yicha qidiruv
+    // bir ma'noli bo'lishi uchun).
+    await db
+      .update(passwordResetTokens)
+      .set({ usedAt: now })
+      .where(and(eq(passwordResetTokens.userId, user.id), isNull(passwordResetTokens.usedAt)));
+
     const code = sixDigitCode();
     const tokenHash = await hashToken(code);
-    const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 daq
+    const expiresAt = new Date(now.getTime() + RESET_TOKEN_TTL_MIN * 60 * 1000);
 
     await db.insert(passwordResetTokens).values({
       userId: user.id,
@@ -623,31 +667,68 @@ export const createAuthService = (deps: AuthServiceDeps) => {
       expiresAt,
     });
 
-    // MOCK OTP — Phase 1 da SMS yo'q, kodni log'ga yozamiz (M3 da Eskiz)
-    logger.warn(
-      { userId: user.id, phone: user.phone, code },
-      `🔐 Mock OTP — bu console'da production'da SMS bilan yuboriladi`,
-    );
+    // CLI-226: kodni NotificationChannel orqali yuborish (Eskiz config bo'lsa real SMS,
+    // aks holda NoOp — dev'da log qiladi, oqim buzilmaydi).
+    const result = await sms.send(user.phone, {
+      text: `Dental Service parolni tiklash kodi: ${code}. Kod ${RESET_TOKEN_TTL_MIN} daqiqa amal qiladi.`,
+    });
+    if (!result.ok) {
+      logger.warn({ userId: user.id, error: result.error }, 'Reset SMS yuborilmadi');
+    }
 
     return { sent: true };
   }
 
+  /**
+   * Parolni reset qilish (CLI-226 ATO fix).
+   *
+   * Token endi FOYDALANUVCHIGA bog'langan: avval phone→userId topiladi, keyin shu
+   * userId'ning aktiv (muddati o'tmagan, ishlatilmagan) tokeni olinadi va kod hash'i
+   * APP KODIDA solishtiriladi. Noto'g'ri kod → `attempts++`; limit oshsa token bekor
+   * qilinadi. Bu global hash-bo'yicha brute-force'ni (10^6 maydon) imkonsiz qiladi va
+   * A foydalanuvchi kodi B'ni reset qila olmaydi.
+   *
+   * Natija: null → noto'g'ri/muddati o'tgan/tugagan urinishlar (route 400 qaytaradi,
+   * sabab oshkor qilinmaydi — enumeration/oracle oldini olish).
+   */
   async function resetPassword(input: PasswordResetInput) {
-    const tokenHash = await hashToken(input.token);
     const now = new Date();
 
+    const [user] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.phone, input.phone), isNull(users.deletedAt)));
+    if (!user) return null;
+
+    // userId bo'yicha aktiv token (eng yangisi) — tokenHash bo'yicha global EMAS.
     const [reset] = await db
       .select()
       .from(passwordResetTokens)
       .where(
         and(
-          eq(passwordResetTokens.tokenHash, tokenHash),
+          eq(passwordResetTokens.userId, user.id),
           gt(passwordResetTokens.expiresAt, now),
           isNull(passwordResetTokens.usedAt),
         ),
-      );
+      )
+      .orderBy(desc(passwordResetTokens.createdAt))
+      .limit(1);
 
     if (!reset) return null;
+
+    // Kod hash'ini APP KODIDA solishtiramiz (DB query EMAS) — shunda noto'g'ri kodda ham
+    // qatorga ega bo'lamiz va attempts'ni oshira olamiz.
+    const submittedHash = await hashToken(input.token);
+    if (submittedHash !== reset.tokenHash) {
+      const newAttempts = reset.attempts + 1;
+      // Limit oshganda tokenni bekor qilamiz (usedAt) — yangi so'rov kerak bo'ladi.
+      const exhausted = newAttempts >= MAX_RESET_ATTEMPTS;
+      await db
+        .update(passwordResetTokens)
+        .set({ attempts: newAttempts, ...(exhausted ? { usedAt: now } : {}) })
+        .where(eq(passwordResetTokens.id, reset.id));
+      return null;
+    }
 
     const newHash = await hashPassword(input.newPassword);
 
