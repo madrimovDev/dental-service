@@ -232,16 +232,33 @@ export const createAuthService = (deps: AuthServiceDeps) => {
     });
   }
 
-  async function login(input: LoginInput) {
+  /**
+   * Login natijasi — diskriminatsiyalangan union (CLI-227 audit uchun outcome+userId).
+   *  - success: token juftligi + user.
+   *  - failure: sabab ('no_user' | 'bad_password') + (mavjud bo'lsa) userId — audit'da
+   *    KIM urinib ko'rdi yozish uchun.
+   */
+  type LoginResult =
+    | {
+        ok: true;
+        userId: string;
+        user: { id: string; phone: string; fullName: string | null; lang: string };
+        accessToken: string;
+        refreshToken: string;
+        accessExpiresAt: Date;
+      }
+    | { ok: false; reason: 'no_user' | 'bad_password'; userId: string | null };
+
+  async function login(input: LoginInput): Promise<LoginResult> {
     const [user] = await db
       .select()
       .from(users)
       .where(and(eq(users.phone, input.phone), isNull(users.deletedAt)));
 
-    if (!user) return null;
+    if (!user) return { ok: false, reason: 'no_user', userId: null };
 
-    const ok = await verifyPassword(input.password, user.passwordHash);
-    if (!ok) return null;
+    const valid = await verifyPassword(input.password, user.passwordHash);
+    if (!valid) return { ok: false, reason: 'bad_password', userId: user.id };
 
     // JWT — no workspace context yet (atid/abid null, empty perms)
     const access = await signAccess({
@@ -261,6 +278,8 @@ export const createAuthService = (deps: AuthServiceDeps) => {
     });
 
     return {
+      ok: true,
+      userId: user.id,
       user: {
         id: user.id,
         phone: user.phone,

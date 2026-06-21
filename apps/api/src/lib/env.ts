@@ -27,6 +27,12 @@ const envSchema = z.object({
   // Eskiz SMS (optional — yo'q bo'lsa NoOp kanal ishlatiladi)
   ESKIZ_EMAIL: z.string().optional(),
   ESKIZ_PASSWORD: z.string().optional(),
+
+  // Auth rate limiting (CLI-227) — IP+telefon bo'yicha fixed-window. Sane defaults.
+  AUTH_RATE_LIMIT_WINDOW_SEC: z.coerce.number().int().positive().default(900), // 15 daqiqa
+  AUTH_LOGIN_RATE_LIMIT: z.coerce.number().int().positive().default(10),
+  AUTH_REFRESH_RATE_LIMIT: z.coerce.number().int().positive().default(60),
+  AUTH_RESET_RATE_LIMIT: z.coerce.number().int().positive().default(5),
 });
 
 const parsed = envSchema.safeParse(Bun.env);
