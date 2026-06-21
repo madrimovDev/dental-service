@@ -3,6 +3,7 @@ import type { ErrorHandler } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { ZodError, z } from 'zod';
 import { logger } from '../lib/logger.ts';
+import { captureException } from '../lib/sentry.ts';
 
 export const errorHandler: ErrorHandler = (err, c) => {
   const requestId = c.get('requestId');
@@ -16,5 +17,7 @@ export const errorHandler: ErrorHandler = (err, c) => {
   }
 
   logger.error({ err, requestId }, 'Unhandled error');
+  // Report only genuine unhandled 5xx errors (no-op when Sentry disabled).
+  captureException(err);
   return c.json(fail('internal_error', 'Internal server error'), 500);
 };
