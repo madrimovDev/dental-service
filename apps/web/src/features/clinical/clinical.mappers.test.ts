@@ -7,10 +7,12 @@ import type {
   ServicePrice,
   ToothChartWithStates,
   TreatmentPlan,
+  TreatmentPlanEstimate,
   TreatmentStage,
   VisitNote,
 } from '@dental/api-client';
 import { describe, expect, it } from 'vitest';
+import { formatNumber } from '@/lib/format.ts';
 import {
   diagnosisSearchIndex,
   draftMapToCreateInput,
@@ -22,10 +24,12 @@ import {
   normalizeSearch,
   parseToothNumbers,
   planStatusToTone,
+  stageAcceptanceToTone,
   stageStatusToTone,
   templateBodyForLang,
   toConsentFormVM,
   toDiagnosisOptions,
+  toEstimateVM,
   toLabOrderVM,
   toPatientImageVM,
   toPlanCardVM,
@@ -204,6 +208,78 @@ describe('toPlanCardVM / toStageRowVM', () => {
     expect(planStatusToTone('cancelled')).toBe('danger');
     expect(stageStatusToTone('pending')).toBe('neutral');
     expect(stageStatusToTone('skipped')).toBe('danger');
+  });
+
+  // CLI-224: acceptance — status'dan alohida o'q.
+  it('stage acceptance -> tone + labelKey (proposed/accepted/rejected)', () => {
+    expect(toStageRowVM(stage({ acceptance: 'proposed' })).acceptanceTone).toBe('info');
+    expect(toStageRowVM(stage({ acceptance: 'accepted' })).acceptanceLabelKey).toBe(
+      'treatment_plan.acceptance_accepted',
+    );
+    expect(stageAcceptanceToTone('rejected')).toBe('danger');
+    expect(stageAcceptanceToTone('accepted')).toBe('success');
+  });
+});
+
+// ---- A: treatment plan estimate (smeta — CLI-223/224) ----
+describe('toEstimateVM', () => {
+  function estimate(over: Partial<TreatmentPlanEstimate> = {}): TreatmentPlanEstimate {
+    return {
+      planId: 'pl1',
+      status: 'accepted',
+      totalProposed: 0,
+      totalAccepted: 500000,
+      totalCost: 650000,
+      totalPaid: 200000,
+      balance: 300000,
+      stages: [
+        {
+          stageId: 's1',
+          serviceName: 'Plomba',
+          cost: 500000,
+          status: 'pending',
+          acceptance: 'accepted',
+          paid: 200000,
+          debtEligible: true,
+        },
+        {
+          stageId: 's2',
+          serviceName: 'Tozalash',
+          cost: 150000,
+          status: 'skipped',
+          acceptance: 'accepted',
+          paid: 0,
+          debtEligible: false,
+        },
+      ],
+      ...over,
+    } as TreatmentPlanEstimate;
+  }
+
+  it('per-stage cost/status/acceptance/paid + debtEligible mapped', () => {
+    const vm = toEstimateVM(estimate());
+    expect(vm.stages).toHaveLength(2);
+    const [s1, s2] = vm.stages;
+    expect(s1?.serviceName).toBe('Plomba');
+    expect(s1?.costText).toBe(formatNumber(500000));
+    expect(s1?.paidText).toBe(formatNumber(200000));
+    expect(s1?.statusLabelKey).toBe('treatment_plan.stage_status_pending');
+    expect(s1?.acceptanceLabelKey).toBe('treatment_plan.acceptance_accepted');
+    expect(s1?.acceptanceTone).toBe('success');
+    expect(s1?.debtEligible).toBe(true);
+    expect(s2?.debtEligible).toBe(false);
+  });
+
+  it('totals are independent subtotals; balance is authoritative', () => {
+    const vm = toEstimateVM(estimate());
+    expect(vm.totalProposedText).toBe(formatNumber(0));
+    expect(vm.totalAcceptedText).toBe(formatNumber(500000));
+    expect(vm.totalCostText).toBe(formatNumber(650000));
+    expect(vm.totalPaidText).toBe(formatNumber(200000));
+    expect(vm.balanceText).toBe(formatNumber(300000));
+    expect(vm.balance).toBe(300000);
+    // skipped-but-accepted stage is in totalCost only, not in totalAccepted subtotal
+    expect(vm.totalAcceptedText).not.toBe(vm.totalCostText);
   });
 });
 
