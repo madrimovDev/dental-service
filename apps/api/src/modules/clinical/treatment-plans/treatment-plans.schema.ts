@@ -34,9 +34,21 @@ export type UpdateTreatmentPlanInput = z.infer<typeof updateTreatmentPlanSchema>
 
 export const updateStageSchema = z.object({
   status: z.enum(['pending', 'in_progress', 'completed', 'skipped']).optional(),
+  // Qaror #25: acceptance — ALOHIDA o'q (status'dan mustaqil). Qarz faqat 'accepted'.
+  acceptance: z.enum(['proposed', 'accepted', 'rejected']).optional(),
   notes: z.string().max(500).optional(),
 });
 export type UpdateStageInput = z.infer<typeof updateStageSchema>;
+
+/** C3 — plan consent linkage (presented→accepted REQUIRES consent). */
+export const consentSchema = z.object({
+  consentSignedAt: z.iso
+    .datetime()
+    .optional()
+    .openapi({ example: '2026-06-21T10:00:00.000Z', description: 'Defaults to now if omitted' }),
+  consentSignatureUrl: z.string().max(1000).optional(),
+});
+export type ConsentInput = z.infer<typeof consentSchema>;
 
 // ─── Path param schemas ───────────────────────────────────────────────────────
 
@@ -58,6 +70,9 @@ export const listPlansQuerySchema = z.object({
 
 /** Stage status enum values */
 export const treatmentStageStatusEnum = z.enum(['pending', 'in_progress', 'completed', 'skipped']);
+
+/** Stage acceptance enum values (Qaror #25 — debt axis) */
+export const treatmentStageAcceptanceEnum = z.enum(['proposed', 'accepted', 'rejected']);
 
 /** Plan status enum values */
 export const treatmentPlanStatusEnum = z.enum([
@@ -85,6 +100,7 @@ export const treatmentStageDtoSchema = z
     estimatedDurationMinutes: z.number().int().nullable().openapi({ example: 30 }),
     cost: z.string().openapi({ example: '150000.00' }),
     status: treatmentStageStatusEnum.openapi({ example: 'pending' }),
+    acceptance: treatmentStageAcceptanceEnum.openapi({ example: 'proposed' }),
     notes: z.string().nullable().openapi({ example: null }),
     completedAt: z.string().nullable().openapi({ example: null }),
   })
@@ -103,6 +119,8 @@ export const treatmentPlanDtoSchema = z
     status: treatmentPlanStatusEnum.openapi({ example: 'draft' }),
     totalCost: z.string().openapi({ example: '450000.00' }),
     totalVisits: z.number().int().openapi({ example: 3 }),
+    consentSignedAt: z.string().nullable().openapi({ example: null }),
+    consentSignatureUrl: z.string().nullable().openapi({ example: null }),
     notes: z.string().nullable().openapi({ example: null }),
     createdAt: z.string().openapi({ example: '2026-06-12T10:00:00.000Z' }),
     updatedAt: z.string().openapi({ example: '2026-06-12T10:00:00.000Z' }),

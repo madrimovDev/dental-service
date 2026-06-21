@@ -82,6 +82,12 @@ export const createTreatmentPlansRepository = () => {
     return plan ?? null;
   }
 
+  async function findStage(c: Context, id: string) {
+    const db = getDb(c);
+    const [stage] = await db.select().from(treatmentStages).where(eq(treatmentStages.id, id));
+    return stage ?? null;
+  }
+
   async function updatePlan(
     c: Context,
     id: string,
@@ -110,5 +116,13 @@ export const createTreatmentPlansRepository = () => {
     return updated ?? null;
   }
 
-  return { listPlans, getPlanWithStages, insertPlanWithStages, findPlan, updatePlan, updateStage };
+  return {
+    listPlans,
+    getPlanWithStages,
+    insertPlanWithStages,
+    findPlan,
+    findStage,
+    updatePlan,
+    updateStage,
+  };
 };

@@ -3228,6 +3228,15 @@
             ],
             "example": "pending"
           },
+          "acceptance": {
+            "type": "string",
+            "enum": [
+              "proposed",
+              "accepted",
+              "rejected"
+            ],
+            "example": "proposed"
+          },
           "notes": {
             "type": "string",
             "nullable": true,
@@ -3250,6 +3259,7 @@
           "estimatedDurationMinutes",
           "cost",
           "status",
+          "acceptance",
           "notes",
           "completedAt"
         ]
@@ -3297,6 +3307,16 @@
             "type": "integer",
             "example": 3
           },
+          "consentSignedAt": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          },
+          "consentSignatureUrl": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          },
           "notes": {
             "type": "string",
             "nullable": true,
@@ -3320,6 +3340,8 @@
           "status",
           "totalCost",
           "totalVisits",
+          "consentSignedAt",
+          "consentSignatureUrl",
           "notes",
           "createdAt",
           "updatedAt"
@@ -13511,6 +13533,113 @@
             }
           },
           "400": {
+            "description": "Invalid transition or consent required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Treatment plan not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/treatment-plans/{id}/consent": {
+      "post": {
+        "tags": [
+          "treatment-plans"
+        ],
+        "operationId": "signTreatmentPlanConsent",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "consentSignedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "example": "2026-06-21T10:00:00.000Z",
+                    "description": "Defaults to now if omitted"
+                  },
+                  "consentSignatureUrl": {
+                    "type": "string",
+                    "maxLength": 1000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Consent recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/TreatmentPlan"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
             "description": "Validation error",
             "content": {
               "application/json": {
@@ -13585,6 +13714,14 @@
                       "skipped"
                     ]
                   },
+                  "acceptance": {
+                    "type": "string",
+                    "enum": [
+                      "proposed",
+                      "accepted",
+                      "rejected"
+                    ]
+                  },
                   "notes": {
                     "type": "string",
                     "maxLength": 500
@@ -13621,7 +13758,7 @@
             }
           },
           "400": {
-            "description": "Validation error",
+            "description": "Invalid stage transition",
             "content": {
               "application/json": {
                 "schema": {

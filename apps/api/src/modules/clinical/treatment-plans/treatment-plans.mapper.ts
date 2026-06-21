@@ -20,6 +20,7 @@ export const toStageDto = (row: StageRow): TreatmentStageDto => ({
   estimatedDurationMinutes: row.estimatedDurationMinutes ?? null,
   cost: row.cost,
   status: row.status,
+  acceptance: row.acceptance,
   notes: row.notes ?? null,
   completedAt: row.completedAt ? row.completedAt.toISOString() : null,
 });
@@ -34,6 +35,8 @@ export const toPlanDto = (row: PlanRow): TreatmentPlanDto => ({
   status: row.status,
   totalCost: row.totalCost,
   totalVisits: row.totalVisits,
+  consentSignedAt: row.consentSignedAt ? row.consentSignedAt.toISOString() : null,
+  consentSignatureUrl: row.consentSignatureUrl ?? null,
   notes: row.notes ?? null,
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(),
