@@ -9,6 +9,7 @@ export type CreateVisitNoteBody = {
   patientId: string;
   doctorId: string;
   appointmentId?: string;
+  stageId?: string;
   visitDate?: string;
   /** @maxLength 5000 */
   subjective?: string;

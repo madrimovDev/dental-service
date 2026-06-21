@@ -12,6 +12,8 @@ export interface VisitNote {
   doctorId: string;
   /** @nullable */
   appointmentId: string | null;
+  /** @nullable */
+  stageId: string | null;
   visitDate: string;
   /** @nullable */
   subjective: string | null;

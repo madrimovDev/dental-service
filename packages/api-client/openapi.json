@@ -3372,6 +3372,12 @@
             "format": "uuid",
             "example": null
           },
+          "stageId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid",
+            "example": null
+          },
           "visitDate": {
             "type": "string",
             "example": "2026-06-12T10:00:00.000Z"
@@ -3429,6 +3435,7 @@
           "patientId",
           "doctorId",
           "appointmentId",
+          "stageId",
           "visitDate",
           "subjective",
           "objective",
@@ -13903,6 +13910,10 @@
                     "type": "string",
                     "format": "uuid"
                   },
+                  "stageId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
                   "visitDate": {
                     "type": "string",
                     "format": "date-time",
@@ -14123,6 +14134,10 @@
                     "type": "string",
                     "format": "uuid"
                   },
+                  "stageId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
                   "visitDate": {
                     "type": "string",
                     "format": "date-time",
@@ -14192,7 +14207,7 @@
             }
           },
           "400": {
-            "description": "Validation error",
+            "description": "Invalid stage transition",
             "content": {
               "application/json": {
                 "schema": {
