@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
+import { RecallNavBadge } from '@/features/recalls/components/RecallNavBadge.tsx';
 import { useVertical } from '@/features/settings/settings.api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { type NavItem, visibleGroups } from './nav-config';
@@ -48,6 +49,7 @@ export function Sidebar() {
       >
         <Icon />
         {label}
+        {item.key === 'recalls' && <RecallNavBadge />}
       </Link>
     );
   };

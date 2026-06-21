@@ -8,6 +8,7 @@ import { patientRoutes } from '@/features/patients';
 import { payrollRoutes } from '@/features/payroll';
 import { profileRoutes } from '@/features/profile';
 import { queueRoutes } from '@/features/queue';
+import { recallRoutes } from '@/features/recalls';
 import { reportsRoutes } from '@/features/reports';
 import { scheduleRoutes } from '@/features/schedule';
 import { settingsRoutes } from '@/features/settings';
@@ -32,6 +33,7 @@ export const protectedRoutes: AppRoute[] = [
   ...appointmentRoutes,
   ...scheduleRoutes,
   ...queueRoutes,
+  ...recallRoutes,
   ...cashierRoutes,
   ...reportsRoutes,
   ...auditRoutes,

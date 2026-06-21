@@ -124,6 +124,7 @@
     "appointments": "Календарь",
     "schedule": "График работы",
     "queue": "Табло очереди",
+    "recalls": "Повторные вызовы",
     "cashier": "Касса",
     "transactions": "Транзакции",
     "expenses": "Расходы",
@@ -1012,5 +1013,48 @@
     "commission_percent": "Комиссия %",
     "commission_amount": "Комиссия",
     "total": "Итого"
+  },
+  "recall": {
+    "title": "Повторные вызовы",
+    "due_today": "Срок сегодня",
+    "empty": "Список повторных вызовов на сегодня пуст",
+    "col": {
+      "patient": "Пациент",
+      "phone": "Телефон",
+      "reason": "Причина",
+      "due": "Срок",
+      "status": "Статус",
+      "actions": "Действия"
+    },
+    "action": {
+      "contacted": "Связались",
+      "schedule": "Записать",
+      "dismiss": "Отменить"
+    },
+    "status": {
+      "pending": "Ожидает",
+      "contacted": "Связались",
+      "scheduled": "Записан",
+      "completed": "Выполнен",
+      "dismissed": "Отменён"
+    },
+    "reason": {
+      "preventive": "Профилактика",
+      "treatment_followup": "Контроль после лечения",
+      "post_op_check": "Осмотр после операции",
+      "manual": "Вручную"
+    },
+    "tab": {
+      "title": "Повторные вызовы",
+      "empty": "У пациента нет повторных вызовов",
+      "create": "Добавить повторный вызов"
+    },
+    "form": {
+      "reason": "Причина",
+      "due_date": "Дата срока",
+      "interval_months": "Интервал (мес.)",
+      "notes": "Заметка",
+      "submit": "Сохранить"
+    }
   }
 }

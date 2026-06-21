@@ -124,6 +124,7 @@
     "appointments": "Kalendar",
     "schedule": "Ish jadvali",
     "queue": "Navbat tablosi",
+    "recalls": "Qayta chaqirish",
     "cashier": "Kassa",
     "transactions": "Tranzaksiyalar",
     "expenses": "Xarajatlar",
@@ -1012,5 +1013,48 @@
     "commission_percent": "Komissiya %",
     "commission_amount": "Komissiya",
     "total": "Jami"
+  },
+  "recall": {
+    "title": "Qayta chaqirish",
+    "due_today": "Bugun muddati keluvchilar",
+    "empty": "Bugun qayta chaqirish ro'yxati bo'sh",
+    "col": {
+      "patient": "Bemor",
+      "phone": "Telefon",
+      "reason": "Sabab",
+      "due": "Muddat",
+      "status": "Holat",
+      "actions": "Amallar"
+    },
+    "action": {
+      "contacted": "Bog'lanildi",
+      "schedule": "Yozish",
+      "dismiss": "Bekor qilish"
+    },
+    "status": {
+      "pending": "Kutilmoqda",
+      "contacted": "Bog'lanilgan",
+      "scheduled": "Yozilgan",
+      "completed": "Bajarilgan",
+      "dismissed": "Bekor qilingan"
+    },
+    "reason": {
+      "preventive": "Profilaktika",
+      "treatment_followup": "Davolashdan keyingi nazorat",
+      "post_op_check": "Operatsiyadan keyingi tekshiruv",
+      "manual": "Qo'lda"
+    },
+    "tab": {
+      "title": "Qayta chaqirishlar",
+      "empty": "Bemorda qayta chaqirish yo'q",
+      "create": "Qayta chaqirish qo'shish"
+    },
+    "form": {
+      "reason": "Sabab",
+      "due_date": "Muddat sanasi",
+      "interval_months": "Interval (oy)",
+      "notes": "Izoh",
+      "submit": "Saqlash"
+    }
   }
 }
