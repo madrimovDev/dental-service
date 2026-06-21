@@ -3,7 +3,6 @@ import type {
   Diagnosis,
   LabOrderStatus,
   LabOrderType,
-  PatientImage,
   PatientImageType,
   PrescriptionItem,
   ToothState,

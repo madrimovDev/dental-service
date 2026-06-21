@@ -21,7 +21,6 @@ vi.mock('@/stores/auth-store.ts', () => ({
   useAuthStore: () => ({ hasPermission: () => true }),
 }));
 
-// biome-ignore lint/style/noNonNullAssertion: test helper, button always present
 const saveButton = () => screen.getByText(/Snapshot|Saqlash/i).closest('button')!;
 
 describe('OdontogramTab', () => {

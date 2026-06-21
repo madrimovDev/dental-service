@@ -15,6 +15,29 @@ export default defineConfig({
       '@dental/api-client': path.resolve(__dirname, '../../packages/api-client/src'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Split heavy, rarely-changing vendor code into separate long-cached
+        // chunks so the app chunk shrinks + browser caching improves across
+        // deploys (CLI-239 / D8). `xlsx` is code-split via dynamic import in
+        // reports.export.ts, so it is NOT listed here.
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-mantine': [
+            '@mantine/core',
+            '@mantine/hooks',
+            '@mantine/form',
+            '@mantine/dates',
+            '@mantine/notifications',
+            '@mantine/spotlight',
+          ],
+          'vendor-icons': ['@tabler/icons-react', 'lucide-react'],
+          'vendor-query': ['@tanstack/react-query'],
+        },
+      },
+    },
+  },
   server: {
     port: 8000,
     strictPort: true,
