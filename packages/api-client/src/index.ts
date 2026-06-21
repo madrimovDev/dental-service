@@ -142,7 +142,7 @@ export type {
   WorkspaceBranches,
   WorkspaceBranchesBranchesItem,
 } from './generated/model';
-// Generated model types — appointments, services, queue, notifications
+// Generated model types — appointments, services, queue, notifications, schedule
 // QueueTicketStatus re-exported under both names for backward compatibility
 export type {
   AllergyEntry,
@@ -154,6 +154,8 @@ export type {
   AuditLogEntry,
   AuditLogEntryAfter,
   AuditLogEntryBefore,
+  Availability,
+  AvailabilitySlot,
   Branch,
   BranchDeleteResult,
   BranchWorkHours,
@@ -198,6 +200,8 @@ export type {
   CreateRoleBody,
   CreateService201,
   CreateServiceBody,
+  CreateTimeOff,
+  CreateTimeOff201,
   CreateToothChart201,
   CreateToothChartBody,
   CreateToothChartBodyStatesItem,
@@ -214,6 +218,7 @@ export type {
   DeletePrescription200,
   DeleteRole200,
   DeleteService200,
+  DeleteTimeOff200,
   DeleteUserAssignment200,
   Diagnosis,
   DoctorListItem,
@@ -226,10 +231,14 @@ export type {
   ExpenseSummary,
   FinalizePayrollRun200,
   GetAppointment200,
+  GetAvailability200,
+  GetAvailabilityParams,
   GetBranch200,
   GetCheckInCandidates200,
   GetCheckInCandidatesParams,
   GetConsentTemplate200,
+  GetDoctorWorkingHours200,
+  GetDoctorWorkingHoursParams,
   GetLabOrder200,
   GetLatestToothChart200,
   GetPayrollRun200,
@@ -269,6 +278,8 @@ export type {
   ListPrescriptionsParams,
   ListRoles200,
   ListServices200,
+  ListTimeOff200,
+  ListTimeOffParams,
   ListToothCharts200,
   ListTreatmentPlans200,
   ListTreatmentPlansParams,
@@ -298,6 +309,8 @@ export type {
   Prescription,
   PrescriptionDeleteResult,
   PrescriptionItem,
+  PutDoctorWorkingHours200,
+  PutWorkingHours,
   QueueTicket,
   QueueTicketStatus,
   QueueTicketStatus as QueueStatus,
@@ -333,6 +346,8 @@ export type {
   TenantSettings,
   TenantSubscriptionStatus,
   TenantVertical,
+  TimeOffDto,
+  TimeOffDtoType,
   ToothChart,
   ToothChartWithStates,
   ToothChartWithStatesAllOf,
@@ -394,7 +409,11 @@ export type {
   UserAssignment,
   UserAssignmentRow,
   VisitNote,
+  WorkingHoursSegment,
+  WorkingHoursSegmentDto,
 } from './generated/model/index.ts';
+// CreateTimeOffType is a runtime const enum (value export for option lists).
+export { CreateTimeOffType } from './generated/model/index.ts';
 // Generated (orval) — notifications
 export type {
   ListNotificationsResult,
@@ -520,6 +539,23 @@ export {
   setRolePermissions,
   updateRole,
 } from './generated/roles/roles.ts';
+// Generated (orval) — schedule (working-hours, time-off, availability)
+export type {
+  CreateTimeOffResult,
+  DeleteTimeOffResult,
+  GetAvailabilityResult,
+  GetDoctorWorkingHoursResult,
+  ListTimeOffResult,
+  PutDoctorWorkingHoursResult,
+} from './generated/schedule/schedule.ts';
+export {
+  createTimeOff,
+  deleteTimeOff,
+  getAvailability,
+  getDoctorWorkingHours,
+  listTimeOff,
+  putDoctorWorkingHours,
+} from './generated/schedule/schedule.ts';
 // Generated (orval) — services
 export type {
   CreateServiceResult,

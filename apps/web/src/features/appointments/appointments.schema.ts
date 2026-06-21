@@ -5,8 +5,10 @@ export const wizardSchema = z.object({
   patientId: z.string().min(1),
   doctorId: z.string().min(1),
   serviceIds: z.array(z.string()).default([]),
-  startTime: z.date(),
-  endTime: z.date(),
+  date: z.date(),
+  /** Tanlangan bo'sh slot (ISO instant juftligi); slot tanlanmaguncha null. */
+  startTime: z.string().nullable().default(null),
+  endTime: z.string().nullable().default(null),
   notes: z.string().optional(),
 });
 export type WizardValues = z.infer<typeof wizardSchema>;

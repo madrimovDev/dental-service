@@ -122,6 +122,7 @@
     "patients": "Bemorlar ro'yxati",
     "patient_new": "Yangi bemor",
     "appointments": "Kalendar",
+    "schedule": "Ish jadvali",
     "queue": "Navbat tablosi",
     "cashier": "Kassa",
     "transactions": "Tranzaksiyalar",
@@ -712,6 +713,10 @@
     "step_confirm": "Tasdiq",
     "start_time": "Boshlanish vaqti",
     "end_time": "Tugash vaqti",
+    "date": "Sana",
+    "free_slots": "Bo'sh vaqtlar",
+    "pick_service_first": "Avval xizmatni tanlang",
+    "no_slots": "Bu kun uchun bo'sh vaqt yo'q",
     "services": "Xizmatlar",
     "notes": "Eslatma",
     "conflict": "Doktor bu vaqtda band",
@@ -725,6 +730,45 @@
       "completed": "Bajarilgan",
       "no_show": "Kelmagan",
       "cancelled": "Bekor qilingan"
+    }
+  },
+  "schedule": {
+    "title": "Ish jadvali",
+    "doctor": "Shifokor",
+    "branch": "Filial",
+    "select_doctor": "Shifokorni tanlang",
+    "select_branch": "Filialni tanlang",
+    "tab_hours": "Ish soatlari",
+    "tab_timeoff": "Dam olish / ta'til",
+    "start": "Boshlanish",
+    "end": "Tugash",
+    "add_segment": "Oraliq qo'shish",
+    "remove_segment": "Oraliqni o'chirish",
+    "day_off": "Dam olish kuni",
+    "weekday": {
+      "0": "Yakshanba",
+      "1": "Dushanba",
+      "2": "Seshanba",
+      "3": "Chorshanba",
+      "4": "Payshanba",
+      "5": "Juma",
+      "6": "Shanba"
+    }
+  },
+  "time_off": {
+    "add": "Yangi ta'til",
+    "delete": "O'chirish",
+    "empty": "Ta'til/dam olish yo'q",
+    "type_label": "Turi",
+    "start_date": "Boshlanish sanasi",
+    "end_date": "Tugash sanasi",
+    "reason": "Sabab",
+    "range_invalid": "Tugash sanasi boshlanishdan oldin bo'la olmaydi",
+    "type": {
+      "vacation": "Ta'til",
+      "sick": "Kasallik",
+      "personal": "Shaxsiy",
+      "other": "Boshqa"
     }
   },
   "queue": {

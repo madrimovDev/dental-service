@@ -1,11 +1,13 @@
 import { Button } from '@dental/ui';
-import { MultiSelect, Select, Stack, Stepper, Text } from '@mantine/core';
-import { DateTimePicker } from '@mantine/dates';
+import { Chip, Group, MultiSelect, Select, Stack, Stepper, Text } from '@mantine/core';
+import { DatePickerInput } from '@mantine/dates';
 import { useForm } from '@mantine/form';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePatients } from '@/features/patients';
+import { useAvailability } from '@/features/schedule/schedule.api';
+import { localDateParam, slotTimeLabel } from '@/features/schedule/schedule.mappers';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { useBranches, useCreateAppointment, useDoctors, useServices } from '../appointments.api';
 import { type WizardValues, wizardSchema } from '../appointments.schema';
@@ -40,8 +42,9 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
       patientId: '',
       doctorId: '',
       serviceIds: [],
-      startTime: new Date(),
-      endTime: new Date(Date.now() + 30 * 60000),
+      date: new Date(),
+      startTime: null,
+      endTime: null,
       notes: '',
     },
     validate: zod4Resolver(wizardSchema),
@@ -49,16 +52,51 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
 
   const doctorOptions: Option[] = (doctors ?? []).map((d) => ({ value: d.id, label: d.name }));
 
+  // slotMinutes = Σ tanlangan xizmatlar davomiyligi (xizmat yo'q → 0 → availability o'chiq).
+  const durationByService = useMemo(
+    () => new Map((servicesData ?? []).map((s) => [s.id, s.durationMinutes])),
+    [servicesData],
+  );
+  const slotMinutes = form.values.serviceIds.reduce(
+    (sum, id) => sum + (durationByService.get(id) ?? 0),
+    0,
+  );
+
+  const dateParam = localDateParam(form.values.date);
+  const { data: availability, isLoading: slotsLoading } = useAvailability({
+    doctorId: form.values.doctorId || null,
+    branchId: form.values.branchId || null,
+    date: dateParam,
+    slotMinutes,
+  });
+  const slots = availability?.slots ?? [];
+
+  // Availability bazasi (doktor/filial/sana/davomiylik) o'zgarsa — eski slot
+  // tanlovini tozalaymiz, aks holda stale start/end submit'ga ketishi mumkin.
+  // ⚠️ `form.setFieldValue` har renderda yangi identifikator → deps'ga qo'shib
+  // bo'lmaydi (cheksiz sikl). Bazani ref'da kuzatamiz, faqat o'zgarganda tozalaymiz.
+  const basis = `${form.values.doctorId}|${form.values.branchId}|${dateParam}|${slotMinutes}`;
+  const prevBasis = useRef(basis);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: faqat baza string o'zgarsa ishlaydi
+  useEffect(() => {
+    if (prevBasis.current !== basis) {
+      prevBasis.current = basis;
+      form.setFieldValue('startTime', null);
+      form.setFieldValue('endTime', null);
+    }
+  }, [basis]);
+
   const submit = () => {
     setError(null);
+    if (!form.values.startTime || !form.values.endTime) return;
     createMut.mutate(
       {
         branchId: form.values.branchId,
         patientId: form.values.patientId,
         doctorId: form.values.doctorId,
         serviceIds: form.values.serviceIds,
-        startTime: form.values.startTime.toISOString(),
-        endTime: form.values.endTime.toISOString(),
+        startTime: form.values.startTime,
+        endTime: form.values.endTime,
         notes: form.values.notes,
       },
       {
@@ -73,6 +111,7 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
 
   const selectedDoctor = doctorOptions.find((d) => d.value === form.values.doctorId)?.label ?? '—';
   const selectedPatient = patients.find((p) => p.value === form.values.patientId)?.label ?? '—';
+  const slotPicked = form.values.startTime != null;
 
   return (
     <div>
@@ -116,12 +155,46 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
           </Stack>
         </Stepper.Step>
         <Stepper.Step label={t('appointments.step_time')}>
-          <Stack mt="md">
-            <DateTimePicker
-              label={t('appointments.start_time')}
-              {...form.getInputProps('startTime')}
+          <Stack mt="md" gap="sm">
+            <DatePickerInput
+              label={t('appointments.date')}
+              valueFormat="DD.MM.YYYY"
+              value={form.values.date}
+              onChange={(d) => form.setFieldValue('date', d ?? new Date())}
             />
-            <DateTimePicker label={t('appointments.end_time')} {...form.getInputProps('endTime')} />
+            <Text size="sm" fw={600}>
+              {t('appointments.free_slots')}
+            </Text>
+            {slotMinutes <= 0 ? (
+              <Text size="sm" c="dimmed">
+                {t('appointments.pick_service_first')}
+              </Text>
+            ) : slotsLoading ? (
+              <Text size="sm" c="dimmed">
+                {t('common.loading')}
+              </Text>
+            ) : slots.length === 0 ? (
+              <Text size="sm" c="dimmed">
+                {t('appointments.no_slots')}
+              </Text>
+            ) : (
+              <Chip.Group
+                value={form.values.startTime ?? ''}
+                onChange={(val) => {
+                  const slot = slots.find((s) => s.start === val);
+                  form.setFieldValue('startTime', slot ? slot.start : null);
+                  form.setFieldValue('endTime', slot ? slot.end : null);
+                }}
+              >
+                <Group gap="xs">
+                  {slots.map((s) => (
+                    <Chip key={s.start} value={s.start}>
+                      {slotTimeLabel(s.start)}
+                    </Chip>
+                  ))}
+                </Group>
+              </Chip.Group>
+            )}
           </Stack>
         </Stepper.Step>
         <Stepper.Step label={t('appointments.step_confirm')}>
@@ -134,6 +207,10 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
             </Text>
             <Text size="sm">
               {t('appointments.services')}: {form.values.serviceIds.length}
+            </Text>
+            <Text size="sm">
+              {t('appointments.start_time')}:{' '}
+              {form.values.startTime ? slotTimeLabel(form.values.startTime) : '—'}
             </Text>
             {error != null && (
               <Text size="sm" c="red">
@@ -150,13 +227,16 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
         {active < 3 ? (
           <Button
             variant="primary"
-            disabled={active === 0 && needsBranchSelect && !form.values.branchId}
+            disabled={
+              (active === 0 && needsBranchSelect && !form.values.branchId) ||
+              (active === 2 && !slotPicked)
+            }
             onClick={next}
           >
             {t('common.next')}
           </Button>
         ) : (
-          <Button variant="primary" disabled={createMut.isPending} onClick={submit}>
+          <Button variant="primary" disabled={createMut.isPending || !slotPicked} onClick={submit}>
             {t('common.save')}
           </Button>
         )}

@@ -9,6 +9,7 @@ import { payrollRoutes } from '@/features/payroll';
 import { profileRoutes } from '@/features/profile';
 import { queueRoutes } from '@/features/queue';
 import { reportsRoutes } from '@/features/reports';
+import { scheduleRoutes } from '@/features/schedule';
 import { settingsRoutes } from '@/features/settings';
 import { stockRoutes } from '@/features/stock';
 import { type AppRoute, DesignSystemPage, ForbiddenPage } from '@/shell';
@@ -29,6 +30,7 @@ export const protectedRoutes: AppRoute[] = [
   ...dashboardRoutes,
   ...patientRoutes,
   ...appointmentRoutes,
+  ...scheduleRoutes,
   ...queueRoutes,
   ...cashierRoutes,
   ...reportsRoutes,
