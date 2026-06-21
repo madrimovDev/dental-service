@@ -9,6 +9,7 @@ import type {
   Prescription,
   ServicePrice,
   ToothChartWithStates,
+  ToothSurface,
   TreatmentPlan,
   TreatmentPlanStatus,
   TreatmentStage,
@@ -24,6 +25,8 @@ import type {
   PrescriptionVM,
   StageRowVM,
   Tone,
+  ToothDraft,
+  ToothDraftMap,
   ToothStateMap,
   VisitNoteVM,
 } from './clinical.types';
@@ -73,6 +76,51 @@ export function draftStatesToCreateInput(map: ToothStateMap): CreateToothStateIn
     surface: 'whole' as const,
   }));
 }
+
+// ===== CLI-189: per-surface + diagnosis draft model =====
+/**
+ * Snapshot → tish bo'yicha draft xarita (har tishga bitta yozuv: state + surface + diagnosisId).
+ * Bir nechta yuza yozuvi bo'lsa 'whole' afzal, aks holda birinchi topilgan.
+ * (Avvalgi `toToothStateMap` 'whole'siz yuzalarni tashlardi → round-trip yo'qolardi.)
+ */
+export function toToothDraftMap(chart: ToothChartWithStates | null): ToothDraftMap {
+  const map: ToothDraftMap = new Map();
+  if (!chart) return map;
+  for (const s of chart.states) {
+    const existing = map.get(s.toothNumber);
+    // 'whole' yozuvi har doim ustun; aks holda faqat bo'sh bo'lsa yozamiz.
+    if (!existing || s.surface === 'whole') {
+      map.set(s.toothNumber, {
+        state: s.state,
+        surface: (s.surface ?? 'whole') as ToothSurface,
+        diagnosisId: s.diagnosisId ?? null,
+      });
+    }
+  }
+  return map;
+}
+
+export function draftMapToCreateInput(map: ToothDraftMap): CreateToothStateInput[] {
+  return Array.from(map.entries()).map(([toothNumber, d]) => ({
+    toothNumber,
+    state: d.state,
+    surface: d.surface,
+    diagnosisId: d.diagnosisId ?? undefined,
+  }));
+}
+
+/** Odontogram cell rendering uchun: draft xaritani tish→holat xaritasiga keltiradi. */
+export function draftMapToStateMap(map: ToothDraftMap): ToothStateMap {
+  const out: ToothStateMap = new Map();
+  for (const [n, d] of map.entries()) out.set(n, d.state);
+  return out;
+}
+
+export const EMPTY_TOOTH_DRAFT = (): ToothDraft => ({
+  state: 'healthy',
+  surface: 'whole',
+  diagnosisId: null,
+});
 
 // ===== A: treatment plan =====
 const PLAN_TONE: Record<TreatmentPlanStatus, Tone> = {

@@ -516,7 +516,10 @@
     "stage_status_pending": "Kutilmoqda",
     "stage_status_in_progress": "Davom etmoqda",
     "stage_status_completed": "Bajarilgan",
-    "stage_status_skipped": "O'tkazib yuborilgan"
+    "stage_status_skipped": "O'tkazib yuborilgan",
+    "service_catalog": "Katalogdan xizmat",
+    "service_catalog_placeholder": "Xizmatni tanlang (narx avto-to‘ladi)",
+    "no_services": "Xizmat topilmadi"
   },
   "visit_note": {
     "title": "Vizit yozuvlari",
@@ -563,7 +566,26 @@
     "upper_right": "Yuqori o'ng",
     "upper_left": "Yuqori chap",
     "lower_left": "Pastki chap",
-    "lower_right": "Pastki o'ng"
+    "lower_right": "Pastki o'ng",
+    "set_surface": "Tish yuzasi",
+    "set_diagnosis": "Diagnoz (IKD-10)",
+    "no_diagnosis": "Diagnozsiz",
+    "diagnosis_placeholder": "Diagnoz tanlang yoki qidiring",
+    "history": "Tarix",
+    "snapshot_at": "Snapshot sanasi",
+    "view_history": "Tarixni ko‘rish",
+    "return_to_current": "Hozirgiga qaytish",
+    "viewing_snapshot": "Eski snapshot ko‘rilmoqda (faqat o‘qish)",
+    "no_history": "Snapshot tarixi yo‘q",
+    "surfaces": {
+      "whole": "Butun tish",
+      "M": "Mezial (M)",
+      "D": "Distal (D)",
+      "B": "Bukkal (B)",
+      "L": "Lingual (L)",
+      "O": "Okklyuzion (O)",
+      "I": "Insizal (I)"
+    }
   },
   "prescription": {
     "title": "Reseptlar",
