@@ -45,7 +45,7 @@ export function usePasswordResetRequest(
   });
 }
 
-type ResetVars = { token: string; newPassword: string };
+type ResetVars = { phone: string; token: string; newPassword: string };
 export function usePasswordReset(
   opts?: UseMutationOptions<Data<typeof passwordReset>, ApiError, ResetVars>,
 ) {

@@ -10,17 +10,23 @@ import {
   Title,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
+import type { TFunction } from 'i18next';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
+import { PhoneInput } from '@/components/PhoneInput.tsx';
 import { usePasswordReset } from '../auth.api';
 
-const schema = z.object({
-  token: z.string().min(1),
-  newPassword: z.string().min(12),
-});
+// Telefon raqamга bog'langan reset (CLI-226 ATO fix) — token endi userId'ga bog'langan,
+// shu sabab foydalanuvchi telefon raqamini ham kiritadi.
+const makeSchema = (t: TFunction) =>
+  z.object({
+    phone: z.string().regex(/^\+?\d{9,15}$/, t('validation.phone_invalid')),
+    token: z.string().min(1),
+    newPassword: z.string().min(12),
+  });
 
 export function ResetPasswordPage() {
   const { t } = useTranslation();
@@ -28,8 +34,8 @@ export function ResetPasswordPage() {
   const [error, setError] = useState<string | null>(null);
 
   const form = useForm({
-    initialValues: { token: '', newPassword: '' },
-    validate: zod4Resolver(schema),
+    initialValues: { phone: '', token: '', newPassword: '' },
+    validate: zod4Resolver(makeSchema(t)),
   });
 
   const mut = usePasswordReset({
@@ -58,6 +64,7 @@ export function ResetPasswordPage() {
               </Alert>
             )}
 
+            <PhoneInput label={t('auth.login.phone')} required {...form.getInputProps('phone')} />
             <TextInput
               label={t('auth.reset.code')}
               description={t('auth.reset.code_hint')}
