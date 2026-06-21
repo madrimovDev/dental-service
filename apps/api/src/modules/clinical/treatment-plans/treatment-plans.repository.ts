@@ -1,4 +1,4 @@
-import { treatmentPlans, treatmentStages } from '@dental/db-schema';
+import { treatmentPlans, treatmentStagePayments, treatmentStages } from '@dental/db-schema';
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../../db/scoped.ts';
@@ -88,6 +88,19 @@ export const createTreatmentPlansRepository = () => {
     return stage ?? null;
   }
 
+  /** C6: estimate uchun plan bosqichlariga tegishli allocation'lar (RLS filtrlaydi). */
+  async function listStageAllocations(c: Context, planId: string) {
+    const db = getDb(c);
+    return db
+      .select({
+        stageId: treatmentStagePayments.stageId,
+        amount: treatmentStagePayments.amount,
+      })
+      .from(treatmentStagePayments)
+      .innerJoin(treatmentStages, eq(treatmentStagePayments.stageId, treatmentStages.id))
+      .where(eq(treatmentStages.treatmentPlanId, planId));
+  }
+
   async function updatePlan(
     c: Context,
     id: string,
@@ -122,6 +135,7 @@ export const createTreatmentPlansRepository = () => {
     insertPlanWithStages,
     findPlan,
     findStage,
+    listStageAllocations,
     updatePlan,
     updateStage,
   };

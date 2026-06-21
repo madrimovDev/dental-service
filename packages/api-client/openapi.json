@@ -3347,6 +3347,112 @@
           "updatedAt"
         ]
       },
+      "TreatmentPlanEstimate": {
+        "type": "object",
+        "properties": {
+          "planId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "presented",
+              "accepted",
+              "in_progress",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "totalProposed": {
+            "type": "number",
+            "example": 50000
+          },
+          "totalAccepted": {
+            "type": "number",
+            "example": 200000
+          },
+          "totalCost": {
+            "type": "number",
+            "example": 320000
+          },
+          "totalPaid": {
+            "type": "number",
+            "example": 220000
+          },
+          "balance": {
+            "type": "number",
+            "example": -20000
+          },
+          "stages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TreatmentPlanEstimateStage"
+            }
+          }
+        },
+        "required": [
+          "planId",
+          "status",
+          "totalProposed",
+          "totalAccepted",
+          "totalCost",
+          "totalPaid",
+          "balance",
+          "stages"
+        ]
+      },
+      "TreatmentPlanEstimateStage": {
+        "type": "object",
+        "properties": {
+          "stageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "serviceName": {
+            "type": "string"
+          },
+          "cost": {
+            "type": "number",
+            "example": 150000,
+            "description": "Stage list cost (xom)"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "in_progress",
+              "completed",
+              "skipped"
+            ]
+          },
+          "acceptance": {
+            "type": "string",
+            "enum": [
+              "proposed",
+              "accepted",
+              "rejected"
+            ]
+          },
+          "paid": {
+            "type": "number",
+            "example": 0
+          },
+          "debtEligible": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "stageId",
+          "serviceName",
+          "cost",
+          "status",
+          "acceptance",
+          "paid",
+          "debtEligible"
+        ]
+      },
       "VisitNote": {
         "type": "object",
         "properties": {
@@ -13541,6 +13647,92 @@
           },
           "400": {
             "description": "Invalid transition or consent required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Treatment plan not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/treatment-plans/{id}/estimate": {
+      "get": {
+        "tags": [
+          "treatment-plans"
+        ],
+        "operationId": "getTreatmentPlanEstimate",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Treatment plan estimate breakdown",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/TreatmentPlanEstimate"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
             "content": {
               "application/json": {
                 "schema": {

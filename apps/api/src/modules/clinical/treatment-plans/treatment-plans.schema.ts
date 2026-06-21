@@ -137,3 +137,44 @@ export const treatmentPlanWithStagesDtoSchema = treatmentPlanDtoSchema
   .openapi('TreatmentPlanWithStages');
 
 export type TreatmentPlanWithStagesDto = z.infer<typeof treatmentPlanWithStagesDtoSchema>;
+
+// ─── C6 (CLI-223) — estimate breakdown (RFC-0005 style; C4 predikatiga mos) ──────
+
+/** Per-stage estimate satri (money number — billing pure fn ISTISNOSI). */
+export const estimateStageDtoSchema = z
+  .object({
+    stageId: z.uuid(),
+    serviceName: z.string(),
+    cost: z.number().openapi({ example: 150000, description: 'Stage list cost (xom)' }),
+    status: treatmentStageStatusEnum,
+    acceptance: treatmentStageAcceptanceEnum,
+    paid: z.number().openapi({ example: 0 }),
+    /** C4: bu bosqich qarz cost'iga kiradimi (acceptance='accepted' ∧ status≠'skipped' ∧ plan debt-status). */
+    debtEligible: z.boolean(),
+  })
+  .openapi('TreatmentPlanEstimateStage');
+export type EstimateStageDto = z.infer<typeof estimateStageDtoSchema>;
+
+/**
+ * Plan estimate — RFC-0005 uslubidagi smeta. `proposed` = qabul kutilayotgan cost,
+ * `accepted` = qarzga loyiq cost (C4 predikati), `paid` = allocation yig'indisi,
+ * `balance` = accepted − paid (manfiy = kredit).
+ */
+export const treatmentPlanEstimateDtoSchema = z
+  .object({
+    planId: z.uuid(),
+    status: treatmentPlanStatusEnum,
+    /** Σ cost — acceptance='proposed' bosqichlar (hali qabul qilinmagan). */
+    totalProposed: z.number().openapi({ example: 50000 }),
+    /** Σ cost — C4 qarz predikatiga loyiq (debtEligible) bosqichlar. */
+    totalAccepted: z.number().openapi({ example: 200000 }),
+    /** Σ cost — barcha bosqichlar (xom, filtrlanmagan). */
+    totalCost: z.number().openapi({ example: 320000 }),
+    /** Σ allocation (filtrlanmaydi). */
+    totalPaid: z.number().openapi({ example: 220000 }),
+    /** totalAccepted − totalPaid (manfiy = kredit). */
+    balance: z.number().openapi({ example: -20000 }),
+    stages: z.array(estimateStageDtoSchema),
+  })
+  .openapi('TreatmentPlanEstimate');
+export type TreatmentPlanEstimateDto = z.infer<typeof treatmentPlanEstimateDtoSchema>;

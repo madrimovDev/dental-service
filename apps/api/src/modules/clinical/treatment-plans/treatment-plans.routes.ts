@@ -11,6 +11,7 @@ import {
   planIdParamSchema,
   stageIdParamSchema,
   treatmentPlanDtoSchema,
+  treatmentPlanEstimateDtoSchema,
   treatmentPlanWithStagesDtoSchema,
   treatmentStageDtoSchema,
   updateStageSchema,
@@ -128,6 +129,30 @@ export const treatmentPlansRoutes = (deps: { audit: AuditLogger; recall?: Recall
     const plan = await service.getPlan(c, id);
     if (!plan) return c.json(fail('plan.not_found', 'Plan not found'), 404);
     return c.json(ok(toPlanWithStagesDto(plan)), 200);
+  });
+
+  // ─── GET /treatment-plans/{id}/estimate — C6 computed smeta ────────────────
+
+  const estimateRoute = createRoute({
+    method: 'get',
+    path: '/treatment-plans/{id}/estimate',
+    tags: ['treatment-plans'],
+    operationId: 'getTreatmentPlanEstimate',
+    middleware: [requirePermission('medical_record.view')] as const,
+    request: {
+      params: planIdParamSchema,
+    },
+    responses: {
+      ...okJson(treatmentPlanEstimateDtoSchema, 'Treatment plan estimate breakdown'),
+      ...planNotFound,
+    },
+  });
+
+  app.openapi(estimateRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const est = await service.estimate(c, id);
+    if (!est) return c.json(fail('plan.not_found', 'Plan not found'), 404);
+    return c.json(ok(est), 200);
   });
 
   // ─── PATCH /treatment-plans/{id} — update ─────────────────────────────────

@@ -1,5 +1,7 @@
 import type { Context } from 'hono';
 import type { AuditLogger } from '../../../lib/audit-logger.ts';
+// C6: C4 qarz predikatini YAGONA manbadan ishlatish (cashier billing pure fn).
+import { computePlanBalance } from '../../cashier/cashier.billing.ts';
 import { createTreatmentPlansRepository } from './treatment-plans.repository.ts';
 import type {
   ConsentInput,
@@ -190,6 +192,62 @@ export const createTreatmentPlansService = (deps: {
     return updateStage(c, stageId, { status: 'completed' });
   }
 
+  /**
+   * C6 (CLI-223): plan smetasi — computed (saqlanmaydi). Per-stage cost/acceptance/
+   * status + totallar. debtEligible YAGONA manbadan (computePlanBalance, C4 predikati)
+   * → estimate, cashier va patient balansi hammasi MOS. Allocation filtrlanmaydi.
+   */
+  async function estimate(c: Context, planId: string) {
+    const plan = await repo.findPlan(c, planId);
+    if (!plan) return null;
+    const full = await repo.getPlanWithStages(c, planId);
+    const stageRows = full?.stages ?? [];
+    const allocations = await repo.listStageAllocations(c, planId);
+
+    // C4 pure fn — debtEligible (excludedFromDebt teskarisi) + paid + balance shu yerdan.
+    const billing = computePlanBalance(
+      stageRows.map((s) => ({
+        id: s.id,
+        serviceName: s.serviceName,
+        cost: s.cost,
+        status: s.status,
+        acceptance: s.acceptance,
+      })),
+      allocations,
+      plan.status,
+    );
+    const byStage = new Map(billing.stages.map((b) => [b.stageId, b]));
+
+    const stages = stageRows.map((s) => {
+      const b = byStage.get(s.id);
+      return {
+        stageId: s.id,
+        serviceName: s.serviceName,
+        cost: Number(s.cost),
+        status: s.status,
+        acceptance: s.acceptance,
+        paid: b?.paid ?? 0,
+        debtEligible: b ? !b.excludedFromDebt : false,
+      };
+    });
+
+    const totalProposed = stages
+      .filter((s) => s.acceptance === 'proposed')
+      .reduce((sum, s) => sum + s.cost, 0);
+    const totalCost = stages.reduce((sum, s) => sum + s.cost, 0);
+
+    return {
+      planId,
+      status: plan.status,
+      totalProposed,
+      totalAccepted: billing.totalCost, // C4 debt-eligible cost
+      totalCost,
+      totalPaid: billing.totalPaid,
+      balance: billing.balance,
+      stages,
+    };
+  }
+
   return {
     listPlans,
     getPlan,
@@ -198,6 +256,7 @@ export const createTreatmentPlansService = (deps: {
     setConsent,
     updateStage,
     completeStageForVisit,
+    estimate,
   };
 };
 
