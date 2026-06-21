@@ -41,6 +41,7 @@ let ownerId: string;
 let patientId: string; // balansli bemor
 let emptyPatientId: string; // reja/tranzaksiyasiz bemor
 let skipPatientId: string; // CLI-184: skip-after-pay bemor (kredit)
+let rejectPatientId: string; // CLI-221: reject/proposed acceptance axis bemor
 
 beforeAll(async () => {
   await db.execute(sql`TRUNCATE users, tenants RESTART IDENTITY CASCADE`);
@@ -83,10 +84,16 @@ beforeAll(async () => {
       .insert(patients)
       .values({ tenantId, fullName: 'Skip Bemor' })
       .returning({ id: patients.id });
-    if (!patient || !empty || !skipPatient) throw new Error('patient insert failed');
+    const [rejectPatient] = await tx
+      .insert(patients)
+      .values({ tenantId, fullName: 'Reject Bemor' })
+      .returning({ id: patients.id });
+    if (!patient || !empty || !skipPatient || !rejectPatient)
+      throw new Error('patient insert failed');
     patientId = patient.id;
     emptyPatientId = empty.id;
     skipPatientId = skipPatient.id;
+    rejectPatientId = rejectPatient.id;
 
     // Accepted reja: S1 cost=100000, S2 cost=50000 → stageCostSum = 150000
     const [acceptedPlan] = await tx
@@ -95,13 +102,28 @@ beforeAll(async () => {
       .returning({ id: treatmentPlans.id });
     if (!acceptedPlan) throw new Error('plan insert failed');
 
+    // C4 (CLI-221): qarz COST faqat acceptance='accepted' bosqichlardan. Hisobga olinishi
+    // kerak bo'lgan har bir seed bosqichga acceptance='accepted' beriladi (default 'proposed'
+    // edi — endi qarzdan chiqarib yuborgan bo'lardi).
     const [s1] = await tx
       .insert(treatmentStages)
-      .values({ treatmentPlanId: acceptedPlan.id, sequence: 1, serviceName: 'S1', cost: '100000' })
+      .values({
+        treatmentPlanId: acceptedPlan.id,
+        sequence: 1,
+        serviceName: 'S1',
+        cost: '100000',
+        acceptance: 'accepted',
+      })
       .returning({ id: treatmentStages.id });
     const [s2] = await tx
       .insert(treatmentStages)
-      .values({ treatmentPlanId: acceptedPlan.id, sequence: 2, serviceName: 'S2', cost: '50000' })
+      .values({
+        treatmentPlanId: acceptedPlan.id,
+        sequence: 2,
+        serviceName: 'S2',
+        cost: '50000',
+        acceptance: 'accepted',
+      })
       .returning({ id: treatmentStages.id });
     if (!s1 || !s2) throw new Error('stage insert failed');
 
@@ -195,6 +217,7 @@ beforeAll(async () => {
         serviceName: 'SK1',
         cost: '100000',
         status: 'skipped',
+        acceptance: 'accepted', // qabul qilingan, keyin skip → cost status orqali chiqadi
       })
       .returning({ id: treatmentStages.id });
     // SK2: skipped, to'lovsiz → cost 0 hissa, allocation 0
@@ -204,14 +227,16 @@ beforeAll(async () => {
       serviceName: 'SK2',
       cost: '70000',
       status: 'skipped',
+      acceptance: 'accepted',
     });
-    // SK3: pending normal → cost 80000 qarzga kiradi
+    // SK3: pending normal + accepted → cost 80000 qarzga kiradi
     await tx.insert(treatmentStages).values({
       treatmentPlanId: skipPlan.id,
       sequence: 3,
       serviceName: 'SK3',
       cost: '80000',
       status: 'pending',
+      acceptance: 'accepted',
     });
     if (!sk1) throw new Error('skip stage insert failed');
 
@@ -237,6 +262,74 @@ beforeAll(async () => {
     // stageCostSum (skipped chiqarilgan) = SK3 80000
     // allocationSum (filtrlANMAYDI) = 100000 (SK1 to'lovi saqlanadi)
     // planDebt = 80000 − 100000 = −20000 (kredit), nonPlan = 0 → balance = −20000
+
+    // === CLI-221: acceptance o'qi (reject/proposed) bemor (rejectPatient) ===
+    // Accepted reja: RJ1 rejected+to'langan (kredit), RJ2 proposed (qarz YO'Q), RJ3 accepted+pending (qarz).
+    const [rejPlan] = await tx
+      .insert(treatmentPlans)
+      .values({
+        tenantId,
+        patientId: rejectPatientId,
+        doctorId: ownerId,
+        title: 'Reject Reja',
+        status: 'accepted',
+      })
+      .returning({ id: treatmentPlans.id });
+    if (!rejPlan) throw new Error('reject plan insert failed');
+
+    const [rj1] = await tx
+      .insert(treatmentStages)
+      .values({
+        treatmentPlanId: rejPlan.id,
+        sequence: 1,
+        serviceName: 'RJ1',
+        cost: '100000',
+        status: 'pending',
+        acceptance: 'rejected', // rad etilgan → cost qarzga KIRMAYDI
+      })
+      .returning({ id: treatmentStages.id });
+    // RJ2: proposed (hali qabul qilinmagan) → cost qarzga KIRMAYDI
+    await tx.insert(treatmentStages).values({
+      treatmentPlanId: rejPlan.id,
+      sequence: 2,
+      serviceName: 'RJ2',
+      cost: '70000',
+      status: 'pending',
+      acceptance: 'proposed',
+    });
+    // RJ3: accepted + pending → cost 60000 qarzga KIRADI
+    await tx.insert(treatmentStages).values({
+      treatmentPlanId: rejPlan.id,
+      sequence: 3,
+      serviceName: 'RJ3',
+      cost: '60000',
+      status: 'pending',
+      acceptance: 'accepted',
+    });
+    if (!rj1) throw new Error('reject stage insert failed');
+
+    // RJ1 ga to'lov (rad etilgandan keyin ham allocation SAQLANADI → kredit)
+    const [rjTx] = await tx
+      .insert(cashierTransactions)
+      .values({
+        tenantId,
+        branchId,
+        patientId: rejectPatientId,
+        treatmentPlanId: rejPlan.id,
+        totalAmount: '100000',
+        paidAmount: '100000',
+        paymentMethod: 'cash',
+        type: 'payment',
+        status: 'completed',
+      })
+      .returning({ id: cashierTransactions.id });
+    if (!rjTx) throw new Error('reject tx insert failed');
+    await tx
+      .insert(treatmentStagePayments)
+      .values({ tenantId, transactionId: rjTx.id, stageId: rj1.id, amount: '100000' });
+    // stageCostSum (accepted+non-skipped) = RJ3 60000  (RJ1 rejected, RJ2 proposed chiqarildi)
+    // allocationSum (filtrlANMAYDI) = 100000 (RJ1 to'lovi saqlanadi)
+    // planDebt = 60000 − 100000 = −40000 (kredit), nonPlan = 0 → balance = −40000
   });
 });
 
@@ -276,6 +369,18 @@ describe('Bemor balansi — real DB aggregate', () => {
     expect(result.balance).toBe(-20000);
   });
 
+  // CLI-221: acceptance o'qi — rejected/proposed cost qarzga kirmaydi; reject-after-pay → kredit.
+  test('balanceFor: rejected+proposed cost chiqariladi, reject-after-pay → kredit', async () => {
+    const result = await db.transaction(async (tx) => {
+      await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
+      return service.balanceFor(ctx(tx), rejectPatientId);
+    });
+    // RJ3 (accepted) 60000 − RJ1 to'lovi 100000 = −40000 kredit. RJ1 (rejected) + RJ2 (proposed) hissa 0.
+    expect(result.planDebt).toBe(-40000);
+    expect(result.nonPlanBalance).toBe(0);
+    expect(result.balance).toBe(-40000);
+  });
+
   test('list: aggregate balanceFor bilan bir xil qiymat qaytaradi', async () => {
     const res = await db.transaction(async (tx) => {
       await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
@@ -285,9 +390,12 @@ describe('Bemor balansi — real DB aggregate', () => {
     const row = res.data.find((p) => p.id === patientId);
     const emptyRow = res.data.find((p) => p.id === emptyPatientId);
     const skipRow = res.data.find((p) => p.id === skipPatientId);
+    const rejectRow = res.data.find((p) => p.id === rejectPatientId);
     expect(row?.balance).toBe(120000);
     expect(emptyRow?.balance).toBe(0);
     // CLI-184: list va balanceFor bir xil qiymat (kredit −20000)
     expect(skipRow?.balance).toBe(-20000);
+    // CLI-221: list va balanceFor acceptance o'qida ham bir xil (kredit −40000)
+    expect(rejectRow?.balance).toBe(-40000);
   });
 });

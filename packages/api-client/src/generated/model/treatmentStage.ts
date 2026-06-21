@@ -5,6 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { TreatmentStageStatus } from './treatmentStageStatus';
+import type { TreatmentStageAcceptance } from './treatmentStageAcceptance';
 
 export interface TreatmentStage {
   id: string;
@@ -20,6 +21,7 @@ export interface TreatmentStage {
   estimatedDurationMinutes: number | null;
   cost: string;
   status: TreatmentStageStatus;
+  acceptance: TreatmentStageAcceptance;
   /** @nullable */
   notes: string | null;
   /** @nullable */

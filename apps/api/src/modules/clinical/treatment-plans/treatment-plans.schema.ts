@@ -34,9 +34,21 @@ export type UpdateTreatmentPlanInput = z.infer<typeof updateTreatmentPlanSchema>
 
 export const updateStageSchema = z.object({
   status: z.enum(['pending', 'in_progress', 'completed', 'skipped']).optional(),
+  // Qaror #25: acceptance — ALOHIDA o'q (status'dan mustaqil). Qarz faqat 'accepted'.
+  acceptance: z.enum(['proposed', 'accepted', 'rejected']).optional(),
   notes: z.string().max(500).optional(),
 });
 export type UpdateStageInput = z.infer<typeof updateStageSchema>;
+
+/** C3 — plan consent linkage (presented→accepted REQUIRES consent). */
+export const consentSchema = z.object({
+  consentSignedAt: z.iso
+    .datetime()
+    .optional()
+    .openapi({ example: '2026-06-21T10:00:00.000Z', description: 'Defaults to now if omitted' }),
+  consentSignatureUrl: z.string().max(1000).optional(),
+});
+export type ConsentInput = z.infer<typeof consentSchema>;
 
 // ─── Path param schemas ───────────────────────────────────────────────────────
 
@@ -58,6 +70,9 @@ export const listPlansQuerySchema = z.object({
 
 /** Stage status enum values */
 export const treatmentStageStatusEnum = z.enum(['pending', 'in_progress', 'completed', 'skipped']);
+
+/** Stage acceptance enum values (Qaror #25 — debt axis) */
+export const treatmentStageAcceptanceEnum = z.enum(['proposed', 'accepted', 'rejected']);
 
 /** Plan status enum values */
 export const treatmentPlanStatusEnum = z.enum([
@@ -85,6 +100,7 @@ export const treatmentStageDtoSchema = z
     estimatedDurationMinutes: z.number().int().nullable().openapi({ example: 30 }),
     cost: z.string().openapi({ example: '150000.00' }),
     status: treatmentStageStatusEnum.openapi({ example: 'pending' }),
+    acceptance: treatmentStageAcceptanceEnum.openapi({ example: 'proposed' }),
     notes: z.string().nullable().openapi({ example: null }),
     completedAt: z.string().nullable().openapi({ example: null }),
   })
@@ -103,6 +119,8 @@ export const treatmentPlanDtoSchema = z
     status: treatmentPlanStatusEnum.openapi({ example: 'draft' }),
     totalCost: z.string().openapi({ example: '450000.00' }),
     totalVisits: z.number().int().openapi({ example: 3 }),
+    consentSignedAt: z.string().nullable().openapi({ example: null }),
+    consentSignatureUrl: z.string().nullable().openapi({ example: null }),
     notes: z.string().nullable().openapi({ example: null }),
     createdAt: z.string().openapi({ example: '2026-06-12T10:00:00.000Z' }),
     updatedAt: z.string().openapi({ example: '2026-06-12T10:00:00.000Z' }),
@@ -119,3 +137,44 @@ export const treatmentPlanWithStagesDtoSchema = treatmentPlanDtoSchema
   .openapi('TreatmentPlanWithStages');
 
 export type TreatmentPlanWithStagesDto = z.infer<typeof treatmentPlanWithStagesDtoSchema>;
+
+// ─── C6 (CLI-223) — estimate breakdown (RFC-0005 style; C4 predikatiga mos) ──────
+
+/** Per-stage estimate satri (money number — billing pure fn ISTISNOSI). */
+export const estimateStageDtoSchema = z
+  .object({
+    stageId: z.uuid(),
+    serviceName: z.string(),
+    cost: z.number().openapi({ example: 150000, description: 'Stage list cost (xom)' }),
+    status: treatmentStageStatusEnum,
+    acceptance: treatmentStageAcceptanceEnum,
+    paid: z.number().openapi({ example: 0 }),
+    /** C4: bu bosqich qarz cost'iga kiradimi (acceptance='accepted' ∧ status≠'skipped' ∧ plan debt-status). */
+    debtEligible: z.boolean(),
+  })
+  .openapi('TreatmentPlanEstimateStage');
+export type EstimateStageDto = z.infer<typeof estimateStageDtoSchema>;
+
+/**
+ * Plan estimate — RFC-0005 uslubidagi smeta. `proposed` = qabul kutilayotgan cost,
+ * `accepted` = qarzga loyiq cost (C4 predikati), `paid` = allocation yig'indisi,
+ * `balance` = accepted − paid (manfiy = kredit).
+ */
+export const treatmentPlanEstimateDtoSchema = z
+  .object({
+    planId: z.uuid(),
+    status: treatmentPlanStatusEnum,
+    /** Σ cost — acceptance='proposed' bosqichlar (hali qabul qilinmagan). */
+    totalProposed: z.number().openapi({ example: 50000 }),
+    /** Σ cost — C4 qarz predikatiga loyiq (debtEligible) bosqichlar. */
+    totalAccepted: z.number().openapi({ example: 200000 }),
+    /** Σ cost — barcha bosqichlar (xom, filtrlanmagan). */
+    totalCost: z.number().openapi({ example: 320000 }),
+    /** Σ allocation (filtrlanmaydi). */
+    totalPaid: z.number().openapi({ example: 220000 }),
+    /** totalAccepted − totalPaid (manfiy = kredit). */
+    balance: z.number().openapi({ example: -20000 }),
+    stages: z.array(estimateStageDtoSchema),
+  })
+  .openapi('TreatmentPlanEstimate');
+export type TreatmentPlanEstimateDto = z.infer<typeof treatmentPlanEstimateDtoSchema>;

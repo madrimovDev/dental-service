@@ -16,6 +16,10 @@ export interface TreatmentPlan {
   totalCost: string;
   totalVisits: number;
   /** @nullable */
+  consentSignedAt: string | null;
+  /** @nullable */
+  consentSignatureUrl: string | null;
+  /** @nullable */
   notes: string | null;
   createdAt: string;
   updatedAt: string;

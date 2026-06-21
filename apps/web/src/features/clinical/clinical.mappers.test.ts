@@ -165,6 +165,7 @@ function stage(over: Partial<TreatmentStage> = {}): TreatmentStage {
     estimatedDurationMinutes: null,
     cost: '150000',
     status: 'pending',
+    acceptance: 'proposed',
     notes: null,
     completedAt: null,
     ...over,

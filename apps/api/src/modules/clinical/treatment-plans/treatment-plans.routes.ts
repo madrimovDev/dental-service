@@ -5,18 +5,25 @@ import { apiResponseSchema, errorResponseSchema, okJson } from '../../../lib/ope
 import { requirePermission } from '../../../middleware/require-permission.ts';
 import { toPlanDto, toPlanWithStagesDto, toStageDto } from './treatment-plans.mapper.ts';
 import {
+  consentSchema,
   createTreatmentPlanSchema,
   listPlansQuerySchema,
   planIdParamSchema,
   stageIdParamSchema,
   treatmentPlanDtoSchema,
+  treatmentPlanEstimateDtoSchema,
   treatmentPlanWithStagesDtoSchema,
   treatmentStageDtoSchema,
   updateStageSchema,
   updateTreatmentPlanSchema,
 } from './treatment-plans.schema.ts';
 // CLI-114: list endi har planning stage'larini nested qaytaradi (N+1 oldini olish).
-import { createTreatmentPlansService, type RecallStageHook } from './treatment-plans.service.ts';
+import {
+  ConsentRequiredError,
+  createTreatmentPlansService,
+  type RecallStageHook,
+} from './treatment-plans.service.ts';
+import { InvalidTransitionError } from './treatment-plans.transitions.ts';
 
 /** Standart 404 — plan not found */
 const planNotFound = {
@@ -124,6 +131,30 @@ export const treatmentPlansRoutes = (deps: { audit: AuditLogger; recall?: Recall
     return c.json(ok(toPlanWithStagesDto(plan)), 200);
   });
 
+  // ─── GET /treatment-plans/{id}/estimate — C6 computed smeta ────────────────
+
+  const estimateRoute = createRoute({
+    method: 'get',
+    path: '/treatment-plans/{id}/estimate',
+    tags: ['treatment-plans'],
+    operationId: 'getTreatmentPlanEstimate',
+    middleware: [requirePermission('medical_record.view')] as const,
+    request: {
+      params: planIdParamSchema,
+    },
+    responses: {
+      ...okJson(treatmentPlanEstimateDtoSchema, 'Treatment plan estimate breakdown'),
+      ...planNotFound,
+    },
+  });
+
+  app.openapi(estimateRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const est = await service.estimate(c, id);
+    if (!est) return c.json(fail('plan.not_found', 'Plan not found'), 404);
+    return c.json(ok(est), 200);
+  });
+
   // ─── PATCH /treatment-plans/{id} — update ─────────────────────────────────
 
   const updatePlanRoute = createRoute({
@@ -138,6 +169,10 @@ export const treatmentPlansRoutes = (deps: { audit: AuditLogger; recall?: Recall
     },
     responses: {
       ...okJson(treatmentPlanDtoSchema, 'Updated treatment plan'),
+      400: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Invalid transition or consent required',
+      },
       ...planNotFound,
     },
   });
@@ -145,7 +180,47 @@ export const treatmentPlansRoutes = (deps: { audit: AuditLogger; recall?: Recall
   app.openapi(updatePlanRoute, async (c) => {
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const plan = await service.updatePlan(c, id, body);
+    try {
+      const plan = await service.updatePlan(c, id, body);
+      if (!plan) return c.json(fail('plan.not_found', 'Plan not found'), 404);
+      return c.json(ok(toPlanDto(plan)), 200);
+    } catch (e) {
+      if (e instanceof InvalidTransitionError) {
+        return c.json(fail('plan.invalid_transition', e.message), 400);
+      }
+      if (e instanceof ConsentRequiredError) {
+        return c.json(fail('plan.consent_required', e.message), 400);
+      }
+      throw e;
+    }
+  });
+
+  // ─── POST /treatment-plans/{id}/consent — C3 consent linkage ───────────────
+
+  const consentRoute = createRoute({
+    method: 'post',
+    path: '/treatment-plans/{id}/consent',
+    tags: ['treatment-plans'],
+    operationId: 'signTreatmentPlanConsent',
+    middleware: [requirePermission('medical_record.edit')] as const,
+    request: {
+      params: planIdParamSchema,
+      body: { content: { 'application/json': { schema: consentSchema } } },
+    },
+    responses: {
+      ...okJson(treatmentPlanDtoSchema, 'Consent recorded'),
+      400: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Validation error',
+      },
+      ...planNotFound,
+    },
+  });
+
+  app.openapi(consentRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const body = c.req.valid('json');
+    const plan = await service.setConsent(c, id, body);
     if (!plan) return c.json(fail('plan.not_found', 'Plan not found'), 404);
     return c.json(ok(toPlanDto(plan)), 200);
   });
@@ -164,6 +239,10 @@ export const treatmentPlansRoutes = (deps: { audit: AuditLogger; recall?: Recall
     },
     responses: {
       ...okJson(treatmentStageDtoSchema, 'Updated treatment stage'),
+      400: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Invalid stage transition',
+      },
       ...stageNotFound,
     },
   });
@@ -171,9 +250,16 @@ export const treatmentPlansRoutes = (deps: { audit: AuditLogger; recall?: Recall
   app.openapi(updateStageRoute, async (c) => {
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const stage = await service.updateStage(c, id, body);
-    if (!stage) return c.json(fail('stage.not_found', 'Stage not found'), 404);
-    return c.json(ok(toStageDto(stage)), 200);
+    try {
+      const stage = await service.updateStage(c, id, body);
+      if (!stage) return c.json(fail('stage.not_found', 'Stage not found'), 404);
+      return c.json(ok(toStageDto(stage)), 200);
+    } catch (e) {
+      if (e instanceof InvalidTransitionError) {
+        return c.json(fail('stage.invalid_transition', e.message), 400);
+      }
+      throw e;
+    }
   });
 
   return app;

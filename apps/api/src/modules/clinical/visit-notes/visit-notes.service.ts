@@ -3,9 +3,19 @@ import type { AuditLogger } from '../../../lib/audit-logger.ts';
 import { createVisitNotesRepository } from './visit-notes.repository.ts';
 import type { CreateVisitNoteInput, UpdateVisitNoteInput } from './visit-notes.schema.ts';
 
+/**
+ * C5 (CLI-222) — treatment-plans modulidan inject qilinadigan narrow dep.
+ * Bog'liqlik yo'nalishi: visit-notes → treatment-plans (factory injection, to'g'ridan
+ * import emas). Bosqichni 'completed' qiladi (C2 guard ichida; skipped→completed RAD).
+ */
+export type StageCompleteHook = {
+  completeStageForVisit: (c: Context, stageId: string) => Promise<unknown>;
+};
+
 export const createVisitNotesService = (deps: {
   audit: AuditLogger;
   deductStock?: (c: Context, serviceIds: string[], visitNoteId: string) => Promise<void>;
+  completeStage?: StageCompleteHook;
 }) => {
   const repo = createVisitNotesRepository();
 
@@ -16,11 +26,19 @@ export const createVisitNotesService = (deps: {
     const tenantId = c.get('activeTenantId');
     if (!tenantId) throw new Error('No tenant context');
 
+    // C5: stageId berilgan bo'lsa AVVAL bosqichni 'completed' qilamiz (C2 guard).
+    // Guard fail (skipped→completed) → InvalidTransitionError → routes 400. Yozuv
+    // yaratilishidan oldin tekshiramiz: noto'g'ri transition'da orphan yozuv qolmaydi.
+    if (input.stageId && deps.completeStage) {
+      await deps.completeStage.completeStageForVisit(c, input.stageId);
+    }
+
     const note = await repo.insert(c, {
       tenantId,
       patientId: input.patientId,
       doctorId: input.doctorId,
       appointmentId: input.appointmentId ?? null,
+      stageId: input.stageId ?? null,
       visitDate: input.visitDate ? new Date(input.visitDate) : new Date(),
       subjective: input.subjective ?? null,
       objective: input.objective ?? null,
@@ -47,9 +65,15 @@ export const createVisitNotesService = (deps: {
     const before = await repo.find(c, id);
     if (!before) return null;
 
+    // C5: stageId yangi berilgan/o'zgargan bo'lsa o'sha bosqichni 'completed' qilamiz (C2 guard).
+    if (input.stageId && input.stageId !== before.stageId && deps.completeStage) {
+      await deps.completeStage.completeStageForVisit(c, input.stageId);
+    }
+
     const patch: Record<string, unknown> = { updatedAt: new Date() };
     if (input.doctorId) patch.doctorId = input.doctorId;
     if (input.appointmentId !== undefined) patch.appointmentId = input.appointmentId;
+    if (input.stageId !== undefined) patch.stageId = input.stageId;
     if (input.visitDate) patch.visitDate = new Date(input.visitDate);
     if (input.subjective !== undefined) patch.subjective = input.subjective;
     if (input.objective !== undefined) patch.objective = input.objective;

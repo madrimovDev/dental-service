@@ -4,13 +4,14 @@ import type { Context } from 'hono';
 import type { AuditLogger } from '../../../lib/audit-logger.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../../lib/openapi.ts';
 import { requirePermission } from '../../../middleware/require-permission.ts';
+import { InvalidTransitionError } from '../treatment-plans/treatment-plans.transitions.ts';
 import { toVisitNoteDto } from './visit-notes.mapper.ts';
 import {
   createVisitNoteSchema,
   updateVisitNoteSchema,
   visitNoteDtoSchema,
 } from './visit-notes.schema.ts';
-import { createVisitNotesService } from './visit-notes.service.ts';
+import { createVisitNotesService, type StageCompleteHook } from './visit-notes.service.ts';
 
 /** Standart 404 response — get / patch endpoint'lar uchun. */
 const notFoundResponse = {
@@ -23,6 +24,7 @@ const notFoundResponse = {
 export const visitNotesRoutes = (deps: {
   audit: AuditLogger;
   deductStock?: (c: Context, serviceIds: string[], visitNoteId: string) => Promise<void>;
+  completeStage?: StageCompleteHook;
 }) => {
   const app = new OpenAPIHono();
   const service = createVisitNotesService(deps);
@@ -82,9 +84,17 @@ export const visitNotesRoutes = (deps: {
 
   app.openapi(createRoute_, async (c) => {
     const body = c.req.valid('json');
-    const note = await service.create(c, body);
-    if (!note) throw new Error('Visit note creation failed');
-    return c.json(ok(toVisitNoteDto(note)), 201);
+    try {
+      const note = await service.create(c, body);
+      if (!note) throw new Error('Visit note creation failed');
+      return c.json(ok(toVisitNoteDto(note)), 201);
+    } catch (e) {
+      // C5: stageId skipped→completed → guard RAD → 400 (orphan yozuv yaratilmaydi).
+      if (e instanceof InvalidTransitionError) {
+        return c.json(fail('stage.invalid_transition', e.message), 400);
+      }
+      throw e;
+    }
   });
 
   // ─── GET /visit-notes/{id} — get by id ──────────────────────────────────
@@ -120,15 +130,29 @@ export const visitNotesRoutes = (deps: {
       params: z.object({ id: z.uuid() }),
       body: { content: { 'application/json': { schema: updateVisitNoteSchema } } },
     },
-    responses: { ...okJson(visitNoteDtoSchema, 'Updated visit note'), ...notFoundResponse },
+    responses: {
+      ...okJson(visitNoteDtoSchema, 'Updated visit note'),
+      400: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Invalid stage transition',
+      },
+      ...notFoundResponse,
+    },
   });
 
   app.openapi(updateRoute, async (c) => {
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const note = await service.update(c, id, body);
-    if (!note) return c.json(fail('note.not_found', 'Note not found'), 404);
-    return c.json(ok(toVisitNoteDto(note)), 200);
+    try {
+      const note = await service.update(c, id, body);
+      if (!note) return c.json(fail('note.not_found', 'Note not found'), 404);
+      return c.json(ok(toVisitNoteDto(note)), 200);
+    } catch (e) {
+      if (e instanceof InvalidTransitionError) {
+        return c.json(fail('stage.invalid_transition', e.message), 400);
+      }
+      throw e;
+    }
   });
 
   return app;

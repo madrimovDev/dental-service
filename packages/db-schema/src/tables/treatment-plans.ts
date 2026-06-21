@@ -74,6 +74,18 @@ export const treatmentStageStatusEnum = pgEnum('treatment_stage_status', [
   'skipped',
 ]);
 
+/**
+ * Acceptance axis (Qaror #25) — SEPARATE from execution `status`.
+ * `status` = nima bajarildi (pending/in_progress/completed/skipped);
+ * `acceptance` = bemor bosqichni qabul qildimi (proposed/accepted/rejected).
+ * Qarz (debt) faqat `acceptance='accepted'` bosqichlardan hisoblanadi (Qaror #24).
+ */
+export const treatmentStageAcceptanceEnum = pgEnum('treatment_stage_acceptance', [
+  'proposed',
+  'accepted',
+  'rejected',
+]);
+
 export const treatmentStages = pgTable(
   'treatment_stages',
   {
@@ -89,6 +101,7 @@ export const treatmentStages = pgTable(
     estimatedDurationMinutes: integer('estimated_duration_minutes'),
     cost: numeric('cost', { precision: 14, scale: 2 }).notNull(),
     status: treatmentStageStatusEnum('status').notNull().default('pending'),
+    acceptance: treatmentStageAcceptanceEnum('acceptance').notNull().default('proposed'),
     completedAt: timestamp('completed_at', { withTimezone: true }),
     notes: text('notes'),
   },

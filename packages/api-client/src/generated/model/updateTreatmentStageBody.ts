@@ -5,9 +5,11 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { UpdateTreatmentStageBodyStatus } from './updateTreatmentStageBodyStatus';
+import type { UpdateTreatmentStageBodyAcceptance } from './updateTreatmentStageBodyAcceptance';
 
 export type UpdateTreatmentStageBody = {
   status?: UpdateTreatmentStageBodyStatus;
+  acceptance?: UpdateTreatmentStageBodyAcceptance;
   /** @maxLength 500 */
   notes?: string;
 };

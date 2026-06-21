@@ -3,6 +3,7 @@ import { boolean, index, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-o
 import { appointments } from './appointments.ts';
 import { patients } from './patients.ts';
 import { tenants } from './tenants.ts';
+import { treatmentStages } from './treatment-plans.ts';
 import { users } from './users.ts';
 
 /**
@@ -30,6 +31,10 @@ export const visitNotes = pgTable(
     appointmentId: uuid('appointment_id').references(() => appointments.id, {
       onDelete: 'set null',
     }),
+    // Epic C (CLI-222): vizit yozuvini davolash bosqichiga bog'lash. Yozuv saqlanganda
+    // shu bosqich status='completed' bo'ladi (C2 guard'ga bo'ysunadi). Nullable — har
+    // vizit bosqichga bog'lanmaydi.
+    stageId: uuid('stage_id').references(() => treatmentStages.id, { onDelete: 'set null' }),
 
     visitDate: timestamp('visit_date', { withTimezone: true }).notNull().defaultNow(),
 

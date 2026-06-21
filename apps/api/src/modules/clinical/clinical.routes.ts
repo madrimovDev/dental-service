@@ -7,7 +7,10 @@ import { createStockService } from '../stock/stock.service.ts';
 import { diagnosesRoutes } from './diagnoses/index.ts';
 import { toothChartsRoutes } from './tooth-charts/index.ts';
 import { treatmentPlansRoutes } from './treatment-plans/index.ts';
-import type { RecallStageHook } from './treatment-plans/treatment-plans.service.ts';
+import {
+  createTreatmentPlansService,
+  type RecallStageHook,
+} from './treatment-plans/treatment-plans.service.ts';
 import { visitNotesRoutes, visitNoteTemplatesRoutes } from './visit-notes/index.ts';
 
 /**
@@ -30,12 +33,23 @@ export const clinicalRoutes = (deps: {
   // Ombor chiqim hook'i DI — vizit yaratilganda BOM material yechiladi (cycle yo'q).
   const stockService = createStockService({ audit: deps.audit });
 
+  // C5: vizit→bosqich completed hook (factory injection, recall pattern bilan bir xil).
+  // Bosqich completed → recall ham fire bo'ladi (treatment-plans.service ichida).
+  const treatmentPlansService = createTreatmentPlansService({
+    audit: deps.audit,
+    recall: deps.recall,
+  });
+
   app.route('/', diagnosesRoutes({ db: deps.db }));
   // B4: bosqich completed → treatment_followup recall (factory injection).
   app.route('/', treatmentPlansRoutes({ audit: deps.audit, recall: deps.recall }));
   app.route(
     '/',
-    visitNotesRoutes({ audit: deps.audit, deductStock: stockService.deductForServices }),
+    visitNotesRoutes({
+      audit: deps.audit,
+      deductStock: stockService.deductForServices,
+      completeStage: { completeStageForVisit: treatmentPlansService.completeStageForVisit },
+    }),
   );
   app.route('/', visitNoteTemplatesRoutes({ audit: deps.audit }));
   app.route('/', toothChartsRoutes({ audit: deps.audit }));

@@ -8,8 +8,11 @@ import type {
   CreateTreatmentPlan201,
   CreateTreatmentPlanBody,
   GetTreatmentPlan200,
+  GetTreatmentPlanEstimate200,
   ListTreatmentPlans200,
   ListTreatmentPlansParams,
+  SignTreatmentPlanConsent200,
+  SignTreatmentPlanConsentBody,
   UpdateTreatmentPlan200,
   UpdateTreatmentPlanBody,
   UpdateTreatmentStage200,
@@ -58,6 +61,25 @@ import { customInstance } from '../../mutator';
     },
       );
     }
+  export const getTreatmentPlanEstimate = (
+    id: string,
+ ) => {
+      return customInstance<GetTreatmentPlanEstimate200>(
+      {url: `/api/treatment-plans/${id}/estimate`, method: 'GET'
+    },
+      );
+    }
+  export const signTreatmentPlanConsent = (
+    id: string,
+    signTreatmentPlanConsentBody: SignTreatmentPlanConsentBody,
+ ) => {
+      return customInstance<SignTreatmentPlanConsent200>(
+      {url: `/api/treatment-plans/${id}/consent`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: signTreatmentPlanConsentBody
+    },
+      );
+    }
   export const updateTreatmentStage = (
     id: string,
     updateTreatmentStageBody: UpdateTreatmentStageBody,
@@ -73,4 +95,6 @@ import { customInstance } from '../../mutator';
 export type CreateTreatmentPlanResult = NonNullable<Awaited<ReturnType<typeof createTreatmentPlan>>>
 export type GetTreatmentPlanResult = NonNullable<Awaited<ReturnType<typeof getTreatmentPlan>>>
 export type UpdateTreatmentPlanResult = NonNullable<Awaited<ReturnType<typeof updateTreatmentPlan>>>
+export type GetTreatmentPlanEstimateResult = NonNullable<Awaited<ReturnType<typeof getTreatmentPlanEstimate>>>
+export type SignTreatmentPlanConsentResult = NonNullable<Awaited<ReturnType<typeof signTreatmentPlanConsent>>>
 export type UpdateTreatmentStageResult = NonNullable<Awaited<ReturnType<typeof updateTreatmentStage>>>

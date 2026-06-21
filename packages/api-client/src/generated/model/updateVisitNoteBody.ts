@@ -8,6 +8,7 @@
 export type UpdateVisitNoteBody = {
   doctorId?: string;
   appointmentId?: string;
+  stageId?: string;
   visitDate?: string;
   /** @maxLength 5000 */
   subjective?: string;
