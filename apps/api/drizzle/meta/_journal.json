@@ -134,6 +134,13 @@
       "when": 1782031545937,
       "tag": "0018_cli226_reset_attempts",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1782034827161,
+      "tag": "0019_normal_rick_jones",
+      "breakpoints": true
     }
   ]
 }

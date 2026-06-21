@@ -14,6 +14,8 @@ export * from './tables/branches.ts';
 export * from './tables/cashier.ts';
 export * from './tables/consent.ts';
 export * from './tables/diagnoses.ts';
+export * from './tables/doctor-schedules.ts';
+export * from './tables/doctor-time-off.ts';
 export * from './tables/expense-categories.ts';
 export * from './tables/expenses.ts';
 export * from './tables/lab-orders.ts';
