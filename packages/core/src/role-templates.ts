@@ -77,6 +77,8 @@ export const ROLE_TEMPLATES = [
       'stock.manage',
       'payroll.view',
       'payroll.manage',
+      'schedule.view',
+      'schedule.manage',
     ],
   },
   {
@@ -112,6 +114,8 @@ export const ROLE_TEMPLATES = [
       'stock.manage',
       'payroll.view',
       'payroll.manage',
+      'schedule.view',
+      'schedule.manage',
     ],
   },
   {
@@ -134,6 +138,7 @@ export const ROLE_TEMPLATES = [
       'service.view',
       'stock.view',
       'stock.manage',
+      'schedule.view',
     ],
   },
   {
@@ -160,6 +165,7 @@ export const ROLE_TEMPLATES = [
       'service.view',
       'stock.view',
       'stock.manage',
+      'schedule.view',
     ],
   },
   {
@@ -200,6 +206,8 @@ export const ROLE_TEMPLATES = [
       'service.view',
       'cashier.view',
       'cashier.create_transaction',
+      'schedule.view',
+      'schedule.manage',
     ],
   },
   {
