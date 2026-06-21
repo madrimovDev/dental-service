@@ -324,6 +324,7 @@ export const createCashierService = (deps: { audit: AuditLogger }) => {
         id: treatmentStages.id,
         serviceName: treatmentStages.serviceName,
         cost: treatmentStages.cost,
+        status: treatmentStages.status,
       })
       .from(treatmentStages)
       .where(eq(treatmentStages.treatmentPlanId, planId));
