@@ -1947,6 +1947,9 @@
           },
           "remaining": {
             "type": "number"
+          },
+          "excludedFromDebt": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -1954,7 +1957,8 @@
           "serviceName",
           "cost",
           "paid",
-          "remaining"
+          "remaining",
+          "excludedFromDebt"
         ]
       },
       "CashierPatientPlan": {
@@ -2871,7 +2875,7 @@
           "updatedAt"
         ]
       },
-      "ToothChart": {
+      "VisitNoteTemplate": {
         "type": "object",
         "properties": {
           "id": {
@@ -2882,41 +2886,71 @@
             "type": "string",
             "format": "uuid"
           },
-          "patientId": {
-            "type": "string",
-            "format": "uuid"
+          "name": {
+            "type": "string"
           },
-          "visitNoteId": {
+          "category": {
             "type": "string",
             "nullable": true,
-            "format": "uuid"
+            "example": null
           },
-          "isPrimaryDentition": {
+          "template": {
+            "type": "object",
+            "properties": {
+              "subjective": {
+                "type": "string",
+                "maxLength": 5000
+              },
+              "objective": {
+                "type": "string",
+                "maxLength": 5000
+              },
+              "plan": {
+                "type": "string",
+                "maxLength": 5000
+              }
+            },
+            "example": {
+              "subjective": "Bemor shikoyati"
+            }
+          },
+          "isShared": {
             "type": "boolean"
-          },
-          "notes": {
-            "type": "string",
-            "nullable": true
           },
           "createdBy": {
             "type": "string",
             "nullable": true,
-            "format": "uuid"
+            "format": "uuid",
+            "example": null
           },
           "createdAt": {
             "type": "string",
-            "example": "2026-06-12T10:00:00.000Z"
+            "example": "2026-06-21T10:00:00.000Z"
           }
         },
         "required": [
           "id",
           "tenantId",
-          "patientId",
-          "visitNoteId",
-          "isPrimaryDentition",
-          "notes",
+          "name",
+          "category",
+          "template",
+          "isShared",
           "createdBy",
           "createdAt"
+        ]
+      },
+      "VisitNoteTemplateDeleteResult": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "deleted"
         ]
       },
       "ToothChartWithStates": {
@@ -2926,7 +2960,6 @@
           },
           {
             "type": "object",
-            "nullable": true,
             "properties": {
               "states": {
                 "type": "array",
@@ -3003,6 +3036,54 @@
           "state",
           "diagnosisId",
           "notes"
+        ]
+      },
+      "ToothChart": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "visitNoteId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "isPrimaryDentition": {
+            "type": "boolean"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-06-12T10:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "patientId",
+          "visitNoteId",
+          "isPrimaryDentition",
+          "notes",
+          "createdBy",
+          "createdAt"
         ]
       },
       "Prescription": {
@@ -12469,6 +12550,406 @@
         }
       }
     },
+    "/api/visit-note-templates": {
+      "get": {
+        "tags": [
+          "visit-note-templates"
+        ],
+        "operationId": "listVisitNoteTemplates",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Filter by category"
+            },
+            "required": false,
+            "description": "Filter by category",
+            "name": "category",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of visit note templates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/VisitNoteTemplate"
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "visit-note-templates"
+        ],
+        "operationId": "createVisitNoteTemplate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "category": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "template": {
+                    "type": "object",
+                    "properties": {
+                      "subjective": {
+                        "type": "string",
+                        "maxLength": 5000
+                      },
+                      "objective": {
+                        "type": "string",
+                        "maxLength": 5000
+                      },
+                      "plan": {
+                        "type": "string",
+                        "maxLength": 5000
+                      }
+                    },
+                    "default": {}
+                  },
+                  "isShared": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Template created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/VisitNoteTemplate"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/visit-note-templates/{id}": {
+      "patch": {
+        "tags": [
+          "visit-note-templates"
+        ],
+        "operationId": "updateVisitNoteTemplate",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "category": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "template": {
+                    "type": "object",
+                    "properties": {
+                      "subjective": {
+                        "type": "string",
+                        "maxLength": 5000
+                      },
+                      "objective": {
+                        "type": "string",
+                        "maxLength": 5000
+                      },
+                      "plan": {
+                        "type": "string",
+                        "maxLength": 5000
+                      }
+                    },
+                    "default": {}
+                  },
+                  "isShared": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated template",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/VisitNoteTemplate"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Template not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "visit-note-templates"
+        ],
+        "operationId": "deleteVisitNoteTemplate",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Template deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/VisitNoteTemplateDeleteResult"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Template not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/patients/{patientId}/tooth-charts": {
       "get": {
         "tags": [
@@ -12490,7 +12971,7 @@
         ],
         "responses": {
           "200": {
-            "description": "List of tooth chart snapshots",
+            "description": "List of tooth chart snapshots with states",
             "content": {
               "application/json": {
                 "schema": {
@@ -12505,7 +12986,7 @@
                     "data": {
                       "type": "array",
                       "items": {
-                        "$ref": "#/components/schemas/ToothChart"
+                        "$ref": "#/components/schemas/ToothChartWithStates"
                       }
                     }
                   },
@@ -12662,9 +13143,7 @@
                       "type": "object",
                       "properties": {
                         "toothNumber": {
-                          "type": "integer",
-                          "minimum": 11,
-                          "maximum": 85
+                          "type": "integer"
                         },
                         "surface": {
                           "type": "string",

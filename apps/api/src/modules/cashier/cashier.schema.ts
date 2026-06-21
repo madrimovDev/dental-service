@@ -161,6 +161,8 @@ export const stageBalanceDtoSchema = z
     cost: z.number(),
     paid: z.number(),
     remaining: z.number(),
+    // Qaror #24: skipped/rejected bosqich — cost 0 lekin to'lov saqlanadi (kredit). Frontend "skipped lekin to'langan" deb ko'rsatishi mumkin.
+    excludedFromDebt: z.boolean(),
   })
   .openapi('StageBalance');
 export type StageBalanceDto = z.infer<typeof stageBalanceDtoSchema>;

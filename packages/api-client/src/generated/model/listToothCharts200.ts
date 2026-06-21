@@ -4,9 +4,9 @@
  * Dental Service API
  * OpenAPI spec version: 0.1.0
  */
-import type { ToothChart } from './toothChart';
+import type { ToothChartWithStates } from './toothChartWithStates';
 
 export type ListToothCharts200 = {
   success: boolean;
-  data: ToothChart[];
+  data: ToothChartWithStates[];
 };

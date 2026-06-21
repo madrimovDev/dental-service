@@ -7,6 +7,7 @@ import type {
   PatientImageType,
   PrescriptionItem,
   ToothState,
+  ToothSurface,
   TreatmentPlanStatus,
   TreatmentStageStatus,
 } from '@dental/api-client';
@@ -16,6 +17,14 @@ export type Tone = NonNullable<StatusPillProps['status']>;
 
 // ===== A: Odontogram =====
 export type ToothStateMap = Map<number, ToothState>;
+
+// CLI-189: tish bo'yicha draft (state + yuza + diagnoz).
+export type ToothDraft = {
+  state: ToothState;
+  surface: ToothSurface;
+  diagnosisId: string | null;
+};
+export type ToothDraftMap = Map<number, ToothDraft>;
 
 // ===== A: Treatment plan =====
 export type PlanCardVM = {
@@ -125,4 +134,4 @@ export type PatientImageVM = {
 };
 
 // Lokal re-export (mapper imzolari uchun)
-export type { Diagnosis, PrescriptionItem, ToothState };
+export type { Diagnosis, PrescriptionItem, ToothState, ToothSurface };

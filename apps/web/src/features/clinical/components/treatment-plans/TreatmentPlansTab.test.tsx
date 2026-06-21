@@ -20,9 +20,17 @@ vi.mock('../../clinical.api', () => ({
   }),
   useCreatePlan: () => ({ mutate: vi.fn(), isPending: false }),
   useUpdateStage: () => ({ mutate: vi.fn() }),
+  // CLI-188: PlanFormModal xizmat katalogi + narx fetch ishlatadi.
+  useServiceCatalog: () => ({ data: [] }),
+  fetchServicePrices: vi.fn(),
 }));
 vi.mock('@/stores/auth-store.ts', () => ({
-  useAuthStore: () => ({ user: { id: 'u1' }, hasPermission: () => true }),
+  // selector-uslubli chaqiruv (useAuthStore((s) => s.activeBranchId)) ni qo'llab-quvvatlaydi
+  // biome-ignore lint/suspicious/noExplicitAny: test mock selector
+  useAuthStore: (sel?: (s: any) => unknown) => {
+    const store = { user: { id: 'u1' }, activeBranchId: null, hasPermission: () => true };
+    return sel ? sel(store) : store;
+  },
 }));
 
 describe('TreatmentPlansTab', () => {

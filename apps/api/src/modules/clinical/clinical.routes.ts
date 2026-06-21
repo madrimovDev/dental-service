@@ -7,13 +7,14 @@ import { createStockService } from '../stock/stock.service.ts';
 import { diagnosesRoutes } from './diagnoses/index.ts';
 import { toothChartsRoutes } from './tooth-charts/index.ts';
 import { treatmentPlansRoutes } from './treatment-plans/index.ts';
-import { visitNotesRoutes } from './visit-notes/index.ts';
+import { visitNotesRoutes, visitNoteTemplatesRoutes } from './visit-notes/index.ts';
 
 /**
  * Clinical aggregator — 4 sub-domenni bitta modul ostida birlashtiradi:
  *   /api/diagnoses (read-only, platform katalog)
  *   /api/treatment-plans (CRUD + stages)
  *   /api/visit-notes (CRUD, BOM ombor chiqimi)
+ *   /api/visit-note-templates (CRUD, isShared/owner visibility)
  *   /api/tooth-charts (snapshot create + read)
  */
 export const clinicalRoutes = (deps: { db: Database; audit: AuditLogger }) => {
@@ -30,6 +31,7 @@ export const clinicalRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     '/',
     visitNotesRoutes({ audit: deps.audit, deductStock: stockService.deductForServices }),
   );
+  app.route('/', visitNoteTemplatesRoutes({ audit: deps.audit }));
   app.route('/', toothChartsRoutes({ audit: deps.audit }));
 
   return app;

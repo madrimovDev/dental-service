@@ -6,9 +6,6 @@
  */
 import type { ToothStateEntry } from './toothStateEntry';
 
-/**
- * @nullable
- */
 export type ToothChartWithStatesAllOf = {
   states: ToothStateEntry[];
-} | null;
+};

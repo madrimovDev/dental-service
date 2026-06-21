@@ -144,6 +144,22 @@ describe('clinical smoke — real DB', () => {
     expect(latest!.id).toBe(chart.id);
   });
 
+  test('CLI-191: tooth-chart list states bilan qaytadi (surface + diagnosisId)', async () => {
+    await run(tenantAId, doctorAId, (c) =>
+      chartsSvc.create(c, {
+        patientId: patientAId,
+        isPrimaryDentition: false,
+        states: [{ toothNumber: 16, surface: 'O', state: 'filling', diagnosisId }],
+      }),
+    );
+    const list = await run(tenantAId, doctorAId, (c) => chartsSvc.list(c, patientAId));
+    expect(list.length).toBeGreaterThan(0);
+    // har snapshot states ni o'z ichiga oladi (CLI-191 — tarix ko'rgichi uchun)
+    const withSurface = list.flatMap((ch) => ch.states).find((s) => s.surface === 'O');
+    expect(withSurface).toBeTruthy();
+    expect(withSurface?.diagnosisId).toBe(diagnosisId);
+  });
+
   test("RLS scope — tenant B bemor A rejalarini ko'rmaydi", async () => {
     const plans = await run(tenantBId, doctorAId, (c) => plansSvc.listPlans(c, patientAId));
     expect(plans).toHaveLength(0);

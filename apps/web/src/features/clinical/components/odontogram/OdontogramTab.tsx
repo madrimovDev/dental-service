@@ -1,7 +1,13 @@
-import type { CreateToothStateInput, ToothState, ToothStateEntry } from '@dental/api-client';
+import type {
+  CreateToothStateInput,
+  ToothState,
+  ToothStateEntry,
+  ToothSurface,
+} from '@dental/api-client';
 import { StateView } from '@dental/ui';
 import {
   Alert,
+  Badge,
   Button,
   Group,
   Paper,
@@ -12,12 +18,23 @@ import {
   Textarea,
   Title,
 } from '@mantine/core';
-import { IconDental } from '@tabler/icons-react';
+import { IconArrowBack, IconDental, IconHistory } from '@tabler/icons-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth-store.ts';
-import { useCreateToothChart, useLatestToothChart } from '../../clinical.api';
-import { draftStatesToCreateInput, toToothStateMap } from '../../clinical.mappers';
+import {
+  useCreateToothChart,
+  useDiagnoses,
+  useLatestToothChart,
+  useToothChartHistory,
+} from '../../clinical.api';
+import {
+  draftMapToCreateInput,
+  EMPTY_TOOTH_DRAFT,
+  toDiagnosisOptions,
+  toToothDraftMap,
+} from '../../clinical.mappers';
+import type { ToothDraftMap } from '../../clinical.types';
 import { Odontogram } from './Odontogram';
 
 type Props = { patientId: string };
@@ -35,53 +52,83 @@ const TOOTH_STATE_OPTIONS: ToothState[] = [
   'veneer',
 ];
 
+const SURFACE_OPTIONS: ToothSurface[] = ['whole', 'M', 'D', 'B', 'L', 'O', 'I'];
+
 export function OdontogramTab({ patientId }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language === 'ru' ? 'ru' : 'uz';
   const { hasPermission } = useAuthStore();
   const canEdit = hasPermission('medical_record.edit');
 
   const chartQuery = useLatestToothChart(patientId);
+  const historyQuery = useToothChartHistory(patientId);
+  const diagnosesQuery = useDiagnoses();
   const createMut = useCreateToothChart(patientId);
 
   const [isPrimary, setIsPrimary] = useState(false);
   const [selectedTooth, setSelectedTooth] = useState<number | null>(null);
-  const [draftStates, setDraftStates] = useState<Map<number, ToothState>>(new Map());
+  const [draft, setDraft] = useState<ToothDraftMap>(new Map());
   const [draftNotes, setDraftNotes] = useState('');
+  // CLI-191: tarix — tanlangan eski snapshot id (null = hozirgi/tahrirlash rejimi).
+  const [viewingId, setViewingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!chartQuery.data) return;
-    setDraftStates(toToothStateMap(chartQuery.data));
+    setDraft(toToothDraftMap(chartQuery.data));
     setIsPrimary(chartQuery.data.isPrimaryDentition);
   }, [chartQuery.data]);
 
+  const diagnosisOptions = useMemo(
+    () => (diagnosesQuery.data ? toDiagnosisOptions(diagnosesQuery.data, lang) : []),
+    [diagnosesQuery.data, lang],
+  );
+
+  // CLI-191: ko'rilayotgan eski snapshot (mavjud bo'lsa) — read-only.
+  const viewingSnapshot = useMemo(
+    () => historyQuery.data?.find((ch) => ch.id === viewingId) ?? null,
+    [historyQuery.data, viewingId],
+  );
+
+  // Odontogram'da ko'rsatiladigan holat: read-only snapshot bo'lsa undan, aks holda draft'dan.
+  const displayMap = useMemo<ToothDraftMap>(
+    () => (viewingSnapshot ? toToothDraftMap(viewingSnapshot) : draft),
+    [viewingSnapshot, draft],
+  );
+
   const statesArray: ToothStateEntry[] = useMemo(
     () =>
-      Array.from(draftStates.entries()).map(([toothNumber, state]) => ({
+      Array.from(displayMap.entries()).map(([toothNumber, d]) => ({
         id: `draft-${toothNumber}`,
         toothChartId: 'draft',
         toothNumber,
-        surface: 'whole' as const,
-        state,
-        diagnosisId: null,
+        surface: d.surface,
+        state: d.state,
+        diagnosisId: d.diagnosisId,
         notes: null,
         createdAt: new Date().toISOString(),
       })),
-    [draftStates],
+    [displayMap],
   );
 
-  const selectTooth = (n: number) => {
-    setSelectedTooth(n);
+  const isReadOnly = viewingSnapshot !== null;
+  const current = selectedTooth !== null ? (draft.get(selectedTooth) ?? null) : null;
+
+  const patchTooth = (patch: Partial<ReturnType<typeof EMPTY_TOOTH_DRAFT>>) => {
+    if (selectedTooth === null) return;
+    const next = new Map(draft);
+    const base = next.get(selectedTooth) ?? EMPTY_TOOTH_DRAFT();
+    next.set(selectedTooth, { ...base, ...patch });
+    setDraft(next);
   };
 
-  const setToothState = (state: ToothState) => {
-    if (selectedTooth === null) return;
-    const next = new Map(draftStates);
-    next.set(selectedTooth, state);
-    setDraftStates(next);
-  };
+  const historyOptions =
+    historyQuery.data?.map((ch) => ({
+      value: ch.id,
+      label: new Date(ch.createdAt).toLocaleString(lang === 'ru' ? 'ru-RU' : 'uz-UZ'),
+    })) ?? [];
 
   const save = () => {
-    const states: CreateToothStateInput[] = draftStatesToCreateInput(draftStates);
+    const states: CreateToothStateInput[] = draftMapToCreateInput(draft);
     createMut.mutate(
       { patientId, isPrimaryDentition: isPrimary, notes: draftNotes || undefined, states },
       {
@@ -96,16 +143,31 @@ export function OdontogramTab({ patientId }: Props) {
     <Stack gap="md">
       <Group justify="space-between">
         <Title order={4}>{t('tooth_chart.title')}</Title>
-        <Switch
-          label={t('tooth_chart.primary_dentition')}
-          checked={isPrimary}
-          onChange={(e) => {
-            setIsPrimary(e.currentTarget.checked);
-            setDraftStates(new Map());
-            setSelectedTooth(null);
-          }}
-          disabled={!canEdit}
-        />
+        <Group gap="sm">
+          {/* CLI-191: snapshot tarix tanlovi */}
+          {historyOptions.length > 0 && (
+            <Select
+              leftSection={<IconHistory size={16} />}
+              placeholder={t('tooth_chart.view_history')}
+              data={historyOptions}
+              value={viewingId}
+              onChange={setViewingId}
+              clearable
+              w={240}
+              comboboxProps={{ withinPortal: true }}
+            />
+          )}
+          <Switch
+            label={t('tooth_chart.primary_dentition')}
+            checked={isPrimary}
+            onChange={(e) => {
+              setIsPrimary(e.currentTarget.checked);
+              setDraft(new Map());
+              setSelectedTooth(null);
+            }}
+            disabled={!canEdit || isReadOnly}
+          />
+        </Group>
       </Group>
 
       {chartQuery.isError && (
@@ -121,16 +183,39 @@ export function OdontogramTab({ patientId }: Props) {
         <Alert color="gray">{t('tooth_chart.no_chart')}</Alert>
       )}
 
+      {isReadOnly && (
+        <Alert
+          color="blue"
+          icon={<IconHistory size={18} />}
+          withCloseButton
+          onClose={() => setViewingId(null)}
+        >
+          <Group justify="space-between" wrap="nowrap">
+            <Text size="sm">{t('tooth_chart.viewing_snapshot')}</Text>
+            <Button
+              size="xs"
+              variant="light"
+              leftSection={<IconArrowBack size={14} />}
+              onClick={() => setViewingId(null)}
+            >
+              {t('tooth_chart.return_to_current')}
+            </Button>
+          </Group>
+        </Alert>
+      )}
+
       <Paper withBorder p="md">
         <Odontogram
           states={statesArray}
-          isPrimaryDentition={isPrimary}
-          selectedTooth={selectedTooth}
-          onSelectTooth={selectTooth}
+          isPrimaryDentition={isReadOnly ? viewingSnapshot.isPrimaryDentition : isPrimary}
+          selectedTooth={isReadOnly ? null : selectedTooth}
+          onSelectTooth={(n) => {
+            if (!isReadOnly) setSelectedTooth(n);
+          }}
         />
       </Paper>
 
-      {canEdit && selectedTooth !== null && (
+      {canEdit && !isReadOnly && selectedTooth !== null && (
         <Paper withBorder p="md">
           <Stack gap="sm">
             <Group gap={6}>
@@ -139,20 +224,44 @@ export function OdontogramTab({ patientId }: Props) {
                 {t('tooth_chart.selected_tooth')}: <strong>{selectedTooth}</strong>
               </Text>
             </Group>
+            <Group grow align="flex-start">
+              <Select
+                label={t('tooth_chart.set_state')}
+                value={current?.state ?? 'healthy'}
+                onChange={(v) => v && patchTooth({ state: v as ToothState })}
+                data={TOOTH_STATE_OPTIONS.map((s) => ({
+                  value: s,
+                  label: t(`tooth_chart.states.${s}`),
+                }))}
+                comboboxProps={{ withinPortal: true }}
+              />
+              <Select
+                label={t('tooth_chart.set_surface')}
+                value={current?.surface ?? 'whole'}
+                onChange={(v) => v && patchTooth({ surface: v as ToothSurface })}
+                data={SURFACE_OPTIONS.map((s) => ({
+                  value: s,
+                  label: t(`tooth_chart.surfaces.${s}`),
+                }))}
+                comboboxProps={{ withinPortal: true }}
+              />
+            </Group>
             <Select
-              label={t('tooth_chart.set_state')}
-              value={draftStates.get(selectedTooth) ?? 'healthy'}
-              onChange={(v) => v && setToothState(v as ToothState)}
-              data={TOOTH_STATE_OPTIONS.map((s) => ({
-                value: s,
-                label: t(`tooth_chart.states.${s}`),
-              }))}
+              label={t('tooth_chart.set_diagnosis')}
+              placeholder={t('tooth_chart.diagnosis_placeholder')}
+              value={current?.diagnosisId ?? null}
+              onChange={(v) => patchTooth({ diagnosisId: v })}
+              data={diagnosisOptions}
+              searchable
+              clearable
+              nothingFoundMessage={t('tooth_chart.no_diagnosis')}
+              comboboxProps={{ withinPortal: true }}
             />
           </Stack>
         </Paper>
       )}
 
-      {canEdit && (
+      {canEdit && !isReadOnly && (
         <Paper withBorder p="md">
           <Stack gap="sm">
             <Textarea
@@ -163,15 +272,22 @@ export function OdontogramTab({ patientId }: Props) {
               rows={2}
             />
             <Group justify="flex-end">
-              <Button
-                onClick={save}
-                loading={createMut.isPending}
-                disabled={draftStates.size === 0}
-              >
+              <Button onClick={save} loading={createMut.isPending} disabled={draft.size === 0}>
                 {t('tooth_chart.save_snapshot')}
               </Button>
             </Group>
           </Stack>
+        </Paper>
+      )}
+
+      {isReadOnly && viewingSnapshot.notes && (
+        <Paper withBorder p="md">
+          <Group gap={6}>
+            <Badge variant="light" color="blue">
+              {t('treatment_plan.notes')}
+            </Badge>
+            <Text size="sm">{viewingSnapshot.notes}</Text>
+          </Group>
         </Paper>
       )}
     </Stack>

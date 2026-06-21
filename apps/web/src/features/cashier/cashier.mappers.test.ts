@@ -206,9 +206,30 @@ describe('toPlanBalanceVM', () => {
     totalPaid: 30000,
     balance: 70000,
     stages: [
-      { stageId: 'st1', serviceName: 'A', cost: 40000, paid: 40000, remaining: 0 },
-      { stageId: 'st2', serviceName: 'B', cost: 30000, paid: 10000, remaining: 20000 },
-      { stageId: 'st3', serviceName: 'C', cost: 30000, paid: 0, remaining: 30000 },
+      {
+        stageId: 'st1',
+        serviceName: 'A',
+        cost: 40000,
+        paid: 40000,
+        remaining: 0,
+        excludedFromDebt: false,
+      },
+      {
+        stageId: 'st2',
+        serviceName: 'B',
+        cost: 30000,
+        paid: 10000,
+        remaining: 20000,
+        excludedFromDebt: false,
+      },
+      {
+        stageId: 'st3',
+        serviceName: 'C',
+        cost: 30000,
+        paid: 0,
+        remaining: 30000,
+        excludedFromDebt: false,
+      },
     ],
   };
 

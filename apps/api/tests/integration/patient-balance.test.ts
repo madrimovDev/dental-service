@@ -40,6 +40,7 @@ let tenantId: string;
 let ownerId: string;
 let patientId: string; // balansli bemor
 let emptyPatientId: string; // reja/tranzaksiyasiz bemor
+let skipPatientId: string; // CLI-184: skip-after-pay bemor (kredit)
 
 beforeAll(async () => {
   await db.execute(sql`TRUNCATE users, tenants RESTART IDENTITY CASCADE`);
@@ -78,9 +79,14 @@ beforeAll(async () => {
       .insert(patients)
       .values({ tenantId, fullName: "Bo'sh Bemor" })
       .returning({ id: patients.id });
-    if (!patient || !empty) throw new Error('patient insert failed');
+    const [skipPatient] = await tx
+      .insert(patients)
+      .values({ tenantId, fullName: 'Skip Bemor' })
+      .returning({ id: patients.id });
+    if (!patient || !empty || !skipPatient) throw new Error('patient insert failed');
     patientId = patient.id;
     emptyPatientId = empty.id;
+    skipPatientId = skipPatient.id;
 
     // Accepted reja: S1 cost=100000, S2 cost=50000 → stageCostSum = 150000
     const [acceptedPlan] = await tx
@@ -166,6 +172,71 @@ beforeAll(async () => {
       status: 'completed',
     });
     // nonPlanBalance = 10000  →  balance = 110000 + 10000 = 120000
+
+    // === CLI-184: skip-after-pay bemor (skipPatient) ===
+    // Accepted reja: SK1 skipped+to'langan (kredit), SK2 skipped+to'lovsiz (0 cost), SK3 pending normal.
+    const [skipPlan] = await tx
+      .insert(treatmentPlans)
+      .values({
+        tenantId,
+        patientId: skipPatientId,
+        doctorId: ownerId,
+        title: 'Skip Reja',
+        status: 'accepted',
+      })
+      .returning({ id: treatmentPlans.id });
+    if (!skipPlan) throw new Error('skip plan insert failed');
+
+    const [sk1] = await tx
+      .insert(treatmentStages)
+      .values({
+        treatmentPlanId: skipPlan.id,
+        sequence: 1,
+        serviceName: 'SK1',
+        cost: '100000',
+        status: 'skipped',
+      })
+      .returning({ id: treatmentStages.id });
+    // SK2: skipped, to'lovsiz → cost 0 hissa, allocation 0
+    await tx.insert(treatmentStages).values({
+      treatmentPlanId: skipPlan.id,
+      sequence: 2,
+      serviceName: 'SK2',
+      cost: '70000',
+      status: 'skipped',
+    });
+    // SK3: pending normal → cost 80000 qarzga kiradi
+    await tx.insert(treatmentStages).values({
+      treatmentPlanId: skipPlan.id,
+      sequence: 3,
+      serviceName: 'SK3',
+      cost: '80000',
+      status: 'pending',
+    });
+    if (!sk1) throw new Error('skip stage insert failed');
+
+    // SK1 ga to'lov (skip qilingandan keyin ham allocation SAQLANADI → kredit)
+    const [skTx] = await tx
+      .insert(cashierTransactions)
+      .values({
+        tenantId,
+        branchId,
+        patientId: skipPatientId,
+        treatmentPlanId: skipPlan.id,
+        totalAmount: '100000',
+        paidAmount: '100000',
+        paymentMethod: 'cash',
+        type: 'payment',
+        status: 'completed',
+      })
+      .returning({ id: cashierTransactions.id });
+    if (!skTx) throw new Error('skip tx insert failed');
+    await tx
+      .insert(treatmentStagePayments)
+      .values({ tenantId, transactionId: skTx.id, stageId: sk1.id, amount: '100000' });
+    // stageCostSum (skipped chiqarilgan) = SK3 80000
+    // allocationSum (filtrlANMAYDI) = 100000 (SK1 to'lovi saqlanadi)
+    // planDebt = 80000 − 100000 = −20000 (kredit), nonPlan = 0 → balance = −20000
   });
 });
 
@@ -193,6 +264,18 @@ describe('Bemor balansi — real DB aggregate', () => {
     expect(result).toEqual({ balance: 0, planDebt: 0, nonPlanBalance: 0 });
   });
 
+  // CLI-184: skipped bosqich qarz cost'iga kirmaydi; skip-after-pay → manfiy (kredit), 0 emas.
+  test('balanceFor: skipped bosqich cost 0, skip-after-pay allocation saqlanadi → kredit', async () => {
+    const result = await db.transaction(async (tx) => {
+      await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
+      return service.balanceFor(ctx(tx), skipPatientId);
+    });
+    // SK3 (pending) 80000 − SK1 to'lovi 100000 = −20000 kredit. SK2 (skipped, to'lovsiz) hissa 0.
+    expect(result.planDebt).toBe(-20000);
+    expect(result.nonPlanBalance).toBe(0);
+    expect(result.balance).toBe(-20000);
+  });
+
   test('list: aggregate balanceFor bilan bir xil qiymat qaytaradi', async () => {
     const res = await db.transaction(async (tx) => {
       await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
@@ -201,7 +284,10 @@ describe('Bemor balansi — real DB aggregate', () => {
 
     const row = res.data.find((p) => p.id === patientId);
     const emptyRow = res.data.find((p) => p.id === emptyPatientId);
+    const skipRow = res.data.find((p) => p.id === skipPatientId);
     expect(row?.balance).toBe(120000);
     expect(emptyRow?.balance).toBe(0);
+    // CLI-184: list va balanceFor bir xil qiymat (kredit −20000)
+    expect(skipRow?.balance).toBe(-20000);
   });
 });

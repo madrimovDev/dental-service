@@ -4,11 +4,18 @@
  * Drizzle numeric → string, shuning uchun string kirish + Number()-parse.
  */
 
+/**
+ * Qarzga KIRMAYDIGAN bosqich statuslari (Qaror #24).
+ * `Set<string>` — enum bilan ham, kelajakdagi statuslar bilan ham xavfsiz taqqoslash.
+ */
+const EXCLUDED_FROM_DEBT = new Set<string>(['skipped', 'rejected']);
+
 /** Plan bosqichi (treatment_stages'dan o'qiladi — billing o'zgartirmaydi). */
 export type StageRow = {
   id: string;
   serviceName: string;
   cost: string; // numeric → string
+  status?: string; // treatment_stage_status — undefined ⇒ qarzga kiradi (fixture'lar uchun)
 };
 
 /** Allocation row (treatment_stage_payments). amount ijobiy=to'lov, manfiy=refund. */
@@ -23,6 +30,8 @@ export type StageBalance = {
   cost: number;
   paid: number;
   remaining: number;
+  /** Qaror #24: bosqich qarzdan chiqarilgan (skipped/rejected) — cost 0, to'lov esa SAQLANADI (kredit). */
+  excludedFromDebt: boolean;
 };
 
 export type PlanBalance = {
@@ -40,14 +49,18 @@ export function computePlanBalance(stages: StageRow[], allocations: AllocationRo
   }
 
   const stageBalances: StageBalance[] = stages.map((s) => {
-    const cost = Number(s.cost);
+    const excludedFromDebt = s.status !== undefined && EXCLUDED_FROM_DEBT.has(s.status);
+    // Qaror #24: skipped/rejected bosqich cost'i 0, lekin allocation (paid) SAQLANADI.
+    // Bosqichni ro'yxatdan O'CHIRMA — allocation orphan bo'lib to'lov yo'qoladi (ghost-tuzoq).
+    const cost = excludedFromDebt ? 0 : Number(s.cost);
     const paid = paidByStage.get(s.id) ?? 0;
     return {
       stageId: s.id,
       serviceName: s.serviceName,
       cost,
       paid,
-      remaining: cost - paid,
+      remaining: cost - paid, // skipped: 0 − paid = manfiy (kredit)
+      excludedFromDebt,
     };
   });
 

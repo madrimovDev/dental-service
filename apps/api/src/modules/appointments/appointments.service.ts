@@ -1,5 +1,5 @@
 import { appointments, roles, userAssignments, users } from '@dental/db-schema';
-import { and, asc, between, eq, gte, lt, lte, ne, sql } from 'drizzle-orm';
+import { and, asc, between, eq, gt, gte, lt, lte, ne, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
@@ -13,6 +13,7 @@ import type {
 export const createAppointmentsService = (deps: {
   audit: AuditLogger;
   enqueueReminder?: (tenantId: string, appointmentId: string, delayMs: number) => Promise<void>;
+  removeReminder?: (appointmentId: string) => Promise<void>;
 }) => {
   async function checkConflict(
     c: Context,
@@ -25,9 +26,11 @@ export const createAppointmentsService = (deps: {
     const filters = [
       eq(appointments.doctorId, doctorId),
       ne(appointments.status, 'cancelled' as const),
-      // Overlap: existing.start < new.end AND existing.end > new.start
+      // Yarim-ochiq [start, end): existing.start < new.end AND existing.end > new.start.
+      // `gt` (gte EMAS) — back-to-back (oldingi 11:00 tugaydi, yangi 11:00 boshlanadi)
+      // konflikt EMAS.
       lt(appointments.startTime, end),
-      gte(appointments.endTime, start),
+      gt(appointments.endTime, start),
     ];
     if (excludeId) filters.push(ne(appointments.id, excludeId));
 
@@ -153,6 +156,20 @@ export const createAppointmentsService = (deps: {
         before,
         after: updated,
       });
+
+      // Reschedule eslatma hayot-sikli (CLI-186): startTime o'zgarsa, eski
+      // (eski vaqtli) job'ni o'chir, keyin yangi delay > 0 bo'lsa qayta enqueue.
+      // BullMQ jobId bo'yicha dedupe qiladi — `add` qayta yozMAYDI, shuning uchun
+      // `remove` MAJBURIY. Yangi vaqt o'tgan/lead ichida → faqat o'chir (delay null).
+      // Doktor-only o'zgarish re-enqueue talab qilmaydi (worker doctorId'ni live o'qiydi).
+      if (input.startTime) {
+        const tenantId = c.get('activeTenantId');
+        if (tenantId) {
+          await deps.removeReminder?.(id);
+          const delay = reminderDelayMs(new Date(updated.startTime), new Date());
+          if (delay != null) await deps.enqueueReminder?.(tenantId, id, delay);
+        }
+      }
     }
     return { ok: true as const, appointment: updated };
   }

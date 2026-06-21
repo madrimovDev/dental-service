@@ -1,16 +1,33 @@
 import { toothCharts, toothStates } from '@dental/db-schema';
-import { desc, eq, sql } from 'drizzle-orm';
+import { desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../../db/scoped.ts';
 
 export const createToothChartsRepository = () => {
+  /**
+   * CLI-191: barcha snapshot'lar states bilan (1 IN-query, N+1 yo'q — CLI-114 precedenti).
+   * UI tarix ko'rgichi har snapshot'ning to'liq holatini ko'rsatadi.
+   */
   async function list(c: Context, patientId: string) {
     const db = getDb(c);
-    return db
+    const charts = await db
       .select()
       .from(toothCharts)
       .where(eq(toothCharts.patientId, patientId))
       .orderBy(desc(toothCharts.createdAt));
+    if (charts.length === 0) return [];
+    const chartIds = charts.map((ch) => ch.id);
+    const states = await db
+      .select()
+      .from(toothStates)
+      .where(inArray(toothStates.toothChartId, chartIds));
+    const byChart = new Map<string, (typeof states)[number][]>();
+    for (const s of states) {
+      const bucket = byChart.get(s.toothChartId);
+      if (bucket) bucket.push(s);
+      else byChart.set(s.toothChartId, [s]);
+    }
+    return charts.map((ch) => ({ ...ch, states: byChart.get(ch.id) ?? [] }));
   }
 
   async function getLatestWithStates(c: Context, patientId: string) {

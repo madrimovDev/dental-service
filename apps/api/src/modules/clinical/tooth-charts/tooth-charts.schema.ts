@@ -16,6 +16,23 @@ const TOOTH_STATE = z.enum([
   'veneer',
 ]);
 
+// ─── FDI tish raqamlash validatsiyasi ─────────────────────────────────────────
+
+/**
+ * FDI (ISO 3950) ikki xonali tish raqami amal qiladimi.
+ * Doimiy: 11-18, 21-28, 31-38, 41-48 (kvadrant 1-4, tish 1-8).
+ * Sut: 51-55, 61-65, 71-75, 81-85 (kvadrant 5-8, tish 1-5).
+ * `19/29/49/56/66...` kabi raqamlar yaroqsiz.
+ */
+export function isValidFdi(n: number): boolean {
+  if (!Number.isInteger(n)) return false;
+  const quadrant = Math.floor(n / 10);
+  const tooth = n % 10;
+  if (quadrant >= 1 && quadrant <= 4) return tooth >= 1 && tooth <= 8; // doimiy
+  if (quadrant >= 5 && quadrant <= 8) return tooth >= 1 && tooth <= 5; // sut
+  return false;
+}
+
 // ─── Input DTOs ───────────────────────────────────────────────────────────────
 
 export const createToothChartSchema = z.object({
@@ -26,7 +43,10 @@ export const createToothChartSchema = z.object({
   states: z
     .array(
       z.object({
-        toothNumber: z.coerce.number().int().min(11).max(85),
+        toothNumber: z.coerce
+          .number()
+          .int()
+          .refine(isValidFdi, { message: 'Invalid FDI tooth number' }),
         surface: TOOTH_SURFACE.default('whole'),
         state: TOOTH_STATE,
         diagnosisId: z.uuid().optional(),
