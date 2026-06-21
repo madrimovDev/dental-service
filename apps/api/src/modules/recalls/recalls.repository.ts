@@ -1,0 +1,158 @@
+import { patients, type RecallInsert, recalls } from '@dental/db-schema';
+import { and, desc, eq, inArray, lte, sql } from 'drizzle-orm';
+import type { Context } from 'hono';
+import { getDb } from '../../db/scoped.ts';
+import type { RecallWithPatient } from './recalls.mapper.ts';
+import type { ListRecallsQuery } from './recalls.schema.ts';
+
+/** Patient join bilan recall select — DTO uchun nom/telefon kerak. */
+const recallWithPatientSelect = {
+  recall: recalls,
+  patientName: patients.fullName,
+  patientPhone: patients.phone,
+};
+
+const joinRow = (r: {
+  recall: typeof recalls.$inferSelect;
+  patientName: string;
+  patientPhone: string | null;
+}): RecallWithPatient => ({
+  ...r.recall,
+  patientName: r.patientName,
+  patientPhone: r.patientPhone,
+});
+
+export const createRecallsRepository = () => {
+  /** Dashboard list — RLS tenant'ni filtrlaydi. Default: pending + due bugun yoki oldin. */
+  async function list(c: Context, query: ListRecallsQuery): Promise<RecallWithPatient[]> {
+    const db = getDb(c);
+    const filters = [];
+    // Default sana — bugungacha (klinika-local kun string'i route'da beriladi).
+    if (query.date) filters.push(lte(recalls.dueDate, query.date));
+    filters.push(query.status ? eq(recalls.status, query.status) : eq(recalls.status, 'pending'));
+    if (query.branchId) filters.push(eq(recalls.branchId, query.branchId));
+
+    const rows = await db
+      .select(recallWithPatientSelect)
+      .from(recalls)
+      .innerJoin(patients, eq(patients.id, recalls.patientId))
+      .where(and(...filters))
+      .orderBy(recalls.dueDate, desc(recalls.createdAt));
+    return rows.map(joinRow);
+  }
+
+  /** Bemor bo'yicha barcha recall'lar (holatdan qat'i nazar). */
+  async function listByPatient(c: Context, patientId: string): Promise<RecallWithPatient[]> {
+    const db = getDb(c);
+    const rows = await db
+      .select(recallWithPatientSelect)
+      .from(recalls)
+      .innerJoin(patients, eq(patients.id, recalls.patientId))
+      .where(eq(recalls.patientId, patientId))
+      .orderBy(desc(recalls.dueDate));
+    return rows.map(joinRow);
+  }
+
+  async function findById(c: Context, id: string): Promise<RecallWithPatient | null> {
+    const db = getDb(c);
+    const [row] = await db
+      .select(recallWithPatientSelect)
+      .from(recalls)
+      .innerJoin(patients, eq(patients.id, recalls.patientId))
+      .where(eq(recalls.id, id))
+      .limit(1);
+    return row ? joinRow(row) : null;
+  }
+
+  async function insert(c: Context, values: RecallInsert): Promise<RecallWithPatient | null> {
+    const db = getDb(c);
+    const [row] = await db.insert(recalls).values(values).returning();
+    if (!row) return null;
+    return findById(c, row.id);
+  }
+
+  /**
+   * Idempotent auto-create (B4). Partial unique index `(patientId, sourceStageId)
+   * WHERE status in (pending,contacted)` bo'yicha conflict → DO NOTHING.
+   * ⚠️ `targetWhere` index predikatiga AYNAN mos bo'lishi shart (qisman index
+   * inference uchun). NULL sourceStageId NULL'lar distinct → bu yo'l dedupe
+   * QILMAYDI; preventive yo'li service'da transition + open-check bilan gate'lanadi.
+   * Yaratilgan bo'lsa true, conflict (skip) bo'lsa false.
+   */
+  async function insertIfAbsent(c: Context, values: RecallInsert): Promise<boolean> {
+    const db = getDb(c);
+    const inserted = await db
+      .insert(recalls)
+      .values(values)
+      .onConflictDoNothing({
+        target: [recalls.patientId, recalls.sourceStageId],
+        // Qisman index predikati — index `WHERE`'iga AYNAN mos bo'lishi shart.
+        where: sql`status in ('pending', 'contacted')`,
+      })
+      .returning({ id: recalls.id });
+    return inserted.length > 0;
+  }
+
+  /** Bemorda berilgan reason bo'yicha ochiq recall bormi (preventive dedupe, B4). */
+  async function hasOpenByReason(
+    c: Context,
+    patientId: string,
+    reason: RecallInsert['reason'],
+  ): Promise<boolean> {
+    const db = getDb(c);
+    const [row] = await db
+      .select({ id: recalls.id })
+      .from(recalls)
+      .where(
+        and(
+          eq(recalls.patientId, patientId),
+          eq(recalls.reason, reason),
+          inArray(recalls.status, ['pending', 'contacted']),
+        ),
+      )
+      .limit(1);
+    return !!row;
+  }
+
+  /** Bemorning ochiq (pending/contacted) recall'larini topadi (rebook-close, B5). */
+  async function findOpenByPatient(
+    c: Context,
+    patientId: string,
+  ): Promise<(typeof recalls.$inferSelect)[]> {
+    const db = getDb(c);
+    return db
+      .select()
+      .from(recalls)
+      .where(
+        and(eq(recalls.patientId, patientId), inArray(recalls.status, ['pending', 'contacted'])),
+      );
+  }
+
+  async function update(
+    c: Context,
+    id: string,
+    patch: Partial<typeof recalls.$inferSelect>,
+  ): Promise<RecallWithPatient | null> {
+    const db = getDb(c);
+    const [row] = await db
+      .update(recalls)
+      .set({ ...patch, updatedAt: new Date() })
+      .where(eq(recalls.id, id))
+      .returning();
+    if (!row) return null;
+    return findById(c, row.id);
+  }
+
+  return {
+    list,
+    listByPatient,
+    findById,
+    insert,
+    insertIfAbsent,
+    hasOpenByReason,
+    findOpenByPatient,
+    update,
+  };
+};
+
+export type RecallsRepository = ReturnType<typeof createRecallsRepository>;

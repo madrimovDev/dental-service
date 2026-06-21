@@ -25,6 +25,7 @@ import { payrollRoutes } from './modules/payroll/index.ts';
 import { permissionRoutes } from './modules/permissions/index.ts';
 import { prescriptionsRoutes } from './modules/prescriptions/index.ts';
 import { queueRoutes } from './modules/queue/index.ts';
+import { recallRoutes } from './modules/recalls/index.ts';
 import { reportsRoutes } from './modules/reports/index.ts';
 import { roleRoutes } from './modules/roles/index.ts';
 import { createScheduleService, scheduleRoutes } from './modules/schedule/index.ts';
@@ -98,6 +99,8 @@ export const createApp = () => {
   app.route('/api/appointments', appointmentRoutes({ db, audit, schedule }));
   app.route('/api/schedule', scheduleRoutes({ db, audit }));
   app.route('/api/queue', queueRoutes({ db, audit }));
+  // Epic B: recall / revisit (qayta chaqirish).
+  app.route('/api/recalls', recallRoutes({ db, audit }));
   // Clinical: /api/diagnoses, /api/treatment-plans, /api/visit-notes, /api/tooth-charts
   app.route('/api', clinicalRoutes({ db, audit }));
   // M5 clinical extras
