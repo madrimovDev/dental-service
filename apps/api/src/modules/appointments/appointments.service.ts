@@ -10,8 +10,31 @@ import type {
   UpdateAppointmentInput,
 } from './appointments.schema.ts';
 
+/**
+ * Schedule modulidan inject qilinadigan predikatlar (A6, RFC-0009 bog'liqlik
+ * yo'nalishi: appointments → schedule). Structural tip — schedule.service'ning
+ * `isWithinWorkingHours`/`isOnTimeOff` metodlari shu shaklga mos keladi.
+ */
+export type SchedulePredicates = {
+  isWithinWorkingHours: (
+    c: Context,
+    doctorId: string,
+    branchId: string,
+    start: Date,
+    end: Date,
+  ) => Promise<boolean>;
+  isOnTimeOff: (
+    c: Context,
+    doctorId: string,
+    branchId: string,
+    start: Date,
+    end: Date,
+  ) => Promise<boolean>;
+};
+
 export const createAppointmentsService = (deps: {
   audit: AuditLogger;
+  schedule?: SchedulePredicates;
   enqueueReminder?: (tenantId: string, appointmentId: string, delayMs: number) => Promise<void>;
   removeReminder?: (appointmentId: string) => Promise<void>;
 }) => {
@@ -41,6 +64,27 @@ export const createAppointmentsService = (deps: {
       .limit(1);
 
     return !!row;
+  }
+
+  /**
+   * A6 schedule guard'lari — ish-soati va time-off. Schedule dep yo'q bo'lsa
+   * `null` (tekshiruv o'tkazib yuboriladi). Buzilsa error kodi qaytaradi.
+   */
+  async function checkSchedule(
+    c: Context,
+    doctorId: string,
+    branchId: string,
+    start: Date,
+    end: Date,
+  ): Promise<'schedule.doctor_on_time_off' | 'schedule.outside_working_hours' | null> {
+    if (!deps.schedule) return null;
+    if (await deps.schedule.isOnTimeOff(c, doctorId, branchId, start, end)) {
+      return 'schedule.doctor_on_time_off';
+    }
+    if (!(await deps.schedule.isWithinWorkingHours(c, doctorId, branchId, start, end))) {
+      return 'schedule.outside_working_hours';
+    }
+    return null;
   }
 
   async function list(c: Context, query: ListAppointmentsQuery) {
@@ -87,6 +131,11 @@ export const createAppointmentsService = (deps: {
       return { ok: false as const, code: 'conflict.doctor_busy' };
     }
 
+    // A6: ish-soati + time-off guard'lari (checkConflict'dan KEYIN). Schedule
+    // dep inject qilinmagan bo'lsa o'tkazib yuboriladi (backward-safe).
+    const scheduleCheck = await checkSchedule(c, input.doctorId, input.branchId, start, end);
+    if (scheduleCheck) return { ok: false as const, code: scheduleCheck };
+
     const [appt] = await db
       .insert(appointments)
       .values({
@@ -123,13 +172,18 @@ export const createAppointmentsService = (deps: {
     const [before] = await db.select().from(appointments).where(eq(appointments.id, id));
     if (!before) return { ok: false as const, code: 'not_found' };
 
-    // Conflict check if time/doctor changing
+    // Conflict + schedule check if time/doctor/branch changing
     if (input.startTime || input.endTime || input.doctorId) {
       const start = new Date(input.startTime ?? before.startTime);
       const end = new Date(input.endTime ?? before.endTime);
       const doctor = input.doctorId ?? before.doctorId;
+      const branch = before.branchId; // branch update PATCH'da yo'q — mavjudni ishlatamiz
       const conflict = await checkConflict(c, doctor, start, end, id);
       if (conflict) return { ok: false as const, code: 'conflict.doctor_busy' };
+
+      // A6: ish-soati + time-off guard'lari (checkConflict'dan KEYIN).
+      const scheduleCheck = await checkSchedule(c, doctor, branch, start, end);
+      if (scheduleCheck) return { ok: false as const, code: scheduleCheck };
     }
 
     const patch: Record<string, unknown> = { updatedAt: new Date() };

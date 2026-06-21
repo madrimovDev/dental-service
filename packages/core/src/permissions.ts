@@ -395,6 +395,20 @@ export const PERMISSIONS = [
     descriptionUz: 'Ish haqi hisoblash (run) yaratish va yakunlash',
     descriptionRu: 'Создание и финализация расчётов заработной платы',
   },
+
+  // ===== Epic A permissions (doctor schedule / availability) =====
+  {
+    code: 'schedule.view',
+    category: 'schedule',
+    descriptionUz: "Ish jadvali, time-off va bo'sh vaqtlarni ko'rish",
+    descriptionRu: 'Просмотр графика, отгулов и доступного времени',
+  },
+  {
+    code: 'schedule.manage',
+    category: 'schedule',
+    descriptionUz: 'Ish jadvali va time-off yozuvlarini boshqarish',
+    descriptionRu: 'Управление графиком работы и отгулами',
+  },
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number]['code'];

@@ -26,6 +26,7 @@ import { prescriptionsRoutes } from './modules/prescriptions/index.ts';
 import { queueRoutes } from './modules/queue/index.ts';
 import { reportsRoutes } from './modules/reports/index.ts';
 import { roleRoutes } from './modules/roles/index.ts';
+import { createScheduleService, scheduleRoutes } from './modules/schedule/index.ts';
 import { serviceRoutes } from './modules/services/index.ts';
 import { stockRoutes } from './modules/stock/index.ts';
 import { tenantSettingsRoutes } from './modules/tenant-settings/index.ts';
@@ -83,7 +84,11 @@ export const createApp = () => {
   app.route('/api/cashier', cashierRoutes({ db, audit }));
   app.route('/api/reports', reportsRoutes({ db }));
   app.route('/api/audit', auditRoutes({ db }));
-  app.route('/api/appointments', appointmentRoutes({ db, audit }));
+  // Epic A: doktor jadvali + time-off + availability. Service'ni bir marta
+  // yaratamiz va predikatlarini appointmentRoutes'ga inject qilamiz (A6).
+  const schedule = createScheduleService({ audit });
+  app.route('/api/appointments', appointmentRoutes({ db, audit, schedule }));
+  app.route('/api/schedule', scheduleRoutes({ db, audit }));
   app.route('/api/queue', queueRoutes({ db, audit }));
   // Clinical: /api/diagnoses, /api/treatment-plans, /api/visit-notes, /api/tooth-charts
   app.route('/api', clinicalRoutes({ db, audit }));

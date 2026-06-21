@@ -17,7 +17,7 @@ import {
   listAppointmentsQuery,
   updateAppointmentSchema,
 } from './appointments.schema.ts';
-import { createAppointmentsService } from './appointments.service.ts';
+import { createAppointmentsService, type SchedulePredicates } from './appointments.service.ts';
 
 /** Standart 404 response — get / patch / cancel endpoint'lar uchun. */
 const notFoundResponse = {
@@ -27,21 +27,30 @@ const notFoundResponse = {
   },
 };
 
-/** 409 Conflict response — create / patch endpoint'lar uchun (doctor_busy). */
+/**
+ * 409 Conflict response — create / patch endpoint'lar uchun. Kodlar:
+ * `conflict.doctor_busy`, `schedule.outside_working_hours` (A6),
+ * `schedule.doctor_on_time_off` (A6).
+ */
 const conflictResponse = {
   409: {
     content: { 'application/json': { schema: errorResponseSchema } },
-    description: 'Doctor is busy (scheduling conflict)',
+    description: 'Scheduling conflict (doctor busy / outside working hours / on time-off)',
   },
 };
 
-export const appointmentRoutes = (deps: { db: Database; audit: AuditLogger }) => {
+export const appointmentRoutes = (deps: {
+  db: Database;
+  audit: AuditLogger;
+  schedule?: SchedulePredicates;
+}) => {
   const app = new OpenAPIHono();
   app.use('*', authMiddleware());
   app.use('*', rlsMiddleware(deps.db));
 
   const service = createAppointmentsService({
     audit: deps.audit,
+    schedule: deps.schedule,
     enqueueReminder: async (tenantId, appointmentId, delayMs) => {
       await reminderQueue.add(
         'appointment-reminder',
@@ -110,7 +119,12 @@ export const appointmentRoutes = (deps: { db: Database; audit: AuditLogger }) =>
     const body = c.req.valid('json');
     const result = await service.create(c, body);
     if (!result.ok) {
-      if (result.code === 'conflict.doctor_busy')
+      // Konflikt oilasi (409): doctor_busy + ish-soati/time-off guard'lari (A6).
+      if (
+        result.code === 'conflict.doctor_busy' ||
+        result.code === 'schedule.outside_working_hours' ||
+        result.code === 'schedule.doctor_on_time_off'
+      )
         return c.json(fail(result.code, result.code), 409);
       return c.json(fail(result.code, result.code), 400);
     }
@@ -181,7 +195,12 @@ export const appointmentRoutes = (deps: { db: Database; audit: AuditLogger }) =>
     const body = c.req.valid('json');
     const result = await service.update(c, id, body);
     if (!result.ok) {
-      if (result.code === 'conflict.doctor_busy')
+      // Konflikt oilasi (409): doctor_busy + ish-soati/time-off guard'lari (A6).
+      if (
+        result.code === 'conflict.doctor_busy' ||
+        result.code === 'schedule.outside_working_hours' ||
+        result.code === 'schedule.doctor_on_time_off'
+      )
         return c.json(fail(result.code, result.code), 409);
       if (result.code === 'not_found') return c.json(fail(result.code, result.code), 404);
       return c.json(fail(result.code, result.code), 400);
