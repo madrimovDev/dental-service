@@ -1,0 +1,47 @@
+# Public edge reverse proxy for dental-service (CLI-233 / D2).
+#
+# Automatic HTTPS: Caddy provisions + renews Let's Encrypt certs for {$DOMAIN}
+# on first request (ports 80/443 must be reachable + DNS pointing here). For a
+# private/staging host with no public DNS, set DOMAIN to e.g. `localhost` or use
+# the internal-CA mode by replacing the site address with `:443` + `tls internal`.
+#
+# Env (interpolated by Caddy at startup, set in docker-compose.prod.yml):
+#   DOMAIN       — public hostname, e.g. clinic.example.com
+#   ACME_EMAIL   — contact email for Let's Encrypt
+#
+# Routing model: single public host. `/api/*` → api service, everything else →
+# the web SPA static server. Because the SPA is served from the same origin, the
+# frontend can use a RELATIVE `/api` base (VITE_API_BASE_URL="") with no CORS.
+{
+	email {$ACME_EMAIL}
+	# Uncomment for staging certs while testing to avoid LE rate limits:
+	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+{$DOMAIN} {
+	encode gzip zstd
+
+	# API — preserve the /api prefix (Hono mounts routes under /api/*).
+	handle /api/* {
+		reverse_proxy api:8001
+	}
+
+	# Everything else → static SPA container (Caddyfile.web handles SPA fallback).
+	handle {
+		reverse_proxy web:80
+	}
+
+	# Security headers at the edge (defense in depth; the API also sets its own).
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

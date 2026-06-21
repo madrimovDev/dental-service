@@ -141,7 +141,10 @@ export const payrollRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     if (error === 'not_draft') {
       return c.json(fail('payroll_run.not_draft', 'Only draft runs can be finalized'), 400);
     }
-    return c.json(ok(toPayrollRunDto(run!)), 200);
+    if (!run) {
+      return c.json(fail('payroll_run.not_found', 'Payroll run not found'), 404);
+    }
+    return c.json(ok(toPayrollRunDto(run)), 200);
   });
 
   return app;

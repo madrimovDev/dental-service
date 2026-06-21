@@ -4,7 +4,10 @@ import type {
   PlanCompletionReport,
   RevenueReport,
 } from '@dental/api-client';
-import * as XLSX from 'xlsx';
+// NOTE: `xlsx` (~430 kB) is NOT imported statically — it is dynamically loaded
+// inside `downloadXlsx` so it only enters the bundle (as its own async chunk)
+// when the user actually clicks "Excel". CSV export + the toRows mappers stay
+// in the main chunk (tiny, no SheetJS). (CLI-239 / D8 bundle splitting.)
 
 // ── Pure toRows mappers (string[][]) ──────────────────────────────────────────
 // Har biri: bo'lim sarlavhasi + ustun sarlavhalari + qiymat qatorlari.
@@ -91,7 +94,9 @@ export function downloadCsv(rows: string[][], filename: string): void {
   triggerDownload(blob, filename.endsWith('.csv') ? filename : `${filename}.csv`);
 }
 
-export function downloadXlsx(rows: string[][], filename: string): void {
+export async function downloadXlsx(rows: string[][], filename: string): Promise<void> {
+  // Lazy-load SheetJS only on demand — keeps it out of the initial bundle.
+  const XLSX = await import('xlsx');
   const ws = XLSX.utils.aoa_to_sheet(rows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Report');

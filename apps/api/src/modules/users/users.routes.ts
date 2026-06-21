@@ -280,7 +280,10 @@ export const userRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     const { userId } = c.req.valid('param');
     const body = c.req.valid('json');
     const profile = await service.upsertProfile(c, userId, body);
-    return c.json(ok(toStaffProfileDto(profile!)), 200);
+    // upsert + RETURNING always yields a row; guard instead of `!` so a null
+    // surfaces as a 500 via the error handler rather than a runtime cast.
+    if (!profile) throw new Error('upsertProfile returned no row');
+    return c.json(ok(toStaffProfileDto(profile)), 200);
   });
 
   return app;

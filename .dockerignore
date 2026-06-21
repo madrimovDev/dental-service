@@ -1,0 +1,51 @@
+# Build context is the repo ROOT — keep it small + never ship secrets/junk.
+
+# Dependencies (re-installed inside the image)
+**/node_modules
+
+# VCS + tooling
+.git
+.gitignore
+.githooks
+.github
+
+# Claude Code / agent artifacts
+.claude
+.superpowers
+.playwright-mcp
+
+# Build outputs (web dist is produced inside the image)
+**/dist
+**/build
+**/.next
+**/out
+**/.turbo
+**/*.tsbuildinfo
+
+# Secrets + local env (injected at runtime, NEVER baked into an image)
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# Tests / coverage (not needed at runtime)
+**/coverage
+**/.nyc_output
+
+# Editor / OS
+.vscode
+.idea
+**/*.swp
+**/.DS_Store
+
+# Logs
+**/*.log
+
+# Docs + markdown audits (not needed in runtime images)
+*.md
+docs
+
+# Electron desktop (separate build) — keep only its manifest so the root
+# lockfile's workspace set stays complete for `bun install --frozen-lockfile`.
+apps/desktop/*
+!apps/desktop/package.json

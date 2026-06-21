@@ -50,6 +50,19 @@ export const envSchema = z
     ESKIZ_EMAIL: z.string().optional(),
     ESKIZ_PASSWORD: z.string().optional(),
 
+    // Observability (D7) — Sentry error tracking. NoOp when unset.
+    SENTRY_DSN: z.string().optional(),
+
+    // Worker process separation (D6). When the API process should ALSO run the
+    // in-process BullMQ reminder worker. Default `true` keeps dev unchanged
+    // (single `bun dev` runs everything); prod sets `false` on the api service
+    // because the dedicated `worker` process owns the queue consumer (avoids a
+    // duplicate consumer per api replica). Accepts true/false/1/0.
+    RUN_REMINDER_WORKER: z
+      .enum(['true', 'false', '1', '0'])
+      .default('true')
+      .transform((v) => v === 'true' || v === '1'),
+
     // Auth rate limiting (CLI-227) — IP+telefon bo'yicha fixed-window. Sane defaults.
     AUTH_RATE_LIMIT_WINDOW_SEC: z.coerce.number().int().positive().default(900), // 15 daqiqa
     AUTH_LOGIN_RATE_LIMIT: z.coerce.number().int().positive().default(10),

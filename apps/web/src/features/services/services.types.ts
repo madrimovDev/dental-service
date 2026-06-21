@@ -1,5 +1,3 @@
-import type { Service } from '@dental/api-client';
-
 /** Bitta xizmat qatorining view-model'i (jadval uchun). */
 export type ServiceVM = {
   id: string;

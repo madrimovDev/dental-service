@@ -5,6 +5,7 @@ import { secureHeaders } from 'hono/secure-headers';
 import { db } from './db/client.ts';
 import { createAuditLogger } from './lib/audit-logger.ts';
 import { env } from './lib/env.ts';
+import { METRICS_CONTENT_TYPE, renderMetrics } from './lib/metrics.ts';
 import { errorHandler } from './middleware/error-handler.ts';
 import { requestId } from './middleware/request-id.ts';
 import { appointmentRoutes } from './modules/appointments/index.ts';
@@ -71,6 +72,13 @@ export const createApp = () => {
   // Public routes
   app.route('/api/health', healthRoutes({ db }));
   app.route('/api/auth', authRoutes({ db }));
+
+  // Observability (CLI-238 / D7): Prometheus metrics. Public text/plain — keep
+  // on the internal network / behind edge auth. Localized append-only mount.
+  app.get('/metrics', async (c) => {
+    const body = await renderMetrics();
+    return c.text(body, 200, { 'Content-Type': METRICS_CONTENT_TYPE });
+  });
 
   // Authenticated routes (auth + RLS middleware har module ichida mount qilingan)
   app.route('/api/permissions', permissionRoutes({ db }));
