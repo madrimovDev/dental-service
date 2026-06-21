@@ -70,6 +70,10 @@ export const passwordResetRequestSchema = z.object({
 export type PasswordResetRequestInput = z.infer<typeof passwordResetRequestSchema>;
 
 export const passwordResetSchema = z.object({
+  // ⚠️ CLI-226 ATO fix: token endi FOYDALANUVCHIGA bog'langan — phone majburiy.
+  // Token userId bo'yicha topiladi (faqat hash bo'yicha global EMAS) → A foydalanuvchi
+  // kodi B foydalanuvchini reset qila olmaydi + per-user brute-force limiti ishlaydi.
+  phone,
   token: z.string().min(1),
   newPassword: password,
 });

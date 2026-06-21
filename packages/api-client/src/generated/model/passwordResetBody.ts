@@ -6,6 +6,11 @@
  */
 
 export type PasswordResetBody = {
+  /**
+   * Telefon raqami (+998 ... yoki 998... format)
+   * @pattern ^\+?\d{9,15}$
+   */
+  phone: string;
   /** @minLength 1 */
   token: string;
   /**

@@ -4414,6 +4414,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -4490,6 +4500,16 @@
           },
           "403": {
             "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
             "content": {
               "application/json": {
                 "schema": {
@@ -4892,6 +4912,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -4908,6 +4938,11 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "phone": {
+                    "type": "string",
+                    "pattern": "^\\+?\\d{9,15}$",
+                    "description": "Telefon raqami (+998 ... yoki 998... format)"
+                  },
                   "token": {
                     "type": "string",
                     "minLength": 1
@@ -4919,6 +4954,7 @@
                   }
                 },
                 "required": [
+                  "phone",
                   "token",
                   "newPassword"
                 ]
@@ -4974,6 +5010,16 @@
           },
           "403": {
             "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
             "content": {
               "application/json": {
                 "schema": {
