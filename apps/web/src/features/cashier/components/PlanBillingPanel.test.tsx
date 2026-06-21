@@ -10,8 +10,22 @@ const planBalanceMock = {
   totalPaid: 30000,
   balance: 70000,
   stages: [
-    { stageId: 'st1', serviceName: 'Plomba', cost: 40000, paid: 40000, remaining: 0 },
-    { stageId: 'st2', serviceName: 'Kanal', cost: 60000, paid: 0, remaining: 60000 },
+    {
+      stageId: 'st1',
+      serviceName: 'Plomba',
+      cost: 40000,
+      paid: 40000,
+      remaining: 0,
+      excludedFromDebt: false,
+    },
+    {
+      stageId: 'st2',
+      serviceName: 'Kanal',
+      cost: 60000,
+      paid: 0,
+      remaining: 60000,
+      excludedFromDebt: false,
+    },
   ],
 };
 

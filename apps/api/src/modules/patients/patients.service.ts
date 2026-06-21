@@ -7,7 +7,7 @@ import {
   treatmentStagePayments,
   treatmentStages,
 } from '@dental/db-schema';
-import { and, count, desc, eq, ilike, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
+import { and, count, desc, eq, ilike, inArray, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
@@ -106,6 +106,10 @@ export const createPatientsService = (deps: { audit: AuditLogger }) => {
             and(
               inArray(treatmentPlans.patientId, ids),
               inArray(treatmentPlans.status, [...DEBT_PLAN_STATUSES]),
+              // Qaror #24 (CLI-184): skipped bosqich COST'i qarzga kirmaydi.
+              // DIQQAT: faqat COST SUM filtrlangan — allocation SUM (pastda) FILTRLANMAYDI,
+              // shunda skip-after-pay to'lovi saqlanib, manfiy (kredit) balans chiqadi.
+              ne(treatmentStages.status, 'skipped'),
             ),
           )
           .groupBy(treatmentPlans.patientId),
@@ -177,6 +181,8 @@ export const createPatientsService = (deps: { audit: AuditLogger }) => {
         and(
           eq(treatmentPlans.patientId, patientId),
           inArray(treatmentPlans.status, [...DEBT_PLAN_STATUSES]),
+          // Qaror #24 (CLI-184): skipped bosqich COST'i qarzga kirmaydi (allocation FILTRLANMAYDI).
+          ne(treatmentStages.status, 'skipped'),
         ),
       );
 

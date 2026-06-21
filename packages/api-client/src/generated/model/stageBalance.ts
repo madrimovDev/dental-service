@@ -11,4 +11,5 @@ export interface StageBalance {
   cost: number;
   paid: number;
   remaining: number;
+  excludedFromDebt: boolean;
 }
