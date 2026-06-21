@@ -14,6 +14,7 @@ import {
   deletePatientImage,
   getLatestToothChart,
   getService,
+  getTreatmentPlanEstimate,
   type LabOrderStatus,
   listAppointments,
   listConsentForms,
@@ -28,12 +29,19 @@ import {
   listVisitNotes,
   type ServiceWithPrices,
   type SignFormInput,
+  type SignTreatmentPlanConsentBody,
   signConsentForm,
+  signTreatmentPlanConsent,
+  type TreatmentStageAcceptance,
   type TreatmentStageStatus,
+  type UpdateTreatmentPlanBodyStatus,
   updateLabOrder,
+  updateTreatmentPlan,
   updateTreatmentStage,
 } from '@dental/api-client';
 import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { cashierKeys } from '@/features/cashier/cashier.keys.ts';
+import { patientKeys } from '@/features/patients/patients.keys.ts';
 import { api } from '@/lib/api.ts';
 import { lookupKeys } from '@/lib/lookup-keys.ts';
 import { clinicalKeys } from './clinical.keys';
@@ -108,11 +116,83 @@ export function useUpdateStage(patientId: string) {
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: TreatmentStageStatus }) =>
       updateTreatmentStage(id, { status }).then((r) => r.data),
-    onSuccess: () => {
-      // CLI-114: stage'lar list javobida — plans'ni invalidatsiya qilish yetarli.
-      void qc.invalidateQueries({ queryKey: clinicalKeys.plans(patientId) });
+    onSuccess: () => invalidatePlanFinancials(qc, patientId),
+  });
+}
+
+// CLI-223/224: smeta (estimate) — bemorga taqdim qilish + balans yakuniy manbasi.
+export function useTreatmentPlanEstimate(planId: string, enabled = true) {
+  return useQuery({
+    queryKey: clinicalKeys.planEstimate(planId),
+    queryFn: () => getTreatmentPlanEstimate(planId).then((r) => r.data),
+    enabled,
+  });
+}
+
+/**
+ * CLI-224: bosqich qabul/rad qilish (acceptance — status'dan alohida o'q).
+ * Qabul qilingach bosqich qarzga kiradi (Qaror #24/#25) → smeta + balanslarni yangilaymiz.
+ * Plan-estimate keshini ham bekor qilamiz; planId stage javobidan olinadi.
+ */
+export function useUpdateStageAcceptance(patientId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, acceptance }: { id: string; acceptance: TreatmentStageAcceptance }) =>
+      updateTreatmentStage(id, { acceptance }).then((r) => r.data),
+    onSuccess: (stage) => {
+      invalidatePlanFinancials(qc, patientId);
+      void qc.invalidateQueries({ queryKey: clinicalKeys.planEstimate(stage.treatmentPlanId) });
     },
   });
+}
+
+/**
+ * CLI-224: "Hammasini qabul qilish" — keng tarqalgan holat (bemor butun rejaga rozi).
+ * Faqat `proposed` bosqichlar yuboriladi (guard 400 oldini olish). allSettled — qisman
+ * muvaffaqiyat ham bekor qilishni triggerlaydi; chaqiruvchi rad etilganlarni xabar beradi.
+ */
+export function useAcceptAllStages(patientId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (stageIds: string[]) => {
+      const results = await Promise.allSettled(
+        stageIds.map((id) => updateTreatmentStage(id, { acceptance: 'accepted' })),
+      );
+      const rejected = results.filter((r) => r.status === 'rejected').length;
+      return { total: stageIds.length, rejected };
+    },
+    onSuccess: () => invalidatePlanFinancials(qc, patientId),
+  });
+}
+
+/** CLI-224: reja status o'tishi (presented/accepted/...); accept consent'ga bog'liq (guard 400). */
+export function useUpdatePlanStatus(patientId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: UpdateTreatmentPlanBodyStatus }) =>
+      updateTreatmentPlan(id, { status }).then((r) => r.data),
+    onSuccess: () => invalidatePlanFinancials(qc, patientId),
+  });
+}
+
+/** CLI-224: reja rozilik (consent) imzosi — present→accept'ni ochadi. */
+export function useSignPlanConsent(patientId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: SignTreatmentPlanConsentBody }) =>
+      signTreatmentPlanConsent(id, body).then((r) => r.data),
+    onSuccess: () => invalidatePlanFinancials(qc, patientId),
+  });
+}
+
+/**
+ * Reja moliyaviy ko'rinishini bekor qiladi: plan list (stage'lar nested) + bemor balansi
+ * (boshqa feature, faqat kalit massivi → scope'da) + kassa reja balansi.
+ */
+function invalidatePlanFinancials(qc: QueryClient, patientId: string) {
+  void qc.invalidateQueries({ queryKey: clinicalKeys.plans(patientId) });
+  void qc.invalidateQueries({ queryKey: patientKeys.balance(patientId) });
+  void qc.invalidateQueries({ queryKey: cashierKeys.all });
 }
 
 // ===== A: visit notes =====

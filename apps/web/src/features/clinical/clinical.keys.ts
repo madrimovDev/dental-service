@@ -8,6 +8,7 @@ export const clinicalKeys = {
   // A — treatment plans
   plans: (patientId: string) => ['clinical', 'plans', patientId] as const,
   planDetail: (planId: string) => ['clinical', 'plan-detail', planId] as const,
+  planEstimate: (planId: string) => ['clinical', 'plan-estimate', planId] as const,
   // A — visit notes
   visitNotes: (patientId: string) => ['clinical', 'visit-notes', patientId] as const,
   diagnoses: () => ['clinical', 'diagnoses'] as const,

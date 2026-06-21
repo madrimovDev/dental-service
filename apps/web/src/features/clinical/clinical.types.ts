@@ -8,6 +8,7 @@ import type {
   ToothState,
   ToothSurface,
   TreatmentPlanStatus,
+  TreatmentStageAcceptance,
   TreatmentStageStatus,
 } from '@dental/api-client';
 import type { StatusPillProps } from '@dental/ui';
@@ -45,6 +46,33 @@ export type StageRowVM = {
   status: TreatmentStageStatus;
   statusTone: Tone;
   statusLabelKey: string;
+  acceptance: TreatmentStageAcceptance;
+  acceptanceTone: Tone;
+  acceptanceLabelKey: string;
+};
+
+// ===== A: Treatment plan estimate (smeta — CLI-223/224) =====
+export type EstimateStageVM = {
+  id: string;
+  serviceName: string;
+  costText: string;
+  statusLabelKey: string;
+  statusTone: Tone;
+  acceptanceLabelKey: string;
+  acceptanceTone: Tone;
+  paidText: string;
+  debtEligible: boolean;
+};
+
+export type EstimateVM = {
+  planId: string;
+  stages: EstimateStageVM[];
+  totalProposedText: string;
+  totalAcceptedText: string;
+  totalCostText: string;
+  totalPaidText: string;
+  balanceText: string;
+  balance: number;
 };
 
 // ===== A: Visit note =====

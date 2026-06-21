@@ -11,14 +11,19 @@ import type {
   ToothChartWithStates,
   ToothSurface,
   TreatmentPlan,
+  TreatmentPlanEstimate,
   TreatmentPlanStatus,
   TreatmentStage,
+  TreatmentStageAcceptance,
   TreatmentStageStatus,
   VisitNote,
 } from '@dental/api-client';
+import { formatNumber } from '@/lib/format.ts';
 import type {
   ConsentFormVM,
   DiagnosisOptionVM,
+  EstimateStageVM,
+  EstimateVM,
   LabOrderVM,
   PatientImageVM,
   PlanCardVM,
@@ -139,6 +144,15 @@ const STAGE_TONE: Record<TreatmentStageStatus, Tone> = {
   skipped: 'danger',
 };
 
+// CLI-224: acceptance — status'dan alohida o'q (qabul = qarzga kiradi).
+const ACCEPTANCE_TONE: Record<TreatmentStageAcceptance, Tone> = {
+  proposed: 'info',
+  accepted: 'success',
+  rejected: 'danger',
+};
+
+export const stageAcceptanceToTone = (a: TreatmentStageAcceptance): Tone => ACCEPTANCE_TONE[a];
+
 /**
  * CLI-188: tanlangan filial uchun amaldagi xizmat narxini topadi (sof).
  * `validTo === null` (joriy amaldagi) + `branchId` mos qator; bir nechta active
@@ -179,6 +193,37 @@ export function toStageRowVM(stage: TreatmentStage): StageRowVM {
     status: stage.status,
     statusTone: STAGE_TONE[stage.status],
     statusLabelKey: `treatment_plan.stage_status_${stage.status}`,
+    acceptance: stage.acceptance,
+    acceptanceTone: ACCEPTANCE_TONE[stage.acceptance],
+    acceptanceLabelKey: `treatment_plan.acceptance_${stage.acceptance}`,
+  };
+}
+
+// ===== A: treatment plan estimate (smeta — CLI-223/224) =====
+function toEstimateStageVM(stage: TreatmentPlanEstimate['stages'][number]): EstimateStageVM {
+  return {
+    id: stage.stageId,
+    serviceName: stage.serviceName,
+    costText: formatNumber(stage.cost),
+    statusLabelKey: `treatment_plan.stage_status_${stage.status}`,
+    statusTone: STAGE_TONE[stage.status],
+    acceptanceLabelKey: `treatment_plan.acceptance_${stage.acceptance}`,
+    acceptanceTone: ACCEPTANCE_TONE[stage.acceptance],
+    paidText: formatNumber(stage.paid),
+    debtEligible: stage.debtEligible,
+  };
+}
+
+export function toEstimateVM(est: TreatmentPlanEstimate): EstimateVM {
+  return {
+    planId: est.planId,
+    stages: est.stages.map(toEstimateStageVM),
+    totalProposedText: formatNumber(est.totalProposed),
+    totalAcceptedText: formatNumber(est.totalAccepted),
+    totalCostText: formatNumber(est.totalCost),
+    totalPaidText: formatNumber(est.totalPaid),
+    balanceText: formatNumber(est.balance),
+    balance: est.balance,
   };
 }
 
