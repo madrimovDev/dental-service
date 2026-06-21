@@ -6,14 +6,16 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { env } from '../lib/env.ts';
 
-const queryClient = postgres(env.DATABASE_URL, {
+// Exported so graceful shutdown (index.ts / worker.ts) can drain the pool with
+// `dbClient.end()` on SIGTERM/SIGINT.
+export const dbClient = postgres(env.DATABASE_URL, {
   // M1 da multi-tenant RLS uchun transaction-per-request middleware ishlatamiz
   // Bu yerda default pool, request-level transaction o'rnatadi.
   max: 20,
   idle_timeout: 30,
 });
 
-export const db = drizzle(queryClient, { schema });
+export const db = drizzle(dbClient, { schema });
 
 /** Top-level Database (pool connection) */
 export type Database = typeof db;
