@@ -25,6 +25,14 @@ const notFoundResponse = {
   },
 };
 
+/** Bemor telefoni masklansinmi — `patient.view_pii` (yoki @owner) yo'q bo'lsa HA (patients moduli bilan izchil). */
+const shouldMaskPii = (c: {
+  get: (k: 'accessClaims') => { perms?: string[] } | undefined;
+}): boolean => {
+  const perms = c.get('accessClaims')?.perms ?? [];
+  return !(perms.includes('@owner') || perms.includes('patient.view_pii'));
+};
+
 export const recallRoutes = (deps: { db: Database; audit: AuditLogger }) => {
   const app = new OpenAPIHono();
   app.use('*', authMiddleware());
@@ -45,7 +53,8 @@ export const recallRoutes = (deps: { db: Database; audit: AuditLogger }) => {
   app.openapi(listRoute, async (c) => {
     const query = c.req.valid('query');
     const rows = await service.list(c, query);
-    return c.json(ok(rows.map(toRecallDto)), 200);
+    const mask = shouldMaskPii(c);
+    return c.json(ok(rows.map((r) => toRecallDto(r, mask))), 200);
   });
 
   // ─── GET /recalls/patient/{id} ─────────────────────────────────────────────
@@ -61,7 +70,8 @@ export const recallRoutes = (deps: { db: Database; audit: AuditLogger }) => {
   app.openapi(listByPatientRoute, async (c) => {
     const { id } = c.req.valid('param');
     const rows = await service.listByPatient(c, id);
-    return c.json(ok(rows.map(toRecallDto)), 200);
+    const mask = shouldMaskPii(c);
+    return c.json(ok(rows.map((r) => toRecallDto(r, mask))), 200);
   });
 
   // ─── POST /recalls (manual create) ─────────────────────────────────────────
@@ -87,7 +97,7 @@ export const recallRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     const body = c.req.valid('json');
     const created = await service.create(c, body);
     if (!created) return c.json(fail('insert.failed', 'insert.failed'), 400);
-    return c.json(ok(toRecallDto(created)), 201);
+    return c.json(ok(toRecallDto(created, shouldMaskPii(c))), 201);
   });
 
   // ─── PATCH /recalls/{id} ───────────────────────────────────────────────────
@@ -108,7 +118,7 @@ export const recallRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     const body = c.req.valid('json');
     const updated = await service.update(c, id, body);
     if (!updated) return c.json(fail('not_found', 'not_found'), 404);
-    return c.json(ok(toRecallDto(updated)), 200);
+    return c.json(ok(toRecallDto(updated, shouldMaskPii(c))), 200);
   });
 
   // ─── POST /recalls/{id}/contact (mark contacted manually) ──────────────────
@@ -129,7 +139,7 @@ export const recallRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     const body = c.req.valid('json');
     const updated = await service.markContacted(c, id, body);
     if (!updated) return c.json(fail('not_found', 'not_found'), 404);
-    return c.json(ok(toRecallDto(updated)), 200);
+    return c.json(ok(toRecallDto(updated, shouldMaskPii(c))), 200);
   });
 
   return app;
