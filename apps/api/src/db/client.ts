@@ -20,6 +20,27 @@ export const db = drizzle(dbClient, { schema });
 /** Top-level Database (pool connection) */
 export type Database = typeof db;
 
+/**
+ * Admin (superuser) connection — RLS BYPASS (Qaror #23, RFC-0011 §2.2). Faqat
+ * cross-tenant scan kerak bo'lgan joyda ishlatiladi (recall worker). Tenant
+ * context o'rnatilmagani uchun app `db` (FORCE RLS) bu yerda 0 row ko'radi.
+ *
+ * ⚠️ `DATABASE_URL`'ga FALLBACK QILMAYDI (migrate.ts'dan farqli) — app URL
+ * non-superuser bo'lib RLS'ni majburlaydi → scan jim 0 row qaytaradi. Yo'q
+ * bo'lsa BALAND ovozda fail qiladi. Lazy: chaqirilganda quriladi.
+ */
+export const createAdminDb = (): { db: Database; client: ReturnType<typeof postgres> } => {
+  const adminUrl = env.DATABASE_ADMIN_URL;
+  if (!adminUrl) {
+    throw new Error(
+      'DATABASE_ADMIN_URL is required for the recall worker (cross-tenant scan, RLS bypass). ' +
+        'It must NOT fall back to DATABASE_URL (RLS-forced → 0 rows).',
+    );
+  }
+  const client = postgres(adminUrl, { max: 5, idle_timeout: 30 });
+  return { db: drizzle(client, { schema }), client };
+};
+
 /** Transaction instance — har RLS-scoped request bunda ishlaydi */
 export type DbTransaction = PgTransaction<
   PostgresJsQueryResultHKT,
