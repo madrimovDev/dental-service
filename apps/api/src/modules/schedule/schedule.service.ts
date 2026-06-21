@@ -1,6 +1,6 @@
 import type { Context } from 'hono';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
-import { computeAvailability, weekdayOf } from './schedule.availability.ts';
+import { computeAvailability, WEEKDAY_KEYS, weekdayOf } from './schedule.availability.ts';
 import {
   toAvailabilitySlotDto,
   toTimeOffDto,
@@ -187,8 +187,19 @@ export const createScheduleService = (deps: { audit: AuditLogger }) => {
     if (endMin <= startMin || startMin < 0 || endMin > 1440) return false;
 
     const weekday = weekdayOf(dateStr);
-    const segs = await repo.listActiveSegmentsForDay(c, doctorId, branchId, weekday);
+    const [segs, workHours] = await Promise.all([
+      repo.listActiveSegmentsForDay(c, doctorId, branchId, weekday),
+      repo.getBranchWorkHours(c, branchId),
+    ]);
     if (segs.length === 0) return false;
+
+    // A3 bilan izchillik: ish-soati = intersect(branchOpen[weekday], doctor
+    // segmentlari). Filial yopiq/sozlanmagan bo'lsa — qamrov tashqarisi.
+    const branchEntry = workHours ? workHours[WEEKDAY_KEYS[weekday] ?? ''] : undefined;
+    if (!branchEntry) return false;
+    const branchStart = hhmm(branchEntry.open);
+    const branchEnd = hhmm(branchEntry.close);
+    if (startMin < branchStart || endMin > branchEnd) return false;
 
     // effective oynasi + butun [startMin,endMin) bitta segmentга sig'sa.
     return segs.some(

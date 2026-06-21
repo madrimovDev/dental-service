@@ -40,7 +40,7 @@ export type AvailabilitySlot = {
 };
 
 /** weekday key tartibi — JS getUTCDay() (0=Sun) va reports konvensiyasiga mos. */
-const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
+export const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
 
 /** "HH:mm" → daqiqa (yarim tundan). */
 function hhmmToMinutes(hhmm: string): number {

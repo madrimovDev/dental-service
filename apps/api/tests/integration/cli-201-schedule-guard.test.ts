@@ -125,6 +125,61 @@ describe('CLI-201 working-hours guard', () => {
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.code).toBe('schedule.outside_working_hours');
   });
+
+  // Consistency with A3: guard intersects branch hours too. Doctor segment is
+  // WIDER than branch open → slot inside doctor segment but outside branch hours
+  // must be rejected (mirrors availability which would show no such slot).
+  test('doctor segment ⊋ branch hours → slot outside branch hours REJECTED', async () => {
+    // WED (2026-12-09): branch open 09:00–12:00, doctor 09:00–18:00.
+    const WED = '2026-12-09';
+    await db.transaction(async (tx) => {
+      await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
+      await tx
+        .update(branches)
+        .set({
+          workHours: {
+            mon: { open: '09:00', close: '18:00' },
+            wed: { open: '09:00', close: '12:00' },
+          },
+        })
+        .where(sql`id = ${branchId}`);
+      await tx.insert(doctorSchedules).values({
+        tenantId,
+        branchId,
+        doctorId: ownerId,
+        weekday: 3, // Wednesday
+        startMinute: 540, // 09:00
+        endMinute: 1080, // 18:00 (wider than branch)
+      });
+    });
+
+    // 14:00–15:00 WED: inside doctor segment, OUTSIDE branch hours.
+    const outside = await run(tenantId, (c) =>
+      svc.create(c, {
+        branchId,
+        patientId,
+        doctorId: ownerId,
+        startTime: `${WED}T14:00:00+05:00`,
+        endTime: `${WED}T15:00:00+05:00`,
+        serviceIds: [],
+      }),
+    );
+    expect(outside.ok).toBe(false);
+    if (!outside.ok) expect(outside.code).toBe('schedule.outside_working_hours');
+
+    // 10:00–11:00 WED: inside both → OK.
+    const inside = await run(tenantId, (c) =>
+      svc.create(c, {
+        branchId,
+        patientId,
+        doctorId: ownerId,
+        startTime: `${WED}T10:00:00+05:00`,
+        endTime: `${WED}T11:00:00+05:00`,
+        serviceIds: [],
+      }),
+    );
+    expect(inside.ok).toBe(true);
+  });
 });
 
 describe('CLI-201 time-off guard', () => {
