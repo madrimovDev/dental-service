@@ -8,6 +8,8 @@ export const toothChartSnapshotSchema = z.object({
 
 // ===== A: treatment plan =====
 export const stageSchema = z.object({
+  // CLI-188: katalog xizmati tanlansa to'ldiriladi (snapshot — cost forma vaqtida olinadi).
+  serviceId: z.string().optional(),
   serviceName: z.string().min(1),
   toothNumbersText: z.string(),
   estimatedVisits: z.number().min(1),

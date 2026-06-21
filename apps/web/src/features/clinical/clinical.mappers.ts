@@ -7,6 +7,7 @@ import type {
   LabOrderStatus,
   PatientImage,
   Prescription,
+  ServicePrice,
   ToothChartWithStates,
   TreatmentPlan,
   TreatmentPlanStatus,
@@ -89,6 +90,21 @@ const STAGE_TONE: Record<TreatmentStageStatus, Tone> = {
   completed: 'success',
   skipped: 'danger',
 };
+
+/**
+ * CLI-188: tanlangan filial uchun amaldagi xizmat narxini topadi (sof).
+ * `validTo === null` (joriy amaldagi) + `branchId` mos qator; bir nechta active
+ * bo'lsa eng oxirgi `validFrom`. Topilmasa null → qo'lda kiritiladi.
+ * (Cashier'dagi `findActivePrice` bilan bir xil mantiq — dental seam'ni saqlash uchun
+ * import qilinmaydi, replikatsiya qilinadi.)
+ */
+export function findActivePrice(prices: ServicePrice[], branchId: string): number | null {
+  const active = prices
+    .filter((p) => p.branchId === branchId && p.validTo === null)
+    .sort((a, b) => b.validFrom.localeCompare(a.validFrom));
+  const top = active[0];
+  return top ? Number(top.price) : null;
+}
 
 export const planStatusToTone = (s: TreatmentPlanStatus): Tone => PLAN_TONE[s];
 export const stageStatusToTone = (s: TreatmentStageStatus): Tone => STAGE_TONE[s];
