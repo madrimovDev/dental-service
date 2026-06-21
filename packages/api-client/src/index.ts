@@ -196,6 +196,8 @@ export type {
   CreatePrescriptionBodyItemsItem,
   CreateQueueTicket201,
   CreateQueueTicketBody,
+  CreateRecall,
+  CreateRecall201,
   CreateRole201,
   CreateRoleBody,
   CreateService201,
@@ -272,10 +274,14 @@ export type {
   ListLabOrdersStatus,
   ListNotifications200,
   ListNotificationsParams,
+  ListPatientRecalls200,
   ListPayrollRuns200,
   ListPermissions200,
   ListPrescriptions200,
   ListPrescriptionsParams,
+  ListRecalls200,
+  ListRecallsParams,
+  ListRecallsStatus,
   ListRoles200,
   ListServices200,
   ListTimeOff200,
@@ -288,6 +294,8 @@ export type {
   ListVisitNotesParams,
   MarkAllNotificationsRead200,
   MarkNotificationRead200,
+  MarkRecallContacted,
+  MarkRecallContacted200,
   Notification,
   NotificationMarkAllReadResult,
   NotificationMarkReadResult,
@@ -314,6 +322,9 @@ export type {
   QueueTicket,
   QueueTicketStatus,
   QueueTicketStatus as QueueStatus,
+  RecallDto,
+  RecallDtoReason,
+  RecallDtoSource,
   ResetPasswordResponse,
   ResetUserPassword200,
   RevenueReport,
@@ -384,6 +395,8 @@ export type {
   UpdateQueueTicketStatus200,
   UpdateQueueTicketStatusBody,
   UpdateQueueTicketStatusBodyStatus,
+  UpdateRecall,
+  UpdateRecall200,
   UpdateRole200,
   UpdateRoleBody,
   UpdateService200,
@@ -413,7 +426,13 @@ export type {
   WorkingHoursSegmentDto,
 } from './generated/model/index.ts';
 // CreateTimeOffType is a runtime const enum (value export for option lists).
-export { CreateTimeOffType } from './generated/model/index.ts';
+// Recall enums are runtime const enums (value export for option/select lists).
+export {
+  CreateRecallReason,
+  CreateTimeOffType,
+  RecallDtoStatus,
+  UpdateRecallStatus,
+} from './generated/model/index.ts';
 // Generated (orval) — notifications
 export type {
   ListNotificationsResult,
@@ -509,6 +528,21 @@ export {
   getQueueToday,
   updateQueueTicketStatus,
 } from './generated/queue/queue.ts';
+// Generated (orval) — recalls
+export type {
+  CreateRecallResult,
+  ListPatientRecallsResult,
+  ListRecallsResult,
+  MarkRecallContactedResult,
+  UpdateRecallResult,
+} from './generated/recalls/recalls.ts';
+export {
+  createRecall,
+  listPatientRecalls,
+  listRecalls,
+  markRecallContacted,
+  updateRecall,
+} from './generated/recalls/recalls.ts';
 // Generated (orval) — reports
 export type {
   GetAppointmentStatsReportResult,
