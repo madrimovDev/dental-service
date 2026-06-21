@@ -106,10 +106,12 @@ export const createPatientsService = (deps: { audit: AuditLogger }) => {
             and(
               inArray(treatmentPlans.patientId, ids),
               inArray(treatmentPlans.status, [...DEBT_PLAN_STATUSES]),
-              // Qaror #24 (CLI-184): skipped bosqich COST'i qarzga kirmaydi.
+              // Qaror #24/#25 (CLI-184/221): qarz COST predikati — skipped chiqariladi
+              // VA faqat acceptance='accepted' kiradi (proposed/rejected chiqariladi).
               // DIQQAT: faqat COST SUM filtrlangan — allocation SUM (pastda) FILTRLANMAYDI,
-              // shunda skip-after-pay to'lovi saqlanib, manfiy (kredit) balans chiqadi.
+              // shunda skip/reject-after-pay to'lovi saqlanib, manfiy (kredit) balans chiqadi.
               ne(treatmentStages.status, 'skipped'),
+              eq(treatmentStages.acceptance, 'accepted'),
             ),
           )
           .groupBy(treatmentPlans.patientId),
@@ -181,8 +183,10 @@ export const createPatientsService = (deps: { audit: AuditLogger }) => {
         and(
           eq(treatmentPlans.patientId, patientId),
           inArray(treatmentPlans.status, [...DEBT_PLAN_STATUSES]),
-          // Qaror #24 (CLI-184): skipped bosqich COST'i qarzga kirmaydi (allocation FILTRLANMAYDI).
+          // Qaror #24/#25 (CLI-184/221): qarz COST predikati — skipped chiqariladi VA
+          // faqat acceptance='accepted' kiradi (allocation SUM esa FILTRLANMAYDI → kredit).
           ne(treatmentStages.status, 'skipped'),
+          eq(treatmentStages.acceptance, 'accepted'),
         ),
       );
 

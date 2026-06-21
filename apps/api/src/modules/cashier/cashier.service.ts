@@ -318,13 +318,21 @@ export const createCashierService = (deps: { audit: AuditLogger }) => {
   async function planBalance(c: Context, planId: string) {
     const db = getDb(c);
 
+    // Plan status — C4 predikatining 3-konjunkti (qarzga kiruvchi reja). RLS filtrlaydi.
+    const [plan] = await db
+      .select({ status: treatmentPlans.status })
+      .from(treatmentPlans)
+      .where(eq(treatmentPlans.id, planId));
+
     // Plan bosqichlari (RLS tenant orqali filtrlaydi — explicit WHERE tenant_id YOZILMAYDI).
+    // acceptance MAJBURIY — pure fn'ga uzatiladi (C4: faqat 'accepted' qarz cost'iga kiradi).
     const stageRows = await db
       .select({
         id: treatmentStages.id,
         serviceName: treatmentStages.serviceName,
         cost: treatmentStages.cost,
         status: treatmentStages.status,
+        acceptance: treatmentStages.acceptance,
       })
       .from(treatmentStages)
       .where(eq(treatmentStages.treatmentPlanId, planId));
@@ -339,7 +347,7 @@ export const createCashierService = (deps: { audit: AuditLogger }) => {
       .innerJoin(treatmentStages, eq(treatmentStagePayments.stageId, treatmentStages.id))
       .where(eq(treatmentStages.treatmentPlanId, planId));
 
-    return computePlanBalance(stageRows, allocRows);
+    return computePlanBalance(stageRows, allocRows, plan?.status);
   }
 
   /**

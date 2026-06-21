@@ -110,4 +110,86 @@ describe('computePlanBalance', () => {
     expect(r.balance).toBe(300000);
     expect(r.stages.find((s) => s.stageId === 's1')?.excludedFromDebt).toBe(false);
   });
+
+  // ─── CLI-221 / C4 — acceptance axis (Qaror #25). Qarz cost faqat acceptance='accepted'.
+  // ASIMMETRIYA: acceptance undefined ⇒ qarzga KIRADI (M9 fixture'lar buzilmaydi); ishlab
+  // chiqarishda rowlar doim haqiqiy enum qiymatga ega. Allocation HECH QACHON filtrlanmaydi.
+
+  it('accepted bosqich qarzga kiradi (xuddi status undefined kabi)', () => {
+    const withAcc = [
+      { id: 's1', serviceName: 'A', cost: '100000.00', acceptance: 'accepted' as const },
+    ];
+    const r = computePlanBalance(withAcc, []);
+    expect(r.totalCost).toBe(100000);
+    expect(r.stages[0]?.excludedFromDebt).toBe(false);
+  });
+
+  it('proposed bosqich qarz COST chiqariladi (hali qabul qilinmagan)', () => {
+    const withAcc = [
+      { id: 's1', serviceName: 'A', cost: '100000.00', acceptance: 'proposed' as const },
+      { id: 's2', serviceName: 'B', cost: '300000.00', acceptance: 'accepted' as const },
+    ];
+    const r = computePlanBalance(withAcc, []);
+    expect(r.totalCost).toBe(300000); // s1 (proposed) chiqarildi
+    expect(r.stages.find((s) => s.stageId === 's1')?.excludedFromDebt).toBe(true);
+    expect(r.stages.find((s) => s.stageId === 's2')?.excludedFromDebt).toBe(false);
+  });
+
+  it('rejected bosqich qarz cost chiqariladi', () => {
+    const withAcc = [
+      { id: 's1', serviceName: 'A', cost: '100000.00', acceptance: 'rejected' as const },
+    ];
+    const r = computePlanBalance(withAcc, []);
+    expect(r.totalCost).toBe(0);
+    expect(r.stages[0]?.excludedFromDebt).toBe(true);
+  });
+
+  it("reject-after-pay: rejected bosqich allocation'i SAQLANADI → kredit", () => {
+    const withAcc = [
+      { id: 's1', serviceName: 'A', cost: '100000.00', acceptance: 'rejected' as const },
+    ];
+    const r = computePlanBalance(withAcc, [{ stageId: 's1', amount: '100000.00' }]);
+    expect(r.totalCost).toBe(0); // rejected cost chiqarildi
+    expect(r.totalPaid).toBe(100000); // to'lov SAQLANDI
+    expect(r.balance).toBe(-100000); // kredit (refundga loyiq)
+    expect(r.stages[0]?.excludedFromDebt).toBe(true);
+    expect(r.stages[0]?.remaining).toBe(-100000);
+  });
+
+  it("non-debt plan status (presented) qarz COST'ni butunlay 0 qiladi", () => {
+    const withAcc = [
+      { id: 's1', serviceName: 'A', cost: '100000.00', acceptance: 'accepted' as const },
+    ];
+    // accepted bosqich, lekin plan hali presented → qarz YO'Q (3 konjunkt birgalikda).
+    const r = computePlanBalance(withAcc, [], 'presented');
+    expect(r.totalCost).toBe(0);
+    expect(r.stages[0]?.excludedFromDebt).toBe(true);
+  });
+
+  it('debt plan status (accepted) + accepted bosqich → qarz', () => {
+    const withAcc = [
+      { id: 's1', serviceName: 'A', cost: '100000.00', acceptance: 'accepted' as const },
+    ];
+    const r = computePlanBalance(withAcc, [], 'accepted');
+    expect(r.totalCost).toBe(100000);
+    expect(r.stages[0]?.excludedFromDebt).toBe(false);
+  });
+
+  it("cancelled plan reject-after-pay: cost 0, to'lov saqlanadi → kredit", () => {
+    const withAcc = [
+      { id: 's1', serviceName: 'A', cost: '100000.00', acceptance: 'accepted' as const },
+    ];
+    const r = computePlanBalance(withAcc, [{ stageId: 's1', amount: '100000.00' }], 'cancelled');
+    expect(r.totalCost).toBe(0); // cancelled plan → cost chiqarildi
+    expect(r.totalPaid).toBe(100000); // allocation saqlandi
+    expect(r.balance).toBe(-100000);
+  });
+
+  it('planStatus undefined ⇒ debt-eligible (asimmetriya saqlanadi)', () => {
+    const withAcc = [
+      { id: 's1', serviceName: 'A', cost: '100000.00', acceptance: 'accepted' as const },
+    ];
+    const r = computePlanBalance(withAcc, []); // planStatus berilmagan
+    expect(r.totalCost).toBe(100000);
+  });
 });
