@@ -780,6 +780,12 @@
     "empty": "Записей нет",
     "empty_week": "На этой неделе записей нет",
     "cancel_reason": "Причина отмены",
+    "summary_appts": "{{count}} записей",
+    "summary_doctors": "{{count}} врачей",
+    "waitlist": {
+      "title": "Лист ожидания",
+      "empty": "Лист ожидания пока пуст"
+    },
     "status": {
       "scheduled": "Запланирован",
       "confirmed": "Подтверждён",

@@ -28,11 +28,11 @@ describe('appointments.mappers — timezone + grid', () => {
     expect(localMinutes('2026-06-10T05:00:00Z')).toBe(600);
   });
 
-  it('toSlotPosition: 10:00–10:30, kun boshi 08:00, 40px/30min', () => {
-    // 10:00 = 600 min; dayStart 08:00 = 480 min; (600-480)=120 min × (40/30) = 160px top
+  it('toSlotPosition: 10:00–10:30, kun boshi 08:00, 88px/soat (Dental OS)', () => {
+    // 10:00 = 600 min; dayStart 08:00 = 480 min; (600-480)=120 min × (88/60) = 176px top
     const pos = toSlotPosition(600, 630, GRID);
-    expect(pos.top).toBe(160);
-    expect(pos.height).toBe(40); // 30 min × 40/30
+    expect(pos.top).toBe(176);
+    expect(pos.height).toBe(44); // 30 min × 88/60
   });
 
   it('assignLanes: overlap cluster lane + per-cluster laneCount', () => {
