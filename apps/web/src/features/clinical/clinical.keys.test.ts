@@ -23,7 +23,8 @@ describe('clinicalKeys', () => {
     expect(clinicalKeys.consentTemplates()).toEqual(['clinical', 'consent-templates']);
   });
 
-  it('C: images', () => {
-    expect(clinicalKeys.images('p1')).toEqual(['clinical', 'images', 'p1']);
+  it('C: images (visitNoteId ixtiyoriy — V2-6)', () => {
+    expect(clinicalKeys.images('p1')).toEqual(['clinical', 'images', 'p1', 'all']);
+    expect(clinicalKeys.images('p1', 'v1')).toEqual(['clinical', 'images', 'p1', 'v1']);
   });
 });
