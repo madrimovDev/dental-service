@@ -20,8 +20,8 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "@fontsource/ibm-plex-sans": "^5.1.0",
-    "@fontsource/ibm-plex-mono": "^5.1.0",
+    "@fontsource-variable/hanken-grotesk": "^5.0.0",
+    "@fontsource/jetbrains-mono": "^5.0.0",
     "@mantine/core": "^7.15.2",
     "@mantine/hooks": "^7.15.2",
     "@testing-library/react": "^16.1.0",
@@ -32,7 +32,7 @@
     "vitest": "^2.1.8"
   },
   "dependencies": {
-    "@fontsource/ibm-plex-sans": "^5.1.0",
-    "@fontsource/ibm-plex-mono": "^5.1.0"
+    "@fontsource-variable/hanken-grotesk": "^5.0.0",
+    "@fontsource/jetbrains-mono": "^5.0.0"
   }
 }
