@@ -1,23 +1,23 @@
-import {
-  Avatar,
-  Button,
-  Card,
-  IconButton,
-  Input,
-  Mono,
-  PageHead,
-  StateView,
-  Tag,
-} from '@dental/ui';
-import { Pagination, Switch } from '@mantine/core';
+import { Button, Card, IconButton, Input, StateView } from '@dental/ui';
+import { Pagination } from '@mantine/core';
 import { Archive, Eye, Plus, Search } from 'lucide-react';
+import type { MouseEvent } from 'react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { BalanceBadge } from '@/components/BalanceBadge';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { useArchivePatient, usePatients } from '../patients.api';
+import { BalanceChip } from './BalanceChip';
 import classes from './PatientsListScreen.module.css';
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '';
+  const first = parts[0]?.[0] ?? '';
+  if (parts.length === 1) return first.toUpperCase();
+  const last = parts[parts.length - 1]?.[0] ?? '';
+  return (first + last).toUpperCase();
+}
 
 export function PatientsListScreen() {
   const { t } = useTranslation();
@@ -29,13 +29,35 @@ export function PatientsListScreen() {
   const { data, isLoading, isError, refetch } = usePatients({ search, archived, page });
   const archiveMut = useArchivePatient();
   const items = data?.items ?? [];
+  const canCreate = hasPermission('patient.create');
+
+  const setFilter = (next: boolean) => {
+    setArchived(next);
+    setPage(1);
+  };
 
   return (
     <div>
-      <PageHead
-        title={t('patients.title')}
-        actions={
-          hasPermission('patient.create') && (
+      <div className={classes.header}>
+        <div>
+          <div className={classes.headTitle}>{t('patients.title')}</div>
+          {data && (
+            <div className={classes.headSub}>{t('patients.count', { count: data.meta.total })}</div>
+          )}
+        </div>
+        <div className={classes.headRight}>
+          <div className={classes.searchField}>
+            <Input
+              icon={<Search size={16} />}
+              placeholder={t('patients.search_placeholder')}
+              value={search}
+              onChange={(v) => {
+                setSearch(v);
+                setPage(1);
+              }}
+            />
+          </div>
+          {canCreate && (
             <Button
               variant="primary"
               iconLeft={<Plus size={16} />}
@@ -43,30 +65,27 @@ export function PatientsListScreen() {
             >
               {t('patients.create')}
             </Button>
-          )
-        }
-      />
-
-      <div className={classes.toolbar}>
-        <div className={classes.searchField}>
-          <Input
-            icon={<Search size={16} />}
-            placeholder={t('patients.search_placeholder')}
-            value={search}
-            onChange={(v) => {
-              setSearch(v);
-              setPage(1);
-            }}
-          />
+          )}
         </div>
-        <Switch
-          label={t('patients.show_archived')}
-          checked={archived}
-          onChange={(e) => {
-            setArchived(e.currentTarget.checked);
-            setPage(1);
-          }}
-        />
+      </div>
+
+      <div className={classes.pills}>
+        <button
+          type="button"
+          className={classes.pill}
+          data-active={!archived}
+          onClick={() => setFilter(false)}
+        >
+          {t('patients.filter.all')}
+        </button>
+        <button
+          type="button"
+          className={classes.pill}
+          data-active={archived}
+          onClick={() => setFilter(true)}
+        >
+          {t('patients.filter.archived')}
+        </button>
       </div>
 
       {isLoading ? (
@@ -81,37 +100,89 @@ export function PatientsListScreen() {
       ) : items.length === 0 ? (
         <StateView
           status="empty"
-          title={t('states.empty_title')}
-          description={t('patients.empty')}
+          icon={<Search size={26} />}
+          title={t('patients.empty_title')}
+          description={t('patients.empty_desc')}
+          action={
+            canCreate ? (
+              <Button
+                variant="primary"
+                iconLeft={<Plus size={16} />}
+                onClick={() => navigate('/patients/new')}
+              >
+                {t('patients.create')}
+              </Button>
+            ) : undefined
+          }
         />
       ) : (
         <Card bodyless>
+          <div className={classes.tableHead}>
+            <span>{t('patients.col.patient')}</span>
+            <span>{t('patients.col.phone')}</span>
+            <span>{t('patients.col.age_gender')}</span>
+            <span className={classes.colBalance}>{t('patients.col.balance')}</span>
+          </div>
           {items.map((p) => (
-            <div key={p.id} className={classes.row}>
-              <Avatar name={p.fullName} size="md" />
-              <div className={classes.identity}>
-                <div className={classes.name}>{p.fullName}</div>
-                {p.phone && <Mono>{p.phone}</Mono>}
+            // biome-ignore lint/a11y/useSemanticElements: grid row carries nested action buttons; a <button> cannot wrap them (invalid HTML)
+            <div
+              key={p.id}
+              className={classes.row}
+              role="button"
+              tabIndex={0}
+              onClick={() => navigate(`/patients/${p.id}`)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') navigate(`/patients/${p.id}`);
+              }}
+            >
+              <div className={classes.patientCell}>
+                <span className={classes.avatar} aria-hidden>
+                  {initials(p.fullName)}
+                </span>
+                <div className={classes.identity}>
+                  <div className={classes.nameRow}>
+                    <span className={classes.name}>{p.fullName}</span>
+                    {p.tags[0] && <span className={classes.tagPill}>{p.tags[0]}</span>}
+                  </div>
+                </div>
               </div>
-              {p.tags.map((tg) => (
-                <Tag key={tg}>{tg}</Tag>
-              ))}
-              <span title={t('patients.balance')}>
-                <BalanceBadge balance={p.balance} />
-              </span>
-              {p.age != null && <span className={classes.age}>{p.age}</span>}
-              <IconButton label={t('common.view')} onClick={() => navigate(`/patients/${p.id}`)}>
-                <Eye size={16} />
-              </IconButton>
-              {hasPermission('patient.delete') && (
-                <IconButton
-                  label={t('common.archive')}
-                  disabled={archiveMut.isPending}
-                  onClick={() => archiveMut.mutate(p.id)}
-                >
-                  <Archive size={16} />
-                </IconButton>
+
+              {p.phone ? (
+                <span className={classes.phone}>{p.phone}</span>
+              ) : (
+                <span className={classes.empty}>—</span>
               )}
+
+              <span className={classes.ageGender}>
+                {p.age != null ? `${p.age} · ${p.genderLabel}` : p.genderLabel || '—'}
+              </span>
+
+              <div className={classes.balanceCell}>
+                <BalanceChip balance={p.balance} />
+                <div className={classes.rowActions}>
+                  <IconButton
+                    label={t('common.view')}
+                    onClick={(e: MouseEvent<HTMLButtonElement>) => {
+                      e.stopPropagation();
+                      navigate(`/patients/${p.id}`);
+                    }}
+                  >
+                    <Eye size={16} />
+                  </IconButton>
+                  {hasPermission('patient.delete') && (
+                    <IconButton
+                      label={t('common.archive')}
+                      disabled={archiveMut.isPending}
+                      onClick={(e: MouseEvent<HTMLButtonElement>) => {
+                        e.stopPropagation();
+                        archiveMut.mutate(p.id);
+                      }}
+                    >
+                      <Archive size={16} />
+                    </IconButton>
+                  )}
+                </div>
+              </div>
             </div>
           ))}
         </Card>
@@ -119,10 +190,10 @@ export function PatientsListScreen() {
 
       {data && data.meta.total > data.meta.pageSize && (
         <Pagination
+          className={classes.pagination}
           total={Math.ceil(data.meta.total / data.meta.pageSize)}
           value={page}
           onChange={setPage}
-          mt="md"
         />
       )}
     </div>

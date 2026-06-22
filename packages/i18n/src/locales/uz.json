@@ -363,6 +363,21 @@
   "patients": {
     "title": "Bemorlar",
     "create": "Yangi bemor",
+    "count": "{{count}} ta bemor",
+    "filter": {
+      "all": "Barchasi",
+      "archived": "Arxiv"
+    },
+    "col": {
+      "patient": "Bemor",
+      "phone": "Telefon",
+      "age_gender": "Yosh · jins",
+      "balance": "Balans"
+    },
+    "empty_title": "Bu bo'limda bemor yo'q",
+    "empty_desc": "Boshqa filtrni tanlang yoki yangi bemor qo'shing",
+    "balance_paid": "To'langan",
+    "back_to_list": "‹ Bemorlar ro'yxati",
     "search_placeholder": "F.I.SH, telefon yoki pasport bo'yicha qidirish...",
     "show_archived": "Arxivlangan",
     "empty": "Bemorlar yo'q",
@@ -459,7 +474,16 @@
       "insurance_active": "Sug'urta faol",
       "coverage_dental": "Stomatologik",
       "coverage_general": "Umumiy",
-      "coverage_other": "Boshqa"
+      "coverage_other": "Boshqa",
+      "section_personal": "Shaxsiy ma'lumot",
+      "section_contact": "Aloqa",
+      "section_extra": "Qo'shimcha ma'lumot",
+      "sub_personal": "Bemorning asosiy shaxsiy ma'lumotlari",
+      "sub_contact": "Telefon va manzil ma'lumotlari",
+      "sub_extra": "Pasport, izoh, teglar va sug'urta",
+      "checklist_title": "To'ldirilishi shart",
+      "checklist_name": "Ism",
+      "checklist_phone": "Telefon"
     },
     "insurance_status": {
       "active": "Faol",
