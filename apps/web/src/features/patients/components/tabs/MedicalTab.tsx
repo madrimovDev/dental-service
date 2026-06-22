@@ -1,13 +1,76 @@
-import type { AllergyEntry } from '@dental/api-client';
+import type { AllergyEntry, MedicalRecordHistoryEntry } from '@dental/api-client';
 import { Button, Input, Select } from '@dental/ui';
-import { Alert, Card, Group, Paper, SimpleGrid, Stack, Text, Textarea } from '@mantine/core';
+import {
+  Accordion,
+  Alert,
+  Card,
+  Group,
+  Paper,
+  SimpleGrid,
+  Stack,
+  Text,
+  Textarea,
+} from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth-store.ts';
-import { useMedicalRecord, useUpdateMedicalRecord } from '../../patients.api';
+import {
+  useMedicalRecord,
+  useMedicalRecordHistory,
+  useUpdateMedicalRecord,
+} from '../../patients.api';
 import { medicalRecordFormSchema } from '../../patients.schema';
+
+function fmtValue(v: unknown): string {
+  if (v == null) return '—';
+  if (Array.isArray(v)) return v.length ? v.map((x) => fmtValue(x)).join(', ') : '—';
+  if (typeof v === 'object') return JSON.stringify(v);
+  return String(v);
+}
+
+function MedicalHistorySection({ patientId }: { patientId: string }) {
+  const { t, i18n } = useTranslation();
+  const historyQuery = useMedicalRecordHistory(patientId);
+  const entries: MedicalRecordHistoryEntry[] = historyQuery.data ?? [];
+
+  if (entries.length === 0) return null;
+
+  return (
+    <Paper withBorder p="md" radius="md">
+      <Text fw={600} mb="sm">
+        {t('medical.history_title')}
+      </Text>
+      <Accordion variant="separated">
+        {entries.map((e) => (
+          <Accordion.Item key={e.id} value={e.id}>
+            <Accordion.Control>
+              <Group justify="space-between" wrap="nowrap">
+                <Text size="sm">
+                  {new Date(e.changedAt).toLocaleString(i18n.language === 'ru' ? 'ru-RU' : 'uz-UZ')}
+                </Text>
+                <Text size="sm" c="dimmed">
+                  {e.changedBy?.fullName ?? '—'} · {e.changes.length} {t('medical.history_fields')}
+                </Text>
+              </Group>
+            </Accordion.Control>
+            <Accordion.Panel>
+              <Stack gap={4}>
+                {e.changes.map((ch) => (
+                  <Text key={ch.field} size="sm">
+                    <b>{String(t(`medical.${ch.field}`, { defaultValue: ch.field }))}:</b>{' '}
+                    {fmtValue(ch.before)} → {fmtValue(ch.after)}
+                  </Text>
+                ))}
+              </Stack>
+            </Accordion.Panel>
+          </Accordion.Item>
+        ))}
+      </Accordion>
+    </Paper>
+  );
+}
 
 export function MedicalTab({ patientId }: { patientId: string }) {
   const { t } = useTranslation();
@@ -204,6 +267,8 @@ export function MedicalTab({ patientId }: { patientId: string }) {
           </Stack>
         </form>
       </Paper>
+
+      <MedicalHistorySection patientId={patientId} />
     </Stack>
   );
 }

@@ -195,6 +195,23 @@ export const medicalRecordDtoSchema = z
   .openapi('MedicalRecord');
 export type MedicalRecordDto = z.infer<typeof medicalRecordDtoSchema>;
 
+/** Medical record tarix yozuvi — bitta o'zgarish + field-darajali diff (V2-7). */
+export const medicalRecordHistoryEntrySchema = z
+  .object({
+    id: z.uuid(),
+    changedAt: z.string(),
+    changedBy: z.object({ id: z.uuid(), fullName: z.string() }).nullable(),
+    changes: z.array(
+      z.object({
+        field: z.string(),
+        before: z.unknown(),
+        after: z.unknown(),
+      }),
+    ),
+  })
+  .openapi('MedicalRecordHistoryEntry');
+export type MedicalRecordHistoryEntryDto = z.infer<typeof medicalRecordHistoryEntrySchema>;
+
 /** Qarindosh ko'rinishi — har link row uchun "boshqa" bemor + yo'nalish. */
 export const patientRelativeViewSchema = z
   .object({

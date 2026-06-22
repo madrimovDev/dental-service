@@ -4,6 +4,7 @@ import {
   archivePatient,
   createPatient,
   getMedicalRecord,
+  getMedicalRecordHistory,
   getPatient,
   getPatientBalance,
   listCashierTransactions,
@@ -98,7 +99,18 @@ export function useUpdateMedicalRecord(id: string) {
   return useMutation({
     mutationFn: (body: Parameters<typeof updateMedicalRecord>[1]) =>
       updateMedicalRecord(id, body).then((r) => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: patientKeys.medical(id) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: patientKeys.medical(id) });
+      qc.invalidateQueries({ queryKey: patientKeys.medicalHistory(id) });
+    },
+  });
+}
+
+export function useMedicalRecordHistory(id: string) {
+  return useQuery({
+    queryKey: patientKeys.medicalHistory(id),
+    queryFn: () => getMedicalRecordHistory(id).then((r) => r.data),
+    enabled: !!id,
   });
 }
 

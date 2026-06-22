@@ -465,6 +465,8 @@
     "no_medical_permission": "Sizda tibbiy kartani ko'rish ruxsati yo'q"
   },
   "medical": {
+    "history_title": "O'zgarishlar tarixi",
+    "history_fields": "maydon o'zgardi",
     "anamnez": "Anamnez (umumiy salomatlik tarixi)",
     "chronic_conditions": "Surunkali kasalliklar",
     "current_medications": "Hozirgi dorilar",

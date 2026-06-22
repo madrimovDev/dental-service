@@ -9,6 +9,7 @@ import { rlsMiddleware } from '../../middleware/rls.ts';
 import {
   toEmergencyContactDto,
   toMedicalRecordDto,
+  toMedicalRecordHistoryEntry,
   toPatientDto,
   toPatientListItemDto,
   toPatientRelativeDto,
@@ -22,6 +23,7 @@ import {
   emergencyContactRemoveResultSchema,
   listQuerySchema,
   medicalRecordDtoSchema,
+  medicalRecordHistoryEntrySchema,
   patientArchiveResultSchema,
   patientBalanceSchema,
   patientDtoSchema,
@@ -253,6 +255,24 @@ export const patientRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     const row = await service.updateMedicalRecord(c, id, body);
     if (!row) return c.json(fail('medical_record.not_found', 'Medical record not found'), 404);
     return c.json(ok(toMedicalRecordDto(row)), 200);
+  });
+
+  // ─── GET /{id}/medical/history — o'zgarishlar tarixi (V2-7) ──────────────
+
+  const medicalHistoryRoute = createRoute({
+    method: 'get',
+    path: '/{id}/medical/history',
+    tags: ['patients'],
+    operationId: 'getMedicalRecordHistory',
+    middleware: [requirePermission('medical_record.view')] as const,
+    request: { params: patientIdParamSchema },
+    responses: okJson(z.array(medicalRecordHistoryEntrySchema), 'Medical record change history'),
+  });
+
+  app.openapi(medicalHistoryRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const rows = await service.medicalRecordHistory(c, id);
+    return c.json(ok(rows.map(toMedicalRecordHistoryEntry)), 200);
   });
 
   // ─── Patient relatives (oila) sub-resource ───────────────────────────────
