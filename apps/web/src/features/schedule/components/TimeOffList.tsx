@@ -2,12 +2,20 @@ import { Button, StateView } from '@dental/ui';
 import { ActionIcon, Card, Group, Modal, Stack, Text } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { Trash2 } from 'lucide-react';
+import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { useDeleteTimeOff, useTimeOff } from '../schedule.api';
 import { TimeOffForm } from './TimeOffForm';
 
 const TZ = 'Asia/Tashkent';
+
+// Dental OS chrome — time-off list karta sirti (token-driven, yangi CSS yo'q).
+const cardStyle: CSSProperties = {
+  background: 'var(--surface)',
+  borderColor: 'var(--border)',
+  borderRadius: 'var(--radius-md)',
+};
 
 /** UTC ISO → klinika-local 'DD.MM.YYYY'. */
 function dateLabel(iso: string): string {
@@ -71,7 +79,7 @@ export function TimeOffList({
       ) : (
         <Stack gap="xs">
           {(data ?? []).map((to) => (
-            <Card key={to.id} withBorder padding="sm">
+            <Card key={to.id} withBorder padding="sm" style={cardStyle}>
               <Group justify="space-between" wrap="nowrap">
                 <Stack gap={2}>
                   <Text fw={600} size="sm">

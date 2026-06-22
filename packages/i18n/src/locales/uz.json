@@ -791,6 +791,7 @@
   },
   "schedule": {
     "title": "Ish jadvali",
+    "subtitle": "Haftalik ish vaqti · mavjudlik",
     "doctor": "Shifokor",
     "branch": "Filial",
     "select_doctor": "Shifokorni tanlang",
