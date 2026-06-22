@@ -1,6 +1,13 @@
 import { Mono } from '@dental/ui';
 import { ActionIcon, Badge, Box, Button, Card, Group, Image, Stack, Text } from '@mantine/core';
-import { IconDental, IconDownload, IconFile, IconTrash, IconZoomIn } from '@tabler/icons-react';
+import {
+  IconDental,
+  IconDownload,
+  IconFile,
+  IconPhoto,
+  IconTrash,
+  IconZoomIn,
+} from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import type { PatientImageVM } from '../../clinical.types';
 
@@ -17,7 +24,12 @@ export function ImageCard({
 }) {
   const { t } = useTranslation();
   return (
-    <Card withBorder padding="sm">
+    <Card
+      withBorder
+      padding="sm"
+      radius={14}
+      style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
+    >
       <Card.Section>
         <Box
           role="button"
@@ -26,9 +38,9 @@ export function ImageCard({
           style={{
             position: 'relative',
             cursor: 'pointer',
-            aspectRatio: '1 / 1',
+            aspectRatio: '4 / 3',
             overflow: 'hidden',
-            background: 'var(--mantine-color-gray-1)',
+            background: 'var(--surface-2)',
           }}
           onClick={onPreview}
           onKeyDown={(e) => {
@@ -41,12 +53,25 @@ export function ImageCard({
           {vm.isImage ? (
             <Image src={vm.url} alt={vm.displayTitle} height="100%" fit="cover" />
           ) : (
-            <Stack align="center" justify="center" h="100%">
-              <IconFile size={32} />
-              <Text size="xs" c="dimmed">
+            <Stack align="center" justify="center" h="100%" gap={6}>
+              <IconFile size={32} style={{ color: 'var(--ink-3)' }} />
+              <Text fz={12} c="dimmed">
                 {vm.contentType}
               </Text>
             </Stack>
+          )}
+          {vm.isImage && (
+            <IconPhoto
+              size={14}
+              aria-hidden
+              style={{
+                position: 'absolute',
+                top: 8,
+                left: 8,
+                color: 'var(--on-primary)',
+                opacity: 0.85,
+              }}
+            />
           )}
           <ActionIcon
             component="div"
@@ -67,7 +92,7 @@ export function ImageCard({
           </Badge>
           <Mono>{vm.sizeLabel}</Mono>
         </Group>
-        <Text size="sm" fw={500} truncate>
+        <Text fz={12} fw={500} truncate style={{ color: 'var(--ink)' }}>
           {vm.displayTitle}
         </Text>
         {vm.toothNumbers.length > 0 && (

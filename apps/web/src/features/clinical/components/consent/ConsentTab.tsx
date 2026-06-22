@@ -1,8 +1,7 @@
 import type { ConsentTemplate, ConsentType } from '@dental/api-client';
-import { Mono, StateView, Tag } from '@dental/ui';
+import { Card, Mono, StateView, Tag } from '@dental/ui';
 import {
   Button,
-  Card,
   Group,
   Modal,
   Select,
@@ -158,19 +157,23 @@ export function ConsentTab({ patientId }: Props) {
         <StateView status="empty" title={t('consent.empty')} />
       ) : (
         formsQuery.data?.map(toConsentFormVM).map((vm) => (
-          <Card key={vm.id} withBorder padding="md">
-            <Stack gap="xs">
-              <Group justify="space-between">
-                <Group gap={6}>
-                  <IconFileText size={16} />
-                  <Text fw={700}>{vm.title}</Text>
-                </Group>
-                <Group gap="xs">
-                  <Tag>{t(vm.typeLabelKey)}</Tag>
-                  <Mono>{vm.languageUpper}</Mono>
-                </Group>
+          <Card
+            key={vm.id}
+            title={
+              <Group gap={6}>
+                <IconFileText size={16} />
+                <Text fw={700}>{vm.title}</Text>
               </Group>
-              <Text size="xs" c="dimmed">
+            }
+            actions={
+              <>
+                <Tag>{t(vm.typeLabelKey)}</Tag>
+                <Mono>{vm.languageUpper}</Mono>
+              </>
+            }
+          >
+            <Stack gap="xs">
+              <Text style={{ fontSize: '11.5px', color: 'var(--ink-3)' }}>
                 {t('consent.signed_at')}: {vm.signedAtText}
                 {vm.signerName && ` — ${vm.signerName}`}
               </Text>

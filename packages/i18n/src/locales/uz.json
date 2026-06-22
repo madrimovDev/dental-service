@@ -474,6 +474,8 @@
       "other": "Boshqa"
     },
     "severe_allergy_warning": "DIQQAT — anestetik allergiyasi!",
+    "allergy_confirm_pill": "Anesteziyadan oldin tasdiqlang",
+    "payment_history": "To'lov tarixi",
     "no_medical_permission": "Sizda tibbiy kartani ko'rish ruxsati yo'q"
   },
   "medical": {
@@ -574,10 +576,14 @@
     "consent_signed": "Rozilik imzolangan",
     "consent_signed_at": "Imzolangan sana",
     "consent_required": "Avval rozilikni imzolang",
-    "consent_signature_url": "Imzo havolasi (ixtiyoriy)"
+    "consent_signature_url": "Imzo havolasi (ixtiyoriy)",
+    "financial_summary": "Moliyaviy xulosa",
+    "total_plan": "Jami reja",
+    "pdf_consent": "Reja PDF · konsent"
   },
   "visit_note": {
     "title": "Vizit yozuvlari",
+    "title_soap": "Vizit yozuvlari · SOAP",
     "create": "Yangi vizit yozuvi",
     "visit_date": "Vizit sanasi",
     "doctor": "Shifokor",
@@ -645,6 +651,7 @@
   },
   "prescription": {
     "title": "Reseptlar",
+    "active_title": "Faol reseptlar",
     "create": "Yangi resept",
     "issued_date": "Berilgan sana",
     "diagnosis": "Diagnoz",

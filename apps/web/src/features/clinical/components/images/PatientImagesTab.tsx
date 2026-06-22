@@ -1,7 +1,16 @@
 import { StateView } from '@dental/ui';
-import { Button, Group, Modal, SimpleGrid, Stack, Text, Title } from '@mantine/core';
+import {
+  Button,
+  Group,
+  Modal,
+  SimpleGrid,
+  Stack,
+  Text,
+  Title,
+  UnstyledButton,
+} from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconPhotoPlus } from '@tabler/icons-react';
+import { IconPhotoPlus, IconPlus } from '@tabler/icons-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth-store.ts';
@@ -59,7 +68,7 @@ export function PatientImagesTab({ patientId }: Props) {
       ) : vms.length === 0 ? (
         <StateView status="empty" title={t('image.empty')} />
       ) : (
-        <SimpleGrid cols={{ base: 1, sm: 2, md: 3, lg: 4 }} spacing="md">
+        <SimpleGrid cols={{ base: 2, md: 3, lg: 4 }} spacing="md">
           {vms.map((vm) => (
             <ImageCard
               key={vm.id}
@@ -69,6 +78,38 @@ export function PatientImagesTab({ patientId }: Props) {
               onRequestDelete={() => setDeleteId(vm.id)}
             />
           ))}
+          {canUpload && (
+            <UnstyledButton
+              onClick={openUpload}
+              aria-label={t('image.upload')}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                aspectRatio: '4 / 3',
+                borderRadius: 14,
+                border: '1.5px dashed var(--border-strong)',
+                background: 'var(--surface-2)',
+                color: 'var(--ink-3)',
+                transition: 'border-color 120ms ease, color 120ms ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = 'var(--primary)';
+                e.currentTarget.style.color = 'var(--primary)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'var(--border-strong)';
+                e.currentTarget.style.color = 'var(--ink-3)';
+              }}
+            >
+              <IconPlus size={24} />
+              <Text size="xs" inherit>
+                {t('image.upload')}
+              </Text>
+            </UnstyledButton>
+          )}
         </SimpleGrid>
       )}
 

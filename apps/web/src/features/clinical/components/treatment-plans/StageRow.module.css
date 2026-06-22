@@ -1,0 +1,53 @@
+/* DS3 §4.3 — stage qatori (jadval grid: # / Bosqich / Tish / Narx / Holat+amal) */
+
+.row {
+  display: grid;
+  grid-template-columns: 34px 1fr 56px auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.cellNum {
+  text-align: center;
+  color: var(--ink-3);
+}
+
+.cellStage {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.serviceName {
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--ink);
+  line-height: 1.25;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.cellTooth {
+  text-align: center;
+  color: var(--ink-2);
+  font-size: 12.5px;
+}
+
+.cellCost {
+  text-align: right;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.cellActions {
+  display: flex;
+  justify-content: flex-end;
+}
