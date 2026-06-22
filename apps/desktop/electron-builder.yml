@@ -1,0 +1,24 @@
+# electron-builder konfiguratsiyasi (V3-3) — Dental Service desktop.
+# ⚠️ Distribution uchun code-signing + publish provider kerak (TODO, V3-3 jonli):
+#   - mac: Developer ID sertifikat; win: code-signing sertifikat.
+#   - publish: S3/GitHub releases (auto-update uchun).
+appId: uz.dental.service
+productName: Dental Service
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**/*
+  - package.json
+mac:
+  target: dmg
+  category: public.app-category.medical
+win:
+  target: nsis
+linux:
+  target: AppImage
+  category: Office
+# TODO(jonli): publish provideri (auto-update). Imzo'siz local build uchun bo'sh.
+# publish:
+#   provider: s3
+#   bucket: dental-desktop-updates
