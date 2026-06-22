@@ -25,7 +25,8 @@ export type PatientDetail = {
   notes: string | null;
   tags: string[];
   source: string | null;
-  insurance: { provider: string; policyNumber: string } | null;
+  insurance: Patient['insurance'];
+  insuranceStatus: Patient['insuranceStatus'];
   archived: boolean;
 };
 

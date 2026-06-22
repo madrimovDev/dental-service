@@ -53,6 +53,7 @@ export function toPatientDetail(p: Patient, t: TFn): PatientDetail {
     tags: p.tags ?? [],
     source: p.source,
     insurance: p.insurance,
+    insuranceStatus: p.insuranceStatus,
     archived: p.archivedAt != null,
   };
 }

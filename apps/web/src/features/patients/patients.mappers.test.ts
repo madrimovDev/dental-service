@@ -17,6 +17,7 @@ const base: Patient = {
   tags: ['VIP'],
   source: 'Tavsiya',
   insurance: null,
+  insuranceStatus: 'none',
   archivedAt: null,
   createdAt: '2026-01-01',
   updatedAt: '2026-01-01',
@@ -40,10 +41,21 @@ describe('patients.mappers', () => {
   });
   it("toPatientDetail sana formatlaydi va insurance o'tkazadi", () => {
     const vm = toPatientDetail(
-      { ...base, insurance: { provider: 'Gross', policyNumber: 'X1' } },
+      {
+        ...base,
+        insurance: {
+          provider: 'Gross',
+          policyNumber: 'X1',
+          coverageType: 'dental',
+          expiryDate: null,
+          isActive: true,
+        },
+        insuranceStatus: 'active',
+      },
       (k) => k,
     );
     expect(vm.dateOfBirthFormatted).toBe('08.06.1990');
     expect(vm.insurance?.provider).toBe('Gross');
+    expect(vm.insuranceStatus).toBe('active');
   });
 });

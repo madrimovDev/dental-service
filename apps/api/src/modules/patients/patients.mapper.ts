@@ -54,6 +54,16 @@ export const toMedicalRecordHistoryEntry = (row: AuditHistoryRow): MedicalRecord
  * ⚠️ `dateOfBirth` is a drizzle `date` column (string mode) — passthrough, NO .toISOString().
  * `archivedAt`/`createdAt`/`updatedAt` are `timestamp` (Date) → ISO string.
  */
+/** Sug'urta holati (V3-5) — none/inactive/expired/active. */
+const computeInsuranceStatus = (
+  ins: Patient['insurance'],
+): 'active' | 'expired' | 'inactive' | 'none' => {
+  if (!ins) return 'none';
+  if (ins.isActive === false) return 'inactive';
+  if (ins.expiryDate && ins.expiryDate < new Date().toISOString().slice(0, 10)) return 'expired';
+  return 'active';
+};
+
 export const toPatientDto = (row: Patient): PatientDto => ({
   id: row.id,
   tenantId: row.tenantId,
@@ -68,7 +78,16 @@ export const toPatientDto = (row: Patient): PatientDto => ({
   notes: row.notes ?? null,
   tags: row.tags ?? [],
   source: row.source ?? null,
-  insurance: row.insurance ?? null,
+  insurance: row.insurance
+    ? {
+        provider: row.insurance.provider,
+        policyNumber: row.insurance.policyNumber,
+        coverageType: row.insurance.coverageType ?? null,
+        expiryDate: row.insurance.expiryDate ?? null,
+        isActive: row.insurance.isActive ?? null,
+      }
+    : null,
+  insuranceStatus: computeInsuranceStatus(row.insurance),
   archivedAt: row.archivedAt ? row.archivedAt.toISOString() : null,
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(),

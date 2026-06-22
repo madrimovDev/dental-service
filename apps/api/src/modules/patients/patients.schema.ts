@@ -9,6 +9,15 @@ const allergyEntrySchema = z
   })
   .openapi('AllergyEntry');
 
+/** Sug'urta polisi (V3-5) — provider+policyNumber majburiy, qolgani ixtiyoriy. */
+const insuranceInputSchema = z.object({
+  provider: z.string().min(1).max(120),
+  policyNumber: z.string().min(1).max(80),
+  coverageType: z.enum(['dental', 'general', 'other']).optional(),
+  expiryDate: z.iso.date().optional(),
+  isActive: z.boolean().optional(),
+});
+
 const testResultSchema = z.object({
   date: z.iso.date(),
   result: z.enum(['positive', 'negative', 'unknown']),
@@ -46,10 +55,7 @@ export const createPatientSchema = z.object({
   notes: z.string().max(2000).optional(),
   tags: z.array(z.string().min(1).max(40)).max(20).optional(),
   source: z.string().max(80).optional(),
-  insurance: z
-    .object({ provider: z.string().min(1).max(120), policyNumber: z.string().min(1).max(80) })
-    .nullable()
-    .optional(),
+  insurance: insuranceInputSchema.nullable().optional(),
 });
 export type CreatePatientInput = z.infer<typeof createPatientSchema>;
 
@@ -139,7 +145,17 @@ export const patientDtoSchema = z
     notes: z.string().nullable(),
     tags: z.array(z.string()),
     source: z.string().nullable(),
-    insurance: z.object({ provider: z.string(), policyNumber: z.string() }).nullable(),
+    insurance: z
+      .object({
+        provider: z.string(),
+        policyNumber: z.string(),
+        coverageType: z.enum(['dental', 'general', 'other']).nullable(),
+        expiryDate: z.string().nullable(),
+        isActive: z.boolean().nullable(),
+      })
+      .nullable(),
+    /** Computed: active | expired | inactive | none (V3-5). */
+    insuranceStatus: z.enum(['active', 'expired', 'inactive', 'none']),
     archivedAt: z.string().nullable(),
     createdAt: z.string(),
     updatedAt: z.string(),

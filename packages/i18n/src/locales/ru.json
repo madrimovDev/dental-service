@@ -453,7 +453,19 @@
       "source": "Источник",
       "insurance": "Страховка",
       "insurance_provider": "Страховая компания",
-      "insurance_policy": "Номер полиса"
+      "insurance_policy": "Номер полиса",
+      "insurance_coverage": "Тип покрытия",
+      "insurance_expiry": "Срок действия",
+      "insurance_active": "Страховка активна",
+      "coverage_dental": "Стоматологическое",
+      "coverage_general": "Общее",
+      "coverage_other": "Другое"
+    },
+    "insurance_status": {
+      "active": "Активна",
+      "expired": "Истекла",
+      "inactive": "Неактивна",
+      "none": "Нет"
     },
     "source": {
       "referral": "Рекомендация",

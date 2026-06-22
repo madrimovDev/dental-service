@@ -1,5 +1,5 @@
 import { Button, Card, Input, PageHead, Select } from '@dental/ui';
-import { Group, TagsInput, Textarea } from '@mantine/core';
+import { Checkbox, Group, TagsInput, Textarea } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useTranslation } from 'react-i18next';
@@ -140,7 +140,34 @@ export function PatientNewScreen() {
               error={form.errors['insurance.policyNumber']}
               onChange={(v) => form.setFieldValue('insurance.policyNumber', v)}
             />
+            <Select
+              label={t('patients.form.insurance_coverage')}
+              value={form.values.insurance?.coverageType ?? null}
+              onChange={(v) =>
+                form.setFieldValue(
+                  'insurance.coverageType',
+                  (v as 'dental' | 'general' | 'other') || undefined,
+                )
+              }
+              data={[
+                { value: 'dental', label: t('patients.form.coverage_dental') },
+                { value: 'general', label: t('patients.form.coverage_general') },
+                { value: 'other', label: t('patients.form.coverage_other') },
+              ]}
+            />
+            <Input
+              label={t('patients.form.insurance_expiry')}
+              type="date"
+              value={form.values.insurance?.expiryDate ?? ''}
+              onChange={(v) => form.setFieldValue('insurance.expiryDate', v || undefined)}
+            />
           </div>
+          <Checkbox
+            mt="sm"
+            label={t('patients.form.insurance_active')}
+            checked={form.values.insurance?.isActive ?? false}
+            onChange={(e) => form.setFieldValue('insurance.isActive', e.currentTarget.checked)}
+          />
         </div>
       </Card>
 

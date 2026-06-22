@@ -453,7 +453,19 @@
       "source": "Manba",
       "insurance": "Sug'urta",
       "insurance_provider": "Sug'urta kompaniyasi",
-      "insurance_policy": "Polis raqami"
+      "insurance_policy": "Polis raqami",
+      "insurance_coverage": "Qamrov turi",
+      "insurance_expiry": "Amal qilish muddati",
+      "insurance_active": "Sug'urta faol",
+      "coverage_dental": "Stomatologik",
+      "coverage_general": "Umumiy",
+      "coverage_other": "Boshqa"
+    },
+    "insurance_status": {
+      "active": "Faol",
+      "expired": "Muddati o'tgan",
+      "inactive": "Faol emas",
+      "none": "Yo'q"
     },
     "source": {
       "referral": "Tavsiya",

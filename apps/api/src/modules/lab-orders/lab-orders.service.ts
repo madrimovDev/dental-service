@@ -1,5 +1,5 @@
 import { labOrders } from '@dental/db-schema';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, lt, notInArray } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
@@ -16,6 +16,21 @@ export const createLabOrdersService = (deps: { audit: AuditLogger }) => {
       .from(labOrders)
       .where(filters.length > 0 ? and(...filters) : undefined)
       .orderBy(desc(labOrders.createdAt));
+  }
+
+  /** Muddati o'tgan buyurtmalar (V3-5) — expectedDate < hozir, delivered/cancelled EMAS. */
+  async function overdue(c: Context) {
+    const db = getDb(c);
+    return db
+      .select()
+      .from(labOrders)
+      .where(
+        and(
+          lt(labOrders.expectedDate, new Date()),
+          notInArray(labOrders.status, ['delivered', 'cancelled']),
+        ),
+      )
+      .orderBy(labOrders.expectedDate);
   }
 
   async function get(c: Context, id: string) {
@@ -92,7 +107,7 @@ export const createLabOrdersService = (deps: { audit: AuditLogger }) => {
     return row;
   }
 
-  return { list, get, create, update };
+  return { list, get, create, update, overdue };
 };
 
 export type LabOrdersService = ReturnType<typeof createLabOrdersService>;

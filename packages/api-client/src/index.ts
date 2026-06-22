@@ -130,12 +130,14 @@ export type {
   CreateLabOrderResult,
   GetLabOrderResult,
   ListLabOrdersResult,
+  ListOverdueLabOrdersResult,
   UpdateLabOrderResult,
 } from './generated/lab-orders/lab-orders.ts';
 export {
   createLabOrder,
   getLabOrder,
   listLabOrders,
+  listOverdueLabOrders,
   updateLabOrder,
 } from './generated/lab-orders/lab-orders.ts';
 export type {

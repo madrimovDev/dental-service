@@ -6,6 +6,7 @@
  */
 import type { PatientGender } from './patientGender';
 import type { PatientInsurance } from './patientInsurance';
+import type { PatientInsuranceStatus } from './patientInsuranceStatus';
 
 export interface Patient {
   id: string;
@@ -32,6 +33,7 @@ export interface Patient {
   source: string | null;
   /** @nullable */
   insurance: PatientInsurance;
+  insuranceStatus: PatientInsuranceStatus;
   /** @nullable */
   archivedAt: string | null;
   createdAt: string;

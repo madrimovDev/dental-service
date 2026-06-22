@@ -4,6 +4,7 @@
  * Dental Service API
  * OpenAPI spec version: 0.1.0
  */
+import type { CreatePatientBodyInsuranceCoverageType } from './createPatientBodyInsuranceCoverageType';
 
 /**
  * @nullable
@@ -19,4 +20,7 @@ export type CreatePatientBodyInsurance = {
    * @maxLength 80
    */
   policyNumber: string;
+  coverageType?: CreatePatientBodyInsuranceCoverageType;
+  expiryDate?: string;
+  isActive?: boolean;
 } | null;
