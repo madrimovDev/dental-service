@@ -17,6 +17,7 @@
       "dependencies": {
         "@dental/core": "workspace:*",
         "@dental/db-schema": "workspace:*",
+        "@dental/fiscal": "workspace:*",
         "@hono/zod-openapi": "^1.2.0",
         "@sentry/node": "^10.59.0",
         "bullmq": "^5.78.0",

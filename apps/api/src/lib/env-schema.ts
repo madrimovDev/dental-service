@@ -50,6 +50,12 @@ export const envSchema = z
     ESKIZ_EMAIL: z.string().optional(),
     ESKIZ_PASSWORD: z.string().optional(),
 
+    // Soliq fiskal (V3-1, optional — yo'q bo'lsa NoOpFiscalProvider). Jonli ishlashi
+    // uchun Soliq.uz API endpoint + kalit + TLS sertifikat kerak (TODO: V3-1 jonli).
+    SOLIQ_API_URL: z.string().optional(),
+    SOLIQ_API_KEY: z.string().optional(),
+    SOLIQ_FISCAL_ID: z.string().optional(),
+
     // Observability (D7) — Sentry error tracking. NoOp when unset.
     SENTRY_DSN: z.string().optional(),
 

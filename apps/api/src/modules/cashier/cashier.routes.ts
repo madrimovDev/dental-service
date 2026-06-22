@@ -1,4 +1,5 @@
 import { fail, ok } from '@dental/core';
+import type { FiscalProvider } from '@dental/fiscal';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
@@ -31,12 +32,16 @@ const notFoundResponse = {
   },
 };
 
-export const cashierRoutes = (deps: { db: Database; audit: AuditLogger }) => {
+export const cashierRoutes = (deps: {
+  db: Database;
+  audit: AuditLogger;
+  fiscal?: FiscalProvider;
+}) => {
   const app = new OpenAPIHono();
   app.use('*', authMiddleware());
   app.use('*', rlsMiddleware(deps.db));
 
-  const service = createCashierService({ audit: deps.audit });
+  const service = createCashierService({ audit: deps.audit, fiscal: deps.fiscal });
 
   // ─── GET /transactions — list (paginated) ────────────────────────────────
 
