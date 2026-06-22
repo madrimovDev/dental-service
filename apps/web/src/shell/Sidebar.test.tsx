@@ -33,6 +33,7 @@ vi.mock('@/stores/ui-store.ts', () => ({
 vi.mock('@/features/auth', () => ({
   useWorkspaceBranches: () => ({ data: null }),
   useSwitchWorkspace: () => ({ mutate: vi.fn(), isPending: false }),
+  useBranchSwitch: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 afterEach(() => {

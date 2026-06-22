@@ -115,6 +115,7 @@
   },
   "layout": {
     "switch_workspace": "Сменить workspace",
+    "profile": "Профиль",
     "logout": "Выйти"
   },
   "nav": {

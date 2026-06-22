@@ -115,6 +115,7 @@
   },
   "layout": {
     "switch_workspace": "Workspace o'zgartirish",
+    "profile": "Profil",
     "logout": "Chiqish"
   },
   "nav": {

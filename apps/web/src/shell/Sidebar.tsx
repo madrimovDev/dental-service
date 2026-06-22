@@ -1,12 +1,10 @@
-import { ApiError, logout as apiLogout } from '@dental/api-client';
+import { logout as apiLogout } from '@dental/api-client';
 import { Avatar } from '@dental/ui';
 import { Menu } from '@mantine/core';
-import { notifications } from '@mantine/notifications';
-import { useQueryClient } from '@tanstack/react-query';
 import { Building2, Check, ChevronDown, LogOut } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useSwitchWorkspace, useWorkspaceBranches } from '@/features/auth';
+import { useBranchSwitch, useWorkspaceBranches } from '@/features/auth';
 import { RecallNavBadge } from '@/features/recalls/components/RecallNavBadge.tsx';
 import { useVertical } from '@/features/settings/settings.api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
@@ -25,51 +23,10 @@ function isActive(pathname: string, path: string, allPaths: string[]): boolean {
 function SidebarWorkspaceSwitcher({ rail }: { rail: boolean }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const { activeTenantId, activeBranchId, setTokens, setContext, clear, user } = useAuthStore();
+  const { activeTenantId, activeBranchId, user } = useAuthStore();
 
   const branchesQuery = useWorkspaceBranches();
-
-  const switchMut = useSwitchWorkspace({
-    onSuccess: (data) => {
-      setTokens(data.accessToken, data.refreshToken);
-      try {
-        const seg = data.accessToken.split('.')[1] ?? '';
-        const b64 = seg
-          .replace(/-/g, '+')
-          .replace(/_/g, '/')
-          .padEnd(Math.ceil(seg.length / 4) * 4, '=');
-        const payload = JSON.parse(atob(b64)) as {
-          atid: string | null;
-          abid: string | null;
-          perms: string[];
-          roleKey?: string | null;
-        };
-        setContext(payload.atid, payload.abid, payload.perms, payload.roleKey ?? null);
-      } catch {
-        /* malformed JWT payload */
-      }
-      queryClient.clear();
-      navigate('/');
-    },
-    onError: (err) => {
-      const code = err instanceof ApiError ? err.code : null;
-      if (
-        code === 'auth.refresh_revoked' ||
-        code === 'auth.invalid_refresh' ||
-        code === 'auth.refresh_mismatch'
-      ) {
-        clear();
-        navigate('/login', { replace: true });
-        return;
-      }
-      notifications.show({
-        title: t('common.error'),
-        message: err instanceof ApiError ? err.message : t('shell.branch_switch_error'),
-        color: 'red',
-      });
-    },
-  });
+  const switchMut = useBranchSwitch();
 
   const clinicLetter = (user?.fullName ?? t('app.name')).charAt(0).toUpperCase();
   const data = branchesQuery.data;
@@ -200,6 +157,9 @@ function SidebarFooter({ rail }: { rail: boolean }) {
   if (rail) {
     return (
       <div className={classes.foot}>
+        <Link to="/profile" className={classes.footProfileRail} aria-label={t('layout.profile')}>
+          <Avatar name={user?.fullName ?? '?'} size="sm" />
+        </Link>
         <button
           type="button"
           className={classes.footLogout}
@@ -215,11 +175,13 @@ function SidebarFooter({ rail }: { rail: boolean }) {
 
   return (
     <div className={classes.foot}>
-      <Avatar name={user?.fullName ?? '?'} size="sm" />
-      <span className={classes.footInfo}>
-        <b>{user?.fullName ?? user?.phone}</b>
-        <span>{user?.phone}</span>
-      </span>
+      <Link to="/profile" className={classes.footProfile} aria-label={t('layout.profile')}>
+        <Avatar name={user?.fullName ?? '?'} size="sm" />
+        <span className={classes.footInfo}>
+          <b>{user?.fullName ?? user?.phone}</b>
+          <span>{user?.phone}</span>
+        </span>
+      </Link>
       <button
         type="button"
         className={classes.footLogout}
