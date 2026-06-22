@@ -5,6 +5,8 @@
  * OpenAPI spec version: 0.1.0
  */
 import type {
+  CreateStockBatch201,
+  CreateStockBatchBody,
   CreateStockBom201,
   CreateStockBomBody,
   CreateStockItem201,
@@ -12,6 +14,10 @@ import type {
   CreateStockMovement201,
   CreateStockMovementBody,
   GetStockItem200,
+  ListExpiringStockBatches200,
+  ListExpiringStockBatchesParams,
+  ListStockBatches200,
+  ListStockBatchesParams,
   ListStockBom200,
   ListStockBomParams,
   ListStockItems200,
@@ -111,6 +117,34 @@ import { customInstance } from '../../mutator';
     },
       );
     }
+  export const listStockBatches = (
+    params: ListStockBatchesParams,
+ ) => {
+      return customInstance<ListStockBatches200>(
+      {url: `/api/stock/batches`, method: 'GET',
+        params
+    },
+      );
+    }
+  export const createStockBatch = (
+    createStockBatchBody: CreateStockBatchBody,
+ ) => {
+      return customInstance<CreateStockBatch201>(
+      {url: `/api/stock/batches`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: createStockBatchBody
+    },
+      );
+    }
+  export const listExpiringStockBatches = (
+    params?: ListExpiringStockBatchesParams,
+ ) => {
+      return customInstance<ListExpiringStockBatches200>(
+      {url: `/api/stock/batches/expiring`, method: 'GET',
+        params
+    },
+      );
+    }
   export type ListStockItemsResult = NonNullable<Awaited<ReturnType<typeof listStockItems>>>
 export type CreateStockItemResult = NonNullable<Awaited<ReturnType<typeof createStockItem>>>
 export type GetStockItemResult = NonNullable<Awaited<ReturnType<typeof getStockItem>>>
@@ -120,3 +154,6 @@ export type CreateStockMovementResult = NonNullable<Awaited<ReturnType<typeof cr
 export type ListStockBomResult = NonNullable<Awaited<ReturnType<typeof listStockBom>>>
 export type CreateStockBomResult = NonNullable<Awaited<ReturnType<typeof createStockBom>>>
 export type RemoveStockBomResult = NonNullable<Awaited<ReturnType<typeof removeStockBom>>>
+export type ListStockBatchesResult = NonNullable<Awaited<ReturnType<typeof listStockBatches>>>
+export type CreateStockBatchResult = NonNullable<Awaited<ReturnType<typeof createStockBatch>>>
+export type ListExpiringStockBatchesResult = NonNullable<Awaited<ReturnType<typeof listExpiringStockBatches>>>

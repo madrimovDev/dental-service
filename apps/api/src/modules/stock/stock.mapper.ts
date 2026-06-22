@@ -1,6 +1,7 @@
-import type { ServiceMaterial, StockItem, StockMovement } from '@dental/db-schema';
+import type { ServiceMaterial, StockBatch, StockItem, StockMovement } from '@dental/db-schema';
 import type {
   ServiceMaterialDto,
+  StockBatchDto,
   StockItemDto,
   StockItemWithLowStockDto,
   StockMovementDto,
@@ -48,5 +49,18 @@ export const toServiceMaterialDto = (row: ServiceMaterial): ServiceMaterialDto =
   serviceId: row.serviceId,
   itemId: row.itemId,
   qtyPerService: row.qtyPerService,
+  createdAt: row.createdAt.toISOString(),
+});
+
+export const toStockBatchDto = (row: StockBatch): StockBatchDto => ({
+  id: row.id,
+  tenantId: row.tenantId,
+  itemId: row.itemId,
+  supplierName: row.supplierName ?? null,
+  batchNumber: row.batchNumber ?? null,
+  expiryDate: row.expiryDate ? row.expiryDate.toISOString() : null,
+  costPerUnit: row.costPerUnit ?? null,
+  qtyReceived: row.qtyReceived,
+  receivedAt: row.receivedAt.toISOString(),
   createdAt: row.createdAt.toISOString(),
 });

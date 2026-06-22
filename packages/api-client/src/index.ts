@@ -352,6 +352,7 @@ export type {
   StaffProfile,
   StaffProfileEmploymentStatus,
   StageBalance,
+  StockBatch,
   StockItem,
   StockItemWithLowStock,
   StockMovement,
@@ -626,10 +627,13 @@ export {
 } from './generated/services/services.ts';
 // Generated (orval) — stock
 export type {
+  CreateStockBatchResult,
   CreateStockBomResult,
   CreateStockItemResult,
   CreateStockMovementResult,
   GetStockItemResult,
+  ListExpiringStockBatchesResult,
+  ListStockBatchesResult,
   ListStockBomResult,
   ListStockItemsResult,
   ListStockMovementsResult,
@@ -637,10 +641,13 @@ export type {
   UpdateStockItemResult,
 } from './generated/stock/stock.ts';
 export {
+  createStockBatch,
   createStockBom,
   createStockItem,
   createStockMovement,
   getStockItem,
+  listExpiringStockBatches,
+  listStockBatches,
   listStockBom,
   listStockItems,
   listStockMovements,

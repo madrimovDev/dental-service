@@ -176,6 +176,13 @@
       "when": 1782106526548,
       "tag": "0024_adorable_polaris",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1782107375903,
+      "tag": "0025_mean_the_stranger",
+      "breakpoints": true
     }
   ]
 }

@@ -26,3 +26,14 @@ export const bomFormSchema = z.object({
   qtyPerService: z.coerce.number().positive(),
 });
 export type BomFormSchema = z.infer<typeof bomFormSchema>;
+
+/** Partiya qabul qilish formasi (V2-2) — supplier/batch#/expiry/cost ixtiyoriy. */
+export const batchFormSchema = z.object({
+  itemId: z.string().min(1),
+  qtyReceived: z.coerce.number().positive(),
+  supplierName: z.string().max(200).optional(),
+  batchNumber: z.string().max(100).optional(),
+  expiryDate: z.string().optional(),
+  costPerUnit: z.union([z.coerce.number().nonnegative(), z.literal('')]).optional(),
+});
+export type BatchFormSchema = z.infer<typeof batchFormSchema>;

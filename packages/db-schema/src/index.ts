@@ -40,6 +40,7 @@ export * from './tables/service-materials.ts';
 export * from './tables/service-prices.ts';
 export * from './tables/services.ts';
 export * from './tables/staff-profiles.ts';
+export * from './tables/stock-batches.ts';
 export * from './tables/stock-items.ts';
 export * from './tables/stock-movements.ts';
 export * from './tables/tenant-settings.ts';

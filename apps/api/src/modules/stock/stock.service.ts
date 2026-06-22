@@ -1,10 +1,13 @@
-import { serviceMaterials, stockItems, stockMovements } from '@dental/db-schema';
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { serviceMaterials, stockBatches, stockItems, stockMovements } from '@dental/db-schema';
+import { and, asc, desc, eq, inArray, lte, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
+import type { DbOrTx } from '../../db/client.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { findRecipientsWithPermission } from '../../lib/notify-recipients.ts';
 import { applyMovement, isLowStock } from './stock.calc.ts';
 import type {
+  CreateBatchInput,
   CreateBomInput,
   CreateItemInput,
   CreateMovementInput,
@@ -12,7 +15,60 @@ import type {
   UpdateItemInput,
 } from './stock.schema.ts';
 
-export const createStockService = (deps: { audit: AuditLogger }) => {
+/** Qo'lda 'out' harakat manfiy qoldiqqa olib kelganda (negative-stock guard). */
+export class InsufficientStockError extends Error {
+  constructor(
+    public itemId: string,
+    public available: number,
+    public requested: number,
+  ) {
+    super(`Insufficient stock: have ${available}, requested ${requested}`);
+    this.name = 'InsufficientStockError';
+  }
+}
+
+/** Low-stock alert recipient — `stock.manage` permission egasi (+ owner). */
+type NotificationsDep = {
+  notifyInTx: (
+    tx: DbOrTx,
+    tenantId: string,
+    payload: { userId: string; type: string; title: string; body?: string },
+  ) => Promise<unknown>;
+};
+
+export const createStockService = (deps: {
+  audit: AuditLogger;
+  notifications?: NotificationsDep;
+}) => {
+  /**
+   * Low-stock alert — qoldiq chegaradan O'TGANDA (transition), har harakatda EMAS.
+   * `stock.manage` egalariga (+ owner) in-app bildirishnoma (smsTo YO'Q → faqat insert,
+   * deduction tx hot-path'ida tashqi gateway latency yo'q). Advisor qarori.
+   */
+  async function maybeAlertLowStock(
+    c: Context,
+    tx: DbOrTx,
+    item: { id: string; name: string; branchId: string | null; minThreshold: string },
+    oldQty: number,
+    newQty: number,
+  ) {
+    if (!deps.notifications) return;
+    const threshold = Number(item.minThreshold);
+    // Faqat chegaradan PASTGA o'tganda (oldin >=, hozir <).
+    if (!(oldQty >= threshold && newQty < threshold)) return;
+    const tenantId = c.get('activeTenantId');
+    if (!tenantId) return;
+    const recipients = await findRecipientsWithPermission(c, 'stock.manage', item.branchId);
+    for (const userId of recipients) {
+      await deps.notifications.notifyInTx(tx, tenantId, {
+        userId,
+        type: 'stock.low_threshold',
+        title: `Kam qoldiq: ${item.name}`,
+        body: `Qoldiq: ${newQty} (min: ${threshold})`,
+      });
+    }
+  }
+
   // ===== Stock Items =====
   async function listItems(c: Context, query: ListItemsQuery) {
     const db = getDb(c);
@@ -118,13 +174,26 @@ export const createStockService = (deps: { audit: AuditLogger }) => {
       await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);
 
       const [item] = await tx
-        .select({ quantity: stockItems.quantity })
+        .select({
+          id: stockItems.id,
+          name: stockItems.name,
+          branchId: stockItems.branchId,
+          quantity: stockItems.quantity,
+          minThreshold: stockItems.minThreshold,
+        })
         .from(stockItems)
         .where(eq(stockItems.id, input.itemId))
         .for('update');
       if (!item) throw new Error('Stock item not found');
 
-      const newQuantity = applyMovement(Number(item.quantity), input.type, input.quantity);
+      const oldQty = Number(item.quantity);
+      const newQuantity = applyMovement(oldQty, input.type, input.quantity);
+
+      // Negative-stock guard — QO'LDA 'out' harakat manfiyga tushsa RAD (row-lock race-safe).
+      // (Auto-deduction deductForServices'da guard YO'Q — vizit yozuvini bloklamaslik uchun.)
+      if (input.type === 'out' && newQuantity < 0) {
+        throw new InsufficientStockError(input.itemId, oldQty, input.quantity);
+      }
 
       const [movement] = await tx
         .insert(stockMovements)
@@ -151,6 +220,7 @@ export const createStockService = (deps: { audit: AuditLogger }) => {
           after: { itemId: input.itemId, type: input.type, quantity: input.quantity, newQuantity },
         });
       }
+      await maybeAlertLowStock(c, tx, item, oldQty, newQuantity);
       return movement;
     });
   }
@@ -235,14 +305,106 @@ export const createStockService = (deps: { audit: AuditLogger }) => {
         sourceVisitNoteId,
         createdBy: c.get('user')?.id ?? null,
       });
-      await db
+      // ⚠️ Auto-deduction'da negative-stock guard YO'Q (advisor): vizit yozuvini ombor
+      // noto'g'ri sozlangani uchun bloklamaslik kerak. Manfiyga ruxsat + alert. newQty
+      // olish uchun .returning() (transition alert solishtiruvi uchun).
+      const [updated] = await db
         .update(stockItems)
         .set({
           quantity: sql`${stockItems.quantity} - ${bom.qtyPerService}`,
           updatedAt: new Date(),
         })
-        .where(eq(stockItems.id, bom.itemId));
+        .where(eq(stockItems.id, bom.itemId))
+        .returning({
+          id: stockItems.id,
+          name: stockItems.name,
+          branchId: stockItems.branchId,
+          quantity: stockItems.quantity,
+          minThreshold: stockItems.minThreshold,
+        });
+      if (updated) {
+        const newQty = Number(updated.quantity);
+        await maybeAlertLowStock(c, db, updated, newQty + Number(bom.qtyPerService), newQty);
+      }
     }
+  }
+
+  // ===== Stock batches (qabul + expiry/cost/supplier) — V2-2 =====
+
+  /** Item bo'yicha partiyalar (yangi avval). */
+  async function listBatches(c: Context, itemId: string) {
+    const db = getDb(c);
+    return db
+      .select()
+      .from(stockBatches)
+      .where(eq(stockBatches.itemId, itemId))
+      .orderBy(desc(stockBatches.receivedAt));
+  }
+
+  /** Muddati yaqinlashayotgan partiyalar (default 30 kun). */
+  async function expiringBatches(c: Context, withinDays = 30) {
+    const db = getDb(c);
+    const cutoff = new Date(Date.now() + withinDays * 24 * 60 * 60 * 1000);
+    return db
+      .select()
+      .from(stockBatches)
+      .where(lte(stockBatches.expiryDate, cutoff))
+      .orderBy(asc(stockBatches.expiryDate));
+  }
+
+  /**
+   * Partiya qabul qilish — batch yozuvi + `qtyReceived` uchun 'in' stock movement
+   * (quantity yagona manba bo'lib qoladi, Qaror #31). Bitta tx'da.
+   */
+  async function createBatch(c: Context, input: CreateBatchInput) {
+    const db = getDb(c);
+    const tenantId = c.get('activeTenantId');
+    const user = c.get('user');
+    if (!tenantId) throw new Error('No tenant context');
+
+    return await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);
+
+      const [batch] = await tx
+        .insert(stockBatches)
+        .values({
+          tenantId,
+          itemId: input.itemId,
+          supplierName: input.supplierName ?? null,
+          batchNumber: input.batchNumber ?? null,
+          expiryDate: input.expiryDate ? new Date(input.expiryDate) : null,
+          costPerUnit: input.costPerUnit != null ? String(input.costPerUnit) : null,
+          qtyReceived: String(input.qtyReceived),
+        })
+        .returning();
+
+      // 'in' movement — quantity'ni oshiradi (qabul = ombor kirimi).
+      await tx.insert(stockMovements).values({
+        tenantId,
+        itemId: input.itemId,
+        type: 'in',
+        quantity: String(input.qtyReceived),
+        reason: 'batch_received',
+        createdBy: user?.id ?? null,
+      });
+      await tx
+        .update(stockItems)
+        .set({
+          quantity: sql`${stockItems.quantity} + ${String(input.qtyReceived)}`,
+          updatedAt: new Date(),
+        })
+        .where(eq(stockItems.id, input.itemId));
+
+      if (batch) {
+        await deps.audit.record(c, {
+          action: 'created',
+          resourceType: 'stock_batch',
+          resourceId: batch.id,
+          after: batch,
+        });
+      }
+      return batch ?? null;
+    });
   }
 
   return {
@@ -256,6 +418,9 @@ export const createStockService = (deps: { audit: AuditLogger }) => {
     createBom,
     removeBom,
     deductForServices,
+    listBatches,
+    expiringBatches,
+    createBatch,
   };
 };
 
