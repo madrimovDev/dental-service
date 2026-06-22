@@ -105,3 +105,27 @@ export const dentalAnalyticsReportDtoSchema = z
   .openapi('DentalAnalyticsReport');
 
 export type DentalAnalyticsReport = z.infer<typeof dentalAnalyticsReportDtoSchema>;
+
+// ─── 1C export — transaction-level (V3-4) ────────────────────────────────────
+
+/**
+ * Buxgalteriya (1C) eksporti uchun tranzaksiya-darajali qator. ⚠️ FORMAT PROVIZIONAL:
+ * aniq 1C interchange (CommerceML/CSV ustun-xaritasi) mijozning 1C konfiguratsiyasiga
+ * (hisoblar rejasi) bog'liq — FE `format1C` standart shaklni beradi, mijoz XSD bilan
+ * moslash TODO (Qaror — V3 tashqi-dep, scaffold chegarasi).
+ */
+export const oneCExportRowDtoSchema = z
+  .object({
+    date: z.string(),
+    receiptNumber: z.string().nullable(),
+    type: z.string(),
+    paymentMethod: z.string(),
+    amount: z.number(),
+    patientName: z.string().nullable(),
+  })
+  .openapi('OneCExportRow');
+
+export const oneCExportReportDtoSchema = z
+  .array(oneCExportRowDtoSchema)
+  .openapi('OneCExportReport');
+export type OneCExportRow = z.infer<typeof oneCExportRowDtoSchema>;

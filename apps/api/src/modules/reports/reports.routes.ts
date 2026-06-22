@@ -16,6 +16,7 @@ import {
   appointmentStatsReportDtoSchema,
   dentalAnalyticsReportDtoSchema,
   doctorWorkloadReportDtoSchema,
+  oneCExportReportDtoSchema,
   planCompletionReportDtoSchema,
   reportRangeSchema,
   revenueReportDtoSchema,
@@ -117,6 +118,24 @@ export const reportsRoutes = (deps: { db: Database }) => {
     const range = c.req.valid('query');
     const result = await service.dentalAnalytics(c, range);
     return c.json(ok(toDentalAnalyticsReportDto(result)), 200);
+  });
+
+  // ─── GET /1c-export — buxgalteriya (1C) tranzaksiya eksporti (V3-4) ────────
+
+  const oneCExportRoute = createRoute({
+    method: 'get',
+    path: '/1c-export',
+    tags: ['reports'],
+    operationId: 'getOneCExport',
+    middleware: [requirePermission('report.view')] as const,
+    request: { query: reportRangeSchema },
+    responses: okJson(oneCExportReportDtoSchema, '1C accounting export rows'),
+  });
+
+  app.openapi(oneCExportRoute, async (c) => {
+    const range = c.req.valid('query');
+    const rows = await service.oneCExport(c, range);
+    return c.json(ok(rows), 200);
   });
 
   return app;

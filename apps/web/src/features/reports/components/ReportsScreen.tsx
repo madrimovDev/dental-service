@@ -23,14 +23,17 @@ import {
   useAppointmentStats,
   useDentalAnalytics,
   useDoctorWorkload,
+  useOneCExport,
   usePlanCompletion,
   useRevenueReport,
 } from '../reports.api';
 import {
   appointmentsToRows,
   doctorsToRows,
+  download1C,
   downloadCsv,
   downloadXlsx,
+  oneCToRows,
   planCompletionToRows,
   revenueToRows,
 } from '../reports.export';
@@ -147,8 +150,14 @@ export function ReportsScreen() {
   const doctors = useDoctorWorkload(range);
   const plans = usePlanCompletion(range);
   const analytics = useDentalAnalytics(range);
+  const oneC = useOneCExport(range);
 
   const WEEKDAY_LABELS = ['Yak', 'Dush', 'Sesh', 'Chor', 'Pay', 'Jum', 'Shan'];
+
+  const handle1CExport = async () => {
+    const { data } = await oneC.refetch();
+    if (data) download1C(oneCToRows(data), `1c_export_${range.from}_${range.to}`);
+  };
 
   // doctorId → ism (workload jadvali xom UUID o'rniga ism ko'rsatadi; CSV/XLSX ham)
   const doctorList = useDoctors();
@@ -198,6 +207,14 @@ export function ReportsScreen() {
                 style={{ minWidth: 220 }}
               />
             )}
+            <Button
+              variant="light"
+              leftSection={<IconFileSpreadsheet size={16} />}
+              loading={oneC.isFetching}
+              onClick={handle1CExport}
+            >
+              {t('reports.export_1c', { defaultValue: '1C eksport' })}
+            </Button>
           </Group>
         </Card>
 

@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import {
   appointmentsToRows,
   doctorsToRows,
+  oneCToRows,
   planCompletionToRows,
   revenueToRows,
 } from './reports.export';
@@ -130,5 +131,31 @@ describe('planCompletionToRows', () => {
     expect(rows).toContainEqual(['Status', 'Soni']);
     expect(rows).toContainEqual(['done', '12']);
     expect(rows).toContainEqual(['pending', '8']);
+  });
+});
+
+describe('oneCToRows (V3-4)', () => {
+  it('1C header + qator (refund manfiy summa)', () => {
+    const rows = oneCToRows([
+      {
+        date: '2026-03-01',
+        receiptNumber: 'R-1',
+        type: 'payment',
+        paymentMethod: 'cash',
+        amount: 100000,
+        patientName: 'Ali',
+      },
+      {
+        date: '2026-03-02',
+        receiptNumber: 'R-1-R1',
+        type: 'refund',
+        paymentMethod: 'cash',
+        amount: -40000,
+        patientName: 'Ali',
+      },
+    ]);
+    expect(rows[0]).toEqual(['Дата', 'Документ', 'Тип', 'Метод', 'Сумма', 'Контрагент']);
+    expect(rows[1]).toEqual(['2026-03-01', 'R-1', 'payment', 'cash', '100000', 'Ali']);
+    expect(rows[2]?.[4]).toBe('-40000');
   });
 });

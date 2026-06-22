@@ -11,6 +11,8 @@ import type {
   GetDentalAnalyticsReportParams,
   GetDoctorWorkloadReport200,
   GetDoctorWorkloadReportParams,
+  GetOneCExport200,
+  GetOneCExportParams,
   GetPlanCompletionReport200,
   GetPlanCompletionReportParams,
   GetRevenueReport200,
@@ -66,8 +68,18 @@ import { customInstance } from '../../mutator';
     },
       );
     }
+  export const getOneCExport = (
+    params: GetOneCExportParams,
+ ) => {
+      return customInstance<GetOneCExport200>(
+      {url: `/api/reports/1c-export`, method: 'GET',
+        params
+    },
+      );
+    }
   export type GetRevenueReportResult = NonNullable<Awaited<ReturnType<typeof getRevenueReport>>>
 export type GetAppointmentStatsReportResult = NonNullable<Awaited<ReturnType<typeof getAppointmentStatsReport>>>
 export type GetDoctorWorkloadReportResult = NonNullable<Awaited<ReturnType<typeof getDoctorWorkloadReport>>>
 export type GetPlanCompletionReportResult = NonNullable<Awaited<ReturnType<typeof getPlanCompletionReport>>>
 export type GetDentalAnalyticsReportResult = NonNullable<Awaited<ReturnType<typeof getDentalAnalyticsReport>>>
+export type GetOneCExportResult = NonNullable<Awaited<ReturnType<typeof getOneCExport>>>

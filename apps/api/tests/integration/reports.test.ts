@@ -210,4 +210,13 @@ describe('reports — real DB', () => {
     expect(r.completedStages).toBe(1);
     expect(r.rate).toBe(0.5);
   });
+
+  test('oneCExport (V3-4): tranzaksiya qatorlari, refund manfiy', async () => {
+    const rows = await run((c) => service.oneCExport(c, RANGE));
+    expect(rows.length).toBeGreaterThan(0);
+    // Setup'da plansiz refund 20000 bor → manfiy summa qatori bo'lishi kerak.
+    const refundRow = rows.find((r) => r.type === 'refund');
+    expect(refundRow).toBeDefined();
+    expect(refundRow?.amount).toBeLessThan(0);
+  });
 });
