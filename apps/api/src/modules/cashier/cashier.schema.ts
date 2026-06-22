@@ -57,6 +57,11 @@ export const planIdParamSchema = z.object({
   planId: z.uuid().openapi({ param: { name: 'planId', in: 'path' } }),
 });
 
+/** Refund request body — `amount` ixtiyoriy (yo'q = to'liq qolgan summa). Qisman = plan-linked. */
+export const refundRequestSchema = z.object({
+  amount: z.number().positive().optional(),
+});
+
 /** Daily-summary query — branchId majburiy (yo'qligida 400), date ixtiyoriy (default: bugun). */
 export const dailySummaryQuery = z.object({
   branchId: z.uuid(),

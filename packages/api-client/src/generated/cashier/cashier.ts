@@ -15,7 +15,8 @@ import type {
   ListCashierPatientPlansParams,
   ListCashierTransactions200,
   ListCashierTransactionsParams,
-  RefundCashierTransaction200
+  RefundCashierTransaction200,
+  RefundCashierTransactionBody
 } from '.././model';
 
 import { customInstance } from '../../mutator';
@@ -51,9 +52,12 @@ import { customInstance } from '../../mutator';
     }
   export const refundCashierTransaction = (
     id: string,
+    refundCashierTransactionBody: RefundCashierTransactionBody,
  ) => {
       return customInstance<RefundCashierTransaction200>(
-      {url: `/api/cashier/transactions/${id}/refund`, method: 'POST'
+      {url: `/api/cashier/transactions/${id}/refund`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: refundCashierTransactionBody
     },
       );
     }

@@ -77,8 +77,9 @@ export const cashierTransactions = pgTable(
     index('cashier_tx_treatment_plan_idx').on(t.treatmentPlanId),
     // Receipt raqami noyob (jimgina dublikatning oldini oladi). NULL ko'p bo'lishi mumkin.
     uniqueIndex('cashier_tx_receipt_unique').on(t.receiptNumber),
-    // Bitta tranzaksiyaga faqat bitta refund (TOCTOU backstop). To'lovlarda parent NULL.
-    uniqueIndex('cashier_tx_parent_unique').on(t.parentTransactionId),
+    // Parent bo'yicha qidiruv. V2-4 (CLI-244): qisman refund uchun bitta parentga
+    // BIR NECHTA refund ruxsat — unique EMAS (cumulative guard service'da).
+    index('cashier_tx_parent_idx').on(t.parentTransactionId),
   ],
 );
 

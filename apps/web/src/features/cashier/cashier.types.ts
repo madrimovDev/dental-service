@@ -24,6 +24,8 @@ export type TransactionVM = {
   status: TransactionStatus;
   createdAt: string;
   refundable: boolean;
+  /** Plan-linked bo'lsa qisman refund ruxsat (V2-4). */
+  planLinked: boolean;
 };
 
 /** Bosqich to'lov holati. */

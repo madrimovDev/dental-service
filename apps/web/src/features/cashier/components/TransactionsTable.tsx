@@ -1,6 +1,17 @@
 import type { CashierTransaction } from '@dental/api-client';
 import { Mono } from '@dental/ui';
-import { ActionIcon, Badge, Button, Group, Modal, Stack, Table, Text, Title } from '@mantine/core';
+import {
+  ActionIcon,
+  Badge,
+  Button,
+  Group,
+  Modal,
+  NumberInput,
+  Stack,
+  Table,
+  Text,
+  Title,
+} from '@mantine/core';
 import { IconReceipt, IconRefresh } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -18,15 +29,25 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
   const { hasPermission } = useAuthStore();
   const refundMut = useRefund();
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [partialAmount, setPartialAmount] = useState<number | ''>('');
 
   const canRefund = hasPermission('cashier.refund');
   const vms = transactions.map(toTransactionVM);
   const selected = vms.find((v) => v.id === confirmId);
 
+  const closeModal = () => {
+    setConfirmId(null);
+    setPartialAmount('');
+  };
+
   const confirmRefund = () => {
     if (confirmId) {
-      refundMut.mutate(confirmId);
-      setConfirmId(null);
+      const amount =
+        selected?.planLinked && typeof partialAmount === 'number' && partialAmount > 0
+          ? partialAmount
+          : undefined;
+      refundMut.mutate({ id: confirmId, amount });
+      closeModal();
     }
   };
 
@@ -92,7 +113,7 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
 
       <Modal
         opened={confirmId !== null}
-        onClose={() => setConfirmId(null)}
+        onClose={closeModal}
         title={t('cashier.refund_modal.title')}
         centered
       >
@@ -120,8 +141,20 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
               </Group>
             </Stack>
           )}
+          {selected?.planLinked && (
+            <NumberInput
+              label={t('cashier.refund_modal.partial_amount')}
+              description={t('cashier.refund_modal.partial_hint')}
+              placeholder={String(selected.paidAmount)}
+              value={partialAmount}
+              onChange={(v) => setPartialAmount(typeof v === 'number' ? v : '')}
+              min={0}
+              max={selected.paidAmount}
+              thousandSeparator=" "
+            />
+          )}
           <Group justify="flex-end">
-            <Button variant="default" onClick={() => setConfirmId(null)}>
+            <Button variant="default" onClick={closeModal}>
               {t('cashier.refund_modal.cancel')}
             </Button>
             <Button color="orange" loading={refundMut.isPending} onClick={confirmRefund}>

@@ -10899,6 +10899,22 @@
             "in": "path"
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "amount": {
+                    "type": "number",
+                    "minimum": 0,
+                    "exclusiveMinimum": true
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Refund transaction",
@@ -10926,7 +10942,7 @@
             }
           },
           "400": {
-            "description": "Validation error",
+            "description": "Cannot refund",
             "content": {
               "application/json": {
                 "schema": {

@@ -169,6 +169,13 @@
       "when": 1782104938582,
       "tag": "0023_handy_norrin_radd",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1782106526548,
+      "tag": "0024_adorable_polaris",
+      "breakpoints": true
     }
   ]
 }

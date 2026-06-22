@@ -219,7 +219,23 @@ export const createCashierService = (deps: { audit: AuditLogger }) => {
     });
   }
 
-  async function refund(c: Context, id: string) {
+  /**
+   * Refund — to'liq YOKI qisman (V2-4, CLI-244).
+   * `amount` berilmasa = qolgan to'liq summa (eski xulq: void). Qisman (`amount` <
+   * qolgan) FAQAT plan-linked tranzaksiyada ruxsat (non-plan = semantik noaniqlik,
+   * line-item modeli yo'q → faqat to'liq). Mexanizm: kompensatsiya refund txn +
+   * PROPORSIONAL negative allocation (per-stage phantom-credit avtomatik oldi olinadi).
+   * Cumulative guard: Σ(refund.paidAmount) ≤ original.paidAmount. Original faqat
+   * cumulative=full bo'lganda void. Advisor qarori + Qaror #24 (allocation filtrlanmaydi).
+   */
+  async function refund(
+    c: Context,
+    id: string,
+    amount?: number,
+  ): Promise<
+    | { ok: true; refund: typeof cashierTransactions.$inferSelect }
+    | { ok: false; reason: 'invalid' | 'over_refund' | 'non_plan_partial' }
+  > {
     const db = getDb(c);
 
     return await db.transaction(async (tx) => {
@@ -229,9 +245,50 @@ export const createCashierService = (deps: { audit: AuditLogger }) => {
         .from(cashierTransactions)
         .where(eq(cashierTransactions.id, id))
         .for('update');
-      if (!original) return null;
-      // Refund of refund yoki allaqachon void qilingan (ikki marta refund) — RAD.
-      if (original.type === 'refund' || original.status === 'voided') return null;
+      if (!original) return { ok: false as const, reason: 'invalid' as const };
+      // Refund of refund yoki allaqachon void qilingan — RAD.
+      if (original.type === 'refund' || original.status === 'voided') {
+        return { ok: false as const, reason: 'invalid' as const };
+      }
+
+      const paid = Number(original.paidAmount);
+
+      // Allaqachon qaytarilgan summa (shu parentning refund row'lari).
+      const [refundedRow] = await tx
+        .select({ sum: sql<string>`COALESCE(SUM(${cashierTransactions.paidAmount}), 0)` })
+        .from(cashierTransactions)
+        .where(
+          and(
+            eq(cashierTransactions.parentTransactionId, id),
+            eq(cashierTransactions.type, 'refund'),
+          ),
+        );
+      const alreadyRefunded = Number(refundedRow?.sum ?? 0);
+      const remaining = paid - alreadyRefunded;
+
+      const refundAmount = amount ?? remaining;
+      if (!(refundAmount > 0)) return { ok: false as const, reason: 'invalid' as const };
+      if (refundAmount > remaining) return { ok: false as const, reason: 'over_refund' as const };
+
+      // Qisman (yoki ketma-ket) refund — faqat plan-linked.
+      const isPartial = refundAmount < paid;
+      if (!original.treatmentPlanId && (isPartial || alreadyRefunded > 0)) {
+        return { ok: false as const, reason: 'non_plan_partial' as const };
+      }
+
+      const factor = paid > 0 ? refundAmount / paid : 1;
+      const refundSeq =
+        (
+          await tx
+            .select({ c: count() })
+            .from(cashierTransactions)
+            .where(
+              and(
+                eq(cashierTransactions.parentTransactionId, id),
+                eq(cashierTransactions.type, 'refund'),
+              ),
+            )
+        )[0]?.c ?? 0;
 
       const [refundTx] = await tx
         .insert(cashierTransactions)
@@ -240,40 +297,45 @@ export const createCashierService = (deps: { audit: AuditLogger }) => {
           branchId: original.branchId,
           patientId: original.patientId,
           treatmentPlanId: original.treatmentPlanId,
-          receiptNumber: `${original.receiptNumber}-R`,
-          totalAmount: original.totalAmount,
-          paidAmount: original.paidAmount,
-          discount: original.discount,
+          receiptNumber: `${original.receiptNumber}-R${refundSeq + 1}`,
+          totalAmount: String(refundAmount),
+          paidAmount: String(refundAmount),
+          discount: '0',
           paymentMethod: original.paymentMethod,
           type: 'refund',
           parentTransactionId: id,
           status: 'completed',
-          notes: `Refund of ${original.receiptNumber}`,
+          notes: `Refund of ${original.receiptNumber}${isPartial ? ` (${refundAmount})` : ''}`,
           createdBy: c.get('user')?.id ?? null,
         })
         .returning();
+      if (!refundTx) return { ok: false as const, reason: 'invalid' as const };
 
-      // Asl tranzaksiya allocation'larini negatsiya qilish (balansni tiklaydi).
+      // Asl allocation'larni PROPORSIONAL negatsiya (balansni tiklaydi). Proporsional
+      // bo'lgani uchun har bosqich uchun Σ negatsiya ≤ asl allocation (phantom-credit yo'q).
       const origAllocations = await tx
         .select({ stageId: treatmentStagePayments.stageId, amount: treatmentStagePayments.amount })
         .from(treatmentStagePayments)
         .where(eq(treatmentStagePayments.transactionId, id));
 
-      if (refundTx && origAllocations.length > 0) {
+      if (origAllocations.length > 0) {
         await tx.insert(treatmentStagePayments).values(
           origAllocations.map((a) => ({
             tenantId: original.tenantId,
             transactionId: refundTx.id,
             stageId: a.stageId,
-            amount: String(-Number(a.amount)),
+            amount: String(-(Number(a.amount) * factor)),
           })),
         );
       }
 
-      await tx
-        .update(cashierTransactions)
-        .set({ status: 'voided' })
-        .where(eq(cashierTransactions.id, id));
+      // Original faqat to'liq qaytarilganda void (qisman → completed qoladi).
+      if (alreadyRefunded + refundAmount >= paid) {
+        await tx
+          .update(cashierTransactions)
+          .set({ status: 'voided' })
+          .where(eq(cashierTransactions.id, id));
+      }
 
       await deps.audit.record(c, {
         action: 'refunded',
@@ -283,7 +345,7 @@ export const createCashierService = (deps: { audit: AuditLogger }) => {
         after: refundTx,
       });
 
-      return refundTx;
+      return { ok: true as const, refund: refundTx };
     });
   }
 

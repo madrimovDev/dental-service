@@ -944,7 +944,9 @@
       "cancel": "Bekor qilish",
       "detail_receipt": "Chek raqami",
       "detail_amount": "Summa",
-      "detail_method": "To'lov usuli"
+      "detail_method": "To'lov usuli",
+      "partial_amount": "Qisman summa (ixtiyoriy)",
+      "partial_hint": "Bo'sh = to'liq qaytarish. Qisman faqat reja to'lovlari uchun."
     },
     "status_label": {
       "completed": "Yakunlangan",

@@ -333,6 +333,7 @@ export * from './recallDtoStatus';
 export * from './refresh200';
 export * from './refreshBody';
 export * from './refundCashierTransaction200';
+export * from './refundCashierTransactionBody';
 export * from './registerTenant201';
 export * from './registerTenantBody';
 export * from './registerTenantBodyDefaultLanguage';

@@ -944,7 +944,9 @@
       "cancel": "Отмена",
       "detail_receipt": "Номер чека",
       "detail_amount": "Сумма",
-      "detail_method": "Способ оплаты"
+      "detail_method": "Способ оплаты",
+      "partial_amount": "Частичная сумма (необязательно)",
+      "partial_hint": "Пусто = полный возврат. Частичный только для плановых платежей."
     },
     "status_label": {
       "completed": "Завершён",

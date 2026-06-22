@@ -104,7 +104,9 @@ export function useCreateTransaction() {
 export function useRefund() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => refundCashierTransaction(id).then((r) => r.data),
+    // amount yo'q = to'liq refund; berilsa = qisman (faqat plan-linked, backend tekshiradi).
+    mutationFn: ({ id, amount }: { id: string; amount?: number }) =>
+      refundCashierTransaction(id, amount != null ? { amount } : {}).then((r) => r.data),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: cashierKeys.all });
       // Refund allocation'larni negate qiladi → plan balans tiklanadi.

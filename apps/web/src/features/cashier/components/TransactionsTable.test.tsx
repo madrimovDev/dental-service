@@ -50,7 +50,7 @@ describe('TransactionsTable', () => {
     // Modaldagi tasdiqlash tugmasi (transition tugashini kutamiz).
     fireEvent.click(await screen.findByRole('button', { name: 'Qaytarish' }));
 
-    expect(refundMutate).toHaveBeenCalledWith('tx1');
+    expect(refundMutate).toHaveBeenCalledWith({ id: 'tx1', amount: undefined });
   });
 
   it("refund tugmasi faqat completed+payment uchun ko'rinadi", () => {

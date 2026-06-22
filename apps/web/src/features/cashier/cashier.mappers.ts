@@ -114,6 +114,7 @@ export function toTransactionVM(tx: CashierTransaction): TransactionVM {
     status: tx.status,
     createdAt: tx.createdAt,
     refundable: tx.status === 'completed' && tx.type === 'payment',
+    planLinked: tx.treatmentPlanId != null,
   };
 }
 

@@ -18,6 +18,7 @@ import {
   patientPlansQuery,
   planBalanceDtoSchema,
   planIdParamSchema,
+  refundRequestSchema,
   transactionIdParamSchema,
 } from './cashier.schema.ts';
 import { AllocationExceedError, createCashierService } from './cashier.service.ts';
@@ -131,16 +132,34 @@ export const cashierRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     tags: ['cashier'],
     operationId: 'refundCashierTransaction',
     middleware: [requirePermission('cashier.refund')] as const,
-    request: { params: transactionIdParamSchema },
-    responses: okJson(cashierTransactionWithItemsDtoSchema, 'Refund transaction'),
+    request: {
+      params: transactionIdParamSchema,
+      body: { content: { 'application/json': { schema: refundRequestSchema } } },
+    },
+    responses: {
+      ...okJson(cashierTransactionWithItemsDtoSchema, 'Refund transaction'),
+      400: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Cannot refund',
+      },
+    },
   });
 
   app.openapi(refundRoute, async (c) => {
     const { id } = c.req.valid('param');
-    const tx = await service.refund(c, id);
-    if (!tx) return c.json(fail('refund.invalid', 'Cannot refund'), 400);
+    const { amount } = c.req.valid('json');
+    const res = await service.refund(c, id, amount);
+    if (!res.ok) {
+      const msg =
+        res.reason === 'over_refund'
+          ? 'Refund exceeds remaining paid amount'
+          : res.reason === 'non_plan_partial'
+            ? 'Partial refund only supported for plan-linked payments'
+            : 'Cannot refund';
+      return c.json(fail(`refund.${res.reason}`, msg), 400);
+    }
     // refund row items'siz keladi — wire shaklida `items: []`.
-    return c.json(ok(toCashierTransactionWithItemsDto(tx)), 200);
+    return c.json(ok(toCashierTransactionWithItemsDto(res.refund)), 200);
   });
 
   // ─── GET /daily-summary — kassa yopilishi ────────────────────────────────
