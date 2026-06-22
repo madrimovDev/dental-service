@@ -24,6 +24,7 @@ import type {
   AppointmentStatsReport,
   DentalAnalyticsReport,
   DoctorWorkloadRow,
+  OneCExportRow,
   PlanCompletionReport,
   ReportRange,
   RevenueReport,
@@ -346,7 +347,52 @@ export const createReportsService = () => {
     };
   }
 
-  return { revenue, appointmentStats, doctorWorkload, planCompletion, dentalAnalytics };
+  /** 1C buxgalteriya eksporti — tranzaksiya-darajali (completed) qatorlar. */
+  async function oneCExport(
+    c: Context,
+    { from, to, branchId }: ReportRange,
+  ): Promise<OneCExportRow[]> {
+    const db = getDb(c);
+    const { start, end } = tashkentRange(from, to);
+    const filter = [
+      eq(cashierTransactions.status, 'completed'),
+      between(cashierTransactions.createdAt, start, end),
+    ];
+    if (branchId) filter.push(eq(cashierTransactions.branchId, branchId));
+
+    const rows = await db
+      .select({
+        date: sql<string>`(${cashierTransactions.createdAt} AT TIME ZONE 'Asia/Tashkent')::date`,
+        receiptNumber: cashierTransactions.receiptNumber,
+        type: cashierTransactions.type,
+        paymentMethod: cashierTransactions.paymentMethod,
+        amount: cashierTransactions.paidAmount,
+        patientName: patients.fullName,
+      })
+      .from(cashierTransactions)
+      .leftJoin(patients, eq(cashierTransactions.patientId, patients.id))
+      .where(and(...filter))
+      .orderBy(cashierTransactions.createdAt);
+
+    return rows.map((r) => ({
+      date: String(r.date),
+      receiptNumber: r.receiptNumber ?? null,
+      type: r.type,
+      paymentMethod: r.paymentMethod,
+      // refund manfiy summa sifatida (buxgalteriya konvensiyasi).
+      amount: r.type === 'refund' ? -Number(r.amount) : Number(r.amount),
+      patientName: r.patientName ?? null,
+    }));
+  }
+
+  return {
+    revenue,
+    appointmentStats,
+    doctorWorkload,
+    planCompletion,
+    dentalAnalytics,
+    oneCExport,
+  };
 };
 
 export type ReportsService = ReturnType<typeof createReportsService>;

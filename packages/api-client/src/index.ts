@@ -305,6 +305,7 @@ export type {
   NotificationMarkReadResult,
   NotificationsFeed,
   NotificationsFeedMeta,
+  OneCExportRow,
   Patient,
   PatientEmergencyContact,
   PatientGender as Gender,
@@ -569,6 +570,7 @@ export type {
   GetAppointmentStatsReportResult,
   GetDentalAnalyticsReportResult,
   GetDoctorWorkloadReportResult,
+  GetOneCExportResult,
   GetPlanCompletionReportResult,
   GetRevenueReportResult,
 } from './generated/reports/reports.ts';
@@ -576,6 +578,7 @@ export {
   getAppointmentStatsReport,
   getDentalAnalyticsReport,
   getDoctorWorkloadReport,
+  getOneCExport,
   getPlanCompletionReport,
   getRevenueReport,
 } from './generated/reports/reports.ts';

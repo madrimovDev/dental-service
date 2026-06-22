@@ -2,6 +2,7 @@ import {
   getAppointmentStatsReport,
   getDentalAnalyticsReport,
   getDoctorWorkloadReport,
+  getOneCExport,
   getPlanCompletionReport,
   getRevenueReport,
 } from '@dental/api-client';
@@ -47,5 +48,14 @@ export function useDentalAnalytics(range: ReportRange) {
   return useQuery({
     queryKey: reportKeys.dentalAnalytics(range),
     queryFn: () => getDentalAnalyticsReport(toQuery(range)).then((r) => r.data),
+  });
+}
+
+/** 1C eksport — faqat tugma bosilganda (enabled:false → refetch). */
+export function useOneCExport(range: ReportRange) {
+  return useQuery({
+    queryKey: reportKeys.oneCExport(range),
+    queryFn: () => getOneCExport(toQuery(range)).then((r) => r.data),
+    enabled: false,
   });
 }

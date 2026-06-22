@@ -1,6 +1,7 @@
 import type {
   AppointmentStatsReport,
   DoctorWorkloadRow,
+  OneCExportRow,
   PlanCompletionReport,
   RevenueReport,
 } from '@dental/api-client';
@@ -86,6 +87,34 @@ const escapeCsvCell = (cell: string): string => {
   }
   return cell;
 };
+
+/**
+ * 1C buxgalteriya eksporti — tranzaksiya qatorlari (V3-4). ⚠️ FORMAT PROVIZIONAL:
+ * standart ustun-xaritasi (Дата;Документ;Тип;Метод;Сумма;Контрагент). Aniq 1C
+ * interchange mijozning konfiguratsiyasiga (hisoblar rejasi) bog'liq.
+ * TODO: mijoz 1C XSD/shabloni bilan ustunlarni moslash.
+ */
+export function oneCToRows(rows: OneCExportRow[]): string[][] {
+  const out: string[][] = [['Дата', 'Документ', 'Тип', 'Метод', 'Сумма', 'Контрагент']];
+  for (const r of rows) {
+    out.push([
+      r.date,
+      r.receiptNumber ?? '',
+      r.type,
+      r.paymentMethod,
+      String(r.amount),
+      r.patientName ?? '',
+    ]);
+  }
+  return out;
+}
+
+/** 1C CSV — nuqta-vergul ajratkichi (1C/RU Excel konvensiyasi). */
+export function download1C(rows: string[][], filename: string): void {
+  const csv = rows.map((row) => row.map(escapeCsvCell).join(';')).join('\r\n');
+  const blob = new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8;' });
+  triggerDownload(blob, filename.endsWith('.csv') ? filename : `${filename}.csv`);
+}
 
 export function downloadCsv(rows: string[][], filename: string): void {
   const csv = rows.map((row) => row.map(escapeCsvCell).join(',')).join('\r\n');
