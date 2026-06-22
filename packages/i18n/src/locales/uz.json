@@ -62,7 +62,22 @@
   "validation": {
     "phone_invalid": "Telefon raqami noto'g'ri formatda",
     "password_required": "Parol kerak",
-    "min_chars": "Kamida {{count}} belgi"
+    "min_chars": "Kamida {{count}} belgi",
+    "required": "Majburiy maydon",
+    "invalidType": "Noto'g'ri qiymat",
+    "invalidEmail": "Email manzili noto'g'ri",
+    "invalidUrl": "URL manzili noto'g'ri",
+    "invalidFormat": "Noto'g'ri format",
+    "tooShort": "Kamida {{min}} belgi bo'lishi kerak",
+    "tooLong": "Ko'pi bilan {{max}} belgi bo'lishi mumkin",
+    "tooSmall": "{{min}} dan katta yoki teng bo'lishi kerak",
+    "tooBig": "{{max}} dan kichik yoki teng bo'lishi kerak",
+    "tooFew": "Kamida {{min}} ta element bo'lishi kerak",
+    "tooMany": "Ko'pi bilan {{max}} ta element bo'lishi mumkin",
+    "notMultipleOf": "{{divisor}} ga karrali bo'lishi kerak",
+    "unrecognizedKeys": "Noma'lum maydon(lar)",
+    "invalidValue": "Ruxsat etilmagan qiymat",
+    "invalidInput": "Noto'g'ri kiritildi"
   },
   "auth": {
     "login": {
