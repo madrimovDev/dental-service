@@ -1,11 +1,14 @@
-import { IconButton } from '@dental/ui';
+import { Button, IconButton } from '@dental/ui';
 import { Burger, useMantineColorScheme } from '@mantine/core';
 import { spotlight } from '@mantine/spotlight';
-import { Moon, PanelLeft, Search, Sun } from 'lucide-react';
+import { Moon, PanelLeft, Plus, Search, Sun } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { NotificationBell } from '@/features/notifications/components/NotificationBell.tsx';
+import { useAuthStore } from '@/stores/auth-store.ts';
 import { useUiStore } from '@/stores/ui-store.ts';
 import classes from './Topbar.module.css';
+import { usePageTitle } from './use-page-title.ts';
 
 export function Topbar({
   onBurger,
@@ -17,6 +20,9 @@ export function Topbar({
   const { t, i18n } = useTranslation();
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
   const toggleSidebarRail = useUiStore((s) => s.toggleSidebarRail);
+  const navigate = useNavigate();
+  const { hasPermission } = useAuthStore();
+  const titleKey = usePageTitle();
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent);
 
   return (
@@ -26,6 +32,8 @@ export function Topbar({
       <IconButton label={t('shell.toggle_sidebar')} onClick={toggleSidebarRail}>
         <PanelLeft />
       </IconButton>
+
+      <span className={classes.pageTitle}>{t(titleKey)}</span>
 
       <button
         type="button"
@@ -67,6 +75,16 @@ export function Topbar({
           RU
         </button>
       </div>
+
+      {hasPermission('patient.create') && (
+        <Button
+          variant="primary"
+          iconLeft={<Plus size={16} />}
+          onClick={() => navigate('/patients/new')}
+        >
+          {t('nav.patient_new')}
+        </Button>
+      )}
     </div>
   );
 }
