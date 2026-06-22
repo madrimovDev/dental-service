@@ -10,6 +10,7 @@ import type {
   GetLabOrder200,
   ListLabOrders200,
   ListLabOrdersParams,
+  ListOverdueLabOrders200,
   UpdateLabOrder200,
   UpdateLabOrderBody
 } from '.././model';
@@ -37,6 +38,14 @@ import { customInstance } from '../../mutator';
     },
       );
     }
+  export const listOverdueLabOrders = (
+    
+ ) => {
+      return customInstance<ListOverdueLabOrders200>(
+      {url: `/api/lab-orders/overdue`, method: 'GET'
+    },
+      );
+    }
   export const getLabOrder = (
     id: string,
  ) => {
@@ -58,5 +67,6 @@ import { customInstance } from '../../mutator';
     }
   export type ListLabOrdersResult = NonNullable<Awaited<ReturnType<typeof listLabOrders>>>
 export type CreateLabOrderResult = NonNullable<Awaited<ReturnType<typeof createLabOrder>>>
+export type ListOverdueLabOrdersResult = NonNullable<Awaited<ReturnType<typeof listOverdueLabOrders>>>
 export type GetLabOrderResult = NonNullable<Awaited<ReturnType<typeof getLabOrder>>>
 export type UpdateLabOrderResult = NonNullable<Awaited<ReturnType<typeof updateLabOrder>>>

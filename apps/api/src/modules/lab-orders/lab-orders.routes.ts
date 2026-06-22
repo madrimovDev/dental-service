@@ -56,6 +56,21 @@ export const labOrdersRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     return c.json(ok(rows.map(toLabOrderDto)), 200);
   });
 
+  // ─── GET /overdue — muddati o'tgan buyurtmalar (V3-5) ───────────────────────
+  const overdueRoute = createRoute({
+    method: 'get',
+    path: '/overdue',
+    tags: ['lab-orders'],
+    operationId: 'listOverdueLabOrders',
+    middleware: [requirePermission('lab_order.view'), requireFeature('labOrders')] as const,
+    responses: okJson(z.array(labOrderDtoSchema), 'Overdue lab orders'),
+  });
+
+  app.openapi(overdueRoute, async (c) => {
+    const rows = await service.overdue(c);
+    return c.json(ok(rows.map(toLabOrderDto)), 200);
+  });
+
   // ─── POST / — create ─────────────────────────────────────────────────────────
 
   const createRoute_ = createRoute({

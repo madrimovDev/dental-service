@@ -38,7 +38,14 @@ export const patients = pgTable(
     // R2: teg / manba / sug'urta (CLI-38)
     tags: text('tags').array().notNull().default(sql`'{}'`),
     source: text('source'),
-    insurance: jsonb('insurance').$type<{ provider: string; policyNumber: string } | null>(),
+    insurance: jsonb('insurance').$type<{
+      provider: string;
+      policyNumber: string;
+      // V3-5 — ixtiyoriy (eski rows'da yo'q, backward-compatible JSONB kengaytma).
+      coverageType?: 'dental' | 'general' | 'other';
+      expiryDate?: string;
+      isActive?: boolean;
+    } | null>(),
 
     archivedAt: timestamp('archived_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

@@ -74,7 +74,22 @@ function GeneralReadOnly({ patient }: { patient: PatientDetail }) {
       </Card>
 
       {patient.insurance && (
-        <Card title={t('patients.form.insurance')}>
+        <Card
+          title={t('patients.form.insurance')}
+          actions={
+            <Badge
+              color={
+                patient.insuranceStatus === 'active'
+                  ? 'teal'
+                  : patient.insuranceStatus === 'expired'
+                    ? 'red'
+                    : 'gray'
+              }
+            >
+              {t(`patients.insurance_status.${patient.insuranceStatus}`)}
+            </Badge>
+          }
+        >
           <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
             <Field
               label={t('patients.form.insurance_provider')}
@@ -89,6 +104,18 @@ function GeneralReadOnly({ patient }: { patient: PatientDetail }) {
                   dash
                 )
               }
+            />
+            <Field
+              label={t('patients.form.insurance_coverage')}
+              value={
+                patient.insurance.coverageType
+                  ? t(`patients.form.coverage_${patient.insurance.coverageType}`)
+                  : dash
+              }
+            />
+            <Field
+              label={t('patients.form.insurance_expiry')}
+              value={patient.insurance.expiryDate || dash}
             />
           </SimpleGrid>
         </Card>

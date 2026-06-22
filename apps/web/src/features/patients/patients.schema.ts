@@ -23,6 +23,9 @@ export const patientFormSchema = z.object({
     .object({
       provider: z.string().max(120),
       policyNumber: z.string().max(80),
+      coverageType: z.enum(['dental', 'general', 'other']).optional(),
+      expiryDate: z.string().optional(),
+      isActive: z.boolean().optional(),
     })
     .refine((v) => (v.provider.trim() === '') === (v.policyNumber.trim() === ''), {
       path: ['policyNumber'],

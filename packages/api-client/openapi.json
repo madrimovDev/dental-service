@@ -1093,11 +1093,41 @@
               },
               "policyNumber": {
                 "type": "string"
+              },
+              "coverageType": {
+                "type": "string",
+                "nullable": true,
+                "enum": [
+                  "dental",
+                  "general",
+                  "other",
+                  null
+                ]
+              },
+              "expiryDate": {
+                "type": "string",
+                "nullable": true
+              },
+              "isActive": {
+                "type": "boolean",
+                "nullable": true
               }
             },
             "required": [
               "provider",
-              "policyNumber"
+              "policyNumber",
+              "coverageType",
+              "expiryDate",
+              "isActive"
+            ]
+          },
+          "insuranceStatus": {
+            "type": "string",
+            "enum": [
+              "active",
+              "expired",
+              "inactive",
+              "none"
             ]
           },
           "archivedAt": {
@@ -1126,6 +1156,7 @@
           "tags",
           "source",
           "insurance",
+          "insuranceStatus",
           "archivedAt",
           "createdAt",
           "updatedAt"
@@ -8644,6 +8675,21 @@
                         "type": "string",
                         "minLength": 1,
                         "maxLength": 80
+                      },
+                      "coverageType": {
+                        "type": "string",
+                        "enum": [
+                          "dental",
+                          "general",
+                          "other"
+                        ]
+                      },
+                      "expiryDate": {
+                        "type": "string",
+                        "format": "date"
+                      },
+                      "isActive": {
+                        "type": "boolean"
                       }
                     },
                     "required": [
@@ -8888,6 +8934,21 @@
                         "type": "string",
                         "minLength": 1,
                         "maxLength": 80
+                      },
+                      "coverageType": {
+                        "type": "string",
+                        "enum": [
+                          "dental",
+                          "general",
+                          "other"
+                        ]
+                      },
+                      "expiryDate": {
+                        "type": "string",
+                        "format": "date"
+                      },
+                      "isActive": {
+                        "type": "boolean"
                       }
                     },
                     "required": [
@@ -17270,6 +17331,74 @@
                     },
                     "data": {
                       "$ref": "#/components/schemas/LabOrder"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lab-orders/overdue": {
+      "get": {
+        "tags": [
+          "lab-orders"
+        ],
+        "operationId": "listOverdueLabOrders",
+        "responses": {
+          "200": {
+            "description": "Overdue lab orders",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/LabOrder"
+                      }
                     }
                   },
                   "required": [
