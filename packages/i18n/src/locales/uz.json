@@ -1007,6 +1007,17 @@
     "tab_items": "Mahsulotlar",
     "tab_bom": "Sarflanish (BOM)",
     "create_item": "Yangi mahsulot",
+    "batch": {
+      "receive": "Partiya qabul qilish",
+      "item": "Mahsulot",
+      "qty": "Miqdor",
+      "cost": "Narx (dona)",
+      "supplier": "Yetkazib beruvchi",
+      "number": "Partiya raqami",
+      "expiry": "Yaroqlilik muddati",
+      "expiring_title": "Muddati yaqinlashayotgan partiyalar",
+      "expiring_body": "{{count}} ta partiyaning yaroqlilik muddati 30 kun ichida tugaydi."
+    },
     "item_name": "Nomi",
     "unit": "Birlik",
     "unit_placeholder": "dona, ml, g...",

@@ -1,13 +1,20 @@
 import { PageHead, StateView } from '@dental/ui';
-import { Button, Card, Container, Grid, Group, Select, Stack, Tabs } from '@mantine/core';
+import { Alert, Button, Card, Container, Grid, Group, Select, Stack, Tabs } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconBox, IconList, IconPlus } from '@tabler/icons-react';
+import { IconAlertTriangle, IconBox, IconList, IconPlus, IconTruck } from '@tabler/icons-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth-store.ts';
-import { useBranches, useServices, useStockItems, useStockMovements } from '../stock.api';
+import {
+  useBranches,
+  useExpiringBatches,
+  useServices,
+  useStockItems,
+  useStockMovements,
+} from '../stock.api';
 import { toStockItemVM } from '../stock.mappers';
 import type { StockItemVM } from '../stock.types';
+import { BatchFormModal } from './BatchFormModal';
 import { BomPanel } from './BomPanel';
 import { ItemFormModal } from './ItemFormModal';
 import { MovementFormModal } from './MovementFormModal';
@@ -25,11 +32,13 @@ export function StockScreen() {
 
   const [itemFormOpened, { open: openItemForm, close: closeItemForm }] = useDisclosure(false);
   const [movementOpened, { open: openMovement, close: closeMovement }] = useDisclosure(false);
+  const [batchOpened, { open: openBatch, close: closeBatch }] = useDisclosure(false);
 
   const branches = useBranches();
   const services = useServices();
   const items = useStockItems(branchId ?? undefined);
   const movements = useStockMovements(selectedId);
+  const expiring = useExpiringBatches(30);
 
   const itemVMs = useMemo(() => (items.data ?? []).map(toStockItemVM), [items.data]);
   const selectedItem = useMemo(
@@ -51,12 +60,27 @@ export function StockScreen() {
           title={t('stock.title')}
           actions={
             canManage && (
-              <Button leftSection={<IconPlus size={18} />} onClick={openItemForm}>
-                {t('stock.create_item')}
-              </Button>
+              <Group gap="sm">
+                <Button variant="default" leftSection={<IconTruck size={18} />} onClick={openBatch}>
+                  {t('stock.batch.receive')}
+                </Button>
+                <Button leftSection={<IconPlus size={18} />} onClick={openItemForm}>
+                  {t('stock.create_item')}
+                </Button>
+              </Group>
             )
           }
         />
+
+        {(expiring.data?.length ?? 0) > 0 && (
+          <Alert
+            color="orange"
+            icon={<IconAlertTriangle size={18} />}
+            title={t('stock.batch.expiring_title')}
+          >
+            {t('stock.batch.expiring_body', { count: expiring.data?.length ?? 0 })}
+          </Alert>
+        )}
 
         <Tabs defaultValue="items">
           <Tabs.List mb="md">
@@ -134,6 +158,7 @@ export function StockScreen() {
         branches={branches.data ?? []}
       />
       <MovementFormModal opened={movementOpened} onClose={closeMovement} item={movementItem} />
+      <BatchFormModal opened={batchOpened} onClose={closeBatch} items={itemVMs} />
     </Container>
   );
 }

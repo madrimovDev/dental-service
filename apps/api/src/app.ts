@@ -18,7 +18,7 @@ import { consentRoutes } from './modules/consent/index.ts';
 import { expensesRoutes } from './modules/expenses/index.ts';
 import { healthRoutes } from './modules/health/index.ts';
 import { labOrdersRoutes } from './modules/lab-orders/index.ts';
-import { notificationsRoutes } from './modules/notifications/index.ts';
+import { createNotificationsService, notificationsRoutes } from './modules/notifications/index.ts';
 import { patientImagesRoutes } from './modules/patient-images/index.ts';
 import { patientRoutes } from './modules/patients/index.ts';
 import { payrollRoutes } from './modules/payroll/index.ts';
@@ -38,6 +38,10 @@ import { userRoutes } from './modules/users/index.ts';
 export const createApp = () => {
   const app = new OpenAPIHono();
   const audit = createAuditLogger({ db });
+  // Notifications service — bir marta yaratiladi, bir nechta modulga ulanadi
+  // (notifications routes + stock low-stock alert + clinical auto-deduction alert).
+  const sms = createSmsChannel({ eskizEmail: env.ESKIZ_EMAIL, eskizPassword: env.ESKIZ_PASSWORD });
+  const notifications = createNotificationsService({ sms });
 
   // Global middleware
   app.use('*', requestId());
@@ -105,7 +109,7 @@ export const createApp = () => {
   app.route('/api/queue', queueRoutes({ db, audit }));
   app.route('/api/recalls', recallRoutes({ db, audit }));
   // Clinical: /api/diagnoses, /api/treatment-plans, /api/visit-notes, /api/tooth-charts
-  app.route('/api', clinicalRoutes({ db, audit, recall }));
+  app.route('/api', clinicalRoutes({ db, audit, recall, notifications }));
   // M5 clinical extras
   app.route('/api/prescriptions', prescriptionsRoutes({ db, audit }));
   app.route('/api/consent', consentRoutes({ db, audit }));
@@ -113,15 +117,9 @@ export const createApp = () => {
   app.route('/api', patientImagesRoutes({ db, audit }));
   // R4 Guruh A: xarajatlar (/api/expense-categories, /api/expenses), ombor (/api/stock)
   app.route('/api', expensesRoutes({ db, audit }));
-  app.route('/api/stock', stockRoutes({ db, audit }));
+  app.route('/api/stock', stockRoutes({ db, audit, notifications }));
   app.route('/api/payroll', payrollRoutes({ db, audit }));
-  app.route(
-    '/api/notifications',
-    notificationsRoutes({
-      db,
-      sms: createSmsChannel({ eskizEmail: env.ESKIZ_EMAIL, eskizPassword: env.ESKIZ_PASSWORD }),
-    }),
-  );
+  app.route('/api/notifications', notificationsRoutes({ db, sms }));
 
   // Error handler
   app.onError(errorHandler);

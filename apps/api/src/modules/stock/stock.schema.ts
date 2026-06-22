@@ -33,6 +33,17 @@ export const createBomSchema = z.object({
 });
 export type CreateBomInput = z.infer<typeof createBomSchema>;
 
+/** Partiya qabul qilish (V2-2) — supplier/batch#/expiry/cost ixtiyoriy. */
+export const createBatchSchema = z.object({
+  itemId: z.uuid(),
+  qtyReceived: z.coerce.number().positive(),
+  supplierName: z.string().max(200).optional(),
+  batchNumber: z.string().max(100).optional(),
+  expiryDate: z.iso.datetime().optional(),
+  costPerUnit: z.coerce.number().nonnegative().optional(),
+});
+export type CreateBatchInput = z.infer<typeof createBatchSchema>;
+
 // ===== Query schemas (route-level) =====
 export const movementsQuerySchema = z.object({
   itemId: z.uuid(),
@@ -40,6 +51,14 @@ export const movementsQuerySchema = z.object({
 
 export const bomQuerySchema = z.object({
   serviceId: z.uuid().optional(),
+});
+
+export const batchesQuerySchema = z.object({
+  itemId: z.uuid(),
+});
+
+export const expiringQuerySchema = z.object({
+  withinDays: z.coerce.number().int().positive().max(365).optional(),
 });
 
 /** Path param — /items/{id} va /bom/{id} ikkalasi ham faqat `id`. */
@@ -98,3 +117,19 @@ export type ServiceMaterialDto = z.infer<typeof serviceMaterialDtoSchema>;
 export const stockBomDeleteResultSchema = z
   .object({ deleted: z.literal(true) })
   .openapi('StockBomDeleteResult');
+
+export const stockBatchDtoSchema = z
+  .object({
+    id: z.uuid(),
+    tenantId: z.uuid(),
+    itemId: z.uuid(),
+    supplierName: z.string().nullable(),
+    batchNumber: z.string().nullable(),
+    expiryDate: z.string().nullable(),
+    costPerUnit: z.string().nullable(),
+    qtyReceived: z.string(),
+    receivedAt: z.string(),
+    createdAt: z.string(),
+  })
+  .openapi('StockBatch');
+export type StockBatchDto = z.infer<typeof stockBatchDtoSchema>;

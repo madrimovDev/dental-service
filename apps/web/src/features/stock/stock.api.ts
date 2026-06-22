@@ -1,9 +1,12 @@
 import {
+  createStockBatch,
   createStockBom,
   createStockItem,
   createStockMovement,
   listBranches,
+  listExpiringStockBatches,
   listServices,
+  listStockBatches,
   listStockBom,
   listStockItems,
   listStockMovements,
@@ -35,6 +38,32 @@ export function useServiceMaterials(serviceId?: string) {
   return useQuery({
     queryKey: stockKeys.bom(serviceId ?? ''),
     queryFn: () => listStockBom(serviceId ? { serviceId } : undefined).then((r) => r.data),
+  });
+}
+
+/** Item bo'yicha partiyalar (supplier/batch#/expiry/cost). */
+export function useStockBatches(itemId: string | null) {
+  return useQuery({
+    queryKey: stockKeys.batches(itemId ?? ''),
+    queryFn: () => listStockBatches({ itemId: itemId ?? '' }).then((r) => r.data),
+    enabled: !!itemId,
+  });
+}
+
+/** Muddati yaqinlashayotgan partiyalar (ogohlantirish). */
+export function useExpiringBatches(withinDays = 30) {
+  return useQuery({
+    queryKey: stockKeys.expiring(withinDays),
+    queryFn: () => listExpiringStockBatches({ withinDays }).then((r) => r.data),
+  });
+}
+
+export function useCreateBatch() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Parameters<typeof createStockBatch>[0]) =>
+      createStockBatch(body).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: stockKeys.all }),
   });
 }
 

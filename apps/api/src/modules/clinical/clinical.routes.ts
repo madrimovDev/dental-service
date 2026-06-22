@@ -3,6 +3,7 @@ import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
+import type { NotificationsService } from '../notifications/notifications.service.ts';
 import { createStockService } from '../stock/stock.service.ts';
 import { diagnosesRoutes } from './diagnoses/index.ts';
 import { toothChartsRoutes } from './tooth-charts/index.ts';
@@ -25,13 +26,18 @@ export const clinicalRoutes = (deps: {
   db: Database;
   audit: AuditLogger;
   recall?: RecallStageHook;
+  notifications?: NotificationsService;
 }) => {
   const app = new OpenAPIHono();
   app.use('*', authMiddleware());
   app.use('*', rlsMiddleware(deps.db));
 
   // Ombor chiqim hook'i DI — vizit yaratilganda BOM material yechiladi (cycle yo'q).
-  const stockService = createStockService({ audit: deps.audit });
+  // notifications — auto-deduction low-stock alert uchun (V2-2).
+  const stockService = createStockService({
+    audit: deps.audit,
+    notifications: deps.notifications,
+  });
 
   // C5: vizit→bosqich completed hook (factory injection, recall pattern bilan bir xil).
   // Bosqich completed → recall ham fire bo'ladi (treatment-plans.service ichida).

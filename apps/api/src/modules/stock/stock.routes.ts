@@ -6,20 +6,26 @@ import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openap
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
+import type { NotificationsService } from '../notifications/notifications.service.ts';
 import {
   toServiceMaterialDto,
+  toStockBatchDto,
   toStockItemDto,
   toStockItemWithLowStockDto,
   toStockMovementDto,
 } from './stock.mapper.ts';
 import {
+  batchesQuerySchema,
   bomQuerySchema,
+  createBatchSchema,
   createBomSchema,
   createItemSchema,
   createMovementSchema,
+  expiringQuerySchema,
   listItemsQuerySchema,
   movementsQuerySchema,
   serviceMaterialDtoSchema,
+  stockBatchDtoSchema,
   stockBomDeleteResultSchema,
   stockIdParamSchema,
   stockItemDtoSchema,
@@ -27,7 +33,7 @@ import {
   stockMovementDtoSchema,
   updateItemSchema,
 } from './stock.schema.ts';
-import { createStockService } from './stock.service.ts';
+import { createStockService, InsufficientStockError } from './stock.service.ts';
 
 /** Standart 404 — get / patch / delete endpoint'lar uchun. */
 const notFoundResponse = {
@@ -63,12 +69,16 @@ const createdResponses = <T extends z.ZodTypeAny>(schema: T, description: string
  *   /api/stock/movements (POST manage, GET item bo'yicha view)
  *   /api/stock/bom       (CRUD manage — service→material normalari)
  */
-export const stockRoutes = (deps: { db: Database; audit: AuditLogger }) => {
+export const stockRoutes = (deps: {
+  db: Database;
+  audit: AuditLogger;
+  notifications?: NotificationsService;
+}) => {
   const app = new OpenAPIHono();
   app.use('*', authMiddleware());
   app.use('*', rlsMiddleware(deps.db));
 
-  const service = createStockService({ audit: deps.audit });
+  const service = createStockService({ audit: deps.audit, notifications: deps.notifications });
 
   // ===== Items =====
   const listItemsRoute = createRoute({
@@ -170,14 +180,33 @@ export const stockRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     request: {
       body: { content: { 'application/json': { schema: createMovementSchema } } },
     },
-    responses: createdResponses(stockMovementDtoSchema, 'Stock movement created'),
+    responses: {
+      ...createdResponses(stockMovementDtoSchema, 'Stock movement created'),
+      409: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Insufficient stock (negative guard)',
+      },
+    },
   });
 
   app.openapi(createMovementRoute, async (c) => {
     const body = c.req.valid('json');
-    const movement = await service.createMovement(c, body);
-    if (!movement) throw new Error('Stock movement creation failed');
-    return c.json(ok(toStockMovementDto(movement)), 201);
+    try {
+      const movement = await service.createMovement(c, body);
+      if (!movement) throw new Error('Stock movement creation failed');
+      return c.json(ok(toStockMovementDto(movement)), 201);
+    } catch (err) {
+      if (err instanceof InsufficientStockError) {
+        return c.json(
+          fail('stock.insufficient', 'Insufficient stock for this movement', {
+            available: err.available,
+            requested: err.requested,
+          }),
+          409,
+        );
+      }
+      throw err;
+    }
   });
 
   // ===== BOM =====
@@ -231,6 +260,58 @@ export const stockRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     const bom = await service.removeBom(c, id);
     if (!bom) return c.json(fail('bom.not_found', 'BOM not found'), 404);
     return c.json(ok({ deleted: true as const }), 200);
+  });
+
+  // ===== Batches (V2-2) =====
+  const listBatchesRoute = createRoute({
+    method: 'get',
+    path: '/batches',
+    tags: ['stock'],
+    operationId: 'listStockBatches',
+    middleware: [requirePermission('stock.view')] as const,
+    request: { query: batchesQuerySchema },
+    responses: okJson(z.array(stockBatchDtoSchema), 'List of stock batches for an item'),
+  });
+
+  app.openapi(listBatchesRoute, async (c) => {
+    const { itemId } = c.req.valid('query');
+    const rows = await service.listBatches(c, itemId);
+    return c.json(ok(rows.map(toStockBatchDto)), 200);
+  });
+
+  const expiringBatchesRoute = createRoute({
+    method: 'get',
+    path: '/batches/expiring',
+    tags: ['stock'],
+    operationId: 'listExpiringStockBatches',
+    middleware: [requirePermission('stock.view')] as const,
+    request: { query: expiringQuerySchema },
+    responses: okJson(z.array(stockBatchDtoSchema), 'Batches expiring within N days'),
+  });
+
+  app.openapi(expiringBatchesRoute, async (c) => {
+    const { withinDays } = c.req.valid('query');
+    const rows = await service.expiringBatches(c, withinDays);
+    return c.json(ok(rows.map(toStockBatchDto)), 200);
+  });
+
+  const createBatchRoute = createRoute({
+    method: 'post',
+    path: '/batches',
+    tags: ['stock'],
+    operationId: 'createStockBatch',
+    middleware: [requirePermission('stock.manage')] as const,
+    request: {
+      body: { content: { 'application/json': { schema: createBatchSchema } } },
+    },
+    responses: createdResponses(stockBatchDtoSchema, 'Stock batch received'),
+  });
+
+  app.openapi(createBatchRoute, async (c) => {
+    const body = c.req.valid('json');
+    const batch = await service.createBatch(c, body);
+    if (!batch) throw new Error('Batch creation failed');
+    return c.json(ok(toStockBatchDto(batch)), 201);
   });
 
   return app;
