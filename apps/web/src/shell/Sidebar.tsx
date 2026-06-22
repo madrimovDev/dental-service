@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { RecallNavBadge } from '@/features/recalls/components/RecallNavBadge.tsx';
 import { useVertical } from '@/features/settings/settings.api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
+import { useUiStore } from '@/stores/ui-store.ts';
 import { type NavItem, visibleGroups } from './nav-config';
 import classes from './Sidebar.module.css';
 
@@ -19,6 +20,7 @@ export function Sidebar() {
   const { hasPermission, permissions } = useAuthStore();
   const { pathname } = useLocation();
   const vertical = useVertical();
+  const rail = useUiStore((s) => s.sidebarRail);
   const isOwner = permissions.includes('@owner');
   const groups = visibleGroups(hasPermission, vertical, isOwner);
   const allPaths = groups.flatMap((g) => g.items.filter((i) => !i.disabled).map((i) => i.path));
@@ -35,7 +37,7 @@ export function Sidebar() {
           title={t('shell.coming_soon')}
         >
           <Icon />
-          {label}
+          <span className={classes.label}>{label}</span>
           <span className={classes.soon}>{t('shell.coming_soon')}</span>
         </span>
       );
@@ -46,16 +48,17 @@ export function Sidebar() {
         to={item.path}
         className={classes.item}
         data-active={isActive(pathname, item.path, allPaths)}
+        title={label}
       >
         <Icon />
-        {label}
+        <span className={classes.label}>{label}</span>
         {item.key === 'recalls' && <RecallNavBadge />}
       </Link>
     );
   };
 
   return (
-    <>
+    <div className={classes.root} data-rail={rail ? 'true' : undefined}>
       <div className={classes.top}>
         <span className={classes.topLabel}>{t('app.name')}</span>
         <span className={classes.pin} />
@@ -68,6 +71,6 @@ export function Sidebar() {
           </div>
         ))}
       </nav>
-    </>
+    </div>
   );
 }

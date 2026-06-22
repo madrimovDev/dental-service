@@ -2,11 +2,12 @@ import { logout as apiLogout } from '@dental/api-client';
 import { Avatar, IconButton } from '@dental/ui';
 import { Burger, Menu, useMantineColorScheme } from '@mantine/core';
 import { spotlight } from '@mantine/spotlight';
-import { LogOut, Moon, Repeat, Search, Sun, User } from 'lucide-react';
+import { LogOut, Moon, PanelLeft, Repeat, Search, Sun, User } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { NotificationBell } from '@/features/notifications/components/NotificationBell.tsx';
 import { useAuthStore } from '@/stores/auth-store.ts';
+import { useUiStore } from '@/stores/ui-store.ts';
 import { BranchSwitcher } from './BranchSwitcher.tsx';
 import classes from './Topbar.module.css';
 
@@ -21,6 +22,7 @@ export function Topbar({
   const navigate = useNavigate();
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
   const { user, refreshToken, clear } = useAuthStore();
+  const toggleSidebarRail = useUiStore((s) => s.toggleSidebarRail);
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent);
 
   const logout = async () => {
@@ -38,6 +40,10 @@ export function Topbar({
   return (
     <div className={classes.bar}>
       <Burger opened={burgerOpened} onClick={onBurger} hiddenFrom="sm" size="sm" />
+
+      <IconButton label={t('shell.toggle_sidebar')} onClick={toggleSidebarRail}>
+        <PanelLeft />
+      </IconButton>
 
       <button type="button" className={classes.ws} onClick={() => navigate('/select-workspace')}>
         <span className={classes.wsLogo}>{t('app.name').charAt(0)}</span>

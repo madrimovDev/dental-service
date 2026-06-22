@@ -4,6 +4,8 @@ import { renderApp } from '../test-utils';
 import { Sidebar } from './Sidebar';
 
 let mockPermissions: string[] = [];
+let mockRail = false;
+
 vi.mock('@/stores/auth-store.ts', () => ({
   useAuthStore: () => ({
     hasPermission: (p: string) =>
@@ -13,8 +15,14 @@ vi.mock('@/stores/auth-store.ts', () => ({
   }),
 }));
 
+vi.mock('@/stores/ui-store.ts', () => ({
+  useUiStore: (sel: (s: { sidebarRail: boolean; toggleSidebarRail: () => void }) => unknown) =>
+    sel({ sidebarRail: mockRail, toggleSidebarRail: () => {} }),
+}));
+
 afterEach(() => {
   mockPermissions = [];
+  mockRail = false;
 });
 
 describe('Sidebar', () => {
@@ -47,5 +55,17 @@ describe('Sidebar', () => {
   it("guruh sarlavhasini ko'rsatadi", () => {
     renderApp(<Sidebar />);
     expect(screen.getByText('Asosiy')).toBeInTheDocument(); // nav.group.asosiy
+  });
+
+  it("rail rejimida ildiz elementda data-rail='true' atributi bo'ladi", () => {
+    mockRail = true;
+    const { container } = renderApp(<Sidebar />);
+    expect(container.querySelector('[data-rail="true"]')).toBeTruthy();
+  });
+
+  it("oddiy rejimda data-rail atributi bo'lmaydi", () => {
+    mockRail = false;
+    const { container } = renderApp(<Sidebar />);
+    expect(container.querySelector('[data-rail="true"]')).toBeNull();
   });
 });

@@ -171,7 +171,8 @@
     "select_branch": "Filialni tanlash",
     "branch_switch_error": "Filialni almashtirib bo'lmadi",
     "lang_uz": "O'zbekcha",
-    "lang_ru": "Ruscha"
+    "lang_ru": "Ruscha",
+    "toggle_sidebar": "Yon panelni yig'ish"
   },
   "notifications": {
     "title": "Bildirishnomalar",

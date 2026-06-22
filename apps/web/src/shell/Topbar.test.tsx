@@ -11,6 +11,11 @@ vi.mock('@/stores/auth-store.ts', () => ({
   }),
 }));
 
+vi.mock('@/stores/ui-store.ts', () => ({
+  useUiStore: (sel: (s: { sidebarRail: boolean; toggleSidebarRail: () => void }) => unknown) =>
+    sel({ sidebarRail: false, toggleSidebarRail: vi.fn() }),
+}));
+
 vi.mock('@/features/notifications/notifications.api.ts', () => ({
   useNotifications: () => ({ data: { data: [], unreadCount: 0 }, isLoading: false }),
   useMarkRead: () => ({ mutate: vi.fn(), isPending: false }),
