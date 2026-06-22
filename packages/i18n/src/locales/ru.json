@@ -846,7 +846,18 @@
     "from_appointment": "Из записи",
     "walk_in": "Без записи",
     "check_in": "В очередь",
-    "no_candidates": "Нет записей для регистрации сегодня"
+    "no_candidates": "Нет записей для регистрации сегодня",
+    "now_serving": "Сейчас вызывается",
+    "next_in_queue": "Следующий в очереди",
+    "display_board": "Табло",
+    "exit": "Выход",
+    "live_subtitle": "живое управление",
+    "board_subtitle": "Очередь — живое табло",
+    "next_queues": "Следующие в очереди",
+    "waited_minutes": "ждал {{count}} мин",
+    "cabinet": "Кабинет {{n}}",
+    "not_called_yet": "Пока не вызван",
+    "call_arrow": "Вызвать →"
   },
   "services": {
     "title": "Каталог услуг",
