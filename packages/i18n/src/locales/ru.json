@@ -115,6 +115,7 @@
   },
   "layout": {
     "switch_workspace": "Сменить workspace",
+    "profile": "Профиль",
     "logout": "Выйти"
   },
   "nav": {
@@ -143,11 +144,9 @@
     "settings": "Настройки",
     "tenant_settings": "Настройки",
     "group": {
-      "today": "Сегодня",
-      "patients": "Пациенты",
-      "clinic": "Клиника",
-      "finance": "Финансы",
-      "management": "Управление"
+      "asosiy": "Основное",
+      "klinika": "Клиника",
+      "boshqaruv": "Управление"
     }
   },
   "palette": {
@@ -173,7 +172,8 @@
     "select_branch": "Выбрать филиал",
     "branch_switch_error": "Не удалось сменить филиал",
     "lang_uz": "Узбекский",
-    "lang_ru": "Русский"
+    "lang_ru": "Русский",
+    "toggle_sidebar": "Свернуть боковую панель"
   },
   "notifications": {
     "title": "Уведомления",

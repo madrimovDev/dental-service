@@ -2,6 +2,7 @@ import { AppShell as MantineAppShell } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useTranslation } from 'react-i18next';
 import { Outlet } from 'react-router-dom';
+import { useUiStore } from '@/stores/ui-store.ts';
 import { CommandPalette } from './CommandPalette';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
@@ -9,10 +10,11 @@ import { Topbar } from './Topbar';
 export function AppShell() {
   const [opened, { toggle }] = useDisclosure();
   const { t } = useTranslation();
+  const rail = useUiStore((s) => s.sidebarRail);
   return (
     <MantineAppShell
-      header={{ height: 58 }}
-      navbar={{ width: 244, breakpoint: 'sm', collapsed: { mobile: !opened } }}
+      header={{ height: 62 }}
+      navbar={{ width: rail ? 76 : 266, breakpoint: 'sm', collapsed: { mobile: !opened } }}
       padding="md"
     >
       <a href="#main-content" className="skip-link">

@@ -1,19 +1,32 @@
-/* @dental/ui — design tokens (clinik "Teal").
+/* @dental/ui — design tokens (Dental OS palette, DS0.1).
    Vizual haqiqat manbasi. Mantine theme + cssVariablesResolver bularga ergashadi.
    Dark mode: [data-mantine-color-scheme="dark"] (Mantine qo'yadi). */
 
 :root {
-  /* --- primary: teal scale --- */
-  --teal-50: #e9f8f4;
-  --teal-100: #c9f0e7;
-  --teal-200: #9fe4d5;
-  --teal-300: #6fd7c7;
-  --teal-400: #2fc6b2;
-  --teal-500: #14b8a6;
-  --teal-600: #0e9384;
-  --teal-700: #0b7268;
-  --teal-800: #0a5a52;
-  --teal-900: #0a4a44;
+  /* --- primary: teal scale (Dental OS) --- */
+  --teal-50: #e7f6f1;
+  --teal-100: #c6efe6;
+  --teal-200: #9ce2d3;
+  --teal-300: #62d2bf;
+  --teal-400: #2cb9a2;
+  --teal-500: #15a18c;
+  --teal-600: #0b7a6b;
+  --teal-700: #096154;
+  --teal-800: #0a4e45;
+  --teal-900: #0a3f38;
+
+  /* --- danger red scale (Dental OS) --- */
+  --red-50: #fbe7e5;
+  --red-100: #f8d2cf;
+  --red-200: #f0aea9;
+  --red-300: #e88882;
+  --red-400: #f26b64;
+  --red-500: #dc4b47;
+  --red-600: #cc3d3a;
+  --red-700: #a82f2d;
+  --red-800: #842523;
+  --red-900: #5e1a18;
+  --red-bg: #fbe7e5;
 
   /* --- neutral: cool slate w/ faint teal undertone --- */
   --neutral-0: #ffffff;
@@ -28,42 +41,51 @@
   --neutral-800: #16302c;
   --neutral-900: #0e1f1d;
 
-  /* --- raw status hues --- */
-  --green-600: #15803d;
-  --green-bg: #e6f4ea;
-  --amber-600: #b45309;
-  --amber-bg: #faefdb;
-  --red-600: #dc2626;
-  --red-bg: #fbe6e5;
-  --cyan-600: #0e7490;
-  --cyan-bg: #e0f0f3;
-
   /* --- semantic aliases (light) --- */
-  --bg: #f3f8f7;
+  --bg: #f1f3ef;
   --surface: #ffffff;
-  --surface-2: #e9f2ef;
+  --surface-2: #f6f8f4;
   --surface-raised: #ffffff;
-  --border: #dce7e4;
-  --border-subtle: #eaf1ef;
-  --border-strong: #c4d6d2;
-  --text: #0e1f1d;
-  --text-2: #41605b;
-  --text-3: #52706a;
+  --sidebar: #fafbf8;
+  --border: #e4e8e1;
+  --border-subtle: #eef1ec;
+  --border-strong: #d3d9cf;
+  --text: #192420;
+  --text-2: #4c5852;
+  --text-3: #7a857e;
   --text-on-primary: #ffffff;
   --text-on-danger: #ffffff;
+  /* ink aliases — same as text, added for Dental OS naming convention */
+  --ink: var(--text);
+  --ink-2: var(--text-2);
+  --ink-3: var(--text-3);
+  --on-primary: var(--text-on-primary);
   --primary: var(--teal-600);
   --primary-hover: var(--teal-700);
-  --primary-tint: #e9f8f4;
-  --primary-tint-2: #d2f0e8;
+  --primary-strong: var(--teal-700);
+  --primary-tint: #ddefea;
+  --primary-tint-2: #c9e7df;
+  --primary-soft: var(--primary-tint);
   --focus-ring: color-mix(in srgb, var(--teal-600) 40%, transparent);
-  --success: var(--green-600);
-  --success-bg: var(--green-bg);
-  --warning: var(--amber-600);
-  --warning-bg: var(--amber-bg);
+  --success: var(--teal-600);
+  --success-bg: #ddefea;
+  --success-soft: var(--success-bg);
+  --warning: #b57611;
+  --warning-bg: #f7ecd6;
+  --warning-soft: var(--warning-bg);
   --danger: var(--red-600);
   --danger-bg: var(--red-bg);
-  --info: var(--cyan-600);
-  --info-bg: var(--cyan-bg);
+  --danger-soft: var(--danger-bg);
+  --info: #2a66cc;
+  --info-bg: #e2eafb;
+  --info-soft: var(--info-bg);
+  --violet: #7c4dd6;
+  --violet-soft: #ece4fb;
+
+  /* --- elevation (light, Dental OS) --- */
+  --shadow-sm: 0 1px 2px rgba(25, 40, 35, 0.04), 0 1px 1px rgba(25, 40, 35, 0.02);
+  --shadow: 0 2px 6px rgba(25, 40, 35, 0.05), 0 12px 30px -10px rgba(25, 40, 35, 0.09);
+  --shadow-lg: 0 24px 64px -14px rgba(25, 40, 35, 0.24), 0 8px 22px -10px rgba(25, 40, 35, 0.12);
 
   /* --- spacing (4px base) --- */
   --space-0: 0;
@@ -86,23 +108,19 @@
   --radius-xl: 14px;
   --radius-pill: 999px;
 
-  /* --- elevation (light) --- */
-  --shadow-sm: 0 1px 2px rgba(14, 31, 29, 0.05), 0 1px 3px rgba(14, 31, 29, 0.04);
-  --shadow: 0 1px 2px rgba(14, 31, 29, 0.05), 0 6px 16px -4px rgba(14, 31, 29, 0.08);
-  --shadow-lg: 0 16px 40px -10px rgba(14, 31, 29, 0.22);
-
   /* --- motion --- */
   --ease: cubic-bezier(0.2, 0.6, 0.2, 1);
   --dur-fast: 0.12s;
   --dur: 0.2s;
 
-  /* --- layout --- */
-  --topbar-h: 58px;
-  --sidebar-w: 244px;
+  /* --- layout (Dental OS) --- */
+  --topbar-h: 62px;
+  --sidebar-w: 266px;
+  --sidebar-rail-w: 76px;
 
   /* --- typography --- */
-  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-sans: "Hanken Grotesk Variable", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --text-2xs: 10px;
   --text-xs: 11px;
   --text-sm: 12.5px;
@@ -125,35 +143,39 @@
 }
 
 [data-mantine-color-scheme="dark"] {
-  --bg: #0a1817;
-  --surface: #102220;
-  --surface-2: #16302c;
-  --surface-raised: #16302c;
-  --border: #21352f;
+  --bg: #0b100e;
+  --surface: #161f1b;
+  --surface-2: #1d2824;
+  --surface-raised: #1d2824;
+  --sidebar: #0e1512;
+  --border: #2a352f;
   --border-subtle: #172e2a;
-  --border-strong: #2c4641;
-  --text: #e4f0ed;
-  --text-2: #9db8b3;
-  --text-3: #7f9c97;
-  --text-on-primary: #04201c;
+  --border-strong: #3b4a43;
+  --text: #edf2ef;
+  --text-2: #aab6b0;
+  --text-3: #7e8b84;
+  --text-on-primary: #04130f;
   --text-on-danger: #2a0f0d;
   --primary: var(--teal-400);
-  --primary-hover: #36d3c3;
-  --primary-tint: #15302c;
+  --primary-hover: #40cfb7;
+  --primary-strong: #40cfb7;
+  --primary-tint: #16332c;
   --primary-tint-2: #1b3d38;
+  --primary-soft: #16332c;
   --focus-ring: color-mix(in srgb, var(--teal-400) 45%, transparent);
-  --success: #5fd68b;
-  --success-bg: #15331f;
-  --warning: #e8b765;
-  --warning-bg: #33270f;
-  --danger: #f08a82;
-  --danger-bg: #371917;
-  --info: #5fc4d8;
-  --info-bg: #0e2a30;
-
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 20px -6px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 20px 48px -12px rgba(0, 0, 0, 0.7);
+  --success: #2cb9a2;
+  --success-bg: #16332c;
+  --warning: #e4ab44;
+  --warning-bg: #332814;
+  --danger: #f26b64;
+  --danger-bg: #341917;
+  --info: #6a9bf2;
+  --info-bg: #172642;
+  --violet: #b093ee;
+  --violet-soft: #241b39;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.28), 0 1px 1px rgba(0, 0, 0, 0.2);
+  --shadow: 0 2px 6px rgba(0, 0, 0, 0.3), 0 14px 34px -10px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 28px 68px -14px rgba(0, 0, 0, 0.62), 0 10px 24px -10px rgba(0, 0, 0, 0.45);
 }
 
 /* opt-in typography helpers (primitivlar var() ishlatadi, bular qulaylik uchun) */

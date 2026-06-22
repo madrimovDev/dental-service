@@ -115,6 +115,7 @@
   },
   "layout": {
     "switch_workspace": "Workspace o'zgartirish",
+    "profile": "Profil",
     "logout": "Chiqish"
   },
   "nav": {
@@ -143,11 +144,9 @@
     "settings": "Sozlamalar",
     "tenant_settings": "Sozlamalar",
     "group": {
-      "today": "Bugun",
-      "patients": "Bemorlar",
-      "clinic": "Klinika",
-      "finance": "Moliya",
-      "management": "Boshqaruv"
+      "asosiy": "Asosiy",
+      "klinika": "Klinika",
+      "boshqaruv": "Boshqaruv"
     }
   },
   "palette": {
@@ -173,7 +172,8 @@
     "select_branch": "Filialni tanlash",
     "branch_switch_error": "Filialni almashtirib bo'lmadi",
     "lang_uz": "O'zbekcha",
-    "lang_ru": "Ruscha"
+    "lang_ru": "Ruscha",
+    "toggle_sidebar": "Yon panelni yig'ish"
   },
   "notifications": {
     "title": "Bildirishnomalar",

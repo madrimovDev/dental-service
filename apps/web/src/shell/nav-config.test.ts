@@ -1,5 +1,39 @@
 import { describe, expect, it } from 'vitest';
-import { visibleGroups } from './nav-config';
+import { NAV_GROUPS, visibleGroups } from './nav-config';
+
+const ALL = () => true;
+
+describe('NAV_GROUPS 3-guruh superset', () => {
+  it('3 guruh: asosiy/klinika/boshqaruv', () => {
+    expect(NAV_GROUPS.map((g) => g.labelKey)).toEqual([
+      'nav.group.asosiy',
+      'nav.group.klinika',
+      'nav.group.boshqaruv',
+    ]);
+  });
+  it('asosiy: home, appointments, queue, patients, cashier', () => {
+    const g = NAV_GROUPS[0]!;
+    expect(g.items.map((i) => i.key)).toEqual([
+      'home',
+      'appointments',
+      'queue',
+      'patients',
+      'cashier',
+    ]);
+  });
+  it("hech qaysi element yo'qolmadi (dublikat yo'q)", () => {
+    const keys = NAV_GROUPS.flatMap((g) => g.items.map((i) => i.key));
+    expect(keys).toContain('recalls');
+    expect(keys).toContain('payroll');
+    expect(keys).toContain('audit');
+    expect(new Set(keys).size).toBe(keys.length); // dublikat yo'q
+  });
+  it("owner barcha disabled-future elementni ko'radi", () => {
+    const groups = visibleGroups(ALL, 'dental', true);
+    const keys = groups.flatMap((g) => g.items.map((i) => i.key));
+    expect(keys).toContain('plans'); // disabled-future
+  });
+});
 
 describe('nav-config', () => {
   it('LIVE element ruxsatsiz yashirin', () => {
@@ -50,10 +84,11 @@ describe('nav-config', () => {
   });
 
   it("bo'sh guruh yashirin", () => {
-    // hech qanday ruxsat yo'q; "Bemorlar" guruhida faqat LIVE permission element bor
-    // (patients=patient.view, patient-new=patient.create) → ikkalasi yashirin → guruh yo'q
+    // hech qanday ruxsat yo'q va owner emas; "Klinika" guruhida faqat FUTURE (disabled) va
+    // permission-gated LIVE element bor (plans/lab/rx=disabled-owner; schedule/recalls=perm)
+    // → barchasi yashirin → klinika guruhi yo'q
     const groups = visibleGroups(() => false);
-    expect(groups.find((g) => g.labelKey === 'nav.group.patients')).toBeUndefined();
+    expect(groups.find((g) => g.labelKey === 'nav.group.klinika')).toBeUndefined();
   });
 
   it("@owner hamma LIVE elementni ko'radi", () => {

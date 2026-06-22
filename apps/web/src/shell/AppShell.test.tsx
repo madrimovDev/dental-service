@@ -15,6 +15,11 @@ vi.mock('@/stores/auth-store.ts', () => ({
   }),
 }));
 
+vi.mock('@/stores/ui-store.ts', () => ({
+  useUiStore: (sel: (s: { sidebarRail: boolean; toggleSidebarRail: () => void }) => unknown) =>
+    sel({ sidebarRail: false, toggleSidebarRail: vi.fn() }),
+}));
+
 describe('AppShell', () => {
   it('topbar + sidebar + outlet render qiladi', () => {
     renderApp(
