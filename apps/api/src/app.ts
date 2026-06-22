@@ -1,3 +1,4 @@
+import { createFiscalProvider } from '@dental/fiscal';
 import { createSmsChannel } from '@dental/notifications';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { cors } from 'hono/cors';
@@ -42,6 +43,12 @@ export const createApp = () => {
   // (notifications routes + stock low-stock alert + clinical auto-deduction alert).
   const sms = createSmsChannel({ eskizEmail: env.ESKIZ_EMAIL, eskizPassword: env.ESKIZ_PASSWORD });
   const notifications = createNotificationsService({ sms });
+  // Fiskal provider (V3-1) — SOLIQ_* env bo'lsa real Soliq, aks holda NoOp.
+  const fiscal = createFiscalProvider({
+    soliqApiUrl: env.SOLIQ_API_URL,
+    soliqApiKey: env.SOLIQ_API_KEY,
+    soliqFiscalId: env.SOLIQ_FISCAL_ID,
+  });
 
   // Global middleware
   app.use('*', requestId());
@@ -94,7 +101,7 @@ export const createApp = () => {
   app.route('/api/users', userRoutes({ db, audit }));
   app.route('/api/patients', patientRoutes({ db, audit }));
   app.route('/api/services', serviceRoutes({ db, audit }));
-  app.route('/api/cashier', cashierRoutes({ db, audit }));
+  app.route('/api/cashier', cashierRoutes({ db, audit, fiscal }));
   app.route('/api/reports', reportsRoutes({ db }));
   app.route('/api/audit', auditRoutes({ db }));
   // Epic A: doktor jadvali + time-off + availability. Service'ni bir marta

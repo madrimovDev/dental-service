@@ -6,31 +6,13 @@ import {
   treatmentStagePayments,
   treatmentStages,
 } from '@dental/db-schema';
+import { createNoOpFiscalProvider, type FiscalProvider } from '@dental/fiscal';
 import { and, between, count, desc, eq, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { computePlanBalance } from './cashier.billing.ts';
 import type { CreateTransactionInput, ListTransactionsQuery } from './cashier.schema.ts';
-
-/**
- * Soliq Fiscal Provider — scaffold pattern.
- * M1-M3 da NoOp (DB ga yozadi, soliqqa yubormaydi).
- * Phase 2 da real SoliqApiProvider plug qilinadi — business kod o'zgarmaydi.
- */
-interface FiscalProvider {
-  createReceipt(payment: { id: string; amount: number; items: unknown[] }): Promise<{
-    fiscalId: string | null;
-    response: unknown;
-  }>;
-}
-
-const noOpFiscalProvider: FiscalProvider = {
-  async createReceipt() {
-    // M1-M3: hech narsa yubormaymiz. Receipt raqami DB ichida generate qilinadi.
-    return { fiscalId: null, response: { provider: 'noop', note: 'No fiscal device wired' } };
-  },
-};
 
 const generateReceiptNumber = (): string => {
   const date = new Date();
@@ -47,8 +29,9 @@ export class AllocationExceedError extends Error {
   }
 }
 
-export const createCashierService = (deps: { audit: AuditLogger }) => {
-  const fiscal: FiscalProvider = noOpFiscalProvider;
+export const createCashierService = (deps: { audit: AuditLogger; fiscal?: FiscalProvider }) => {
+  // DI: env'da SOLIQ_* bo'lsa real Soliq provider, aks holda NoOp (V3-1).
+  const fiscal: FiscalProvider = deps.fiscal ?? createNoOpFiscalProvider();
 
   async function list(c: Context, query: ListTransactionsQuery) {
     const db = getDb(c);
