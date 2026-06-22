@@ -1,19 +1,32 @@
-/* @dental/ui — design tokens (clinik "Teal").
+/* @dental/ui — design tokens (Dental OS palette, DS0.1).
    Vizual haqiqat manbasi. Mantine theme + cssVariablesResolver bularga ergashadi.
    Dark mode: [data-mantine-color-scheme="dark"] (Mantine qo'yadi). */
 
 :root {
-  /* --- primary: teal scale --- */
-  --teal-50: #e9f8f4;
-  --teal-100: #c9f0e7;
-  --teal-200: #9fe4d5;
-  --teal-300: #6fd7c7;
-  --teal-400: #2fc6b2;
-  --teal-500: #14b8a6;
-  --teal-600: #0e9384;
-  --teal-700: #0b7268;
-  --teal-800: #0a5a52;
-  --teal-900: #0a4a44;
+  /* --- primary: teal scale (Dental OS) --- */
+  --teal-50: #E7F6F1;
+  --teal-100: #C6EFE6;
+  --teal-200: #9CE2D3;
+  --teal-300: #62D2BF;
+  --teal-400: #2CB9A2;
+  --teal-500: #15A18C;
+  --teal-600: #0B7A6B;
+  --teal-700: #096154;
+  --teal-800: #0A4E45;
+  --teal-900: #0A3F38;
+
+  /* --- danger red scale (Dental OS) --- */
+  --red-50: #FBE7E5;
+  --red-100: #F8D2CF;
+  --red-200: #F0AEA9;
+  --red-300: #E88882;
+  --red-400: #F26B64;
+  --red-500: #DC4B47;
+  --red-600: #CC3D3A;
+  --red-700: #A82F2D;
+  --red-800: #842523;
+  --red-900: #5E1A18;
+  --red-bg: #FBE7E5;
 
   /* --- neutral: cool slate w/ faint teal undertone --- */
   --neutral-0: #ffffff;
@@ -28,42 +41,51 @@
   --neutral-800: #16302c;
   --neutral-900: #0e1f1d;
 
-  /* --- raw status hues --- */
-  --green-600: #15803d;
-  --green-bg: #e6f4ea;
-  --amber-600: #b45309;
-  --amber-bg: #faefdb;
-  --red-600: #dc2626;
-  --red-bg: #fbe6e5;
-  --cyan-600: #0e7490;
-  --cyan-bg: #e0f0f3;
-
   /* --- semantic aliases (light) --- */
-  --bg: #f3f8f7;
-  --surface: #ffffff;
-  --surface-2: #e9f2ef;
-  --surface-raised: #ffffff;
-  --border: #dce7e4;
-  --border-subtle: #eaf1ef;
-  --border-strong: #c4d6d2;
-  --text: #0e1f1d;
-  --text-2: #41605b;
-  --text-3: #52706a;
-  --text-on-primary: #ffffff;
+  --bg: #F1F3EF;
+  --surface: #FFFFFF;
+  --surface-2: #F6F8F4;
+  --surface-raised: #FFFFFF;
+  --sidebar: #FAFBF8;
+  --border: #E4E8E1;
+  --border-subtle: #EEF1EC;
+  --border-strong: #D3D9CF;
+  --text: #192420;
+  --text-2: #4C5852;
+  --text-3: #7A857E;
+  --text-on-primary: #FFFFFF;
   --text-on-danger: #ffffff;
+  /* ink aliases — same as text, added for Dental OS naming convention */
+  --ink: var(--text);
+  --ink-2: var(--text-2);
+  --ink-3: var(--text-3);
+  --on-primary: var(--text-on-primary);
   --primary: var(--teal-600);
   --primary-hover: var(--teal-700);
-  --primary-tint: #e9f8f4;
-  --primary-tint-2: #d2f0e8;
+  --primary-strong: var(--teal-700);
+  --primary-tint: #DDEFEA;
+  --primary-tint-2: #C9E7DF;
+  --primary-soft: var(--primary-tint);
   --focus-ring: color-mix(in srgb, var(--teal-600) 40%, transparent);
-  --success: var(--green-600);
-  --success-bg: var(--green-bg);
-  --warning: var(--amber-600);
-  --warning-bg: var(--amber-bg);
+  --success: var(--teal-600);
+  --success-bg: #DDEFEA;
+  --success-soft: var(--success-bg);
+  --warning: #B57611;
+  --warning-bg: #F7ECD6;
+  --warning-soft: var(--warning-bg);
   --danger: var(--red-600);
   --danger-bg: var(--red-bg);
-  --info: var(--cyan-600);
-  --info-bg: var(--cyan-bg);
+  --danger-soft: var(--danger-bg);
+  --info: #2A66CC;
+  --info-bg: #E2EAFB;
+  --info-soft: var(--info-bg);
+  --violet: #7C4DD6;
+  --violet-soft: #ECE4FB;
+
+  /* --- elevation (light, Dental OS) --- */
+  --shadow-sm: 0 1px 2px rgba(25,40,35,.04), 0 1px 1px rgba(25,40,35,.02);
+  --shadow: 0 2px 6px rgba(25,40,35,.05), 0 12px 30px -10px rgba(25,40,35,.09);
+  --shadow-lg: 0 24px 64px -14px rgba(25,40,35,.24), 0 8px 22px -10px rgba(25,40,35,.12);
 
   /* --- spacing (4px base) --- */
   --space-0: 0;
@@ -86,19 +108,15 @@
   --radius-xl: 14px;
   --radius-pill: 999px;
 
-  /* --- elevation (light) --- */
-  --shadow-sm: 0 1px 2px rgba(14, 31, 29, 0.05), 0 1px 3px rgba(14, 31, 29, 0.04);
-  --shadow: 0 1px 2px rgba(14, 31, 29, 0.05), 0 6px 16px -4px rgba(14, 31, 29, 0.08);
-  --shadow-lg: 0 16px 40px -10px rgba(14, 31, 29, 0.22);
-
   /* --- motion --- */
   --ease: cubic-bezier(0.2, 0.6, 0.2, 1);
   --dur-fast: 0.12s;
   --dur: 0.2s;
 
-  /* --- layout --- */
-  --topbar-h: 58px;
-  --sidebar-w: 244px;
+  /* --- layout (Dental OS) --- */
+  --topbar-h: 62px;
+  --sidebar-w: 266px;
+  --sidebar-rail-w: 76px;
 
   /* --- typography --- */
   --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -125,35 +143,38 @@
 }
 
 [data-mantine-color-scheme="dark"] {
-  --bg: #0a1817;
-  --surface: #102220;
-  --surface-2: #16302c;
-  --surface-raised: #16302c;
-  --border: #21352f;
-  --border-subtle: #172e2a;
-  --border-strong: #2c4641;
-  --text: #e4f0ed;
-  --text-2: #9db8b3;
-  --text-3: #7f9c97;
-  --text-on-primary: #04201c;
-  --text-on-danger: #2a0f0d;
+  --bg: #0B100E;
+  --surface: #161F1B;
+  --surface-2: #1D2824;
+  --surface-raised: #1D2824;
+  --sidebar: #0E1512;
+  --border: #2A352F;
+  --border-subtle: #172E2A;
+  --border-strong: #3B4A43;
+  --text: #EDF2EF;
+  --text-2: #AAB6B0;
+  --text-3: #7E8B84;
+  --text-on-primary: #04130F;
   --primary: var(--teal-400);
-  --primary-hover: #36d3c3;
-  --primary-tint: #15302c;
-  --primary-tint-2: #1b3d38;
+  --primary-hover: #40CFB7;
+  --primary-strong: #40CFB7;
+  --primary-tint: #16332C;
+  --primary-tint-2: #1B3D38;
+  --primary-soft: #16332C;
   --focus-ring: color-mix(in srgb, var(--teal-400) 45%, transparent);
-  --success: #5fd68b;
-  --success-bg: #15331f;
-  --warning: #e8b765;
-  --warning-bg: #33270f;
-  --danger: #f08a82;
-  --danger-bg: #371917;
-  --info: #5fc4d8;
-  --info-bg: #0e2a30;
-
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 20px -6px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 20px 48px -12px rgba(0, 0, 0, 0.7);
+  --success: #2CB9A2;
+  --success-bg: #16332C;
+  --warning: #E4AB44;
+  --warning-bg: #332814;
+  --danger: #F26B64;
+  --danger-bg: #341917;
+  --info: #6A9BF2;
+  --info-bg: #172642;
+  --violet: #B093EE;
+  --violet-soft: #241B39;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.28), 0 1px 1px rgba(0,0,0,.2);
+  --shadow: 0 2px 6px rgba(0,0,0,.3), 0 14px 34px -10px rgba(0,0,0,.5);
+  --shadow-lg: 0 28px 68px -14px rgba(0,0,0,.62), 0 10px 24px -10px rgba(0,0,0,.45);
 }
 
 /* opt-in typography helpers (primitivlar var() ishlatadi, bular qulaylik uchun) */
