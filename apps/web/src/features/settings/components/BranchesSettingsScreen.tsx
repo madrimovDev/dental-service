@@ -1,15 +1,6 @@
 import type { Branch } from '@dental/api-client';
-import {
-  ActionIcon,
-  Badge,
-  Button,
-  Group,
-  Modal,
-  Stack,
-  Table,
-  Text,
-  TextInput,
-} from '@mantine/core';
+import { StatusPill } from '@dental/ui';
+import { ActionIcon, Button, Group, Modal, Stack, Text, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
 import { IconEdit, IconPlus, IconTrash } from '@tabler/icons-react';
@@ -22,6 +13,8 @@ import { useBranches, useDeleteBranch, useUpsertBranch, useUsers } from '../sett
 import { type BranchFormValues, branchSchema } from '../settings.schema';
 import { ConfirmModal } from './ConfirmModal';
 import { SettingsShell } from './SettingsShell';
+
+const GRID_COLS = 'minmax(0,1fr) minmax(0,1.3fr) 150px 110px auto';
 
 export function BranchesSettingsScreen() {
   const { t } = useTranslation();
@@ -80,73 +73,133 @@ export function BranchesSettingsScreen() {
       },
     );
 
-  const actions = hasPermission('branch.create') ? (
-    <Button leftSection={<IconPlus size={18} />} onClick={openCreate}>
-      {t('branches.create')}
-    </Button>
-  ) : undefined;
-
   return (
-    <SettingsShell active="branches" actions={actions}>
-      <Stack gap="lg">
-        {branches.isLoading && <Text>{t('common.loading')}</Text>}
+    <SettingsShell active="branches">
+      <div
+        style={{
+          border: '1px solid var(--border)',
+          borderRadius: 16,
+          background: 'var(--surface)',
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            padding: '16px 18px',
+            borderBottom: '1px solid var(--border)',
+          }}
+        >
+          <Text fw={700} style={{ fontSize: 16, color: 'var(--ink)' }}>
+            {t('branches.title')}
+          </Text>
+          {hasPermission('branch.create') && (
+            <Button leftSection={<IconPlus size={18} />} onClick={openCreate}>
+              {t('branches.create')}
+            </Button>
+          )}
+        </div>
+
+        {branches.isLoading && <Text style={{ padding: '16px 18px' }}>{t('common.loading')}</Text>}
         {branches.data && branches.data.length === 0 && (
-          <Text c="dimmed">{t('branches.empty')}</Text>
+          <Text c="dimmed" style={{ padding: '16px 18px' }}>
+            {t('branches.empty')}
+          </Text>
         )}
         {branches.data && branches.data.length > 0 && (
-          <Table verticalSpacing="md">
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>{t('common.name')}</Table.Th>
-                <Table.Th>{t('branches.address')}</Table.Th>
-                <Table.Th>{t('branches.phone')}</Table.Th>
-                <Table.Th>{t('branches.staff_count')}</Table.Th>
-                <Table.Th />
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {branches.data.map((b) => {
-                const count = (perBranch.get(b.id) ?? 0) + allBranchesCount;
-                return (
-                  <Table.Tr key={b.id}>
-                    <Table.Td>{b.name}</Table.Td>
-                    <Table.Td>{b.address ?? '—'}</Table.Td>
-                    <Table.Td>{b.phone ?? '—'}</Table.Td>
-                    <Table.Td>
-                      <Badge variant="light" color={count > 0 ? 'teal' : 'gray'}>
-                        {t('branches.staff_n', { n: count })}
-                      </Badge>
-                    </Table.Td>
-                    <Table.Td>
-                      <Group gap="xs" justify="flex-end">
-                        {hasPermission('branch.edit') && (
-                          <ActionIcon
-                            variant="subtle"
-                            onClick={() => openEdit(b)}
-                            aria-label={t('common.edit')}
-                          >
-                            <IconEdit size={16} />
-                          </ActionIcon>
-                        )}
-                        {hasPermission('branch.delete') && (
-                          <ActionIcon
-                            variant="subtle"
-                            color="red"
-                            onClick={() => setToDelete(b)}
-                            aria-label={t('common.delete')}
-                          >
-                            <IconTrash size={16} />
-                          </ActionIcon>
-                        )}
-                      </Group>
-                    </Table.Td>
-                  </Table.Tr>
-                );
-              })}
-            </Table.Tbody>
-          </Table>
+          <div>
+            {/* Header band */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: GRID_COLS,
+                gap: 12,
+                alignItems: 'center',
+                padding: '10px 18px',
+                background: 'var(--surface-2)',
+                fontSize: 11,
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+                color: 'var(--ink-3)',
+              }}
+            >
+              <span>{t('common.name')}</span>
+              <span>{t('branches.address')}</span>
+              <span>{t('branches.phone')}</span>
+              <span style={{ textAlign: 'right' }}>{t('branches.staff_count')}</span>
+              <span />
+            </div>
+            {branches.data.map((b) => {
+              const count = (perBranch.get(b.id) ?? 0) + allBranchesCount;
+              return (
+                <div
+                  key={b.id}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: GRID_COLS,
+                    gap: 12,
+                    alignItems: 'center',
+                    padding: '14px 18px',
+                    borderTop: '1px solid var(--border)',
+                    fontSize: 13.5,
+                    color: 'var(--ink)',
+                  }}
+                >
+                  <span style={{ fontWeight: 600 }}>{b.name}</span>
+                  <span style={{ color: 'var(--ink-2)' }}>{b.address ?? '—'}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-2)' }}>
+                    {b.phone ?? '—'}
+                  </span>
+                  <span
+                    style={{
+                      textAlign: 'right',
+                      fontFamily: 'var(--font-mono)',
+                      color: 'var(--ink-2)',
+                    }}
+                  >
+                    {t('branches.staff_n', { n: count })}
+                  </span>
+                  <span
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'flex-end',
+                      alignItems: 'center',
+                      gap: 8,
+                    }}
+                  >
+                    <StatusPill status={count > 0 ? 'success' : 'neutral'}>
+                      {count > 0 ? t('common.active') : t('common.inactive')}
+                    </StatusPill>
+                    {hasPermission('branch.edit') && (
+                      <ActionIcon
+                        variant="subtle"
+                        onClick={() => openEdit(b)}
+                        aria-label={t('common.edit')}
+                      >
+                        <IconEdit size={16} />
+                      </ActionIcon>
+                    )}
+                    {hasPermission('branch.delete') && (
+                      <ActionIcon
+                        variant="subtle"
+                        color="red"
+                        onClick={() => setToDelete(b)}
+                        aria-label={t('common.delete')}
+                      >
+                        <IconTrash size={16} />
+                      </ActionIcon>
+                    )}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         )}
-      </Stack>
+      </div>
 
       <Modal
         opened={opened}

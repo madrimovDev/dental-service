@@ -1,13 +1,18 @@
 import type { Role } from '@dental/api-client';
-import { Button, Divider, Group, Modal, Stack, Text, TextInput } from '@mantine/core';
+import { Button, Group, Modal, Stack, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { usePermissions, useRole, useUpsertRole } from '../settings.api';
+import { useRole, useUpsertRole } from '../settings.api';
 import { type RoleFormValues, roleSchema } from '../settings.schema';
-import { PermissionBuilder } from './PermissionBuilder';
 
+/**
+ * Rol nomi/tavsifini yaratish/tahrirlash modali (DS10).
+ * Ruxsatlar endi inline o'ng panelda (PermissionBuilder) — modaldan OLIB TASHLANDI.
+ * `useUpsertRole` payload (`{id,name,description,permissions[]}`) O'ZGARMAYDI:
+ * yangi rol → `permissions:[]`; nom tahriri → mavjud ruxsatlar saqlanadi (detail'dan).
+ */
 export function RoleFormModal({
   opened,
   onClose,
@@ -18,8 +23,6 @@ export function RoleFormModal({
   editing: Role | null;
 }) {
   const { t } = useTranslation();
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const perms = usePermissions();
   const detail = useRole(editing?.id ?? null, opened);
   const upsert = useUpsertRole();
 
@@ -28,17 +31,15 @@ export function RoleFormModal({
     validate: zod4Resolver(roleSchema),
   });
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: faqat opened/editing/detail o'zgarganda
+  // biome-ignore lint/correctness/useExhaustiveDependencies: faqat opened/editing o'zgarganda
   useEffect(() => {
     if (!opened) return;
     if (editing) {
       form.setValues({ name: editing.name, description: editing.description ?? '' });
-      setSelected(new Set(detail.data?.permissions ?? []));
     } else {
       form.reset();
-      setSelected(new Set());
     }
-  }, [opened, editing, detail.data]);
+  }, [opened, editing]);
 
   const submit = (values: RoleFormValues) => {
     upsert.mutate(
@@ -46,13 +47,12 @@ export function RoleFormModal({
         id: editing?.id ?? null,
         name: values.name,
         description: values.description,
-        permissions: [...selected],
+        permissions: editing ? (detail.data?.permissions ?? []) : [],
       },
       {
         onSuccess: () => {
           onClose();
           form.reset();
-          setSelected(new Set());
         },
       },
     );
@@ -63,30 +63,18 @@ export function RoleFormModal({
       opened={opened}
       onClose={onClose}
       title={editing ? `${t('roles.edit')}: ${editing.name}` : t('roles.create')}
-      size="lg"
     >
       <form onSubmit={form.onSubmit(submit)}>
         <Stack gap="md">
           <TextInput label={t('common.name')} required {...form.getInputProps('name')} />
           <TextInput label={t('roles.description')} {...form.getInputProps('description')} />
-          <Divider label={t('roles.permissions')} labelPosition="center" />
-          <PermissionBuilder
-            permissions={perms.data ?? []}
-            selected={selected}
-            onChange={setSelected}
-          />
-          <Group justify="space-between">
-            <Text size="sm" c="dimmed">
-              {t('roles.selected_count', { count: selected.size })}
-            </Text>
-            <Group>
-              <Button variant="default" onClick={onClose}>
-                {t('common.cancel')}
-              </Button>
-              <Button type="submit" loading={upsert.isPending}>
-                {t('common.save')}
-              </Button>
-            </Group>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={onClose}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="submit" loading={upsert.isPending}>
+              {t('common.save')}
+            </Button>
           </Group>
         </Stack>
       </form>

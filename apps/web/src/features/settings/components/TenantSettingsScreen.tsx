@@ -1,9 +1,8 @@
 import { ApiError } from '@dental/api-client';
+import { StatusPill } from '@dental/ui';
 import {
   Alert,
-  Badge,
   Button,
-  Card,
   Group,
   Loader,
   Modal,
@@ -40,6 +39,23 @@ import {
 import { ConfirmModal } from './ConfirmModal';
 import { SettingsShell } from './SettingsShell';
 
+const CARD_STYLE: React.CSSProperties = {
+  maxWidth: 620,
+  borderRadius: 16,
+  padding: 22,
+  background: 'var(--surface)',
+  border: '1px solid var(--border)',
+  boxShadow: 'var(--shadow-sm)',
+};
+
+const INPUT_STYLES = {
+  input: {
+    height: 42,
+    borderRadius: 10,
+    backgroundColor: 'var(--surface-2)',
+  },
+} as const;
+
 export function TenantSettingsScreen() {
   const { t } = useTranslation();
   const { hasPermission } = useAuthStore();
@@ -49,6 +65,7 @@ export function TenantSettingsScreen() {
   const updateSettings = useUpdateTenantSettings();
   const transfer = useTransferOwnership();
   const users = useUsers();
+  const canEditTenant = hasPermission('tenant.edit');
   const canEditSettings = hasPermission('tenant_settings.edit');
   const [transferOpened, { open: openTransfer, close: closeTransfer }] = useDisclosure(false);
   const [confirmOpened, { open: openConfirm, close: closeConfirm }] = useDisclosure(false);
@@ -124,111 +141,157 @@ export function TenantSettingsScreen() {
     });
   };
 
+  // Bitta «Saqlash» — ikkala forma (tenant + sozlamalar) o'z ruxsati bilan saqlanadi.
+  // Permission gating O'ZGARMAYDI: tenant.edit → update, tenant_settings.edit → updateSettings.
+  const handleSave = () => {
+    if (canEditTenant) form.onSubmit((values) => update.mutate(values))();
+    if (canEditSettings) settingsForm.onSubmit((values) => updateSettings.mutate(values))();
+  };
+
+  const vertical = settingsForm.values.vertical;
+  const isSaving = update.isPending || updateSettings.isPending;
+  const subscriptionActive = data?.subscriptionStatus === 'active';
+
   return (
     <SettingsShell active="tenant">
       <Stack gap="lg">
-        {!hasPermission('tenant.edit') && (
-          <Alert color="yellow" variant="light">
+        {(!canEditTenant || !canEditSettings) && (
+          <Alert color="yellow" variant="light" style={{ maxWidth: 620 }}>
             {t('tenant_settings.readonly_notice')}
           </Alert>
         )}
 
-        <Card withBorder padding="lg" radius="md">
-          <Stack gap="md">
-            <Group justify="space-between">
-              <Stack gap={2}>
-                <Text size="sm" c="dimmed">
-                  {t('tenant_settings.slug')}
-                </Text>
-                <Text fw={600}>{data?.slug ?? '—'}</Text>
-              </Stack>
-              <Badge color={data?.subscriptionStatus === 'active' ? 'teal' : 'yellow'}>
-                {data?.subscriptionStatus}
-              </Badge>
-            </Group>
+        <div style={CARD_STYLE}>
+          <Stack gap={18}>
+            <Text fw={700} fz={16}>
+              {t('tenant_settings.clinic_section')}
+            </Text>
 
-            <form onSubmit={form.onSubmit((values) => update.mutate(values))}>
-              <Stack gap="md">
+            {settings.isLoading ? (
+              <Loader />
+            ) : (
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: 14,
+                }}
+              >
                 <TextInput
+                  style={{ gridColumn: 'span 2' }}
                   label={t('tenant_settings.name')}
                   required
-                  disabled={!hasPermission('tenant.edit')}
+                  disabled={!canEditTenant}
+                  styles={INPUT_STYLES}
                   {...form.getInputProps('name')}
                 />
+
+                <TextInput
+                  label={t('tenant_settings.slug')}
+                  value={data?.slug ?? '—'}
+                  readOnly
+                  styles={{
+                    input: {
+                      ...INPUT_STYLES.input,
+                      fontFamily: 'var(--font-mono)',
+                      color: 'var(--ink-2)',
+                    },
+                  }}
+                />
+
                 <Select
                   label={t('tenant_settings.default_language')}
                   data={[
                     { value: 'uz', label: "O'zbek" },
                     { value: 'ru', label: 'Русский' },
                   ]}
-                  disabled={!hasPermission('tenant.edit')}
+                  disabled={!canEditTenant}
+                  styles={INPUT_STYLES}
                   {...form.getInputProps('defaultLanguage')}
                 />
-                {hasPermission('tenant.edit') && (
-                  <Group justify="flex-end">
-                    <Button type="submit" loading={update.isPending}>
-                      {t('common.save')}
-                    </Button>
+
+                {/* Vertical — segmented ikki-button toggle (Select o'rniga). */}
+                <div style={{ gridColumn: 'span 2' }}>
+                  <Text component="label" fz={14} fw={500} display="block" mb={6}>
+                    {t('tenant_settings.vertical')}
+                  </Text>
+                  <Group gap={10} grow>
+                    {(['dental', 'general'] as const).map((value) => {
+                      const isActive = vertical === value;
+                      return (
+                        <button
+                          key={value}
+                          type="button"
+                          aria-pressed={isActive}
+                          disabled={!canEditSettings}
+                          onClick={() => settingsForm.setFieldValue('vertical', value)}
+                          style={{
+                            height: 42,
+                            borderRadius: 10,
+                            cursor: canEditSettings ? 'pointer' : 'not-allowed',
+                            fontWeight: 600,
+                            fontSize: 13.5,
+                            border: isActive
+                              ? '1.5px solid var(--primary)'
+                              : '1.5px solid var(--border)',
+                            background: isActive ? 'var(--primary-soft)' : 'var(--surface)',
+                            color: isActive ? 'var(--primary)' : 'var(--ink-2)',
+                          }}
+                        >
+                          {value === 'dental'
+                            ? t('tenant_settings.vertical_dental')
+                            : t('tenant_settings.vertical_general')}
+                        </button>
+                      );
+                    })}
                   </Group>
-                )}
-              </Stack>
-            </form>
-          </Stack>
-        </Card>
+                  <Text fz={12} c="dimmed" mt={6}>
+                    {t('tenant_settings.vertical_hint')}
+                  </Text>
+                </div>
 
-        <Card withBorder padding="lg" radius="md">
-          <Stack gap="md">
-            <Text fw={600}>{t('tenant_settings.clinic_section')}</Text>
-            {!canEditSettings && (
-              <Alert color="yellow" variant="light">
-                {t('tenant_settings.readonly_notice')}
-              </Alert>
-            )}
-            {settings.isLoading ? (
-              <Loader />
-            ) : (
-              <form onSubmit={settingsForm.onSubmit((values) => updateSettings.mutate(values))}>
-                <Stack gap="md">
-                  <Select
-                    label={t('tenant_settings.vertical')}
-                    description={t('tenant_settings.vertical_hint')}
-                    data={[
-                      { value: 'dental', label: t('tenant_settings.vertical_dental') },
-                      { value: 'general', label: t('tenant_settings.vertical_general') },
-                    ]}
-                    disabled={!canEditSettings}
-                    {...settingsForm.getInputProps('vertical')}
-                  />
-                  <TextInput
-                    label={t('tenant_settings.currency')}
-                    required
-                    disabled={!canEditSettings}
-                    {...settingsForm.getInputProps('currency')}
-                  />
-                  <NumberInput
-                    label={t('tenant_settings.reminder_lead_hours')}
-                    min={0}
-                    max={168}
-                    disabled={!canEditSettings}
-                    {...settingsForm.getInputProps('reminderLeadHours')}
-                  />
-                  {canEditSettings && (
-                    <Group justify="flex-end">
-                      <Button type="submit" loading={updateSettings.isPending}>
-                        {t('common.save')}
-                      </Button>
-                    </Group>
-                  )}
-                </Stack>
-              </form>
-            )}
-          </Stack>
-        </Card>
+                <TextInput
+                  label={t('tenant_settings.currency')}
+                  required
+                  disabled={!canEditSettings}
+                  styles={INPUT_STYLES}
+                  {...settingsForm.getInputProps('currency')}
+                />
 
-        {hasPermission('tenant.edit') && (
-          <Card withBorder padding="lg" radius="md">
+                <NumberInput
+                  label={t('tenant_settings.reminder_lead_hours')}
+                  min={0}
+                  max={168}
+                  disabled={!canEditSettings}
+                  styles={INPUT_STYLES}
+                  {...settingsForm.getInputProps('reminderLeadHours')}
+                />
+              </div>
+            )}
+
+            <Group
+              justify="space-between"
+              align="center"
+              style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}
+            >
+              <StatusPill status={subscriptionActive ? 'success' : 'warning'}>
+                {data?.subscriptionStatus ?? '—'}
+              </StatusPill>
+              {(canEditTenant || canEditSettings) && (
+                <Button onClick={handleSave} loading={isSaving}>
+                  {t('common.save')}
+                </Button>
+              )}
+            </Group>
+          </Stack>
+        </div>
+
+        {canEditTenant && (
+          <div style={CARD_STYLE}>
             <Stack gap="md">
-              <Text fw={600}>{t('settings.transfer_ownership')}</Text>
+              <Text fw={700} fz={16}>
+                {t('settings.transfer_ownership')}
+              </Text>
               <Text size="sm" c="dimmed">
                 {t('settings.transfer_hint')}
               </Text>
@@ -238,7 +301,7 @@ export function TenantSettingsScreen() {
                 </Button>
               </Group>
             </Stack>
-          </Card>
+          </div>
         )}
       </Stack>
 
