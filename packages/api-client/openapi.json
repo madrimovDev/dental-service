@@ -4294,6 +4294,11 @@
             "nullable": true,
             "format": "date-time"
           },
+          "visitNoteId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -4316,6 +4321,7 @@
           "description",
           "toothNumbers",
           "takenDate",
+          "visitNoteId",
           "createdAt",
           "url"
         ]
@@ -17179,6 +17185,15 @@
             "required": true,
             "name": "patientId",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "visitNoteId",
+            "in": "query"
           }
         ],
         "responses": {

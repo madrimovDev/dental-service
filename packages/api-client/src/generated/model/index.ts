@@ -229,6 +229,7 @@ export * from './listNotifications200';
 export * from './listNotificationsParams';
 export * from './listPatientEmergencyContacts200';
 export * from './listPatientImages200';
+export * from './listPatientImagesParams';
 export * from './listPatientRecalls200';
 export * from './listPatientRelatives200';
 export * from './listPatients200';

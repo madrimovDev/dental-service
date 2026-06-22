@@ -3,6 +3,7 @@ import { index, integer, pgEnum, pgTable, text, timestamp, uuid } from 'drizzle-
 import { patients } from './patients.ts';
 import { tenants } from './tenants.ts';
 import { users } from './users.ts';
+import { visitNotes } from './visit-notes.ts';
 
 export const patientImageTypeEnum = pgEnum('patient_image_type', [
   'xray_panoramic',
@@ -30,6 +31,8 @@ export const patientImages = pgTable(
     patientId: uuid('patient_id')
       .notNull()
       .references(() => patients.id, { onDelete: 'cascade' }),
+    // Vizitga bog'lash (V2-6) — ixtiyoriy; vizit o'chsa rasm qoladi (SET NULL).
+    visitNoteId: uuid('visit_note_id').references(() => visitNotes.id, { onDelete: 'set null' }),
     uploadedByUserId: uuid('uploaded_by_user_id').references(() => users.id, {
       onDelete: 'set null',
     }),
@@ -50,6 +53,7 @@ export const patientImages = pgTable(
   (t) => [
     index('patient_images_patient_idx').on(t.patientId),
     index('patient_images_tenant_created_idx').on(t.tenantId, t.createdAt),
+    index('patient_images_visit_note_idx').on(t.visitNoteId),
   ],
 );
 

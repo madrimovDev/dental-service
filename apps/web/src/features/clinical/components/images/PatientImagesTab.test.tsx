@@ -22,6 +22,7 @@ vi.mock('../../clinical.api', () => ({
   usePatientImages: () => ({ data: [img], isLoading: false }),
   useUploadPatientImage: () => ({ mutate: vi.fn(), isPending: false }),
   useDeletePatientImage: () => ({ mutate: deleteMutate, isPending: false }),
+  useVisitNotes: () => ({ data: [], isLoading: false }),
 }));
 let perm = true;
 vi.mock('@/stores/auth-store.ts', () => ({

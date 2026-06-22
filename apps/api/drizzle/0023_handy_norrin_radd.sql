@@ -1,0 +1,3 @@
+ALTER TABLE "patient_images" ADD COLUMN "visit_note_id" uuid;--> statement-breakpoint
+ALTER TABLE "patient_images" ADD CONSTRAINT "patient_images_visit_note_id_visit_notes_id_fk" FOREIGN KEY ("visit_note_id") REFERENCES "public"."visit_notes"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "patient_images_visit_note_idx" ON "patient_images" USING btree ("visit_note_id");

@@ -25,6 +25,8 @@ export interface PatientImage {
   toothNumbers: number[] | null;
   /** @nullable */
   takenDate: string | null;
+  /** @nullable */
+  visitNoteId: string | null;
   createdAt: string;
   url: string;
 }

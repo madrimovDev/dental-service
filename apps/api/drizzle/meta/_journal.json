@@ -162,6 +162,13 @@
       "when": 1782104184624,
       "tag": "0022_tough_jazinda",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1782104938582,
+      "tag": "0023_handy_norrin_radd",
+      "breakpoints": true
     }
   ]
 }

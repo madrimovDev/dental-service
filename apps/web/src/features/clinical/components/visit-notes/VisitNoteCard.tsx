@@ -1,8 +1,9 @@
 import type { Diagnosis, VisitNote } from '@dental/api-client';
 import { Mono } from '@dental/ui';
-import { Badge, Box, Card, Group, Stack, Text } from '@mantine/core';
+import { Badge, Box, Card, Group, Image, SimpleGrid, Stack, Text } from '@mantine/core';
 import { IconCalendar } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
+import { usePatientImages } from '../../clinical.api';
 import { toVisitNoteVM } from '../../clinical.mappers';
 
 export function VisitNoteCard({
@@ -14,6 +15,8 @@ export function VisitNoteCard({
 }) {
   const { t, i18n } = useTranslation();
   const vm = toVisitNoteVM(note, diagnosisMap, i18n.language === 'ru' ? 'ru' : 'uz');
+  const linkedImages = usePatientImages(note.patientId, note.id);
+  const images = linkedImages.data ?? [];
   return (
     <Card withBorder padding="md">
       <Stack gap="xs">
@@ -65,6 +68,26 @@ export function VisitNoteCard({
               {t('visit_note.free_notes')}
             </Text>
             <Text size="sm">{vm.freeNotes}</Text>
+          </Box>
+        )}
+        {images.length > 0 && (
+          <Box>
+            <Text size="sm" fw={600} c="dimmed">
+              {t('visit_note.linked_images')}
+            </Text>
+            <SimpleGrid cols={4} mt={4} spacing="xs">
+              {images.map((img) => (
+                <a key={img.id} href={img.url} target="_blank" rel="noreferrer">
+                  <Image
+                    src={img.url}
+                    alt={img.title ?? img.originalFilename}
+                    h={72}
+                    fit="cover"
+                    radius="sm"
+                  />
+                </a>
+              ))}
+            </SimpleGrid>
           </Box>
         )}
       </Stack>
