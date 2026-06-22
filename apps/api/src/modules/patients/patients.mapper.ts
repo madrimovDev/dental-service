@@ -7,10 +7,47 @@ import type {
 import type {
   EmergencyContactDto,
   MedicalRecordDto,
+  MedicalRecordHistoryEntryDto,
   PatientDto,
   PatientListItemDto,
   PatientRelativeDto,
 } from './patients.schema.ts';
+
+/** Medical record snapshot'larida o'zgargan field'lar (audit_log before/after). */
+const MEDICAL_RECORD_TRACKED_FIELDS = [
+  'anamnez',
+  'chronicConditions',
+  'currentMedications',
+  'allergies',
+  'bloodType',
+  'pregnancyStatus',
+  'testResults',
+] as const;
+
+type AuditHistoryRow = {
+  id: string;
+  changedAt: Date;
+  changedById: string | null;
+  changedByName: string | null;
+  before: unknown;
+  after: unknown;
+};
+
+/** audit_log yozuvi → tarix DTO (field-darajali diff). */
+export const toMedicalRecordHistoryEntry = (row: AuditHistoryRow): MedicalRecordHistoryEntryDto => {
+  const before = (row.before ?? {}) as Record<string, unknown>;
+  const after = (row.after ?? {}) as Record<string, unknown>;
+  const changes = MEDICAL_RECORD_TRACKED_FIELDS.filter(
+    (f) => JSON.stringify(before[f] ?? null) !== JSON.stringify(after[f] ?? null),
+  ).map((f) => ({ field: f, before: before[f] ?? null, after: after[f] ?? null }));
+
+  return {
+    id: row.id,
+    changedAt: row.changedAt.toISOString(),
+    changedBy: row.changedById ? { id: row.changedById, fullName: row.changedByName ?? '' } : null,
+    changes,
+  };
+};
 
 /**
  * Patient DB row → wire DTO.

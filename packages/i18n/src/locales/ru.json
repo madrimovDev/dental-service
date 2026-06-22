@@ -465,6 +465,8 @@
     "no_medical_permission": "У вас нет прав на просмотр медкарты"
   },
   "medical": {
+    "history_title": "История изменений",
+    "history_fields": "поле(й) изменено",
     "anamnez": "Анамнез (общая история здоровья)",
     "chronic_conditions": "Хронические заболевания",
     "current_medications": "Текущие препараты",

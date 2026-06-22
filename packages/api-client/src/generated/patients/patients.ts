@@ -13,6 +13,7 @@ import type {
   CreatePatient201,
   CreatePatientBody,
   GetMedicalRecord200,
+  GetMedicalRecordHistory200,
   GetPatient200,
   GetPatientBalance200,
   ListPatientEmergencyContacts200,
@@ -104,6 +105,14 @@ import { customInstance } from '../../mutator';
     },
       );
     }
+  export const getMedicalRecordHistory = (
+    id: string,
+ ) => {
+      return customInstance<GetMedicalRecordHistory200>(
+      {url: `/api/patients/${id}/medical/history`, method: 'GET'
+    },
+      );
+    }
   export const listPatientRelatives = (
     id: string,
  ) => {
@@ -168,6 +177,7 @@ export type ArchivePatientResult = NonNullable<Awaited<ReturnType<typeof archive
 export type GetPatientBalanceResult = NonNullable<Awaited<ReturnType<typeof getPatientBalance>>>
 export type GetMedicalRecordResult = NonNullable<Awaited<ReturnType<typeof getMedicalRecord>>>
 export type UpdateMedicalRecordResult = NonNullable<Awaited<ReturnType<typeof updateMedicalRecord>>>
+export type GetMedicalRecordHistoryResult = NonNullable<Awaited<ReturnType<typeof getMedicalRecordHistory>>>
 export type ListPatientRelativesResult = NonNullable<Awaited<ReturnType<typeof listPatientRelatives>>>
 export type AddPatientRelativeResult = NonNullable<Awaited<ReturnType<typeof addPatientRelative>>>
 export type RemovePatientRelativeResult = NonNullable<Awaited<ReturnType<typeof removePatientRelative>>>

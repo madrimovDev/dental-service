@@ -1,4 +1,5 @@
 import {
+  auditLog,
   cashierTransactions,
   medicalRecords,
   patientEmergencyContacts,
@@ -7,6 +8,7 @@ import {
   treatmentPlans,
   treatmentStagePayments,
   treatmentStages,
+  users,
 } from '@dental/db-schema';
 import { and, count, desc, eq, ilike, inArray, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
@@ -395,6 +397,40 @@ export const createPatientsService = (deps: { audit: AuditLogger }) => {
     return updated;
   }
 
+  /**
+   * Medical record o'zgarishlar tarixi (V2-7) — audit_log'dan o'qiladi
+   * (updateMedicalRecord har o'zgarishda before/after yozadi). Yangi jadval shart emas.
+   * RLS audit_log'ni tenant bo'yicha filtrlaydi.
+   */
+  async function medicalRecordHistory(c: Context, patientId: string) {
+    const db = getDb(c);
+    const [record] = await db
+      .select()
+      .from(medicalRecords)
+      .where(eq(medicalRecords.patientId, patientId));
+    if (!record) return [];
+
+    return db
+      .select({
+        id: auditLog.id,
+        changedAt: auditLog.createdAt,
+        changedById: auditLog.userId,
+        changedByName: users.fullName,
+        before: auditLog.before,
+        after: auditLog.after,
+      })
+      .from(auditLog)
+      .leftJoin(users, eq(auditLog.userId, users.id))
+      .where(
+        and(
+          eq(auditLog.resourceType, 'medical_record'),
+          eq(auditLog.resourceId, record.id),
+          eq(auditLog.action, 'updated'),
+        ),
+      )
+      .orderBy(desc(auditLog.createdAt));
+  }
+
   // ===== Patient relatives (oila) sub-resource =====
 
   /**
@@ -577,6 +613,7 @@ export const createPatientsService = (deps: { audit: AuditLogger }) => {
     archive,
     getMedicalRecord,
     updateMedicalRecord,
+    medicalRecordHistory,
     listRelatives,
     addRelative,
     removeRelative,
