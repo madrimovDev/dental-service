@@ -113,7 +113,7 @@ export function BranchesSettingsScreen() {
                     <Table.Td>{b.address ?? '—'}</Table.Td>
                     <Table.Td>{b.phone ?? '—'}</Table.Td>
                     <Table.Td>
-                      <Badge variant="light" color={count > 0 ? 'teal' : 'gray'}>
+                      <Badge variant="light" color="gray">
                         {t('branches.staff_n', { n: count })}
                       </Badge>
                     </Table.Td>

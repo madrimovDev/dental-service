@@ -62,7 +62,7 @@ export function PermissionBuilder({
                     key={p.code}
                     label={
                       <Stack gap={0}>
-                        <Text size="sm" ff="monospace">
+                        <Text size="sm" ff="var(--font-mono)">
                           {p.code}
                         </Text>
                         {desc && (

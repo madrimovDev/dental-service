@@ -1,5 +1,5 @@
-import { StateView } from '@dental/ui';
-import { Badge, Button, Card, Container, Group, Stack, Table, Title } from '@mantine/core';
+import { PageHead, StateView, StatusPill } from '@dental/ui';
+import { Button, Card, Container, Group, Stack, Table, Title } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { useForm } from '@mantine/form';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
@@ -64,15 +64,15 @@ export function PayrollScreen() {
   const detailStatus = runDetail.data?.status;
 
   const statusBadge = (status: 'draft' | 'finalized') => (
-    <Badge color={status === 'finalized' ? 'green' : 'gray'} variant="light">
+    <StatusPill status={status === 'finalized' ? 'success' : 'neutral'}>
       {t(`payroll.status_label.${status}`)}
-    </Badge>
+    </StatusPill>
   );
 
   return (
     <Container size="xl">
       <Stack gap="lg">
-        <Title order={2}>{t('payroll.title')}</Title>
+        <PageHead title={t('payroll.title')} />
 
         {/* Davr tanlash + run yaratish */}
         {canManage && (
@@ -124,7 +124,7 @@ export function PayrollScreen() {
                   {runRows.map((r) => (
                     <Table.Tr
                       key={r.id}
-                      bg={r.id === selectedRunId ? 'var(--mantine-color-blue-light)' : undefined}
+                      bg={r.id === selectedRunId ? 'var(--primary-soft)' : undefined}
                     >
                       <Table.Td>
                         {r.periodFrom} — {r.periodTo}
@@ -154,7 +154,7 @@ export function PayrollScreen() {
                 </Group>
                 {canManage && detailStatus === 'draft' && (
                   <Button
-                    color="green"
+                    color="teal"
                     loading={finalizeRun.isPending}
                     onClick={() => finalizeRun.mutate(selectedRunId)}
                   >

@@ -33,8 +33,10 @@ describe('StockItemsTable', () => {
         onMovement={() => {}}
       />,
     );
-    // i18n stock.low = "Kam qoldi"
-    expect(screen.getByText('Kam qoldi')).toBeTruthy();
+    // i18n stock.low = "Kam qoldi"; rendered via @dental/ui StatusPill (status="danger")
+    const lowLabel = screen.getByText('Kam qoldi');
+    expect(lowLabel).toBeTruthy();
+    expect(lowLabel.closest('[data-status="danger"]')).toBeTruthy();
     expect(screen.getByText('Qoʻlqop')).toBeTruthy();
   });
 
@@ -48,7 +50,9 @@ describe('StockItemsTable', () => {
         onMovement={() => {}}
       />,
     );
-    expect(screen.getByText('Yetarli')).toBeTruthy();
+    const okLabel = screen.getByText('Yetarli');
+    expect(okLabel).toBeTruthy();
+    expect(okLabel.closest('[data-status="success"]')).toBeTruthy();
   });
 
   it('boʻsh roʻyxatda empty matn', () => {
