@@ -235,7 +235,14 @@
     "doctor_pending_placeholder": "Агрегат незавершённых работ пока отсутствует",
     "no_lab_orders": "Нет активных заказов лаборатории",
     "no_appointments": "Сегодня нет приёмов",
-    "no_queue": "Очередь пуста"
+    "no_queue": "Очередь пуста",
+    "weekly_revenue": "Недельная выручка",
+    "last_7_days": "Последние 7 дней",
+    "queue_status": "Статус очереди",
+    "queue_waiting": "{{n}} ожидают",
+    "calendar_link": "Календарь",
+    "new_appointment": "Новая запись",
+    "open_cashier": "Касса"
   },
   "branches": {
     "title": "Филиалы",
