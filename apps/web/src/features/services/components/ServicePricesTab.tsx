@@ -1,5 +1,5 @@
 import type { ServicePrice } from '@dental/api-client';
-import { Mono } from '@dental/ui';
+import { Card, Mono } from '@dental/ui';
 import { Button, Group, NumberInput, Select, Stack, Table, Text } from '@mantine/core';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -38,18 +38,22 @@ export function ServicePricesTab({
           {t('services.no_prices')}
         </Text>
       ) : (
-        <Table>
-          <Table.Tbody>
-            {prices.map((p) => (
-              <Table.Tr key={p.id}>
-                <Table.Td>{branches.find((b) => b.id === p.branchId)?.name ?? p.branchId}</Table.Td>
-                <Table.Td>
-                  <Mono>{formatCurrency(Number(p.price), t)}</Mono>
-                </Table.Td>
-              </Table.Tr>
-            ))}
-          </Table.Tbody>
-        </Table>
+        <Card bodyless>
+          <Table>
+            <Table.Tbody>
+              {prices.map((p) => (
+                <Table.Tr key={p.id}>
+                  <Table.Td>
+                    {branches.find((b) => b.id === p.branchId)?.name ?? p.branchId}
+                  </Table.Td>
+                  <Table.Td ta="right">
+                    <Mono>{formatCurrency(Number(p.price), t)}</Mono>
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        </Card>
       )}
       <Group align="flex-end">
         <Select

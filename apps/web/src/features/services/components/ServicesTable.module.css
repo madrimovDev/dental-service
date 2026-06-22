@@ -1,0 +1,50 @@
+/* DS6 services table chrome (spec §4.5) — token-driven, light+dark */
+
+.headRow th {
+  background: var(--surface-2);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.groupRow td {
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.groupLabel {
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+
+.name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.sub {
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+.duration {
+  font-family: var(--font-mono);
+  color: var(--ink-2);
+}
+
+.remove {
+  color: var(--ink-3);
+}
+
+.remove:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}

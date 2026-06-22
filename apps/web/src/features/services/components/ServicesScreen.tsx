@@ -10,6 +10,7 @@ import { useDeleteService, useServices } from '../services.api';
 import { filterServices, groupByCategory } from '../services.mappers';
 import type { ServiceVM } from '../services.types';
 import { ServiceFormModal } from './ServiceFormModal';
+import classes from './ServicesScreen.module.css';
 import { ServicesTable } from './ServicesTable';
 
 export function ServicesScreen() {
@@ -70,14 +71,14 @@ export function ServicesScreen() {
           }
         />
 
-        <Group>
+        <div className={classes.toolbar}>
           <TextInput
+            className={classes.searchField}
             leftSection={<IconSearch size={16} />}
             placeholder={t('services.search')}
             aria-label={t('services.search')}
             value={search}
             onChange={(e) => setSearch(e.currentTarget.value)}
-            flex={1}
           />
           <Select
             placeholder={t('services.category')}
@@ -88,7 +89,7 @@ export function ServicesScreen() {
             clearable
             w={220}
           />
-        </Group>
+        </div>
 
         {services.isLoading ? (
           <StateView status="loading" skeleton="table" />

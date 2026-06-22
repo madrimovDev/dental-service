@@ -891,7 +891,9 @@
     "new_payment": "Новый платёж",
     "previous_balance": "Старый баланс",
     "add_service": "Добавить услугу",
-    "search_service": "Поиск услуги...",
+    "search_service": "Поиск услуги или ввод кода…",
+    "current_receipt": "Текущий чек",
+    "subtotal": "Промежуточный итог",
     "discount": "Скидка",
     "payment_method": "Способ оплаты",
     "method": {
@@ -912,6 +914,15 @@
     "status": "Статус",
     "receipt": "Номер чека",
     "daily_summary": "Дневной отчёт",
+    "cash_today": "Касса за сегодня",
+    "total_revenue": "Общая выручка",
+    "noop_fiscal": "Фискальный документ будет отправлен в налоговую позже",
+    "receipt_modal": {
+      "print": "Печать",
+      "close": "Закрыть",
+      "total": "Итого",
+      "view": "Просмотр чека"
+    },
     "confirm_refund": "Подтвердить возврат?",
     "type": {
       "refund": "Возврат",
