@@ -65,6 +65,17 @@
 - **Bemor tenant-scoped** (hech qachon tenantlar orasida ulanmaydi).
 - Batafsil: CLAUDE.md §3.1–3.4.
 
+### 5.1 Branch scoping modeli (Qaror #27)
+
+Multi-branch'da qaysi entity filialga bog'lanadi — **ataylab tanlangan**:
+
+| Entity | Scoping | Sabab |
+|---|---|---|
+| `appointments`, `cashier_transactions`, `stock_*`, `queue` | **branch-scoped** (`branch_id` ustun) | Operatsion hodisa aniq bir filialda sodir bo'ladi |
+| `patients`, `treatment_plans`, `medical_records` | **tenant-level by-design** (filial yo'q) | Bemor ko'p filialli markazda istalgan filialga borishi mumkin; uni bir filialga "qamash" noto'g'ri (filial B'ga borgani filial A ro'yxatidan yo'qolmaydi). Reja — bemorning bolasi, shu sababli u ham tenant-level |
+
+**Reports filial filtri (`?branchId=`):** `revenue`, `appointmentStats`, `doctorWorkload` filial bo'yicha filtrlaydi (branch-scoped manbalardan). `planCompletion` **tenant-wide** — reja branch-scoped emas; bu silently-ignored emas, balki yuqoridagi qarorning izchil natijasi. Plan-completion'ni filial bo'yicha bo'lish kerak bo'lsa (V2-3 doirasida EMAS), `treatment_plans.branch_id` nullable attribution ustuni sifatida alohida qaror bilan qo'shiladi — scoping chegarasi sifatida emas.
+
 ---
 
 ## 6. Vertikal-neytral core vs dental seam ([RFC-0001](./rfcs/0001-extensibility-vertical-model.md))
