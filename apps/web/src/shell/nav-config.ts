@@ -41,7 +41,7 @@ export type NavGroup = { labelKey: string; items: NavItem[] };
 
 export const NAV_GROUPS: NavGroup[] = [
   {
-    labelKey: 'nav.group.today',
+    labelKey: 'nav.group.asosiy',
     items: [
       { key: 'home', labelKey: 'nav.dashboard', icon: Home, path: '/' },
       {
@@ -52,31 +52,12 @@ export const NAV_GROUPS: NavGroup[] = [
         permission: 'appointment.view',
       },
       {
-        key: 'schedule',
-        labelKey: 'nav.schedule',
-        icon: CalendarClock,
-        path: '/schedule',
-        permission: 'schedule.view',
-      },
-      {
         key: 'queue',
         labelKey: 'nav.queue',
         icon: ListChecks,
         path: '/queue',
         permission: 'queue.view',
       },
-      {
-        key: 'recalls',
-        labelKey: 'nav.recalls',
-        icon: PhoneCall,
-        path: '/recalls',
-        permission: 'recall.view',
-      },
-    ],
-  },
-  {
-    labelKey: 'nav.group.patients',
-    items: [
       {
         key: 'patients',
         labelKey: 'nav.patients',
@@ -85,16 +66,16 @@ export const NAV_GROUPS: NavGroup[] = [
         permission: 'patient.view',
       },
       {
-        key: 'patient-new',
-        labelKey: 'nav.patient_new',
-        icon: UserPlus,
-        path: '/patients/new',
-        permission: 'patient.create',
+        key: 'cashier',
+        labelKey: 'nav.cashier',
+        icon: Wallet,
+        path: '/cashier',
+        permission: 'cashier.view',
       },
     ],
   },
   {
-    labelKey: 'nav.group.clinic',
+    labelKey: 'nav.group.klinika',
     items: [
       { key: 'plans', labelKey: 'nav.plans', icon: FileText, path: '/plans', disabled: true },
       {
@@ -106,45 +87,25 @@ export const NAV_GROUPS: NavGroup[] = [
         disabled: true,
       },
       { key: 'rx', labelKey: 'nav.rx', icon: Pill, path: '/rx', disabled: true },
-    ],
-  },
-  {
-    labelKey: 'nav.group.finance',
-    items: [
       {
-        key: 'cashier',
-        labelKey: 'nav.cashier',
-        icon: Wallet,
-        path: '/cashier',
-        permission: 'cashier.view',
+        key: 'schedule',
+        labelKey: 'nav.schedule',
+        icon: CalendarClock,
+        path: '/schedule',
+        permission: 'schedule.view',
       },
       {
-        key: 'transactions',
-        labelKey: 'nav.transactions',
-        icon: ArrowLeftRight,
-        path: '/transactions',
-        disabled: true,
-      },
-      {
-        key: 'expenses',
-        labelKey: 'nav.expenses',
-        icon: Receipt,
-        path: '/expenses',
-        permission: 'expense.view',
-      },
-      {
-        key: 'payroll',
-        labelKey: 'nav.payroll',
-        icon: Coins,
-        path: '/payroll',
-        permission: 'payroll.view',
+        key: 'recalls',
+        labelKey: 'nav.recalls',
+        icon: PhoneCall,
+        path: '/recalls',
+        permission: 'recall.view',
       },
     ],
   },
   {
-    labelKey: 'nav.group.management',
+    labelKey: 'nav.group.boshqaruv',
     items: [
-      { key: 'kpi', labelKey: 'nav.kpi', icon: BarChart3, path: '/dashboard', disabled: true },
       {
         key: 'reports',
         labelKey: 'nav.reports',
@@ -158,20 +119,6 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: Stethoscope,
         path: '/settings/services',
         permission: 'service.view',
-      },
-      {
-        key: 'branches',
-        labelKey: 'nav.branches',
-        icon: Building2,
-        path: '/settings/branches',
-        permission: 'branch.view',
-      },
-      {
-        key: 'roles',
-        labelKey: 'nav.roles',
-        icon: Shield,
-        path: '/settings/roles',
-        permission: 'role.view',
       },
       {
         key: 'users',
@@ -188,6 +135,34 @@ export const NAV_GROUPS: NavGroup[] = [
         permission: 'stock.view',
       },
       {
+        key: 'expenses',
+        labelKey: 'nav.expenses',
+        icon: Receipt,
+        path: '/expenses',
+        permission: 'expense.view',
+      },
+      {
+        key: 'payroll',
+        labelKey: 'nav.payroll',
+        icon: Coins,
+        path: '/payroll',
+        permission: 'payroll.view',
+      },
+      {
+        key: 'branches',
+        labelKey: 'nav.branches',
+        icon: Building2,
+        path: '/settings/branches',
+        permission: 'branch.view',
+      },
+      {
+        key: 'roles',
+        labelKey: 'nav.roles',
+        icon: Shield,
+        path: '/settings/roles',
+        permission: 'role.view',
+      },
+      {
         key: 'audit',
         labelKey: 'nav.audit',
         icon: ScrollText,
@@ -200,6 +175,21 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: Settings,
         path: '/settings/tenant',
         permission: 'tenant.view',
+      },
+      { key: 'kpi', labelKey: 'nav.kpi', icon: BarChart3, path: '/dashboard', disabled: true },
+      {
+        key: 'transactions',
+        labelKey: 'nav.transactions',
+        icon: ArrowLeftRight,
+        path: '/transactions',
+        disabled: true,
+      },
+      {
+        key: 'patient-new',
+        labelKey: 'nav.patient_new',
+        icon: UserPlus,
+        path: '/patients/new',
+        permission: 'patient.create',
       },
     ],
   },

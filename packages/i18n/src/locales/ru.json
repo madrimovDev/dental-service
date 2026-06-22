@@ -143,11 +143,9 @@
     "settings": "Настройки",
     "tenant_settings": "Настройки",
     "group": {
-      "today": "Сегодня",
-      "patients": "Пациенты",
-      "clinic": "Клиника",
-      "finance": "Финансы",
-      "management": "Управление"
+      "asosiy": "Основное",
+      "klinika": "Клиника",
+      "boshqaruv": "Управление"
     }
   },
   "palette": {

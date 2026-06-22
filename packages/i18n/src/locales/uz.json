@@ -143,11 +143,9 @@
     "settings": "Sozlamalar",
     "tenant_settings": "Sozlamalar",
     "group": {
-      "today": "Bugun",
-      "patients": "Bemorlar",
-      "clinic": "Klinika",
-      "finance": "Moliya",
-      "management": "Boshqaruv"
+      "asosiy": "Asosiy",
+      "klinika": "Klinika",
+      "boshqaruv": "Boshqaruv"
     }
   },
   "palette": {

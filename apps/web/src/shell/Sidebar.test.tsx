@@ -46,6 +46,6 @@ describe('Sidebar', () => {
 
   it("guruh sarlavhasini ko'rsatadi", () => {
     renderApp(<Sidebar />);
-    expect(screen.getByText('Bemorlar')).toBeInTheDocument(); // group.patients
+    expect(screen.getByText('Asosiy')).toBeInTheDocument(); // nav.group.asosiy
   });
 });
