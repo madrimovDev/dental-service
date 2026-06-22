@@ -21,6 +21,17 @@ export function completionRate(completed: number, total: number): number {
   return total === 0 ? 0 : completed / total;
 }
 
+/** Recall samaradorligi (0..1) — converted (scheduled+completed) / total. total=0 → 0. */
+export function recallEfficacy(converted: number, total: number): number {
+  return total === 0 ? 0 : converted / total;
+}
+
+/** Retention foizi (0..1) — qaytgan / (yangi + qaytgan). jami=0 → 0. */
+export function retentionRate(returning: number, newPatients: number): number {
+  const total = returning + newPatients;
+  return total === 0 ? 0 : returning / total;
+}
+
 /** "HH:MM" → daqiqa (yarim tundan). */
 function toMinutes(hhmm: string): number {
   const [h, m] = hhmm.split(':').map(Number);

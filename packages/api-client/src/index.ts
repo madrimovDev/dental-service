@@ -222,6 +222,7 @@ export type {
   DeleteService200,
   DeleteTimeOff200,
   DeleteUserAssignment200,
+  DentalAnalyticsReport,
   Diagnosis,
   DoctorListItem,
   DoctorWorkloadRow,
@@ -564,12 +565,14 @@ export {
 // Generated (orval) — reports
 export type {
   GetAppointmentStatsReportResult,
+  GetDentalAnalyticsReportResult,
   GetDoctorWorkloadReportResult,
   GetPlanCompletionReportResult,
   GetRevenueReportResult,
 } from './generated/reports/reports.ts';
 export {
   getAppointmentStatsReport,
+  getDentalAnalyticsReport,
   getDoctorWorkloadReport,
   getPlanCompletionReport,
   getRevenueReport,

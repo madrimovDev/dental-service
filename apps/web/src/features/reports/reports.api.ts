@@ -1,5 +1,6 @@
 import {
   getAppointmentStatsReport,
+  getDentalAnalyticsReport,
   getDoctorWorkloadReport,
   getPlanCompletionReport,
   getRevenueReport,
@@ -39,5 +40,12 @@ export function usePlanCompletion(range: ReportRange) {
   return useQuery({
     queryKey: reportKeys.planCompletion(range),
     queryFn: () => getPlanCompletionReport(toQuery(range)).then((r) => r.data),
+  });
+}
+
+export function useDentalAnalytics(range: ReportRange) {
+  return useQuery({
+    queryKey: reportKeys.dentalAnalytics(range),
+    queryFn: () => getDentalAnalyticsReport(toQuery(range)).then((r) => r.data),
   });
 }

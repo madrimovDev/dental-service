@@ -3,10 +3,12 @@ import {
   branches,
   cashierTransactionItems,
   cashierTransactions,
+  patients,
+  recalls,
   treatmentPlans,
   treatmentStages,
 } from '@dental/db-schema';
-import { and, between, count, eq, isNull, ne, sql } from 'drizzle-orm';
+import { and, between, count, countDistinct, desc, eq, isNull, lt, ne, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import {
@@ -14,10 +16,13 @@ import {
   completionRate,
   DEFAULT_WORK_MINUTES,
   noShowRate,
+  recallEfficacy,
+  retentionRate,
   utilizationPct,
 } from './reports.aggregations.ts';
 import type {
   AppointmentStatsReport,
+  DentalAnalyticsReport,
   DoctorWorkloadRow,
   PlanCompletionReport,
   ReportRange,
@@ -237,7 +242,111 @@ export const createReportsService = () => {
     };
   }
 
-  return { revenue, appointmentStats, doctorWorkload, planCompletion };
+  async function dentalAnalytics(
+    c: Context,
+    { from, to, branchId }: ReportRange,
+  ): Promise<DentalAnalyticsReport> {
+    const db = getDb(c);
+    const { start, end } = tashkentRange(from, to);
+
+    // 1. Procedure-mix — kassa item'lari (completed payment, oraliq, filial).
+    const txFilter = [
+      between(cashierTransactions.createdAt, start, end),
+      eq(cashierTransactions.type, 'payment'),
+      eq(cashierTransactions.status, 'completed'),
+    ];
+    if (branchId) txFilter.push(eq(cashierTransactions.branchId, branchId));
+    const mixRows = await db
+      .select({
+        serviceName: cashierTransactionItems.serviceName,
+        count: sql<string>`SUM(${cashierTransactionItems.quantity})`,
+        revenue: sql<string>`SUM(${cashierTransactionItems.subtotal})`,
+      })
+      .from(cashierTransactionItems)
+      .innerJoin(
+        cashierTransactions,
+        eq(cashierTransactionItems.transactionId, cashierTransactions.id),
+      )
+      .where(and(...txFilter))
+      .groupBy(cashierTransactionItems.serviceName)
+      .orderBy(desc(sql`SUM(${cashierTransactionItems.subtotal})`));
+
+    // 2. Retention — yangi (oraliqda yaratilgan) vs qaytgan (oraliqda yozilgan, lekin
+    //    oraliqdan oldin yaratilgan bemor). Retention bemor-darajasida (tenant-wide, Qaror #29).
+    const [newRow] = await db
+      .select({ c: count() })
+      .from(patients)
+      .where(between(patients.createdAt, start, end));
+    const apptRetFilter = [
+      between(appointments.startTime, start, end),
+      lt(patients.createdAt, start),
+    ];
+    if (branchId) apptRetFilter.push(eq(appointments.branchId, branchId));
+    const [retRow] = await db
+      .select({ c: countDistinct(appointments.patientId) })
+      .from(appointments)
+      .innerJoin(patients, eq(appointments.patientId, patients.id))
+      .where(and(...apptRetFilter));
+    const newPatients = Number(newRow?.c ?? 0);
+    const returningPatients = Number(retRow?.c ?? 0);
+
+    // 3. Recall-efficacy — oraliqda yaratilgan recall'lar, status bo'yicha.
+    const recallRows = await db
+      .select({ status: recalls.status, c: count() })
+      .from(recalls)
+      .where(between(recalls.createdAt, start, end))
+      .groupBy(recalls.status);
+    const recallByStatus = recallRows.map((r) => ({
+      status: r.status as string,
+      count: Number(r.c),
+    }));
+    const recallTotal = recallByStatus.reduce((s, r) => s + r.count, 0);
+    const recallConverted = recallByStatus
+      .filter((r) => r.status === 'scheduled' || r.status === 'completed')
+      .reduce((s, r) => s + r.count, 0);
+
+    // 4. No-show trend — hafta-kuni bo'yicha (Asia/Tashkent). EXTRACT(DOW) 0=Yak..6=Shan.
+    const nsFilter = [between(appointments.startTime, start, end)];
+    if (branchId) nsFilter.push(eq(appointments.branchId, branchId));
+    const nsRows = await db
+      .select({
+        weekday: sql<number>`EXTRACT(DOW FROM ${appointments.startTime} AT TIME ZONE 'Asia/Tashkent')::int`,
+        total: count(),
+        noShow: sql<number>`COUNT(*) FILTER (WHERE ${appointments.status} = 'no_show')`,
+      })
+      .from(appointments)
+      .where(and(...nsFilter))
+      .groupBy(sql`EXTRACT(DOW FROM ${appointments.startTime} AT TIME ZONE 'Asia/Tashkent')`);
+
+    return {
+      procedureMix: mixRows.map((r) => ({
+        serviceName: r.serviceName,
+        count: Number(r.count),
+        revenue: Number(r.revenue),
+      })),
+      retention: {
+        newPatients,
+        returningPatients,
+        retentionRate: retentionRate(returningPatients, newPatients),
+      },
+      recallEfficacy: {
+        total: recallTotal,
+        converted: recallConverted,
+        efficacy: recallEfficacy(recallConverted, recallTotal),
+        byStatus: recallByStatus,
+      },
+      noShowByWeekday: nsRows
+        .map((r) => ({
+          weekday: Number(r.weekday),
+          total: Number(r.total),
+          noShow: Number(r.noShow),
+          rate: noShowRate(Number(r.noShow), Number(r.total)),
+        }))
+        .sort((a, b) => a.weekday - b.weekday),
+    };
+  }
+
+  return { revenue, appointmentStats, doctorWorkload, planCompletion, dentalAnalytics };
 };
 
 export type ReportsService = ReturnType<typeof createReportsService>;

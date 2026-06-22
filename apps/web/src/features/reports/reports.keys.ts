@@ -6,4 +6,5 @@ export const reportKeys = {
   appointments: (range: ReportRange) => ['reports', 'appointments', range] as const,
   doctors: (range: ReportRange) => ['reports', 'doctors', range] as const,
   planCompletion: (range: ReportRange) => ['reports', 'planCompletion', range] as const,
+  dentalAnalytics: (range: ReportRange) => ['reports', 'dentalAnalytics', range] as const,
 };

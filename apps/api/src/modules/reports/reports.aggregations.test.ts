@@ -4,6 +4,8 @@ import {
   completionRate,
   DEFAULT_WORK_MINUTES,
   noShowRate,
+  recallEfficacy,
+  retentionRate,
   utilizationPct,
 } from './reports.aggregations.ts';
 
@@ -20,6 +22,14 @@ describe('reports.aggregations', () => {
   it('completionRate', () => {
     expect(completionRate(3, 4)).toBe(0.75);
     expect(completionRate(0, 0)).toBe(0);
+  });
+  it('recallEfficacy (V2-3)', () => {
+    expect(recallEfficacy(3, 10)).toBe(0.3);
+    expect(recallEfficacy(0, 0)).toBe(0);
+  });
+  it('retentionRate (V2-3)', () => {
+    expect(retentionRate(6, 4)).toBe(0.6); // qaytgan/(qaytgan+yangi)
+    expect(retentionRate(0, 0)).toBe(0);
   });
   it('branchOpenMinutes', () => {
     const wh = { mon: { open: '09:00', close: '18:00' }, sun: null };

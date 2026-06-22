@@ -21,6 +21,7 @@ import { formatCurrency, formatNumber } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import {
   useAppointmentStats,
+  useDentalAnalytics,
   useDoctorWorkload,
   usePlanCompletion,
   useRevenueReport,
@@ -145,6 +146,9 @@ export function ReportsScreen() {
   const appointments = useAppointmentStats(range);
   const doctors = useDoctorWorkload(range);
   const plans = usePlanCompletion(range);
+  const analytics = useDentalAnalytics(range);
+
+  const WEEKDAY_LABELS = ['Yak', 'Dush', 'Sesh', 'Chor', 'Pay', 'Jum', 'Shan'];
 
   // doctorId → ism (workload jadvali xom UUID o'rniga ism ko'rsatadi; CSV/XLSX ham)
   const doctorList = useDoctors();
@@ -369,6 +373,75 @@ export function ReportsScreen() {
             )}
           </ReportSection>
         </SimpleGrid>
+
+        {/* Dental analitika (V2-3) */}
+        <Card withBorder padding="lg">
+          <Stack gap="md">
+            <Title order={4}>
+              {t('reports.dental_analytics', { defaultValue: 'Dental analitika' })}
+            </Title>
+            {analytics.isLoading ? (
+              <StateView status="loading" skeleton="cards" />
+            ) : analytics.isError ? (
+              <StateView
+                status="error"
+                title={statesLabels.errorTitle}
+                retryLabel={statesLabels.retry}
+                onRetry={() => analytics.refetch()}
+              />
+            ) : analytics.data ? (
+              <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="lg">
+                <Stack gap="xs">
+                  <Text fw={600}>{t('reports.procedure_mix')}</Text>
+                  {analytics.data.procedureMix.length > 0 ? (
+                    <BarMini
+                      data={analytics.data.procedureMix.map((p) => ({
+                        label: p.serviceName,
+                        value: p.revenue,
+                      }))}
+                    />
+                  ) : (
+                    <Text c="dimmed">{t('reports.empty')}</Text>
+                  )}
+                </Stack>
+                <Stack gap="xs">
+                  <Text fw={600}>{t('reports.retention')}</Text>
+                  <Group gap="xl">
+                    <Text>
+                      {t('reports.retention_new')}: {fmt(analytics.data.retention.newPatients)}
+                    </Text>
+                    <Text>
+                      {t('reports.retention_returning')}:{' '}
+                      {fmt(analytics.data.retention.returningPatients)}
+                    </Text>
+                    <Text>
+                      {t('reports.rate')}: {pct(analytics.data.retention.retentionRate)}
+                    </Text>
+                  </Group>
+                  <Text fw={600} mt="sm">
+                    {t('reports.recall_efficacy')}
+                  </Text>
+                  <Text>
+                    {fmt(analytics.data.recallEfficacy.converted)} /{' '}
+                    {fmt(analytics.data.recallEfficacy.total)} ={' '}
+                    {pct(analytics.data.recallEfficacy.efficacy)}
+                  </Text>
+                </Stack>
+                <Stack gap="xs">
+                  <Text fw={600}>{t('reports.no_show_trend')}</Text>
+                  <BarMini
+                    data={analytics.data.noShowByWeekday.map((w) => ({
+                      label: WEEKDAY_LABELS[w.weekday] ?? String(w.weekday),
+                      value: Math.round(w.rate * 100),
+                    }))}
+                  />
+                </Stack>
+              </SimpleGrid>
+            ) : (
+              <StateView status="empty" title={statesLabels.emptyTitle} />
+            )}
+          </Stack>
+        </Card>
       </Stack>
     </Container>
   );
