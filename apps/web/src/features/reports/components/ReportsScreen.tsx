@@ -1,4 +1,4 @@
-import { StateView } from '@dental/ui';
+import { PageHead, StatCard, StateView } from '@dental/ui';
 import {
   Button,
   Card,
@@ -12,7 +12,14 @@ import {
   Title,
 } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
-import { IconFileSpreadsheet, IconFileTypeCsv } from '@tabler/icons-react';
+import {
+  IconCalendarStats,
+  IconCashBanknote,
+  IconChartBar,
+  IconFileSpreadsheet,
+  IconFileTypeCsv,
+  IconUserOff,
+} from '@tabler/icons-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDoctors } from '@/features/appointments/appointments.api';
@@ -183,7 +190,32 @@ export function ReportsScreen() {
   return (
     <Container size="xl">
       <Stack gap="lg">
-        <Title order={2}>{t('reports.title', { defaultValue: 'Hisobotlar' })}</Title>
+        <PageHead title={t('reports.title', { defaultValue: 'Hisobotlar' })} />
+
+        {/* 4 KPI — har biri o'z hook'iga bog'liq; ma'lumot yo'q bo'lsa em-dash (hech qachon bo'sh grid) */}
+        <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="lg">
+          <StatCard
+            accent
+            icon={<IconCashBanknote size={18} />}
+            label={t('reports.revenue', { defaultValue: 'Daromad' })}
+            value={revenue.data ? formatCurrency(revenue.data.total, t) : '—'}
+          />
+          <StatCard
+            icon={<IconCalendarStats size={18} />}
+            label={t('reports.appointments', { defaultValue: 'Qabullar' })}
+            value={appointments.data ? formatNumber(appointments.data.total) : '—'}
+          />
+          <StatCard
+            icon={<IconUserOff size={18} />}
+            label={t('reports.no_show', { defaultValue: 'Kelmaganlar' })}
+            value={appointments.data ? pct(appointments.data.noShowRate) : '—'}
+          />
+          <StatCard
+            icon={<IconChartBar size={18} />}
+            label={t('reports.utilization', { defaultValue: 'Bandlik' })}
+            value={appointments.data ? pct(appointments.data.slotUtilization) : '—'}
+          />
+        </SimpleGrid>
 
         <Card withBorder padding="md">
           <Group align="end" gap="md">
@@ -238,17 +270,31 @@ export function ReportsScreen() {
           >
             {revenue.data && (
               <Stack gap="md">
-                <Text fw={600}>
-                  {t('reports.total', { defaultValue: 'Jami' })}:{' '}
-                  {formatCurrency(revenue.data.total, t)}
-                </Text>
+                {revenue.data.byPeriod.length > 0 && (
+                  <Stack gap="xs">
+                    <Text fw={600}>
+                      {t('reports.revenue_trend', { defaultValue: 'Daromad dinamikasi' })}
+                    </Text>
+                    <BarMini
+                      data={revenue.data.byPeriod.map((p) => ({
+                        label: p.date,
+                        value: p.total,
+                      }))}
+                    />
+                  </Stack>
+                )}
                 {revenue.data.byService.length > 0 && (
-                  <BarMini
-                    data={revenue.data.byService.map((s) => ({
-                      label: s.serviceName,
-                      value: s.total,
-                    }))}
-                  />
+                  <Stack gap="xs">
+                    <Text fw={600}>
+                      {t('reports.top_services', { defaultValue: 'Eng ko‘p xizmatlar' })}
+                    </Text>
+                    <BarMini
+                      data={revenue.data.byService.map((s) => ({
+                        label: s.serviceName,
+                        value: s.total,
+                      }))}
+                    />
+                  </Stack>
                 )}
               </Stack>
             )}
@@ -275,19 +321,6 @@ export function ReportsScreen() {
           >
             {appointments.data && (
               <Stack gap="xs">
-                <Group gap="xl">
-                  <Text>
-                    {t('reports.total', { defaultValue: 'Jami' })}: {fmt(appointments.data.total)}
-                  </Text>
-                  <Text>
-                    {t('reports.no_show', { defaultValue: 'Kelmaganlar' })}:{' '}
-                    {pct(appointments.data.noShowRate)}
-                  </Text>
-                  <Text>
-                    {t('reports.utilization', { defaultValue: 'Bandlik' })}:{' '}
-                    {pct(appointments.data.slotUtilization)}
-                  </Text>
-                </Group>
                 <Table>
                   <Table.Thead>
                     <Table.Tr>
@@ -328,24 +361,32 @@ export function ReportsScreen() {
             exportLabel={exportLabel}
           >
             {doctors.data && (
-              <Table>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th>{t('reports.doctor', { defaultValue: 'Shifokor' })}</Table.Th>
-                    <Table.Th>{t('reports.total', { defaultValue: 'Jami' })}</Table.Th>
-                    <Table.Th>{t('reports.completed', { defaultValue: 'Yakunlangan' })}</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {doctors.data.map((d) => (
-                    <Table.Tr key={d.doctorId}>
-                      <Table.Td>{doctorName(d.doctorId)}</Table.Td>
-                      <Table.Td>{fmt(d.total)}</Table.Td>
-                      <Table.Td>{fmt(d.completed)}</Table.Td>
+              <Stack gap="md">
+                <BarMini
+                  data={doctors.data.map((d) => ({
+                    label: doctorName(d.doctorId),
+                    value: d.total,
+                  }))}
+                />
+                <Table>
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>{t('reports.doctor', { defaultValue: 'Shifokor' })}</Table.Th>
+                      <Table.Th>{t('reports.total', { defaultValue: 'Jami' })}</Table.Th>
+                      <Table.Th>{t('reports.completed', { defaultValue: 'Yakunlangan' })}</Table.Th>
                     </Table.Tr>
-                  ))}
-                </Table.Tbody>
-              </Table>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {doctors.data.map((d) => (
+                      <Table.Tr key={d.doctorId}>
+                        <Table.Td>{doctorName(d.doctorId)}</Table.Td>
+                        <Table.Td>{fmt(d.total)}</Table.Td>
+                        <Table.Td>{fmt(d.completed)}</Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              </Stack>
             )}
           </ReportSection>
 
