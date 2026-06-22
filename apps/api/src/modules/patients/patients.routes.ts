@@ -7,14 +7,19 @@ import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
 import {
+  toEmergencyContactDto,
   toMedicalRecordDto,
   toPatientDto,
   toPatientListItemDto,
   toPatientRelativeDto,
 } from './patients.mapper.ts';
 import {
+  addEmergencyContactSchema,
   addRelativeSchema,
   createPatientSchema,
+  emergencyContactDtoSchema,
+  emergencyContactParamSchema,
+  emergencyContactRemoveResultSchema,
   listQuerySchema,
   medicalRecordDtoSchema,
   patientArchiveResultSchema,
@@ -50,6 +55,13 @@ const relativeNotFound = {
   404: {
     content: { 'application/json': { schema: errorResponseSchema } },
     description: 'Relative link not found',
+  },
+};
+
+const emergencyContactNotFound = {
+  404: {
+    content: { 'application/json': { schema: errorResponseSchema } },
+    description: 'Emergency contact not found',
   },
 };
 
@@ -316,6 +328,86 @@ export const patientRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     const { id, relId } = c.req.valid('param');
     const row = await service.removeRelative(c, id, relId);
     if (!row) return c.json(fail('patient_relative.not_found', 'Relative link not found'), 404);
+    return c.json(ok({ removed: true as const, id: row.id }), 200);
+  });
+
+  // ─── Patient emergency contacts (erkin) sub-resource ─────────────────────
+
+  const listEmergencyContactsRoute = createRoute({
+    method: 'get',
+    path: '/{id}/emergency-contacts',
+    tags: ['patients'],
+    operationId: 'listPatientEmergencyContacts',
+    middleware: [requirePermission('patient.edit')] as const,
+    request: { params: patientIdParamSchema },
+    responses: okJson(z.array(emergencyContactDtoSchema), 'List of patient emergency contacts'),
+  });
+
+  app.openapi(listEmergencyContactsRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const rows = await service.listEmergencyContacts(c, id);
+    return c.json(ok(rows.map(toEmergencyContactDto)), 200);
+  });
+
+  const addEmergencyContactRoute = createRoute({
+    method: 'post',
+    path: '/{id}/emergency-contacts',
+    tags: ['patients'],
+    operationId: 'addPatientEmergencyContact',
+    middleware: [requirePermission('patient.edit')] as const,
+    request: {
+      params: patientIdParamSchema,
+      body: { content: { 'application/json': { schema: addEmergencyContactSchema } } },
+    },
+    responses: {
+      201: {
+        content: { 'application/json': { schema: apiResponseSchema(emergencyContactDtoSchema) } },
+        description: 'Emergency contact created',
+      },
+      400: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Validation error',
+      },
+      401: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Unauthorized',
+      },
+      403: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Forbidden',
+      },
+    },
+  });
+
+  app.openapi(addEmergencyContactRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const body = c.req.valid('json');
+    const row = await service.addEmergencyContact(c, id, body);
+    if (!row) throw new Error('Emergency contact creation failed');
+    return c.json(ok(toEmergencyContactDto(row)), 201);
+  });
+
+  const removeEmergencyContactRoute = createRoute({
+    method: 'delete',
+    path: '/{id}/emergency-contacts/{contactId}',
+    tags: ['patients'],
+    operationId: 'removePatientEmergencyContact',
+    middleware: [requirePermission('patient.edit')] as const,
+    request: { params: emergencyContactParamSchema },
+    responses: {
+      ...okJson(emergencyContactRemoveResultSchema, 'Emergency contact removed'),
+      ...emergencyContactNotFound,
+    },
+  });
+
+  app.openapi(removeEmergencyContactRoute, async (c) => {
+    const { id, contactId } = c.req.valid('param');
+    const row = await service.removeEmergencyContact(c, id, contactId);
+    if (!row)
+      return c.json(
+        fail('patient_emergency_contact.not_found', 'Emergency contact not found'),
+        404,
+      );
     return c.json(ok({ removed: true as const, id: row.id }), 200);
   });
 

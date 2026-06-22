@@ -1,4 +1,5 @@
 import {
+  addPatientEmergencyContact,
   addPatientRelative,
   archivePatient,
   createPatient,
@@ -6,8 +7,10 @@ import {
   getPatient,
   getPatientBalance,
   listCashierTransactions,
+  listPatientEmergencyContacts,
   listPatientRelatives,
   listPatients,
+  removePatientEmergencyContact,
   removePatientRelative,
   updateMedicalRecord,
   updatePatient,
@@ -137,5 +140,35 @@ export function useRemoveRelative(id: string) {
   return useMutation({
     mutationFn: (relId: string) => removePatientRelative(id, relId).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: patientKeys.relatives(id) }),
+  });
+}
+
+export function usePatientEmergencyContacts(id: string) {
+  return useQuery({
+    queryKey: patientKeys.emergencyContacts(id),
+    queryFn: () => listPatientEmergencyContacts(id).then((r) => r.data),
+    enabled: !!id,
+  });
+}
+
+export function useAddEmergencyContact(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      name: string;
+      phone: string;
+      relationship?: string;
+      isPrimary?: boolean;
+    }) => addPatientEmergencyContact(id, body).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: patientKeys.emergencyContacts(id) }),
+  });
+}
+
+export function useRemoveEmergencyContact(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (contactId: string) =>
+      removePatientEmergencyContact(id, contactId).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: patientKeys.emergencyContacts(id) }),
   });
 }

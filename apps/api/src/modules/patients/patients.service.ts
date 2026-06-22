@@ -1,6 +1,7 @@
 import {
   cashierTransactions,
   medicalRecords,
+  patientEmergencyContacts,
   patientRelatives,
   patients,
   treatmentPlans,
@@ -13,6 +14,7 @@ import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { computePatientBalance } from './patients.balance.ts';
 import type {
+  AddEmergencyContactInput,
   AddRelativeInput,
   CreatePatientInput,
   ListQuery,
@@ -496,6 +498,76 @@ export const createPatientsService = (deps: { audit: AuditLogger }) => {
     return deleted ?? null;
   }
 
+  // ===== Patient emergency contacts (erkin) sub-resource =====
+
+  /** Bemorning erkin emergency kontaktlari (isPrimary avval, keyin yangi). */
+  async function listEmergencyContacts(c: Context, patientId: string) {
+    const db = getDb(c);
+    return db
+      .select()
+      .from(patientEmergencyContacts)
+      .where(eq(patientEmergencyContacts.patientId, patientId))
+      .orderBy(desc(patientEmergencyContacts.isPrimary), desc(patientEmergencyContacts.createdAt));
+  }
+
+  async function addEmergencyContact(
+    c: Context,
+    patientId: string,
+    input: AddEmergencyContactInput,
+  ) {
+    const db = getDb(c);
+    const tenantId = c.get('activeTenantId');
+    if (!tenantId) throw new Error('No tenant context');
+
+    const [contact] = await db
+      .insert(patientEmergencyContacts)
+      .values({
+        tenantId,
+        patientId,
+        name: input.name,
+        phone: input.phone,
+        relationship: input.relationship ?? null,
+        isPrimary: input.isPrimary ?? false,
+      })
+      .returning();
+
+    if (contact) {
+      await deps.audit.record(c, {
+        action: 'created',
+        resourceType: 'patient_emergency_contact',
+        resourceId: contact.id,
+        after: contact,
+      });
+    }
+
+    return contact ?? null;
+  }
+
+  async function removeEmergencyContact(c: Context, patientId: string, contactId: string) {
+    const db = getDb(c);
+
+    const [deleted] = await db
+      .delete(patientEmergencyContacts)
+      .where(
+        and(
+          eq(patientEmergencyContacts.id, contactId),
+          eq(patientEmergencyContacts.patientId, patientId),
+        ),
+      )
+      .returning();
+
+    if (deleted) {
+      await deps.audit.record(c, {
+        action: 'deleted',
+        resourceType: 'patient_emergency_contact',
+        resourceId: contactId,
+        before: deleted,
+      });
+    }
+
+    return deleted ?? null;
+  }
+
   return {
     list,
     findById,
@@ -508,6 +580,9 @@ export const createPatientsService = (deps: { audit: AuditLogger }) => {
     listRelatives,
     addRelative,
     removeRelative,
+    listEmergencyContacts,
+    addEmergencyContact,
+    removeEmergencyContact,
   };
 };
 

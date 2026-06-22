@@ -1,5 +1,15 @@
 import { Button, Card, Input } from '@dental/ui';
-import { ActionIcon, Badge, Group, Paper, Select, Stack, Table, Text } from '@mantine/core';
+import {
+  ActionIcon,
+  Badge,
+  Checkbox,
+  Group,
+  Paper,
+  Select,
+  Stack,
+  Table,
+  Text,
+} from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { IconTrash } from '@tabler/icons-react';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
@@ -7,12 +17,15 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import {
+  useAddEmergencyContact,
   useAddRelative,
+  usePatientEmergencyContacts,
   usePatientRelatives,
   usePatients,
+  useRemoveEmergencyContact,
   useRemoveRelative,
 } from '../../patients.api';
-import { addRelativeFormSchema } from '../../patients.schema';
+import { addEmergencyContactFormSchema, addRelativeFormSchema } from '../../patients.schema';
 
 function AddRelativeForm({ patientId }: { patientId: string }) {
   const { t } = useTranslation();
@@ -67,6 +80,134 @@ function AddRelativeForm({ patientId }: { patientId: string }) {
         </Stack>
       </form>
     </Card>
+  );
+}
+
+function AddEmergencyContactForm({ patientId }: { patientId: string }) {
+  const { t } = useTranslation();
+  const addMut = useAddEmergencyContact(patientId);
+
+  const form = useForm({
+    initialValues: { name: '', phone: '', relationship: '', isPrimary: false },
+    validate: zod4Resolver(addEmergencyContactFormSchema),
+  });
+
+  const submit = form.onSubmit((values) =>
+    addMut.mutate(
+      {
+        name: values.name,
+        phone: values.phone,
+        relationship: values.relationship || undefined,
+        isPrimary: values.isPrimary,
+      },
+      { onSuccess: () => form.reset() },
+    ),
+  );
+
+  return (
+    <Card title={t('patients.emergency.add')}>
+      <form onSubmit={submit}>
+        <Stack gap="md">
+          <Input
+            label={t('patients.emergency.name')}
+            placeholder={t('patients.emergency.name_placeholder')}
+            value={form.values.name}
+            error={form.errors.name}
+            onChange={(v) => form.setFieldValue('name', v)}
+          />
+          <Input
+            label={t('patients.emergency.phone')}
+            placeholder={t('patients.emergency.phone_placeholder')}
+            value={form.values.phone}
+            error={form.errors.phone}
+            onChange={(v) => form.setFieldValue('phone', v)}
+          />
+          <Input
+            label={t('patients.emergency.relationship')}
+            placeholder={t('patients.emergency.relationship_placeholder')}
+            value={form.values.relationship}
+            error={form.errors.relationship}
+            onChange={(v) => form.setFieldValue('relationship', v)}
+          />
+          <Checkbox
+            label={t('patients.emergency.is_primary')}
+            checked={form.values.isPrimary}
+            onChange={(e) => form.setFieldValue('isPrimary', e.currentTarget.checked)}
+          />
+          <Group justify="flex-end">
+            <Button type="submit" variant="primary" disabled={addMut.isPending}>
+              {t('patients.emergency.add')}
+            </Button>
+          </Group>
+        </Stack>
+      </form>
+    </Card>
+  );
+}
+
+function EmergencyContactsSection({ patientId }: { patientId: string }) {
+  const { t } = useTranslation();
+  const { hasPermission } = useAuthStore();
+  const canEdit = hasPermission('patient.edit');
+  const query = usePatientEmergencyContacts(patientId);
+  const removeMut = useRemoveEmergencyContact(patientId);
+
+  const rows = query.data ?? [];
+
+  return (
+    <Stack gap="md">
+      <Text fw={600}>{t('patients.emergency.title')}</Text>
+      <Paper withBorder p="md" radius="md">
+        {query.isLoading ? (
+          <Text>{t('common.loading')}</Text>
+        ) : rows.length === 0 ? (
+          <Text c="dimmed">{t('patients.emergency.empty')}</Text>
+        ) : (
+          <Table striped highlightOnHover>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>{t('patients.emergency.name')}</Table.Th>
+                <Table.Th>{t('patients.emergency.phone')}</Table.Th>
+                <Table.Th>{t('patients.emergency.relationship')}</Table.Th>
+                {canEdit && <Table.Th />}
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {rows.map((c) => (
+                <Table.Tr key={c.id}>
+                  <Table.Td>
+                    <Group gap="xs">
+                      {c.name}
+                      {c.isPrimary && (
+                        <Badge variant="light" color="blue">
+                          {t('patients.emergency.primary')}
+                        </Badge>
+                      )}
+                    </Group>
+                  </Table.Td>
+                  <Table.Td>{c.phone}</Table.Td>
+                  <Table.Td>{c.relationship ?? '—'}</Table.Td>
+                  {canEdit && (
+                    <Table.Td>
+                      <ActionIcon
+                        variant="subtle"
+                        color="red"
+                        aria-label={t('common.delete')}
+                        disabled={removeMut.isPending}
+                        onClick={() => removeMut.mutate(c.id)}
+                      >
+                        <IconTrash size={16} />
+                      </ActionIcon>
+                    </Table.Td>
+                  )}
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        )}
+      </Paper>
+      {canEdit && <AddEmergencyContactForm patientId={patientId} />}
+    </Stack>
   );
 }
 
@@ -127,6 +268,8 @@ export function FamilyTab({ patientId }: { patientId: string }) {
       </Paper>
 
       {canEdit && <AddRelativeForm patientId={patientId} />}
+
+      <EmergencyContactsSection patientId={patientId} />
     </Stack>
   );
 }

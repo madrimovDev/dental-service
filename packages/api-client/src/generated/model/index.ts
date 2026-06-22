@@ -5,6 +5,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './addPatientEmergencyContact201';
+export * from './addPatientEmergencyContactBody';
 export * from './addPatientRelative201';
 export * from './addPatientRelativeBody';
 export * from './addUserAssignment201';
@@ -225,6 +227,7 @@ export * from './listLabOrdersParams';
 export * from './listLabOrdersStatus';
 export * from './listNotifications200';
 export * from './listNotificationsParams';
+export * from './listPatientEmergencyContacts200';
 export * from './listPatientImages200';
 export * from './listPatientRecalls200';
 export * from './listPatientRelatives200';
@@ -284,6 +287,8 @@ export * from './passwordResetResponse';
 export * from './patient';
 export * from './patientArchiveResult';
 export * from './patientBalance';
+export * from './patientEmergencyContact';
+export * from './patientEmergencyContactRemoveResult';
 export * from './patientGender';
 export * from './patientImage';
 export * from './patientImageType';
@@ -325,6 +330,7 @@ export * from './registerTenant201';
 export * from './registerTenantBody';
 export * from './registerTenantBodyDefaultLanguage';
 export * from './registerTenantResponse';
+export * from './removePatientEmergencyContact200';
 export * from './removePatientRelative200';
 export * from './removeStockBom200';
 export * from './resetPasswordResponse';
