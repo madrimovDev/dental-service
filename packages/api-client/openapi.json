@@ -2297,6 +2297,122 @@
           "byStatus"
         ]
       },
+      "DentalAnalyticsReport": {
+        "type": "object",
+        "properties": {
+          "procedureMix": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "serviceName": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "number"
+                },
+                "revenue": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "serviceName",
+                "count",
+                "revenue"
+              ]
+            }
+          },
+          "retention": {
+            "type": "object",
+            "properties": {
+              "newPatients": {
+                "type": "number"
+              },
+              "returningPatients": {
+                "type": "number"
+              },
+              "retentionRate": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "newPatients",
+              "returningPatients",
+              "retentionRate"
+            ]
+          },
+          "recallEfficacy": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "number"
+              },
+              "converted": {
+                "type": "number"
+              },
+              "efficacy": {
+                "type": "number"
+              },
+              "byStatus": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "count": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "count"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "total",
+              "converted",
+              "efficacy",
+              "byStatus"
+            ]
+          },
+          "noShowByWeekday": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "weekday": {
+                  "type": "number"
+                },
+                "total": {
+                  "type": "number"
+                },
+                "noShow": {
+                  "type": "number"
+                },
+                "rate": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "weekday",
+                "total",
+                "noShow",
+                "rate"
+              ]
+            }
+          }
+        },
+        "required": [
+          "procedureMix",
+          "retention",
+          "recallEfficacy",
+          "noShowByWeekday"
+        ]
+      },
       "AuditListResponse": {
         "type": "object",
         "properties": {
@@ -11601,6 +11717,100 @@
                     },
                     "data": {
                       "$ref": "#/components/schemas/PlanCompletionReport"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/dental-analytics": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "operationId": "getDentalAnalyticsReport",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "required": true,
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "required": true,
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dental analytics report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/DentalAnalyticsReport"
                     }
                   },
                   "required": [

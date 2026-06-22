@@ -69,3 +69,39 @@ export const planCompletionReportDtoSchema = z
   .openapi('PlanCompletionReport');
 
 export type PlanCompletionReport = z.infer<typeof planCompletionReportDtoSchema>;
+
+// ─── Dental analytics report (V2-3) ──────────────────────────────────────────
+
+/**
+ * Dental-spetsifik analitika: procedure-mix, bemor retention, recall samaradorligi,
+ * no-show trend (hafta-kuni bo'yicha). Filial filtri branch-scoped manbalarga
+ * qo'llanadi (procedure-mix/no-show); retention bemor-darajasida (tenant-wide).
+ */
+export const dentalAnalyticsReportDtoSchema = z
+  .object({
+    procedureMix: z.array(
+      z.object({ serviceName: z.string(), count: z.number(), revenue: z.number() }),
+    ),
+    retention: z.object({
+      newPatients: z.number(),
+      returningPatients: z.number(),
+      retentionRate: z.number(),
+    }),
+    recallEfficacy: z.object({
+      total: z.number(),
+      converted: z.number(),
+      efficacy: z.number(),
+      byStatus: z.array(z.object({ status: z.string(), count: z.number() })),
+    }),
+    noShowByWeekday: z.array(
+      z.object({
+        weekday: z.number(),
+        total: z.number(),
+        noShow: z.number(),
+        rate: z.number(),
+      }),
+    ),
+  })
+  .openapi('DentalAnalyticsReport');
+
+export type DentalAnalyticsReport = z.infer<typeof dentalAnalyticsReportDtoSchema>;

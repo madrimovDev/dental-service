@@ -1,5 +1,6 @@
 import type {
   AppointmentStatsReport,
+  DentalAnalyticsReport,
   DoctorWorkloadRow,
   PlanCompletionReport,
   RevenueReport,
@@ -37,4 +38,14 @@ export const toPlanCompletionReportDto = (r: PlanCompletionReport): PlanCompleti
   completedStages: r.completedStages,
   rate: r.rate,
   byStatus: r.byStatus.map((s) => ({ status: s.status, count: s.count })),
+});
+
+export const toDentalAnalyticsReportDto = (r: DentalAnalyticsReport): DentalAnalyticsReport => ({
+  procedureMix: r.procedureMix.map((p) => ({ ...p })),
+  retention: { ...r.retention },
+  recallEfficacy: {
+    ...r.recallEfficacy,
+    byStatus: r.recallEfficacy.byStatus.map((s) => ({ ...s })),
+  },
+  noShowByWeekday: r.noShowByWeekday.map((w) => ({ ...w })),
 });

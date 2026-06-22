@@ -7,12 +7,14 @@ import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
 import {
   toAppointmentStatsReportDto,
+  toDentalAnalyticsReportDto,
   toDoctorWorkloadReportDto,
   toPlanCompletionReportDto,
   toRevenueReportDto,
 } from './reports.mapper.ts';
 import {
   appointmentStatsReportDtoSchema,
+  dentalAnalyticsReportDtoSchema,
   doctorWorkloadReportDtoSchema,
   planCompletionReportDtoSchema,
   reportRangeSchema,
@@ -97,6 +99,24 @@ export const reportsRoutes = (deps: { db: Database }) => {
     const range = c.req.valid('query');
     const result = await service.planCompletion(c, range);
     return c.json(ok(toPlanCompletionReportDto(result)), 200);
+  });
+
+  // ─── GET /dental-analytics (V2-3) ────────────────────────────────────────
+
+  const dentalAnalyticsRoute = createRoute({
+    method: 'get',
+    path: '/dental-analytics',
+    tags: ['reports'],
+    operationId: 'getDentalAnalyticsReport',
+    middleware: [requirePermission('report.view')] as const,
+    request: { query: reportRangeSchema },
+    responses: okJson(dentalAnalyticsReportDtoSchema, 'Dental analytics report'),
+  });
+
+  app.openapi(dentalAnalyticsRoute, async (c) => {
+    const range = c.req.valid('query');
+    const result = await service.dentalAnalytics(c, range);
+    return c.json(ok(toDentalAnalyticsReportDto(result)), 200);
   });
 
   return app;

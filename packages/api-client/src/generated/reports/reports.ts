@@ -7,6 +7,8 @@
 import type {
   GetAppointmentStatsReport200,
   GetAppointmentStatsReportParams,
+  GetDentalAnalyticsReport200,
+  GetDentalAnalyticsReportParams,
   GetDoctorWorkloadReport200,
   GetDoctorWorkloadReportParams,
   GetPlanCompletionReport200,
@@ -55,7 +57,17 @@ import { customInstance } from '../../mutator';
     },
       );
     }
+  export const getDentalAnalyticsReport = (
+    params: GetDentalAnalyticsReportParams,
+ ) => {
+      return customInstance<GetDentalAnalyticsReport200>(
+      {url: `/api/reports/dental-analytics`, method: 'GET',
+        params
+    },
+      );
+    }
   export type GetRevenueReportResult = NonNullable<Awaited<ReturnType<typeof getRevenueReport>>>
 export type GetAppointmentStatsReportResult = NonNullable<Awaited<ReturnType<typeof getAppointmentStatsReport>>>
 export type GetDoctorWorkloadReportResult = NonNullable<Awaited<ReturnType<typeof getDoctorWorkloadReport>>>
 export type GetPlanCompletionReportResult = NonNullable<Awaited<ReturnType<typeof getPlanCompletionReport>>>
+export type GetDentalAnalyticsReportResult = NonNullable<Awaited<ReturnType<typeof getDentalAnalyticsReport>>>
