@@ -1,5 +1,12 @@
+import { ApiError, logout as apiLogout } from '@dental/api-client';
+import { Avatar } from '@dental/ui';
+import { Menu } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
+import { useQueryClient } from '@tanstack/react-query';
+import { Building2, Check, ChevronDown, LogOut } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useSwitchWorkspace, useWorkspaceBranches } from '@/features/auth';
 import { RecallNavBadge } from '@/features/recalls/components/RecallNavBadge.tsx';
 import { useVertical } from '@/features/settings/settings.api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
@@ -13,6 +20,217 @@ function isActive(pathname: string, path: string, allPaths: string[]): boolean {
   // Boshqa nav element shu yo'lni aniq egasi bo'lsa (masalan /patients/new), parent (/patients) yonmaydi
   if (allPaths.some((p) => p !== path && pathname === p)) return false;
   return pathname.startsWith(`${path}/`);
+}
+
+function SidebarWorkspaceSwitcher({ rail }: { rail: boolean }) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { activeTenantId, activeBranchId, setTokens, setContext, clear, user } = useAuthStore();
+
+  const branchesQuery = useWorkspaceBranches();
+
+  const switchMut = useSwitchWorkspace({
+    onSuccess: (data) => {
+      setTokens(data.accessToken, data.refreshToken);
+      try {
+        const seg = data.accessToken.split('.')[1] ?? '';
+        const b64 = seg
+          .replace(/-/g, '+')
+          .replace(/_/g, '/')
+          .padEnd(Math.ceil(seg.length / 4) * 4, '=');
+        const payload = JSON.parse(atob(b64)) as {
+          atid: string | null;
+          abid: string | null;
+          perms: string[];
+          roleKey?: string | null;
+        };
+        setContext(payload.atid, payload.abid, payload.perms, payload.roleKey ?? null);
+      } catch {
+        /* malformed JWT payload */
+      }
+      queryClient.clear();
+      navigate('/');
+    },
+    onError: (err) => {
+      const code = err instanceof ApiError ? err.code : null;
+      if (
+        code === 'auth.refresh_revoked' ||
+        code === 'auth.invalid_refresh' ||
+        code === 'auth.refresh_mismatch'
+      ) {
+        clear();
+        navigate('/login', { replace: true });
+        return;
+      }
+      notifications.show({
+        title: t('common.error'),
+        message: err instanceof ApiError ? err.message : t('shell.branch_switch_error'),
+        color: 'red',
+      });
+    },
+  });
+
+  const clinicLetter = (user?.fullName ?? t('app.name')).charAt(0).toUpperCase();
+  const data = branchesQuery.data;
+  const totalChoices = (data?.branches.length ?? 0) + (data?.allowAllBranches ? 1 : 0);
+
+  const currentBranchName = activeBranchId
+    ? (data?.branches.find((b) => b.id === activeBranchId)?.name ?? t('shell.select_branch'))
+    : t('shell.all_branches');
+
+  const avatarEl = <span className={classes.wsAvatar}>{clinicLetter}</span>;
+
+  // Narrow activeTenantId for branch-switch clicks — hasBranchChoice already guards nullability
+  if (!data || totalChoices <= 1 || !activeTenantId) {
+    // No branch choice — show plain workspace button (or rail avatar)
+    if (rail) {
+      return (
+        <button
+          type="button"
+          className={classes.wsHeaderRail}
+          onClick={() => navigate('/select-workspace')}
+          aria-label={t('app.name')}
+        >
+          {avatarEl}
+        </button>
+      );
+    }
+    return (
+      <button
+        type="button"
+        className={classes.wsHeader}
+        onClick={() => navigate('/select-workspace')}
+        aria-label={t('app.name')}
+      >
+        {avatarEl}
+        <span className={classes.wsInfo}>
+          <b data-testid="sidebar-clinic-name">{t('app.name')}</b>
+        </span>
+      </button>
+    );
+  }
+
+  // Past this point: activeTenantId is string (non-null narrowed by guard above)
+  const tenantId = activeTenantId;
+
+  const branchMenuItems = (
+    <>
+      {data.allowAllBranches && (
+        <Menu.Item
+          leftSection={!activeBranchId ? <Check size={16} /> : <span style={{ width: 16 }} />}
+          onClick={() => activeBranchId && switchMut.mutate({ tenantId })}
+        >
+          {t('shell.all_branches')}
+        </Menu.Item>
+      )}
+      {data.branches.map((b) => (
+        <Menu.Item
+          key={b.id}
+          leftSection={
+            activeBranchId === b.id ? <Check size={16} /> : <span style={{ width: 16 }} />
+          }
+          onClick={() => activeBranchId !== b.id && switchMut.mutate({ tenantId, branchId: b.id })}
+        >
+          {b.name}
+        </Menu.Item>
+      ))}
+    </>
+  );
+
+  if (rail) {
+    return (
+      <Menu shadow="md" width={220} position="bottom-start">
+        <Menu.Target>
+          <button
+            type="button"
+            className={classes.wsHeaderRail}
+            aria-label={t('shell.select_branch')}
+          >
+            {avatarEl}
+          </button>
+        </Menu.Target>
+        <Menu.Dropdown>{branchMenuItems}</Menu.Dropdown>
+      </Menu>
+    );
+  }
+
+  return (
+    <Menu shadow="md" width={220} position="bottom-start">
+      <Menu.Target>
+        <button
+          type="button"
+          className={classes.wsHeader}
+          disabled={switchMut.isPending}
+          aria-label={t('shell.select_branch')}
+        >
+          {avatarEl}
+          <span className={classes.wsInfo}>
+            <b data-testid="sidebar-clinic-name">{t('app.name')}</b>
+            <span className={classes.wsBranch}>
+              <Building2 size={11} />
+              {currentBranchName}
+            </span>
+          </span>
+          <ChevronDown size={14} className={classes.wsChevron} />
+        </button>
+      </Menu.Target>
+      <Menu.Dropdown>{branchMenuItems}</Menu.Dropdown>
+    </Menu>
+  );
+}
+
+function SidebarFooter({ rail }: { rail: boolean }) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const { user, refreshToken, clear } = useAuthStore();
+
+  const logout = async () => {
+    if (refreshToken) {
+      try {
+        await apiLogout({ refreshToken });
+      } catch {
+        /* silent */
+      }
+    }
+    clear();
+    navigate('/login');
+  };
+
+  if (rail) {
+    return (
+      <div className={classes.foot}>
+        <button
+          type="button"
+          className={classes.footLogout}
+          onClick={logout}
+          aria-label={t('layout.logout')}
+          data-testid="sidebar-logout"
+        >
+          <LogOut size={17} />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className={classes.foot}>
+      <Avatar name={user?.fullName ?? '?'} size="sm" />
+      <span className={classes.footInfo}>
+        <b>{user?.fullName ?? user?.phone}</b>
+        <span>{user?.phone}</span>
+      </span>
+      <button
+        type="button"
+        className={classes.footLogout}
+        onClick={logout}
+        aria-label={t('layout.logout')}
+        data-testid="sidebar-logout"
+      >
+        <LogOut size={17} />
+      </button>
+    </div>
+  );
 }
 
 export function Sidebar() {
@@ -60,8 +278,7 @@ export function Sidebar() {
   return (
     <div className={classes.root} data-rail={rail ? 'true' : undefined}>
       <div className={classes.top}>
-        <span className={classes.topLabel}>{t('app.name')}</span>
-        <span className={classes.pin} />
+        <SidebarWorkspaceSwitcher rail={rail} />
       </div>
       <nav className={classes.scroll}>
         {groups.map((g) => (
@@ -71,6 +288,7 @@ export function Sidebar() {
           </div>
         ))}
       </nav>
+      <SidebarFooter rail={rail} />
     </div>
   );
 }

@@ -7,17 +7,32 @@ let mockPermissions: string[] = [];
 let mockRail = false;
 
 vi.mock('@/stores/auth-store.ts', () => ({
-  useAuthStore: () => ({
-    hasPermission: (p: string) =>
-      mockPermissions.includes('@owner') || mockPermissions.includes(p) || p === 'patient.view',
-    permissions: mockPermissions,
-    activeBranchId: 'b1',
-  }),
+  useAuthStore: (sel?: (s: unknown) => unknown) => {
+    const state = {
+      hasPermission: (p: string) =>
+        mockPermissions.includes('@owner') || mockPermissions.includes(p) || p === 'patient.view',
+      permissions: mockPermissions,
+      activeBranchId: 'b1',
+      activeTenantId: 'tenant1',
+      user: { fullName: 'Firdavs Tursunov', phone: '+998901234567' },
+      refreshToken: 'r',
+      clear: vi.fn(),
+      setTokens: vi.fn(),
+      setContext: vi.fn(),
+    };
+    return sel ? sel(state) : state;
+  },
 }));
 
 vi.mock('@/stores/ui-store.ts', () => ({
   useUiStore: (sel: (s: { sidebarRail: boolean; toggleSidebarRail: () => void }) => unknown) =>
     sel({ sidebarRail: mockRail, toggleSidebarRail: () => {} }),
+}));
+
+// BranchSwitcher logikasi sidebar'ga ko'chdi — hooks mock qilinadi
+vi.mock('@/features/auth', () => ({
+  useWorkspaceBranches: () => ({ data: null }),
+  useSwitchWorkspace: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 afterEach(() => {
@@ -67,5 +82,22 @@ describe('Sidebar', () => {
     mockRail = false;
     const { container } = renderApp(<Sidebar />);
     expect(container.querySelector('[data-rail="true"]')).toBeNull();
+  });
+
+  // DS0 Task 5 — workspace switcher + footer smoke tests
+  it("sidebar header'da klinika nomi (workspace switcher) ko'rinadi", () => {
+    renderApp(<Sidebar />);
+    expect(screen.getByTestId('sidebar-clinic-name')).toBeInTheDocument();
+  });
+
+  it("sidebar footer'da logout tugmasi bor", () => {
+    renderApp(<Sidebar />);
+    expect(screen.getByTestId('sidebar-logout')).toBeInTheDocument();
+  });
+
+  it("sidebar footer'da foydalanuvchi ismi ko'rinadi (expanded rejim)", () => {
+    mockRail = false;
+    renderApp(<Sidebar />);
+    expect(screen.getByText('Firdavs Tursunov')).toBeInTheDocument();
   });
 });

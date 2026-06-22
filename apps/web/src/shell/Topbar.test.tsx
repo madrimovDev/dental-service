@@ -3,14 +3,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderApp } from '../test-utils';
 import { Topbar } from './Topbar';
 
-vi.mock('@/stores/auth-store.ts', () => ({
-  useAuthStore: () => ({
-    user: { fullName: 'Firdavs Tursunov', phone: '+998901234567' },
-    refreshToken: 'r',
-    clear: vi.fn(),
-  }),
-}));
-
 vi.mock('@/stores/ui-store.ts', () => ({
   useUiStore: (sel: (s: { sidebarRail: boolean; toggleSidebarRail: () => void }) => unknown) =>
     sel({ sidebarRail: false, toggleSidebarRail: vi.fn() }),
@@ -23,15 +15,22 @@ vi.mock('@/features/notifications/notifications.api.ts', () => ({
 }));
 
 describe('Topbar', () => {
-  it("foydalanuvchi ismini va qidiruvni ko'rsatadi", () => {
+  it("qidiruv va sidebar toggle tugmalari ko'rsatiladi (workspace/user sidebar'ga ko'chdi)", () => {
     renderApp(<Topbar onBurger={() => {}} burgerOpened={false} />);
-    expect(screen.getByText('Firdavs Tursunov')).toBeInTheDocument();
-    // Qidiruv endi ⌘K palette'ni ochuvchi tugma (placeholder input emas) — matn bo'yicha tekshiramiz
+    // Qidiruv endi ⌘K palette'ni ochuvchi tugma (placeholder input emas)
     expect(screen.getByText(/Bemor, yozuv/)).toBeInTheDocument();
+    // Sidebar toggle tugmasi
+    expect(screen.getByLabelText("Yon panelni yig'ish")).toBeInTheDocument();
   });
 
   it('bildirishnoma va theme tugmalari (aria-label) bor', () => {
     renderApp(<Topbar onBurger={() => {}} burgerOpened={false} />);
     expect(screen.getByLabelText('Bildirishnomalar')).toBeInTheDocument();
+  });
+
+  it("workspace switcher va user menu topbar'da yo'q (sidebar'da)", () => {
+    renderApp(<Topbar onBurger={() => {}} burgerOpened={false} />);
+    // Foydalanuvchi ismi topbar'da ko'rinmaydi (sidebar footer'ga ko'chdi)
+    expect(screen.queryByText('Firdavs Tursunov')).toBeNull();
   });
 });
