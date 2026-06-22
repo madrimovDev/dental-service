@@ -422,6 +422,19 @@
         "incoming": "Связан"
       }
     },
+    "emergency": {
+      "title": "Экстренные контакты",
+      "add": "Добавить контакт",
+      "empty": "Экстренные контакты не добавлены",
+      "name": "Имя",
+      "name_placeholder": "Полное имя",
+      "phone": "Телефон",
+      "phone_placeholder": "+998901234567",
+      "relationship": "Родство",
+      "relationship_placeholder": "Например: отец, мать, друг",
+      "is_primary": "Основной контакт",
+      "primary": "Основной"
+    },
     "payments_empty": "У этого пациента нет платежей",
     "balance": "Баланс",
     "balance_debt": "долг",

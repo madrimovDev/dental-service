@@ -93,6 +93,15 @@ export const addRelativeSchema = z.object({
 });
 export type AddRelativeInput = z.infer<typeof addRelativeSchema>;
 
+/** Erkin emergency contact (tizimda bemor BO'LMAGAN shaxs) — add input. */
+export const addEmergencyContactSchema = z.object({
+  name: z.string().min(1).max(120),
+  phone: z.string().min(1).max(40),
+  relationship: z.string().min(1).max(60).optional(),
+  isPrimary: z.boolean().optional(),
+});
+export type AddEmergencyContactInput = z.infer<typeof addEmergencyContactSchema>;
+
 // ─── Path param schemas ──────────────────────────────────────────────────────
 
 /** Path param schema for routes requiring :id */
@@ -104,6 +113,12 @@ export const patientIdParamSchema = z
 export const relativeParamSchema = z.object({
   id: z.uuid().openapi({ param: { name: 'id', in: 'path' } }),
   relId: z.uuid().openapi({ param: { name: 'relId', in: 'path' } }),
+});
+
+/** Path param schema for emergency-contacts sub-resource (:id, :contactId). */
+export const emergencyContactParamSchema = z.object({
+  id: z.uuid().openapi({ param: { name: 'id', in: 'path' } }),
+  contactId: z.uuid().openapi({ param: { name: 'contactId', in: 'path' } }),
 });
 
 // ─── Response DTOs (wire shape — ISO strings, nullable explicit) ─────────────
@@ -213,3 +228,23 @@ export const patientArchiveResultSchema = z
 export const relativeRemoveResultSchema = z
   .object({ removed: z.literal(true), id: z.uuid() })
   .openapi('PatientRelativeRemoveResult');
+
+/** Emergency contact DTO — wire shape. */
+export const emergencyContactDtoSchema = z
+  .object({
+    id: z.uuid(),
+    tenantId: z.uuid(),
+    patientId: z.uuid(),
+    name: z.string(),
+    phone: z.string(),
+    relationship: z.string().nullable(),
+    isPrimary: z.boolean(),
+    createdAt: z.string(),
+  })
+  .openapi('PatientEmergencyContact');
+export type EmergencyContactDto = z.infer<typeof emergencyContactDtoSchema>;
+
+/** DELETE emergency-contacts remove response. */
+export const emergencyContactRemoveResultSchema = z
+  .object({ removed: z.literal(true), id: z.uuid() })
+  .openapi('PatientEmergencyContactRemoveResult');

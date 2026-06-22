@@ -58,3 +58,14 @@ export const addRelativeFormSchema = z.object({
   relationship: z.string().min(1).max(60),
 });
 export type AddRelativeFormValues = z.infer<typeof addRelativeFormSchema>;
+
+export const addEmergencyContactFormSchema = z.object({
+  name: z.string().min(1).max(120),
+  phone: z
+    .string()
+    .regex(/^\+?\d{9,15}$/)
+    .max(40),
+  relationship: z.string().max(60).optional(),
+  isPrimary: z.boolean().optional(),
+});
+export type AddEmergencyContactFormValues = z.infer<typeof addEmergencyContactFormSchema>;

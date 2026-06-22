@@ -422,6 +422,19 @@
         "incoming": "Bog'langan"
       }
     },
+    "emergency": {
+      "title": "Favqulodda kontaktlar",
+      "add": "Kontakt qo'shish",
+      "empty": "Favqulodda kontaktlar qo'shilmagan",
+      "name": "Ism",
+      "name_placeholder": "To'liq ism",
+      "phone": "Telefon",
+      "phone_placeholder": "+998901234567",
+      "relationship": "Munosabat",
+      "relationship_placeholder": "Masalan: ota, ona, do'st",
+      "is_primary": "Asosiy kontakt",
+      "primary": "Asosiy"
+    },
     "payments_empty": "Bu bemor uchun to'lovlar yo'q",
     "balance": "Balans",
     "balance_debt": "qarz",

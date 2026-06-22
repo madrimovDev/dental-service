@@ -1,5 +1,11 @@
-import type { MedicalRecord, Patient, PatientRelative } from '@dental/db-schema';
 import type {
+  MedicalRecord,
+  Patient,
+  PatientEmergencyContact,
+  PatientRelative,
+} from '@dental/db-schema';
+import type {
+  EmergencyContactDto,
   MedicalRecordDto,
   PatientDto,
   PatientListItemDto,
@@ -61,5 +67,17 @@ export const toPatientRelativeDto = (row: PatientRelative): PatientRelativeDto =
   patientId: row.patientId,
   relativePatientId: row.relativePatientId,
   relationship: row.relationship,
+  createdAt: row.createdAt.toISOString(),
+});
+
+/** Erkin emergency contact row → wire DTO. */
+export const toEmergencyContactDto = (row: PatientEmergencyContact): EmergencyContactDto => ({
+  id: row.id,
+  tenantId: row.tenantId,
+  patientId: row.patientId,
+  name: row.name,
+  phone: row.phone,
+  relationship: row.relationship ?? null,
+  isPrimary: row.isPrimary,
   createdAt: row.createdAt.toISOString(),
 });

@@ -5,6 +5,8 @@
  * OpenAPI spec version: 0.1.0
  */
 import type {
+  AddPatientEmergencyContact201,
+  AddPatientEmergencyContactBody,
   AddPatientRelative201,
   AddPatientRelativeBody,
   ArchivePatient200,
@@ -13,9 +15,11 @@ import type {
   GetMedicalRecord200,
   GetPatient200,
   GetPatientBalance200,
+  ListPatientEmergencyContacts200,
   ListPatientRelatives200,
   ListPatients200,
   ListPatientsParams,
+  RemovePatientEmergencyContact200,
   RemovePatientRelative200,
   UpdateMedicalRecord200,
   UpdateMedicalRecordBody,
@@ -128,6 +132,34 @@ import { customInstance } from '../../mutator';
     },
       );
     }
+  export const listPatientEmergencyContacts = (
+    id: string,
+ ) => {
+      return customInstance<ListPatientEmergencyContacts200>(
+      {url: `/api/patients/${id}/emergency-contacts`, method: 'GET'
+    },
+      );
+    }
+  export const addPatientEmergencyContact = (
+    id: string,
+    addPatientEmergencyContactBody: AddPatientEmergencyContactBody,
+ ) => {
+      return customInstance<AddPatientEmergencyContact201>(
+      {url: `/api/patients/${id}/emergency-contacts`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: addPatientEmergencyContactBody
+    },
+      );
+    }
+  export const removePatientEmergencyContact = (
+    id: string,
+    contactId: string,
+ ) => {
+      return customInstance<RemovePatientEmergencyContact200>(
+      {url: `/api/patients/${id}/emergency-contacts/${contactId}`, method: 'DELETE'
+    },
+      );
+    }
   export type ListPatientsResult = NonNullable<Awaited<ReturnType<typeof listPatients>>>
 export type CreatePatientResult = NonNullable<Awaited<ReturnType<typeof createPatient>>>
 export type GetPatientResult = NonNullable<Awaited<ReturnType<typeof getPatient>>>
@@ -139,3 +171,6 @@ export type UpdateMedicalRecordResult = NonNullable<Awaited<ReturnType<typeof up
 export type ListPatientRelativesResult = NonNullable<Awaited<ReturnType<typeof listPatientRelatives>>>
 export type AddPatientRelativeResult = NonNullable<Awaited<ReturnType<typeof addPatientRelative>>>
 export type RemovePatientRelativeResult = NonNullable<Awaited<ReturnType<typeof removePatientRelative>>>
+export type ListPatientEmergencyContactsResult = NonNullable<Awaited<ReturnType<typeof listPatientEmergencyContacts>>>
+export type AddPatientEmergencyContactResult = NonNullable<Awaited<ReturnType<typeof addPatientEmergencyContact>>>
+export type RemovePatientEmergencyContactResult = NonNullable<Awaited<ReturnType<typeof removePatientEmergencyContact>>>

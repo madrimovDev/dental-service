@@ -9,4 +9,5 @@ export const patientKeys = {
   payments: (id: string) => ['patients', 'payments', id] as const,
   balance: (id: string) => ['patients', 'balance', id] as const,
   relatives: (id: string) => ['patients', 'relatives', id] as const,
+  emergencyContacts: (id: string) => ['patients', 'emergency-contacts', id] as const,
 };
