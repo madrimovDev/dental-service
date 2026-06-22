@@ -3,9 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "main": "dist/main.js",
   "scripts": {
-    "dev": "echo 'Desktop app — to be implemented in M6'",
-    "build": "echo 'Desktop app — to be implemented in M6'",
-    "typecheck": "echo 'Skipped — desktop M6'"
+    "build:main": "tsc -p tsconfig.json --noEmit false --outDir dist",
+    "dev": "bun run build:main && electron dist/main.js",
+    "start": "electron dist/main.js",
+    "build": "bun run build:main && electron-builder --config electron-builder.yml",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8",
+    "electron-updater": "^6.3.9"
   }
 }
