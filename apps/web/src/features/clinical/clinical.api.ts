@@ -306,10 +306,11 @@ export function useCreateConsentTemplate() {
 }
 
 // ===== C: images =====
-export function usePatientImages(patientId: string) {
+export function usePatientImages(patientId: string, visitNoteId?: string) {
   return useQuery({
-    queryKey: clinicalKeys.images(patientId),
-    queryFn: () => listPatientImages(patientId).then((r) => r.data),
+    queryKey: clinicalKeys.images(patientId, visitNoteId),
+    queryFn: () =>
+      listPatientImages(patientId, visitNoteId ? { visitNoteId } : undefined).then((r) => r.data),
   });
 }
 
@@ -317,7 +318,8 @@ export function useUploadPatientImage(patientId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (form: FormData) => api.patientImages.upload(form),
-    onSuccess: () => qc.invalidateQueries({ queryKey: clinicalKeys.images(patientId) }),
+    // Prefiks bo'yicha invalidatsiya — barcha (filtered/all) image query'lari.
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['clinical', 'images', patientId] }),
   });
 }
 
@@ -325,6 +327,6 @@ export function useDeletePatientImage(patientId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => deletePatientImage(id).then((r) => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: clinicalKeys.images(patientId) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['clinical', 'images', patientId] }),
   });
 }

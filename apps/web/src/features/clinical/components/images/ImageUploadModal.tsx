@@ -4,7 +4,7 @@ import { useForm } from '@mantine/form';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useUploadPatientImage } from '../../clinical.api';
+import { useUploadPatientImage, useVisitNotes } from '../../clinical.api';
 import { type UploadImageFormValues, uploadImageFormSchema } from '../../clinical.schema';
 
 const TYPE_OPTIONS: PatientImageType[] = [
@@ -27,9 +27,15 @@ export function ImageUploadModal({
   onClose: () => void;
   patientId: string;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [file, setFile] = useState<File | null>(null);
+  const [visitNoteId, setVisitNoteId] = useState<string | null>(null);
   const uploadMut = useUploadPatientImage(patientId);
+  const visitsQuery = useVisitNotes(patientId);
+  const visitOptions = (visitsQuery.data ?? []).map((v) => ({
+    value: v.id,
+    label: new Date(v.visitDate).toLocaleDateString(i18n.language === 'ru' ? 'ru-RU' : 'uz-UZ'),
+  }));
   const form = useForm<UploadImageFormValues>({
     initialValues: {
       type: 'intraoral_photo',
@@ -44,6 +50,7 @@ export function ImageUploadModal({
   const handleClose = () => {
     form.reset();
     setFile(null);
+    setVisitNoteId(null);
     onClose();
   };
 
@@ -57,6 +64,7 @@ export function ImageUploadModal({
     if (values.description) fd.append('description', values.description);
     if (values.toothNumbersText) fd.append('toothNumbers', values.toothNumbersText);
     if (values.takenDate) fd.append('takenDate', new Date(values.takenDate).toISOString());
+    if (visitNoteId) fd.append('visitNoteId', visitNoteId);
     uploadMut.mutate(fd, { onSuccess: handleClose });
   });
 
@@ -96,6 +104,15 @@ export function ImageUploadModal({
               {...form.getInputProps('takenDate')}
             />
           </Group>
+          <Select
+            label={t('image.link_visit')}
+            placeholder={t('image.link_visit_placeholder')}
+            data={visitOptions}
+            value={visitNoteId}
+            onChange={setVisitNoteId}
+            clearable
+            nothingFoundMessage={t('visit_note.empty')}
+          />
           <Group justify="flex-end">
             <Button variant="default" onClick={handleClose}>
               {t('common.cancel')}

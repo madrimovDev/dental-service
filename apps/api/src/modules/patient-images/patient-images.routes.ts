@@ -17,6 +17,7 @@ import {
   patientImageIdParamSchema,
   patientImageSchema,
   patientImagesByPatientParamSchema,
+  patientImagesListQuerySchema,
   updateImageMetadataSchema,
 } from './patient-images.schema.ts';
 import { createPatientImagesService } from './patient-images.service.ts';
@@ -43,12 +44,16 @@ export const patientImagesRoutes = (deps: { db: Database; audit: AuditLogger }) 
     tags: ['patient-images'],
     operationId: 'listPatientImages',
     middleware: [requirePermission('patient_image.view')] as const,
-    request: { params: patientImagesByPatientParamSchema },
+    request: {
+      params: patientImagesByPatientParamSchema,
+      query: patientImagesListQuerySchema,
+    },
     responses: okJson(z.array(patientImageSchema), 'Patient images'),
   });
 
   app.openapi(listRoute, async (c) => {
-    const rows = await service.list(c, c.req.valid('param').patientId);
+    const { visitNoteId } = c.req.valid('query');
+    const rows = await service.list(c, c.req.valid('param').patientId, visitNoteId);
     return c.json(ok(rows.map(toPatientImageDto)), 200);
   });
 
@@ -64,6 +69,7 @@ export const patientImagesRoutes = (deps: { db: Database; audit: AuditLogger }) 
     const description = form.get('description')?.toString();
     const toothNumbersRaw = form.get('toothNumbers')?.toString();
     const takenDate = form.get('takenDate')?.toString();
+    const visitNoteId = form.get('visitNoteId')?.toString() || undefined;
 
     if (!(file instanceof File)) {
       throw new HTTPException(400, { message: 'Missing file' });
@@ -95,6 +101,7 @@ export const patientImagesRoutes = (deps: { db: Database; audit: AuditLogger }) 
       description,
       toothNumbers,
       takenDate,
+      visitNoteId,
       originalFilename: file.name,
       contentType: file.type,
       ext: extFromContentType(file.type),

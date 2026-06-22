@@ -21,5 +21,6 @@ export const clinicalKeys = {
   consentForms: (patientId: string) => ['clinical', 'consent-forms', patientId] as const,
   consentTemplates: () => ['clinical', 'consent-templates'] as const,
   // C — images
-  images: (patientId: string) => ['clinical', 'images', patientId] as const,
+  images: (patientId: string, visitNoteId?: string) =>
+    ['clinical', 'images', patientId, visitNoteId ?? 'all'] as const,
 };

@@ -1,5 +1,5 @@
 import { patientImages } from '@dental/db-schema';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
@@ -21,6 +21,7 @@ export type UploadInput = {
   description?: string;
   toothNumbers?: number[];
   takenDate?: string;
+  visitNoteId?: string;
   originalFilename: string;
   contentType: string;
   ext: string;
@@ -28,12 +29,16 @@ export type UploadInput = {
 };
 
 export const createPatientImagesService = (deps: { audit: AuditLogger }) => {
-  async function list(c: Context, patientId: string) {
+  async function list(c: Context, patientId: string, visitNoteId?: string) {
     const db = getDb(c);
     const rows = await db
       .select()
       .from(patientImages)
-      .where(eq(patientImages.patientId, patientId))
+      .where(
+        visitNoteId
+          ? and(eq(patientImages.patientId, patientId), eq(patientImages.visitNoteId, visitNoteId))
+          : eq(patientImages.patientId, patientId),
+      )
       .orderBy(desc(patientImages.createdAt));
 
     // Sign URLs for client preview
@@ -87,6 +92,7 @@ export const createPatientImagesService = (deps: { audit: AuditLogger }) => {
         description: input.description ?? null,
         toothNumbers: input.toothNumbers ?? null,
         takenDate: input.takenDate ? new Date(input.takenDate) : null,
+        visitNoteId: input.visitNoteId ?? null,
       })
       .returning();
 

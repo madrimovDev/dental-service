@@ -6,6 +6,7 @@ import { ImageUploadModal } from './ImageUploadModal';
 const uploadMutate = vi.fn();
 vi.mock('../../clinical.api', () => ({
   useUploadPatientImage: () => ({ mutate: uploadMutate, isPending: false }),
+  useVisitNotes: () => ({ data: [], isLoading: false }),
 }));
 
 describe('ImageUploadModal', () => {

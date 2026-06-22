@@ -8,6 +8,7 @@ import type {
   DeletePatientImage200,
   GetPatientImage200,
   ListPatientImages200,
+  ListPatientImagesParams,
   UpdatePatientImage200,
   UpdatePatientImageBody
 } from '.././model';
@@ -18,9 +19,11 @@ import { customInstance } from '../../mutator';
 
   export const listPatientImages = (
     patientId: string,
+    params?: ListPatientImagesParams,
  ) => {
       return customInstance<ListPatientImages200>(
-      {url: `/api/patients/${patientId}/images`, method: 'GET'
+      {url: `/api/patients/${patientId}/images`, method: 'GET',
+        params
     },
       );
     }

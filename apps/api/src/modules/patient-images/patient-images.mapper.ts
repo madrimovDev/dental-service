@@ -18,6 +18,7 @@ type PatientImageRow = {
   description: string | null;
   toothNumbers: number[] | null;
   takenDate: Date | null;
+  visitNoteId: string | null;
   createdAt: Date;
   url: string;
 };
@@ -36,6 +37,7 @@ export const toPatientImageDto = (row: PatientImageRow): PatientImageDto => ({
   description: row.description,
   toothNumbers: row.toothNumbers,
   takenDate: row.takenDate ? row.takenDate.toISOString() : null,
+  visitNoteId: row.visitNoteId,
   createdAt: row.createdAt.toISOString(),
   url: row.url,
 });

@@ -14,6 +14,7 @@ export const imageType = z.enum([
 export const uploadImageMetadataSchema = z.object({
   patientId: z.uuid(),
   type: imageType,
+  visitNoteId: z.uuid().optional(),
   title: z.string().max(200).optional(),
   description: z.string().max(2000).optional(),
   toothNumbers: z
@@ -79,6 +80,7 @@ export const patientImageSchema = z
     description: z.string().nullable(),
     toothNumbers: z.array(z.number().int()).nullable(),
     takenDate: z.iso.datetime().nullable(),
+    visitNoteId: z.uuid().nullable(),
     createdAt: z.iso.datetime(),
     url: z.string(),
   })
@@ -88,3 +90,11 @@ export const patientImageDeleteSchema = z.object({ deleted: z.literal(true) });
 
 export const patientImageIdParamSchema = z.object({ id: z.uuid() });
 export const patientImagesByPatientParamSchema = z.object({ patientId: z.uuid() });
+
+/** List query — ixtiyoriy vizit bo'yicha filtr (V2-6). */
+export const patientImagesListQuerySchema = z.object({
+  visitNoteId: z
+    .uuid()
+    .optional()
+    .openapi({ param: { name: 'visitNoteId', in: 'query' } }),
+});
