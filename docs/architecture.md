@@ -65,7 +65,7 @@
 - **Bemor tenant-scoped** (hech qachon tenantlar orasida ulanmaydi).
 - Batafsil: CLAUDE.md §3.1–3.4.
 
-### 5.1 Branch scoping modeli (Qaror #27)
+### 5.1 Branch scoping modeli (Qaror #29)
 
 Multi-branch'da qaysi entity filialga bog'lanadi — **ataylab tanlangan**:
 

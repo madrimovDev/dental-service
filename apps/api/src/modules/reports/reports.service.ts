@@ -211,7 +211,7 @@ export const createReportsService = () => {
     const db = getDb(c);
     const { start, end } = tashkentRange(from, to);
     // Reja created_at oraliqda; status accepted/in_progress/completed.
-    // branchId ataylab e'tiborga olinmaydi: treatment_plans tenant-level by-design (Qaror #27,
+    // branchId ataylab e'tiborga olinmaydi: treatment_plans tenant-level by-design (Qaror #29,
     // docs/architecture.md §5.1) — reja branch-scoped emas, shuning uchun plan-completion tenant-wide.
     const rows = await db
       .select({ status: treatmentStages.status, c: count() })
