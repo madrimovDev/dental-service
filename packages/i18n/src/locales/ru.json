@@ -62,7 +62,22 @@
   "validation": {
     "phone_invalid": "Неверный формат номера телефона",
     "password_required": "Введите пароль",
-    "min_chars": "Минимум {{count}} символов"
+    "min_chars": "Минимум {{count}} символов",
+    "required": "Обязательное поле",
+    "invalidType": "Неверное значение",
+    "invalidEmail": "Неверный адрес эл. почты",
+    "invalidUrl": "Неверный URL-адрес",
+    "invalidFormat": "Неверный формат",
+    "tooShort": "Минимум {{min}} символов",
+    "tooLong": "Максимум {{max}} символов",
+    "tooSmall": "Должно быть больше или равно {{min}}",
+    "tooBig": "Должно быть меньше или равно {{max}}",
+    "tooFew": "Минимум {{min}} элементов",
+    "tooMany": "Максимум {{max}} элементов",
+    "notMultipleOf": "Должно быть кратно {{divisor}}",
+    "unrecognizedKeys": "Нераспознанные поля",
+    "invalidValue": "Недопустимое значение",
+    "invalidInput": "Неверный ввод"
   },
   "auth": {
     "login": {
