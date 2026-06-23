@@ -145,6 +145,14 @@ describe('ds12-a: revenue byPaymentMethod', () => {
   });
 });
 
+describe('ds12-a: revenue byPeriod ordering', () => {
+  test("revenue.byPeriod sana bo'yicha o'sish tartibida qaytadi", async () => {
+    const r = await run((c) => service.revenue(c, RANGE));
+    const dates = r.byPeriod.map((p) => p.date);
+    expect([...dates].sort()).toEqual(dates);
+  });
+});
+
 describe('ds12-a: appointmentStats byPeriod', () => {
   test('appointmentStats.byPeriod: kunlik count', async () => {
     const r = await run((c) => service.appointmentStats(c, RANGE));

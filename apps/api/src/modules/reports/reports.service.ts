@@ -132,7 +132,8 @@ export const createReportsService = () => {
       .select({ date: dayExpr, total: signedPaidAmount })
       .from(cashierTransactions)
       .where(and(...base))
-      .groupBy(dayExpr);
+      .groupBy(dayExpr)
+      .orderBy(dayExpr);
 
     // byService — itemli POS (payment, completed)
     const itemBase = [
