@@ -2302,6 +2302,24 @@
           "slotUtilization": {
             "type": "number"
           },
+          "byPeriod": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "date",
+                "count"
+              ]
+            }
+          },
           "comparison": {
             "$ref": "#/components/schemas/PeriodComparison"
           }
@@ -2311,6 +2329,7 @@
           "byStatus",
           "noShowRate",
           "slotUtilization",
+          "byPeriod",
           "comparison"
         ]
       },

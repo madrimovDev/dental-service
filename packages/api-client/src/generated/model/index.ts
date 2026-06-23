@@ -16,6 +16,7 @@ export * from './allergyEntrySeverity';
 export * from './allergyEntryType';
 export * from './appointment';
 export * from './appointmentStatsReport';
+export * from './appointmentStatsReportByPeriodItem';
 export * from './appointmentStatsReportByStatusItem';
 export * from './appointmentStatus';
 export * from './archivePatient200';

@@ -64,6 +64,7 @@ describe('appointmentsToRows', () => {
     ],
     noShowRate: 0.1,
     slotUtilization: 0.75,
+    byPeriod: [],
     comparison: { previous: null, yoy: null },
   };
 

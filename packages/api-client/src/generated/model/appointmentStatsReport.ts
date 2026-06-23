@@ -5,6 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { AppointmentStatsReportByStatusItem } from './appointmentStatsReportByStatusItem';
+import type { AppointmentStatsReportByPeriodItem } from './appointmentStatsReportByPeriodItem';
 import type { PeriodComparison } from './periodComparison';
 
 export interface AppointmentStatsReport {
@@ -12,5 +13,6 @@ export interface AppointmentStatsReport {
   byStatus: AppointmentStatsReportByStatusItem[];
   noShowRate: number;
   slotUtilization: number;
+  byPeriod: AppointmentStatsReportByPeriodItem[];
   comparison: PeriodComparison;
 }

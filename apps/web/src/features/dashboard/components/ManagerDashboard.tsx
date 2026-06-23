@@ -16,6 +16,7 @@ import { toStatDelta } from '../dashboard.mappers';
 import { OnboardingChecklist } from './OnboardingChecklist.tsx';
 import { BarMini } from './widgets/BarMini.tsx';
 import { MiniList } from './widgets/MiniList.tsx';
+import { Sparkline } from './widgets/Sparkline.tsx';
 import { StatCard } from './widgets/StatCard.tsx';
 
 const fmtPct = (n: number) => `${Math.round(n * 100)}%`;
@@ -132,10 +133,12 @@ export function ManagerDashboard() {
               value={rev ? formatCurrency(rev.total, t) : '—'}
               color="teal"
               delta={toStatDelta(rev?.comparison?.previous, t)}
+              spark={<Sparkline points={(rev?.byPeriod ?? []).map((p) => p.total)} />}
             />
             <StatCard
               label={t('dashboard.no_show_rate')}
               value={appt ? fmtPct(appt.noShowRate) : '—'}
+              spark={<Sparkline points={(appt?.byPeriod ?? []).map((p) => p.count)} />}
             />
             <StatCard
               label={t('dashboard.slot_utilization')}

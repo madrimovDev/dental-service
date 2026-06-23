@@ -238,11 +238,21 @@ export const createReportsService = () => {
 
     const comparison = await buildComparison(c, { from, to, branchId }, total, appointmentCount);
 
+    const dayExpr = sql<string>`(${appointments.startTime} AT TIME ZONE 'Asia/Tashkent')::date`;
+    const periodRows = await db
+      .select({ date: dayExpr, c: count() })
+      .from(appointments)
+      .where(and(...base))
+      .groupBy(dayExpr)
+      .orderBy(dayExpr);
+    const byPeriod = periodRows.map((r) => ({ date: String(r.date), count: Number(r.c) }));
+
     return {
       total,
       byStatus,
       noShowRate: noShowRate(noShow, total),
       slotUtilization: utilizationPct(bookedMinutes, capacityMinutes),
+      byPeriod,
       comparison,
     };
   }

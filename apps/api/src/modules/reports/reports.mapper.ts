@@ -32,6 +32,7 @@ export const toAppointmentStatsReportDto = (r: AppointmentStatsReport): Appointm
   byStatus: r.byStatus.map((s) => ({ status: s.status, count: s.count })),
   noShowRate: r.noShowRate,
   slotUtilization: r.slotUtilization,
+  byPeriod: r.byPeriod.map((p) => ({ date: p.date, count: p.count })),
   comparison: {
     previous: r.comparison.previous && { ...r.comparison.previous },
     yoy: r.comparison.yoy && { ...r.comparison.yoy },
