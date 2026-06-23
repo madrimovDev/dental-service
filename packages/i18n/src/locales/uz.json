@@ -1109,7 +1109,8 @@
     "empty": "Maʼlumot yoʻq",
     "export_csv": "CSV",
     "export_excel": "Excel",
-    "byPaymentMethod": "To'lov usuli taqsimoti"
+    "byPaymentMethod": "To'lov usuli taqsimoti",
+    "occupancy": "Qabullar bandligi (issiqligi)"
   },
   "payment": {
     "method": {

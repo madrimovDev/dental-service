@@ -41,6 +41,7 @@ export const toAppointmentStatsReportDto = (r: AppointmentStatsReport): Appointm
     previous: r.comparison.previous && { ...r.comparison.previous },
     yoy: r.comparison.yoy && { ...r.comparison.yoy },
   },
+  occupancy: r.occupancy.map((o) => ({ weekday: o.weekday, hour: o.hour, count: o.count })),
 });
 
 export const toDoctorWorkloadReportDto = (rows: DoctorWorkloadRow[]): DoctorWorkloadRow[] =>

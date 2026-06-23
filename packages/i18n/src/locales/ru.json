@@ -1109,7 +1109,8 @@
     "empty": "Нет данных",
     "export_csv": "CSV",
     "export_excel": "Excel",
-    "byPaymentMethod": "Структура по способу оплаты"
+    "byPaymentMethod": "Структура по способу оплаты",
+    "occupancy": "Тепловая карта записей"
   },
   "payment": {
     "method": {

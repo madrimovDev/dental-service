@@ -24,6 +24,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDoctors } from '@/features/appointments/appointments.api';
 import { Donut } from '@/features/dashboard/components/widgets/Donut';
+import { Heatmap } from '@/features/dashboard/components/widgets/Heatmap';
 import { useBranches } from '@/features/queue/queue.api.ts';
 import { formatCurrency, formatNumber } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth-store.ts';
@@ -480,6 +481,18 @@ export function ReportsScreen() {
                   ))}
                 </Stack>
               </Group>
+            </Stack>
+          </Card>
+        )}
+
+        {/* Qabullar bandligi issiqligi (DS12-A Task 4) */}
+        {appointments.data && appointments.data.occupancy.length > 0 && (
+          <Card withBorder padding="lg">
+            <Stack gap="md">
+              <Title order={4}>
+                {t('reports.occupancy', { defaultValue: 'Qabullar bandligi' })}
+              </Title>
+              <Heatmap cells={appointments.data.occupancy} />
             </Stack>
           </Card>
         )}

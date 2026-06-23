@@ -67,6 +67,7 @@ describe('appointmentsToRows', () => {
     slotUtilization: 0.75,
     byPeriod: [],
     comparison: { previous: null, yoy: null },
+    occupancy: [],
   };
 
   it('emits header and summary metrics', () => {

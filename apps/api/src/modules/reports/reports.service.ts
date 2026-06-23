@@ -258,6 +258,19 @@ export const createReportsService = () => {
       .orderBy(dayExpr);
     const byPeriod = periodRows.map((r) => ({ date: String(r.date), count: Number(r.c) }));
 
+    const wExpr = sql<number>`EXTRACT(DOW FROM ${appointments.startTime} AT TIME ZONE 'Asia/Tashkent')::int`;
+    const hExpr = sql<number>`EXTRACT(HOUR FROM ${appointments.startTime} AT TIME ZONE 'Asia/Tashkent')::int`;
+    const occRows = await db
+      .select({ weekday: wExpr, hour: hExpr, c: count() })
+      .from(appointments)
+      .where(and(...base))
+      .groupBy(wExpr, hExpr);
+    const occupancy = occRows.map((r) => ({
+      weekday: Number(r.weekday),
+      hour: Number(r.hour),
+      count: Number(r.c),
+    }));
+
     return {
       total,
       byStatus,
@@ -265,6 +278,7 @@ export const createReportsService = () => {
       slotUtilization: utilizationPct(bookedMinutes, capacityMinutes),
       byPeriod,
       comparison,
+      occupancy,
     };
   }
 

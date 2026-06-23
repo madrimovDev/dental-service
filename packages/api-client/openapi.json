@@ -2341,6 +2341,28 @@
           },
           "comparison": {
             "$ref": "#/components/schemas/PeriodComparison"
+          },
+          "occupancy": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "weekday": {
+                  "type": "number"
+                },
+                "hour": {
+                  "type": "number"
+                },
+                "count": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "weekday",
+                "hour",
+                "count"
+              ]
+            }
           }
         },
         "required": [
@@ -2349,7 +2371,8 @@
           "noShowRate",
           "slotUtilization",
           "byPeriod",
-          "comparison"
+          "comparison",
+          "occupancy"
         ]
       },
       "DoctorWorkloadReport": {

@@ -18,6 +18,7 @@ export * from './appointment';
 export * from './appointmentStatsReport';
 export * from './appointmentStatsReportByPeriodItem';
 export * from './appointmentStatsReportByStatusItem';
+export * from './appointmentStatsReportOccupancyItem';
 export * from './appointmentStatus';
 export * from './archivePatient200';
 export * from './auditListResponse';

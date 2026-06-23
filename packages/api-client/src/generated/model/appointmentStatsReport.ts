@@ -7,6 +7,7 @@
 import type { AppointmentStatsReportByStatusItem } from './appointmentStatsReportByStatusItem';
 import type { AppointmentStatsReportByPeriodItem } from './appointmentStatsReportByPeriodItem';
 import type { PeriodComparison } from './periodComparison';
+import type { AppointmentStatsReportOccupancyItem } from './appointmentStatsReportOccupancyItem';
 
 export interface AppointmentStatsReport {
   total: number;
@@ -15,4 +16,5 @@ export interface AppointmentStatsReport {
   slotUtilization: number;
   byPeriod: AppointmentStatsReportByPeriodItem[];
   comparison: PeriodComparison;
+  occupancy: AppointmentStatsReportOccupancyItem[];
 }

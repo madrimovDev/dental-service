@@ -48,6 +48,7 @@ export const appointmentStatsReportDtoSchema = z
     slotUtilization: z.number(),
     byPeriod: z.array(z.object({ date: z.string(), count: z.number() })),
     comparison: periodComparisonDtoSchema,
+    occupancy: z.array(z.object({ weekday: z.number(), hour: z.number(), count: z.number() })),
   })
   .openapi('AppointmentStatsReport');
 
