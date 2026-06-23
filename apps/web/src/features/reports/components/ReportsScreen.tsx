@@ -177,6 +177,14 @@ export function ReportsScreen() {
 
   const fmt = (n: number) => formatNumber(n);
   const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
+  const methodColor = (m: string) =>
+    m === 'cash'
+      ? 'var(--success)'
+      : m === 'card'
+        ? 'var(--info)'
+        : m === 'transfer'
+          ? 'var(--violet)'
+          : 'var(--ink-3)';
   const exportLabel = {
     csv: t('reports.export_csv', { defaultValue: 'CSV' }),
     xlsx: t('reports.export_excel', { defaultValue: 'Excel' }),
@@ -442,19 +450,13 @@ export function ReportsScreen() {
               </Title>
               <Group align="flex-start" gap="xl">
                 <Donut
+                  title={t('reports.byPaymentMethod')}
                   segments={revenue.data.byPaymentMethod.map((p) => ({
                     label: t(`payment.method.${p.paymentMethod}`, {
                       defaultValue: p.paymentMethod,
                     }),
                     value: p.total,
-                    color:
-                      p.paymentMethod === 'cash'
-                        ? 'var(--success)'
-                        : p.paymentMethod === 'card'
-                          ? 'var(--info)'
-                          : p.paymentMethod === 'transfer'
-                            ? 'var(--violet)'
-                            : 'var(--ink-3)',
+                    color: methodColor(p.paymentMethod),
                   }))}
                 />
                 <Stack gap="xs">
@@ -465,14 +467,7 @@ export function ReportsScreen() {
                           width: 12,
                           height: 12,
                           borderRadius: '50%',
-                          background:
-                            p.paymentMethod === 'cash'
-                              ? 'var(--success)'
-                              : p.paymentMethod === 'card'
-                                ? 'var(--info)'
-                                : p.paymentMethod === 'transfer'
-                                  ? 'var(--violet)'
-                                  : 'var(--ink-3)',
+                          background: methodColor(p.paymentMethod),
                           flexShrink: 0,
                         }}
                       />

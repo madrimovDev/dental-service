@@ -158,7 +158,8 @@ export const createReportsService = () => {
       .select({ paymentMethod: cashierTransactions.paymentMethod, total: signedPaidAmount })
       .from(cashierTransactions)
       .where(and(...base))
-      .groupBy(cashierTransactions.paymentMethod);
+      .groupBy(cashierTransactions.paymentMethod)
+      .orderBy(desc(signedPaidAmount));
 
     // byDoctor — plan-linked (treatment_plans.doctorId), plansiz → null
     const byDoctorPlan = await db
