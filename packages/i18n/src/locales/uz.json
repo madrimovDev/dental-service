@@ -235,7 +235,14 @@
     "doctor_pending_placeholder": "Tugallanmagan ishlar agregati hali yo'q",
     "no_lab_orders": "Faol laboratoriya buyurtmalari yo'q",
     "no_appointments": "Bugun qabullar yo'q",
-    "no_queue": "Navbat bo'sh"
+    "no_queue": "Navbat bo'sh",
+    "weekly_revenue": "Haftalik tushum",
+    "last_7_days": "So'nggi 7 kun",
+    "queue_status": "Navbat holati",
+    "queue_waiting": "{{n}} kutmoqda",
+    "calendar_link": "Kalendar",
+    "new_appointment": "Yangi yozilish",
+    "open_cashier": "Kassa"
   },
   "branches": {
     "title": "Filiallar",
