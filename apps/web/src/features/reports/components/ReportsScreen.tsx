@@ -489,9 +489,7 @@ export function ReportsScreen() {
         {appointments.data && appointments.data.occupancy.length > 0 && (
           <Card withBorder padding="lg">
             <Stack gap="md">
-              <Title order={4}>
-                {t('reports.occupancy', { defaultValue: 'Qabullar bandligi' })}
-              </Title>
+              <Title order={4}>{t('reports.occupancy')}</Title>
               <Heatmap cells={appointments.data.occupancy} />
             </Stack>
           </Card>

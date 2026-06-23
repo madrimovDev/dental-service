@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { type CSSProperties, Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
 
 interface HeatCell {
@@ -57,10 +57,9 @@ export function Heatmap({ cells, hours = DEFAULT_HOURS }: HeatmapProps) {
 
       {/* Data rows: one per hour */}
       {hours.map((h) => (
-        <>
+        <Fragment key={h}>
           {/* Hour label */}
           <div
-            key={`label-${h}`}
             style={{
               textAlign: 'right',
               paddingRight: 6,
@@ -97,7 +96,7 @@ export function Heatmap({ cells, hours = DEFAULT_HOURS }: HeatmapProps) {
               />
             );
           })}
-        </>
+        </Fragment>
       ))}
     </div>
   );

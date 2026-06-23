@@ -164,5 +164,7 @@ describe('ds12-a: appointmentStats occupancy', () => {
     const r = await run((c) => service.appointmentStats(c, RANGE));
     // 2026-06-01 dushanba(weekday=1), 09:00 da 1 completed qabul (reports.test setup)
     expect(r.occupancy.find((o) => o.weekday === 1 && o.hour === 9)?.count).toBe(1);
+    // 2026-06-01 dushanba(weekday=1), 10:00 da 1 no_show qabul — occupancy statusdan qat'i nazar sanaydi
+    expect(r.occupancy.find((o) => o.weekday === 1 && o.hour === 10)?.count).toBe(1);
   });
 });
