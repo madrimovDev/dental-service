@@ -11,22 +11,29 @@ function perm(code: string): PermissionDef {
 const perms = [perm('patient.view'), perm('patient.create'), perm('cashier.refund')];
 
 describe('PermissionBuilder', () => {
-  it('guruh toggle → guruhdagi barcha permission tanlanadi', () => {
+  it("pill toggle (OFF→ON) → o'sha permission Set'ga qo'shiladi (xulq saqlanadi)", () => {
     const onChange = vi.fn();
     renderApp(<PermissionBuilder permissions={perms} selected={new Set()} onChange={onChange} />);
-    // "Bemorlar" guruh sarlavhasi checkbox'i (settings.perm_group.patient)
-    fireEvent.click(screen.getByLabelText('Bemorlar'));
-    const next = onChange.mock.calls[0]?.[0] as Set<string>;
-    expect(next.has('patient.view')).toBe(true);
-    expect(next.has('patient.create')).toBe(true);
-    expect(next.has('cashier.refund')).toBe(false);
-  });
-
-  it("individual checkbox → faqat o'sha permission", () => {
-    const onChange = vi.fn();
-    renderApp(<PermissionBuilder permissions={perms} selected={new Set()} onChange={onChange} />);
-    fireEvent.click(screen.getByLabelText('cashier.refund'));
+    // desc yo'q → label = code; toggle = role="switch" tugma
+    fireEvent.click(screen.getByRole('switch', { name: 'cashier.refund' }));
     const next = onChange.mock.calls[0]?.[0] as Set<string>;
     expect([...next]).toEqual(['cashier.refund']);
+  });
+
+  it("pill toggle (ON→OFF) → o'sha permission Set'dan olib tashlanadi", () => {
+    const onChange = vi.fn();
+    renderApp(
+      <PermissionBuilder
+        permissions={perms}
+        selected={new Set(['patient.view', 'cashier.refund'])}
+        onChange={onChange}
+      />,
+    );
+    const toggle = screen.getByRole('switch', { name: 'patient.view' });
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(toggle);
+    const next = onChange.mock.calls[0]?.[0] as Set<string>;
+    expect(next.has('patient.view')).toBe(false);
+    expect(next.has('cashier.refund')).toBe(true);
   });
 });
