@@ -1,7 +1,8 @@
 import { Button, StateView } from '@dental/ui';
-import { ActionIcon, Group, Stack, Text } from '@mantine/core';
+import { ActionIcon, Group, Paper, Stack, Text } from '@mantine/core';
 import { TimeInput } from '@mantine/dates';
 import { Plus, X } from 'lucide-react';
+import type { CSSProperties } from 'react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth-store.ts';
@@ -10,6 +11,20 @@ import { groupSegmentsByWeekday, newSegmentKey, toPutSegments } from '../schedul
 import type { EditableSegment, WeeklyHours } from '../schedule.types';
 
 const WEEKDAYS = [1, 2, 3, 4, 5, 6, 0]; // Dushanba..Yakshanba (0=Sun oxirida)
+
+// Dental OS chrome — har hafta kuni surface karta; yangi CSS fayl yo'q (scope=fayl ichi).
+const dayCardStyle: CSSProperties = {
+  background: 'var(--surface)',
+  borderColor: 'var(--border)',
+  borderRadius: 'var(--radius-md)',
+};
+const weekdayLabelStyle: CSSProperties = {
+  color: 'var(--ink-3)',
+  fontSize: 'var(--text-xs)',
+  fontWeight: 'var(--fw-semibold)',
+  letterSpacing: '0.04em',
+  textTransform: 'uppercase',
+};
 
 function emptyWeek(): WeeklyHours {
   const w: WeeklyHours = {};
@@ -79,57 +94,59 @@ export function WeeklyHoursEditor({
   };
 
   return (
-    <Stack gap="md">
+    <Stack gap="sm">
       {WEEKDAYS.map((wd) => (
-        <Group key={wd} align="flex-start" wrap="nowrap">
-          <Text fw={600} w={120} style={{ flexShrink: 0 }}>
-            {t(`schedule.weekday.${wd}`)}
-          </Text>
-          <Stack gap="xs" style={{ flex: 1 }}>
-            {(week[wd] ?? []).length === 0 && (
-              <Text size="sm" c="dimmed">
-                {t('schedule.day_off')}
-              </Text>
-            )}
-            {(week[wd] ?? []).map((seg, idx) => (
-              <Group key={seg.key} gap="xs" wrap="nowrap">
-                <TimeInput
-                  aria-label={t('schedule.start')}
-                  value={seg.start}
-                  disabled={!canManage}
-                  onChange={(e) => setSegment(wd, idx, { start: e.currentTarget.value })}
-                />
-                <Text>—</Text>
-                <TimeInput
-                  aria-label={t('schedule.end')}
-                  value={seg.end}
-                  disabled={!canManage}
-                  onChange={(e) => setSegment(wd, idx, { end: e.currentTarget.value })}
-                />
-                {canManage && (
-                  <ActionIcon
-                    variant="subtle"
-                    color="red"
-                    aria-label={t('schedule.remove_segment')}
-                    onClick={() => removeSegment(wd, idx)}
-                  >
-                    <X size={16} />
-                  </ActionIcon>
-                )}
-              </Group>
-            ))}
-            {canManage && (
-              <Button
-                variant="default"
-                size="sm"
-                iconLeft={<Plus size={14} />}
-                onClick={() => addSegment(wd)}
-              >
-                {t('schedule.add_segment')}
-              </Button>
-            )}
-          </Stack>
-        </Group>
+        <Paper key={wd} withBorder p="md" style={dayCardStyle}>
+          <Group align="flex-start" wrap="nowrap">
+            <Text w={120} style={{ ...weekdayLabelStyle, flexShrink: 0, paddingTop: 6 }}>
+              {t(`schedule.weekday.${wd}`)}
+            </Text>
+            <Stack gap="xs" style={{ flex: 1 }}>
+              {(week[wd] ?? []).length === 0 && (
+                <Text size="sm" c="dimmed">
+                  {t('schedule.day_off')}
+                </Text>
+              )}
+              {(week[wd] ?? []).map((seg, idx) => (
+                <Group key={seg.key} gap="xs" wrap="nowrap">
+                  <TimeInput
+                    aria-label={t('schedule.start')}
+                    value={seg.start}
+                    disabled={!canManage}
+                    onChange={(e) => setSegment(wd, idx, { start: e.currentTarget.value })}
+                  />
+                  <Text>—</Text>
+                  <TimeInput
+                    aria-label={t('schedule.end')}
+                    value={seg.end}
+                    disabled={!canManage}
+                    onChange={(e) => setSegment(wd, idx, { end: e.currentTarget.value })}
+                  />
+                  {canManage && (
+                    <ActionIcon
+                      variant="subtle"
+                      color="red"
+                      aria-label={t('schedule.remove_segment')}
+                      onClick={() => removeSegment(wd, idx)}
+                    >
+                      <X size={16} />
+                    </ActionIcon>
+                  )}
+                </Group>
+              ))}
+              {canManage && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  iconLeft={<Plus size={14} />}
+                  onClick={() => addSegment(wd)}
+                >
+                  {t('schedule.add_segment')}
+                </Button>
+              )}
+            </Stack>
+          </Group>
+        </Paper>
       ))}
       {canManage && (
         <Group justify="flex-end">
