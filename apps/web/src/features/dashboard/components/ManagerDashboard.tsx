@@ -2,7 +2,6 @@ import { StateView } from '@dental/ui';
 import { Box, Group, Stack, Text } from '@mantine/core';
 import { IconCalendarPlus, IconCash } from '@tabler/icons-react';
 import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -22,8 +21,6 @@ import { BarMini } from './widgets/BarMini.tsx';
 import { MiniList } from './widgets/MiniList.tsx';
 import { Sparkline } from './widgets/Sparkline.tsx';
 import { StatCard } from './widgets/StatCard.tsx';
-
-dayjs.extend(relativeTime);
 
 const fmtPct = (n: number) => `${Math.round(n * 100)}%`;
 

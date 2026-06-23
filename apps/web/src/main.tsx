@@ -7,6 +7,7 @@ import { App } from './app/App.tsx';
 // Login/register sahifalari `@dental/api-client`'dan to'g'ridan import qiladi,
 // shuning uchun bu eager import bo'lmasa client sozlanmay qoladi.
 import './lib/api.ts';
+import './lib/dayjs.ts';
 import './styles.css';
 
 const root = document.getElementById('root');
