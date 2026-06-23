@@ -1108,7 +1108,16 @@
     "rate": "Выполнение",
     "empty": "Нет данных",
     "export_csv": "CSV",
-    "export_excel": "Excel"
+    "export_excel": "Excel",
+    "byPaymentMethod": "Структура по способу оплаты"
+  },
+  "payment": {
+    "method": {
+      "cash": "Наличные",
+      "card": "Карта",
+      "transfer": "Перевод",
+      "other": "Другое"
+    }
   },
   "expenses": {
     "title": "Расходы",

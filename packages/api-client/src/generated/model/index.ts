@@ -372,6 +372,7 @@ export * from './resetUserPassword200';
 export * from './revenueReport';
 export * from './revenueReportByBranchItem';
 export * from './revenueReportByDoctorItem';
+export * from './revenueReportByPaymentMethodItem';
 export * from './revenueReportByPeriodItem';
 export * from './revenueReportByServiceItem';
 export * from './role';

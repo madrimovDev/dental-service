@@ -8,6 +8,7 @@ import type { RevenueReportByBranchItem } from './revenueReportByBranchItem';
 import type { RevenueReportByServiceItem } from './revenueReportByServiceItem';
 import type { RevenueReportByDoctorItem } from './revenueReportByDoctorItem';
 import type { RevenueReportByPeriodItem } from './revenueReportByPeriodItem';
+import type { RevenueReportByPaymentMethodItem } from './revenueReportByPaymentMethodItem';
 import type { PeriodComparison } from './periodComparison';
 
 export interface RevenueReport {
@@ -16,5 +17,6 @@ export interface RevenueReport {
   byService: RevenueReportByServiceItem[];
   byDoctor: RevenueReportByDoctorItem[];
   byPeriod: RevenueReportByPeriodItem[];
+  byPaymentMethod: RevenueReportByPaymentMethodItem[];
   comparison: PeriodComparison;
 }

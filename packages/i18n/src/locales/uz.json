@@ -1108,7 +1108,16 @@
     "rate": "Bajarilish",
     "empty": "Maʼlumot yoʻq",
     "export_csv": "CSV",
-    "export_excel": "Excel"
+    "export_excel": "Excel",
+    "byPaymentMethod": "To'lov usuli taqsimoti"
+  },
+  "payment": {
+    "method": {
+      "cash": "Naqd pul",
+      "card": "Karta",
+      "transfer": "Pul o'tkazma",
+      "other": "Boshqa"
+    }
   },
   "expenses": {
     "title": "Xarajatlar",

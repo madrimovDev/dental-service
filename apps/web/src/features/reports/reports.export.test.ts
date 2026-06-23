@@ -23,6 +23,7 @@ describe('revenueToRows', () => {
       { doctorId: null, total: 100 },
     ],
     byPeriod: [{ date: '2026-06-01', total: 500 }],
+    byPaymentMethod: [],
     comparison: { previous: null, yoy: null },
   };
 

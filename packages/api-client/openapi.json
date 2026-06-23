@@ -2218,6 +2218,24 @@
               ]
             }
           },
+          "byPaymentMethod": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "paymentMethod": {
+                  "type": "string"
+                },
+                "total": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "paymentMethod",
+                "total"
+              ]
+            }
+          },
           "comparison": {
             "$ref": "#/components/schemas/PeriodComparison"
           }
@@ -2228,6 +2246,7 @@
           "byService",
           "byDoctor",
           "byPeriod",
+          "byPaymentMethod",
           "comparison"
         ]
       },

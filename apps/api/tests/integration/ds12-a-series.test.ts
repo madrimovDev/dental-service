@@ -1,5 +1,12 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { appointments, branches, patients, tenants, users } from '@dental/db-schema';
+import {
+  appointments,
+  branches,
+  cashierTransactions,
+  patients,
+  tenants,
+  users,
+} from '@dental/db-schema';
 import { sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { DbOrTx } from '../../src/db/client.ts';
@@ -80,6 +87,43 @@ beforeAll(async () => {
         status: 'cancelled',
       },
     ]);
+
+    // Kassa: barcha cash — payment 100000, payment 50000, refund 20000 → signed = 130000
+    await tx.insert(cashierTransactions).values([
+      {
+        tenantId,
+        branchId,
+        patientId,
+        totalAmount: '100000',
+        paidAmount: '100000',
+        paymentMethod: 'cash',
+        type: 'payment',
+        status: 'completed',
+        createdAt: new Date(`${day}T12:00:00+05:00`),
+      },
+      {
+        tenantId,
+        branchId,
+        patientId,
+        totalAmount: '50000',
+        paidAmount: '50000',
+        paymentMethod: 'cash',
+        type: 'payment',
+        status: 'completed',
+        createdAt: new Date(`${day}T12:30:00+05:00`),
+      },
+      {
+        tenantId,
+        branchId,
+        patientId,
+        totalAmount: '20000',
+        paidAmount: '20000',
+        paymentMethod: 'cash',
+        type: 'refund',
+        status: 'completed',
+        createdAt: new Date(`${day}T13:00:00+05:00`),
+      },
+    ]);
   });
 });
 
@@ -92,6 +136,14 @@ const run = <T>(fn: (c: Context) => Promise<T>) =>
     await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
     return fn(ctx(tx));
   });
+
+describe('ds12-a: revenue byPaymentMethod', () => {
+  test("revenue.byPaymentMethod: cash bo'yicha jamlanma", async () => {
+    const r = await run((c) => service.revenue(c, RANGE));
+    // barcha tx cash; signed = 100000+50000-20000 = 130000
+    expect(r.byPaymentMethod.find((p) => p.paymentMethod === 'cash')?.total).toBe(130000);
+  });
+});
 
 describe('ds12-a: appointmentStats byPeriod', () => {
   test('appointmentStats.byPeriod: kunlik count', async () => {

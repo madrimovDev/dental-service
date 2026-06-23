@@ -30,6 +30,7 @@ export const revenueReportDtoSchema = z
     byService: z.array(z.object({ serviceName: z.string(), total: z.number() })),
     byDoctor: z.array(z.object({ doctorId: z.string().nullable(), total: z.number() })),
     byPeriod: z.array(z.object({ date: z.string(), total: z.number() })),
+    byPaymentMethod: z.array(z.object({ paymentMethod: z.string(), total: z.number() })),
     comparison: periodComparisonDtoSchema,
   })
   .openapi('RevenueReport');

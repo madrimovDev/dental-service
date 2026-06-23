@@ -154,6 +154,12 @@ export const createReportsService = () => {
       .where(and(...itemBase))
       .groupBy(cashierTransactionItems.serviceName);
 
+    const byPaymentMethod = await db
+      .select({ paymentMethod: cashierTransactions.paymentMethod, total: signedPaidAmount })
+      .from(cashierTransactions)
+      .where(and(...base))
+      .groupBy(cashierTransactions.paymentMethod);
+
     // byDoctor — plan-linked (treatment_plans.doctorId), plansiz → null
     const byDoctorPlan = await db
       .select({ doctorId: treatmentPlans.doctorId, total: signedPaidAmount })
@@ -182,6 +188,10 @@ export const createReportsService = () => {
       byService: byService.map((r) => ({ serviceName: r.serviceName, total: Number(r.total) })),
       byDoctor,
       byPeriod: byPeriod.map((r) => ({ date: String(r.date), total: Number(r.total) })),
+      byPaymentMethod: byPaymentMethod.map((r) => ({
+        paymentMethod: r.paymentMethod,
+        total: Number(r.total),
+      })),
       comparison,
     };
   }
