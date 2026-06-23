@@ -53,10 +53,9 @@ export function useUpdateRecall() {
 }
 
 /** Recall KPI xulosasi (pending/contacted/scheduled/overdue/efficacyPct) — `recall.view`. */
-export function useRecallSummary(branchId?: string, options?: { enabled?: boolean }) {
+export function useRecallSummary(branchId?: string) {
   return useQuery({
     queryKey: recallKeys.summary(branchId),
-    enabled: options?.enabled ?? true,
     queryFn: () => getRecallSummary({ branchId }).then((r) => r.data),
   });
 }

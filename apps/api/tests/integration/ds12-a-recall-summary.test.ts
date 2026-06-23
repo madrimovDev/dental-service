@@ -11,7 +11,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { ROLE_TEMPLATES } from '@dental/core';
 import { branches, patients, recalls, tenants, users } from '@dental/db-schema';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { Hono } from 'hono';
 import type { DbOrTx } from '../../src/db/client.ts';
@@ -121,7 +121,7 @@ beforeAll(async () => {
     // - contacted, kelajakda → overdue EMAS
     // - scheduled → yopiq, efficacy uchun converted
     // Jami: total=4, pending=2, contacted=1, scheduled=1, overdue=1
-    // efficacyPct = scheduled / total * 100 = 1/4 * 100 = 25
+    // efficacyPct = (scheduled + completed) / total * 100 = (1+0)/4 * 100 = 25
     await tx.insert(recalls).values([
       {
         tenantId,
@@ -170,15 +170,123 @@ describe('DS12-A recall summary — real DB + RLS', () => {
     expect(r.contacted).toBe(1);
     expect(r.scheduled).toBe(1);
     expect(r.overdue).toBe(1); // dueDate < CURRENT_DATE, pending holatda
-    // efficacyPct = scheduled / total * 100 = 1/4 * 100 = 25
+    // efficacyPct = (scheduled + completed) / total * 100 = (1+0)/4 * 100 = 25
     expect(r.efficacyPct).toBeCloseTo((1 / 4) * 100, 1);
   });
 
-  test('summary branchId filter — boshqa tenant xurujidan izolatsiya', async () => {
-    // Ushbu tenantda branchId filtri qo'llanilsa ham sum=0 bo'lmaydi (branchId=null)
-    // chunki insert'da branchId ko'rsatilmagan → null — global tenant filtr ishlaydi
+  test("summary — RLS tenant izolyatsiyasi: boshqa tenant recall ko'rinmaydi", async () => {
+    // branchId berilmasa ham RLS tenantId bo'yicha filtrlaydi
+    // Bu tenantdagi 4 ta recall ko'rinadi, boshqa tenant yo'q
     const r = await run((c) => service.summary(c));
-    // RLS izolatsiyasi: tenantId avtomatik filtrlaydi, boshqa tenant ko'rinmaydi
     expect(r.pending + r.contacted + r.scheduled).toBe(4);
+  });
+
+  test('summary branchId filter — faqat shu filial recalls qaytadi', async () => {
+    // Bir tenantda ikki filial, har birida alohida recall'lar
+    // branchId bilan filter qilinganda faqat shu filialniki ko'rinadi
+    // branchId=null bo'lgan recall'lar EQ filter'ga tushmaydi (null != branchA.id)
+
+    let branchAId: string;
+    let branchBId: string;
+
+    await db.transaction(async (tx) => {
+      await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
+
+      const [branchA] = await tx
+        .insert(branches)
+        .values({ tenantId, name: 'Filial A' })
+        .returning({ id: branches.id });
+      if (!branchA) throw new Error('branchA insert failed');
+      branchAId = branchA.id;
+
+      const [branchB] = await tx
+        .insert(branches)
+        .values({ tenantId, name: 'Filial B' })
+        .returning({ id: branches.id });
+      if (!branchB) throw new Error('branchB insert failed');
+      branchBId = branchB.id;
+
+      const [patient] = await tx
+        .insert(patients)
+        .values({ tenantId, fullName: 'Branch Filter Bemor' })
+        .returning({ id: patients.id });
+      if (!patient) throw new Error('branch filter patient insert failed');
+
+      // branchA: 2 ta pending recall
+      await tx.insert(recalls).values([
+        {
+          tenantId,
+          patientId: patient.id,
+          branchId: branchAId,
+          reason: 'preventive' as const,
+          source: 'manual' as const,
+          status: 'pending' as const,
+          dueDate: '2099-12-31',
+        },
+        {
+          tenantId,
+          patientId: patient.id,
+          branchId: branchAId,
+          reason: 'preventive' as const,
+          source: 'manual' as const,
+          status: 'contacted' as const,
+          dueDate: '2099-12-31',
+        },
+      ]);
+
+      // branchB: 3 ta recall (branchA filter'da ko'rinmasin)
+      await tx.insert(recalls).values([
+        {
+          tenantId,
+          patientId: patient.id,
+          branchId: branchBId,
+          reason: 'preventive' as const,
+          source: 'manual' as const,
+          status: 'pending' as const,
+          dueDate: '2099-12-31',
+        },
+        {
+          tenantId,
+          patientId: patient.id,
+          branchId: branchBId,
+          reason: 'preventive' as const,
+          source: 'manual' as const,
+          status: 'scheduled' as const,
+          dueDate: '2099-12-31',
+        },
+        {
+          tenantId,
+          patientId: patient.id,
+          branchId: branchBId,
+          reason: 'preventive' as const,
+          source: 'manual' as const,
+          status: 'contacted' as const,
+          dueDate: '2099-12-31',
+        },
+      ]);
+    });
+
+    // branchA filter: faqat 2 ta recall (pending=1, contacted=1)
+    const rA = await run((c) => service.summary(c, branchAId));
+    expect(rA.pending).toBe(1);
+    expect(rA.contacted).toBe(1);
+    expect(rA.scheduled).toBe(0);
+    expect(rA.pending + rA.contacted + rA.scheduled).toBe(2);
+
+    // branchB filter: faqat 3 ta recall (pending=1, scheduled=1, contacted=1)
+    const rB = await run((c) => service.summary(c, branchBId));
+    expect(rB.pending).toBe(1);
+    expect(rB.contacted).toBe(1);
+    expect(rB.scheduled).toBe(1);
+    expect(rB.pending + rB.contacted + rB.scheduled).toBe(3);
+
+    // Tozalash: bu testda yaratilgan recall'larni o'chirish (afterAll cascade qiladi lekin tekshiramiz)
+    await db.transaction(async (tx) => {
+      await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
+      await tx.delete(recalls).where(eq(recalls.branchId, branchAId));
+      await tx.delete(recalls).where(eq(recalls.branchId, branchBId));
+      await tx.delete(branches).where(eq(branches.id, branchAId));
+      await tx.delete(branches).where(eq(branches.id, branchBId));
+    });
   });
 });
