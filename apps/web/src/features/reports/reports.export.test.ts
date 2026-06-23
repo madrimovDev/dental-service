@@ -23,6 +23,7 @@ describe('revenueToRows', () => {
       { doctorId: null, total: 100 },
     ],
     byPeriod: [{ date: '2026-06-01', total: 500 }],
+    comparison: { previous: null, yoy: null },
   };
 
   it('emits a header section for each grouping', () => {
@@ -63,6 +64,7 @@ describe('appointmentsToRows', () => {
     ],
     noShowRate: 0.1,
     slotUtilization: 0.75,
+    comparison: { previous: null, yoy: null },
   };
 
   it('emits header and summary metrics', () => {

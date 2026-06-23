@@ -13,11 +13,15 @@ import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import {
   branchOpenMinutes,
+  comparisonEntry,
   completionRate,
   DEFAULT_WORK_MINUTES,
   noShowRate,
+  periodLengthDays,
   recallEfficacy,
   retentionRate,
+  shiftDays,
+  shiftYears,
   utilizationPct,
 } from './reports.aggregations.ts';
 import type {
@@ -48,6 +52,57 @@ function* eachWeekday(from: string, to: string): Generator<string> {
 }
 
 export const createReportsService = () => {
+  async function revenueTotal(c: Context, { from, to, branchId }: ReportRange): Promise<number> {
+    const db = getDb(c);
+    const { start, end } = tashkentRange(from, to);
+    const signed = sql<string>`COALESCE(SUM(CASE WHEN ${cashierTransactions.type} = 'refund' THEN -${cashierTransactions.paidAmount} ELSE ${cashierTransactions.paidAmount} END), 0)`;
+    const base = [
+      eq(cashierTransactions.status, 'completed'),
+      between(cashierTransactions.createdAt, start, end),
+    ];
+    if (branchId) base.push(eq(cashierTransactions.branchId, branchId));
+    const [row] = await db
+      .select({ total: signed })
+      .from(cashierTransactions)
+      .where(and(...base));
+    return Number(row?.total ?? 0);
+  }
+
+  async function appointmentCount(
+    c: Context,
+    { from, to, branchId }: ReportRange,
+  ): Promise<number> {
+    const db = getDb(c);
+    const { start, end } = tashkentRange(from, to);
+    const base = [between(appointments.startTime, start, end)];
+    if (branchId) base.push(eq(appointments.branchId, branchId));
+    const [row] = await db
+      .select({ c: count() })
+      .from(appointments)
+      .where(and(...base));
+    return Number(row?.c ?? 0);
+  }
+
+  /** Joriy oraliq uchun previous + yoy taqqoslash (umumiy). */
+  async function buildComparison(
+    c: Context,
+    range: ReportRange,
+    current: number,
+    totalFn: (c: Context, r: ReportRange) => Promise<number>,
+  ) {
+    const len = periodLengthDays(range.from, range.to);
+    const prevTo = shiftDays(range.from, -1);
+    const prevFrom = shiftDays(prevTo, -(len - 1));
+    const prevRange = { from: prevFrom, to: prevTo, branchId: range.branchId };
+    const yoyRange = {
+      from: shiftYears(range.from, -1),
+      to: shiftYears(range.to, -1),
+      branchId: range.branchId,
+    };
+    const [prev, yoy] = await Promise.all([totalFn(c, prevRange), totalFn(c, yoyRange)]);
+    return { previous: comparisonEntry(current, prev), yoy: comparisonEntry(current, yoy) };
+  }
+
   async function revenue(c: Context, { from, to, branchId }: ReportRange): Promise<RevenueReport> {
     const db = getDb(c);
     const { start, end } = tashkentRange(from, to);
@@ -117,12 +172,16 @@ export const createReportsService = () => {
     const unassignedTotal = Number(unassigned?.total ?? 0);
     if (unassignedTotal !== 0) byDoctor.push({ doctorId: null, total: unassignedTotal });
 
+    const currentTotal = Number(totalRow?.total ?? 0);
+    const comparison = await buildComparison(c, { from, to, branchId }, currentTotal, revenueTotal);
+
     return {
-      total: Number(totalRow?.total ?? 0),
+      total: currentTotal,
       byBranch: byBranch.map((r) => ({ branchId: r.branchId, total: Number(r.total) })),
       byService: byService.map((r) => ({ serviceName: r.serviceName, total: Number(r.total) })),
       byDoctor,
       byPeriod: byPeriod.map((r) => ({ date: String(r.date), total: Number(r.total) })),
+      comparison,
     };
   }
 
@@ -176,11 +235,14 @@ export const createReportsService = () => {
       }
     }
 
+    const comparison = await buildComparison(c, { from, to, branchId }, total, appointmentCount);
+
     return {
       total,
       byStatus,
       noShowRate: noShowRate(noShow, total),
       slotUtilization: utilizationPct(bookedMinutes, capacityMinutes),
+      comparison,
     };
   }
 

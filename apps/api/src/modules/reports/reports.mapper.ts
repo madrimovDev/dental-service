@@ -21,6 +21,10 @@ export const toRevenueReportDto = (r: RevenueReport): RevenueReport => ({
   byService: r.byService.map((s) => ({ serviceName: s.serviceName, total: s.total })),
   byDoctor: r.byDoctor.map((d) => ({ doctorId: d.doctorId, total: d.total })),
   byPeriod: r.byPeriod.map((p) => ({ date: p.date, total: p.total })),
+  comparison: {
+    previous: r.comparison.previous && { ...r.comparison.previous },
+    yoy: r.comparison.yoy && { ...r.comparison.yoy },
+  },
 });
 
 export const toAppointmentStatsReportDto = (r: AppointmentStatsReport): AppointmentStatsReport => ({
@@ -28,6 +32,10 @@ export const toAppointmentStatsReportDto = (r: AppointmentStatsReport): Appointm
   byStatus: r.byStatus.map((s) => ({ status: s.status, count: s.count })),
   noShowRate: r.noShowRate,
   slotUtilization: r.slotUtilization,
+  comparison: {
+    previous: r.comparison.previous && { ...r.comparison.previous },
+    yoy: r.comparison.yoy && { ...r.comparison.yoy },
+  },
 });
 
 export const toDoctorWorkloadReportDto = (rows: DoctorWorkloadRow[]): DoctorWorkloadRow[] =>

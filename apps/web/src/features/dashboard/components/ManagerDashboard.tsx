@@ -12,6 +12,7 @@ import {
   useDoctorNames,
   useManagerKpi,
 } from '../dashboard.api.ts';
+import { toStatDelta } from '../dashboard.mappers';
 import { OnboardingChecklist } from './OnboardingChecklist.tsx';
 import { BarMini } from './widgets/BarMini.tsx';
 import { MiniList } from './widgets/MiniList.tsx';
@@ -130,10 +131,12 @@ export function ManagerDashboard() {
               label={t('dashboard.revenue_total')}
               value={rev ? formatCurrency(rev.total, t) : '—'}
               color="teal"
+              delta={toStatDelta(rev?.comparison?.previous, t)}
             />
             <StatCard
               label={t('dashboard.no_show_rate')}
               value={appt ? fmtPct(appt.noShowRate) : '—'}
+              delta={toStatDelta(appt?.comparison?.previous, t)}
             />
             <StatCard
               label={t('dashboard.slot_utilization')}

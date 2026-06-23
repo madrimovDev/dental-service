@@ -257,7 +257,8 @@
     "queue_waiting": "{{n}} ожидают",
     "calendar_link": "Календарь",
     "new_appointment": "Новая запись",
-    "open_cashier": "Касса"
+    "open_cashier": "Касса",
+    "vsPrevPeriod": "к прошлому периоду"
   },
   "branches": {
     "title": "Филиалы",

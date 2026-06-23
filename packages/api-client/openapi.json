@@ -2217,6 +2217,9 @@
                 "total"
               ]
             }
+          },
+          "comparison": {
+            "$ref": "#/components/schemas/PeriodComparison"
           }
         },
         "required": [
@@ -2224,7 +2227,49 @@
           "byBranch",
           "byService",
           "byDoctor",
-          "byPeriod"
+          "byPeriod",
+          "comparison"
+        ]
+      },
+      "PeriodComparison": {
+        "type": "object",
+        "properties": {
+          "previous": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "total": {
+                "type": "number"
+              },
+              "deltaPct": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "total",
+              "deltaPct"
+            ]
+          },
+          "yoy": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "total": {
+                "type": "number"
+              },
+              "deltaPct": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "total",
+              "deltaPct"
+            ]
+          }
+        },
+        "required": [
+          "previous",
+          "yoy"
         ]
       },
       "AppointmentStatsReport": {
@@ -2256,13 +2301,17 @@
           },
           "slotUtilization": {
             "type": "number"
+          },
+          "comparison": {
+            "$ref": "#/components/schemas/PeriodComparison"
           }
         },
         "required": [
           "total",
           "byStatus",
           "noShowRate",
-          "slotUtilization"
+          "slotUtilization",
+          "comparison"
         ]
       },
       "DoctorWorkloadReport": {

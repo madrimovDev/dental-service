@@ -257,7 +257,8 @@
     "queue_waiting": "{{n}} kutmoqda",
     "calendar_link": "Kalendar",
     "new_appointment": "Yangi yozilish",
-    "open_cashier": "Kassa"
+    "open_cashier": "Kassa",
+    "vsPrevPeriod": "o'tgan davrga nisbatan"
   },
   "branches": {
     "title": "Filiallar",
