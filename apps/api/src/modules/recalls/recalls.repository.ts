@@ -1,5 +1,5 @@
 import { patients, type RecallInsert, recalls, tenantSettings } from '@dental/db-schema';
-import { and, desc, eq, inArray, lte, sql } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, lte, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { RecallWithPatient } from './recalls.mapper.ts';
@@ -156,6 +156,32 @@ export const createRecallsRepository = () => {
     return row?.months ?? 6;
   }
 
+  /** Status bo'yicha sanoq + overdue (dueDate < bugun, ochiq) + efficacy. RLS tenant-scoped. */
+  async function summary(c: Context, branchId?: string) {
+    const db = getDb(c);
+    const filters = branchId ? [eq(recalls.branchId, branchId)] : [];
+    const where = filters.length ? and(...filters) : undefined;
+    const [row] = await db
+      .select({
+        pending: sql<number>`COUNT(*) FILTER (WHERE ${recalls.status} = 'pending')`,
+        contacted: sql<number>`COUNT(*) FILTER (WHERE ${recalls.status} = 'contacted')`,
+        scheduled: sql<number>`COUNT(*) FILTER (WHERE ${recalls.status} = 'scheduled')`,
+        completed: sql<number>`COUNT(*) FILTER (WHERE ${recalls.status} = 'completed')`,
+        total: count(),
+        overdue: sql<number>`COUNT(*) FILTER (WHERE ${recalls.dueDate} < CURRENT_DATE AND ${recalls.status} IN ('pending','contacted'))`,
+      })
+      .from(recalls)
+      .where(where);
+    return {
+      pending: Number(row?.pending ?? 0),
+      contacted: Number(row?.contacted ?? 0),
+      scheduled: Number(row?.scheduled ?? 0),
+      completed: Number(row?.completed ?? 0),
+      overdue: Number(row?.overdue ?? 0),
+      total: Number(row?.total ?? 0),
+    };
+  }
+
   return {
     list,
     listByPatient,
@@ -166,6 +192,7 @@ export const createRecallsRepository = () => {
     findOpenByPatient,
     update,
     getDefaultIntervalMonths,
+    summary,
   };
 };
 

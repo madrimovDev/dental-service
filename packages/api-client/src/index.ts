@@ -250,6 +250,8 @@ export type {
   GetPrescription200,
   GetQueueToday200,
   GetQueueTodayParams,
+  GetRecallSummary200,
+  GetRecallSummaryParams,
   GetRole200,
   GetService200,
   GetTenant200,
@@ -331,6 +333,7 @@ export type {
   RecallDto,
   RecallDtoReason,
   RecallDtoSource,
+  RecallSummary,
   ResetPasswordResponse,
   ResetUserPassword200,
   RevenueReport,
@@ -553,6 +556,7 @@ export {
 // Generated (orval) — recalls
 export type {
   CreateRecallResult,
+  GetRecallSummaryResult,
   ListPatientRecallsResult,
   ListRecallsResult,
   MarkRecallContactedResult,
@@ -560,6 +564,7 @@ export type {
 } from './generated/recalls/recalls.ts';
 export {
   createRecall,
+  getRecallSummary,
   listPatientRecalls,
   listRecalls,
   markRecallContacted,

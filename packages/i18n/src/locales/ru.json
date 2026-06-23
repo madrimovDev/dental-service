@@ -1254,6 +1254,13 @@
       "interval_months": "Интервал (мес.)",
       "notes": "Заметка",
       "submit": "Сохранить"
+    },
+    "kpi": {
+      "pending": "Ожидает",
+      "contacted": "Связались",
+      "scheduled": "Записан",
+      "overdue": "Просрочен",
+      "efficacy": "Эффективность"
     }
   }
 }

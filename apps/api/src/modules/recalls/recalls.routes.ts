@@ -14,6 +14,8 @@ import {
   patientIdParamSchema,
   recallDtoSchema,
   recallIdParamSchema,
+  recallSummaryDtoSchema,
+  recallSummaryQuerySchema,
   updateRecallSchema,
 } from './recalls.schema.ts';
 import { createRecallsService } from './recalls.service.ts';
@@ -55,6 +57,22 @@ export const recallRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     const rows = await service.list(c, query);
     const mask = shouldMaskPii(c);
     return c.json(ok(rows.map((r) => toRecallDto(r, mask))), 200);
+  });
+
+  // ─── GET /recalls/summary (KPI) ───────────────────────────────────────────
+  // ⚠️ /summary statik yo'l /{id} param yo'lidan OLDIN ro'yxatdan o'tkazilishi shart.
+  const summaryRoute = createRoute({
+    method: 'get',
+    path: '/summary',
+    tags: ['recalls'],
+    operationId: 'getRecallSummary',
+    middleware: [requirePermission('recall.view')] as const,
+    request: { query: recallSummaryQuerySchema },
+    responses: okJson(recallSummaryDtoSchema, 'Recall KPI summary'),
+  });
+  app.openapi(summaryRoute, async (c) => {
+    const { branchId } = c.req.valid('query');
+    return c.json(ok(await service.summary(c, branchId)), 200);
   });
 
   // ─── GET /recalls/patient/{id} ─────────────────────────────────────────────

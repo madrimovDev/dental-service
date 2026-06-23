@@ -7,6 +7,8 @@
 import type {
   CreateRecall,
   CreateRecall201,
+  GetRecallSummary200,
+  GetRecallSummaryParams,
   ListPatientRecalls200,
   ListRecalls200,
   ListRecallsParams,
@@ -36,6 +38,15 @@ import { customInstance } from '../../mutator';
       {url: `/api/recalls`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
       data: createRecall
+    },
+      );
+    }
+  export const getRecallSummary = (
+    params?: GetRecallSummaryParams,
+ ) => {
+      return customInstance<GetRecallSummary200>(
+      {url: `/api/recalls/summary`, method: 'GET',
+        params
     },
       );
     }
@@ -71,6 +82,7 @@ import { customInstance } from '../../mutator';
     }
   export type ListRecallsResult = NonNullable<Awaited<ReturnType<typeof listRecalls>>>
 export type CreateRecallResult = NonNullable<Awaited<ReturnType<typeof createRecall>>>
+export type GetRecallSummaryResult = NonNullable<Awaited<ReturnType<typeof getRecallSummary>>>
 export type ListPatientRecallsResult = NonNullable<Awaited<ReturnType<typeof listPatientRecalls>>>
 export type UpdateRecallResult = NonNullable<Awaited<ReturnType<typeof updateRecall>>>
 export type MarkRecallContactedResult = NonNullable<Awaited<ReturnType<typeof markRecallContacted>>>

@@ -4,6 +4,7 @@ import { IconCalendarPlus, IconCash } from '@tabler/icons-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { useRecallSummary } from '@/features/recalls/recalls.api.ts';
 import { formatCurrency } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import {
@@ -20,6 +21,34 @@ import { Sparkline } from './widgets/Sparkline.tsx';
 import { StatCard } from './widgets/StatCard.tsx';
 
 const fmtPct = (n: number) => `${Math.round(n * 100)}%`;
+
+/**
+ * Recall rail kartasi — faqat `recall.view` ruxsati bor bo'lganda render qilinadi.
+ * Hook shu komponent ichida — Permission yo'q bo'lsa komponent mount bo'lmaydi,
+ * shu sababli 403 so'rov ham yuborilmaydi (RBAC gap avoidance pattern).
+ */
+function RecallRailCard() {
+  const { t } = useTranslation();
+  const { data: kpi } = useRecallSummary();
+  return (
+    <MiniList
+      title={t('recall.title')}
+      items={[
+        {
+          id: 'pending',
+          label: t('recall.kpi.pending'),
+          right: String(kpi?.pending ?? '—'),
+        },
+        {
+          id: 'overdue',
+          label: t('recall.kpi.overdue'),
+          right: String(kpi?.overdue ?? '—'),
+        },
+      ]}
+      emptyText={t('dashboard.empty')}
+    />
+  );
+}
 
 // Off-scale literal (parity): tokenlar --radius-xl:14px da to'xtaydi; DS1 karta 16px.
 const CARD_RADIUS = 16;
@@ -84,6 +113,7 @@ export function ManagerDashboard() {
 
   const canAppointment = hasPermission('appointment.view');
   const canCashier = hasPermission('cashier.view');
+  const canRecall = hasPermission('recall.view');
 
   return (
     <Stack gap="lg">
@@ -199,6 +229,9 @@ export function ManagerDashboard() {
                 }))}
                 emptyText={t('dashboard.empty')}
               />
+              {/* Recall rail — faqat recall.view ruxsati bor bo'lsa render qilinadi.
+                  RecallRailCard ichida hook bor → mount bo'lmasa 403 so'rov yuborilmaydi. */}
+              {canRecall && <RecallRailCard />}
             </Stack>
           </Box>
         </>

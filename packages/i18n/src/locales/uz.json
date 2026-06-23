@@ -1254,6 +1254,13 @@
       "interval_months": "Interval (oy)",
       "notes": "Izoh",
       "submit": "Saqlash"
+    },
+    "kpi": {
+      "pending": "Kutilmoqda",
+      "contacted": "Bog'lanilgan",
+      "scheduled": "Yozilgan",
+      "overdue": "Muddati o'tgan",
+      "efficacy": "Samaradorlik"
     }
   }
 }
