@@ -505,6 +505,8 @@
       "other": "Другое"
     },
     "severe_allergy_warning": "ВНИМАНИЕ — аллергия на анестетик!",
+    "allergy_confirm_pill": "Подтвердите перед анестезией",
+    "payment_history": "История платежей",
     "no_medical_permission": "У вас нет прав на просмотр медкарты"
   },
   "medical": {
@@ -605,10 +607,14 @@
     "consent_signed": "Согласие подписано",
     "consent_signed_at": "Дата подписания",
     "consent_required": "Сначала подпишите согласие",
-    "consent_signature_url": "Ссылка на подпись (необязательно)"
+    "consent_signature_url": "Ссылка на подпись (необязательно)",
+    "financial_summary": "Финансовая сводка",
+    "total_plan": "Итого по плану",
+    "pdf_consent": "PDF плана · согласие"
   },
   "visit_note": {
     "title": "Записи визитов",
+    "title_soap": "Записи визитов · SOAP",
     "create": "Новая запись",
     "visit_date": "Дата визита",
     "doctor": "Врач",
@@ -676,6 +682,7 @@
   },
   "prescription": {
     "title": "Рецепты",
+    "active_title": "Активные рецепты",
     "create": "Новый рецепт",
     "issued_date": "Дата выдачи",
     "diagnosis": "Диагноз",

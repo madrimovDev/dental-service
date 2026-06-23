@@ -51,4 +51,13 @@ describe('TreatmentPlansTab', () => {
     const text = container.textContent ?? '';
     expect(text.toLowerCase()).not.toMatch(/paid|to'langan|qoldiq|balans|balance/);
   });
+
+  it('DS3: moliyaviy xulosa chrome + 0-bosqich progress xavfsiz render', () => {
+    const { container } = renderApp(<TreatmentPlansTab patientId="p1" />);
+    // 0 stage → progress NaN emas, "0/0" + "0%" ko'rinadi.
+    expect(container.textContent).toContain('0/0');
+    expect(container.textContent).toContain('0%');
+    // Jami narx (smeta panel) doim ko'rinadi (totalCost shartsiz).
+    expect(screen.getByText(/1[\s ,.]?500[\s ,.]?000/)).toBeInTheDocument();
+  });
 });

@@ -3,11 +3,12 @@ import type {
   TreatmentStageAcceptance,
   TreatmentStageStatus,
 } from '@dental/api-client';
-import { StatusPill } from '@dental/ui';
-import { Box, Button, Card, Group, Select, Text } from '@mantine/core';
-import { IconCheck, IconDental, IconX } from '@tabler/icons-react';
+import { Mono, StatusPill } from '@dental/ui';
+import { Button, Group, Select } from '@mantine/core';
+import { IconCheck, IconX } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { toStageRowVM } from '../../clinical.mappers';
+import classes from './StageRow.module.css';
 
 const STAGE_STATUSES: TreatmentStageStatus[] = ['pending', 'in_progress', 'completed', 'skipped'];
 
@@ -28,57 +29,57 @@ export function StageRow({
   const { t } = useTranslation();
   const vm = toStageRowVM(stage);
   return (
-    <Card withBorder padding="sm">
-      <Group justify="space-between" align="flex-start">
-        <Box>
-          <Text fw={500}>
-            #{vm.sequence}. {vm.serviceName}
-          </Text>
-          <Group gap="xs">
-            {vm.toothNumbers.length > 0 && (
-              <Group gap={4}>
-                <IconDental size={14} />
-                <Text size="sm" c="dimmed">
-                  {vm.toothNumbers.join(', ')}
-                </Text>
-              </Group>
+    <div className={classes.row}>
+      <div className={classes.cellNum}>
+        <Mono>{vm.sequence}</Mono>
+      </div>
+
+      <div className={classes.cellStage}>
+        <span className={classes.serviceName}>{vm.serviceName}</span>
+        <div className={classes.chips}>
+          <StatusPill status={vm.statusTone}>{t(vm.statusLabelKey)}</StatusPill>
+          <StatusPill status={vm.acceptanceTone}>{t(vm.acceptanceLabelKey)}</StatusPill>
+        </div>
+      </div>
+
+      <div className={classes.cellTooth}>
+        {vm.toothNumbers.length > 0 ? <Mono>{vm.toothNumbers.join(', ')}</Mono> : '—'}
+      </div>
+
+      <div className={classes.cellCost}>
+        <Mono>{vm.costText}</Mono>
+      </div>
+
+      <div className={classes.cellActions}>
+        {canEdit && (
+          <Group gap={6} align="center" justify="flex-end" wrap="nowrap">
+            {vm.acceptance !== 'accepted' && (
+              <Button
+                size="compact-xs"
+                variant="light"
+                color="teal"
+                leftSection={<IconCheck size={14} />}
+                loading={acceptancePending}
+                onClick={() => onSetAcceptance(vm.id, 'accepted')}
+              >
+                {t('treatment_plan.accept')}
+              </Button>
             )}
-            <Text size="sm" c="dimmed">
-              {vm.costText} {t('common.currency')}
-            </Text>
-            <StatusPill status={vm.statusTone}>{t(vm.statusLabelKey)}</StatusPill>
-            <StatusPill status={vm.acceptanceTone}>{t(vm.acceptanceLabelKey)}</StatusPill>
-          </Group>
-        </Box>
-        <Group gap="xs" align="center">
-          {canEdit && vm.acceptance !== 'accepted' && (
-            <Button
-              size="compact-xs"
-              variant="light"
-              color="teal"
-              leftSection={<IconCheck size={14} />}
-              loading={acceptancePending}
-              onClick={() => onSetAcceptance(vm.id, 'accepted')}
-            >
-              {t('treatment_plan.accept')}
-            </Button>
-          )}
-          {canEdit && vm.acceptance !== 'rejected' && (
-            <Button
-              size="compact-xs"
-              variant="subtle"
-              color="red"
-              leftSection={<IconX size={14} />}
-              loading={acceptancePending}
-              onClick={() => onSetAcceptance(vm.id, 'rejected')}
-            >
-              {t('treatment_plan.reject')}
-            </Button>
-          )}
-          {canEdit && (
+            {vm.acceptance !== 'rejected' && (
+              <Button
+                size="compact-xs"
+                variant="subtle"
+                color="red"
+                leftSection={<IconX size={14} />}
+                loading={acceptancePending}
+                onClick={() => onSetAcceptance(vm.id, 'rejected')}
+              >
+                {t('treatment_plan.reject')}
+              </Button>
+            )}
             <Select
               size="xs"
-              w={140}
+              w={132}
               value={vm.status}
               onChange={(v) => v && onUpdateStage(vm.id, v as TreatmentStageStatus)}
               data={STAGE_STATUSES.map((s) => ({
@@ -86,9 +87,9 @@ export function StageRow({
                 label: t(`treatment_plan.stage_status_${s}`),
               }))}
             />
-          )}
-        </Group>
-      </Group>
-    </Card>
+          </Group>
+        )}
+      </div>
+    </div>
   );
 }

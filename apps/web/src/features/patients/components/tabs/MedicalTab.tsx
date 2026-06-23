@@ -1,10 +1,10 @@
 import type { AllergyEntry, MedicalRecordHistoryEntry } from '@dental/api-client';
-import { Button, Input, Select } from '@dental/ui';
+import { Button, Card, Input, Select } from '@dental/ui';
 import {
   Accordion,
   Alert,
-  Card,
   Group,
+  Card as MantineCard,
   Paper,
   SimpleGrid,
   Stack,
@@ -141,7 +141,7 @@ export function MedicalTab({ patientId }: { patientId: string }) {
 
   return (
     <Stack gap="md">
-      <Paper withBorder p="xl" radius="md">
+      <Card title={t('patients.tab_medical')}>
         <form onSubmit={submit}>
           <Stack gap="md">
             <Textarea
@@ -165,10 +165,20 @@ export function MedicalTab({ patientId }: { patientId: string }) {
               {...form.getInputProps('currentMedicationsText')}
             />
 
-            <Card withBorder padding="md" radius="md">
+            <MantineCard
+              withBorder
+              padding="md"
+              radius="md"
+              style={{
+                borderColor: 'var(--danger)',
+                background: 'var(--danger-soft)',
+              }}
+            >
               <Stack gap="sm">
                 <Group justify="space-between">
-                  <Text fw={600}>⚠️ {t('medical.allergies')}</Text>
+                  <Text fw={700} style={{ color: 'var(--danger)' }}>
+                    ⚠️ {t('medical.allergies')}
+                  </Text>
                   {canEdit && (
                     <Button
                       size="sm"
@@ -230,7 +240,7 @@ export function MedicalTab({ patientId }: { patientId: string }) {
                   </Group>
                 ))}
               </Stack>
-            </Card>
+            </MantineCard>
 
             <SimpleGrid cols={{ base: 1, sm: 2 }}>
               <Input
@@ -266,7 +276,7 @@ export function MedicalTab({ patientId }: { patientId: string }) {
             )}
           </Stack>
         </form>
-      </Paper>
+      </Card>
 
       <MedicalHistorySection patientId={patientId} />
     </Stack>
