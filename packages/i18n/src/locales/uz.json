@@ -12,7 +12,7 @@
     "title": "Audit log",
     "from": "Sanadan",
     "to": "Sanagacha",
-    "action": "Amal",
+    "action_label": "Amal",
     "action_placeholder": "masalan, patient.create",
     "resource_type": "Resurs turi",
     "resource_type_placeholder": "masalan, patient",
@@ -29,6 +29,26 @@
       "action": "Amal",
       "resource": "Resurs",
       "resource_id": "Resurs ID"
+    },
+    "action": {
+      "created": "yaratdi",
+      "updated": "yangiladi",
+      "deleted": "o'chirdi",
+      "viewed": "ko'rdi",
+      "login": "tizimga kirdi",
+      "workspace_switched": "ish joyini almashtirdi"
+    },
+    "resource": {
+      "patient": "bemor",
+      "appointment": "yozilish",
+      "cashier_transaction": "to'lov",
+      "treatment_plan": "davolash rejasi",
+      "visit_note": "vizit yozuvi",
+      "user": "foydalanuvchi",
+      "auth": "autentifikatsiya",
+      "service": "xizmat",
+      "stock_item": "ombor mahsuloti",
+      "expense": "xarajat"
     }
   },
   "common": {
@@ -258,7 +278,8 @@
     "calendar_link": "Kalendar",
     "new_appointment": "Yangi yozilish",
     "open_cashier": "Kassa",
-    "vsPrevPeriod": "o'tgan davrga nisbatan"
+    "vsPrevPeriod": "o'tgan davrga nisbatan",
+    "activityFeed": "So'nggi faoliyat"
   },
   "branches": {
     "title": "Filiallar",

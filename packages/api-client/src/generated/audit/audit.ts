@@ -5,6 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type {
+  GetRecentActivity200,
   ListAuditLog200,
   ListAuditLogParams
 } from '.././model';
@@ -22,4 +23,13 @@ import { customInstance } from '../../mutator';
     },
       );
     }
+  export const getRecentActivity = (
+    
+ ) => {
+      return customInstance<GetRecentActivity200>(
+      {url: `/api/audit/recent`, method: 'GET'
+    },
+      );
+    }
   export type ListAuditLogResult = NonNullable<Awaited<ReturnType<typeof listAuditLog>>>
+export type GetRecentActivityResult = NonNullable<Awaited<ReturnType<typeof getRecentActivity>>>

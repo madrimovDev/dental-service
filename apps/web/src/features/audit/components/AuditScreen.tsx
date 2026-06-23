@@ -121,7 +121,7 @@ export function AuditScreen() {
               w={160}
             />
             <TextInput
-              label={t('audit.action')}
+              label={t('audit.action_label')}
               placeholder={t('audit.action_placeholder')}
               value={action}
               onChange={(e) => onFilterChange(setAction)(e.currentTarget.value)}

@@ -12,7 +12,7 @@
     "title": "Журнал аудита",
     "from": "С даты",
     "to": "По дату",
-    "action": "Действие",
+    "action_label": "Действие",
     "action_placeholder": "например, patient.create",
     "resource_type": "Тип ресурса",
     "resource_type_placeholder": "например, patient",
@@ -29,6 +29,26 @@
       "action": "Действие",
       "resource": "Ресурс",
       "resource_id": "ID ресурса"
+    },
+    "action": {
+      "created": "создал(а)",
+      "updated": "обновил(а)",
+      "deleted": "удалил(а)",
+      "viewed": "просмотрел(а)",
+      "login": "вошёл(а) в систему",
+      "workspace_switched": "сменил(а) рабочее пространство"
+    },
+    "resource": {
+      "patient": "пациент",
+      "appointment": "запись",
+      "cashier_transaction": "платёж",
+      "treatment_plan": "план лечения",
+      "visit_note": "запись визита",
+      "user": "пользователь",
+      "auth": "аутентификация",
+      "service": "услуга",
+      "stock_item": "товар на складе",
+      "expense": "расход"
     }
   },
   "common": {
@@ -258,7 +278,8 @@
     "calendar_link": "Календарь",
     "new_appointment": "Новая запись",
     "open_cashier": "Касса",
-    "vsPrevPeriod": "к прошлому периоду"
+    "vsPrevPeriod": "к прошлому периоду",
+    "activityFeed": "Последняя активность"
   },
   "branches": {
     "title": "Филиалы",
