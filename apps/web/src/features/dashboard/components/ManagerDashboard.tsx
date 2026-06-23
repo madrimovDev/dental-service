@@ -138,7 +138,6 @@ export function ManagerDashboard() {
             <StatCard
               label={t('dashboard.no_show_rate')}
               value={appt ? fmtPct(appt.noShowRate) : '—'}
-              spark={<Sparkline points={(appt?.byPeriod ?? []).map((p) => p.count)} />}
             />
             <StatCard
               label={t('dashboard.slot_utilization')}

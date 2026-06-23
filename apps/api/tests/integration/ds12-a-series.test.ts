@@ -100,8 +100,9 @@ describe('ds12-a: appointmentStats byPeriod', () => {
     expect(r.byPeriod.find((p) => p.date === '2026-06-01')?.count).toBe(3);
   });
 
-  test("byPeriod massiv qaytadi (bo'sh bo'lishi mumkin)", async () => {
+  test("byPeriod sana bo'yicha o'sish tartibida qaytadi", async () => {
     const r = await run((c) => service.appointmentStats(c, RANGE));
-    expect(Array.isArray(r.byPeriod)).toBe(true);
+    const dates = r.byPeriod.map((p) => p.date);
+    expect([...dates].sort()).toEqual(dates);
   });
 });
