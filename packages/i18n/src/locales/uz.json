@@ -890,7 +890,18 @@
     "from_appointment": "Yozuvdan",
     "walk_in": "Navbat (yozuvsiz)",
     "check_in": "Navbatga olish",
-    "no_candidates": "Bugun check-in uchun yozuv yo'q"
+    "no_candidates": "Bugun check-in uchun yozuv yo'q",
+    "now_serving": "Hozir chaqirilmoqda",
+    "next_in_queue": "Keyingi navbat",
+    "display_board": "Display board",
+    "exit": "Chiqish",
+    "live_subtitle": "jonli boshqaruv",
+    "board_subtitle": "Navbat — jonli tablo",
+    "next_queues": "Keyingi navbatlar",
+    "waited_minutes": "{{count}} daqiqa kutdi",
+    "cabinet": "Kabinet {{n}}",
+    "not_called_yet": "Hozircha chaqirilmagan",
+    "call_arrow": "Chaqirish →"
   },
   "services": {
     "title": "Xizmatlar katalogi",
