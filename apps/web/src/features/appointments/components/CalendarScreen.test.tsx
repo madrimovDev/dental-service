@@ -30,4 +30,13 @@ describe('CalendarScreen', () => {
     expect(screen.getByText('Kun')).toBeInTheDocument();
     expect(screen.getByText('Hafta')).toBeInTheDocument();
   });
+
+  it("chevron-nav + 'Bugun' reset amali saqlangan", () => {
+    renderApp(<CalendarScreen />);
+    // Chevron nav (oldingi/keyingi) — IconButton aria-label mavjud common.* kalitlardan.
+    expect(screen.getByRole('button', { name: 'Orqaga' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Keyingi' })).toBeInTheDocument();
+    // 'Bugun' reset tugmasi + (default sana bugun) statik 'Bugun' pill — kamida 1 ko'rinadi.
+    expect(screen.getAllByText('Bugun').length).toBeGreaterThan(0);
+  });
 });

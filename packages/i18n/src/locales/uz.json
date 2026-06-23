@@ -818,6 +818,12 @@
     "empty": "Yozuvlar yo'q",
     "empty_week": "Bu hafta yozilishlar yo'q",
     "cancel_reason": "Bekor qilish sababi",
+    "summary_appts": "{{count}} ta yozilish",
+    "summary_doctors": "{{count}} doktor",
+    "waitlist": {
+      "title": "Kutish ro'yxati",
+      "empty": "Hozircha kutish ro'yxati bo'sh"
+    },
     "status": {
       "scheduled": "Rejalashtirilgan",
       "confirmed": "Tasdiqlangan",

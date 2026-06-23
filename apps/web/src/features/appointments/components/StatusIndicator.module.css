@@ -1,0 +1,62 @@
+.root {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.dot {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  box-sizing: border-box;
+}
+
+.check {
+  color: var(--ink-3);
+}
+
+/* scheduled — halqa (ring): shaffof ichi, ink-3 ramka */
+.root[data-status="scheduled"] .dot {
+  background: transparent;
+  border: 2px solid var(--ink-3);
+}
+
+/* confirmed — to'la dot ink-3 */
+.root[data-status="confirmed"] .dot {
+  background: var(--ink-3);
+}
+
+/* in_progress — to'la dot warning + warning-soft halqa (pulse) */
+.root[data-status="in_progress"] .dot {
+  background: var(--warning);
+  box-shadow: 0 0 0 3px var(--warning-soft);
+  animation: pulse 1.6s var(--ease) infinite;
+}
+
+/* no_show — to'la dot danger */
+.root[data-status="no_show"] .dot {
+  background: var(--danger);
+}
+
+/* cancelled — dim dot ink-3 */
+.root[data-status="cancelled"] .dot {
+  background: var(--ink-3);
+  opacity: 0.5;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px var(--warning-soft);
+  }
+  50% {
+    box-shadow: 0 0 0 5px var(--warning-soft);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root[data-status="in_progress"] .dot {
+    animation: none;
+  }
+}
