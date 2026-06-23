@@ -136,7 +136,6 @@ export function ManagerDashboard() {
             <StatCard
               label={t('dashboard.no_show_rate')}
               value={appt ? fmtPct(appt.noShowRate) : '—'}
-              delta={toStatDelta(appt?.comparison?.previous, t)}
             />
             <StatCard
               label={t('dashboard.slot_utilization')}

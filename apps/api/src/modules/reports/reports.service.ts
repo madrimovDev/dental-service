@@ -36,6 +36,9 @@ import type {
 
 const WEEKDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 
+/** Refund → manfiy, to'lov → musbat yig'indisi (COALESCE 0 agar hech narsa yo'q). */
+const signedPaidAmount = sql<string>`COALESCE(SUM(CASE WHEN ${cashierTransactions.type} = 'refund' THEN -${cashierTransactions.paidAmount} ELSE ${cashierTransactions.paidAmount} END), 0)`;
+
 const tashkentRange = (from: string, to: string) => ({
   start: new Date(`${from}T00:00:00+05:00`),
   end: new Date(`${to}T23:59:59.999+05:00`),
@@ -55,14 +58,13 @@ export const createReportsService = () => {
   async function revenueTotal(c: Context, { from, to, branchId }: ReportRange): Promise<number> {
     const db = getDb(c);
     const { start, end } = tashkentRange(from, to);
-    const signed = sql<string>`COALESCE(SUM(CASE WHEN ${cashierTransactions.type} = 'refund' THEN -${cashierTransactions.paidAmount} ELSE ${cashierTransactions.paidAmount} END), 0)`;
     const base = [
       eq(cashierTransactions.status, 'completed'),
       between(cashierTransactions.createdAt, start, end),
     ];
     if (branchId) base.push(eq(cashierTransactions.branchId, branchId));
     const [row] = await db
-      .select({ total: signed })
+      .select({ total: signedPaidAmount })
       .from(cashierTransactions)
       .where(and(...base));
     return Number(row?.total ?? 0);
@@ -106,7 +108,6 @@ export const createReportsService = () => {
   async function revenue(c: Context, { from, to, branchId }: ReportRange): Promise<RevenueReport> {
     const db = getDb(c);
     const { start, end } = tashkentRange(from, to);
-    const signed = sql<string>`COALESCE(SUM(CASE WHEN ${cashierTransactions.type} = 'refund' THEN -${cashierTransactions.paidAmount} ELSE ${cashierTransactions.paidAmount} END), 0)`;
 
     const base = [
       eq(cashierTransactions.status, 'completed'),
@@ -117,18 +118,18 @@ export const createReportsService = () => {
     const dayExpr = sql<string>`(${cashierTransactions.createdAt} AT TIME ZONE 'Asia/Tashkent')::date`;
 
     const [totalRow] = await db
-      .select({ total: signed })
+      .select({ total: signedPaidAmount })
       .from(cashierTransactions)
       .where(and(...base));
 
     const byBranch = await db
-      .select({ branchId: cashierTransactions.branchId, total: signed })
+      .select({ branchId: cashierTransactions.branchId, total: signedPaidAmount })
       .from(cashierTransactions)
       .where(and(...base))
       .groupBy(cashierTransactions.branchId);
 
     const byPeriod = await db
-      .select({ date: dayExpr, total: signed })
+      .select({ date: dayExpr, total: signedPaidAmount })
       .from(cashierTransactions)
       .where(and(...base))
       .groupBy(dayExpr);
@@ -155,13 +156,13 @@ export const createReportsService = () => {
 
     // byDoctor — plan-linked (treatment_plans.doctorId), plansiz → null
     const byDoctorPlan = await db
-      .select({ doctorId: treatmentPlans.doctorId, total: signed })
+      .select({ doctorId: treatmentPlans.doctorId, total: signedPaidAmount })
       .from(cashierTransactions)
       .innerJoin(treatmentPlans, eq(cashierTransactions.treatmentPlanId, treatmentPlans.id))
       .where(and(...base))
       .groupBy(treatmentPlans.doctorId);
     const [unassigned] = await db
-      .select({ total: signed })
+      .select({ total: signedPaidAmount })
       .from(cashierTransactions)
       .where(and(...base, isNull(cashierTransactions.treatmentPlanId)));
 
