@@ -1,4 +1,5 @@
-import { Badge, Button, Table, Text } from '@mantine/core';
+import { StatusPill } from '@dental/ui';
+import { Button, Table, Text } from '@mantine/core';
 import { IconArrowsExchange } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { formatQty } from '../stock.mappers';
@@ -51,25 +52,21 @@ export function StockItemsTable({
                 }
               }}
               style={{ cursor: 'pointer' }}
-              bg={selectedId === item.id ? 'var(--mantine-color-blue-light)' : undefined}
+              bg={selectedId === item.id ? 'var(--primary-soft)' : undefined}
             >
               <Table.Td>{item.name}</Table.Td>
               <Table.Td>{item.unit}</Table.Td>
               <Table.Td>
-                <Text fw={600} c={item.stockState === 'low' ? 'red' : undefined}>
+                <Text fw={600} c={item.stockState === 'low' ? 'var(--danger)' : undefined}>
                   {formatQty(item.quantity)}
                 </Text>
               </Table.Td>
               <Table.Td>{formatQty(item.minThreshold)}</Table.Td>
               <Table.Td>
                 {item.stockState === 'low' ? (
-                  <Badge color="red" size="sm">
-                    {t('stock.low')}
-                  </Badge>
+                  <StatusPill status="danger">{t('stock.low')}</StatusPill>
                 ) : (
-                  <Badge color="teal" size="sm" variant="light">
-                    {t('stock.ok')}
-                  </Badge>
+                  <StatusPill status="success">{t('stock.ok')}</StatusPill>
                 )}
               </Table.Td>
               <Table.Td>

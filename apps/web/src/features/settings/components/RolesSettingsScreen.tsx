@@ -1,5 +1,6 @@
 import type { Role } from '@dental/api-client';
-import { ActionIcon, Badge, Button, Group, Stack, Table, Text } from '@mantine/core';
+import { StatusPill } from '@dental/ui';
+import { ActionIcon, Button, Group, Stack, Table, Text } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconEdit, IconPlus, IconShieldCheck, IconTrash } from '@tabler/icons-react';
 import { useState } from 'react';
@@ -57,9 +58,9 @@ export function RolesSettingsScreen() {
                   </Table.Td>
                   <Table.Td>
                     {r.isSystem ? (
-                      <Badge color="blue">{t('roles.system')}</Badge>
+                      <StatusPill status="accent">{t('roles.system')}</StatusPill>
                     ) : (
-                      <Badge color="teal">{t('roles.custom')}</Badge>
+                      <StatusPill status="neutral">{t('roles.custom')}</StatusPill>
                     )}
                   </Table.Td>
                   <Table.Td>
