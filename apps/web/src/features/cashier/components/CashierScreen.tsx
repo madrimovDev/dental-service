@@ -1,13 +1,5 @@
 import { PageHead, StateView } from '@dental/ui';
-import {
-  Container,
-  Group,
-  Paper,
-  SegmentedControl,
-  Select,
-  SimpleGrid,
-  Stack,
-} from '@mantine/core';
+import { Box, Container, Flex, Group, Paper, SegmentedControl, Select, Stack } from '@mantine/core';
 import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth-store.ts';
@@ -67,7 +59,7 @@ export function CashierScreen() {
           }
         />
 
-        <Group align="flex-end" wrap="wrap">
+        <Group align="flex-end" gap="md" wrap="wrap">
           <Select
             label={t('cashier.patient')}
             placeholder={t('cashier.select_patient')}
@@ -88,39 +80,55 @@ export function CashierScreen() {
           />
         </Group>
 
-        <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="lg">
-          {/* LEFT: POS yoki plan billing */}
-          {canCreate &&
-            branchId &&
-            (mode === 'payment' ? (
-              <PosPanel
-                branchId={branchId}
-                patientId={patientId}
-                onDirtyChange={handlePosDirtyChange}
-              />
-            ) : (
-              <PlanBillingPanel branchId={branchId} patientId={patientId} />
-            ))}
-
-          {/* RIGHT: kunlik xulosa + tranzaksiyalar */}
-          <Stack gap="md">
-            {summaryQuery.data && <DailySummaryCard summary={summaryQuery.data} />}
-            <Paper withBorder p="lg" radius="md">
-              {txQuery.isLoading ? (
-                <StateView status="loading" skeleton="table" />
-              ) : txQuery.isError ? (
-                <StateView
-                  status="error"
-                  title={t('states.error_title')}
-                  retryLabel={t('states.retry')}
-                  onRetry={() => txQuery.refetch()}
+        {/* Dental OS 2-ustun layout: chap = POS/plan (1fr), o'ng = 360px stacked. */}
+        <Flex direction={{ base: 'column', lg: 'row' }} gap={16} align="flex-start">
+          {/* LEFT: POS yoki plan billing — minmax(0,1fr) ekvivalenti (miw=0). */}
+          <Box flex={1} miw={0} w={{ base: '100%', lg: 'auto' }}>
+            {canCreate &&
+              branchId &&
+              (mode === 'payment' ? (
+                <PosPanel
+                  branchId={branchId}
+                  patientId={patientId}
+                  onDirtyChange={handlePosDirtyChange}
                 />
               ) : (
-                <TransactionsTable transactions={txQuery.data?.data ?? []} />
-              )}
-            </Paper>
-          </Stack>
-        </SimpleGrid>
+                <PlanBillingPanel branchId={branchId} patientId={patientId} />
+              ))}
+          </Box>
+
+          {/* RIGHT (360px): kunlik xulosa + tranzaksiyalar */}
+          <Box w={{ base: '100%', lg: 360 }} style={{ flexShrink: 0 }}>
+            <Stack gap="md">
+              {summaryQuery.data && <DailySummaryCard summary={summaryQuery.data} />}
+              <Paper
+                p={0}
+                radius={16}
+                style={{
+                  border: '1px solid var(--border)',
+                  boxShadow: 'var(--shadow-sm)',
+                  overflow: 'hidden',
+                  fontFamily: 'var(--font-sans)',
+                }}
+              >
+                <Box p="18px">
+                  {txQuery.isLoading ? (
+                    <StateView status="loading" skeleton="table" />
+                  ) : txQuery.isError ? (
+                    <StateView
+                      status="error"
+                      title={t('states.error_title')}
+                      retryLabel={t('states.retry')}
+                      onRetry={() => txQuery.refetch()}
+                    />
+                  ) : (
+                    <TransactionsTable transactions={txQuery.data?.data ?? []} />
+                  )}
+                </Box>
+              </Paper>
+            </Stack>
+          </Box>
+        </Flex>
       </Stack>
     </Container>
   );

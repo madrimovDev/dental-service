@@ -1,5 +1,5 @@
 import type { CashierTransaction } from '@dental/api-client';
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderApp } from '../../../test-utils';
 import { TransactionsTable } from './TransactionsTable';
@@ -69,5 +69,27 @@ describe('TransactionsTable', () => {
     );
     expect(screen.getByText('Bekor qilingan')).toBeTruthy();
     expect(screen.getByText('Qaytarish')).toBeTruthy();
+  });
+
+  it("chek ko'rish tugmasi → ReceiptModal ochiladi (chek raqami + JAMI + NoOp footer)", async () => {
+    renderApp(
+      <TransactionsTable transactions={[tx({ receiptNumber: 'R-007', totalAmount: '120000' })]} />,
+    );
+
+    // Chek-ko'rish tugmasi bosiladi → modal dialog ochiladi.
+    fireEvent.click(screen.getByTestId('receipt-view-tx1'));
+    const dialog = await screen.findByRole('dialog');
+    const inDialog = within(dialog);
+
+    // Chek raqami header'da.
+    expect(inDialog.getByText(/R-007/)).toBeTruthy();
+    // JAMI summasi formatCurrency orqali (t('common.currency') = "so'm").
+    // Subtotal == total (chegirmasiz) → bir nechta marta, getAllByText.
+    expect(inDialog.getAllByText(/120\s?000\s?so'm/).length).toBeGreaterThan(0);
+    // NoOp fiskal footer mavjud (matn Task F i18n'dan keladi — strukturaviy tekshiruv,
+    // testid orqali — i18n landing'idan mustaqil yashil qoladi).
+    expect(inDialog.getByTestId('receipt-noop-footer')).toBeTruthy();
+    // Walk-in bemor (tarix VM'da ism yo'q → placeholder).
+    expect(inDialog.getByText('Bemorsiz (walk-in)')).toBeTruthy();
   });
 });

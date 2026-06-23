@@ -946,7 +946,9 @@
     "new_payment": "Yangi to'lov",
     "previous_balance": "Eski balans",
     "add_service": "Xizmat qo'shish",
-    "search_service": "Xizmatni qidirish...",
+    "search_service": "Xizmat qidirish yoki kod kiritish…",
+    "current_receipt": "Joriy chek",
+    "subtotal": "Oraliq jami",
     "discount": "Chegirma",
     "payment_method": "To'lov turi",
     "method": {
@@ -967,6 +969,15 @@
     "status": "Status",
     "receipt": "Chek raqami",
     "daily_summary": "Kunlik xulosa",
+    "cash_today": "Bugungi kassa",
+    "total_revenue": "Jami tushum",
+    "noop_fiscal": "Fiskal hujjat keyinroq Soliqqa yuboriladi",
+    "receipt_modal": {
+      "print": "Chop etish",
+      "close": "Yopish",
+      "total": "Jami",
+      "view": "Chekni ko'rish"
+    },
     "confirm_refund": "To'lovni qaytarishni tasdiqlaysizmi?",
     "type": {
       "refund": "Qaytarish",
