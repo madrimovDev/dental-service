@@ -8,8 +8,17 @@ vi.mock('../patients.api', () => ({
   useCreatePatient: () => ({ mutate: createMock, isPending: false }),
 }));
 
+const navigateMock = vi.fn();
+vi.mock('react-router-dom', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router-dom')>();
+  return { ...actual, useNavigate: () => navigateMock };
+});
+
 describe('PatientNewScreen', () => {
-  beforeEach(() => createMock.mockClear());
+  beforeEach(() => {
+    createMock.mockClear();
+    navigateMock.mockClear();
+  });
 
   it("form maydonlari + teg/manba/sug'urta ko'rsatadi", () => {
     renderApp(<PatientNewScreen />);
@@ -39,5 +48,22 @@ describe('PatientNewScreen', () => {
     // fullName '' → min(2) buziladi → form.errors.fullName → Input error render
     await vi.waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
     expect(createMock).not.toHaveBeenCalled();
+  });
+
+  it('back-link bosilsa /patients ga navigatsiya (DS2 additive)', () => {
+    renderApp(<PatientNewScreen />);
+    fireEvent.click(screen.getByTestId('back-link'));
+    expect(navigateMock).toHaveBeenCalledWith('/patients');
+  });
+
+  it('ism yozilganda checklist nuqtasi to‘ladi (DS2 presentational)', () => {
+    renderApp(<PatientNewScreen />);
+    const dot = screen.getByTestId('checklist-dot-name');
+    // boshida bo'sh → data-filled yo'q
+    expect(dot).not.toHaveAttribute('data-filled');
+    fireEvent.change(screen.getByLabelText("To'liq ism"), {
+      target: { value: 'Ali' },
+    });
+    expect(screen.getByTestId('checklist-dot-name')).toHaveAttribute('data-filled', 'true');
   });
 });

@@ -370,6 +370,21 @@
   "patients": {
     "title": "Пациенты",
     "create": "Новый пациент",
+    "count": "{{count}} пациентов",
+    "filter": {
+      "all": "Все",
+      "archived": "Архив"
+    },
+    "col": {
+      "patient": "Пациент",
+      "phone": "Телефон",
+      "age_gender": "Возраст · пол",
+      "balance": "Баланс"
+    },
+    "empty_title": "В этом разделе нет пациентов",
+    "empty_desc": "Выберите другой фильтр или добавьте нового пациента",
+    "balance_paid": "Оплачено",
+    "back_to_list": "‹ Список пациентов",
     "search_placeholder": "Поиск по ФИО, телефону или паспорту...",
     "show_archived": "Архивные",
     "empty": "Нет пациентов",
@@ -466,7 +481,16 @@
       "insurance_active": "Страховка активна",
       "coverage_dental": "Стоматологическое",
       "coverage_general": "Общее",
-      "coverage_other": "Другое"
+      "coverage_other": "Другое",
+      "section_personal": "Личные данные",
+      "section_contact": "Контакты",
+      "section_extra": "Дополнительная информация",
+      "sub_personal": "Основные личные данные пациента",
+      "sub_contact": "Телефон и адрес",
+      "sub_extra": "Паспорт, примечание, теги и страховка",
+      "checklist_title": "Обязательно к заполнению",
+      "checklist_name": "Имя",
+      "checklist_phone": "Телефон"
     },
     "insurance_status": {
       "active": "Активна",
