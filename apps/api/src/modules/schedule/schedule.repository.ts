@@ -159,6 +159,73 @@ export const createScheduleRepository = () => {
       );
   }
 
+  // ─── branch-wide availability inputs (DS4) ────────────────────────────────
+  // Filialdagi BARCHA doktorlar uchun bir kunlik availability bir necha
+  // so'rovda (per-doktor N+1 emas) — service xotirada doctorId bo'yicha guruh-
+  // laydi va har biri uchun `computeAvailability` chaqiradi.
+
+  /** Filial+weekday uchun barcha doktorlarning aktiv segmentlari. */
+  async function listBranchActiveSegmentsForDay(c: Context, branchId: string, weekday: number) {
+    const db = getDb(c);
+    return db
+      .select()
+      .from(doctorSchedules)
+      .where(
+        and(
+          eq(doctorSchedules.branchId, branchId),
+          eq(doctorSchedules.weekday, weekday),
+          eq(doctorSchedules.isActive, true),
+        ),
+      );
+  }
+
+  /** Filialdagi [start,end) oraliq appointmentlari (cancelled tashqari), doctorId bilan. */
+  async function listBranchAppointments(c: Context, branchId: string, start: Date, end: Date) {
+    const db = getDb(c);
+    return db
+      .select({
+        doctorId: appointments.doctorId,
+        startAt: appointments.startTime,
+        endAt: appointments.endTime,
+      })
+      .from(appointments)
+      .where(
+        and(
+          eq(appointments.branchId, branchId),
+          ne(appointments.status, 'cancelled' as const),
+          lt(appointments.startTime, end),
+          gte(appointments.endTime, start),
+        ),
+      );
+  }
+
+  /**
+   * Filialdagi [start,end) bilan kesishgan time-off'lar, doctorId bilan.
+   * branchId null (barcha filial) YOKI berilgan filialga teng.
+   */
+  async function listBranchOverlappingTimeOff(
+    c: Context,
+    branchId: string,
+    start: Date,
+    end: Date,
+  ) {
+    const db = getDb(c);
+    return db
+      .select({
+        doctorId: doctorTimeOff.doctorId,
+        startAt: doctorTimeOff.startAt,
+        endAt: doctorTimeOff.endAt,
+      })
+      .from(doctorTimeOff)
+      .where(
+        and(
+          or(isNull(doctorTimeOff.branchId), eq(doctorTimeOff.branchId, branchId)),
+          lt(doctorTimeOff.startAt, end),
+          gte(doctorTimeOff.endAt, start),
+        ),
+      );
+  }
+
   /** Instant [start,end) bilan kesishgan time-off bormi (guard uchun). */
   async function hasOverlappingTimeOff(
     c: Context,
@@ -197,6 +264,9 @@ export const createScheduleRepository = () => {
     listDoctorAppointments,
     listOverlappingTimeOff,
     listActiveSegmentsForDay,
+    listBranchActiveSegmentsForDay,
+    listBranchAppointments,
+    listBranchOverlappingTimeOff,
     hasOverlappingTimeOff,
   };
 };

@@ -133,3 +133,39 @@ export const availabilityDtoSchema = z
   })
   .openapi('Availability');
 export type AvailabilityDto = z.infer<typeof availabilityDtoSchema>;
+
+// ─── Branch-wide availability (DS4 — right-rail "Bo'sh slot") ────────────────
+// Doctor tanlamasdan, berilgan kun uchun filialdagi BARCHA doktorlarning bo'sh
+// slotlari. Single-doctor `getAvailability` ustiga qurilgan — har doktor uchun
+// `computeAvailability` qayta ishlatiladi (migration yo'q; mavjud data'dan).
+
+export const branchAvailabilityQuerySchema = z.object({
+  branchId: z.uuid(),
+  /** Klinika-local kalendar kuni "YYYY-MM-DD". */
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD format kutilgan')
+    .openapi({ example: '2026-06-22' }),
+  slotMinutes: z.coerce.number().int().min(5).max(480).default(30),
+});
+export type BranchAvailabilityQuery = z.infer<typeof branchAvailabilityQuerySchema>;
+
+/** Bitta doktorning shu kundagi bo'sh slotlari (branch-wide javob ichida). */
+export const doctorAvailabilityDtoSchema = z
+  .object({
+    doctorId: z.uuid(),
+    slots: z.array(availabilitySlotDtoSchema),
+  })
+  .openapi('DoctorAvailability');
+export type DoctorAvailabilityDto = z.infer<typeof doctorAvailabilityDtoSchema>;
+
+export const branchAvailabilityDtoSchema = z
+  .object({
+    branchId: z.uuid(),
+    date: z.string().openapi({ example: '2026-06-22' }),
+    slotMinutes: z.number().int().openapi({ example: 30 }),
+    /** Faqat shu hafta-kunida aktiv ish-soati bor doktorlar (doctorId bo'yicha tartiblangan). */
+    doctors: z.array(doctorAvailabilityDtoSchema),
+  })
+  .openapi('BranchAvailability');
+export type BranchAvailabilityDto = z.infer<typeof branchAvailabilityDtoSchema>;
