@@ -2,6 +2,7 @@ import type { CreateAppointmentBody } from '@dental/api-client';
 import {
   cancelAppointment,
   createAppointment,
+  getBranchAvailability,
   listAppointments,
   listBranches,
   listDoctors,
@@ -47,6 +48,32 @@ export function useBranches() {
   return useQuery({
     queryKey: lookupKeys.branches(),
     queryFn: () => listBranches().then((r) => r.data),
+  });
+}
+
+/**
+ * Filial bo'sh slotlari — `GET /schedule/availability/branch` (DS12 regen,
+ * `schedule.view`). Right-rail "Bo'sh slot" kartasi uchun: tanlangan kun +
+ * filialdagi barcha doktorlarning bo'sh oynalari. `slotMinutes` jo'natilmaydi
+ * (backend default). `enabled` — filial tanlangan VA chaqiruvchi `schedule.view`
+ * ruxsatiga ega bo'lganda (gating CalendarScreen'da, 403 oldini olish — CLI-153).
+ */
+export function useBranchAvailability(params: {
+  branchId: string | null;
+  date: string;
+  enabled: boolean;
+}) {
+  const enabled = params.enabled && !!params.branchId;
+  return useQuery({
+    queryKey: appointmentKeys.branchAvailability({
+      branchId: params.branchId ?? '',
+      date: params.date,
+    }),
+    enabled,
+    queryFn: () =>
+      getBranchAvailability({ branchId: params.branchId as string, date: params.date }).then(
+        (r) => r.data,
+      ),
   });
 }
 
