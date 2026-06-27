@@ -48,6 +48,8 @@ export const serviceDtoSchema = z
     nameUz: z.string().openapi({ example: "Plomba qo'yish" }),
     nameRu: z.string().nullable().openapi({ example: 'Пломбирование' }),
     category: z.string().nullable().openapi({ example: 'Terapevtika' }),
+    categoryId: z.uuid().nullable().openapi({ example: null }),
+    categoryNameRu: z.string().nullable().openapi({ example: null }),
     durationMinutes: z.number().int().openapi({ example: 30 }),
     requiredRole: z.string().nullable().openapi({ example: 'doctor' }),
     descriptionUz: z.string().nullable().openapi({ example: null }),

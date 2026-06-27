@@ -39,6 +39,7 @@ import {
   queueTickets,
   recallLogs,
   recalls,
+  serviceCategories,
   serviceMaterials,
   servicePrices,
   services,
@@ -385,6 +386,18 @@ async function seed() {
     },
   ];
   if ((await count(services)) < 1) {
+    // Insert distinct categories first (services.category_id FK requires them)
+    const uniqueCatNames = [...new Set(svc.map((s) => s.category))];
+    await db
+      .insert(serviceCategories)
+      .values(uniqueCatNames.map((name) => ({ tenantId: TENANT_ID, name })))
+      .onConflictDoNothing();
+    const catRows = await db
+      .select({ id: serviceCategories.id, name: serviceCategories.name })
+      .from(serviceCategories)
+      .where(eq(serviceCategories.tenantId, TENANT_ID));
+    const catId = Object.fromEntries(catRows.map((r) => [r.name, r.id]));
+
     for (const s of svc) {
       await db.insert(services).values({
         id: s.sid,
@@ -392,7 +405,7 @@ async function seed() {
         code: s.code,
         nameUz: s.nameUz,
         nameRu: s.nameRu,
-        // category: s.category, // TODO(task-3): migrate to categoryId FK
+        categoryId: catId[s.category],
         durationMinutes: s.dur,
         isActive: true,
       });
@@ -407,7 +420,9 @@ async function seed() {
         });
       }
     }
-    console.log(`  ✓ services: +${svc.length}, service_prices: +${svc.length * 2}`);
+    console.log(
+      `  ✓ service_categories: +${uniqueCatNames.length}, services: +${svc.length}, service_prices: +${svc.length * 2}`,
+    );
   } else {
     console.log('  · services: already seeded, skip');
   }

@@ -1,14 +1,22 @@
 import type { Service, ServicePrice } from '@dental/db-schema';
 import type { ServiceDto, ServicePriceDto, ServiceWithPricesDto } from './services.schema.ts';
 
+/** services + LEFT JOIN service_categories natija qatori. */
+export type ServiceRow = Omit<Service, never> & {
+  categoryName: string | null;
+  categoryNameRu: string | null;
+};
+
 /** DB row → Service wire DTO (Date timestamps → ISO strings, nullable fields preserved). */
-export const toServiceDto = (row: Service): ServiceDto => ({
+export const toServiceDto = (row: ServiceRow): ServiceDto => ({
   id: row.id,
   tenantId: row.tenantId,
   code: row.code,
   nameUz: row.nameUz,
   nameRu: row.nameRu ?? null,
-  category: null, // TODO(task-3): join service_categories to resolve name
+  category: row.categoryName ?? null,
+  categoryId: row.categoryId ?? null,
+  categoryNameRu: row.categoryNameRu ?? null,
   durationMinutes: row.durationMinutes,
   requiredRole: row.requiredRole ?? null,
   descriptionUz: row.descriptionUz ?? null,
@@ -37,7 +45,7 @@ export const toServicePriceDto = (row: ServicePrice): ServicePriceDto => ({
 
 /** Service row + prices array → ServiceWithPrices wire DTO. */
 export const toServiceWithPricesDto = (
-  row: Service,
+  row: ServiceRow,
   prices: ServicePrice[],
 ): ServiceWithPricesDto => ({
   ...toServiceDto(row),

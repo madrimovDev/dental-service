@@ -6,6 +6,7 @@ import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openap
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
+import { createServiceCategoriesService } from '../service-categories/service-categories.service.ts';
 import { toServiceDto, toServicePriceDto, toServiceWithPricesDto } from './services.mapper.ts';
 import {
   createServiceSchema,
@@ -32,7 +33,8 @@ export const serviceRoutes = (deps: { db: Database; audit: AuditLogger }) => {
   app.use('*', authMiddleware());
   app.use('*', rlsMiddleware(deps.db));
 
-  const service = createServicesService({ audit: deps.audit });
+  const categories = createServiceCategoriesService({ audit: deps.audit });
+  const service = createServicesService({ audit: deps.audit, categories });
 
   // ─── GET / — list ─────────────────────────────────────────────────────────
 
