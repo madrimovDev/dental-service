@@ -28,10 +28,10 @@ describe('NAV_GROUPS 3-guruh superset', () => {
     expect(keys).toContain('audit');
     expect(new Set(keys).size).toBe(keys.length); // dublikat yo'q
   });
-  it("owner barcha disabled-future elementni ko'radi", () => {
+  it("owner barcha element + LIVE klinik ro'yxatlarni ko'radi", () => {
     const groups = visibleGroups(ALL, 'dental', true);
     const keys = groups.flatMap((g) => g.items.map((i) => i.key));
-    expect(keys).toContain('plans'); // disabled-future
+    expect(keys).toContain('plans'); // DS7: LIVE, medical_record.view bilan gated
   });
 });
 
@@ -84,8 +84,8 @@ describe('nav-config', () => {
   });
 
   it("bo'sh guruh yashirin", () => {
-    // hech qanday ruxsat yo'q va owner emas; "Klinika" guruhida faqat FUTURE (disabled) va
-    // permission-gated LIVE element bor (plans/lab/rx=disabled-owner; schedule/recalls=perm)
+    // hech qanday ruxsat yo'q va owner emas; "Klinika" guruhida plans/lab/schedule/recalls=
+    // permission-gated LIVE (DS7'da plans/lab enable), rx=FUTURE (disabled-owner)
     // → barchasi yashirin → klinika guruhi yo'q
     const groups = visibleGroups(() => false);
     expect(groups.find((g) => g.labelKey === 'nav.group.klinika')).toBeUndefined();
@@ -97,7 +97,7 @@ describe('nav-config', () => {
     expect(items.find((i) => i.key === 'roles')).toBeDefined();
   });
 
-  // lab — FUTURE (disabled) + feature-gated; feature gatesini ajratish uchun isOwner=true
+  // lab — LIVE (lab_order.view) + feature-gated; has=()=>true → perm o'tadi, feature gate qoladi
   it("vertical 'general' → labOrders nav element tushadi", () => {
     const items = visibleGroups(() => true, 'general', true).flatMap((g) => g.items);
     expect(items.find((i) => i.key === 'lab')).toBeUndefined();

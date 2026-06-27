@@ -24,9 +24,11 @@ import type {
   DiagnosisOptionVM,
   EstimateStageVM,
   EstimateVM,
+  LabOrderListRowVM,
   LabOrderVM,
   PatientImageVM,
   PlanCardVM,
+  PlanListRowVM,
   PrescriptionVM,
   StageRowVM,
   Tone,
@@ -183,6 +185,21 @@ export function toPlanCardVM(plan: TreatmentPlan): PlanCardVM {
   };
 }
 
+// DS7: tenant-wide reja qatori (ism alohida hal qilinadi — list javobida yo'q).
+export function toPlanListRowVM(plan: TreatmentPlan): PlanListRowVM {
+  return {
+    id: plan.id,
+    patientId: plan.patientId,
+    title: plan.title,
+    status: plan.status,
+    statusTone: PLAN_TONE[plan.status],
+    statusLabelKey: `treatment_plan.status_${plan.status}`,
+    totalCostText: formatNumber(Number(plan.totalCost)),
+    totalVisits: plan.totalVisits,
+    updatedAtText: dt(plan.updatedAt),
+  };
+}
+
 export function toStageRowVM(stage: TreatmentStage): StageRowVM {
   return {
     id: stage.id,
@@ -289,6 +306,24 @@ const LAB_TONE: Record<LabOrderStatus, Tone> = {
 };
 
 export const labOrderStatusToTone = (s: LabOrderStatus): Tone => LAB_TONE[s];
+
+// DS7: tenant-wide lab buyurtma qatori (ism alohida hal qilinadi).
+export function toLabOrderListRowVM(order: LabOrder): LabOrderListRowVM {
+  return {
+    id: order.id,
+    patientId: order.patientId,
+    orderNumber: order.orderNumber,
+    labName: order.labName,
+    orderType: order.orderType,
+    typeLabelKey: `lab_order.type_${order.orderType}`,
+    status: order.status,
+    statusTone: LAB_TONE[order.status],
+    statusLabelKey: `lab_order.status_${order.status}`,
+    costText: order.cost ? formatNumber(Number(order.cost)) : null,
+    currency: order.currency,
+    expectedDateText: order.expectedDate ? dt(order.expectedDate) : null,
+  };
+}
 
 export function toLabOrderVM(order: LabOrder): LabOrderVM {
   return {

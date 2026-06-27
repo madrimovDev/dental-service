@@ -4,6 +4,8 @@ import {
   isOverdue,
   localToday,
   recallReasonLabelKey,
+  recallSmsStatusLabelKey,
+  recallSmsStatusTone,
   recallStatusLabelKey,
 } from './recalls.mappers';
 
@@ -39,6 +41,32 @@ describe('label key derivation', () => {
   it('reason → recall.reason.<reason>', () => {
     expect(recallReasonLabelKey('manual')).toBe('recall.reason.manual');
     expect(recallReasonLabelKey('treatment_followup')).toBe('recall.reason.treatment_followup');
+  });
+});
+
+describe('recallSmsStatusLabelKey', () => {
+  it('ma’lum holat → recall.sms_status.<status>', () => {
+    expect(recallSmsStatusLabelKey('sent')).toBe('recall.sms_status.sent');
+    expect(recallSmsStatusLabelKey('replied')).toBe('recall.sms_status.replied');
+  });
+  it('null → recall.sms_status.none', () => {
+    expect(recallSmsStatusLabelKey(null)).toBe('recall.sms_status.none');
+  });
+  it("noma'lum qiymat → none (kalit injeksiyasidan himoya)", () => {
+    expect(recallSmsStatusLabelKey('weird')).toBe('recall.sms_status.none');
+  });
+});
+
+describe('recallSmsStatusTone', () => {
+  it('holatlar mos tonga maplanadi', () => {
+    expect(recallSmsStatusTone('sent')).toBe('success');
+    expect(recallSmsStatusTone('replied')).toBe('info');
+    expect(recallSmsStatusTone('pending')).toBe('warning');
+    expect(recallSmsStatusTone('failed')).toBe('danger');
+  });
+  it('null/noma’lum → neutral', () => {
+    expect(recallSmsStatusTone(null)).toBe('neutral');
+    expect(recallSmsStatusTone('weird')).toBe('neutral');
   });
 });
 
