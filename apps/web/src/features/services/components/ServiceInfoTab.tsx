@@ -1,6 +1,15 @@
-import { NumberInput, Select, Stack, Switch, Textarea, TextInput } from '@mantine/core';
+import {
+  Autocomplete,
+  NumberInput,
+  Select,
+  Stack,
+  Switch,
+  Textarea,
+  TextInput,
+} from '@mantine/core';
 import type { UseFormReturnType } from '@mantine/form';
 import { useTranslation } from 'react-i18next';
+import { useServiceCategories } from '@/features/service-categories';
 import type { ServiceFormValues } from '../services.types';
 
 export function ServiceInfoTab({
@@ -11,6 +20,8 @@ export function ServiceInfoTab({
   isEditing: boolean;
 }) {
   const { t } = useTranslation();
+  const categories = useServiceCategories();
+  const categoryData = (categories.data ?? []).map((c) => c.name);
 
   const roleOptions = [
     { value: '', label: t('services.role_none') },
@@ -27,9 +38,10 @@ export function ServiceInfoTab({
         disabled={isEditing}
         {...form.getInputProps('code')}
       />
-      <TextInput
+      <Autocomplete
         label={t('services.category')}
         placeholder={t('services.category_placeholder')}
+        data={categoryData}
         {...form.getInputProps('category')}
       />
       <TextInput label={t('services.name_uz')} required {...form.getInputProps('nameUz')} />
