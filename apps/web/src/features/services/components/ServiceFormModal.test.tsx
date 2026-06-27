@@ -20,6 +20,8 @@ const editing = {
   nameUz: 'Plomba',
   nameRu: null,
   category: 'Terapevtika',
+  categoryId: null,
+  categoryNameRu: null,
   durationMinutes: 30,
   requiredRole: null,
   descriptionUz: null,

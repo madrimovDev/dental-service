@@ -204,6 +204,8 @@ export type {
   CreateRoleBody,
   CreateService201,
   CreateServiceBody,
+  CreateServiceCategory201,
+  CreateServiceCategoryBody,
   CreateTimeOff,
   CreateTimeOff201,
   CreateToothChart201,
@@ -222,6 +224,7 @@ export type {
   DeletePrescription200,
   DeleteRole200,
   DeleteService200,
+  DeleteServiceCategory200,
   DeleteTimeOff200,
   DeleteUserAssignment200,
   DentalAnalyticsReport,
@@ -288,6 +291,7 @@ export type {
   ListRecallsParams,
   ListRecallsStatus,
   ListRoles200,
+  ListServiceCategories200,
   ListServices200,
   ListTimeOff200,
   ListTimeOffParams,
@@ -342,6 +346,8 @@ export type {
   RolePermissionsResult,
   RoleWithPermissions,
   Service,
+  ServiceCategory,
+  ServiceCategoryDeleteResult,
   ServiceDeleteResult,
   ServiceMaterial,
   ServicePrice,
@@ -417,6 +423,8 @@ export type {
   UpdateRoleBody,
   UpdateService200,
   UpdateServiceBody,
+  UpdateServiceCategory200,
+  UpdateServiceCategoryBody,
   UpdateTenant200,
   UpdateTenantBody,
   UpdateTenantBodyDefaultLanguage,
@@ -621,6 +629,19 @@ export {
   listTimeOff,
   putDoctorWorkingHours,
 } from './generated/schedule/schedule.ts';
+// Generated (orval) — service-categories
+export type {
+  CreateServiceCategoryResult,
+  DeleteServiceCategoryResult,
+  ListServiceCategoriesResult,
+  UpdateServiceCategoryResult,
+} from './generated/service-categories/service-categories.ts';
+export {
+  createServiceCategory,
+  deleteServiceCategory,
+  listServiceCategories,
+  updateServiceCategory,
+} from './generated/service-categories/service-categories.ts';
 // Generated (orval) — services
 export type {
   CreateServiceResult,

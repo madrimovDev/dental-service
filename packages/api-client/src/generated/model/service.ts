@@ -14,6 +14,10 @@ export interface Service {
   nameRu: string | null;
   /** @nullable */
   category: string | null;
+  /** @nullable */
+  categoryId: string | null;
+  /** @nullable */
+  categoryNameRu: string | null;
   durationMinutes: number;
   /** @nullable */
   requiredRole: string | null;
