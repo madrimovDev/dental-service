@@ -18,6 +18,8 @@ export function toStockItemVM(item: StockItemWithLowStock): StockItemVM {
     branchId: item.branchId,
     name: item.name,
     unit: item.unit,
+    category: item.category,
+    price: item.price == null ? null : Number(item.price),
     quantity: Number(item.quantity),
     minThreshold: Number(item.minThreshold),
     lowStock: item.lowStock,

@@ -14,6 +14,8 @@ function vm(over: Partial<StockItemVM> = {}): StockItemVM {
     branchId: 'b1',
     name: 'Anesteziya',
     unit: 'ml',
+    category: null,
+    price: null,
     quantity: 12,
     minThreshold: 5,
     lowStock: false,

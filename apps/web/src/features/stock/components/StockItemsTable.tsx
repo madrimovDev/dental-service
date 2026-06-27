@@ -2,6 +2,7 @@ import { StatusPill } from '@dental/ui';
 import { Button, Table, Text } from '@mantine/core';
 import { IconArrowsExchange } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
+import { formatCurrency } from '@/lib/format.ts';
 import { formatQty } from '../stock.mappers';
 import type { StockItemVM } from '../stock.types';
 
@@ -32,9 +33,11 @@ export function StockItemsTable({
         <Table.Thead>
           <Table.Tr>
             <Table.Th>{t('stock.item_name')}</Table.Th>
+            <Table.Th>{t('stock.category')}</Table.Th>
             <Table.Th>{t('stock.unit')}</Table.Th>
             <Table.Th>{t('stock.quantity')}</Table.Th>
             <Table.Th>{t('stock.min_threshold')}</Table.Th>
+            <Table.Th>{t('stock.price')}</Table.Th>
             <Table.Th>{t('stock.status')}</Table.Th>
             <Table.Th />
           </Table.Tr>
@@ -55,6 +58,7 @@ export function StockItemsTable({
               bg={selectedId === item.id ? 'var(--primary-soft)' : undefined}
             >
               <Table.Td>{item.name}</Table.Td>
+              <Table.Td>{item.category ?? <Text c="dimmed">—</Text>}</Table.Td>
               <Table.Td>{item.unit}</Table.Td>
               <Table.Td>
                 <Text fw={600} c={item.stockState === 'low' ? 'var(--danger)' : undefined}>
@@ -62,6 +66,9 @@ export function StockItemsTable({
                 </Text>
               </Table.Td>
               <Table.Td>{formatQty(item.minThreshold)}</Table.Td>
+              <Table.Td>
+                {item.price == null ? <Text c="dimmed">—</Text> : formatCurrency(item.price, t)}
+              </Table.Td>
               <Table.Td>
                 {item.stockState === 'low' ? (
                   <StatusPill status="danger">{t('stock.low')}</StatusPill>
