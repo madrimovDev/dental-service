@@ -674,7 +674,17 @@
     "consent_signature_url": "Ссылка на подпись (необязательно)",
     "financial_summary": "Финансовая сводка",
     "total_plan": "Итого по плану",
-    "pdf_consent": "PDF плана · согласие"
+    "pdf_consent": "PDF плана · согласие",
+    "list": {
+      "title": "Планы лечения",
+      "subtitle": "Планы по всем пациентам",
+      "search": "Поиск по пациенту или плану",
+      "filter_status": "По статусу",
+      "all_status": "Все статусы",
+      "empty": "Планы лечения не найдены",
+      "col_patient": "Пациент",
+      "col_updated": "Обновлён"
+    }
   },
   "visit_note": {
     "title": "Записи визитов",
@@ -824,7 +834,18 @@
     "notes": "Заметки",
     "save": "Сохранить",
     "empty": "Заказов нет",
-    "teeth_inline": "зуб: {{teeth}}"
+    "teeth_inline": "зуб: {{teeth}}",
+    "list": {
+      "title": "Лабораторные заказы",
+      "subtitle": "Заказы по всем пациентам",
+      "search": "Поиск по пациенту или лаборатории",
+      "filter_status": "По статусу",
+      "all_status": "Все статусы",
+      "empty": "Заказы не найдены",
+      "col_number": "№",
+      "col_patient": "Пациент",
+      "col_expected": "Ожидаемая дата"
+    }
   },
   "image": {
     "title": "Снимки пациента",
@@ -1208,7 +1229,9 @@
     "bom_service": "Услуга",
     "bom_empty": "Для этой услуги материалы не заданы",
     "material": "Материал",
-    "qty_per_service": "Количество на услугу"
+    "qty_per_service": "Количество на услугу",
+    "category": "Категория",
+    "price": "Цена"
   },
   "payroll": {
     "title": "Зарплата",
@@ -1282,6 +1305,14 @@
       "scheduled": "Записан",
       "overdue": "Просрочен",
       "efficacy": "Эффективность"
+    },
+    "sms_status": {
+      "label": "Статус SMS",
+      "sent": "Отправлено",
+      "pending": "Ожидание",
+      "failed": "Не отправлено",
+      "replied": "Получен ответ",
+      "none": "—"
     }
   }
 }

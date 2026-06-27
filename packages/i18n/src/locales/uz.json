@@ -674,7 +674,17 @@
     "consent_signature_url": "Imzo havolasi (ixtiyoriy)",
     "financial_summary": "Moliyaviy xulosa",
     "total_plan": "Jami reja",
-    "pdf_consent": "Reja PDF · konsent"
+    "pdf_consent": "Reja PDF · konsent",
+    "list": {
+      "title": "Davolash rejalari",
+      "subtitle": "Barcha bemorlar bo'yicha rejalar",
+      "search": "Bemor yoki reja bo'yicha qidirish",
+      "filter_status": "Status bo'yicha",
+      "all_status": "Barcha statuslar",
+      "empty": "Davolash rejalari topilmadi",
+      "col_patient": "Bemor",
+      "col_updated": "Yangilangan"
+    }
   },
   "visit_note": {
     "title": "Vizit yozuvlari",
@@ -824,7 +834,18 @@
     "notes": "Eslatma",
     "save": "Saqlash",
     "empty": "Buyurtmalar yo'q",
-    "teeth_inline": "tish: {{teeth}}"
+    "teeth_inline": "tish: {{teeth}}",
+    "list": {
+      "title": "Laboratoriya buyurtmalari",
+      "subtitle": "Barcha bemorlar bo'yicha buyurtmalar",
+      "search": "Bemor yoki laboratoriya bo'yicha qidirish",
+      "filter_status": "Status bo'yicha",
+      "all_status": "Barcha statuslar",
+      "empty": "Buyurtmalar topilmadi",
+      "col_number": "№",
+      "col_patient": "Bemor",
+      "col_expected": "Kutilgan sana"
+    }
   },
   "image": {
     "title": "Bemor rasmlari",
@@ -1208,7 +1229,9 @@
     "bom_service": "Xizmat",
     "bom_empty": "Bu xizmat uchun materiallar belgilanmagan",
     "material": "Material",
-    "qty_per_service": "Xizmatga miqdor"
+    "qty_per_service": "Xizmatga miqdor",
+    "category": "Kategoriya",
+    "price": "Narx"
   },
   "payroll": {
     "title": "Ish haqi",
@@ -1282,6 +1305,14 @@
       "scheduled": "Yozilgan",
       "overdue": "Muddati o'tgan",
       "efficacy": "Samaradorlik"
+    },
+    "sms_status": {
+      "label": "SMS holati",
+      "sent": "Yuborildi",
+      "pending": "Kutilmoqda",
+      "failed": "Yuborilmadi",
+      "replied": "Javob keldi",
+      "none": "—"
     }
   }
 }
