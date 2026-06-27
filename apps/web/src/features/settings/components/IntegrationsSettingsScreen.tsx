@@ -1,5 +1,6 @@
+import type { TenantSettings } from '@dental/api-client';
 import { StatusPill } from '@dental/ui';
-import { Button } from '@mantine/core';
+import { Button, Loader } from '@mantine/core';
 import {
   type Icon,
   IconBrandTelegram,
@@ -8,136 +9,152 @@ import {
   IconReceiptTax,
 } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
+import { useTenantSettings } from '../settings.api';
 import { SettingsShell } from './SettingsShell';
 
+/**
+ * Integratsiya kartalari. Holat (`connected`) backend
+ * `tenant_settings.integration_settings` JSONB'dan o'qiladi (GET): `eskiz`/`telegram`
+ * provayderlari uchun `enabled`. `soliq`/`onec` hali backend-tomondan boshqarilmaydi
+ * (scaffold — Faza 3 jonli faollashtirish), shu sabab doimo «Ulanmagan».
+ *
+ * Connect/Configure tugmalari scaffold (maxfiy cred yig'ish + faollashtirish Faza 3'da) —
+ * backend hech qachon sirlarni qaytarmaydi, shuning uchun holat faqat GET'dan keladi.
+ */
 type IntegrationCard = {
   id: string;
   nameKey: string;
   descKey: string;
   icon: Icon;
-  connected: boolean;
+  /** `integration_settings` ichidagi provayder kaliti; yo'q bo'lsa — scaffold (doim off). */
+  provider?: keyof TenantSettings['integrationSettings'];
 };
 
-// DS12 deferred — statik chrome. Hech qanday hook/API/persist YO'Q.
-// Real ulanish/holat backend DS12'ga defer qilingan.
 const CARDS: IntegrationCard[] = [
   {
     id: 'eskiz',
     nameKey: 'settings.integration_eskiz_name',
     descKey: 'settings.integration_eskiz_desc',
     icon: IconMessage,
-    connected: true,
+    provider: 'eskiz',
   },
   {
     id: 'telegram',
     nameKey: 'settings.integration_telegram_name',
     descKey: 'settings.integration_telegram_desc',
     icon: IconBrandTelegram,
-    connected: true,
+    provider: 'telegram',
   },
   {
     id: 'soliq',
     nameKey: 'settings.integration_soliq_name',
     descKey: 'settings.integration_soliq_desc',
     icon: IconReceiptTax,
-    connected: false,
   },
   {
     id: 'onec',
     nameKey: 'settings.integration_onec_name',
     descKey: 'settings.integration_onec_desc',
     icon: IconFileSpreadsheet,
-    connected: false,
   },
 ];
 
 export function IntegrationsSettingsScreen() {
   const { t } = useTranslation();
+  const settings = useTenantSettings();
+  const integrations = settings.data?.integrationSettings;
 
   return (
     <SettingsShell active="integrations">
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(2, 1fr)',
-          gap: 14,
-        }}
-      >
-        {CARDS.map((card) => {
-          const Icon = card.icon;
-          return (
-            <div
-              key={card.id}
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 12,
-                borderRadius: 16,
-                padding: 18,
-                border: '1px solid var(--border)',
-                background: 'var(--surface)',
-                boxShadow: 'var(--shadow-sm)',
-              }}
-            >
+      {settings.isLoading || !integrations ? (
+        <div style={{ padding: 24 }}>
+          <Loader size="sm" />
+        </div>
+      ) : (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(2, 1fr)',
+            gap: 14,
+          }}
+        >
+          {CARDS.map((card) => {
+            const Icon = card.icon;
+            const connected = card.provider ? integrations[card.provider].enabled : false;
+            return (
               <div
+                key={card.id}
                 style={{
                   display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
+                  flexDirection: 'column',
                   gap: 12,
+                  borderRadius: 16,
+                  padding: 18,
+                  border: '1px solid var(--border)',
+                  background: 'var(--surface)',
+                  boxShadow: 'var(--shadow-sm)',
                 }}
               >
                 <div
                   style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 10,
-                    background: 'var(--surface-2)',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'var(--ink-2)',
-                    flexShrink: 0,
+                    justifyContent: 'space-between',
+                    gap: 12,
                   }}
                 >
-                  <Icon size={20} stroke={1.6} />
+                  <div
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 10,
+                      background: 'var(--surface-2)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'var(--ink-2)',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Icon size={20} stroke={1.6} />
+                  </div>
+                  <StatusPill status={connected ? 'success' : 'neutral'}>
+                    {connected
+                      ? t('settings.integration_status_connected')
+                      : t('settings.integration_status_off')}
+                  </StatusPill>
                 </div>
-                <StatusPill status={card.connected ? 'success' : 'neutral'}>
-                  {card.connected
-                    ? t('settings.integration_status_connected')
-                    : t('settings.integration_status_off')}
-                </StatusPill>
-              </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>
-                  {t(card.nameKey)}
-                </span>
-                <span style={{ fontSize: 12.5, color: 'var(--ink-3)', lineHeight: 1.4 }}>
-                  {t(card.descKey)}
-                </span>
-              </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>
+                    {t(card.nameKey)}
+                  </span>
+                  <span style={{ fontSize: 12.5, color: 'var(--ink-3)', lineHeight: 1.4 }}>
+                    {t(card.descKey)}
+                  </span>
+                </div>
 
-              {card.connected ? (
-                <Button variant="outline" size="xs" style={{ alignSelf: 'flex-start' }}>
-                  {t('settings.integration_configure')}
-                </Button>
-              ) : (
-                <Button
-                  size="xs"
-                  style={{
-                    alignSelf: 'flex-start',
-                    background: 'var(--primary)',
-                    color: 'var(--on-primary)',
-                  }}
-                >
-                  {t('settings.integration_connect')}
-                </Button>
-              )}
-            </div>
-          );
-        })}
-      </div>
+                {connected ? (
+                  <Button variant="outline" size="xs" style={{ alignSelf: 'flex-start' }}>
+                    {t('settings.integration_configure')}
+                  </Button>
+                ) : (
+                  <Button
+                    size="xs"
+                    style={{
+                      alignSelf: 'flex-start',
+                      background: 'var(--primary)',
+                      color: 'var(--on-primary)',
+                    }}
+                  >
+                    {t('settings.integration_connect')}
+                  </Button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </SettingsShell>
   );
 }
