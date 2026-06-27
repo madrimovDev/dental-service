@@ -6,6 +6,7 @@ import { createTreatmentPlansRepository } from './treatment-plans.repository.ts'
 import type {
   ConsentInput,
   CreateTreatmentPlanInput,
+  ListPlansQuery,
   UpdateStageInput,
   UpdateTreatmentPlanInput,
 } from './treatment-plans.schema.ts';
@@ -45,7 +46,7 @@ export const createTreatmentPlansService = (deps: {
 }) => {
   const repo = createTreatmentPlansRepository();
 
-  const listPlans = (c: Context, patientId?: string) => repo.listPlans(c, patientId);
+  const listPlans = (c: Context, query: ListPlansQuery) => repo.listPlans(c, query);
   const getPlan = (c: Context, id: string) => repo.getPlanWithStages(c, id);
 
   async function createPlan(c: Context, input: CreateTreatmentPlanInput) {

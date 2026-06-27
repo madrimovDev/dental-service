@@ -161,7 +161,11 @@ describe('clinical smoke — real DB', () => {
   });
 
   test("RLS scope — tenant B bemor A rejalarini ko'rmaydi", async () => {
-    const plans = await run(tenantBId, doctorAId, (c) => plansSvc.listPlans(c, patientAId));
-    expect(plans).toHaveLength(0);
+    // DS7: listPlans endi paginated { data, meta } qaytaradi (query obyekti).
+    const plans = await run(tenantBId, doctorAId, (c) =>
+      plansSvc.listPlans(c, { patientId: patientAId, page: 1, pageSize: 20 }),
+    );
+    expect(plans.data).toHaveLength(0);
+    expect(plans.meta.total).toBe(0);
   });
 });

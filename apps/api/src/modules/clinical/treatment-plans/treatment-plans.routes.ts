@@ -1,5 +1,5 @@
 import { fail, ok } from '@dental/core';
-import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
+import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import type { AuditLogger } from '../../../lib/audit-logger.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../../lib/openapi.ts';
 import { requirePermission } from '../../../middleware/require-permission.ts';
@@ -12,6 +12,7 @@ import {
   stageIdParamSchema,
   treatmentPlanDtoSchema,
   treatmentPlanEstimateDtoSchema,
+  treatmentPlanListResponseDtoSchema,
   treatmentPlanWithStagesDtoSchema,
   treatmentStageDtoSchema,
   updateStageSchema,
@@ -57,15 +58,15 @@ export const treatmentPlansRoutes = (deps: { audit: AuditLogger; recall?: Recall
       query: listPlansQuerySchema,
     },
     responses: okJson(
-      z.array(treatmentPlanWithStagesDtoSchema),
-      'List of treatment plans with nested stages',
+      treatmentPlanListResponseDtoSchema,
+      'Paginated treatment plans (tenant-wide or patient-filtered) with nested stages',
     ),
   });
 
   app.openapi(listRoute, async (c) => {
-    const { patientId } = c.req.valid('query');
-    const rows = await service.listPlans(c, patientId);
-    return c.json(ok(rows.map(toPlanWithStagesDto)), 200);
+    const query = c.req.valid('query');
+    const { data, meta } = await service.listPlans(c, query);
+    return c.json(ok({ data: data.map(toPlanWithStagesDto), meta }), 200);
   });
 
   // ─── POST /treatment-plans — create ───────────────────────────────────────

@@ -64,7 +64,15 @@ export const stageIdParamSchema = z
 
 export const listPlansQuerySchema = z.object({
   patientId: z.uuid().optional().openapi({ description: 'Filter by patient UUID' }),
+  // DS7: tenant-wide ro'yxat uchun status filtri (ixtiyoriy) + pagination.
+  status: z
+    .enum(['draft', 'presented', 'accepted', 'in_progress', 'completed', 'cancelled'])
+    .optional()
+    .openapi({ description: 'Filter by plan status' }),
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().positive().max(100).default(20),
 });
+export type ListPlansQuery = z.infer<typeof listPlansQuerySchema>;
 
 // ─── Response DTOs ────────────────────────────────────────────────────────────
 
@@ -137,6 +145,19 @@ export const treatmentPlanWithStagesDtoSchema = treatmentPlanDtoSchema
   .openapi('TreatmentPlanWithStages');
 
 export type TreatmentPlanWithStagesDto = z.infer<typeof treatmentPlanWithStagesDtoSchema>;
+
+/** DS7 — paginated tenant-wide list response (`{ data, meta }` inside `ok()` envelope). */
+export const treatmentPlanListResponseDtoSchema = z
+  .object({
+    data: z.array(treatmentPlanWithStagesDtoSchema),
+    meta: z.object({
+      page: z.number().int(),
+      pageSize: z.number().int(),
+      total: z.number().int(),
+    }),
+  })
+  .openapi('TreatmentPlanListResponse');
+export type TreatmentPlanListResponseDto = z.infer<typeof treatmentPlanListResponseDtoSchema>;
 
 // ─── C6 (CLI-223) — estimate breakdown (RFC-0005 style; C4 predikatiga mos) ──────
 
