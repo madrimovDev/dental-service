@@ -23,4 +23,8 @@ export const clinicalKeys = {
   // C — images
   images: (patientId: string, visitNoteId?: string) =>
     ['clinical', 'images', patientId, visitNoteId ?? 'all'] as const,
+  // standalone aggregate views (patientId yo'q)
+  allPlans: () => ['clinical', 'plans-all'] as const,
+  allLabOrders: () => ['clinical', 'lab-orders-all'] as const,
+  allPrescriptions: () => ['clinical', 'prescriptions-all'] as const,
 };

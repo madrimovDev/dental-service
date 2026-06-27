@@ -330,3 +330,26 @@ export function useDeletePatientImage(patientId: string) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['clinical', 'images', patientId] }),
   });
 }
+
+// ─── Standalone aggregate views (patientId filtrisiz) ──────────────────────
+
+export function useAllTreatmentPlans() {
+  return useQuery({
+    queryKey: clinicalKeys.allPlans(),
+    queryFn: () => listTreatmentPlans().then((r) => r.data),
+  });
+}
+
+export function useAllLabOrders() {
+  return useQuery({
+    queryKey: clinicalKeys.allLabOrders(),
+    queryFn: () => listLabOrders().then((r) => r.data),
+  });
+}
+
+export function useAllPrescriptions() {
+  return useQuery({
+    queryKey: clinicalKeys.allPrescriptions(),
+    queryFn: () => listPrescriptions().then((r) => r.data),
+  });
+}
