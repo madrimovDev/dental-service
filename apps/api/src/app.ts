@@ -30,6 +30,7 @@ import { createRecallsService, recallRoutes } from './modules/recalls/index.ts';
 import { reportsRoutes } from './modules/reports/index.ts';
 import { roleRoutes } from './modules/roles/index.ts';
 import { createScheduleService, scheduleRoutes } from './modules/schedule/index.ts';
+import { serviceCategoryRoutes } from './modules/service-categories/index.ts';
 import { serviceRoutes } from './modules/services/index.ts';
 import { stockRoutes } from './modules/stock/index.ts';
 import { tenantSettingsRoutes } from './modules/tenant-settings/index.ts';
@@ -101,6 +102,7 @@ export const createApp = () => {
   app.route('/api/users', userRoutes({ db, audit }));
   app.route('/api/patients', patientRoutes({ db, audit }));
   app.route('/api/services', serviceRoutes({ db, audit }));
+  app.route('/api/service-categories', serviceCategoryRoutes({ db, audit }));
   app.route('/api/cashier', cashierRoutes({ db, audit, fiscal }));
   app.route('/api/reports', reportsRoutes({ db }));
   app.route('/api/audit', auditRoutes({ db }));
