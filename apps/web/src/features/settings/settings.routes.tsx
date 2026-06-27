@@ -1,3 +1,4 @@
+import { ServiceCategoriesScreen } from '@/features/service-categories';
 import { ServicesScreen } from '@/features/services';
 import type { AppRoute } from '@/shell';
 import { BranchesSettingsScreen } from './components/BranchesSettingsScreen';
@@ -10,6 +11,11 @@ import { UsersSettingsScreen } from './components/UsersSettingsScreen';
 export const settingsRoutes: AppRoute[] = [
   // Xizmatlar katalogi /settings/* ostida; ekran `features/services` da
   { path: '/settings/services', perm: 'service.view', element: <ServicesScreen /> },
+  {
+    path: '/settings/service-categories',
+    perm: 'service.view',
+    element: <ServiceCategoriesScreen />,
+  },
   { path: '/settings/tenant', perm: 'tenant.view', element: <TenantSettingsScreen /> },
   { path: '/settings/branches', perm: 'branch.view', element: <BranchesSettingsScreen /> },
   { path: '/settings/roles', perm: 'role.view', element: <RolesSettingsScreen /> },

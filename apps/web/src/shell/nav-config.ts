@@ -20,6 +20,7 @@ import {
   Settings,
   Shield,
   Stethoscope,
+  Tag,
   UserPlus,
   Users,
   Wallet,
@@ -118,6 +119,13 @@ export const NAV_GROUPS: NavGroup[] = [
         labelKey: 'nav.services',
         icon: Stethoscope,
         path: '/settings/services',
+        permission: 'service.view',
+      },
+      {
+        key: 'service-categories',
+        labelKey: 'nav.service_categories',
+        icon: Tag,
+        path: '/settings/service-categories',
         permission: 'service.view',
       },
       {

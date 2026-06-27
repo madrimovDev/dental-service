@@ -171,6 +171,7 @@
     "kpi": "Dashboard / KPI",
     "reports": "Hisobotlar",
     "services": "Xizmatlar va narxlar",
+    "service_categories": "Kategoriyalar",
     "branches": "Filiallar",
     "roles": "Rollar",
     "users": "Foydalanuvchilar",
@@ -1283,5 +1284,15 @@
       "overdue": "Muddati o'tgan",
       "efficacy": "Samaradorlik"
     }
+  },
+  "serviceCategories": {
+    "title": "Xizmat kategoriyalari",
+    "create": "Yangi kategoriya",
+    "edit": "Kategoriyani tahrirlash",
+    "name": "Nomi",
+    "name_ru": "Nomi (ruscha)",
+    "empty": "Hali kategoriya yo'q",
+    "confirm_delete": "Kategoriyani o'chirish?",
+    "in_use_error": "Bu kategoriyaga xizmatlar biriktirilgan — avval ularni ko'chiring"
   }
 }
