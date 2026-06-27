@@ -5,6 +5,9 @@ export const createItemSchema = z.object({
   branchId: z.uuid().optional(),
   name: z.string().min(1).max(200),
   unit: z.string().min(1).max(40),
+  // DS12 (DS9 ombor): kategoriya + birlik narxi — ixtiyoriy.
+  category: z.string().max(100).optional(),
+  price: z.coerce.number().nonnegative().optional(),
   quantity: z.coerce.number().nonnegative().default(0),
   minThreshold: z.coerce.number().nonnegative().default(0),
 });
@@ -73,6 +76,9 @@ const stockItemShape = {
   branchId: z.uuid().nullable(),
   name: z.string().openapi({ example: 'Anestetik' }),
   unit: z.string().openapi({ example: 'dona' }),
+  // DS12 (DS9 ombor): kategoriya (nullable) + birlik narxi (numeric → string, nullable).
+  category: z.string().nullable().openapi({ example: 'Anesteziya' }),
+  price: z.string().nullable().openapi({ example: '15000.00' }),
   quantity: z.string().openapi({ example: '120.00' }),
   minThreshold: z.string().openapi({ example: '10.00' }),
   createdAt: z.string().openapi({ example: '2026-06-12T10:00:00.000Z' }),
