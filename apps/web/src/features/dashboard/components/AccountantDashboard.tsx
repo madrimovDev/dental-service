@@ -8,8 +8,10 @@ import { useDailySummary } from '@/features/cashier/cashier.api.ts';
 import { formatCurrency } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { useDefaultPeriod, useRevenueReport } from '../dashboard.api.ts';
+import { toStatDelta } from '../dashboard.mappers';
 import { BarMini } from './widgets/BarMini.tsx';
 import { MiniList } from './widgets/MiniList.tsx';
+import { Sparkline } from './widgets/Sparkline.tsx';
 import { StatCard } from './widgets/StatCard.tsx';
 
 // Off-scale literal (parity): tokenlar --radius-xl:14px da to'xtaydi; DS1 karta 16px.
@@ -119,6 +121,8 @@ export function AccountantDashboard() {
               label={t('dashboard.revenue_total')}
               value={rev ? formatCurrency(rev.total, t) : '—'}
               color="teal"
+              delta={toStatDelta(rev?.comparison?.previous, t)}
+              spark={<Sparkline points={(rev?.byPeriod ?? []).map((p) => p.total)} />}
             />
             <StatCard
               label={t('dashboard.daily_cash')}

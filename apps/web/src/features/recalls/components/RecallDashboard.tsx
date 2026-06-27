@@ -1,12 +1,18 @@
 import { Mono, PageHead, StateView, StatusPill } from '@dental/ui';
-import { Button, Group, Table, Text } from '@mantine/core';
+import { Box, Button, Group, Table, Text } from '@mantine/core';
 import { IconCalendarPlus, IconPhoneCheck, IconX } from '@tabler/icons-react';
 import type { CSSProperties } from 'react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { StatCard } from '@/features/dashboard/components/widgets/StatCard.tsx';
 import { useAuthStore } from '@/stores/auth-store.ts';
-import { useMarkRecallContacted, useRecalls, useUpdateRecall } from '../recalls.api';
+import {
+  useMarkRecallContacted,
+  useRecallSummary,
+  useRecalls,
+  useUpdateRecall,
+} from '../recalls.api';
 import {
   isOverdue,
   localToday,
@@ -59,11 +65,13 @@ export function RecallDashboard() {
   // muddati keluvchi pending recall'lar qaytadi.
   const today = useMemo(() => localToday(), []);
   const recallsQuery = useRecalls({ date: today });
+  const summaryQuery = useRecallSummary();
 
   const markContacted = useMarkRecallContacted();
   const updateRecall = useUpdateRecall();
 
   const rows = recallsQuery.data ?? [];
+  const kpi = summaryQuery.data;
 
   if (recallsQuery.isError) {
     return (
@@ -82,6 +90,39 @@ export function RecallDashboard() {
   return (
     <div>
       <PageHead title={t('recall.title')} subtitle={t('recall.due_today')} />
+
+      {/* 4-KPI grid: pending / contacted / scheduled / overdue + efficacyPct hint */}
+      <Box
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: 14,
+          marginTop: 16,
+          marginBottom: 20,
+        }}
+      >
+        <StatCard
+          label={t('recall.kpi.pending')}
+          value={kpi ? String(kpi.pending) : '—'}
+          tone="warning"
+        />
+        <StatCard
+          label={t('recall.kpi.contacted')}
+          value={kpi ? String(kpi.contacted) : '—'}
+          tone="info"
+        />
+        <StatCard
+          label={t('recall.kpi.scheduled')}
+          value={kpi ? String(kpi.scheduled) : '—'}
+          tone="primary"
+        />
+        <StatCard
+          label={t('recall.kpi.overdue')}
+          value={kpi ? String(kpi.overdue) : '—'}
+          tone="warning"
+          hint={kpi ? `${t('recall.kpi.efficacy')}: ${Math.round(kpi.efficacyPct)}%` : undefined}
+        />
+      </Box>
       {recallsQuery.isLoading ? (
         <StateView status="loading" skeleton="table" />
       ) : rows.length === 0 ? (

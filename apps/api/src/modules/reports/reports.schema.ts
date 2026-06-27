@@ -7,6 +7,16 @@ export const reportRangeSchema = z.object({
 });
 export type ReportRange = z.infer<typeof reportRangeSchema>;
 
+// ─── Period comparison (DS12-A) ──────────────────────────────────────────────
+const comparisonEntryDtoSchema = z.object({ total: z.number(), deltaPct: z.number() });
+export const periodComparisonDtoSchema = z
+  .object({
+    previous: comparisonEntryDtoSchema.nullable(),
+    yoy: comparisonEntryDtoSchema.nullable(),
+  })
+  .openapi('PeriodComparison');
+export type PeriodComparison = z.infer<typeof periodComparisonDtoSchema>;
+
 // ─── Revenue report ─────────────────────────────────────────────────────────
 
 /**
@@ -20,6 +30,8 @@ export const revenueReportDtoSchema = z
     byService: z.array(z.object({ serviceName: z.string(), total: z.number() })),
     byDoctor: z.array(z.object({ doctorId: z.string().nullable(), total: z.number() })),
     byPeriod: z.array(z.object({ date: z.string(), total: z.number() })),
+    byPaymentMethod: z.array(z.object({ paymentMethod: z.string(), total: z.number() })),
+    comparison: periodComparisonDtoSchema,
   })
   .openapi('RevenueReport');
 
@@ -34,6 +46,9 @@ export const appointmentStatsReportDtoSchema = z
     byStatus: z.array(z.object({ status: z.string(), count: z.number() })),
     noShowRate: z.number(),
     slotUtilization: z.number(),
+    byPeriod: z.array(z.object({ date: z.string(), count: z.number() })),
+    comparison: periodComparisonDtoSchema,
+    occupancy: z.array(z.object({ weekday: z.number(), hour: z.number(), count: z.number() })),
   })
   .openapi('AppointmentStatsReport');
 

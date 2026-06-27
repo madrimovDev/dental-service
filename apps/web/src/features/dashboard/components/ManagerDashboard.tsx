@@ -1,9 +1,12 @@
 import { StateView } from '@dental/ui';
 import { Box, Group, Stack, Text } from '@mantine/core';
 import { IconCalendarPlus, IconCash } from '@tabler/icons-react';
+import dayjs from 'dayjs';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { useRecentActivity } from '@/features/audit/audit.api.ts';
+import { useRecallSummary } from '@/features/recalls/recalls.api.ts';
 import { formatCurrency } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import {
@@ -12,12 +15,68 @@ import {
   useDoctorNames,
   useManagerKpi,
 } from '../dashboard.api.ts';
+import { toStatDelta } from '../dashboard.mappers';
 import { OnboardingChecklist } from './OnboardingChecklist.tsx';
 import { BarMini } from './widgets/BarMini.tsx';
 import { MiniList } from './widgets/MiniList.tsx';
+import { Sparkline } from './widgets/Sparkline.tsx';
 import { StatCard } from './widgets/StatCard.tsx';
 
 const fmtPct = (n: number) => `${Math.round(n * 100)}%`;
+
+/**
+ * Recall rail kartasi — faqat `recall.view` ruxsati bor bo'lganda render qilinadi.
+ * Hook shu komponent ichida — Permission yo'q bo'lsa komponent mount bo'lmaydi,
+ * shu sababli 403 so'rov ham yuborilmaydi (RBAC gap avoidance pattern).
+ */
+function RecallRailCard() {
+  const { t } = useTranslation();
+  const { data: kpi } = useRecallSummary();
+  return (
+    <MiniList
+      title={t('recall.title')}
+      items={[
+        {
+          id: 'pending',
+          label: t('recall.kpi.pending'),
+          right: String(kpi?.pending ?? '—'),
+        },
+        {
+          id: 'overdue',
+          label: t('recall.kpi.overdue'),
+          right: String(kpi?.overdue ?? '—'),
+        },
+      ]}
+      emptyText={t('dashboard.empty')}
+    />
+  );
+}
+
+/**
+ * Activity feed rail kartasi — faqat `audit_log.view` ruxsati bor bo'lganda render qilinadi.
+ * Hook shu komponent ichida — permission yo'q bo'lsa mount bo'lmaydi, 403 so'rov yuborilmaydi.
+ * before/after backend'da qaytarilmaydi (metadata-only endpoint).
+ */
+function ActivityRailCard() {
+  const { t } = useTranslation();
+  const { data: rows, isLoading } = useRecentActivity();
+
+  if (isLoading) {
+    return (
+      <MiniList title={t('dashboard.activityFeed')} items={[]} emptyText={t('common.loading')} />
+    );
+  }
+
+  const items = (rows ?? []).map((r) => ({
+    id: r.id,
+    label: `${r.actorName ?? t('audit.system')} — ${t(`audit.action.${r.action}`, r.action)} ${t(`audit.resource.${r.resourceType}`, r.resourceType)}`,
+    right: dayjs(r.createdAt).fromNow(),
+  }));
+
+  return (
+    <MiniList title={t('dashboard.activityFeed')} items={items} emptyText={t('audit.empty')} />
+  );
+}
 
 // Off-scale literal (parity): tokenlar --radius-xl:14px da to'xtaydi; DS1 karta 16px.
 const CARD_RADIUS = 16;
@@ -82,6 +141,8 @@ export function ManagerDashboard() {
 
   const canAppointment = hasPermission('appointment.view');
   const canCashier = hasPermission('cashier.view');
+  const canRecall = hasPermission('recall.view');
+  const canAuditView = hasPermission('audit_log.view');
 
   return (
     <Stack gap="lg">
@@ -130,6 +191,8 @@ export function ManagerDashboard() {
               label={t('dashboard.revenue_total')}
               value={rev ? formatCurrency(rev.total, t) : '—'}
               color="teal"
+              delta={toStatDelta(rev?.comparison?.previous, t)}
+              spark={<Sparkline points={(rev?.byPeriod ?? []).map((p) => p.total)} />}
             />
             <StatCard
               label={t('dashboard.no_show_rate')}
@@ -195,6 +258,12 @@ export function ManagerDashboard() {
                 }))}
                 emptyText={t('dashboard.empty')}
               />
+              {/* Recall rail — faqat recall.view ruxsati bor bo'lsa render qilinadi.
+                  RecallRailCard ichida hook bor → mount bo'lmasa 403 so'rov yuborilmaydi. */}
+              {canRecall && <RecallRailCard />}
+              {/* Activity feed rail — faqat audit_log.view ruxsati bor bo'lsa render qilinadi.
+                  ActivityRailCard ichida hook bor → mount bo'lmasa so'rov yuborilmaydi. */}
+              {canAuditView && <ActivityRailCard />}
             </Stack>
           </Box>
         </>

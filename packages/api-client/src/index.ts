@@ -19,9 +19,9 @@ export {
   listDoctors,
   updateAppointment,
 } from './generated/appointments/appointments.ts';
-export type { ListAuditLogResult } from './generated/audit/audit.ts';
+export type { GetRecentActivityResult, ListAuditLogResult } from './generated/audit/audit.ts';
 // Generated (orval) — explicit re-export (coexistence: kolliziya nazorati)
-export { listAuditLog } from './generated/audit/audit.ts';
+export { getRecentActivity, listAuditLog } from './generated/audit/audit.ts';
 // Generated (orval) — auth
 export type {
   ChangePasswordResult,
@@ -250,6 +250,8 @@ export type {
   GetPrescription200,
   GetQueueToday200,
   GetQueueTodayParams,
+  GetRecallSummary200,
+  GetRecallSummaryParams,
   GetRole200,
   GetService200,
   GetTenant200,
@@ -331,6 +333,7 @@ export type {
   RecallDto,
   RecallDtoReason,
   RecallDtoSource,
+  RecallSummary,
   ResetPasswordResponse,
   ResetUserPassword200,
   RevenueReport,
@@ -553,6 +556,7 @@ export {
 // Generated (orval) — recalls
 export type {
   CreateRecallResult,
+  GetRecallSummaryResult,
   ListPatientRecallsResult,
   ListRecallsResult,
   MarkRecallContactedResult,
@@ -560,6 +564,7 @@ export type {
 } from './generated/recalls/recalls.ts';
 export {
   createRecall,
+  getRecallSummary,
   listPatientRecalls,
   listRecalls,
   markRecallContacted,

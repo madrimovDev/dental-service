@@ -12,7 +12,7 @@
     "title": "Журнал аудита",
     "from": "С даты",
     "to": "По дату",
-    "action": "Действие",
+    "action_label": "Действие",
     "action_placeholder": "например, patient.create",
     "resource_type": "Тип ресурса",
     "resource_type_placeholder": "например, patient",
@@ -29,6 +29,26 @@
       "action": "Действие",
       "resource": "Ресурс",
       "resource_id": "ID ресурса"
+    },
+    "action": {
+      "created": "создал(а)",
+      "updated": "обновил(а)",
+      "deleted": "удалил(а)",
+      "viewed": "просмотрел(а)",
+      "login": "вошёл(а) в систему",
+      "workspace_switched": "сменил(а) рабочее пространство"
+    },
+    "resource": {
+      "patient": "пациент",
+      "appointment": "запись",
+      "cashier_transaction": "платёж",
+      "treatment_plan": "план лечения",
+      "visit_note": "запись визита",
+      "user": "пользователь",
+      "auth": "аутентификация",
+      "service": "услуга",
+      "stock_item": "товар на складе",
+      "expense": "расход"
     }
   },
   "common": {
@@ -257,7 +277,9 @@
     "queue_waiting": "{{n}} ожидают",
     "calendar_link": "Календарь",
     "new_appointment": "Новая запись",
-    "open_cashier": "Касса"
+    "open_cashier": "Касса",
+    "vsPrevPeriod": "к прошлому периоду",
+    "activityFeed": "Последняя активность"
   },
   "branches": {
     "title": "Филиалы",
@@ -1107,7 +1129,17 @@
     "rate": "Выполнение",
     "empty": "Нет данных",
     "export_csv": "CSV",
-    "export_excel": "Excel"
+    "export_excel": "Excel",
+    "byPaymentMethod": "Структура по способу оплаты",
+    "occupancy": "Тепловая карта записей"
+  },
+  "payment": {
+    "method": {
+      "cash": "Наличные",
+      "card": "Карта",
+      "transfer": "Перевод",
+      "other": "Другое"
+    }
   },
   "expenses": {
     "title": "Расходы",
@@ -1243,6 +1275,13 @@
       "interval_months": "Интервал (мес.)",
       "notes": "Заметка",
       "submit": "Сохранить"
+    },
+    "kpi": {
+      "pending": "Ожидает",
+      "contacted": "Связались",
+      "scheduled": "Записан",
+      "overdue": "Просрочен",
+      "efficacy": "Эффективность"
     }
   }
 }

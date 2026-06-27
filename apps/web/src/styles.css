@@ -1,8 +1,11 @@
 @import "@dental/ui/tokens.css";
-@import "@mantine/core/styles.css";
-@import "@mantine/dates/styles.css";
-@import "@mantine/notifications/styles.css";
-@import "@mantine/spotlight/styles.css";
+/* Mantine CSS'ni @layer mantine'ga o'raydi — @dental/ui design-system primitivlari
+   (Button.module.css va h.k., layer'siz) Mantine reset'larini override qiladi.
+   Fix: UnstyledButton padding:0 reset @dental/ui Button .root padding'ini bosib turardi. */
+@import "@mantine/core/styles.layer.css";
+@import "@mantine/dates/styles.layer.css";
+@import "@mantine/notifications/styles.layer.css";
+@import "@mantine/spotlight/styles.layer.css";
 
 html,
 body,

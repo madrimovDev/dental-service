@@ -23,6 +23,8 @@ import {
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDoctors } from '@/features/appointments/appointments.api';
+import { Donut } from '@/features/dashboard/components/widgets/Donut';
+import { Heatmap } from '@/features/dashboard/components/widgets/Heatmap';
 import { useBranches } from '@/features/queue/queue.api.ts';
 import { formatCurrency, formatNumber } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth-store.ts';
@@ -176,6 +178,14 @@ export function ReportsScreen() {
 
   const fmt = (n: number) => formatNumber(n);
   const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
+  const methodColor = (m: string) =>
+    m === 'cash'
+      ? 'var(--success)'
+      : m === 'card'
+        ? 'var(--info)'
+        : m === 'transfer'
+          ? 'var(--violet)'
+          : 'var(--ink-3)';
   const exportLabel = {
     csv: t('reports.export_csv', { defaultValue: 'CSV' }),
     xlsx: t('reports.export_excel', { defaultValue: 'Excel' }),
@@ -431,6 +441,59 @@ export function ReportsScreen() {
             )}
           </ReportSection>
         </SimpleGrid>
+
+        {/* To'lov usuli taqsimoti (DS12-A Task 3) */}
+        {revenue.data && revenue.data.byPaymentMethod.length > 0 && (
+          <Card withBorder padding="lg">
+            <Stack gap="md">
+              <Title order={4}>
+                {t('reports.byPaymentMethod', { defaultValue: "To'lov usuli" })}
+              </Title>
+              <Group align="flex-start" gap="xl">
+                <Donut
+                  title={t('reports.byPaymentMethod')}
+                  segments={revenue.data.byPaymentMethod.map((p) => ({
+                    label: t(`payment.method.${p.paymentMethod}`, {
+                      defaultValue: p.paymentMethod,
+                    }),
+                    value: p.total,
+                    color: methodColor(p.paymentMethod),
+                  }))}
+                />
+                <Stack gap="xs">
+                  {revenue.data.byPaymentMethod.map((p) => (
+                    <Group key={p.paymentMethod} gap="xs">
+                      <div
+                        style={{
+                          width: 12,
+                          height: 12,
+                          borderRadius: '50%',
+                          background: methodColor(p.paymentMethod),
+                          flexShrink: 0,
+                        }}
+                      />
+                      <Text size="sm">
+                        {t(`payment.method.${p.paymentMethod}`, { defaultValue: p.paymentMethod })}
+                        {': '}
+                        {formatCurrency(p.total, t)}
+                      </Text>
+                    </Group>
+                  ))}
+                </Stack>
+              </Group>
+            </Stack>
+          </Card>
+        )}
+
+        {/* Qabullar bandligi issiqligi (DS12-A Task 4) */}
+        {appointments.data && appointments.data.occupancy.length > 0 && (
+          <Card withBorder padding="lg">
+            <Stack gap="md">
+              <Title order={4}>{t('reports.occupancy')}</Title>
+              <Heatmap cells={appointments.data.occupancy} />
+            </Stack>
+          </Card>
+        )}
 
         {/* Dental analitika (V2-3) */}
         <Card withBorder padding="lg">

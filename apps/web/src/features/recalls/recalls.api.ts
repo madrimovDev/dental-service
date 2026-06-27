@@ -1,6 +1,7 @@
 import type { CreateRecall, UpdateRecall } from '@dental/api-client';
 import {
   createRecall,
+  getRecallSummary,
   listPatientRecalls,
   listRecalls,
   markRecallContacted,
@@ -48,6 +49,14 @@ export function useUpdateRecall() {
     mutationFn: ({ id, body }: { id: string; body: UpdateRecall }) =>
       updateRecall(id, body).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: recallKeys.all }),
+  });
+}
+
+/** Recall KPI xulosasi (pending/contacted/scheduled/overdue/efficacyPct) — `recall.view`. */
+export function useRecallSummary(branchId?: string) {
+  return useQuery({
+    queryKey: recallKeys.summary(branchId),
+    queryFn: () => getRecallSummary({ branchId }).then((r) => r.data),
   });
 }
 

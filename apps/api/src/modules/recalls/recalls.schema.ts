@@ -110,3 +110,19 @@ export const markContactedSchema = z
   .object({ notes: z.string().max(1000).nullable().optional() })
   .openapi('MarkRecallContacted');
 export type MarkContactedInput = z.infer<typeof markContactedSchema>;
+
+// ─── Summary ────────────────────────────────────────────────────────────────
+
+export const recallSummaryQuerySchema = z.object({ branchId: z.uuid().optional() });
+export type RecallSummaryQuery = z.infer<typeof recallSummaryQuerySchema>;
+
+export const recallSummaryDtoSchema = z
+  .object({
+    pending: z.number().int(),
+    contacted: z.number().int(),
+    scheduled: z.number().int(),
+    overdue: z.number().int(),
+    efficacyPct: z.number(),
+  })
+  .openapi('RecallSummary');
+export type RecallSummaryDto = z.infer<typeof recallSummaryDtoSchema>;

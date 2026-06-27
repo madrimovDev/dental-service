@@ -2217,6 +2217,27 @@
                 "total"
               ]
             }
+          },
+          "byPaymentMethod": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "paymentMethod": {
+                  "type": "string"
+                },
+                "total": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "paymentMethod",
+                "total"
+              ]
+            }
+          },
+          "comparison": {
+            "$ref": "#/components/schemas/PeriodComparison"
           }
         },
         "required": [
@@ -2224,7 +2245,50 @@
           "byBranch",
           "byService",
           "byDoctor",
-          "byPeriod"
+          "byPeriod",
+          "byPaymentMethod",
+          "comparison"
+        ]
+      },
+      "PeriodComparison": {
+        "type": "object",
+        "properties": {
+          "previous": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "total": {
+                "type": "number"
+              },
+              "deltaPct": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "total",
+              "deltaPct"
+            ]
+          },
+          "yoy": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "total": {
+                "type": "number"
+              },
+              "deltaPct": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "total",
+              "deltaPct"
+            ]
+          }
+        },
+        "required": [
+          "previous",
+          "yoy"
         ]
       },
       "AppointmentStatsReport": {
@@ -2256,13 +2320,59 @@
           },
           "slotUtilization": {
             "type": "number"
+          },
+          "byPeriod": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "date",
+                "count"
+              ]
+            }
+          },
+          "comparison": {
+            "$ref": "#/components/schemas/PeriodComparison"
+          },
+          "occupancy": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "weekday": {
+                  "type": "number"
+                },
+                "hour": {
+                  "type": "number"
+                },
+                "count": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "weekday",
+                "hour",
+                "count"
+              ]
+            }
           }
         },
         "required": [
           "total",
           "byStatus",
           "noShowRate",
-          "slotUtilization"
+          "slotUtilization",
+          "byPeriod",
+          "comparison",
+          "occupancy"
         ]
       },
       "DoctorWorkloadReport": {
@@ -2575,6 +2685,41 @@
           "resourceId",
           "ip",
           "userAgent",
+          "createdAt"
+        ]
+      },
+      "AuditRecentItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "actorName": {
+            "type": "string",
+            "nullable": true
+          },
+          "action": {
+            "type": "string"
+          },
+          "resourceType": {
+            "type": "string"
+          },
+          "resourceId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "actorName",
+          "action",
+          "resourceType",
+          "resourceId",
           "createdAt"
         ]
       },
@@ -3302,6 +3447,33 @@
           "closedAt",
           "createdAt",
           "updatedAt"
+        ]
+      },
+      "RecallSummary": {
+        "type": "object",
+        "properties": {
+          "pending": {
+            "type": "integer"
+          },
+          "contacted": {
+            "type": "integer"
+          },
+          "scheduled": {
+            "type": "integer"
+          },
+          "overdue": {
+            "type": "integer"
+          },
+          "efficacyPct": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "pending",
+          "contacted",
+          "scheduled",
+          "overdue",
+          "efficacyPct"
         ]
       },
       "CreateRecall": {
@@ -12181,6 +12353,74 @@
         }
       }
     },
+    "/api/audit/recent": {
+      "get": {
+        "tags": [
+          "audit"
+        ],
+        "operationId": "getRecentActivity",
+        "responses": {
+          "200": {
+            "description": "Recent activity (metadata-only)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AuditRecentItem"
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/appointments": {
       "get": {
         "tags": [
@@ -13858,6 +14098,82 @@
           },
           "400": {
             "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recalls/summary": {
+      "get": {
+        "tags": [
+          "recalls"
+        ],
+        "operationId": "getRecallSummary",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recall KPI summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/RecallSummary"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
             "content": {
               "application/json": {
                 "schema": {

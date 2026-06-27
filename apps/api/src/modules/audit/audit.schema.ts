@@ -44,3 +44,20 @@ export const auditListResponseDtoSchema = z
     }),
   })
   .openapi('AuditListResponse');
+
+/**
+ * Recent activity item DTO — metadata-only (before/after QASDDAN yo'q — maxfiy tarkib
+ * hech qachon chiqarilmaydi). actorName — users jadvalidan JOIN.
+ */
+export const auditRecentItemDtoSchema = z
+  .object({
+    id: z.uuid(),
+    actorName: z.string().nullable(),
+    action: z.string(),
+    resourceType: z.string(),
+    resourceId: z.uuid().nullable(),
+    createdAt: z.string(),
+  })
+  .openapi('AuditRecentItem');
+
+export type AuditRecentItemDto = z.infer<typeof auditRecentItemDtoSchema>;
