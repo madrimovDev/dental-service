@@ -13,6 +13,8 @@ describe('toTenantSettingsDto', () => {
       defaultRecallIntervalMonths: 6,
       timezone: 'Asia/Tashkent',
       recallSendHourLocal: 10,
+      notificationSettings: null,
+      integrationSettings: null,
       createdAt: new Date('2026-06-12T10:00:00.000Z'),
       updatedAt: new Date('2026-06-12T11:00:00.000Z'),
     };
@@ -34,6 +36,8 @@ describe('toTenantSettingsDto', () => {
       defaultRecallIntervalMonths: 6,
       timezone: 'Asia/Tashkent',
       recallSendHourLocal: 10,
+      notificationSettings: null,
+      integrationSettings: null,
       createdAt: new Date('2026-06-12T10:00:00.000Z'),
       updatedAt: new Date('2026-06-12T11:00:00.000Z'),
     };
