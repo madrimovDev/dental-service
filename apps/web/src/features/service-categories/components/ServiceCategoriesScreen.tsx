@@ -22,7 +22,6 @@ export function ServiceCategoriesScreen() {
   const [opened, { open, close }] = useDisclosure(false);
 
   const dtos = categories.data ?? [];
-  const list = dtos.map(toServiceCategoryVM);
   const openCreate = () => {
     setEditing(null);
     open();
@@ -54,7 +53,7 @@ export function ServiceCategoriesScreen() {
             retryLabel={t('states.retry')}
             onRetry={() => categories.refetch()}
           />
-        ) : list.length === 0 ? (
+        ) : dtos.length === 0 ? (
           <StateView
             status="empty"
             title={t('states.empty_title')}
@@ -70,8 +69,8 @@ export function ServiceCategoriesScreen() {
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {list.map((vm) => {
-                const dto = dtos.find((d) => d.id === vm.id)!;
+              {dtos.map((dto) => {
+                const vm = toServiceCategoryVM(dto);
                 return (
                   <Table.Tr key={vm.id}>
                     <Table.Td>{vm.name}</Table.Td>
