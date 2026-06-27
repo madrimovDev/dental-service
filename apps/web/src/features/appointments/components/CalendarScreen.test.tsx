@@ -5,6 +5,13 @@ import { CalendarScreen } from './CalendarScreen';
 
 vi.mock('../appointments.api', () => ({
   useAppointments: () => ({ data: [], isLoading: false }),
+  useBranchAvailability: () => ({
+    data: undefined,
+    isLoading: false,
+    isError: false,
+    isFetching: false,
+    refetch: vi.fn(),
+  }),
   useDoctors: () => ({ data: [{ id: 'd1', name: 'Dr. Ali' }] }),
   useServices: () => ({ data: [] }),
   useBranches: () => ({ data: [] }),
