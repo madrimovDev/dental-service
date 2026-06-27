@@ -72,7 +72,10 @@
     "active": "Активен",
     "inactive": "Не активен",
     "view": "Просмотр",
-    "archive": "Архивировать"
+    "archive": "Архивировать",
+    "date": "Дата",
+    "patient": "Пациент",
+    "status": "Статус"
   },
   "health": {
     "title": "Состояние системы",
@@ -1032,6 +1035,7 @@
     "no_transactions_today": "Сегодня операций нет",
     "date": "Дата",
     "amount": "Сумма",
+    "paymentMethod": "Способ оплаты",
     "status": "Статус",
     "receipt": "Номер чека",
     "daily_summary": "Дневной отчёт",
@@ -1284,6 +1288,18 @@
       "overdue": "Просрочен",
       "efficacy": "Эффективность"
     }
+  },
+  "plans": {
+    "title": "Название",
+    "total": "Итого"
+  },
+  "lab": {
+    "orderType": "Тип",
+    "expectedDate": "Срок"
+  },
+  "rx": {
+    "itemsCount": "Препараты",
+    "diagnosis": "Диагноз"
   },
   "serviceCategories": {
     "title": "Категории услуг",

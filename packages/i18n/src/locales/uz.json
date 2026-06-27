@@ -72,7 +72,10 @@
     "active": "Faol",
     "inactive": "Faol emas",
     "view": "Ko'rish",
-    "archive": "Arxivlash"
+    "archive": "Arxivlash",
+    "date": "Sana",
+    "patient": "Bemor",
+    "status": "Status"
   },
   "health": {
     "title": "Tizim holati",
@@ -1032,6 +1035,7 @@
     "no_transactions_today": "Bugun operatsiyalar yo'q",
     "date": "Sana",
     "amount": "Summa",
+    "paymentMethod": "To'lov usuli",
     "status": "Status",
     "receipt": "Chek raqami",
     "daily_summary": "Kunlik xulosa",
@@ -1284,6 +1288,18 @@
       "overdue": "Muddati o'tgan",
       "efficacy": "Samaradorlik"
     }
+  },
+  "plans": {
+    "title": "Sarlavha",
+    "total": "Jami"
+  },
+  "lab": {
+    "orderType": "Tur",
+    "expectedDate": "Muddat"
+  },
+  "rx": {
+    "itemsCount": "Dorilar",
+    "diagnosis": "Tashxis"
   },
   "serviceCategories": {
     "title": "Xizmat kategoriyalari",

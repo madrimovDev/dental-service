@@ -1,3 +1,4 @@
+export { clinicalRoutes } from './clinical.routes';
 export { ConsentTab } from './components/consent/ConsentTab';
 export { PatientImagesTab } from './components/images/PatientImagesTab';
 export { LabOrdersTab } from './components/lab-orders/LabOrdersTab';
