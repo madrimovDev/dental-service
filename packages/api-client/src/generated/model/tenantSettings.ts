@@ -4,6 +4,8 @@
  * Dental Service API
  * OpenAPI spec version: 0.1.0
  */
+import type { NotificationSettings } from './notificationSettings';
+import type { IntegrationSettings } from './integrationSettings';
 
 export interface TenantSettings {
   id: string;
@@ -13,6 +15,8 @@ export interface TenantSettings {
   currency: string;
   /** @nullable */
   onboardingDismissedAt: string | null;
+  notificationSettings: NotificationSettings;
+  integrationSettings: IntegrationSettings;
   createdAt: string;
   updatedAt: string;
 }

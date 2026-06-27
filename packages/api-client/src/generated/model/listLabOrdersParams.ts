@@ -7,6 +7,23 @@
 import type { ListLabOrdersStatus } from './listLabOrdersStatus';
 
 export type ListLabOrdersParams = {
+/**
+ * Filter by patient UUID
+ */
 patientId?: string;
+/**
+ * Filter by order status
+ */
 status?: ListLabOrdersStatus;
+/**
+ * @minimum 0
+ * @exclusiveMinimum
+ */
+page?: number;
+/**
+ * @minimum 0
+ * @maximum 100
+ * @exclusiveMinimum
+ */
+pageSize?: number;
 };

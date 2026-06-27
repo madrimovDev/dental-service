@@ -4,6 +4,8 @@
  * Dental Service API
  * OpenAPI spec version: 0.1.0
  */
+import type { UpdateTenantSettingsBodyNotificationSettings } from './updateTenantSettingsBodyNotificationSettings';
+import type { UpdateTenantSettingsBodyIntegrationSettings } from './updateTenantSettingsBodyIntegrationSettings';
 
 export type UpdateTenantSettingsBody = {
   /** @minLength 1 */
@@ -20,4 +22,6 @@ export type UpdateTenantSettingsBody = {
   currency?: string;
   /** @nullable */
   onboardingDismissedAt?: string | null;
+  notificationSettings?: UpdateTenantSettingsBodyNotificationSettings;
+  integrationSettings?: UpdateTenantSettingsBodyIntegrationSettings;
 };

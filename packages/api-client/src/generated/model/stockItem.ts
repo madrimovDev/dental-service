@@ -12,6 +12,10 @@ export interface StockItem {
   branchId: string | null;
   name: string;
   unit: string;
+  /** @nullable */
+  category: string | null;
+  /** @nullable */
+  price: string | null;
   quantity: string;
   minThreshold: string;
   createdAt: string;
