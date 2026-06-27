@@ -46,3 +46,17 @@ describe('toRecallDto — PII masking', () => {
     expect(toRecallDto(noPhone, false).patientPhone).toBeNull();
   });
 });
+
+describe('toRecallDto — smsStatus (DS7, SMS yetkazish ≠ workflow status)', () => {
+  it('smsStatus qiymati oʻzgarmasdan oʻtadi', () => {
+    const sent = { ...row, smsStatus: 'sent' } as RecallWithPatient;
+    expect(toRecallDto(sent).smsStatus).toBe('sent');
+  });
+
+  it('smsStatus null/undefined boʼlsa null qaytadi', () => {
+    const nullStatus = { ...row, smsStatus: null } as RecallWithPatient;
+    expect(toRecallDto(nullStatus).smsStatus).toBeNull();
+    // Base `row` da smsStatus yo'q (undefined) — DTO null boʼlishi shart (nullable, undefined emas).
+    expect(toRecallDto(row).smsStatus).toBeNull();
+  });
+});

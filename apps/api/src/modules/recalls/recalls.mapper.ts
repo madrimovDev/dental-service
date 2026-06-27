@@ -41,6 +41,7 @@ export const toRecallDto = (row: RecallWithPatient, maskPhone = false): RecallDt
   assignedDoctorId: row.assignedDoctorId ?? null,
   lastContactedAt: row.lastContactedAt ? row.lastContactedAt.toISOString() : null,
   contactAttempts: row.contactAttempts,
+  smsStatus: row.smsStatus ?? null,
   notes: row.notes ?? null,
   createdBy: row.createdBy ?? null,
   closedBy: row.closedBy ?? null,
