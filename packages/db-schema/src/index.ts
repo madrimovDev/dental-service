@@ -36,6 +36,7 @@ export * from './tables/recalls.ts';
 export * from './tables/refresh-tokens.ts';
 export * from './tables/role-permissions.ts';
 export * from './tables/roles.ts';
+export * from './tables/service-categories.ts';
 export * from './tables/service-materials.ts';
 export * from './tables/service-prices.ts';
 export * from './tables/services.ts';

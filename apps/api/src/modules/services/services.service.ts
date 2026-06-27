@@ -16,7 +16,7 @@ export const createServicesService = (deps: { audit: AuditLogger }) => {
       .select()
       .from(services)
       .where(isNull(services.deletedAt))
-      .orderBy(services.category, services.nameUz);
+      .orderBy(services.categoryId, services.nameUz);
   }
 
   async function findById(c: Context, id: string) {
@@ -59,7 +59,7 @@ export const createServicesService = (deps: { audit: AuditLogger }) => {
           code: input.code,
           nameUz: input.nameUz,
           nameRu: input.nameRu ?? null,
-          category: input.category ?? null,
+          // categoryId: set via dedicated endpoint (task-3)
           durationMinutes: input.durationMinutes,
           requiredRole: input.requiredRole ?? null,
           descriptionUz: input.descriptionUz ?? null,

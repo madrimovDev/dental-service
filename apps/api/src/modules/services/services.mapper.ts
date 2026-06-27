@@ -8,7 +8,7 @@ export const toServiceDto = (row: Service): ServiceDto => ({
   code: row.code,
   nameUz: row.nameUz,
   nameRu: row.nameRu ?? null,
-  category: row.category ?? null,
+  category: null, // TODO(task-3): join service_categories to resolve name
   durationMinutes: row.durationMinutes,
   requiredRole: row.requiredRole ?? null,
   descriptionUz: row.descriptionUz ?? null,

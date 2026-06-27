@@ -392,7 +392,7 @@ async function seed() {
         code: s.code,
         nameUz: s.nameUz,
         nameRu: s.nameRu,
-        category: s.category,
+        // category: s.category, // TODO(task-3): migrate to categoryId FK
         durationMinutes: s.dur,
         isActive: true,
       });

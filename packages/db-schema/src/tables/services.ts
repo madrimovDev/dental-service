@@ -9,6 +9,7 @@ import {
   unique,
   uuid,
 } from 'drizzle-orm/pg-core';
+import { serviceCategories } from './service-categories.ts';
 import { tenants } from './tenants.ts';
 
 /**
@@ -28,7 +29,9 @@ export const services = pgTable(
     code: text('code').notNull(), // "PL-001", "FK-002"
     nameUz: text('name_uz').notNull(),
     nameRu: text('name_ru'),
-    category: text('category'), // "Terapevtika", "Ortopediya", ...
+    categoryId: uuid('category_id').references(() => serviceCategories.id, {
+      onDelete: 'restrict',
+    }),
     durationMinutes: integer('duration_minutes').notNull().default(30),
     requiredRole: text('required_role'), // 'doctor' | 'assistant' | 'technician'
     descriptionUz: text('description_uz'),
@@ -42,7 +45,7 @@ export const services = pgTable(
   (t) => [
     unique('services_tenant_code_unique').on(t.tenantId, t.code),
     index('services_tenant_idx').on(t.tenantId),
-    index('services_tenant_category_idx').on(t.tenantId, t.category),
+    index('services_tenant_category_id_idx').on(t.tenantId, t.categoryId),
     index('services_tenant_deleted_idx').on(t.tenantId, t.deletedAt),
   ],
 );
