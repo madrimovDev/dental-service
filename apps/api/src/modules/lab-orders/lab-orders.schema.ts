@@ -61,6 +61,17 @@ export const labOrderIdParamSchema = z
   .object({ id: z.uuid() })
   .openapi({ param: { name: 'id', in: 'path' } });
 
+// ─── Query schema ──────────────────────────────────────────────────────────────
+
+/** DS7: tenant-wide yoki patient-filtered ro'yxat + status filtri + pagination. */
+export const listLabOrdersQuerySchema = z.object({
+  patientId: z.uuid().optional().openapi({ description: 'Filter by patient UUID' }),
+  status: orderStatusSchema.optional().openapi({ description: 'Filter by order status' }),
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().positive().max(100).default(20),
+});
+export type ListLabOrdersQuery = z.infer<typeof listLabOrdersQuerySchema>;
+
 // ─── Response DTO ──────────────────────────────────────────────────────────────
 
 /** Response DTO — wire shape (timestamps ISO string, nullable fields preserved). */
@@ -87,3 +98,16 @@ export const labOrderDtoSchema = z
   .openapi('LabOrder');
 
 export type LabOrderDto = z.infer<typeof labOrderDtoSchema>;
+
+/** DS7 — paginated list response (`{ data, meta }` inside `ok()` envelope). */
+export const labOrderListResponseDtoSchema = z
+  .object({
+    data: z.array(labOrderDtoSchema),
+    meta: z.object({
+      page: z.number().int(),
+      pageSize: z.number().int(),
+      total: z.number().int(),
+    }),
+  })
+  .openapi('LabOrderListResponse');
+export type LabOrderListResponseDto = z.infer<typeof labOrderListResponseDtoSchema>;
