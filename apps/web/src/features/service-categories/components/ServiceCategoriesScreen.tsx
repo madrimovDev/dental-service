@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { useDeleteServiceCategory, useServiceCategories } from '../service-categories.api';
+import { toServiceCategoryVM } from '../service-categories.mappers';
 import { ServiceCategoryFormModal } from './ServiceCategoryFormModal';
 
 export function ServiceCategoriesScreen() {
@@ -20,7 +21,8 @@ export function ServiceCategoriesScreen() {
   const [pendingDelete, setPendingDelete] = useState<ServiceCategory | null>(null);
   const [opened, { open, close }] = useDisclosure(false);
 
-  const list = categories.data ?? [];
+  const dtos = categories.data ?? [];
+  const list = dtos.map(toServiceCategoryVM);
   const openCreate = () => {
     setEditing(null);
     open();
@@ -68,33 +70,36 @@ export function ServiceCategoriesScreen() {
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {list.map((cat) => (
-                <Table.Tr key={cat.id}>
-                  <Table.Td>{cat.name}</Table.Td>
-                  <Table.Td>{cat.nameRu ?? '—'}</Table.Td>
-                  {canManage && (
-                    <Table.Td>
-                      <Group gap="xs" justify="flex-end">
-                        <ActionIcon
-                          variant="subtle"
-                          aria-label={t('common.edit')}
-                          onClick={() => openEdit(cat)}
-                        >
-                          <IconPencil size={16} />
-                        </ActionIcon>
-                        <ActionIcon
-                          variant="subtle"
-                          color="red"
-                          aria-label={t('common.delete')}
-                          onClick={() => setPendingDelete(cat)}
-                        >
-                          <IconTrash size={16} />
-                        </ActionIcon>
-                      </Group>
-                    </Table.Td>
-                  )}
-                </Table.Tr>
-              ))}
+              {list.map((vm) => {
+                const dto = dtos.find((d) => d.id === vm.id)!;
+                return (
+                  <Table.Tr key={vm.id}>
+                    <Table.Td>{vm.name}</Table.Td>
+                    <Table.Td>{vm.nameRu ?? '—'}</Table.Td>
+                    {canManage && (
+                      <Table.Td>
+                        <Group gap="xs" justify="flex-end">
+                          <ActionIcon
+                            variant="subtle"
+                            aria-label={t('common.edit')}
+                            onClick={() => openEdit(dto)}
+                          >
+                            <IconPencil size={16} />
+                          </ActionIcon>
+                          <ActionIcon
+                            variant="subtle"
+                            color="red"
+                            aria-label={t('common.delete')}
+                            onClick={() => setPendingDelete(dto)}
+                          >
+                            <IconTrash size={16} />
+                          </ActionIcon>
+                        </Group>
+                      </Table.Td>
+                    )}
+                  </Table.Tr>
+                );
+              })}
             </Table.Tbody>
           </Table>
         )}
