@@ -169,7 +169,7 @@ export function RecallDashboard() {
                   </Table.Td>
                   <Table.Td>
                     {r.smsStatus ? (
-                      <StatusPill status={recallSmsStatusTone(r.smsStatus)} dot={false}>
+                      <StatusPill status={recallSmsStatusTone(r.smsStatus)}>
                         {t(recallSmsStatusLabelKey(r.smsStatus))}
                       </StatusPill>
                     ) : (

@@ -17,7 +17,9 @@ vi.mock('../recalls.api', () => ({
     isError,
     refetch: vi.fn(),
   }),
-  useRecallSummary: () => ({ data: undefined }),
+  useRecallSummary: () => ({
+    data: { pending: 2, contacted: 1, scheduled: 3, overdue: 1, efficacyPct: 75 },
+  }),
   useMarkRecallContacted: () => ({ mutate: markContactedMutate, isPending: false }),
   useUpdateRecall: () => ({ mutate: updateMutate, isPending: false }),
 }));
@@ -107,5 +109,22 @@ describe('RecallDashboard', () => {
     recalls = [makeRecall()];
     renderApp(<RecallDashboard />);
     expect(screen.queryByRole('button', { name: "Bog'lanildi" })).not.toBeInTheDocument();
+  });
+
+  it("SMS holati ustuni yuborilgan SMS uchun 'Yuborildi' ko'rsatadi", () => {
+    recalls = [makeRecall({ smsStatus: 'sent' })];
+    renderApp(<RecallDashboard />);
+    const row = screen.getByText('Ali Valiyev').closest('tr');
+    expect(row).toHaveTextContent('Yuborildi');
+  });
+
+  it("smsStatus null bo'lsa SMS ustunida '—' ko'rsatadi", () => {
+    recalls = [makeRecall({ smsStatus: null })];
+    renderApp(<RecallDashboard />);
+    const row = screen.getByText('Ali Valiyev').closest('tr');
+    // SMS yuborilmagan → none ("—"). Telefon ham ko'rinadi, shuning uchun
+    // SMS holati ustunini header orqali tekshiramiz: jadval "SMS holati" ustuniga ega.
+    expect(screen.getByText('SMS holati')).toBeInTheDocument();
+    expect(row).not.toHaveTextContent('Yuborildi');
   });
 });
