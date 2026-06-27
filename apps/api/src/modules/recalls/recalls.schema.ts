@@ -40,6 +40,16 @@ export const recallDtoSchema = z
     assignedDoctorId: z.uuid().nullable().openapi({ example: null }),
     lastContactedAt: z.string().nullable().openapi({ example: null }),
     contactAttempts: z.number().int().openapi({ example: 0 }),
+    /**
+     * SMS yetkazish holati — workflow `status`'dan SEMANTIK ALOHIDA (DS7).
+     * Oxirgi SMS yuborish natijasi (odatda: pending/sent/failed/replied).
+     * Denormalizatsiya — manba haqiqati `recall_logs`. Nullable: SMS yuborilmagan
+     * recall'da bo'sh. Erkin matn (DB enum EMAS) — strict enum bilan bog'lanmaydi.
+     */
+    smsStatus: z
+      .string()
+      .nullable()
+      .openapi({ example: 'sent', description: 'SMS delivery status (workflow status ≠ SMS)' }),
     notes: z.string().nullable().openapi({ example: null }),
     createdBy: z.uuid().nullable().openapi({ example: null }),
     closedBy: z.uuid().nullable().openapi({ example: null }),
