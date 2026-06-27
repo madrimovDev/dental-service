@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { index, numeric, pgTable, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
+import { numeric, pgTable, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
 import { services } from './services.ts';
 import { stockItems } from './stock-items.ts';
 import { tenants } from './tenants.ts';
