@@ -1035,6 +1035,7 @@
     "no_transactions_today": "Bugun operatsiyalar yo'q",
     "date": "Sana",
     "amount": "Summa",
+    "transactionType": "Tur",
     "paymentMethod": "To'lov usuli",
     "status": "Status",
     "receipt": "Chek raqami",

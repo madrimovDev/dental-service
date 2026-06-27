@@ -31,7 +31,7 @@ export function TransactionsScreen() {
             <Table.Tr>
               <Table.Th>{t('common.date')}</Table.Th>
               <Table.Th>{t('common.patient')}</Table.Th>
-              <Table.Th>{t('cashier.type')}</Table.Th>
+              <Table.Th>{t('cashier.transactionType')}</Table.Th>
               <Table.Th>{t('cashier.amount')}</Table.Th>
               <Table.Th>{t('cashier.paymentMethod')}</Table.Th>
             </Table.Tr>
@@ -49,9 +49,9 @@ export function TransactionsScreen() {
                     '—'
                   )}
                 </Table.Td>
-                <Table.Td>{tx.type}</Table.Td>
+                <Table.Td>{t(`cashier.type.${tx.type}`)}</Table.Td>
                 <Table.Td>{formatCurrency(Number(tx.totalAmount), t)}</Table.Td>
-                <Table.Td>{tx.paymentMethod}</Table.Td>
+                <Table.Td>{t(`cashier.method.${tx.paymentMethod}`)}</Table.Td>
               </Table.Tr>
             ))}
           </Table.Tbody>

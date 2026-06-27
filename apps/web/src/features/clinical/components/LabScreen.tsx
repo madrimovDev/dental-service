@@ -43,7 +43,7 @@ export function LabScreen() {
                     {t('common.view')}
                   </Anchor>
                 </Table.Td>
-                <Table.Td>{order.orderType}</Table.Td>
+                <Table.Td>{t(`lab_order.type_${order.orderType}`)}</Table.Td>
                 <Table.Td>{order.expectedDate ? fmtDate(order.expectedDate) : '—'}</Table.Td>
                 <Table.Td>
                   <StatusPill status={labOrderStatusToTone(order.status)}>
