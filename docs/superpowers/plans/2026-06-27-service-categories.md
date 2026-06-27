@@ -585,7 +585,10 @@ git commit -m "feat(api): service-categories modul — CRUD + findOrCreateByName
 - Modify: `apps/api/src/modules/services/services.mapper.ts`
 - Modify: `apps/api/src/modules/services/services.service.ts`
 - Modify: `apps/api/src/modules/services/services.routes.ts`
+- Modify: `apps/api/src/db/seed-demo.ts` (replace Task 1 shim — set `categoryId` via `findOrCreateByName` or drop the field)
 - Test: `apps/api/tests/integration/services-category.test.ts`
+
+> **MUHIM (Task 1 shim'lari):** Task 1 monorepo kompilyatsiyasini saqlash uchun 3 faylga vaqtinchalik shim qo'ygan — bu task ularning HAMMASINI haqiqiy kodga almashtirishi shart: `services.mapper.ts` (`category: null` → join'dan `categoryName`), `services.service.ts` (`orderBy(categoryId)` + insertdan tushib qolgan category → real find-or-create + join), `seed-demo.ts` (kommentlangan `category` qatori → `categoryId` yoki olib tashlash). Hech qanday `TODO(task-3)` shim qolmasligi kerak.
 
 **Interfaces:**
 - Consumes: `createServiceCategoriesService` (Task 3); `serviceCategories` (Task 1).
