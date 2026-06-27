@@ -34,3 +34,41 @@ export function recallReasonLabelKey(reason: RecallDtoReason): string {
 export function formatRecallDate(iso: string): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date(iso));
 }
+
+/**
+ * SMS yetkazish holatlari — DB manba haqiqati (`recalls.sms_status`):
+ * `pending | sent | failed | replied`. Workflow `status`'dan ALOHIDA (DS7).
+ */
+const RECALL_SMS_STATUSES = ['pending', 'sent', 'failed', 'replied'] as const;
+type RecallSmsStatus = (typeof RECALL_SMS_STATUSES)[number];
+
+function isKnownSmsStatus(v: string): v is RecallSmsStatus {
+  return (RECALL_SMS_STATUSES as readonly string[]).includes(v);
+}
+
+/**
+ * SMS holati → i18n kalit (`recall.sms_status.*`). `null` yoki notanish qiymat →
+ * `none` (SMS yuborilmagan, "—"). Yangi kalit qo'shilmaydi — Faza 4a kalitlari.
+ */
+export function recallSmsStatusLabelKey(smsStatus: string | null): string {
+  if (smsStatus && isKnownSmsStatus(smsStatus)) return `recall.sms_status.${smsStatus}`;
+  return 'recall.sms_status.none';
+}
+
+/** SMS holati → StatusPill toni (vizual semantika). */
+export function recallSmsStatusTone(
+  smsStatus: string | null,
+): 'neutral' | 'success' | 'warning' | 'danger' | 'info' {
+  switch (smsStatus) {
+    case 'sent':
+      return 'success';
+    case 'replied':
+      return 'info';
+    case 'pending':
+      return 'warning';
+    case 'failed':
+      return 'danger';
+    default:
+      return 'neutral';
+  }
+}

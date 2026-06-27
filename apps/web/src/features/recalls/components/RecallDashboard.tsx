@@ -17,6 +17,8 @@ import {
   isOverdue,
   localToday,
   recallReasonLabelKey,
+  recallSmsStatusLabelKey,
+  recallSmsStatusTone,
   recallStatusLabelKey,
 } from '../recalls.mappers';
 import type { RecallDto } from '../recalls.types';
@@ -137,6 +139,7 @@ export function RecallDashboard() {
                 <Table.Th style={thLabelStyle}>{t('recall.col.reason')}</Table.Th>
                 <Table.Th style={thLabelStyle}>{t('recall.col.due')}</Table.Th>
                 <Table.Th style={thLabelStyle}>{t('recall.col.status')}</Table.Th>
+                <Table.Th style={thLabelStyle}>{t('recall.sms_status.label')}</Table.Th>
                 {canManage && <Table.Th style={thLabelStyle}>{t('recall.col.actions')}</Table.Th>}
               </Table.Tr>
             </Table.Thead>
@@ -163,6 +166,15 @@ export function RecallDashboard() {
                     <StatusPill status={statusTone(r.status)}>
                       {t(recallStatusLabelKey(r.status))}
                     </StatusPill>
+                  </Table.Td>
+                  <Table.Td>
+                    {r.smsStatus ? (
+                      <StatusPill status={recallSmsStatusTone(r.smsStatus)}>
+                        {t(recallSmsStatusLabelKey(r.smsStatus))}
+                      </StatusPill>
+                    ) : (
+                      <Text c="dimmed">{t('recall.sms_status.none')}</Text>
+                    )}
                   </Table.Td>
                   {canManage && (
                     <Table.Td>

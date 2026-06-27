@@ -4,6 +4,8 @@ import {
   isOverdue,
   localToday,
   recallReasonLabelKey,
+  recallSmsStatusLabelKey,
+  recallSmsStatusTone,
   recallStatusLabelKey,
 } from './recalls.mappers';
 
@@ -46,5 +48,33 @@ describe('formatRecallDate', () => {
   it('UTC ISO instant → Tashkent kalendar sanasi', () => {
     // 2026-06-20T20:00:00Z = 01:00 Tashkent 21-iyun
     expect(formatRecallDate('2026-06-20T20:00:00Z')).toBe('2026-06-21');
+  });
+});
+
+describe('recallSmsStatusLabelKey (DS7 SMS ustuni)', () => {
+  it('tanilgan qiymat → recall.sms_status.<value>', () => {
+    expect(recallSmsStatusLabelKey('sent')).toBe('recall.sms_status.sent');
+    expect(recallSmsStatusLabelKey('pending')).toBe('recall.sms_status.pending');
+    expect(recallSmsStatusLabelKey('failed')).toBe('recall.sms_status.failed');
+    expect(recallSmsStatusLabelKey('replied')).toBe('recall.sms_status.replied');
+  });
+  it('null → recall.sms_status.none (SMS yuborilmagan)', () => {
+    expect(recallSmsStatusLabelKey(null)).toBe('recall.sms_status.none');
+  });
+  it('notanish qiymat → none (default xavfsiz)', () => {
+    expect(recallSmsStatusLabelKey('queued')).toBe('recall.sms_status.none');
+  });
+});
+
+describe('recallSmsStatusTone', () => {
+  it('sent→success, replied→info, pending→warning, failed→danger', () => {
+    expect(recallSmsStatusTone('sent')).toBe('success');
+    expect(recallSmsStatusTone('replied')).toBe('info');
+    expect(recallSmsStatusTone('pending')).toBe('warning');
+    expect(recallSmsStatusTone('failed')).toBe('danger');
+  });
+  it('null/notanish → neutral', () => {
+    expect(recallSmsStatusTone(null)).toBe('neutral');
+    expect(recallSmsStatusTone('queued')).toBe('neutral');
   });
 });
