@@ -37,6 +37,34 @@ export type PlanCardVM = {
   totalVisits: number;
 };
 
+// ===== DS7: tenant-wide list rows =====
+export type PlanListRowVM = {
+  id: string;
+  patientId: string;
+  title: string;
+  status: TreatmentPlanStatus;
+  statusTone: Tone;
+  statusLabelKey: string;
+  totalCostText: string;
+  totalVisits: number;
+  updatedAtText: string;
+};
+
+export type LabOrderListRowVM = {
+  id: string;
+  patientId: string;
+  orderNumber: number | null;
+  labName: string;
+  orderType: LabOrderType;
+  typeLabelKey: string;
+  status: LabOrderStatus;
+  statusTone: Tone;
+  statusLabelKey: string;
+  costText: string | null;
+  currency: string;
+  expectedDateText: string | null;
+};
+
 export type StageRowVM = {
   id: string;
   sequence: number;

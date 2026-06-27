@@ -17,6 +17,7 @@ vi.mock('../recalls.api', () => ({
     isError,
     refetch: vi.fn(),
   }),
+  useRecallSummary: () => ({ data: undefined }),
   useMarkRecallContacted: () => ({ mutate: markContactedMutate, isPending: false }),
   useUpdateRecall: () => ({ mutate: updateMutate, isPending: false }),
 }));
@@ -45,6 +46,7 @@ function makeRecall(over: Partial<RecallDto> = {}): RecallDto {
     assignedDoctorId: null,
     lastContactedAt: null,
     contactAttempts: 0,
+    smsStatus: null,
     notes: null,
     createdBy: null,
     closedBy: null,

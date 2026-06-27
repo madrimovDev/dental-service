@@ -2,6 +2,7 @@ import { appointmentRoutes } from '@/features/appointments';
 import { auditRoutes } from '@/features/audit';
 import { authRoutes } from '@/features/auth';
 import { cashierRoutes } from '@/features/cashier';
+import { clinicalRoutes } from '@/features/clinical';
 import { dashboardRoutes } from '@/features/dashboard';
 import { expensesRoutes } from '@/features/expenses';
 import { patientRoutes } from '@/features/patients';
@@ -34,6 +35,7 @@ export const protectedRoutes: AppRoute[] = [
   ...scheduleRoutes,
   ...queueRoutes,
   ...recallRoutes,
+  ...clinicalRoutes,
   ...cashierRoutes,
   ...reportsRoutes,
   ...auditRoutes,
