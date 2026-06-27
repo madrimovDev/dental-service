@@ -78,16 +78,15 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     labelKey: 'nav.group.klinika',
     items: [
-      { key: 'plans', labelKey: 'nav.plans', icon: FileText, path: '/plans', disabled: true },
+      { key: 'plans', labelKey: 'nav.plans', icon: FileText, path: '/plans' },
       {
         key: 'lab',
         labelKey: 'nav.lab',
         icon: FlaskConical,
         path: '/lab',
         feature: 'labOrders',
-        disabled: true,
       },
-      { key: 'rx', labelKey: 'nav.rx', icon: Pill, path: '/rx', disabled: true },
+      { key: 'rx', labelKey: 'nav.rx', icon: Pill, path: '/rx' },
       {
         key: 'schedule',
         labelKey: 'nav.schedule',
@@ -184,13 +183,12 @@ export const NAV_GROUPS: NavGroup[] = [
         path: '/settings/tenant',
         permission: 'tenant.view',
       },
-      { key: 'kpi', labelKey: 'nav.kpi', icon: BarChart3, path: '/dashboard', disabled: true },
+      { key: 'kpi', labelKey: 'nav.kpi', icon: BarChart3, path: '/dashboard' },
       {
         key: 'transactions',
         labelKey: 'nav.transactions',
         icon: ArrowLeftRight,
         path: '/transactions',
-        disabled: true,
       },
       {
         key: 'patient-new',
