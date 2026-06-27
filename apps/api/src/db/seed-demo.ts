@@ -721,6 +721,8 @@ async function seed() {
       const start = atHour(daysFromNow(dayOffset), 9 + (i % 6), (i % 2) * 30);
       const doc = i % 2 === 0 ? DOC1 : DOC2;
       const status = apptStatuses[i];
+      const apptSvc = svc[(i % 5) + 1];
+      if (!apptSvc) continue;
       await db
         .insert(appointments)
         .values({
@@ -732,7 +734,7 @@ async function seed() {
           startTime: start,
           endTime: new Date(start.getTime() + 45 * 60_000),
           status,
-          serviceIds: [svc[(i % 5) + 1]!.sid],
+          serviceIds: [apptSvc.sid],
           notes: status === 'cancelled' ? 'Bemor bekor qildi' : null,
           cancellationReason: status === 'cancelled' ? 'Bemor kela olmadi' : null,
           createdBy: id(13),
@@ -748,11 +750,14 @@ async function seed() {
   if ((await count(queueTickets)) < 1) {
     const queueStatuses = ['done', 'done', 'in_progress', 'waiting', 'waiting'] as const;
     for (let i = 0; i < 5; i++) {
+      const qPat = pts[i];
+      const qSvc = svc[(i % 5) + 1];
+      if (!qPat || !qSvc) continue;
       await db.insert(queueTickets).values({
         tenantId: TENANT_ID,
         branchId: MAIN_BRANCH_ID,
-        patientId: pts[i]!.pid,
-        serviceId: svc[(i % 5) + 1]!.sid,
+        patientId: qPat.pid,
+        serviceId: qSvc.sid,
         doctorId: i % 2 === 0 ? DOC1 : DOC2,
         queueNumber: i + 1,
         status: queueStatuses[i],
