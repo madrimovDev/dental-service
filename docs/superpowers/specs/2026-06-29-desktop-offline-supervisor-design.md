@@ -347,10 +347,16 @@ Admin panel → "Restore" tugma →
 
 ---
 
-## 8. Ochiq savollar
+## 8. Qarorlar va ochiq savollar
 
-- [ ] S3 provider: AWS S3 yoki o'z MinIO serveri?
+### Qabul qilingan qarorlar
+
+- **Grace period:** 30 kun (Supervisor admin paneldan har klinika uchun alohida sozlanadi)
+- **S3 backup:** keyinroq — hozir spec'dan tashqarida
+- **Reactivation:** admin (developer) Supervisor paneldan qo'lda amalga oshiradi (hardware o'zgarganda klinika murojaat qiladi)
+
+### Ochiq savollar
+
+- [ ] S3 provider: AWS S3 yoki o'z MinIO serveri? *(backup tayyor bo'lganda hal qilinadi)*
 - [ ] Supervisor qaysi hostingda? (VPS, Railway, Fly.io?)
-- [ ] Grace period: 30 kun yetarlimi?
-- [ ] Backup encryption kaliti: Supervisor saqlaydi yoki klinika o'zi?
-- [ ] Reactivation: hardware o'zgarganda qanday jarayon?
+- [ ] Backup encryption kaliti: Supervisor saqlaydi yoki klinika o'zi? *(backup tayyor bo'lganda)*
