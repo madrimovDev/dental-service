@@ -29,7 +29,6 @@ export const publicRoutes: AppRoute[] = [
 ];
 
 export const protectedRoutes: AppRoute[] = [
-  ...clinicalRoutes,
   ...dashboardRoutes,
   ...patientRoutes,
   ...appointmentRoutes,
