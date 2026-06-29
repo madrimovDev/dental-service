@@ -94,10 +94,10 @@ function NavButton({
 
 export function SettingsShell({
   active,
+  actions,
   children,
 }: {
   active: SettingsTab;
-  /** Backward-compat with DS9 (UsersSettingsScreen) — accepted but not rendered (§3.8). */
   actions?: ReactNode;
   children: ReactNode;
 }) {
@@ -128,7 +128,14 @@ export function SettingsShell({
           />
         ))}
       </nav>
-      <div style={{ minWidth: 0 }}>{children}</div>
+      <div style={{ minWidth: 0 }}>
+        {actions && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+            {actions}
+          </div>
+        )}
+        {children}
+      </div>
     </div>
   );
 }
