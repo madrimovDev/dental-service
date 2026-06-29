@@ -1,9 +1,11 @@
 import { AppShell as MantineAppShell } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
+import { Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Outlet } from 'react-router-dom';
 import { useUiStore } from '@/stores/ui-store.ts';
 import { CommandPalette } from './CommandPalette';
+import { PageLoader } from './PageLoader';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 
@@ -28,7 +30,9 @@ export function AppShell() {
         <Sidebar />
       </MantineAppShell.Navbar>
       <MantineAppShell.Main id="main-content">
-        <Outlet />
+        <Suspense fallback={<PageLoader />}>
+          <Outlet />
+        </Suspense>
       </MantineAppShell.Main>
     </MantineAppShell>
   );
