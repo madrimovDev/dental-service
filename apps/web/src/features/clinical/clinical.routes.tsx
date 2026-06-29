@@ -1,7 +1,15 @@
+import { lazy } from 'react';
 import type { AppRoute } from '@/shell';
-import { LabOrdersScreen } from './components/lab-orders/LabOrdersScreen';
-import { RxScreen } from './components/RxScreen';
-import { TreatmentPlansScreen } from './components/treatment-plans/TreatmentPlansScreen';
+
+const TreatmentPlansScreen = lazy(() =>
+  import('./components/treatment-plans/TreatmentPlansScreen').then((m) => ({
+    default: m.TreatmentPlansScreen,
+  })),
+);
+const LabOrdersScreen = lazy(() =>
+  import('./components/lab-orders/LabOrdersScreen').then((m) => ({ default: m.LabOrdersScreen })),
+);
+const RxScreen = lazy(() => import('./components/RxScreen').then((m) => ({ default: m.RxScreen })));
 
 export const clinicalRoutes: AppRoute[] = [
   { path: '/plans', perm: 'medical_record.view', element: <TreatmentPlansScreen /> },
