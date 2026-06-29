@@ -1,9 +1,19 @@
+import { lazy } from 'react';
 import type { AppRoute } from '@/shell';
-import { ForgotPasswordPage } from './pages/forgot-password.page';
-import { LoginPage } from './pages/login.page';
-import { RegisterTenantPage } from './pages/register-tenant.page';
-import { ResetPasswordPage } from './pages/reset-password.page';
-import { SelectWorkspacePage } from './pages/select-workspace.page';
+
+const ForgotPasswordPage = lazy(() =>
+  import('./pages/forgot-password.page').then((m) => ({ default: m.ForgotPasswordPage })),
+);
+const LoginPage = lazy(() => import('./pages/login.page').then((m) => ({ default: m.LoginPage })));
+const RegisterTenantPage = lazy(() =>
+  import('./pages/register-tenant.page').then((m) => ({ default: m.RegisterTenantPage })),
+);
+const ResetPasswordPage = lazy(() =>
+  import('./pages/reset-password.page').then((m) => ({ default: m.ResetPasswordPage })),
+);
+const SelectWorkspacePage = lazy(() =>
+  import('./pages/select-workspace.page').then((m) => ({ default: m.SelectWorkspacePage })),
+);
 
 // Public route'lar — shell tashqarisida, perm darvozasiz (app/routes.tsx publicRoutes ga qo'yadi)
 export const authRoutes: AppRoute[] = [
