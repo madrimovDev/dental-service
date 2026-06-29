@@ -13,9 +13,12 @@ import {
   createVisitNote,
   deletePatientImage,
   getLatestToothChart,
+  getPatient,
   getService,
   getTreatmentPlanEstimate,
   type LabOrderStatus,
+  type ListLabOrdersParams,
+  type ListTreatmentPlansParams,
   listAppointments,
   listConsentForms,
   listConsentTemplates,
@@ -39,7 +42,13 @@ import {
   updateTreatmentPlan,
   updateTreatmentStage,
 } from '@dental/api-client';
-import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  type QueryClient,
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { cashierKeys } from '@/features/cashier/cashier.keys.ts';
 import { patientKeys } from '@/features/patients/patients.keys.ts';
 import { api } from '@/lib/api.ts';
@@ -47,6 +56,32 @@ import { lookupKeys } from '@/lib/lookup-keys.ts';
 import { clinicalKeys } from './clinical.keys';
 
 const HOUR = 1000 * 60 * 60;
+
+// ===== DS7: tenant-wide list patient-ism hal qilish =====
+/**
+ * Tenant-wide ro'yxatlarda bemor ismini hal qiladi. Backend list javobi faqat
+ * `patientId` beradi → joriy sahifadagi NOYOB id'lar uchun `getPatient` (cached +
+ * deduped, sahifa hajmi bilan chegaralangan; boshqa sahifalarni qamramaydi).
+ * `patient.view` YO'Q rollar uchun `enabled=false` → 403 bo'lmaydi, cell id-fallback'ga
+ * tushadi. `patientKeys.raw` keshini patients feature bilan bo'lishadi (qayta so'rovsiz).
+ */
+export function usePatientNames(ids: string[], enabled: boolean): Map<string, string> {
+  const unique = Array.from(new Set(ids));
+  const results = useQueries({
+    queries: unique.map((id) => ({
+      queryKey: patientKeys.raw(id),
+      queryFn: () => getPatient(id).then((r) => r.data),
+      enabled: enabled && !!id,
+      staleTime: HOUR,
+    })),
+  });
+  const map = new Map<string, string>();
+  unique.forEach((id, i) => {
+    const name = results[i]?.data?.fullName;
+    if (name) map.set(id, name);
+  });
+  return map;
+}
 
 // ===== A: odontogram =====
 export function useLatestToothChart(patientId: string) {
@@ -79,7 +114,19 @@ export function useCreateToothChart(patientId: string) {
 export function useTreatmentPlans(patientId: string) {
   return useQuery({
     queryKey: clinicalKeys.plans(patientId),
-    queryFn: () => listTreatmentPlans({ patientId }).then((r) => r.data),
+    // DS7: list javobi endi `{ data, meta }` (paginated) — bemor tab'i faqat qatorlarni ko'rsatadi.
+    queryFn: () => listTreatmentPlans({ patientId }).then((r) => r.data.data),
+  });
+}
+
+/**
+ * DS7: tenant-wide davolash rejalari (barcha bemorlar). `status` server-side filtr,
+ * pagination `meta` orqali. Javob `{ data, meta }` (paginated envelope).
+ */
+export function useTreatmentPlansList(params: ListTreatmentPlansParams) {
+  return useQuery({
+    queryKey: clinicalKeys.plansList(params),
+    queryFn: () => listTreatmentPlans(params).then((r) => r.data),
   });
 }
 
@@ -253,7 +300,19 @@ export function useCreatePrescription(patientId: string) {
 export function useLabOrders(patientId: string) {
   return useQuery({
     queryKey: clinicalKeys.labOrders(patientId),
-    queryFn: () => listLabOrders({ patientId }).then((r) => r.data),
+    // DS7: list javobi endi `{ data, meta }` (paginated).
+    queryFn: () => listLabOrders({ patientId }).then((r) => r.data.data),
+  });
+}
+
+/**
+ * DS7: tenant-wide laboratoriya buyurtmalari (barcha bemorlar). `status` server-side
+ * filtr, pagination `meta` orqali. Javob `{ data, meta }`.
+ */
+export function useLabOrdersList(params: ListLabOrdersParams) {
+  return useQuery({
+    queryKey: clinicalKeys.labOrdersList(params),
+    queryFn: () => listLabOrders(params).then((r) => r.data),
   });
 }
 

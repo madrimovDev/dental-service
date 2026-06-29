@@ -91,7 +91,7 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: FlaskConical,
         path: '/lab',
         feature: 'labOrders',
-        permission: 'medical_record.view',
+        permission: 'lab_order.view',
       },
       { key: 'rx', labelKey: 'nav.rx', icon: Pill, path: '/rx', permission: 'medical_record.view' },
       {

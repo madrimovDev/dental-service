@@ -4,9 +4,9 @@
  * Dental Service API
  * OpenAPI spec version: 0.1.0
  */
-import type { LabOrder } from './labOrder';
+import type { LabOrderListResponse } from './labOrderListResponse';
 
 export type ListLabOrders200 = {
   success: boolean;
-  data: LabOrder[];
+  data: LabOrderListResponse;
 };

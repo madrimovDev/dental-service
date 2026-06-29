@@ -17,6 +17,7 @@ import { localDateKey, localTimeLabel } from '../appointments.mappers';
 import type { AppointmentStatus, CalendarEvent } from '../appointments.types';
 import { CalendarGrid } from './CalendarGrid';
 import { DayStatsCard } from './DayStatsCard';
+import { FreeSlotsCard } from './FreeSlotsCard';
 import { NewAppointmentWizard } from './NewAppointmentWizard';
 import { StatusLegend } from './StatusLegend';
 import { WaitlistCard } from './WaitlistCard';
@@ -295,6 +296,11 @@ export function CalendarScreen() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <DayStatsCard appts={apptList} />
+          {/* DS12: jonli "Bo'sh slot" kartasi — faqat `schedule.view` ruxsati
+              bo'lganda render (cheklangan rollarda 403 oldini olish, CLI-153). */}
+          {hasPermission('schedule.view') && (
+            <FreeSlotsCard branchId={branchId} date={localDateKey(date.toISOString())} enabled />
+          )}
           <WaitlistCard appts={apptList} />
         </div>
       </div>

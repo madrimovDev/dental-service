@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { mergeIntegrationSettings, mergeNotificationSettings } from './tenant-settings.mapper.ts';
 import type { UpdateSettingsInput } from './tenant-settings.schema.ts';
 
 export const createTenantSettingsService = (deps: { audit: AuditLogger }) => {
@@ -49,10 +50,24 @@ export const createTenantSettingsService = (deps: { audit: AuditLogger }) => {
     const before = await getOrCreate(c);
 
     // `onboardingDismissedAt` wire'da ISO string keladi; Drizzle ustun Date kutadi.
-    const { onboardingDismissedAt, ...rest } = input;
+    // DS10: `notificationSettings`/`integrationSettings` — saqlangan JSONB ustiga
+    // MERGE qilinadi (to'liq almashtirilmaydi), shuning uchun `...rest`'dan ajratiladi.
+    const { onboardingDismissedAt, notificationSettings, integrationSettings, ...rest } = input;
     const patch: Record<string, unknown> = { ...rest, updatedAt: new Date() };
     if (onboardingDismissedAt !== undefined) {
       patch.onboardingDismissedAt = onboardingDismissedAt ? new Date(onboardingDismissedAt) : null;
+    }
+    if (notificationSettings !== undefined) {
+      patch.notificationSettings = mergeNotificationSettings(
+        before.notificationSettings,
+        notificationSettings,
+      );
+    }
+    if (integrationSettings !== undefined) {
+      patch.integrationSettings = mergeIntegrationSettings(
+        before.integrationSettings,
+        integrationSettings,
+      );
     }
 
     const [updated] = await db.update(tenantSettings).set(patch).returning();

@@ -6,6 +6,10 @@ export type StockItemVM = {
   branchId: string | null;
   name: string;
   unit: string;
+  /** Mahsulot kategoriyasi (ixtiyoriy). */
+  category: string | null;
+  /** Dona narxi (string son → number; belgilangan bo'lmasa null). */
+  price: number | null;
   quantity: number;
   minThreshold: number;
   /** Backend `isLowStock` natijasi (`StockItemWithLowStock.lowStock`). */

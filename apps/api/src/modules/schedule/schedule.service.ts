@@ -9,6 +9,7 @@ import {
 import { createScheduleRepository } from './schedule.repository.ts';
 import type {
   AvailabilityQuery,
+  BranchAvailabilityQuery,
   CreateTimeOffInput,
   ListTimeOffQuery,
   PutWorkingHoursInput,
@@ -165,6 +166,73 @@ export const createScheduleService = (deps: { audit: AuditLogger }) => {
     };
   }
 
+  /**
+   * Branch-wide availability (DS4 — right-rail "Bo'sh slot"): doktor tanlamasdan,
+   * filialdagi shu hafta-kunida aktiv ish-soati bor BARCHA doktorlarning bo'sh
+   * slotlari. Single-doctor `getAvailability` bilan bir xil pure yadro
+   * (`computeAvailability`) — har doktor uchun qayta ishlatiladi. Migration yo'q.
+   */
+  async function getBranchAvailability(c: Context, query: BranchAvailabilityQuery) {
+    const dayStart = new Date(`${query.date}T00:00:00+05:00`);
+    const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60_000);
+    const weekday = weekdayOf(query.date);
+
+    // Filial uchun barcha kirishlarni bir necha so'rovda (per-doktor N+1 emas).
+    const [workHours, segRows, apptRows, timeOffRows] = await Promise.all([
+      repo.getBranchWorkHours(c, query.branchId),
+      repo.listBranchActiveSegmentsForDay(c, query.branchId, weekday),
+      repo.listBranchAppointments(c, query.branchId, dayStart, dayEnd),
+      repo.listBranchOverlappingTimeOff(c, query.branchId, dayStart, dayEnd),
+    ]);
+
+    // doctorId bo'yicha guruhlash.
+    const segsByDoctor = new Map<string, typeof segRows>();
+    for (const s of segRows) {
+      const arr = segsByDoctor.get(s.doctorId);
+      if (arr) arr.push(s);
+      else segsByDoctor.set(s.doctorId, [s]);
+    }
+    const apptsByDoctor = new Map<string, typeof apptRows>();
+    for (const a of apptRows) {
+      const arr = apptsByDoctor.get(a.doctorId);
+      if (arr) arr.push(a);
+      else apptsByDoctor.set(a.doctorId, [a]);
+    }
+    const timeOffByDoctor = new Map<string, typeof timeOffRows>();
+    for (const t of timeOffRows) {
+      const arr = timeOffByDoctor.get(t.doctorId);
+      if (arr) arr.push(t);
+      else timeOffByDoctor.set(t.doctorId, [t]);
+    }
+
+    // Faqat shu kunda aktiv segmentга ega doktorlar (deterministik tartib).
+    const doctorIds = [...segsByDoctor.keys()].sort();
+    const doctors = doctorIds.map((doctorId) => {
+      const slots = computeAvailability({
+        date: query.date,
+        doctorSegments: (segsByDoctor.get(doctorId) ?? []).map((s) => ({
+          weekday: s.weekday,
+          startMinute: s.startMinute,
+          endMinute: s.endMinute,
+          effectiveFrom: s.effectiveFrom,
+          effectiveUntil: s.effectiveUntil,
+        })),
+        branchWorkHours: workHours,
+        appointments: apptsByDoctor.get(doctorId) ?? [],
+        timeOffs: timeOffByDoctor.get(doctorId) ?? [],
+        slotMinutes: query.slotMinutes,
+      });
+      return { doctorId, slots: slots.map(toAvailabilitySlotDto) };
+    });
+
+    return {
+      branchId: query.branchId,
+      date: query.date,
+      slotMinutes: query.slotMinutes,
+      doctors,
+    };
+  }
+
   // ─── Predicates (A6 — appointments integration imports these) ─────────────
 
   /**
@@ -228,6 +296,7 @@ export const createScheduleService = (deps: { audit: AuditLogger }) => {
     createTimeOff,
     deleteTimeOff,
     getAvailability,
+    getBranchAvailability,
     isWithinWorkingHours,
     isOnTimeOff,
   };

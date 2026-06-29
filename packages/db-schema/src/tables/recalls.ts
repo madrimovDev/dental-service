@@ -86,6 +86,14 @@ export const recalls = pgTable(
     }),
     lastContactedAt: timestamp('last_contacted_at', { withTimezone: true }),
     contactAttempts: integer('contact_attempts').notNull().default(0),
+    /**
+     * DS12 (DS7): SMS yetkazish holati — workflow `status`'dan SEMANTIK ALOHIDA.
+     * Workflow `status` recall hayot-siklini (pending/contacted/...) kuzatadi;
+     * `smsStatus` esa oxirgi SMS yuborish natijasini (pending/sent/failed/replied)
+     * ko'rsatadi. Nullable — SMS hech yuborilmagan recall'da bo'sh. Manba haqiqati
+     * `recall_logs` (per-urinish audit); bu — UI ustuni uchun denormalizatsiya.
+     */
+    smsStatus: text('sms_status'),
     notes: text('notes'),
 
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),

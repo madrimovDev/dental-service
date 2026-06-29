@@ -36,6 +36,7 @@ export const protectedRoutes: AppRoute[] = [
   ...scheduleRoutes,
   ...queueRoutes,
   ...recallRoutes,
+  ...clinicalRoutes,
   ...cashierRoutes,
   ...reportsRoutes,
   ...auditRoutes,

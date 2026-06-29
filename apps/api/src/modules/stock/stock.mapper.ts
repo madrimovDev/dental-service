@@ -18,6 +18,8 @@ export const toStockItemDto = (row: StockItem): StockItemDto => ({
   branchId: row.branchId ?? null,
   name: row.name,
   unit: row.unit,
+  category: row.category ?? null,
+  price: row.price ?? null,
   quantity: row.quantity,
   minThreshold: row.minThreshold,
   createdAt: row.createdAt.toISOString(),

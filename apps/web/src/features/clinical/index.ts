@@ -1,8 +1,10 @@
 export { clinicalRoutes } from './clinical.routes';
 export { ConsentTab } from './components/consent/ConsentTab';
 export { PatientImagesTab } from './components/images/PatientImagesTab';
+export { LabOrdersScreen } from './components/lab-orders/LabOrdersScreen';
 export { LabOrdersTab } from './components/lab-orders/LabOrdersTab';
 export { OdontogramTab } from './components/odontogram/OdontogramTab';
 export { PrescriptionsTab } from './components/prescriptions/PrescriptionsTab';
+export { TreatmentPlansScreen } from './components/treatment-plans/TreatmentPlansScreen';
 export { TreatmentPlansTab } from './components/treatment-plans/TreatmentPlansTab';
 export { VisitNotesTab } from './components/visit-notes/VisitNotesTab';

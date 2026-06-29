@@ -15,6 +15,8 @@ function item(over: Partial<StockItemWithLowStock> = {}): StockItemWithLowStock 
     branchId: 'b1',
     name: 'Anesteziya',
     unit: 'ml',
+    category: null,
+    price: null,
     quantity: '12.50',
     minThreshold: '5',
     lowStock: false,
@@ -45,6 +47,16 @@ describe('stock.mappers', () => {
       expect(vm.minThreshold).toBe(5);
       expect(vm.lowStock).toBe(false);
       expect(vm.stockState).toBe('ok');
+    });
+
+    it('category passthrough, price string → number (null → null)', () => {
+      expect(toStockItemVM(item({ category: 'Terapevtika', price: '15000.00' }))).toMatchObject({
+        category: 'Terapevtika',
+        price: 15000,
+      });
+      const noPrice = toStockItemVM(item({ category: null, price: null }));
+      expect(noPrice.category).toBeNull();
+      expect(noPrice.price).toBeNull();
     });
 
     it('lowStock=true → stockState=low (mijozda qayta hisoblamaydi)', () => {
