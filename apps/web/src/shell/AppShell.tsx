@@ -3,7 +3,6 @@ import { useDisclosure } from '@mantine/hooks';
 import { useTranslation } from 'react-i18next';
 import { Outlet } from 'react-router-dom';
 import { useUiStore } from '@/stores/ui-store.ts';
-import classes from './AppShell.module.css';
 import { CommandPalette } from './CommandPalette';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
@@ -29,9 +28,7 @@ export function AppShell() {
         <Sidebar />
       </MantineAppShell.Navbar>
       <MantineAppShell.Main id="main-content">
-        <div className={classes.content}>
-          <Outlet />
-        </div>
+        <Outlet />
       </MantineAppShell.Main>
     </MantineAppShell>
   );
