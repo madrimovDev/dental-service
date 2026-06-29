@@ -358,5 +358,5 @@ Admin panel → "Restore" tugma →
 ### Ochiq savollar
 
 - [ ] S3 provider: AWS S3 yoki o'z MinIO serveri? *(backup tayyor bo'lganda hal qilinadi)*
-- [ ] Supervisor qaysi hostingda? (VPS, Railway, Fly.io?)
+- **Supervisor hosting:** VPS (Docker + Caddy, xuddi `docker-compose.prod.yml` pattern)
 - [ ] Backup encryption kaliti: Supervisor saqlaydi yoki klinika o'zi? *(backup tayyor bo'lganda)*
