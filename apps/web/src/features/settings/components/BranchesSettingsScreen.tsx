@@ -1,6 +1,6 @@
 import type { Branch } from '@dental/api-client';
 import { StatusPill } from '@dental/ui';
-import { ActionIcon, Button, Group, Modal, Stack, Text, TextInput } from '@mantine/core';
+import { ActionIcon, Button, Group, Modal, Stack, Text, TextInput, Title } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
 import { IconEdit, IconPlus, IconTrash } from '@tabler/icons-react';
@@ -78,7 +78,7 @@ export function BranchesSettingsScreen() {
       <div
         style={{
           border: '1px solid var(--border)',
-          borderRadius: 16,
+          borderRadius: 'var(--radius-card)',
           background: 'var(--surface)',
           overflow: 'hidden',
         }}
@@ -93,9 +93,9 @@ export function BranchesSettingsScreen() {
             borderBottom: '1px solid var(--border)',
           }}
         >
-          <Text fw={700} style={{ fontSize: 16, color: 'var(--ink)' }}>
+          <Title order={4} fw={700} c="var(--ink)">
             {t('branches.title')}
-          </Text>
+          </Title>
           {hasPermission('branch.create') && (
             <Button leftSection={<IconPlus size={18} />} onClick={openCreate}>
               {t('branches.create')}

@@ -1,5 +1,5 @@
-import { PageHead, Tabs } from '@dental/ui';
-import { Group, Select, Stack } from '@mantine/core';
+import { Tabs } from '@dental/ui';
+import { Group, Select, Stack, Text } from '@mantine/core';
 import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -42,8 +42,10 @@ export function ScheduleScreen() {
 
   return (
     <div>
-      <PageHead title={t('schedule.title')} subtitle={t('schedule.subtitle')} />
-      <Stack gap="md" mt="md">
+      <Text size="sm" c="dimmed" mb="md">
+        {t('schedule.subtitle')}
+      </Text>
+      <Stack gap="lg" mt="md">
         <Group gap="md">
           <Select
             label={t('schedule.doctor')}

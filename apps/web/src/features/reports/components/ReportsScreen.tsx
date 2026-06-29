@@ -1,16 +1,5 @@
 import { PageHead, StatCard, StateView } from '@dental/ui';
-import {
-  Button,
-  Card,
-  Container,
-  Group,
-  Select,
-  SimpleGrid,
-  Stack,
-  Table,
-  Text,
-  Title,
-} from '@mantine/core';
+import { Button, Card, Group, Select, SimpleGrid, Stack, Table, Text, Title } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import {
   IconCalendarStats,
@@ -198,372 +187,370 @@ export function ReportsScreen() {
   const suffix = `${range.from}_${range.to}`;
 
   return (
-    <Container size="xl">
-      <Stack gap="lg">
-        <PageHead title={t('reports.title', { defaultValue: 'Hisobotlar' })} />
+    <Stack gap="lg">
+      <PageHead title={t('reports.title', { defaultValue: 'Hisobotlar' })} />
 
-        {/* 4 KPI — har biri o'z hook'iga bog'liq; ma'lumot yo'q bo'lsa em-dash (hech qachon bo'sh grid) */}
-        <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="lg">
-          <StatCard
-            accent
-            icon={<IconCashBanknote size={18} />}
-            label={t('reports.revenue', { defaultValue: 'Daromad' })}
-            value={revenue.data ? formatCurrency(revenue.data.total, t) : '—'}
-          />
-          <StatCard
-            icon={<IconCalendarStats size={18} />}
-            label={t('reports.appointments', { defaultValue: 'Qabullar' })}
-            value={appointments.data ? formatNumber(appointments.data.total) : '—'}
-          />
-          <StatCard
-            icon={<IconUserOff size={18} />}
-            label={t('reports.no_show', { defaultValue: 'Kelmaganlar' })}
-            value={appointments.data ? pct(appointments.data.noShowRate) : '—'}
-          />
-          <StatCard
-            icon={<IconChartBar size={18} />}
-            label={t('reports.utilization', { defaultValue: 'Bandlik' })}
-            value={appointments.data ? pct(appointments.data.slotUtilization) : '—'}
-          />
-        </SimpleGrid>
+      {/* 4 KPI — har biri o'z hook'iga bog'liq; ma'lumot yo'q bo'lsa em-dash (hech qachon bo'sh grid) */}
+      <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="lg">
+        <StatCard
+          accent
+          icon={<IconCashBanknote size={18} />}
+          label={t('reports.revenue', { defaultValue: 'Daromad' })}
+          value={revenue.data ? formatCurrency(revenue.data.total, t) : '—'}
+        />
+        <StatCard
+          icon={<IconCalendarStats size={18} />}
+          label={t('reports.appointments', { defaultValue: 'Qabullar' })}
+          value={appointments.data ? formatNumber(appointments.data.total) : '—'}
+        />
+        <StatCard
+          icon={<IconUserOff size={18} />}
+          label={t('reports.no_show', { defaultValue: 'Kelmaganlar' })}
+          value={appointments.data ? pct(appointments.data.noShowRate) : '—'}
+        />
+        <StatCard
+          icon={<IconChartBar size={18} />}
+          label={t('reports.utilization', { defaultValue: 'Bandlik' })}
+          value={appointments.data ? pct(appointments.data.slotUtilization) : '—'}
+        />
+      </SimpleGrid>
 
-        <Card withBorder padding="md">
-          <Group align="end" gap="md">
-            <DatePickerInput
-              type="range"
-              label={t('reports.date_range', { defaultValue: 'Sana oralig‘i' })}
-              value={[from, to]}
-              onChange={(val) => setDates(val)}
-              valueFormat="DD.MM.YYYY"
-              style={{ minWidth: 260 }}
-              allowSingleDateInRange
+      <Card withBorder padding="md">
+        <Group align="end" gap="md">
+          <DatePickerInput
+            type="range"
+            label={t('reports.date_range', { defaultValue: 'Sana oralig‘i' })}
+            value={[from, to]}
+            onChange={(val) => setDates(val)}
+            valueFormat="DD.MM.YYYY"
+            style={{ minWidth: 260 }}
+            allowSingleDateInRange
+          />
+          {canFilterBranch && (
+            <Select
+              label={t('reports.branch', { defaultValue: 'Filial' })}
+              placeholder={t('reports.all_branches', { defaultValue: 'Barcha filiallar' })}
+              clearable
+              value={branchId}
+              onChange={setBranchId}
+              data={(branches.data ?? []).map((b) => ({ value: b.id, label: b.name }))}
+              style={{ minWidth: 220 }}
             />
-            {canFilterBranch && (
-              <Select
-                label={t('reports.branch', { defaultValue: 'Filial' })}
-                placeholder={t('reports.all_branches', { defaultValue: 'Barcha filiallar' })}
-                clearable
-                value={branchId}
-                onChange={setBranchId}
-                data={(branches.data ?? []).map((b) => ({ value: b.id, label: b.name }))}
-                style={{ minWidth: 220 }}
-              />
-            )}
-            <Button
-              variant="light"
-              leftSection={<IconFileSpreadsheet size={16} />}
-              loading={oneC.isFetching}
-              onClick={handle1CExport}
-            >
-              {t('reports.export_1c', { defaultValue: '1C eksport' })}
-            </Button>
-          </Group>
-        </Card>
-
-        <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="lg">
-          {/* Daromad */}
-          <ReportSection
-            title={t('reports.revenue', { defaultValue: 'Daromad' })}
-            loading={revenue.isLoading}
-            error={revenue.isError}
-            onRetry={() => revenue.refetch()}
-            statesLabels={statesLabels}
-            hasData={!!revenue.data}
-            emptyText={t('reports.empty', { defaultValue: 'Ma’lumot yo‘q' })}
-            onCsv={() =>
-              revenue.data && downloadCsv(revenueToRows(revenue.data), `daromad_${suffix}`)
-            }
-            onXlsx={() =>
-              revenue.data && downloadXlsx(revenueToRows(revenue.data), `daromad_${suffix}`)
-            }
-            exportLabel={exportLabel}
+          )}
+          <Button
+            variant="light"
+            leftSection={<IconFileSpreadsheet size={16} />}
+            loading={oneC.isFetching}
+            onClick={handle1CExport}
           >
-            {revenue.data && (
-              <Stack gap="md">
-                {revenue.data.byPeriod.length > 0 && (
-                  <Stack gap="xs">
-                    <Text fw={600}>
-                      {t('reports.revenue_trend', { defaultValue: 'Daromad dinamikasi' })}
-                    </Text>
-                    <BarMini
-                      data={revenue.data.byPeriod.map((p) => ({
-                        label: p.date,
-                        value: p.total,
-                      }))}
-                    />
-                  </Stack>
-                )}
-                {revenue.data.byService.length > 0 && (
-                  <Stack gap="xs">
-                    <Text fw={600}>
-                      {t('reports.top_services', { defaultValue: 'Eng ko‘p xizmatlar' })}
-                    </Text>
-                    <BarMini
-                      data={revenue.data.byService.map((s) => ({
-                        label: s.serviceName,
-                        value: s.total,
-                      }))}
-                    />
-                  </Stack>
-                )}
-              </Stack>
-            )}
-          </ReportSection>
+            {t('reports.export_1c', { defaultValue: '1C eksport' })}
+          </Button>
+        </Group>
+      </Card>
 
-          {/* Qabullar */}
-          <ReportSection
-            title={t('reports.appointments', { defaultValue: 'Qabullar' })}
-            loading={appointments.isLoading}
-            error={appointments.isError}
-            onRetry={() => appointments.refetch()}
-            statesLabels={statesLabels}
-            hasData={!!appointments.data}
-            emptyText={t('reports.empty', { defaultValue: 'Ma’lumot yo‘q' })}
-            onCsv={() =>
-              appointments.data &&
-              downloadCsv(appointmentsToRows(appointments.data), `qabullar_${suffix}`)
-            }
-            onXlsx={() =>
-              appointments.data &&
-              downloadXlsx(appointmentsToRows(appointments.data), `qabullar_${suffix}`)
-            }
-            exportLabel={exportLabel}
-          >
-            {appointments.data && (
-              <Stack gap="xs">
-                <Table>
-                  <Table.Thead>
-                    <Table.Tr>
-                      <Table.Th>{t('reports.status', { defaultValue: 'Status' })}</Table.Th>
-                      <Table.Th>{t('reports.count', { defaultValue: 'Soni' })}</Table.Th>
-                    </Table.Tr>
-                  </Table.Thead>
-                  <Table.Tbody>
-                    {appointments.data.byStatus.map((s) => (
-                      <Table.Tr key={s.status}>
-                        <Table.Td>{s.status}</Table.Td>
-                        <Table.Td>{fmt(s.count)}</Table.Td>
-                      </Table.Tr>
-                    ))}
-                  </Table.Tbody>
-                </Table>
-              </Stack>
-            )}
-          </ReportSection>
-
-          {/* Shifokorlar yuklamasi */}
-          <ReportSection
-            title={t('reports.doctor_workload', { defaultValue: 'Shifokorlar yuklamasi' })}
-            loading={doctors.isLoading}
-            error={doctors.isError}
-            onRetry={() => doctors.refetch()}
-            statesLabels={statesLabels}
-            hasData={!!doctors.data && doctors.data.length > 0}
-            emptyText={t('reports.empty', { defaultValue: 'Ma’lumot yo‘q' })}
-            onCsv={() =>
-              doctors.data &&
-              downloadCsv(doctorsToRows(doctors.data, doctorName), `shifokorlar_${suffix}`)
-            }
-            onXlsx={() =>
-              doctors.data &&
-              downloadXlsx(doctorsToRows(doctors.data, doctorName), `shifokorlar_${suffix}`)
-            }
-            exportLabel={exportLabel}
-          >
-            {doctors.data && (
-              <Stack gap="md">
-                <BarMini
-                  data={doctors.data.map((d) => ({
-                    label: doctorName(d.doctorId),
-                    value: d.total,
-                  }))}
-                />
-                <Table>
-                  <Table.Thead>
-                    <Table.Tr>
-                      <Table.Th>{t('reports.doctor', { defaultValue: 'Shifokor' })}</Table.Th>
-                      <Table.Th>{t('reports.total', { defaultValue: 'Jami' })}</Table.Th>
-                      <Table.Th>{t('reports.completed', { defaultValue: 'Yakunlangan' })}</Table.Th>
-                    </Table.Tr>
-                  </Table.Thead>
-                  <Table.Tbody>
-                    {doctors.data.map((d) => (
-                      <Table.Tr key={d.doctorId}>
-                        <Table.Td>{doctorName(d.doctorId)}</Table.Td>
-                        <Table.Td>{fmt(d.total)}</Table.Td>
-                        <Table.Td>{fmt(d.completed)}</Table.Td>
-                      </Table.Tr>
-                    ))}
-                  </Table.Tbody>
-                </Table>
-              </Stack>
-            )}
-          </ReportSection>
-
-          {/* Davolash rejalari */}
-          <ReportSection
-            title={t('reports.plan_completion', { defaultValue: 'Davolash rejalari' })}
-            loading={plans.isLoading}
-            error={plans.isError}
-            onRetry={() => plans.refetch()}
-            statesLabels={statesLabels}
-            hasData={!!plans.data}
-            emptyText={t('reports.empty', { defaultValue: 'Ma’lumot yo‘q' })}
-            onCsv={() =>
-              plans.data && downloadCsv(planCompletionToRows(plans.data), `rejalar_${suffix}`)
-            }
-            onXlsx={() =>
-              plans.data && downloadXlsx(planCompletionToRows(plans.data), `rejalar_${suffix}`)
-            }
-            exportLabel={exportLabel}
-          >
-            {plans.data && (
-              <Stack gap="xs">
-                <Group gap="xl">
-                  <Text>
-                    {t('reports.total_stages', { defaultValue: 'Bosqichlar' })}:{' '}
-                    {fmt(plans.data.totalStages)}
-                  </Text>
-                  <Text>
-                    {t('reports.completed', { defaultValue: 'Yakunlangan' })}:{' '}
-                    {fmt(plans.data.completedStages)}
-                  </Text>
-                  <Text>
-                    {t('reports.rate', { defaultValue: 'Bajarilish' })}: {pct(plans.data.rate)}
-                  </Text>
-                </Group>
-                {plans.data.byStatus.length > 0 && (
-                  <BarMini
-                    data={plans.data.byStatus.map((s) => ({ label: s.status, value: s.count }))}
-                  />
-                )}
-              </Stack>
-            )}
-          </ReportSection>
-        </SimpleGrid>
-
-        {/* To'lov usuli taqsimoti (DS12-A Task 3) */}
-        {revenue.data && revenue.data.byPaymentMethod.length > 0 && (
-          <Card withBorder padding="lg">
+      <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="lg">
+        {/* Daromad */}
+        <ReportSection
+          title={t('reports.revenue', { defaultValue: 'Daromad' })}
+          loading={revenue.isLoading}
+          error={revenue.isError}
+          onRetry={() => revenue.refetch()}
+          statesLabels={statesLabels}
+          hasData={!!revenue.data}
+          emptyText={t('reports.empty', { defaultValue: 'Ma’lumot yo‘q' })}
+          onCsv={() =>
+            revenue.data && downloadCsv(revenueToRows(revenue.data), `daromad_${suffix}`)
+          }
+          onXlsx={() =>
+            revenue.data && downloadXlsx(revenueToRows(revenue.data), `daromad_${suffix}`)
+          }
+          exportLabel={exportLabel}
+        >
+          {revenue.data && (
             <Stack gap="md">
-              <Title order={4}>
-                {t('reports.byPaymentMethod', { defaultValue: "To'lov usuli" })}
-              </Title>
-              <Group align="flex-start" gap="xl">
-                <Donut
-                  title={t('reports.byPaymentMethod')}
-                  segments={revenue.data.byPaymentMethod.map((p) => ({
-                    label: t(`payment.method.${p.paymentMethod}`, {
-                      defaultValue: p.paymentMethod,
-                    }),
-                    value: p.total,
-                    color: methodColor(p.paymentMethod),
-                  }))}
-                />
+              {revenue.data.byPeriod.length > 0 && (
                 <Stack gap="xs">
-                  {revenue.data.byPaymentMethod.map((p) => (
-                    <Group key={p.paymentMethod} gap="xs">
-                      <div
-                        style={{
-                          width: 12,
-                          height: 12,
-                          borderRadius: '50%',
-                          background: methodColor(p.paymentMethod),
-                          flexShrink: 0,
-                        }}
-                      />
-                      <Text size="sm">
-                        {t(`payment.method.${p.paymentMethod}`, { defaultValue: p.paymentMethod })}
-                        {': '}
-                        {formatCurrency(p.total, t)}
-                      </Text>
-                    </Group>
-                  ))}
-                </Stack>
-              </Group>
-            </Stack>
-          </Card>
-        )}
-
-        {/* Qabullar bandligi issiqligi (DS12-A Task 4) */}
-        {appointments.data && appointments.data.occupancy.length > 0 && (
-          <Card withBorder padding="lg">
-            <Stack gap="md">
-              <Title order={4}>{t('reports.occupancy')}</Title>
-              <Heatmap cells={appointments.data.occupancy} />
-            </Stack>
-          </Card>
-        )}
-
-        {/* Dental analitika (V2-3) */}
-        <Card withBorder padding="lg">
-          <Stack gap="md">
-            <Title order={4}>
-              {t('reports.dental_analytics', { defaultValue: 'Dental analitika' })}
-            </Title>
-            {analytics.isLoading ? (
-              <StateView status="loading" skeleton="cards" />
-            ) : analytics.isError ? (
-              <StateView
-                status="error"
-                title={statesLabels.errorTitle}
-                retryLabel={statesLabels.retry}
-                onRetry={() => analytics.refetch()}
-              />
-            ) : analytics.data ? (
-              <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="lg">
-                <Stack gap="xs">
-                  <Text fw={600}>{t('reports.procedure_mix')}</Text>
-                  {analytics.data.procedureMix.length > 0 ? (
-                    <BarMini
-                      data={analytics.data.procedureMix.map((p) => ({
-                        label: p.serviceName,
-                        value: p.revenue,
-                      }))}
-                    />
-                  ) : (
-                    <Text c="dimmed">{t('reports.empty')}</Text>
-                  )}
-                </Stack>
-                <Stack gap="xs">
-                  <Text fw={600}>{t('reports.retention')}</Text>
-                  <Group gap="xl">
-                    <Text>
-                      {t('reports.retention_new')}: {fmt(analytics.data.retention.newPatients)}
-                    </Text>
-                    <Text>
-                      {t('reports.retention_returning')}:{' '}
-                      {fmt(analytics.data.retention.returningPatients)}
-                    </Text>
-                    <Text>
-                      {t('reports.rate')}: {pct(analytics.data.retention.retentionRate)}
-                    </Text>
-                  </Group>
-                  <Text fw={600} mt="sm">
-                    {t('reports.recall_efficacy')}
+                  <Text fw={600}>
+                    {t('reports.revenue_trend', { defaultValue: 'Daromad dinamikasi' })}
                   </Text>
-                  <Text>
-                    {fmt(analytics.data.recallEfficacy.converted)} /{' '}
-                    {fmt(analytics.data.recallEfficacy.total)} ={' '}
-                    {pct(analytics.data.recallEfficacy.efficacy)}
-                  </Text>
-                </Stack>
-                <Stack gap="xs">
-                  <Text fw={600}>{t('reports.no_show_trend')}</Text>
                   <BarMini
-                    data={analytics.data.noShowByWeekday.map((w) => ({
-                      label: WEEKDAY_LABELS[w.weekday] ?? String(w.weekday),
-                      value: Math.round(w.rate * 100),
+                    data={revenue.data.byPeriod.map((p) => ({
+                      label: p.date,
+                      value: p.total,
                     }))}
                   />
                 </Stack>
-              </SimpleGrid>
-            ) : (
-              <StateView status="empty" title={statesLabels.emptyTitle} />
-            )}
+              )}
+              {revenue.data.byService.length > 0 && (
+                <Stack gap="xs">
+                  <Text fw={600}>
+                    {t('reports.top_services', { defaultValue: 'Eng ko‘p xizmatlar' })}
+                  </Text>
+                  <BarMini
+                    data={revenue.data.byService.map((s) => ({
+                      label: s.serviceName,
+                      value: s.total,
+                    }))}
+                  />
+                </Stack>
+              )}
+            </Stack>
+          )}
+        </ReportSection>
+
+        {/* Qabullar */}
+        <ReportSection
+          title={t('reports.appointments', { defaultValue: 'Qabullar' })}
+          loading={appointments.isLoading}
+          error={appointments.isError}
+          onRetry={() => appointments.refetch()}
+          statesLabels={statesLabels}
+          hasData={!!appointments.data}
+          emptyText={t('reports.empty', { defaultValue: 'Ma’lumot yo‘q' })}
+          onCsv={() =>
+            appointments.data &&
+            downloadCsv(appointmentsToRows(appointments.data), `qabullar_${suffix}`)
+          }
+          onXlsx={() =>
+            appointments.data &&
+            downloadXlsx(appointmentsToRows(appointments.data), `qabullar_${suffix}`)
+          }
+          exportLabel={exportLabel}
+        >
+          {appointments.data && (
+            <Stack gap="xs">
+              <Table>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>{t('reports.status', { defaultValue: 'Status' })}</Table.Th>
+                    <Table.Th>{t('reports.count', { defaultValue: 'Soni' })}</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {appointments.data.byStatus.map((s) => (
+                    <Table.Tr key={s.status}>
+                      <Table.Td>{s.status}</Table.Td>
+                      <Table.Td>{fmt(s.count)}</Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </Stack>
+          )}
+        </ReportSection>
+
+        {/* Shifokorlar yuklamasi */}
+        <ReportSection
+          title={t('reports.doctor_workload', { defaultValue: 'Shifokorlar yuklamasi' })}
+          loading={doctors.isLoading}
+          error={doctors.isError}
+          onRetry={() => doctors.refetch()}
+          statesLabels={statesLabels}
+          hasData={!!doctors.data && doctors.data.length > 0}
+          emptyText={t('reports.empty', { defaultValue: 'Ma’lumot yo‘q' })}
+          onCsv={() =>
+            doctors.data &&
+            downloadCsv(doctorsToRows(doctors.data, doctorName), `shifokorlar_${suffix}`)
+          }
+          onXlsx={() =>
+            doctors.data &&
+            downloadXlsx(doctorsToRows(doctors.data, doctorName), `shifokorlar_${suffix}`)
+          }
+          exportLabel={exportLabel}
+        >
+          {doctors.data && (
+            <Stack gap="md">
+              <BarMini
+                data={doctors.data.map((d) => ({
+                  label: doctorName(d.doctorId),
+                  value: d.total,
+                }))}
+              />
+              <Table>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>{t('reports.doctor', { defaultValue: 'Shifokor' })}</Table.Th>
+                    <Table.Th>{t('reports.total', { defaultValue: 'Jami' })}</Table.Th>
+                    <Table.Th>{t('reports.completed', { defaultValue: 'Yakunlangan' })}</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {doctors.data.map((d) => (
+                    <Table.Tr key={d.doctorId}>
+                      <Table.Td>{doctorName(d.doctorId)}</Table.Td>
+                      <Table.Td>{fmt(d.total)}</Table.Td>
+                      <Table.Td>{fmt(d.completed)}</Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </Stack>
+          )}
+        </ReportSection>
+
+        {/* Davolash rejalari */}
+        <ReportSection
+          title={t('reports.plan_completion', { defaultValue: 'Davolash rejalari' })}
+          loading={plans.isLoading}
+          error={plans.isError}
+          onRetry={() => plans.refetch()}
+          statesLabels={statesLabels}
+          hasData={!!plans.data}
+          emptyText={t('reports.empty', { defaultValue: 'Ma’lumot yo‘q' })}
+          onCsv={() =>
+            plans.data && downloadCsv(planCompletionToRows(plans.data), `rejalar_${suffix}`)
+          }
+          onXlsx={() =>
+            plans.data && downloadXlsx(planCompletionToRows(plans.data), `rejalar_${suffix}`)
+          }
+          exportLabel={exportLabel}
+        >
+          {plans.data && (
+            <Stack gap="xs">
+              <Group gap="xl">
+                <Text>
+                  {t('reports.total_stages', { defaultValue: 'Bosqichlar' })}:{' '}
+                  {fmt(plans.data.totalStages)}
+                </Text>
+                <Text>
+                  {t('reports.completed', { defaultValue: 'Yakunlangan' })}:{' '}
+                  {fmt(plans.data.completedStages)}
+                </Text>
+                <Text>
+                  {t('reports.rate', { defaultValue: 'Bajarilish' })}: {pct(plans.data.rate)}
+                </Text>
+              </Group>
+              {plans.data.byStatus.length > 0 && (
+                <BarMini
+                  data={plans.data.byStatus.map((s) => ({ label: s.status, value: s.count }))}
+                />
+              )}
+            </Stack>
+          )}
+        </ReportSection>
+      </SimpleGrid>
+
+      {/* To'lov usuli taqsimoti (DS12-A Task 3) */}
+      {revenue.data && revenue.data.byPaymentMethod.length > 0 && (
+        <Card withBorder padding="lg">
+          <Stack gap="md">
+            <Title order={4}>
+              {t('reports.byPaymentMethod', { defaultValue: "To'lov usuli" })}
+            </Title>
+            <Group align="flex-start" gap="xl">
+              <Donut
+                title={t('reports.byPaymentMethod')}
+                segments={revenue.data.byPaymentMethod.map((p) => ({
+                  label: t(`payment.method.${p.paymentMethod}`, {
+                    defaultValue: p.paymentMethod,
+                  }),
+                  value: p.total,
+                  color: methodColor(p.paymentMethod),
+                }))}
+              />
+              <Stack gap="xs">
+                {revenue.data.byPaymentMethod.map((p) => (
+                  <Group key={p.paymentMethod} gap="xs">
+                    <div
+                      style={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: '50%',
+                        background: methodColor(p.paymentMethod),
+                        flexShrink: 0,
+                      }}
+                    />
+                    <Text size="sm">
+                      {t(`payment.method.${p.paymentMethod}`, { defaultValue: p.paymentMethod })}
+                      {': '}
+                      {formatCurrency(p.total, t)}
+                    </Text>
+                  </Group>
+                ))}
+              </Stack>
+            </Group>
           </Stack>
         </Card>
-      </Stack>
-    </Container>
+      )}
+
+      {/* Qabullar bandligi issiqligi (DS12-A Task 4) */}
+      {appointments.data && appointments.data.occupancy.length > 0 && (
+        <Card withBorder padding="lg">
+          <Stack gap="md">
+            <Title order={4}>{t('reports.occupancy')}</Title>
+            <Heatmap cells={appointments.data.occupancy} />
+          </Stack>
+        </Card>
+      )}
+
+      {/* Dental analitika (V2-3) */}
+      <Card withBorder padding="lg">
+        <Stack gap="md">
+          <Title order={4}>
+            {t('reports.dental_analytics', { defaultValue: 'Dental analitika' })}
+          </Title>
+          {analytics.isLoading ? (
+            <StateView status="loading" skeleton="cards" />
+          ) : analytics.isError ? (
+            <StateView
+              status="error"
+              title={statesLabels.errorTitle}
+              retryLabel={statesLabels.retry}
+              onRetry={() => analytics.refetch()}
+            />
+          ) : analytics.data ? (
+            <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="lg">
+              <Stack gap="xs">
+                <Text fw={600}>{t('reports.procedure_mix')}</Text>
+                {analytics.data.procedureMix.length > 0 ? (
+                  <BarMini
+                    data={analytics.data.procedureMix.map((p) => ({
+                      label: p.serviceName,
+                      value: p.revenue,
+                    }))}
+                  />
+                ) : (
+                  <Text c="dimmed">{t('reports.empty')}</Text>
+                )}
+              </Stack>
+              <Stack gap="xs">
+                <Text fw={600}>{t('reports.retention')}</Text>
+                <Group gap="xl">
+                  <Text>
+                    {t('reports.retention_new')}: {fmt(analytics.data.retention.newPatients)}
+                  </Text>
+                  <Text>
+                    {t('reports.retention_returning')}:{' '}
+                    {fmt(analytics.data.retention.returningPatients)}
+                  </Text>
+                  <Text>
+                    {t('reports.rate')}: {pct(analytics.data.retention.retentionRate)}
+                  </Text>
+                </Group>
+                <Text fw={600} mt="sm">
+                  {t('reports.recall_efficacy')}
+                </Text>
+                <Text>
+                  {fmt(analytics.data.recallEfficacy.converted)} /{' '}
+                  {fmt(analytics.data.recallEfficacy.total)} ={' '}
+                  {pct(analytics.data.recallEfficacy.efficacy)}
+                </Text>
+              </Stack>
+              <Stack gap="xs">
+                <Text fw={600}>{t('reports.no_show_trend')}</Text>
+                <BarMini
+                  data={analytics.data.noShowByWeekday.map((w) => ({
+                    label: WEEKDAY_LABELS[w.weekday] ?? String(w.weekday),
+                    value: Math.round(w.rate * 100),
+                  }))}
+                />
+              </Stack>
+            </SimpleGrid>
+          ) : (
+            <StateView status="empty" title={statesLabels.emptyTitle} />
+          )}
+        </Stack>
+      </Card>
+    </Stack>
   );
 }

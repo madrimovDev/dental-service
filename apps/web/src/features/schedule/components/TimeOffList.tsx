@@ -14,7 +14,7 @@ const TZ = 'Asia/Tashkent';
 const cardStyle: CSSProperties = {
   background: 'var(--surface)',
   borderColor: 'var(--border)',
-  borderRadius: 'var(--radius-md)',
+  borderRadius: 'var(--radius-card)',
 };
 
 /** UTC ISO → klinika-local 'DD.MM.YYYY'. */

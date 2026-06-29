@@ -1,4 +1,4 @@
-import { StateView, StatusPill } from '@dental/ui';
+import { Mono, StateView, StatusPill } from '@dental/ui';
 import { Divider, Group, Modal, Stack, Table, Text } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { formatCurrency } from '@/lib/format.ts';
@@ -86,8 +86,8 @@ function EstimateBody({ data }: { data: ReturnType<typeof toEstimateVM> }) {
         <Divider my={4} />
         <Group justify="space-between">
           <Text fw={700}>{t('treatment_plan.balance')}</Text>
-          <Text fw={700} c={data.balance > 0 ? 'red' : undefined}>
-            {formatCurrency(data.balance, t)}
+          <Text fw={700} c={data.balance > 0 ? 'var(--danger)' : undefined}>
+            <Mono>{formatCurrency(data.balance, t)}</Mono>
           </Text>
         </Group>
       </Stack>
@@ -101,7 +101,9 @@ function TotalRow({ label, value }: { label: string; value: string }) {
     <Group justify="space-between">
       <Text c="dimmed">{label}</Text>
       <Text>
-        {value} {t('common.currency')}
+        <Mono>
+          {value} {t('common.currency')}
+        </Mono>
       </Text>
     </Group>
   );

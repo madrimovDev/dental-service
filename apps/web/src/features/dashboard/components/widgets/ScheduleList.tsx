@@ -3,6 +3,7 @@ import type { AppointmentStatus as AppointmentStatusValue } from '@dental/api-cl
 // import gives the value object so consumers/tests can iterate every status.
 import { AppointmentStatus } from '@dental/api-client/generated/model/appointmentStatus';
 import { StatusPill, type StatusPillProps } from '@dental/ui';
+import { Title } from '@mantine/core';
 import type { ReactNode } from 'react';
 
 type Tone = NonNullable<StatusPillProps['status']>;
@@ -63,8 +64,7 @@ export interface ScheduleListProps {
   onRowClick?: (row: ScheduleRow) => void;
 }
 
-/** Off-scale literal: card radius 16 / row padding 12·18 have no exact token → kept for parity. */
-const CARD_RADIUS = 16;
+const CARD_RADIUS = 'var(--radius-card)';
 
 /** "Bugungi jadval" — token card with bordered header + rich appointment rows. Pure presentational. */
 export function ScheduleList({
@@ -96,7 +96,9 @@ export function ScheduleList({
           borderBottom: '1px solid var(--border)',
         }}
       >
-        <span style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--ink)' }}>{title}</span>
+        <Title order={4} fw={700} c="var(--ink)">
+          {title}
+        </Title>
         {calendarLabel != null &&
           (href != null ? (
             <a

@@ -64,7 +64,7 @@ export function DoctorDashboard() {
     <Stack gap="lg">
       {/* 1a. Header — greeting YO'Q (DS0 topbar sarlavhani olib boradi); amal tugmalari o'ngga surilgan. */}
       {(canAppointment || canCashier) && (
-        <Group gap={8} justify="flex-end">
+        <Group gap="xs" justify="flex-end">
           {canAppointment && (
             <HeaderAction
               to="/appointments"

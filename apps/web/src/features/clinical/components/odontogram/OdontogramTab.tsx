@@ -231,7 +231,11 @@ export function OdontogramTab({ patientId }: Props) {
         <Paper
           withBorder
           p="md"
-          style={{ borderRadius: 16, boxShadow: 'var(--shadow-sm)', background: 'var(--surface)' }}
+          style={{
+            borderRadius: 'var(--radius-card)',
+            boxShadow: 'var(--shadow-sm)',
+            background: 'var(--surface)',
+          }}
         >
           <Odontogram
             states={statesArray}
@@ -249,7 +253,7 @@ export function OdontogramTab({ patientId }: Props) {
             withBorder
             p="md"
             style={{
-              borderRadius: 16,
+              borderRadius: 'var(--radius-card)',
               boxShadow: 'var(--shadow-sm)',
               background: 'var(--surface)',
             }}
@@ -395,7 +399,11 @@ export function OdontogramTab({ patientId }: Props) {
         <Paper
           withBorder
           p="md"
-          style={{ borderRadius: 16, boxShadow: 'var(--shadow-sm)', background: 'var(--surface)' }}
+          style={{
+            borderRadius: 'var(--radius-card)',
+            boxShadow: 'var(--shadow-sm)',
+            background: 'var(--surface)',
+          }}
         >
           <Stack gap="md">
             <Group gap={6}>
@@ -558,7 +566,11 @@ export function OdontogramTab({ patientId }: Props) {
         <Paper
           withBorder
           p="md"
-          style={{ borderRadius: 16, boxShadow: 'var(--shadow-sm)', background: 'var(--surface)' }}
+          style={{
+            borderRadius: 'var(--radius-card)',
+            boxShadow: 'var(--shadow-sm)',
+            background: 'var(--surface)',
+          }}
         >
           <Stack gap="sm">
             <Textarea
@@ -578,7 +590,11 @@ export function OdontogramTab({ patientId }: Props) {
       )}
 
       {isReadOnly && viewingSnapshot.notes && (
-        <Paper withBorder p="md" style={{ borderRadius: 16, background: 'var(--surface-2)' }}>
+        <Paper
+          withBorder
+          p="md"
+          style={{ borderRadius: 'var(--radius-card)', background: 'var(--surface-2)' }}
+        >
           <Group gap={6}>
             <Badge variant="light" color="blue">
               {t('treatment_plan.notes')}

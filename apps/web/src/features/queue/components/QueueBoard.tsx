@@ -1,6 +1,6 @@
 import type { QueueStatus, QueueTicket } from '@dental/api-client';
 import { StateView } from '@dental/ui';
-import { Button, Container, Select, Stack, Text } from '@mantine/core';
+import { Button, Select, Stack, Text } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconLayoutGrid, IconPlus } from '@tabler/icons-react';
 import { useMemo, useState } from 'react';
@@ -74,7 +74,7 @@ export function QueueBoard() {
     id ? (lookups.serviceNameById.get(id) ?? null) : null;
 
   return (
-    <Container size="xl">
+    <>
       <Stack gap="lg">
         <div className={classes.header}>
           <div className={classes.titleBlock}>
@@ -196,6 +196,6 @@ export function QueueBoard() {
       </Stack>
 
       {branchFilter && <CheckInDialog opened={opened} onClose={close} branchId={branchFilter} />}
-    </Container>
+    </>
   );
 }

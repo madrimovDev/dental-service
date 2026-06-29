@@ -1,6 +1,6 @@
 import type { Service } from '@dental/api-client';
 import { PageHead, StateView } from '@dental/ui';
-import { Button, Container, Group, Modal, Select, Stack, Text, TextInput } from '@mantine/core';
+import { Button, Group, Modal, Select, Stack, Text, TextInput } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconPlus, IconSearch } from '@tabler/icons-react';
 import { useMemo, useState } from 'react';
@@ -58,7 +58,7 @@ export function ServicesScreen() {
   };
 
   return (
-    <Container size="xl">
+    <>
       <Stack gap="lg">
         <PageHead
           title={t('services.title')}
@@ -138,6 +138,6 @@ export function ServicesScreen() {
           </Group>
         </Stack>
       </Modal>
-    </Container>
+    </>
   );
 }

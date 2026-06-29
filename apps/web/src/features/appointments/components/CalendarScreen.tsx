@@ -1,5 +1,5 @@
-import { Button, IconButton, Mono, PageHead, StateView, StatusPill, Tabs } from '@dental/ui';
-import { Modal, Select, Stack, Text, Textarea } from '@mantine/core';
+import { Button, IconButton, Mono, StateView, StatusPill, Tabs } from '@dental/ui';
+import { Group, Modal, Select, Stack, Text, Textarea } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { ChevronRight } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -174,16 +174,13 @@ export function CalendarScreen() {
 
   return (
     <div>
-      <PageHead
-        title={t('appointments.title')}
-        actions={
-          hasPermission('appointment.create') ? (
-            <Button variant="primary" onClick={open}>
-              {t('appointments.create')}
-            </Button>
-          ) : undefined
-        }
-      />
+      <Group justify="flex-end" gap="xs" mb="md">
+        {hasPermission('appointment.create') && (
+          <Button variant="primary" onClick={open}>
+            {t('appointments.create')}
+          </Button>
+        )}
+      </Group>
 
       {/* Header row: chevron-nav + sana sarlavha + Bugun pill + Day/Week toggle + branch filter */}
       <div
@@ -191,7 +188,7 @@ export function CalendarScreen() {
           display: 'flex',
           alignItems: 'center',
           gap: 14,
-          marginTop: 16,
+          marginTop: 'var(--space-4)',
           flexWrap: 'wrap',
         }}
       >

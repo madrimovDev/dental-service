@@ -231,6 +231,13 @@ function isVisible(
  * Ruxsat + vertical bo'yicha filtrlangan guruhlar; bo'sh guruh tushiriladi.
  * `isOwner` — FUTURE (disabled) elementlar faqat owner uchun ko'rsatiladi.
  */
+/** nav-config'da bo'lmagan, lekin Topbar sarlavhasiga muhtoj yo'llar (sidebar'ga qo'shilmaydi). */
+export const EXTRA_TITLE_KEYS: Record<string, string> = {
+  '/settings/notify': 'settings.nav_notify',
+  '/settings/integrations': 'settings.nav_integrations',
+  '/profile': 'profile.title',
+};
+
 export function visibleGroups(
   has: (p: string) => boolean,
   vertical: Vertical = 'dental',

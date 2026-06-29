@@ -222,7 +222,7 @@
   min-width: 220px;
   flex: 1 1 220px;
   background: var(--surface-2);
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   padding: 16px 18px;
 }
 

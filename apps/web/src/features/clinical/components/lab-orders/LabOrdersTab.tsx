@@ -141,7 +141,7 @@ export function LabOrdersTab({ patientId }: Props) {
           style={{
             background: 'var(--surface)',
             border: '1px solid var(--border)',
-            borderRadius: 16,
+            borderRadius: 'var(--radius-card)',
             boxShadow: 'var(--shadow-sm)',
             overflow: 'hidden',
           }}

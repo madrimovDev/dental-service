@@ -16,7 +16,7 @@ const WEEKDAYS = [1, 2, 3, 4, 5, 6, 0]; // Dushanba..Yakshanba (0=Sun oxirida)
 const dayCardStyle: CSSProperties = {
   background: 'var(--surface)',
   borderColor: 'var(--border)',
-  borderRadius: 'var(--radius-md)',
+  borderRadius: 'var(--radius-card)',
 };
 const weekdayLabelStyle: CSSProperties = {
   color: 'var(--ink-3)',

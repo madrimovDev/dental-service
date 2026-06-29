@@ -56,8 +56,7 @@ export interface StatCardProps {
   spark?: ReactNode;
 }
 
-// Off-scale literallar (gap brief §1b) — tokenga aniq mos kelmaydi, parity uchun saqlanadi.
-const CARD_RADIUS = 16; // tokenlar --radius-xl:14px'da to'xtaydi
+const CARD_RADIUS = 'var(--radius-card)';
 const CARD_PADDING = '16px 16px 13px'; // 13px 4px-shkaladan tashqari
 
 const cardStyle: CSSProperties = {

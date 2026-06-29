@@ -38,7 +38,7 @@ function MedicalHistorySection({ patientId }: { patientId: string }) {
   if (entries.length === 0) return null;
 
   return (
-    <Paper withBorder p="md" radius="md">
+    <Paper withBorder p="md" radius="var(--radius-card)">
       <Text fw={600} mb="sm">
         {t('medical.history_title')}
       </Text>
@@ -168,7 +168,7 @@ export function MedicalTab({ patientId }: { patientId: string }) {
             <MantineCard
               withBorder
               padding="md"
-              radius="md"
+              radius="var(--radius-card)"
               style={{
                 borderColor: 'var(--danger)',
                 background: 'var(--danger-soft)',

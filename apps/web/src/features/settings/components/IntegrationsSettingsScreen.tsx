@@ -1,5 +1,5 @@
 import { StatusPill } from '@dental/ui';
-import { Button } from '@mantine/core';
+import { Button, Title } from '@mantine/core';
 import {
   type Icon,
   IconBrandTelegram,
@@ -72,7 +72,7 @@ export function IntegrationsSettingsScreen() {
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 12,
-                borderRadius: 16,
+                borderRadius: 'var(--radius-card)',
                 padding: 18,
                 border: '1px solid var(--border)',
                 background: 'var(--surface)',
@@ -110,9 +110,9 @@ export function IntegrationsSettingsScreen() {
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>
+                <Title order={4} fw={700} c="var(--ink)">
                   {t(card.nameKey)}
-                </span>
+                </Title>
                 <span style={{ fontSize: 12.5, color: 'var(--ink-3)', lineHeight: 1.4 }}>
                   {t(card.descKey)}
                 </span>

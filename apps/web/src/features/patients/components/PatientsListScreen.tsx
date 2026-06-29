@@ -40,7 +40,6 @@ export function PatientsListScreen() {
     <div>
       <div className={classes.header}>
         <div>
-          <div className={classes.headTitle}>{t('patients.title')}</div>
           {data && (
             <div className={classes.headSub}>{t('patients.count', { count: data.meta.total })}</div>
           )}

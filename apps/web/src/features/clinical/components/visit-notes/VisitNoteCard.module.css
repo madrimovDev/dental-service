@@ -1,5 +1,5 @@
 .card {
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   box-shadow: var(--shadow-sm);
   padding: 18px;
   background: var(--surface-1);

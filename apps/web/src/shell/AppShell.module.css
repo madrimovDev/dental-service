@@ -1,0 +1,5 @@
+.content {
+  max-width: var(--content-max, 1320px);
+  margin-inline: auto;
+  width: 100%;
+}

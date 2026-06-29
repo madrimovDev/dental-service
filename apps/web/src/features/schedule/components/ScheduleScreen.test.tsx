@@ -41,9 +41,8 @@ describe('ScheduleScreen', () => {
     perms = new Set(['schedule.manage']);
   });
 
-  it("sarlavha + subtitle ko'rsatadi", () => {
+  it("subtitle ko'rsatadi", () => {
     renderApp(<ScheduleScreen />);
-    expect(screen.getByText('Ish jadvali')).toBeInTheDocument();
     expect(screen.getByText('Haftalik ish vaqti · mavjudlik')).toBeInTheDocument();
   });
 

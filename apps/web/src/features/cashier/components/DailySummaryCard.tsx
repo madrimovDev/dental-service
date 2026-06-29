@@ -28,7 +28,7 @@ export function DailySummaryCard({ summary }: DailySummaryCardProps) {
   const cardShare = totalRevenue > 0 ? Math.round((cardAmount / totalRevenue) * 100) : 0;
 
   return (
-    <Paper withBorder radius={16} p="lg" style={{ boxShadow: 'var(--shadow-sm)' }}>
+    <Paper withBorder radius="var(--radius-card)" p="lg" style={{ boxShadow: 'var(--shadow-sm)' }}>
       <Stack gap="sm">
         <Title order={4}>
           <IconChartBar size={18} style={{ verticalAlign: 'middle', marginRight: 6 }} />

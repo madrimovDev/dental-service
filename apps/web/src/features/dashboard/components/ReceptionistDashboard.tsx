@@ -71,7 +71,7 @@ export function ReceptionistDashboard() {
     <Stack gap="lg">
       {/* 1a. Header — greeting YO'Q (DS0 topbar); amal tugmalari o'ngga surilgan. */}
       {(canAppointment || canCashier) && (
-        <Group gap={8} justify="flex-end">
+        <Group gap="xs" justify="flex-end">
           {canAppointment && (
             <HeaderAction
               to="/appointments"
@@ -117,7 +117,7 @@ export function ReceptionistDashboard() {
               alignItems: 'start',
             }}
           >
-            <Stack gap={16} style={{ minWidth: 0 }}>
+            <Stack gap="md" style={{ minWidth: 0 }}>
               <ScheduleList
                 title={t('dashboard.today_appointments')}
                 calendarLabel={t('dashboard.calendar_link', 'Kalendar')}
@@ -135,7 +135,7 @@ export function ReceptionistDashboard() {
               />
             </Stack>
 
-            <Stack gap={16}>
+            <Stack gap="md">
               <QueueCard
                 title={t('dashboard.queue_status', 'Navbat holati')}
                 waitingLabel={

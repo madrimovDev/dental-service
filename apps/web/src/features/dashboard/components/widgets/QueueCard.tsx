@@ -3,6 +3,7 @@ import type { QueueTicketStatus as QueueStatusValue } from '@dental/api-client';
 // import gives the value object so consumers/tests can iterate every status.
 import { QueueTicketStatus } from '@dental/api-client/generated/model/queueTicketStatus';
 import { StatusPill, type StatusPillProps } from '@dental/ui';
+import { Title } from '@mantine/core';
 import type { ReactNode } from 'react';
 
 type Tone = NonNullable<StatusPillProps['status']>;
@@ -54,8 +55,7 @@ export interface QueueCardProps {
   emptyText?: ReactNode;
 }
 
-/** Off-scale literal: card radius 16 / padding bottom 6 have no exact token → kept for parity. */
-const CARD_RADIUS = 16;
+const CARD_RADIUS = 'var(--radius-card)';
 
 /** "Navbat holati" — token card with header + mono waiting pill + numbered queue rows. Pure presentational. */
 export function QueueCard({ title, rows, waitingLabel, emptyText }: QueueCardProps) {
@@ -78,7 +78,9 @@ export function QueueCard({ title, rows, waitingLabel, emptyText }: QueueCardPro
           marginBottom: 4,
         }}
       >
-        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>{title}</span>
+        <Title order={4} fw={700} c="var(--ink)">
+          {title}
+        </Title>
         {waitingLabel != null && (
           <span
             style={{

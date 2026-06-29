@@ -3,9 +3,8 @@ import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth-store.ts';
 
-// Off-scale literal (gap brief §1) — tokenlar --radius-xl:14px'da to'xtaydi, parity uchun 16px.
 const cardStyle: CSSProperties = {
-  borderRadius: 16,
+  borderRadius: 'var(--radius-card)',
   border: '1px solid var(--border)',
   background: 'var(--surface)',
   boxShadow: 'var(--shadow-sm)',

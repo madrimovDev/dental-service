@@ -1,5 +1,5 @@
 import { useLocation } from 'react-router-dom';
-import { NAV_GROUPS } from './nav-config';
+import { EXTRA_TITLE_KEYS, NAV_GROUPS } from './nav-config';
 
 /**
  * Joriy yo'l (pathname) uchun sahifa sarlavhasi i18n KALITI.
@@ -12,6 +12,7 @@ export function pageTitleKey(pathname: string): string {
       if (item.path === pathname) return item.labelKey;
     }
   }
+  if (EXTRA_TITLE_KEYS[pathname]) return EXTRA_TITLE_KEYS[pathname];
   return 'app.name';
 }
 

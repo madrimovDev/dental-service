@@ -1,5 +1,5 @@
 import { StateView } from '@dental/ui';
-import { Box, Group, Stack, Text } from '@mantine/core';
+import { Box, Group, Stack, Text, Title } from '@mantine/core';
 import { IconCalendarPlus, IconCash } from '@tabler/icons-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,8 +14,7 @@ import { MiniList } from './widgets/MiniList.tsx';
 import { Sparkline } from './widgets/Sparkline.tsx';
 import { StatCard } from './widgets/StatCard.tsx';
 
-// Off-scale literal (parity): tokenlar --radius-xl:14px da to'xtaydi; DS1 karta 16px.
-const CARD_RADIUS = 16;
+const CARD_RADIUS = 'var(--radius-card)';
 // Off-scale literal (parity): KPI grid gap 14px (4px shkalada yo'q: 12/16).
 const KPI_GAP = 14;
 
@@ -79,7 +78,7 @@ export function AccountantDashboard() {
     <Stack gap="lg">
       {/* 1a. Header qatori — greeting YO'Q (DS0 topbar sarlavhani olib boradi); amal tugmalari o'ngga surilgan. */}
       {(canAppointment || canCashier) && (
-        <Group gap={8} justify="flex-end">
+        <Group gap="xs" justify="flex-end">
           {canAppointment && (
             <HeaderAction
               to="/appointments"
@@ -147,12 +146,12 @@ export function AccountantDashboard() {
             }}
           >
             {/* Chap ustun — haftalik tushum kartasi (line chart deferred → BarMini by-service). */}
-            <Stack gap={16} style={{ minWidth: 0 }}>
+            <Stack gap="md" style={{ minWidth: 0 }}>
               <CardShell>
                 <Stack gap="sm">
-                  <Text fw={700} fz="md" c="var(--ink)">
+                  <Title order={4} fw={700} c="var(--ink)">
                     {t('dashboard.weekly_revenue', 'Haftalik tushum')}
-                  </Text>
+                  </Title>
                   {/* Line chart (7-kunlik seriya) DEFERRED — data-gap (ds12);
                       mavjud by-service BarMini re-skin sifatida saqlanadi. */}
                   <BarMini
@@ -168,7 +167,7 @@ export function AccountantDashboard() {
 
             {/* O'ng rail (360px) — kunlik kassa breakdown ro'yxati saqlanadi.
                 Navbat/recall/faollik kartalari OMIT (data-gap, ds12). */}
-            <Stack gap={16}>
+            <Stack gap="md">
               <MiniList
                 title={t('dashboard.daily_cash')}
                 items={(summary.data?.breakdown ?? []).map((b, i) => ({

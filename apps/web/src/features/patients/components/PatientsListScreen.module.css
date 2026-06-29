@@ -10,13 +10,6 @@
   margin-bottom: 16px;
 }
 
-.headTitle {
-  font-size: 17px;
-  font-weight: 700;
-  color: var(--text);
-  line-height: 1.2;
-}
-
 .headSub {
   margin-top: 4px;
   font-size: 12.5px;

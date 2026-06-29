@@ -1,8 +1,7 @@
-import { Mono, PageHead, StateView } from '@dental/ui';
+import { Mono, StateView } from '@dental/ui';
 import {
   Button,
   Code,
-  Container,
   Group,
   JsonInput,
   Modal,
@@ -98,11 +97,9 @@ export function AuditScreen() {
   };
 
   return (
-    <Container size="xl">
+    <>
       <Stack gap="lg">
-        <PageHead title={t('audit.title')} />
-
-        <Paper withBorder p="md" radius="md">
+        <Paper withBorder p="md" radius="var(--radius-card)">
           <Group align="flex-end" wrap="wrap">
             <DateInput
               label={t('audit.from')}
@@ -147,7 +144,7 @@ export function AuditScreen() {
           </Group>
         </Paper>
 
-        <Paper withBorder p="lg" radius="md">
+        <Paper withBorder p="lg" radius="var(--radius-card)">
           {query.isError ? (
             <StateView
               status="error"
@@ -248,6 +245,6 @@ export function AuditScreen() {
           </Stack>
         )}
       </Modal>
-    </Container>
+    </>
   );
 }

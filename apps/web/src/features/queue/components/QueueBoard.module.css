@@ -52,7 +52,7 @@
 .hero {
   flex: 1 1 360px;
   background: linear-gradient(135deg, var(--primary), var(--primary-strong));
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   padding: 20px 22px;
   color: var(--on-primary);
   box-shadow: var(--shadow);
@@ -123,7 +123,7 @@
   flex: 1 1 260px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   padding: 20px 22px;
   box-shadow: var(--shadow-sm);
   display: flex;

@@ -115,7 +115,6 @@ export function SettingsShell({
         gap: 20,
         alignItems: 'start',
         animation: 'fadeUp .2s ease',
-        padding: 24,
       }}
     >
       <nav style={{ position: 'sticky', top: 0 }}>

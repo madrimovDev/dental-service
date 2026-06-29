@@ -1,15 +1,5 @@
 import { PageHead, StatCard, StateView } from '@dental/ui';
-import {
-  Button,
-  Container,
-  Group,
-  Modal,
-  Select,
-  SimpleGrid,
-  Stack,
-  Text,
-  TextInput,
-} from '@mantine/core';
+import { Button, Group, Modal, Select, SimpleGrid, Stack, Text, TextInput } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconCategory, IconListNumbers, IconPlus, IconWallet } from '@tabler/icons-react';
 import { useMemo, useState } from 'react';
@@ -100,7 +90,7 @@ export function ExpensesScreen() {
   };
 
   return (
-    <Container size="xl">
+    <>
       <Stack gap="lg">
         <PageHead
           title={t('expenses.title')}
@@ -219,6 +209,6 @@ export function ExpensesScreen() {
           </Group>
         </Stack>
       </Modal>
-    </Container>
+    </>
   );
 }

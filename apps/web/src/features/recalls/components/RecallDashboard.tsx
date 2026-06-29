@@ -1,4 +1,4 @@
-import { Mono, PageHead, StateView, StatusPill } from '@dental/ui';
+import { Mono, StateView, StatusPill } from '@dental/ui';
 import { Box, Button, Group, Table, Text } from '@mantine/core';
 import { IconCalendarPlus, IconPhoneCheck, IconX } from '@tabler/icons-react';
 import type { CSSProperties } from 'react';
@@ -76,7 +76,6 @@ export function RecallDashboard() {
   if (recallsQuery.isError) {
     return (
       <div>
-        <PageHead title={t('recall.title')} />
         <StateView
           status="error"
           title={t('states.error_title')}
@@ -89,7 +88,9 @@ export function RecallDashboard() {
 
   return (
     <div>
-      <PageHead title={t('recall.title')} subtitle={t('recall.due_today')} />
+      <Text size="sm" c="dimmed" mb="md">
+        {t('recall.due_today')}
+      </Text>
 
       {/* 4-KPI grid: pending / contacted / scheduled / overdue + efficacyPct hint */}
       <Box

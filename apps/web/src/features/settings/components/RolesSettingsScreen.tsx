@@ -1,6 +1,6 @@
 import type { Role } from '@dental/api-client';
 import { StatusPill, Tag } from '@dental/ui';
-import { ActionIcon, Button } from '@mantine/core';
+import { ActionIcon, Button, Title } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -90,7 +90,7 @@ export function RolesSettingsScreen() {
         {/* Chap panel — rol ro'yxati */}
         <div
           style={{
-            borderRadius: 16,
+            borderRadius: 'var(--radius-card)',
             border: '1px solid var(--border)',
             background: 'var(--surface)',
             boxShadow: 'var(--shadow-sm)',
@@ -105,9 +105,9 @@ export function RolesSettingsScreen() {
               borderBottom: '1px solid var(--border)',
             }}
           >
-            <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>
+            <Title order={4} fw={700} c="var(--ink)">
               {t('settings.nav_roles')}
-            </span>
+            </Title>
             {canManage && (
               <ActionIcon
                 onClick={openCreate}
@@ -176,7 +176,7 @@ export function RolesSettingsScreen() {
         {/* O'ng panel — ruxsat grid */}
         <div
           style={{
-            borderRadius: 16,
+            borderRadius: 'var(--radius-card)',
             border: '1px solid var(--border)',
             background: 'var(--surface)',
             boxShadow: 'var(--shadow-sm)',

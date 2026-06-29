@@ -157,7 +157,7 @@ function EmergencyContactsSection({ patientId }: { patientId: string }) {
   return (
     <Stack gap="md">
       <Text fw={600}>{t('patients.emergency.title')}</Text>
-      <Paper withBorder p="md" radius="md">
+      <Paper withBorder p="md" radius="var(--radius-card)">
         {query.isLoading ? (
           <Text>{t('common.loading')}</Text>
         ) : rows.length === 0 ? (
@@ -222,7 +222,7 @@ export function FamilyTab({ patientId }: { patientId: string }) {
 
   return (
     <Stack gap="md">
-      <Paper withBorder p="md" radius="md">
+      <Paper withBorder p="md" radius="var(--radius-card)">
         {query.isLoading ? (
           <Text>{t('common.loading')}</Text>
         ) : rows.length === 0 ? (

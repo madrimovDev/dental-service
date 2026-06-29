@@ -1,9 +1,5 @@
 /* DS2 — Yangi bemor formasi (Dental OS re-skin). Front-end-only, existing tokens. */
 
-.form {
-  max-width: 1140px;
-}
-
 /* ---- Back-link ---- */
 .backLink {
   display: inline-flex;
@@ -188,7 +184,7 @@
   align-items: center;
   gap: 8px;
   padding: 24px 20px;
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
@@ -250,7 +246,7 @@
   flex-direction: column;
   gap: 10px;
   padding: 16px 18px;
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   border: 1px solid var(--border);
 }

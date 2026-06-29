@@ -1,4 +1,4 @@
-import { Text } from '@mantine/core';
+import { Text, Title } from '@mantine/core';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SettingsShell } from './SettingsShell';
@@ -70,7 +70,7 @@ export function NotificationsSettingsScreen() {
         style={{
           maxWidth: 680,
           border: '1px solid var(--border)',
-          borderRadius: 16,
+          borderRadius: 'var(--radius-card)',
           background: 'var(--surface)',
           overflow: 'hidden',
         }}
@@ -81,9 +81,9 @@ export function NotificationsSettingsScreen() {
             borderBottom: '1px solid var(--border)',
           }}
         >
-          <Text fw={700} style={{ fontSize: 16, color: 'var(--ink)' }}>
+          <Title order={4} fw={700} c="var(--ink)">
             {t('settings.notify_title')}
-          </Text>
+          </Title>
         </div>
 
         <div>

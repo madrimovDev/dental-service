@@ -20,7 +20,7 @@ export function PaymentsTab({ patientId }: { patientId: string }) {
       <Paper
         withBorder
         p="xl"
-        radius={16}
+        radius="var(--radius-card)"
         style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
       >
         <Text c="dimmed">{t('patients.payments_empty')}</Text>
@@ -32,7 +32,7 @@ export function PaymentsTab({ patientId }: { patientId: string }) {
     <Paper
       withBorder
       p={0}
-      radius={16}
+      radius="var(--radius-card)"
       style={{
         background: 'var(--surface)',
         borderColor: 'var(--border)',

@@ -12,6 +12,7 @@ import {
   Stack,
   Text,
   TextInput,
+  Title,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
@@ -41,7 +42,7 @@ import { SettingsShell } from './SettingsShell';
 
 const CARD_STYLE: React.CSSProperties = {
   maxWidth: 620,
-  borderRadius: 16,
+  borderRadius: 'var(--radius-card)',
   padding: 22,
   background: 'var(--surface)',
   border: '1px solid var(--border)',
@@ -163,9 +164,9 @@ export function TenantSettingsScreen() {
 
         <div style={CARD_STYLE}>
           <Stack gap={18}>
-            <Text fw={700} fz={16}>
+            <Title order={4} fw={700}>
               {t('tenant_settings.clinic_section')}
-            </Text>
+            </Title>
 
             {settings.isLoading ? (
               <Loader />
@@ -215,7 +216,7 @@ export function TenantSettingsScreen() {
                   <Text component="label" fz={14} fw={500} display="block" mb={6}>
                     {t('tenant_settings.vertical')}
                   </Text>
-                  <Group gap={10} grow>
+                  <Group gap="xs" grow>
                     {(['dental', 'general'] as const).map((value) => {
                       const isActive = vertical === value;
                       return (
@@ -289,9 +290,9 @@ export function TenantSettingsScreen() {
         {canEditTenant && (
           <div style={CARD_STYLE}>
             <Stack gap="md">
-              <Text fw={700} fz={16}>
+              <Title order={4} fw={700}>
                 {t('settings.transfer_ownership')}
-              </Text>
+              </Title>
               <Text size="sm" c="dimmed">
                 {t('settings.transfer_hint')}
               </Text>

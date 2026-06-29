@@ -136,7 +136,7 @@ export function RecallTab({ patientId }: { patientId: string }) {
 
   return (
     <Stack gap="md">
-      <Paper withBorder p="md" radius="md">
+      <Paper withBorder p="md" radius="var(--radius-card)">
         {query.isLoading ? (
           <Text>{t('common.loading')}</Text>
         ) : rows.length === 0 ? (

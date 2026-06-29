@@ -81,7 +81,7 @@ export function PatientHeaderCard({
             display: 'flex',
             flex: '0 0 auto',
             fontSize: 21,
-            fontWeight: 800,
+            fontWeight: 700,
             height: 60,
             justifyContent: 'center',
             width: 60,
@@ -96,7 +96,7 @@ export function PatientHeaderCard({
               style={{
                 color: 'var(--ink)',
                 fontSize: 22,
-                fontWeight: 800,
+                fontWeight: 700,
                 letterSpacing: '-.02em',
                 margin: 0,
               }}
@@ -204,7 +204,7 @@ export function PatientHeaderCard({
               display: 'flex',
               flex: '0 0 auto',
               fontSize: 18,
-              fontWeight: 800,
+              fontWeight: 700,
               height: 30,
               justifyContent: 'center',
               width: 30,

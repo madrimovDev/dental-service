@@ -1,5 +1,5 @@
 import { PageHead, StateView, StatusPill } from '@dental/ui';
-import { Button, Card, Container, Group, Stack, Table, Title } from '@mantine/core';
+import { Button, Card, Group, Stack, Table, Title } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { useForm } from '@mantine/form';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
@@ -70,144 +70,142 @@ export function PayrollScreen() {
   );
 
   return (
-    <Container size="xl">
-      <Stack gap="lg">
-        <PageHead title={t('payroll.title')} />
+    <Stack gap="lg">
+      <PageHead title={t('payroll.title')} />
 
-        {/* Davr tanlash + run yaratish */}
-        {canManage && (
-          <Card withBorder padding="md">
-            <form onSubmit={handleCreate}>
-              <Group align="end" gap="md">
-                <DatePickerInput
-                  type="range"
-                  label={t('payroll.period')}
-                  placeholder={t('payroll.period_placeholder')}
-                  valueFormat="DD.MM.YYYY"
-                  style={{ minWidth: 280 }}
-                  allowSingleDateInRange
-                  {...form.getInputProps('period')}
-                />
-                <Button type="submit" loading={createRun.isPending}>
-                  {t('payroll.create_run')}
-                </Button>
-              </Group>
-            </form>
-          </Card>
-        )}
+      {/* Davr tanlash + run yaratish */}
+      {canManage && (
+        <Card withBorder padding="md">
+          <form onSubmit={handleCreate}>
+            <Group align="end" gap="md">
+              <DatePickerInput
+                type="range"
+                label={t('payroll.period')}
+                placeholder={t('payroll.period_placeholder')}
+                valueFormat="DD.MM.YYYY"
+                style={{ minWidth: 280 }}
+                allowSingleDateInRange
+                {...form.getInputProps('period')}
+              />
+              <Button type="submit" loading={createRun.isPending}>
+                {t('payroll.create_run')}
+              </Button>
+            </Group>
+          </form>
+        </Card>
+      )}
 
-        {/* Run ro'yxati */}
+      {/* Run ro'yxati */}
+      <Card withBorder padding="lg">
+        <Stack gap="md">
+          <Title order={4}>{t('payroll.runs')}</Title>
+          {runs.isError ? (
+            <StateView
+              status="error"
+              title={t('states.error_title')}
+              retryLabel={t('states.retry')}
+              onRetry={() => runs.refetch()}
+            />
+          ) : runs.isLoading ? (
+            <StateView status="loading" skeleton="table" />
+          ) : runRows.length === 0 ? (
+            <StateView status="empty" title={t('payroll.no_runs')} />
+          ) : (
+            <Table highlightOnHover>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>{t('payroll.period')}</Table.Th>
+                  <Table.Th>{t('payroll.status')}</Table.Th>
+                  <Table.Th />
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {runRows.map((r) => (
+                  <Table.Tr
+                    key={r.id}
+                    bg={r.id === selectedRunId ? 'var(--primary-soft)' : undefined}
+                  >
+                    <Table.Td>
+                      {r.periodFrom} — {r.periodTo}
+                    </Table.Td>
+                    <Table.Td>{statusBadge(r.status)}</Table.Td>
+                    <Table.Td>
+                      <Button size="xs" variant="subtle" onClick={() => setSelectedRunId(r.id)}>
+                        {t('payroll.view_detail')}
+                      </Button>
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          )}
+        </Stack>
+      </Card>
+
+      {/* Run detali */}
+      {selectedRunId && (
         <Card withBorder padding="lg">
           <Stack gap="md">
-            <Title order={4}>{t('payroll.runs')}</Title>
-            {runs.isError ? (
+            <Group justify="space-between">
+              <Group gap="sm">
+                <Title order={4}>{t('payroll.detail')}</Title>
+                {detailStatus && statusBadge(detailStatus)}
+              </Group>
+              {canManage && detailStatus === 'draft' && (
+                <Button
+                  color="teal"
+                  loading={finalizeRun.isPending}
+                  onClick={() => finalizeRun.mutate(selectedRunId)}
+                >
+                  {t('payroll.finalize')}
+                </Button>
+              )}
+            </Group>
+
+            {runDetail.isError ? (
               <StateView
                 status="error"
                 title={t('states.error_title')}
                 retryLabel={t('states.retry')}
-                onRetry={() => runs.refetch()}
+                onRetry={() => runDetail.refetch()}
               />
-            ) : runs.isLoading ? (
+            ) : runDetail.isLoading ? (
               <StateView status="loading" skeleton="table" />
-            ) : runRows.length === 0 ? (
-              <StateView status="empty" title={t('payroll.no_runs')} />
+            ) : lineVMs.length === 0 ? (
+              <StateView status="empty" title={t('payroll.no_lines')} />
             ) : (
-              <Table highlightOnHover>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th>{t('payroll.period')}</Table.Th>
-                    <Table.Th>{t('payroll.status')}</Table.Th>
-                    <Table.Th />
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {runRows.map((r) => (
-                    <Table.Tr
-                      key={r.id}
-                      bg={r.id === selectedRunId ? 'var(--primary-soft)' : undefined}
-                    >
-                      <Table.Td>
-                        {r.periodFrom} — {r.periodTo}
-                      </Table.Td>
-                      <Table.Td>{statusBadge(r.status)}</Table.Td>
-                      <Table.Td>
-                        <Button size="xs" variant="subtle" onClick={() => setSelectedRunId(r.id)}>
-                          {t('payroll.view_detail')}
-                        </Button>
-                      </Table.Td>
+              <Table.ScrollContainer minWidth={800}>
+                <Table>
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>{t('payroll.employee')}</Table.Th>
+                      <Table.Th ta="right">{t('payroll.base_salary')}</Table.Th>
+                      <Table.Th ta="right">{t('payroll.attributed_revenue')}</Table.Th>
+                      <Table.Th ta="right">{t('payroll.commission_percent')}</Table.Th>
+                      <Table.Th ta="right">{t('payroll.commission_amount')}</Table.Th>
+                      <Table.Th ta="right">{t('payroll.total')}</Table.Th>
                     </Table.Tr>
-                  ))}
-                </Table.Tbody>
-              </Table>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {lineVMs.map((l) => (
+                      <Table.Tr key={l.id}>
+                        <Table.Td>{l.employeeName}</Table.Td>
+                        <Table.Td ta="right">{formatCurrency(l.baseSalary, t)}</Table.Td>
+                        <Table.Td ta="right">{formatCurrency(l.attributedRevenue, t)}</Table.Td>
+                        <Table.Td ta="right">{l.commissionPercent}%</Table.Td>
+                        <Table.Td ta="right">{formatCurrency(l.commissionAmount, t)}</Table.Td>
+                        <Table.Td ta="right" fw={600}>
+                          {formatCurrency(l.total, t)}
+                        </Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              </Table.ScrollContainer>
             )}
           </Stack>
         </Card>
-
-        {/* Run detali */}
-        {selectedRunId && (
-          <Card withBorder padding="lg">
-            <Stack gap="md">
-              <Group justify="space-between">
-                <Group gap="sm">
-                  <Title order={4}>{t('payroll.detail')}</Title>
-                  {detailStatus && statusBadge(detailStatus)}
-                </Group>
-                {canManage && detailStatus === 'draft' && (
-                  <Button
-                    color="teal"
-                    loading={finalizeRun.isPending}
-                    onClick={() => finalizeRun.mutate(selectedRunId)}
-                  >
-                    {t('payroll.finalize')}
-                  </Button>
-                )}
-              </Group>
-
-              {runDetail.isError ? (
-                <StateView
-                  status="error"
-                  title={t('states.error_title')}
-                  retryLabel={t('states.retry')}
-                  onRetry={() => runDetail.refetch()}
-                />
-              ) : runDetail.isLoading ? (
-                <StateView status="loading" skeleton="table" />
-              ) : lineVMs.length === 0 ? (
-                <StateView status="empty" title={t('payroll.no_lines')} />
-              ) : (
-                <Table.ScrollContainer minWidth={800}>
-                  <Table>
-                    <Table.Thead>
-                      <Table.Tr>
-                        <Table.Th>{t('payroll.employee')}</Table.Th>
-                        <Table.Th ta="right">{t('payroll.base_salary')}</Table.Th>
-                        <Table.Th ta="right">{t('payroll.attributed_revenue')}</Table.Th>
-                        <Table.Th ta="right">{t('payroll.commission_percent')}</Table.Th>
-                        <Table.Th ta="right">{t('payroll.commission_amount')}</Table.Th>
-                        <Table.Th ta="right">{t('payroll.total')}</Table.Th>
-                      </Table.Tr>
-                    </Table.Thead>
-                    <Table.Tbody>
-                      {lineVMs.map((l) => (
-                        <Table.Tr key={l.id}>
-                          <Table.Td>{l.employeeName}</Table.Td>
-                          <Table.Td ta="right">{formatCurrency(l.baseSalary, t)}</Table.Td>
-                          <Table.Td ta="right">{formatCurrency(l.attributedRevenue, t)}</Table.Td>
-                          <Table.Td ta="right">{l.commissionPercent}%</Table.Td>
-                          <Table.Td ta="right">{formatCurrency(l.commissionAmount, t)}</Table.Td>
-                          <Table.Td ta="right" fw={600}>
-                            {formatCurrency(l.total, t)}
-                          </Table.Td>
-                        </Table.Tr>
-                      ))}
-                    </Table.Tbody>
-                  </Table>
-                </Table.ScrollContainer>
-              )}
-            </Stack>
-          </Card>
-        )}
-      </Stack>
-    </Container>
+      )}
+    </Stack>
   );
 }

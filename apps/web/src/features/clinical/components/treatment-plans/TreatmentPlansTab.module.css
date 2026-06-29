@@ -17,7 +17,7 @@
 .planCard {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   box-shadow: var(--shadow-sm);
   padding: 18px;
   display: flex;
@@ -92,7 +92,7 @@
 .summaryCard {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   box-shadow: var(--shadow-sm);
   padding: 18px;
   display: flex;

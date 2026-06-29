@@ -71,7 +71,7 @@ export function PatientNewScreen() {
   const hasPhone = (form.values.phone ?? '').trim().length > 0;
 
   return (
-    <form onSubmit={submit} className={classes.form}>
+    <form onSubmit={submit}>
       <button
         type="button"
         className={classes.backLink}

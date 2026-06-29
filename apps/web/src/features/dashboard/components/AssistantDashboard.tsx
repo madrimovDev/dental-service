@@ -60,7 +60,7 @@ export function AssistantDashboard() {
     <Stack gap="lg">
       {/* 1a. Header — greeting YO'Q (DS0 topbar); amal tugmalari o'ngga surilgan. */}
       {(canAppointment || canCashier) && (
-        <Group gap={8} justify="flex-end">
+        <Group gap="xs" justify="flex-end">
           {canAppointment && (
             <HeaderAction
               to="/appointments"
