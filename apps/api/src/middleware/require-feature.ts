@@ -18,7 +18,10 @@ export const requireFeature =
   (feature: VerticalFeature): MiddlewareHandler =>
   async (c, next) => {
     const db = getDb(c);
-    const [settings] = await db.select().from(tenantSettings).limit(1);
+    const [settings] = await db
+      .select({ vertical: tenantSettings.vertical })
+      .from(tenantSettings)
+      .limit(1);
     const vertical = (settings?.vertical ?? 'dental') as Vertical;
     if (!hasFeature(vertical, feature)) {
       return c.json(

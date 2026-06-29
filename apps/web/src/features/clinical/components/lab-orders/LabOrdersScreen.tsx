@@ -1,6 +1,6 @@
 import type { ListLabOrdersStatus } from '@dental/api-client';
 import { Mono, PageHead, StateView, StatusPill } from '@dental/ui';
-import { Container, Group, Pagination, Select, Stack, Table, Text, TextInput } from '@mantine/core';
+import { Group, Pagination, Select, Stack, Table, Text, TextInput } from '@mantine/core';
 import { IconSearch } from '@tabler/icons-react';
 import { type CSSProperties, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -70,108 +70,106 @@ export function LabOrdersScreen() {
   ];
 
   return (
-    <Container size="xl">
-      <Stack gap="lg">
-        <PageHead title={t('lab_order.list.title')} subtitle={t('lab_order.list.subtitle')} />
+    <Stack gap="lg">
+      <PageHead title={t('lab_order.list.title')} subtitle={t('lab_order.list.subtitle')} />
 
-        <Group gap="sm" align="flex-end">
-          <TextInput
-            flex={1}
-            leftSection={<IconSearch size={16} />}
-            placeholder={t('lab_order.list.search')}
-            value={search}
-            onChange={(e) => setSearch(e.currentTarget.value)}
-          />
-          <Select
-            w={220}
-            placeholder={t('lab_order.list.filter_status')}
-            data={statusOptions}
-            value={status ?? ''}
-            onChange={(v) => {
-              setStatus((v || null) as ListLabOrdersStatus | null);
-              setPage(1);
-            }}
-            allowDeselect={false}
-          />
-        </Group>
+      <Group gap="sm" align="flex-end">
+        <TextInput
+          flex={1}
+          leftSection={<IconSearch size={16} />}
+          placeholder={t('lab_order.list.search')}
+          value={search}
+          onChange={(e) => setSearch(e.currentTarget.value)}
+        />
+        <Select
+          w={220}
+          placeholder={t('lab_order.list.filter_status')}
+          data={statusOptions}
+          value={status ?? ''}
+          onChange={(v) => {
+            setStatus((v || null) as ListLabOrdersStatus | null);
+            setPage(1);
+          }}
+          allowDeselect={false}
+        />
+      </Group>
 
-        {query.isError ? (
-          <StateView
-            status="error"
-            title={t('states.error_title')}
-            retryLabel={t('states.retry')}
-            onRetry={() => query.refetch()}
-          />
-        ) : query.isLoading ? (
-          <StateView status="loading" skeleton="table" />
-        ) : filtered.length === 0 ? (
-          <StateView status="empty" title={t('lab_order.list.empty')} />
-        ) : (
-          <>
-            <Table.ScrollContainer minWidth={820}>
-              <Table verticalSpacing="sm" highlightOnHover>
-                <Table.Thead style={headStripStyle}>
-                  <Table.Tr>
-                    <Table.Th style={thLabelStyle}>{t('lab_order.list.col_number')}</Table.Th>
-                    <Table.Th style={thLabelStyle}>{t('lab_order.list.col_patient')}</Table.Th>
-                    <Table.Th style={thLabelStyle}>{t('lab_order.lab_name')}</Table.Th>
-                    <Table.Th style={thLabelStyle}>{t('lab_order.order_type')}</Table.Th>
-                    <Table.Th style={thLabelStyle}>{t('lab_order.status')}</Table.Th>
-                    <Table.Th style={thLabelStyle}>{t('lab_order.cost')}</Table.Th>
-                    <Table.Th style={thLabelStyle}>{t('lab_order.list.col_expected')}</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {filtered.map((r) => {
-                    const name = nameMap.get(r.patientId);
-                    return (
-                      <Table.Tr key={r.id}>
-                        <Table.Td>
-                          <Mono>{r.orderNumber ?? '—'}</Mono>
-                        </Table.Td>
-                        <Table.Td>
-                          {name ? (
-                            <Link to={`/patients/${r.patientId}`}>{name}</Link>
-                          ) : (
-                            <Mono>{r.patientId.slice(0, 8)}</Mono>
-                          )}
-                        </Table.Td>
-                        <Table.Td>{r.labName}</Table.Td>
-                        <Table.Td>{t(r.typeLabelKey)}</Table.Td>
-                        <Table.Td>
-                          <StatusPill status={r.statusTone}>{t(r.statusLabelKey)}</StatusPill>
-                        </Table.Td>
-                        <Table.Td>
-                          {r.costText ? (
-                            <Mono>
-                              {r.costText} {r.currency}
-                            </Mono>
-                          ) : (
-                            <Text c="dimmed">—</Text>
-                          )}
-                        </Table.Td>
-                        <Table.Td>
-                          {r.expectedDateText ? (
-                            <Mono>{r.expectedDateText}</Mono>
-                          ) : (
-                            <Text c="dimmed">—</Text>
-                          )}
-                        </Table.Td>
-                      </Table.Tr>
-                    );
-                  })}
-                </Table.Tbody>
-              </Table>
-            </Table.ScrollContainer>
+      {query.isError ? (
+        <StateView
+          status="error"
+          title={t('states.error_title')}
+          retryLabel={t('states.retry')}
+          onRetry={() => query.refetch()}
+        />
+      ) : query.isLoading ? (
+        <StateView status="loading" skeleton="table" />
+      ) : filtered.length === 0 ? (
+        <StateView status="empty" title={t('lab_order.list.empty')} />
+      ) : (
+        <>
+          <Table.ScrollContainer minWidth={820}>
+            <Table verticalSpacing="sm" highlightOnHover>
+              <Table.Thead style={headStripStyle}>
+                <Table.Tr>
+                  <Table.Th style={thLabelStyle}>{t('lab_order.list.col_number')}</Table.Th>
+                  <Table.Th style={thLabelStyle}>{t('lab_order.list.col_patient')}</Table.Th>
+                  <Table.Th style={thLabelStyle}>{t('lab_order.lab_name')}</Table.Th>
+                  <Table.Th style={thLabelStyle}>{t('lab_order.order_type')}</Table.Th>
+                  <Table.Th style={thLabelStyle}>{t('lab_order.status')}</Table.Th>
+                  <Table.Th style={thLabelStyle}>{t('lab_order.cost')}</Table.Th>
+                  <Table.Th style={thLabelStyle}>{t('lab_order.list.col_expected')}</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {filtered.map((r) => {
+                  const name = nameMap.get(r.patientId);
+                  return (
+                    <Table.Tr key={r.id}>
+                      <Table.Td>
+                        <Mono>{r.orderNumber ?? '—'}</Mono>
+                      </Table.Td>
+                      <Table.Td>
+                        {name ? (
+                          <Link to={`/patients/${r.patientId}`}>{name}</Link>
+                        ) : (
+                          <Mono>{r.patientId.slice(0, 8)}</Mono>
+                        )}
+                      </Table.Td>
+                      <Table.Td>{r.labName}</Table.Td>
+                      <Table.Td>{t(r.typeLabelKey)}</Table.Td>
+                      <Table.Td>
+                        <StatusPill status={r.statusTone}>{t(r.statusLabelKey)}</StatusPill>
+                      </Table.Td>
+                      <Table.Td>
+                        {r.costText ? (
+                          <Mono>
+                            {r.costText} {r.currency}
+                          </Mono>
+                        ) : (
+                          <Text c="dimmed">—</Text>
+                        )}
+                      </Table.Td>
+                      <Table.Td>
+                        {r.expectedDateText ? (
+                          <Mono>{r.expectedDateText}</Mono>
+                        ) : (
+                          <Text c="dimmed">—</Text>
+                        )}
+                      </Table.Td>
+                    </Table.Tr>
+                  );
+                })}
+              </Table.Tbody>
+            </Table>
+          </Table.ScrollContainer>
 
-            {totalPages > 1 && (
-              <Group justify="flex-end">
-                <Pagination value={page} onChange={setPage} total={totalPages} />
-              </Group>
-            )}
-          </>
-        )}
-      </Stack>
-    </Container>
+          {totalPages > 1 && (
+            <Group justify="flex-end">
+              <Pagination value={page} onChange={setPage} total={totalPages} />
+            </Group>
+          )}
+        </>
+      )}
+    </Stack>
   );
 }

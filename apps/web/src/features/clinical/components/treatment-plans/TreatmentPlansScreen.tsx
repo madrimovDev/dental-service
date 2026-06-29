@@ -1,6 +1,6 @@
 import type { ListTreatmentPlansParams } from '@dental/api-client';
 import { Mono, PageHead, StateView, StatusPill } from '@dental/ui';
-import { Container, Group, Pagination, Select, Stack, Table, Text, TextInput } from '@mantine/core';
+import { Group, Pagination, Select, Stack, Table, Text, TextInput } from '@mantine/core';
 import { IconSearch } from '@tabler/icons-react';
 import { type CSSProperties, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -74,99 +74,97 @@ export function TreatmentPlansScreen() {
   ];
 
   return (
-    <Container size="xl">
-      <Stack gap="lg">
-        <PageHead
-          title={t('treatment_plan.list.title')}
-          subtitle={t('treatment_plan.list.subtitle')}
+    <Stack gap="lg">
+      <PageHead
+        title={t('treatment_plan.list.title')}
+        subtitle={t('treatment_plan.list.subtitle')}
+      />
+
+      <Group gap="sm" align="flex-end">
+        <TextInput
+          flex={1}
+          leftSection={<IconSearch size={16} />}
+          placeholder={t('treatment_plan.list.search')}
+          value={search}
+          onChange={(e) => setSearch(e.currentTarget.value)}
         />
+        <Select
+          w={220}
+          placeholder={t('treatment_plan.list.filter_status')}
+          data={statusOptions}
+          value={status ?? ''}
+          onChange={(v) => {
+            setStatus((v || null) as PlanStatus | null);
+            setPage(1);
+          }}
+          allowDeselect={false}
+        />
+      </Group>
 
-        <Group gap="sm" align="flex-end">
-          <TextInput
-            flex={1}
-            leftSection={<IconSearch size={16} />}
-            placeholder={t('treatment_plan.list.search')}
-            value={search}
-            onChange={(e) => setSearch(e.currentTarget.value)}
-          />
-          <Select
-            w={220}
-            placeholder={t('treatment_plan.list.filter_status')}
-            data={statusOptions}
-            value={status ?? ''}
-            onChange={(v) => {
-              setStatus((v || null) as PlanStatus | null);
-              setPage(1);
-            }}
-            allowDeselect={false}
-          />
-        </Group>
+      {query.isError ? (
+        <StateView
+          status="error"
+          title={t('states.error_title')}
+          retryLabel={t('states.retry')}
+          onRetry={() => query.refetch()}
+        />
+      ) : query.isLoading ? (
+        <StateView status="loading" skeleton="table" />
+      ) : filtered.length === 0 ? (
+        <StateView status="empty" title={t('treatment_plan.list.empty')} />
+      ) : (
+        <>
+          <Table.ScrollContainer minWidth={760}>
+            <Table verticalSpacing="sm" highlightOnHover>
+              <Table.Thead style={headStripStyle}>
+                <Table.Tr>
+                  <Table.Th style={thLabelStyle}>{t('treatment_plan.list.col_patient')}</Table.Th>
+                  <Table.Th style={thLabelStyle}>{t('treatment_plan.plan_title')}</Table.Th>
+                  <Table.Th style={thLabelStyle}>{t('treatment_plan.status')}</Table.Th>
+                  <Table.Th style={thLabelStyle}>{t('treatment_plan.total_cost')}</Table.Th>
+                  <Table.Th style={thLabelStyle}>{t('treatment_plan.total_visits')}</Table.Th>
+                  <Table.Th style={thLabelStyle}>{t('treatment_plan.list.col_updated')}</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {filtered.map((r) => {
+                  const name = nameMap.get(r.patientId);
+                  return (
+                    <Table.Tr key={r.id}>
+                      <Table.Td>
+                        {name ? (
+                          <Link to={`/patients/${r.patientId}`}>{name}</Link>
+                        ) : (
+                          <Mono>{r.patientId.slice(0, 8)}</Mono>
+                        )}
+                      </Table.Td>
+                      <Table.Td>{r.title}</Table.Td>
+                      <Table.Td>
+                        <StatusPill status={r.statusTone}>{t(r.statusLabelKey)}</StatusPill>
+                      </Table.Td>
+                      <Table.Td>
+                        <Mono>
+                          {r.totalCostText} {t('common.currency')}
+                        </Mono>
+                      </Table.Td>
+                      <Table.Td>{r.totalVisits}</Table.Td>
+                      <Table.Td>
+                        <Text c="dimmed">{r.updatedAtText}</Text>
+                      </Table.Td>
+                    </Table.Tr>
+                  );
+                })}
+              </Table.Tbody>
+            </Table>
+          </Table.ScrollContainer>
 
-        {query.isError ? (
-          <StateView
-            status="error"
-            title={t('states.error_title')}
-            retryLabel={t('states.retry')}
-            onRetry={() => query.refetch()}
-          />
-        ) : query.isLoading ? (
-          <StateView status="loading" skeleton="table" />
-        ) : filtered.length === 0 ? (
-          <StateView status="empty" title={t('treatment_plan.list.empty')} />
-        ) : (
-          <>
-            <Table.ScrollContainer minWidth={760}>
-              <Table verticalSpacing="sm" highlightOnHover>
-                <Table.Thead style={headStripStyle}>
-                  <Table.Tr>
-                    <Table.Th style={thLabelStyle}>{t('treatment_plan.list.col_patient')}</Table.Th>
-                    <Table.Th style={thLabelStyle}>{t('treatment_plan.plan_title')}</Table.Th>
-                    <Table.Th style={thLabelStyle}>{t('treatment_plan.status')}</Table.Th>
-                    <Table.Th style={thLabelStyle}>{t('treatment_plan.total_cost')}</Table.Th>
-                    <Table.Th style={thLabelStyle}>{t('treatment_plan.total_visits')}</Table.Th>
-                    <Table.Th style={thLabelStyle}>{t('treatment_plan.list.col_updated')}</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {filtered.map((r) => {
-                    const name = nameMap.get(r.patientId);
-                    return (
-                      <Table.Tr key={r.id}>
-                        <Table.Td>
-                          {name ? (
-                            <Link to={`/patients/${r.patientId}`}>{name}</Link>
-                          ) : (
-                            <Mono>{r.patientId.slice(0, 8)}</Mono>
-                          )}
-                        </Table.Td>
-                        <Table.Td>{r.title}</Table.Td>
-                        <Table.Td>
-                          <StatusPill status={r.statusTone}>{t(r.statusLabelKey)}</StatusPill>
-                        </Table.Td>
-                        <Table.Td>
-                          <Mono>
-                            {r.totalCostText} {t('common.currency')}
-                          </Mono>
-                        </Table.Td>
-                        <Table.Td>{r.totalVisits}</Table.Td>
-                        <Table.Td>
-                          <Text c="dimmed">{r.updatedAtText}</Text>
-                        </Table.Td>
-                      </Table.Tr>
-                    );
-                  })}
-                </Table.Tbody>
-              </Table>
-            </Table.ScrollContainer>
-
-            {totalPages > 1 && (
-              <Group justify="flex-end">
-                <Pagination value={page} onChange={setPage} total={totalPages} />
-              </Group>
-            )}
-          </>
-        )}
-      </Stack>
-    </Container>
+          {totalPages > 1 && (
+            <Group justify="flex-end">
+              <Pagination value={page} onChange={setPage} total={totalPages} />
+            </Group>
+          )}
+        </>
+      )}
+    </Stack>
   );
 }
