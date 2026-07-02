@@ -1,7 +1,11 @@
 import type { MiddlewareHandler } from 'hono';
 import { jwtVerify } from 'jose';
 
-const secret = () => new TextEncoder().encode(process.env.JWT_SECRET!);
+const secret = () => {
+  const jwtSecret = process.env.JWT_SECRET;
+  if (!jwtSecret) throw new Error('JWT_SECRET is required');
+  return new TextEncoder().encode(jwtSecret);
+};
 
 export const adminJwtMiddleware: MiddlewareHandler = async (c, next) => {
   const auth = c.req.header('Authorization');
