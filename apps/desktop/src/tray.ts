@@ -31,6 +31,14 @@ export const createTray = (role: AppRole, info: TrayInfo, callbacks: TrayCallbac
   updateTray(role, info, callbacks);
 };
 
+// Auto-updater (CLI-357, Task 12) tray ikonkasiga tegishli — tray instansiyasi
+// bu modulda inkapsulyatsiya qilingani sababli tashqaridan tooltip yangilash
+// shu eksport orqali amalga oshadi (`main.ts` `Tray` obyektiga bevosita
+// kirmaydi).
+export const setTrayToolTip = (text: string): void => {
+  tray?.setToolTip(text);
+};
+
 export const updateTray = (role: AppRole, info: TrayInfo, callbacks: TrayCallbacks): void => {
   const label =
     role === 'server'

@@ -8,21 +8,25 @@
  * - Klient: LAN discovery orqali server qidiriladi → tray → brauzer oynasi
  *   serverга ulanadi.
  *
+ * Auto-update — `electron-updater` generic provider orqali `UPDATE_URL`
+ * (build-time env, `electron-builder.yml`) manzilidan tekshiradi
+ * (`auto-updater.ts`, CLI-357, Task 12); faqat packaged build'da ishlaydi.
+ *
  * ⚠️ TASHQI BOG'LIQLIK (jonli, TODO):
- *   - Auto-update (electron-updater, CLI-251) — bu qayta yozishda olib
- *     tashlandi; server/klient rejimida qayta ulanishi kerak (keyingi task).
  *   - `assets/tray-icon.png` — hali repo'da yo'q, distribution paketlashda
  *     qo'shiladi.
  *   - Sozlamalar oynasi (IP qo'lda kiritish, litsenziya) — web app
  *     `/settings` sahifasiga ochiladi, alohida Electron oyna emas.
  */
 import { join } from 'node:path';
-import { app, BrowserWindow, dialog, shell } from 'electron';
+import { app, BrowserWindow, dialog, Notification, shell } from 'electron';
+import { autoUpdater } from 'electron-updater';
+import { setupAutoUpdater } from './auto-updater';
 import { readConfig } from './config';
 import { findServer, startServerDiscovery, stopServerDiscovery } from './discovery';
 import { isFirstRun, runFirstSetup, runMigrations } from './first-run';
 import { startServer, stopServer } from './process-manager';
-import { createTray } from './tray';
+import { createTray, setTrayToolTip } from './tray';
 
 const RESOURCES = app.isPackaged
   ? process.resourcesPath
@@ -118,6 +122,13 @@ app.whenReady().then(async () => {
     );
     openBrowser(serverUrl);
   }
+
+  setupAutoUpdater({
+    isPackaged: app.isPackaged,
+    updater: autoUpdater,
+    notify: (title, body) => new Notification({ title, body }).show(),
+    setTrayToolTip,
+  });
 });
 
 app.on('window-all-closed', () => {

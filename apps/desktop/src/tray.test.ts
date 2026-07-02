@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, mock, test } from 'bun:test';
 // tartibiga bog'liq racy natija beradi — test-electron-mock.ts izohiga qarang).
 import { resetTrayMockState, trayMockState } from './test-electron-mock';
 
-const { createTray, updateTray } = await import('./tray');
+const { createTray, updateTray, setTrayToolTip } = await import('./tray');
 
 describe('tray', () => {
   beforeEach(() => {
@@ -108,5 +108,20 @@ describe('tray', () => {
     exitItem?.click?.();
 
     expect(onStop).toHaveBeenCalledTimes(1);
+  });
+
+  test("setTrayToolTip mavjud tray'ning tooltip'ini yangilaydi", () => {
+    createTray(
+      'server',
+      { serverUrl: 'http://localhost:80' },
+      { onOpen: mock(() => {}), onSettings: mock(() => {}), onStop: mock(() => {}) },
+    );
+
+    setTrayToolTip('Dental Service — yangilash tayyor');
+
+    expect(trayMockState.setToolTipCalls).toEqual([
+      'Dental Service',
+      'Dental Service — yangilash tayyor',
+    ]);
   });
 });
