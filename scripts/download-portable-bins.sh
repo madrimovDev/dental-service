@@ -6,7 +6,13 @@
 
 set -e
 
-RESOURCES_DIR="apps/desktop/resources"
+# `bun run` ishga tushirilganda cwd — chaqiruvchi package.json'ning papkasi
+# (masalan apps/desktop/package.json'dagi prebuild "apps/desktop"'dan ishga
+# tushadi, repo root'dan emas). Shu sabab yo'l script'ning o'z joylashuviga
+# nisbatan hisoblanadi — qaysi cwd'dan chaqirilishidan qat'i nazar to'g'ri.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+RESOURCES_DIR="$ROOT_DIR/apps/desktop/resources"
 mkdir -p "$RESOURCES_DIR/postgres" "$RESOURCES_DIR/valkey"
 
 if [ -z "$POSTGRES_WIN_URL" ]; then
