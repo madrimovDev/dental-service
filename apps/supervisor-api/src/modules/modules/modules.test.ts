@@ -68,4 +68,15 @@ describe('PATCH /v1/admin/licenses/:key/modules', () => {
     });
     expect(updated?.gracePeriodDays).toBe(15);
   });
+
+  it('returns 404 for an unknown license key', async () => {
+    const res = await app.request('/v1/admin/licenses/NOPE-NOPE-NOPE-NOPE/modules', {
+      method: 'PATCH',
+      headers: await authHeaders(),
+      body: JSON.stringify({ modules: ['patients'] }),
+    });
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as any;
+    expect(body.error.code).toBe('NOT_FOUND');
+  });
 });

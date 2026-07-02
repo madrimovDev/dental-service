@@ -21,7 +21,12 @@ export const modulesRoutes = () => {
     const { modules, gracePeriodDays } = c.req.valid('json');
     const update: { modules: string[]; gracePeriodDays?: number } = { modules };
     if (gracePeriodDays !== undefined) update.gracePeriodDays = gracePeriodDays;
-    await db.update(licenses).set(update).where(eq(licenses.licenseKey, key));
+    const updated = await db
+      .update(licenses)
+      .set(update)
+      .where(eq(licenses.licenseKey, key))
+      .returning({ id: licenses.id });
+    if (updated.length === 0) return c.json({ error: { code: 'NOT_FOUND' } }, 404);
     return c.json({ ok: true });
   });
 
