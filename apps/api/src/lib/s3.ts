@@ -1,18 +1,13 @@
-import { S3Client } from 'bun';
-import { env } from './env.ts';
+import { createLocalStorageAdapter } from './storage.ts';
 
 /**
- * MinIO/S3 client — barcha patient images shu yerga yuklanadi.
- * Endpoint MinIO uchun custom; AWS S3 uchun ham ishlaydi (endpoint o'zgartirilsa).
+ * Local Desktop (CLI-340): MinIO/S3 endi ishlatilmaydi — offline LAN
+ * deploy'da tashqi S3 mavjud emas. Bu modul endi `storage.ts` (local
+ * filesystem adapter) ga delegatsiya qiladi; public funksiya signaturalari
+ * o'zgarmadi, shuning uchun chaqiruvchi modullar (masalan
+ * `patient-images.service.ts`) o'zgarishsiz qoladi.
  */
-export const s3 = new S3Client({
-  endpoint: env.MINIO_ENDPOINT,
-  accessKeyId: env.MINIO_ROOT_USER,
-  secretAccessKey: env.MINIO_ROOT_PASSWORD,
-  bucket: env.MINIO_BUCKET,
-  region: 'us-east-1', // MinIO default
-  virtualHostedStyle: false, // path-style URLs uchun
-});
+const storage = createLocalStorageAdapter();
 
 /**
  * Storage key generator — multi-tenant uchun:
@@ -29,26 +24,31 @@ export function patientImageKey(args: {
 }
 
 /**
- * Presigned download URL — short-lived (5 min).
- * Frontend `<img src>` ga shu URL beriladi.
+ * Fayl URL — avval MinIO presigned (short-lived) URL edi, endi local
+ * filesystem'dagi `/uploads/:key` route'ga relative path
+ * (`storage.serveUrl`). Frontend `<img src>` shu path'ni to'g'ridan ishlatadi.
+ * `expiresInSec` endi ma'nosiz (local fayl uchun muddat yo'q) — signature
+ * chaqiruvchi kodni o'zgartirmaslik uchun saqlanadi.
  */
-export async function presignedGetUrl(objectKey: string, expiresInSec = 300): Promise<string> {
-  const file = s3.file(objectKey);
-  return file.presign({ expiresIn: expiresInSec, method: 'GET' });
+export async function presignedGetUrl(objectKey: string, _expiresInSec = 300): Promise<string> {
+  return storage.serveUrl(objectKey);
 }
 
 /**
- * Upload buffer to MinIO. Returns object key.
+ * Buffer'ni local filesystem'ga yozadi. Returns object key.
  */
 export async function uploadObject(args: {
   key: string;
   body: ArrayBuffer | Uint8Array;
   contentType: string;
 }): Promise<void> {
-  const file = s3.file(args.key);
-  await file.write(args.body, { type: args.contentType });
+  const data =
+    args.body instanceof Uint8Array
+      ? Buffer.from(args.body)
+      : Buffer.from(new Uint8Array(args.body));
+  await storage.save(args.key, data);
 }
 
 export async function deleteObject(key: string): Promise<void> {
-  await s3.delete(key);
+  await storage.remove(key);
 }
