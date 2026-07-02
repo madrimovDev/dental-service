@@ -38,4 +38,13 @@ describe('createLocalStorageAdapter', () => {
     const storage = createLocalStorageAdapter(tmpDir);
     expect(storage.serveUrl('images/abc.jpg')).toBe('/uploads/images%2Fabc.jpg');
   });
+
+  test('blocks path traversal outside baseDir', async () => {
+    const storage = createLocalStorageAdapter(tmpDir);
+    // baseDir tashqarisidagi "sirli" fayl (masalan boshqa tenant ma'lumoti
+    // yoki server konfiguratsiyasi) ga chiqib ketmasligi kerak.
+    expect(await storage.exists('../outside.txt')).toBe(false);
+    await expect(storage.save('../escape.txt', Buffer.from('x'))).rejects.toThrow();
+    await expect(storage.remove('../escape.txt')).rejects.toThrow();
+  });
 });

@@ -10,8 +10,14 @@ import { authMiddleware } from '../middleware/auth.ts';
  *
  * `serveUrl()` (storage.ts) `encodeURIComponent` bilan `/` ni ham kodlaydi
  * (masalan `tenants/x/patients/y/z.jpg` → `tenants%2Fx%2F...`), shuning uchun
- * bu yerda ham to'liq encoded segmentni bitta `:key{.+}` param sifatida olib
- * `decodeURIComponent` bilan asl key'ga qaytaramiz.
+ * bu yerda to'liq encoded segment bitta `:key{.+}` param sifatida keladi.
+ * Hono `c.req.param()` route paramlarni AVTOMATIK bir marta decode qiladi —
+ * shu sababli bu yerda QAYTA `decodeURIComponent` chaqirilMAYDI: agar
+ * chaqirilsa, decode qilingan key literal `%` belgi bilan tugasa (masalan
+ * fayl nomi `50%off.jpg`) `URIError: URI malformed` bilan crash qiladi
+ * (isbotlangan: bir martalik decode aynan asl key'ni qaytaradi).
+ * Path-traversal himoyasi (`../etc/passwd`) `storage.ts`ning
+ * `resolveSafePath` ichida — bu yerda qo'shimcha tekshiruv shart emas.
  */
 export const uploadsRoutes = (storage: StorageAdapter) => {
   const app = new Hono();
@@ -19,7 +25,7 @@ export const uploadsRoutes = (storage: StorageAdapter) => {
   app.use('*', authMiddleware());
 
   app.get('/:key{.+}', async (c) => {
-    const key = decodeURIComponent(c.req.param('key'));
+    const key = c.req.param('key');
 
     if (!(await storage.exists(key))) {
       return c.json(fail('NOT_FOUND', 'File not found'), 404);
