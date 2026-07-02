@@ -14,6 +14,9 @@ export interface TrayInfo {
   serverUrl: string;
   connectedClients?: number;
   licenseInfo?: string;
+  // Klient rolida `false` — LAN discovery serverni topa olmadi (fon retry
+  // davom etmoqda, CLI-348 qaror 4). `undefined`/`true` — ulangan holat.
+  serverFound?: boolean;
 }
 
 export interface TrayCallbacks {
@@ -43,7 +46,9 @@ export const updateTray = (role: AppRole, info: TrayInfo, callbacks: TrayCallbac
   const label =
     role === 'server'
       ? `Dental Service — Server\n📡 ${info.serverUrl}\n👥 ${info.connectedClients ?? 0} ta qurilma${info.licenseInfo ? `\n🔐 ${info.licenseInfo}` : ''}`
-      : `Dental Service — Klient\n✅ Ulangan: ${info.serverUrl}`;
+      : info.serverFound === false
+        ? 'Dental Service — Klient\n🔍 Server topilmadi (30s da qayta urinilmoqda)'
+        : `Dental Service — Klient\n✅ Ulangan: ${info.serverUrl}`;
 
   const menu = Menu.buildFromTemplate([
     { label, enabled: false },

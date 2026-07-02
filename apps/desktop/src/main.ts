@@ -22,12 +22,13 @@ import { join } from 'node:path';
 import { app, BrowserWindow, dialog, Notification, shell } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import { setupAutoUpdater } from './auto-updater';
+import { startClientReconnectLoop } from './client-reconnect';
 import { readConfig } from './config';
 import { findServer, startServerDiscovery, stopServerDiscovery } from './discovery';
 import { isFirstRun, runFirstSetup, runMigrations } from './first-run';
 import { hasLicense } from './license-status';
 import { startServer, stopServer } from './process-manager';
-import { createTray, setTrayToolTip } from './tray';
+import { createTray, setTrayToolTip, updateTray } from './tray';
 
 const RESOURCES = app.isPackaged
   ? process.resourcesPath
@@ -43,6 +44,10 @@ const LOGS_DIR = join(
 );
 
 let mainWindow: BrowserWindow | null = null;
+// Klient rejimida server topilmaganda ishga tushirilgan fon retry sikli
+// to'xtatuvchisi — server topilganda yoki ilova yopilganda tozalanadi
+// (CLI-348 qaror 4).
+let stopClientReconnectLoop: (() => void) | null = null;
 
 const openBrowser = (url: string): void => {
   if (mainWindow) {
@@ -114,18 +119,43 @@ app.whenReady().then(async () => {
     openBrowser(hasLicense() ? localUrl : `${localUrl}/activate`);
   } else {
     // Klient rejimi — LAN discovery orqali server qidiriladi.
-    const serverUrl = config.serverUrl || (await findServer()) || 'http://localhost';
+    const serverUrl = config.serverUrl || (await findServer());
 
-    createTray(
-      'client',
-      { serverUrl },
-      {
-        onOpen: () => openBrowser(serverUrl),
-        onSettings: () => openBrowser(`${serverUrl}/settings`),
-        onStop: () => app.quit(),
-      },
-    );
-    openBrowser(serverUrl);
+    const connectedCallbacks = (url: string) => ({
+      onOpen: () => openBrowser(url),
+      onSettings: () => openBrowser(`${url}/settings`),
+      onStop: () => app.quit(),
+    });
+
+    if (serverUrl) {
+      createTray('client', { serverUrl }, connectedCallbacks(serverUrl));
+      openBrowser(serverUrl);
+    } else {
+      // Server topilmadi — tray "Server topilmadi" holatini ko'rsatadi va
+      // har 30s fon da qayta discovery urinadi (CLI-348 qaror 4). Topilgach
+      // `updateTray` chaqiriladi — YANGI `createTray` emas, aks holda ikkinchi
+      // tray ikonkasi yaratilib qoladi.
+      createTray(
+        'client',
+        { serverUrl: '', serverFound: false },
+        {
+          onOpen: () => {},
+          onSettings: () => {},
+          onStop: () => {
+            stopClientReconnectLoop?.();
+            app.quit();
+          },
+        },
+      );
+      stopClientReconnectLoop = startClientReconnectLoop({
+        findServer,
+        onFound: (found) => {
+          stopClientReconnectLoop = null;
+          updateTray('client', { serverUrl: found }, connectedCallbacks(found));
+          openBrowser(found);
+        },
+      });
+    }
   }
 
   setupAutoUpdater({
@@ -145,5 +175,8 @@ app.on('before-quit', async () => {
   if (config.role === 'server') {
     stopServerDiscovery();
     await stopServer();
+  } else {
+    stopClientReconnectLoop?.();
+    stopClientReconnectLoop = null;
   }
 });

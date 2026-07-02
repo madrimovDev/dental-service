@@ -95,6 +95,19 @@ describe('tray', () => {
     expect(onStop).toHaveBeenCalledTimes(1);
   });
 
+  test("updateTray klient rolida server topilmasa 'Server topilmadi' holatini ko'rsatadi", () => {
+    const onOpen = mock(() => {});
+    const onSettings = mock(() => {});
+    const onStop = mock(() => {});
+
+    createTray('client', { serverUrl: '', serverFound: false }, { onOpen, onSettings, onStop });
+
+    const template = trayMockState.lastMenuTemplate;
+    if (!template) throw new Error('menu template yaratilmadi');
+    expect(template[0]?.label).toContain('Server topilmadi');
+    expect(template[0]?.label).not.toContain('Ulangan');
+  });
+
   test('klient rolida oxirgi menu band "Chiqish" bo\'ladi', () => {
     const onOpen = mock(() => {});
     const onSettings = mock(() => {});
