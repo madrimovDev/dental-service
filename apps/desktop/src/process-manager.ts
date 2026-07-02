@@ -60,18 +60,23 @@ const spawnPostgres = (): Promise<void> =>
   });
 
 const spawnValkey = (): Promise<void> =>
-  new Promise((resolve) => {
+  new Promise((resolve, reject) => {
     const valkeyBin = join(getResourcesDir(), 'valkey');
     valkeyProcess = spawn(
       join(valkeyBin, 'valkey-server.exe'),
       [join(getDataDir(), 'valkey.conf')],
       { stdio: 'pipe' },
     );
+    // Binary topilmadi/spawn muvaffaqiyatsiz — reject (postgres bilan bir xil
+    // pattern), aks holda 'error' hech kim tinglamasa unhandled exception
+    // Electron main process'ni crash qiladi (CLI-346 qarori: binary
+    // topilmadi -> Error throw -> main.ts dialog.showErrorBox()).
+    valkeyProcess.on('error', reject);
     setTimeout(() => resolve(), getValkeyReadyDelayMs()).unref?.();
   });
 
 const spawnApi = (port: number): Promise<void> =>
-  new Promise((resolve) => {
+  new Promise((resolve, reject) => {
     const apiBin = join(getResourcesDir(), 'api.exe');
     apiProcess = spawn(apiBin, [], {
       env: {
@@ -85,6 +90,8 @@ const spawnApi = (port: number): Promise<void> =>
       },
       stdio: 'pipe',
     });
+    // postgres/valkey bilan bir xil pattern — binary topilmasa reject.
+    apiProcess.on('error', reject);
     setTimeout(() => resolve(), getApiReadyDelayMs()).unref?.();
   });
 

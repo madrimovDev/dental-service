@@ -12,6 +12,9 @@ class FakeChildProcess extends EventEmitter {
 
 let spawnCalls: Array<{ cmd: string; args: string[]; opts: Record<string, unknown> }> = [];
 let spawnedProcesses: FakeChildProcess[] = [];
+// Test tanlab bitta spawn chaqiruvini (0-indeksli) "binary topilmadi" holatiga
+// o'tkazishi mumkin — 'error' emit qilinadi, "ready" signali emas.
+let failSpawnAtIndex: number | null = null;
 
 const realChildProcess = await import('node:child_process');
 
@@ -23,13 +26,19 @@ mock.module('electron', () => ({ app: { isPackaged: false } }));
 mock.module('node:child_process', () => ({
   ...realChildProcess,
   spawn: (cmd: string, args: string[] = [], opts: Record<string, unknown> = {}) => {
+    const index = spawnCalls.length;
     spawnCalls.push({ cmd, args, opts });
     const proc = new FakeChildProcess();
     spawnedProcesses.push(proc);
-    // Real spawn'dagi kabi keyingi tick'da "ready" signalini chiqaramiz —
-    // spawnPostgres promise executor listener'ni synchronous ravishda
-    // ulaydi, shu sabab bu keyinroq keladigan emission qo'lga tushadi.
+    // Real spawn'dagi kabi keyingi tick'da signalni chiqaramiz —
+    // spawnPostgres/spawnValkey/spawnApi promise executor listener'ni
+    // synchronous ravishda ulaydi, shu sabab bu keyinroq keladigan emission
+    // qo'lga tushadi.
     queueMicrotask(() => {
+      if (failSpawnAtIndex === index) {
+        proc.emit('error', new Error('spawn ENOENT'));
+        return;
+      }
       proc.stdout.emit('data', Buffer.from('database system is ready to accept connections'));
     });
     return proc;
@@ -49,6 +58,7 @@ describe('process-manager', () => {
   beforeEach(() => {
     spawnCalls = [];
     spawnedProcesses = [];
+    failSpawnAtIndex = null;
   });
 
   test('boshlang\'ich holat "stopped"', () => {
@@ -81,5 +91,17 @@ describe('process-manager', () => {
     for (const proc of spawnedProcesses) {
       expect(proc.kill).toHaveBeenCalledWith('SIGTERM');
     }
+  });
+
+  test('valkey binary topilmasa (spawn error) startServer reject qiladi', async () => {
+    failSpawnAtIndex = 1; // 0=postgres (ok), 1=valkey (fail)
+
+    await expect(startServer()).rejects.toThrow(/ENOENT/);
+  });
+
+  test('api.exe topilmasa (spawn error) startServer reject qiladi', async () => {
+    failSpawnAtIndex = 2; // 0=postgres, 1=valkey (ok), 2=api (fail)
+
+    await expect(startServer()).rejects.toThrow(/ENOENT/);
   });
 });
