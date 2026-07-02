@@ -12,23 +12,44 @@
  * (build-time env, `electron-builder.yml`) manzilidan tekshiradi
  * (`auto-updater.ts`, CLI-357, Task 12); faqat packaged build'da ishlaydi.
  *
+ * Klient — server topilmasa (`serverUrl` config'da yo'q va `findServer()`
+ * `null` qaytarsa) tray "Server topilmadi" holatini ko'rsatadi va
+ * `client-reconnect.ts` orqali har 30s fon da qayta discovery urinadi
+ * (CLI-348 qaror 4). Server topilganda YOKI foydalanuvchi `/settings`
+ * sahifasida (`preload.ts` → `settings-ipc.ts`, CLI-348 qaror 5) qo'lda
+ * serverUrl kiritib muvaffaqiyatli ulansa — tray/brauzer yangi manzilga
+ * o'tadi (`updateTray`, YANGI `createTray` emas — bitta tray ikonkasi).
+ *
+ * Server — litsenziya faollashtirilmagan bo'lsa (`.lic` fayl yo'q,
+ * `license-status.ts` — existence-only, muddat tekshiruvi API tomonida)
+ * brauzer asosiy UI o'rniga `/activate`ga ochiladi (CLI-348 qaror 1; web
+ * `/activate` sahifasining o'zi hali qurilmagan — follow-up, apps/web
+ * doirasi tashqarisida).
+ *
  * ⚠️ TASHQI BOG'LIQLIK (jonli, TODO):
  *   - `assets/tray-icon.png` — hali repo'da yo'q, distribution paketlashda
  *     qo'shiladi.
- *   - Sozlamalar oynasi (IP qo'lda kiritish, litsenziya) — web app
- *     `/settings` sahifasiga ochiladi, alohida Electron oyna emas.
+ *   - `preload.ts` ESM (`"type": "module"`) sifatida kompilyatsiya qilinadi —
+ *     `sandbox`/Electron versiyasiga bog'liq yuklash xatti-harakati real
+ *     BrowserWindow'da hali tekshirilmagan (web `/settings` bu ko'prikni
+ *     hali chaqirmagani sabab hozircha bloklovchi emas).
+ *   - Web `/settings` sahifasi `window.dentalDesktop?.setServerUrl(url)`ni
+ *     hali chaqirmaydi (apps/web o'zgarishi shu ticket doirasi tashqarisida).
  */
 import { join } from 'node:path';
-import { app, BrowserWindow, dialog, Notification, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Notification, shell } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import { setupAutoUpdater } from './auto-updater';
 import { startClientReconnectLoop } from './client-reconnect';
-import { readConfig } from './config';
+import { readConfig, writeConfig } from './config';
 import { findServer, startServerDiscovery, stopServerDiscovery } from './discovery';
 import { isFirstRun, runFirstSetup, runMigrations } from './first-run';
 import { hasLicense } from './license-status';
 import { startServer, stopServer } from './process-manager';
+import { registerSettingsIpc } from './settings-ipc';
 import { createTray, setTrayToolTip, updateTray } from './tray';
+
+const PRELOAD_PATH = join(import.meta.dirname, 'preload.js');
 
 const RESOURCES = app.isPackaged
   ? process.resourcesPath
@@ -55,7 +76,12 @@ const openBrowser = (url: string): void => {
     mainWindow.show();
     return;
   }
-  mainWindow = new BrowserWindow({ width: 1280, height: 800, minWidth: 1024 });
+  mainWindow = new BrowserWindow({
+    width: 1280,
+    height: 800,
+    minWidth: 1024,
+    webPreferences: { preload: PRELOAD_PATH },
+  });
   mainWindow.webContents.setWindowOpenHandler(({ url: u }) => {
     void shell.openExternal(u);
     return { action: 'deny' };
@@ -125,6 +151,21 @@ app.whenReady().then(async () => {
       onOpen: () => openBrowser(url),
       onSettings: () => openBrowser(`${url}/settings`),
       onStop: () => app.quit(),
+    });
+
+    // Sozlamalar'da (web `/settings`, `preload.ts` orqali) qo'lda kiritilgan
+    // serverUrl — `writeConfig()` + reconnect urinishi (CLI-348 qaror 5).
+    // Muvaffaqiyatli ulansa tray/brauzer yangi manzilga o'tadi, joriy fon
+    // discovery retry (bo'lsa) to'xtatiladi.
+    registerSettingsIpc({
+      ipcMain,
+      writeConfig,
+      onConnected: (url) => {
+        stopClientReconnectLoop?.();
+        stopClientReconnectLoop = null;
+        updateTray('client', { serverUrl: url }, connectedCallbacks(url));
+        openBrowser(url);
+      },
     });
 
     if (serverUrl) {
