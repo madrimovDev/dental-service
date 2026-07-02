@@ -223,24 +223,30 @@ Sensitive read (masalan, `medical_record.view`) ham yoziladi (lekin tarkibi yozi
 dental-service/
 ├── apps/
 │   ├── api/               # Bun + Hono backend
-│   ├── web/               # Vite + React + Mantine (browser)
-│   ├── desktop/           # Electron (web ni wrap qiladi)
-│   └── telegram-bot/      # Telegraf bot (Phase 2)
+│   ├── web/                # Vite + React + Mantine (browser)
+│   ├── desktop/            # Electron (web ni wrap qiladi)
+│   ├── telegram-bot/       # Telegraf bot (Phase 2)
+│   ├── supervisor-api/     # Bun + Hono — markaziy litsenziya-boshqaruv backend
+│   │                       # (@supervisor/*, dental-service'dan alohida mahsulot,
+│   │                       #  lekin bitta monorepo; 2026-07-02 qarori)
+│   └── supervisor-admin/   # Vite + React + Mantine — Supervisor admin paneli (@supervisor/*)
 ├── packages/
 │   ├── ui/                # Custom dental React komponentlar
-│   ├── core/              # Shared types, Zod schemalar
+│   ├── core/              # Shared types, Zod schemalar (shu yerda supervisor-public-key.ts ham)
 │   ├── db-schema/         # Drizzle schemalar
 │   ├── api-client/        # OpenAPI'dan auto-generated client
 │   ├── i18n/              # uz/ru tarjimalar
 │   ├── fiscal/            # Soliq scaffold (Phase 2+)
 │   └── notifications/     # SMS/Telegram channel abstractions
-├── infra/                 # Docker Compose, Caddyfile
+├── infra/                 # Docker Compose, Caddyfile (dental-service per-klinika deploy)
+│   └── supervisor/        # Supervisor'ning PROD orkestratsiyasi — bitta markaziy VPS,
+│                           # klinika deploy'iga HECH QACHON qo'shilmaydi
 ├── docs/                  # Texnik dokumentatsiya
 ├── .github/workflows/     # CI/CD
 ├── turbo.json
-├── bun.lockb
+├── bun.lock
 ├── package.json
-├── tsconfig.base.json
+├── tsconfig.json
 ├── CONCEPT.md
 └── CLAUDE.md              # Bu fayl
 ```

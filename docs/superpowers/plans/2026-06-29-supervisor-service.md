@@ -2,13 +2,19 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> ⚠️ **Bu alohida repo** — `supervisor-service/` (dental-service'dan mustaqil)
+> ✅ **Monorepo ichida (2026-07-02 qaror bilan yangilandi)** — `apps/supervisor-api` + `apps/supervisor-admin`, `dental-service` bilan **bitta repo**, `@supervisor/*` npm scope (`@dental/*`dan qasddan farqli — Supervisor mustaqil mahsulot, lekin bir repoda). Birinchi urinish (`supervisor-service/` alohida repo sifatida) chala qolib ketgani va root `package.json`/`turbo.json`ni buzib qo'ygani sababli bekor qilindi va butunlay o'chirildi — quyidagi Task 1 shu sababli yangilandi. To'liq kontekst: `/home/madrimov/.claude/plans/hozir-supervisor-service-va-asosiy-iterative-teacup.md`.
+>
+> **Muhim tuzatishlar (eski qismlarni o'qiganda yodda tuting):**
+> - Backend testlari **`bun:test`** bilan yoziladi, **`vitest` emas** (import manbai `'bun:test'`, API shakli bir xil — `describe/it/expect`). `vi.mock(...)` bun:test'da yo'q — Task 3 testlari haqiqiy (integratsion) DB'ga qarshi yoziladi, mock emas.
+> - Admin JWT — **`jose`** kutubxonasi (`apps/api` bilan bir xil), **`hono/jwt` emas**.
+> - Har joyda `supervisor-service/apps/api/...` → `apps/supervisor-api/...`, `supervisor-service/apps/admin/...` → `apps/supervisor-admin/...` deb o'qing.
+> - `db/index.ts` nomi endi **`db/client.ts`** (`apps/api` konvensiyasiga mos) va **`drizzle(client, { schema })`** — `schema` parametri MAJBURIY (bu — birinchi urinishning asosiy bugi edi: `db.query.*` schema'siz ishlamaydi).
 
 **Goal:** Developer boshqaradigan central Supervisor service — klinikalar litsenziyasini boshqarish, modul gating, grace period sozlash, reactivation.
 
 **Architecture:** Hono API (VPS'da Docker + Caddy), React admin panel. Dental Service har 24 soatda `/v1/heartbeat` chaqiradi. RSA imzo bilan `.lic` fayllari imzolanadi. VPS'da PostgreSQL + Caddy (TLS).
 
-**Tech Stack:** Bun + Hono, Drizzle + PostgreSQL, React + Vite + Mantine, Docker + Caddy (VPS), node-forge (RSA), Vitest
+**Tech Stack:** Bun + Hono, Drizzle + PostgreSQL, React + Vite + Mantine, Docker + Caddy (VPS), Node built-in `crypto` (RSA — node-forge EMAS), bun:test (API) + Vitest (admin panel)
 
 ## Global Constraints
 
@@ -16,118 +22,146 @@
 - Bun runtime
 - Drizzle ORM (PostgreSQL)
 - Biome lint
-- Vitest testlar
+- Testlar: `bun:test` (supervisor-api), Vitest (supervisor-admin) — apps/api/apps/web konvensiyasiga mos
 - Hono factory DI pattern (CLAUDE.md §3.5)
 - Barcha API endpoint HTTPS only (production)
 
 ---
 
-## Fayl xaritasi (yangi repo)
+## Fayl xaritasi (dental-service monorepo ichida, apps/ ostida)
 
 ```
-supervisor-service/
-├── apps/
-│   ├── api/                    # Hono backend
-│   │   └── src/
-│   │       ├── index.ts        # Entry point
-│   │       ├── db/
-│   │       │   ├── schema.ts   # Drizzle schema
-│   │       │   └── migrate.ts
-│   │       ├── lib/
-│   │       │   └── rsa.ts      # RSA imzolash
-│   │       └── modules/
-│   │           ├── clinics/    # Klinika CRUD
-│   │           ├── licenses/   # Activate, heartbeat, reactivate
-│   │           └── modules/    # Modul on/off
-│   └── admin/                  # React admin panel
-│       └── src/
-│           ├── main.tsx
-│           ├── features/
-│           │   ├── clinics/
-│           │   └── licenses/
-│           └── components/
-├── infra/
-│   ├── docker-compose.yml      # Dev
-│   ├── docker-compose.prod.yml # VPS prod
-│   └── Caddyfile
-├── package.json
-└── turbo.json
+apps/
+├── supervisor-api/             # Hono backend (@supervisor/api)
+│   ├── Dockerfile
+│   ├── drizzle.config.ts
+│   ├── drizzle/                # generatsiya qilingan migratsiyalar
+│   ├── package.json
+│   ├── tsconfig.json           # extends ../../tsconfig.json
+│   ├── .env.example
+│   └── src/
+│       ├── index.ts            # Entry point (Bun.serve)
+│       ├── db/
+│       │   ├── schema.ts       # Drizzle schema
+│       │   ├── client.ts       # drizzle(client, { schema }) — schema MAJBURIY
+│       │   ├── migrate.ts
+│       │   └── seed.ts
+│       ├── lib/
+│       │   ├── rsa.ts          # RSA imzolash (node:crypto)
+│       │   └── jwt.ts          # admin JWT (jose)
+│       └── modules/
+│           ├── clinics/        # Klinika CRUD + modul toggle
+│           ├── licenses/       # Activate, heartbeat, reactivate
+│           └── auth/           # Admin login (JWT)
+└── supervisor-admin/           # React admin panel (@supervisor/admin)
+    ├── Dockerfile
+    ├── package.json
+    ├── tsconfig.json
+    ├── vite.config.ts
+    ├── vitest.config.ts
+    └── src/
+        ├── main.tsx
+        ├── lib/api.ts           # authFetch helper
+        └── features/
+            ├── auth/            # LoginPage
+            └── clinics/         # ClinicsPage, ClinicDetailPage
+
+infra/
+├── docker-compose.yml          # dental-service dev stack — postgres'ga
+│                                # supervisor DB init-script qo'shiladi (Task 1)
+├── postgres-init-supervisor.sql
+└── supervisor/                 # Supervisor'ning PROD orkestratsiyasi (Task 6)
+    ├── docker-compose.prod.yml # bitta markaziy VPS'da (klinika VPS'ida EMAS)
+    ├── Caddyfile
+    └── README.md
 ```
+
+Root `package.json` (`workspaces: ["apps/*", "packages/*"]`) va root `turbo.json` — **o'zgarishsiz** qoladi, `apps/*` glob avtomatik qamrab oladi.
 
 ---
 
-## Task 1: Repo Scaffolding + DB Schema
+## Task 1: Monorepo Scaffolding + DB Schema + Client (bug-fix task)
 
 **Files:**
-- Create: `apps/api/src/db/schema.ts`
-- Create: `apps/api/src/db/migrate.ts`
-- Create: `package.json`, `turbo.json`, `infra/docker-compose.yml`
+- Create: `apps/supervisor-api/package.json`, `tsconfig.json`, `drizzle.config.ts`
+- Create: `apps/supervisor-api/src/db/schema.ts`, `db/client.ts`, `db/migrate.ts`
+- Create: `infra/postgres-init-supervisor.sql`, mount qatori `infra/docker-compose.yml`ga
+- Create: `apps/supervisor-api/.env.example`
 
-- [ ] **Step 1: Yangi repo yaratish**
+**Qarorlar (brainstorm 2026-06-29 + monorepo qarori 2026-07-02):**
+- `clinics → branches → licenses` (har filialga alohida litsenziya, alohida to'lov)
+- `plan` hardcoded enum (`starter|standard|premium|enterprise`), `modules` jsonb override
+- Admin auth: username+password → JWT (faqat `x-admin-token` emas), kutubxona **`jose`**
+- `admin_users` jadval qo'shildi
+- Alohida repo/root `package.json`/`turbo.json`/`infra/docker-compose.yml` yaratish **YO'Q** — mavjud dental-service monorepo strukturasidan foydalaniladi (pastga qarang)
+
+- [ ] **Step 1: Papka strukturasi (mavjud dental-service ichida, YANGI repo YO'Q)**
 
 ```bash
-mkdir supervisor-service && cd supervisor-service
-git init
-mkdir -p apps/api/src/db apps/api/src/lib apps/api/src/modules/clinics apps/api/src/modules/licenses apps/api/src/modules/modules
-mkdir -p apps/admin/src infra
+# dental-service repo root'ida (git init QILINMAYDI — mavjud repo ichida)
+mkdir -p apps/supervisor-api/src/db apps/supervisor-api/src/lib
+mkdir -p apps/supervisor-api/src/modules/clinics apps/supervisor-api/src/modules/licenses apps/supervisor-api/src/modules/auth
+mkdir -p apps/supervisor-admin/src
 ```
 
-- [ ] **Step 2: `package.json` (root)**
+Root `package.json` (`workspaces: ["apps/*", "packages/*"]`) va root `turbo.json` — **tegilmaydi**, `apps/*` glob yangi ikkala papkani avtomatik qamrab oladi.
 
-```json
-{
-  "name": "supervisor-service",
-  "private": true,
-  "workspaces": ["apps/*"],
-  "scripts": {
-    "dev": "turbo dev",
-    "build": "turbo build",
-    "test": "turbo test"
-  },
-  "devDependencies": {
-    "turbo": "^2.0.0",
-    "@biomejs/biome": "^1.8.0",
-    "typescript": "^5.5.0"
-  }
-}
-```
-
-- [ ] **Step 3: `apps/api/package.json`**
+- [ ] **Step 2: `apps/supervisor-api/package.json`**
 
 ```json
 {
   "name": "@supervisor/api",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "bun --hot src/index.ts",
-    "build": "bun build --compile --outfile dist/api src/index.ts",
-    "test": "bun test",
+    "dev": "bun --env-file=.env --hot run src/index.ts",
+    "start:prod": "bun run src/index.ts",
+    "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "bun run src/db/migrate.ts"
+    "test": "bun test",
+    "db:generate": "bun --env-file=.env x drizzle-kit generate",
+    "db:migrate": "bun --env-file=.env run src/db/migrate.ts",
+    "db:migrate:prod": "bun run src/db/migrate.ts"
   },
   "dependencies": {
     "hono": "^4.5.0",
-    "drizzle-orm": "^0.32.0",
-    "postgres": "^3.4.0",
-    "node-forge": "^1.3.1",
-    "zod": "^3.23.0"
+    "drizzle-orm": "^0.45.2",
+    "postgres": "^3.4.5",
+    "zod": "^3.23.0",
+    "jose": "^6.2.3",
+    "bcryptjs": "^2.4.0"
   },
   "devDependencies": {
     "@hono/zod-validator": "^0.3.0",
-    "drizzle-kit": "^0.23.0",
-    "vitest": "^2.0.0",
-    "@types/node-forge": "^1.3.11",
+    "drizzle-kit": "^0.31.10",
     "bun-types": "latest"
   }
+}
+```
+
+`--env-file=.env` (o'z fayli, `apps/api`dagi `--env-file=../../.env` EMAS) — ikkala app'ning dev konfiguratsiyasi chalkashmasligi uchun ataylab shunday.
+
+- [ ] **Step 3: `apps/supervisor-api/tsconfig.json`**
+
+```json
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "noEmit": true,
+    "lib": ["ESNext"],
+    "baseUrl": ".",
+    "paths": { "@/*": ["./src/*"] }
+  },
+  "include": ["src/**/*", "drizzle.config.ts"]
 }
 ```
 
 - [ ] **Step 4: DB Schema yoz**
 
 ```ts
-// apps/api/src/db/schema.ts
+// apps/supervisor-api/src/db/schema.ts
 import { pgTable, uuid, text, timestamp, integer, boolean, jsonb } from 'drizzle-orm/pg-core'
 
 export const clinics = pgTable('clinics', {
@@ -138,9 +172,19 @@ export const clinics = pgTable('clinics', {
   createdAt:    timestamp('created_at').defaultNow().notNull(),
 })
 
+export const branches = pgTable('branches', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  clinicId:  uuid('clinic_id').notNull().references(() => clinics.id, { onDelete: 'cascade' }),
+  name:      text('name').notNull(),
+  address:   text('address'),
+  phone:     text('phone'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+})
+
 export const licenses = pgTable('licenses', {
   id:               uuid('id').primaryKey().defaultRandom(),
-  clinicId:         uuid('clinic_id').notNull().references(() => clinics.id),
+  clinicId:         uuid('clinic_id').notNull().references(() => clinics.id, { onDelete: 'cascade' }),   // denorm
+  branchId:         uuid('branch_id').notNull().references(() => branches.id, { onDelete: 'cascade' }),
   licenseKey:       text('license_key').notNull().unique(),
   fingerprint:      text('fingerprint'),           // machine fingerprint (SHA-256)
   plan:             text('plan').notNull(),         // 'starter'|'standard'|'premium'|'enterprise'
@@ -156,57 +200,117 @@ export const licenses = pgTable('licenses', {
 // Litsenziya tarixi (reactivation log)
 export const licenseEvents = pgTable('license_events', {
   id:          uuid('id').primaryKey().defaultRandom(),
-  licenseId:   uuid('license_id').notNull().references(() => licenses.id),
+  licenseId:   uuid('license_id').notNull().references(() => licenses.id, { onDelete: 'cascade' }),
   event:       text('event').notNull(), // 'activated'|'heartbeat'|'reactivated'|'deactivated'
   fingerprint: text('fingerprint'),
   metadata:    jsonb('metadata'),
   createdAt:   timestamp('created_at').defaultNow().notNull(),
 })
+
+// Admin foydalanuvchilar (Supervisor panel uchun)
+export const adminUsers = pgTable('admin_users', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  email:        text('email').notNull().unique(),
+  passwordHash: text('password_hash').notNull(),
+  createdAt:    timestamp('created_at').defaultNow().notNull(),
+})
+
+export type Clinics = typeof clinics.$inferSelect
+export type Branches = typeof branches.$inferSelect
+export type Licenses = typeof licenses.$inferSelect
+export type LicenseEvents = typeof licenseEvents.$inferSelect
+export type AdminUsers = typeof adminUsers.$inferSelect
 ```
 
-- [ ] **Step 5: Migrate yoz**
+- [ ] **Step 5: DB client yoz (asosiy bug-fix — `schema` MAJBURIY)**
+
+Birinchi urinishning asl bugi: `drizzle(client)` ga `schema` berilmagan edi, shuning uchun `db.query.*` (`db.query.adminUsers.findFirst(...)` kabi) runtime'da `DrizzleTypeError` bilan yiqilardi. Bu yerda avval **failing test** yoziladi (`db.test.ts` — haqiqiy `supervisor` bazasiga ulanib `db.query.adminUsers.findMany()` chaqiradi, natija array bo'lishini kutadi), keyin implementatsiya:
 
 ```ts
-// apps/api/src/db/migrate.ts
+// apps/supervisor-api/src/db/client.ts
+import { drizzle } from 'drizzle-orm/postgres-js'
+import postgres from 'postgres'
+import * as schema from './schema'
+
+const databaseUrl = process.env.DATABASE_URL
+if (!databaseUrl) throw new Error('DATABASE_URL is required')
+
+export const client = postgres(databaseUrl, { max: 10 })
+export const db = drizzle(client, { schema })   // <-- schema MAJBURIY
+export type Database = typeof db
+```
+
+- [ ] **Step 6: Migrate yoz**
+
+```ts
+// apps/supervisor-api/src/db/migrate.ts
 import { drizzle } from 'drizzle-orm/postgres-js'
 import { migrate } from 'drizzle-orm/postgres-js/migrator'
 import postgres from 'postgres'
+import { seedAdminUser } from './seed'
 
 const sql = postgres(process.env.DATABASE_URL!)
 const db = drizzle(sql)
-await migrate(db, { migrationsFolder: './drizzle' })
-await sql.end()
-console.log('Migrations done')
+
+try {
+  await migrate(db, { migrationsFolder: './drizzle' })
+  console.log('Migrations done')
+  await seedAdminUser()
+} catch (err) {
+  console.error('Migration failed:', err)
+  process.exit(1)
+} finally {
+  await sql.end()
+}
 ```
 
-- [ ] **Step 6: Migration generatsiya**
+`seed.ts` implementatsiyasi Task 6'da yoziladi, lekin `migrate.ts` uni **shu yerdan chaqiradi** — birinchi urinishning ikkinchi bugi shu edi (seed yozilgan, lekin hech qayerdan chaqirilmagan).
+
+- [ ] **Step 7: Migration generatsiya**
 
 ```bash
-cd apps/api && bun run db:generate
+cd apps/supervisor-api && bun run db:generate
 ```
 
-- [ ] **Step 7: Dev infra**
+- [ ] **Step 8: Dev DB — umumiy `dental-postgres` container, 2-baza (YANGI CONTAINER YO'Q)**
+
+`infra/postgres-init-supervisor.sql` (yangi fayl):
+
+```sql
+-- Dev-only: umumiy dental-postgres container'da 'supervisor' nomli 2-baza
+-- yaratadi. Supervisor kichik, bitta-tenant admin tool — dental_app/RLS split
+-- takrorlanmaydi, mavjud 'dental' superuser orqali ulanadi.
+SELECT 'CREATE DATABASE supervisor OWNER dental'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'supervisor')\gexec
+```
+
+`infra/docker-compose.yml`dagi mavjud `postgres` service'ga bitta qatop qo'shiladi (yangi service/port YO'Q):
 
 ```yaml
-# infra/docker-compose.yml
-services:
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: supervisor
-      POSTGRES_PASSWORD: supervisor_dev
-      POSTGRES_DB: supervisor
-    ports: ["5433:5432"]
-    volumes: [postgres_data:/var/lib/postgresql/data]
-volumes:
-  postgres_data:
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./postgres-init-supervisor.sql:/docker-entrypoint-initdb.d/02-init-supervisor.sql:ro
 ```
 
-- [ ] **Step 8: Commit**
+⚠️ `docker-entrypoint-initdb.d` skriptlari faqat **yangi** volume'da ishga tushadi. Mavjud `postgres_data` bo'lsa: `docker compose -f infra/docker-compose.yml down -v` + qayta up (dev-only, destructive), yoki qo'lda `docker exec -it dental-postgres createdb -U dental supervisor`.
+
+`apps/supervisor-api/.env.example` (yangi, commit qilinadi):
+
+```
+DATABASE_URL=postgres://dental:dental_local_dev@localhost:5432/supervisor
+JWT_SECRET=change_me_supervisor_dev_min_32_chars
+RSA_PRIVATE_KEY=
+ADMIN_SEED_EMAIL=admin@example.com
+ADMIN_SEED_PASSWORD=change_me
+API_PORT=3101
+```
+
+- [ ] **Step 9: Commit**
 
 ```bash
-git add .
-git commit -m "feat: initial supervisor-service scaffold + DB schema"
+git add apps/supervisor-api/ infra/postgres-init-supervisor.sql infra/docker-compose.yml
+git commit -m "feat(supervisor-api): scaffold + DB schema + client (schema-fixed)"
 ```
 
 ---
@@ -214,8 +318,8 @@ git commit -m "feat: initial supervisor-service scaffold + DB schema"
 ## Task 2: RSA Imzolash
 
 **Files:**
-- Create: `apps/api/src/lib/rsa.ts`
-- Test: `apps/api/src/lib/rsa.test.ts`
+- Create: `apps/supervisor-api/src/lib/rsa.ts`
+- Test: `apps/supervisor-api/src/lib/rsa.test.ts`
 
 **Interfaces:**
 - Produces:
@@ -228,8 +332,8 @@ git commit -m "feat: initial supervisor-service scaffold + DB schema"
 - [ ] **Step 1: Failing test yoz**
 
 ```ts
-// apps/api/src/lib/rsa.test.ts
-import { describe, it, expect } from 'vitest'
+// apps/supervisor-api/src/lib/rsa.test.ts
+import { describe, it, expect } from 'bun:test'
 import { generateKeyPair, signLicense, verifySignature } from './rsa'
 
 describe('RSA license signing', () => {
@@ -253,31 +357,37 @@ describe('RSA license signing', () => {
 - [ ] **Step 2: Test FAIL**
 
 ```bash
-cd apps/api && bun test src/lib/rsa.test.ts
+cd apps/supervisor-api && bun test src/lib/rsa.test.ts
 ```
 
-- [ ] **Step 3: `rsa.ts` implementatsiya**
+**Qarorlar (brainstorm 2026-06-29):**
+- `node-forge` O'RNIGA Node.js built-in `crypto` (zero dependency)
+- RSA 2048 bit, SHA-256
+- Private key VPS `.env` + zaxira (parol menejeri)
+- Public key `packages/core/supervisor-public-key.ts` ga (dental-service repo — endi bir xil monorepo, oddiy copy-paste, keyinchalik avtomatlashtirish mumkin)
+
+- [ ] **Step 3: `rsa.ts` implementatsiya (built-in crypto)**
 
 ```ts
-// apps/api/src/lib/rsa.ts
-import forge from 'node-forge'
-
-export const generateKeyPair = () => {
-  const keypair = forge.pki.rsa.generateKeyPair({ bits: 2048 })
-  return {
-    privateKey: forge.pki.privateKeyToPem(keypair.privateKey),
-    publicKey:  forge.pki.publicKeyToPem(keypair.publicKey),
-  }
-}
+// apps/supervisor-api/src/lib/rsa.ts
+import { generateKeyPairSync, createSign, createVerify } from 'crypto'
 
 const canonicalize = (data: object): string =>
-  JSON.stringify(data, Object.keys(data).sort())
+  JSON.stringify(data, Object.keys(data as Record<string, unknown>).sort())
+
+export const generateKeyPair = (): { privateKey: string; publicKey: string } => {
+  const { privateKey, publicKey } = generateKeyPairSync('rsa', {
+    modulusLength: 2048,
+    privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    publicKeyEncoding:  { type: 'spki',  format: 'pem' },
+  })
+  return { privateKey, publicKey }
+}
 
 export const signLicense = (data: object, privateKeyPem: string): string => {
-  const key = forge.pki.privateKeyFromPem(privateKeyPem)
-  const md = forge.md.sha256.create()
-  md.update(canonicalize(data), 'utf8')
-  return forge.util.bytesToHex(key.sign(md))
+  const sign = createSign('SHA256')
+  sign.update(canonicalize(data))
+  return sign.sign(privateKeyPem, 'hex')
 }
 
 export const verifySignature = (
@@ -286,10 +396,9 @@ export const verifySignature = (
   publicKeyPem: string
 ): boolean => {
   try {
-    const key = forge.pki.publicKeyFromPem(publicKeyPem)
-    const md = forge.md.sha256.create()
-    md.update(canonicalize(data), 'utf8')
-    return key.verify(md.digest().bytes(), forge.util.hexToBytes(signature))
+    const verify = createVerify('SHA256')
+    verify.update(canonicalize(data))
+    return verify.verify(publicKeyPem, signature, 'hex')
   } catch {
     return false
   }
@@ -299,14 +408,14 @@ export const verifySignature = (
 - [ ] **Step 4: Test PASS**
 
 ```bash
-cd apps/api && bun test src/lib/rsa.test.ts
+cd apps/supervisor-api && bun test src/lib/rsa.test.ts
 ```
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add apps/api/src/lib/rsa.ts apps/api/src/lib/rsa.test.ts
-git commit -m "feat(api): RSA license signing + verification"
+git add apps/supervisor-api/src/lib/rsa.ts apps/supervisor-api/src/lib/rsa.test.ts
+git commit -m "feat(supervisor-api): RSA license signing + verification"
 ```
 
 ---
@@ -314,9 +423,9 @@ git commit -m "feat(api): RSA license signing + verification"
 ## Task 3: License API (Activate + Heartbeat + Reactivate)
 
 **Files:**
-- Create: `apps/api/src/modules/licenses/licenses.routes.ts`
-- Create: `apps/api/src/modules/licenses/licenses.service.ts`
-- Test: `apps/api/src/modules/licenses/licenses.test.ts`
+- Create: `apps/supervisor-api/src/modules/licenses/licenses.routes.ts`
+- Create: `apps/supervisor-api/src/modules/licenses/licenses.service.ts`
+- Test: `apps/supervisor-api/src/modules/licenses/licenses.test.ts`
 
 **Interfaces:**
 - Consumes: `signLicense()` (Task 2), `licenses` DB table (Task 1)
@@ -339,87 +448,132 @@ git commit -m "feat(api): RSA license signing + verification"
   }
   ```
 
-- [ ] **Step 1: Failing test yoz**
+- [ ] **Step 1: Failing test yoz (bun:test, haqiqiy `supervisor` test DB'ga qarshi — mock EMAS)**
 
 ```ts
-// apps/api/src/modules/licenses/licenses.test.ts
-import { describe, it, expect, vi, beforeAll } from 'vitest'
-import app from '../../index'
+// apps/supervisor-api/src/modules/licenses/licenses.test.ts
+import { describe, it, expect, beforeEach } from 'bun:test'
+import { eq } from 'drizzle-orm'
+import { db } from '../../db/client'
+import { clinics, branches, licenses } from '../../db/schema'
+import { createApp } from '../../app'   // Hono instansiyasini quradigan factory (index.ts Bun.serve'siz)
 
-// DB mock
-vi.mock('../../db', () => ({
-  db: {
-    query: {
-      licenses: {
-        findFirst: vi.fn().mockResolvedValue({
-          id: 'lic-1',
-          clinicId: 'clinic-1',
-          licenseKey: 'VALID-KEY-123',
-          fingerprint: null,
-          plan: 'standard',
-          modules: ['patients', 'appointments', 'cashier'],
-          gracePeriodDays: 30,
-          expiresAt: new Date(Date.now() + 86400000 * 365),
-          isActive: true,
-        }),
-      },
-    },
-    update: vi.fn().mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn() }) }),
-    insert: vi.fn().mockReturnValue({ values: vi.fn() }),
-  },
-}))
+const app = createApp()
+
+let licenseKey: string
+
+beforeEach(async () => {
+  const [clinic] = await db.insert(clinics).values({ name: 'Test Clinic' }).returning()
+  const [branch] = await db.insert(branches).values({ clinicId: clinic.id, name: 'Main' }).returning()
+  licenseKey = `TEST-${crypto.randomUUID()}`
+  await db.insert(licenses).values({
+    clinicId: clinic.id,
+    branchId: branch.id,
+    licenseKey,
+    plan: 'standard',
+    modules: ['patients', 'appointments', 'cashier'],
+    gracePeriodDays: 30,
+    expiresAt: new Date(Date.now() + 86400000 * 365),
+    isActive: true,
+  })
+})
 
 describe('POST /v1/activate', () => {
-  it('activates a valid license key', async () => {
+  it('activates a valid license key va fingerprint bog\'laydi', async () => {
     const res = await app.request('/v1/activate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ licenseKey: 'VALID-KEY-123', fingerprint: 'fp-abc' }),
+      body: JSON.stringify({ licenseKey, fingerprint: 'fp-abc' }),
     })
     expect(res.status).toBe(200)
-    const body = await res.json() as any
+    const body = (await res.json()) as any
     expect(body.modules).toContain('patients')
     expect(body.signature).toBeTruthy()
+
+    const lic = await db.query.licenses.findFirst({ where: eq(licenses.licenseKey, licenseKey) })
+    expect(lic?.fingerprint).toBe('fp-abc')
   })
 
   it('returns 403 for unknown key', async () => {
-    const { db } = await import('../../db')
-    ;(db.query.licenses.findFirst as any).mockResolvedValueOnce(null)
     const res = await app.request('/v1/activate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ licenseKey: 'WRONG', fingerprint: 'fp' }),
+      body: JSON.stringify({ licenseKey: 'WRONG-KEY', fingerprint: 'fp' }),
+    })
+    expect(res.status).toBe(403)
+  })
+
+  it('returns 403 for fingerprint mismatch (allaqachon boshqa qurilmaga bog\'langan)', async () => {
+    await app.request('/v1/activate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ licenseKey, fingerprint: 'fp-first' }),
+    })
+    const res = await app.request('/v1/activate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ licenseKey, fingerprint: 'fp-different' }),
     })
     expect(res.status).toBe(403)
   })
 })
 
 describe('POST /v1/heartbeat', () => {
-  it('returns updated modules on heartbeat', async () => {
+  it('lastHeartbeatAt yangilaydi va joriy modullarni qaytaradi', async () => {
+    await app.request('/v1/activate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ licenseKey, fingerprint: 'fp-abc' }),
+    })
     const res = await app.request('/v1/heartbeat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ licenseKey: 'VALID-KEY-123', fingerprint: 'fp-abc' }),
+      body: JSON.stringify({ licenseKey, fingerprint: 'fp-abc' }),
     })
     expect(res.status).toBe(200)
-    const body = await res.json() as any
+    const body = (await res.json()) as any
     expect(body.gracePeriodDays).toBe(30)
+  })
+})
+
+describe('POST /v1/reactivate', () => {
+  it('admin JWT bo\'lmasa 401', async () => {
+    const res = await app.request('/v1/reactivate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ licenseKey, fingerprint: 'fp-new' }),
+    })
+    expect(res.status).toBe(401)
+  })
+
+  it('valid admin JWT bilan fingerprint qayta bog\'lanadi', async () => {
+    const token = await signAdminTestToken()   // test helper — Task 4'dagi jwt.ts bilan bir xil secret
+    const res = await app.request('/v1/reactivate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ licenseKey, fingerprint: 'fp-new' }),
+    })
+    expect(res.status).toBe(200)
+    const lic = await db.query.licenses.findFirst({ where: eq(licenses.licenseKey, licenseKey) })
+    expect(lic?.fingerprint).toBe('fp-new')
   })
 })
 ```
 
+`signAdminTestToken()` — testlar uchun kichik yordamchi (`apps/supervisor-api/src/lib/test-helpers.ts`), Task 4'dagi `jose`+`JWT_SECRET` bilan bir xil sxema orqali test tokeni yasaydi. Testlar `apps/supervisor-api/.env` orqali `DATABASE_URL`ni (dev `supervisor` bazasi) va `RSA_PRIVATE_KEY`ni o'qiydi (Task 2'da generatsiya qilingan). CI'da esa Phase G'dagi `supervisor` bazasi provisioning kerak bo'ladi.
+
 - [ ] **Step 2: Test FAIL**
 
 ```bash
-cd apps/api && bun test src/modules/licenses/licenses.test.ts
+cd apps/supervisor-api && bun test src/modules/licenses/licenses.test.ts
 ```
 
 - [ ] **Step 3: Service yoz**
 
 ```ts
-// apps/api/src/modules/licenses/licenses.service.ts
+// apps/supervisor-api/src/modules/licenses/licenses.service.ts
 import { eq } from 'drizzle-orm'
-import { db } from '../../db'
+import { db } from '../../db/client'
 import { licenses, licenseEvents } from '../../db/schema'
 import { signLicense } from '../../lib/rsa'
 
@@ -499,14 +653,39 @@ export const createLicenseService = () => ({
 })
 ```
 
-- [ ] **Step 4: Routes yoz**
+- [ ] **Step 4: JWT middleware (reactivate shu yerda kerak — auth.routes.ts login'i Task 4'da qo'shiladi, middleware esa shu yerda)**
 
 ```ts
-// apps/api/src/modules/licenses/licenses.routes.ts
+// apps/supervisor-api/src/modules/auth/jwt.middleware.ts
+import type { MiddlewareHandler } from 'hono'
+import { jwtVerify } from 'jose'
+
+const secret = () => new TextEncoder().encode(process.env.JWT_SECRET!)
+
+export const adminJwtMiddleware: MiddlewareHandler = async (c, next) => {
+  const auth = c.req.header('Authorization')
+  if (!auth?.startsWith('Bearer ')) {
+    return c.json({ error: { code: 'UNAUTHORIZED' } }, 401)
+  }
+  try {
+    const { payload } = await jwtVerify(auth.slice(7), secret())
+    c.set('adminUserId', payload.sub)
+    await next()
+  } catch {
+    return c.json({ error: { code: 'UNAUTHORIZED' } }, 401)
+  }
+}
+```
+
+- [ ] **Step 5: Routes yoz (reactivate — admin JWT talab qiladi, `x-admin-token` YO'Q)**
+
+```ts
+// apps/supervisor-api/src/modules/licenses/licenses.routes.ts
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { createLicenseService } from './licenses.service'
+import { adminJwtMiddleware } from '../auth/jwt.middleware'
 
 const activateSchema = z.object({
   licenseKey: z.string().min(1),
@@ -537,14 +716,10 @@ export const licensesRoutes = () => {
     }
   })
 
-  // Faqat admin token bilan (env'dan ADMIN_TOKEN)
-  app.post('/reactivate', async (c) => {
-    const token = c.req.header('x-admin-token')
-    if (token !== process.env.ADMIN_TOKEN) {
-      return c.json({ error: { code: 'UNAUTHORIZED' } }, 401)
-    }
+  // Admin JWT talab qiladi (login: POST /v1/admin/auth/login — Task 4)
+  app.post('/reactivate', adminJwtMiddleware, zValidator('json', activateSchema), async (c) => {
     try {
-      const { licenseKey, fingerprint } = await c.req.json()
+      const { licenseKey, fingerprint } = c.req.valid('json')
       const data = await service.reactivate(licenseKey, fingerprint)
       return c.json(data)
     } catch (e: any) {
@@ -556,48 +731,86 @@ export const licensesRoutes = () => {
 }
 ```
 
-- [ ] **Step 5: Test PASS**
+- [ ] **Step 6: Test PASS**
 
 ```bash
-cd apps/api && bun test src/modules/licenses/licenses.test.ts
+cd apps/supervisor-api && bun test src/modules/licenses/licenses.test.ts
 ```
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add apps/api/src/modules/licenses/
+git add apps/supervisor-api/src/modules/licenses/
 git commit -m "feat(api): license activate + heartbeat + reactivate endpoints"
 ```
 
 ---
 
-## Task 4: Clinic + Module Management API (Admin)
+## Task 4: Admin Auth + Clinic + Module Management API
 
 **Files:**
-- Create: `apps/api/src/modules/clinics/clinics.routes.ts`
-- Create: `apps/api/src/modules/modules/modules.routes.ts`
+- Create: `apps/supervisor-api/src/modules/auth/auth.routes.ts`
+- Create: `apps/supervisor-api/src/modules/clinics/clinics.routes.ts`
+- Create: `apps/supervisor-api/src/modules/modules/modules.routes.ts`
+- (`apps/supervisor-api/src/modules/auth/jwt.middleware.ts` — Task 3'da allaqachon yaratilgan, `/v1/reactivate` shu middleware'ni ishlatadi)
 
-**Admin auth:** Har admin route `x-admin-token` header tekshiradi.
+**Admin auth:** Email + password → JWT (brainstorm qaror "B"), **`jose`** kutubxonasi (`apps/api`dagi `lib/env.ts`+JWT konvensiyasiga mos). `JWT_SECRET` env vardan.
 
-- [ ] **Step 1: Clinics CRUD yoz**
+**Qarorlar (brainstorm 2026-06-29):** JWT auth (email/password login → 7 kunlik token). `x-admin-token` ishlatilmaydi.
+
+- [ ] **Step 1: Failing test + auth route (login)**
 
 ```ts
-// apps/api/src/modules/clinics/clinics.routes.ts
+// apps/supervisor-api/src/modules/auth/auth.routes.ts
 import { Hono } from 'hono'
-import { db } from '../../db'
-import { clinics, licenses } from '../../db/schema'
+import { SignJWT } from 'jose'
+import { db } from '../../db/client'
+import { adminUsers } from '../../db/schema'
+import { eq } from 'drizzle-orm'
+import bcrypt from 'bcryptjs'
+import { z } from 'zod'
+import { zValidator } from '@hono/zod-validator'
+
+const secret = () => new TextEncoder().encode(process.env.JWT_SECRET!)
+
+export const authRoutes = () => {
+  const app = new Hono()
+
+  app.post('/login', zValidator('json', z.object({
+    email: z.string().email(),
+    password: z.string().min(1),
+  })), async (c) => {
+    const { email, password } = c.req.valid('json')
+    const user = await db.query.adminUsers.findFirst({ where: eq(adminUsers.email, email) })
+    if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+      return c.json({ error: { code: 'INVALID_CREDENTIALS' } }, 401)
+    }
+    const token = await new SignJWT({ sub: user.id })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .setExpirationTime('7d')
+      .sign(secret())
+    return c.json({ token })
+  })
+
+  return app
+}
+```
+
+`jwt.middleware.ts` (Task 3'da `licenses.routes.ts`ning `/reactivate`si uchun yaratilgan) shu bilan bir xil `jose`+`JWT_SECRET`ni ishlatadi — qayta yozilmaydi, faqat import qilinadi (`clinics.routes.ts` va `modules.routes.ts`da).
+
+- [ ] **Step 2: Clinics CRUD yoz**
+
+```ts
+// apps/supervisor-api/src/modules/clinics/clinics.routes.ts
+import { Hono } from 'hono'
+import { db } from '../../db/client'
+import { clinics, branches, licenses } from '../../db/schema'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { zValidator } from '@hono/zod-validator'
-import { generateKeyPair } from '../../lib/rsa'
+import { adminJwtMiddleware } from '../auth/jwt.middleware'
 import crypto from 'crypto'
-
-const adminAuth = async (c: any, next: any) => {
-  if (c.req.header('x-admin-token') !== process.env.ADMIN_TOKEN) {
-    return c.json({ error: { code: 'UNAUTHORIZED' } }, 401)
-  }
-  await next()
-}
 
 const createClinicSchema = z.object({
   name: z.string().min(1),
@@ -620,7 +833,7 @@ const MODULE_MAP: Record<string, string[]> = {
 
 export const clinicsRoutes = () => {
   const app = new Hono()
-  app.use('*', adminAuth)
+  app.use('*', adminJwtMiddleware)
 
   // Klinikalar ro'yxati
   app.get('/', async (c) => {
@@ -670,20 +883,14 @@ export const clinicsRoutes = () => {
 - [ ] **Step 2: Modules toggle route yoz**
 
 ```ts
-// apps/api/src/modules/modules/modules.routes.ts
+// apps/supervisor-api/src/modules/modules/modules.routes.ts
 import { Hono } from 'hono'
-import { db } from '../../db'
+import { db } from '../../db/client'
 import { licenses } from '../../db/schema'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { zValidator } from '@hono/zod-validator'
-
-const adminAuth = async (c: any, next: any) => {
-  if (c.req.header('x-admin-token') !== process.env.ADMIN_TOKEN) {
-    return c.json({ error: { code: 'UNAUTHORIZED' } }, 401)
-  }
-  await next()
-}
+import { adminJwtMiddleware } from '../auth/jwt.middleware'
 
 const updateModulesSchema = z.object({
   modules: z.array(z.string()),
@@ -692,7 +899,7 @@ const updateModulesSchema = z.object({
 
 export const modulesRoutes = () => {
   const app = new Hono()
-  app.use('*', adminAuth)
+  app.use('*', adminJwtMiddleware)
 
   // Modul ro'yxatini yangilash (keyingi heartbeat'da klientga yetadi)
   app.patch('/licenses/:key/modules', zValidator('json', updateModulesSchema), async (c) => {
@@ -708,26 +915,38 @@ export const modulesRoutes = () => {
 }
 ```
 
-- [ ] **Step 3: `index.ts` da routelar birlashtirish**
+- [ ] **Step 3: `app.ts` (Hono instansiyasi, Bun.serve'siz — testlar shuni import qiladi) + `index.ts` (entry)**
+
+`apps/api`ning `app.ts`/`index.ts` split konvensiyasiga mos — `app.ts` sinaladigan `Hono` instansiyasini quradi, `index.ts` uni `Bun.serve`ga ulaydi. Task 3'dagi `licenses.test.ts` allaqachon `createApp` importini kutgan edi.
 
 ```ts
-// apps/api/src/index.ts
+// apps/supervisor-api/src/app.ts
 import { Hono } from 'hono'
 import { licensesRoutes } from './modules/licenses/licenses.routes'
 import { clinicsRoutes } from './modules/clinics/clinics.routes'
 import { modulesRoutes } from './modules/modules/modules.routes'
+import { authRoutes } from './modules/auth/auth.routes'
 
-const app = new Hono()
+export const createApp = () => {
+  const app = new Hono()
 
-app.route('/v1', licensesRoutes())
-app.route('/v1/admin/clinics', clinicsRoutes())
-app.route('/v1/admin', modulesRoutes())
+  app.route('/v1', licensesRoutes())
+  app.route('/v1/admin/auth', authRoutes())
+  app.route('/v1/admin/clinics', clinicsRoutes())
+  app.route('/v1/admin', modulesRoutes())
 
-app.get('/health', (c) => c.json({ ok: true }))
+  app.get('/health', (c) => c.json({ ok: true }))
 
-export default app
+  return app
+}
+```
 
-const port = Number(process.env.API_PORT ?? 3001)
+```ts
+// apps/supervisor-api/src/index.ts
+import { createApp } from './app'
+
+const app = createApp()
+const port = Number(process.env.API_PORT ?? 3101)
 Bun.serve({ fetch: app.fetch, port })
 console.log(`Supervisor API running on :${port}`)
 ```
@@ -735,8 +954,8 @@ console.log(`Supervisor API running on :${port}`)
 - [ ] **Step 4: Commit**
 
 ```bash
-git add apps/api/src/modules/ apps/api/src/index.ts
-git commit -m "feat(api): clinic + module management admin routes"
+git add apps/supervisor-api/src/modules/ apps/supervisor-api/src/app.ts apps/supervisor-api/src/index.ts
+git commit -m "feat(supervisor-api): clinic + module management admin routes"
 ```
 
 ---
@@ -744,52 +963,218 @@ git commit -m "feat(api): clinic + module management admin routes"
 ## Task 5: Admin Panel (React)
 
 **Files:**
-- Create: `apps/admin/src/main.tsx`
-- Create: `apps/admin/src/features/clinics/` (list + detail)
-- Create: `apps/admin/package.json`
+- Create: `apps/supervisor-admin/index.html`, `vite.config.ts`, `vitest.config.ts`, `tsconfig.json`
+- Create: `apps/supervisor-admin/src/main.tsx`, `App.tsx`, `test-setup.ts`
+- Create: `apps/supervisor-admin/src/features/auth/LoginPage.tsx`
+- Create: `apps/supervisor-admin/src/features/clinics/` (list + detail)
+- Create: `apps/supervisor-admin/package.json`
 
-- [ ] **Step 1: `apps/admin/package.json`**
+`apps/web`ning vite/vitest konvensiyasiga mos (jsdom + `@testing-library/react`), lekin `@dental/*` paketlarsiz (mustaqil mahsulot — faqat versiyalarni `apps/web/package.json`dan nusxa oling, workspace bog'liqlik YO'Q).
+
+- [ ] **Step 1: `apps/supervisor-admin/package.json`**
 
 ```json
 {
   "name": "@supervisor/admin",
   "version": "0.1.0",
+  "private": true,
+  "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "typecheck": "tsc --noEmit"
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
-    "react": "^18.3.0",
-    "react-dom": "^18.3.0",
-    "@mantine/core": "^7.11.0",
-    "@mantine/hooks": "^7.11.0",
-    "@tanstack/react-query": "^5.50.0",
-    "react-router-dom": "^6.24.0"
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "@mantine/core": "^7.15.2",
+    "@mantine/hooks": "^7.15.2",
+    "@mantine/form": "^7.15.2",
+    "@tanstack/react-query": "^5.62.10",
+    "react-router-dom": "^6.28.1"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.3.0",
-    "vite": "^5.3.0",
-    "typescript": "^5.5.0"
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "jsdom": "^25.0.1",
+    "postcss": "^8.4.49",
+    "postcss-preset-mantine": "^1.17.0",
+    "postcss-simple-vars": "^7.0.1",
+    "vite": "^6.0.7",
+    "vitest": "^2.1.8"
   }
 }
 ```
 
-- [ ] **Step 2: Clinics sahifasi (list)**
+- [ ] **Step 2: `index.html` + `vite.config.ts` + `tsconfig.json` + `main.tsx`/`App.tsx` (router skeleton)**
+
+```html
+<!-- apps/supervisor-admin/index.html -->
+<!doctype html>
+<html lang="uz">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Supervisor Admin</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+```
+
+```ts
+// apps/supervisor-admin/vite.config.ts
+import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vite'
+
+export default defineConfig({
+  plugins: [react()],
+  server: { port: 3102, strictPort: true },
+})
+```
+
+```json
+// apps/supervisor-admin/tsconfig.json
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "noEmit": true,
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "types": ["vite/client"],
+    "baseUrl": ".",
+    "paths": { "@/*": ["./src/*"] }
+  },
+  "include": ["src/**/*", "vite.config.ts"]
+}
+```
 
 ```tsx
-// apps/admin/src/features/clinics/ClinicsPage.tsx
+// apps/supervisor-admin/src/main.tsx
+import { MantineProvider } from '@mantine/core'
+import '@mantine/core/styles.css'
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import { App } from './App'
+
+const root = document.getElementById('root')
+if (!root) throw new Error('Root element not found')
+
+ReactDOM.createRoot(root).render(
+  <React.StrictMode>
+    <MantineProvider>
+      <App />
+    </MantineProvider>
+  </React.StrictMode>,
+)
+```
+
+```tsx
+// apps/supervisor-admin/src/App.tsx
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { LoginPage } from './features/auth/LoginPage'
+import { ClinicDetailPage } from './features/clinics/ClinicDetailPage'
+import { ClinicsPage } from './features/clinics/ClinicsPage'
+
+const queryClient = new QueryClient()
+
+export const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/" element={<ClinicsPage />} />
+        <Route path="/clinics/:id" element={<ClinicDetailPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  </QueryClientProvider>
+)
+```
+
+- [ ] **Step 3: Login sahifasi**
+
+```tsx
+// apps/supervisor-admin/src/features/auth/LoginPage.tsx
+import { TextInput, PasswordInput, Button, Paper, Title, Stack } from '@mantine/core'
+import { useForm } from '@mantine/form'
+import { useMutation } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
+
+const API = import.meta.env.VITE_API_URL ?? ''
+
+export const LoginPage = () => {
+  const navigate = useNavigate()
+  const form = useForm({ initialValues: { email: '', password: '' } })
+
+  const login = useMutation({
+    mutationFn: async (values: { email: string; password: string }) => {
+      const res = await fetch(`${API}/v1/admin/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values),
+      })
+      if (!res.ok) throw new Error('Login failed')
+      return res.json() as Promise<{ token: string }>
+    },
+    onSuccess: ({ token }) => {
+      localStorage.setItem('admin_token', token)
+      navigate('/')
+    },
+  })
+
+  return (
+    <Paper maw={400} mx="auto" mt={100} p="xl" withBorder>
+      <Title order={2} mb="md">Supervisor Admin</Title>
+      <form onSubmit={form.onSubmit((v) => login.mutate(v))}>
+        <Stack>
+          <TextInput label="Email" type="email" {...form.getInputProps('email')} />
+          <PasswordInput label="Parol" {...form.getInputProps('password')} />
+          <Button type="submit" loading={login.isPending}>Kirish</Button>
+          {login.isError && <span style={{ color: 'red' }}>Login yoki parol noto'g'ri</span>}
+        </Stack>
+      </form>
+    </Paper>
+  )
+}
+```
+
+**Token management helper:**
+```ts
+// apps/supervisor-admin/src/lib/api.ts
+const API = import.meta.env.VITE_API_URL ?? ''
+
+export const authFetch = (path: string, init?: RequestInit) =>
+  fetch(`${API}${path}`, {
+    ...init,
+    headers: {
+      ...init?.headers,
+      Authorization: `Bearer ${localStorage.getItem('admin_token') ?? ''}`,
+      'Content-Type': 'application/json',
+    },
+  })
+```
+
+- [ ] **Step 4: Clinics sahifasi (list)**
+
+```tsx
+// apps/supervisor-admin/src/features/clinics/ClinicsPage.tsx
 import { Table, Button, Badge, Title, Group } from '@mantine/core'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-
-const API = import.meta.env.VITE_API_URL ?? ''
-const TOKEN = import.meta.env.VITE_ADMIN_TOKEN ?? ''
+import { authFetch } from '../../lib/api'
 
 const fetchClinics = async () => {
-  const res = await fetch(`${API}/v1/admin/clinics`, {
-    headers: { 'x-admin-token': TOKEN },
-  })
+  const res = await authFetch('/v1/admin/clinics')
   return res.json()
 }
 
@@ -837,17 +1222,14 @@ export const ClinicsPage = () => {
 }
 ```
 
-- [ ] **Step 3: Klinika detail + modul toggle**
+- [ ] **Step 5: Klinika detail + modul toggle**
 
 ```tsx
-// apps/admin/src/features/clinics/ClinicDetailPage.tsx
+// apps/supervisor-admin/src/features/clinics/ClinicDetailPage.tsx
 import { useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Title, Switch, Stack, Badge, Text, Paper, Group, Button } from '@mantine/core'
-
-const API = import.meta.env.VITE_API_URL ?? ''
-const TOKEN = import.meta.env.VITE_ADMIN_TOKEN ?? ''
-const headers = { 'x-admin-token': TOKEN, 'Content-Type': 'application/json' }
+import { Title, Switch, Stack, Text, Paper, Group, Button } from '@mantine/core'
+import { authFetch } from '../../lib/api'
 
 const ALL_MODULES = [
   'patients', 'appointments', 'queue', 'cashier', 'reports', 'staff',
@@ -862,16 +1244,15 @@ export const ClinicDetailPage = () => {
   const { data } = useQuery({
     queryKey: ['clinic', id],
     queryFn: async () => {
-      const res = await fetch(`${API}/v1/admin/clinics/${id}`, { headers })
+      const res = await authFetch(`/v1/admin/clinics/${id}`)
       return res.json()
     },
   })
 
   const updateModules = useMutation({
     mutationFn: async (modules: string[]) => {
-      await fetch(`${API}/v1/admin/licenses/${data.license.licenseKey}/modules`, {
+      await authFetch(`/v1/admin/licenses/${data.license.licenseKey}/modules`, {
         method: 'PATCH',
-        headers,
         body: JSON.stringify({ modules }),
       })
     },
@@ -882,9 +1263,8 @@ export const ClinicDetailPage = () => {
     mutationFn: async () => {
       const fp = prompt('Yangi fingerprint kiriting:')
       if (!fp) return
-      await fetch(`${API}/v1/reactivate`, {
+      await authFetch('/v1/reactivate', {
         method: 'POST',
-        headers,
         body: JSON.stringify({ licenseKey: data.license.licenseKey, fingerprint: fp }),
       })
     },
@@ -931,40 +1311,69 @@ export const ClinicDetailPage = () => {
 }
 ```
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add apps/admin/
+git add apps/supervisor-admin/
 git commit -m "feat(admin): clinics list + detail + module toggle UI"
 ```
 
 ---
 
-## Task 6: VPS Deployment
+## Task 6: VPS Deployment (bitta markaziy Supervisor VPS — klinika VPS'lariga HECH QACHON qo'shilmaydi)
 
 **Files:**
-- Create: `infra/docker-compose.prod.yml`
-- Create: `infra/Caddyfile`
-- Create: `apps/api/Dockerfile`
+- Create: `infra/supervisor/docker-compose.prod.yml`
+- Create: `infra/supervisor/Caddyfile`
+- Create: `infra/supervisor/README.md`
+- Create: `apps/supervisor-api/Dockerfile`, `apps/supervisor-admin/Dockerfile`
+- Create: `apps/supervisor-api/src/db/seed.ts`
 
-- [ ] **Step 1: `apps/api/Dockerfile`**
+⚠️ Bu fayllar dental-service'ning per-klinika `infra/docker-compose.prod.yml`/`infra/Caddyfile`siga **HECH QACHON qo'shilmaydi** — Supervisor vendor'ning o'z VPS'ida, bitta marta ishga tushadi.
+
+- [ ] **Step 1: `apps/supervisor-api/Dockerfile`** (apps/api/Dockerfile'ning soddaroq varianti — `@dental/*` paketlar kerak emas)
 
 ```dockerfile
-FROM oven/bun:1.1-alpine AS builder
+# syntax=docker/dockerfile:1
+FROM oven/bun:1.2.21-alpine AS deps
 WORKDIR /app
-COPY package.json bun.lockb ./
-COPY apps/api/package.json apps/api/
+COPY package.json bun.lock ./
+COPY apps/supervisor-api/package.json apps/supervisor-api/
 RUN bun install --frozen-lockfile
-COPY apps/api/ apps/api/
-RUN cd apps/api && bun build --compile --outfile /app/dist/api src/index.ts
 
-FROM debian:bookworm-slim
-COPY --from=builder /app/dist/api /usr/local/bin/supervisor-api
-EXPOSE 3001
-CMD ["/usr/local/bin/supervisor-api"]
+FROM oven/bun:1.2.21-alpine AS runtime
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/package.json ./package.json
+COPY apps/supervisor-api ./apps/supervisor-api
+WORKDIR /app/apps/supervisor-api
+USER bun
+EXPOSE 3101
+CMD ["bun", "run", "src/index.ts"]
 ```
 
-- [ ] **Step 2: `infra/docker-compose.prod.yml`**
+Build context — repo ROOT (bun workspace lockfile kerak): `docker build -f apps/supervisor-api/Dockerfile -t supervisor-api .`
+
+- [ ] **Step 2: `apps/supervisor-admin/Dockerfile`** (Caddy static-serve, `infra/Caddyfile.web` SPA-fallback namunasida)
+
+```dockerfile
+FROM oven/bun:1.2.21-alpine AS build
+WORKDIR /app
+COPY package.json bun.lock ./
+COPY apps/supervisor-admin/package.json apps/supervisor-admin/
+RUN bun install --frozen-lockfile
+COPY apps/supervisor-admin ./apps/supervisor-admin
+WORKDIR /app/apps/supervisor-admin
+RUN bun run build
+
+FROM caddy:2-alpine
+COPY --from=build /app/apps/supervisor-admin/dist /usr/share/caddy
+# SPA fallback — barcha noma'lum yo'llar index.html'ga (client-side routing uchun)
+RUN printf ':80 {\n\troot * /usr/share/caddy\n\tfile_server\n\ttry_files {path} /index.html\n}\n' > /etc/caddy/Caddyfile
+```
+
+- [ ] **Step 3: `infra/supervisor/docker-compose.prod.yml`** (build context `../..` — repo root, `infra/supervisor/`dan 2 daraja yuqori)
 
 ```yaml
 services:
@@ -981,22 +1390,38 @@ services:
   api:
     image: supervisor-api:latest
     build:
-      context: ..
-      dockerfile: apps/api/Dockerfile
+      context: ../..
+      dockerfile: apps/supervisor-api/Dockerfile
     restart: unless-stopped
     environment:
       DATABASE_URL: ${DATABASE_URL:?}
       RSA_PRIVATE_KEY: ${RSA_PRIVATE_KEY:?}
-      ADMIN_TOKEN: ${ADMIN_TOKEN:?}
-      API_PORT: 3001
+      JWT_SECRET: ${JWT_SECRET:?}
+      ADMIN_SEED_EMAIL: ${ADMIN_SEED_EMAIL:?}
+      ADMIN_SEED_PASSWORD: ${ADMIN_SEED_PASSWORD:?}
+      API_PORT: 3101
+    depends_on: [postgres]
+    networks: [internal]
+
+  migrate:
+    image: supervisor-api:latest
+    build:
+      context: ../..
+      dockerfile: apps/supervisor-api/Dockerfile
+    command: ['bun', 'run', 'src/db/migrate.ts']
+    restart: 'no'
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?}
+      ADMIN_SEED_EMAIL: ${ADMIN_SEED_EMAIL:?}
+      ADMIN_SEED_PASSWORD: ${ADMIN_SEED_PASSWORD:?}
     depends_on: [postgres]
     networks: [internal]
 
   admin:
     image: supervisor-admin:latest
     build:
-      context: ..
-      dockerfile: apps/admin/Dockerfile
+      context: ../..
+      dockerfile: apps/supervisor-admin/Dockerfile
     restart: unless-stopped
     networks: [internal]
 
@@ -1022,14 +1447,14 @@ volumes:
   caddy_data:
 ```
 
-- [ ] **Step 3: `infra/Caddyfile`**
+- [ ] **Step 4: `infra/supervisor/Caddyfile`**
 
 ```
 {env.DOMAIN} {
   tls {env.ACME_EMAIL}
 
   handle /v1/* {
-    reverse_proxy api:3001
+    reverse_proxy api:3101
   }
 
   handle {
@@ -1038,11 +1463,40 @@ volumes:
 }
 ```
 
-- [ ] **Step 4: RSA key pair generatsiya (bir marta)**
+`infra/supervisor/README.md` — bir qatorli eslatma: *"Bu papka faqat vendor'ning o'z markaziy Supervisor VPS'ida deploy qilinadi. Klinika VPS deploy'iga (root `infra/docker-compose.prod.yml`) HECH QACHON qo'shilmaydi."*
+
+- [ ] **Step 5: Seed admin foydalanuvchi**
+
+**Qaror (brainstorm 2026-06-29):** `ADMIN_SEED_EMAIL` + `ADMIN_SEED_PASSWORD` env vardan — `migrate.ts` (Task 1'da yozilgan) startup'da bir marta chaqiradi, mavjud bo'lsa skip.
+
+```ts
+// apps/supervisor-api/src/db/seed.ts
+import { db } from './client'
+import { adminUsers } from './schema'
+import { eq } from 'drizzle-orm'
+import bcrypt from 'bcryptjs'
+
+export const seedAdminUser = async () => {
+  const email = process.env.ADMIN_SEED_EMAIL
+  const password = process.env.ADMIN_SEED_PASSWORD
+  if (!email || !password) return
+
+  const existing = await db.query.adminUsers.findFirst({ where: eq(adminUsers.email, email) })
+  if (existing) return
+
+  const passwordHash = await bcrypt.hash(password, 12)
+  await db.insert(adminUsers).values({ email, passwordHash })
+  console.log(`[seed] Admin user yaratildi: ${email}`)
+}
+```
+
+(`migrate.ts` allaqachon Task 1 Step 6'da `seedAdminUser()`ni chaqiradi — bu yerda qayta yozilmaydi.)
+
+- [ ] **Step 6: RSA key pair generatsiya (bir marta)**
 
 ```bash
 # Lokal muhitda bir marta ishlatiladi, PRIVATE_KEY .env ga qo'yiladi
-cd apps/api && bun -e "
+cd apps/supervisor-api && bun -e "
 const { generateKeyPair } = await import('./src/lib/rsa.ts')
 const { privateKey, publicKey } = generateKeyPair()
 console.log('PRIVATE:', privateKey)
@@ -1051,22 +1505,37 @@ console.log('PUBLIC:', publicKey)
 ```
 
 `RSA_PRIVATE_KEY` VPS `.env` fayliga qo'shiladi.
-`publicKey` → `packages/core/supervisor-public-key.ts` (dental-service repo'siga) — `.lic` verificatsiya uchun.
+`publicKey` → `packages/core/supervisor-public-key.ts` (endi bir xil monorepo — oddiy copy-paste) — `.lic` verificatsiya uchun.
 
-- [ ] **Step 5: Commit**
+**`apps/supervisor-api/.env.production` namuna:**
+```
+POSTGRES_USER=supervisor
+POSTGRES_PASSWORD=<strong-random>
+DATABASE_URL=postgres://supervisor:<pw>@postgres:5432/supervisor
+RSA_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----
+JWT_SECRET=<64-char-random>
+ADMIN_SEED_EMAIL=admin@example.com
+ADMIN_SEED_PASSWORD=<strong-password>
+DOMAIN=supervisor.yoursite.uz
+ACME_EMAIL=you@example.com
+```
+
+- [ ] **Step 7: Commit**
 
 ```bash
-git add infra/ apps/api/Dockerfile
-git commit -m "infra: VPS Docker + Caddy production deployment"
+git add infra/supervisor/ apps/supervisor-api/Dockerfile apps/supervisor-admin/Dockerfile apps/supervisor-api/src/db/seed.ts
+git commit -m "infra(supervisor): VPS Docker + Caddy + admin seed migration"
 ```
 
 ---
 
 ## Qo'lda Tekshirish
 
+- [ ] `POST /v1/admin/auth/login` — email/parol bilan JWT token keladi
 - [ ] `POST /v1/activate` — yangi litsenziya faollashadi, RSA imzoli javob keladi
 - [ ] `POST /v1/heartbeat` — modullar yangilanadi, grace period ko'rinadi
-- [ ] `POST /v1/reactivate` — admin token bilan yangi fingerprint bog'lanadi
+- [ ] `POST /v1/reactivate` — JWT token bilan yangi fingerprint bog'lanadi
+- [ ] Admin panel: login sahifasi ko'rinadi, kirish ishlaydi
 - [ ] Admin panel: klinikalar ro'yxati ko'rinadi
 - [ ] Admin panel: modul toggle → keyingi heartbeat'da dental-service modullar o'zgaradi
-- [ ] VPS'da HTTPS ishlaydi (`https://supervisor.dental.uz`)
+- [ ] VPS'da HTTPS ishlaydi (`https://${DOMAIN}`)
