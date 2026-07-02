@@ -6,7 +6,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "lib": ["ESNext"],
-    "types": ["node"],
+    "types": ["bun-types", "node"],
     "allowImportingTsExtensions": false
   },
   "include": ["src/**/*"]

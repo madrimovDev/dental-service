@@ -1,7 +1,7 @@
 # electron-builder konfiguratsiyasi (V3-3) — Dental Service desktop.
-# ⚠️ Distribution uchun code-signing + publish provider kerak (TODO, V3-3 jonli):
+# ⚠️ Distribution uchun code-signing kerak (TODO, V3-3 jonli):
 #   - mac: Developer ID sertifikat; win: code-signing sertifikat.
-#   - publish: S3/GitHub releases (auto-update uchun).
+# Auto-update publish provider — quyida `publish:` (CLI-357, Task 12).
 appId: uz.dental.service
 productName: Dental Service
 directories:
@@ -10,15 +10,38 @@ directories:
 files:
   - dist/**/*
   - package.json
+extraResources:
+  - from: resources/postgres
+    to: postgres
+    filter: ["**/*"]
+  - from: resources/valkey
+    to: valkey
+    filter: ["**/*"]
+  - from: ../../dist/api.exe    # bun compile chiqishi
+    to: api.exe
+  - from: ../../infra/postgres-win.conf
+    to: ../infra/postgres-win.conf
+  - from: ../../infra/valkey-win.conf
+    to: ../infra/valkey-win.conf
 mac:
   target: dmg
   category: public.app-category.medical
 win:
   target: nsis
+  # TODO(jonli): build/icon.ico hali yaratilmagan — real build oldidan qo'shilishi kerak
+  icon: build/icon.ico
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  installerLanguages: [uz, ru]
+  include: build/installer.nsh    # rol tanlash dialog
 linux:
   target: AppImage
   category: Office
-# TODO(jonli): publish provideri (auto-update). Imzo'siz local build uchun bo'sh.
-# publish:
-#   provider: s3
-#   bucket: dental-desktop-updates
+# Auto-update (CLI-357) — o'z (generic) update serveri, `UPDATE_URL` build-time
+# environment o'zgaruvchisidan olinadi:
+#   UPDATE_URL=https://updates.dental-service.uz bun run build
+# Serverda `latest.yml` + installer EXE static serve qilinishi kerak.
+publish:
+  provider: generic
+  url: "${env.UPDATE_URL}"
