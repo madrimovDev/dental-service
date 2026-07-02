@@ -20,7 +20,10 @@ let spawnSyncImpl: (...args: unknown[]) => SpawnSyncResult = () => ({
 });
 let copyFileSyncImpl: (...args: unknown[]) => void = () => {};
 
-mock.module('electron', () => ({ app: { isPackaged: false } }));
+// side-effect import — bitta umumiy 'electron' mock (test-electron-mock.ts
+// izohiga qarang: alohida-alohida mock.module('electron', ...) chaqiruvlar
+// fayllar orasidagi racy natija berardi, chunki 'electron' moduli global).
+await import('./test-electron-mock');
 // Boshqa test fayl (process-manager.test.ts) ham 'node:child_process' ni
 // mock qiladi va bitta `bun test` invokatsiyasida modul registry global —
 // shu sabab real modul spread qilinadi (faqat `spawnSync` override qilinadi).

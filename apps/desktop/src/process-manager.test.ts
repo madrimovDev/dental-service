@@ -18,7 +18,10 @@ let failSpawnAtIndex: number | null = null;
 
 const realChildProcess = await import('node:child_process');
 
-mock.module('electron', () => ({ app: { isPackaged: false } }));
+// side-effect import — bitta umumiy 'electron' mock (test-electron-mock.ts
+// izohiga qarang: alohida-alohida mock.module('electron', ...) chaqiruvlar
+// fayllar orasidagi racy natija berardi, chunki 'electron' moduli global).
+await import('./test-electron-mock');
 // Boshqa test fayl (first-run.test.ts) ham 'node:child_process' ni mock
 // qiladi va bitta `bun test` invokatsiyasida modul registry global — shu
 // sabab real modul spread qilinadi (faqat `spawn` override qilinadi,
