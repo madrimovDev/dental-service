@@ -737,11 +737,11 @@ export const licensesRoutes = () => {
 cd apps/supervisor-api && bun test src/modules/licenses/licenses.test.ts
 ```
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add apps/supervisor-api/src/modules/licenses/
-git commit -m "feat(api): license activate + heartbeat + reactivate endpoints"
+git add apps/supervisor-api/src/modules/licenses/ apps/supervisor-api/src/modules/auth/jwt.middleware.ts
+git commit -m "feat(supervisor-api): license activate + heartbeat + reactivate endpoints"
 ```
 
 ---
