@@ -232,7 +232,7 @@ dental-service/
 │   └── supervisor-admin/   # Vite + React + Mantine — Supervisor admin paneli (@supervisor/*)
 ├── packages/
 │   ├── ui/                # Custom dental React komponentlar
-│   ├── core/              # Shared types, Zod schemalar (shu yerda supervisor-public-key.ts ham)
+│   ├── core/              # Shared types, Zod schemalar (birinchi prod deploy'da supervisor-public-key.ts shu yerga qo'shiladi)
 │   ├── db-schema/         # Drizzle schemalar
 │   ├── api-client/        # OpenAPI'dan auto-generated client
 │   ├── i18n/              # uz/ru tarjimalar
