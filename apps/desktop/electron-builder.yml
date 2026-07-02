@@ -10,11 +10,31 @@ directories:
 files:
   - dist/**/*
   - package.json
+extraResources:
+  - from: resources/postgres
+    to: postgres
+    filter: ["**/*"]
+  - from: resources/valkey
+    to: valkey
+    filter: ["**/*"]
+  - from: ../../dist/api.exe    # bun compile chiqishi
+    to: api.exe
+  - from: ../../infra/postgres-win.conf
+    to: ../infra/postgres-win.conf
+  - from: ../../infra/valkey-win.conf
+    to: ../infra/valkey-win.conf
 mac:
   target: dmg
   category: public.app-category.medical
 win:
   target: nsis
+  # TODO(jonli): build/icon.ico hali yaratilmagan — real build oldidan qo'shilishi kerak
+  icon: build/icon.ico
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  installerLanguages: [uz, ru]
+  include: build/installer.nsh    # rol tanlash dialog
 linux:
   target: AppImage
   category: Office

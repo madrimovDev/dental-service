@@ -46,6 +46,8 @@ coverage/
 # Electron build
 apps/desktop/dist-electron/
 apps/desktop/release/
+# electron-builder buildResources (icons, NSIS scripts) — versioned, not generated
+!apps/desktop/build/
 
 # Misc
 *.pid

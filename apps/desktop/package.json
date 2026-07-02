@@ -8,6 +8,8 @@
     "build:main": "tsc -p tsconfig.json --noEmit false --outDir dist",
     "dev": "bun run build:main && electron dist/main.js",
     "start": "electron dist/main.js",
+    "prebuild": "bun run ../../scripts/download-portable-bins.sh && bun run build:api",
+    "build:api": "cd ../api && bun build --compile --outfile ../../dist/api.exe src/index.ts",
     "build": "bun run build:main && electron-builder --config electron-builder.yml",
     "typecheck": "tsc --noEmit"
   },
