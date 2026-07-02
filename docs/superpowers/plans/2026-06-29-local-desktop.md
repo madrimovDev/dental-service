@@ -368,7 +368,13 @@ export const getFingerprint = async (): Promise<string> => {
     si.networkInterfaces(),
   ])
   const primaryMac = (Array.isArray(nets) ? nets : [nets])
-    .find((n: any) => n.default)?.mac ?? 'unknown'
+    .find((n: any) => n.default)?.mac ?? ''
+
+  // VM yoki konteynerda bo'sh qaytsa — aniq xato (virtual muhit qo'llab-quvvatlanmaydi)
+  if (!system.uuid && !system.serial && !primaryMac) {
+    throw new Error('FINGERPRINT_UNAVAILABLE')
+  }
+
   const raw = `${cpu.manufacturer}:${cpu.brand}:${system.uuid}:${system.serial}:${primaryMac}`
   return createHash('sha256').update(raw).digest('hex')
 }
@@ -518,6 +524,8 @@ cd apps/api && bun test src/lib/license-client.test.ts
 // apps/api/src/lib/license-client.ts
 import { getFingerprint, type LicenseData } from './license'
 
+// Compile-time constant (bun build --compile --define ishlatiladi)
+// Foydalanuvchi o'zgartira olmaydi — xavfsizlik chegarasi
 export const SUPERVISOR_URL =
   process.env.SUPERVISOR_URL ?? 'https://supervisor.dental.uz'
 
@@ -619,9 +627,19 @@ cd apps/api && bun test src/lib/license-middleware.test.ts
 import type { MiddlewareHandler } from 'hono'
 import { getActiveModules } from './license'
 
+// '/activate' va '/api/activate' whitelisted — license yo'q bo'lsa ham ochiq
+const WHITELIST = ['/activate', '/api/activate']
+
 export const requireModule = (module: string): MiddlewareHandler =>
   async (c, next) => {
+    if (WHITELIST.some(p => c.req.path.startsWith(p))) return next()
     const modules = await getActiveModules()
+    if (!modules.length) {
+      return c.json(
+        { error: { code: 'LICENSE_NOT_FOUND', message: 'License not activated' } },
+        403
+      )
+    }
     if (!modules.includes(module)) {
       return c.json(
         { error: { code: 'MODULE_DISABLED', message: `Module '${module}' is not enabled in your plan` } },
@@ -802,15 +820,15 @@ export type AppRole = 'server' | 'client'
 
 export interface AppConfig {
   role: AppRole
-  serverUrl: string
-  licenseKey: string
+  serverUrl: string | null  // null = hali topilmagan, discovery qayta ishlaydi
+  licenseKey: string | null
   serverPort: number
 }
 
 const DEFAULTS: AppConfig = {
   role: 'server',
-  serverUrl: '',
-  licenseKey: '',
+  serverUrl: null,
+  licenseKey: null,
   serverPort: 80,
 }
 
@@ -895,7 +913,7 @@ const spawnPostgres = (): Promise<void> =>
   new Promise((resolve, reject) => {
     pgProcess = spawn(
       join(POSTGRES_BIN, 'postgres.exe'),
-      ['-D', PG_DATA, '-p', '5432', '-c', `config_file=${join(DATA_DIR, 'postgres.conf')}`],
+      ['-D', PG_DATA, '-p', '5433', '-c', `config_file=${join(DATA_DIR, 'postgres.conf')}`],
       { stdio: 'pipe' }
     )
     pgProcess.on('error', reject)
@@ -925,8 +943,8 @@ const spawnApi = (port: number): Promise<void> =>
       env: {
         ...process.env,
         API_PORT: String(port),
-        DATABASE_URL: `postgresql://dental:dental@localhost:5432/dental`,
-        REDIS_URL: 'redis://localhost:6379',
+        DATABASE_URL: `postgresql://dental:dental@localhost:5433/dental`,
+        REDIS_URL: 'redis://localhost:6380',
         UPLOADS_DIR: join(DATA_DIR, 'uploads'),
         RUN_REMINDER_WORKER: 'true',
         NODE_ENV: 'production',
@@ -1012,8 +1030,8 @@ export const runMigrations = (apiExePath: string): void => {
   const result = spawnSync(apiExePath, ['migrate'], {
     env: {
       ...process.env,
-      DATABASE_URL: 'postgresql://dental:dental@localhost:5432/dental',
-      DATABASE_ADMIN_URL: 'postgresql://dental:dental@localhost:5432/dental',
+      DATABASE_URL: 'postgresql://dental:dental@localhost:5433/dental',
+      DATABASE_ADMIN_URL: 'postgresql://dental:dental@localhost:5433/dental',
       RUN_MIGRATIONS: 'true',
     },
     stdio: 'pipe',
@@ -1309,6 +1327,8 @@ git commit -m "feat(desktop): tray icon + server/client main entry point"
 
 ```ini
 # infra/postgres-win.conf — Windows office PC (i3/i5, 8GB RAM, ~5 ta klient) uchun
+# Port 5433 (standart 5432 emas — boshqa PG instansiyalari bilan konflikt oldini olish)
+port = 5433
 shared_buffers = 64MB
 work_mem = 4MB
 maintenance_work_mem = 32MB
@@ -1327,6 +1347,8 @@ log_min_messages = warning
 
 ```
 # infra/valkey-win.conf
+# Port 6380 (standart 6379 emas — boshqa Redis/Valkey instansiyalari bilan konflikt oldini olish)
+port 6380
 maxmemory 64mb
 maxmemory-policy allkeys-lru
 appendonly no
@@ -1356,26 +1378,33 @@ git commit -m "infra: optimized PostgreSQL + Valkey configs for Windows office P
 #!/usr/bin/env bash
 # scripts/download-portable-bins.sh
 # Build vaqtida portable binaries yuklab oladi
+# Qaror (brainstorm 2026-06-29): o'z serverdan (POSTGRES_WIN_URL + VALKEY_WIN_URL env var)
+# Rasmiy URL'lar vaqt o'tishi bilan o'zgaradi — o'z serverda barqaror
 
 set -e
 
 RESOURCES_DIR="apps/desktop/resources"
 mkdir -p "$RESOURCES_DIR/postgres" "$RESOURCES_DIR/valkey"
 
-# PostgreSQL 16 portable for Windows (EnterpriseDB zip)
-PG_VERSION="16.3-1"
-PG_URL="https://get.enterprisedb.com/postgresql/postgresql-${PG_VERSION}-windows-x64-binaries.zip"
+if [ -z "$POSTGRES_WIN_URL" ]; then
+  echo "ERROR: POSTGRES_WIN_URL env var belgilanmagan" >&2
+  exit 1
+fi
+if [ -z "$VALKEY_WIN_URL" ]; then
+  echo "ERROR: VALKEY_WIN_URL env var belgilanmagan" >&2
+  exit 1
+fi
+
+# PostgreSQL 16 portable for Windows (o'z serverdan)
 echo "Downloading PostgreSQL..."
-curl -L -o /tmp/postgres-win.zip "$PG_URL"
+curl -L -o /tmp/postgres-win.zip "$POSTGRES_WIN_URL"
 unzip -q /tmp/postgres-win.zip -d /tmp/pg-extract
 cp -r /tmp/pg-extract/pgsql/bin "$RESOURCES_DIR/postgres/"
 cp -r /tmp/pg-extract/pgsql/lib "$RESOURCES_DIR/postgres/"
 
-# Valkey 8 Windows binary
-VALKEY_VERSION="8.0.2"
-VALKEY_URL="https://github.com/valkey-io/valkey/releases/download/${VALKEY_VERSION}/valkey-${VALKEY_VERSION}-windows-x64.zip"
+# Valkey Windows binary (o'z serverdan)
 echo "Downloading Valkey..."
-curl -L -o /tmp/valkey-win.zip "$VALKEY_URL"
+curl -L -o /tmp/valkey-win.zip "$VALKEY_WIN_URL"
 unzip -q /tmp/valkey-win.zip -d /tmp/valkey-extract
 cp /tmp/valkey-extract/valkey-server.exe "$RESOURCES_DIR/valkey/"
 
@@ -1461,6 +1490,132 @@ linux:
 ```bash
 git add apps/desktop/electron-builder.yml scripts/download-portable-bins.sh apps/desktop/package.json
 git commit -m "feat(desktop): NSIS installer + portable binaries bundling"
+```
+
+---
+
+### Task 12: Auto-Updater (CLI-357)
+
+**Maqsad:** Electron ilovasi fon rejimida yangilanishlarni tekshiradi; tayyor bo'lganda tray orqali foydalanuvchiga xabar beradi va keyingi o'chirish/yoqishda o'rnatadi.
+
+**Files:**
+- Modify: `apps/desktop/electron-builder.yml`
+- Modify: `apps/desktop/src/main.ts`
+- Modify: `apps/desktop/package.json`
+
+**Interfaces:**
+- Consumes: `electron-updater` npm paketi, build vaqtida `UPDATE_URL` env var
+- Produces: background update check + tray notification
+
+---
+
+- [ ] **Step 1: `electron-updater` o'rnatish**
+
+```bash
+cd apps/desktop
+bun add electron-updater
+```
+
+- [ ] **Step 2: `electron-builder.yml` ga publish konfiguratsiya qo'shish**
+
+`electron-builder.yml` ga quyidagi bo'limni qo'shing:
+
+```yaml
+publish:
+  provider: generic
+  url: "${env.UPDATE_URL}"
+```
+
+`${env.UPDATE_URL}` — build vaqtida `UPDATE_URL` environment o'zgaruvchisidan olinadi (masalan, `https://updates.dental-service.uz`). CI/build script da set qilinadi:
+
+```bash
+UPDATE_URL=https://updates.dental-service.uz bun run build
+```
+
+- [ ] **Step 3: `main.ts` ga auto-updater logikasi qo'shish**
+
+`apps/desktop/src/main.ts` da mavjud import'lar qatoriga:
+
+```ts
+import { autoUpdater } from 'electron-updater'
+```
+
+`app.whenReady()` yoki `createTray()` chaqirilgandan keyin:
+
+```ts
+function setupAutoUpdater(tray: Tray) {
+  if (!app.isPackaged) return  // dev rejimida o'chirilgan
+
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = true
+
+  autoUpdater.on('update-downloaded', () => {
+    tray.setToolTip('Dental Service — yangilash tayyor')
+    const notification = new Notification({
+      title: 'Dental Service',
+      body: '🔄 Yangilash yuklab olindi. Keyingi ishga tushirishda o\'rnatiladi.',
+    })
+    notification.show()
+  })
+
+  autoUpdater.on('error', (err) => {
+    console.error('[updater] Xato:', err.message)
+  })
+
+  // Darhol tekshir, keyin har 4 soatda
+  autoUpdater.checkForUpdatesAndNotify()
+  setInterval(() => {
+    autoUpdater.checkForUpdatesAndNotify()
+  }, 4 * 60 * 60 * 1000)
+}
+```
+
+`setupAutoUpdater(tray)` ni tray yaratilganidan keyin chaqiring:
+
+```ts
+const tray = new Tray(iconPath)
+// ... boshqa tray sozlamalari
+setupAutoUpdater(tray)
+```
+
+- [ ] **Step 4: Server tarafda update feed tayyorlash (hujjat)**
+
+`electron-updater` generic provider quyidagi URL strukturani kutadi:
+
+```
+${UPDATE_URL}/latest.yml          ← Windows versiya ma'lumoti
+${UPDATE_URL}/DentalServiceSetup-X.Y.Z.exe   ← installer fayl
+```
+
+Build buyrug'i:
+
+```bash
+UPDATE_URL=https://updates.dental-service.uz bun run build
+# → dist/DentalServiceSetup-1.0.0.exe
+# → dist/latest.yml
+```
+
+`latest.yml` ni va installer EXE ni update serveriga yuklash:
+
+```bash
+scp dist/latest.yml dist/DentalServiceSetup-*.exe user@updates-server:/var/www/updates/
+```
+
+Caddy yoki Nginx da static serve:
+
+```
+# Caddyfile (update server)
+updates.dental-service.uz {
+  root * /var/www/updates
+  file_server
+}
+```
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add apps/desktop/electron-builder.yml apps/desktop/src/main.ts apps/desktop/package.json
+git commit -m "feat(desktop): auto-updater via generic provider (CLI-357)"
 ```
 
 ---
