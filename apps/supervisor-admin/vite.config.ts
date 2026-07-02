@@ -9,5 +9,14 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
-  server: { port: 3102, strictPort: true },
+  server: {
+    port: 3102,
+    strictPort: true,
+    proxy: {
+      '/v1': {
+        target: 'http://localhost:3101',
+        changeOrigin: true,
+      },
+    },
+  },
 });
