@@ -32,11 +32,15 @@ export const envSchema = z
     // Redis
     REDIS_URL: z.url(),
 
-    // MinIO
-    MINIO_ENDPOINT: z.url(),
-    MINIO_BUCKET: z.string().min(1),
-    MINIO_ROOT_USER: z.string().min(1),
-    MINIO_ROOT_PASSWORD: z.string().min(1),
+    // MinIO — dead since Local Desktop's storage.ts replaced it with local
+    // filesystem (Task 1, CLI-340). Kept optional (not removed) because the
+    // cloud/VPS deployment docker-compose still provisions a MinIO container;
+    // no code path reads these values anymore (grep confirms), so nothing
+    // actually depends on them being set.
+    MINIO_ENDPOINT: z.url().optional(),
+    MINIO_BUCKET: z.string().min(1).optional(),
+    MINIO_ROOT_USER: z.string().min(1).optional(),
+    MINIO_ROOT_PASSWORD: z.string().min(1).optional(),
 
     // API
     API_PORT: z.coerce.number().int().positive().default(8001),
@@ -62,6 +66,12 @@ export const envSchema = z
 
     // Observability (D7) — Sentry error tracking. NoOp when unset.
     SENTRY_DSN: z.string().optional(),
+
+    // Local Desktop bitta-EXE arxitekturasi — o'rnatilganda `apps/web` build
+    // outputni ham shu process serve qiladi (Windows'da alohida nginx/Caddy
+    // yo'q). `process-manager.ts` `spawnApi()`da beradi; cloud/dev
+    // deployment'da bo'sh — mavjud xulq o'zgarmaydi.
+    WEB_DIST_DIR: z.string().optional(),
 
     // Worker process separation (D6). When the API process should ALSO run the
     // in-process BullMQ reminder worker. Default `true` keeps dev unchanged

@@ -55,7 +55,14 @@ process.env.DENTAL_VALKEY_READY_DELAY_MS = '5';
 process.env.DENTAL_API_READY_DELAY_MS = '5';
 process.env.DENTAL_STOP_WAIT_MS = '5';
 
-const { startServer, stopServer, getServerStatus } = await import('./process-manager.js');
+const {
+  startServer,
+  stopServer,
+  getServerStatus,
+  getPostgresCommand,
+  getValkeyCommand,
+  getApiCommand,
+} = await import('./process-manager.js');
 
 describe('process-manager', () => {
   beforeEach(() => {
@@ -73,16 +80,30 @@ describe('process-manager', () => {
 
     expect(getServerStatus()).toBe('running');
     expect(spawnCalls).toHaveLength(3);
-    expect(spawnCalls[0]?.cmd).toContain('postgres.exe');
-    expect(spawnCalls[1]?.cmd).toContain('valkey-server.exe');
-    expect(spawnCalls[2]?.cmd).toContain('api.exe');
+    // Platform-mos komandalar — joriy testni ishga tushirayotgan platformadan
+    // mustaqil (`getPostgresCommand()`/`getValkeyCommand()`/`getApiCommand()`
+    // ham xuddi shu default `process.platform`ni ishlatadi, alohida
+    // `describe('platform-mos komandalar')` blokida win32 va boshqa
+    // platformalar aniq sinaladi).
+    expect(spawnCalls[0]?.cmd).toBe(getPostgresCommand());
+    expect(spawnCalls[1]?.cmd).toBe(getValkeyCommand());
+    expect(spawnCalls[2]?.cmd).toBe(getApiCommand());
     expect(spawnCalls[2]?.opts.env).toMatchObject({
       API_PORT: '8080',
-      DATABASE_URL: 'postgresql://dental:dental@localhost:5433/dental',
+      DATABASE_URL: 'postgresql://dental_app:dental_app_local_dev@localhost:5433/dental',
       REDIS_URL: 'redis://localhost:6380',
       RUN_REMINDER_WORKER: 'true',
       NODE_ENV: 'production',
+      WEB_ORIGIN: 'http://localhost:8080',
     });
+    const env = spawnCalls[2]?.opts.env as Record<string, string>;
+    expect(env.JWT_SECRET?.length).toBeGreaterThanOrEqual(32);
+    expect(env.WEB_DIST_DIR).toContain('web');
+    // Regression guard (2026-07-02 xavfsizlik bugi): runtime HECH QACHON
+    // superuser (`dental`) bilan ulanmasin — Postgres'da superuser RLS'ni
+    // avtomatik chetlab o'tadi, butun tenant izolyatsiyasini yo'qqa chiqaradi.
+    expect(env.DATABASE_URL).toContain('dental_app');
+    expect(env.DATABASE_URL).not.toMatch(/:\/\/dental:/);
   });
 
   test('stopServer barcha child process\'larni SIGTERM bilan to\'xtatadi, status "stopped"', async () => {
@@ -106,5 +127,22 @@ describe('process-manager', () => {
     failSpawnAtIndex = 2; // 0=postgres, 1=valkey (ok), 2=api (fail)
 
     await expect(startServer()).rejects.toThrow(/ENOENT/);
+  });
+});
+
+describe('platform-mos komandalar', () => {
+  test("win32 — bundled portable binary yo'llari (.exe, resources/ ostida)", () => {
+    expect(getPostgresCommand('win32')).toContain('postgres.exe');
+    expect(getValkeyCommand('win32')).toContain('valkey-server.exe');
+    expect(getApiCommand('win32')).toContain('api.exe');
+  });
+
+  test('linux/darwin — tizim PATH (postgres/valkey-server bare nom), api hali bundled', () => {
+    expect(getPostgresCommand('linux')).toBe('postgres');
+    expect(getValkeyCommand('linux')).toBe('valkey-server');
+    expect(getPostgresCommand('darwin')).toBe('postgres');
+    expect(getValkeyCommand('darwin')).toBe('valkey-server');
+    expect(getApiCommand('linux')).toContain('api');
+    expect(getApiCommand('linux')).not.toContain('.exe');
   });
 });

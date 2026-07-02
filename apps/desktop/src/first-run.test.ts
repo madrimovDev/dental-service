@@ -36,7 +36,9 @@ mock.module('node:fs', () => ({
   copyFileSync: (...args: unknown[]) => copyFileSyncImpl(...args),
 }));
 
-const { isFirstRun, runFirstSetup, runMigrations } = await import('./first-run.js');
+const { isFirstRun, runFirstSetup, runMigrations, getOrCreateJwtSecret } = await import(
+  './first-run.js'
+);
 
 describe('isFirstRun', () => {
   let tmpDir: string;
@@ -76,7 +78,7 @@ describe('runFirstSetup', () => {
     await rm(tmpDir, { recursive: true, force: true });
   });
 
-  test("initdb muvaffaqiyatli bo'lsa papkalar yaratiladi va conf fayllar nusxalanadi", () => {
+  test("initdb muvaffaqiyatli bo'lsa papkalar yaratiladi, conf fayllar nusxalanadi va JWT_SECRET generatsiya qilinadi", () => {
     spawnSyncImpl = mock(() => ({ status: 0, stdout: Buffer.from(''), stderr: Buffer.from('') }));
 
     expect(() => runFirstSetup()).not.toThrow();
@@ -84,6 +86,7 @@ describe('runFirstSetup', () => {
     expect(existsSync(join(tmpDir, 'logs'))).toBe(true);
     expect(existsSync(join(tmpDir, 'postgres', 'data'))).toBe(true);
     expect(copyFileSyncImpl).toHaveBeenCalledTimes(2);
+    expect(existsSync(join(tmpDir, 'jwt-secret.txt'))).toBe(true);
   });
 
   test("initdb muvaffaqiyatsiz bo'lsa (status != 0) throw qiladi", () => {
@@ -133,5 +136,31 @@ describe('runMigrations', () => {
       stderr: Buffer.from('migration error'),
     }));
     expect(() => runMigrations('C:\\api.exe')).toThrow(/Migrations failed/);
+  });
+});
+
+describe('getOrCreateJwtSecret', () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'first-run-test-'));
+    process.env.DENTAL_DATA_DIR = tmpDir;
+  });
+
+  afterEach(async () => {
+    delete process.env.DENTAL_DATA_DIR;
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  test('birinchi chaqiruvda faylni yaratadi va API talabini (32+ belgi) qanoatlantiradi', () => {
+    const secret = getOrCreateJwtSecret();
+    expect(existsSync(join(tmpDir, 'jwt-secret.txt'))).toBe(true);
+    expect(secret.length).toBeGreaterThanOrEqual(32);
+  });
+
+  test('idempotent — ikkinchi chaqiruvda bir xil qiymatni qaytaradi (qayta yozmaydi)', () => {
+    const first = getOrCreateJwtSecret();
+    const second = getOrCreateJwtSecret();
+    expect(second).toBe(first);
   });
 });

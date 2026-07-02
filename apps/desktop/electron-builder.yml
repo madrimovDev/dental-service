@@ -19,6 +19,22 @@ extraResources:
     filter: ["**/*"]
   - from: ../../dist/api.exe    # bun compile chiqishi
     to: api.exe
+  # Bitta-EXE arxitektura — api.exe apps/web build outputni ham serve qiladi
+  # (apps/api/src/app.ts, WEB_DIST_DIR). `bun run build` oldidan
+  # `cd apps/web && bun run build` bajarilishi shart.
+  - from: ../web/dist
+    to: web
+    filter: ["**/*"]
+  # `bun build --compile` migratsiya SQL fayllarini (meta/_journal.json + RLS
+  # DDL) ICHIGA OLMAYDI — first-run.ts `runMigrations()` bularni api.exe
+  # yoniga (sibling) resurs sifatida kutadi (2026-07-02 real-run'da topildi;
+  # MIGRATIONS_DIR/RLS_MIGRATIONS_DIR — apps/api/src/db/migrate.ts).
+  - from: ../api/drizzle
+    to: drizzle
+    filter: ["**/*"]
+  - from: ../api/migrations/rls
+    to: migrations/rls
+    filter: ["**/*"]
   - from: ../../infra/postgres-win.conf
     to: ../infra/postgres-win.conf
   - from: ../../infra/valkey-win.conf

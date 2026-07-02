@@ -59,3 +59,11 @@ describe('parseEnv JWT_SECRET guard', () => {
     expect(result.success).toBe(false);
   });
 });
+
+describe('MINIO_* is optional (dead since storage.ts local-filesystem, CLI-340)', () => {
+  test('boots without any MINIO_* vars set', () => {
+    const { MINIO_ENDPOINT, MINIO_BUCKET, MINIO_ROOT_USER, MINIO_ROOT_PASSWORD, ...rest } = baseRaw;
+    const result = parseEnv({ ...rest, NODE_ENV: 'development', JWT_SECRET: STRONG_SECRET });
+    expect(result.success).toBe(true);
+  });
+});

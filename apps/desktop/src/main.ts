@@ -45,7 +45,13 @@ import { readConfig, writeConfig } from './config.js';
 import { findServer, startServerDiscovery, stopServerDiscovery } from './discovery.js';
 import { isFirstRun, runFirstSetup, runMigrations } from './first-run.js';
 import { hasLicense } from './license-status.js';
-import { startServer, stopServer } from './process-manager.js';
+import {
+  getApiCommand,
+  startApiLayer,
+  startDatabaseLayer,
+  startServer,
+  stopServer,
+} from './process-manager.js';
 import { registerSettingsIpc } from './settings-ipc.js';
 import { createTray, setTrayToolTip, updateTray } from './tray.js';
 
@@ -57,10 +63,10 @@ const { autoUpdater } = electronUpdater;
 
 const PRELOAD_PATH = join(import.meta.dirname, 'preload.js');
 
-const RESOURCES = app.isPackaged
-  ? process.resourcesPath
-  : join(import.meta.dirname, '../../resources');
-const API_EXE = join(RESOURCES, 'api.exe');
+// Platform-mos yo'l — process-manager.ts'ning `getApiCommand()`i bilan bir
+// xil (yagona manba, ikki joyda alohida-alohida .exe/bare-nom mantiq
+// takrorlanmasin).
+const API_EXE = getApiCommand();
 
 // process-manager.ts/first-run.ts konvensiyasi bilan bir xil default (CLI-346
 // qarori: xato dialogida foydalanuvchiga ko'rsatiladigan log yo'li).
@@ -86,6 +92,14 @@ let stopClientReconnectLoop: (() => void) | null = null;
 // productionga o'xshab DEV'DA HAM ishlaydi — `hasLicense()` faqat fayl
 // mavjudligini tekshiradi (platform-agnostik, hech qanday Windows binary
 // kerak emas), shuning uchun uni dev'da chetlab o'tishning hojati yo'q.
+//
+// `DENTAL_FORCE_PROD_FLOW=true` — real NSIS/AppImage paketlashsiz, to'liq
+// server/client oqimini (process-manager+first-run+discovery+tray) haqiqiy
+// binary bilan sinash uchun (2026-07-02, CLI-338 runtime-verify). Faqat
+// qo'lda o'rnatilganda ishlaydi — oddiy `bun run dev` xulqi o'zgarmaydi.
+const isDevWrapMode = (): boolean =>
+  !app.isPackaged && process.env.DENTAL_FORCE_PROD_FLOW !== 'true';
+
 const DEV_URL = process.env.DENTAL_DEV_URL ?? 'http://localhost:8000';
 
 const openDevWindow = (): void => {
@@ -124,7 +138,7 @@ const openBrowser = (url: string): void => {
 app.whenReady().then(async () => {
   app.dock?.hide(); // macOS: dock'da ko'rsatmaydi — faqat tray
 
-  if (!app.isPackaged) {
+  if (isDevWrapMode()) {
     openDevWindow();
     return;
   }
@@ -137,14 +151,20 @@ app.whenReady().then(async () => {
     // (binary topilmadi, timeout) — `Error` throw qilinadi (CLI-346);
     // foydalanuvchi jim qolgan ilova bilan chalkashmasin deb modal dialog
     // ko'rsatib chiqamiz (CLI-346 qarori: "Task 7 bilan birga").
+    //
+    // ⚠️ Ketma-ketlik muhim (2026-07-02 tuzatildi): migratsiyalar API'dan
+    // OLDIN ishlashi shart — API boot'ida `seedPermissions`/`seedDiagnoses`
+    // jadval borligini talab qiladi; avval API'ni ishga tushirib keyin
+    // migratsiya qilish bo'sh (yangi) bazada API'ni darhol qulatgan bo'lardi.
     try {
       const firstRun = isFirstRun();
       if (firstRun) {
         runFirstSetup();
-      }
-      await startServer(config.serverPort);
-      if (firstRun) {
+        await startDatabaseLayer();
         runMigrations(API_EXE);
+        await startApiLayer(config.serverPort);
+      } else {
+        await startServer(config.serverPort);
       }
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
@@ -245,11 +265,11 @@ app.on('window-all-closed', () => {
   // Dev rejimida tray yo'q — oyna yopilsa ilova ham chiqadi (standart Electron
   // xatti-harakati). Paketlangan build — tray app, oyna yopilganda chiqmaydi
   // (server/klient tray'da ishlayveradi).
-  if (!app.isPackaged) app.quit();
+  if (isDevWrapMode()) app.quit();
 });
 
 app.on('before-quit', async () => {
-  if (!app.isPackaged) return; // dev rejimida process-manager/discovery ishga tushmagan
+  if (isDevWrapMode()) return; // dev rejimida process-manager/discovery ishga tushmagan
 
   const config = readConfig();
   if (config.role === 'server') {

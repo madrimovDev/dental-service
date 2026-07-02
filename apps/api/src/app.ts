@@ -1,6 +1,7 @@
 import { createFiscalProvider } from '@dental/fiscal';
 import { createSmsChannel } from '@dental/notifications';
 import { OpenAPIHono } from '@hono/zod-openapi';
+import { serveStatic } from 'hono/bun';
 import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
 import { db } from './db/client.ts';
@@ -133,6 +134,17 @@ export const createApp = () => {
   app.route('/api/stock', stockRoutes({ db, audit, notifications }));
   app.route('/api/payroll', payrollRoutes({ db, audit }));
   app.route('/api/notifications', notificationsRoutes({ db, sms }));
+
+  // Local Desktop bitta-EXE arxitekturasi — Windows'da alohida nginx/Caddy
+  // yo'q, api.exe o'zi `apps/web` build outputni ham serve qiladi
+  // (`process-manager.ts` `spawnApi()` `WEB_DIST_DIR`ni beradi). Faqat shu env
+  // o'rnatilganda faollashadi — cloud/dev deployment'da bo'sh, mavjud xulq
+  // o'zgarmaydi. `/api/*`/`/uploads/*`/`/metrics` yuqorida ro'yxatdan o'tgan
+  // (aniqroq) — Hono ularni bu catch-all'dan oldin moslashtiradi.
+  if (env.WEB_DIST_DIR) {
+    app.use('*', serveStatic({ root: env.WEB_DIST_DIR }));
+    app.get('*', serveStatic({ root: env.WEB_DIST_DIR, path: 'index.html' }));
+  }
 
   // Error handler
   app.onError(errorHandler);
