@@ -34,7 +34,10 @@ export const getFingerprint = async (): Promise<string> => {
 
 const getKey = async () => {
   const fp = await getFingerprint();
-  return Buffer.from(fp.slice(0, 32)); // AES-256 → 32 byte kalit
+  // fp — sha256 hex digest (64 hex char = 32 byte). To'liq 256 bit kalit uchun
+  // hex sifatida parse qilinadi (oldingi `fp.slice(0,32)` — ASCII sifatida
+  // faqat 128 bit haqiqiy entropiya berardi, chunki har bayt 0-9a-f oralig'ida).
+  return Buffer.from(fp, 'hex');
 };
 
 export const writeLicense = async (data: LicenseData): Promise<void> => {
@@ -63,6 +66,14 @@ export const readLicense = async (): Promise<LicenseData | null> => {
   }
 };
 
+// TODO(security): signature verifikatsiya keyinga qoldirilgan —
+// `packages/core/supervisor-public-key.ts` hali mavjud emas (birinchi prod
+// deploy'da qo'shiladi). Hozircha faqat grace-period tekshiriladi; imzo
+// tekshirilmagani sabab, mahalliy admin `getFingerprint()`ni o'zi chaqirib
+// (u sir emas) kalitni hosil qilib, ixtiyoriy `modules`/`expiresAt` bilan
+// `.lic` faylni qayta yozishi mumkin — module-gating hozircha shu yo'l bilan
+// chetlab o'tiladi. Public key ulanganda bu yerga RSA signature verify
+// qo'shilishi shart.
 export const isLicenseValid = (data: LicenseData): boolean => {
   const expiry = new Date(data.expiresAt).getTime();
   const grace = data.gracePeriodDays * 86400000;
