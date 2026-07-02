@@ -18,6 +18,9 @@ out/
 .env.*.local
 !.env.example
 
+# Local Desktop dev — LICENSE_PATH override (.lic file, machine-specific)
+.dev-data/
+
 # Logs
 *.log
 npm-debug.log*

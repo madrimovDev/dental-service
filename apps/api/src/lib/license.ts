@@ -13,7 +13,15 @@ export interface LicenseData {
   signature: string;
 }
 
-export const LICENSE_PATH =
+// Funksiya sifatida (top-level const EMAS) — chaqiruv-vaqtida hisoblanadi,
+// storage.ts/config.ts/process-manager.ts konvensiyasiga mos. Top-level const
+// bo'lganida modul birinchi marta import qilinganda (masalan boshqa test
+// faylining `import * as realLicense from './license'` orqali, `mock.module`
+// spread uchun) `process.env.LICENSE_PATH` "muzlab" qolar edi — keyinchalik
+// biror test shu env varni o'zgartirsa ham, allaqachon eskirgan qiymat
+// ishlatilardi (isbotlangan: license.test.ts'ning o'z tmpdir override'i
+// e'tiborsiz qolib, haqiqiy dev LICENSE_PATH'ga yozib qo'yardi).
+export const getLicensePath = (): string =>
   process.env.LICENSE_PATH ??
   (process.platform === 'win32'
     ? 'C:\\ProgramData\\DentalService\\license.lic'
@@ -47,13 +55,14 @@ export const writeLicense = async (data: LicenseData): Promise<void> => {
   const json = JSON.stringify(data);
   const encrypted = Buffer.concat([cipher.update(json, 'utf8'), cipher.final()]);
   const payload = Buffer.concat([iv, encrypted]);
-  await mkdir(dirname(LICENSE_PATH), { recursive: true });
-  await writeFile(LICENSE_PATH, payload.toString('base64'));
+  const licensePath = getLicensePath();
+  await mkdir(dirname(licensePath), { recursive: true });
+  await writeFile(licensePath, payload.toString('base64'));
 };
 
 export const readLicense = async (): Promise<LicenseData | null> => {
   try {
-    const raw = await readFile(LICENSE_PATH, 'utf8');
+    const raw = await readFile(getLicensePath(), 'utf8');
     const payload = Buffer.from(raw, 'base64');
     const iv = payload.subarray(0, 16);
     const encrypted = payload.subarray(16);

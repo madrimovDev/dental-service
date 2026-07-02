@@ -1,13 +1,19 @@
 import { describe, expect, mock, test } from 'bun:test';
 import { Hono } from 'hono';
+import * as realLicense from './license';
 
 // './license' mock qilinadi — mock.module BEFORE any dynamic import of
 // './license-middleware' resolves it (bun mock.module must be registered up front).
 // `activeModules` mutable — har test o'z holatini o'rnatadi (LICENSE_NOT_FOUND vs
-// MODULE_DISABLED vs active).
+// MODULE_DISABLED vs active). Haqiqiy modulni spread qilib faqat
+// `getActiveModules`ni override qilamiz — aks holda `mock.module`ning GLOBAL
+// tabiati sabab boshqa test fayllari (masalan license.test.ts) `./license`ni
+// import qilganda qolgan eksportlar (`writeLicense` va h.k.) `undefined`
+// bo'lib qoladi (fayllar tartibiga bog'liq, racy).
 let activeModules: string[] = ['patients', 'appointments'];
 
 mock.module('./license', () => ({
+  ...realLicense,
   getActiveModules: async () => activeModules,
 }));
 

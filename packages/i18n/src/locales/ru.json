@@ -149,6 +149,18 @@
       "submit": "Обновить пароль",
       "invalid": "Код неверный или истёк",
       "password_placeholder": "Минимум 12 символов"
+    },
+    "activate": {
+      "title": "Активация лицензии",
+      "description": "Введите лицензионный ключ, выданный вашей клинике, чтобы начать пользоваться Dental Service.",
+      "license_key": "Лицензионный ключ",
+      "license_key_placeholder": "XXXXX-XXXXX-XXXXX-XXXXX",
+      "submit": "Активировать",
+      "success": "Лицензия успешно активирована. Перенаправление...",
+      "error_invalid_key": "Неверный лицензионный ключ",
+      "error_fingerprint_mismatch": "Эта лицензия активна на другом устройстве. Свяжитесь с Supervisor.",
+      "error_fingerprint_unavailable": "Не удалось определить это устройство (виртуальная среда не поддерживается)",
+      "error_generic": "Не удалось активировать лицензию. Попробуйте ещё раз."
     }
   },
   "layout": {

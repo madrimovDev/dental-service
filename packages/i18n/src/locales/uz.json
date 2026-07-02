@@ -149,6 +149,18 @@
       "submit": "Parolni yangilash",
       "invalid": "Kod noto'g'ri yoki muddati tugagan",
       "password_placeholder": "Kamida 12 belgi"
+    },
+    "activate": {
+      "title": "Litsenziyani faollashtirish",
+      "description": "Dental Service'dan foydalanish uchun klinikangizga berilgan litsenziya kalitini kiriting.",
+      "license_key": "Litsenziya kaliti",
+      "license_key_placeholder": "XXXXX-XXXXX-XXXXX-XXXXX",
+      "submit": "Faollashtirish",
+      "success": "Litsenziya muvaffaqiyatli faollashtirildi. Yo'naltirilmoqda...",
+      "error_invalid_key": "Litsenziya kaliti noto'g'ri",
+      "error_fingerprint_mismatch": "Bu litsenziya boshqa qurilmada faol. Supervisor bilan bog'laning.",
+      "error_fingerprint_unavailable": "Bu qurilmani aniqlab bo'lmadi (virtual muhit qo'llab-quvvatlanmaydi)",
+      "error_generic": "Litsenziyani faollashtirib bo'lmadi. Qaytadan urinib ko'ring."
     }
   },
   "layout": {

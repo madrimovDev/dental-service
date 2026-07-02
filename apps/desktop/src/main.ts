@@ -79,19 +79,23 @@ let stopClientReconnectLoop: (() => void) | null = null;
 // Dev rejimi — `!app.isPackaged` (process-manager.ts/first-run.ts bilan bir
 // xil konvensiya). Portable Postgres/Valkey/api.exe (Task 7) faqat Windows
 // uchun paketlangan — Linux/macOS'da dasturchi ustida ishlaydi va bu binarylar
-// yo'q, shuning uchun to'liq server/client oqimi (process-manager, discovery,
-// litsenziya) chetlab o'tiladi: Electron oddiy allaqachon ishlab turgan Vite
-// dev-server'ni (`bun dev` / `turbo dev` — web:8000, /api'ni 8001ga proxy
-// qiladi) o'raydi, xuddi eski web-wrapper (CLI-251) kabi.
+// yo'q, shuning uchun process-manager/first-run/discovery chetlab o'tiladi:
+// Electron oddiy allaqachon ishlab turgan Vite dev-server'ni (`bun dev` /
+// `turbo dev` — web:8000, /api'ni 8001ga proxy qiladi) o'raydi, xuddi eski
+// web-wrapper (CLI-251) kabi. Litsenziya tekshiruvi (CLI-348 qaror 1) esa
+// productionga o'xshab DEV'DA HAM ishlaydi — `hasLicense()` faqat fayl
+// mavjudligini tekshiradi (platform-agnostik, hech qanday Windows binary
+// kerak emas), shuning uchun uni dev'da chetlab o'tishning hojati yo'q.
 const DEV_URL = process.env.DENTAL_DEV_URL ?? 'http://localhost:8000';
 
 const openDevWindow = (): void => {
-  openBrowser(DEV_URL);
+  const target = hasLicense() ? DEV_URL : `${DEV_URL}/activate`;
+  openBrowser(target);
   mainWindow?.webContents.openDevTools({ mode: 'detach' });
   // `turbo dev --parallel` bilan Electron web dev-serverdan oldin ochilishi
   // mumkin — bir marta 1s dan keyin qayta yuklab ko'ramiz.
   mainWindow?.webContents.once('did-fail-load', () => {
-    setTimeout(() => void mainWindow?.loadURL(DEV_URL), 1000);
+    setTimeout(() => void mainWindow?.loadURL(target), 1000);
   });
 };
 

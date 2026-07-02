@@ -36,6 +36,7 @@ import { stockRoutes } from './modules/stock/index.ts';
 import { tenantSettingsRoutes } from './modules/tenant-settings/index.ts';
 import { tenantRoutes } from './modules/tenants/index.ts';
 import { userRoutes } from './modules/users/index.ts';
+import { activateRoutes } from './routes/activate.ts';
 
 export const createApp = () => {
   const app = new OpenAPIHono();
@@ -85,6 +86,9 @@ export const createApp = () => {
   // Public routes
   app.route('/api/health', healthRoutes({ db }));
   app.route('/api/auth', authRoutes({ db }));
+  // Local Desktop litsenziya faollashtirish (CLI-348 qaror 1) — auth yo'q,
+  // license-middleware.ts WHITELIST'i bilan bir xil yo'l.
+  app.route('/api/activate', activateRoutes());
 
   // Observability (CLI-238 / D7): Prometheus metrics. Public text/plain — keep
   // on the internal network / behind edge auth. Localized append-only mount.

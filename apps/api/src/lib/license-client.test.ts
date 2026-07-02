@@ -1,8 +1,16 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test';
+import * as realLicense from './license';
 
 // './license' mock qilinadi — mock.module BEFORE any dynamic import of
-// './license-client' resolves it (bun mock.module must be registered up front).
+// './license-client' resolves it (bun mock.module must be registered up
+// front). `mock.module` bir jarayonga GLOBAL — agar faqat `getFingerprint`ni
+// export qilsak, boshqa test fayli (masalan license.test.ts) `./license`ni
+// import qilganda `writeLicense`/`readLicense`/`isLicenseValid` `undefined`
+// bo'lib qoladi (fayllar tartibiga bog'liq, racy). Haqiqiy modulni spread
+// qilib faqat kerakli funksiyani override qilamiz — qolganlari real bo'lib
+// qoladi.
 mock.module('./license', () => ({
+  ...realLicense,
   getFingerprint: async () => 'abc123fingerprint',
 }));
 
