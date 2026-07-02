@@ -25,6 +25,7 @@ import { setupAutoUpdater } from './auto-updater';
 import { readConfig } from './config';
 import { findServer, startServerDiscovery, stopServerDiscovery } from './discovery';
 import { isFirstRun, runFirstSetup, runMigrations } from './first-run';
+import { hasLicense } from './license-status';
 import { startServer, stopServer } from './process-manager';
 import { createTray, setTrayToolTip } from './tray';
 
@@ -106,7 +107,11 @@ app.whenReady().then(async () => {
         },
       },
     );
-    openBrowser(localUrl);
+    // Litsenziya faollashtirilmagan bo'lsa (`.lic` fayl yo'q) — asosiy UI
+    // o'rniga aktivatsiya sahifasi ochiladi (CLI-348 qaror 1). Web app
+    // `/activate` sahifasi hali qurilmagan (follow-up, apps/web doirasi
+    // tashqarisida) — bu yerda faqat desktop-tomon signal+redirect ulanadi.
+    openBrowser(hasLicense() ? localUrl : `${localUrl}/activate`);
   } else {
     // Klient rejimi — LAN discovery orqali server qidiriladi.
     const serverUrl = config.serverUrl || (await findServer()) || 'http://localhost';
