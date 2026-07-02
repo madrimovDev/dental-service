@@ -60,9 +60,22 @@ export const setupAutoUpdater = (deps: AutoUpdaterDeps): void => {
     console.error('[updater] Xato:', err.message);
   });
 
+  // `checkForUpdatesAndNotify()` electron-updater ichida xatoni ham 'error'
+  // event orqali emit qiladi, HAM promise'ni reject qiladi (ikki alohida yo'l).
+  // Promise'ni catch qilmasak — Node/Electron main process'da unhandled
+  // rejection default'da butun processni to'xtatadi (Node 15+ throw-by-default),
+  // ya'ni update-server ishlamasa ham butun ilova (server rejimida — klinika
+  // serveri) qulab tushadi. Shu uchun har chaqiruvda alohida catch qilinadi.
+  const checkForUpdates = (): void => {
+    Promise.resolve(updater.checkForUpdatesAndNotify()).catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('[updater] Xato:', message);
+    });
+  };
+
   // Darhol tekshir, keyin har 4 soatda.
-  updater.checkForUpdatesAndNotify();
+  checkForUpdates();
   scheduleInterval(() => {
-    updater.checkForUpdatesAndNotify();
+    checkForUpdates();
   }, intervalMs);
 };

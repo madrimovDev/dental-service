@@ -23,8 +23,13 @@ class FakeUpdater implements UpdaterLike {
     return this;
   }
 
+  rejectNextCheck = false;
+
   checkForUpdatesAndNotify(): unknown {
     this.checkCalls += 1;
+    if (this.rejectNextCheck) {
+      return Promise.reject(new Error('network fail'));
+    }
     return Promise.resolve(null);
   }
 
@@ -88,6 +93,27 @@ describe('setupAutoUpdater', () => {
     try {
       setupAutoUpdater({ isPackaged: true, updater, notify, setTrayToolTip, scheduleInterval });
       updater.emitError(new Error('network fail'));
+
+      expect(errSpy).toHaveBeenCalledWith('[updater] Xato:', 'network fail');
+    } finally {
+      console.error = originalError;
+    }
+  });
+
+  test('checkForUpdatesAndNotify() promise reject qilsa unhandled rejection tashlamaydi, console.error ga log qiladi', async () => {
+    const originalError = console.error;
+    const errSpy = mock(() => {});
+    console.error = errSpy as typeof console.error;
+    updater.rejectNextCheck = true;
+
+    try {
+      expect(() =>
+        setupAutoUpdater({ isPackaged: true, updater, notify, setTrayToolTip, scheduleInterval }),
+      ).not.toThrow();
+
+      // Promise mikrotasklarini ishlatish uchun navbatni bo'shatamiz.
+      await Promise.resolve();
+      await Promise.resolve();
 
       expect(errSpy).toHaveBeenCalledWith('[updater] Xato:', 'network fail');
     } finally {
