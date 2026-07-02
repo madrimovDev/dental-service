@@ -97,4 +97,31 @@ describe('ClinicDetailPage', () => {
     const body = JSON.parse(String(patchCall[1].body));
     expect(body.modules).toEqual(expect.arrayContaining(['patients', 'appointments', 'cashier']));
   });
+
+  it("modul PATCH so'rovi muvaffaqiyatsiz bo'lsa xato xabarini ko'rsatadi", async () => {
+    fetchMock.mockReset();
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (
+        init?.method === 'PATCH' &&
+        url.endsWith('/v1/admin/licenses/AAAAA-BBBBB-CCCCC-DDDDD/modules')
+      ) {
+        return jsonResponse({ error: { code: 'SERVER_ERROR' } }, false);
+      }
+      if (url.endsWith('/v1/admin/clinics/c1')) {
+        return jsonResponse({ clinic, license });
+      }
+      throw new Error(`unhandled fetch: ${url} ${init?.method ?? 'GET'}`);
+    });
+
+    renderDetail();
+    await screen.findByText('Clinic One');
+
+    const cashierRow = screen.getByText('cashier').closest('div');
+    const cashierSwitch = cashierRow?.querySelector('input[type="checkbox"]');
+    if (!cashierSwitch) throw new Error('cashier switch not found');
+    fireEvent.click(cashierSwitch);
+
+    expect(await screen.findByText("Modulni yangilab bo'lmadi")).toBeInTheDocument();
+  });
 });

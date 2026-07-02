@@ -77,4 +77,20 @@ describe('ClinicsPage', () => {
     expect(labels).toContain('Faol');
     expect(labels).toContain('Nofaol');
   });
+
+  it("ro'yxat so'rovi muvaffaqiyatsiz bo'lsa xato xabarini ko'rsatadi (bo'sh jadval emas)", async () => {
+    fetchMock.mockReset();
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/v1/admin/clinics')) {
+        return jsonResponse({ error: { code: 'UNAUTHORIZED' } }, false);
+      }
+      throw new Error(`unhandled fetch: ${url}`);
+    });
+
+    renderApp(<ClinicsPage />);
+
+    expect(await screen.findByText(/Klinikalar ro'yxatini yuklab bo'lmadi/)).toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
 });

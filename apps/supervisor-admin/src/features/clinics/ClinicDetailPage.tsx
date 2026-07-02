@@ -1,8 +1,9 @@
 import { Button, Group, Paper, Stack, Switch, Text, Title } from '@mantine/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { authFetch } from '../../lib/api';
-import type { ClinicDetail } from './clinics.types';
+import { fetchClinicDetail } from './clinics.api';
 
 const ALL_MODULES = [
   'patients',
@@ -22,15 +23,10 @@ const ALL_MODULES = [
   'branches',
 ];
 
-const fetchClinicDetail = async (id: string): Promise<ClinicDetail> => {
-  const res = await authFetch(`/v1/admin/clinics/${id}`);
-  if (!res.ok) throw new Error('Klinika topilmadi');
-  return res.json();
-};
-
 export const ClinicDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
+  const [mutationError, setMutationError] = useState<string | null>(null);
 
   const { data, isError } = useQuery({
     queryKey: ['clinic', id],
@@ -41,12 +37,19 @@ export const ClinicDetailPage = () => {
   const updateModules = useMutation({
     mutationFn: async (modules: string[]) => {
       if (!data?.license) return;
-      await authFetch(`/v1/admin/licenses/${data.license.licenseKey}/modules`, {
+      const res = await authFetch(`/v1/admin/licenses/${data.license.licenseKey}/modules`, {
         method: 'PATCH',
         body: JSON.stringify({ modules }),
       });
+      if (!res.ok) throw new Error("Modulni yangilab bo'lmadi");
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['clinic', id] }),
+    onSuccess: () => {
+      setMutationError(null);
+      qc.invalidateQueries({ queryKey: ['clinic', id] });
+    },
+    onError: (err) => {
+      setMutationError(err instanceof Error ? err.message : "Modulni yangilab bo'lmadi");
+    },
   });
 
   const reactivate = useMutation({
@@ -54,10 +57,17 @@ export const ClinicDetailPage = () => {
       if (!data?.license) return;
       const fp = prompt('Yangi fingerprint kiriting:');
       if (!fp) return;
-      await authFetch('/v1/reactivate', {
+      const res = await authFetch('/v1/reactivate', {
         method: 'POST',
         body: JSON.stringify({ licenseKey: data.license.licenseKey, fingerprint: fp }),
       });
+      if (!res.ok) throw new Error("Litsenziyani qayta faollashtirib bo'lmadi");
+    },
+    onSuccess: () => setMutationError(null),
+    onError: (err) => {
+      setMutationError(
+        err instanceof Error ? err.message : "Litsenziyani qayta faollashtirib bo'lmadi",
+      );
     },
   });
 
@@ -78,6 +88,11 @@ export const ClinicDetailPage = () => {
       <Title order={2} mb="md">
         {data.clinic.name}
       </Title>
+      {mutationError && (
+        <Text c="red" mb="md">
+          {mutationError}
+        </Text>
+      )}
       <Paper p="md" withBorder mb="md">
         <Text fw={500}>Litsenziya: {data.license?.licenseKey}</Text>
         <Text c="dimmed">Tarif: {data.license?.plan}</Text>
