@@ -1,4 +1,4 @@
-import { Badge, Button, Group, Table, Text, Title } from '@mantine/core';
+import { Badge, Button, Group, Table, Text, Title, Tooltip } from '@mantine/core';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { fetchClinicDetail, fetchClinics } from './clinics.api';
@@ -27,9 +27,13 @@ export const ClinicsPage = () => {
     <>
       <Group justify="space-between" mb="md">
         <Title order={2}>Klinikalar</Title>
-        <Button component={Link} to="/clinics/new">
-          + Yangi klinika
-        </Button>
+        <Tooltip label="Klinika yaratish hozircha faqat API orqali: POST /v1/admin/clinics">
+          {/* Disabled buttons don't fire pointer events, so the Tooltip's
+              hover trigger needs a non-disabled wrapper element to hang off. */}
+          <span>
+            <Button disabled>+ Yangi klinika</Button>
+          </span>
+        </Tooltip>
       </Group>
       {isError && (
         <Text c="red" mb="md">

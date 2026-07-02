@@ -121,4 +121,20 @@ describe('GET /v1/admin/clinics/:id', () => {
     const body = (await res.json()) as any;
     expect(body.error.code).toBe('NOT_FOUND');
   });
+
+  it('returns 404 (not 500) for a syntactically invalid uuid id', async () => {
+    const res = await app.request('/v1/admin/clinics/not-a-uuid', {
+      headers: await authHeaders(),
+    });
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as any;
+    expect(body.error.code).toBe('NOT_FOUND');
+  });
+
+  it('returns 404 (not 500) for "new" (the dead frontend create-clinic route)', async () => {
+    const res = await app.request('/v1/admin/clinics/new', {
+      headers: await authHeaders(),
+    });
+    expect(res.status).toBe(404);
+  });
 });

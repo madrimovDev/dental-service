@@ -7,6 +7,8 @@ import { db } from '../../db/client';
 import { branches, clinics, licenses } from '../../db/schema';
 import { adminJwtMiddleware } from '../auth/jwt.middleware';
 
+const uuidSchema = z.string().uuid();
+
 const createClinicSchema = z.object({
   name: z.string().min(1),
   contactEmail: z.string().email().optional(),
@@ -117,7 +119,13 @@ export const clinicsRoutes = () => {
 
   // Klinika litsenziyasi + modullar
   app.get('/:id', async (c) => {
-    const clinic = await db.query.clinics.findFirst({ where: eq(clinics.id, c.req.param('id')) });
+    // `id` — uuid ustunga bog'lanadi; noto'g'ri formatdagi qiymat (masalan "new")
+    // Postgres'ga uzatilsa "invalid input syntax for type uuid" bilan 500 beradi.
+    // Formatni oldindan tekshirib, noto'g'ri bo'lsa 404 (mavjud emas) qaytaramiz.
+    const idResult = uuidSchema.safeParse(c.req.param('id'));
+    if (!idResult.success) return c.json({ error: { code: 'NOT_FOUND' } }, 404);
+
+    const clinic = await db.query.clinics.findFirst({ where: eq(clinics.id, idResult.data) });
     if (!clinic) return c.json({ error: { code: 'NOT_FOUND' } }, 404);
     const license = await db.query.licenses.findFirst({ where: eq(licenses.clinicId, clinic.id) });
     return c.json({ clinic, license });
