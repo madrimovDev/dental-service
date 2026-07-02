@@ -22,11 +22,16 @@
 **/.turbo
 **/*.tsbuildinfo
 
-# Secrets + local env (injected at runtime, NEVER baked into an image)
-.env
-.env.*
-!.env.example
-!.env.production.example
+# Secrets + local env (injected at runtime, NEVER baked into an image).
+# MUST be `**/`-prefixed — a bare `.env`/`.env.*` pattern only matches the
+# context ROOT in Docker's ignore semantics, so per-app dev env files (e.g.
+# apps/supervisor-api/.env) would silently slip into the build context and
+# get baked into the image layers otherwise (confirmed empirically while
+# building apps/supervisor-api/Dockerfile — CLI supervisor VPS deploy task).
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.production.example
 
 # Tests / coverage (not needed at runtime)
 **/coverage

@@ -1,0 +1,45 @@
+# Public edge reverse proxy for the Supervisor licensing/admin backend.
+#
+# ⚠️ Vendor's own central VPS only — separate host/domain from any clinic
+# deploy (root infra/Caddyfile). Never merge these.
+#
+# Automatic HTTPS: Caddy provisions + renews Let's Encrypt certs for {$DOMAIN}
+# on first request (ports 80/443 must be reachable + DNS pointing here).
+#
+# Env (interpolated by Caddy at startup, set in docker-compose.prod.yml):
+#   DOMAIN       — public hostname, e.g. supervisor.yoursite.uz
+#   ACME_EMAIL   — contact email for Let's Encrypt
+#
+# Routing: /v1/* (apps/supervisor-api mounts all routes under /v1, see
+# src/app.ts) → the api service; everything else → the admin SPA.
+
+{
+	email {$ACME_EMAIL}
+	# Uncomment for staging certs while testing to avoid LE rate limits:
+	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+{$DOMAIN} {
+	encode gzip zstd
+
+	handle /v1/* {
+		reverse_proxy api:3101
+	}
+
+	handle {
+		reverse_proxy admin:80
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}
