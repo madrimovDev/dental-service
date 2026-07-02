@@ -17,7 +17,7 @@
  *     `/settings` sahifasiga ochiladi, alohida Electron oyna emas.
  */
 import { join } from 'node:path';
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, dialog, shell } from 'electron';
 import { readConfig } from './config';
 import { findServer, startServerDiscovery, stopServerDiscovery } from './discovery';
 import { isFirstRun, runFirstSetup, runMigrations } from './first-run';
@@ -28,6 +28,14 @@ const RESOURCES = app.isPackaged
   ? process.resourcesPath
   : join(import.meta.dirname, '../../resources');
 const API_EXE = join(RESOURCES, 'api.exe');
+
+// process-manager.ts/first-run.ts konvensiyasi bilan bir xil default (CLI-346
+// qarori: xato dialogida foydalanuvchiga ko'rsatiladigan log yo'li).
+const LOGS_DIR = join(
+  process.env.DENTAL_DATA_DIR ||
+    (process.platform === 'win32' ? 'C:\\ProgramData\\DentalService' : '/var/lib/dental-service'),
+  'logs',
+);
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -55,13 +63,27 @@ app.whenReady().then(async () => {
 
   if (config.role === 'server') {
     // Birinchi ishga tushish — portable Postgres initdb + conf fayllar.
-    const firstRun = isFirstRun();
-    if (firstRun) {
-      runFirstSetup();
-    }
-    await startServer(config.serverPort);
-    if (firstRun) {
-      runMigrations(API_EXE);
+    // Postgres/Valkey/api.exe spawn yoki migration muvaffaqiyatsiz bo'lsa
+    // (binary topilmadi, timeout) — `Error` throw qilinadi (CLI-346);
+    // foydalanuvchi jim qolgan ilova bilan chalkashmasin deb modal dialog
+    // ko'rsatib chiqamiz (CLI-346 qarori: "Task 7 bilan birga").
+    try {
+      const firstRun = isFirstRun();
+      if (firstRun) {
+        runFirstSetup();
+      }
+      await startServer(config.serverPort);
+      if (firstRun) {
+        runMigrations(API_EXE);
+      }
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      dialog.showErrorBox(
+        'Dental Service — ishga tushmadi',
+        `Server komponentlari ishga tushmadi: ${detail}\n\nLoglarni ko'ring: ${LOGS_DIR}`,
+      );
+      app.quit();
+      return;
     }
 
     const localUrl = `http://localhost:${config.serverPort}`;
