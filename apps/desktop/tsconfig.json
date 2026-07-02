@@ -3,8 +3,8 @@
   "compilerOptions": {
     "outDir": "./dist",
     "noEmit": true,
-    "module": "ESNext",
-    "moduleResolution": "bundler",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "lib": ["ESNext"],
     "types": ["bun-types", "node"],
     "allowImportingTsExtensions": false

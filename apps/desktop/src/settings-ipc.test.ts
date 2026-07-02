@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test';
-import { registerSettingsIpc, SET_SERVER_URL_CHANNEL } from './settings-ipc';
+import { registerSettingsIpc, SET_SERVER_URL_CHANNEL } from './settings-ipc.js';
 
 class FakeIpcMain {
   handlers = new Map<string, (event: unknown, ...args: unknown[]) => unknown>();

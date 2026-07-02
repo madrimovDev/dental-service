@@ -18,7 +18,7 @@
  * bloklovchi emas), packaging bosqichida tasdiqlansin.
  */
 import { contextBridge, ipcRenderer } from 'electron';
-import { SET_SERVER_URL_CHANNEL } from './settings-ipc';
+import { SET_SERVER_URL_CHANNEL } from './settings-ipc.js';
 
 contextBridge.exposeInMainWorld('dentalDesktop', {
   setServerUrl: (serverUrl: string) => ipcRenderer.invoke(SET_SERVER_URL_CHANNEL, serverUrl),

@@ -3,9 +3,10 @@ import { beforeEach, describe, expect, mock, test } from 'bun:test';
 // (bun test bir process ichida barcha *.test.ts'ni yuklaydi; alohida-alohida
 // mock.module('electron', ...) chaqiruvlar fayllar orasidagi yuklash
 // tartibiga bog'liq racy natija beradi — test-electron-mock.ts izohiga qarang).
-import { resetTrayMockState, trayMockState } from './test-electron-mock';
+import type { MockMenuItem } from './test-electron-mock.js';
+import { resetTrayMockState, trayMockState } from './test-electron-mock.js';
 
-const { createTray, updateTray, setTrayToolTip } = await import('./tray');
+const { createTray, updateTray, setTrayToolTip } = await import('./tray.js');
 
 describe('tray', () => {
   beforeEach(() => {
@@ -74,7 +75,7 @@ describe('tray', () => {
 
     const template = trayMockState.lastMenuTemplate;
     if (!template) throw new Error('menu template yaratilmadi');
-    const openItem = template.find((item) => item.label?.includes('Ochish'));
+    const openItem = template.find((item: MockMenuItem) => item.label?.includes('Ochish'));
     openItem?.click?.();
 
     expect(onOpen).toHaveBeenCalledTimes(1);
@@ -89,7 +90,7 @@ describe('tray', () => {
 
     const template = trayMockState.lastMenuTemplate;
     if (!template) throw new Error('menu template yaratilmadi');
-    const stopItem = template.find((item) => item.label?.includes("To'xtatish"));
+    const stopItem = template.find((item: MockMenuItem) => item.label?.includes("To'xtatish"));
     stopItem?.click?.();
 
     expect(onStop).toHaveBeenCalledTimes(1);
@@ -117,7 +118,7 @@ describe('tray', () => {
 
     const template = trayMockState.lastMenuTemplate;
     if (!template) throw new Error('menu template yaratilmadi');
-    const exitItem = template.find((item) => item.label?.includes('Chiqish'));
+    const exitItem = template.find((item: MockMenuItem) => item.label?.includes('Chiqish'));
     exitItem?.click?.();
 
     expect(onStop).toHaveBeenCalledTimes(1);

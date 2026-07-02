@@ -64,7 +64,7 @@ mock.module('@homebridge/ciao', () => ({
   },
 }));
 
-const { startServerDiscovery, stopServerDiscovery, findServer } = await import('./discovery');
+const { startServerDiscovery, stopServerDiscovery, findServer } = await import('./discovery.js');
 
 describe('discovery', () => {
   beforeEach(() => {

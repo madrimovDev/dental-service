@@ -8,7 +8,7 @@
 
 import { join } from 'node:path';
 import { Menu, nativeImage, Tray } from 'electron';
-import type { AppRole } from './config';
+import type { AppRole } from './config.js';
 
 export interface TrayInfo {
   serverUrl: string;

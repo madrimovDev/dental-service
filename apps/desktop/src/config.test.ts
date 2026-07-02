@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readConfig, writeConfig } from './config';
+import { readConfig, writeConfig } from './config.js';
 
 describe('readConfig / writeConfig', () => {
   let tmpDir: string;

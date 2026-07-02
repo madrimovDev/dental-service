@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test';
-import type { UpdaterLike } from './auto-updater';
-import { setupAutoUpdater } from './auto-updater';
+import type { UpdaterLike } from './auto-updater.js';
+import { setupAutoUpdater } from './auto-updater.js';
 
 class FakeUpdater implements UpdaterLike {
   autoDownload = false;

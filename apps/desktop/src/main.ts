@@ -38,16 +38,22 @@
  */
 import { join } from 'node:path';
 import { app, BrowserWindow, dialog, ipcMain, Notification, shell } from 'electron';
-import { autoUpdater } from 'electron-updater';
-import { setupAutoUpdater } from './auto-updater';
-import { startClientReconnectLoop } from './client-reconnect';
-import { readConfig, writeConfig } from './config';
-import { findServer, startServerDiscovery, stopServerDiscovery } from './discovery';
-import { isFirstRun, runFirstSetup, runMigrations } from './first-run';
-import { hasLicense } from './license-status';
-import { startServer, stopServer } from './process-manager';
-import { registerSettingsIpc } from './settings-ipc';
-import { createTray, setTrayToolTip, updateTray } from './tray';
+import electronUpdater from 'electron-updater';
+import { setupAutoUpdater } from './auto-updater.js';
+import { startClientReconnectLoop } from './client-reconnect.js';
+import { readConfig, writeConfig } from './config.js';
+import { findServer, startServerDiscovery, stopServerDiscovery } from './discovery.js';
+import { isFirstRun, runFirstSetup, runMigrations } from './first-run.js';
+import { hasLicense } from './license-status.js';
+import { startServer, stopServer } from './process-manager.js';
+import { registerSettingsIpc } from './settings-ipc.js';
+import { createTray, setTrayToolTip, updateTray } from './tray.js';
+
+// `electron-updater`ning `autoUpdater` eksporti runtime'da lazy getter orqali
+// aniqlanadi (platform-conditional) — cjs-module-lexer buni statik named
+// export sifatida ko'ra olmaydi, Node ESM `SyntaxError` beradi. Standart
+// interop: default import + destructure.
+const { autoUpdater } = electronUpdater;
 
 const PRELOAD_PATH = join(import.meta.dirname, 'preload.js');
 
@@ -69,6 +75,25 @@ let mainWindow: BrowserWindow | null = null;
 // to'xtatuvchisi — server topilganda yoki ilova yopilganda tozalanadi
 // (CLI-348 qaror 4).
 let stopClientReconnectLoop: (() => void) | null = null;
+
+// Dev rejimi — `!app.isPackaged` (process-manager.ts/first-run.ts bilan bir
+// xil konvensiya). Portable Postgres/Valkey/api.exe (Task 7) faqat Windows
+// uchun paketlangan — Linux/macOS'da dasturchi ustida ishlaydi va bu binarylar
+// yo'q, shuning uchun to'liq server/client oqimi (process-manager, discovery,
+// litsenziya) chetlab o'tiladi: Electron oddiy allaqachon ishlab turgan Vite
+// dev-server'ni (`bun dev` / `turbo dev` — web:8000, /api'ni 8001ga proxy
+// qiladi) o'raydi, xuddi eski web-wrapper (CLI-251) kabi.
+const DEV_URL = process.env.DENTAL_DEV_URL ?? 'http://localhost:8000';
+
+const openDevWindow = (): void => {
+  openBrowser(DEV_URL);
+  mainWindow?.webContents.openDevTools({ mode: 'detach' });
+  // `turbo dev --parallel` bilan Electron web dev-serverdan oldin ochilishi
+  // mumkin — bir marta 1s dan keyin qayta yuklab ko'ramiz.
+  mainWindow?.webContents.once('did-fail-load', () => {
+    setTimeout(() => void mainWindow?.loadURL(DEV_URL), 1000);
+  });
+};
 
 const openBrowser = (url: string): void => {
   if (mainWindow) {
@@ -94,6 +119,11 @@ const openBrowser = (url: string): void => {
 
 app.whenReady().then(async () => {
   app.dock?.hide(); // macOS: dock'da ko'rsatmaydi — faqat tray
+
+  if (!app.isPackaged) {
+    openDevWindow();
+    return;
+  }
 
   const config = readConfig();
 
@@ -208,10 +238,15 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
-  // Tray app — barcha oynalar yopilganda chiqmaymiz (server/klient tray'da ishlayveradi).
+  // Dev rejimida tray yo'q — oyna yopilsa ilova ham chiqadi (standart Electron
+  // xatti-harakati). Paketlangan build — tray app, oyna yopilganda chiqmaydi
+  // (server/klient tray'da ishlayveradi).
+  if (!app.isPackaged) app.quit();
 });
 
 app.on('before-quit', async () => {
+  if (!app.isPackaged) return; // dev rejimida process-manager/discovery ishga tushmagan
+
   const config = readConfig();
   if (config.role === 'server') {
     stopServerDiscovery();

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test';
-import { startClientReconnectLoop } from './client-reconnect';
+import { startClientReconnectLoop } from './client-reconnect.js';
 
 describe('startClientReconnectLoop', () => {
   let scheduledFn: (() => void) | null;

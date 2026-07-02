@@ -21,7 +21,7 @@ const realChildProcess = await import('node:child_process');
 // side-effect import — bitta umumiy 'electron' mock (test-electron-mock.ts
 // izohiga qarang: alohida-alohida mock.module('electron', ...) chaqiruvlar
 // fayllar orasidagi racy natija berardi, chunki 'electron' moduli global).
-await import('./test-electron-mock');
+await import('./test-electron-mock.js');
 // Boshqa test fayl (first-run.test.ts) ham 'node:child_process' ni mock
 // qiladi va bitta `bun test` invokatsiyasida modul registry global — shu
 // sabab real modul spread qilinadi (faqat `spawn` override qilinadi,
@@ -55,7 +55,7 @@ process.env.DENTAL_VALKEY_READY_DELAY_MS = '5';
 process.env.DENTAL_API_READY_DELAY_MS = '5';
 process.env.DENTAL_STOP_WAIT_MS = '5';
 
-const { startServer, stopServer, getServerStatus } = await import('./process-manager');
+const { startServer, stopServer, getServerStatus } = await import('./process-manager.js');
 
 describe('process-manager', () => {
   beforeEach(() => {
