@@ -1,0 +1,29 @@
+{
+  "name": "@supervisor/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --env-file=.env --hot run src/index.ts",
+    "start:prod": "bun run src/index.ts",
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "db:generate": "bun --env-file=.env x drizzle-kit generate",
+    "db:migrate": "bun --env-file=.env run src/db/migrate.ts",
+    "db:migrate:prod": "bun run src/db/migrate.ts"
+  },
+  "dependencies": {
+    "hono": "^4.5.0",
+    "drizzle-orm": "^0.45.2",
+    "postgres": "^3.4.5",
+    "zod": "^3.23.0",
+    "jose": "^6.2.3",
+    "bcryptjs": "^2.4.0"
+  },
+  "devDependencies": {
+    "@hono/zod-validator": "^0.3.0",
+    "drizzle-kit": "^0.31.10",
+    "bun-types": "latest"
+  }
+}
