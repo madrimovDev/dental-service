@@ -1,0 +1,83 @@
+import { Badge, Button, Group, Table, Title } from '@mantine/core';
+import { useQueries, useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import { authFetch } from '../../lib/api';
+import type { Clinic, ClinicDetail } from './clinics.types';
+
+const fetchClinics = async (): Promise<Clinic[]> => {
+  const res = await authFetch('/v1/admin/clinics');
+  if (!res.ok) throw new Error("Klinikalar ro'yxatini yuklab bo'lmadi");
+  return res.json();
+};
+
+const fetchClinicDetail = async (id: string): Promise<ClinicDetail> => {
+  const res = await authFetch(`/v1/admin/clinics/${id}`);
+  if (!res.ok) throw new Error('Klinika topilmadi');
+  return res.json();
+};
+
+export const ClinicsPage = () => {
+  const { data: clinics = [], isLoading } = useQuery({
+    queryKey: ['clinics'],
+    queryFn: fetchClinics,
+  });
+
+  // GET /v1/admin/clinics ro'yxatida litsenziya kiritilmagan (bare clinic
+  // row'lar) — jadvalda litsenziya/tarif/holat ko'rsatish uchun har bir
+  // klinika uchun detail endpoint'ni alohida so'raymiz.
+  const detailQueries = useQueries({
+    queries: clinics.map((clinic) => ({
+      queryKey: ['clinic', clinic.id],
+      queryFn: () => fetchClinicDetail(clinic.id),
+    })),
+  });
+
+  return (
+    <>
+      <Group justify="space-between" mb="md">
+        <Title order={2}>Klinikalar</Title>
+        <Button component={Link} to="/clinics/new">
+          + Yangi klinika
+        </Button>
+      </Group>
+      <Table striped highlightOnHover>
+        <Table.Thead>
+          <Table.Tr>
+            <Table.Th>Nomi</Table.Th>
+            <Table.Th>Litsenziya</Table.Th>
+            <Table.Th>Tarif</Table.Th>
+            <Table.Th>Holat</Table.Th>
+            <Table.Th />
+          </Table.Tr>
+        </Table.Thead>
+        <Table.Tbody>
+          {isLoading && (
+            <Table.Tr>
+              <Table.Td colSpan={5}>Yuklanmoqda...</Table.Td>
+            </Table.Tr>
+          )}
+          {clinics.map((clinic, index) => {
+            const license = detailQueries[index]?.data?.license;
+            return (
+              <Table.Tr key={clinic.id}>
+                <Table.Td>{clinic.name}</Table.Td>
+                <Table.Td>{license?.licenseKey ?? '—'}</Table.Td>
+                <Table.Td>{license?.plan ?? '—'}</Table.Td>
+                <Table.Td>
+                  <Badge color={license?.isActive ? 'green' : 'red'}>
+                    {license?.isActive ? 'Faol' : 'Nofaol'}
+                  </Badge>
+                </Table.Td>
+                <Table.Td>
+                  <Button size="xs" variant="subtle" component={Link} to={`/clinics/${clinic.id}`}>
+                    Ko'rish
+                  </Button>
+                </Table.Td>
+              </Table.Tr>
+            );
+          })}
+        </Table.Tbody>
+      </Table>
+    </>
+  );
+};
