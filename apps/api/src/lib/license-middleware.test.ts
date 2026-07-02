@@ -1,0 +1,68 @@
+import { describe, expect, mock, test } from 'bun:test';
+import { Hono } from 'hono';
+
+// './license' mock qilinadi — mock.module BEFORE any dynamic import of
+// './license-middleware' resolves it (bun mock.module must be registered up front).
+// `activeModules` mutable — har test o'z holatini o'rnatadi (LICENSE_NOT_FOUND vs
+// MODULE_DISABLED vs active).
+let activeModules: string[] = ['patients', 'appointments'];
+
+mock.module('./license', () => ({
+  getActiveModules: async () => activeModules,
+}));
+
+const { requireModule } = await import('./license-middleware');
+
+describe('requireModule', () => {
+  test('allows request if module is active', async () => {
+    activeModules = ['patients', 'appointments'];
+    const app = new Hono();
+    app.get('/test', requireModule('patients'), (c) => c.json({ ok: true }));
+    const res = await app.request('/test');
+    expect(res.status).toBe(200);
+  });
+
+  test('blocks request with 403 MODULE_DISABLED if module is inactive', async () => {
+    activeModules = ['patients', 'appointments'];
+    const app = new Hono();
+    app.get('/test', requireModule('lab-orders'), (c) => c.json({ ok: true }));
+    const res = await app.request('/test');
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe('MODULE_DISABLED');
+  });
+
+  test('blocks request with 403 LICENSE_NOT_FOUND if no license activated', async () => {
+    activeModules = [];
+    const app = new Hono();
+    app.get('/test', requireModule('patients'), (c) => c.json({ ok: true }));
+    const res = await app.request('/test');
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe('LICENSE_NOT_FOUND');
+  });
+
+  test('whitelists /activate route even without an active license', async () => {
+    activeModules = [];
+    const app = new Hono();
+    app.get('/activate', requireModule('patients'), (c) => c.json({ ok: true }));
+    const res = await app.request('/activate');
+    expect(res.status).toBe(200);
+  });
+
+  test('whitelists /api/activate route even without an active license', async () => {
+    activeModules = [];
+    const app = new Hono();
+    app.get('/api/activate', requireModule('patients'), (c) => c.json({ ok: true }));
+    const res = await app.request('/api/activate');
+    expect(res.status).toBe(200);
+  });
+
+  test('enterprise wildcard (*) grants access to any module', async () => {
+    activeModules = ['*'];
+    const app = new Hono();
+    app.get('/test', requireModule('lab-orders'), (c) => c.json({ ok: true }));
+    const res = await app.request('/test');
+    expect(res.status).toBe(200);
+  });
+});
