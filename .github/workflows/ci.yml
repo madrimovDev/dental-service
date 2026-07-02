@@ -69,5 +69,52 @@ jobs:
       - name: Apply migrations (Drizzle + RLS DDL)
         run: bun run db:migrate
 
+      # apps/supervisor-api is a separate product sharing this monorepo/CI —
+      # its tests need a real Postgres DB of their own (NOT the dental one
+      # above). Reuse the same `postgres` service container (one Postgres
+      # server, two databases) instead of standing up a second service.
+      - name: Create supervisor test database
+        env:
+          PGPASSWORD: dental
+        run: psql -h localhost -U dental -d dental -c "CREATE DATABASE supervisor;"
+
+      - name: Apply supervisor-api migrations
+        working-directory: apps/supervisor-api
+        env:
+          DATABASE_URL: postgres://dental:dental@localhost:5432/supervisor
+          # db:migrate:prod also seeds a bootstrap admin (idempotent, see
+          # src/db/seed.ts) when these are set — harmless in CI, mirrors prod.
+          ADMIN_SEED_EMAIL: ci-admin@example.com
+          ADMIN_SEED_PASSWORD: ci_admin_password_not_secret
+        run: bun run db:migrate:prod
+
+      # apps/supervisor-api's test suite needs its own DATABASE_URL (the
+      # `supervisor` DB above, NOT `dental`) plus a real RSA keypair +
+      # JWT_SECRET. The job-level `env:` block above already sets DATABASE_URL
+      # / JWT_SECRET for apps/api's tests and must NOT change — so rather than
+      # overloading the shared job env, write a `.env` file scoped to
+      # apps/supervisor-api/ (same `--env-file=.env` pattern its dev/db:migrate
+      # scripts already use) and have ITS `test` script explicitly unset the
+      # ambient dental-scoped vars before loading it (see
+      # apps/supervisor-api/package.json — `env -u ... bun --env-file=.env
+      # test`), so `turbo run test` can run both apps' suites in one pass
+      # without the two DATABASE_URLs colliding.
+      - name: Write supervisor-api test env
+        run: |
+          PRIVATE_KEY=$(bun -e "
+            const { generateKeyPairSync } = require('node:crypto');
+            const { privateKey } = generateKeyPairSync('rsa', {
+              modulusLength: 2048,
+              privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+              publicKeyEncoding: { type: 'spki', format: 'pem' },
+            });
+            console.log(privateKey);
+          ")
+          {
+            echo "DATABASE_URL=postgres://dental:dental@localhost:5432/supervisor"
+            echo "JWT_SECRET=ci_supervisor_test_secret_min_32_chars_zzz"
+            printf 'RSA_PRIVATE_KEY="%s"\n' "$PRIVATE_KEY"
+          } > apps/supervisor-api/.env
+
       - name: Test
         run: bun run test

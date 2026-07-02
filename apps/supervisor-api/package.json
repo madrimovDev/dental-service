@@ -8,7 +8,7 @@
     "start:prod": "bun run src/index.ts",
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "test": "bun test",
+    "test": "env -u DATABASE_URL -u JWT_SECRET -u RSA_PRIVATE_KEY bun --env-file=.env test",
     "db:generate": "bun --env-file=.env x drizzle-kit generate",
     "db:migrate": "bun --env-file=.env run src/db/migrate.ts",
     "db:migrate:prod": "bun run src/db/migrate.ts"
