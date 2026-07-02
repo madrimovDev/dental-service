@@ -6,15 +6,25 @@ import { secureHeaders } from 'hono/secure-headers';
  * Mirrors the secureHeaders configuration applied in app.ts. Asserted on a
  * minimal app so the test runs under bare `bun test` (no env boot dependency).
  */
-function buildApp(nodeEnv: 'development' | 'production') {
+function buildApp(nodeEnv: 'development' | 'production', webDistDir?: string) {
   const app = new Hono();
   app.use(
     '*',
     secureHeaders({
-      contentSecurityPolicy: {
-        defaultSrc: ["'none'"],
-        frameAncestors: ["'none'"],
-      },
+      contentSecurityPolicy: webDistDir
+        ? {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            imgSrc: ["'self'", 'data:'],
+            fontSrc: ["'self'"],
+            connectSrc: ["'self'"],
+            frameAncestors: ["'none'"],
+          }
+        : {
+            defaultSrc: ["'none'"],
+            frameAncestors: ["'none'"],
+          },
       xFrameOptions: 'DENY',
       xContentTypeOptions: 'nosniff',
       strictTransportSecurity:
@@ -48,5 +58,22 @@ describe('security headers middleware', () => {
     const res = await buildApp('development').request('/ping');
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true });
+  });
+
+  // Regression guard (2026-07-02, real BrowserWindow): the API-only lockdown
+  // CSP (default-src 'none') blocks the desktop's own SPA assets when
+  // WEB_DIST_DIR is set (blank screen — index.css/index.js/favicon.svg all
+  // refused). This branch must allow 'self' loads instead.
+  describe('Local Desktop mode (WEB_DIST_DIR set)', () => {
+    test('allows self-hosted script/style/img/font, still blocks framing', async () => {
+      const res = await buildApp('production', '/app/resources/web').request('/ping');
+      const csp = res.headers.get('content-security-policy') ?? '';
+      expect(csp).toContain("default-src 'self'");
+      expect(csp).toContain("script-src 'self'");
+      expect(csp).toContain("style-src 'self' 'unsafe-inline'");
+      expect(csp).toContain("img-src 'self' data:");
+      expect(csp).toContain("frame-ancestors 'none'");
+      expect(csp).not.toContain("default-src 'none'");
+    });
   });
 });

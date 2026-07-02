@@ -61,7 +61,8 @@ import { createTray, setTrayToolTip, updateTray } from './tray.js';
 // interop: default import + destructure.
 const { autoUpdater } = electronUpdater;
 
-const PRELOAD_PATH = join(import.meta.dirname, 'preload.js');
+// `.cjs` — `preload.cts` (CommonJS, sandbox:true talabi; ESM emas, izohiga qarang).
+const PRELOAD_PATH = join(import.meta.dirname, 'preload.cjs');
 
 // Platform-mos yo'l — process-manager.ts'ning `getApiCommand()`i bilan bir
 // xil (yagona manba, ikki joyda alohida-alohida .exe/bare-nom mantiq

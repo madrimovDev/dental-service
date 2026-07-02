@@ -56,17 +56,35 @@ export const createApp = () => {
   // Global middleware
   app.use('*', requestId());
 
-  // Security headers — early in the chain. This is a JSON API serving a separate
-  // SPA (no HTML/docs UI served at runtime), so the CSP locks everything down.
+  // Security headers — early in the chain. Normally this is a JSON API
+  // serving a separate SPA (no HTML/docs UI served at runtime), so the CSP
+  // locks everything down. Local Desktop (WEB_DIST_DIR set) is the one
+  // exception — this SAME process serves the web SPA's own HTML/JS/CSS/
+  // fonts, so `default-src 'none'` would block the app from loading its own
+  // assets (found 2026-07-02 in a real BrowserWindow — blank screen, CSP
+  // refused index.css/index.js/favicon.svg). `'unsafe-inline'` for styles
+  // only — Mantine's emotion CSS-in-JS injects <style> tags without a nonce;
+  // acceptable here since this serves a single trusted bundled SPA on a
+  // desktop-local port, not third-party content.
   // CORS is handled separately below; secureHeaders does not touch CORS headers.
   app.use(
     '*',
     secureHeaders({
-      // No HTML is served → forbid all sub-resource loading and framing.
-      contentSecurityPolicy: {
-        defaultSrc: ["'none'"],
-        frameAncestors: ["'none'"],
-      },
+      contentSecurityPolicy: env.WEB_DIST_DIR
+        ? {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            imgSrc: ["'self'", 'data:'],
+            fontSrc: ["'self'"],
+            connectSrc: ["'self'"],
+            frameAncestors: ["'none'"],
+          }
+        : {
+            // No HTML is served → forbid all sub-resource loading and framing.
+            defaultSrc: ["'none'"],
+            frameAncestors: ["'none'"],
+          },
       xFrameOptions: 'DENY',
       xContentTypeOptions: 'nosniff',
       // HSTS only in production (over real HTTPS) — emitting it on http://localhost

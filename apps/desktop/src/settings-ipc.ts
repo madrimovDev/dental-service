@@ -36,6 +36,9 @@ export interface SettingsIpcDeps {
   onConnected?: (serverUrl: string) => void;
 }
 
+// ⚠️ `preload.cts` bu qiymatni QAYTA E'LON QILADI (import qilmaydi — CJS
+// preload ESM modulni sinxron yuklay olmaydi). Bu yerda o'zgartirsangiz
+// `preload.cts`dagi nusxasini ham yangilang.
 export const SET_SERVER_URL_CHANNEL = 'dental:set-server-url';
 
 const HEALTH_CHECK_TIMEOUT_MS = 3000;
