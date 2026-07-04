@@ -50,16 +50,22 @@ describe('nav-config', () => {
     expect(items.find((i) => i.key === 'patients')).toBeDefined();
   });
 
-  it("FUTURE (disabled) element faqat owner uchun ko'rinadi (CLI-161)", () => {
-    // transactions — route'i yo'q, haqiqiy FUTURE element ('Tez orada')
+  it("transactions — LIVE, cashier.view bilan gated (CLI-366: 4ce4b07 disabled:true'ni olib tashladi)", () => {
+    // owner, ruxsat bor → ko'rinadi, disabled maydoni yo'q
     const asOwner = visibleGroups(() => true, 'dental', true).flatMap((g) => g.items);
     const transactions = asOwner.find((i) => i.key === 'transactions');
     expect(transactions).toBeDefined();
-    expect(transactions?.disabled).toBe(true);
+    expect(transactions?.disabled).toBeUndefined();
 
-    // owner emas (hasPermission true bo'lsa ham) → FUTURE element butunlay yashirin
-    const asNonOwner = visibleGroups(() => true, 'dental', false).flatMap((g) => g.items);
-    expect(asNonOwner.find((i) => i.key === 'transactions')).toBeUndefined();
+    // owner emas, lekin cashier.view bor → baribir ko'rinadi (permission-gate, owner-gate emas)
+    const asNonOwnerWithPerm = visibleGroups((p) => p === 'cashier.view', 'dental', false).flatMap(
+      (g) => g.items,
+    );
+    expect(asNonOwnerWithPerm.find((i) => i.key === 'transactions')).toBeDefined();
+
+    // owner emas va cashier.view yo'q → yashirin
+    const asNonOwnerNoPerm = visibleGroups(() => false, 'dental', false).flatMap((g) => g.items);
+    expect(asNonOwnerNoPerm.find((i) => i.key === 'transactions')).toBeUndefined();
   });
 
   it("R4 LIVE modullar permission bilan ko'rinadi, permissionsiz yashirin", () => {
