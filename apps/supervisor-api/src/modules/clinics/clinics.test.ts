@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'bun:test';
+import { eq } from 'drizzle-orm';
 import { createApp } from '../../app';
+import { db } from '../../db/client';
+import { licenseEvents } from '../../db/schema';
 import { signAdminTestToken } from '../../lib/test-helpers';
 
 const app = createApp();
@@ -133,6 +136,61 @@ describe('GET /v1/admin/clinics/:id', () => {
 
   it('returns 404 (not 500) for "new" (the dead frontend create-clinic route)', async () => {
     const res = await app.request('/v1/admin/clinics/new', {
+      headers: await authHeaders(),
+    });
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('PATCH /v1/admin/clinics/:id/deactivate', () => {
+  it('requires admin JWT', async () => {
+    const created = await createClinic();
+    const body = (await created.json()) as any;
+    const res = await app.request(`/v1/admin/clinics/${body.clinic.id}/deactivate`, {
+      method: 'PATCH',
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('sets license.isActive=false and records a deactivated licenseEvent', async () => {
+    const created = await createClinic();
+    const body = (await created.json()) as any;
+
+    const res = await app.request(`/v1/admin/clinics/${body.clinic.id}/deactivate`, {
+      method: 'PATCH',
+      headers: await authHeaders(),
+    });
+    expect(res.status).toBe(200);
+    const updated = (await res.json()) as any;
+    expect(updated.license.isActive).toBe(false);
+    expect(updated.clinic.id).toBe(body.clinic.id);
+
+    const events = await db.query.licenseEvents.findMany({
+      where: eq(licenseEvents.licenseId, body.license.id),
+    });
+    expect(events.some((e) => e.event === 'deactivated')).toBe(true);
+  });
+
+  it('rejects a subsequent /v1/activate call with 403 after deactivation (regression: existing isActive guard)', async () => {
+    const created = await createClinic();
+    const body = (await created.json()) as any;
+
+    await app.request(`/v1/admin/clinics/${body.clinic.id}/deactivate`, {
+      method: 'PATCH',
+      headers: await authHeaders(),
+    });
+
+    const activateRes = await app.request('/v1/activate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ licenseKey: body.license.licenseKey, fingerprint: 'fp-x' }),
+    });
+    expect(activateRes.status).toBe(403);
+  });
+
+  it('returns 404 for an unknown clinic id', async () => {
+    const res = await app.request(`/v1/admin/clinics/${crypto.randomUUID()}/deactivate`, {
+      method: 'PATCH',
       headers: await authHeaders(),
     });
     expect(res.status).toBe(404);
