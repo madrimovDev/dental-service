@@ -70,6 +70,31 @@ export const getOrCreateJwtSecret = (): string => {
   return secret;
 };
 
+// dental_app Postgres roli uchun parol — birinchi ishga tushishda
+// generatsiya qilinadi va `dataDir`da saqlanadi (CLI-390). getOrCreateJwtSecret
+// bilan bir xil idempotent fayl-persist pattern.
+export const getDbPasswordPath = (): string => join(getDataDir(), 'db-password.txt');
+
+export const getOrCreateDbPassword = (): string => {
+  const path = getDbPasswordPath();
+  if (existsSync(path)) {
+    return readFileSync(path, 'utf8').trim();
+  }
+  mkdirSync(getDataDir(), { recursive: true });
+  // Upgrade-safety (CLI-390): agar bu birinchi chaqiruv paytida Postgres
+  // klasteri ALLAQACHON mavjud bo'lsa (isFirstRun() false — bu kod
+  // versiyasidan OLDIN o'rnatilgan nusxa, dental_app roli eski hardcoded
+  // parol bilan allaqachon yaratilgan) — tasodifiy YANGI parol generatsiya
+  // qilib bo'lmaydi (mavjud rol paroliga mos kelmay, runtime auth-failure
+  // beradi). Faqat haqiqiy fresh install (Postgres klasteri hali yo'q)da
+  // tasodifiy parol xavfsiz. Chaqiruvchi tomonidan bu funksiya initdb'dan
+  // OLDIN chaqirilishi SHART (runFirstSetup() qarang) — aks holda fresh
+  // install ham noto'g'ri "mavjud o'rnatish" filialiga tushib qoladi.
+  const password = isFirstRun() ? randomBytes(32).toString('hex') : 'dental_app_local_dev';
+  writeFileSync(path, password, { mode: 0o600 });
+  return password;
+};
+
 export const runFirstSetup = (): void => {
   const dataDir = getDataDir();
   const pgData = getPgDataDir();
@@ -81,7 +106,13 @@ export const runFirstSetup = (): void => {
   mkdirSync(join(dataDir, 'logs'), { recursive: true });
   mkdirSync(pgData, { recursive: true });
 
-  // 2. initdb — postgres data dir yaratish
+  // 2. DB parolini generatsiya qilish/aniqlash — initdb'DAN OLDIN (CLI-390:
+  //    isFirstRun() PG_VERSION borligiga tayanadi, initdb esa aynan shu
+  //    faylni yaratadi — tartib teskari bo'lsa fresh install ham "mavjud
+  //    o'rnatish" deb noto'g'ri aniqlanib qoladi).
+  getOrCreateDbPassword();
+
+  // 3. initdb — postgres data dir yaratish
   const initdb = spawnSync(
     getInitdbPath(),
     ['-D', pgData, '--encoding=UTF8', '--locale=C', '-U', 'dental'],
@@ -89,14 +120,14 @@ export const runFirstSetup = (): void => {
   );
   assertSuccess(initdb, 'initdb');
 
-  // 3. postgres.conf / valkey.conf nusxalash (platform-mos)
+  // 4. postgres.conf / valkey.conf nusxalash (platform-mos)
   copyFileSync(
     join(resourcesDir, '..', 'infra', confNames.postgres),
     join(dataDir, 'postgres.conf'),
   );
   copyFileSync(join(resourcesDir, '..', 'infra', confNames.valkey), join(dataDir, 'valkey.conf'));
 
-  // 4. JWT_SECRET — birinchi ishga tushishda generatsiya (idempotent).
+  // 5. JWT_SECRET — birinchi ishga tushishda generatsiya (idempotent).
   getOrCreateJwtSecret();
 };
 
@@ -114,6 +145,7 @@ export const runMigrations = (apiExePath: string): void => {
       ...process.env,
       DATABASE_URL: 'postgresql://dental:dental@localhost:5433/dental',
       DATABASE_ADMIN_URL: 'postgresql://dental:dental@localhost:5433/dental',
+      DENTAL_APP_DB_PASSWORD: getOrCreateDbPassword(), // CLI-390 — dental_app roli shu parol bilan yaratiladi
       UPLOADS_DIR: join(dataDir, 'uploads'),
       MIGRATIONS_DIR: join(apiDir, 'drizzle'),
       RLS_MIGRATIONS_DIR: join(apiDir, 'migrations', 'rls'),

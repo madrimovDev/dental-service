@@ -36,9 +36,8 @@ mock.module('node:fs', () => ({
   copyFileSync: (...args: unknown[]) => copyFileSyncImpl(...args),
 }));
 
-const { isFirstRun, runFirstSetup, runMigrations, getOrCreateJwtSecret } = await import(
-  './first-run.js'
-);
+const { isFirstRun, runFirstSetup, runMigrations, getOrCreateJwtSecret, getOrCreateDbPassword } =
+  await import('./first-run.js');
 
 describe('isFirstRun', () => {
   let tmpDir: string;
@@ -162,5 +161,42 @@ describe('getOrCreateJwtSecret', () => {
     const first = getOrCreateJwtSecret();
     const second = getOrCreateJwtSecret();
     expect(second).toBe(first);
+  });
+});
+
+describe('getOrCreateDbPassword', () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'first-run-test-'));
+    process.env.DENTAL_DATA_DIR = tmpDir;
+  });
+
+  afterEach(async () => {
+    delete process.env.DENTAL_DATA_DIR;
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  test("fresh install (PG_VERSION yo'q) — tasodifiy parol generatsiya qiladi va faylga yozadi", () => {
+    const password = getOrCreateDbPassword();
+    expect(existsSync(join(tmpDir, 'db-password.txt'))).toBe(true);
+    expect(password).not.toBe('dental_app_local_dev');
+    expect(password.length).toBeGreaterThanOrEqual(32);
+  });
+
+  test('idempotent — ikkinchi chaqiruvda bir xil qiymatni qaytaradi (qayta yozmaydi)', () => {
+    const first = getOrCreateDbPassword();
+    const second = getOrCreateDbPassword();
+    expect(second).toBe(first);
+  });
+
+  test("mavjud o'rnatish (PG_VERSION allaqachon bor) — eski hardcoded literalni qaytaradi (upgrade-safety, CLI-390)", async () => {
+    // Postgres klasteri "allaqachon mavjud" holatini simulyatsiya qilamiz —
+    // isFirstRun() shu faylga qarab true/false qaytaradi.
+    await mkdir(join(tmpDir, 'postgres', 'data'), { recursive: true });
+    await writeFile(join(tmpDir, 'postgres', 'data', 'PG_VERSION'), '16');
+
+    const password = getOrCreateDbPassword();
+    expect(password).toBe('dental_app_local_dev');
   });
 });
