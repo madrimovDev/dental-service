@@ -280,6 +280,13 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
       count: Number(r.c),
     }));
 
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'report',
+      resourceId: null,
+      after: { report: 'appointment_stats', from, to, branchId: branchId ?? null },
+    });
+
     return {
       total,
       byStatus,
@@ -309,6 +316,19 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
       .from(appointments)
       .where(and(...base))
       .groupBy(appointments.doctorId);
+
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'report',
+      resourceId: null,
+      after: {
+        report: 'doctor_workload',
+        from,
+        to,
+        branchId: branchId ?? null,
+        rowCount: rows.length,
+      },
+    });
 
     return rows.map((r) => ({
       doctorId: r.doctorId,
@@ -341,6 +361,13 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
     const byStatus = rows.map((r) => ({ status: r.status as string, count: Number(r.c) }));
     const totalStages = byStatus.reduce((s, r) => s + r.count, 0);
     const completedStages = byStatus.find((r) => r.status === 'completed')?.count ?? 0;
+
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'report',
+      resourceId: null,
+      after: { report: 'plan_completion', from, to },
+    });
 
     return {
       totalStages,
@@ -425,6 +452,13 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
       .from(appointments)
       .where(and(...nsFilter))
       .groupBy(sql`EXTRACT(DOW FROM ${appointments.startTime} AT TIME ZONE 'Asia/Tashkent')`);
+
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'report',
+      resourceId: null,
+      after: { report: 'dental_analytics', from, to, branchId: branchId ?? null },
+    });
 
     return {
       procedureMix: mixRows.map((r) => ({

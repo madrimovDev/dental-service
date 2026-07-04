@@ -140,4 +140,71 @@ describe('Reports — o‘qish audit (CLI-389)', () => {
     expect(JSON.stringify(after)).not.toContain('patientName');
     expect(JSON.stringify(after)).not.toContain('receiptNumber');
   });
+
+  test('appointmentStats(): after.report=appointment_stats', async () => {
+    await db.transaction(async (tx) => {
+      await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
+      await service.appointmentStats(ctx(tx), { from: '2026-01-01', to: '2026-01-31' });
+    });
+    const rows = await db.transaction(async (tx) => {
+      await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
+      return tx
+        .select()
+        .from(auditLog)
+        .where(and(eq(auditLog.action, 'viewed'), eq(auditLog.resourceType, 'report')));
+    });
+    const match = rows.find(
+      (r) => (r.after as { report?: string })?.report === 'appointment_stats',
+    );
+    expect(match).toBeTruthy();
+  });
+
+  test('doctorWorkload(): after.report=doctor_workload, after.rowCount is a number', async () => {
+    await db.transaction(async (tx) => {
+      await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
+      await service.doctorWorkload(ctx(tx), { from: '2026-01-01', to: '2026-01-31' });
+    });
+    const rows = await db.transaction(async (tx) => {
+      await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
+      return tx
+        .select()
+        .from(auditLog)
+        .where(and(eq(auditLog.action, 'viewed'), eq(auditLog.resourceType, 'report')));
+    });
+    const match = rows.find((r) => (r.after as { report?: string })?.report === 'doctor_workload');
+    expect(match).toBeTruthy();
+    expect(typeof (match?.after as { rowCount?: number })?.rowCount).toBe('number');
+  });
+
+  test('planCompletion(): after.report=plan_completion, no branchId key (tenant-wide by-design)', async () => {
+    await db.transaction(async (tx) => {
+      await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
+      await service.planCompletion(ctx(tx), { from: '2026-01-01', to: '2026-01-31' });
+    });
+    const rows = await db.transaction(async (tx) => {
+      await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
+      return tx
+        .select()
+        .from(auditLog)
+        .where(and(eq(auditLog.action, 'viewed'), eq(auditLog.resourceType, 'report')));
+    });
+    const match = rows.find((r) => (r.after as { report?: string })?.report === 'plan_completion');
+    expect(match).toBeTruthy();
+  });
+
+  test('dentalAnalytics(): after.report=dental_analytics', async () => {
+    await db.transaction(async (tx) => {
+      await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
+      await service.dentalAnalytics(ctx(tx), { from: '2026-01-01', to: '2026-01-31' });
+    });
+    const rows = await db.transaction(async (tx) => {
+      await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
+      return tx
+        .select()
+        .from(auditLog)
+        .where(and(eq(auditLog.action, 'viewed'), eq(auditLog.resourceType, 'report')));
+    });
+    const match = rows.find((r) => (r.after as { report?: string })?.report === 'dental_analytics');
+    expect(match).toBeTruthy();
+  });
 });
