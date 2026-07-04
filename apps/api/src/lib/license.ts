@@ -1,6 +1,8 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import { verifyLicenseSignature } from '@dental/core/license-signature';
+import { SUPERVISOR_PUBLIC_KEY_PEM } from '@dental/core/supervisor-public-key';
 import si from 'systeminformation';
 
 export interface LicenseData {
@@ -75,15 +77,11 @@ export const readLicense = async (): Promise<LicenseData | null> => {
   }
 };
 
-// TODO(security): signature verifikatsiya keyinga qoldirilgan —
-// `packages/core/supervisor-public-key.ts` hali mavjud emas (birinchi prod
-// deploy'da qo'shiladi). Hozircha faqat grace-period tekshiriladi; imzo
-// tekshirilmagani sabab, mahalliy admin `getFingerprint()`ni o'zi chaqirib
-// (u sir emas) kalitni hosil qilib, ixtiyoriy `modules`/`expiresAt` bilan
-// `.lic` faylni qayta yozishi mumkin — module-gating hozircha shu yo'l bilan
-// chetlab o'tiladi. Public key ulanganda bu yerga RSA signature verify
-// qo'shilishi shart.
 export const isLicenseValid = (data: LicenseData): boolean => {
+  const { signature, ...payload } = data;
+  if (!verifyLicenseSignature(payload, signature, SUPERVISOR_PUBLIC_KEY_PEM)) {
+    return false;
+  }
   const expiry = new Date(data.expiresAt).getTime();
   const grace = data.gracePeriodDays * 86400000;
   return Date.now() < expiry + grace;
