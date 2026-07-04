@@ -135,12 +135,31 @@ export const createExpensesService = (deps: { audit: AuditLogger }) => {
     ]);
 
     const total = totalRows[0]?.total ?? 0;
+
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'expense',
+      resourceId: null,
+      after: {
+        categoryId: query.categoryId ?? null,
+        branchId: query.branchId ?? null,
+        count: rows.length,
+      },
+    });
+
     return { data: rows, meta: { page: query.page, pageSize: query.pageSize, total } };
   }
 
   async function getById(c: Context, id: string) {
     const db = getDb(c);
     const [row] = await db.select().from(expenses).where(eq(expenses.id, id));
+    if (row) {
+      await deps.audit.record(c, {
+        action: 'viewed',
+        resourceType: 'expense',
+        resourceId: id,
+      });
+    }
     return row ?? null;
   }
 

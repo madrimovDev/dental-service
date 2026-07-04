@@ -67,6 +67,18 @@ export const createCashierService = (deps: { audit: AuditLogger; fiscal?: Fiscal
     ]);
 
     const total = totalRows[0]?.total ?? 0;
+
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'cashier_transaction',
+      resourceId: query.patientId ?? null,
+      after: {
+        patientId: query.patientId ?? null,
+        branchId: query.branchId ?? null,
+        count: rows.length,
+      },
+    });
+
     return { data: rows, meta: { page: query.page, pageSize: query.pageSize, total } };
   }
 
@@ -79,6 +91,12 @@ export const createCashierService = (deps: { audit: AuditLogger; fiscal?: Fiscal
       .select()
       .from(cashierTransactionItems)
       .where(eq(cashierTransactionItems.transactionId, id));
+
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'cashier_transaction',
+      resourceId: id,
+    });
 
     return { ...tx, items };
   }
@@ -356,6 +374,13 @@ export const createCashierService = (deps: { audit: AuditLogger; fiscal?: Fiscal
       )
       .groupBy(cashierTransactions.paymentMethod, cashierTransactions.type);
 
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'cashier_transaction',
+      resourceId: branchId,
+      after: { date: dateStr, count: rows.length },
+    });
+
     return { date: dateStr, branchId, breakdown: rows };
   }
 
@@ -392,6 +417,13 @@ export const createCashierService = (deps: { audit: AuditLogger; fiscal?: Fiscal
       .innerJoin(treatmentStages, eq(treatmentStagePayments.stageId, treatmentStages.id))
       .where(eq(treatmentStages.treatmentPlanId, planId));
 
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'treatment_plan',
+      resourceId: planId,
+      after: { stageCount: stageRows.length },
+    });
+
     return computePlanBalance(stageRows, allocRows, plan?.status);
   }
 
@@ -402,7 +434,7 @@ export const createCashierService = (deps: { audit: AuditLogger; fiscal?: Fiscal
    */
   async function listPatientPlans(c: Context, patientId: string) {
     const db = getDb(c);
-    return db
+    const rows = await db
       .select({
         id: treatmentPlans.id,
         title: treatmentPlans.title,
@@ -411,6 +443,15 @@ export const createCashierService = (deps: { audit: AuditLogger; fiscal?: Fiscal
       .from(treatmentPlans)
       .where(eq(treatmentPlans.patientId, patientId))
       .orderBy(desc(treatmentPlans.createdAt));
+
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'treatment_plan',
+      resourceId: patientId,
+      after: { count: rows.length },
+    });
+
+    return rows;
   }
 
   return { list, getById, create, refund, dailySummary, planBalance, listPatientPlans };
