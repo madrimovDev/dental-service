@@ -35,13 +35,20 @@ export const createLabOrdersService = (deps: { audit: AuditLogger }) => {
     ]);
     const total = totalRows[0]?.total ?? 0;
 
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'lab_order',
+      resourceId: query.patientId ?? null,
+      after: { patientId: query.patientId ?? null, count: data.length },
+    });
+
     return { data, meta: { page: query.page, pageSize: query.pageSize, total } };
   }
 
   /** Muddati o'tgan buyurtmalar (V3-5) — expectedDate < hozir, delivered/cancelled EMAS. */
   async function overdue(c: Context) {
     const db = getDb(c);
-    return db
+    const rows = await db
       .select()
       .from(labOrders)
       .where(
@@ -51,11 +58,26 @@ export const createLabOrdersService = (deps: { audit: AuditLogger }) => {
         ),
       )
       .orderBy(labOrders.expectedDate);
+
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'lab_order',
+      resourceId: null,
+      after: { overdue: true, count: rows.length },
+    });
+    return rows;
   }
 
   async function get(c: Context, id: string) {
     const db = getDb(c);
     const [row] = await db.select().from(labOrders).where(eq(labOrders.id, id));
+    if (row) {
+      await deps.audit.record(c, {
+        action: 'viewed',
+        resourceType: 'lab_order',
+        resourceId: id,
+      });
+    }
     return row ?? null;
   }
 
