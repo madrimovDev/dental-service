@@ -140,18 +140,31 @@ export const createApp = () => {
   app.route('/api/schedule', scheduleRoutes({ db, audit }));
   app.route('/api/queue', queueRoutes({ db, audit }));
   app.route('/api/recalls', recallRoutes({ db, audit }));
-  // Clinical: /api/diagnoses, /api/treatment-plans, /api/visit-notes, /api/tooth-charts
-  app.route('/api', clinicalRoutes({ db, audit, recall, notifications }));
   // M5 clinical extras
   app.route('/api/prescriptions', prescriptionsRoutes({ db, audit }));
   app.route('/api/consent', consentRoutes({ db, audit }));
   app.route('/api/lab-orders', labOrdersRoutes({ db, audit }));
-  app.route('/api', patientImagesRoutes({ db, audit }));
   // R4 Guruh A: xarajatlar (/api/expense-categories, /api/expenses), ombor (/api/stock)
   app.route('/api', expensesRoutes({ db, audit }));
   app.route('/api/stock', stockRoutes({ db, audit, notifications }));
   app.route('/api/payroll', payrollRoutes({ db, audit }));
   app.route('/api/notifications', notificationsRoutes({ db, sms }));
+  // CLI-358: clinical/patient-images are mounted at the BARE `/api` prefix
+  // (they fan out to top-level paths like /api/diagnoses, /api/treatment-plans,
+  // /api/patients/{id}/images — see each file's own comment) and clinical
+  // internally composes several nested `.route('/', childApp)` sub-apps.
+  // Empirically, registering a bare-`/api` mount with nested route
+  // composition BEFORE a sibling module that mounts its own top-level
+  // `app.use('*', requireModuleInDesktop(...))` gate at a distinct prefix
+  // (e.g. `/api/lab-orders`) breaks that sibling's gate entirely (its
+  // middleware silently stops matching — reproduced and root-caused via
+  // runtime probes, not yet filed as an upstream Hono issue). Mounting
+  // clinical/patient-images LAST avoids the interaction: nothing gated is
+  // registered after them, and their own gates are pattern-scoped (not
+  // blanket `'*'`) so they don't leak onto each other or anything before them.
+  // Clinical: /api/diagnoses, /api/treatment-plans, /api/visit-notes, /api/tooth-charts
+  app.route('/api', clinicalRoutes({ db, audit, recall, notifications }));
+  app.route('/api', patientImagesRoutes({ db, audit }));
 
   // Local Desktop bitta-EXE arxitekturasi — Windows'da alohida nginx/Caddy
   // yo'q, api.exe o'zi `apps/web` build outputni ham serve qiladi
