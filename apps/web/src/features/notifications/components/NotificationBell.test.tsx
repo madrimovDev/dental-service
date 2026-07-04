@@ -155,3 +155,46 @@ describe("NotificationBell — o'qilgan/o'qilmagan qator farqi", () => {
     expect(markReadMutate).not.toHaveBeenCalled();
   });
 });
+
+describe('NotificationBell — locale-aware sana formatlash', () => {
+  const iso = '2026-07-05T08:30:00.000Z';
+
+  const expectedFor = (locale: string) =>
+    new Intl.DateTimeFormat(locale, {
+      timeZone: 'Asia/Tashkent',
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(new Date(iso));
+
+  beforeEach(() => {
+    markReadMutate.mockClear();
+    markAllReadMutate.mockClear();
+    mockData = {
+      data: [{ id: 'n1', title: 'Item', body: null, readAt: null, createdAt: iso }],
+      unreadCount: 1,
+    };
+  });
+
+  it('uz va ru Intl formatlari bir-biridan farq qiladi (sanity — locale shoxobchasi tekshirilishi mumkinligini tasdiqlaydi)', () => {
+    expect(expectedFor('uz-UZ')).not.toBe(expectedFor('ru-RU'));
+  });
+
+  it("i18n tili 'uz' bo'lganda sana uz-UZ formatida ko'rsatiladi", async () => {
+    await i18n.changeLanguage('uz');
+    renderApp(<NotificationBell />);
+    fireEvent.click(screen.getByLabelText(i18n.t('shell.notifications')));
+    await screen.findByText('Item');
+    expect(screen.getByText(expectedFor('uz-UZ'))).toBeInTheDocument();
+  });
+
+  it("i18n tili 'ru' bo'lganda sana ru-RU formatida ko'rsatiladi", async () => {
+    await i18n.changeLanguage('ru');
+    renderApp(<NotificationBell />);
+    fireEvent.click(screen.getByLabelText(i18n.t('shell.notifications')));
+    await screen.findByText('Item');
+    expect(screen.getByText(expectedFor('ru-RU'))).toBeInTheDocument();
+  });
+});
