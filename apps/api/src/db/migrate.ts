@@ -53,17 +53,17 @@ const adminDb = drizzle(adminClient);
 
 // ⚠️ XAVFSIZLIK (2026-07-02 topildi): RLS-only tenant izolyatsiyasi FAQAT
 // non-superuser role orqali ulanganda ishlaydi — superuser Postgres'da RLS'ni
-// avtomatik CHETLAB O'TADI. Cloud/dev'da bu ajratish `infra/postgres-init.sql`
+// avtomatik CHETLAB O'TADI. Cloud/dev'da bu ajratish `infra/postgres-init.sh`
 // orqali (Docker birinchi ishga tushishda) qilingan, lekin Local Desktop
 // first-run `initdb`dan keyin FAQAT superuser (`dental`) mavjud edi —
 // `dental_app` roli hech qachon yaratilmagan, ya'ni desktop API runtime
 // ulanishi (agar shu yerda tuzatilmasa) superuser orqali RLS'ni butunlay
 // chetlab o'tgan bo'lardi (barcha tenant ma'lumotlari hamma tenant uchun
-// ko'rinadigan bo'lib qolardi). `postgres-init.sql`dagi bilan bir xil
+// ko'rinadigan bo'lib qolardi). `postgres-init.sh`dagi bilan bir xil
 // pattern, idempotent (allaqachon mavjud bo'lsa — cloud/dev — hech narsa
 // qilmaydi).
 const APP_ROLE = 'dental_app';
-const APP_ROLE_PASSWORD = process.env.DATABASE_APP_PASSWORD ?? 'dental_app_local_dev';
+const APP_ROLE_PASSWORD = process.env.DENTAL_APP_DB_PASSWORD ?? 'dental_app_local_dev';
 
 async function ensureAppRole(): Promise<void> {
   const existing = await adminDb.execute(sql`SELECT 1 FROM pg_roles WHERE rolname = ${APP_ROLE}`);
