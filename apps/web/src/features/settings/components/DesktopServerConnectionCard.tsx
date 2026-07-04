@@ -71,7 +71,9 @@ export function DesktopServerConnectionCard() {
         loading={isSubmitting}
         onClick={handleConnect}
       >
-        {t('settings.desktop_server_connect_button')}
+        {isSubmitting
+          ? t('settings.desktop_server_connecting')
+          : t('settings.desktop_server_connect_button')}
       </Button>
     </Stack>
   );
