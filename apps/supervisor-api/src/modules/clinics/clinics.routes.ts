@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { db } from '../../db/client';
-import { branches, clinics, licenses } from '../../db/schema';
+import { branches, clinics, licenseEvents, licenses } from '../../db/schema';
 import { adminJwtMiddleware } from '../auth/jwt.middleware';
 
 const uuidSchema = z.string().uuid();
@@ -129,6 +129,32 @@ export const clinicsRoutes = () => {
     if (!clinic) return c.json({ error: { code: 'NOT_FOUND' } }, 404);
     const license = await db.query.licenses.findFirst({ where: eq(licenses.clinicId, clinic.id) });
     return c.json({ clinic, license });
+  });
+
+  // Litsenziyani bekor qilish (revoke) — vendor operatori to'lamayotgan/shartnoma
+  // tugagan klinikani deaktivatsiya qiladi. isActive:false keyingi
+  // activate/heartbeat'ni licenses.service.ts'dagi mavjud guard orqali 403
+  // bilan rad etadi (bu yerda qo'shimcha tekshiruv shart emas).
+  app.patch('/:id/deactivate', async (c) => {
+    const idResult = uuidSchema.safeParse(c.req.param('id'));
+    if (!idResult.success) return c.json({ error: { code: 'NOT_FOUND' } }, 404);
+
+    const clinic = await db.query.clinics.findFirst({ where: eq(clinics.id, idResult.data) });
+    if (!clinic) return c.json({ error: { code: 'NOT_FOUND' } }, 404);
+
+    const license = await db.query.licenses.findFirst({ where: eq(licenses.clinicId, clinic.id) });
+    if (!license) return c.json({ error: { code: 'NOT_FOUND' } }, 404);
+
+    await db.update(licenses).set({ isActive: false }).where(eq(licenses.id, license.id));
+    await db.insert(licenseEvents).values({
+      licenseId: license.id,
+      event: 'deactivated',
+    });
+
+    const updatedLicense = await db.query.licenses.findFirst({
+      where: eq(licenses.id, license.id),
+    });
+    return c.json({ clinic, license: updatedLicense });
   });
 
   return app;
