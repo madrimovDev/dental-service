@@ -110,7 +110,16 @@ export const createPayrollService = (deps: { audit: AuditLogger }) => {
 
   async function listRuns(c: Context) {
     const db = getDb(c);
-    return db.select().from(payrollRuns).orderBy(desc(payrollRuns.createdAt));
+    const runs = await db.select().from(payrollRuns).orderBy(desc(payrollRuns.createdAt));
+
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'payroll_run',
+      resourceId: null,
+      after: { count: runs.length },
+    });
+
+    return runs;
   }
 
   async function getRun(c: Context, runId: string) {
@@ -123,6 +132,12 @@ export const createPayrollService = (deps: { audit: AuditLogger }) => {
       .from(payrollLines)
       .where(eq(payrollLines.runId, runId))
       .orderBy(desc(payrollLines.total));
+
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'payroll_run',
+      resourceId: runId,
+    });
 
     return { ...run, lines };
   }
