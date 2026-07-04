@@ -1,4 +1,7 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { Notifications } from '@mantine/notifications';
+import { fireEvent, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { i18n } from '@/lib/i18n.ts';
 import { renderApp } from '../../../test-utils';
 import { DesktopServerConnectionCard } from './DesktopServerConnectionCard';
 
@@ -21,5 +24,35 @@ describe('DesktopServerConnectionCard', () => {
     expect(container.querySelector('[data-testid="desktop-server-card"]')).not.toBeNull();
     expect(getByRole('textbox')).toBeTruthy();
     expect(getByRole('button')).toBeTruthy();
+  });
+
+  it("bo'sh URL bilan submit qilinsa setServerUrl chaqirilmaydi, xato ko'rinadi", async () => {
+    const setServerUrl = vi.fn();
+    window.dentalDesktop = { setServerUrl };
+
+    const { getByRole, findByText } = renderApp(<DesktopServerConnectionCard />);
+    fireEvent.click(getByRole('button'));
+
+    await findByText(i18n.t('settings.desktop_server_url_required'));
+    expect(setServerUrl).not.toHaveBeenCalled();
+  });
+
+  it("to'g'ri URL bilan submit qilinsa setServerUrl chaqiriladi va connected:true da muvaffaqiyat xabari chiqadi", async () => {
+    const setServerUrl = vi
+      .fn()
+      .mockResolvedValue({ ok: true, connected: true, serverUrl: 'http://10.0.0.5:8001' });
+    window.dentalDesktop = { setServerUrl };
+
+    const { getByRole, findAllByText } = renderApp(
+      <>
+        <Notifications />
+        <DesktopServerConnectionCard />
+      </>,
+    );
+    fireEvent.change(getByRole('textbox'), { target: { value: 'http://10.0.0.5:8001' } });
+    fireEvent.click(getByRole('button'));
+
+    await waitFor(() => expect(setServerUrl).toHaveBeenCalledWith('http://10.0.0.5:8001'));
+    expect(await findAllByText(i18n.t('settings.desktop_server_success'))).not.toHaveLength(0);
   });
 });
