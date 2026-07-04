@@ -25,19 +25,28 @@ export const trayMockState: {
   setToolTipCalls: string[];
   setContextMenuCalls: MockMenuItem[][];
   lastMenuTemplate: MockMenuItem[] | null;
+  throwOnConstruct: Error | null;
+  iconEmpty: boolean;
 } = {
   setToolTipCalls: [],
   setContextMenuCalls: [],
   lastMenuTemplate: null,
+  throwOnConstruct: null,
+  iconEmpty: false,
 };
 
 export const resetTrayMockState = (): void => {
   trayMockState.setToolTipCalls = [];
   trayMockState.setContextMenuCalls = [];
   trayMockState.lastMenuTemplate = null;
+  trayMockState.throwOnConstruct = null;
+  trayMockState.iconEmpty = false;
 };
 
 class FakeTray {
+  constructor(_icon: unknown) {
+    if (trayMockState.throwOnConstruct) throw trayMockState.throwOnConstruct;
+  }
   setToolTip(text: string): void {
     trayMockState.setToolTipCalls.push(text);
   }
@@ -58,5 +67,7 @@ mock.module('electron', () => ({
     },
   },
   shell: { openExternal: shellOpenExternalMock },
-  nativeImage: { createFromPath: (_path: string) => ({}) },
+  nativeImage: {
+    createFromPath: (_path: string) => ({ isEmpty: () => trayMockState.iconEmpty }),
+  },
 }));

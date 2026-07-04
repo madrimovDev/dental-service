@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, mock, test } from 'bun:test';
+import { beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
 // side-effect import — bitta umumiy 'electron' mock ro'yxatdan o'tkaziladi
 // (bun test bir process ichida barcha *.test.ts'ni yuklaydi; alohida-alohida
 // mock.module('electron', ...) chaqiruvlar fayllar orasidagi yuklash
@@ -137,5 +137,40 @@ describe('tray', () => {
       'Dental Service',
       'Dental Service — yangilash tayyor',
     ]);
+  });
+
+  test("ikon fayli yo'q (nativeImage bo'sh qaytaradi) bo'lsa createTray warning log qiladi va crash bo'lmaydi", () => {
+    trayMockState.iconEmpty = true;
+    const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
+
+    expect(() =>
+      createTray(
+        'server',
+        { serverUrl: 'http://localhost:80' },
+        { onOpen: mock(() => {}), onSettings: mock(() => {}), onStop: mock(() => {}) },
+      ),
+    ).not.toThrow();
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0]?.[0]).toContain('tray-icon.png');
+
+    warnSpy.mockRestore();
+  });
+
+  test("Tray konstruktori xato tashlasa ham (platforma-darajasidagi xato), createTray crash bo'lmaydi va warning log qiladi", () => {
+    trayMockState.throwOnConstruct = new Error('ENOENT: no such file, tray-icon.png');
+    const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
+
+    expect(() =>
+      createTray(
+        'server',
+        { serverUrl: 'http://localhost:80' },
+        { onOpen: mock(() => {}), onSettings: mock(() => {}), onStop: mock(() => {}) },
+      ),
+    ).not.toThrow();
+
+    expect(warnSpy).toHaveBeenCalled();
+
+    warnSpy.mockRestore();
   });
 });
