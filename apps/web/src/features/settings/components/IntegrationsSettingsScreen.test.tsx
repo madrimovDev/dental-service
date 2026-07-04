@@ -1,3 +1,4 @@
+import { fireEvent, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/lib/i18n.ts';
 import { renderApp } from '../../../test-utils';
@@ -38,7 +39,7 @@ describe('IntegrationsSettingsScreen', () => {
     expect(labels.filter((l) => l === t('settings.integration_connect'))).toHaveLength(3);
   });
 
-  it('Connect/Configure tugmalari disabled va "tez orada" tooltip ko‘rsatadi', () => {
+  it('Connect/Configure tugmalari disabled va "tez orada" tooltip ko‘rsatadi', async () => {
     const { getAllByRole } = renderApp(<IntegrationsSettingsScreen />);
     const buttons = getAllByRole('button');
     // 4 karta — har birida bitta Connect yoki Configure tugma, hammasi disabled bo'lishi kerak
@@ -46,5 +47,14 @@ describe('IntegrationsSettingsScreen', () => {
     for (const button of buttons) {
       expect(button).toBeDisabled();
     }
+
+    // Tooltip'ning hover-nishoni — disabled tugmani o'rab turgan <span> (Tooltip.tsx
+    // komponent kodida tugma emas, span'ga bog'langan: disabled tugma pointer-hodisa
+    // otmaydi). Mantine Tooltip label'ni faqat `opened` bo'lganda mount qiladi —
+    // shuning uchun getByText emas, findByText (async) ishlatiladi.
+    const firstButtonWrapper = buttons[0]?.parentElement;
+    expect(firstButtonWrapper).toBeTruthy();
+    fireEvent.mouseEnter(firstButtonWrapper as HTMLElement);
+    expect(await screen.findByText(i18n.t('shell.coming_soon'))).toBeInTheDocument();
   });
 });
