@@ -2,6 +2,7 @@ import { fail, ok } from '@dental/core';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { requireModuleInDesktop } from '../../lib/license-middleware.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
 import { reminderJobId, reminderQueue } from '../../lib/queue.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
@@ -50,6 +51,7 @@ export const appointmentRoutes = (deps: {
   recall?: RecallAppointmentHook;
 }) => {
   const app = new OpenAPIHono();
+  app.use('*', requireModuleInDesktop('appointments'));
   app.use('*', authMiddleware());
   app.use('*', rlsMiddleware(deps.db));
 

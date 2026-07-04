@@ -63,4 +63,12 @@ describe('CLI-358 requireModuleInDesktop mounted on gated route groups', () => {
     expect(body.success).toBe(false);
     expect(body.error.code).toBe('LICENSE_NOT_FOUND');
   });
+
+  test('GET /api/appointments (Local Desktop, no license) → 403 LICENSE_NOT_FOUND', async () => {
+    const app = createApp();
+    const res = await app.request('/api/appointments');
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { success: boolean; error: { code: string } };
+    expect(body.error.code).toBe('LICENSE_NOT_FOUND');
+  });
 });
