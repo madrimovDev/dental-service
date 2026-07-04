@@ -4,6 +4,7 @@ import { jwtVerify } from 'jose';
 import { createApp } from '../../app';
 import { db } from '../../db/client';
 import { adminUsers } from '../../db/schema';
+import { resetRateLimitStore } from '../../lib/rate-limit';
 
 const app = createApp();
 
@@ -11,6 +12,7 @@ let email: string;
 const password = 'correct-horse-battery-staple';
 
 beforeEach(async () => {
+  resetRateLimitStore();
   email = `admin-${crypto.randomUUID()}@test.com`;
   const passwordHash = await bcrypt.hash(password, 10);
   await db.insert(adminUsers).values({ email, passwordHash });
@@ -59,5 +61,21 @@ describe('POST /v1/admin/auth/login', () => {
       body: JSON.stringify({ email: 'not-an-email', password }),
     });
     expect(res.status).toBe(400);
+  });
+
+  it('returns 429 after exceeding the login rate limit for the same IP+email', async () => {
+    const ip = '10.99.1.1';
+    let lastRes: Response | undefined;
+    for (let i = 0; i < 11; i++) {
+      lastRes = await app.request('/v1/admin/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-forwarded-for': ip },
+        body: JSON.stringify({ email, password: 'wrong-password' }),
+      });
+    }
+    expect(lastRes?.status).toBe(429);
+    expect(lastRes?.headers.get('retry-after')).toBeTruthy();
+    const body = (await lastRes?.json()) as any;
+    expect(body.error.code).toBe('RATE_LIMITED');
   });
 });

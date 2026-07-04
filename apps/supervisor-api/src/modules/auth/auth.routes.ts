@@ -6,6 +6,7 @@ import { SignJWT } from 'jose';
 import { z } from 'zod';
 import { db } from '../../db/client';
 import { adminUsers } from '../../db/schema';
+import { rateLimit } from '../../lib/rate-limit';
 
 const secret = () => new TextEncoder().encode(process.env.JWT_SECRET!);
 
@@ -17,7 +18,18 @@ const loginSchema = z.object({
 export const authRoutes = () => {
   const app = new Hono();
 
-  app.post('/login', zValidator('json', loginSchema), async (c) => {
+  // CLI-369: brute-force guard — 10 attempts / 15 min, keyed by IP + email.
+  const loginRateLimit = rateLimit({
+    name: 'login',
+    limit: 10,
+    windowSeconds: 900,
+    keyFromBody: (b) =>
+      typeof b === 'object' && b !== null && typeof (b as { email?: unknown }).email === 'string'
+        ? (b as { email: string }).email
+        : undefined,
+  });
+
+  app.post('/login', loginRateLimit, zValidator('json', loginSchema), async (c) => {
     const { email, password } = c.req.valid('json');
     const user = await db.query.adminUsers.findFirst({ where: eq(adminUsers.email, email) });
     if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
