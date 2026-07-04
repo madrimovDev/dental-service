@@ -94,4 +94,26 @@ describe('DesktopServerConnectionCard', () => {
     await waitFor(() => expect(setServerUrl).toHaveBeenCalled());
     expect(await findAllByText(i18n.t('settings.desktop_server_error'))).not.toHaveLength(0);
   });
+
+  it('submit paytida (isSubmitting) tugma matni "ulanmoqda..." ga almashadi', async () => {
+    let resolveSetServerUrl: (value: { ok: true; connected: boolean; serverUrl: string }) => void;
+    const pending = new Promise<{ ok: true; connected: boolean; serverUrl: string }>((resolve) => {
+      resolveSetServerUrl = resolve;
+    });
+    const setServerUrl = vi.fn().mockReturnValue(pending);
+    window.dentalDesktop = { setServerUrl };
+
+    const { getByRole, findByText, queryByText } = renderApp(<DesktopServerConnectionCard />);
+    fireEvent.change(getByRole('textbox'), { target: { value: 'http://10.0.0.5:8001' } });
+    fireEvent.click(getByRole('button'));
+
+    // isSubmitting=true bo'lgan darhol oraliqda tugma matni "ulanmoqda..." bo'lishi kerak
+    expect(await findByText(i18n.t('settings.desktop_server_connecting'))).toBeInTheDocument();
+    expect(queryByText(i18n.t('settings.desktop_server_connect_button'))).not.toBeInTheDocument();
+
+    resolveSetServerUrl!({ ok: true, connected: true, serverUrl: 'http://10.0.0.5:8001' });
+
+    // Promise hal bo'lgach tugma asl matniga qaytadi
+    expect(await findByText(i18n.t('settings.desktop_server_connect_button'))).toBeInTheDocument();
+  });
 });

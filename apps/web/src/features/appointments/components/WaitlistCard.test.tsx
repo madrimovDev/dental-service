@@ -1,5 +1,6 @@
 import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { i18n } from '@/lib/i18n.ts';
 import { renderApp } from '../../../test-utils';
 import { WaitlistCard } from './WaitlistCard';
 
@@ -23,6 +24,8 @@ describe('WaitlistCard', () => {
   it("bo'sh-holat 'tez orada' Tag bilan aniq belgilanadi (haqiqiy bo'sh natijadan farqlanishi uchun, CLI-374)", () => {
     renderApp(<WaitlistCard appts={[]} />);
     expect(screen.getByTestId('waitlist-coming-soon')).toBeInTheDocument();
-    expect(screen.getByTestId('waitlist-coming-soon')).toHaveTextContent('Tez orada');
+    expect(screen.getByTestId('waitlist-coming-soon')).toHaveTextContent(
+      i18n.t('shell.coming_soon'),
+    );
   });
 });
