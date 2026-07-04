@@ -27,15 +27,12 @@
  * `apps/web/src/features/auth/pages/activate.page.tsx` (commit 7670124,
  * "feat: end-to-end desktop license activation flow")).
  *
- * ⚠️ TASHQI BOG'LIQLIK (jonli, TODO):
- *   - `assets/tray-icon.png` — hali repo'da yo'q, distribution paketlashda
- *     qo'shiladi.
- *   - `preload.cjs` (`.cts`dan kompilyatsiya, CommonJS, `sandbox:true` talabi —
- *     ESM emas) real BrowserWindow'da tekshirilgan: shu yerda topilgan
- *     CSP + preload ESM/CJS blank-screen xatosi tuzatilgan (commit 165ddc5,
- *     "fix(desktop): blank screen in real BrowserWindow (CSP + preload ESM)").
- *   - Web `/settings` sahifasi `window.dentalDesktop?.setServerUrl(url)`ni
- *     hali chaqirmaydi (apps/web o'zgarishi shu ticket doirasi tashqarisida).
+ * 📌 DOIMIY CHEKLOV: `preload.cjs` CommonJS bo'lib qolishi SHART
+ *   (`.cts`dan kompilyatsiya, `sandbox:true` talabi — ESM emas). Bu talab
+ *   real BrowserWindow'da tekshirilgan: shu yerda topilgan CSP + preload
+ *   ESM/CJS blank-screen xatosi tuzatilgan (commit 165ddc5, "fix(desktop):
+ *   blank screen in real BrowserWindow (CSP + preload ESM)"). `preload.ts`ni
+ *   ESM'ga o'tkazish shu bug'ni qaytaradi.
  */
 import { join } from 'node:path';
 import { app, BrowserWindow, dialog, ipcMain, Notification, shell } from 'electron';
