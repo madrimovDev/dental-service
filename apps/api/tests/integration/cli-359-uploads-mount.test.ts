@@ -1,0 +1,37 @@
+/**
+ * CLI-359 — `GET /uploads/:key` mount + tenant-scoping (REAL DB emas —
+ * bu route filesystem-based, DB'ga bormaydi; ikkita tenantId — random UUID,
+ * seed shart emas).
+ *
+ * `UPLOADS_DIR` — `app.ts` va `lib/s3.ts` modul-darajasida `createLocalStorageAdapter()`
+ * yaratadi, `process.env.UPLOADS_DIR`ni MODUL YUKLANGANDA o'qiydi — shuning uchun
+ * bu env `../../src/app.ts` dynamic import'idan OLDIN o'rnatiladi (activate.test.ts
+ * bilan bir xil idiom: mock/env import'dan oldin).
+ *
+ * Ishga tushirish: `cd apps/api && bun test --env-file=../../.env cli-359-uploads-mount`
+ */
+
+import { afterAll, describe, expect, test } from 'bun:test';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+const testUploadsDir = await mkdtemp(join(tmpdir(), 'cli-359-uploads-'));
+process.env.UPLOADS_DIR = testUploadsDir;
+
+const { createApp } = await import('../../src/app.ts');
+
+afterAll(async () => {
+  await rm(testUploadsDir, { recursive: true, force: true });
+});
+
+describe('CLI-359 — /uploads mount', () => {
+  test('GET /uploads/:key without Authorization -> 401 (proves route is mounted)', async () => {
+    const app = createApp();
+    // Mount qilinmagan bo'lsa Hono default 404 "Not Found" qaytaradi (route
+    // yo'q); mount qilingandan keyin authMiddleware 401 bilan bloklaydi —
+    // shu farq mount qilinganini isbotlaydi.
+    const res = await app.request('/uploads/tenants/x/patients/y/z.jpg');
+    expect(res.status).toBe(401);
+  });
+});

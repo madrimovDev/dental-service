@@ -8,6 +8,7 @@ import { db } from './db/client.ts';
 import { createAuditLogger } from './lib/audit-logger.ts';
 import { env } from './lib/env.ts';
 import { METRICS_CONTENT_TYPE, renderMetrics } from './lib/metrics.ts';
+import { createLocalStorageAdapter } from './lib/storage.ts';
 import { errorHandler } from './middleware/error-handler.ts';
 import { requestId } from './middleware/request-id.ts';
 import { appointmentRoutes } from './modules/appointments/index.ts';
@@ -38,6 +39,7 @@ import { tenantSettingsRoutes } from './modules/tenant-settings/index.ts';
 import { tenantRoutes } from './modules/tenants/index.ts';
 import { userRoutes } from './modules/users/index.ts';
 import { activateRoutes } from './routes/activate.ts';
+import { uploadsRoutes } from './routes/uploads.ts';
 
 export const createApp = () => {
   const app = new OpenAPIHono();
@@ -165,6 +167,14 @@ export const createApp = () => {
   // Clinical: /api/diagnoses, /api/treatment-plans, /api/visit-notes, /api/tooth-charts
   app.route('/api', clinicalRoutes({ db, audit, recall, notifications }));
   app.route('/api', patientImagesRoutes({ db, audit }));
+
+  // CLI-359: bemor rasmlari (`patient-images`) `serveUrl()` orqali generatsiya
+  // qilingan `/uploads/:key` URL'lar shu route orqali serve qilinadi (local
+  // filesystem storage — MinIO/S3 emas, CLI-340). Tenant-scoping tekshiruvi
+  // `uploads.ts` ichida (key'dagi tenantId JWT `activeTenantId` bilan
+  // solishtiriladi — bu route filesystem-based, RLS qamrovidan tashqarida).
+  const uploadsStorage = createLocalStorageAdapter();
+  app.route('/uploads', uploadsRoutes(uploadsStorage));
 
   // Local Desktop bitta-EXE arxitekturasi — Windows'da alohida nginx/Caddy
   // yo'q, api.exe o'zi `apps/web` build outputni ham serve qiladi
