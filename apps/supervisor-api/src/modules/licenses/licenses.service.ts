@@ -72,7 +72,7 @@ export const createLicenseService = () => ({
     if (!lic) throw Object.assign(new Error('INVALID_KEY'), { status: 404 });
     await db
       .update(licenses)
-      .set({ fingerprint: newFingerprint, lastHeartbeatAt: new Date() })
+      .set({ fingerprint: newFingerprint, lastHeartbeatAt: new Date(), isActive: true })
       .where(eq(licenses.id, lic.id));
     await db.insert(licenseEvents).values({
       licenseId: lic.id,

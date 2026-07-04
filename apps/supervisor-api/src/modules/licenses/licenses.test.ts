@@ -109,4 +109,19 @@ describe('POST /v1/reactivate', () => {
     const lic = await db.query.licenses.findFirst({ where: eq(licenses.licenseKey, licenseKey) });
     expect(lic?.fingerprint).toBe('fp-new');
   });
+
+  it('re-enables isActive on a deactivated license', async () => {
+    await db.update(licenses).set({ isActive: false }).where(eq(licenses.licenseKey, licenseKey));
+
+    const token = await signAdminTestToken();
+    const res = await app.request('/v1/reactivate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ licenseKey, fingerprint: 'fp-new' }),
+    });
+    expect(res.status).toBe(200);
+
+    const lic = await db.query.licenses.findFirst({ where: eq(licenses.licenseKey, licenseKey) });
+    expect(lic?.isActive).toBe(true);
+  });
 });
