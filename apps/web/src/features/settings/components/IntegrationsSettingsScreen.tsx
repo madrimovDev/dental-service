@@ -10,6 +10,7 @@ import {
 } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { useTenantSettings } from '../settings.api';
+import { DesktopServerConnectionCard } from './DesktopServerConnectionCard';
 import { SettingsShell } from './SettingsShell';
 
 /**
@@ -66,6 +67,7 @@ export function IntegrationsSettingsScreen() {
 
   return (
     <SettingsShell active="integrations">
+      <DesktopServerConnectionCard />
       {settings.isLoading || !integrations ? (
         <div style={{ padding: 24 }}>
           <Loader size="sm" />
