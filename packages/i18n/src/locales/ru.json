@@ -130,6 +130,7 @@
       "title": "Выберите workspace",
       "no_workspaces": "У вас нет клиник. Первый шаг — зарегистрируйте клинику.",
       "all_branches": "Все филиалы",
+      "owner_badge": "Владелец",
       "session_expired_title": "Сессия истекла",
       "session_expired_message": "Пожалуйста, войдите снова. Старый refresh token больше не действителен.",
       "switch_failed": "Не удалось сменить рабочее пространство"

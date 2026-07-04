@@ -146,7 +146,9 @@ export function SelectWorkspacePage() {
                     {opt.branchName ?? t('auth.select_workspace.all_branches')} · {opt.roleName}
                   </Text>
                 </Stack>
-                {opt.isOwner && <Badge color="teal">Owner</Badge>}
+                {opt.isOwner && (
+                  <Badge color="teal">{t('auth.select_workspace.owner_badge')}</Badge>
+                )}
               </Group>
             </Card>
           </UnstyledButton>
