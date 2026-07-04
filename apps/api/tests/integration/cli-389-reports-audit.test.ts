@@ -5,7 +5,7 @@
  * Ishga tushirish: `cd apps/api && bun test --env-file=../../.env cli-389-reports`
  */
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { auditLog, tenants, users } from '@dental/db-schema';
+import { auditLog, branches, cashierTransactions, tenants, users } from '@dental/db-schema';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { DbOrTx } from '../../src/db/client.ts';
@@ -18,6 +18,7 @@ const service = createReportsService({ audit });
 
 let tenantId: string;
 let userId: string;
+let branchId: string;
 
 const ctx = (tx: DbOrTx): Context =>
   ({
@@ -50,6 +51,16 @@ beforeAll(async () => {
     .returning({ id: tenants.id });
   if (!tenant) throw new Error('tenant insert failed');
   tenantId = tenant.id;
+
+  await db.transaction(async (tx) => {
+    await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
+    const [branch] = await tx
+      .insert(branches)
+      .values({ tenantId, name: 'Reports Branch' })
+      .returning({ id: branches.id });
+    if (!branch) throw new Error('branch insert failed');
+    branchId = branch.id;
+  });
 });
 
 afterAll(async () => {
@@ -79,5 +90,54 @@ describe('Reports — o‘qish audit (CLI-389)', () => {
     expect(rows.length).toBeGreaterThanOrEqual(1);
     const after = rows[rows.length - 1]?.after as { report?: string } | null;
     expect(after?.report).toBe('revenue');
+  });
+
+  test('oneCExport(): action=exported, after.report=1c_export, after.rowCount=natija uzunligi', async () => {
+    await db.transaction(async (tx) => {
+      await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
+      const [row] = await tx
+        .insert(cashierTransactions)
+        .values({
+          tenantId,
+          branchId,
+          type: 'payment',
+          status: 'completed',
+          paymentMethod: 'cash',
+          totalAmount: '100000',
+          paidAmount: '100000',
+        })
+        .returning({ id: cashierTransactions.id });
+      if (!row) throw new Error('tx insert failed');
+    });
+
+    await db.transaction(async (tx) => {
+      await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
+      const rows = await service.oneCExport(ctx(tx), { from: '2026-01-01', to: '2026-12-31' });
+      expect(rows.length).toBeGreaterThanOrEqual(1);
+    });
+
+    const auditRows = await db.transaction(async (tx) => {
+      await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
+      return tx
+        .select()
+        .from(auditLog)
+        .where(
+          and(
+            eq(auditLog.action, 'exported'),
+            eq(auditLog.resourceType, 'report'),
+            isNull(auditLog.resourceId),
+          ),
+        );
+    });
+    expect(auditRows.length).toBeGreaterThanOrEqual(1);
+    const after = auditRows[auditRows.length - 1]?.after as {
+      report?: string;
+      rowCount?: number;
+    } | null;
+    expect(after?.report).toBe('1c_export');
+    expect(after?.rowCount).toBeGreaterThanOrEqual(1);
+    // §4 — natija tarkibi (patientName/amount/receiptNumber) after'da bo'lmasligi kerak.
+    expect(JSON.stringify(after)).not.toContain('patientName');
+    expect(JSON.stringify(after)).not.toContain('receiptNumber');
   });
 });

@@ -481,6 +481,13 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
       .where(and(...filter))
       .orderBy(cashierTransactions.createdAt);
 
+    await deps.audit.record(c, {
+      action: 'exported',
+      resourceType: 'report',
+      resourceId: null,
+      after: { report: '1c_export', from, to, branchId: branchId ?? null, rowCount: rows.length },
+    });
+
     return rows.map((r) => ({
       date: String(r.date),
       receiptNumber: r.receiptNumber ?? null,
