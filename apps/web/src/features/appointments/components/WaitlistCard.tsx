@@ -1,3 +1,4 @@
+import { Tag } from '@dental/ui';
 import { useTranslation } from 'react-i18next';
 import type { Appointment } from '../appointments.types';
 
@@ -6,7 +7,8 @@ import type { Appointment } from '../appointments.types';
  *
  * Live data / endpoint / "Slotga joylashtirish" amali JO'NATILMAYDI — bu
  * ham data-gap, ham yangi feature (ds12 / Qaror #33). Foydasiz (non-functional)
- * tugma chiqarilmaydi; faqat bo'sh-holat ko'rsatiladi.
+ * tugma chiqarilmaydi; bo'sh-holat endi `shell.coming_soon` Tag bilan aniq
+ * belgilanadi (CLI-374) — haqiqiy bo'sh natijadan farqlanishi uchun.
  *
  * `appts` prop DS4-3 montajidan keladi (statistika/kelajak uchun) — tiplangan,
  * lekin hozircha render mantiqida ishlatilmaydi (data manbai yo'q).
@@ -40,8 +42,10 @@ export function WaitlistCard(_props: { appts?: Appointment[] }) {
         data-testid="waitlist-empty"
         style={{
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
+          gap: 8,
           padding: '20px 12px',
           background: 'var(--surface-2)',
           border: '1px dashed var(--border)',
@@ -52,6 +56,9 @@ export function WaitlistCard(_props: { appts?: Appointment[] }) {
         }}
       >
         {t('appointments.waitlist.empty')}
+        <span data-testid="waitlist-coming-soon">
+          <Tag>{t('shell.coming_soon')}</Tag>
+        </span>
       </div>
     </div>
   );

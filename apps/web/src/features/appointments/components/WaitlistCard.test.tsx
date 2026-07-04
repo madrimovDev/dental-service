@@ -19,4 +19,10 @@ describe('WaitlistCard', () => {
     // Live amal yo'q — hech qanday tugma render qilinmaydi.
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
+
+  it("bo'sh-holat 'tez orada' Tag bilan aniq belgilanadi (haqiqiy bo'sh natijadan farqlanishi uchun, CLI-374)", () => {
+    renderApp(<WaitlistCard appts={[]} />);
+    expect(screen.getByTestId('waitlist-coming-soon')).toBeInTheDocument();
+    expect(screen.getByTestId('waitlist-coming-soon')).toHaveTextContent('Tez orada');
+  });
 });
