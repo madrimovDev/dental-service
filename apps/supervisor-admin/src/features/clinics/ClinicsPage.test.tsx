@@ -11,6 +11,12 @@ const clinicOne = {
   contactEmail: 'one@test.com',
   contactPhone: null,
   createdAt: '2026-01-01T00:00:00.000Z',
+  license: {
+    licenseKey: 'KEY-c1',
+    plan: 'standard',
+    isActive: true,
+    expiresAt: '2027-01-01T00:00:00.000Z',
+  },
 };
 const clinicTwo = {
   id: 'c2',
@@ -18,8 +24,17 @@ const clinicTwo = {
   contactEmail: 'two@test.com',
   contactPhone: null,
   createdAt: '2026-01-02T00:00:00.000Z',
+  license: {
+    licenseKey: 'KEY-c2',
+    plan: 'standard',
+    isActive: false,
+    expiresAt: '2027-01-01T00:00:00.000Z',
+  },
 };
 
+// ClinicDetail-shape license (full fidelity) — still used by the
+// '+ Yangi klinika' create flow, whose POST response is `{ clinic, license }`
+// (unaffected by this ticket — that's ClinicDetail, not the list summary).
 const licenseFor = (clinicId: string, overrides: Record<string, unknown> = {}) => ({
   id: `license-${clinicId}`,
   clinicId,
@@ -48,12 +63,6 @@ describe('ClinicsPage', () => {
       if (url.endsWith('/v1/admin/clinics')) {
         return jsonResponse([clinicOne, clinicTwo]);
       }
-      if (url.endsWith('/v1/admin/clinics/c1')) {
-        return jsonResponse({ clinic: clinicOne, license: licenseFor('c1', { isActive: true }) });
-      }
-      if (url.endsWith('/v1/admin/clinics/c2')) {
-        return jsonResponse({ clinic: clinicTwo, license: licenseFor('c2', { isActive: false }) });
-      }
       throw new Error(`unhandled fetch: ${url}`);
     });
   });
@@ -64,11 +73,9 @@ describe('ClinicsPage', () => {
     expect(await screen.findByText('Clinic Two')).toBeInTheDocument();
   });
 
-  it("har bir klinika uchun litsenziya faol/nofaol badge ko'rsatadi (detail-endpoint bilan boyitilgan)", async () => {
+  it("har bir klinika uchun litsenziya kalit/tarif/holat ustunini ro'yxat javobidan (N+1siz) ko'rsatadi", async () => {
     renderApp(<ClinicsPage />);
 
-    // Badge ma'lumoti ikkinchi (detail) so'rovdan keladi — async kutish shart,
-    // aks holda pending holatda hamma "Nofaol" ko'rinib noto'g'ri o'tadi.
     expect(await screen.findByText('KEY-c1')).toBeInTheDocument();
     expect(await screen.findByText('KEY-c2')).toBeInTheDocument();
 
@@ -76,6 +83,17 @@ describe('ClinicsPage', () => {
     const labels = badges.map((b) => b.textContent);
     expect(labels).toContain('Faol');
     expect(labels).toContain('Nofaol');
+  });
+
+  it("N+1'siz — GET /v1/admin/clinics bitta marta chaqiriladi, per-klinika detail so'rovi yo'q", async () => {
+    renderApp(<ClinicsPage />);
+    await screen.findByText('Clinic One');
+    await screen.findByText('KEY-c1');
+
+    const calledUrls = fetchMock.mock.calls.map(([input]) => String(input));
+    expect(calledUrls.filter((u) => u.endsWith('/v1/admin/clinics'))).toHaveLength(1);
+    expect(calledUrls.some((u) => u.endsWith('/v1/admin/clinics/c1'))).toBe(false);
+    expect(calledUrls.some((u) => u.endsWith('/v1/admin/clinics/c2'))).toBe(false);
   });
 
   it("ro'yxat so'rovi muvaffaqiyatsiz bo'lsa xato xabarini ko'rsatadi (bo'sh jadval emas)", async () => {
@@ -112,12 +130,6 @@ describe('ClinicsPage', () => {
       }
       if (url.endsWith('/v1/admin/clinics')) {
         return jsonResponse([clinicOne, clinicTwo]);
-      }
-      if (url.endsWith('/v1/admin/clinics/c1')) {
-        return jsonResponse({ clinic: clinicOne, license: licenseFor('c1', { isActive: true }) });
-      }
-      if (url.endsWith('/v1/admin/clinics/c2')) {
-        return jsonResponse({ clinic: clinicTwo, license: licenseFor('c2', { isActive: false }) });
       }
       throw new Error(`unhandled fetch: ${url} ${init?.method ?? 'GET'}`);
     });

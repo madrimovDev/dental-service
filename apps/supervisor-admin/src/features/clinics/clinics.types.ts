@@ -1,9 +1,17 @@
+export interface ClinicLicenseSummary {
+  licenseKey: string;
+  plan: string;
+  isActive: boolean;
+  expiresAt: string;
+}
+
 export interface Clinic {
   id: string;
   name: string;
   contactEmail: string | null;
   contactPhone: string | null;
   createdAt: string;
+  license: ClinicLicenseSummary | null;
 }
 
 export interface License {
