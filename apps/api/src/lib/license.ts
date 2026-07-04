@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { verifyLicenseSignature } from '@dental/core/license-signature';
 import { SUPERVISOR_PUBLIC_KEY_PEM } from '@dental/core/supervisor-public-key';
@@ -91,4 +91,19 @@ export const getActiveModules = async (): Promise<string[]> => {
   const lic = await readLicense();
   if (!lic || !isLicenseValid(lic)) return [];
   return lic.modules;
+};
+
+/**
+ * `.lic` faylni o'chiradi (CLI-387 — heartbeat Supervisor'dan `INVALID_KEY`
+ * (deaktivatsiya) qaytarganda chaqiriladi). `getActiveModules()` faylni HAR
+ * chaqiruvda qayta o'qiydi (cache yo'q) — shuning uchun bu yetarli: keyingi
+ * `requireModule` tekshiruvi darhol `LICENSE_NOT_FOUND` qaytaradi, hech
+ * qanday qo'shimcha invalidation-signal yoki restart kerak emas.
+ */
+export const invalidateLicense = async (): Promise<void> => {
+  try {
+    await unlink(getLicensePath());
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+  }
 };
