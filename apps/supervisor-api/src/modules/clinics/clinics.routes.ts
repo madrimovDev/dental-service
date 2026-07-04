@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { zValidator } from '@hono/zod-validator';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { db } from '../../db/client';
@@ -64,10 +64,49 @@ export const clinicsRoutes = () => {
   const app = new Hono();
   app.use('*', adminJwtMiddleware);
 
-  // Klinikalar ro'yxati
+  // Klinikalar ro'yxati + litsenziya summary (frontend ClinicsPage jadvali
+  // litsenziya kaliti/tarif/holatni shu javobdan oladi — har-qator GET /:id
+  // chaqiruvi (N+1) endi kerak emas, CLI-396). N+1 fixi treatment-plans
+  // .repository.ts'dagi (apps/api) bir xil naqsh: parent-ro'yxat + bitta
+  // IN-query + xotirada Map bo'yicha guruhlash.
   app.get('/', async (c) => {
     const rows = await db.query.clinics.findMany();
-    return c.json(rows);
+    if (rows.length === 0) return c.json([]);
+
+    const licenseRows = await db
+      .select({
+        clinicId: licenses.clinicId,
+        licenseKey: licenses.licenseKey,
+        plan: licenses.plan,
+        isActive: licenses.isActive,
+        expiresAt: licenses.expiresAt,
+      })
+      .from(licenses)
+      .where(
+        inArray(
+          licenses.clinicId,
+          rows.map((r) => r.id),
+        ),
+      );
+
+    // GET /:id (pastda) clinicId bo'yicha findFirst ishlatadi — orderBy yo'q,
+    // birinchi topilgan qator. Bu yerda ham xuddi shu semantikani saqlaymiz.
+    const licenseByClinic = new Map<string, (typeof licenseRows)[number]>();
+    for (const l of licenseRows) {
+      if (!licenseByClinic.has(l.clinicId)) licenseByClinic.set(l.clinicId, l);
+    }
+
+    const data = rows.map((clinic) => {
+      const l = licenseByClinic.get(clinic.id);
+      return {
+        ...clinic,
+        license: l
+          ? { licenseKey: l.licenseKey, plan: l.plan, isActive: l.isActive, expiresAt: l.expiresAt }
+          : null,
+      };
+    });
+
+    return c.json(data);
   });
 
   // Yangi klinika + asosiy filial + litsenziya yaratish
