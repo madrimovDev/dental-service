@@ -76,6 +76,33 @@ describe('writeLicense + readLicense', () => {
   });
 });
 
+describe('invalidateLicense', () => {
+  test('deletes the cached .lic file so readLicense() returns null afterward', async () => {
+    const { writeLicense, readLicense, invalidateLicense } = await import('./license');
+    const data = {
+      licenseKey: 'CLI-387-KEY',
+      clinicId: 'clinic-387',
+      modules: ['patients'],
+      expiresAt: new Date(Date.now() + 86400000 * 30).toISOString(),
+      gracePeriodDays: 30,
+      issuedAt: new Date().toISOString(),
+      signature: 'mock-signature',
+    };
+    await writeLicense(data);
+    expect(await readLicense()).not.toBeNull();
+
+    await invalidateLicense();
+
+    expect(await readLicense()).toBeNull();
+  });
+
+  test('no-ops (does not throw) if the .lic file does not exist', async () => {
+    const { invalidateLicense } = await import('./license');
+    await invalidateLicense(); // already deleted by the previous test, or never existed
+    await invalidateLicense(); // calling twice must still not throw
+  });
+});
+
 describe('isLicenseValid', () => {
   test('returns false if expiresAt + gracePeriodDays passed', async () => {
     const { isLicenseValid } = await import('./license');

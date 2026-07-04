@@ -105,6 +105,14 @@ export const envSchema = z
     // foydalanuvchi bir soatda 5 martadan ko'p faollashtirish urinmaydi.
     ACTIVATE_RATE_LIMIT_WINDOW_SEC: z.coerce.number().int().positive().default(3600), // 1 soat
     ACTIVATE_RATE_LIMIT: z.coerce.number().int().positive().default(5),
+
+    // CLI-387 — Local Desktop license heartbeat cadence. Only consulted when
+    // WEB_DIST_DIR is set (Local Desktop signal); harmless default elsewhere.
+    LICENSE_HEARTBEAT_INTERVAL_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(4 * 60 * 60 * 1000), // 4 soat
   })
   // Reject known-placeholder secrets in production. Dev/test intentionally keep
   // the placeholder so local boot + `bun test --env-file=../../.env` work.
