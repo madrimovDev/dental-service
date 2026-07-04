@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AppLayout } from './components/AppLayout';
+import { RequireAuth } from './components/auth/RequireAuth';
 import { LoginPage } from './features/auth/LoginPage';
 import { ClinicDetailPage } from './features/clinics/ClinicDetailPage';
 import { ClinicsPage } from './features/clinics/ClinicsPage';
@@ -12,7 +13,13 @@ export const App = () => (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-        <Route element={<AppLayout />}>
+        <Route
+          element={
+            <RequireAuth>
+              <AppLayout />
+            </RequireAuth>
+          }
+        >
           <Route path="/" element={<ClinicsPage />} />
           <Route path="/clinics/:id" element={<ClinicDetailPage />} />
         </Route>
