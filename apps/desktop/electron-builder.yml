@@ -44,7 +44,7 @@ mac:
   category: public.app-category.medical
 win:
   target: nsis
-  # TODO(jonli): build/icon.ico hali yaratilmagan — real build oldidan qo'shilishi kerak
+  # PLACEHOLDER (CLI-367) — build/icon.ico haqiqiy brend logotipi emas, almashtirilishi kerak (CLI-361 real build oldidan)
   icon: build/icon.ico
 nsis:
   oneClick: false
