@@ -16,6 +16,7 @@ if (process.argv[2] === 'migrate') {
   const { seedDiagnoses, seedPermissions } = await import('./db/boot-seed.ts');
   const { db, dbClient } = await import('./db/client.ts');
   const { env } = await import('./lib/env.ts');
+  const { startLicenseHeartbeatScheduler } = await import('./lib/license-heartbeat-scheduler.ts');
   const { logger } = await import('./lib/logger.ts');
   const { recallQueue, reminderQueue } = await import('./lib/queue.ts');
   const { registerRecallScheduler } = await import('./lib/recall-scheduler.ts');
@@ -52,6 +53,15 @@ if (process.argv[2] === 'migrate') {
     env.NODE_ENV !== 'test' && env.RUN_REMINDER_WORKER ? startRecallWorker() : null;
   if (inProcessRecall) await registerRecallScheduler();
 
+  // CLI-387 — License heartbeat: only relevant for Local Desktop (WEB_DIST_DIR
+  // signal, same one requireModuleInDesktop uses — apps/api/src/lib/license-middleware.ts).
+  // Cloud/dev/CI never write a .lic file, so this is a no-op there (readLicense()
+  // returns null, runLicenseHeartbeatCheck short-circuits — see license-heartbeat-scheduler.ts).
+  const stopLicenseHeartbeat =
+    env.NODE_ENV !== 'test' && env.WEB_DIST_DIR
+      ? startLicenseHeartbeatScheduler({ intervalMs: env.LICENSE_HEARTBEAT_INTERVAL_MS })
+      : null;
+
   logger.info(`🚀 API listening on http://localhost:${server.port}`);
 
   // Graceful shutdown (CLI-237 / D6): on SIGTERM/SIGINT, stop accepting new
@@ -67,6 +77,7 @@ if (process.argv[2] === 'migrate') {
       await server.stop();
       if (inProcessWorker) await inProcessWorker.close();
       if (inProcessRecall) await inProcessRecall.close();
+      stopLicenseHeartbeat?.();
       await reminderQueue.close();
       await recallQueue.close();
       await dbClient.end({ timeout: 5 });
