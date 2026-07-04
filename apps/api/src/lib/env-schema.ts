@@ -88,6 +88,15 @@ export const envSchema = z
     AUTH_LOGIN_RATE_LIMIT: z.coerce.number().int().positive().default(10),
     AUTH_REFRESH_RATE_LIMIT: z.coerce.number().int().positive().default(60),
     AUTH_RESET_RATE_LIMIT: z.coerce.number().int().positive().default(5),
+
+    // Activate rate limiting (CLI-370) — license-key guessing/enumeration himoyasi.
+    // IP-only kalit (keyFromBody yo'q) — licenseKey o'zi taxmin qilinayotgan sir;
+    // kalitga kiritilsa har urinish yangi Redis bucket ochib limitni chetlab
+    // o'tar edi. Login'dan qattiqroq: har urinish real Supervisor'ga tarmoq
+    // so'rovi (login'dagi lokal bcrypt tekshiruvidan qimmatroq) + legitim
+    // foydalanuvchi bir soatda 5 martadan ko'p faollashtirish urinmaydi.
+    ACTIVATE_RATE_LIMIT_WINDOW_SEC: z.coerce.number().int().positive().default(3600), // 1 soat
+    ACTIVATE_RATE_LIMIT: z.coerce.number().int().positive().default(5),
   })
   // Reject known-placeholder secrets in production. Dev/test intentionally keep
   // the placeholder so local boot + `bun test --env-file=../../.env` work.
