@@ -1,6 +1,7 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
 import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { requireModuleInDesktop } from '../../lib/license-middleware.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
 import type { NotificationsService } from '../notifications/notifications.service.ts';
@@ -29,6 +30,7 @@ export const clinicalRoutes = (deps: {
   notifications?: NotificationsService;
 }) => {
   const app = new OpenAPIHono();
+  app.use('*', requireModuleInDesktop('clinical'));
   app.use('*', authMiddleware());
   app.use('*', rlsMiddleware(deps.db));
 
