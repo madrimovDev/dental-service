@@ -23,16 +23,17 @@
  * Server — litsenziya faollashtirilmagan bo'lsa (`.lic` fayl yo'q,
  * `license-status.ts` — existence-only, muddat tekshiruvi API tomonida)
  * brauzer asosiy UI o'rniga `/activate`ga ochiladi (CLI-348 qaror 1; web
- * `/activate` sahifasining o'zi hali qurilmagan — follow-up, apps/web
- * doirasi tashqarisida).
+ * `/activate` sahifasi qurilgan va `auth.routes.tsx`da ro'yxatdan o'tgan —
+ * `apps/web/src/features/auth/pages/activate.page.tsx` (commit 7670124,
+ * "feat: end-to-end desktop license activation flow")).
  *
  * ⚠️ TASHQI BOG'LIQLIK (jonli, TODO):
  *   - `assets/tray-icon.png` — hali repo'da yo'q, distribution paketlashda
  *     qo'shiladi.
- *   - `preload.ts` ESM (`"type": "module"`) sifatida kompilyatsiya qilinadi —
- *     `sandbox`/Electron versiyasiga bog'liq yuklash xatti-harakati real
- *     BrowserWindow'da hali tekshirilmagan (web `/settings` bu ko'prikni
- *     hali chaqirmagani sabab hozircha bloklovchi emas).
+ *   - `preload.cjs` (`.cts`dan kompilyatsiya, CommonJS, `sandbox:true` talabi —
+ *     ESM emas) real BrowserWindow'da tekshirilgan: shu yerda topilgan
+ *     CSP + preload ESM/CJS blank-screen xatosi tuzatilgan (commit 165ddc5,
+ *     "fix(desktop): blank screen in real BrowserWindow (CSP + preload ESM)").
  *   - Web `/settings` sahifasi `window.dentalDesktop?.setServerUrl(url)`ni
  *     hali chaqirmaydi (apps/web o'zgarishi shu ticket doirasi tashqarisida).
  */
@@ -195,8 +196,9 @@ app.whenReady().then(async () => {
     );
     // Litsenziya faollashtirilmagan bo'lsa (`.lic` fayl yo'q) — asosiy UI
     // o'rniga aktivatsiya sahifasi ochiladi (CLI-348 qaror 1). Web app
-    // `/activate` sahifasi hali qurilmagan (follow-up, apps/web doirasi
-    // tashqarisida) — bu yerda faqat desktop-tomon signal+redirect ulanadi.
+    // `/activate` sahifasi qurilgan va ro'yxatdan o'tgan
+    // (`apps/web/src/features/auth/pages/activate.page.tsx`, commit 7670124)
+    // — bu yerda faqat desktop-tomon signal+redirect ulanadi.
     openBrowser(hasLicense() ? localUrl : `${localUrl}/activate`);
   } else {
     // Klient rejimi — LAN discovery orqali server qidiriladi.
