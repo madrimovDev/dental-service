@@ -1,6 +1,6 @@
 # RFC-0011: Recall / Revisit Subsystem
 
-- **Status:** Proposed
+- **Status:** Implemented
 - **Sana:** 2026-06-21
 - **Bog'liq:** RFC-0008 (notifications), RFC-0009 (backend module architecture), RFC-0005 (patient balance)
 - **Manba:** `DENTAL-WORKFLOW-AUDIT.md` (Recall = Critical Missing / Very High impact)
