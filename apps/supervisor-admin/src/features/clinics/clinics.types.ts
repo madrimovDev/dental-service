@@ -26,3 +26,12 @@ export interface ClinicDetail {
   clinic: Clinic;
   license: License | null;
 }
+
+export interface CreateClinicInput {
+  name: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  plan: 'starter' | 'standard' | 'premium' | 'enterprise';
+  expiresAt: string;
+  gracePeriodDays: number;
+}

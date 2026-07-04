@@ -17,7 +17,9 @@
     "@mantine/hooks": "^7.15.2",
     "@mantine/form": "^7.15.2",
     "@tanstack/react-query": "^5.62.10",
-    "react-router-dom": "^6.28.1"
+    "mantine-form-zod-resolver": "^1.3.0",
+    "react-router-dom": "^6.28.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.6.3",

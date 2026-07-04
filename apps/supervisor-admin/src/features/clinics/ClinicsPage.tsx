@@ -1,7 +1,9 @@
-import { Badge, Button, Group, Table, Text, Title, Tooltip } from '@mantine/core';
+import { Badge, Button, Group, Table, Text, Title } from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { fetchClinicDetail, fetchClinics } from './clinics.api';
+import { CreateClinicModal } from './components/CreateClinicModal';
 
 export const ClinicsPage = () => {
   const {
@@ -23,18 +25,15 @@ export const ClinicsPage = () => {
     })),
   });
 
+  const [opened, { open, close }] = useDisclosure(false);
+
   return (
     <>
       <Group justify="space-between" mb="md">
         <Title order={2}>Klinikalar</Title>
-        <Tooltip label="Klinika yaratish hozircha faqat API orqali: POST /v1/admin/clinics">
-          {/* Disabled buttons don't fire pointer events, so the Tooltip's
-              hover trigger needs a non-disabled wrapper element to hang off. */}
-          <span>
-            <Button disabled>+ Yangi klinika</Button>
-          </span>
-        </Tooltip>
+        <Button onClick={open}>+ Yangi klinika</Button>
       </Group>
+      <CreateClinicModal opened={opened} onClose={close} />
       {isError && (
         <Text c="red" mb="md">
           Klinikalar ro'yxatini yuklab bo'lmadi. Qayta urinib ko'ring yoki qaytadan kiring.
