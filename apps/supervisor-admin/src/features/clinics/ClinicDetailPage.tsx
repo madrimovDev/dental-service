@@ -71,6 +71,27 @@ export const ClinicDetailPage = () => {
     },
   });
 
+  const deactivate = useMutation({
+    mutationFn: async () => {
+      if (!data?.clinic) return;
+      const ok = confirm(
+        'Litsenziyani bekor qilishni tasdiqlaysizmi? Klinika xizmatdan foydalana olmay qoladi.',
+      );
+      if (!ok) return;
+      const res = await authFetch(`/v1/admin/clinics/${data.clinic.id}/deactivate`, {
+        method: 'PATCH',
+      });
+      if (!res.ok) throw new Error("Litsenziyani bekor qilib bo'lmadi");
+    },
+    onSuccess: () => {
+      setMutationError(null);
+      qc.invalidateQueries({ queryKey: ['clinic', id] });
+    },
+    onError: (err) => {
+      setMutationError(err instanceof Error ? err.message : "Litsenziyani bekor qilib bo'lmadi");
+    },
+  });
+
   if (isError) return <Text c="red">Klinika topilmadi</Text>;
   if (!data) return null;
 
@@ -103,9 +124,15 @@ export const ClinicDetailPage = () => {
             : '—'}
         </Text>
         <Text c="dimmed">Grace period: {data.license?.gracePeriodDays} kun</Text>
+        <Text c={data.license?.isActive ? 'teal' : 'red'} mt="xs">
+          Holat: {data.license?.isActive ? 'Faol' : 'Bekor qilingan'}
+        </Text>
         <Group mt="sm">
           <Button size="xs" variant="outline" onClick={() => reactivate.mutate()}>
             Reactivate
+          </Button>
+          <Button size="xs" variant="outline" color="red" onClick={() => deactivate.mutate()}>
+            Bekor qilish
           </Button>
         </Group>
       </Paper>

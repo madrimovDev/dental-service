@@ -124,4 +124,70 @@ describe('ClinicDetailPage', () => {
 
     expect(await screen.findByText("Modulni yangilab bo'lmadi")).toBeInTheDocument();
   });
+
+  it("holatni ko'rsatadi va 'Bekor qilish' bosilganda tasdiqlansa PATCH deactivate chaqiriladi", async () => {
+    vi.stubGlobal(
+      'confirm',
+      vi.fn(() => true),
+    );
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === 'PATCH' && url.endsWith('/v1/admin/clinics/c1/deactivate')) {
+        return jsonResponse({ clinic, license: { ...license, isActive: false } });
+      }
+      if (url.endsWith('/v1/admin/clinics/c1')) {
+        return jsonResponse({ clinic, license });
+      }
+      throw new Error(`unhandled fetch: ${url} ${init?.method ?? 'GET'}`);
+    });
+
+    renderDetail();
+    await screen.findByText('Clinic One');
+    expect(screen.getByText(/Holat:/)).toHaveTextContent('Faol');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Bekor qilish' }));
+
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/v1/admin/clinics/c1/deactivate'),
+        expect.objectContaining({ method: 'PATCH' }),
+      ),
+    );
+  });
+
+  it("tasdiqlash bekor qilinsa (confirm=false) deactivate so'rovi yuborilmaydi", async () => {
+    vi.stubGlobal(
+      'confirm',
+      vi.fn(() => false),
+    );
+    renderDetail();
+    await screen.findByText('Clinic One');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Bekor qilish' }));
+
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'PATCH')).toBe(false);
+  });
+
+  it("deactivate so'rovi muvaffaqiyatsiz bo'lsa xato xabarini ko'rsatadi", async () => {
+    vi.stubGlobal(
+      'confirm',
+      vi.fn(() => true),
+    );
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === 'PATCH' && url.endsWith('/v1/admin/clinics/c1/deactivate')) {
+        return jsonResponse({ error: { code: 'SERVER_ERROR' } }, false);
+      }
+      if (url.endsWith('/v1/admin/clinics/c1')) {
+        return jsonResponse({ clinic, license });
+      }
+      throw new Error(`unhandled fetch: ${url} ${init?.method ?? 'GET'}`);
+    });
+
+    renderDetail();
+    await screen.findByText('Clinic One');
+    fireEvent.click(screen.getByRole('button', { name: 'Bekor qilish' }));
+
+    expect(await screen.findByText("Litsenziyani bekor qilib bo'lmadi")).toBeInTheDocument();
+  });
 });
