@@ -1,4 +1,4 @@
-import { describe, expect, mock, test } from 'bun:test';
+import { afterEach, describe, expect, mock, test } from 'bun:test';
 import { Hono } from 'hono';
 import * as realLicense from './license';
 
@@ -17,7 +17,7 @@ mock.module('./license', () => ({
   getActiveModules: async () => activeModules,
 }));
 
-const { requireModule } = await import('./license-middleware');
+const { requireModule, requireModuleInDesktop } = await import('./license-middleware');
 
 describe('requireModule', () => {
   test('allows request if module is active', async () => {
@@ -68,6 +68,47 @@ describe('requireModule', () => {
     activeModules = ['*'];
     const app = new Hono();
     app.get('/test', requireModule('lab-orders'), (c) => c.json({ ok: true }));
+    const res = await app.request('/test');
+    expect(res.status).toBe(200);
+  });
+});
+
+describe('requireModuleInDesktop', () => {
+  const originalWebDistDir = process.env.WEB_DIST_DIR;
+
+  afterEach(() => {
+    if (originalWebDistDir === undefined) {
+      delete process.env.WEB_DIST_DIR;
+    } else {
+      process.env.WEB_DIST_DIR = originalWebDistDir;
+    }
+  });
+
+  test("WEB_DIST_DIR yo'q bo'lsa (cloud/dev/CI) — litsenziya bo'lmasa ham o'tadi (no-op)", async () => {
+    delete process.env.WEB_DIST_DIR;
+    activeModules = [];
+    const app = new Hono();
+    app.get('/test', requireModuleInDesktop('patients'), (c) => c.json({ ok: true }));
+    const res = await app.request('/test');
+    expect(res.status).toBe(200);
+  });
+
+  test("WEB_DIST_DIR bor bo'lsa (Local Desktop) — requireModule kabi 403 LICENSE_NOT_FOUND qaytaradi", async () => {
+    process.env.WEB_DIST_DIR = '/tmp/fake-web-dist';
+    activeModules = [];
+    const app = new Hono();
+    app.get('/test', requireModuleInDesktop('patients'), (c) => c.json({ ok: true }));
+    const res = await app.request('/test');
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe('LICENSE_NOT_FOUND');
+  });
+
+  test("WEB_DIST_DIR bor + modul faol bo'lsa — o'tadi", async () => {
+    process.env.WEB_DIST_DIR = '/tmp/fake-web-dist';
+    activeModules = ['patients'];
+    const app = new Hono();
+    app.get('/test', requireModuleInDesktop('patients'), (c) => c.json({ ok: true }));
     const res = await app.request('/test');
     expect(res.status).toBe(200);
   });
