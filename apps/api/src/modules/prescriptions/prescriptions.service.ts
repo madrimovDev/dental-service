@@ -10,16 +10,31 @@ export const createPrescriptionsService = (deps: { audit: AuditLogger }) => {
     const db = getDb(c);
     const filters = [];
     if (patientId) filters.push(eq(prescriptions.patientId, patientId));
-    return db
+    const rows = await db
       .select()
       .from(prescriptions)
       .where(filters.length > 0 ? and(...filters) : undefined)
       .orderBy(desc(prescriptions.issuedDate));
+
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'prescription',
+      resourceId: patientId ?? null,
+      after: { patientId: patientId ?? null, count: rows.length },
+    });
+    return rows;
   }
 
   async function get(c: Context, id: string) {
     const db = getDb(c);
     const [row] = await db.select().from(prescriptions).where(eq(prescriptions.id, id));
+    if (row) {
+      await deps.audit.record(c, {
+        action: 'viewed',
+        resourceType: 'prescription',
+        resourceId: id,
+      });
+    }
     return row ?? null;
   }
 
