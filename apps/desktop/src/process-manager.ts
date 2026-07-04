@@ -17,7 +17,7 @@ import { type ChildProcess, spawn } from 'node:child_process';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { app } from 'electron';
-import { getOrCreateJwtSecret } from './first-run.js';
+import { getOrCreateDbPassword, getOrCreateJwtSecret } from './first-run.js';
 
 const getResourcesDir = (): string =>
   app.isPackaged ? process.resourcesPath : join(import.meta.dirname, '..', 'resources');
@@ -129,7 +129,7 @@ const spawnApi = (port: number): Promise<void> =>
         // (CLAUDE.md §3.4) yo'qqa chiqadi (2026-07-02 topilgan xavfsizlik
         // bugi). `dental_app` roli `db/migrate.ts`ning `ensureAppRole()`si
         // orqali first-run'da yaratiladi (`runMigrations()` shundan keyin).
-        DATABASE_URL: 'postgresql://dental_app:dental_app_local_dev@localhost:5433/dental',
+        DATABASE_URL: `postgresql://dental_app:${getOrCreateDbPassword()}@localhost:5433/dental`,
         // Recall worker (in-process, RUN_REMINDER_WORKER=true) qasddan
         // superuser orqali cross-tenant scan qiladi (lib/db/client.ts
         // `createAdminDb()` buni talab qiladi — DATABASE_URL'ga fallback
