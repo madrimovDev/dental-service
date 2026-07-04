@@ -43,7 +43,9 @@ Inject via one of:
 ### Required secrets (boot fails fast if missing)
 `JWT_SECRET` (>= 32 chars, unique — a `change_me`/placeholder value is REJECTED
 at boot when `NODE_ENV=production`, see `apps/api/src/lib/env-schema.ts`),
-`POSTGRES_PASSWORD`, `DATABASE_URL`, `DATABASE_ADMIN_URL` (migrate only),
+`POSTGRES_PASSWORD`, `DENTAL_APP_DB_PASSWORD` (sets the `dental_app` role's
+actual password — MUST match the password embedded in `DATABASE_URL` below,
+see CLI-383), `DATABASE_URL`, `DATABASE_ADMIN_URL` (migrate only),
 `REDIS_PASSWORD` / `REDIS_URL`, `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD`,
 `WEB_ORIGIN`, `DOMAIN`, `ACME_EMAIL`. Generate a JWT secret with:
 
