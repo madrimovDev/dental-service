@@ -1,6 +1,6 @@
 import type { TenantSettings } from '@dental/api-client';
 import { StatusPill } from '@dental/ui';
-import { Button, Loader, Title } from '@mantine/core';
+import { Button, Loader, Title, Tooltip } from '@mantine/core';
 import {
   type Icon,
   IconBrandTelegram,
@@ -137,20 +137,28 @@ export function IntegrationsSettingsScreen() {
                 </div>
 
                 {connected ? (
-                  <Button variant="outline" size="xs" style={{ alignSelf: 'flex-start' }}>
-                    {t('settings.integration_configure')}
-                  </Button>
+                  <Tooltip label={t('shell.coming_soon')}>
+                    <span style={{ alignSelf: 'flex-start' }}>
+                      <Button variant="outline" size="xs" disabled>
+                        {t('settings.integration_configure')}
+                      </Button>
+                    </span>
+                  </Tooltip>
                 ) : (
-                  <Button
-                    size="xs"
-                    style={{
-                      alignSelf: 'flex-start',
-                      background: 'var(--primary)',
-                      color: 'var(--on-primary)',
-                    }}
-                  >
-                    {t('settings.integration_connect')}
-                  </Button>
+                  <Tooltip label={t('shell.coming_soon')}>
+                    <span style={{ alignSelf: 'flex-start' }}>
+                      <Button
+                        size="xs"
+                        disabled
+                        style={{
+                          background: 'var(--primary)',
+                          color: 'var(--on-primary)',
+                        }}
+                      >
+                        {t('settings.integration_connect')}
+                      </Button>
+                    </span>
+                  </Tooltip>
                 )}
               </div>
             );

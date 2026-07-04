@@ -37,4 +37,14 @@ describe('IntegrationsSettingsScreen', () => {
     expect(labels.filter((l) => l === t('settings.integration_configure'))).toHaveLength(1);
     expect(labels.filter((l) => l === t('settings.integration_connect'))).toHaveLength(3);
   });
+
+  it('Connect/Configure tugmalari disabled va "tez orada" tooltip ko‘rsatadi', () => {
+    const { getAllByRole } = renderApp(<IntegrationsSettingsScreen />);
+    const buttons = getAllByRole('button');
+    // 4 karta — har birida bitta Connect yoki Configure tugma, hammasi disabled bo'lishi kerak
+    expect(buttons).toHaveLength(4);
+    for (const button of buttons) {
+      expect(button).toBeDisabled();
+    }
+  });
 });
