@@ -46,8 +46,28 @@ export const createTreatmentPlansService = (deps: {
 }) => {
   const repo = createTreatmentPlansRepository();
 
-  const listPlans = (c: Context, query: ListPlansQuery) => repo.listPlans(c, query);
-  const getPlan = (c: Context, id: string) => repo.getPlanWithStages(c, id);
+  const listPlans = async (c: Context, query: ListPlansQuery) => {
+    const result = await repo.listPlans(c, query);
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'treatment_plan',
+      resourceId: query.patientId ?? null,
+      after: { patientId: query.patientId ?? null, count: result.data.length },
+    });
+    return result;
+  };
+
+  const getPlan = async (c: Context, id: string) => {
+    const plan = await repo.getPlanWithStages(c, id);
+    if (plan) {
+      await deps.audit.record(c, {
+        action: 'viewed',
+        resourceType: 'treatment_plan',
+        resourceId: id,
+      });
+    }
+    return plan;
+  };
 
   async function createPlan(c: Context, input: CreateTreatmentPlanInput) {
     const tenantId = c.get('activeTenantId');

@@ -19,8 +19,28 @@ export const createVisitNotesService = (deps: {
 }) => {
   const repo = createVisitNotesRepository();
 
-  const list = (c: Context, patientId?: string) => repo.list(c, patientId);
-  const get = (c: Context, id: string) => repo.find(c, id);
+  const list = async (c: Context, patientId?: string) => {
+    const rows = await repo.list(c, patientId);
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'visit_note',
+      resourceId: patientId ?? null,
+      after: { patientId: patientId ?? null, count: rows.length },
+    });
+    return rows;
+  };
+
+  const get = async (c: Context, id: string) => {
+    const note = await repo.find(c, id);
+    if (note) {
+      await deps.audit.record(c, {
+        action: 'viewed',
+        resourceType: 'visit_note',
+        resourceId: id,
+      });
+    }
+    return note;
+  };
 
   async function create(c: Context, input: CreateVisitNoteInput) {
     const tenantId = c.get('activeTenantId');

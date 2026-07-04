@@ -6,8 +6,28 @@ import type { CreateToothChartInput } from './tooth-charts.schema.ts';
 export const createToothChartsService = (deps: { audit: AuditLogger }) => {
   const repo = createToothChartsRepository();
 
-  const list = (c: Context, patientId: string) => repo.list(c, patientId);
-  const getLatest = (c: Context, patientId: string) => repo.getLatestWithStates(c, patientId);
+  const list = async (c: Context, patientId: string) => {
+    const rows = await repo.list(c, patientId);
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'tooth_chart',
+      resourceId: patientId,
+      after: { count: rows.length },
+    });
+    return rows;
+  };
+
+  const getLatest = async (c: Context, patientId: string) => {
+    const chart = await repo.getLatestWithStates(c, patientId);
+    if (chart) {
+      await deps.audit.record(c, {
+        action: 'viewed',
+        resourceType: 'tooth_chart',
+        resourceId: chart.id,
+      });
+    }
+    return chart;
+  };
 
   async function create(c: Context, input: CreateToothChartInput) {
     const tenantId = c.get('activeTenantId');
