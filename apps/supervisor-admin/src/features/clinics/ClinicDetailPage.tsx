@@ -54,16 +54,20 @@ export const ClinicDetailPage = () => {
 
   const reactivate = useMutation({
     mutationFn: async () => {
-      if (!data?.license) return;
-      const fp = prompt('Yangi fingerprint kiriting:');
-      if (!fp) return;
+      if (!data?.license?.fingerprint) return;
       const res = await authFetch('/v1/reactivate', {
         method: 'POST',
-        body: JSON.stringify({ licenseKey: data.license.licenseKey, fingerprint: fp }),
+        body: JSON.stringify({
+          licenseKey: data.license.licenseKey,
+          fingerprint: data.license.fingerprint,
+        }),
       });
       if (!res.ok) throw new Error("Litsenziyani qayta faollashtirib bo'lmadi");
     },
-    onSuccess: () => setMutationError(null),
+    onSuccess: () => {
+      setMutationError(null);
+      qc.invalidateQueries({ queryKey: ['clinic', id] });
+    },
     onError: (err) => {
       setMutationError(
         err instanceof Error ? err.message : "Litsenziyani qayta faollashtirib bo'lmadi",
@@ -124,11 +128,19 @@ export const ClinicDetailPage = () => {
             : '—'}
         </Text>
         <Text c="dimmed">Grace period: {data.license?.gracePeriodDays} kun</Text>
+        <Text c="dimmed">
+          Fingerprint: {data.license?.fingerprint ?? '— (hali faollashtirilmagan)'}
+        </Text>
         <Text c={data.license?.isActive ? 'teal' : 'red'} mt="xs">
           Holat: {data.license?.isActive ? 'Faol' : 'Bekor qilingan'}
         </Text>
         <Group mt="sm">
-          <Button size="xs" variant="outline" onClick={() => reactivate.mutate()}>
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={() => reactivate.mutate()}
+            disabled={!data.license?.fingerprint}
+          >
             Reactivate
           </Button>
           <Button size="xs" variant="outline" color="red" onClick={() => deactivate.mutate()}>

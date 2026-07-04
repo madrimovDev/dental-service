@@ -30,6 +30,11 @@ const license = {
   createdAt: '2026-01-01T00:00:00.000Z',
 };
 
+const licenseWithFingerprint = {
+  ...license,
+  fingerprint: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
+};
+
 const jsonResponse = (body: unknown, ok = true) => ({ ok, json: async () => body });
 
 const renderDetail = () =>
@@ -189,5 +194,108 @@ describe('ClinicDetailPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Bekor qilish' }));
 
     expect(await screen.findByText("Litsenziyani bekor qilib bo'lmadi")).toBeInTheDocument();
+  });
+
+  it("litsenziyada saqlangan fingerprint ko'rsatiladi", async () => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/v1/admin/clinics/c1')) {
+        return jsonResponse({ clinic, license: licenseWithFingerprint });
+      }
+      throw new Error(`unhandled fetch: ${url} ${init?.method ?? 'GET'}`);
+    });
+
+    renderDetail();
+    await screen.findByText('Clinic One');
+    expect(screen.getByText(/Fingerprint:/)).toHaveTextContent(licenseWithFingerprint.fingerprint);
+  });
+
+  it("fingerprint yo'q bo'lsa 'Reactivate' tugmasi disable bo'ladi va promptsiz hech qanday so'rov yubormaydi", async () => {
+    vi.stubGlobal(
+      'prompt',
+      vi.fn(() => {
+        throw new Error('prompt should not be called');
+      }),
+    );
+    renderDetail();
+    await screen.findByText('Clinic One');
+
+    const reactivateButton = screen.getByRole('button', { name: 'Reactivate' });
+    expect(reactivateButton).toBeDisabled();
+
+    fireEvent.click(reactivateButton);
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
+  });
+
+  it("'Reactivate' bosilganda saqlangan fingerprint bilan POST /v1/reactivate promptsiz chaqiriladi", async () => {
+    vi.stubGlobal(
+      'prompt',
+      vi.fn(() => {
+        throw new Error('prompt should not be called');
+      }),
+    );
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === 'POST' && url.endsWith('/v1/reactivate')) {
+        return jsonResponse({ ok: true });
+      }
+      if (url.endsWith('/v1/admin/clinics/c1')) {
+        return jsonResponse({ clinic, license: licenseWithFingerprint });
+      }
+      throw new Error(`unhandled fetch: ${url} ${init?.method ?? 'GET'}`);
+    });
+
+    renderDetail();
+    await screen.findByText('Clinic One');
+
+    const reactivateButton = screen.getByRole('button', { name: 'Reactivate' });
+    expect(reactivateButton).not.toBeDisabled();
+    fireEvent.click(reactivateButton);
+
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/v1/reactivate'),
+        expect.objectContaining({ method: 'POST' }),
+      ),
+    );
+    const reactivateCall = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST') as
+      | [string, RequestInit]
+      | undefined;
+    if (!reactivateCall) throw new Error('POST /v1/reactivate call not found');
+    const body = JSON.parse(String(reactivateCall[1].body));
+    expect(body).toEqual({
+      licenseKey: licenseWithFingerprint.licenseKey,
+      fingerprint: licenseWithFingerprint.fingerprint,
+    });
+  });
+
+  it("reactivate muvaffaqiyatli bo'lgandan keyin klinika ma'lumotlari qayta so'raladi (cache invalidatsiya)", async () => {
+    let getCallCount = 0;
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === 'POST' && url.endsWith('/v1/reactivate')) {
+        return jsonResponse({ ok: true });
+      }
+      if (url.endsWith('/v1/admin/clinics/c1')) {
+        getCallCount += 1;
+        return jsonResponse({ clinic, license: licenseWithFingerprint });
+      }
+      throw new Error(`unhandled fetch: ${url} ${init?.method ?? 'GET'}`);
+    });
+
+    renderDetail();
+    await screen.findByText('Clinic One');
+    expect(getCallCount).toBe(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reactivate' }));
+
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/v1/reactivate'),
+        expect.objectContaining({ method: 'POST' }),
+      ),
+    );
+
+    await vi.waitFor(() => expect(getCallCount).toBe(2));
   });
 });
