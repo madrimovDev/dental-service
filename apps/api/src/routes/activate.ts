@@ -1,8 +1,10 @@
 import { fail, ok } from '@dental/core';
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { env } from '../lib/env.ts';
 import { writeLicense } from '../lib/license.ts';
 import { activateLicense } from '../lib/license-client.ts';
+import { rateLimit } from '../lib/rate-limit.ts';
 
 /**
  * `POST /api/activate` — Local Desktop litsenziya faollashtirish (CLI-348
@@ -16,7 +18,17 @@ const activateSchema = z.object({ licenseKey: z.string().min(1) });
 export const activateRoutes = () => {
   const app = new Hono();
 
-  app.post('/', async (c) => {
+  // ─── Rate limiting (CLI-370) — Redis fixed-window, IP-only ───────────────
+  // licenseKey o'zi taxmin qilinayotgan sir (login'dagi telefon — hisob
+  // identifikatori — dan farqli) — kalitga kiritilmaydi, aks holda har
+  // urinishda boshqa key sinalsa yangi bucket ochilib limit chetlab o'tiladi.
+  const activateRateLimit = rateLimit({
+    name: 'activate',
+    limit: env.ACTIVATE_RATE_LIMIT,
+    windowSeconds: env.ACTIVATE_RATE_LIMIT_WINDOW_SEC,
+  });
+
+  app.post('/', activateRateLimit, async (c) => {
     const json = await c.req.json().catch(() => null);
     const parsed = activateSchema.safeParse(json);
     if (!parsed.success) {
