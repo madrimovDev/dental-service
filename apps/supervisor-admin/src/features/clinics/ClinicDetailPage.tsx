@@ -64,7 +64,10 @@ export const ClinicDetailPage = () => {
       });
       if (!res.ok) throw new Error("Litsenziyani qayta faollashtirib bo'lmadi");
     },
-    onSuccess: () => setMutationError(null),
+    onSuccess: () => {
+      setMutationError(null);
+      qc.invalidateQueries({ queryKey: ['clinic', id] });
+    },
     onError: (err) => {
       setMutationError(
         err instanceof Error ? err.message : "Litsenziyani qayta faollashtirib bo'lmadi",

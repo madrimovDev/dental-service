@@ -268,4 +268,34 @@ describe('ClinicDetailPage', () => {
       fingerprint: licenseWithFingerprint.fingerprint,
     });
   });
+
+  it("reactivate muvaffaqiyatli bo'lgandan keyin klinika ma'lumotlari qayta so'raladi (cache invalidatsiya)", async () => {
+    let getCallCount = 0;
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === 'POST' && url.endsWith('/v1/reactivate')) {
+        return jsonResponse({ ok: true });
+      }
+      if (url.endsWith('/v1/admin/clinics/c1')) {
+        getCallCount += 1;
+        return jsonResponse({ clinic, license: licenseWithFingerprint });
+      }
+      throw new Error(`unhandled fetch: ${url} ${init?.method ?? 'GET'}`);
+    });
+
+    renderDetail();
+    await screen.findByText('Clinic One');
+    expect(getCallCount).toBe(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reactivate' }));
+
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/v1/reactivate'),
+        expect.objectContaining({ method: 'POST' }),
+      ),
+    );
+
+    await vi.waitFor(() => expect(getCallCount).toBe(2));
+  });
 });
