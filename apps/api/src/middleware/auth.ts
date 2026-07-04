@@ -44,26 +44,3 @@ export const authMiddleware = (): MiddlewareHandler => async (c, next) => {
 
   await next();
 };
-
-/**
- * Optional auth — token bor bo'lsa decode qiladi, lekin yo'q bo'lsa ham davom etadi.
- * Public endpoint'lar uchun (masalan, registratsiya sahifasi user'ni preview qilish uchun).
- */
-export const optionalAuthMiddleware = (): MiddlewareHandler => async (c, next) => {
-  const header = c.req.header('Authorization');
-  if (header?.startsWith('Bearer ')) {
-    const token = header.slice(7).trim();
-    if (token) {
-      try {
-        const claims = await verifyAccess(token);
-        c.set('accessClaims', claims);
-        c.set('user', { id: claims.sub });
-        c.set('activeTenantId', claims.atid);
-        c.set('activeBranchId', claims.abid);
-      } catch {
-        // Invalid token — silently skip (ext bo'lganda fail emas)
-      }
-    }
-  }
-  await next();
-};
