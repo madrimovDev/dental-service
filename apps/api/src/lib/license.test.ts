@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, mock, test } from 'bun:test';
+import { createSign, generateKeyPairSync } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -23,6 +24,26 @@ mock.module('systeminformation', () => {
   ];
   return { default: { cpu, system, networkInterfaces }, cpu, system, networkInterfaces };
 });
+
+// CLI-362 — signature verification. Registered at top level (module scope),
+// before any describe block below does `await import('./license')`, mirroring
+// the `systeminformation` mock above (see plan Task 3 Step 1 ordering note).
+const testKeypair = generateKeyPairSync('rsa', {
+  modulusLength: 2048,
+  privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+  publicKeyEncoding: { type: 'spki', format: 'pem' },
+});
+
+mock.module('@dental/core/supervisor-public-key', () => ({
+  SUPERVISOR_PUBLIC_KEY_PEM: testKeypair.publicKey,
+}));
+
+const signForTest = (data: object): string => {
+  const canonical = JSON.stringify(data, Object.keys(data).sort());
+  const sign = createSign('SHA256');
+  sign.update(canonical);
+  return sign.sign(testKeypair.privateKey, 'hex');
+};
 
 describe('getFingerprint', () => {
   test('returns consistent SHA-256 hash', async () => {
@@ -68,5 +89,46 @@ describe('isLicenseValid', () => {
       signature: 'sig',
     };
     expect(isLicenseValid(expired)).toBe(false);
+  });
+});
+
+describe('isLicenseValid — signature verification (CLI-362)', () => {
+  test('accepts a non-expired license whose signature matches the (mocked) public key', async () => {
+    const payload = {
+      licenseKey: 'K',
+      clinicId: 'c',
+      modules: ['patients'],
+      expiresAt: new Date(Date.now() + 86400000 * 30).toISOString(), // 30 kun keyin
+      gracePeriodDays: 0,
+      issuedAt: new Date().toISOString(),
+    };
+    const signature = signForTest(payload);
+
+    const { isLicenseValid } = await import('./license');
+    expect(isLicenseValid({ ...payload, signature })).toBe(true);
+  });
+
+  test('rejects the same license after modules/expiresAt are tampered with (fingerprint-forge scenario)', async () => {
+    const payload = {
+      licenseKey: 'K',
+      clinicId: 'c',
+      modules: ['patients'],
+      expiresAt: new Date(Date.now() + 86400000 * 30).toISOString(),
+      gracePeriodDays: 0,
+      issuedAt: new Date().toISOString(),
+    };
+    const signature = signForTest(payload);
+
+    // A local admin who knows getFingerprint()'s output (non-secret) could
+    // rewrite the .lic file with this exact mutation using the old code.
+    const forged = {
+      ...payload,
+      modules: ['patients', 'lab-orders', 'clinical'], // enable modules not licensed
+      expiresAt: new Date(Date.now() + 86400000 * 3650).toISOString(), // extend 10 years
+      signature, // stale signature, no longer matches the mutated payload
+    };
+
+    const { isLicenseValid } = await import('./license');
+    expect(isLicenseValid(forged)).toBe(false);
   });
 });
