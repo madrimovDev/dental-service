@@ -80,6 +80,15 @@ export const authRoutes = (deps: { db: Database }) => {
     windowSeconds: window,
     keyFromBody: phoneKey,
   });
+  const registerRateLimit = rateLimit({
+    name: 'register-tenant',
+    limit: env.AUTH_REGISTER_RATE_LIMIT,
+    windowSeconds: env.AUTH_REGISTER_RATE_LIMIT_WINDOW_SEC,
+    // ⚠️ keyFromBody YO'Q — ownerPhone tajovuzkor tomonidan erkin tanlanadi;
+    // telefon bo'yicha kalitласак har urinishda yangi raqam bilan limit
+    // butunlay chetlab o'tiladi (activate.ts ACTIVATE_RATE_LIMIT precedenti —
+    // licenseKey ham shu sabab kalitga kiritilmagan). Faqat IP.
+  });
 
   // ─── POST /register-tenant — public ──────────────────────────────────────
 
@@ -88,6 +97,7 @@ export const authRoutes = (deps: { db: Database }) => {
     path: '/register-tenant',
     tags: ['auth'],
     operationId: 'registerTenant',
+    middleware: [registerRateLimit] as const,
     request: {
       body: { content: { 'application/json': { schema: registerTenantSchema } } },
     },
@@ -100,6 +110,7 @@ export const authRoutes = (deps: { db: Database }) => {
       },
       400: errResp('Validation error'),
       409: errResp('Phone already registered'),
+      429: errResp('Too many requests'),
     },
   });
 

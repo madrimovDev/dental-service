@@ -89,6 +89,14 @@ export const envSchema = z
     AUTH_REFRESH_RATE_LIMIT: z.coerce.number().int().positive().default(60),
     AUTH_RESET_RATE_LIMIT: z.coerce.number().int().positive().default(5),
 
+    // Register-tenant rate limiting (CLI-388) — IP-only (ownerPhone attacker
+    // tanlaydi, keyFromBody bo'lsa chetlab o'tiladi — activate.ts precedenti).
+    // Login/refresh/reset'dan qattiqroq oyna: bu operatsiya bir nechta INSERT
+    // ishga tushiradi va legitim foydalanuvchi bir soatda 5 martadan ko'p yangi
+    // klinika ro'yxatdan o'tkazmaydi.
+    AUTH_REGISTER_RATE_LIMIT_WINDOW_SEC: z.coerce.number().int().positive().default(3600), // 1 soat
+    AUTH_REGISTER_RATE_LIMIT: z.coerce.number().int().positive().default(5),
+
     // Activate rate limiting (CLI-370) — license-key guessing/enumeration himoyasi.
     // IP-only kalit (keyFromBody yo'q) — licenseKey o'zi taxmin qilinayotgan sir;
     // kalitga kiritilsa har urinish yangi Redis bucket ochib limitni chetlab
