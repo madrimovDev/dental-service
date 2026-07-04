@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import { createApp } from '../../app';
 import { db } from '../../db/client';
-import { licenseEvents } from '../../db/schema';
+import { clinics as clinicsTable, licenseEvents } from '../../db/schema';
 import { signAdminTestToken } from '../../lib/test-helpers';
 
 const app = createApp();
@@ -94,6 +94,42 @@ describe('GET /v1/admin/clinics', () => {
     const body = (await res.json()) as any[];
     expect(Array.isArray(body)).toBe(true);
     expect(body.some((c) => c.id === created.clinic.id)).toBe(true);
+  });
+
+  it('includes a license summary (licenseKey/plan/isActive/expiresAt) per clinic without a detail call', async () => {
+    const createRes = await createClinic({ plan: 'premium' });
+    const created = (await createRes.json()) as any;
+
+    const res = await app.request('/v1/admin/clinics', {
+      headers: await authHeaders(),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as any[];
+    const row = body.find((c) => c.id === created.clinic.id);
+    expect(row).toBeTruthy();
+    expect(row.license).toEqual({
+      licenseKey: created.license.licenseKey,
+      plan: 'premium',
+      isActive: true,
+      expiresAt: created.license.expiresAt,
+    });
+  });
+
+  it('returns license: null for a clinic with no license row', async () => {
+    const [orphan] = await db
+      .insert(clinicsTable)
+      .values({ name: `Orphan Clinic ${crypto.randomUUID()}` })
+      .returning();
+    if (!orphan) throw new Error('orphan clinic insert returned no row');
+
+    const res = await app.request('/v1/admin/clinics', {
+      headers: await authHeaders(),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as any[];
+    const row = body.find((c) => c.id === orphan.id);
+    expect(row).toBeTruthy();
+    expect(row.license).toBeNull();
   });
 });
 

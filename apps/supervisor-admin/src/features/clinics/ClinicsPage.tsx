@@ -1,8 +1,8 @@
 import { Badge, Button, Group, Table, Text, Title } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { useQueries, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { fetchClinicDetail, fetchClinics } from './clinics.api';
+import { fetchClinics } from './clinics.api';
 import { CreateClinicModal } from './components/CreateClinicModal';
 
 export const ClinicsPage = () => {
@@ -13,16 +13,6 @@ export const ClinicsPage = () => {
   } = useQuery({
     queryKey: ['clinics'],
     queryFn: fetchClinics,
-  });
-
-  // GET /v1/admin/clinics ro'yxatida litsenziya kiritilmagan (bare clinic
-  // row'lar) — jadvalda litsenziya/tarif/holat ko'rsatish uchun har bir
-  // klinika uchun detail endpoint'ni alohida so'raymiz.
-  const detailQueries = useQueries({
-    queries: clinics.map((clinic) => ({
-      queryKey: ['clinic', clinic.id],
-      queryFn: () => fetchClinicDetail(clinic.id),
-    })),
   });
 
   const [opened, { open, close }] = useDisclosure(false);
@@ -56,8 +46,8 @@ export const ClinicsPage = () => {
                 <Table.Td colSpan={5}>Yuklanmoqda...</Table.Td>
               </Table.Tr>
             )}
-            {clinics.map((clinic, index) => {
-              const license = detailQueries[index]?.data?.license;
+            {clinics.map((clinic) => {
+              const license = clinic.license;
               return (
                 <Table.Tr key={clinic.id}>
                   <Table.Td>{clinic.name}</Table.Td>
