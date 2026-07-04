@@ -26,6 +26,18 @@ export const uploadsRoutes = (storage: StorageAdapter) => {
 
   app.get('/:key{.+}', async (c) => {
     const key = c.req.param('key');
+    const activeTenantId = c.get('activeTenantId');
+
+    // Tenant-scoping (CLI-359): key formati doim `tenants/{tenantId}/...`
+    // (yagona producer — `patientImageKey()`, lib/s3.ts). Bu route filesystem
+    // asosida ishlaydi (RLS qamrovidan tashqarida), shuning uchun tenant
+    // mosligini bu yerda qo'lda tekshiramiz. Mismatch bo'lsa 404 (403 emas) —
+    // "file not found" bilan bir xil javob, fayl mavjudligini boshqa
+    // tenantga oshkor qilmaslik uchun (enumeration'dan himoya).
+    const [prefix, keyTenantId] = key.split('/');
+    if (prefix !== 'tenants' || !keyTenantId || keyTenantId !== activeTenantId) {
+      return c.json(fail('NOT_FOUND', 'File not found'), 404);
+    }
 
     if (!(await storage.exists(key))) {
       return c.json(fail('NOT_FOUND', 'File not found'), 404);
