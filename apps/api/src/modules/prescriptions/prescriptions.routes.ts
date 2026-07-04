@@ -2,6 +2,7 @@ import { fail, ok } from '@dental/core';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { requireModuleInDesktop } from '../../lib/license-middleware.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
@@ -27,6 +28,7 @@ const notFoundResponse = {
 
 export const prescriptionsRoutes = (deps: { db: Database; audit: AuditLogger }) => {
   const app = new OpenAPIHono();
+  app.use('*', requireModuleInDesktop('prescriptions'));
   app.use('*', authMiddleware());
   app.use('*', rlsMiddleware(deps.db));
 

@@ -58,3 +58,31 @@ export const MODULE_MAP: Record<string, string[]> = {
   ],
   enterprise: ['*'],
 };
+
+/**
+ * `requireModule` litsenziya tushunchasi (`.lic`, machine-fingerprint) FAQAT
+ * Local Desktop (bitta-EXE, CLI-338/348) mahsulotiga tegishli — cloud/dev/CI
+ * muhitida (multi-tenant SaaS) hech qachon `.lic` fayl yozilmaydi, shuning
+ * uchun `requireModule`ni shartsiz ulash butun mavjud test suite'ni va
+ * cloud deploy'ni buzadi (har doim LICENSE_NOT_FOUND).
+ *
+ * Bu wrapper `requireModule`ni `process.env.WEB_DIST_DIR` (Local Desktop
+ * signali — `app.ts` CSP branch bilan bir xil, `process-manager.ts`
+ * `spawnApi()` shu env'ni beradi) bilan shartlaydi: WEB_DIST_DIR yo'q bo'lsa
+ * gating butunlay chetlab o'tiladi (no-op), bor bo'lsa `requireModule` bilan
+ * bir xil ishlaydi.
+ *
+ * `process.env.WEB_DIST_DIR` har so'rovda qayta o'qiladi (frozen `env.ts`
+ * singleton emas) — xuddi `getLicensePath()`dagi kabi (license.ts izohi:
+ * top-level const bo'lsa import-vaqtida "muzlab qolar edi").
+ */
+export const requireModuleInDesktop = (module: string): MiddlewareHandler => {
+  const gate = requireModule(module);
+  return async (c, next) => {
+    if (!process.env.WEB_DIST_DIR) {
+      await next();
+      return;
+    }
+    return gate(c, next);
+  };
+};

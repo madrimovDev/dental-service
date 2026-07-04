@@ -1,6 +1,7 @@
 import { ok } from '@dental/core';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { Database } from '../../../db/client.ts';
+import { requireModuleInDesktop } from '../../../lib/license-middleware.ts';
 import { okJson } from '../../../lib/openapi.ts';
 import { requirePermission } from '../../../middleware/require-permission.ts';
 import { toDiagnosisDto } from './diagnoses.mapper.ts';
@@ -16,7 +17,10 @@ export const diagnosesRoutes = (deps: { db: Database }) => {
     path: '/diagnoses',
     tags: ['diagnoses'],
     operationId: 'listDiagnoses',
-    middleware: [requirePermission('medical_record.view')] as const,
+    middleware: [
+      requireModuleInDesktop('clinical'),
+      requirePermission('medical_record.view'),
+    ] as const,
     request: {
       query: z.object({
         search: z.string().optional().openapi({ description: 'Search by code or name' }),

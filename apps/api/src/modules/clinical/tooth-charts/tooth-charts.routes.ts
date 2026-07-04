@@ -1,6 +1,7 @@
 import { ok } from '@dental/core';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { AuditLogger } from '../../../lib/audit-logger.ts';
+import { requireModuleInDesktop } from '../../../lib/license-middleware.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../../lib/openapi.ts';
 import { requireFeature } from '../../../middleware/require-feature.ts';
 import { requirePermission } from '../../../middleware/require-permission.ts';
@@ -23,7 +24,11 @@ export const toothChartsRoutes = (deps: { audit: AuditLogger }) => {
     path: '/patients/{patientId}/tooth-charts',
     tags: ['tooth-charts'],
     operationId: 'listToothCharts',
-    middleware: [requirePermission('medical_record.view'), requireFeature('odontogram')] as const,
+    middleware: [
+      requireModuleInDesktop('clinical'),
+      requirePermission('medical_record.view'),
+      requireFeature('odontogram'),
+    ] as const,
     request: {
       params: patientIdParamSchema,
     },
@@ -46,7 +51,11 @@ export const toothChartsRoutes = (deps: { audit: AuditLogger }) => {
     path: '/patients/{patientId}/tooth-charts/latest',
     tags: ['tooth-charts'],
     operationId: 'getLatestToothChart',
-    middleware: [requirePermission('medical_record.view'), requireFeature('odontogram')] as const,
+    middleware: [
+      requireModuleInDesktop('clinical'),
+      requirePermission('medical_record.view'),
+      requireFeature('odontogram'),
+    ] as const,
     request: {
       params: patientIdParamSchema,
     },
@@ -70,7 +79,11 @@ export const toothChartsRoutes = (deps: { audit: AuditLogger }) => {
     path: '/tooth-charts',
     tags: ['tooth-charts'],
     operationId: 'createToothChart',
-    middleware: [requirePermission('medical_record.edit'), requireFeature('odontogram')] as const,
+    middleware: [
+      requireModuleInDesktop('clinical'),
+      requirePermission('medical_record.edit'),
+      requireFeature('odontogram'),
+    ] as const,
     request: {
       body: { content: { 'application/json': { schema: createToothChartSchema } } },
     },

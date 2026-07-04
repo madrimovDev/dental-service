@@ -1,6 +1,7 @@
 import { fail, ok } from '@dental/core';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { AuditLogger } from '../../../lib/audit-logger.ts';
+import { requireModuleInDesktop } from '../../../lib/license-middleware.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../../lib/openapi.ts';
 import { requirePermission } from '../../../middleware/require-permission.ts';
 import { toVisitNoteTemplateDto } from './visit-note-templates.mapper.ts';
@@ -30,7 +31,10 @@ export const visitNoteTemplatesRoutes = (deps: { audit: AuditLogger }) => {
     path: '/visit-note-templates',
     tags: ['visit-note-templates'],
     operationId: 'listVisitNoteTemplates',
-    middleware: [requirePermission('medical_record.view')] as const,
+    middleware: [
+      requireModuleInDesktop('clinical'),
+      requirePermission('medical_record.view'),
+    ] as const,
     request: {
       query: z.object({
         category: z.string().optional().openapi({ description: 'Filter by category' }),
@@ -51,7 +55,10 @@ export const visitNoteTemplatesRoutes = (deps: { audit: AuditLogger }) => {
     path: '/visit-note-templates',
     tags: ['visit-note-templates'],
     operationId: 'createVisitNoteTemplate',
-    middleware: [requirePermission('medical_record.edit')] as const,
+    middleware: [
+      requireModuleInDesktop('clinical'),
+      requirePermission('medical_record.edit'),
+    ] as const,
     request: {
       body: { content: { 'application/json': { schema: createVisitNoteTemplateSchema } } },
     },
@@ -88,7 +95,10 @@ export const visitNoteTemplatesRoutes = (deps: { audit: AuditLogger }) => {
     path: '/visit-note-templates/{id}',
     tags: ['visit-note-templates'],
     operationId: 'updateVisitNoteTemplate',
-    middleware: [requirePermission('medical_record.edit')] as const,
+    middleware: [
+      requireModuleInDesktop('clinical'),
+      requirePermission('medical_record.edit'),
+    ] as const,
     request: {
       params: z.object({ id: z.uuid() }),
       body: { content: { 'application/json': { schema: updateVisitNoteTemplateSchema } } },
@@ -110,7 +120,10 @@ export const visitNoteTemplatesRoutes = (deps: { audit: AuditLogger }) => {
     path: '/visit-note-templates/{id}',
     tags: ['visit-note-templates'],
     operationId: 'deleteVisitNoteTemplate',
-    middleware: [requirePermission('medical_record.edit')] as const,
+    middleware: [
+      requireModuleInDesktop('clinical'),
+      requirePermission('medical_record.edit'),
+    ] as const,
     request: { params: z.object({ id: z.uuid() }) },
     responses: {
       ...okJson(visitNoteTemplateDeleteResultSchema, 'Template deleted'),
