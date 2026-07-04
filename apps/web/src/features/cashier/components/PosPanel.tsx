@@ -431,7 +431,7 @@ export function PosPanel({ branchId, patientId, onDirtyChange }: PosPanelProps) 
           </UnstyledButton>
           {/* NoOp fiskal eslatma (Soliq scaffold — Phase 2). i18n stub → Task F. */}
           <Text style={{ fontSize: 11, color: 'var(--ink-3)', textAlign: 'center', marginTop: 8 }}>
-            {t('cashier.noop_fiscal', 'Fiskal hujjat keyinroq Soliqqa yuboriladi')}
+            {t('cashier.noop_fiscal')}
           </Text>
         </Box>
       </Card>
