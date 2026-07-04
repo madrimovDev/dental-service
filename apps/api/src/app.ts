@@ -129,7 +129,7 @@ export const createApp = () => {
   app.route('/api/services', serviceRoutes({ db, audit }));
   app.route('/api/service-categories', serviceCategoryRoutes({ db, audit }));
   app.route('/api/cashier', cashierRoutes({ db, audit, fiscal }));
-  app.route('/api/reports', reportsRoutes({ db }));
+  app.route('/api/reports', reportsRoutes({ db, audit }));
   app.route('/api/audit', auditRoutes({ db }));
   // Epic A: doktor jadvali + time-off + availability. Service'ni bir marta
   // yaratamiz va predikatlarini appointmentRoutes'ga inject qilamiz (A6).

@@ -1,6 +1,7 @@
 import { ok } from '@dental/core';
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import type { Database } from '../../db/client.ts';
+import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { requireModuleInDesktop } from '../../lib/license-middleware.ts';
 import { okJson } from '../../lib/openapi.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
@@ -24,13 +25,13 @@ import {
 } from './reports.schema.ts';
 import { createReportsService } from './reports.service.ts';
 
-export const reportsRoutes = (deps: { db: Database }) => {
+export const reportsRoutes = (deps: { db: Database; audit: AuditLogger }) => {
   const app = new OpenAPIHono();
   app.use('*', requireModuleInDesktop('reports'));
   app.use('*', authMiddleware());
   app.use('*', rlsMiddleware(deps.db));
 
-  const service = createReportsService();
+  const service = createReportsService({ audit: deps.audit });
 
   // ─── GET /revenue ──────────────────────────────────────────────────────────
 
