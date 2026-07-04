@@ -12,16 +12,31 @@ export const createConsentService = (deps: { audit: AuditLogger }) => {
     const filters = [];
     if (type) filters.push(eq(consentTemplates.type, type as 'treatment'));
     if (activeOnly) filters.push(eq(consentTemplates.isActive, true));
-    return db
+    const rows = await db
       .select()
       .from(consentTemplates)
       .where(filters.length > 0 ? and(...filters) : undefined)
       .orderBy(desc(consentTemplates.createdAt));
+
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'consent_template',
+      resourceId: null,
+      after: { type: type ?? null, count: rows.length },
+    });
+    return rows;
   }
 
   async function getTemplate(c: Context, id: string) {
     const db = getDb(c);
     const [row] = await db.select().from(consentTemplates).where(eq(consentTemplates.id, id));
+    if (row) {
+      await deps.audit.record(c, {
+        action: 'viewed',
+        resourceType: 'consent_template',
+        resourceId: id,
+      });
+    }
     return row ?? null;
   }
 
@@ -88,11 +103,19 @@ export const createConsentService = (deps: { audit: AuditLogger }) => {
     const db = getDb(c);
     const filters = [];
     if (patientId) filters.push(eq(consentForms.patientId, patientId));
-    return db
+    const rows = await db
       .select()
       .from(consentForms)
       .where(filters.length > 0 ? and(...filters) : undefined)
       .orderBy(desc(consentForms.signedAt));
+
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'consent_form',
+      resourceId: patientId ?? null,
+      after: { patientId: patientId ?? null, count: rows.length },
+    });
+    return rows;
   }
 
   async function signForm(c: Context, input: SignFormInput) {
