@@ -29,7 +29,20 @@ let tray: Tray | null = null;
 
 export const createTray = (role: AppRole, info: TrayInfo, callbacks: TrayCallbacks): void => {
   const iconPath = join(import.meta.dirname, '..', 'assets', 'tray-icon.png');
-  tray = new Tray(nativeImage.createFromPath(iconPath));
+  const icon = nativeImage.createFromPath(iconPath);
+  if (icon.isEmpty()) {
+    console.warn(
+      `[tray] Icon fayl topilmadi yoki yaroqsiz (${iconPath}) — tray ikonkasi ko'rinmasligi mumkin.`,
+    );
+  }
+  try {
+    tray = new Tray(icon);
+  } catch (err) {
+    console.warn(
+      `[tray] Tray ikonkasi yaratilmadi (${iconPath}): ${(err as Error).message}. Ilova tray'siz davom etadi.`,
+    );
+    return;
+  }
   tray.setToolTip('Dental Service');
   updateTray(role, info, callbacks);
 };
