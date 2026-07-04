@@ -11,6 +11,7 @@ import {
 import { and, between, count, countDistinct, desc, eq, isNull, lt, ne, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
+import type { AuditLogger } from '../../lib/audit-logger.ts';
 import {
   branchOpenMinutes,
   comparisonEntry,
@@ -54,7 +55,7 @@ function* eachWeekday(from: string, to: string): Generator<string> {
   }
 }
 
-export const createReportsService = () => {
+export const createReportsService = (deps: { audit: AuditLogger }) => {
   async function revenueTotal(c: Context, { from, to, branchId }: ReportRange): Promise<number> {
     const db = getDb(c);
     const { start, end } = tashkentRange(from, to);
@@ -184,6 +185,13 @@ export const createReportsService = () => {
     const currentTotal = Number(totalRow?.total ?? 0);
     const comparison = await buildComparison(c, { from, to, branchId }, currentTotal, revenueTotal);
 
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'report',
+      resourceId: null,
+      after: { report: 'revenue', from, to, branchId: branchId ?? null },
+    });
+
     return {
       total: currentTotal,
       byBranch: byBranch.map((r) => ({ branchId: r.branchId, total: Number(r.total) })),
@@ -272,6 +280,13 @@ export const createReportsService = () => {
       count: Number(r.c),
     }));
 
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'report',
+      resourceId: null,
+      after: { report: 'appointment_stats', from, to, branchId: branchId ?? null },
+    });
+
     return {
       total,
       byStatus,
@@ -301,6 +316,19 @@ export const createReportsService = () => {
       .from(appointments)
       .where(and(...base))
       .groupBy(appointments.doctorId);
+
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'report',
+      resourceId: null,
+      after: {
+        report: 'doctor_workload',
+        from,
+        to,
+        branchId: branchId ?? null,
+        rowCount: rows.length,
+      },
+    });
 
     return rows.map((r) => ({
       doctorId: r.doctorId,
@@ -333,6 +361,13 @@ export const createReportsService = () => {
     const byStatus = rows.map((r) => ({ status: r.status as string, count: Number(r.c) }));
     const totalStages = byStatus.reduce((s, r) => s + r.count, 0);
     const completedStages = byStatus.find((r) => r.status === 'completed')?.count ?? 0;
+
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'report',
+      resourceId: null,
+      after: { report: 'plan_completion', from, to },
+    });
 
     return {
       totalStages,
@@ -418,6 +453,13 @@ export const createReportsService = () => {
       .where(and(...nsFilter))
       .groupBy(sql`EXTRACT(DOW FROM ${appointments.startTime} AT TIME ZONE 'Asia/Tashkent')`);
 
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'report',
+      resourceId: null,
+      after: { report: 'dental_analytics', from, to, branchId: branchId ?? null },
+    });
+
     return {
       procedureMix: mixRows.map((r) => ({
         serviceName: r.serviceName,
@@ -472,6 +514,13 @@ export const createReportsService = () => {
       .leftJoin(patients, eq(cashierTransactions.patientId, patients.id))
       .where(and(...filter))
       .orderBy(cashierTransactions.createdAt);
+
+    await deps.audit.record(c, {
+      action: 'exported',
+      resourceType: 'report',
+      resourceId: null,
+      after: { report: '1c_export', from, to, branchId: branchId ?? null, rowCount: rows.length },
+    });
 
     return rows.map((r) => ({
       date: String(r.date),
