@@ -94,4 +94,44 @@ describe('CLI-359 — /uploads mount', () => {
     expect(body.success).toBe(false);
     expect(body.error.code).toBe('NOT_FOUND');
   });
+
+  test('correct tenant but non-existent file -> 404 (unchanged from before CLI-359)', async () => {
+    const tenantAId = randomUUID();
+    const patientId = randomUUID();
+    const key = `tenants/${tenantAId}/patients/${patientId}/${randomUUID()}.jpg`; // hech qachon save qilinmagan
+
+    const { token } = await signAccess({
+      sub: randomUUID(),
+      atid: tenantAId,
+      abid: null,
+      perms: [],
+      roleKey: null,
+      lang: 'uz',
+    });
+
+    const app = createApp();
+    const res = await app.request(`/uploads/${encodeURIComponent(key)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(res.status).toBe(404);
+  });
+
+  test('malformed key (no "tenants/" prefix) -> 404, never leaks arbitrary path', async () => {
+    const { token } = await signAccess({
+      sub: randomUUID(),
+      atid: randomUUID(),
+      abid: null,
+      perms: [],
+      roleKey: null,
+      lang: 'uz',
+    });
+
+    const app = createApp();
+    const res = await app.request(`/uploads/${encodeURIComponent('not-a-tenant-path/x.jpg')}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(res.status).toBe(404);
+  });
 });
