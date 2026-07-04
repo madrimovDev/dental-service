@@ -1,5 +1,6 @@
 import { screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { i18n } from '@/lib/i18n.ts';
 import { renderApp } from '../../../test-utils';
 import { SelectWorkspacePage } from './select-workspace.page';
 
@@ -43,7 +44,7 @@ describe('SelectWorkspacePage — CLI-373 owner badge i18n', () => {
   it("egasi bejchasi tarjima qilingan matn bilan ko'rinadi, literal 'Owner' emas", () => {
     renderApp(<SelectWorkspacePage />);
 
-    expect(screen.getByText('Egasi')).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('auth.select_workspace.owner_badge'))).toBeInTheDocument();
     expect(screen.queryByText('Owner')).not.toBeInTheDocument();
   });
 });
