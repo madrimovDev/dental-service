@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test';
 import { EventEmitter } from 'node:events';
+import { rmSync } from 'node:fs';
+import { join } from 'node:path';
 
 // 'electron' va 'node:child_process' mock qilinadi — mock.module BEFORE any
 // dynamic import of './process-manager' resolves it (bun mock.module must be
@@ -55,6 +57,13 @@ process.env.DENTAL_VALKEY_READY_DELAY_MS = '5';
 process.env.DENTAL_API_READY_DELAY_MS = '5';
 process.env.DENTAL_STOP_WAIT_MS = '5';
 
+// CLI-390: eski test-run'lardan qolgan db-password.txt bo'lsa tozalaymiz —
+// aks holda isFirstRun()'ning "fresh install" filiali bu statik (mkdtemp
+// emas) DENTAL_DATA_DIR'da deterministik ishlamaydi.
+rmSync(join('/tmp/dental-pm-test', 'db-password.txt'), { force: true });
+
+const { getOrCreateDbPassword } = await import('./first-run.js');
+
 const {
   startServer,
   stopServer,
@@ -90,7 +99,6 @@ describe('process-manager', () => {
     expect(spawnCalls[2]?.cmd).toBe(getApiCommand());
     expect(spawnCalls[2]?.opts.env).toMatchObject({
       API_PORT: '8080',
-      DATABASE_URL: 'postgresql://dental_app:dental_app_local_dev@localhost:5433/dental',
       REDIS_URL: 'redis://localhost:6380',
       RUN_REMINDER_WORKER: 'true',
       NODE_ENV: 'production',
@@ -104,6 +112,12 @@ describe('process-manager', () => {
     // avtomatik chetlab o'tadi, butun tenant izolyatsiyasini yo'qqa chiqaradi.
     expect(env.DATABASE_URL).toContain('dental_app');
     expect(env.DATABASE_URL).not.toMatch(/:\/\/dental:/);
+    // Regression guard (CLI-390): parol endi committed literal EMAS — persisted
+    // (first-run.ts) qiymatdan qurilgan bo'lishi shart.
+    expect(env.DATABASE_URL).not.toContain('dental_app:dental_app_local_dev');
+    expect(env.DATABASE_URL).toBe(
+      `postgresql://dental_app:${getOrCreateDbPassword()}@localhost:5433/dental`,
+    );
   });
 
   test('stopServer barcha child process\'larni SIGTERM bilan to\'xtatadi, status "stopped"', async () => {
