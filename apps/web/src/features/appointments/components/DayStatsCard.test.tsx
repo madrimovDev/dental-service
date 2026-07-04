@@ -54,8 +54,8 @@ describe('DayStatsCard', () => {
     expect(value('day-stat-total')).toBe('0');
   });
 
-  it('"Bo‘sh slot" data manbai yo‘q → — placeholder', () => {
+  it("\"Bo'sh slot\" tile olib tashlangan — FreeSlotsCard xuddi shu rail'da real ma'lumot bilan uni almashtiradi (CLI-374)", () => {
     renderApp(<DayStatsCard appts={[appt('1', 'confirmed')]} />);
-    expect(value('day-stat-free')).toBe('—');
+    expect(screen.queryByTestId('day-stat-free')).not.toBeInTheDocument();
   });
 });

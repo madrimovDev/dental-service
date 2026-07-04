@@ -7,7 +7,11 @@ import type { Appointment } from '../appointments.types';
  *
  * Jami / Tasdiqlangan / Kutilmoqda — uzatilgan `appts`'dan client-side hisoblanadi
  * (`appts ?? []` xavfsiz — bo'sh → 0; CalendarScreen.test `useAppointments`'ni `{data:[]}` mock qiladi).
- * "Bo'sh slot" → `—` (data manbai yo'q — ds12 data-gap; backend chaqiruvi qo'shilmaydi).
+ * "Bo'sh slot" tile OLIB TASHLANDI (CLI-374) — `FreeSlotsCard.tsx` shu
+ * rail'da (`CalendarScreen.tsx`) xuddi shu `appointments.free_slots`
+ * labeli bilan `useBranchAvailability` orqali real ma'lumot ko'rsatadi;
+ * bu yerda statik `—` tile'ni qoldirish uni dublikat va chalg'ituvchi
+ * qilardi (bir ekranda ikkita ziddiyatli "Bo'sh vaqtlar" kartasi).
  */
 type Tile = { key: string; labelKey: string; value: string };
 
@@ -55,8 +59,8 @@ export function DayStatsCard({ appts }: { appts?: Appointment[] }) {
     { key: 'total', labelKey: 'dashboard.today_total', value: String(total) },
     { key: 'confirmed', labelKey: 'appointments.status.confirmed', value: String(confirmed) },
     { key: 'pending', labelKey: 'appointments.status.scheduled', value: String(pending) },
-    // "Bo'sh slot" — data manbai yo'q (ds12 data-gap) → placeholder.
-    { key: 'free', labelKey: 'appointments.free_slots', value: '—' },
+    // "Bo'sh slot" tile olib tashlandi (CLI-374) — FreeSlotsCard.tsx shu rail'da
+    // xuddi shu labelda real ma'lumot ko'rsatadi (spec §2.2/§4.2).
   ];
 
   return (
