@@ -63,8 +63,18 @@ export type RecallAppointmentHook = {
     c: Context,
     args: { patientId: string; branchId?: string | null },
   ) => Promise<void>;
-  /** Yangi yozilish → bemorning ochiq recall'larini scheduled qiladi (rebook). */
-  closeOpenOnRebook: (c: Context, patientId: string, newAppointmentId: string) => Promise<void>;
+  /**
+   * Yangi yozilish → bemorning ochiq recall'larini scheduled qiladi (rebook).
+   * CLI-426: `appointmentStart` relevantlik filtri uchun (due-oynasiga yaqin recall'gina).
+   */
+  closeOpenOnRebook: (
+    c: Context,
+    patientId: string,
+    newAppointmentId: string,
+    appointmentStart: Date,
+  ) => Promise<void>;
+  /** Yozilish cancel/no_show → uni yopgan scheduled recall'ni pending'ga qaytaradi (CLI-426). */
+  reopenOnCancel: (c: Context, appointmentId: string) => Promise<void>;
 };
 
 export const createAppointmentsService = (deps: {
@@ -208,8 +218,9 @@ export const createAppointmentsService = (deps: {
     if (delay != null) await deps.enqueueReminder?.(tenantId, appt.id, delay);
 
     // B5: yangi yozilish — bemorning ochiq recall'larini scheduled qiladi va
-    // shu yozilishga bog'laydi (rebook linkage). Ochiq recall yo'q bo'lsa no-op.
-    await deps.recall?.closeOpenOnRebook(c, appt.patientId, appt.id);
+    // shu yozilishga bog'laydi (rebook linkage). CLI-426: relevantlik uchun
+    // yozilish boshlanish vaqti uzatiladi. Ochiq/relevant recall yo'q → no-op.
+    await deps.recall?.closeOpenOnRebook(c, appt.patientId, appt.id, appt.startTime);
 
     return { ok: true as const, appointment: appt };
   }
@@ -298,6 +309,16 @@ export const createAppointmentsService = (deps: {
           patientId: updated.patientId,
           branchId: updated.branchId,
         });
+      }
+
+      // CLI-426: yozilish cancel/no_show'ga o'tganda — uni yopgan scheduled
+      // recall'ni pending'ga qaytar (dashboardga qaytadi, follow-up yo'qolmaydi).
+      if (
+        (input.status === 'cancelled' || input.status === 'no_show') &&
+        before.status !== input.status &&
+        deps.recall
+      ) {
+        await deps.recall.reopenOnCancel(c, id);
       }
 
       // Reschedule eslatma hayot-sikli (CLI-186): startTime o'zgarsa, eski

@@ -13,6 +13,24 @@ import type {
 const CLOSED_STATUSES = new Set(['scheduled', 'completed', 'dismissed']);
 
 /**
+ * Rebook relevantlik oynasi (CLI-426): yozilish recall'ni faqat `dueDate − 30 kun`
+ * dan keyin (yoki keyingi) boshlansa yopadi. Uzoq kelajakdagi (mas. +4 oy preventive)
+ * recall bugungi shoshilinch yozilish bilan yopilmaydi.
+ */
+const REBOOK_GRACE_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * Yozilish recall'ni yopishga "yetarlicha yaqin"mi — `appointmentStart >= dueDate − 30d`.
+ * dueDate klinika-local kun string'i ("YYYY-MM-DD"); UTC yarim tunga anchor qilamiz
+ * (grace kun sonida ishlaydi, TZ mayda farqi ahamiyatsiz).
+ */
+export function isRebookRelevant(dueDate: string, appointmentStart: Date): boolean {
+  const dueMs = Date.parse(`${dueDate}T00:00:00Z`);
+  if (Number.isNaN(dueMs)) return true; // noto'g'ri sana → eski xulq (yop)
+  return appointmentStart.getTime() >= dueMs - REBOOK_GRACE_MS;
+}
+
+/**
  * Bugungi klinika-local kun (YYYY-MM-DD) + N oy → due-date string.
  * `date` ustun instant emas — klinika kalendar kuni (Asia/Tashkent) bilan ishlaymiz.
  */
@@ -189,22 +207,43 @@ export const createRecallsService = (deps: { audit: AuditLogger }) => {
 
   /**
    * Bemor qayta yozilganda (appointments.create) — uning ochiq (pending/contacted)
-   * recall'larini scheduled qiladi va yozilishga bog'laydi (B5). Idempotent:
-   * ochiq recall bo'lmasa no-op.
+   * recall'larini scheduled qiladi va yozilishga bog'laydi (B5). CLI-426: faqat
+   * yozilish recall due-oynasiga RELEVANT bo'lsa (`start >= dueDate − 30d`) yopadi;
+   * uzoq kelajak recall'lar ochiq qoladi (yo'qolmaydi). Idempotent: mos ochiq recall
+   * bo'lmasa no-op.
    */
   async function closeOpenOnRebook(
     c: Context,
     patientId: string,
     newAppointmentId: string,
+    appointmentStart: Date,
   ): Promise<void> {
     const user = c.get('user');
     const open = await repo.findOpenByPatient(c, patientId);
     for (const r of open) {
+      if (!isRebookRelevant(r.dueDate, appointmentStart)) continue;
       await repo.update(c, r.id, {
         status: 'scheduled',
         scheduledAppointmentId: newAppointmentId,
         closedBy: user?.id ?? null,
         closedAt: new Date(),
+      });
+    }
+  }
+
+  /**
+   * Yozilish cancel/no_show bo'lganda (appointments.update) — uni yopgan `scheduled`
+   * recall'larni `pending`ga qaytaradi (CLI-426 reopen). dueDate o'zgarmaydi → recall
+   * dashboardga qaytadi. Faqat SHU yozilish yopgan recall'lar (link bo'yicha).
+   */
+  async function reopenOnCancel(c: Context, appointmentId: string): Promise<void> {
+    const reopened = await repo.reopenByAppointment(c, appointmentId);
+    if (reopened > 0) {
+      await deps.audit.record(c, {
+        action: 'reopened',
+        resourceType: 'recall',
+        resourceId: appointmentId,
+        after: { reopened, appointmentId },
       });
     }
   }
@@ -232,6 +271,7 @@ export const createRecallsService = (deps: { audit: AuditLogger }) => {
     autoCreateFromStage,
     autoCreatePreventive,
     closeOpenOnRebook,
+    reopenOnCancel,
     summary,
   };
 };

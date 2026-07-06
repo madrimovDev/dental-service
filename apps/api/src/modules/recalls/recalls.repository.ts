@@ -128,6 +128,30 @@ export const createRecallsRepository = () => {
       );
   }
 
+  /**
+   * Yozilish bekor/no_show bo'lganda uni yopgan recall'larni qayta ochadi (B/CLI-426):
+   * `scheduled_appointment_id = appointmentId AND status='scheduled'` → `pending`ga
+   * qaytar, link/closedBy/closedAt tozala. dueDate o'zgarmaydi. Idempotent (topilmasa
+   * no-op). Qaytadi: qayta ochilgan qatorlar soni. RLS tenant-scoped.
+   */
+  async function reopenByAppointment(c: Context, appointmentId: string): Promise<number> {
+    const db = getDb(c);
+    const rows = await db
+      .update(recalls)
+      .set({
+        status: 'pending',
+        scheduledAppointmentId: null,
+        closedBy: null,
+        closedAt: null,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(eq(recalls.scheduledAppointmentId, appointmentId), eq(recalls.status, 'scheduled')),
+      )
+      .returning({ id: recalls.id });
+    return rows.length;
+  }
+
   async function update(
     c: Context,
     id: string,
@@ -190,6 +214,7 @@ export const createRecallsRepository = () => {
     insertIfAbsent,
     hasOpenByReason,
     findOpenByPatient,
+    reopenByAppointment,
     update,
     getDefaultIntervalMonths,
     summary,
