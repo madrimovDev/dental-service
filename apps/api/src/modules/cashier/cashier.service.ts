@@ -11,7 +11,7 @@ import { and, between, count, desc, eq, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
-import { computePlanBalance } from './cashier.billing.ts';
+import { computePlanBalance, distributeRefundNegations } from './cashier.billing.ts';
 import type { CreateTransactionInput, ListTransactionsQuery } from './cashier.schema.ts';
 
 const generateReceiptNumber = (): string => {
@@ -289,7 +289,6 @@ export const createCashierService = (deps: { audit: AuditLogger; fiscal?: Fiscal
         return { ok: false as const, reason: 'non_plan_partial' as const };
       }
 
-      const factor = paid > 0 ? refundAmount / paid : 1;
       const refundSeq =
         (
           await tx
@@ -332,12 +331,15 @@ export const createCashierService = (deps: { audit: AuditLogger; fiscal?: Fiscal
         .where(eq(treatmentStagePayments.transactionId, id));
 
       if (origAllocations.length > 0) {
+        // CLI-418: 2dp yaxlitlash + residue true-up (Σ negatsiya aynan proporsional
+        // maqsad — kasr drift yo'q). `factor` inline ko'paytirish o'rniga sof helper.
+        const negations = distributeRefundNegations(origAllocations, refundAmount, paid);
         await tx.insert(treatmentStagePayments).values(
-          origAllocations.map((a) => ({
+          negations.map((n) => ({
             tenantId: original.tenantId,
             transactionId: refundTx.id,
-            stageId: a.stageId,
-            amount: String(-(Number(a.amount) * factor)),
+            stageId: n.stageId,
+            amount: n.amount,
           })),
         );
       }
@@ -370,7 +372,10 @@ export const createCashierService = (deps: { audit: AuditLogger; fiscal?: Fiscal
       .select({
         paymentMethod: cashierTransactions.paymentMethod,
         type: cashierTransactions.type,
-        total: sql<string>`SUM(${cashierTransactions.totalAmount})`,
+        // CLI-419: olingan pul = paidAmount (totalAmount = hisob-faktura; sale kam
+        // to'langan bo'lishi mumkin → kassa qoldig'i totalAmount emas). `type` bo'yicha
+        // guruhlanadi — frontend refundni kassa-chiqim sifatida netlaydi.
+        total: sql<string>`SUM(${cashierTransactions.paidAmount})`,
         count: count(),
       })
       .from(cashierTransactions)

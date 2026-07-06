@@ -1,5 +1,44 @@
 import { describe, expect, it } from 'bun:test';
-import { computePlanBalance } from './cashier.billing.ts';
+import { computePlanBalance, distributeRefundNegations } from './cashier.billing.ts';
+
+describe('distributeRefundNegations (CLI-418)', () => {
+  const sum = (rows: { amount: string }[]) => rows.reduce((s, r) => s + Number(r.amount), 0);
+
+  it("3000 (1000/1000/1000), refund 1000 → Σ = aynan -1000 (drift yo'q)", () => {
+    const allocs = [
+      { stageId: 'a', amount: '1000.00' },
+      { stageId: 'b', amount: '1000.00' },
+      { stageId: 'c', amount: '1000.00' },
+    ];
+    const neg = distributeRefundNegations(allocs, 1000, 3000);
+    // Har biri ~-333.33, oxirgisi residue bilan → Σ = -1000.00 aynan.
+    expect(sum(neg)).toBeCloseTo(-1000, 2);
+    // Har amount 2dp (numeric(14,2) xavfsiz).
+    for (const n of neg) expect(Number(n.amount) * 100).toBe(Math.round(Number(n.amount) * 100));
+  });
+
+  it("to'liq refund (factor=1) → har stage aynan -amount", () => {
+    const allocs = [
+      { stageId: 'a', amount: '1000.00' },
+      { stageId: 'b', amount: '500.00' },
+    ];
+    const neg = distributeRefundNegations(allocs, 1500, 1500);
+    expect(sum(neg)).toBeCloseTo(-1500, 2);
+  });
+
+  it('qisman split 1000/500, refund 1000 (factor 2/3) → Σ = -1000', () => {
+    const allocs = [
+      { stageId: 'a', amount: '1000.00' },
+      { stageId: 'b', amount: '500.00' },
+    ];
+    const neg = distributeRefundNegations(allocs, 1000, 1500);
+    expect(sum(neg)).toBeCloseTo(-1000, 2);
+  });
+
+  it('bo‘sh allocation → bo‘sh natija', () => {
+    expect(distributeRefundNegations([], 1000, 1000)).toEqual([]);
+  });
+});
 
 // Drizzle numeric'ni string qaytaradi — test real DB shaklini aks ettiradi.
 const stages = [
