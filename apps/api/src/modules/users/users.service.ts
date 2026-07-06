@@ -8,7 +8,7 @@ import {
   userAssignments,
   users,
 } from '@dental/db-schema';
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, gt, isNull, or, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { Database } from '../../db/client.ts';
 import { getDb } from '../../db/scoped.ts';
@@ -436,7 +436,7 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
             eq(userAssignments.userId, userId),
             eq(userAssignments.tenantId, tenantId),
             eq(userAssignments.isActive, true),
-            sql`(${userAssignments.validTo} IS NULL OR ${userAssignments.validTo} > ${now0})`,
+            or(isNull(userAssignments.validTo), gt(userAssignments.validTo, now0)),
           ),
         );
       if (!assignment) return { ok: false as const, code: 'user.not_member' as const };
