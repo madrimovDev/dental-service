@@ -40,6 +40,11 @@ export const listAppointmentsQuery = z.object({
   patientId: z.uuid().optional(),
   from: z.iso.datetime().optional(),
   to: z.iso.datetime().optional(),
+  // CLI-435: majburiy chegara (self-DoS). Javob shakli o'zgarmaydi (bare array) —
+  // default pageSize 100 (kunlik kalendar ko'rinishini chegarasiz qamraydi),
+  // `.max(100)` cap chegarasiz so'rovni yopadi. patients.schema naqshi bilan izchil.
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().positive().max(100).default(100),
 });
 export type ListAppointmentsQuery = z.infer<typeof listAppointmentsQuery>;
 

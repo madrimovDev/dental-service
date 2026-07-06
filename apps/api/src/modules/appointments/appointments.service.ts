@@ -147,11 +147,15 @@ export const createAppointmentsService = (deps: {
       filters.push(lte(appointments.startTime, new Date(query.to)));
     }
 
+    // CLI-435: majburiy chegara + barqaror tartib (startTime asc, id tie-break).
+    const offset = (query.page - 1) * query.pageSize;
     return db
       .select()
       .from(appointments)
       .where(filters.length > 0 ? and(...filters) : undefined)
-      .orderBy(asc(appointments.startTime));
+      .orderBy(asc(appointments.startTime), asc(appointments.id))
+      .limit(query.pageSize)
+      .offset(offset);
   }
 
   async function getById(c: Context, id: string) {
