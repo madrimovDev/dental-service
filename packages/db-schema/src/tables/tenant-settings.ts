@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { integer, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
+import { integer, jsonb, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
 import { tenants } from './tenants.ts';
 
 /**
@@ -27,6 +27,13 @@ export const tenantSettings = pgTable(
     defaultRecallIntervalMonths: integer('default_recall_interval_months').notNull().default(6),
     timezone: text('timezone').notNull().default('Asia/Tashkent'),
     recallSendHourLocal: integer('recall_send_hour_local').notNull().default(10),
+    // DS12 (DS10 Sozlamalar): bildirishnoma toggle'lari — kanal/hodisa bo'yicha
+    // boolean xarita (masalan { appointmentReminder: true, recallSms: false }).
+    // Nullable JSONB — eski rows'da yo'q; default xulq service qatlamida.
+    notificationSettings: jsonb('notification_settings').$type<Record<string, boolean> | null>(),
+    // DS12 (DS10 Sozlamalar): integratsiya konfiguratsiyasi (provider bo'yicha blob,
+    // masalan { telegram: { enabled }, sms: { provider } }). Nullable, backward-compatible.
+    integrationSettings: jsonb('integration_settings').$type<Record<string, unknown> | null>(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

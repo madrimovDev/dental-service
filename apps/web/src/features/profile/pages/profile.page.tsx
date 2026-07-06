@@ -1,15 +1,5 @@
 import { ApiError } from '@dental/api-client';
-import {
-  Alert,
-  Button,
-  Container,
-  Group,
-  Paper,
-  PasswordInput,
-  Stack,
-  Text,
-  Title,
-} from '@mantine/core';
+import { Alert, Button, Group, Paper, PasswordInput, Stack, Text, Title } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { IconLock, IconUser } from '@tabler/icons-react';
@@ -72,74 +62,72 @@ export function ProfilePage() {
   });
 
   return (
-    <Container size="sm">
-      <Stack gap="lg">
-        <Group>
-          <IconUser size={24} />
-          <Title order={2}>{t('profile.title')}</Title>
-        </Group>
+    <Stack gap="lg">
+      <Group>
+        <IconUser size={24} />
+        <Title order={2}>{t('profile.title')}</Title>
+      </Group>
 
-        <Paper withBorder p="lg" radius="md">
+      <Paper withBorder p="lg" radius="md">
+        <Stack gap="md">
+          <Group>
+            <Text fw={600}>{user?.fullName ?? user?.phone}</Text>
+          </Group>
+          <Text size="sm" c="dimmed">
+            {user?.phone}
+          </Text>
+        </Stack>
+      </Paper>
+
+      <Paper withBorder p="lg" radius="md">
+        <form
+          onSubmit={form.onSubmit((values) =>
+            changeMut.mutate({
+              currentPassword: values.currentPassword,
+              newPassword: values.newPassword,
+            }),
+          )}
+        >
           <Stack gap="md">
             <Group>
-              <Text fw={600}>{user?.fullName ?? user?.phone}</Text>
+              <IconLock size={20} />
+              <Title order={4}>{t('profile.change_password')}</Title>
             </Group>
-            <Text size="sm" c="dimmed">
-              {user?.phone}
-            </Text>
+
+            <Alert color="yellow" variant="light">
+              <Text size="sm">{t('profile.change_password_warning')}</Text>
+            </Alert>
+
+            <PasswordInput
+              label={t('profile.current_password')}
+              required
+              {...form.getInputProps('currentPassword')}
+            />
+            <PasswordInput
+              label={t('profile.new_password')}
+              description={t('profile.new_password_hint')}
+              required
+              {...form.getInputProps('newPassword')}
+            />
+            <PasswordInput
+              label={t('profile.confirm_password')}
+              required
+              error={
+                form.errors.confirmPassword === 'passwords_not_match'
+                  ? t('profile.passwords_not_match')
+                  : form.errors.confirmPassword
+              }
+              {...form.getInputProps('confirmPassword')}
+            />
+
+            <Group justify="flex-end">
+              <Button type="submit" loading={changeMut.isPending}>
+                {t('profile.save')}
+              </Button>
+            </Group>
           </Stack>
-        </Paper>
-
-        <Paper withBorder p="lg" radius="md">
-          <form
-            onSubmit={form.onSubmit((values) =>
-              changeMut.mutate({
-                currentPassword: values.currentPassword,
-                newPassword: values.newPassword,
-              }),
-            )}
-          >
-            <Stack gap="md">
-              <Group>
-                <IconLock size={20} />
-                <Title order={4}>{t('profile.change_password')}</Title>
-              </Group>
-
-              <Alert color="yellow" variant="light">
-                <Text size="sm">{t('profile.change_password_warning')}</Text>
-              </Alert>
-
-              <PasswordInput
-                label={t('profile.current_password')}
-                required
-                {...form.getInputProps('currentPassword')}
-              />
-              <PasswordInput
-                label={t('profile.new_password')}
-                description={t('profile.new_password_hint')}
-                required
-                {...form.getInputProps('newPassword')}
-              />
-              <PasswordInput
-                label={t('profile.confirm_password')}
-                required
-                error={
-                  form.errors.confirmPassword === 'passwords_not_match'
-                    ? t('profile.passwords_not_match')
-                    : form.errors.confirmPassword
-                }
-                {...form.getInputProps('confirmPassword')}
-              />
-
-              <Group justify="flex-end">
-                <Button type="submit" loading={changeMut.isPending}>
-                  {t('profile.save')}
-                </Button>
-              </Group>
-            </Stack>
-          </form>
-        </Paper>
-      </Stack>
-    </Container>
+        </form>
+      </Paper>
+    </Stack>
   );
 }

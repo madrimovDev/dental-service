@@ -18,6 +18,9 @@ out/
 .env.*.local
 !.env.example
 
+# Local Desktop dev — LICENSE_PATH override (.lic file, machine-specific)
+.dev-data/
+
 # Logs
 *.log
 npm-debug.log*
@@ -46,6 +49,15 @@ coverage/
 # Electron build
 apps/desktop/dist-electron/
 apps/desktop/release/
+# electron-builder buildResources (icons, NSIS scripts) — versioned, not generated
+!apps/desktop/build/
+# Dev-only staged resources (compiled api binary, apps/web build, infra
+# symlink) for running the real server-mode flow locally without full
+# NSIS/AppImage packaging — never committed (huge binary blobs).
+apps/desktop/resources/
+# No trailing slash — this is a symlink (to ../../infra), not a real
+# directory; git's dir-only "/" suffix pattern doesn't match symlinks.
+apps/desktop/infra
 
 # Misc
 *.pid

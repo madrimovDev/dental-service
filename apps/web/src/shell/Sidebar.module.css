@@ -1,3 +1,8 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
 .top {
   height: 46px;
   display: flex;
@@ -104,4 +109,208 @@
   border: 1px solid var(--border);
   border-radius: 20px;
   padding: 1px 6px;
+}
+.label {
+  /* wrapper so rail CSS can target it independently */
+}
+
+/* Workspace header */
+.wsHeader {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  min-width: 0;
+}
+.wsHeader:hover {
+  background: var(--surface-2);
+}
+.wsHeader:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+.wsHeader:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.wsHeaderRail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 6px 0;
+  border-radius: var(--radius-md);
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+.wsHeaderRail:hover {
+  background: var(--surface-2);
+}
+.wsHeaderRail:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+.wsAvatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--primary);
+  color: var(--text-on-primary);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 13px;
+  flex: none;
+}
+.wsInfo {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  min-width: 0;
+  overflow: hidden;
+}
+.wsInfo b {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wsBranch {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wsChevron {
+  margin-left: auto;
+  color: var(--text-3);
+  flex: none;
+}
+
+/* Sidebar footer */
+.foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border-subtle);
+  min-height: 52px;
+}
+.footInfo {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  min-width: 0;
+  overflow: hidden;
+  flex: 1;
+}
+.footInfo b {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.footInfo span {
+  font-size: 11px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.footLogout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--text-3);
+  flex: none;
+}
+.footLogout:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.footLogout:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+.footProfile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 4px;
+  margin: -4px;
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: inherit;
+}
+.footProfile:hover {
+  background: var(--surface-2);
+}
+.footProfile:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+.footProfileRail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  text-decoration: none;
+}
+.footProfileRail:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+/* Rail mode (76px collapsed) */
+[data-rail="true"] .topLabel,
+[data-rail="true"] .groupLabel,
+[data-rail="true"] .label,
+[data-rail="true"] .soon {
+  display: none;
+}
+[data-rail="true"] .item {
+  justify-content: center;
+  gap: 0;
+  padding: 8px 0;
+}
+[data-rail="true"] .top {
+  justify-content: center;
+  padding: 0 8px;
+}
+[data-rail="true"] .pin {
+  margin-left: 0;
+}
+[data-rail="true"] .foot {
+  justify-content: center;
+  padding: 10px 0;
+}
+[data-rail="true"] .footInfo {
+  display: none;
+}
+[data-rail="true"] .footLogout {
+  width: 36px;
+  height: 36px;
 }

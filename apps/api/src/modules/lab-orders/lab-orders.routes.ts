@@ -2,6 +2,7 @@ import { fail, ok } from '@dental/core';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { requireModuleInDesktop } from '../../lib/license-middleware.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requireFeature } from '../../middleware/require-feature.ts';
@@ -12,6 +13,8 @@ import {
   createLabOrderSchema,
   labOrderDtoSchema,
   labOrderIdParamSchema,
+  labOrderListResponseDtoSchema,
+  listLabOrdersQuerySchema,
   updateLabOrderSchema,
 } from './lab-orders.schema.ts';
 import { createLabOrdersService } from './lab-orders.service.ts';
@@ -26,6 +29,7 @@ const notFoundResponse = {
 
 export const labOrdersRoutes = (deps: { db: Database; audit: AuditLogger }) => {
   const app = new OpenAPIHono();
+  app.use('*', requireModuleInDesktop('lab-orders'));
   app.use('*', authMiddleware());
   app.use('*', rlsMiddleware(deps.db));
 
@@ -40,20 +44,18 @@ export const labOrdersRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     operationId: 'listLabOrders',
     middleware: [requirePermission('lab_order.view'), requireFeature('labOrders')] as const,
     request: {
-      query: z.object({
-        patientId: z.uuid().optional(),
-        status: z
-          .enum(['draft', 'sent', 'in_progress', 'ready', 'delivered', 'cancelled'])
-          .optional(),
-      }),
+      query: listLabOrdersQuerySchema,
     },
-    responses: okJson(z.array(labOrderDtoSchema), 'List of lab orders'),
+    responses: okJson(
+      labOrderListResponseDtoSchema,
+      'Paginated lab orders (tenant-wide or patient-filtered)',
+    ),
   });
 
   app.openapi(listRoute, async (c) => {
-    const { patientId, status } = c.req.valid('query');
-    const rows = await service.list(c, patientId, status);
-    return c.json(ok(rows.map(toLabOrderDto)), 200);
+    const query = c.req.valid('query');
+    const { data, meta } = await service.list(c, query);
+    return c.json(ok({ data: data.map(toLabOrderDto), meta }), 200);
   });
 
   // ─── GET /overdue — muddati o'tgan buyurtmalar (V3-5) ───────────────────────

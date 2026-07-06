@@ -1,12 +1,16 @@
+/* Dental OS notification panel — token-based re-skin. Logika o'zgarmaydi. */
+
 .header {
-  border-bottom: 1px solid var(--mantine-color-default-border);
+  border-bottom: 1px solid var(--border);
 }
 
 .row {
-  display: block;
+  display: flex;
+  gap: 10px;
   width: 100%;
-  padding: var(--mantine-spacing-sm) var(--mantine-spacing-md);
-  border-bottom: 1px solid var(--mantine-color-default-border);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: left;
 }
 
 .row:last-child {
@@ -14,15 +18,35 @@
 }
 
 .row:hover {
-  background: var(--mantine-color-default-hover);
+  background: var(--surface-2);
 }
 
 .row[data-unread] {
-  background: var(--mantine-color-blue-light);
+  background: var(--primary-soft);
 }
 
 .row[data-unread]:hover {
-  background: var(--mantine-color-blue-light-hover);
+  background: var(--primary-tint-2);
+}
+
+.iconChip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
 }
 
 .unreadDot {
@@ -30,5 +54,5 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--mantine-color-red-6);
+  background: var(--danger);
 }

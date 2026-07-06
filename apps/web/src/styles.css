@@ -1,8 +1,11 @@
 @import "@dental/ui/tokens.css";
-@import "@mantine/core/styles.css";
-@import "@mantine/dates/styles.css";
-@import "@mantine/notifications/styles.css";
-@import "@mantine/spotlight/styles.css";
+/* Mantine CSS'ni @layer mantine'ga o'raydi — @dental/ui design-system primitivlari
+   (Button.module.css va h.k., layer'siz) Mantine reset'larini override qiladi.
+   Fix: UnstyledButton padding:0 reset @dental/ui Button .root padding'ini bosib turardi. */
+@import "@mantine/core/styles.layer.css";
+@import "@mantine/dates/styles.layer.css";
+@import "@mantine/notifications/styles.layer.css";
+@import "@mantine/spotlight/styles.layer.css";
 
 html,
 body,
@@ -34,6 +37,78 @@ body {
 .skip-link:focus {
   left: 8px;
   top: 8px;
+}
+
+/* ============================================================================
+   Mantine input → @dental/ui Input vizual paritet (theme-convergent, Qaror #19).
+   Layer'siz (styles.css) — @layer mantine'ni override qiladi. Manba kanonik
+   ko'rinish: packages/ui/src/primitives/Input/Input.module.css.
+   .mantine-Input-input bazasini TextInput/Textarea/Select/MultiSelect/
+   NumberInput/PasswordInput/DateInput — hammasi ulashadi, shu sabab bitta
+   joydan butun ilova form-elementlari bir xil ko'rinadi.
+   Eslatma: padding ATAYLAB override qilinmaydi — Mantine rightSection (Select
+   chevron, NumberInput tugmalari, Password ko'rsatish) joyini saqlash uchun.
+   ============================================================================ */
+.mantine-Input-input {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  color: var(--text);
+  min-height: 36px;
+  transition: border-color var(--dur-fast);
+}
+.mantine-Input-input::placeholder {
+  color: var(--text-3);
+}
+.mantine-Input-input:focus,
+.mantine-Input-input:focus-within {
+  border-color: var(--primary);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 0;
+}
+.mantine-Input-input[aria-invalid="true"],
+.mantine-Input-input[data-error] {
+  border-color: var(--danger);
+}
+.mantine-Input-input:disabled,
+.mantine-Input-input[data-disabled] {
+  opacity: 0.5;
+  background: var(--surface-2);
+}
+
+/* Label / required yulduzcha / xato matni */
+.mantine-InputWrapper-label {
+  font-size: var(--text-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-2);
+  margin-bottom: 6px;
+}
+.mantine-InputWrapper-required {
+  color: var(--danger);
+}
+.mantine-InputWrapper-error {
+  font-size: var(--text-sm);
+  color: var(--danger);
+  margin-top: 2px;
+}
+
+/* Select / MultiSelect dropdown + variant (manba: Select.module.css) */
+.mantine-Combobox-dropdown {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.mantine-Combobox-option {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  border-radius: var(--radius-sm);
+}
+.mantine-Combobox-option[data-checked] {
+  background: var(--primary-tint);
+  color: var(--primary-hover);
 }
 
 /* prefers-reduced-motion — vestibulyar harakatni kamaytirish */

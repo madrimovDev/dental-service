@@ -5,12 +5,24 @@ import { Group, Select, Stack, Textarea } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { useForm } from '@mantine/form';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
+import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCreateTimeOff } from '../schedule.api';
 import { fullDayRangeToInstants, localDateParam } from '../schedule.mappers';
 import { type TimeOffValues, timeOffSchema } from '../schedule.schema';
 
 const TYPE_VALUES: CreateTimeOffType[] = Object.values(TimeOffTypeEnum);
+
+// Dental OS chrome — forma kiritma sirtlari (token-driven, yangi CSS yo'q).
+// `borderColor` ATAYIN yo'q: inline border-color Mantine `data-error` qizil
+// ramkasini bosib qo'yardi (CLI-179 validatsiya feedback'ini saqlash). Ramka
+// rangini DS0 locked theme allaqachon tokenlashtirgan.
+const fieldStyles = {
+  input: {
+    background: 'var(--surface)',
+    borderRadius: 'var(--radius-md)',
+  } satisfies CSSProperties,
+} as const;
 
 export function TimeOffForm({
   doctorId,
@@ -63,19 +75,27 @@ export function TimeOffForm({
           label={t('time_off.type_label')}
           data={typeOptions}
           allowDeselect={false}
+          styles={fieldStyles}
           {...form.getInputProps('type')}
         />
         <DatePickerInput
           label={t('time_off.start_date')}
           valueFormat="DD.MM.YYYY"
+          styles={fieldStyles}
           {...form.getInputProps('startDate')}
         />
         <DatePickerInput
           label={t('time_off.end_date')}
           valueFormat="DD.MM.YYYY"
+          styles={fieldStyles}
           {...form.getInputProps('endDate')}
         />
-        <Textarea label={t('time_off.reason')} rows={2} {...form.getInputProps('reason')} />
+        <Textarea
+          label={t('time_off.reason')}
+          rows={2}
+          styles={fieldStyles}
+          {...form.getInputProps('reason')}
+        />
         <Group justify="flex-end">
           <Button variant="default" onClick={onDone}>
             {t('common.cancel')}

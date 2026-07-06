@@ -13,7 +13,7 @@ export interface BarMiniProps {
 }
 
 /** Sof CSS bar chart — max qiymatga nisbatan width%. Grafik dep yo'q. */
-export function BarMini({ data, color = 'var(--mantine-color-teal-6)' }: BarMiniProps) {
+export function BarMini({ data, color = 'var(--primary)' }: BarMiniProps) {
   const max = Math.max(0, ...data.map((d) => d.value));
   return (
     <Stack gap={8}>
@@ -33,7 +33,7 @@ export function BarMini({ data, color = 'var(--mantine-color-teal-6)' }: BarMini
               style={{
                 height: 8,
                 borderRadius: 4,
-                backgroundColor: 'var(--mantine-color-gray-2)',
+                backgroundColor: 'var(--surface-2)',
                 overflow: 'hidden',
               }}
             >

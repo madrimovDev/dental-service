@@ -183,6 +183,20 @@
       "when": 1782107375903,
       "tag": "0025_mean_the_stranger",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1782566162315,
+      "tag": "0026_service_categories",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1782545094488,
+      "tag": "0027_tidy_mindworm",
+      "breakpoints": true
     }
   ]
 }

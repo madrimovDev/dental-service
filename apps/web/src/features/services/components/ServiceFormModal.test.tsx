@@ -6,6 +6,10 @@ import { ServiceFormModal } from './ServiceFormModal';
 const upsertMutate = vi.fn();
 const setPriceMutate = vi.fn();
 
+vi.mock('@/features/service-categories', () => ({
+  useServiceCategories: () => ({ data: [] }),
+}));
+
 vi.mock('../services.api', () => ({
   useBranches: () => ({ data: [{ id: 'b1', name: 'Asosiy' }] }),
   useServiceDetail: () => ({ data: { prices: [] } }),
@@ -20,6 +24,8 @@ const editing = {
   nameUz: 'Plomba',
   nameRu: null,
   category: 'Terapevtika',
+  categoryId: null,
+  categoryNameRu: null,
   durationMinutes: 30,
   requiredRole: null,
   descriptionUz: null,

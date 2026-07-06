@@ -17,6 +17,13 @@ export type UpdateStockItemBody = {
    * @maxLength 40
    */
   unit?: string;
+  /** @maxLength 100 */
+  category?: string;
+  /**
+   * @minimum 0
+   * @nullable
+   */
+  price?: number | null;
   /**
    * @minimum 0
    * @nullable

@@ -1,5 +1,5 @@
-import { Card, Group, Stack, Text } from '@mantine/core';
-import type { ReactNode } from 'react';
+import { Group, Stack, Text } from '@mantine/core';
+import type { CSSProperties, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 
 export interface MiniListItem {
@@ -15,14 +15,24 @@ export interface MiniListProps {
   emptyText: string;
 }
 
+const cardStyle: CSSProperties = {
+  borderRadius: 'var(--radius-card)',
+  border: '1px solid var(--border)',
+  background: 'var(--surface)',
+  boxShadow: 'var(--shadow-sm)',
+  padding: 16,
+};
+
 /** Kichik ro'yxat kartasi — har element ixtiyoriy `to` link. */
 export function MiniList({ title, items, emptyText }: MiniListProps) {
   return (
-    <Card withBorder shadow="sm" padding="lg" radius="md">
+    <div style={cardStyle}>
       <Stack gap="sm">
-        <Text fw={600}>{title}</Text>
+        <Text fw={600} c="var(--ink)">
+          {title}
+        </Text>
         {items.length === 0 ? (
-          <Text size="sm" c="dimmed">
+          <Text size="sm" c="var(--ink-3)">
             {emptyText}
           </Text>
         ) : (
@@ -30,16 +40,16 @@ export function MiniList({ title, items, emptyText }: MiniListProps) {
             {items.map((item) => (
               <Group key={item.id} justify="space-between" wrap="nowrap" gap="sm">
                 {item.to ? (
-                  <Text component={Link} to={item.to} size="sm" c="teal" truncate>
+                  <Text component={Link} to={item.to} size="sm" c="var(--primary)" truncate>
                     {item.label}
                   </Text>
                 ) : (
-                  <Text size="sm" truncate>
+                  <Text size="sm" c="var(--ink)" truncate>
                     {item.label}
                   </Text>
                 )}
                 {item.right != null && (
-                  <Text size="sm" c="dimmed" style={{ flexShrink: 0 }}>
+                  <Text size="sm" c="var(--ink-3)" style={{ flexShrink: 0 }}>
                     {item.right}
                   </Text>
                 )}
@@ -48,6 +58,6 @@ export function MiniList({ title, items, emptyText }: MiniListProps) {
           </Stack>
         )}
       </Stack>
-    </Card>
+    </div>
   );
 }

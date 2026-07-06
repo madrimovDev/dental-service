@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { usePatients } from '@/features/patients/patients.api.ts';
 import { useUsers, useVertical } from '@/features/settings/settings.api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
+import classes from './CommandPalette.module.css';
 import { buildPatientActions, buildQuickActions, buildStaffActions } from './command-actions';
 import { visibleGroups } from './nav-config';
 
@@ -81,6 +82,9 @@ export function CommandPalette() {
       shortcut="mod + K"
       nothingFound={t('palette.nothing_found')}
       highlightQuery
+      classNames={classes}
+      radius="lg"
+      overlayProps={{ blur: 4 }}
       searchProps={{ placeholder: t('shell.search_placeholder') }}
     />
   );

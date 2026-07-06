@@ -4,10 +4,26 @@
  * Dental Service API
  * OpenAPI spec version: 0.1.0
  */
+import type { ListTreatmentPlansStatus } from './listTreatmentPlansStatus';
 
 export type ListTreatmentPlansParams = {
 /**
  * Filter by patient UUID
  */
 patientId?: string;
+/**
+ * Filter by plan status
+ */
+status?: ListTreatmentPlansStatus;
+/**
+ * @minimum 0
+ * @exclusiveMinimum
+ */
+page?: number;
+/**
+ * @minimum 0
+ * @maximum 100
+ * @exclusiveMinimum
+ */
+pageSize?: number;
 };

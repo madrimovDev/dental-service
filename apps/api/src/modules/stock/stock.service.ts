@@ -107,6 +107,8 @@ export const createStockService = (deps: {
         branchId: input.branchId ?? null,
         name: input.name,
         unit: input.unit,
+        category: input.category ?? null,
+        price: input.price != null ? String(input.price) : null,
         quantity: String(input.quantity),
         minThreshold: String(input.minThreshold),
       })
@@ -132,6 +134,8 @@ export const createStockService = (deps: {
     if (input.branchId !== undefined) patch.branchId = input.branchId;
     if (input.name !== undefined) patch.name = input.name;
     if (input.unit !== undefined) patch.unit = input.unit;
+    if (input.category !== undefined) patch.category = input.category;
+    if (input.price !== undefined) patch.price = input.price != null ? String(input.price) : null;
     if (input.quantity !== undefined) patch.quantity = String(input.quantity);
     if (input.minThreshold !== undefined) patch.minThreshold = String(input.minThreshold);
 

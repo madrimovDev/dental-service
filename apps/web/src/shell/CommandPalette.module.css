@@ -1,0 +1,62 @@
+/* Dental OS command palette (⌘K) — Mantine Spotlight token-based re-skin.
+   Faqat ko'rinish; palette logikasi CommandPalette.tsx'da o'zgarmaydi. */
+
+.search {
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  color: var(--text);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  padding: 16px 18px;
+}
+.search::placeholder {
+  color: var(--text-3);
+}
+
+.actionsList {
+  padding: 8px;
+}
+
+.actionSection {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text-2);
+  flex: none;
+}
+
+.action {
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  gap: 11px;
+}
+.action[data-selected] {
+  background: var(--primary-soft);
+}
+.action[data-selected] .actionSection {
+  background: var(--surface);
+  color: var(--primary);
+}
+
+.actionLabel {
+  font-size: var(--text-base);
+  color: var(--text);
+}
+
+.actionDescription {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-3);
+}
+
+.empty {
+  padding: 28px 18px;
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--text-3);
+}

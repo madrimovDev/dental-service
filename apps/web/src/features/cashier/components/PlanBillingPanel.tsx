@@ -97,14 +97,14 @@ export function PlanBillingPanel({ branchId, patientId }: PlanBillingPanelProps)
 
   if (!patientId) {
     return (
-      <Card withBorder padding="lg" radius="md">
+      <Card withBorder padding="lg" radius="var(--radius-card)">
         <Text c="dimmed">{t('cashier.plan_billing.select_patient_first')}</Text>
       </Card>
     );
   }
 
   return (
-    <Card withBorder padding="lg" radius="md">
+    <Card withBorder padding="lg" radius="var(--radius-card)">
       <Stack gap="md">
         <Title order={4}>{t('cashier.mode.plan')}</Title>
 

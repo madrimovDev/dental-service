@@ -1,5 +1,5 @@
 import {
-  type ApiError,
+  ApiError,
   getMe,
   getWorkspaceBranches,
   login,
@@ -8,7 +8,15 @@ import {
   registerTenant,
   switchWorkspace,
 } from '@dental/api-client';
-import { type UseMutationOptions, useMutation, useQuery } from '@tanstack/react-query';
+import { notifications } from '@mantine/notifications';
+import {
+  type UseMutationOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { authKeys } from './auth.keys';
 
@@ -76,7 +84,6 @@ export function useWorkspaceBranches() {
 }
 
 // Workspace (tenant/branch) almashtirish — refreshToken store'dan, rotation chain davom etadi.
-// 2 joyda ishlatiladi (SelectWorkspace + BranchSwitcher), shu sabab opts config darajasida.
 type SwitchVars = { tenantId: string; branchId?: string };
 export function useSwitchWorkspace(
   opts?: UseMutationOptions<Data<typeof switchWorkspace>, ApiError, SwitchVars>,
@@ -88,5 +95,63 @@ export function useSwitchWorkspace(
       return switchWorkspace({ ...input, refreshToken: rt }).then((r) => r.data);
     },
     ...opts,
+  });
+}
+
+/**
+ * Filial almashtirish orchestratsiyasi — JWT decode + setTokens/setContext + queryClient.clear()
+ * + revocation triage (auth.refresh_revoked/invalid_refresh/refresh_mismatch → clear + /login).
+ * SidebarWorkspaceSwitcher ishlatadi. SelectWorkspacePage — boshqa tartib (setContext oldin,
+ * queryClient.clear() yo'q, revocation toast bilan) — mos kelmaydi, alohida qoldi.
+ */
+export function useBranchSwitch() {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { setTokens, setContext, clear } = useAuthStore();
+
+  return useSwitchWorkspace({
+    onSuccess: (data) => {
+      // Token hamisha saqlanadi; payload decode (base64url) xato bo'lsa ham login buzilmasin.
+      setTokens(data.accessToken, data.refreshToken);
+      try {
+        const seg = data.accessToken.split('.')[1] ?? '';
+        const b64 = seg
+          .replace(/-/g, '+')
+          .replace(/_/g, '/')
+          .padEnd(Math.ceil(seg.length / 4) * 4, '=');
+        const payload = JSON.parse(atob(b64)) as {
+          atid: string | null;
+          abid: string | null;
+          perms: string[];
+          roleKey?: string | null;
+        };
+        setContext(payload.atid, payload.abid, payload.perms, payload.roleKey ?? null);
+      } catch {
+        /* malformed JWT payload — kontekst keyingi auth bootstrap'da o'rnatiladi */
+      }
+      // Filial-scoped data (navbat, yozilish, hisobotlar) yangi kontekstni aks ettirsin.
+      queryClient.clear();
+      navigate('/');
+    },
+    onError: (err) => {
+      // Stale refresh (multi-tab yoki fon-401 rotatsiyasi) — switchWorkspace butun chain'ni
+      // revoke qiladi. Bunda toast emas, toza qayta-login kerak.
+      const code = err instanceof ApiError ? err.code : null;
+      if (
+        code === 'auth.refresh_revoked' ||
+        code === 'auth.invalid_refresh' ||
+        code === 'auth.refresh_mismatch'
+      ) {
+        clear();
+        navigate('/login', { replace: true });
+        return;
+      }
+      notifications.show({
+        title: t('common.error'),
+        message: err instanceof ApiError ? err.message : t('shell.branch_switch_error'),
+        color: 'red',
+      });
+    },
   });
 }

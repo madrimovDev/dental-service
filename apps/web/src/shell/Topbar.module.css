@@ -6,6 +6,15 @@
   padding: 0 18px;
   width: 100%;
 }
+.pageTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: var(--ls-tight);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .ws {
   display: flex;
   align-items: center;

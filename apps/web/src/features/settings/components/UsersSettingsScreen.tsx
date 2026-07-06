@@ -1,8 +1,8 @@
 import { ApiError } from '@dental/api-client';
+import { StatusPill } from '@dental/ui';
 import {
   ActionIcon,
   Alert,
-  Badge,
   Button,
   Group,
   Modal,
@@ -161,9 +161,9 @@ export function UsersSettingsScreen() {
                     <Table.Td>{a.roleName}</Table.Td>
                     <Table.Td>{a.branchName ?? t('users.all_branches')}</Table.Td>
                     <Table.Td>
-                      <Badge color={a.isActive ? 'teal' : 'gray'}>
+                      <StatusPill status={a.isActive ? 'success' : 'neutral'}>
                         {a.isActive ? t('users.active') : t('users.inactive')}
-                      </Badge>
+                      </StatusPill>
                     </Table.Td>
                     <Table.Td>
                       <Group gap="xs" wrap="nowrap" justify="flex-end">
@@ -186,7 +186,8 @@ export function UsersSettingsScreen() {
                         {hasPermission('user.manage') && a.userId !== currentUser?.id && (
                           <ActionIcon
                             variant="subtle"
-                            color="blue"
+                            color="gray"
+                            style={{ color: 'var(--info)' }}
                             onClick={() => setToReset(a.userId)}
                             title={t('users.reset_password')}
                             aria-label={t('users.reset_password')}
@@ -221,7 +222,7 @@ export function UsersSettingsScreen() {
             <Alert color="teal" variant="light">
               <Text fw={600}>{t('users.invited_successfully')}</Text>
               <Text size="sm">{t('users.temp_password_notice')}</Text>
-              <Text mt="sm" fw={700} ff="monospace" size="lg">
+              <Text mt="sm" fw={700} ff="var(--font-mono)" size="lg">
                 {tempPassword}
               </Text>
             </Alert>
@@ -232,7 +233,7 @@ export function UsersSettingsScreen() {
         ) : (
           <form onSubmit={form.onSubmit(submitInvite)}>
             <Stack gap="md">
-              <Alert color="blue" variant="light">
+              <Alert color="var(--info)" variant="light">
                 <Text size="sm">{t('users.invite_hint')}</Text>
               </Alert>
               <TextInput
@@ -283,7 +284,7 @@ export function UsersSettingsScreen() {
                 {resetResult.phone}
               </Text>
               <Text size="sm">{t('users.temp_password_notice')}</Text>
-              <Text mt="sm" fw={700} ff="monospace" size="lg">
+              <Text mt="sm" fw={700} ff="var(--font-mono)" size="lg">
                 {resetResult.tempPassword}
               </Text>
             </Alert>
@@ -327,7 +328,7 @@ export function UsersSettingsScreen() {
           });
         }}
         message={t('users.reset_password_confirm')}
-        confirmColor="blue"
+        confirmColor="var(--info)"
         loading={resetPassword.isPending}
       />
 

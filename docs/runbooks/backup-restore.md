@@ -69,7 +69,7 @@ pg_restore --no-owner --no-privileges --jobs=4 \
 
 The dump already contains the schema + RLS policies (they are real DB objects).
 After restore, confirm the runtime non-superuser role exists (`dental_app`,
-NOBYPASSRLS) — it is created by `infra/postgres-init.sql` on first init; if
+NOBYPASSRLS) — it is created by `infra/postgres-init.sh` on first init; if
 restoring onto a brand-new cluster, run that init first.
 
 ### 2. Restore MinIO objects

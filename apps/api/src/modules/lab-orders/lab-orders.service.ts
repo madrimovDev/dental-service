@@ -1,27 +1,54 @@
 import { labOrders } from '@dental/db-schema';
-import { and, desc, eq, lt, notInArray } from 'drizzle-orm';
+import { and, count, desc, eq, lt, notInArray } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
-import type { CreateLabOrderInput, UpdateLabOrderInput } from './lab-orders.schema.ts';
+import type {
+  CreateLabOrderInput,
+  ListLabOrdersQuery,
+  UpdateLabOrderInput,
+} from './lab-orders.schema.ts';
 
 export const createLabOrdersService = (deps: { audit: AuditLogger }) => {
-  async function list(c: Context, patientId?: string, status?: string) {
+  /**
+   * DS7: tenant-wide yoki patientId-filtered ro'yxat. RLS tenant bo'yicha filtrlaydi
+   * (explicit WHERE tenant_id YO'Q). Pagination + ixtiyoriy status filtri; jami count alohida.
+   */
+  async function list(c: Context, query: ListLabOrdersQuery) {
     const db = getDb(c);
+    const offset = (query.page - 1) * query.pageSize;
+
     const filters = [];
-    if (patientId) filters.push(eq(labOrders.patientId, patientId));
-    if (status) filters.push(eq(labOrders.status, status as 'draft'));
-    return db
-      .select()
-      .from(labOrders)
-      .where(filters.length > 0 ? and(...filters) : undefined)
-      .orderBy(desc(labOrders.createdAt));
+    if (query.patientId) filters.push(eq(labOrders.patientId, query.patientId));
+    if (query.status) filters.push(eq(labOrders.status, query.status));
+    const where = filters.length > 0 ? and(...filters) : undefined;
+
+    const [data, totalRows] = await Promise.all([
+      db
+        .select()
+        .from(labOrders)
+        .where(where)
+        .orderBy(desc(labOrders.createdAt))
+        .limit(query.pageSize)
+        .offset(offset),
+      db.select({ total: count() }).from(labOrders).where(where),
+    ]);
+    const total = totalRows[0]?.total ?? 0;
+
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'lab_order',
+      resourceId: query.patientId ?? null,
+      after: { patientId: query.patientId ?? null, count: data.length },
+    });
+
+    return { data, meta: { page: query.page, pageSize: query.pageSize, total } };
   }
 
   /** Muddati o'tgan buyurtmalar (V3-5) — expectedDate < hozir, delivered/cancelled EMAS. */
   async function overdue(c: Context) {
     const db = getDb(c);
-    return db
+    const rows = await db
       .select()
       .from(labOrders)
       .where(
@@ -31,11 +58,26 @@ export const createLabOrdersService = (deps: { audit: AuditLogger }) => {
         ),
       )
       .orderBy(labOrders.expectedDate);
+
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'lab_order',
+      resourceId: null,
+      after: { overdue: true, count: rows.length },
+    });
+    return rows;
   }
 
   async function get(c: Context, id: string) {
     const db = getDb(c);
     const [row] = await db.select().from(labOrders).where(eq(labOrders.id, id));
+    if (row) {
+      await deps.audit.record(c, {
+        action: 'viewed',
+        resourceType: 'lab_order',
+        resourceId: id,
+      });
+    }
     return row ?? null;
   }
 

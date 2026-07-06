@@ -1,5 +1,6 @@
-import { PageHead, Tabs } from '@dental/ui';
-import { Group, Select, Stack } from '@mantine/core';
+import { Tabs } from '@dental/ui';
+import { Group, Select, Stack, Text } from '@mantine/core';
+import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useBranches, useDoctors } from '@/features/appointments/appointments.api';
@@ -8,6 +9,18 @@ import { TimeOffList } from './TimeOffList';
 import { WeeklyHoursEditor } from './WeeklyHoursEditor';
 
 type Tab = 'hours' | 'timeoff';
+
+// Dental OS chrome — Select sirtini DS0 surface/border/radius token'lariga moslash
+// (searchable Select saqlanadi — segment pill switcher emas, spec §C). Yangi CSS yo'q.
+const selectStyles = {
+  input: {
+    background: 'var(--surface)',
+    borderColor: 'var(--border)',
+    borderRadius: 'var(--radius-md)',
+  } satisfies CSSProperties,
+} as const;
+
+const selectStyle: CSSProperties = { minWidth: 240 };
 
 export function ScheduleScreen() {
   const { t } = useTranslation();
@@ -29,8 +42,10 @@ export function ScheduleScreen() {
 
   return (
     <div>
-      <PageHead title={t('schedule.title')} />
-      <Stack gap="md" mt="md">
+      <Text size="sm" c="dimmed" mb="md">
+        {t('schedule.subtitle')}
+      </Text>
+      <Stack gap="lg" mt="md">
         <Group gap="md">
           <Select
             label={t('schedule.doctor')}
@@ -39,7 +54,8 @@ export function ScheduleScreen() {
             data={doctorOptions}
             value={doctorId}
             onChange={setDoctorId}
-            style={{ minWidth: 240 }}
+            styles={selectStyles}
+            style={selectStyle}
           />
           <Select
             label={t('schedule.branch')}
@@ -48,7 +64,8 @@ export function ScheduleScreen() {
             data={branchOptions}
             value={branchId}
             onChange={setBranchId}
-            style={{ minWidth: 240 }}
+            styles={selectStyles}
+            style={selectStyle}
           />
         </Group>
         <Tabs

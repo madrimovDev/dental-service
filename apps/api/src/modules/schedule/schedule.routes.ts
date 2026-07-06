@@ -9,6 +9,8 @@ import { rlsMiddleware } from '../../middleware/rls.ts';
 import {
   availabilityDtoSchema,
   availabilityQuerySchema,
+  branchAvailabilityDtoSchema,
+  branchAvailabilityQuerySchema,
   createTimeOffSchema,
   doctorIdParamSchema,
   listTimeOffQuerySchema,
@@ -168,6 +170,25 @@ export const scheduleRoutes = (deps: { db: Database; audit: AuditLogger }) => {
   app.openapi(availabilityRoute, async (c) => {
     const query = c.req.valid('query');
     const result = await service.getAvailability(c, query);
+    return c.json(ok(result), 200);
+  });
+
+  // ─── GET /availability/branch — DS4 right-rail "Bo'sh slot" ─────────────────
+  // Doktor tanlamasdan, filialdagi barcha doktorlarning shu kungi bo'sh slotlari.
+
+  const branchAvailabilityRoute = createRoute({
+    method: 'get',
+    path: '/availability/branch',
+    tags: ['schedule'],
+    operationId: 'getBranchAvailability',
+    middleware: [requirePermission('schedule.view')] as const,
+    request: { query: branchAvailabilityQuerySchema },
+    responses: okJson(branchAvailabilityDtoSchema, 'Branch-wide available slots per doctor'),
+  });
+
+  app.openapi(branchAvailabilityRoute, async (c) => {
+    const query = c.req.valid('query');
+    const result = await service.getBranchAvailability(c, query);
     return c.json(ok(result), 200);
   });
 

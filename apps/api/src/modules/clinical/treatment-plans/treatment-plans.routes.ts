@@ -1,6 +1,7 @@
 import { fail, ok } from '@dental/core';
-import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
+import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import type { AuditLogger } from '../../../lib/audit-logger.ts';
+import { requireModuleInDesktop } from '../../../lib/license-middleware.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../../lib/openapi.ts';
 import { requirePermission } from '../../../middleware/require-permission.ts';
 import { toPlanDto, toPlanWithStagesDto, toStageDto } from './treatment-plans.mapper.ts';
@@ -12,6 +13,7 @@ import {
   stageIdParamSchema,
   treatmentPlanDtoSchema,
   treatmentPlanEstimateDtoSchema,
+  treatmentPlanListResponseDtoSchema,
   treatmentPlanWithStagesDtoSchema,
   treatmentStageDtoSchema,
   updateStageSchema,
@@ -52,20 +54,23 @@ export const treatmentPlansRoutes = (deps: { audit: AuditLogger; recall?: Recall
     path: '/treatment-plans',
     tags: ['treatment-plans'],
     operationId: 'listTreatmentPlans',
-    middleware: [requirePermission('medical_record.view')] as const,
+    middleware: [
+      requireModuleInDesktop('clinical'),
+      requirePermission('medical_record.view'),
+    ] as const,
     request: {
       query: listPlansQuerySchema,
     },
     responses: okJson(
-      z.array(treatmentPlanWithStagesDtoSchema),
-      'List of treatment plans with nested stages',
+      treatmentPlanListResponseDtoSchema,
+      'Paginated treatment plans (tenant-wide or patient-filtered) with nested stages',
     ),
   });
 
   app.openapi(listRoute, async (c) => {
-    const { patientId } = c.req.valid('query');
-    const rows = await service.listPlans(c, patientId);
-    return c.json(ok(rows.map(toPlanWithStagesDto)), 200);
+    const query = c.req.valid('query');
+    const { data, meta } = await service.listPlans(c, query);
+    return c.json(ok({ data: data.map(toPlanWithStagesDto), meta }), 200);
   });
 
   // ─── POST /treatment-plans — create ───────────────────────────────────────
@@ -75,7 +80,10 @@ export const treatmentPlansRoutes = (deps: { audit: AuditLogger; recall?: Recall
     path: '/treatment-plans',
     tags: ['treatment-plans'],
     operationId: 'createTreatmentPlan',
-    middleware: [requirePermission('medical_record.edit')] as const,
+    middleware: [
+      requireModuleInDesktop('clinical'),
+      requirePermission('medical_record.edit'),
+    ] as const,
     request: {
       body: { content: { 'application/json': { schema: createTreatmentPlanSchema } } },
     },
@@ -114,7 +122,10 @@ export const treatmentPlansRoutes = (deps: { audit: AuditLogger; recall?: Recall
     path: '/treatment-plans/{id}',
     tags: ['treatment-plans'],
     operationId: 'getTreatmentPlan',
-    middleware: [requirePermission('medical_record.view')] as const,
+    middleware: [
+      requireModuleInDesktop('clinical'),
+      requirePermission('medical_record.view'),
+    ] as const,
     request: {
       params: planIdParamSchema,
     },
@@ -138,7 +149,10 @@ export const treatmentPlansRoutes = (deps: { audit: AuditLogger; recall?: Recall
     path: '/treatment-plans/{id}/estimate',
     tags: ['treatment-plans'],
     operationId: 'getTreatmentPlanEstimate',
-    middleware: [requirePermission('medical_record.view')] as const,
+    middleware: [
+      requireModuleInDesktop('clinical'),
+      requirePermission('medical_record.view'),
+    ] as const,
     request: {
       params: planIdParamSchema,
     },
@@ -162,7 +176,10 @@ export const treatmentPlansRoutes = (deps: { audit: AuditLogger; recall?: Recall
     path: '/treatment-plans/{id}',
     tags: ['treatment-plans'],
     operationId: 'updateTreatmentPlan',
-    middleware: [requirePermission('medical_record.edit')] as const,
+    middleware: [
+      requireModuleInDesktop('clinical'),
+      requirePermission('medical_record.edit'),
+    ] as const,
     request: {
       params: planIdParamSchema,
       body: { content: { 'application/json': { schema: updateTreatmentPlanSchema } } },
@@ -202,7 +219,10 @@ export const treatmentPlansRoutes = (deps: { audit: AuditLogger; recall?: Recall
     path: '/treatment-plans/{id}/consent',
     tags: ['treatment-plans'],
     operationId: 'signTreatmentPlanConsent',
-    middleware: [requirePermission('medical_record.edit')] as const,
+    middleware: [
+      requireModuleInDesktop('clinical'),
+      requirePermission('medical_record.edit'),
+    ] as const,
     request: {
       params: planIdParamSchema,
       body: { content: { 'application/json': { schema: consentSchema } } },
@@ -232,7 +252,10 @@ export const treatmentPlansRoutes = (deps: { audit: AuditLogger; recall?: Recall
     path: '/treatment-stages/{id}',
     tags: ['treatment-plans'],
     operationId: 'updateTreatmentStage',
-    middleware: [requirePermission('medical_record.edit')] as const,
+    middleware: [
+      requireModuleInDesktop('clinical'),
+      requirePermission('medical_record.edit'),
+    ] as const,
     request: {
       params: stageIdParamSchema,
       body: { content: { 'application/json': { schema: updateStageSchema } } },

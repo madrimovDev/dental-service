@@ -13,6 +13,10 @@ export const stockItems = pgTable(
     branchId: uuid('branch_id').references(() => branches.id, { onDelete: 'set null' }),
     name: text('name').notNull(),
     unit: text('unit').notNull(),
+    // DS12 (DS9 ombor): kategoriya bo'yicha guruhlash — eski rows'da yo'q (nullable).
+    category: text('category'),
+    // DS12 (DS9 ombor): birlik narxi (so'm) — money konvensiyasi numeric(14,2), nullable.
+    price: numeric('price', { precision: 14, scale: 2 }),
     quantity: numeric('quantity', { precision: 14, scale: 2 }).notNull().default('0'),
     minThreshold: numeric('min_threshold', { precision: 14, scale: 2 }).notNull().default('0'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

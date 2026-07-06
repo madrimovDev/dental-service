@@ -72,10 +72,8 @@ describe('OdontogramTab', () => {
     renderApp(<OdontogramTab patientId="p1" />);
     fireEvent.click(screen.getByText('16'));
 
-    // Surface Select ochiladi → 'D' (Distal) tanlanadi
-    const surfaceSelect = screen.getByRole('textbox', { name: /Tish yuzasi/i });
-    fireEvent.click(surfaceSelect);
-    fireEvent.click(screen.getByText(/Distal \(D\)/i));
+    // surfPicker toggle → 'D' (Distal) tugmasi bosiladi (DS3 re-skin: Select → toggle button)
+    fireEvent.click(screen.getByRole('button', { name: /Distal \(D\)/i }));
 
     // Diagnoz Select → mock diagnoz tanlanadi
     const dxSelect = screen.getByRole('textbox', { name: /Diagnoz/i });

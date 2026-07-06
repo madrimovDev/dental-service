@@ -2,6 +2,7 @@ import { fail, ok } from '@dental/core';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import type { AuditLogger } from '../../../lib/audit-logger.ts';
+import { requireModuleInDesktop } from '../../../lib/license-middleware.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../../lib/openapi.ts';
 import { requirePermission } from '../../../middleware/require-permission.ts';
 import { InvalidTransitionError } from '../treatment-plans/treatment-plans.transitions.ts';
@@ -36,7 +37,10 @@ export const visitNotesRoutes = (deps: {
     path: '/visit-notes',
     tags: ['visit-notes'],
     operationId: 'listVisitNotes',
-    middleware: [requirePermission('medical_record.view')] as const,
+    middleware: [
+      requireModuleInDesktop('clinical'),
+      requirePermission('medical_record.view'),
+    ] as const,
     request: {
       query: z.object({
         patientId: z.uuid().optional().openapi({ description: 'Filter by patient ID' }),
@@ -58,7 +62,10 @@ export const visitNotesRoutes = (deps: {
     path: '/visit-notes',
     tags: ['visit-notes'],
     operationId: 'createVisitNote',
-    middleware: [requirePermission('medical_record.edit')] as const,
+    middleware: [
+      requireModuleInDesktop('clinical'),
+      requirePermission('medical_record.edit'),
+    ] as const,
     request: {
       body: { content: { 'application/json': { schema: createVisitNoteSchema } } },
     },
@@ -104,7 +111,10 @@ export const visitNotesRoutes = (deps: {
     path: '/visit-notes/{id}',
     tags: ['visit-notes'],
     operationId: 'getVisitNote',
-    middleware: [requirePermission('medical_record.view')] as const,
+    middleware: [
+      requireModuleInDesktop('clinical'),
+      requirePermission('medical_record.view'),
+    ] as const,
     request: {
       params: z.object({ id: z.uuid() }),
     },
@@ -125,7 +135,10 @@ export const visitNotesRoutes = (deps: {
     path: '/visit-notes/{id}',
     tags: ['visit-notes'],
     operationId: 'updateVisitNote',
-    middleware: [requirePermission('medical_record.edit')] as const,
+    middleware: [
+      requireModuleInDesktop('clinical'),
+      requirePermission('medical_record.edit'),
+    ] as const,
     request: {
       params: z.object({ id: z.uuid() }),
       body: { content: { 'application/json': { schema: updateVisitNoteSchema } } },

@@ -1,3 +1,87 @@
+/* DS2 — Yangi bemor formasi (Dental OS re-skin). Front-end-only, existing tokens. */
+
+/* ---- Back-link ---- */
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 14px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-3);
+  transition: color 0.12s ease;
+}
+
+.backLink:hover {
+  color: var(--primary);
+}
+
+/* ---- Two-column layout ---- */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* ---- Sectioned card header (icon tile) ---- */
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.iconTile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.iconTile[data-tone="violet"] {
+  background: color-mix(in srgb, var(--violet) 16%, transparent);
+  color: var(--violet);
+}
+
+.cardTitle {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.cardSub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-3);
+  font-family: var(--font-sans);
+}
+
+/* ---- Fields ---- */
 .fields {
   display: flex;
   flex-direction: column;
@@ -14,4 +98,197 @@
   .grid2 {
     grid-template-columns: 1fr;
   }
+}
+
+/* Field label styling (locked primitive — wrapper only) */
+.fieldWrap :global(.dental-input-field) > span,
+.fieldWrap label > span:first-child,
+.phoneWrap label,
+.textareaWrap label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  font-family: var(--font-sans);
+}
+
+/* Required asterisk via ::after (does NOT enter the accessible label name,
+   so getByLabelText exact-match stays green). Scoped to fullName + phone. */
+.required.fieldWrap label > span:first-child::after,
+.required.phoneWrap :global(.mantine-InputWrapper-label)::after {
+  content: " *";
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* Wrap the locked Input control (44px tall / 11px radius / surface-2 fill). */
+.fieldWrap :global([class*="wrap"]) {
+  min-height: 44px;
+  border-radius: 11px;
+  background: var(--surface-2);
+}
+
+.fieldWrap :global([class*="wrap"]):focus-within {
+  border-color: var(--primary);
+}
+
+/* Mantine Select / Textarea / PhoneInput controls (44px / 11px / surface-2). */
+.fieldWrap :global(.mantine-Select-input),
+.textareaWrap :global(.mantine-Textarea-input),
+.textareaWrap :global(.mantine-TagsInput-input),
+.phoneWrap :global(.mantine-TextInput-input) {
+  border-radius: 11px;
+  background: var(--surface-2);
+}
+
+.fieldWrap :global(.mantine-Select-input),
+.phoneWrap :global(.mantine-TextInput-input) {
+  min-height: 44px;
+}
+
+.fieldWrap :global(.mantine-Select-input):focus,
+.textareaWrap :global(.mantine-Textarea-input):focus,
+.textareaWrap :global(.mantine-TagsInput-input):focus-within,
+.phoneWrap :global(.mantine-TextInput-input):focus {
+  border-color: var(--primary);
+}
+
+/* ---- Insurance block (inside card 3) ---- */
+.insuranceBlock {
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ---- Right rail ---- */
+.rail {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .rail {
+    position: static;
+  }
+}
+
+/* ---- Preview card ---- */
+.previewCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 20px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+.previewAvatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--primary), var(--violet));
+  color: var(--on-primary);
+  font-family: var(--font-sans);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.previewAvatar[data-empty="true"] {
+  opacity: 0.7;
+}
+
+.previewName {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  text-align: center;
+}
+
+.previewPhone {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.previewMeta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.metaChip {
+  padding: 2px 10px;
+  border-radius: var(--radius-pill, 99px);
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+}
+
+/* ---- Required checklist ---- */
+.checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.checklistTitle {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-3);
+  font-family: var(--font-sans);
+}
+
+.checklistItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-2);
+  font-family: var(--font-sans);
+}
+
+.dot {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong);
+  background: transparent;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.dot[data-filled="true"] {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+/* ---- Action buttons ---- */
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }

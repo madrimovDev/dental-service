@@ -77,7 +77,7 @@ export function useDoctorAppointments(
 export function useActiveLabOrders() {
   return useQuery({
     queryKey: dashboardKeys.labOrders(),
-    queryFn: () => listLabOrders().then((r) => r.data),
+    queryFn: () => listLabOrders().then((r) => r.data.data),
     select: filterActiveLabOrders,
   });
 }

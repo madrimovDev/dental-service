@@ -1,0 +1,279 @@
+/* DS5-T4 — Fullscreen display board (in-shell, scrBoard parity).
+   Lokal keyframes — shell CSS'da YO'Q (DS0 globalga kirmagan, shell LOCKED). */
+
+@keyframes dotpulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: fadeUp 0.4s ease both;
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 13px;
+  background: var(--primary);
+  color: var(--on-primary);
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+
+.brandText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.clinicName {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  color: var(--text);
+}
+
+.subtitle {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.clock {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 30px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  line-height: 1;
+}
+
+.clockDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--danger);
+  animation: dotpulse 1.4s infinite;
+}
+
+.exitButton {
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+/* Cabinet showcases */
+.cabinets {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.cabinet {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-radius: 20px;
+  padding: 26px 28px;
+  min-height: 200px;
+  box-shadow: var(--shadow-sm);
+}
+
+.cabinetPrimary {
+  background: linear-gradient(135deg, var(--primary), var(--primary-strong));
+  color: var(--on-primary);
+}
+
+/* Cabinet-2 — violet gradient. Matn `--on-primary` (light=oq, dark=qora) —
+   literal #fff o'rniga (CLI-80/255 darsi). LIGHT temada WCAG AA OK (CR 8.15).
+   ⚠️ DARK temada KICHIK matn AA FAIL: dark `--violet` (#b093ee) OCH, `--on-primary`
+   (#04130f) qora bo'lib, .cabinetService/.cabinetEyebrow/.cabinetPlaceholder gradient
+   ustida ~3.78:1 (<4.5). Faqat yirik matn (.cabinetNumber/.cabinetPatient) o'tadi.
+   Strukturaviy: `--on-violet` token YO'Q, #fff ham `--on-primary` ham kichik matnni
+   dark violet gradientda 4.5:1'ga ko'tara olmaydi. HONEST FIX = LOCKED tokenlar
+   (packages/ui/src/theme/tokens.css: `--on-violet` qo'shish YOKI dark `--violet`'ni
+   qoraytirib `--on-primary` 4.5:1'dan o'tkazish) — queue scope'dan TASHQARI →
+   DS0/token follow-up'ga ESKALATSIYA. In-queue hardcode QILINMAYDI. */
+.cabinetViolet {
+  background: linear-gradient(135deg, var(--violet), color-mix(in srgb, var(--violet) 75%, #000));
+  color: var(--on-primary);
+}
+
+.cabinetEyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.cabinetNumber {
+  font-family: var(--font-mono);
+  font-size: 84px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.cabinetMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.cabinetPatient {
+  font-size: 20px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cabinetService {
+  font-size: 14px;
+  opacity: 0.85;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cabinetPlaceholder {
+  font-size: 16px;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+/* Next queues panel */
+.nextPanel {
+  background: var(--surface);
+  border-radius: 20px;
+  box-shadow: var(--shadow-sm);
+  padding: 22px 24px;
+}
+
+.nextTitle {
+  margin: 0 0 16px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.nextCards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.nextCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 220px;
+  flex: 1 1 220px;
+  background: var(--surface-2);
+  border-radius: var(--radius-card);
+  padding: 16px 18px;
+}
+
+.nextNumber {
+  font-family: var(--font-mono);
+  font-size: 38px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-3);
+}
+
+.nextNumberLead {
+  color: var(--primary);
+}
+
+.nextCardMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.nextNameRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.nextName {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nextService {
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+
+.nextEmpty {
+  font-size: 14px;
+  color: var(--text-3);
+}
+
+@media (max-width: 900px) {
+  .cabinets {
+    grid-template-columns: 1fr;
+  }
+}

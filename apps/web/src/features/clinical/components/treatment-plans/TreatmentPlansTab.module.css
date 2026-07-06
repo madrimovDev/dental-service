@@ -1,0 +1,148 @@
+/* DS3 §4.3 — Davolash rejasi tab: 2-ustun grid (reja + moliyaviy xulosa) */
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ===== Reja card (chap) ===== */
+.planCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-sm);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.planHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.planTitle {
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  line-height: 1.2;
+}
+
+.planSubtitle {
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+.headChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ===== Stage jadvali ===== */
+.tableHead {
+  display: grid;
+  grid-template-columns: 34px 1fr 56px auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 0 4px 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+  font-weight: 600;
+}
+
+.colNum {
+  text-align: center;
+}
+
+.colCost,
+.colStatus {
+  text-align: right;
+}
+
+.stageList {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== Moliyaviy xulosa card (o'ng) ===== */
+.summaryCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-sm);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: sticky;
+  top: 12px;
+}
+
+.summaryTitle {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-3);
+  font-weight: 600;
+}
+
+.summaryRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.summaryLabel {
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+
+.summaryValue {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* Progress bar */
+.progressTrack {
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, var(--primary), var(--primary-strong));
+  transition: width 0.2s ease;
+}
+
+.progressMeta {
+  font-size: 11px;
+  color: var(--ink-3);
+}

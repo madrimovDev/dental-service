@@ -32,11 +32,15 @@ export const envSchema = z
     // Redis
     REDIS_URL: z.url(),
 
-    // MinIO
-    MINIO_ENDPOINT: z.url(),
-    MINIO_BUCKET: z.string().min(1),
-    MINIO_ROOT_USER: z.string().min(1),
-    MINIO_ROOT_PASSWORD: z.string().min(1),
+    // MinIO — dead since Local Desktop's storage.ts replaced it with local
+    // filesystem (Task 1, CLI-340). Kept optional (not removed) because the
+    // cloud/VPS deployment docker-compose still provisions a MinIO container;
+    // no code path reads these values anymore (grep confirms), so nothing
+    // actually depends on them being set.
+    MINIO_ENDPOINT: z.url().optional(),
+    MINIO_BUCKET: z.string().min(1).optional(),
+    MINIO_ROOT_USER: z.string().min(1).optional(),
+    MINIO_ROOT_PASSWORD: z.string().min(1).optional(),
 
     // API
     API_PORT: z.coerce.number().int().positive().default(8001),
@@ -63,6 +67,12 @@ export const envSchema = z
     // Observability (D7) — Sentry error tracking. NoOp when unset.
     SENTRY_DSN: z.string().optional(),
 
+    // Local Desktop bitta-EXE arxitekturasi — o'rnatilganda `apps/web` build
+    // outputni ham shu process serve qiladi (Windows'da alohida nginx/Caddy
+    // yo'q). `process-manager.ts` `spawnApi()`da beradi; cloud/dev
+    // deployment'da bo'sh — mavjud xulq o'zgarmaydi.
+    WEB_DIST_DIR: z.string().optional(),
+
     // Worker process separation (D6). When the API process should ALSO run the
     // in-process BullMQ reminder worker. Default `true` keeps dev unchanged
     // (single `bun dev` runs everything); prod sets `false` on the api service
@@ -78,6 +88,31 @@ export const envSchema = z
     AUTH_LOGIN_RATE_LIMIT: z.coerce.number().int().positive().default(10),
     AUTH_REFRESH_RATE_LIMIT: z.coerce.number().int().positive().default(60),
     AUTH_RESET_RATE_LIMIT: z.coerce.number().int().positive().default(5),
+
+    // Register-tenant rate limiting (CLI-388) — IP-only (ownerPhone attacker
+    // tanlaydi, keyFromBody bo'lsa chetlab o'tiladi — activate.ts precedenti).
+    // Login/refresh/reset'dan qattiqroq oyna: bu operatsiya bir nechta INSERT
+    // ishga tushiradi va legitim foydalanuvchi bir soatda 5 martadan ko'p yangi
+    // klinika ro'yxatdan o'tkazmaydi.
+    AUTH_REGISTER_RATE_LIMIT_WINDOW_SEC: z.coerce.number().int().positive().default(3600), // 1 soat
+    AUTH_REGISTER_RATE_LIMIT: z.coerce.number().int().positive().default(5),
+
+    // Activate rate limiting (CLI-370) — license-key guessing/enumeration himoyasi.
+    // IP-only kalit (keyFromBody yo'q) — licenseKey o'zi taxmin qilinayotgan sir;
+    // kalitga kiritilsa har urinish yangi Redis bucket ochib limitni chetlab
+    // o'tar edi. Login'dan qattiqroq: har urinish real Supervisor'ga tarmoq
+    // so'rovi (login'dagi lokal bcrypt tekshiruvidan qimmatroq) + legitim
+    // foydalanuvchi bir soatda 5 martadan ko'p faollashtirish urinmaydi.
+    ACTIVATE_RATE_LIMIT_WINDOW_SEC: z.coerce.number().int().positive().default(3600), // 1 soat
+    ACTIVATE_RATE_LIMIT: z.coerce.number().int().positive().default(5),
+
+    // CLI-387 — Local Desktop license heartbeat cadence. Only consulted when
+    // WEB_DIST_DIR is set (Local Desktop signal); harmless default elsewhere.
+    LICENSE_HEARTBEAT_INTERVAL_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(4 * 60 * 60 * 1000), // 4 soat
   })
   // Reject known-placeholder secrets in production. Dev/test intentionally keep
   // the placeholder so local boot + `bun test --env-file=../../.env` work.

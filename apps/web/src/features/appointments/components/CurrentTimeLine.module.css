@@ -1,0 +1,38 @@
+.line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--danger);
+  flex: none;
+  margin-left: -4px;
+}
+
+.bar {
+  flex: 1;
+  height: 2px;
+  background: var(--danger);
+}
+
+.badge {
+  flex: none;
+  font-family: var(--font-mono);
+  font-feature-settings: var(--num);
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-semibold);
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: var(--radius-xs);
+  background: var(--danger);
+  /* DS0/CLI-80: dark kontrast uchun --text-on-danger, hech qachon #fff */
+  color: var(--text-on-danger);
+}

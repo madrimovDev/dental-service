@@ -12,13 +12,14 @@ import {
   Text,
   Title,
 } from '@mantine/core';
-import { IconReceipt, IconRefresh } from '@tabler/icons-react';
+import { IconEye, IconReceipt, IconRefresh } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatCurrency } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { useRefund } from '../cashier.api';
 import { toTransactionVM } from '../cashier.mappers';
+import { ReceiptModal } from './ReceiptModal';
 
 export interface TransactionsTableProps {
   transactions: CashierTransaction[];
@@ -30,10 +31,12 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
   const refundMut = useRefund();
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [partialAmount, setPartialAmount] = useState<number | ''>('');
+  const [receiptId, setReceiptId] = useState<string | null>(null);
 
   const canRefund = hasPermission('cashier.refund');
   const vms = transactions.map(toTransactionVM);
   const selected = vms.find((v) => v.id === confirmId);
+  const receiptVm = vms.find((v) => v.id === receiptId);
 
   const closeModal = () => {
     setConfirmId(null);
@@ -93,16 +96,28 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
                     </Badge>
                   </Table.Td>
                   <Table.Td>
-                    {canRefund && tx.refundable && (
+                    <Group gap={4} justify="flex-end" wrap="nowrap">
                       <ActionIcon
                         variant="subtle"
-                        color="orange"
-                        aria-label={t('cashier.refund_modal.title')}
-                        onClick={() => setConfirmId(tx.id)}
+                        color="teal"
+                        data-testid={`receipt-view-${tx.id}`}
+                        aria-label={t('cashier.receipt_modal.view')}
+                        onClick={() => setReceiptId(tx.id)}
+                        style={{ fontFamily: 'var(--font-sans)' }}
                       >
-                        <IconRefresh size={14} />
+                        <IconEye size={14} />
                       </ActionIcon>
-                    )}
+                      {canRefund && tx.refundable && (
+                        <ActionIcon
+                          variant="subtle"
+                          color="orange"
+                          aria-label={t('cashier.refund_modal.title')}
+                          onClick={() => setConfirmId(tx.id)}
+                        >
+                          <IconRefresh size={14} />
+                        </ActionIcon>
+                      )}
+                    </Group>
                   </Table.Td>
                 </Table.Tr>
               ))}
@@ -163,6 +178,14 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
           </Group>
         </Stack>
       </Modal>
+
+      {receiptVm && (
+        <ReceiptModal
+          opened={receiptId !== null}
+          onClose={() => setReceiptId(null)}
+          transaction={receiptVm}
+        />
+      )}
     </>
   );
 }

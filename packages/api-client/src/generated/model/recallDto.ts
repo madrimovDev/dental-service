@@ -34,6 +34,11 @@ export interface RecallDto {
   /** @nullable */
   lastContactedAt: string | null;
   contactAttempts: number;
+  /**
+   * SMS delivery status (workflow status ≠ SMS)
+   * @nullable
+   */
+  smsStatus: string | null;
   /** @nullable */
   notes: string | null;
   /** @nullable */

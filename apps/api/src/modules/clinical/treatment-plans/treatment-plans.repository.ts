@@ -1,25 +1,41 @@
 import { treatmentPlans, treatmentStagePayments, treatmentStages } from '@dental/db-schema';
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../../db/scoped.ts';
+import type { ListPlansQuery } from './treatment-plans.schema.ts';
 
 export const createTreatmentPlansRepository = () => {
   /**
-   * Planlar ro'yxati + har planning stage'lari (nested).
-   * N+1 oldini olish uchun stage'lar BITTA `IN`-query bilan olinadi va
-   * xotirada plan bo'yicha guruhlanadi → jami 2 so'rov (plan-soni'dan mustaqil).
+   * DS7: planlar ro'yxati + har planning stage'lari (nested) — tenant-wide yoki
+   * patientId-filtered. RLS tenant bo'yicha filtrlaydi (explicit WHERE tenant_id YO'Q).
+   * Pagination (page/pageSize) + ixtiyoriy status filtri; jami count alohida so'rov.
+   * N+1 oldini olish uchun stage'lar BITTA `IN`-query bilan olinadi (sahifa planlari)
+   * va xotirada plan bo'yicha guruhlanadi → jami 3 so'rov (plan-soni'dan mustaqil).
    */
-  async function listPlans(c: Context, patientId?: string) {
+  async function listPlans(c: Context, query: ListPlansQuery) {
     const db = getDb(c);
-    const filters = [];
-    if (patientId) filters.push(eq(treatmentPlans.patientId, patientId));
-    const plans = await db
-      .select()
-      .from(treatmentPlans)
-      .where(filters.length > 0 ? and(...filters) : undefined)
-      .orderBy(desc(treatmentPlans.createdAt));
+    const offset = (query.page - 1) * query.pageSize;
 
-    if (plans.length === 0) return [];
+    const filters = [];
+    if (query.patientId) filters.push(eq(treatmentPlans.patientId, query.patientId));
+    if (query.status) filters.push(eq(treatmentPlans.status, query.status));
+    const where = filters.length > 0 ? and(...filters) : undefined;
+
+    const [plans, totalRows] = await Promise.all([
+      db
+        .select()
+        .from(treatmentPlans)
+        .where(where)
+        .orderBy(desc(treatmentPlans.createdAt))
+        .limit(query.pageSize)
+        .offset(offset),
+      db.select({ total: count() }).from(treatmentPlans).where(where),
+    ]);
+    const total = totalRows[0]?.total ?? 0;
+
+    if (plans.length === 0) {
+      return { data: [], meta: { page: query.page, pageSize: query.pageSize, total } };
+    }
 
     const stages = await db
       .select()
@@ -39,7 +55,8 @@ export const createTreatmentPlansRepository = () => {
       else stagesByPlan.set(s.treatmentPlanId, [s]);
     }
 
-    return plans.map((p) => ({ ...p, stages: stagesByPlan.get(p.id) ?? [] }));
+    const data = plans.map((p) => ({ ...p, stages: stagesByPlan.get(p.id) ?? [] }));
+    return { data, meta: { page: query.page, pageSize: query.pageSize, total } };
   }
 
   async function getPlanWithStages(c: Context, id: string) {

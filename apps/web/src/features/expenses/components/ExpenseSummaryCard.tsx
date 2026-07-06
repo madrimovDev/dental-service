@@ -2,6 +2,7 @@ import { Paper, Stack, Table, Text, Title } from '@mantine/core';
 import { IconChartBar } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { formatCurrency } from '@/lib/format';
+import { BarMini } from '../../reports/components/BarMini';
 import type { SummaryRowVM } from '../expenses.types';
 
 export interface ExpenseSummaryCardProps {
@@ -22,29 +23,32 @@ export function ExpenseSummaryCard({ rows, grandTotal }: ExpenseSummaryCardProps
         {rows.length === 0 ? (
           <Text c="dimmed">{t('expenses.empty')}</Text>
         ) : (
-          <Table>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>{t('expenses.category')}</Table.Th>
-                <Table.Th>{t('expenses.count')}</Table.Th>
-                <Table.Th>{t('expenses.total')}</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {rows.map((r) => (
-                <Table.Tr key={r.categoryId ?? '__uncategorized__'}>
-                  <Table.Td>{r.categoryName}</Table.Td>
-                  <Table.Td>{r.count}</Table.Td>
-                  <Table.Td fw={600}>{formatCurrency(r.total, t)}</Table.Td>
+          <Stack gap="md">
+            <BarMini data={rows.map((r) => ({ label: r.categoryName, value: r.total }))} />
+            <Table>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>{t('expenses.category')}</Table.Th>
+                  <Table.Th>{t('expenses.count')}</Table.Th>
+                  <Table.Th>{t('expenses.total')}</Table.Th>
                 </Table.Tr>
-              ))}
-              <Table.Tr>
-                <Table.Td fw={700}>{t('expenses.grand_total')}</Table.Td>
-                <Table.Td />
-                <Table.Td fw={700}>{formatCurrency(grandTotal, t)}</Table.Td>
-              </Table.Tr>
-            </Table.Tbody>
-          </Table>
+              </Table.Thead>
+              <Table.Tbody>
+                {rows.map((r) => (
+                  <Table.Tr key={r.categoryId ?? '__uncategorized__'}>
+                    <Table.Td>{r.categoryName}</Table.Td>
+                    <Table.Td>{r.count}</Table.Td>
+                    <Table.Td fw={600}>{formatCurrency(r.total, t)}</Table.Td>
+                  </Table.Tr>
+                ))}
+                <Table.Tr>
+                  <Table.Td fw={700}>{t('expenses.grand_total')}</Table.Td>
+                  <Table.Td />
+                  <Table.Td fw={700}>{formatCurrency(grandTotal, t)}</Table.Td>
+                </Table.Tr>
+              </Table.Tbody>
+            </Table>
+          </Stack>
         )}
       </Stack>
     </Paper>

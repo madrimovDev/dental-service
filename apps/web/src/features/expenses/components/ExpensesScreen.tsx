@@ -1,10 +1,10 @@
-import { PageHead, StateView } from '@dental/ui';
-import { Button, Container, Group, Modal, Select, Stack, Text, TextInput } from '@mantine/core';
+import { PageHead, StatCard, StateView } from '@dental/ui';
+import { Button, Group, Modal, Select, SimpleGrid, Stack, Text, TextInput } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconCategory, IconPlus } from '@tabler/icons-react';
+import { IconCategory, IconListNumbers, IconPlus, IconWallet } from '@tabler/icons-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { formatCurrency } from '@/lib/format';
+import { formatCurrency, formatNumber } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import {
   useBranches,
@@ -74,6 +74,10 @@ export function ExpensesScreen() {
     [summary.data, nameMap, uncategorized],
   );
 
+  // 3 KPI — mavjud summaryRows/DTO'dan client-side (yangi data YO'Q, delta YO'Q).
+  const recordCount = useMemo(() => summaryRows.reduce((s, r) => s + r.count, 0), [summaryRows]);
+  const categoryCount = summaryRows.length;
+
   const categoryOptions = catList.map((c) => ({
     value: c.id,
     label: locale === 'ru' && c.nameRu ? c.nameRu : c.name,
@@ -86,7 +90,7 @@ export function ExpensesScreen() {
   };
 
   return (
-    <Container size="xl">
+    <>
       <Stack gap="lg">
         <PageHead
           title={t('expenses.title')}
@@ -107,6 +111,25 @@ export function ExpensesScreen() {
             )
           }
         />
+
+        <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="lg">
+          <StatCard
+            label={t('expenses.grand_total')}
+            value={summary.data ? formatCurrency(summary.data.grandTotal, t) : '—'}
+            icon={<IconWallet />}
+            accent
+          />
+          <StatCard
+            label={t('expenses.count')}
+            value={summary.data ? formatNumber(recordCount) : '—'}
+            icon={<IconListNumbers />}
+          />
+          <StatCard
+            label={t('expenses.categories')}
+            value={summary.data ? formatNumber(categoryCount) : '—'}
+            icon={<IconCategory />}
+          />
+        </SimpleGrid>
 
         <Group align="flex-end">
           <TextInput
@@ -186,6 +209,6 @@ export function ExpensesScreen() {
           </Group>
         </Stack>
       </Modal>
-    </Container>
+    </>
   );
 }

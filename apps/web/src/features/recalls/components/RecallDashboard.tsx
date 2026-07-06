@@ -1,15 +1,24 @@
-import { Mono, PageHead, StateView, StatusPill } from '@dental/ui';
-import { Button, Group, Table, Text } from '@mantine/core';
+import { Mono, StateView, StatusPill } from '@dental/ui';
+import { Box, Button, Group, Table, Text } from '@mantine/core';
 import { IconCalendarPlus, IconPhoneCheck, IconX } from '@tabler/icons-react';
+import type { CSSProperties } from 'react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { StatCard } from '@/features/dashboard/components/widgets/StatCard.tsx';
 import { useAuthStore } from '@/stores/auth-store.ts';
-import { useMarkRecallContacted, useRecalls, useUpdateRecall } from '../recalls.api';
+import {
+  useMarkRecallContacted,
+  useRecallSummary,
+  useRecalls,
+  useUpdateRecall,
+} from '../recalls.api';
 import {
   isOverdue,
   localToday,
   recallReasonLabelKey,
+  recallSmsStatusLabelKey,
+  recallSmsStatusTone,
   recallStatusLabelKey,
 } from '../recalls.mappers';
 import type { RecallDto } from '../recalls.types';
@@ -28,6 +37,26 @@ function statusTone(status: RecallDto['status']): 'neutral' | 'warning' | 'succe
   }
 }
 
+/**
+ * Muddat (due) chip toni — FAQAT mavjud maydonlardan (yangi maydon/kalit yo'q):
+ * muddati o'tgan → warning, bugun → accent, kelajak → neutral.
+ */
+function dueTone(dueDate: string, today: string): 'warning' | 'accent' | 'neutral' {
+  if (isOverdue(dueDate, today)) return 'warning';
+  if (dueDate === today) return 'accent';
+  return 'neutral';
+}
+
+// Dental OS chrome — token-driven inline stillar (yangi CSS fayl yo'q, scope=1 fayl).
+const headStripStyle: CSSProperties = { background: 'var(--surface-2)' };
+const thLabelStyle: CSSProperties = {
+  color: 'var(--ink-3)',
+  fontSize: 'var(--text-xs)',
+  fontWeight: 'var(--fw-semibold)',
+  letterSpacing: '0.04em',
+  textTransform: 'uppercase',
+};
+
 export function RecallDashboard() {
   const { t } = useTranslation();
   const { hasPermission } = useAuthStore();
@@ -38,16 +67,17 @@ export function RecallDashboard() {
   // muddati keluvchi pending recall'lar qaytadi.
   const today = useMemo(() => localToday(), []);
   const recallsQuery = useRecalls({ date: today });
+  const summaryQuery = useRecallSummary();
 
   const markContacted = useMarkRecallContacted();
   const updateRecall = useUpdateRecall();
 
   const rows = recallsQuery.data ?? [];
+  const kpi = summaryQuery.data;
 
   if (recallsQuery.isError) {
     return (
       <div>
-        <PageHead title={t('recall.title')} />
         <StateView
           status="error"
           title={t('states.error_title')}
@@ -60,7 +90,42 @@ export function RecallDashboard() {
 
   return (
     <div>
-      <PageHead title={t('recall.title')} subtitle={t('recall.due_today')} />
+      <Text size="sm" c="dimmed" mb="md">
+        {t('recall.due_today')}
+      </Text>
+
+      {/* 4-KPI grid: pending / contacted / scheduled / overdue + efficacyPct hint */}
+      <Box
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: 14,
+          marginTop: 16,
+          marginBottom: 20,
+        }}
+      >
+        <StatCard
+          label={t('recall.kpi.pending')}
+          value={kpi ? String(kpi.pending) : '—'}
+          tone="warning"
+        />
+        <StatCard
+          label={t('recall.kpi.contacted')}
+          value={kpi ? String(kpi.contacted) : '—'}
+          tone="info"
+        />
+        <StatCard
+          label={t('recall.kpi.scheduled')}
+          value={kpi ? String(kpi.scheduled) : '—'}
+          tone="primary"
+        />
+        <StatCard
+          label={t('recall.kpi.overdue')}
+          value={kpi ? String(kpi.overdue) : '—'}
+          tone="warning"
+          hint={kpi ? `${t('recall.kpi.efficacy')}: ${Math.round(kpi.efficacyPct)}%` : undefined}
+        />
+      </Box>
       {recallsQuery.isLoading ? (
         <StateView status="loading" skeleton="table" />
       ) : rows.length === 0 ? (
@@ -68,14 +133,15 @@ export function RecallDashboard() {
       ) : (
         <Table.ScrollContainer minWidth={680} mt="md">
           <Table verticalSpacing="sm" highlightOnHover>
-            <Table.Thead>
+            <Table.Thead style={headStripStyle}>
               <Table.Tr>
-                <Table.Th>{t('recall.col.patient')}</Table.Th>
-                <Table.Th>{t('recall.col.phone')}</Table.Th>
-                <Table.Th>{t('recall.col.reason')}</Table.Th>
-                <Table.Th>{t('recall.col.due')}</Table.Th>
-                <Table.Th>{t('recall.col.status')}</Table.Th>
-                {canManage && <Table.Th>{t('recall.col.actions')}</Table.Th>}
+                <Table.Th style={thLabelStyle}>{t('recall.col.patient')}</Table.Th>
+                <Table.Th style={thLabelStyle}>{t('recall.col.phone')}</Table.Th>
+                <Table.Th style={thLabelStyle}>{t('recall.col.reason')}</Table.Th>
+                <Table.Th style={thLabelStyle}>{t('recall.col.due')}</Table.Th>
+                <Table.Th style={thLabelStyle}>{t('recall.col.status')}</Table.Th>
+                <Table.Th style={thLabelStyle}>{t('recall.sms_status.label')}</Table.Th>
+                {canManage && <Table.Th style={thLabelStyle}>{t('recall.col.actions')}</Table.Th>}
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -93,19 +159,30 @@ export function RecallDashboard() {
                   </Table.Td>
                   <Table.Td>{t(recallReasonLabelKey(r.reason))}</Table.Td>
                   <Table.Td>
-                    <Text c={isOverdue(r.dueDate, today) ? 'red' : undefined}>{r.dueDate}</Text>
+                    <StatusPill status={dueTone(r.dueDate, today)} dot={false}>
+                      <Mono>{r.dueDate}</Mono>
+                    </StatusPill>
                   </Table.Td>
                   <Table.Td>
                     <StatusPill status={statusTone(r.status)}>
                       {t(recallStatusLabelKey(r.status))}
                     </StatusPill>
                   </Table.Td>
+                  <Table.Td>
+                    {r.smsStatus ? (
+                      <StatusPill status={recallSmsStatusTone(r.smsStatus)}>
+                        {t(recallSmsStatusLabelKey(r.smsStatus))}
+                      </StatusPill>
+                    ) : (
+                      <Text c="dimmed">{t('recall.sms_status.none')}</Text>
+                    )}
+                  </Table.Td>
                   {canManage && (
                     <Table.Td>
                       <Group gap="xs" wrap="nowrap">
                         <Button
                           size="compact-xs"
-                          variant="light"
+                          variant="default"
                           leftSection={<IconPhoneCheck size={14} />}
                           loading={markContacted.isPending}
                           onClick={() => markContacted.mutate({ id: r.id })}
@@ -114,7 +191,7 @@ export function RecallDashboard() {
                         </Button>
                         <Button
                           size="compact-xs"
-                          variant="light"
+                          variant="filled"
                           color="teal"
                           component={Link}
                           to={`/appointments?patientId=${r.patientId}`}

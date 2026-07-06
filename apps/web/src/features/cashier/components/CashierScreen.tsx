@@ -1,13 +1,5 @@
 import { PageHead, StateView } from '@dental/ui';
-import {
-  Container,
-  Group,
-  Paper,
-  SegmentedControl,
-  Select,
-  SimpleGrid,
-  Stack,
-} from '@mantine/core';
+import { Box, Flex, Group, Paper, SegmentedControl, Select, Stack } from '@mantine/core';
 import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth-store.ts';
@@ -52,44 +44,45 @@ export function CashierScreen() {
   const canCreate = hasPermission('cashier.create_transaction');
 
   return (
-    <Container size="xl">
-      <Stack gap="lg">
-        <PageHead
-          title={t('cashier.title')}
-          actions={
-            <Select
-              label={t('cashier.branch')}
-              data={branchesQuery.data?.map((b) => ({ value: b.id, label: b.name })) ?? []}
-              value={branchId}
-              onChange={setBranchId}
-              w={220}
-            />
-          }
-        />
-
-        <Group align="flex-end" wrap="wrap">
+    <Stack gap="lg">
+      <PageHead
+        title={t('cashier.title')}
+        actions={
           <Select
-            label={t('cashier.patient')}
-            placeholder={t('cashier.select_patient')}
-            data={patientsQuery.data?.data.map((p) => ({ value: p.id, label: p.fullName })) ?? []}
-            value={patientId}
-            onChange={setPatientId}
-            searchable
-            clearable
-            w={280}
+            label={t('cashier.branch')}
+            data={branchesQuery.data?.map((b) => ({ value: b.id, label: b.name })) ?? []}
+            value={branchId}
+            onChange={setBranchId}
+            w={220}
           />
-          <SegmentedControl
-            value={mode}
-            onChange={handleModeChange}
-            data={[
-              { value: 'payment', label: t('cashier.mode.payment') },
-              { value: 'plan', label: t('cashier.mode.plan') },
-            ]}
-          />
-        </Group>
+        }
+      />
 
-        <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="lg">
-          {/* LEFT: POS yoki plan billing */}
+      <Group align="flex-end" gap="md" wrap="wrap">
+        <Select
+          label={t('cashier.patient')}
+          placeholder={t('cashier.select_patient')}
+          data={patientsQuery.data?.data.map((p) => ({ value: p.id, label: p.fullName })) ?? []}
+          value={patientId}
+          onChange={setPatientId}
+          searchable
+          clearable
+          w={280}
+        />
+        <SegmentedControl
+          value={mode}
+          onChange={handleModeChange}
+          data={[
+            { value: 'payment', label: t('cashier.mode.payment') },
+            { value: 'plan', label: t('cashier.mode.plan') },
+          ]}
+        />
+      </Group>
+
+      {/* Dental OS 2-ustun layout: chap = POS/plan (1fr), o'ng = 360px stacked. */}
+      <Flex direction={{ base: 'column', lg: 'row' }} gap={16} align="flex-start">
+        {/* LEFT: POS yoki plan billing — minmax(0,1fr) ekvivalenti (miw=0). */}
+        <Box flex={1} miw={0} w={{ base: '100%', lg: 'auto' }}>
           {canCreate &&
             branchId &&
             (mode === 'payment' ? (
@@ -101,27 +94,40 @@ export function CashierScreen() {
             ) : (
               <PlanBillingPanel branchId={branchId} patientId={patientId} />
             ))}
+        </Box>
 
-          {/* RIGHT: kunlik xulosa + tranzaksiyalar */}
+        {/* RIGHT (360px): kunlik xulosa + tranzaksiyalar */}
+        <Box w={{ base: '100%', lg: 360 }} style={{ flexShrink: 0 }}>
           <Stack gap="md">
             {summaryQuery.data && <DailySummaryCard summary={summaryQuery.data} />}
-            <Paper withBorder p="lg" radius="md">
-              {txQuery.isLoading ? (
-                <StateView status="loading" skeleton="table" />
-              ) : txQuery.isError ? (
-                <StateView
-                  status="error"
-                  title={t('states.error_title')}
-                  retryLabel={t('states.retry')}
-                  onRetry={() => txQuery.refetch()}
-                />
-              ) : (
-                <TransactionsTable transactions={txQuery.data?.data ?? []} />
-              )}
+            <Paper
+              p={0}
+              radius="var(--radius-card)"
+              style={{
+                border: '1px solid var(--border)',
+                boxShadow: 'var(--shadow-sm)',
+                overflow: 'hidden',
+                fontFamily: 'var(--font-sans)',
+              }}
+            >
+              <Box p="18px">
+                {txQuery.isLoading ? (
+                  <StateView status="loading" skeleton="table" />
+                ) : txQuery.isError ? (
+                  <StateView
+                    status="error"
+                    title={t('states.error_title')}
+                    retryLabel={t('states.retry')}
+                    onRetry={() => txQuery.refetch()}
+                  />
+                ) : (
+                  <TransactionsTable transactions={txQuery.data?.data ?? []} />
+                )}
+              </Box>
             </Paper>
           </Stack>
-        </SimpleGrid>
-      </Stack>
-    </Container>
+        </Box>
+      </Flex>
+    </Stack>
   );
 }

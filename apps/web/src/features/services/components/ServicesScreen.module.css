@@ -1,0 +1,11 @@
+/* DS6 services screen toolbar (spec §4.5) */
+
+.toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.searchField {
+  flex: 1;
+}

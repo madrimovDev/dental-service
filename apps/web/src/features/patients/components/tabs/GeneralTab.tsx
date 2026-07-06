@@ -13,7 +13,14 @@ import type { PatientDetail } from '../../patients.types';
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <Stack gap={2}>
-      <Text size="xs" c="dimmed">
+      <Text
+        style={{
+          fontSize: '11.5px',
+          color: 'var(--ink-3)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.04em',
+        }}
+      >
         {label}
       </Text>
       <Text>{value}</Text>

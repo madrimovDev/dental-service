@@ -1,6 +1,6 @@
 import type { Service } from '@dental/api-client';
 import { PageHead, StateView } from '@dental/ui';
-import { Button, Container, Group, Modal, Select, Stack, Text, TextInput } from '@mantine/core';
+import { Button, Group, Modal, Select, Stack, Text, TextInput } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconPlus, IconSearch } from '@tabler/icons-react';
 import { useMemo, useState } from 'react';
@@ -10,6 +10,7 @@ import { useDeleteService, useServices } from '../services.api';
 import { filterServices, groupByCategory } from '../services.mappers';
 import type { ServiceVM } from '../services.types';
 import { ServiceFormModal } from './ServiceFormModal';
+import classes from './ServicesScreen.module.css';
 import { ServicesTable } from './ServicesTable';
 
 export function ServicesScreen() {
@@ -57,7 +58,7 @@ export function ServicesScreen() {
   };
 
   return (
-    <Container size="xl">
+    <>
       <Stack gap="lg">
         <PageHead
           title={t('services.title')}
@@ -70,14 +71,14 @@ export function ServicesScreen() {
           }
         />
 
-        <Group>
+        <div className={classes.toolbar}>
           <TextInput
+            className={classes.searchField}
             leftSection={<IconSearch size={16} />}
             placeholder={t('services.search')}
             aria-label={t('services.search')}
             value={search}
             onChange={(e) => setSearch(e.currentTarget.value)}
-            flex={1}
           />
           <Select
             placeholder={t('services.category')}
@@ -88,7 +89,7 @@ export function ServicesScreen() {
             clearable
             w={220}
           />
-        </Group>
+        </div>
 
         {services.isLoading ? (
           <StateView status="loading" skeleton="table" />
@@ -137,6 +138,6 @@ export function ServicesScreen() {
           </Group>
         </Stack>
       </Modal>
-    </Container>
+    </>
   );
 }

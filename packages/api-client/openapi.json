@@ -423,6 +423,12 @@
             "nullable": true,
             "example": null
           },
+          "notificationSettings": {
+            "$ref": "#/components/schemas/NotificationSettings"
+          },
+          "integrationSettings": {
+            "$ref": "#/components/schemas/IntegrationSettings"
+          },
           "createdAt": {
             "type": "string",
             "example": "2026-06-12T10:00:00.000Z"
@@ -439,8 +445,70 @@
           "reminderLeadHours",
           "currency",
           "onboardingDismissedAt",
+          "notificationSettings",
+          "integrationSettings",
           "createdAt",
           "updatedAt"
+        ]
+      },
+      "NotificationSettings": {
+        "type": "object",
+        "properties": {
+          "appointmentReminder": {
+            "type": "boolean"
+          },
+          "recallSms": {
+            "type": "boolean"
+          },
+          "paymentReceipt": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "appointmentReminder",
+          "recallSms",
+          "paymentReceipt"
+        ]
+      },
+      "IntegrationSettings": {
+        "type": "object",
+        "properties": {
+          "telegram": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "botUsername": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "enabled",
+              "botUsername"
+            ]
+          },
+          "eskiz": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "sender": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "enabled",
+              "sender"
+            ]
+          }
+        },
+        "required": [
+          "telegram",
+          "eskiz"
         ]
       },
       "TenantVertical": {
@@ -1655,6 +1723,17 @@
             "nullable": true,
             "example": "Terapevtika"
           },
+          "categoryId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid",
+            "example": null
+          },
+          "categoryNameRu": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          },
           "durationMinutes": {
             "type": "integer",
             "example": 30
@@ -1699,6 +1778,8 @@
           "nameUz",
           "nameRu",
           "category",
+          "categoryId",
+          "categoryNameRu",
           "durationMinutes",
           "requiredRole",
           "descriptionUz",
@@ -1779,6 +1860,58 @@
         ]
       },
       "ServiceDeleteResult": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "deleted"
+        ]
+      },
+      "ServiceCategory": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "example": "Terapevtika"
+          },
+          "nameRu": {
+            "type": "string",
+            "nullable": true,
+            "example": "Терапия"
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-06-27T10:00:00.000Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "example": "2026-06-27T10:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "name",
+          "nameRu",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "ServiceCategoryDeleteResult": {
         "type": "object",
         "properties": {
           "deleted": {
@@ -2217,6 +2350,27 @@
                 "total"
               ]
             }
+          },
+          "byPaymentMethod": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "paymentMethod": {
+                  "type": "string"
+                },
+                "total": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "paymentMethod",
+                "total"
+              ]
+            }
+          },
+          "comparison": {
+            "$ref": "#/components/schemas/PeriodComparison"
           }
         },
         "required": [
@@ -2224,7 +2378,50 @@
           "byBranch",
           "byService",
           "byDoctor",
-          "byPeriod"
+          "byPeriod",
+          "byPaymentMethod",
+          "comparison"
+        ]
+      },
+      "PeriodComparison": {
+        "type": "object",
+        "properties": {
+          "previous": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "total": {
+                "type": "number"
+              },
+              "deltaPct": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "total",
+              "deltaPct"
+            ]
+          },
+          "yoy": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "total": {
+                "type": "number"
+              },
+              "deltaPct": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "total",
+              "deltaPct"
+            ]
+          }
+        },
+        "required": [
+          "previous",
+          "yoy"
         ]
       },
       "AppointmentStatsReport": {
@@ -2256,13 +2453,59 @@
           },
           "slotUtilization": {
             "type": "number"
+          },
+          "byPeriod": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "date",
+                "count"
+              ]
+            }
+          },
+          "comparison": {
+            "$ref": "#/components/schemas/PeriodComparison"
+          },
+          "occupancy": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "weekday": {
+                  "type": "number"
+                },
+                "hour": {
+                  "type": "number"
+                },
+                "count": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "weekday",
+                "hour",
+                "count"
+              ]
+            }
           }
         },
         "required": [
           "total",
           "byStatus",
           "noShowRate",
-          "slotUtilization"
+          "slotUtilization",
+          "byPeriod",
+          "comparison",
+          "occupancy"
         ]
       },
       "DoctorWorkloadReport": {
@@ -2575,6 +2818,41 @@
           "resourceId",
           "ip",
           "userAgent",
+          "createdAt"
+        ]
+      },
+      "AuditRecentItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "actorName": {
+            "type": "string",
+            "nullable": true
+          },
+          "action": {
+            "type": "string"
+          },
+          "resourceType": {
+            "type": "string"
+          },
+          "resourceId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "actorName",
+          "action",
+          "resourceType",
+          "resourceId",
           "createdAt"
         ]
       },
@@ -2970,6 +3248,54 @@
           "endMinute"
         ]
       },
+      "BranchAvailability": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "date": {
+            "type": "string",
+            "example": "2026-06-22"
+          },
+          "slotMinutes": {
+            "type": "integer",
+            "example": 30
+          },
+          "doctors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DoctorAvailability"
+            }
+          }
+        },
+        "required": [
+          "branchId",
+          "date",
+          "slotMinutes",
+          "doctors"
+        ]
+      },
+      "DoctorAvailability": {
+        "type": "object",
+        "properties": {
+          "doctorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "slots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AvailabilitySlot"
+            }
+          }
+        },
+        "required": [
+          "doctorId",
+          "slots"
+        ]
+      },
       "QueueTicket": {
         "type": "object",
         "properties": {
@@ -3247,6 +3573,12 @@
             "type": "integer",
             "example": 0
           },
+          "smsStatus": {
+            "type": "string",
+            "nullable": true,
+            "example": "sent",
+            "description": "SMS delivery status (workflow status ≠ SMS)"
+          },
           "notes": {
             "type": "string",
             "nullable": true,
@@ -3296,12 +3628,40 @@
           "assignedDoctorId",
           "lastContactedAt",
           "contactAttempts",
+          "smsStatus",
           "notes",
           "createdBy",
           "closedBy",
           "closedAt",
           "createdAt",
           "updatedAt"
+        ]
+      },
+      "RecallSummary": {
+        "type": "object",
+        "properties": {
+          "pending": {
+            "type": "integer"
+          },
+          "contacted": {
+            "type": "integer"
+          },
+          "scheduled": {
+            "type": "integer"
+          },
+          "overdue": {
+            "type": "integer"
+          },
+          "efficacyPct": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "pending",
+          "contacted",
+          "scheduled",
+          "overdue",
+          "efficacyPct"
         ]
       },
       "CreateRecall": {
@@ -3449,6 +3809,40 @@
           "category",
           "descriptionUz",
           "descriptionRu"
+        ]
+      },
+      "TreatmentPlanListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TreatmentPlanWithStages"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer"
+              },
+              "pageSize": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "page",
+              "pageSize",
+              "total"
+            ]
+          }
+        },
+        "required": [
+          "data",
+          "meta"
         ]
       },
       "TreatmentPlanWithStages": {
@@ -4322,6 +4716,40 @@
           "createdAt"
         ]
       },
+      "LabOrderListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LabOrder"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer"
+              },
+              "pageSize": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "page",
+              "pageSize",
+              "total"
+            ]
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
       "LabOrder": {
         "type": "object",
         "properties": {
@@ -4766,6 +5194,16 @@
             "type": "string",
             "example": "dona"
           },
+          "category": {
+            "type": "string",
+            "nullable": true,
+            "example": "Anesteziya"
+          },
+          "price": {
+            "type": "string",
+            "nullable": true,
+            "example": "15000.00"
+          },
           "quantity": {
             "type": "string",
             "example": "120.00"
@@ -4792,6 +5230,8 @@
           "branchId",
           "name",
           "unit",
+          "category",
+          "price",
           "quantity",
           "minThreshold",
           "createdAt",
@@ -4823,6 +5263,16 @@
             "type": "string",
             "example": "dona"
           },
+          "category": {
+            "type": "string",
+            "nullable": true,
+            "example": "Anesteziya"
+          },
+          "price": {
+            "type": "string",
+            "nullable": true,
+            "example": "15000.00"
+          },
           "quantity": {
             "type": "string",
             "example": "120.00"
@@ -4846,6 +5296,8 @@
           "branchId",
           "name",
           "unit",
+          "category",
+          "price",
           "quantity",
           "minThreshold",
           "createdAt",
@@ -6591,6 +7043,49 @@
                     "type": "string",
                     "nullable": true,
                     "format": "date-time"
+                  },
+                  "notificationSettings": {
+                    "type": "object",
+                    "properties": {
+                      "appointmentReminder": {
+                        "type": "boolean"
+                      },
+                      "recallSms": {
+                        "type": "boolean"
+                      },
+                      "paymentReceipt": {
+                        "type": "boolean"
+                      }
+                    }
+                  },
+                  "integrationSettings": {
+                    "type": "object",
+                    "properties": {
+                      "telegram": {
+                        "type": "object",
+                        "properties": {
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "botUsername": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "eskiz": {
+                        "type": "object",
+                        "properties": {
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "sender": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        }
+                      }
+                    }
                   }
                 }
               }
@@ -10771,6 +11266,370 @@
         }
       }
     },
+    "/api/service-categories": {
+      "get": {
+        "tags": [
+          "service-categories"
+        ],
+        "operationId": "listServiceCategories",
+        "responses": {
+          "200": {
+            "description": "List of service categories",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ServiceCategory"
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "service-categories"
+        ],
+        "operationId": "createServiceCategory",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "nameRu": {
+                    "type": "string",
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Service category created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ServiceCategory"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Duplicate name",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/service-categories/{id}": {
+      "patch": {
+        "tags": [
+          "service-categories"
+        ],
+        "operationId": "updateServiceCategory",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "nameRu": {
+                    "type": "string",
+                    "maxLength": 100
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ServiceCategory"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Service category not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "service-categories"
+        ],
+        "operationId": "deleteServiceCategory",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ServiceCategoryDeleteResult"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Service category not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Category in use",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/cashier/transactions": {
       "get": {
         "tags": [
@@ -12181,6 +13040,74 @@
         }
       }
     },
+    "/api/audit/recent": {
+      "get": {
+        "tags": [
+          "audit"
+        ],
+        "operationId": "getRecentActivity",
+        "responses": {
+          "200": {
+            "description": "Recent activity (metadata-only)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AuditRecentItem"
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/appointments": {
       "get": {
         "tags": [
@@ -13349,6 +14276,103 @@
         }
       }
     },
+    "/api/schedule/availability/branch": {
+      "get": {
+        "tags": [
+          "schedule"
+        ],
+        "operationId": "getBranchAvailability",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "branchId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "example": "2026-06-22"
+            },
+            "required": true,
+            "name": "date",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 5,
+              "maximum": 480,
+              "default": 30
+            },
+            "required": false,
+            "name": "slotMinutes",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Branch-wide available slots per doctor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/BranchAvailability"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/queue": {
       "get": {
         "tags": [
@@ -13869,6 +14893,82 @@
         }
       }
     },
+    "/api/recalls/summary": {
+      "get": {
+        "tags": [
+          "recalls"
+        ],
+        "operationId": "getRecallSummary",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recall KPI summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/RecallSummary"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/recalls/patient/{id}": {
       "get": {
         "tags": [
@@ -14235,11 +15335,52 @@
             "description": "Filter by patient UUID",
             "name": "patientId",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "presented",
+                "accepted",
+                "in_progress",
+                "completed",
+                "cancelled"
+              ],
+              "description": "Filter by plan status"
+            },
+            "required": false,
+            "description": "Filter by plan status",
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "exclusiveMinimum": true,
+              "default": 1
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "exclusiveMinimum": true,
+              "maximum": 100,
+              "default": 20
+            },
+            "required": false,
+            "name": "pageSize",
+            "in": "query"
           }
         ],
         "responses": {
           "200": {
-            "description": "List of treatment plans with nested stages",
+            "description": "Paginated treatment plans (tenant-wide or patient-filtered) with nested stages",
             "content": {
               "application/json": {
                 "schema": {
@@ -14252,10 +15393,7 @@
                       ]
                     },
                     "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/TreatmentPlanWithStages"
-                      }
+                      "$ref": "#/components/schemas/TreatmentPlanListResponse"
                     }
                   },
                   "required": [
@@ -17265,9 +18403,11 @@
           {
             "schema": {
               "type": "string",
-              "format": "uuid"
+              "format": "uuid",
+              "description": "Filter by patient UUID"
             },
             "required": false,
+            "description": "Filter by patient UUID",
             "name": "patientId",
             "in": "query"
           },
@@ -17281,16 +18421,41 @@
                 "ready",
                 "delivered",
                 "cancelled"
-              ]
+              ],
+              "description": "Filter by order status"
             },
             "required": false,
+            "description": "Filter by order status",
             "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "exclusiveMinimum": true,
+              "default": 1
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "exclusiveMinimum": true,
+              "maximum": 100,
+              "default": 20
+            },
+            "required": false,
+            "name": "pageSize",
             "in": "query"
           }
         ],
         "responses": {
           "200": {
-            "description": "List of lab orders",
+            "description": "Paginated lab orders (tenant-wide or patient-filtered)",
             "content": {
               "application/json": {
                 "schema": {
@@ -17303,10 +18468,7 @@
                       ]
                     },
                     "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/LabOrder"
-                      }
+                      "$ref": "#/components/schemas/LabOrderListResponse"
                     }
                   },
                   "required": [
@@ -19300,6 +20462,15 @@
                     "minLength": 1,
                     "maxLength": 40
                   },
+                  "category": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "price": {
+                    "type": "number",
+                    "nullable": true,
+                    "minimum": 0
+                  },
                   "quantity": {
                     "type": "number",
                     "nullable": true,
@@ -19500,6 +20671,15 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 40
+                  },
+                  "category": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "price": {
+                    "type": "number",
+                    "nullable": true,
+                    "minimum": 0
                   },
                   "quantity": {
                     "type": "number",

@@ -32,6 +32,8 @@ function svc(over: Partial<Service> = {}): Service {
     nameUz: 'Plomba',
     nameRu: 'Пломба',
     category: null,
+    categoryId: null,
+    categoryNameRu: null,
     durationMinutes: 30,
     requiredRole: null,
     descriptionUz: null,

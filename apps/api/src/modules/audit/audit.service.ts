@@ -1,8 +1,8 @@
-import { auditLog } from '@dental/db-schema';
+import { auditLog, users } from '@dental/db-schema';
 import { and, between, count, desc, eq } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
-import type { AuditListQuery } from './audit.schema.ts';
+import type { AuditListQuery, AuditRecentItemDto } from './audit.schema.ts';
 
 /**
  * Audit-log o'qish service (factory). RLS tenant orqali filtrlaydi (getDb(c)) —
@@ -45,7 +45,39 @@ export const createAuditService = () => {
     };
   }
 
-  return { list };
+  /**
+   * So'nggi `limit` ta audit yozuvini metadata-only (before/after YO'Q) qaytaradi.
+   * `users` jadvaliga LEFT JOIN — actorName olish uchun.
+   * RLS tenant-scope: getDb(c) orqali, explicit WHERE tenant_id YOZILMAYDI.
+   * `users` platform-darajali (RLS tenant-scoped EMAS), lekin auditLog RLS orqali
+   * faqat shu tenantning qatorlari qaytadi → cross-tenant user nomi chiqib ketmaydi.
+   */
+  async function recent(c: Context, limit = 15): Promise<AuditRecentItemDto[]> {
+    const db = getDb(c);
+    const rows = await db
+      .select({
+        id: auditLog.id,
+        actorName: users.fullName,
+        action: auditLog.action,
+        resourceType: auditLog.resourceType,
+        resourceId: auditLog.resourceId,
+        createdAt: auditLog.createdAt,
+      })
+      .from(auditLog)
+      .leftJoin(users, eq(auditLog.userId, users.id))
+      .orderBy(desc(auditLog.createdAt))
+      .limit(limit);
+    return rows.map((r) => ({
+      id: r.id,
+      actorName: r.actorName ?? null,
+      action: r.action,
+      resourceType: r.resourceType,
+      resourceId: r.resourceId ?? null,
+      createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
+    }));
+  }
+
+  return { list, recent };
 };
 
 export type AuditService = ReturnType<typeof createAuditService>;

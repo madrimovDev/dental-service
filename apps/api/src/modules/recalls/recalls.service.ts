@@ -209,6 +209,19 @@ export const createRecallsService = (deps: { audit: AuditLogger }) => {
     }
   }
 
+  async function summary(c: Context, branchId?: string) {
+    const s = await repo.summary(c, branchId);
+    const converted = s.scheduled + s.completed;
+    const efficacyPct = s.total === 0 ? 0 : (converted / s.total) * 100;
+    return {
+      pending: s.pending,
+      contacted: s.contacted,
+      scheduled: s.scheduled,
+      overdue: s.overdue,
+      efficacyPct,
+    };
+  }
+
   return {
     list,
     listByPatient,
@@ -219,6 +232,7 @@ export const createRecallsService = (deps: { audit: AuditLogger }) => {
     autoCreateFromStage,
     autoCreatePreventive,
     closeOpenOnRebook,
+    summary,
   };
 };
 

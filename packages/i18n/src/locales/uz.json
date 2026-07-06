@@ -12,7 +12,7 @@
     "title": "Audit log",
     "from": "Sanadan",
     "to": "Sanagacha",
-    "action": "Amal",
+    "action_label": "Amal",
     "action_placeholder": "masalan, patient.create",
     "resource_type": "Resurs turi",
     "resource_type_placeholder": "masalan, patient",
@@ -29,6 +29,26 @@
       "action": "Amal",
       "resource": "Resurs",
       "resource_id": "Resurs ID"
+    },
+    "action": {
+      "created": "yaratdi",
+      "updated": "yangiladi",
+      "deleted": "o'chirdi",
+      "viewed": "ko'rdi",
+      "login": "tizimga kirdi",
+      "workspace_switched": "ish joyini almashtirdi"
+    },
+    "resource": {
+      "patient": "bemor",
+      "appointment": "yozilish",
+      "cashier_transaction": "to'lov",
+      "treatment_plan": "davolash rejasi",
+      "visit_note": "vizit yozuvi",
+      "user": "foydalanuvchi",
+      "auth": "autentifikatsiya",
+      "service": "xizmat",
+      "stock_item": "ombor mahsuloti",
+      "expense": "xarajat"
     }
   },
   "common": {
@@ -52,7 +72,10 @@
     "active": "Faol",
     "inactive": "Faol emas",
     "view": "Ko'rish",
-    "archive": "Arxivlash"
+    "archive": "Arxivlash",
+    "date": "Sana",
+    "patient": "Bemor",
+    "status": "Status"
   },
   "health": {
     "title": "Tizim holati",
@@ -62,7 +85,22 @@
   "validation": {
     "phone_invalid": "Telefon raqami noto'g'ri formatda",
     "password_required": "Parol kerak",
-    "min_chars": "Kamida {{count}} belgi"
+    "min_chars": "Kamida {{count}} belgi",
+    "required": "Majburiy maydon",
+    "invalidType": "Noto'g'ri qiymat",
+    "invalidEmail": "Email manzili noto'g'ri",
+    "invalidUrl": "URL manzili noto'g'ri",
+    "invalidFormat": "Noto'g'ri format",
+    "tooShort": "Kamida {{min}} belgi bo'lishi kerak",
+    "tooLong": "Ko'pi bilan {{max}} belgi bo'lishi mumkin",
+    "tooSmall": "{{min}} dan katta yoki teng bo'lishi kerak",
+    "tooBig": "{{max}} dan kichik yoki teng bo'lishi kerak",
+    "tooFew": "Kamida {{min}} ta element bo'lishi kerak",
+    "tooMany": "Ko'pi bilan {{max}} ta element bo'lishi mumkin",
+    "notMultipleOf": "{{divisor}} ga karrali bo'lishi kerak",
+    "unrecognizedKeys": "Noma'lum maydon(lar)",
+    "invalidValue": "Ruxsat etilmagan qiymat",
+    "invalidInput": "Noto'g'ri kiritildi"
   },
   "auth": {
     "login": {
@@ -92,6 +130,7 @@
       "title": "Workspace tanlash",
       "no_workspaces": "Sizda hech qanday klinika yo'q. Birinchi qadam — klinikani ro'yxatdan o'tkazing.",
       "all_branches": "Barcha filiallar",
+      "owner_badge": "Egasi",
       "session_expired_title": "Sessiya muddati tugadi",
       "session_expired_message": "Iltimos, qayta login qiling. Eski refresh token endi yaroqsiz.",
       "switch_failed": "Workspace almashtirib bo'lmadi"
@@ -111,10 +150,23 @@
       "submit": "Parolni yangilash",
       "invalid": "Kod noto'g'ri yoki muddati tugagan",
       "password_placeholder": "Kamida 12 belgi"
+    },
+    "activate": {
+      "title": "Litsenziyani faollashtirish",
+      "description": "Dental Service'dan foydalanish uchun klinikangizga berilgan litsenziya kalitini kiriting.",
+      "license_key": "Litsenziya kaliti",
+      "license_key_placeholder": "XXXXX-XXXXX-XXXXX-XXXXX",
+      "submit": "Faollashtirish",
+      "success": "Litsenziya muvaffaqiyatli faollashtirildi. Yo'naltirilmoqda...",
+      "error_invalid_key": "Litsenziya kaliti noto'g'ri",
+      "error_fingerprint_mismatch": "Bu litsenziya boshqa qurilmada faol. Supervisor bilan bog'laning.",
+      "error_fingerprint_unavailable": "Bu qurilmani aniqlab bo'lmadi (virtual muhit qo'llab-quvvatlanmaydi)",
+      "error_generic": "Litsenziyani faollashtirib bo'lmadi. Qaytadan urinib ko'ring."
     }
   },
   "layout": {
     "switch_workspace": "Workspace o'zgartirish",
+    "profile": "Profil",
     "logout": "Chiqish"
   },
   "nav": {
@@ -135,6 +187,7 @@
     "kpi": "Dashboard / KPI",
     "reports": "Hisobotlar",
     "services": "Xizmatlar va narxlar",
+    "service_categories": "Kategoriyalar",
     "branches": "Filiallar",
     "roles": "Rollar",
     "users": "Foydalanuvchilar",
@@ -143,11 +196,9 @@
     "settings": "Sozlamalar",
     "tenant_settings": "Sozlamalar",
     "group": {
-      "today": "Bugun",
-      "patients": "Bemorlar",
-      "clinic": "Klinika",
-      "finance": "Moliya",
-      "management": "Boshqaruv"
+      "asosiy": "Asosiy",
+      "klinika": "Klinika",
+      "boshqaruv": "Boshqaruv"
     }
   },
   "palette": {
@@ -173,7 +224,8 @@
     "select_branch": "Filialni tanlash",
     "branch_switch_error": "Filialni almashtirib bo'lmadi",
     "lang_uz": "O'zbekcha",
-    "lang_ru": "Ruscha"
+    "lang_ru": "Ruscha",
+    "toggle_sidebar": "Yon panelni yig'ish"
   },
   "notifications": {
     "title": "Bildirishnomalar",
@@ -235,7 +287,16 @@
     "doctor_pending_placeholder": "Tugallanmagan ishlar agregati hali yo'q",
     "no_lab_orders": "Faol laboratoriya buyurtmalari yo'q",
     "no_appointments": "Bugun qabullar yo'q",
-    "no_queue": "Navbat bo'sh"
+    "no_queue": "Navbat bo'sh",
+    "weekly_revenue": "Haftalik tushum",
+    "last_7_days": "So'nggi 7 kun",
+    "queue_status": "Navbat holati",
+    "queue_waiting": "{{n}} kutmoqda",
+    "calendar_link": "Kalendar",
+    "new_appointment": "Yangi yozilish",
+    "open_cashier": "Kassa",
+    "vsPrevPeriod": "o'tgan davrga nisbatan",
+    "activityFeed": "So'nggi faoliyat"
   },
   "branches": {
     "title": "Filiallar",
@@ -284,6 +345,42 @@
     "transfer_current_password": "Joriy parolingiz",
     "transfer_confirm": "Egalik boshqa xodimga o'tkaziladi. Bu amalni qaytarib bo'lmaydi. Davom etasizmi?",
     "transfer_hint": "Egalikni o'tkazsangiz — superuser huquqlari yangi egaga o'tadi.",
+    "nav_notify": "Bildirishnomalar",
+    "nav_integrations": "Integratsiyalar",
+    "role_users": "{{count}} foydalanuvchi",
+    "role_perm_count": "{{desc}} · {{count}} ruxsat",
+    "copy": "Nusxalash",
+    "notify_title": "Bildirishnoma sozlamalari",
+    "notify_pref_appointment_title": "Qabul eslatmasi",
+    "notify_pref_appointment_desc": "Bemorga qabuldan oldin avtomatik eslatma yuboriladi.",
+    "notify_pref_recall_title": "Qayta chaqiruv",
+    "notify_pref_recall_desc": "Profilaktik ko'rik vaqti kelganda bemorga xabar yuboriladi.",
+    "notify_pref_birthday_title": "Tug'ilgan kun tabrigi",
+    "notify_pref_birthday_desc": "Bemorlarni tug'ilgan kuni bilan avtomatik tabriklash.",
+    "notify_pref_lab_title": "Laboratoriya tayyor",
+    "notify_pref_lab_desc": "Laboratoriya buyurtmasi tayyor bo'lganda xabar beriladi.",
+    "integration_configure": "Sozlash",
+    "integration_connect": "Ulash",
+    "integration_eskiz_name": "Eskiz.uz SMS",
+    "integration_eskiz_desc": "Bemorlarga SMS eslatma va xabarlar yuborish.",
+    "integration_telegram_name": "Telegram bot",
+    "integration_telegram_desc": "Telegram orqali bildirishnoma va aloqa kanali.",
+    "integration_soliq_name": "Soliq.uz fiskal",
+    "integration_soliq_desc": "Fiskal cheklar va soliq hisobotini avtomatlashtirish.",
+    "integration_onec_name": "1C eksport",
+    "integration_onec_desc": "Buxgalteriya uchun 1C formatida ma'lumot eksporti.",
+    "integration_status_connected": "Ulangan",
+    "integration_status_off": "Ulanmagan",
+    "desktop_server_title": "Desktop server manzili",
+    "desktop_server_desc": "LAN orqali server avtomatik topilmasa, manzilni qo'lda kiriting va qayta ulaning.",
+    "desktop_server_url_label": "Server manzili",
+    "desktop_server_url_placeholder": "http://192.168.1.10:8001",
+    "desktop_server_connect_button": "Ulash",
+    "desktop_server_connecting": "Ulanmoqda...",
+    "desktop_server_success": "Serverga muvaffaqiyatli ulandi.",
+    "desktop_server_saved_not_connected": "Manzil saqlandi, lekin serverga ulanib bo'lmadi. Manzil va tarmoqni tekshiring.",
+    "desktop_server_error": "Xatolik yuz berdi. Qaytadan urinib ko'ring.",
+    "desktop_server_url_required": "Server manzilini kiriting.",
     "perm_group": {
       "patient": "Bemorlar",
       "appointment": "Yozuvlar",
@@ -358,11 +455,27 @@
     "custom": "Maxsus",
     "permissions": "Ruxsatlar",
     "selected_count": "{{count}} ta tanlangan",
-    "confirm_delete": "Rolni o'chirishni tasdiqlaysizmi?"
+    "confirm_delete": "Rolni o'chirishni tasdiqlaysizmi?",
+    "system_template": "Tizim shabloni"
   },
   "patients": {
     "title": "Bemorlar",
     "create": "Yangi bemor",
+    "count": "{{count}} ta bemor",
+    "filter": {
+      "all": "Barchasi",
+      "archived": "Arxiv"
+    },
+    "col": {
+      "patient": "Bemor",
+      "phone": "Telefon",
+      "age_gender": "Yosh · jins",
+      "balance": "Balans"
+    },
+    "empty_title": "Bu bo'limda bemor yo'q",
+    "empty_desc": "Boshqa filtrni tanlang yoki yangi bemor qo'shing",
+    "balance_paid": "To'langan",
+    "back_to_list": "‹ Bemorlar ro'yxati",
     "search_placeholder": "F.I.SH, telefon yoki pasport bo'yicha qidirish...",
     "show_archived": "Arxivlangan",
     "empty": "Bemorlar yo'q",
@@ -459,7 +572,16 @@
       "insurance_active": "Sug'urta faol",
       "coverage_dental": "Stomatologik",
       "coverage_general": "Umumiy",
-      "coverage_other": "Boshqa"
+      "coverage_other": "Boshqa",
+      "section_personal": "Shaxsiy ma'lumot",
+      "section_contact": "Aloqa",
+      "section_extra": "Qo'shimcha ma'lumot",
+      "sub_personal": "Bemorning asosiy shaxsiy ma'lumotlari",
+      "sub_contact": "Telefon va manzil ma'lumotlari",
+      "sub_extra": "Pasport, izoh, teglar va sug'urta",
+      "checklist_title": "To'ldirilishi shart",
+      "checklist_name": "Ism",
+      "checklist_phone": "Telefon"
     },
     "insurance_status": {
       "active": "Faol",
@@ -474,6 +596,8 @@
       "other": "Boshqa"
     },
     "severe_allergy_warning": "DIQQAT — anestetik allergiyasi!",
+    "allergy_confirm_pill": "Anesteziyadan oldin tasdiqlang",
+    "payment_history": "To'lov tarixi",
     "no_medical_permission": "Sizda tibbiy kartani ko'rish ruxsati yo'q"
   },
   "medical": {
@@ -574,10 +698,24 @@
     "consent_signed": "Rozilik imzolangan",
     "consent_signed_at": "Imzolangan sana",
     "consent_required": "Avval rozilikni imzolang",
-    "consent_signature_url": "Imzo havolasi (ixtiyoriy)"
+    "consent_signature_url": "Imzo havolasi (ixtiyoriy)",
+    "financial_summary": "Moliyaviy xulosa",
+    "total_plan": "Jami reja",
+    "pdf_consent": "Reja PDF · konsent",
+    "list": {
+      "title": "Davolash rejalari",
+      "subtitle": "Barcha bemorlar bo'yicha rejalar",
+      "search": "Bemor yoki reja bo'yicha qidirish",
+      "filter_status": "Status bo'yicha",
+      "all_status": "Barcha statuslar",
+      "empty": "Davolash rejalari topilmadi",
+      "col_patient": "Bemor",
+      "col_updated": "Yangilangan"
+    }
   },
   "visit_note": {
     "title": "Vizit yozuvlari",
+    "title_soap": "Vizit yozuvlari · SOAP",
     "create": "Yangi vizit yozuvi",
     "visit_date": "Vizit sanasi",
     "doctor": "Shifokor",
@@ -645,6 +783,7 @@
   },
   "prescription": {
     "title": "Reseptlar",
+    "active_title": "Faol reseptlar",
     "create": "Yangi resept",
     "issued_date": "Berilgan sana",
     "diagnosis": "Diagnoz",
@@ -722,7 +861,18 @@
     "notes": "Eslatma",
     "save": "Saqlash",
     "empty": "Buyurtmalar yo'q",
-    "teeth_inline": "tish: {{teeth}}"
+    "teeth_inline": "tish: {{teeth}}",
+    "list": {
+      "title": "Laboratoriya buyurtmalari",
+      "subtitle": "Barcha bemorlar bo'yicha buyurtmalar",
+      "search": "Bemor yoki laboratoriya bo'yicha qidirish",
+      "filter_status": "Status bo'yicha",
+      "all_status": "Barcha statuslar",
+      "empty": "Buyurtmalar topilmadi",
+      "col_number": "№",
+      "col_patient": "Bemor",
+      "col_expected": "Kutilgan sana"
+    }
   },
   "image": {
     "title": "Bemor rasmlari",
@@ -780,6 +930,12 @@
     "empty": "Yozuvlar yo'q",
     "empty_week": "Bu hafta yozilishlar yo'q",
     "cancel_reason": "Bekor qilish sababi",
+    "summary_appts": "{{count}} ta yozilish",
+    "summary_doctors": "{{count}} doktor",
+    "waitlist": {
+      "title": "Kutish ro'yxati",
+      "empty": "Hozircha kutish ro'yxati bo'sh"
+    },
     "status": {
       "scheduled": "Rejalashtirilgan",
       "confirmed": "Tasdiqlangan",
@@ -791,6 +947,7 @@
   },
   "schedule": {
     "title": "Ish jadvali",
+    "subtitle": "Haftalik ish vaqti · mavjudlik",
     "doctor": "Shifokor",
     "branch": "Filial",
     "select_doctor": "Shifokorni tanlang",
@@ -846,7 +1003,18 @@
     "from_appointment": "Yozuvdan",
     "walk_in": "Navbat (yozuvsiz)",
     "check_in": "Navbatga olish",
-    "no_candidates": "Bugun check-in uchun yozuv yo'q"
+    "no_candidates": "Bugun check-in uchun yozuv yo'q",
+    "now_serving": "Hozir chaqirilmoqda",
+    "next_in_queue": "Keyingi navbat",
+    "display_board": "Display board",
+    "exit": "Chiqish",
+    "live_subtitle": "jonli boshqaruv",
+    "board_subtitle": "Navbat — jonli tablo",
+    "next_queues": "Keyingi navbatlar",
+    "waited_minutes": "{{count}} daqiqa kutdi",
+    "cabinet": "Kabinet {{n}}",
+    "not_called_yet": "Hozircha chaqirilmagan",
+    "call_arrow": "Chaqirish →"
   },
   "services": {
     "title": "Xizmatlar katalogi",
@@ -891,7 +1059,9 @@
     "new_payment": "Yangi to'lov",
     "previous_balance": "Eski balans",
     "add_service": "Xizmat qo'shish",
-    "search_service": "Xizmatni qidirish...",
+    "search_service": "Xizmat qidirish yoki kod kiritish…",
+    "current_receipt": "Joriy chek",
+    "subtotal": "Oraliq jami",
     "discount": "Chegirma",
     "payment_method": "To'lov turi",
     "method": {
@@ -909,9 +1079,20 @@
     "no_transactions_today": "Bugun operatsiyalar yo'q",
     "date": "Sana",
     "amount": "Summa",
+    "transactionType": "Tur",
+    "paymentMethod": "To'lov usuli",
     "status": "Status",
     "receipt": "Chek raqami",
     "daily_summary": "Kunlik xulosa",
+    "cash_today": "Bugungi kassa",
+    "total_revenue": "Jami tushum",
+    "noop_fiscal": "Fiskal hujjat keyinroq Soliqqa yuboriladi",
+    "receipt_modal": {
+      "print": "Chop etish",
+      "close": "Yopish",
+      "total": "Jami",
+      "view": "Chekni ko'rish"
+    },
     "confirm_refund": "To'lovni qaytarishni tasdiqlaysizmi?",
     "type": {
       "refund": "Qaytarish",
@@ -975,12 +1156,14 @@
     "dental_analytics": "Dental analitika",
     "export_1c": "1C eksport",
     "procedure_mix": "Protsedura taqsimoti",
+    "top_services": "Top xizmatlar",
     "retention": "Bemor saqlanishi",
     "retention_new": "Yangi",
     "retention_returning": "Qaytgan",
     "recall_efficacy": "Recall samaradorligi",
     "no_show_trend": "Kelmaslik (hafta-kuni, %)",
     "revenue": "Daromad",
+    "revenue_trend": "Tushum dinamikasi",
     "appointments": "Qabullar",
     "doctor_workload": "Shifokorlar yuklamasi",
     "plan_completion": "Davolash rejalari",
@@ -996,7 +1179,17 @@
     "rate": "Bajarilish",
     "empty": "Maʼlumot yoʻq",
     "export_csv": "CSV",
-    "export_excel": "Excel"
+    "export_excel": "Excel",
+    "byPaymentMethod": "To'lov usuli taqsimoti",
+    "occupancy": "Qabullar bandligi (issiqligi)"
+  },
+  "payment": {
+    "method": {
+      "cash": "Naqd pul",
+      "card": "Karta",
+      "transfer": "Pul o'tkazma",
+      "other": "Boshqa"
+    }
   },
   "expenses": {
     "title": "Xarajatlar",
@@ -1065,7 +1258,9 @@
     "bom_service": "Xizmat",
     "bom_empty": "Bu xizmat uchun materiallar belgilanmagan",
     "material": "Material",
-    "qty_per_service": "Xizmatga miqdor"
+    "qty_per_service": "Xizmatga miqdor",
+    "category": "Kategoriya",
+    "price": "Narx"
   },
   "payroll": {
     "title": "Ish haqi",
@@ -1132,6 +1327,43 @@
       "interval_months": "Interval (oy)",
       "notes": "Izoh",
       "submit": "Saqlash"
+    },
+    "kpi": {
+      "pending": "Kutilmoqda",
+      "contacted": "Bog'lanilgan",
+      "scheduled": "Yozilgan",
+      "overdue": "Muddati o'tgan",
+      "efficacy": "Samaradorlik"
+    },
+    "sms_status": {
+      "label": "SMS holati",
+      "sent": "Yuborildi",
+      "pending": "Kutilmoqda",
+      "failed": "Yuborilmadi",
+      "replied": "Javob keldi",
+      "none": "—"
     }
+  },
+  "plans": {
+    "title": "Sarlavha",
+    "total": "Jami"
+  },
+  "lab": {
+    "orderType": "Tur",
+    "expectedDate": "Muddat"
+  },
+  "rx": {
+    "itemsCount": "Dorilar",
+    "diagnosis": "Tashxis"
+  },
+  "serviceCategories": {
+    "title": "Xizmat kategoriyalari",
+    "create": "Yangi kategoriya",
+    "edit": "Kategoriyani tahrirlash",
+    "name": "Nomi",
+    "name_ru": "Nomi (ruscha)",
+    "empty": "Hali kategoriya yo'q",
+    "confirm_delete": "Kategoriyani o'chirish?",
+    "in_use_error": "Bu kategoriyaga xizmatlar biriktirilgan — avval ularni ko'chiring"
   }
 }

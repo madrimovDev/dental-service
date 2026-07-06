@@ -36,16 +36,22 @@ vi.mock('../cashier.api', () => ({
   })),
 }));
 
+// Task D'ning ReceiptModal'i (net-new) hali landed bo'lmasligi mumkin —
+// import disjoint qoladi; bu test uni stublaydi (B uni faqat import qiladi, tahrirlamaydi).
+vi.mock('./ReceiptModal', () => ({
+  ReceiptModal: () => null,
+}));
+
 describe('PosPanel', () => {
   beforeEach(() => {
     mutate.mockClear();
   });
 
-  it('xizmat qo‘shilganda narx avto-to‘ldiriladi (50000)', async () => {
+  it('xizmat pill bosilganda narx avto-to‘ldiriladi (50000)', async () => {
     renderApp(<PosPanel branchId="b1" patientId={null} />);
 
-    fireEvent.click(screen.getByPlaceholderText('Xizmatni qidirish...'));
-    fireEvent.click(await screen.findByText('PL-001 — Plomba'));
+    // Quick-add pill (label = nameUz) bosish → addService() trigger.
+    fireEvent.click(await screen.findByText('Plomba'));
 
     // Savat qatori narxi 50000 ga avto-to'ldiriladi.
     await waitFor(() => {
@@ -57,8 +63,7 @@ describe('PosPanel', () => {
   it('charge → create allocation-siz body bilan chaqiriladi', async () => {
     renderApp(<PosPanel branchId="b1" patientId="pat1" />);
 
-    fireEvent.click(screen.getByPlaceholderText('Xizmatni qidirish...'));
-    fireEvent.click(await screen.findByText('PL-001 — Plomba'));
+    fireEvent.click(await screen.findByText('Plomba'));
     await screen.findByDisplayValue("50 000 so'm");
 
     fireEvent.click(screen.getByText("To'lovni qabul qilish"));
@@ -70,6 +75,39 @@ describe('PosPanel', () => {
         items: [expect.objectContaining({ serviceId: 's1', quantity: 1, unitPrice: 50000 })],
         paymentMethod: 'cash',
       }),
+      expect.anything(),
+    );
+  });
+
+  it('chegirma pill (10%) → emitilgan discount = round(gross*0.1)', async () => {
+    renderApp(<PosPanel branchId="b1" patientId="pat1" />);
+
+    fireEvent.click(await screen.findByText('Plomba'));
+    await screen.findByDisplayValue("50 000 so'm");
+
+    // gross = 50000 → 10% → 5000.
+    fireEvent.click(screen.getByText('10%'));
+
+    fireEvent.click(screen.getByText("To'lovni qabul qilish"));
+
+    expect(mutate).toHaveBeenCalledWith(
+      expect.objectContaining({ discount: 5000 }),
+      expect.anything(),
+    );
+  });
+
+  it('to‘lov toggle "Karta" → payload paymentMethod:card', async () => {
+    renderApp(<PosPanel branchId="b1" patientId="pat1" />);
+
+    fireEvent.click(await screen.findByText('Plomba'));
+    await screen.findByDisplayValue("50 000 so'm");
+
+    fireEvent.click(screen.getByText('Karta'));
+
+    fireEvent.click(screen.getByText("To'lovni qabul qilish"));
+
+    expect(mutate).toHaveBeenCalledWith(
+      expect.objectContaining({ paymentMethod: 'card' }),
       expect.anything(),
     );
   });

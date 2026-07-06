@@ -1,5 +1,5 @@
 import { PageHead, StateView } from '@dental/ui';
-import { Alert, Button, Card, Container, Grid, Group, Select, Stack, Tabs } from '@mantine/core';
+import { Alert, Button, Card, Grid, Group, Select, Stack, Tabs } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconAlertTriangle, IconBox, IconList, IconPlus, IconTruck } from '@tabler/icons-react';
 import { useMemo, useState } from 'react';
@@ -54,7 +54,7 @@ export function StockScreen() {
   };
 
   return (
-    <Container size="xl">
+    <>
       <Stack gap="lg">
         <PageHead
           title={t('stock.title')}
@@ -159,6 +159,6 @@ export function StockScreen() {
       />
       <MovementFormModal opened={movementOpened} onClose={closeMovement} item={movementItem} />
       <BatchFormModal opened={batchOpened} onClose={closeBatch} items={itemVMs} />
-    </Container>
+    </>
   );
 }

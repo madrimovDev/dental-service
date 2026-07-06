@@ -5,6 +5,13 @@ import { CalendarScreen } from './CalendarScreen';
 
 vi.mock('../appointments.api', () => ({
   useAppointments: () => ({ data: [], isLoading: false }),
+  useBranchAvailability: () => ({
+    data: undefined,
+    isLoading: false,
+    isError: false,
+    isFetching: false,
+    refetch: vi.fn(),
+  }),
   useDoctors: () => ({ data: [{ id: 'd1', name: 'Dr. Ali' }] }),
   useServices: () => ({ data: [] }),
   useBranches: () => ({ data: [] }),
@@ -29,5 +36,14 @@ describe('CalendarScreen', () => {
     renderApp(<CalendarScreen />);
     expect(screen.getByText('Kun')).toBeInTheDocument();
     expect(screen.getByText('Hafta')).toBeInTheDocument();
+  });
+
+  it("chevron-nav + 'Bugun' reset amali saqlangan", () => {
+    renderApp(<CalendarScreen />);
+    // Chevron nav (oldingi/keyingi) — IconButton aria-label mavjud common.* kalitlardan.
+    expect(screen.getByRole('button', { name: 'Orqaga' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Keyingi' })).toBeInTheDocument();
+    // 'Bugun' reset tugmasi + (default sana bugun) statik 'Bugun' pill — kamida 1 ko'rinadi.
+    expect(screen.getAllByText('Bugun').length).toBeGreaterThan(0);
   });
 });

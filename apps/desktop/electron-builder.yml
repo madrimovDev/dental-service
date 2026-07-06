@@ -1,7 +1,7 @@
 # electron-builder konfiguratsiyasi (V3-3) — Dental Service desktop.
-# ⚠️ Distribution uchun code-signing + publish provider kerak (TODO, V3-3 jonli):
+# ⚠️ Distribution uchun code-signing kerak (TODO, V3-3 jonli):
 #   - mac: Developer ID sertifikat; win: code-signing sertifikat.
-#   - publish: S3/GitHub releases (auto-update uchun).
+# Auto-update publish provider — quyida `publish:` (CLI-357, Task 12).
 appId: uz.dental.service
 productName: Dental Service
 directories:
@@ -10,15 +10,54 @@ directories:
 files:
   - dist/**/*
   - package.json
+extraResources:
+  - from: resources/postgres
+    to: postgres
+    filter: ["**/*"]
+  - from: resources/valkey
+    to: valkey
+    filter: ["**/*"]
+  - from: ../../dist/api.exe    # bun compile chiqishi
+    to: api.exe
+  # Bitta-EXE arxitektura — api.exe apps/web build outputni ham serve qiladi
+  # (apps/api/src/app.ts, WEB_DIST_DIR). `bun run build` oldidan
+  # `cd apps/web && bun run build` bajarilishi shart.
+  - from: ../web/dist
+    to: web
+    filter: ["**/*"]
+  # `bun build --compile` migratsiya SQL fayllarini (meta/_journal.json + RLS
+  # DDL) ICHIGA OLMAYDI — first-run.ts `runMigrations()` bularni api.exe
+  # yoniga (sibling) resurs sifatida kutadi (2026-07-02 real-run'da topildi;
+  # MIGRATIONS_DIR/RLS_MIGRATIONS_DIR — apps/api/src/db/migrate.ts).
+  - from: ../api/drizzle
+    to: drizzle
+    filter: ["**/*"]
+  - from: ../api/migrations/rls
+    to: migrations/rls
+    filter: ["**/*"]
+  - from: ../../infra/postgres-win.conf
+    to: ../infra/postgres-win.conf
+  - from: ../../infra/valkey-win.conf
+    to: ../infra/valkey-win.conf
 mac:
   target: dmg
   category: public.app-category.medical
 win:
   target: nsis
+  # PLACEHOLDER (CLI-367) — build/icon.ico haqiqiy brend logotipi emas, almashtirilishi kerak (CLI-361 real build oldidan)
+  icon: build/icon.ico
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  installerLanguages: [uz, ru]
+  include: build/installer.nsh    # rol tanlash dialog
 linux:
   target: AppImage
   category: Office
-# TODO(jonli): publish provideri (auto-update). Imzo'siz local build uchun bo'sh.
-# publish:
-#   provider: s3
-#   bucket: dental-desktop-updates
+# Auto-update (CLI-357) — o'z (generic) update serveri, `UPDATE_URL` build-time
+# environment o'zgaruvchisidan olinadi:
+#   UPDATE_URL=https://updates.dental-service.uz bun run build
+# Serverda `latest.yml` + installer EXE static serve qilinishi kerak.
+publish:
+  provider: generic
+  url: "${env.UPDATE_URL}"

@@ -1,38 +1,229 @@
-.toolbar {
+/* DS2 — Bemorlar ro'yxati (Dental OS re-skin). Front-end-only, existing tokens. */
+
+/* ---- Header ---- */
+.header {
   display: flex;
-  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
   margin-bottom: 16px;
+}
+
+.headSub {
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--text-3);
+  font-family: var(--font-sans);
+}
+
+.headRight {
+  display: flex;
   align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .searchField {
-  flex: 1;
+  min-width: 230px;
+}
+
+/* Wrap the locked Input (38px tall / 10px radius) without touching the primitive. */
+.searchField :global([class*="wrap"]) {
+  height: 38px;
+  border-radius: 10px;
+}
+
+/* ---- Filter pills ---- */
+.pills {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.pill {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: var(--radius-pill, 99px);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.pill:hover {
+  background: var(--surface-2);
+}
+
+.pill[data-active="true"] {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-primary);
+}
+
+/* ---- Table (CSS grid inside bodyless Card) ---- */
+.tableHead,
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) 170px 120px 150px;
+  align-items: center;
+  gap: 16px;
+  padding: 0 16px;
+}
+
+.tableHead {
+  height: 40px;
+  background: var(--surface-2);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-3);
+}
+
+.colBalance {
+  text-align: right;
+  justify-self: end;
 }
 
 .row {
+  min-height: 60px;
+  border-top: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+
+.row:hover {
+  background: var(--surface-2);
+}
+
+/* ---- Cell: patient identity ---- */
+.patientCell {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border-subtle);
+  min-width: 0;
 }
 
-.row:last-child {
-  border-bottom: none;
+.avatar {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: linear-gradient(135deg, var(--primary), var(--violet));
+  color: var(--on-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: var(--font-sans);
+  text-transform: uppercase;
 }
 
 .identity {
-  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nameRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
 }
 
 .name {
   font-weight: 600;
+  color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.age {
+.tagPill {
+  flex-shrink: 0;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill, 99px);
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 10.5px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  white-space: nowrap;
+}
+
+/* ---- Cell: phone ---- */
+.phone {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.empty {
   color: var(--text-3);
+}
+
+/* ---- Cell: age · gender ---- */
+.ageGender {
+  font-size: 13px;
+  color: var(--text-2);
+  font-family: var(--font-sans);
+}
+
+/* ---- Cell: balance + actions ---- */
+.balanceCell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.balanceChip {
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.balanceChip[data-tone="paid"] {
+  color: var(--text-3);
+}
+
+.balanceChip[data-tone="debt"] .balanceAmount {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.balanceChip[data-tone="credit"] .balanceAmount {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.balanceLabel {
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.rowActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 6px;
+}
+
+.pagination {
+  margin-top: 16px;
 }

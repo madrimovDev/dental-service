@@ -2,13 +2,14 @@ import { cssVarsResolver, mantineTheme } from '@dental/ui';
 import { MantineProvider } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
 import { QueryClientProvider } from '@tanstack/react-query';
+import { Suspense } from 'react';
 import { I18nextProvider } from 'react-i18next';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute.tsx';
 import { ErrorBoundary } from '@/components/ErrorBoundary.tsx';
 import { i18n } from '@/lib/i18n.ts';
 import { queryClient } from '@/lib/query-client.ts';
-import { AppShell, RequirePermission } from '@/shell';
+import { AppShell, PageLoader, RequirePermission } from '@/shell';
 import { protectedRoutes, publicRoutes } from './routes.tsx';
 
 export function App() {
@@ -25,9 +26,17 @@ export function App() {
             <ErrorBoundary>
               <Routes>
                 {/* Public — shell tashqarisida */}
-                {publicRoutes.map((r) => (
-                  <Route key={r.path} path={r.path} element={r.element} />
-                ))}
+                <Route
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <Outlet />
+                    </Suspense>
+                  }
+                >
+                  {publicRoutes.map((r) => (
+                    <Route key={r.path} path={r.path} element={r.element} />
+                  ))}
+                </Route>
 
                 {/* Protected — AppShell layout, Outlet */}
                 <Route

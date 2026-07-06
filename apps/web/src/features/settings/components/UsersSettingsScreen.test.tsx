@@ -59,4 +59,10 @@ describe('UsersSettingsScreen', () => {
     expect(screen.queryByText('Ali Valiyev')).not.toBeInTheDocument();
     expect(screen.getByText('Vali Aliyev')).toBeInTheDocument();
   });
+
+  it("faol holat yorlig'i StatusPill matni bilan ko'rinadi", () => {
+    renderApp(<UsersSettingsScreen />);
+    // Badge -> StatusPill migratsiyasidan keyin ham label matni (users.active) DOM'da
+    expect(screen.getAllByText('Faol').length).toBeGreaterThan(0);
+  });
 });

@@ -10,6 +10,8 @@ import type {
   DeleteTimeOff200,
   GetAvailability200,
   GetAvailabilityParams,
+  GetBranchAvailability200,
+  GetBranchAvailabilityParams,
   GetDoctorWorkingHours200,
   GetDoctorWorkingHoursParams,
   ListTimeOff200,
@@ -79,9 +81,19 @@ import { customInstance } from '../../mutator';
     },
       );
     }
+  export const getBranchAvailability = (
+    params: GetBranchAvailabilityParams,
+ ) => {
+      return customInstance<GetBranchAvailability200>(
+      {url: `/api/schedule/availability/branch`, method: 'GET',
+        params
+    },
+      );
+    }
   export type GetDoctorWorkingHoursResult = NonNullable<Awaited<ReturnType<typeof getDoctorWorkingHours>>>
 export type PutDoctorWorkingHoursResult = NonNullable<Awaited<ReturnType<typeof putDoctorWorkingHours>>>
 export type ListTimeOffResult = NonNullable<Awaited<ReturnType<typeof listTimeOff>>>
 export type CreateTimeOffResult = NonNullable<Awaited<ReturnType<typeof createTimeOff>>>
 export type DeleteTimeOffResult = NonNullable<Awaited<ReturnType<typeof deleteTimeOff>>>
 export type GetAvailabilityResult = NonNullable<Awaited<ReturnType<typeof getAvailability>>>
+export type GetBranchAvailabilityResult = NonNullable<Awaited<ReturnType<typeof getBranchAvailability>>>

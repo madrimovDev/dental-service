@@ -1,10 +1,11 @@
 import type { Diagnosis, VisitNote } from '@dental/api-client';
 import { Mono } from '@dental/ui';
-import { Badge, Box, Card, Group, Image, SimpleGrid, Stack, Text } from '@mantine/core';
+import { Badge, Box, Group, Image, SimpleGrid, Stack, Text } from '@mantine/core';
 import { IconCalendar } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { usePatientImages } from '../../clinical.api';
 import { toVisitNoteVM } from '../../clinical.mappers';
+import classes from './VisitNoteCard.module.css';
 
 export function VisitNoteCard({
   note,
@@ -17,51 +18,56 @@ export function VisitNoteCard({
   const vm = toVisitNoteVM(note, diagnosisMap, i18n.language === 'ru' ? 'ru' : 'uz');
   const linkedImages = usePatientImages(note.patientId, note.id);
   const images = linkedImages.data ?? [];
+
+  const soapCells = [
+    { key: 'S', cls: classes.soapS, label: t('visit_note.subjective'), body: vm.subjective },
+    { key: 'O', cls: classes.soapO, label: t('visit_note.objective'), body: vm.objective },
+    {
+      key: 'A',
+      cls: classes.soapA,
+      label: t('visit_note.assessment'),
+      body: vm.diagnoses.length > 0 ? vm.diagnoses.join(', ') : null,
+    },
+    { key: 'P', cls: classes.soapP, label: t('visit_note.plan'), body: vm.plan },
+  ];
+
   return (
-    <Card withBorder padding="md">
-      <Stack gap="xs">
-        <Group gap={6}>
-          <IconCalendar size={16} />
-          <Mono>{vm.visitDateText}</Mono>
-        </Group>
-        {vm.subjective && (
-          <Box>
-            <Text size="sm" fw={600}>
-              S: {t('visit_note.subjective')}
-            </Text>
-            <Text size="sm">{vm.subjective}</Text>
-          </Box>
-        )}
-        {vm.objective && (
-          <Box>
-            <Text size="sm" fw={600}>
-              O: {t('visit_note.objective')}
-            </Text>
-            <Text size="sm">{vm.objective}</Text>
-          </Box>
-        )}
+    <div className={classes.card}>
+      <Stack gap="md">
+        <div className={classes.header}>
+          <span className={classes.toothChip}>
+            <IconCalendar size={18} />
+          </span>
+          <div className={classes.headMeta}>
+            <Text className={classes.title}>{t('visit_note.title')}</Text>
+            <Mono>{vm.visitDateText}</Mono>
+          </div>
+        </div>
+
         {vm.diagnoses.length > 0 && (
-          <Box>
-            <Text size="sm" fw={600}>
-              A: {t('visit_note.assessment')}
-            </Text>
-            <Group gap="xs" mt={4}>
-              {vm.diagnoses.map((dx) => (
-                <Badge key={dx} variant="light">
-                  {dx}
-                </Badge>
-              ))}
-            </Group>
-          </Box>
+          <div className={classes.dxRow}>
+            {vm.diagnoses.map((dx) => (
+              <Badge key={dx} className={classes.dxChip} variant="transparent">
+                {dx}
+              </Badge>
+            ))}
+          </div>
         )}
-        {vm.plan && (
-          <Box>
-            <Text size="sm" fw={600}>
-              P: {t('visit_note.plan')}
-            </Text>
-            <Text size="sm">{vm.plan}</Text>
-          </Box>
-        )}
+
+        <div className={classes.soapGrid}>
+          {soapCells.map((cell) => (
+            <div key={cell.key} className={`${classes.soapCell} ${cell.cls}`}>
+              <Group gap={6} mb={4} align="baseline">
+                <Mono>
+                  <span className={classes.soapLetter}>{cell.key}</span>
+                </Mono>
+                <span className={classes.soapLabel}>{cell.label}</span>
+              </Group>
+              {cell.body && <div className={classes.soapBody}>{cell.body}</div>}
+            </div>
+          ))}
+        </div>
+
         {vm.freeNotes && (
           <Box>
             <Text size="sm" fw={600} c="dimmed">
@@ -70,6 +76,7 @@ export function VisitNoteCard({
             <Text size="sm">{vm.freeNotes}</Text>
           </Box>
         )}
+
         {images.length > 0 && (
           <Box>
             <Text size="sm" fw={600} c="dimmed">
@@ -91,6 +98,6 @@ export function VisitNoteCard({
           </Box>
         )}
       </Stack>
-    </Card>
+    </div>
   );
 }

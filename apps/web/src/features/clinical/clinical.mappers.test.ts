@@ -30,9 +30,11 @@ import {
   toConsentFormVM,
   toDiagnosisOptions,
   toEstimateVM,
+  toLabOrderListRowVM,
   toLabOrderVM,
   toPatientImageVM,
   toPlanCardVM,
+  toPlanListRowVM,
   toPrescriptionVM,
   toStageRowVM,
   toToothDraftMap,
@@ -218,6 +220,49 @@ describe('toPlanCardVM / toStageRowVM', () => {
     );
     expect(stageAcceptanceToTone('rejected')).toBe('danger');
     expect(stageAcceptanceToTone('accepted')).toBe('success');
+  });
+});
+
+// ---- DS7: tenant-wide list rows ----
+describe('toPlanListRowVM (DS7)', () => {
+  it('patientId + updatedAt sana + cost formatNumber + status tone/labelKey', () => {
+    const plan = {
+      id: 'pl1',
+      patientId: 'pat-9',
+      title: 'Implant',
+      status: 'accepted',
+      totalCost: '2500000',
+      totalVisits: 4,
+      updatedAt: '2026-06-20T05:00:00Z',
+    } as unknown as TreatmentPlan;
+    const vm = toPlanListRowVM(plan);
+    expect(vm.patientId).toBe('pat-9');
+    expect(vm.statusTone).toBe('accent');
+    expect(vm.statusLabelKey).toBe('treatment_plan.status_accepted');
+    expect(vm.totalCostText).toBe(formatNumber(2500000));
+    expect(vm.totalVisits).toBe(4);
+    expect(vm.updatedAtText).toBe('20.06.2026');
+  });
+});
+
+describe('toLabOrderListRowVM (DS7)', () => {
+  it('patientId + orderNumber + expectedDate + cost formatNumber', () => {
+    const vm = toLabOrderListRowVM(
+      labOrder({ patientId: 'pat-3', orderNumber: 7, expectedDate: '2026-07-01T00:00:00Z' }),
+    );
+    expect(vm.patientId).toBe('pat-3');
+    expect(vm.orderNumber).toBe(7);
+    expect(vm.statusTone).toBe('info');
+    expect(vm.statusLabelKey).toBe('lab_order.status_sent');
+    expect(vm.typeLabelKey).toBe('lab_order.type_crown');
+    expect(vm.costText).toBe(formatNumber(500000));
+    expect(vm.expectedDateText).toBe('01.07.2026');
+  });
+
+  it('cost null → costText null; expectedDate null → null', () => {
+    const vm = toLabOrderListRowVM(labOrder({ cost: null, expectedDate: null }));
+    expect(vm.costText).toBeNull();
+    expect(vm.expectedDateText).toBeNull();
   });
 });
 

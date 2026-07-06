@@ -1,12 +1,14 @@
 import { createFiscalProvider } from '@dental/fiscal';
 import { createSmsChannel } from '@dental/notifications';
 import { OpenAPIHono } from '@hono/zod-openapi';
+import { serveStatic } from 'hono/bun';
 import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
 import { db } from './db/client.ts';
 import { createAuditLogger } from './lib/audit-logger.ts';
 import { env } from './lib/env.ts';
 import { METRICS_CONTENT_TYPE, renderMetrics } from './lib/metrics.ts';
+import { createLocalStorageAdapter } from './lib/storage.ts';
 import { errorHandler } from './middleware/error-handler.ts';
 import { requestId } from './middleware/request-id.ts';
 import { appointmentRoutes } from './modules/appointments/index.ts';
@@ -30,11 +32,14 @@ import { createRecallsService, recallRoutes } from './modules/recalls/index.ts';
 import { reportsRoutes } from './modules/reports/index.ts';
 import { roleRoutes } from './modules/roles/index.ts';
 import { createScheduleService, scheduleRoutes } from './modules/schedule/index.ts';
+import { serviceCategoryRoutes } from './modules/service-categories/index.ts';
 import { serviceRoutes } from './modules/services/index.ts';
 import { stockRoutes } from './modules/stock/index.ts';
 import { tenantSettingsRoutes } from './modules/tenant-settings/index.ts';
 import { tenantRoutes } from './modules/tenants/index.ts';
 import { userRoutes } from './modules/users/index.ts';
+import { activateRoutes } from './routes/activate.ts';
+import { uploadsRoutes } from './routes/uploads.ts';
 
 export const createApp = () => {
   const app = new OpenAPIHono();
@@ -53,17 +58,35 @@ export const createApp = () => {
   // Global middleware
   app.use('*', requestId());
 
-  // Security headers — early in the chain. This is a JSON API serving a separate
-  // SPA (no HTML/docs UI served at runtime), so the CSP locks everything down.
+  // Security headers — early in the chain. Normally this is a JSON API
+  // serving a separate SPA (no HTML/docs UI served at runtime), so the CSP
+  // locks everything down. Local Desktop (WEB_DIST_DIR set) is the one
+  // exception — this SAME process serves the web SPA's own HTML/JS/CSS/
+  // fonts, so `default-src 'none'` would block the app from loading its own
+  // assets (found 2026-07-02 in a real BrowserWindow — blank screen, CSP
+  // refused index.css/index.js/favicon.svg). `'unsafe-inline'` for styles
+  // only — Mantine's emotion CSS-in-JS injects <style> tags without a nonce;
+  // acceptable here since this serves a single trusted bundled SPA on a
+  // desktop-local port, not third-party content.
   // CORS is handled separately below; secureHeaders does not touch CORS headers.
   app.use(
     '*',
     secureHeaders({
-      // No HTML is served → forbid all sub-resource loading and framing.
-      contentSecurityPolicy: {
-        defaultSrc: ["'none'"],
-        frameAncestors: ["'none'"],
-      },
+      contentSecurityPolicy: env.WEB_DIST_DIR
+        ? {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            imgSrc: ["'self'", 'data:'],
+            fontSrc: ["'self'"],
+            connectSrc: ["'self'"],
+            frameAncestors: ["'none'"],
+          }
+        : {
+            // No HTML is served → forbid all sub-resource loading and framing.
+            defaultSrc: ["'none'"],
+            frameAncestors: ["'none'"],
+          },
       xFrameOptions: 'DENY',
       xContentTypeOptions: 'nosniff',
       // HSTS only in production (over real HTTPS) — emitting it on http://localhost
@@ -84,6 +107,9 @@ export const createApp = () => {
   // Public routes
   app.route('/api/health', healthRoutes({ db }));
   app.route('/api/auth', authRoutes({ db }));
+  // Local Desktop litsenziya faollashtirish (CLI-348 qaror 1) — auth yo'q,
+  // license-middleware.ts WHITELIST'i bilan bir xil yo'l.
+  app.route('/api/activate', activateRoutes());
 
   // Observability (CLI-238 / D7): Prometheus metrics. Public text/plain — keep
   // on the internal network / behind edge auth. Localized append-only mount.
@@ -101,8 +127,9 @@ export const createApp = () => {
   app.route('/api/users', userRoutes({ db, audit }));
   app.route('/api/patients', patientRoutes({ db, audit }));
   app.route('/api/services', serviceRoutes({ db, audit }));
+  app.route('/api/service-categories', serviceCategoryRoutes({ db, audit }));
   app.route('/api/cashier', cashierRoutes({ db, audit, fiscal }));
-  app.route('/api/reports', reportsRoutes({ db }));
+  app.route('/api/reports', reportsRoutes({ db, audit }));
   app.route('/api/audit', auditRoutes({ db }));
   // Epic A: doktor jadvali + time-off + availability. Service'ni bir marta
   // yaratamiz va predikatlarini appointmentRoutes'ga inject qilamiz (A6).
@@ -115,18 +142,50 @@ export const createApp = () => {
   app.route('/api/schedule', scheduleRoutes({ db, audit }));
   app.route('/api/queue', queueRoutes({ db, audit }));
   app.route('/api/recalls', recallRoutes({ db, audit }));
-  // Clinical: /api/diagnoses, /api/treatment-plans, /api/visit-notes, /api/tooth-charts
-  app.route('/api', clinicalRoutes({ db, audit, recall, notifications }));
   // M5 clinical extras
   app.route('/api/prescriptions', prescriptionsRoutes({ db, audit }));
   app.route('/api/consent', consentRoutes({ db, audit }));
   app.route('/api/lab-orders', labOrdersRoutes({ db, audit }));
-  app.route('/api', patientImagesRoutes({ db, audit }));
   // R4 Guruh A: xarajatlar (/api/expense-categories, /api/expenses), ombor (/api/stock)
   app.route('/api', expensesRoutes({ db, audit }));
   app.route('/api/stock', stockRoutes({ db, audit, notifications }));
   app.route('/api/payroll', payrollRoutes({ db, audit }));
   app.route('/api/notifications', notificationsRoutes({ db, sms }));
+  // CLI-358: clinical/patient-images are mounted at the BARE `/api` prefix
+  // (they fan out to top-level paths like /api/diagnoses, /api/treatment-plans,
+  // /api/patients/{id}/images — see each file's own comment) and clinical
+  // internally composes several nested `.route('/', childApp)` sub-apps.
+  // Empirically, registering a bare-`/api` mount with nested route
+  // composition BEFORE a sibling module that mounts its own top-level
+  // `app.use('*', requireModuleInDesktop(...))` gate at a distinct prefix
+  // (e.g. `/api/lab-orders`) breaks that sibling's gate entirely (its
+  // middleware silently stops matching — reproduced and root-caused via
+  // runtime probes, not yet filed as an upstream Hono issue). Mounting
+  // clinical/patient-images LAST avoids the interaction: nothing gated is
+  // registered after them, and their own gates are pattern-scoped (not
+  // blanket `'*'`) so they don't leak onto each other or anything before them.
+  // Clinical: /api/diagnoses, /api/treatment-plans, /api/visit-notes, /api/tooth-charts
+  app.route('/api', clinicalRoutes({ db, audit, recall, notifications }));
+  app.route('/api', patientImagesRoutes({ db, audit }));
+
+  // CLI-359: bemor rasmlari (`patient-images`) `serveUrl()` orqali generatsiya
+  // qilingan `/uploads/:key` URL'lar shu route orqali serve qilinadi (local
+  // filesystem storage — MinIO/S3 emas, CLI-340). Tenant-scoping tekshiruvi
+  // `uploads.ts` ichida (key'dagi tenantId JWT `activeTenantId` bilan
+  // solishtiriladi — bu route filesystem-based, RLS qamrovidan tashqarida).
+  const uploadsStorage = createLocalStorageAdapter();
+  app.route('/uploads', uploadsRoutes(uploadsStorage));
+
+  // Local Desktop bitta-EXE arxitekturasi — Windows'da alohida nginx/Caddy
+  // yo'q, api.exe o'zi `apps/web` build outputni ham serve qiladi
+  // (`process-manager.ts` `spawnApi()` `WEB_DIST_DIR`ni beradi). Faqat shu env
+  // o'rnatilganda faollashadi — cloud/dev deployment'da bo'sh, mavjud xulq
+  // o'zgarmaydi. `/api/*`/`/uploads/*`/`/metrics` yuqorida ro'yxatdan o'tgan
+  // (aniqroq) — Hono ularni bu catch-all'dan oldin moslashtiradi.
+  if (env.WEB_DIST_DIR) {
+    app.use('*', serveStatic({ root: env.WEB_DIST_DIR }));
+    app.get('*', serveStatic({ root: env.WEB_DIST_DIR, path: 'index.html' }));
+  }
 
   // Error handler
   app.onError(errorHandler);

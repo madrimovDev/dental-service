@@ -125,3 +125,10 @@ export function fetchServicePrices(qc: QueryClient, id: string): Promise<Service
     queryFn: () => getService(id).then((r) => r.data),
   });
 }
+
+export function useAllTransactions() {
+  return useQuery({
+    queryKey: cashierKeys.allTransactions(),
+    queryFn: () => listCashierTransactions().then((r) => r.data),
+  });
+}

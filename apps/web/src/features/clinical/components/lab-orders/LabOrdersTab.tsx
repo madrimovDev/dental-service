@@ -137,63 +137,142 @@ export function LabOrdersTab({ patientId }: Props) {
       ) : (listQuery.data?.length ?? 0) === 0 ? (
         <StateView status="empty" title={t('lab_order.empty')} />
       ) : (
-        listQuery.data?.map(toLabOrderVM).map((vm) => (
-          <Card key={vm.id} withBorder padding="md">
-            <Stack gap="xs">
-              <Group justify="space-between">
-                <Box>
-                  <Group gap={6}>
-                    <IconDental size={16} />
-                    <Text fw={700}>{vm.labName}</Text>
+        <Box
+          style={{
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-card)',
+            boxShadow: 'var(--shadow-sm)',
+            overflow: 'hidden',
+          }}
+        >
+          {/* Table header */}
+          <Box
+            style={{
+              borderBottom: '1px solid var(--border)',
+              color: 'var(--ink-3)',
+              display: 'grid',
+              fontSize: 11,
+              fontWeight: 600,
+              gap: 12,
+              gridTemplateColumns: '40px 1fr 1fr 90px auto',
+              letterSpacing: '.02em',
+              padding: '10px 18px',
+              textTransform: 'uppercase',
+            }}
+          >
+            <span>{t('lab_order.tooth_numbers')}</span>
+            <span>{t('lab_order.order_type')}</span>
+            <span>
+              {t('lab_order.material')} · {t('lab_order.shade')}
+            </span>
+            <span>{t('lab_order.expected_date')}</span>
+            <span style={{ textAlign: 'right' }}>{t('lab_order.status')}</span>
+          </Box>
+
+          {listQuery.data?.map(toLabOrderVM).map((vm) => {
+            const teeth = vm.items.flatMap((it) => it.toothNumbers);
+            const materials = vm.items
+              .map((it) => [it.material, it.shade].filter(Boolean).join(' · '))
+              .filter(Boolean)
+              .join(', ');
+            const descriptions = vm.items
+              .map((it) =>
+                it.quantity && it.quantity > 1
+                  ? `${it.description} ×${it.quantity}`
+                  : it.description,
+              )
+              .filter(Boolean);
+            return (
+              <Box
+                key={vm.id}
+                style={{
+                  borderTop: '1px solid var(--border)',
+                  display: 'grid',
+                  gap: 12,
+                  gridTemplateColumns: '40px 1fr 1fr 90px auto',
+                  padding: '14px 18px',
+                }}
+              >
+                {/* Tish */}
+                <Box style={{ fontSize: 12 }}>
+                  {teeth.length > 0 ? <Mono>{teeth.join(', ')}</Mono> : <span>—</span>}
+                </Box>
+
+                {/* Ish turi + lab nomi + tavsif */}
+                <Box style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
+                  <Group gap={6} wrap="nowrap">
+                    <IconDental size={15} style={{ color: 'var(--ink-3)', flex: '0 0 auto' }} />
+                    <Text fw={700} size="sm" style={{ color: 'var(--ink)' }} truncate>
+                      {vm.labName}
+                    </Text>
                   </Group>
-                  <Group gap="xs" mt={4}>
-                    <Tag>{t(vm.typeLabelKey)}</Tag>
-                    <StatusPill status={vm.statusTone}>{t(vm.statusLabelKey)}</StatusPill>
-                    {vm.costText && (
+                  <Tag>{t(vm.typeLabelKey)}</Tag>
+                  {descriptions.length > 0 && (
+                    <Text size="xs" style={{ color: 'var(--ink-3)' }}>
+                      {descriptions.join(', ')}
+                    </Text>
+                  )}
+                </Box>
+
+                {/* Material · rang + narx */}
+                <Box style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
+                  <Text size="sm" style={{ color: 'var(--ink-2)' }}>
+                    {materials || '—'}
+                  </Text>
+                  {vm.costText && (
+                    <Box style={{ fontSize: 12 }}>
                       <Mono>
                         {vm.costText} {vm.currency}
                       </Mono>
-                    )}
-                  </Group>
+                    </Box>
+                  )}
                 </Box>
-                {canManage && (
-                  <Select
-                    size="xs"
-                    w={150}
-                    value={vm.status}
-                    onChange={(v) =>
-                      v && updateStatusMut.mutate({ id: vm.id, status: v as LabOrderStatus })
-                    }
-                    data={STATUS_OPTIONS.map((s) => ({
-                      value: s,
-                      label: t(`lab_order.status_${s}`),
-                    }))}
-                  />
-                )}
-              </Group>
-              {vm.items.map((it, i) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: stable items from server-side row
-                <Text key={`${vm.id}-item-${i}`} size="sm" pl="md">
-                  • {it.description}
-                  {it.toothNumbers.length > 0 &&
-                    ` ${t('lab_order.teeth_inline', { teeth: it.toothNumbers.join(', ') })}`}
-                  {it.material && `, ${it.material}`}
-                  {it.shade && `, ${t('lab_order.shade')}: ${it.shade}`}
-                  {it.quantity && it.quantity > 1 && ` x${it.quantity}`}
-                </Text>
-              ))}
-              {vm.sentDateText && (
-                <Text size="xs" c="dimmed">
-                  {t('lab_order.sent_date')}: {vm.sentDateText}
-                  {vm.expectedDateText &&
-                    ` · ${t('lab_order.expected_date')}: ${vm.expectedDateText}`}
-                  {vm.deliveredDateText &&
-                    ` · ${t('lab_order.delivered_date')}: ${vm.deliveredDateText}`}
-                </Text>
-              )}
-            </Stack>
-          </Card>
-        ))
+
+                {/* Muddat */}
+                <Box style={{ display: 'flex', flexDirection: 'column', fontSize: 11.5, gap: 2 }}>
+                  {vm.expectedDateText ? <Mono>{vm.expectedDateText}</Mono> : <span>—</span>}
+                  {vm.sentDateText && (
+                    <Text size="xs" style={{ color: 'var(--ink-3)' }}>
+                      {t('lab_order.sent_date')}: {vm.sentDateText}
+                    </Text>
+                  )}
+                  {vm.deliveredDateText && (
+                    <Text size="xs" style={{ color: 'var(--ink-3)' }}>
+                      {t('lab_order.delivered_date')}: {vm.deliveredDateText}
+                    </Text>
+                  )}
+                </Box>
+
+                {/* Holat — status icon o'ngda + boshqaruv Select */}
+                <Box
+                  style={{
+                    alignItems: 'flex-end',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
+                  }}
+                >
+                  <StatusPill status={vm.statusTone}>{t(vm.statusLabelKey)}</StatusPill>
+                  {canManage && (
+                    <Select
+                      size="xs"
+                      w={150}
+                      value={vm.status}
+                      onChange={(v) =>
+                        v && updateStatusMut.mutate({ id: vm.id, status: v as LabOrderStatus })
+                      }
+                      data={STATUS_OPTIONS.map((s) => ({
+                        value: s,
+                        label: t(`lab_order.status_${s}`),
+                      }))}
+                    />
+                  )}
+                </Box>
+              </Box>
+            );
+          })}
+        </Box>
       )}
 
       <Modal opened={opened} onClose={close} title={t('lab_order.create')} size="xl">

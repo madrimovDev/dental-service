@@ -12,7 +12,7 @@
     "title": "Журнал аудита",
     "from": "С даты",
     "to": "По дату",
-    "action": "Действие",
+    "action_label": "Действие",
     "action_placeholder": "например, patient.create",
     "resource_type": "Тип ресурса",
     "resource_type_placeholder": "например, patient",
@@ -29,6 +29,26 @@
       "action": "Действие",
       "resource": "Ресурс",
       "resource_id": "ID ресурса"
+    },
+    "action": {
+      "created": "создал(а)",
+      "updated": "обновил(а)",
+      "deleted": "удалил(а)",
+      "viewed": "просмотрел(а)",
+      "login": "вошёл(а) в систему",
+      "workspace_switched": "сменил(а) рабочее пространство"
+    },
+    "resource": {
+      "patient": "пациент",
+      "appointment": "запись",
+      "cashier_transaction": "платёж",
+      "treatment_plan": "план лечения",
+      "visit_note": "запись визита",
+      "user": "пользователь",
+      "auth": "аутентификация",
+      "service": "услуга",
+      "stock_item": "товар на складе",
+      "expense": "расход"
     }
   },
   "common": {
@@ -52,7 +72,10 @@
     "active": "Активен",
     "inactive": "Не активен",
     "view": "Просмотр",
-    "archive": "Архивировать"
+    "archive": "Архивировать",
+    "date": "Дата",
+    "patient": "Пациент",
+    "status": "Статус"
   },
   "health": {
     "title": "Состояние системы",
@@ -62,7 +85,22 @@
   "validation": {
     "phone_invalid": "Неверный формат номера телефона",
     "password_required": "Введите пароль",
-    "min_chars": "Минимум {{count}} символов"
+    "min_chars": "Минимум {{count}} символов",
+    "required": "Обязательное поле",
+    "invalidType": "Неверное значение",
+    "invalidEmail": "Неверный адрес эл. почты",
+    "invalidUrl": "Неверный URL-адрес",
+    "invalidFormat": "Неверный формат",
+    "tooShort": "Минимум {{min}} символов",
+    "tooLong": "Максимум {{max}} символов",
+    "tooSmall": "Должно быть больше или равно {{min}}",
+    "tooBig": "Должно быть меньше или равно {{max}}",
+    "tooFew": "Минимум {{min}} элементов",
+    "tooMany": "Максимум {{max}} элементов",
+    "notMultipleOf": "Должно быть кратно {{divisor}}",
+    "unrecognizedKeys": "Нераспознанные поля",
+    "invalidValue": "Недопустимое значение",
+    "invalidInput": "Неверный ввод"
   },
   "auth": {
     "login": {
@@ -92,6 +130,7 @@
       "title": "Выберите workspace",
       "no_workspaces": "У вас нет клиник. Первый шаг — зарегистрируйте клинику.",
       "all_branches": "Все филиалы",
+      "owner_badge": "Владелец",
       "session_expired_title": "Сессия истекла",
       "session_expired_message": "Пожалуйста, войдите снова. Старый refresh token больше не действителен.",
       "switch_failed": "Не удалось сменить рабочее пространство"
@@ -111,10 +150,23 @@
       "submit": "Обновить пароль",
       "invalid": "Код неверный или истёк",
       "password_placeholder": "Минимум 12 символов"
+    },
+    "activate": {
+      "title": "Активация лицензии",
+      "description": "Введите лицензионный ключ, выданный вашей клинике, чтобы начать пользоваться Dental Service.",
+      "license_key": "Лицензионный ключ",
+      "license_key_placeholder": "XXXXX-XXXXX-XXXXX-XXXXX",
+      "submit": "Активировать",
+      "success": "Лицензия успешно активирована. Перенаправление...",
+      "error_invalid_key": "Неверный лицензионный ключ",
+      "error_fingerprint_mismatch": "Эта лицензия активна на другом устройстве. Свяжитесь с Supervisor.",
+      "error_fingerprint_unavailable": "Не удалось определить это устройство (виртуальная среда не поддерживается)",
+      "error_generic": "Не удалось активировать лицензию. Попробуйте ещё раз."
     }
   },
   "layout": {
     "switch_workspace": "Сменить workspace",
+    "profile": "Профиль",
     "logout": "Выйти"
   },
   "nav": {
@@ -135,6 +187,7 @@
     "kpi": "Дашборд / KPI",
     "reports": "Отчёты",
     "services": "Услуги и цены",
+    "service_categories": "Категории",
     "branches": "Филиалы",
     "roles": "Роли",
     "users": "Пользователи",
@@ -143,11 +196,9 @@
     "settings": "Настройки",
     "tenant_settings": "Настройки",
     "group": {
-      "today": "Сегодня",
-      "patients": "Пациенты",
-      "clinic": "Клиника",
-      "finance": "Финансы",
-      "management": "Управление"
+      "asosiy": "Основное",
+      "klinika": "Клиника",
+      "boshqaruv": "Управление"
     }
   },
   "palette": {
@@ -173,7 +224,8 @@
     "select_branch": "Выбрать филиал",
     "branch_switch_error": "Не удалось сменить филиал",
     "lang_uz": "Узбекский",
-    "lang_ru": "Русский"
+    "lang_ru": "Русский",
+    "toggle_sidebar": "Свернуть боковую панель"
   },
   "notifications": {
     "title": "Уведомления",
@@ -235,7 +287,16 @@
     "doctor_pending_placeholder": "Агрегат незавершённых работ пока отсутствует",
     "no_lab_orders": "Нет активных заказов лаборатории",
     "no_appointments": "Сегодня нет приёмов",
-    "no_queue": "Очередь пуста"
+    "no_queue": "Очередь пуста",
+    "weekly_revenue": "Недельная выручка",
+    "last_7_days": "Последние 7 дней",
+    "queue_status": "Статус очереди",
+    "queue_waiting": "{{n}} ожидают",
+    "calendar_link": "Календарь",
+    "new_appointment": "Новая запись",
+    "open_cashier": "Касса",
+    "vsPrevPeriod": "к прошлому периоду",
+    "activityFeed": "Последняя активность"
   },
   "branches": {
     "title": "Филиалы",
@@ -284,6 +345,42 @@
     "transfer_current_password": "Ваш текущий пароль",
     "transfer_confirm": "Владение будет передано другому сотруднику. Это действие необратимо. Продолжить?",
     "transfer_hint": "При передаче владения права суперпользователя переходят новому владельцу.",
+    "nav_notify": "Уведомления",
+    "nav_integrations": "Интеграции",
+    "role_users": "{{count}} пользователей",
+    "role_perm_count": "{{desc}} · {{count}} разрешений",
+    "copy": "Копировать",
+    "notify_title": "Настройки уведомлений",
+    "notify_pref_appointment_title": "Напоминание о приёме",
+    "notify_pref_appointment_desc": "Пациенту автоматически отправляется напоминание перед приёмом.",
+    "notify_pref_recall_title": "Повторный вызов",
+    "notify_pref_recall_desc": "Пациенту отправляется сообщение, когда приходит время профилактического осмотра.",
+    "notify_pref_birthday_title": "Поздравление с днём рождения",
+    "notify_pref_birthday_desc": "Автоматическое поздравление пациентов с днём рождения.",
+    "notify_pref_lab_title": "Лаборатория готова",
+    "notify_pref_lab_desc": "Уведомление, когда лабораторный заказ готов.",
+    "integration_configure": "Настроить",
+    "integration_connect": "Подключить",
+    "integration_eskiz_name": "Eskiz.uz SMS",
+    "integration_eskiz_desc": "Отправка SMS-напоминаний и сообщений пациентам.",
+    "integration_telegram_name": "Telegram-бот",
+    "integration_telegram_desc": "Канал уведомлений и связи через Telegram.",
+    "integration_soliq_name": "Soliq.uz фискализация",
+    "integration_soliq_desc": "Автоматизация фискальных чеков и налоговой отчётности.",
+    "integration_onec_name": "Экспорт в 1С",
+    "integration_onec_desc": "Экспорт данных в формате 1С для бухгалтерии.",
+    "integration_status_connected": "Подключено",
+    "integration_status_off": "Не подключено",
+    "desktop_server_title": "Адрес desktop-сервера",
+    "desktop_server_desc": "Если сервер не найден автоматически по локальной сети, введите адрес вручную и переподключитесь.",
+    "desktop_server_url_label": "Адрес сервера",
+    "desktop_server_url_placeholder": "http://192.168.1.10:8001",
+    "desktop_server_connect_button": "Подключить",
+    "desktop_server_connecting": "Подключение...",
+    "desktop_server_success": "Успешно подключено к серверу.",
+    "desktop_server_saved_not_connected": "Адрес сохранён, но подключиться не удалось. Проверьте адрес и сеть.",
+    "desktop_server_error": "Произошла ошибка. Попробуйте снова.",
+    "desktop_server_url_required": "Введите адрес сервера.",
     "perm_group": {
       "patient": "Пациенты",
       "appointment": "Записи",
@@ -358,11 +455,27 @@
     "custom": "Пользовательская",
     "permissions": "Разрешения",
     "selected_count": "{{count}} выбрано",
-    "confirm_delete": "Подтверждаете удаление роли?"
+    "confirm_delete": "Подтверждаете удаление роли?",
+    "system_template": "Системный шаблон"
   },
   "patients": {
     "title": "Пациенты",
     "create": "Новый пациент",
+    "count": "{{count}} пациентов",
+    "filter": {
+      "all": "Все",
+      "archived": "Архив"
+    },
+    "col": {
+      "patient": "Пациент",
+      "phone": "Телефон",
+      "age_gender": "Возраст · пол",
+      "balance": "Баланс"
+    },
+    "empty_title": "В этом разделе нет пациентов",
+    "empty_desc": "Выберите другой фильтр или добавьте нового пациента",
+    "balance_paid": "Оплачено",
+    "back_to_list": "‹ Список пациентов",
     "search_placeholder": "Поиск по ФИО, телефону или паспорту...",
     "show_archived": "Архивные",
     "empty": "Нет пациентов",
@@ -459,7 +572,16 @@
       "insurance_active": "Страховка активна",
       "coverage_dental": "Стоматологическое",
       "coverage_general": "Общее",
-      "coverage_other": "Другое"
+      "coverage_other": "Другое",
+      "section_personal": "Личные данные",
+      "section_contact": "Контакты",
+      "section_extra": "Дополнительная информация",
+      "sub_personal": "Основные личные данные пациента",
+      "sub_contact": "Телефон и адрес",
+      "sub_extra": "Паспорт, примечание, теги и страховка",
+      "checklist_title": "Обязательно к заполнению",
+      "checklist_name": "Имя",
+      "checklist_phone": "Телефон"
     },
     "insurance_status": {
       "active": "Активна",
@@ -474,6 +596,8 @@
       "other": "Другое"
     },
     "severe_allergy_warning": "ВНИМАНИЕ — аллергия на анестетик!",
+    "allergy_confirm_pill": "Подтвердите перед анестезией",
+    "payment_history": "История платежей",
     "no_medical_permission": "У вас нет прав на просмотр медкарты"
   },
   "medical": {
@@ -574,10 +698,24 @@
     "consent_signed": "Согласие подписано",
     "consent_signed_at": "Дата подписания",
     "consent_required": "Сначала подпишите согласие",
-    "consent_signature_url": "Ссылка на подпись (необязательно)"
+    "consent_signature_url": "Ссылка на подпись (необязательно)",
+    "financial_summary": "Финансовая сводка",
+    "total_plan": "Итого по плану",
+    "pdf_consent": "PDF плана · согласие",
+    "list": {
+      "title": "Планы лечения",
+      "subtitle": "Планы по всем пациентам",
+      "search": "Поиск по пациенту или плану",
+      "filter_status": "По статусу",
+      "all_status": "Все статусы",
+      "empty": "Планы лечения не найдены",
+      "col_patient": "Пациент",
+      "col_updated": "Обновлён"
+    }
   },
   "visit_note": {
     "title": "Записи визитов",
+    "title_soap": "Записи визитов · SOAP",
     "create": "Новая запись",
     "visit_date": "Дата визита",
     "doctor": "Врач",
@@ -645,6 +783,7 @@
   },
   "prescription": {
     "title": "Рецепты",
+    "active_title": "Активные рецепты",
     "create": "Новый рецепт",
     "issued_date": "Дата выдачи",
     "diagnosis": "Диагноз",
@@ -722,7 +861,18 @@
     "notes": "Заметки",
     "save": "Сохранить",
     "empty": "Заказов нет",
-    "teeth_inline": "зуб: {{teeth}}"
+    "teeth_inline": "зуб: {{teeth}}",
+    "list": {
+      "title": "Лабораторные заказы",
+      "subtitle": "Заказы по всем пациентам",
+      "search": "Поиск по пациенту или лаборатории",
+      "filter_status": "По статусу",
+      "all_status": "Все статусы",
+      "empty": "Заказы не найдены",
+      "col_number": "№",
+      "col_patient": "Пациент",
+      "col_expected": "Ожидаемая дата"
+    }
   },
   "image": {
     "title": "Снимки пациента",
@@ -780,6 +930,12 @@
     "empty": "Записей нет",
     "empty_week": "На этой неделе записей нет",
     "cancel_reason": "Причина отмены",
+    "summary_appts": "{{count}} записей",
+    "summary_doctors": "{{count}} врачей",
+    "waitlist": {
+      "title": "Лист ожидания",
+      "empty": "Лист ожидания пока пуст"
+    },
     "status": {
       "scheduled": "Запланирован",
       "confirmed": "Подтверждён",
@@ -791,6 +947,7 @@
   },
   "schedule": {
     "title": "График работы",
+    "subtitle": "Недельные часы работы · доступность",
     "doctor": "Врач",
     "branch": "Филиал",
     "select_doctor": "Выберите врача",
@@ -846,7 +1003,18 @@
     "from_appointment": "Из записи",
     "walk_in": "Без записи",
     "check_in": "В очередь",
-    "no_candidates": "Нет записей для регистрации сегодня"
+    "no_candidates": "Нет записей для регистрации сегодня",
+    "now_serving": "Сейчас вызывается",
+    "next_in_queue": "Следующий в очереди",
+    "display_board": "Табло",
+    "exit": "Выход",
+    "live_subtitle": "живое управление",
+    "board_subtitle": "Очередь — живое табло",
+    "next_queues": "Следующие в очереди",
+    "waited_minutes": "ждал {{count}} мин",
+    "cabinet": "Кабинет {{n}}",
+    "not_called_yet": "Пока не вызван",
+    "call_arrow": "Вызвать →"
   },
   "services": {
     "title": "Каталог услуг",
@@ -891,7 +1059,9 @@
     "new_payment": "Новый платёж",
     "previous_balance": "Старый баланс",
     "add_service": "Добавить услугу",
-    "search_service": "Поиск услуги...",
+    "search_service": "Поиск услуги или ввод кода…",
+    "current_receipt": "Текущий чек",
+    "subtotal": "Промежуточный итог",
     "discount": "Скидка",
     "payment_method": "Способ оплаты",
     "method": {
@@ -909,9 +1079,20 @@
     "no_transactions_today": "Сегодня операций нет",
     "date": "Дата",
     "amount": "Сумма",
+    "transactionType": "Тип",
+    "paymentMethod": "Способ оплаты",
     "status": "Статус",
     "receipt": "Номер чека",
     "daily_summary": "Дневной отчёт",
+    "cash_today": "Касса за сегодня",
+    "total_revenue": "Общая выручка",
+    "noop_fiscal": "Фискальный документ будет отправлен в налоговую позже",
+    "receipt_modal": {
+      "print": "Печать",
+      "close": "Закрыть",
+      "total": "Итого",
+      "view": "Просмотр чека"
+    },
     "confirm_refund": "Подтвердить возврат?",
     "type": {
       "refund": "Возврат",
@@ -975,12 +1156,14 @@
     "dental_analytics": "Стоматологическая аналитика",
     "export_1c": "Экспорт 1С",
     "procedure_mix": "Структура процедур",
+    "top_services": "Топ услуг",
     "retention": "Удержание пациентов",
     "retention_new": "Новые",
     "retention_returning": "Вернувшиеся",
     "recall_efficacy": "Эффективность recall",
     "no_show_trend": "Неявки (по дням недели, %)",
     "revenue": "Выручка",
+    "revenue_trend": "Динамика выручки",
     "appointments": "Приёмы",
     "doctor_workload": "Загрузка врачей",
     "plan_completion": "Планы лечения",
@@ -996,7 +1179,17 @@
     "rate": "Выполнение",
     "empty": "Нет данных",
     "export_csv": "CSV",
-    "export_excel": "Excel"
+    "export_excel": "Excel",
+    "byPaymentMethod": "Структура по способу оплаты",
+    "occupancy": "Тепловая карта записей"
+  },
+  "payment": {
+    "method": {
+      "cash": "Наличные",
+      "card": "Карта",
+      "transfer": "Перевод",
+      "other": "Другое"
+    }
   },
   "expenses": {
     "title": "Расходы",
@@ -1065,7 +1258,9 @@
     "bom_service": "Услуга",
     "bom_empty": "Для этой услуги материалы не заданы",
     "material": "Материал",
-    "qty_per_service": "Количество на услугу"
+    "qty_per_service": "Количество на услугу",
+    "category": "Категория",
+    "price": "Цена"
   },
   "payroll": {
     "title": "Зарплата",
@@ -1132,6 +1327,43 @@
       "interval_months": "Интервал (мес.)",
       "notes": "Заметка",
       "submit": "Сохранить"
+    },
+    "kpi": {
+      "pending": "Ожидает",
+      "contacted": "Связались",
+      "scheduled": "Записан",
+      "overdue": "Просрочен",
+      "efficacy": "Эффективность"
+    },
+    "sms_status": {
+      "label": "Статус SMS",
+      "sent": "Отправлено",
+      "pending": "Ожидание",
+      "failed": "Не отправлено",
+      "replied": "Получен ответ",
+      "none": "—"
     }
+  },
+  "plans": {
+    "title": "Название",
+    "total": "Итого"
+  },
+  "lab": {
+    "orderType": "Тип",
+    "expectedDate": "Срок"
+  },
+  "rx": {
+    "itemsCount": "Препараты",
+    "diagnosis": "Диагноз"
+  },
+  "serviceCategories": {
+    "title": "Категории услуг",
+    "create": "Новая категория",
+    "edit": "Редактировать категорию",
+    "name": "Название",
+    "name_ru": "Название (рус)",
+    "empty": "Категорий пока нет",
+    "confirm_delete": "Удалить категорию?",
+    "in_use_error": "К категории привязаны услуги — сначала перенесите их"
   }
 }

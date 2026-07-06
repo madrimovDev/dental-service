@@ -56,3 +56,40 @@ export function branchOpenMinutes(
   if (entry == null) return 0;
   return Math.max(0, toMinutes(entry.close) - toMinutes(entry.open));
 }
+
+// ─── DS12-A: Period-over-period comparison helpers ───────────────────────────
+
+/** Foiz o'zgarishi (current vs baseline). baseline<=0 → null (ma'noli taqqoslash yo'q). */
+export function deltaPct(current: number, baseline: number): number | null {
+  if (baseline <= 0) return null;
+  return ((current - baseline) / baseline) * 100;
+}
+
+/** Taqqoslash yozuvi — baseline 0/yo'q bo'lsa null (▲▼ render qilinmaydi). */
+export function comparisonEntry(
+  current: number,
+  baseline: number,
+): { total: number; deltaPct: number } | null {
+  const d = deltaPct(current, baseline);
+  return d === null ? null : { total: baseline, deltaPct: d };
+}
+
+/** Inclusive kun soni (YYYY-MM-DD). */
+export function periodLengthDays(from: string, to: string): number {
+  const ms = new Date(`${to}T00:00:00Z`).getTime() - new Date(`${from}T00:00:00Z`).getTime();
+  return Math.round(ms / 86_400_000) + 1;
+}
+
+/** YYYY-MM-DD'ni N kun suradi (UTC anchor — TZ drift'siz). */
+export function shiftDays(date: string, days: number): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** YYYY-MM-DD'ni N yil suradi. */
+export function shiftYears(date: string, years: number): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCFullYear(d.getUTCFullYear() + years);
+  return d.toISOString().slice(0, 10);
+}

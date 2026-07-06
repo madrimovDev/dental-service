@@ -19,9 +19,9 @@ export {
   listDoctors,
   updateAppointment,
 } from './generated/appointments/appointments.ts';
-export type { ListAuditLogResult } from './generated/audit/audit.ts';
+export type { GetRecentActivityResult, ListAuditLogResult } from './generated/audit/audit.ts';
 // Generated (orval) — explicit re-export (coexistence: kolliziya nazorati)
-export { listAuditLog } from './generated/audit/audit.ts';
+export { getRecentActivity, listAuditLog } from './generated/audit/audit.ts';
 // Generated (orval) — auth
 export type {
   ChangePasswordResult,
@@ -159,6 +159,7 @@ export type {
   Availability,
   AvailabilitySlot,
   Branch,
+  BranchAvailability,
   BranchDeleteResult,
   BranchWorkHours,
   BranchWorkHoursAnyOf,
@@ -204,6 +205,8 @@ export type {
   CreateRoleBody,
   CreateService201,
   CreateServiceBody,
+  CreateServiceCategory201,
+  CreateServiceCategoryBody,
   CreateTimeOff,
   CreateTimeOff201,
   CreateToothChart201,
@@ -222,10 +225,12 @@ export type {
   DeletePrescription200,
   DeleteRole200,
   DeleteService200,
+  DeleteServiceCategory200,
   DeleteTimeOff200,
   DeleteUserAssignment200,
   DentalAnalyticsReport,
   Diagnosis,
+  DoctorAvailability,
   DoctorListItem,
   DoctorWorkloadRow,
   ErrorResponse,
@@ -239,6 +244,7 @@ export type {
   GetAvailability200,
   GetAvailabilityParams,
   GetBranch200,
+  GetBranchAvailabilityParams,
   GetCheckInCandidates200,
   GetCheckInCandidatesParams,
   GetConsentTemplate200,
@@ -250,6 +256,8 @@ export type {
   GetPrescription200,
   GetQueueToday200,
   GetQueueTodayParams,
+  GetRecallSummary200,
+  GetRecallSummaryParams,
   GetRole200,
   GetService200,
   GetTenant200,
@@ -286,6 +294,7 @@ export type {
   ListRecallsParams,
   ListRecallsStatus,
   ListRoles200,
+  ListServiceCategories200,
   ListServices200,
   ListTimeOff200,
   ListTimeOffParams,
@@ -331,6 +340,7 @@ export type {
   RecallDto,
   RecallDtoReason,
   RecallDtoSource,
+  RecallSummary,
   ResetPasswordResponse,
   ResetUserPassword200,
   RevenueReport,
@@ -339,6 +349,8 @@ export type {
   RolePermissionsResult,
   RoleWithPermissions,
   Service,
+  ServiceCategory,
+  ServiceCategoryDeleteResult,
   ServiceDeleteResult,
   ServiceMaterial,
   ServicePrice,
@@ -414,6 +426,8 @@ export type {
   UpdateRoleBody,
   UpdateService200,
   UpdateServiceBody,
+  UpdateServiceCategory200,
+  UpdateServiceCategoryBody,
   UpdateTenant200,
   UpdateTenantBody,
   UpdateTenantBodyDefaultLanguage,
@@ -553,6 +567,7 @@ export {
 // Generated (orval) — recalls
 export type {
   CreateRecallResult,
+  GetRecallSummaryResult,
   ListPatientRecallsResult,
   ListRecallsResult,
   MarkRecallContactedResult,
@@ -560,6 +575,7 @@ export type {
 } from './generated/recalls/recalls.ts';
 export {
   createRecall,
+  getRecallSummary,
   listPatientRecalls,
   listRecalls,
   markRecallContacted,
@@ -604,6 +620,7 @@ export type {
   CreateTimeOffResult,
   DeleteTimeOffResult,
   GetAvailabilityResult,
+  GetBranchAvailabilityResult,
   GetDoctorWorkingHoursResult,
   ListTimeOffResult,
   PutDoctorWorkingHoursResult,
@@ -612,10 +629,24 @@ export {
   createTimeOff,
   deleteTimeOff,
   getAvailability,
+  getBranchAvailability,
   getDoctorWorkingHours,
   listTimeOff,
   putDoctorWorkingHours,
 } from './generated/schedule/schedule.ts';
+// Generated (orval) — service-categories
+export type {
+  CreateServiceCategoryResult,
+  DeleteServiceCategoryResult,
+  ListServiceCategoriesResult,
+  UpdateServiceCategoryResult,
+} from './generated/service-categories/service-categories.ts';
+export {
+  createServiceCategory,
+  deleteServiceCategory,
+  listServiceCategories,
+  updateServiceCategory,
+} from './generated/service-categories/service-categories.ts';
 // Generated (orval) — services
 export type {
   CreateServiceResult,

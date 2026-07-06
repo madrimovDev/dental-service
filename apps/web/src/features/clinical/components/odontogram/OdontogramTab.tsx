@@ -4,10 +4,11 @@ import type {
   ToothStateEntry,
   ToothSurface,
 } from '@dental/api-client';
-import { StateView } from '@dental/ui';
+import { Mono, StateView } from '@dental/ui';
 import {
   Alert,
   Badge,
+  Box,
   Button,
   Group,
   Paper,
@@ -17,8 +18,9 @@ import {
   Text,
   Textarea,
   Title,
+  UnstyledButton,
 } from '@mantine/core';
-import { IconArrowBack, IconDental, IconHistory } from '@tabler/icons-react';
+import { IconArrowBack, IconHistory } from '@tabler/icons-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth-store.ts';
@@ -36,6 +38,7 @@ import {
 } from '../../clinical.mappers';
 import type { ToothDraftMap } from '../../clinical.types';
 import { Odontogram } from './Odontogram';
+import { STATUS, statusFill, ToothCell } from './ToothCell';
 
 type Props = { patientId: string };
 
@@ -52,7 +55,18 @@ const TOOTH_STATE_OPTIONS: ToothState[] = [
   'veneer',
 ];
 
-const SURFACE_OPTIONS: ToothSurface[] = ['whole', 'M', 'D', 'B', 'L', 'O', 'I'];
+const SURFACE_OPTIONS: ToothSurface[] = ['whole', 'B', 'M', 'O', 'D', 'L', 'I'];
+
+// Detail panel "Yuzalar" qatorlari (whole'siz — 6 anatomik yuza).
+const SURFACE_FACES: Exclude<ToothSurface, 'whole'>[] = ['B', 'M', 'O', 'D', 'L', 'I'];
+
+function quadrantKey(n: number): 'upper_right' | 'upper_left' | 'lower_right' | 'lower_left' {
+  const q = Math.floor(n / 10);
+  if (q === 1 || q === 5) return 'upper_right';
+  if (q === 2 || q === 6) return 'upper_left';
+  if (q === 4 || q === 8) return 'lower_right';
+  return 'lower_left';
+}
 
 export function OdontogramTab({ patientId }: Props) {
   const { t, i18n } = useTranslation();
@@ -112,6 +126,8 @@ export function OdontogramTab({ patientId }: Props) {
 
   const isReadOnly = viewingSnapshot !== null;
   const current = selectedTooth !== null ? (draft.get(selectedTooth) ?? null) : null;
+  const currentState = current?.state ?? 'healthy';
+  const currentSurface = current?.surface ?? 'whole';
 
   const patchTooth = (patch: Partial<ReturnType<typeof EMPTY_TOOTH_DRAFT>>) => {
     if (selectedTooth === null) return;
@@ -204,48 +220,333 @@ export function OdontogramTab({ patientId }: Props) {
         </Alert>
       )}
 
-      <Paper withBorder p="md">
-        <Odontogram
-          states={statesArray}
-          isPrimaryDentition={isReadOnly ? viewingSnapshot.isPrimaryDentition : isPrimary}
-          selectedTooth={isReadOnly ? null : selectedTooth}
-          onSelectTooth={(n) => {
-            if (!isReadOnly) setSelectedTooth(n);
+      <Box
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1fr) 280px',
+          gap: 16,
+          alignItems: 'start',
+        }}
+      >
+        <Paper
+          withBorder
+          p="md"
+          style={{
+            borderRadius: 'var(--radius-card)',
+            boxShadow: 'var(--shadow-sm)',
+            background: 'var(--surface)',
           }}
-        />
-      </Paper>
+        >
+          <Odontogram
+            states={statesArray}
+            isPrimaryDentition={isReadOnly ? viewingSnapshot.isPrimaryDentition : isPrimary}
+            selectedTooth={isReadOnly ? null : selectedTooth}
+            onSelectTooth={(n) => {
+              if (!isReadOnly) setSelectedTooth(n);
+            }}
+          />
+        </Paper>
 
+        {/* Detail panel (o'ng ustun) */}
+        {selectedTooth !== null && !isReadOnly && (
+          <Paper
+            withBorder
+            p="md"
+            style={{
+              borderRadius: 'var(--radius-card)',
+              boxShadow: 'var(--shadow-sm)',
+              background: 'var(--surface)',
+            }}
+          >
+            <Stack gap="sm">
+              <Group justify="space-between" align="flex-start">
+                <Box>
+                  <Mono>
+                    <Text span style={{ fontSize: 30, fontWeight: 700, color: 'var(--ink)' }}>
+                      {selectedTooth}
+                    </Text>
+                  </Mono>
+                  <Text style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>
+                    {t(`tooth_chart.${quadrantKey(selectedTooth)}`)}
+                  </Text>
+                </Box>
+                {/* Status chip: swatch + label (matn doim --surface ustida --ink-2 — WCAG AA) */}
+                <Group
+                  gap={6}
+                  wrap="nowrap"
+                  style={{
+                    padding: '4px 10px 4px 8px',
+                    borderRadius: 'var(--radius-pill, 99px)',
+                    border: '1px solid var(--border)',
+                    background: 'var(--surface-2)',
+                  }}
+                >
+                  <Box
+                    style={{
+                      position: 'relative',
+                      width: 12,
+                      height: 12,
+                      borderRadius: 3,
+                      flexShrink: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: statusFill(currentState),
+                      border:
+                        STATUS[currentState].fill === 'empty'
+                          ? '1.5px solid var(--border-strong)'
+                          : '1px solid var(--border)',
+                    }}
+                  >
+                    {STATUS[currentState].mark === 'x' && (
+                      <Text
+                        span
+                        style={{
+                          fontSize: 9,
+                          lineHeight: 1,
+                          color: 'var(--ink-3)',
+                          fontWeight: 700,
+                        }}
+                      >
+                        ✕
+                      </Text>
+                    )}
+                    {STATUS[currentState].mark === 'extract' && (
+                      <Text
+                        span
+                        style={{
+                          fontSize: 9,
+                          lineHeight: 1,
+                          color: 'var(--text-on-danger)',
+                          fontWeight: 700,
+                        }}
+                      >
+                        ✕
+                      </Text>
+                    )}
+                  </Box>
+                  <Text style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-2)' }}>
+                    {t(`tooth_chart.states.${currentState}`)}
+                  </Text>
+                </Group>
+              </Group>
+
+              <Group justify="center">
+                <ToothCell
+                  number={selectedTooth}
+                  state={currentState}
+                  selected={false}
+                  onClick={() => {}}
+                  size={108}
+                  readOnly
+                />
+              </Group>
+
+              <Box>
+                <Text
+                  style={{
+                    fontSize: 11,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                    color: 'var(--ink-3)',
+                    fontWeight: 600,
+                    marginBottom: 6,
+                  }}
+                >
+                  {t('tooth_chart.set_surface')}
+                </Text>
+                <Stack gap={4}>
+                  {SURFACE_FACES.map((face) => {
+                    const isActive = currentSurface === face;
+                    return (
+                      <Group key={face} justify="space-between" gap="xs" wrap="nowrap">
+                        <Group gap={6} wrap="nowrap">
+                          <Mono>
+                            <Text
+                              span
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 700,
+                                color: 'var(--ink-2)',
+                                minWidth: 12,
+                                display: 'inline-block',
+                              }}
+                            >
+                              {face}
+                            </Text>
+                          </Mono>
+                          <Text style={{ fontSize: 12, color: 'var(--ink-2)' }}>
+                            {t(`tooth_chart.surfaces.${face}`)}
+                          </Text>
+                        </Group>
+                        <Text style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>
+                          {isActive
+                            ? t(`tooth_chart.states.${currentState}`)
+                            : t('tooth_chart.states.healthy')}
+                        </Text>
+                      </Group>
+                    );
+                  })}
+                </Stack>
+              </Box>
+            </Stack>
+          </Paper>
+        )}
+      </Box>
+
+      {/* Editor: surfPicker + statusPalette + diagnoz */}
       {canEdit && !isReadOnly && selectedTooth !== null && (
-        <Paper withBorder p="md">
-          <Stack gap="sm">
+        <Paper
+          withBorder
+          p="md"
+          style={{
+            borderRadius: 'var(--radius-card)',
+            boxShadow: 'var(--shadow-sm)',
+            background: 'var(--surface)',
+          }}
+        >
+          <Stack gap="md">
             <Group gap={6}>
-              <IconDental size={18} />
-              <Text fw={600}>
-                {t('tooth_chart.selected_tooth')}: <strong>{selectedTooth}</strong>
+              <Mono>
+                <Text span style={{ fontWeight: 700, color: 'var(--primary)' }}>
+                  {selectedTooth}
+                </Text>
+              </Mono>
+              <Text fw={600}>{t('tooth_chart.selected_tooth')}</Text>
+            </Group>
+
+            {/* surfPicker toggle */}
+            <Box>
+              <Text
+                style={{
+                  fontSize: 11,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  color: 'var(--ink-3)',
+                  fontWeight: 600,
+                  marginBottom: 6,
+                }}
+              >
+                {t('tooth_chart.set_surface')}
               </Text>
-            </Group>
-            <Group grow align="flex-start">
-              <Select
-                label={t('tooth_chart.set_state')}
-                value={current?.state ?? 'healthy'}
-                onChange={(v) => v && patchTooth({ state: v as ToothState })}
-                data={TOOTH_STATE_OPTIONS.map((s) => ({
-                  value: s,
-                  label: t(`tooth_chart.states.${s}`),
-                }))}
-                comboboxProps={{ withinPortal: true }}
-              />
-              <Select
-                label={t('tooth_chart.set_surface')}
-                value={current?.surface ?? 'whole'}
-                onChange={(v) => v && patchTooth({ surface: v as ToothSurface })}
-                data={SURFACE_OPTIONS.map((s) => ({
-                  value: s,
-                  label: t(`tooth_chart.surfaces.${s}`),
-                }))}
-                comboboxProps={{ withinPortal: true }}
-              />
-            </Group>
+              <Group gap={6} wrap="wrap" role="group" aria-label={t('tooth_chart.set_surface')}>
+                {SURFACE_OPTIONS.map((s) => {
+                  const isActive = currentSurface === s;
+                  const label = s === 'whole' ? t('tooth_chart.surfaces.whole') : s;
+                  return (
+                    <UnstyledButton
+                      key={s}
+                      type="button"
+                      aria-pressed={isActive}
+                      aria-label={t(`tooth_chart.surfaces.${s}`)}
+                      onClick={() => patchTooth({ surface: s })}
+                      style={{
+                        padding: s === 'whole' ? '6px 12px' : '6px 10px',
+                        borderRadius: 8,
+                        fontFamily: s === 'whole' ? undefined : 'var(--font-mono)',
+                        fontSize: 13,
+                        fontWeight: 600,
+                        minWidth: s === 'whole' ? undefined : 34,
+                        textAlign: 'center',
+                        background: isActive ? 'var(--primary-soft)' : 'var(--surface-2)',
+                        border: isActive ? '1px solid var(--primary)' : '1px solid var(--border)',
+                        color: isActive ? 'var(--primary)' : 'var(--ink-2)',
+                      }}
+                    >
+                      {label}
+                    </UnstyledButton>
+                  );
+                })}
+              </Group>
+            </Box>
+
+            {/* statusPalette */}
+            <Box>
+              <Text
+                style={{
+                  fontSize: 11,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  color: 'var(--ink-3)',
+                  fontWeight: 600,
+                  marginBottom: 6,
+                }}
+              >
+                {t('tooth_chart.set_state')}
+              </Text>
+              <Group gap={8} wrap="wrap" role="group" aria-label={t('tooth_chart.set_state')}>
+                {TOOTH_STATE_OPTIONS.map((s) => {
+                  const isActive = currentState === s;
+                  return (
+                    <UnstyledButton
+                      key={s}
+                      type="button"
+                      aria-pressed={isActive}
+                      aria-label={t(`tooth_chart.states.${s}`)}
+                      onClick={() => patchTooth({ state: s })}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 7,
+                        padding: '6px 10px',
+                        borderRadius: 8,
+                        fontSize: 12.5,
+                        background: isActive ? 'var(--primary-soft)' : 'var(--surface-2)',
+                        border: isActive ? '1px solid var(--primary)' : '1px solid var(--border)',
+                        color: 'var(--ink)',
+                      }}
+                    >
+                      <Box
+                        style={{
+                          position: 'relative',
+                          width: 13,
+                          height: 13,
+                          borderRadius: 3,
+                          flexShrink: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: statusFill(s),
+                          border:
+                            STATUS[s].fill === 'empty'
+                              ? '1.5px solid var(--border-strong)'
+                              : '1px solid var(--border)',
+                        }}
+                      >
+                        {STATUS[s].mark === 'x' && (
+                          <Text
+                            span
+                            style={{
+                              fontSize: 10,
+                              lineHeight: 1,
+                              color: 'var(--ink-3)',
+                              fontWeight: 700,
+                            }}
+                          >
+                            ✕
+                          </Text>
+                        )}
+                        {STATUS[s].mark === 'extract' && (
+                          <Text
+                            span
+                            style={{
+                              fontSize: 10,
+                              lineHeight: 1,
+                              color: 'var(--text-on-danger)',
+                              fontWeight: 700,
+                            }}
+                          >
+                            ✕
+                          </Text>
+                        )}
+                      </Box>
+                      {t(`tooth_chart.states.${s}`)}
+                    </UnstyledButton>
+                  );
+                })}
+              </Group>
+            </Box>
+
             <Select
               label={t('tooth_chart.set_diagnosis')}
               placeholder={t('tooth_chart.diagnosis_placeholder')}
@@ -262,7 +563,15 @@ export function OdontogramTab({ patientId }: Props) {
       )}
 
       {canEdit && !isReadOnly && (
-        <Paper withBorder p="md">
+        <Paper
+          withBorder
+          p="md"
+          style={{
+            borderRadius: 'var(--radius-card)',
+            boxShadow: 'var(--shadow-sm)',
+            background: 'var(--surface)',
+          }}
+        >
           <Stack gap="sm">
             <Textarea
               label={t('treatment_plan.notes')}
@@ -281,7 +590,11 @@ export function OdontogramTab({ patientId }: Props) {
       )}
 
       {isReadOnly && viewingSnapshot.notes && (
-        <Paper withBorder p="md">
+        <Paper
+          withBorder
+          p="md"
+          style={{ borderRadius: 'var(--radius-card)', background: 'var(--surface-2)' }}
+        >
           <Group gap={6}>
             <Badge variant="light" color="blue">
               {t('treatment_plan.notes')}

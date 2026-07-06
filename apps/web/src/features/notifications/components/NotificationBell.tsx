@@ -45,20 +45,25 @@ function NotificationRow({
       data-unread={unread || undefined}
       onClick={() => unread && onRead(item.id)}
     >
-      <Group justify="space-between" wrap="nowrap" gap="xs">
-        <Text size="sm" fw={unread ? 600 : 400} lineClamp={1}>
-          {item.title}
+      <span className={classes.iconChip}>
+        <Bell size={16} />
+      </span>
+      <span className={classes.content}>
+        <Group justify="space-between" wrap="nowrap" gap="xs">
+          <Text size="sm" fw={unread ? 600 : 400} lineClamp={1}>
+            {item.title}
+          </Text>
+          {unread && <span className={classes.unreadDot} />}
+        </Group>
+        {item.body && (
+          <Text size="xs" c="dimmed" lineClamp={2}>
+            {item.body}
+          </Text>
+        )}
+        <Text size="xs" c="dimmed">
+          {formatDate(item.createdAt, locale)}
         </Text>
-        {unread && <span className={classes.unreadDot} />}
-      </Group>
-      {item.body && (
-        <Text size="xs" c="dimmed" lineClamp={2}>
-          {item.body}
-        </Text>
-      )}
-      <Text size="xs" c="dimmed">
-        {formatDate(item.createdAt, locale)}
-      </Text>
+      </span>
     </UnstyledButton>
   );
 }
@@ -77,7 +82,7 @@ export function NotificationBell() {
     <Popover
       opened={opened}
       onChange={(o) => (o ? undefined : close())}
-      width={340}
+      width={344}
       position="bottom-end"
       shadow="md"
       withinPortal

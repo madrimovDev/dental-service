@@ -1,29 +1,43 @@
-import { servicePrices, services } from '@dental/db-schema';
-import { and, desc, eq, isNull, lte, or, sql } from 'drizzle-orm';
+import { serviceCategories, servicePrices, services } from '@dental/db-schema';
+import { and, desc, eq, getTableColumns, isNull, lte, or, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import type { ServiceCategoriesService } from '../service-categories/service-categories.service.ts';
 import type {
   CreateServiceInput,
   SetServicePriceInput,
   UpdateServiceInput,
 } from './services.schema.ts';
 
-export const createServicesService = (deps: { audit: AuditLogger }) => {
+export const createServicesService = (deps: {
+  audit: AuditLogger;
+  categories: ServiceCategoriesService;
+}) => {
   async function list(c: Context) {
     const db = getDb(c);
     return db
-      .select()
+      .select({
+        ...getTableColumns(services),
+        categoryName: serviceCategories.name,
+        categoryNameRu: serviceCategories.nameRu,
+      })
       .from(services)
+      .leftJoin(serviceCategories, eq(services.categoryId, serviceCategories.id))
       .where(isNull(services.deletedAt))
-      .orderBy(services.category, services.nameUz);
+      .orderBy(serviceCategories.name, services.nameUz);
   }
 
   async function findById(c: Context, id: string) {
     const db = getDb(c);
     const [service] = await db
-      .select()
+      .select({
+        ...getTableColumns(services),
+        categoryName: serviceCategories.name,
+        categoryNameRu: serviceCategories.nameRu,
+      })
       .from(services)
+      .leftJoin(serviceCategories, eq(services.categoryId, serviceCategories.id))
       .where(and(eq(services.id, id), isNull(services.deletedAt)));
     if (!service) return null;
 
@@ -49,6 +63,10 @@ export const createServicesService = (deps: { audit: AuditLogger }) => {
     const tenantId = c.get('activeTenantId');
     if (!tenantId) throw new Error('No tenant context');
 
+    const categoryId = input.category?.trim()
+      ? await deps.categories.findOrCreateByName(c, input.category)
+      : null;
+
     return await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);
 
@@ -59,7 +77,7 @@ export const createServicesService = (deps: { audit: AuditLogger }) => {
           code: input.code,
           nameUz: input.nameUz,
           nameRu: input.nameRu ?? null,
-          category: input.category ?? null,
+          categoryId,
           durationMinutes: input.durationMinutes,
           requiredRole: input.requiredRole ?? null,
           descriptionUz: input.descriptionUz ?? null,
@@ -86,7 +104,12 @@ export const createServicesService = (deps: { audit: AuditLogger }) => {
         after: service,
       });
 
-      return service;
+      // insert returns the raw services row (no categoryName join); augment for mapper
+      return {
+        ...service,
+        categoryName: null as string | null,
+        categoryNameRu: null as string | null,
+      };
     });
   }
 
@@ -98,9 +121,17 @@ export const createServicesService = (deps: { audit: AuditLogger }) => {
       .where(and(eq(services.id, id), isNull(services.deletedAt)));
     if (!before) return null;
 
+    let categoryId: string | null | undefined;
+    if (input.category !== undefined) {
+      categoryId = input.category?.trim()
+        ? await deps.categories.findOrCreateByName(c, input.category)
+        : null;
+    }
+    const { category: _category, ...rest } = input;
+
     const [updated] = await db
       .update(services)
-      .set({ ...input, updatedAt: new Date() })
+      .set({ ...rest, ...(categoryId !== undefined ? { categoryId } : {}), updatedAt: new Date() })
       .where(and(eq(services.id, id), isNull(services.deletedAt)))
       .returning();
 
@@ -113,7 +144,11 @@ export const createServicesService = (deps: { audit: AuditLogger }) => {
         after: updated,
       });
     }
-    return updated;
+
+    // update returns raw services row; augment for mapper
+    return updated
+      ? { ...updated, categoryName: null as string | null, categoryNameRu: null as string | null }
+      : updated;
   }
 
   async function remove(c: Context, id: string) {

@@ -1,9 +1,22 @@
 import { useTranslation } from 'react-i18next';
 import { groupByDay } from '../appointments.mappers';
 import type { Appointment } from '../appointments.types';
-import { type CalendarEvent, GRID } from '../appointments.types';
+import { type CalendarEvent, GRID, toneForIndex, toneVars } from '../appointments.types';
 import { AppointmentSlot } from './AppointmentSlot';
 import classes from './CalendarGrid.module.css';
+
+/** Yarim soatlik grid chiziqlari (hour opacity 1, half .4) — CalendarGrid bilan bir xil. */
+function GridLines() {
+  const rows = (GRID.dayEndHour - GRID.dayStartHour) * 2;
+  return (
+    <>
+      {Array.from({ length: rows }, (_, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: statik fiksir grid panjarasi
+        <div key={i} className={classes.gridLine} data-half={i % 2 === 1} />
+      ))}
+    </>
+  );
+}
 
 /** Hafta ko'rinishi — 7 kun ustun (kun grid generalizatsiyasi, `groupByDay`). */
 export function WeekGrid({
@@ -19,9 +32,13 @@ export function WeekGrid({
 }) {
   const { i18n } = useTranslation();
   const locale = i18n.language === 'ru' ? 'ru-RU' : 'uz-UZ';
-  const colHeadFmt = new Intl.DateTimeFormat(locale, {
+  const weekdayFmt = new Intl.DateTimeFormat(locale, {
     weekday: 'short',
+    timeZone: 'Asia/Tashkent',
+  });
+  const dayFmt = new Intl.DateTimeFormat(locale, {
     day: '2-digit',
+    month: 'short',
     timeZone: 'Asia/Tashkent',
   });
   const cols = groupByDay(appointments, dayKeys);
@@ -33,7 +50,7 @@ export function WeekGrid({
   return (
     <div className={classes.grid}>
       <div className={classes.times}>
-        <div style={{ height: 40 }} />
+        <div className={classes.timesHead} />
         {hours.map((h) => (
           <div key={h} className={classes.timeLabel}>
             {String(h).padStart(2, '0')}:00
@@ -41,20 +58,26 @@ export function WeekGrid({
         ))}
       </div>
       <div className={classes.cols}>
-        {cols.map((col) => {
+        {cols.map((col, index) => {
           const day = new Date(`${col.dateKey}T00:00:00Z`);
+          const tone = toneForIndex(index);
           return (
             <div key={col.dateKey} className={classes.col}>
-              <div className={classes.colHead}>{colHeadFmt.format(day)}</div>
+              <div className={classes.colHead} style={toneVars(tone)}>
+                <span className={classes.colHeadText}>
+                  <span className={classes.colName}>{weekdayFmt.format(day)}</span>
+                  <span className={classes.colSub}>{dayFmt.format(day)}</span>
+                </span>
+                <span className={classes.colCount}>{col.events.length}</span>
+              </div>
               <div className={classes.colBody}>
-                {hours.map((h) => (
-                  <div key={h} className={classes.hourLine} />
-                ))}
+                <GridLines />
                 {col.events.map((e) => (
                   <AppointmentSlot
                     key={e.appointment.id}
                     event={e}
                     patientName={patientName}
+                    tone={tone}
                     onClick={onSlotClick}
                   />
                 ))}

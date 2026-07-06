@@ -1,76 +1,164 @@
 import { StateView } from '@dental/ui';
-import { Container, Grid, SimpleGrid, Stack, Title } from '@mantine/core';
+import { Box, Group, Stack, Text } from '@mantine/core';
+import { IconCalendarPlus, IconCash } from '@tabler/icons-react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAppointments } from '@/features/appointments/appointments.api.ts';
 import { useQueueToday } from '@/features/queue/queue.api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { useTodayRange } from '../dashboard.api.ts';
-import { MiniList } from './widgets/MiniList.tsx';
+import { QueueCard } from './widgets/QueueCard.tsx';
+import { ScheduleList } from './widgets/ScheduleList.tsx';
 import { StatCard } from './widgets/StatCard.tsx';
+
+// Off-scale literal (parity): KPI grid gap 14px (4px shkalada yo'q: 12/16).
+const KPI_GAP = 14;
 
 const fmtTime = (iso: string) =>
   new Date(iso).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
 
+/** Davomiylik (daqiqa) = end − start (sof arifmetika, hook YO'Q). */
+const fmtDuration = (start: string, end: string) => {
+  const min = Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000);
+  return min > 0 ? `${min}m` : undefined;
+};
+
+/** DS1 header amal-tugmasi (token surface, permission bilan gate qilinadi). */
+function HeaderAction({ to, icon, label }: { to: string; icon: ReactNode; label: string }) {
+  return (
+    <Text
+      component={Link}
+      to={to}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 8,
+        height: 40,
+        padding: '0 14px',
+        border: '1px solid var(--border)',
+        borderRadius: 10,
+        background: 'var(--surface)',
+        color: 'var(--ink)',
+        fontSize: 13,
+        fontWeight: 600,
+        textDecoration: 'none',
+      }}
+    >
+      <span style={{ display: 'inline-flex', color: 'var(--ink-3)' }}>{icon}</span>
+      {label}
+    </Text>
+  );
+}
+
 export function ReceptionistDashboard() {
   const { t } = useTranslation();
-  const { activeBranchId } = useAuthStore();
+  const navigate = useNavigate();
+  const { activeBranchId, hasPermission } = useAuthStore();
   const range = useTodayRange();
   const appointments = useAppointments({ branchId: activeBranchId ?? undefined, ...range });
   const queue = useQueueToday(activeBranchId);
 
   const appts = appointments.data ?? [];
+  const queueItems = queue.data ?? [];
   const noShow = appts.filter((a) => a.status === 'no_show').length;
+  const waiting = queueItems.filter((q) => q.status === 'waiting').length;
+
+  const canAppointment = hasPermission('appointment.view');
+  const canCashier = hasPermission('cashier.view');
 
   return (
-    <Container size="lg">
-      <Stack gap="lg">
-        <Title order={2}>{t('nav.dashboard')}</Title>
+    <Stack gap="lg">
+      {/* 1a. Header — greeting YO'Q (DS0 topbar); amal tugmalari o'ngga surilgan. */}
+      {(canAppointment || canCashier) && (
+        <Group gap="xs" justify="flex-end">
+          {canAppointment && (
+            <HeaderAction
+              to="/appointments"
+              icon={<IconCalendarPlus size={17} />}
+              label={t('dashboard.new_appointment', 'Yangi yozilish')}
+            />
+          )}
+          {canCashier && (
+            <HeaderAction
+              to="/cashier"
+              icon={<IconCash size={17} />}
+              label={t('dashboard.open_cashier', 'Kassa')}
+            />
+          )}
+        </Group>
+      )}
 
-        {appointments.isLoading ? (
-          <StateView status="loading" skeleton="cards" />
-        ) : appointments.isError ? (
-          <StateView
-            status="error"
-            title={t('states.error_title')}
-            retryLabel={t('states.retry')}
-            onRetry={() => appointments.refetch()}
-          />
-        ) : (
-          <>
-            <SimpleGrid cols={{ base: 1, sm: 3 }}>
-              <StatCard label={t('dashboard.today_total')} value={appts.length} color="teal" />
-              <StatCard label={t('dashboard.no_show')} value={noShow} />
-              <StatCard label={t('dashboard.queue')} value={(queue.data ?? []).length} />
-            </SimpleGrid>
+      {appointments.isLoading ? (
+        <StateView status="loading" skeleton="cards" />
+      ) : appointments.isError ? (
+        <StateView
+          status="error"
+          title={t('states.error_title')}
+          retryLabel={t('states.retry')}
+          onRetry={() => appointments.refetch()}
+        />
+      ) : (
+        <>
+          {/* 1b. KPI qatori — repeat(4,1fr), gap 14px (off-scale literal, parity). */}
+          <Box style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: KPI_GAP }}>
+            <StatCard label={t('dashboard.today_total')} value={appts.length} tone="primary" />
+            <StatCard label={t('dashboard.no_show')} value={noShow} tone="warning" />
+            <StatCard label={t('dashboard.queue')} value={queueItems.length} tone="info" />
+          </Box>
 
-            <Grid>
-              <Grid.Col span={{ base: 12, md: 6 }}>
-                <MiniList
-                  title={t('dashboard.today_appointments')}
-                  items={appts.map((a) => ({
-                    id: a.id,
-                    label: `${fmtTime(a.startTime)} · ${t(`appointments.status.${a.status}`, a.status)}`,
-                    to: `/appointments`,
-                  }))}
-                  emptyText={t('dashboard.no_appointments')}
-                />
-              </Grid.Col>
-              <Grid.Col span={{ base: 12, md: 6 }}>
-                <MiniList
-                  title={t('dashboard.queue')}
-                  items={(queue.data ?? []).map((q) => ({
-                    id: q.id,
-                    label: `#${q.queueNumber}`,
-                    right: t(`queue.${q.status}`, q.status),
-                    to: `/queue`,
-                  }))}
-                  emptyText={t('dashboard.no_queue')}
-                />
-              </Grid.Col>
-            </Grid>
-          </>
-        )}
-      </Stack>
-    </Container>
+          {/* 1c. Ikki ustunli tana — minmax(0,1fr) 360px: chap jadval, o'ng rail navbat.
+              Recall/faollik kartalari OMIT (data-gap, ds12). */}
+          <Box
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'minmax(0, 1fr) 360px',
+              gap: 16,
+              alignItems: 'start',
+            }}
+          >
+            <Stack gap="md" style={{ minWidth: 0 }}>
+              <ScheduleList
+                title={t('dashboard.today_appointments')}
+                calendarLabel={t('dashboard.calendar_link', 'Kalendar')}
+                onCalendar={() => navigate('/appointments')}
+                rows={appts.map((a) => ({
+                  id: a.id,
+                  time: fmtTime(a.startTime),
+                  patient: '—',
+                  duration: fmtDuration(a.startTime, a.endTime),
+                  status: a.status,
+                  statusLabel: t(`appointments.status.${a.status}`, a.status),
+                }))}
+                emptyText={t('dashboard.no_appointments')}
+                onRowClick={() => navigate('/appointments')}
+              />
+            </Stack>
+
+            <Stack gap="md">
+              <QueueCard
+                title={t('dashboard.queue_status', 'Navbat holati')}
+                waitingLabel={
+                  waiting > 0
+                    ? t('dashboard.queue_waiting', {
+                        n: waiting,
+                        defaultValue: `${waiting} kutmoqda`,
+                      })
+                    : undefined
+                }
+                rows={queueItems.map((q) => ({
+                  id: q.id,
+                  number: `#${q.queueNumber}`,
+                  patient: '—',
+                  status: q.status,
+                  statusLabel: t(`queue.${q.status}`, q.status),
+                }))}
+                emptyText={t('dashboard.no_queue')}
+              />
+            </Stack>
+          </Box>
+        </>
+      )}
+    </Stack>
   );
 }

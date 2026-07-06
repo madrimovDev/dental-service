@@ -21,9 +21,11 @@ import { sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { DbOrTx } from '../../src/db/client.ts';
 import { db } from '../../src/db/client.ts';
+import type { AuditLogger } from '../../src/lib/audit-logger.ts';
 import { createReportsService } from '../../src/modules/reports/reports.service.ts';
 
-const service = createReportsService();
+const noopAudit = { record: async () => {} } as unknown as AuditLogger;
+const service = createReportsService({ audit: noopAudit });
 let tenantId: string;
 const ctx = (tx: DbOrTx): Context =>
   ({ get: (k: string) => (k === 'db' ? tx : undefined) }) as unknown as Context;

@@ -4,8 +4,8 @@ import type {
   TreatmentStageAcceptance,
   TreatmentStageStatus,
 } from '@dental/api-client';
-import { StatusPill } from '@dental/ui';
-import { Box, Button, Group, Modal, Paper, Stack, Text, TextInput } from '@mantine/core';
+import { Mono, StatusPill } from '@dental/ui';
+import { Button, Group, Modal, Stack, TextInput } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconCheck, IconFileText, IconReceipt2, IconWritingSign } from '@tabler/icons-react';
 import { useState } from 'react';
@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { toPlanCardVM } from '../../clinical.mappers';
 import { EstimateView } from './EstimateView';
 import { StageRow } from './StageRow';
+import classes from './TreatmentPlansTab.module.css';
 
 export function PlanCard({
   plan,
@@ -51,6 +52,14 @@ export function PlanCard({
   const proposedStageIds = plan.stages.filter((s) => s.acceptance === 'proposed').map((s) => s.id);
   const hasConsent = plan.consentSignedAt != null;
 
+  // Yil — plan.createdAt'dan (vizual sarlavha uchun; yangi data YO'Q).
+  const year = plan.createdAt ? new Date(plan.createdAt).getFullYear() : null;
+
+  // Progress — bajarilgan bosqichlar / jami (faqat presentation; backend YO'Q).
+  const totalStages = plan.stages.length;
+  const completedStages = plan.stages.filter((s) => s.status === 'completed').length;
+  const progressPct = totalStages > 0 ? Math.round((completedStages / totalStages) * 100) : 0;
+
   const submitConsent = () => {
     onSignConsent(plan.id, signatureUrl ? { consentSignatureUrl: signatureUrl } : {});
     consent.close();
@@ -58,36 +67,43 @@ export function PlanCard({
   };
 
   return (
-    <Paper withBorder p="md">
-      <Stack gap="sm">
-        <Box>
-          <Group justify="space-between" align="flex-start">
-            <Text fw={700}>{vm.title}</Text>
-            <Button
-              size="compact-xs"
-              variant="light"
-              leftSection={<IconReceipt2 size={14} />}
-              onClick={estimate.open}
-            >
-              {t('treatment_plan.estimate_open')}
-            </Button>
-          </Group>
-          <Group gap="xs" mt={4}>
-            <StatusPill status={vm.statusTone}>{t(vm.statusLabelKey)}</StatusPill>
-            <Text size="sm" c="dimmed">
-              {t('treatment_plan.total_cost')}: {vm.totalCostText} {t('common.currency')}
-            </Text>
-            <Text size="sm" c="dimmed">
-              {t('treatment_plan.total_visits')}: {vm.totalVisits}
-            </Text>
-            {hasConsent && (
-              <StatusPill status="success">{t('treatment_plan.consent_signed')}</StatusPill>
-            )}
-          </Group>
-        </Box>
+    <div className={classes.grid}>
+      {/* ===== Chap: reja card ===== */}
+      <div className={classes.planCard}>
+        <div className={classes.planHeader}>
+          <div>
+            <div className={classes.planTitle}>
+              {vm.title}
+              {year != null && (
+                <>
+                  {' · '}
+                  <Mono>{year}</Mono>
+                </>
+              )}
+            </div>
+            <div className={classes.planSubtitle}>
+              {totalStages} {t('treatment_plan.stages')}
+            </div>
+          </div>
+          <Button
+            size="compact-xs"
+            variant="light"
+            leftSection={<IconReceipt2 size={14} />}
+            onClick={estimate.open}
+          >
+            {t('treatment_plan.estimate_open')}
+          </Button>
+        </div>
+
+        <div className={classes.headChips}>
+          <StatusPill status={vm.statusTone}>{t(vm.statusLabelKey)}</StatusPill>
+          {hasConsent && (
+            <StatusPill status="success">{t('treatment_plan.consent_signed')}</StatusPill>
+          )}
+        </div>
 
         {canEdit && (
-          <Group gap="xs">
+          <div className={classes.actions}>
             {proposedStageIds.length > 0 && (
               <Button
                 size="compact-sm"
@@ -134,20 +150,68 @@ export function PlanCard({
                 {t('treatment_plan.accept_plan')}
               </Button>
             )}
-          </Group>
+          </div>
         )}
 
-        {plan.stages.map((stage) => (
-          <StageRow
-            key={stage.id}
-            stage={stage}
-            canEdit={canEdit}
-            onUpdateStage={onUpdateStage}
-            onSetAcceptance={onSetAcceptance}
-            acceptancePending={acceptancePending}
-          />
-        ))}
-      </Stack>
+        {totalStages > 0 && (
+          <div>
+            <div className={classes.tableHead}>
+              <span className={classes.colNum}>#</span>
+              <span>{t('treatment_plan.stages')}</span>
+              <span>{t('treatment_plan.tooth_numbers')}</span>
+              <span className={classes.colCost}>{t('treatment_plan.cost')}</span>
+              <span className={classes.colStatus}>{t('treatment_plan.status')}</span>
+            </div>
+            <div className={classes.stageList}>
+              {plan.stages.map((stage) => (
+                <StageRow
+                  key={stage.id}
+                  stage={stage}
+                  canEdit={canEdit}
+                  onUpdateStage={onUpdateStage}
+                  onSetAcceptance={onSetAcceptance}
+                  acceptancePending={acceptancePending}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ===== O'ng: moliyaviy xulosa ===== */}
+      <aside className={classes.summaryCard}>
+        <div className={classes.summaryTitle}>{t('treatment_plan.estimate')}</div>
+
+        <div className={classes.summaryRow}>
+          <span className={classes.summaryLabel}>{t('treatment_plan.total_cost')}</span>
+          <Mono>
+            <span className={classes.summaryValue}>
+              {vm.totalCostText} {t('common.currency')}
+            </span>
+          </Mono>
+        </div>
+
+        <div>
+          <div className={classes.progressTrack}>
+            <div className={classes.progressFill} style={{ width: `${progressPct}%` }} />
+          </div>
+          <div className={classes.progressMeta} style={{ marginTop: 6 }}>
+            <Mono>
+              {completedStages}/{totalStages}
+            </Mono>{' '}
+            · <Mono>{progressPct}%</Mono>
+          </div>
+        </div>
+
+        <Button
+          variant="default"
+          fullWidth
+          leftSection={<IconWritingSign size={16} />}
+          onClick={consent.open}
+        >
+          {t('treatment_plan.sign_consent')}
+        </Button>
+      </aside>
 
       <EstimateView planId={plan.id} opened={estimateOpened} onClose={estimate.close} />
 
@@ -172,6 +236,6 @@ export function PlanCard({
           </Group>
         </Stack>
       </Modal>
-    </Paper>
+    </div>
   );
 }

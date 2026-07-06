@@ -1,14 +1,12 @@
-import { Avatar, Mono, PageHead, Tabs } from '@dental/ui';
-import { Alert, Text } from '@mantine/core';
-import { IconAlertTriangle } from '@tabler/icons-react';
+import { Tabs } from '@dental/ui';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
-import { BalanceBadge } from '@/components/BalanceBadge';
 import { useVertical } from '@/features/settings/settings.api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { useMedicalRecord, usePatient, usePatientBalance } from '../patients.api';
 import { filterPatientTabs, type PatientTabDef } from '../visible-tabs';
+import { PatientHeaderCard } from './PatientHeaderCard';
 
 const GeneralTab = lazy(() => import('./tabs/GeneralTab').then((m) => ({ default: m.GeneralTab })));
 const MedicalTab = lazy(() => import('./tabs/MedicalTab').then((m) => ({ default: m.MedicalTab })));
@@ -99,27 +97,14 @@ export function PatientCard() {
 
   return (
     <div>
-      <PageHead
-        title={
-          <span style={{ alignItems: 'center', display: 'flex', gap: 12 }}>
-            {patient && <Avatar name={patient.fullName} size="lg" />}
-            <Text component="span" truncate maw={480}>
-              {patient?.fullName ?? ''}
-            </Text>
-            {balanceQuery.data && <BalanceBadge balance={balanceQuery.data.balance} size="md" />}
-          </span>
-        }
-        subtitle={patient?.phone ? <Mono>{patient.phone}</Mono> : undefined}
-      />
-
-      {severeAllergy && (
-        <Alert color="red" icon={<IconAlertTriangle size={20} />} variant="filled" mb="md">
-          <Text fw={700}>⚠️ {t('patients.severe_allergy_warning')}</Text>
-          <Text size="sm">
-            {severeAllergy.substance} ({severeAllergy.severity})
-            {severeAllergy.notes && ` — ${severeAllergy.notes}`}
-          </Text>
-        </Alert>
+      {patient && (
+        <div style={{ marginBottom: 16 }}>
+          <PatientHeaderCard
+            patient={patient}
+            balance={balanceQuery.data?.balance}
+            severeAllergy={severeAllergy}
+          />
+        </div>
       )}
 
       <Tabs items={tabItems} value={active} onChange={setActive} />

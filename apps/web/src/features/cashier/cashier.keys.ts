@@ -7,4 +7,5 @@ export const cashierKeys = {
   // invalidatsiya ildizi, `patientPlans` — bemor bo'yicha ro'yxat.
   plans: ['treatment-plans'] as const,
   patientPlans: (patientId: string) => ['treatment-plans', 'by-patient', patientId] as const,
+  allTransactions: () => ['cashier', 'transactions-all'] as const,
 };

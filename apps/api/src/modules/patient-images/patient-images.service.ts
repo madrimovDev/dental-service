@@ -41,6 +41,13 @@ export const createPatientImagesService = (deps: { audit: AuditLogger }) => {
       )
       .orderBy(desc(patientImages.createdAt));
 
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'patient_image',
+      resourceId: patientId,
+      after: { patientId, visitNoteId: visitNoteId ?? null, count: rows.length },
+    });
+
     // Sign URLs for client preview
     return Promise.all(
       rows.map(async (row) => ({
@@ -54,6 +61,13 @@ export const createPatientImagesService = (deps: { audit: AuditLogger }) => {
     const db = getDb(c);
     const [row] = await db.select().from(patientImages).where(eq(patientImages.id, id));
     if (!row) return null;
+
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'patient_image',
+      resourceId: id,
+    });
+
     return { ...row, url: await presignedGetUrl(row.objectKey) };
   }
 

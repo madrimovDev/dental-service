@@ -20,6 +20,7 @@ import {
   Settings,
   Shield,
   Stethoscope,
+  Tag,
   UserPlus,
   Users,
   Wallet,
@@ -41,7 +42,7 @@ export type NavGroup = { labelKey: string; items: NavItem[] };
 
 export const NAV_GROUPS: NavGroup[] = [
   {
-    labelKey: 'nav.group.today',
+    labelKey: 'nav.group.asosiy',
     items: [
       { key: 'home', labelKey: 'nav.dashboard', icon: Home, path: '/' },
       {
@@ -52,18 +53,53 @@ export const NAV_GROUPS: NavGroup[] = [
         permission: 'appointment.view',
       },
       {
-        key: 'schedule',
-        labelKey: 'nav.schedule',
-        icon: CalendarClock,
-        path: '/schedule',
-        permission: 'schedule.view',
-      },
-      {
         key: 'queue',
         labelKey: 'nav.queue',
         icon: ListChecks,
         path: '/queue',
         permission: 'queue.view',
+      },
+      {
+        key: 'patients',
+        labelKey: 'nav.patients',
+        icon: Users,
+        path: '/patients',
+        permission: 'patient.view',
+      },
+      {
+        key: 'cashier',
+        labelKey: 'nav.cashier',
+        icon: Wallet,
+        path: '/cashier',
+        permission: 'cashier.view',
+      },
+    ],
+  },
+  {
+    labelKey: 'nav.group.klinika',
+    items: [
+      {
+        key: 'plans',
+        labelKey: 'nav.plans',
+        icon: FileText,
+        path: '/plans',
+        permission: 'medical_record.view',
+      },
+      {
+        key: 'lab',
+        labelKey: 'nav.lab',
+        icon: FlaskConical,
+        path: '/lab',
+        feature: 'labOrders',
+        permission: 'lab_order.view',
+      },
+      { key: 'rx', labelKey: 'nav.rx', icon: Pill, path: '/rx', permission: 'medical_record.view' },
+      {
+        key: 'schedule',
+        labelKey: 'nav.schedule',
+        icon: CalendarClock,
+        path: '/schedule',
+        permission: 'schedule.view',
       },
       {
         key: 'recalls',
@@ -75,76 +111,8 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    labelKey: 'nav.group.patients',
+    labelKey: 'nav.group.boshqaruv',
     items: [
-      {
-        key: 'patients',
-        labelKey: 'nav.patients',
-        icon: Users,
-        path: '/patients',
-        permission: 'patient.view',
-      },
-      {
-        key: 'patient-new',
-        labelKey: 'nav.patient_new',
-        icon: UserPlus,
-        path: '/patients/new',
-        permission: 'patient.create',
-      },
-    ],
-  },
-  {
-    labelKey: 'nav.group.clinic',
-    items: [
-      { key: 'plans', labelKey: 'nav.plans', icon: FileText, path: '/plans', disabled: true },
-      {
-        key: 'lab',
-        labelKey: 'nav.lab',
-        icon: FlaskConical,
-        path: '/lab',
-        feature: 'labOrders',
-        disabled: true,
-      },
-      { key: 'rx', labelKey: 'nav.rx', icon: Pill, path: '/rx', disabled: true },
-    ],
-  },
-  {
-    labelKey: 'nav.group.finance',
-    items: [
-      {
-        key: 'cashier',
-        labelKey: 'nav.cashier',
-        icon: Wallet,
-        path: '/cashier',
-        permission: 'cashier.view',
-      },
-      {
-        key: 'transactions',
-        labelKey: 'nav.transactions',
-        icon: ArrowLeftRight,
-        path: '/transactions',
-        disabled: true,
-      },
-      {
-        key: 'expenses',
-        labelKey: 'nav.expenses',
-        icon: Receipt,
-        path: '/expenses',
-        permission: 'expense.view',
-      },
-      {
-        key: 'payroll',
-        labelKey: 'nav.payroll',
-        icon: Coins,
-        path: '/payroll',
-        permission: 'payroll.view',
-      },
-    ],
-  },
-  {
-    labelKey: 'nav.group.management',
-    items: [
-      { key: 'kpi', labelKey: 'nav.kpi', icon: BarChart3, path: '/dashboard', disabled: true },
       {
         key: 'reports',
         labelKey: 'nav.reports',
@@ -160,18 +128,11 @@ export const NAV_GROUPS: NavGroup[] = [
         permission: 'service.view',
       },
       {
-        key: 'branches',
-        labelKey: 'nav.branches',
-        icon: Building2,
-        path: '/settings/branches',
-        permission: 'branch.view',
-      },
-      {
-        key: 'roles',
-        labelKey: 'nav.roles',
-        icon: Shield,
-        path: '/settings/roles',
-        permission: 'role.view',
+        key: 'service-categories',
+        labelKey: 'nav.service_categories',
+        icon: Tag,
+        path: '/settings/service-categories',
+        permission: 'service.view',
       },
       {
         key: 'users',
@@ -188,6 +149,34 @@ export const NAV_GROUPS: NavGroup[] = [
         permission: 'stock.view',
       },
       {
+        key: 'expenses',
+        labelKey: 'nav.expenses',
+        icon: Receipt,
+        path: '/expenses',
+        permission: 'expense.view',
+      },
+      {
+        key: 'payroll',
+        labelKey: 'nav.payroll',
+        icon: Coins,
+        path: '/payroll',
+        permission: 'payroll.view',
+      },
+      {
+        key: 'branches',
+        labelKey: 'nav.branches',
+        icon: Building2,
+        path: '/settings/branches',
+        permission: 'branch.view',
+      },
+      {
+        key: 'roles',
+        labelKey: 'nav.roles',
+        icon: Shield,
+        path: '/settings/roles',
+        permission: 'role.view',
+      },
+      {
         key: 'audit',
         labelKey: 'nav.audit',
         icon: ScrollText,
@@ -200,6 +189,21 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: Settings,
         path: '/settings/tenant',
         permission: 'tenant.view',
+      },
+      { key: 'kpi', labelKey: 'nav.kpi', icon: BarChart3, path: '/dashboard' },
+      {
+        key: 'transactions',
+        labelKey: 'nav.transactions',
+        icon: ArrowLeftRight,
+        path: '/transactions',
+        permission: 'cashier.view',
+      },
+      {
+        key: 'patient-new',
+        labelKey: 'nav.patient_new',
+        icon: UserPlus,
+        path: '/patients/new',
+        permission: 'patient.create',
       },
     ],
   },
@@ -227,6 +231,13 @@ function isVisible(
  * Ruxsat + vertical bo'yicha filtrlangan guruhlar; bo'sh guruh tushiriladi.
  * `isOwner` — FUTURE (disabled) elementlar faqat owner uchun ko'rsatiladi.
  */
+/** nav-config'da bo'lmagan, lekin Topbar sarlavhasiga muhtoj yo'llar (sidebar'ga qo'shilmaydi). */
+export const EXTRA_TITLE_KEYS: Record<string, string> = {
+  '/settings/notify': 'settings.nav_notify',
+  '/settings/integrations': 'settings.nav_integrations',
+  '/profile': 'profile.title',
+};
+
 export function visibleGroups(
   has: (p: string) => boolean,
   vertical: Vertical = 'dental',

@@ -84,39 +84,116 @@ export function PrescriptionsTab({ patientId }: Props) {
       ) : (listQuery.data?.length ?? 0) === 0 ? (
         <StateView status="empty" title={t('prescription.empty')} />
       ) : (
-        listQuery.data?.map(toPrescriptionVM).map((rx) => (
-          <Card key={rx.id} withBorder padding="md">
-            <Stack gap="xs">
-              <Group justify="space-between">
-                <Group gap={6}>
-                  <IconPill size={16} />
+        <Box
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: 14,
+          }}
+        >
+          {listQuery.data?.map(toPrescriptionVM).map((rx) => (
+            <Box
+              key={rx.id}
+              style={{
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: 14,
+                boxShadow: 'var(--shadow-sm)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+                overflow: 'hidden',
+                padding: 16,
+              }}
+            >
+              <Group justify="space-between" wrap="nowrap" align="flex-start">
+                <Box
+                  aria-hidden
+                  style={{
+                    alignItems: 'center',
+                    background: 'var(--info-soft)',
+                    borderRadius: 'var(--radius-pill)',
+                    color: 'var(--info)',
+                    display: 'flex',
+                    flex: '0 0 auto',
+                    height: 32,
+                    justifyContent: 'center',
+                    width: 32,
+                  }}
+                >
+                  <IconPill size={18} />
+                </Box>
+                <Box style={{ fontSize: 11.5 }}>
                   <Mono>{rx.issuedDateText}</Mono>
-                </Group>
-                {rx.diagnosis && (
-                  <Text size="sm" c="dimmed">
-                    {t('prescription.diagnosis')}: {rx.diagnosis}
-                  </Text>
-                )}
+                </Box>
               </Group>
-              <Box>
+
+              {rx.diagnosis && (
+                <Text size="xs" style={{ color: 'var(--ink-3)' }}>
+                  {t('prescription.diagnosis')}: {rx.diagnosis}
+                </Text>
+              )}
+
+              <Box style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {rx.items.map((it, i) => (
-                  // biome-ignore lint/suspicious/noArrayIndexKey: stable items from server-side row
-                  <Text key={`rx-${rx.id}-${i}`} size="sm">
-                    <strong>{it.medicationName}</strong> — {it.dosage}, {it.frequency}
-                    {it.durationDays != null &&
-                      `, ${t('prescription.duration_days_suffix', { days: it.durationDays })}`}
-                    {it.instructions && ` (${it.instructions})`}
-                  </Text>
+                  <Box
+                    // biome-ignore lint/suspicious/noArrayIndexKey: stable items from server-side row
+                    key={`rx-${rx.id}-${i}`}
+                    style={{ display: 'flex', flexDirection: 'column', gap: 3 }}
+                  >
+                    <Text fw={700} size="sm" style={{ color: 'var(--ink)' }}>
+                      {it.medicationName}
+                    </Text>
+                    <Box
+                      style={{
+                        color: 'var(--ink-2)',
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        fontSize: 12,
+                        gap: '2px 12px',
+                      }}
+                    >
+                      <span>
+                        {t('prescription.dosage')}: <Mono>{it.dosage}</Mono>
+                      </span>
+                      <span>
+                        {t('prescription.frequency')}: <Mono>{it.frequency}</Mono>
+                      </span>
+                      {it.durationDays != null && (
+                        <span>
+                          {t('prescription.duration_days')}:{' '}
+                          <Mono>
+                            {t('prescription.duration_days_suffix', { days: it.durationDays })}
+                          </Mono>
+                        </span>
+                      )}
+                    </Box>
+                    {it.instructions && (
+                      <Text size="xs" style={{ color: 'var(--ink-3)' }}>
+                        {it.instructions}
+                      </Text>
+                    )}
+                  </Box>
                 ))}
               </Box>
+
               {rx.notes && (
-                <Text size="sm" c="dimmed">
+                <Text
+                  size="xs"
+                  style={{
+                    borderTop: '1px solid var(--border)',
+                    color: 'var(--ink-3)',
+                    fontSize: 11.5,
+                    marginTop: 'auto',
+                    paddingTop: 8,
+                  }}
+                >
                   {rx.notes}
                 </Text>
               )}
-            </Stack>
-          </Card>
-        ))
+            </Box>
+          ))}
+        </Box>
       )}
 
       <Modal opened={opened} onClose={close} title={t('prescription.create')} size="xl">
