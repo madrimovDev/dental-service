@@ -1,4 +1,11 @@
-import { invalidateLicense, type LicenseData, readLicense, writeLicense } from './license.ts';
+import {
+  invalidateLicense,
+  type LicenseData,
+  readAnchor,
+  readLicense,
+  writeAnchor,
+  writeLicense,
+} from './license.ts';
 import { sendHeartbeat } from './license-client.ts';
 import { logger } from './logger.ts';
 
@@ -18,6 +25,11 @@ export interface RunHeartbeatCheckDeps {
   writeLicense: (data: LicenseData) => Promise<void>;
   invalidateLicense: () => Promise<void>;
   sendHeartbeat: (licenseKey: string) => Promise<LicenseData>;
+  // CLI-437 — monotonik langar server-vaqti (`issuedAt`) bilan qayta anchorlanadi
+  // har muvaffaqiyatli heartbeat'da (ishonchli signal — offline mahalliy soatga
+  // qaraganda ustun).
+  readAnchor: () => Promise<number>;
+  writeAnchor: (ms: number) => Promise<void>;
   log: HeartbeatLogger;
 }
 
@@ -42,6 +54,14 @@ export const runLicenseHeartbeatCheck = async (deps: RunHeartbeatCheckDeps): Pro
   try {
     const fresh = await deps.sendHeartbeat(lic.licenseKey);
     await deps.writeLicense(fresh);
+    // CLI-437 — Supervisor'ning `issuedAt`i ishonchli server-vaqti; langarni
+    // shu bilan (va joriy langar/mahalliy vaqt bilan `max`) qayta ko'taramiz —
+    // offline'da inflyatsiyalangan langarni haqiqatga moslashtiradi.
+    const anchor = await deps.readAnchor();
+    const issuedAtMs = Date.parse(fresh.issuedAt);
+    await deps.writeAnchor(
+      Math.max(anchor, Number.isFinite(issuedAtMs) ? issuedAtMs : 0, Date.now()),
+    );
     deps.log.info({ clinicId: fresh.clinicId }, 'License heartbeat OK — cached .lic refreshed');
   } catch (err) {
     const code = err instanceof Error ? err.message : 'UNKNOWN';
@@ -89,6 +109,8 @@ export const startLicenseHeartbeatScheduler = (
         writeLicense,
         invalidateLicense,
         sendHeartbeat,
+        readAnchor,
+        writeAnchor,
         log: logger,
       }),
   } = deps;

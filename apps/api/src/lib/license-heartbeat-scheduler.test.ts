@@ -14,6 +14,10 @@ const makeLicense = (): LicenseData => ({
   signature: 'sig',
 });
 
+// CLI-437 — default anchor no-op deps for tests that don't care about the
+// monotonic-anchor advance (existing pre-CLI-437 test cases below).
+const noopAnchorDeps = { readAnchor: async () => 0, writeAnchor: mock(async (_ms: number) => {}) };
+
 describe('runLicenseHeartbeatCheck', () => {
   test('no cached license (not activated yet, or cloud/dev) -> no-op, sendHeartbeat never called', async () => {
     const { runLicenseHeartbeatCheck } = await import('./license-heartbeat-scheduler');
@@ -25,6 +29,7 @@ describe('runLicenseHeartbeatCheck', () => {
       writeLicense: mock(async () => {}),
       invalidateLicense,
       sendHeartbeat,
+      ...noopAnchorDeps,
       log: fakeLog,
     });
 
@@ -42,6 +47,7 @@ describe('runLicenseHeartbeatCheck', () => {
       writeLicense,
       invalidateLicense: mock(async () => {}),
       sendHeartbeat: async () => fresh,
+      ...noopAnchorDeps,
       log: fakeLog,
     });
 
@@ -59,6 +65,7 @@ describe('runLicenseHeartbeatCheck', () => {
       sendHeartbeat: async () => {
         throw new Error('INVALID_KEY');
       },
+      ...noopAnchorDeps,
       log: fakeLog,
     });
 
@@ -76,6 +83,7 @@ describe('runLicenseHeartbeatCheck', () => {
       sendHeartbeat: async () => {
         throw new Error('FINGERPRINT_MISMATCH');
       },
+      ...noopAnchorDeps,
       log: fakeLog,
     });
 
@@ -93,6 +101,7 @@ describe('runLicenseHeartbeatCheck', () => {
       sendHeartbeat: async () => {
         throw new Error('fetch failed');
       },
+      ...noopAnchorDeps,
       log: fakeLog,
     });
 
@@ -110,10 +119,35 @@ describe('runLicenseHeartbeatCheck', () => {
       sendHeartbeat: async () => {
         throw new Error('SUPERVISOR_ERROR');
       },
+      ...noopAnchorDeps,
       log: fakeLog,
     });
 
     expect(invalidateLicense).not.toHaveBeenCalled();
+  });
+
+  // CLI-437 — successful heartbeat re-anchors the monotonic clock to
+  // Supervisor's (trusted) server-time `issuedAt`.
+  test('successful heartbeat advances the anchor to the fresh issuedAt (server time)', async () => {
+    const { runLicenseHeartbeatCheck } = await import('./license-heartbeat-scheduler');
+    const fresh = makeLicense(); // issuedAt = now
+    const writeAnchor = mock(async (_ms: number) => {});
+    const priorAnchorMs = Date.now() - 86400000; // stale anchor, one day old
+
+    await runLicenseHeartbeatCheck({
+      readLicense: async () => makeLicense(),
+      writeLicense: mock(async () => {}),
+      invalidateLicense: mock(async () => {}),
+      sendHeartbeat: async () => fresh,
+      readAnchor: async () => priorAnchorMs,
+      writeAnchor,
+      log: fakeLog,
+    });
+
+    expect(writeAnchor).toHaveBeenCalledTimes(1);
+    const writtenMs = writeAnchor.mock.calls[0]?.[0] as number;
+    expect(writtenMs).toBeGreaterThanOrEqual(Date.parse(fresh.issuedAt));
+    expect(writtenMs).toBeGreaterThan(priorAnchorMs);
   });
 });
 
