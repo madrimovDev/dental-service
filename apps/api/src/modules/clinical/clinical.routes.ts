@@ -10,6 +10,7 @@ import { toothChartsRoutes } from './tooth-charts/index.ts';
 import { treatmentPlansRoutes } from './treatment-plans/index.ts';
 import {
   createTreatmentPlansService,
+  type PriceLookup,
   type RecallStageHook,
 } from './treatment-plans/treatment-plans.service.ts';
 import { visitNotesRoutes, visitNoteTemplatesRoutes } from './visit-notes/index.ts';
@@ -27,6 +28,8 @@ export const clinicalRoutes = (deps: {
   audit: AuditLogger;
   recall?: RecallStageHook;
   notifications?: NotificationsService;
+  /** CLI-443: davolash rejasi bosqich narxini serverda hisoblash uchun. */
+  priceLookup?: PriceLookup;
 }) => {
   const app = new OpenAPIHono();
 
@@ -80,6 +83,7 @@ export const clinicalRoutes = (deps: {
   const treatmentPlansService = createTreatmentPlansService({
     audit: deps.audit,
     recall: deps.recall,
+    priceLookup: deps.priceLookup,
   });
 
   // CLI-414/CLI-445: visit-note UPDATE'da `performedServices` reconciliation — stock modul
@@ -92,7 +96,10 @@ export const clinicalRoutes = (deps: {
 
   app.route('/', diagnosesRoutes({ db: deps.db }));
   // B4: bosqich completed → treatment_followup recall (factory injection).
-  app.route('/', treatmentPlansRoutes({ audit: deps.audit, recall: deps.recall }));
+  app.route(
+    '/',
+    treatmentPlansRoutes({ audit: deps.audit, recall: deps.recall, priceLookup: deps.priceLookup }),
+  );
   app.route(
     '/',
     visitNotesRoutes({

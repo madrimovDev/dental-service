@@ -29,7 +29,46 @@ export class AllocationExceedError extends Error {
   }
 }
 
-export const createCashierService = (deps: { audit: AuditLogger; fiscal?: FiscalProvider }) => {
+/**
+ * CLI-443: POS item uchun filialda faol narx topilmasa — routes 400 ga aylantiradi.
+ * Narxsiz xizmat POS orqali sotib bo'lmaydi (moliyaviy nazoratsizlik xavfi).
+ */
+export class NoActivePriceError extends Error {
+  constructor(readonly serviceId: string) {
+    super(`No active price for service ${serviceId} at this branch`);
+    this.name = 'NoActivePriceError';
+  }
+}
+
+/**
+ * CLI-444: `discount` erkin POS itemsGross'dan katta bo'lganda routes 400 ga
+ * aylantiradi — avvalgi jim `Math.max(0, ...)` clamp o'rniga.
+ */
+export class DiscountExceedsTotalError extends Error {
+  constructor() {
+    super('Discount exceeds items gross total');
+    this.name = 'DiscountExceedsTotalError';
+  }
+}
+
+/**
+ * CLI-443: narrow DI hook (recall pattern bilan bir xil — RecallStageHook,
+ * treatment-plans.service.ts). `services.service.ts::getActivePrice` shu shaklga
+ * strukturaviy mos keladi — to'g'ridan import qilinmaydi, composition root'da uzatiladi.
+ */
+export type PriceLookup = {
+  getActivePrice: (
+    c: Context,
+    serviceId: string,
+    branchId: string,
+  ) => Promise<{ price: string } | null>;
+};
+
+export const createCashierService = (deps: {
+  audit: AuditLogger;
+  fiscal?: FiscalProvider;
+  priceLookup?: PriceLookup;
+}) => {
   // DI: env'da SOLIQ_* bo'lsa real Soliq provider, aks holda NoOp (V3-1).
   const fiscal: FiscalProvider = deps.fiscal ?? createNoOpFiscalProvider();
 
@@ -107,10 +146,37 @@ export const createCashierService = (deps: { audit: AuditLogger; fiscal?: Fiscal
     const user = c.get('user');
     if (!tenantId) throw new Error('No tenant context');
 
-    const itemsGross = input.items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
-    // Erkin POS: jami − chegirma (manfiy bo'lmaydi). Plan-billing (items bo'sh): allocation = paidAmount.
-    const netTotal =
-      input.items.length > 0 ? Math.max(0, itemsGross - input.discount) : input.paidAmount;
+    // CLI-443: POS item narxi client'dan ISHONCH bilan qabul qilinmaydi — har
+    // item uchun SERVERDA `getActivePrice(serviceId, branchId)` orqali hisoblanadi.
+    // Yozuv tranzaksiyasi ochilishidan OLDIN (getDb(c) — request-level RLS tx,
+    // priceLookup ham xuddi shu tx'ni ishlatadi; savepoint ichida emas — sof o'qish).
+    // Faol narx topilmasa — NoActivePriceError (routes 400 `cashier.no_active_price`).
+    const resolvedItems =
+      input.items.length > 0
+        ? await Promise.all(
+            input.items.map(async (i) => {
+              if (!deps.priceLookup) {
+                throw new Error('priceLookup dependency required for POS items');
+              }
+              const price = await deps.priceLookup.getActivePrice(c, i.serviceId, input.branchId);
+              if (!price) throw new NoActivePriceError(i.serviceId);
+              return { ...i, unitPrice: Number(price.price) };
+            }),
+          )
+        : [];
+
+    const itemsGross = resolvedItems.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
+
+    // CLI-444: discount itemsGross'dan katta bo'lsa jim clamp o'rniga RAD etiladi
+    // (routes 400 `cashier.discount_exceeds_total`). Faqat erkin POS (items bor)
+    // rejimida ma'noli — plan-billing (allocations) discount'dan mustaqil.
+    if (resolvedItems.length > 0 && input.discount > itemsGross) {
+      throw new DiscountExceedsTotalError();
+    }
+
+    // Erkin POS: jami − chegirma (endi manfiy bo'lmasligi kafolatlangan — yuqoridagi guard).
+    // Plan-billing (items bo'sh): allocation = paidAmount.
+    const netTotal = resolvedItems.length > 0 ? itemsGross - input.discount : input.paidAmount;
 
     // Allocation yig'indisi paidAmount'dan oshmasligi shart (qisman ruxsat, oshib ketish RAD).
     if (input.allocations && input.allocations.length > 0) {
@@ -145,12 +211,13 @@ export const createCashierService = (deps: { audit: AuditLogger; fiscal?: Fiscal
       if (!transaction) throw new Error('Transaction insert failed');
 
       // Items — bo'sh massivni insert qilmaymiz (Drizzle throw qiladi). Plan-billing'da items bo'sh.
+      // unitPrice/subtotal — server tomonidan resolvedItems'dan (CLI-443, client qiymati emas).
       const items =
-        input.items.length > 0
+        resolvedItems.length > 0
           ? await tx
               .insert(cashierTransactionItems)
               .values(
-                input.items.map((i) => ({
+                resolvedItems.map((i) => ({
                   transactionId: transaction.id,
                   serviceId: i.serviceId,
                   serviceName: i.serviceName,

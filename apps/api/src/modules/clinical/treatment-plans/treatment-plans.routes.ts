@@ -24,6 +24,7 @@ import {
   ConsentOverwriteError,
   ConsentRequiredError,
   createTreatmentPlansService,
+  type PriceLookup,
   type RecallStageHook,
 } from './treatment-plans.service.ts';
 import { InvalidTransitionError } from './treatment-plans.transitions.ts';
@@ -44,7 +45,11 @@ const stageNotFound = {
   },
 };
 
-export const treatmentPlansRoutes = (deps: { audit: AuditLogger; recall?: RecallStageHook }) => {
+export const treatmentPlansRoutes = (deps: {
+  audit: AuditLogger;
+  recall?: RecallStageHook;
+  priceLookup?: PriceLookup;
+}) => {
   const app = new OpenAPIHono();
   const service = createTreatmentPlansService(deps);
 
