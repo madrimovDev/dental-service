@@ -46,11 +46,22 @@ export function computeDueDate(intervalMonths: number, now: Date = new Date()): 
   const y = get('year');
   const m = get('month'); // 1-12
   const d = get('day');
-  // UTC anchor (kun boshini buzmaslik uchun) + oy qo'shish; oy oxiri overflow'i
-  // Date normalizatsiyasi bilan hal qilinadi (mas. 31-yanvar +1 oy → mart emas?
-  // setUTCMonth oxirgi kunni mos kamaytiradi).
-  const anchor = new Date(Date.UTC(y, m - 1, d));
-  anchor.setUTCMonth(anchor.getUTCMonth() + intervalMonths);
+
+  // A7 (CLI-438): oy-oxiri overflow FIX. Eski kod `setUTCMonth(cur+n)` chaqirardi
+  // — bu kunni SAQLAYDI va ortiqcha kunlarni KEYINGI oyga OSHIRIB YUBORADI (izoh
+  // "oxirgi kunni mos kamaytiradi" deb da'vo qilardi, lekin JS Date BUNDAY
+  // ISHLAMAYDI): 31-yanvar + 1 oy → 3-mart, 28/29-fevral EMAS. To'g'ri clamp:
+  // kunni 1ga qo'yib oy qo'shamiz, so'ng target oyning haqiqiy kun-soniga
+  // (Date.UTC(y, m+1, 0) — keyingi oyning 0-kuni = shu oyning oxirgi kuni)
+  // min() bilan cheklaymiz. Oddiy (o'rta oy) holatlarda xulq o'zgarmaydi.
+  const targetMonthAnchor = new Date(Date.UTC(y, m - 1 + intervalMonths, 1));
+  const daysInTargetMonth = new Date(
+    Date.UTC(targetMonthAnchor.getUTCFullYear(), targetMonthAnchor.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  const clampedDay = Math.min(d, daysInTargetMonth);
+  const anchor = new Date(
+    Date.UTC(targetMonthAnchor.getUTCFullYear(), targetMonthAnchor.getUTCMonth(), clampedDay),
+  );
   return anchor.toISOString().slice(0, 10);
 }
 
