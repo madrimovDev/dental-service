@@ -2,10 +2,17 @@ import { z } from '@hono/zod-openapi';
 
 // ─── Request schemas ──────────────────────────────────────────────────────────
 
-export const createRunSchema = z.object({
-  periodFrom: z.iso.date(),
-  periodTo: z.iso.date(),
-});
+export const createRunSchema = z
+  .object({
+    periodFrom: z.iso.date(),
+    periodTo: z.iso.date(),
+  })
+  // CLI-417: teskari oraliqni (periodFrom > periodTo) rad et. ISO YYYY-MM-DD
+  // leksikografik taqqoslash sana tartibi bilan mos → qo'shimcha parse shart emas.
+  .refine((d) => d.periodFrom <= d.periodTo, {
+    message: 'periodFrom must be <= periodTo',
+    path: ['periodTo'],
+  });
 export type CreateRunInput = z.infer<typeof createRunSchema>;
 
 export const runIdParamSchema = z

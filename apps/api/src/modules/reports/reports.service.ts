@@ -1,7 +1,6 @@
 import {
   appointments,
   branches,
-  cashierTransactionItems,
   cashierTransactions,
   patients,
   recalls,
@@ -11,6 +10,7 @@ import {
 import type { Column } from 'drizzle-orm';
 import { and, count, countDistinct, desc, eq, gte, isNull, lt, ne, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
+import type { DbOrTx } from '../../db/client.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import {
@@ -57,6 +57,73 @@ const tashkentRange = (from: string, to: string) => {
 
 /** Yarim-ochiq kun oralig'i filtri: `col >= start AND col < end` (CLI-442 #1). */
 const inRange = (col: Column, start: Date, end: Date) => and(gte(col, start), lt(col, end));
+
+type NetServiceRow = { serviceName: string; count: number; revenue: number };
+
+/**
+ * CLI-430 — byService / procedureMix net-of-refund-and-discount agregatsiyasi.
+ *
+ * `cashier_transaction_items.subtotal` chegirmadan OLDINGI item narxi — tranzaksiya-
+ * darajali `discount` va qisman refundlar item'larda aks etmaydi (refund tx item'siz,
+ * CLI-406). Shuning uchun per-tranzaksiya "net-faktor" orqali har item subtotal'ini
+ * mutanosib kamaytiramiz:
+ *   txGross  = Σ item.subtotal (shu tx)
+ *   txNet    = tx.paidAmount − Σ (shu tx'ga bog'langan child refundlar.paidAmount)
+ *   factor   = txGross > 0 ? txNet / txGross : 0
+ *   perService = Σ round(item.subtotal × factor)
+ * `revenue.total` (`signedPaidAmount`, cash-basis) bilan izchil bo'lishi uchun. To'liq
+ * refundda (CLI-406dan keyin original `completed` qoladi) factor≈0 → o'sha xizmat
+ * hissasi tabiiy ravishda 0 bo'ladi (voided-status tekshiruvi endi kerak emas).
+ * `count` (procedureMix) — XOM `SUM(quantity)` (bajarilgan protsedura soni, refund
+ * pulni qaytaradi lekin ishni "o'chirmaydi").
+ *
+ * Raw SQL (CTE) — korrelyatsiyalangan child-refund subquery + item-darajasidagi
+ * proporsional taqsimot query-builder'da qulay ifodalanmaydi (self-join alias kerak).
+ */
+async function netServiceAggregates(
+  db: DbOrTx,
+  start: Date,
+  end: Date,
+  branchId?: string | null,
+): Promise<NetServiceRow[]> {
+  const branchFilter = branchId ? sql`AND t.branch_id = ${branchId}` : sql``;
+  const rows = await db.execute(sql`
+    WITH tx_net AS (
+      SELECT
+        t.id AS tx_id,
+        (t.paid_amount - COALESCE((
+          SELECT SUM(r.paid_amount) FROM cashier_transactions r
+          WHERE r.parent_transaction_id = t.id AND r.type = 'refund'
+        ), 0)) AS net_paid,
+        (SELECT COALESCE(SUM(i2.subtotal), 0) FROM cashier_transaction_items i2
+          WHERE i2.transaction_id = t.id) AS gross
+      FROM cashier_transactions t
+      WHERE t.status = 'completed'
+        AND t.type = 'payment'
+        AND t.created_at >= ${start}
+        AND t.created_at < ${end}
+        ${branchFilter}
+    )
+    SELECT
+      i.service_name AS "serviceName",
+      COALESCE(SUM(i.quantity), 0) AS "count",
+      COALESCE(SUM(
+        CASE WHEN tn.gross > 0 THEN ROUND((i.subtotal * tn.net_paid / tn.gross)::numeric, 2) ELSE 0 END
+      ), 0) AS "revenue"
+    FROM cashier_transaction_items i
+    JOIN tx_net tn ON tn.tx_id = i.transaction_id
+    GROUP BY i.service_name
+    ORDER BY "revenue" DESC
+  `);
+
+  return (rows as unknown as { serviceName: string; count: string; revenue: string }[]).map(
+    (r) => ({
+      serviceName: r.serviceName,
+      count: Number(r.count),
+      revenue: Number(r.revenue),
+    }),
+  );
+}
 
 /** Har kun (from..to) uchun 'sun'..'sat' kaliti — Tashkent kuni, noon-anchored (TZ chegarasi xavfsiz). */
 function* eachWeekday(from: string, to: string): Generator<string> {
@@ -149,25 +216,9 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
       .groupBy(dayExpr)
       .orderBy(dayExpr);
 
-    // byService — itemli POS (payment, completed)
-    const itemBase = [
-      eq(cashierTransactions.status, 'completed'),
-      eq(cashierTransactions.type, 'payment'),
-      inRange(cashierTransactions.createdAt, start, end),
-    ];
-    if (branchId) itemBase.push(eq(cashierTransactions.branchId, branchId));
-    const byService = await db
-      .select({
-        serviceName: cashierTransactionItems.serviceName,
-        total: sql<string>`COALESCE(SUM(${cashierTransactionItems.subtotal}), 0)`,
-      })
-      .from(cashierTransactionItems)
-      .innerJoin(
-        cashierTransactions,
-        eq(cashierTransactionItems.transactionId, cashierTransactions.id),
-      )
-      .where(and(...itemBase))
-      .groupBy(cashierTransactionItems.serviceName);
+    // byService — itemli POS (payment, completed), net-of-refund-and-discount (CLI-430).
+    const byServiceNet = await netServiceAggregates(db, start, end, branchId);
+    const byService = byServiceNet.map((r) => ({ serviceName: r.serviceName, total: r.revenue }));
 
     const byPaymentMethod = await db
       .select({ paymentMethod: cashierTransactions.paymentMethod, total: signedPaidAmount })
@@ -398,29 +449,16 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
     const { start, end } = tashkentRange(from, to);
 
     // 1. Procedure-mix — kassa item'lari (completed payment, oraliq, filial).
-    const txFilter = [
-      inRange(cashierTransactions.createdAt, start, end),
-      eq(cashierTransactions.type, 'payment'),
-      eq(cashierTransactions.status, 'completed'),
-    ];
-    if (branchId) txFilter.push(eq(cashierTransactions.branchId, branchId));
-    const mixRows = await db
-      .select({
-        serviceName: cashierTransactionItems.serviceName,
-        count: sql<string>`SUM(${cashierTransactionItems.quantity})`,
-        revenue: sql<string>`SUM(${cashierTransactionItems.subtotal})`,
-      })
-      .from(cashierTransactionItems)
-      .innerJoin(
-        cashierTransactions,
-        eq(cashierTransactionItems.transactionId, cashierTransactions.id),
-      )
-      .where(and(...txFilter))
-      .groupBy(cashierTransactionItems.serviceName)
-      .orderBy(desc(sql`SUM(${cashierTransactionItems.subtotal})`));
+    //    `count` = XOM SUM(quantity) (bajarilgan protsedura soni); `revenue` = net-of-
+    //    refund-and-discount (CLI-430) — `netServiceAggregates` bilan bir xil hisoblash.
+    const mixRows = await netServiceAggregates(db, start, end, branchId);
 
     // 2. Retention — yangi (oraliqda yaratilgan) vs qaytgan (oraliqda yozilgan, lekin
-    //    oraliqdan oldin yaratilgan bemor). Retention bemor-darajasida (tenant-wide, Qaror #29).
+    //    oraliqdan oldin yaratilgan bemor). Retention bemor-darajasida — TENANT-WIDE
+    //    (Qaror #29, planCompletion pretsedenti) — `branchId` ATAYLAB ikkala tomonda
+    //    ham e'tiborga olinmaydi (CLI-431: ilgari `returningPatients` branch-scoped edi,
+    //    `newPatients` esa tenant-wide — asimmetriya branchId'ga qarab ichki nomuvofiq
+    //    natija berardi; endi ikkalasi ham branchId'dan mustaqil, branch-invariant).
     const [newRow] = await db
       .select({ c: count() })
       .from(patients)
@@ -429,7 +467,6 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
       inRange(appointments.startTime, start, end),
       lt(patients.createdAt, start),
     ];
-    if (branchId) apptRetFilter.push(eq(appointments.branchId, branchId));
     const [retRow] = await db
       .select({ c: countDistinct(appointments.patientId) })
       .from(appointments)
@@ -438,7 +475,8 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
     const newPatients = Number(newRow?.c ?? 0);
     const returningPatients = Number(retRow?.c ?? 0);
 
-    // 3. Recall-efficacy — oraliqda yaratilgan recall'lar, status bo'yicha.
+    // 3. Recall-efficacy — oraliqda yaratilgan recall'lar, status bo'yicha. TENANT-WIDE
+    //    (recalls jadvalida branch ustuni yo'q) — retention bilan izchil scope.
     const recallRows = await db
       .select({ status: recalls.status, c: count() })
       .from(recalls)
@@ -474,11 +512,7 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
     });
 
     return {
-      procedureMix: mixRows.map((r) => ({
-        serviceName: r.serviceName,
-        count: Number(r.count),
-        revenue: Number(r.revenue),
-      })),
+      procedureMix: mixRows,
       retention: {
         newPatients,
         returningPatients,
