@@ -152,9 +152,17 @@ export const userRoutes = (deps: { db: Database; audit: AuditLogger }) => {
   app.openapi(addAssignmentRoute, async (c) => {
     const { userId } = c.req.valid('param');
     const body = c.req.valid('json');
-    const row = await service.addAssignment(c, userId, body);
-    if (!row) return c.json(fail('user.not_found', 'User not found'), 404);
-    return c.json(ok(toUserAssignmentRowDto(row)), 201);
+    const result = await service.addAssignment(c, userId, body);
+    if (result === null) return c.json(fail('user.not_found', 'User not found'), 404);
+    if (!result.ok) {
+      if (result.code === 'role.not_found')
+        return c.json(fail('role.not_found', 'Role not found'), 404);
+      if (result.code === 'branch.not_found')
+        return c.json(fail('branch.not_found', 'Branch not found'), 404);
+      return c.json(fail(result.code, 'Assignment failed'), 400);
+    }
+    // Yangi yoki idempotent dublikat — ikkalasi ham 201 (mavjud wire kontrakti saqlanadi).
+    return c.json(ok(toUserAssignmentRowDto(result.assignment)), 201);
   });
 
   // ─── PATCH /assignments/{assignmentId} ───────────────────────────────────
@@ -275,17 +283,27 @@ export const userRoutes = (deps: { db: Database; audit: AuditLogger }) => {
       params: userIdParamSchema,
       body: { content: { 'application/json': { schema: upsertProfileSchema } } },
     },
-    responses: okJson(staffProfileDtoSchema, 'Upserted staff profile'),
+    responses: {
+      ...okJson(staffProfileDtoSchema, 'Upserted staff profile'),
+      404: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'User is not a member of the active tenant',
+      },
+    },
   });
 
   app.openapi(upsertProfileRoute, async (c) => {
     const { userId } = c.req.valid('param');
     const body = c.req.valid('json');
-    const profile = await service.upsertProfile(c, userId, body);
-    // upsert + RETURNING always yields a row; guard instead of `!` so a null
-    // surfaces as a 500 via the error handler rather than a runtime cast.
-    if (!profile) throw new Error('upsertProfile returned no row');
-    return c.json(ok(toStaffProfileDto(profile)), 200);
+    const result = await service.upsertProfile(c, userId, body);
+    if (!result.ok) {
+      if (result.code === 'user.not_member') {
+        return c.json(fail('user.not_member', 'User is not a member of the tenant'), 404);
+      }
+      // upsert + RETURNING kutilmagan holda bo'sh qaytdi — 500 (runtime cast emas).
+      throw new Error('upsertProfile returned no row');
+    }
+    return c.json(ok(toStaffProfileDto(result.profile)), 200);
   });
 
   return app;

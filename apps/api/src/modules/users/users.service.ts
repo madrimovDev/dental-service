@@ -26,26 +26,30 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
   /** Joriy tenant'dagi xodimlar (active assignmentlar bilan) */
   async function listAssignments(c: Context) {
     const db = getDb(c);
-    return db
-      .select({
-        assignmentId: userAssignments.id,
-        userId: userAssignments.userId,
-        userEmail: users.email,
-        userPhone: users.phone,
-        userFullName: users.fullName,
-        branchId: userAssignments.branchId,
-        branchName: branches.name,
-        roleId: userAssignments.roleId,
-        roleName: roles.name,
-        validFrom: userAssignments.validFrom,
-        validTo: userAssignments.validTo,
-        isActive: userAssignments.isActive,
-      })
-      .from(userAssignments)
-      .innerJoin(users, eq(users.id, userAssignments.userId))
-      .leftJoin(branches, eq(branches.id, userAssignments.branchId))
-      .innerJoin(roles, eq(roles.id, userAssignments.roleId))
-      .orderBy(users.fullName);
+    return (
+      db
+        .select({
+          assignmentId: userAssignments.id,
+          userId: userAssignments.userId,
+          userEmail: users.email,
+          userPhone: users.phone,
+          userFullName: users.fullName,
+          branchId: userAssignments.branchId,
+          branchName: branches.name,
+          roleId: userAssignments.roleId,
+          roleName: roles.name,
+          validFrom: userAssignments.validFrom,
+          validTo: userAssignments.validTo,
+          isActive: userAssignments.isActive,
+        })
+        .from(userAssignments)
+        .innerJoin(users, eq(users.id, userAssignments.userId))
+        .leftJoin(branches, eq(branches.id, userAssignments.branchId))
+        .innerJoin(roles, eq(roles.id, userAssignments.roleId))
+        // CLI-442 #6: soft-deleted user xodim ro'yxatida ko'rinmasin (deleted_at latent edi).
+        .where(isNull(users.deletedAt))
+        .orderBy(users.fullName)
+    );
   }
 
   /**
@@ -196,6 +200,35 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
     const [user] = await deps.db.select().from(users).where(eq(users.id, userId));
     if (!user) return null;
 
+    // CLI-429: roleId/branchId joriy tenant'da mavjudligini `getDb(c)` (RLS-bound) orqali
+    // tekshirish — cross-tenant/ghost assignment oldini olish (invite bilan bir xil pattern).
+    const [role] = await db.select().from(roles).where(eq(roles.id, input.roleId));
+    if (!role) return { ok: false as const, code: 'role.not_found' as const };
+
+    if (input.branchId) {
+      const [branch] = await db.select().from(branches).where(eq(branches.id, input.branchId));
+      if (!branch) return { ok: false as const, code: 'branch.not_found' as const };
+    }
+
+    // Dublikat-guard (invite bilan bir xil) — bir xil (user, tenant, role, branch) juftligi
+    // qayta qo'shilmaydi; mavjudni idempotent qaytaramiz.
+    const [existing] = await db
+      .select()
+      .from(userAssignments)
+      .where(
+        and(
+          eq(userAssignments.userId, userId),
+          eq(userAssignments.tenantId, tenantId),
+          eq(userAssignments.roleId, input.roleId),
+          input.branchId
+            ? eq(userAssignments.branchId, input.branchId)
+            : sql`${userAssignments.branchId} IS NULL`,
+        ),
+      );
+    if (existing) {
+      return { ok: true as const, assignment: existing, alreadyExists: true };
+    }
+
     const [assignment] = await db
       .insert(userAssignments)
       .values({
@@ -209,16 +242,16 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
       })
       .returning();
 
-    if (assignment) {
-      await deps.audit.record(c, {
-        action: 'created',
-        resourceType: 'user_assignment',
-        resourceId: assignment.id,
-        after: assignment,
-      });
-    }
+    if (!assignment) return { ok: false as const, code: 'assignment.create_failed' as const };
 
-    return assignment;
+    await deps.audit.record(c, {
+      action: 'created',
+      resourceType: 'user_assignment',
+      resourceId: assignment.id,
+      after: assignment,
+    });
+
+    return { ok: true as const, assignment, alreadyExists: false };
   }
 
   async function updateAssignment(c: Context, assignmentId: string, input: UpdateAssignmentInput) {
@@ -375,13 +408,39 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
    * Xodim profilini upsert qiladi (PUT — to'liq almashtirish).
    * `(tenant_id, user_id)` unique konfliktida UPDATE; aks holda INSERT.
    * Ixtiyoriy maydonlar berilmasa null/default'ga tushadi (merge emas).
-   * Eslatma: RLS faqat joriy tenant_id'ni tekshiradi — userId aynan shu tenantga
-   * a'zo ekanligi bu yerda tasdiqlanmaydi (tenant-membership tekshiruvi keyinga qoldirilgan).
+   *
+   * CLI-441 #4: RLS faqat joriy tenant_id'ni tekshiradi — `userId` aynan shu tenantga
+   * a'zo ekanligini tasdiqlamaydi. Insertdan oldin tenant-membership tekshiriladi:
+   * OWNER (assignmentsiz bo'lishi mumkin, CLAUDE.md §3.3 — kodda hardcoded check) YOKI
+   * aktiv (muddati o'tmagan) `user_assignments` qatori (`resetUserPassword` pattern bilan
+   * bir xil — owner carve-out shart, aks holda owner o'z profilini yarata olmaydi).
    */
   async function upsertProfile(c: Context, userId: string, input: UpsertProfileInput) {
     const db = getDb(c);
     const tenantId = c.get('activeTenantId');
     if (!tenantId) throw new Error('No tenant context');
+
+    const [tenant] = await db
+      .select({ ownerUserId: tenants.ownerUserId })
+      .from(tenants)
+      .where(eq(tenants.id, tenantId));
+    const isOwner = tenant?.ownerUserId === userId;
+
+    if (!isOwner) {
+      const now0 = new Date();
+      const [assignment] = await db
+        .select()
+        .from(userAssignments)
+        .where(
+          and(
+            eq(userAssignments.userId, userId),
+            eq(userAssignments.tenantId, tenantId),
+            eq(userAssignments.isActive, true),
+            sql`(${userAssignments.validTo} IS NULL OR ${userAssignments.validTo} > ${now0})`,
+          ),
+        );
+      if (!assignment) return { ok: false as const, code: 'user.not_member' as const };
+    }
 
     const before = await getProfile(c, userId);
     const now = new Date();
@@ -412,17 +471,17 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
       })
       .returning();
 
-    if (profile) {
-      await deps.audit.record(c, {
-        action: before ? 'updated' : 'created',
-        resourceType: 'staff_profile',
-        resourceId: profile.id,
-        before: before ?? undefined,
-        after: profile,
-      });
-    }
+    if (!profile) return { ok: false as const, code: 'profile.upsert_failed' as const };
 
-    return profile;
+    await deps.audit.record(c, {
+      action: before ? 'updated' : 'created',
+      resourceType: 'staff_profile',
+      resourceId: profile.id,
+      before: before ?? undefined,
+      after: profile,
+    });
+
+    return { ok: true as const, profile };
   }
 
   return {

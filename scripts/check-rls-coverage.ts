@@ -69,6 +69,10 @@ async function main() {
   const rlsDdl = await readAllRlsDdl();
 
   const missing: string[] = [];
+  // CLI-442 #4: ENABLE bilan bir qatorda FORCE ROW LEVEL SECURITY ham majburlanadi
+  // (CLAUDE.md §3.4 — jadval egasi ham RLS'ga bo'ysunsin). FORCE'siz (faqat ENABLE)
+  // tenant-scoped jadval CI'da FAIL beradi.
+  const missingForce: string[] = [];
 
   for (const { name, file } of tables) {
     if (PLATFORM_TABLES.has(name)) continue;
@@ -80,18 +84,40 @@ async function main() {
     );
     if (!enableRegex.test(rlsDdl)) {
       missing.push(`${name} (${file})`);
+      continue;
+    }
+
+    const forceRegex = new RegExp(
+      `ALTER\\s+TABLE\\s+${name}\\s+FORCE\\s+ROW\\s+LEVEL\\s+SECURITY`,
+      'i',
+    );
+    if (!forceRegex.test(rlsDdl)) {
+      missingForce.push(`${name} (${file})`);
     }
   }
 
-  if (missing.length > 0) {
+  if (missing.length > 0 || missingForce.length > 0) {
     console.error('❌ RLS coverage check FAILED');
-    console.error("Quyidagi tenant-scoped jadvallar uchun RLS policy YO'Q:");
-    for (const m of missing) {
-      console.error(`  - ${m}`);
+    if (missing.length > 0) {
+      console.error("Quyidagi tenant-scoped jadvallar uchun RLS policy YO'Q (ENABLE):");
+      for (const m of missing) {
+        console.error(`  - ${m}`);
+      }
+    }
+    if (missingForce.length > 0) {
+      console.error(
+        "Quyidagi tenant-scoped jadvallar ENABLE bor, lekin FORCE ROW LEVEL SECURITY YO'Q " +
+          "(jadval egasi RLS'ni aylanib o'tishi mumkin, CLAUDE.md §3.4):",
+      );
+      for (const m of missingForce) {
+        console.error(`  - ${m}`);
+      }
     }
     console.error('');
     console.error('Yechim: apps/api/migrations/rls/ ichida yangi .sql fayl yarating');
-    console.error("va `ALTER TABLE <name> ENABLE ROW LEVEL SECURITY` + policy qo'shing.");
+    console.error(
+      "va `ALTER TABLE <name> ENABLE ROW LEVEL SECURITY` + `ALTER TABLE <name> FORCE ROW LEVEL SECURITY` + policy qo'shing.",
+    );
     process.exit(1);
   }
 
