@@ -50,7 +50,13 @@ let ownerBId: string;
 let branchAId: string;
 let planId: string;
 
+// CLI-417: har test DISTINCT davr ishlatadi — `payroll_runs_no_overlap` EXCLUDE
+// constraint bir tenant uchun ustma-ust davrni to'sadi (bir davr = bir run). Faqat
+// PERIOD (May) seed to'lovini (2026-05-15) o'z ichiga oladi → daromadli assertion.
 const PERIOD = { periodFrom: '2026-05-01', periodTo: '2026-05-31' };
+const PERIOD_JUNE = { periodFrom: '2026-06-01', periodTo: '2026-06-30' };
+const PERIOD_JULY = { periodFrom: '2026-07-01', periodTo: '2026-07-31' };
+const PERIOD_AUGUST = { periodFrom: '2026-08-01', periodTo: '2026-08-31' };
 
 beforeAll(async () => {
   await db.execute(sql`TRUNCATE users, tenants RESTART IDENTITY CASCADE`);
@@ -224,15 +230,16 @@ describe('Payroll — real DB createRun snapshot', () => {
   });
 
   test('getRun: run + lines qaytaradi', async () => {
+    // June davri — seed to'lov (May) bu oraliqda emas → daromad 0, faqat baza (500000).
     const result = await db.transaction(async (tx) => {
       await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantAId}'`));
-      const created = await service.createRun(ctx(tx, tenantAId, doctorId), PERIOD);
+      const created = await service.createRun(ctx(tx, tenantAId, doctorId), PERIOD_JUNE);
       return service.getRun(ctx(tx, tenantAId, doctorId), created.id);
     });
 
     expect(result).not.toBeNull();
     expect(result?.lines).toHaveLength(1);
-    expect(Number(result?.lines[0]?.total)).toBe(600000);
+    expect(Number(result?.lines[0]?.total)).toBe(500000);
   });
 
   test("listRuns: faqat tenant A run'lari (RLS scope)", async () => {
@@ -248,7 +255,7 @@ describe('Payroll — real DB createRun snapshot', () => {
   test('finalizeRun: draft → finalized', async () => {
     const finalized = await db.transaction(async (tx) => {
       await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantAId}'`));
-      const created = await service.createRun(ctx(tx, tenantAId, doctorId), PERIOD);
+      const created = await service.createRun(ctx(tx, tenantAId, doctorId), PERIOD_JULY);
       return service.finalizeRun(ctx(tx, tenantAId, doctorId), created.id);
     });
 
@@ -259,7 +266,7 @@ describe('Payroll — real DB createRun snapshot', () => {
   test('finalizeRun: ikkinchi finalize — not_draft xato', async () => {
     const result = await db.transaction(async (tx) => {
       await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantAId}'`));
-      const created = await service.createRun(ctx(tx, tenantAId, doctorId), PERIOD);
+      const created = await service.createRun(ctx(tx, tenantAId, doctorId), PERIOD_AUGUST);
       await service.finalizeRun(ctx(tx, tenantAId, doctorId), created.id);
       return service.finalizeRun(ctx(tx, tenantAId, doctorId), created.id);
     });

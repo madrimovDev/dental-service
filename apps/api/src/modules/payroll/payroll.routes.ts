@@ -13,7 +13,7 @@ import {
   payrollRunWithLinesDtoSchema,
   runIdParamSchema,
 } from './payroll.schema.ts';
-import { createPayrollService } from './payroll.service.ts';
+import { createPayrollService, PayrollOverlapError } from './payroll.service.ts';
 
 /** Standart 404 response — get/finalize endpoint'lar uchun. */
 const notFoundResponse = {
@@ -76,14 +76,28 @@ export const payrollRoutes = (deps: { db: Database; audit: AuditLogger }) => {
         content: { 'application/json': { schema: errorResponseSchema } },
         description: 'Forbidden',
       },
+      409: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Overlapping / duplicate payroll run for period',
+      },
     },
   });
 
   app.openapi(createRunRoute, async (c) => {
     const body = c.req.valid('json');
-    const result = await service.createRun(c, body);
-    const { lines, ...run } = result;
-    return c.json(ok(toPayrollRunWithLinesDto(run, lines)), 201);
+    try {
+      const result = await service.createRun(c, body);
+      const { lines, ...run } = result;
+      return c.json(ok(toPayrollRunWithLinesDto(run, lines)), 201);
+    } catch (err) {
+      if (err instanceof PayrollOverlapError) {
+        return c.json(
+          fail('payroll_run.overlap', 'A payroll run already exists for an overlapping period'),
+          409,
+        );
+      }
+      throw err;
+    }
   });
 
   // ─── GET /runs/{id} — get by id ───────────────────────────────────────────
@@ -145,6 +159,39 @@ export const payrollRoutes = (deps: { db: Database; audit: AuditLogger }) => {
       return c.json(fail('payroll_run.not_found', 'Payroll run not found'), 404);
     }
     return c.json(ok(toPayrollRunDto(run)), 200);
+  });
+
+  // ─── DELETE /runs/{id} — draft'ni o'chirish (deadlock yechimi) ─────────────
+
+  const deleteRunRoute = createRoute({
+    method: 'delete',
+    path: '/runs/{id}',
+    tags: ['payroll'],
+    operationId: 'deletePayrollRun',
+    middleware: [requirePermission('payroll.manage')] as const,
+    request: {
+      params: runIdParamSchema,
+    },
+    responses: {
+      ...okJson(z.object({ deleted: z.literal(true) }), 'Payroll run deleted'),
+      ...notFoundResponse,
+      409: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Only draft runs can be deleted',
+      },
+    },
+  });
+
+  app.openapi(deleteRunRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const { error } = await service.deleteRun(c, id);
+    if (error === 'not_found') {
+      return c.json(fail('payroll_run.not_found', 'Payroll run not found'), 404);
+    }
+    if (error === 'not_draft') {
+      return c.json(fail('payroll_run.not_draft', 'Only draft runs can be deleted'), 409);
+    }
+    return c.json(ok({ deleted: true as const }), 200);
   });
 
   return app;
