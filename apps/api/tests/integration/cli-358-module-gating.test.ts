@@ -1,21 +1,27 @@
 /**
- * Module-gating integration test (CLI-358) — `requireModuleInDesktop`
+ * Module-gating integration test (CLI-358, updated CLI-433) — `requireModuleInDesktop`
  * litsenziya-gating middleware'ni REAL to'liq app (`createApp()`) ustida
  * tekshiradi.
  *
- * Maqsad: Local Desktop rejimida (`WEB_DIST_DIR` bor) litsenziya
- * faollashtirilmagan (`.lic` fayl yo'q) holatda modul-gated route'lar 403
- * `LICENSE_NOT_FOUND` qaytarishi kerak — Local Desktop litsenziya modeli shu
- * tekshiruvga tayanadi (CLI-338/348), lekin CLI-358 topilishicha hech bir
- * route bu middleware'dan o'tmagan edi.
+ * Maqsad: Local Desktop rejimida litsenziya faollashtirilmagan (`.lic` fayl
+ * yo'q) holatda modul-gated route'lar 403 `LICENSE_NOT_FOUND` qaytarishi
+ * kerak — Local Desktop litsenziya modeli shu tekshiruvga tayanadi
+ * (CLI-338/348), lekin CLI-358 topilishicha hech bir route bu middleware'dan
+ * o'tmagan edi.
  *
- * `requireModuleInDesktop` faqat `process.env.WEB_DIST_DIR` bor bo'lganda
- * faollashadi (cloud/dev/CI'da no-op — Task 1 izohiga qarang), shuning uchun
- * bu fayl `beforeAll`da ikkalasini ham o'rnatadi: `LICENSE_PATH` (mavjud
- * bo'lmagan yo'l → litsenziya topilmadi) VA `WEB_DIST_DIR` (Local Desktop
- * rejimini simulyatsiya qilish uchun, haqiqiy build kerak emas — bu testlar
- * hech qachon static-serving branch'iga yetmaydi, /api/* route'lar
- * ustunroq mos keladi).
+ * CLI-433 — signal `WEB_DIST_DIR`dan (litsenziyaga aloqasi bo'lmagan
+ * static-serve sozlamasi) `DENTAL_LOCAL_DESKTOP='true'`ga (atayin, faqat
+ * litsenziya-gating uchun signal) o'zgardi. Shu ticket bilan expenses/stock/
+ * payroll/notifications (ilgari GATE'SIZ, starter tarif bilan ham to'liq
+ * ochiq edi) ham gate qilindi — quyidagi oxirgi blok endi bu 4 modulni
+ * "gate'siz qoladi" o'rniga "endi gate qilinadi" deb tasdiqlaydi (CLI-433
+ * asosiy fix'i).
+ *
+ * `requireModuleInDesktop` faqat `process.env.DENTAL_LOCAL_DESKTOP === 'true'`
+ * bo'lganda faollashadi (cloud/dev/CI'da no-op), shuning uchun bu fayl
+ * `beforeAll`da ikkalasini ham o'rnatadi: `LICENSE_PATH` (mavjud bo'lmagan
+ * yo'l → litsenziya topilmadi) VA `DENTAL_LOCAL_DESKTOP` (Local Desktop
+ * rejimini simulyatsiya qilish uchun).
  *
  * ⚠️ Ikki xil gating ORDER bor (fix-forward topilgan, quyida izohlangan):
  *   - 9 modul (patients, appointments, queue, cashier, reports, staff,
@@ -53,19 +59,18 @@ import { createApp } from '../../src/app.ts';
 import { signAccess } from '../../src/lib/jwt.ts';
 
 let originalLicensePath: string | undefined;
-let originalWebDistDir: string | undefined;
+let originalLocalDesktopFlag: string | undefined;
 let ownerToken: string;
 
 beforeAll(async () => {
   originalLicensePath = process.env.LICENSE_PATH;
-  originalWebDistDir = process.env.WEB_DIST_DIR;
+  originalLocalDesktopFlag = process.env.DENTAL_LOCAL_DESKTOP;
 
   // Mavjud bo'lmagan yo'l — getLicensePath() bu env'ni har chaqiruvda o'qiydi.
   process.env.LICENSE_PATH = `/tmp/cli-358-no-license-${crypto.randomUUID()}.lic`;
-  // requireModuleInDesktop faqat WEB_DIST_DIR bor bo'lganda faollashadi —
-  // Local Desktop rejimini simulyatsiya qilish uchun (haqiqiy web build
-  // shart emas, /api/* so'rovlar static-serving branch'iga yetmaydi).
-  process.env.WEB_DIST_DIR = '/tmp/cli-358-fake-web-dist';
+  // requireModuleInDesktop faqat DENTAL_LOCAL_DESKTOP==='true' bo'lganda
+  // faollashadi (CLI-433 — Local Desktop rejimini simulyatsiya qilish uchun).
+  process.env.DENTAL_LOCAL_DESKTOP = 'true';
 
   // clinical/patient-images testlari uchun — DB seed SHART EMAS: authMiddleware
   // faqat JWT imzosini tekshiradi (DB'ga bormaydi), rlsMiddleware ixtiyoriy
@@ -90,10 +95,10 @@ afterAll(() => {
   } else {
     process.env.LICENSE_PATH = originalLicensePath;
   }
-  if (originalWebDistDir === undefined) {
-    delete process.env.WEB_DIST_DIR;
+  if (originalLocalDesktopFlag === undefined) {
+    delete process.env.DENTAL_LOCAL_DESKTOP;
   } else {
-    process.env.WEB_DIST_DIR = originalWebDistDir;
+    process.env.DENTAL_LOCAL_DESKTOP = originalLocalDesktopFlag;
   }
 });
 
@@ -206,13 +211,14 @@ describe('CLI-358 requireModuleInDesktop mounted on gated route groups', () => {
 
   // ── Regression guards ─────────────────────────────────────────────────────
 
-  test('GET /api/patients WITHOUT WEB_DIST_DIR (cloud/dev/CI mode) → gating is a no-op, never LICENSE_NOT_FOUND', async () => {
+  test('GET /api/patients WITHOUT DENTAL_LOCAL_DESKTOP (cloud/dev/CI mode) → gating is a no-op, never LICENSE_NOT_FOUND', async () => {
     // Simulates every other existing integration test (cli-79-vertical-gating,
-    // clinical.test.ts, cashier-*.test.ts, ...) — none of them set WEB_DIST_DIR,
-    // none of them provision a .lic. This is the guard that proves CLI-358
-    // did not break the rest of the suite / cloud deploy.
-    const savedWebDistDir = process.env.WEB_DIST_DIR;
-    delete process.env.WEB_DIST_DIR;
+    // clinical.test.ts, cashier-*.test.ts, ...) — none of them set
+    // DENTAL_LOCAL_DESKTOP, none of them provision a .lic. This is the guard
+    // that proves CLI-358/CLI-433 did not break the rest of the suite / cloud
+    // deploy.
+    const savedFlag = process.env.DENTAL_LOCAL_DESKTOP;
+    delete process.env.DENTAL_LOCAL_DESKTOP;
     try {
       const app = createApp();
       const res = await app.request('/api/patients');
@@ -223,10 +229,10 @@ describe('CLI-358 requireModuleInDesktop mounted on gated route groups', () => {
       expect(body.error.code).not.toBe('LICENSE_NOT_FOUND');
       expect(body.error.code).toBe('auth.missing_token');
     } finally {
-      if (savedWebDistDir === undefined) {
-        delete process.env.WEB_DIST_DIR;
+      if (savedFlag === undefined) {
+        delete process.env.DENTAL_LOCAL_DESKTOP;
       } else {
-        process.env.WEB_DIST_DIR = savedWebDistDir;
+        process.env.DENTAL_LOCAL_DESKTOP = savedFlag;
       }
     }
   });
@@ -245,22 +251,33 @@ describe('CLI-358 requireModuleInDesktop mounted on gated route groups', () => {
     expect(body.error.code).toBe('auth.missing_token');
   });
 
-  // The bug this project actually shipped and fixed (see file header + the
-  // `fix(api): de-bleed requireModuleInDesktop('clinical')...` commit):
-  // clinicalRoutes' gate used to be `app.use('*', ...)` at the bare `/api`
-  // mount, which Hono flattens to `/api/*` and which bled FORWARD onto every
-  // route group mounted after it in app.ts — including these four, which are
-  // NOT in MODULE_MAP and must stay reachable (e.g. for the standard tier,
-  // which has no clinical/lab-orders/etc access at all). This is the
-  // discriminating guard: it fails loudly if that bleed ever comes back.
+  // CLI-433 — expenses/stock/payroll/notifications were PREVIOUSLY entirely
+  // ungated (starter tarif got full access) — this loop used to assert they
+  // stayed reachable (documenting the bug). CLI-433 gates all four as
+  // enterprise-only revenue modules; this loop now asserts the fix: no
+  // license -> 403 LICENSE_NOT_FOUND, same as every other gated module group.
   for (const path of ['/api/expenses', '/api/stock', '/api/payroll', '/api/notifications']) {
-    test(`GET ${path} (non-gated route, Local Desktop mode, no license) → NOT LICENSE_NOT_FOUND (clinical bleed regression guard)`, async () => {
+    test(`GET ${path} (Local Desktop, no license) → 403 LICENSE_NOT_FOUND (CLI-433 revenue-module gate)`, async () => {
       const app = createApp();
       const res = await app.request(path);
-      expect(res.status).toBe(401);
+      expect(res.status).toBe(403);
       const body = (await res.json()) as { success: boolean; error: { code: string } };
-      expect(body.error.code).not.toBe('LICENSE_NOT_FOUND');
-      expect(body.error.code).toBe('auth.missing_token');
+      expect(body.error.code).toBe('LICENSE_NOT_FOUND');
     });
   }
+
+  // Regression guard for the underlying Hono nested-mount bleed (see file
+  // header + the `fix(api): de-bleed requireModuleInDesktop('clinical')...`
+  // commit): expenses is mounted at the bare `/api` prefix (like clinical),
+  // so its gate must NOT leak onto ungated sibling routes mounted before it
+  // (e.g. /api/branches, which has no MODULE_MAP entry and must stay
+  // reachable at every tier).
+  test('GET /api/branches (non-gated route, Local Desktop mode, no license) → NOT LICENSE_NOT_FOUND (bare-/api bleed regression guard)', async () => {
+    const app = createApp();
+    const res = await app.request('/api/branches');
+    expect(res.status).toBe(401);
+    const body = (await res.json()) as { success: boolean; error: { code: string } };
+    expect(body.error.code).not.toBe('LICENSE_NOT_FOUND');
+    expect(body.error.code).toBe('auth.missing_token');
+  });
 });
