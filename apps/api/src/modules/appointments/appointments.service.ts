@@ -33,6 +33,21 @@ export type SchedulePredicates = {
 };
 
 /**
+ * Postgres exclusion_violation (SQLSTATE 23P01) — CLI-408 EXCLUDE gist constraint
+ * `appointments_no_doctor_overlap` buzilganda otiladi. `postgres-js` xatosida
+ * `code` maydoni SQLSTATE'ni beradi. Race edge-case'da (pre-check o'tib, DB
+ * darajasida to'qnashuv) 500 emas, 409 `conflict.doctor_busy` qaytarish uchun.
+ */
+function isExclusionViolation(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'code' in err &&
+    (err as { code?: string }).code === '23P01'
+  );
+}
+
+/**
  * Recalls modulidan inject qilinadigan narrow dep (B4/B5, RFC-0011 §5).
  * Bog'liqlik yo'nalishi: appointments → recalls (factory injection).
  */
@@ -151,21 +166,28 @@ export const createAppointmentsService = (deps: {
     const scheduleCheck = await checkSchedule(c, input.doctorId, input.branchId, start, end);
     if (scheduleCheck) return { ok: false as const, code: scheduleCheck };
 
-    const [appt] = await db
-      .insert(appointments)
-      .values({
-        tenantId,
-        branchId: input.branchId,
-        patientId: input.patientId,
-        doctorId: input.doctorId,
-        assistantId: input.assistantId ?? null,
-        startTime: start,
-        endTime: end,
-        serviceIds: input.serviceIds,
-        notes: input.notes ?? null,
-        createdBy: user?.id ?? null,
-      })
-      .returning();
+    let appt: typeof appointments.$inferSelect | undefined;
+    try {
+      [appt] = await db
+        .insert(appointments)
+        .values({
+          tenantId,
+          branchId: input.branchId,
+          patientId: input.patientId,
+          doctorId: input.doctorId,
+          assistantId: input.assistantId ?? null,
+          startTime: start,
+          endTime: end,
+          serviceIds: input.serviceIds,
+          notes: input.notes ?? null,
+          createdBy: user?.id ?? null,
+        })
+        .returning();
+    } catch (err) {
+      // CLI-408: pre-check o'tdi-yu constraint otdi (concurrent race) → 409.
+      if (isExclusionViolation(err)) return { ok: false as const, code: 'conflict.doctor_busy' };
+      throw err;
+    }
 
     if (!appt) return { ok: false as const, code: 'insert.failed' };
 
@@ -215,11 +237,18 @@ export const createAppointmentsService = (deps: {
     if (input.notes !== undefined) patch.notes = input.notes;
     if (input.cancellationReason !== undefined) patch.cancellationReason = input.cancellationReason;
 
-    const [updated] = await db
-      .update(appointments)
-      .set(patch)
-      .where(eq(appointments.id, id))
-      .returning();
+    let updated: typeof appointments.$inferSelect | undefined;
+    try {
+      [updated] = await db
+        .update(appointments)
+        .set(patch)
+        .where(eq(appointments.id, id))
+        .returning();
+    } catch (err) {
+      // CLI-408: reschedule/reactivation band slotga ustma-ust tushdi → 409.
+      if (isExclusionViolation(err)) return { ok: false as const, code: 'conflict.doctor_busy' };
+      throw err;
+    }
 
     if (updated) {
       await deps.audit.record(c, {
