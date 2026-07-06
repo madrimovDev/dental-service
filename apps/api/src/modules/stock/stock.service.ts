@@ -311,6 +311,13 @@ export const createStockService = (deps: {
    * Vizit yozuvi → ombor avtomatik chiqim (BOM bo'yicha).
    * clinical.service'ga DI orqali ulanadi (request-tx ichida ishlaydi — to'g'ridan import yo'q).
    * BOM topilmagan service → skip. Manfiyga ruxsat (guard yo'q).
+   *
+   * CLI-414 (stock-side handoff): `serviceIds` bir vizitda TAKROR bo'lishi mumkin
+   * (masalan `[X, X]` — bitta xizmat ikki marta bajarilgan). `inArray` BOM'larni faqat
+   * *distinct* serviceId bo'yicha oladi — bu o'zi to'g'ri (BOM jadvalda serviceId'ga bir
+   * marta yozilgan), lekin deduction takrorlanish (occurrence) SONIGA qarab bo'lishi kerak,
+   * bitta emas. Count-map orqali har BOM occurrence-count marta ayiriladi (har occurrence —
+   * alohida movement qatori, ledger granularityси saqlanadi).
    */
   async function deductForServices(c: Context, serviceIds: string[], sourceVisitNoteId: string) {
     if (serviceIds.length === 0) return;
@@ -318,41 +325,50 @@ export const createStockService = (deps: {
     const tenantId = c.get('activeTenantId');
     if (!tenantId) throw new Error('No tenant context');
 
+    // Har serviceId necha marta takrorlanganini sanash (masalan [X,X] -> X:2).
+    const occurrenceCount = new Map<string, number>();
+    for (const serviceId of serviceIds) {
+      occurrenceCount.set(serviceId, (occurrenceCount.get(serviceId) ?? 0) + 1);
+    }
+
     const boms = await db
       .select()
       .from(serviceMaterials)
       .where(inArray(serviceMaterials.serviceId, serviceIds));
 
     for (const bom of boms) {
-      await db.insert(stockMovements).values({
-        tenantId,
-        itemId: bom.itemId,
-        type: 'out',
-        quantity: bom.qtyPerService,
-        reason: 'visit_auto',
-        sourceVisitNoteId,
-        createdBy: c.get('user')?.id ?? null,
-      });
-      // ⚠️ Auto-deduction'da negative-stock guard YO'Q (advisor): vizit yozuvini ombor
-      // noto'g'ri sozlangani uchun bloklamaslik kerak. Manfiyga ruxsat + alert. newQty
-      // olish uchun .returning() (transition alert solishtiruvi uchun).
-      const [updated] = await db
-        .update(stockItems)
-        .set({
-          quantity: sql`${stockItems.quantity} - ${bom.qtyPerService}`,
-          updatedAt: new Date(),
-        })
-        .where(eq(stockItems.id, bom.itemId))
-        .returning({
-          id: stockItems.id,
-          name: stockItems.name,
-          branchId: stockItems.branchId,
-          quantity: stockItems.quantity,
-          minThreshold: stockItems.minThreshold,
+      const count = occurrenceCount.get(bom.serviceId) ?? 1;
+      for (let i = 0; i < count; i++) {
+        await db.insert(stockMovements).values({
+          tenantId,
+          itemId: bom.itemId,
+          type: 'out',
+          quantity: bom.qtyPerService,
+          reason: 'visit_auto',
+          sourceVisitNoteId,
+          createdBy: c.get('user')?.id ?? null,
         });
-      if (updated) {
-        const newQty = Number(updated.quantity);
-        await maybeAlertLowStock(c, db, updated, newQty + Number(bom.qtyPerService), newQty);
+        // ⚠️ Auto-deduction'da negative-stock guard YO'Q (advisor): vizit yozuvini ombor
+        // noto'g'ri sozlangani uchun bloklamaslik kerak. Manfiyga ruxsat + alert. newQty
+        // olish uchun .returning() (transition alert solishtiruvi uchun).
+        const [updated] = await db
+          .update(stockItems)
+          .set({
+            quantity: sql`${stockItems.quantity} - ${bom.qtyPerService}`,
+            updatedAt: new Date(),
+          })
+          .where(eq(stockItems.id, bom.itemId))
+          .returning({
+            id: stockItems.id,
+            name: stockItems.name,
+            branchId: stockItems.branchId,
+            quantity: stockItems.quantity,
+            minThreshold: stockItems.minThreshold,
+          });
+        if (updated) {
+          const newQty = Number(updated.quantity);
+          await maybeAlertLowStock(c, db, updated, newQty + Number(bom.qtyPerService), newQty);
+        }
       }
     }
   }
