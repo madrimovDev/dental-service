@@ -13,11 +13,28 @@ export type StageCompleteHook = {
   completeStageForVisit: (c: Context, stageId: string) => Promise<unknown>;
 };
 
+/**
+ * CLI-414 — stock modulidan inject qilinadigan narrow dep (deductStock bilan bir xil
+ * bog'liqlik yo'nalishi: visit-notes → stock, to'g'ridan import emas). Update'da
+ * `performedServices` multiset diff'ini hisoblab BOM ayirish/qaytarishni bajaradi
+ * (`stock.service.ts`dagi `reconcileForServices` — STOCK agent implementatsiyasi;
+ * bu yerda faqat chaqiruv nuqtasi/wiring). `before`/`after` — occurrence-aware
+ * (duplikat serviceId) multiset; `undefined` maydon chaqirilishdan oldin filtrlanadi
+ * (`update()` faqat `performedServices !== undefined` bo'lganda chaqiradi).
+ */
+export type ReconcileStockHook = (
+  c: Context,
+  before: string[],
+  after: string[],
+  visitNoteId: string,
+) => Promise<void>;
+
 export const createVisitNotesService = (deps: {
   audit: AuditLogger;
   deductStock?: (c: Context, serviceIds: string[], visitNoteId: string) => Promise<void>;
   completeStage?: StageCompleteHook;
   ownership?: OwnershipValidator;
+  reconcileStock?: ReconcileStockHook;
 }) => {
   const repo = createVisitNotesRepository();
   const ownership = deps.ownership ?? createOwnershipValidator();
@@ -126,6 +143,13 @@ export const createVisitNotesService = (deps: {
 
     const updated = await repo.update(c, id, patch);
     if (updated) {
+      // CLI-414: `performedServices` YUBORILGAN bo'lsa (undefined EMAS) — stock reconcile
+      // (multiset diff: delta>0 ayirish, delta<0 qaytarish). `undefined` (maydon yo'q) →
+      // stockga tegilmaydi; `[]` (bo'shatish) → hammasi qaytariladi. Idempotent PATCH
+      // (bir xil qiymat) → nol movement (STOCK implementatsiyasi ichida).
+      if (input.performedServices !== undefined) {
+        await deps.reconcileStock?.(c, before.performedServices ?? [], input.performedServices, id);
+      }
       await deps.audit.record(c, {
         action: 'updated',
         resourceType: 'visit_note',

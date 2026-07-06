@@ -1,10 +1,11 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
+import type { Context } from 'hono';
 import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
 import type { NotificationsService } from '../notifications/notifications.service.ts';
-import { createStockService } from '../stock/stock.service.ts';
+import { createStockService, type StockService } from '../stock/stock.service.ts';
 import { diagnosesRoutes } from './diagnoses/index.ts';
 import { toothChartsRoutes } from './tooth-charts/index.ts';
 import { treatmentPlansRoutes } from './treatment-plans/index.ts';
@@ -82,6 +83,25 @@ export const clinicalRoutes = (deps: {
     recall: deps.recall,
   });
 
+  // CLI-414: visit-note UPDATE'da `performedServices` reconciliation — stock modul
+  // `reconcileForServices(c, before[], after[], visitNoteId)` orqali (multiset diff:
+  // delta>0 ayirish/delta<0 qaytarish, occurrence-aware). Bu funksiya STOCK agent
+  // tomonidan `stock.service.ts`ga qo'shiladi (bu worktree'da hali yo'q — spec
+  // `docs/audit-fixes/CLI-414-visit-note-stock-reconciliation.md` §4 signature bilan
+  // hujjatlashtirilgan). Runtime'da undefined bo'lsa `reconcileStock?.()` xavfsiz
+  // no-op (update reconcile'siz ishlaydi); STOCK agent qo'shgach avtomatik ishga tushadi
+  // (qayta wiring shart emas). Cast — spec'dagi signature bilan mos deb hujjatlashtirilgan.
+  const reconcileStock = (
+    stockService as StockService & {
+      reconcileForServices?: (
+        c: Context,
+        before: string[],
+        after: string[],
+        visitNoteId: string,
+      ) => Promise<void>;
+    }
+  ).reconcileForServices;
+
   app.route('/', diagnosesRoutes({ db: deps.db }));
   // B4: bosqich completed → treatment_followup recall (factory injection).
   app.route('/', treatmentPlansRoutes({ audit: deps.audit, recall: deps.recall }));
@@ -91,6 +111,7 @@ export const clinicalRoutes = (deps: {
       audit: deps.audit,
       deductStock: stockService.deductForServices,
       completeStage: { completeStageForVisit: treatmentPlansService.completeStageForVisit },
+      reconcileStock,
     }),
   );
   app.route('/', visitNoteTemplatesRoutes({ audit: deps.audit }));

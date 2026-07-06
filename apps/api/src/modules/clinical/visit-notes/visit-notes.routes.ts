@@ -13,7 +13,11 @@ import {
   updateVisitNoteSchema,
   visitNoteDtoSchema,
 } from './visit-notes.schema.ts';
-import { createVisitNotesService, type StageCompleteHook } from './visit-notes.service.ts';
+import {
+  createVisitNotesService,
+  type ReconcileStockHook,
+  type StageCompleteHook,
+} from './visit-notes.service.ts';
 
 /** Standart 404 response — get / patch endpoint'lar uchun. */
 const notFoundResponse = {
@@ -27,6 +31,7 @@ export const visitNotesRoutes = (deps: {
   audit: AuditLogger;
   deductStock?: (c: Context, serviceIds: string[], visitNoteId: string) => Promise<void>;
   completeStage?: StageCompleteHook;
+  reconcileStock?: ReconcileStockHook;
 }) => {
   const app = new OpenAPIHono();
   const service = createVisitNotesService(deps);
