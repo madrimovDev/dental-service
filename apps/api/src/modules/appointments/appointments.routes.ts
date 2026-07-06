@@ -4,7 +4,6 @@ import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { requireModuleInDesktop } from '../../lib/license-middleware.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
-import { reminderJobId, reminderQueue } from '../../lib/queue.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
@@ -18,11 +17,7 @@ import {
   listAppointmentsQuery,
   updateAppointmentSchema,
 } from './appointments.schema.ts';
-import {
-  createAppointmentsService,
-  type RecallAppointmentHook,
-  type SchedulePredicates,
-} from './appointments.service.ts';
+import type { AppointmentsService } from './appointments.service.ts';
 import { AppointmentTransitionError } from './appointments.transitions.ts';
 
 /** Standart 404 response — get / patch / cancel endpoint'lar uchun. */
@@ -48,60 +43,19 @@ const conflictResponse = {
 export const appointmentRoutes = (deps: {
   db: Database;
   audit: AuditLogger;
-  schedule?: SchedulePredicates;
-  recall?: RecallAppointmentHook;
+  /**
+   * CLI-425: bir marta app.ts'da qurilgan (reminder-queue wiring bilan) —
+   * queue.routes.ts ham shu xil instansiyani ulaydi (shared completion path,
+   * preventive-recall hook har ikki yo'ldan ham bir xil ishlaydi).
+   */
+  service: AppointmentsService;
 }) => {
   const app = new OpenAPIHono();
   app.use('*', requireModuleInDesktop('appointments'));
   app.use('*', authMiddleware());
   app.use('*', rlsMiddleware(deps.db));
 
-  const service = createAppointmentsService({
-    audit: deps.audit,
-    schedule: deps.schedule,
-    recall: deps.recall,
-    // A9 (CLI-438): reminder job hayot-sikli. Ilgari `remove()` keyin `add()`
-    // ketma-ket chaqirilardi — BullMQ bir xil `jobId` bilan `add()`ni MAVJUD
-    // (hali olib tashlanmagan) job'ni qaytarib, delay'ni YANGILAMAYDI (dedupe).
-    // Agar `remove()` job ACTIVE bo'lgani uchun jim muvaffaqiyatsiz bo'lsa
-    // (worker aynan shu daqiqada fire qilayotgan bo'lsa), keyingi `add()` eski
-    // vaqt bilan qolib ketardi → reminder yangi (rescheduled) vaqtda ketmasdi.
-    // Endi: mavjud job'ni AVVAL topib, `changeDelay()` bilan YANGILAYMIZ (job
-    // yo'q qilinmaydi, shuning uchun dedupe race'i yo'q); topilmasa (allaqachon
-    // fire bo'lgan/yo'q) — oddiy `add()`. `removeOnComplete`/`removeOnFail` —
-    // Redis'da tugagan job'lar to'planmasin (CLI-403 bilan bog'liq o'sish).
-    enqueueReminder: async (tenantId, appointmentId, delayMs) => {
-      const jobId = reminderJobId(appointmentId);
-      const existing = await reminderQueue.getJob(jobId);
-      if (existing) {
-        try {
-          await existing.changeDelay(delayMs);
-          return;
-        } catch {
-          // Job ACTIVE/completed bo'lib o'zgartirib bo'lmadi — pastda qayta
-          // qo'shishga urinamiz (eski job hali tursa `add` uni qaytaradi, lekin
-          // bu — worker aynan shu lahzada ishlab turgan chekka holat, kuzatuvga
-          // loyiq bo'lsa-da xavfsiz: fire bo'lgan job endi qayta ishlanmaydi).
-        }
-      }
-      await reminderQueue.add(
-        'appointment-reminder',
-        { tenantId, appointmentId },
-        { delay: delayMs, jobId, removeOnComplete: true, removeOnFail: 100 },
-      );
-    },
-    removeReminder: async (appointmentId) => {
-      const jobId = reminderJobId(appointmentId);
-      const existing = await reminderQueue.getJob(jobId);
-      if (!existing) return;
-      try {
-        await existing.remove();
-      } catch {
-        // Active/locked (fire jarayonida) — worker `shouldSkipReminder` bilan
-        // fire-vaqtida status'ni tekshiradi (cancelled/no_show), xavfsiz no-op.
-      }
-    },
-  });
+  const service = deps.service;
 
   // ─── GET / — list ─────────────────────────────────────────────────────────
 

@@ -9,10 +9,11 @@ import { createAuditLogger } from './lib/audit-logger.ts';
 import { env } from './lib/env.ts';
 import { requireModuleInDesktop } from './lib/license-middleware.ts';
 import { METRICS_CONTENT_TYPE, renderMetrics } from './lib/metrics.ts';
+import { reminderJobId, reminderQueue } from './lib/queue.ts';
 import { createLocalStorageAdapter } from './lib/storage.ts';
 import { errorHandler } from './middleware/error-handler.ts';
 import { requestId } from './middleware/request-id.ts';
-import { appointmentRoutes } from './modules/appointments/index.ts';
+import { appointmentRoutes, createAppointmentsService } from './modules/appointments/index.ts';
 import { auditRoutes } from './modules/audit/index.ts';
 import { authRoutes } from './modules/auth/index.ts';
 import { branchRoutes } from './modules/branches/index.ts';
@@ -139,9 +140,60 @@ export const createApp = () => {
   // preventive + B5 rebook) va clinical/treatment-plans (B4 stage-followup) ga
   // inject qilamiz (RFC-0009 §4 sof factory DI; to'g'ridan import emas).
   const recall = createRecallsService({ audit });
-  app.route('/api/appointments', appointmentRoutes({ db, audit, schedule, recall }));
+  // CLI-425: appointmentsService bir marta quriladi (reminder-queue wiring
+  // bilan) va appointmentRoutes + queueRoutes ikkalasiga uzatiladi — shared
+  // completion path, queue "done"→completed ham preventive-recall hook'ini
+  // (B4) fire qiladi (ilgari faqat kalendar PATCH orqali yopilgan appointment
+  // recall olardi).
+  const appointmentsService = createAppointmentsService({
+    audit,
+    schedule,
+    recall,
+    // A9 (CLI-438): reminder job hayot-sikli. Ilgari `remove()` keyin `add()`
+    // ketma-ket chaqirilardi — BullMQ bir xil `jobId` bilan `add()`ni MAVJUD
+    // (hali olib tashlanmagan) job'ni qaytarib, delay'ni YANGILAMAYDI (dedupe).
+    // Agar `remove()` job ACTIVE bo'lgani uchun jim muvaffaqiyatsiz bo'lsa
+    // (worker aynan shu daqiqada fire qilayotgan bo'lsa), keyingi `add()` eski
+    // vaqt bilan qolib ketardi → reminder yangi (rescheduled) vaqtda ketmasdi.
+    // Endi: mavjud job'ni AVVAL topib, `changeDelay()` bilan YANGILAYMIZ (job
+    // yo'q qilinmaydi, shuning uchun dedupe race'i yo'q); topilmasa (allaqachon
+    // fire bo'lgan/yo'q) — oddiy `add()`. `removeOnComplete`/`removeOnFail` —
+    // Redis'da tugagan job'lar to'planmasin (CLI-403 bilan bog'liq o'sish).
+    enqueueReminder: async (tenantId, appointmentId, delayMs) => {
+      const jobId = reminderJobId(appointmentId);
+      const existing = await reminderQueue.getJob(jobId);
+      if (existing) {
+        try {
+          await existing.changeDelay(delayMs);
+          return;
+        } catch {
+          // Job ACTIVE/completed bo'lib o'zgartirib bo'lmadi — pastda qayta
+          // qo'shishga urinamiz (eski job hali tursa `add` uni qaytaradi, lekin
+          // bu — worker aynan shu lahzada ishlab turgan chekka holat, kuzatuvga
+          // loyiq bo'lsa-da xavfsiz: fire bo'lgan job endi qayta ishlanmaydi).
+        }
+      }
+      await reminderQueue.add(
+        'appointment-reminder',
+        { tenantId, appointmentId },
+        { delay: delayMs, jobId, removeOnComplete: true, removeOnFail: 100 },
+      );
+    },
+    removeReminder: async (appointmentId) => {
+      const jobId = reminderJobId(appointmentId);
+      const existing = await reminderQueue.getJob(jobId);
+      if (!existing) return;
+      try {
+        await existing.remove();
+      } catch {
+        // Active/locked (fire jarayonida) — worker `shouldSkipReminder` bilan
+        // fire-vaqtida status'ni tekshiradi (cancelled/no_show), xavfsiz no-op.
+      }
+    },
+  });
+  app.route('/api/appointments', appointmentRoutes({ db, audit, service: appointmentsService }));
   app.route('/api/schedule', scheduleRoutes({ db, audit }));
-  app.route('/api/queue', queueRoutes({ db, audit }));
+  app.route('/api/queue', queueRoutes({ db, audit, appointmentsService }));
   app.route('/api/recalls', recallRoutes({ db, audit }));
   // M5 clinical extras
   app.route('/api/prescriptions', prescriptionsRoutes({ db, audit }));

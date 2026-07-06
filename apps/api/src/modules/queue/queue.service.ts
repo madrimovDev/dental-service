@@ -199,6 +199,22 @@ export const createQueueService = (deps: {
           // completed) AppointmentTransitionError otadi — bu queue ticket'ni buzmasin:
           // yutamiz (appointment o'z terminal/cancelled holatida qoladi, ticket done).
           try {
+            if (apptStatus === 'completed') {
+              // Navbatда 'waiting'→'done' TO'G'RIDAN-TO'G'RI ruxsat (A6 — tez
+              // checkout), lekin appointment darajasida 'scheduled'→'completed'
+              // bevosita TAQIQLANGAN (CLI-409 matritsasi faqat in_progress→
+              // completed'ga ruxsat beradi). Avval 'in_progress'ga o'tkazamiz —
+              // allaqachon shu yoki keyingi holatda bo'lsa (idempotent 2-chaqiruv)
+              // bu qadam AppointmentTransitionError beradi, xavfsiz e'tiborsiz
+              // qoldiriladi.
+              try {
+                await deps.appointments.update(c, before.appointmentId, {
+                  status: 'in_progress',
+                });
+              } catch (e) {
+                if (!(e instanceof AppointmentTransitionError)) throw e;
+              }
+            }
             await deps.appointments.update(c, before.appointmentId, { status: apptStatus });
           } catch (e) {
             if (!(e instanceof AppointmentTransitionError)) throw e;
