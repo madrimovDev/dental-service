@@ -5,6 +5,7 @@ import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { requireModuleInDesktop } from '../../lib/license-middleware.ts';
 import { errorResponseSchema, okJson } from '../../lib/openapi.ts';
+import { CrossEntityError } from '../../lib/ownership.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
@@ -131,20 +132,28 @@ export const patientImagesRoutes = (deps: { db: Database; audit: AuditLogger }) 
 
       const body = await file.arrayBuffer();
 
-      const row = await service.upload(c, {
-        patientId,
-        type: typeParsed.data,
-        title,
-        description,
-        toothNumbers,
-        takenDate,
-        visitNoteId,
-        originalFilename: file.name,
-        contentType: file.type,
-        ext: extFromContentType(file.type),
-        body,
-      });
-      return c.json(ok(toPatientImageDto(row)), 201);
+      try {
+        const row = await service.upload(c, {
+          patientId,
+          type: typeParsed.data,
+          title,
+          description,
+          toothNumbers,
+          takenDate,
+          visitNoteId,
+          originalFilename: file.name,
+          contentType: file.type,
+          ext: extFromContentType(file.type),
+          body,
+        });
+        return c.json(ok(toPatientImageDto(row)), 201);
+      } catch (e) {
+        // CLI-421: cross-entity ownership mismatch (patientId/visitNoteId) → 400.
+        if (e instanceof CrossEntityError) {
+          throw new HTTPException(400, { message: `ownership.${e.reason}: ${e.message}` });
+        }
+        throw e;
+      }
     },
   );
 

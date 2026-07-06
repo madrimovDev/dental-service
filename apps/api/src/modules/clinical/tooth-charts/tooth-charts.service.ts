@@ -1,10 +1,15 @@
 import type { Context } from 'hono';
 import type { AuditLogger } from '../../../lib/audit-logger.ts';
+import { createOwnershipValidator, type OwnershipValidator } from '../../../lib/ownership.ts';
 import { createToothChartsRepository } from './tooth-charts.repository.ts';
 import type { CreateToothChartInput } from './tooth-charts.schema.ts';
 
-export const createToothChartsService = (deps: { audit: AuditLogger }) => {
+export const createToothChartsService = (deps: {
+  audit: AuditLogger;
+  ownership?: OwnershipValidator;
+}) => {
   const repo = createToothChartsRepository();
+  const ownership = deps.ownership ?? createOwnershipValidator();
 
   const list = async (c: Context, patientId: string) => {
     const rows = await repo.list(c, patientId);
@@ -33,6 +38,11 @@ export const createToothChartsService = (deps: { audit: AuditLogger }) => {
     const tenantId = c.get('activeTenantId');
     const user = c.get('user');
     if (!tenantId) throw new Error('No tenant context');
+
+    // CLI-421: cross-entity ownership — patientId/visitNoteId shu bemorga tegishlimi.
+    await ownership.assertPatientExists(c, input.patientId);
+    if (input.visitNoteId)
+      await ownership.assertVisitNoteBelongsToPatient(c, input.visitNoteId, input.patientId);
 
     const chart = await repo.insertChartWithStates(
       c,

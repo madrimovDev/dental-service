@@ -3,6 +3,7 @@ import { and, desc, eq } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { createOwnershipValidator, type OwnershipValidator } from '../../lib/ownership.ts';
 import { deleteObject, patientImageKey, presignedGetUrl, uploadObject } from '../../lib/s3.ts';
 import type { UpdateImageMetadataInput } from './patient-images.schema.ts';
 
@@ -28,7 +29,12 @@ export type UploadInput = {
   body: ArrayBuffer;
 };
 
-export const createPatientImagesService = (deps: { audit: AuditLogger }) => {
+export const createPatientImagesService = (deps: {
+  audit: AuditLogger;
+  ownership?: OwnershipValidator;
+}) => {
+  const ownership = deps.ownership ?? createOwnershipValidator();
+
   async function list(c: Context, patientId: string, visitNoteId?: string) {
     const db = getDb(c);
     const rows = await db
@@ -76,6 +82,13 @@ export const createPatientImagesService = (deps: { audit: AuditLogger }) => {
     const tenantId = c.get('activeTenantId');
     const user = c.get('user');
     if (!tenantId) throw new Error('No tenant context');
+
+    // CLI-421: cross-entity ownership — storage write'dan OLDIN (shakl-validatsiya → ownership
+    // → storage → insert). patientId/visitNoteId shu bemorga tegishlimi; cross-tenant/mixed
+    // UUID → CrossEntityError → routes 400, hech qanday object yozilmaydi.
+    await ownership.assertPatientExists(c, input.patientId);
+    if (input.visitNoteId)
+      await ownership.assertVisitNoteBelongsToPatient(c, input.visitNoteId, input.patientId);
 
     // 1) Pre-generate ID + key
     const imageId = crypto.randomUUID();
