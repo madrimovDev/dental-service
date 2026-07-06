@@ -205,19 +205,17 @@ export const createApp = () => {
   // HECH QANDAY litsenziya-gate'ga ega emas edi (starter tarif bilan ham
   // to'liq ochiq). Gate parent-darajada (`app.use(...)`, sub-app ichida emas —
   // bu 4 modulning route fayllari file-ownership doirasidan tashqarida)
-  // qo'shiladi, har `app.route(...)`dan DARHOL OLDIN. `expenses` bare `/api`
-  // prefiksiga mount qilinib ikkita top-level yo'lga (expense-categories,
-  // expenses) fan-out qiladi — Hono `/*` wildcard bare prefiksni (masalan
-  // `GET /api/expenses`, sub-path'siz) QAMRAMAYDI, shuning uchun har biri
-  // uchun aniq prefiks + `/*` ikkalasi ham ro'yxatdan o'tkaziladi. Mount-tartib
-  // o'zgarmadi (clinical/patient-images'dan OLDIN — CLI-358 quirk'iga
-  // tegmaydi). `DENTAL_LOCAL_DESKTOP!=='true'` bo'lsa (cloud/dev/CI)
-  // `requireModuleInDesktop` no-op — mavjud test suite/cloud deploy buzilmaydi.
-  app.use('/api/expense-categories', requireModuleInDesktop('expenses'));
-  app.use('/api/expense-categories/*', requireModuleInDesktop('expenses'));
-  app.use('/api/expenses', requireModuleInDesktop('expenses'));
-  app.use('/api/expenses/*', requireModuleInDesktop('expenses'));
-  app.route('/api', expensesRoutes({ db, audit }));
+  // qo'shiladi, har `app.route(...)`dan DARHOL OLDIN.
+  //
+  // Mount-tartib (fix-forward, CLI-358 bare-`/api` quirk'i takrorlanди):
+  // `expenses` bare `/api` prefiksiga mount qilinadi (pastga qarang). Bare-`/api`
+  // mount'dan KEYIN ro'yxatdan o'tkazilgan har qanday path-scoped
+  // `app.use(pattern, ...)` gate matching'ini yo'qotadi (quyidagi CLI-358
+  // izohidagi bilan bir xil Hono quirk — runtime probe bilan tasdiqlangan:
+  // expenses'ni stock/payroll/notifications'dан OLDIN qo'ysa ularning gate'i
+  // 401ga tushib qolardi, chunki gate umuman ishlamay next()ga o'tib ketardi).
+  // Shuning uchun stock/payroll/notifications (path-scoped gate) AVVAL, expenses
+  // (bare-`/api`) esa clinical/patient-images bilan bir qatorda — ENG OXIRIDA.
   app.use('/api/stock', requireModuleInDesktop('stock'));
   app.use('/api/stock/*', requireModuleInDesktop('stock'));
   app.route('/api/stock', stockRoutes({ db, audit, notifications }));
@@ -227,6 +225,20 @@ export const createApp = () => {
   app.use('/api/notifications', requireModuleInDesktop('notifications'));
   app.use('/api/notifications/*', requireModuleInDesktop('notifications'));
   app.route('/api/notifications', notificationsRoutes({ db, sms }));
+  // `DENTAL_LOCAL_DESKTOP!=='true'` bo'lsa (cloud/dev/CI) `requireModuleInDesktop`
+  // no-op — mavjud test suite/cloud deploy buzilmaydi. `expenses` bare `/api`
+  // prefiksiga mount qilinib ikkita top-level yo'lga (expense-categories,
+  // expenses) fan-out qiladi — Hono `/*` wildcard bare prefiksni (masalan
+  // `GET /api/expenses`, sub-path'siz) QAMRAMAYDI, shuning uchun har biri
+  // uchun aniq prefiks + `/*` ikkalasi ham ro'yxatdan o'tkaziladi. Yuqoridagi
+  // izohga ko'ra — bare-`/api` mount'i bo'lgani uchun ENG OXIRIDA (clinical/
+  // patient-images bilan bir qatorda) turadi, hech qanday path-scoped gate'ни
+  // buzmasin deb.
+  app.use('/api/expense-categories', requireModuleInDesktop('expenses'));
+  app.use('/api/expense-categories/*', requireModuleInDesktop('expenses'));
+  app.use('/api/expenses', requireModuleInDesktop('expenses'));
+  app.use('/api/expenses/*', requireModuleInDesktop('expenses'));
+  app.route('/api', expensesRoutes({ db, audit }));
   // CLI-358: clinical/patient-images are mounted at the BARE `/api` prefix
   // (they fan out to top-level paths like /api/diagnoses, /api/treatment-plans,
   // /api/patients/{id}/images — see each file's own comment) and clinical
