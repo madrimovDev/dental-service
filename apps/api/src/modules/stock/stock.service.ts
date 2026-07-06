@@ -1,5 +1,5 @@
 import { serviceMaterials, stockBatches, stockItems, stockMovements } from '@dental/db-schema';
-import { and, asc, desc, eq, inArray, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { DbOrTx } from '../../db/client.ts';
 import { getDb } from '../../db/scoped.ts';
@@ -73,7 +73,11 @@ export const createStockService = (deps: {
   async function listItems(c: Context, query: ListItemsQuery) {
     const db = getDb(c);
     const filters = [];
-    if (query.branchId) filters.push(eq(stockItems.branchId, query.branchId));
+    // CLI-441 #5: branchId bo'yicha filtrlaganda tenant-bo'ylab (branchId=null) itemlar
+    // ham ko'rsatilsin — `stockItems.branchId` nullable (barcha filialga tegishli item).
+    if (query.branchId) {
+      filters.push(or(eq(stockItems.branchId, query.branchId), isNull(stockItems.branchId)));
+    }
 
     const rows = await db
       .select()

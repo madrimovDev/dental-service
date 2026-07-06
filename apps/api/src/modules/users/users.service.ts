@@ -404,13 +404,39 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
    * Xodim profilini upsert qiladi (PUT — to'liq almashtirish).
    * `(tenant_id, user_id)` unique konfliktida UPDATE; aks holda INSERT.
    * Ixtiyoriy maydonlar berilmasa null/default'ga tushadi (merge emas).
-   * Eslatma: RLS faqat joriy tenant_id'ni tekshiradi — userId aynan shu tenantga
-   * a'zo ekanligi bu yerda tasdiqlanmaydi (tenant-membership tekshiruvi keyinga qoldirilgan).
+   *
+   * CLI-441 #4: RLS faqat joriy tenant_id'ni tekshiradi — `userId` aynan shu tenantga
+   * a'zo ekanligini tasdiqlamaydi. Insertdan oldin tenant-membership tekshiriladi:
+   * OWNER (assignmentsiz bo'lishi mumkin, CLAUDE.md §3.3 — kodda hardcoded check) YOKI
+   * aktiv (muddati o'tmagan) `user_assignments` qatori (`resetUserPassword` pattern bilan
+   * bir xil — owner carve-out shart, aks holda owner o'z profilini yarata olmaydi).
    */
   async function upsertProfile(c: Context, userId: string, input: UpsertProfileInput) {
     const db = getDb(c);
     const tenantId = c.get('activeTenantId');
     if (!tenantId) throw new Error('No tenant context');
+
+    const [tenant] = await db
+      .select({ ownerUserId: tenants.ownerUserId })
+      .from(tenants)
+      .where(eq(tenants.id, tenantId));
+    const isOwner = tenant?.ownerUserId === userId;
+
+    if (!isOwner) {
+      const now0 = new Date();
+      const [assignment] = await db
+        .select()
+        .from(userAssignments)
+        .where(
+          and(
+            eq(userAssignments.userId, userId),
+            eq(userAssignments.tenantId, tenantId),
+            eq(userAssignments.isActive, true),
+            sql`(${userAssignments.validTo} IS NULL OR ${userAssignments.validTo} > ${now0})`,
+          ),
+        );
+      if (!assignment) return { ok: false as const, code: 'user.not_member' as const };
+    }
 
     const before = await getProfile(c, userId);
     const now = new Date();
@@ -441,17 +467,17 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
       })
       .returning();
 
-    if (profile) {
-      await deps.audit.record(c, {
-        action: before ? 'updated' : 'created',
-        resourceType: 'staff_profile',
-        resourceId: profile.id,
-        before: before ?? undefined,
-        after: profile,
-      });
-    }
+    if (!profile) return { ok: false as const, code: 'profile.upsert_failed' as const };
 
-    return profile;
+    await deps.audit.record(c, {
+      action: before ? 'updated' : 'created',
+      resourceType: 'staff_profile',
+      resourceId: profile.id,
+      before: before ?? undefined,
+      after: profile,
+    });
+
+    return { ok: true as const, profile };
   }
 
   return {

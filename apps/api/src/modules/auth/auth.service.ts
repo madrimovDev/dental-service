@@ -347,7 +347,15 @@ export const createAuthService = (deps: AuthServiceDeps) => {
         .innerJoin(tenants, eq(tenants.id, userAssignments.tenantId))
         .leftJoin(branches, eq(branches.id, userAssignments.branchId))
         .innerJoin(roles, eq(roles.id, userAssignments.roleId))
-        .where(and(eq(userAssignments.userId, userId), eq(userAssignments.isActive, true)));
+        .where(
+          and(
+            eq(userAssignments.userId, userId),
+            eq(userAssignments.isActive, true),
+            // CLI-441 #3: switchWorkspace bilan izchil — muddati o'tgan (validTo < now)
+            // assignment ro'yxatda ko'rinmasin (aks holda ko'rinib, switch'da RAD bo'ladi).
+            or(isNull(userAssignments.validTo), gt(userAssignments.validTo, new Date())),
+          ),
+        );
 
       // Owner uchun assignment bo'lmasligi mumkin — owner sifatida tenant'larni ham qaytaramiz
       const ownerTenants = await tx
