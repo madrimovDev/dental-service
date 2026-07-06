@@ -83,7 +83,14 @@ const countPreventive = () =>
     return rows.length;
   });
 
-const day = '2026-07-06';
+// A2 (CLI-438): dinamik sana — appointments.service.ts `create()` endi
+// o'tmishga bron qilishni rad etadi (`time.in_past`); hardcoded '2026-07-06'
+// bugungi sana o'tib ketgach doim FAIL bo'lardi.
+const day = (() => {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + 3);
+  return d.toISOString().slice(0, 10);
+})();
 const bookAndCheckIn = async (startH: string) => {
   const created = await run(tenantId, (c) =>
     appts.create(c, {

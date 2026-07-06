@@ -96,7 +96,29 @@ const readStatus = (id: string) =>
     return r;
   });
 
-const day = '2026-07-06';
+/**
+ * A2 (CLI-438): booking kuni endi DINAMIK (hardcoded o'tmish-bo'lib-qolishga
+ * moyil sana emas) — appointments.service.ts `create()` endi o'tmishga bron
+ * qilishni rad etadi (`time.in_past`); hardcoded '2026-07-06' (yozilgan kunda
+ * "bugun" edi) bugungi sana o'tib ketgach doim FAIL bo'lardi. `daysFromDay`/
+ * `monthsFromDay` due-date munosabatlarini (+10 kun, +2 kun, +4 oy) saqlaydi.
+ */
+function ymd(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+const baseDate = new Date();
+baseDate.setUTCDate(baseDate.getUTCDate() + 3);
+const day = ymd(baseDate);
+function daysFromDay(n: number): string {
+  const d = new Date(`${day}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return ymd(d);
+}
+function monthsFromDay(n: number): string {
+  const d = new Date(`${day}T00:00:00Z`);
+  d.setUTCMonth(d.getUTCMonth() + n);
+  return ymd(d);
+}
 const book = (startH: string) =>
   run(tenantId, (c) =>
     appts.create(c, {
@@ -111,7 +133,7 @@ const book = (startH: string) =>
 
 describe('CLI-426 rebook relevance', () => {
   test('long-future preventive (due +4mo) stays pending on today booking', async () => {
-    const rId = await seedRecall('2026-11-06');
+    const rId = await seedRecall(monthsFromDay(4));
     await book('09');
     const r = await readStatus(rId);
     expect(r?.status).toBe('pending');
@@ -119,7 +141,7 @@ describe('CLI-426 rebook relevance', () => {
   });
 
   test('recall due in 10 days → scheduled + linked on booking', async () => {
-    const rId = await seedRecall('2026-07-16');
+    const rId = await seedRecall(daysFromDay(10));
     const created = await book('10');
     expect(created.ok).toBe(true);
     const r = await readStatus(rId);
@@ -130,7 +152,7 @@ describe('CLI-426 rebook relevance', () => {
 
 describe('CLI-426 reopen on cancel/no_show', () => {
   test('cancel reopens the recall to pending, clears link', async () => {
-    const rId = await seedRecall('2026-07-08');
+    const rId = await seedRecall(daysFromDay(2));
     const created = await book('11');
     expect(created.ok).toBe(true);
     if (!created.ok || !created.appointment) return;
@@ -143,7 +165,7 @@ describe('CLI-426 reopen on cancel/no_show', () => {
   });
 
   test('no_show reopens the recall to pending', async () => {
-    const rId = await seedRecall('2026-07-08');
+    const rId = await seedRecall(daysFromDay(2));
     const created = await book('12');
     if (!created.ok || !created.appointment) return;
     await run(tenantId, (c) => appts.update(c, created.appointment!.id, { status: 'no_show' }));

@@ -60,15 +60,46 @@ export const appointmentRoutes = (deps: {
     audit: deps.audit,
     schedule: deps.schedule,
     recall: deps.recall,
+    // A9 (CLI-438): reminder job hayot-sikli. Ilgari `remove()` keyin `add()`
+    // ketma-ket chaqirilardi — BullMQ bir xil `jobId` bilan `add()`ni MAVJUD
+    // (hali olib tashlanmagan) job'ni qaytarib, delay'ni YANGILAMAYDI (dedupe).
+    // Agar `remove()` job ACTIVE bo'lgani uchun jim muvaffaqiyatsiz bo'lsa
+    // (worker aynan shu daqiqada fire qilayotgan bo'lsa), keyingi `add()` eski
+    // vaqt bilan qolib ketardi → reminder yangi (rescheduled) vaqtda ketmasdi.
+    // Endi: mavjud job'ni AVVAL topib, `changeDelay()` bilan YANGILAYMIZ (job
+    // yo'q qilinmaydi, shuning uchun dedupe race'i yo'q); topilmasa (allaqachon
+    // fire bo'lgan/yo'q) — oddiy `add()`. `removeOnComplete`/`removeOnFail` —
+    // Redis'da tugagan job'lar to'planmasin (CLI-403 bilan bog'liq o'sish).
     enqueueReminder: async (tenantId, appointmentId, delayMs) => {
+      const jobId = reminderJobId(appointmentId);
+      const existing = await reminderQueue.getJob(jobId);
+      if (existing) {
+        try {
+          await existing.changeDelay(delayMs);
+          return;
+        } catch {
+          // Job ACTIVE/completed bo'lib o'zgartirib bo'lmadi — pastda qayta
+          // qo'shishga urinamiz (eski job hali tursa `add` uni qaytaradi, lekin
+          // bu — worker aynan shu lahzada ishlab turgan chekka holat, kuzatuvga
+          // loyiq bo'lsa-da xavfsiz: fire bo'lgan job endi qayta ishlanmaydi).
+        }
+      }
       await reminderQueue.add(
         'appointment-reminder',
         { tenantId, appointmentId },
-        { delay: delayMs, jobId: reminderJobId(appointmentId) },
+        { delay: delayMs, jobId, removeOnComplete: true, removeOnFail: 100 },
       );
     },
     removeReminder: async (appointmentId) => {
-      await reminderQueue.remove(reminderJobId(appointmentId));
+      const jobId = reminderJobId(appointmentId);
+      const existing = await reminderQueue.getJob(jobId);
+      if (!existing) return;
+      try {
+        await existing.remove();
+      } catch {
+        // Active/locked (fire jarayonida) — worker `shouldSkipReminder` bilan
+        // fire-vaqtida status'ni tekshiradi (cancelled/no_show), xavfsiz no-op.
+      }
     },
   });
 
