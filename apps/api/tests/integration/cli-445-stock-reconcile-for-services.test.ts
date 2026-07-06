@@ -28,6 +28,7 @@ import type { Context } from 'hono';
 import type { DbOrTx } from '../../src/db/client.ts';
 import { db } from '../../src/db/client.ts';
 import type { AuditLogger } from '../../src/lib/audit-logger.ts';
+import { createVisitNotesService } from '../../src/modules/clinical/visit-notes/visit-notes.service.ts';
 import { createStockService } from '../../src/modules/stock/stock.service.ts';
 
 const noopAudit = { record: async () => {} } as unknown as AuditLogger;
@@ -238,5 +239,90 @@ describe('CLI-445 reconcileForServices — multiset diff (BOM deduct/restock)', 
 
     const after = Number(await withTx(currentQty(itemXId)));
     expect(after - before).toBe(5);
+  });
+});
+
+describe('CLI-445 — end-to-end wiring (clinical.routes.ts pattern, NO spy)', () => {
+  // Bu blok `clinical.routes.ts` qanday DI qilishini AYNAN takrorlaydi:
+  // `createVisitNotesService({ ..., reconcileStock: stockService.reconcileForServices })`.
+  // Spy YO'Q — agar clinical.routes.ts'dagi unsafe cast qaytarilsa (yoki reconcileStock
+  // wiring'dan tushib qolsa), bu test QIZIL bo'lishi kerak (faqat `update()` PATCH orqali
+  // reconcile ishlayotganini isbotlaydi, `reconcileForServices`ni to'g'ridan chaqirish emas).
+  const vnService = createVisitNotesService({
+    audit: noopAudit,
+    deductStock: stock.deductForServices,
+    reconcileStock: stock.reconcileForServices,
+  });
+
+  let e2ePatientId: string;
+  let e2eItemId: string;
+  let e2eServiceId: string;
+
+  beforeAll(async () => {
+    await withTx(async (tx) => {
+      const [item] = await tx
+        .insert(stockItems)
+        .values({
+          tenantId: t1,
+          name: 'Material E2E',
+          unit: 'dona',
+          quantity: '100',
+          minThreshold: '5',
+        })
+        .returning({ id: stockItems.id });
+      if (!item) throw new Error('e2e item insert failed');
+      e2eItemId = item.id;
+
+      const [svc] = await tx
+        .insert(services)
+        .values({ tenantId: t1, code: 'S-445-E2E', nameUz: 'E2E xizmat' })
+        .returning({ id: services.id });
+      if (!svc) throw new Error('e2e service insert failed');
+      e2eServiceId = svc.id;
+      await tx
+        .insert(serviceMaterials)
+        .values({ tenantId: t1, serviceId: e2eServiceId, itemId: e2eItemId, qtyPerService: '3' });
+
+      const [p] = await tx
+        .insert(patients)
+        .values({ tenantId: t1, fullName: 'Bemor445 E2E' })
+        .returning({ id: patients.id });
+      if (!p) throw new Error('e2e patient insert failed');
+      e2ePatientId = p.id;
+    });
+  });
+
+  test('create([X]) BOM ayiradi, keyin PATCH performedServices:[] → restock (real update() orqali)', async () => {
+    const noteId = await withTx(async (tx) => {
+      const note = await vnService.create(ctx(tx), {
+        patientId: e2ePatientId,
+        doctorId: ownerId,
+        assessmentDiagnoses: [],
+        performedServices: [e2eServiceId],
+      });
+      if (!note) throw new Error('create failed');
+      return note.id;
+    });
+
+    // create() → deductStock → BOM 1x ayirildi (100 - 3 = 97).
+    expect(await withTx(currentQty(e2eItemId))).toBe('97.00');
+
+    // PATCH performedServices:[] → update() → reconcileStock(before=[X], after=[]) → restock.
+    await withTx((tx) => vnService.update(ctx(tx), noteId, { performedServices: [] }));
+
+    expect(await withTx(currentQty(e2eItemId))).toBe('100.00');
+
+    const moves = await withTx((tx) =>
+      tx
+        .select()
+        .from(stockMovements)
+        .where(
+          and(eq(stockMovements.itemId, e2eItemId), eq(stockMovements.sourceVisitNoteId, noteId)),
+        ),
+    );
+    const restock = moves.find((m) => m.type === 'in');
+    expect(restock).toBeDefined();
+    expect(restock?.reason).toBe('visit_edit_return');
+    expect(restock?.sourceVisitNoteId).toBe(noteId);
   });
 });
