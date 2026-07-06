@@ -64,7 +64,7 @@ mock.module('@homebridge/ciao', () => ({
   },
 }));
 
-const { startServerDiscovery, stopServerDiscovery, findServer } = await import('./discovery.js');
+const { startServerDiscovery, stopServerDiscovery, findServers } = await import('./discovery.js');
 
 describe('discovery', () => {
   beforeEach(() => {
@@ -133,8 +133,8 @@ describe('discovery', () => {
     expect(createdSockets[0]?.closed).toBe(true);
   });
 
-  test('findServer javob kelsa server URL bilan resolve qiladi', async () => {
-    const promise = findServer(1000);
+  test('findServers javob kelsa — barcha topilgan serverlarni massiv sifatida qaytaradi (timeout tugagach)', async () => {
+    const promise = findServers(20);
     const clientSocket = createdSockets[0];
     if (!clientSocket) throw new Error('client socket yaratilmadi');
 
@@ -146,13 +146,51 @@ describe('discovery', () => {
       Buffer.from(`DENTAL_SERVER_v1:${JSON.stringify({ ip: '10.0.0.9', port: 8080 })}`),
     );
 
-    const url = await promise;
-    expect(url).toBe('http://10.0.0.9:8080');
+    const servers = await promise;
+    expect(servers).toEqual([{ url: 'http://10.0.0.9:8080', ip: '10.0.0.9', port: 8080 }]);
     expect(clientSocket.closed).toBe(true);
   });
 
-  test('findServer javob kelmasa timeout tugagach null qaytaradi', async () => {
-    const url = await findServer(20);
-    expect(url).toBeNull();
+  // CLI-434 — the exact evil-twin fix: does NOT jump on the first response.
+  // Both a legitimate server and a rogue LAN device answering must both end
+  // up in the array so the caller can present them to the user for
+  // confirmation instead of silently trusting whichever answered first.
+  test('findServers ikkita javob kelsa — ikkalasi ham massivda (birinchisiga sakramaydi, evil-twin fix)', async () => {
+    const promise = findServers(20);
+    const clientSocket = createdSockets[0];
+    if (!clientSocket) throw new Error('client socket yaratilmadi');
+
+    clientSocket.emit(
+      'message',
+      Buffer.from(`DENTAL_SERVER_v1:${JSON.stringify({ ip: '10.0.0.9', port: 8080 })}`),
+    );
+    clientSocket.emit(
+      'message',
+      Buffer.from(`DENTAL_SERVER_v1:${JSON.stringify({ ip: '10.0.0.66', port: 8080 })}`),
+    );
+
+    const servers = await promise;
+    expect(servers).toHaveLength(2);
+    expect(servers.map((s) => s.url).sort()).toEqual(
+      ['http://10.0.0.66:8080', 'http://10.0.0.9:8080'].sort(),
+    );
+  });
+
+  test('findServers bir xil serverdan takroriy javob kelsa — dedupe qiladi (bitta yozuv)', async () => {
+    const promise = findServers(20);
+    const clientSocket = createdSockets[0];
+    if (!clientSocket) throw new Error('client socket yaratilmadi');
+
+    const msg = Buffer.from(`DENTAL_SERVER_v1:${JSON.stringify({ ip: '10.0.0.9', port: 8080 })}`);
+    clientSocket.emit('message', msg);
+    clientSocket.emit('message', msg);
+
+    const servers = await promise;
+    expect(servers).toHaveLength(1);
+  });
+
+  test("findServers javob kelmasa timeout tugagach bo'sh massiv qaytaradi", async () => {
+    const servers = await findServers(20);
+    expect(servers).toEqual([]);
   });
 });

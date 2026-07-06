@@ -12,13 +12,19 @@
  * (build-time env, `electron-builder.yml`) manzilidan tekshiradi
  * (`auto-updater.ts`, CLI-357, Task 12); faqat packaged build'da ishlaydi.
  *
- * Klient — server topilmasa (`serverUrl` config'da yo'q va `findServer()`
- * `null` qaytarsa) tray "Server topilmadi" holatini ko'rsatadi va
+ * Klient — CLI-434 (evil-twin fix): `config.serverUrl` mavjud VA yaroqli
+ * (`validateServerUrl`) bo'lsa TOFU — discovery/tasdiqlash o'tkazib
+ * yuboriladi. Aks holda `findServers()` (massiv, BARCHA UDP javob — birinchi
+ * javobga sakramaydi) chaqiriladi va foydalanuvchiga `chooseServerUrl()`
+ * orqali tasdiqlash/tanlash so'raladi; tasdiqlangach `serverUrl` `writeConfig`
+ * bilan yoziladi (keyingi startup TOFU orqali qayta so'ramaydi). Hech narsa
+ * topilmasa/tasdiqlanmasa — tray "Server topilmadi" holatini ko'rsatadi va
  * `client-reconnect.ts` orqali har 30s fon da qayta discovery urinadi
- * (CLI-348 qaror 4). Server topilganda YOKI foydalanuvchi `/settings`
- * sahifasida (`preload.ts` → `settings-ipc.ts`, CLI-348 qaror 5) qo'lda
- * serverUrl kiritib muvaffaqiyatli ulansa — tray/brauzer yangi manzilga
- * o'tadi (`updateTray`, YANGI `createTray` emas — bitta tray ikonkasi).
+ * (CLI-348 qaror 4) — bu urinishlar ham bir xil tasdiqlash oqimidan o'tadi.
+ * Foydalanuvchi `/settings` sahifasida (`preload.ts` → `settings-ipc.ts`,
+ * CLI-348 qaror 5) qo'lda serverUrl kiritib muvaffaqiyatli ulansa — tray/
+ * brauzer yangi manzilga o'tadi (`updateTray`, YANGI `createTray` emas —
+ * bitta tray ikonkasi).
  *
  * Server — litsenziya faollashtirilmagan bo'lsa (`.lic` fayl yo'q,
  * `license-status.ts` — existence-only, muddat tekshiruvi API tomonida)
@@ -40,7 +46,12 @@ import electronUpdater from 'electron-updater';
 import { setupAutoUpdater } from './auto-updater.js';
 import { startClientReconnectLoop } from './client-reconnect.js';
 import { readConfig, writeConfig } from './config.js';
-import { findServer, startServerDiscovery, stopServerDiscovery } from './discovery.js';
+import {
+  type DiscoveredServer,
+  findServers,
+  startServerDiscovery,
+  stopServerDiscovery,
+} from './discovery.js';
 import { isFirstRun, runFirstSetup, runMigrations } from './first-run.js';
 import { hasLicense } from './license-status.js';
 import {
@@ -50,7 +61,7 @@ import {
   startServer,
   stopServer,
 } from './process-manager.js';
-import { registerSettingsIpc } from './settings-ipc.js';
+import { registerSettingsIpc, validateServerUrl } from './settings-ipc.js';
 import { setupSingleInstance } from './single-instance.js';
 import { createTray, setTrayToolTip, updateTray } from './tray.js';
 
@@ -117,6 +128,35 @@ const openDevWindow = (): void => {
 // ochish uchun oxirgi ochilgan URL (single-instance.ts `reopen`).
 let lastOpenedUrl: string | null = null;
 
+// CLI-434(c)/CLI-442#10 — `will-navigate` guard: in-page navigation (redirect,
+// `location = ...`, form submit) is only allowed within the currently-loaded
+// page's origin (same-origin login -> /activate flows etc.); any other
+// origin is prevented and handed to the OS browser instead — this closes the
+// gap `setWindowOpenHandler` (new-window only) doesn't cover. Origin is read
+// from the window's ACTUAL committed URL at navigation time (not a captured
+// variable), so it stays correct across repeated `loadURL` calls on a reused
+// window (tray switching between server/settings/activate).
+const guardNavigation = (contents: Electron.WebContents): void => {
+  contents.on('will-navigate', (event, targetUrl) => {
+    let currentOrigin: string | null = null;
+    let targetOrigin: string | null = null;
+    try {
+      currentOrigin = new URL(contents.getURL()).origin;
+    } catch {
+      // no committed URL yet (e.g. about:blank) -> treat as untrusted, block below
+    }
+    try {
+      targetOrigin = new URL(targetUrl).origin;
+    } catch {
+      // unparsable target -> block below
+    }
+    if (!currentOrigin || !targetOrigin || targetOrigin !== currentOrigin) {
+      event.preventDefault();
+      void shell.openExternal(targetUrl);
+    }
+  });
+};
+
 const openBrowser = (url: string): void => {
   lastOpenedUrl = url;
   if (mainWindow) {
@@ -128,16 +168,60 @@ const openBrowser = (url: string): void => {
     width: 1280,
     height: 800,
     minWidth: 1024,
-    webPreferences: { preload: PRELOAD_PATH },
+    webPreferences: {
+      preload: PRELOAD_PATH,
+      // CLI-442#10 — explicit (Electron defaults are already this, but not
+      // documenting them invites an accidental regression on a future edit).
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
   });
   mainWindow.webContents.setWindowOpenHandler(({ url: u }) => {
     void shell.openExternal(u);
     return { action: 'deny' };
   });
+  guardNavigation(mainWindow.webContents);
   void mainWindow.loadURL(url);
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+};
+
+/**
+ * CLI-434(a) — TOFU (trust on first use) tasdiqlash UI. `findServers()` bir
+ * nechta (yoki bitta) topilgan serverni qaytaradi — hech qanday holatda
+ * BIRINCHISIGA jim ulanmaymiz (bu — evil-twin'ning aynan sababi edi).
+ * Foydalanuvchi aniq tasdiqlashi (yoki bir nechtadan tanlashi) shart;
+ * tasdiqlangan `serverUrl` chaqiruvchi tomonidan `writeConfig()`ga yoziladi
+ * (TOFU — keyingi startup'lar shu saqlangan manzilni ishlatadi, discovery/
+ * tasdiqlash qayta so'ralmaydi).
+ */
+const chooseServerUrl = async (servers: DiscoveredServer[]): Promise<string | null> => {
+  if (servers.length === 0) return null;
+  if (servers.length === 1) {
+    const only = servers[0];
+    if (!only) return null;
+    const { response } = await dialog.showMessageBox({
+      type: 'question',
+      buttons: ['Ulanish', 'Bekor qilish'],
+      defaultId: 0,
+      cancelId: 1,
+      title: 'Server topildi',
+      message: `Quyidagi serverga ulanishni tasdiqlaysizmi?\n\n${only.url}`,
+    });
+    return response === 0 ? only.url : null;
+  }
+  // Bir nechta javob (legit multi-server YOKI rogue) — foydalanuvchi
+  // ro'yxatdan aniq birini tanlaydi, jim birinchi-javobga sakramaydi.
+  const { response } = await dialog.showMessageBox({
+    type: 'question',
+    buttons: [...servers.map((s) => s.url), 'Bekor qilish'],
+    cancelId: servers.length,
+    title: 'Bir nechta server topildi',
+    message: 'Bir nechta server topildi. Ulanish uchun birini tanlang:',
+  });
+  return response < servers.length ? (servers[response]?.url ?? null) : null;
 };
 
 // Linux dev-rejimda oyna identifikatsiyasi (WM_CLASS / Wayland app_id) xom
@@ -239,8 +323,14 @@ app.whenReady().then(async () => {
     // — bu yerda faqat desktop-tomon signal+redirect ulanadi.
     openBrowser(hasLicense() ? localUrl : `${localUrl}/activate`);
   } else {
-    // Klient rejimi — LAN discovery orqali server qidiriladi.
-    const serverUrl = config.serverUrl || (await findServer());
+    // Klient rejimi — CLI-434: TOFU. `config.serverUrl` (avval foydalanuvchi
+    // tomonidan tasdiqlangan) mavjud VA hali ham yaroqli host/scheme'ga ega
+    // bo'lsa (eski buzuq/qo'lda tahrirlangan config bo'lishi mumkin) —
+    // discovery/tasdiqlash BUTUNLAY o'tkazib yuboriladi (qayta so'ralmaydi).
+    // Aks holda discovery + foydalanuvchi tasdig'i orqali topiladi — HECH
+    // QACHON birinchi UDP javobiga jim ishonilmaydi (evil-twin fix).
+    const trustedUrl =
+      config.serverUrl && validateServerUrl(config.serverUrl).ok ? config.serverUrl : null;
 
     const connectedCallbacks = (url: string) => ({
       onOpen: () => openBrowser(url),
@@ -251,8 +341,10 @@ app.whenReady().then(async () => {
 
     // Sozlamalar'da (web `/settings`, `preload.ts` orqali) qo'lda kiritilgan
     // serverUrl — `writeConfig()` + reconnect urinishi (CLI-348 qaror 5).
-    // Muvaffaqiyatli ulansa tray/brauzer yangi manzilga o'tadi, joriy fon
-    // discovery retry (bo'lsa) to'xtatiladi.
+    // `registerSettingsIpc` o'zi `validateServerUrl` bilan gate qiladi
+    // (CLI-434(b) — settings-ipc.ts), shuning uchun bu yerda qo'shimcha
+    // tekshiruv shart emas. Muvaffaqiyatli ulansa tray/brauzer yangi
+    // manzilga o'tadi, joriy fon discovery retry (bo'lsa) to'xtatiladi.
     registerSettingsIpc({
       ipcMain,
       writeConfig,
@@ -264,34 +356,53 @@ app.whenReady().then(async () => {
       },
     });
 
-    if (serverUrl) {
-      createTray('client', { serverUrl }, connectedCallbacks(serverUrl));
-      openBrowser(serverUrl);
+    if (trustedUrl) {
+      createTray('client', { serverUrl: trustedUrl }, connectedCallbacks(trustedUrl));
+      openBrowser(trustedUrl);
     } else {
-      // Server topilmadi — tray "Server topilmadi" holatini ko'rsatadi va
-      // har 30s fon da qayta discovery urinadi (CLI-348 qaror 4). Topilgach
-      // `updateTray` chaqiriladi — YANGI `createTray` emas, aks holda ikkinchi
-      // tray ikonkasi yaratilib qoladi.
-      createTray(
-        'client',
-        { serverUrl: '', serverFound: false },
-        {
-          onOpen: () => {},
-          onSettings: () => {},
-          onStop: () => {
-            stopClientReconnectLoop?.();
-            app.quit();
+      const discovered = await findServers();
+      const chosen = await chooseServerUrl(discovered);
+
+      if (chosen) {
+        // TOFU — bir marta tasdiqlangach config'ga yoziladi, keyingi
+        // startup'lar `trustedUrl` orqali qayta so'ramasdan ishlatadi.
+        writeConfig({ serverUrl: chosen });
+        createTray('client', { serverUrl: chosen }, connectedCallbacks(chosen));
+        openBrowser(chosen);
+      } else {
+        // Server topilmadi (yoki foydalanuvchi tasdiqlashni bekor qildi) —
+        // tray "Server topilmadi" holatini ko'rsatadi va har 30s fon da
+        // qayta discovery urinadi (CLI-348 qaror 4). Topilgan har bir
+        // urinish HAM bir xil tasdiqlash oqimidan o'tadi (CLI-434 §2a —
+        // reconnect ham "birinchi ulanish", jim avto-connect qilmaydi).
+        // `updateTray` chaqiriladi — YANGI `createTray` emas, aks holda
+        // ikkinchi tray ikonkasi yaratilib qoladi.
+        createTray(
+          'client',
+          { serverUrl: '', serverFound: false },
+          {
+            onOpen: () => {},
+            onSettings: () => {},
+            onStop: () => {
+              stopClientReconnectLoop?.();
+              app.quit();
+            },
           },
-        },
-      );
-      stopClientReconnectLoop = startClientReconnectLoop({
-        findServer,
-        onFound: (found) => {
-          stopClientReconnectLoop = null;
-          updateTray('client', { serverUrl: found }, connectedCallbacks(found));
-          openBrowser(found);
-        },
-      });
+        );
+        stopClientReconnectLoop = startClientReconnectLoop({
+          findServers,
+          onFound: (found) => {
+            stopClientReconnectLoop = null;
+            void (async () => {
+              const confirmed = await chooseServerUrl(found);
+              if (!confirmed) return; // foydalanuvchi bekor qildi — tray "topilmadi" holicha qoladi
+              writeConfig({ serverUrl: confirmed });
+              updateTray('client', { serverUrl: confirmed }, connectedCallbacks(confirmed));
+              openBrowser(confirmed);
+            })();
+          },
+        });
+      }
     }
   }
 
