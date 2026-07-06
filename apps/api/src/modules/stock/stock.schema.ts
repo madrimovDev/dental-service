@@ -21,12 +21,24 @@ export const listItemsQuerySchema = z.object({
 });
 export type ListItemsQuery = z.infer<typeof listItemsQuerySchema>;
 
-export const createMovementSchema = z.object({
-  itemId: z.uuid(),
-  type: z.enum(['in', 'out', 'adjustment']),
-  quantity: z.coerce.number().positive(),
-  reason: z.string().max(500).optional(),
-});
+export const createMovementSchema = z
+  .object({
+    itemId: z.uuid(),
+    type: z.enum(['in', 'out', 'adjustment']),
+    // `in`/`out` → miqdor (> 0). `adjustment` → aniqlangan (sanalgan) qoldiq (>= 0,
+    // set-to-value inventarizatsiya; 0 = "hech narsa qolmadi" qonuniy). superRefine quyida.
+    quantity: z.coerce.number().nonnegative(),
+    reason: z.string().max(500).optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.type !== 'adjustment' && val.quantity <= 0) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['quantity'],
+        message: 'quantity must be greater than 0 for in/out movements',
+      });
+    }
+  });
 export type CreateMovementInput = z.infer<typeof createMovementSchema>;
 
 export const createBomSchema = z.object({

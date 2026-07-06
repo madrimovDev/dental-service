@@ -5,7 +5,7 @@ import type { DbOrTx } from '../../db/client.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { findRecipientsWithPermission } from '../../lib/notify-recipients.ts';
-import { applyMovement, isLowStock } from './stock.calc.ts';
+import { adjustmentDelta, applyMovement, isLowStock } from './stock.calc.ts';
 import type {
   CreateBatchInput,
   CreateBomInput,
@@ -195,9 +195,15 @@ export const createStockService = (deps: {
 
       // Negative-stock guard — QO'LDA 'out' harakat manfiyga tushsa RAD (row-lock race-safe).
       // (Auto-deduction deductForServices'da guard YO'Q — vizit yozuvini bloklamaslik uchun.)
+      // `adjustment` set-to-value (>= 0 schema'da majburlangan) → guardga kirmaydi.
       if (input.type === 'out' && newQuantity < 0) {
         throw new InsufficientStockError(input.itemId, oldQty, input.quantity);
       }
+
+      // Ledger `quantity`: `in`/`out` → kiritilgan miqdor; `adjustment` → imzoli delta
+      // (`target − oldQty`, masalan 100→90 → `-10`) — ledger haqiqiy o'zgarishni ko'rsatadi.
+      const movementQuantity =
+        input.type === 'adjustment' ? adjustmentDelta(oldQty, input.quantity) : input.quantity;
 
       const [movement] = await tx
         .insert(stockMovements)
@@ -205,7 +211,7 @@ export const createStockService = (deps: {
           tenantId,
           itemId: input.itemId,
           type: input.type,
-          quantity: String(input.quantity),
+          quantity: String(movementQuantity),
           reason: input.reason ?? null,
           createdBy: user?.id ?? null,
         })
