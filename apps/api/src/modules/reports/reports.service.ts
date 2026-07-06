@@ -454,7 +454,11 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
     const mixRows = await netServiceAggregates(db, start, end, branchId);
 
     // 2. Retention — yangi (oraliqda yaratilgan) vs qaytgan (oraliqda yozilgan, lekin
-    //    oraliqdan oldin yaratilgan bemor). Retention bemor-darajasida (tenant-wide, Qaror #29).
+    //    oraliqdan oldin yaratilgan bemor). Retention bemor-darajasida — TENANT-WIDE
+    //    (Qaror #29, planCompletion pretsedenti) — `branchId` ATAYLAB ikkala tomonda
+    //    ham e'tiborga olinmaydi (CLI-431: ilgari `returningPatients` branch-scoped edi,
+    //    `newPatients` esa tenant-wide — asimmetriya branchId'ga qarab ichki nomuvofiq
+    //    natija berardi; endi ikkalasi ham branchId'dan mustaqil, branch-invariant).
     const [newRow] = await db
       .select({ c: count() })
       .from(patients)
@@ -463,7 +467,6 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
       inRange(appointments.startTime, start, end),
       lt(patients.createdAt, start),
     ];
-    if (branchId) apptRetFilter.push(eq(appointments.branchId, branchId));
     const [retRow] = await db
       .select({ c: countDistinct(appointments.patientId) })
       .from(appointments)
@@ -472,7 +475,8 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
     const newPatients = Number(newRow?.c ?? 0);
     const returningPatients = Number(retRow?.c ?? 0);
 
-    // 3. Recall-efficacy — oraliqda yaratilgan recall'lar, status bo'yicha.
+    // 3. Recall-efficacy — oraliqda yaratilgan recall'lar, status bo'yicha. TENANT-WIDE
+    //    (recalls jadvalida branch ustuni yo'q) — retention bilan izchil scope.
     const recallRows = await db
       .select({ status: recalls.status, c: count() })
       .from(recalls)
