@@ -34,8 +34,11 @@ import { createRecallsService, recallRoutes } from './modules/recalls/index.ts';
 import { reportsRoutes } from './modules/reports/index.ts';
 import { roleRoutes } from './modules/roles/index.ts';
 import { createScheduleService, scheduleRoutes } from './modules/schedule/index.ts';
-import { serviceCategoryRoutes } from './modules/service-categories/index.ts';
-import { serviceRoutes } from './modules/services/index.ts';
+import {
+  createServiceCategoriesService,
+  serviceCategoryRoutes,
+} from './modules/service-categories/index.ts';
+import { createServicesService, serviceRoutes } from './modules/services/index.ts';
 import { stockRoutes } from './modules/stock/index.ts';
 import { tenantSettingsRoutes } from './modules/tenant-settings/index.ts';
 import { tenantRoutes } from './modules/tenants/index.ts';
@@ -55,6 +58,14 @@ export const createApp = () => {
     soliqApiUrl: env.SOLIQ_API_URL,
     soliqApiKey: env.SOLIQ_API_KEY,
     soliqFiscalId: env.SOLIQ_FISCAL_ID,
+  });
+  // CLI-443: cashier POS va treatment-plans bosqich narxini serverda hisoblash
+  // uchun narrow `priceLookup` hook (`getActivePrice`) — `/api/services`
+  // route'ining o'z ichki instance'idan mustaqil (ikkalasi ham stateless factory,
+  // bir xil DB'ga o'qiydi — churn kamaytirish uchun alohida instance yetarli).
+  const priceLookup = createServicesService({
+    audit,
+    categories: createServiceCategoriesService({ audit }),
   });
 
   // Global middleware
@@ -130,7 +141,7 @@ export const createApp = () => {
   app.route('/api/patients', patientRoutes({ db, audit }));
   app.route('/api/services', serviceRoutes({ db, audit }));
   app.route('/api/service-categories', serviceCategoryRoutes({ db, audit }));
-  app.route('/api/cashier', cashierRoutes({ db, audit, fiscal }));
+  app.route('/api/cashier', cashierRoutes({ db, audit, fiscal, priceLookup }));
   app.route('/api/reports', reportsRoutes({ db, audit }));
   app.route('/api/audit', auditRoutes({ db }));
   // Epic A: doktor jadvali + time-off + availability. Service'ni bir marta
@@ -253,7 +264,7 @@ export const createApp = () => {
   // registered after them, and their own gates are pattern-scoped (not
   // blanket `'*'`) so they don't leak onto each other or anything before them.
   // Clinical: /api/diagnoses, /api/treatment-plans, /api/visit-notes, /api/tooth-charts
-  app.route('/api', clinicalRoutes({ db, audit, recall, notifications }));
+  app.route('/api', clinicalRoutes({ db, audit, recall, notifications, priceLookup }));
   app.route('/api', patientImagesRoutes({ db, audit }));
 
   // CLI-359: bemor rasmlari (`patient-images`) `serveUrl()` orqali generatsiya

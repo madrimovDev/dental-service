@@ -34,6 +34,20 @@ export type RecallStageHook = {
   ) => Promise<void>;
 };
 
+/**
+ * CLI-443: narrow DI hook (recall pattern bilan bir xil) — `services.service.ts::
+ * getActivePrice` shu shaklga strukturaviy mos keladi, to'g'ridan import qilinmaydi.
+ * cashier.service.ts'dagi bir xil nomdagi type bilan mustaqil (har consumer o'ziga
+ * kerak shaklni e'lon qiladi — recall precedenti).
+ */
+export type PriceLookup = {
+  getActivePrice: (
+    c: Context,
+    serviceId: string,
+    branchId: string,
+  ) => Promise<{ price: string } | null>;
+};
+
 /** presented→accepted consent yo'q bo'lsa otiladi; routes 400 ga aylantiradi. */
 export class ConsentRequiredError extends Error {
   constructor() {
@@ -57,6 +71,8 @@ export class ConsentOverwriteError extends Error {
 export const createTreatmentPlansService = (deps: {
   audit: AuditLogger;
   recall?: RecallStageHook;
+  /** CLI-443: bosqich narxini serverda hisoblash uchun (faqat `serviceId` bor bosqichlarga). */
+  priceLookup?: PriceLookup;
 }) => {
   const repo = createTreatmentPlansRepository();
 
@@ -87,8 +103,25 @@ export const createTreatmentPlansService = (deps: {
     const tenantId = c.get('activeTenantId');
     if (!tenantId) throw new Error('No tenant context');
 
-    const totalCost = input.stages.reduce((sum, s) => sum + s.cost, 0);
-    const totalVisits = input.stages.reduce((sum, s) => sum + s.estimatedVisits, 0);
+    // CLI-443: serviceId bor bosqich uchun narx SERVERDA `getActivePrice` orqali
+    // hisoblanadi (client'ning `cost`i e'tiborga olinmaydi) — filial JWT'dagi
+    // `activeBranchId`dan aniqlanadi (plan/patient o'zi branch-scoped emas — Qaror
+    // #29 — shuning uchun "joriy ish filiali" konventsiyasi ishlatiladi; frontend
+    // `PlanFormModal` allaqachon shu qiymat bilan narxni oldindan ko'rsatadi).
+    // serviceId'siz (custom/maxsus) bosqich yoki faol narx topilmasa — client
+    // `cost`i saqlanadi (qattiq validatsiya YO'Q — bunday bosqichlar qasddan
+    // narxsiz/moslashuvchan; faqat POS (CLI-443 cashier qismi) qattiq 400 beradi).
+    const activeBranchId = c.get('activeBranchId');
+    const resolvedStages = await Promise.all(
+      input.stages.map(async (s) => {
+        if (!s.serviceId || !activeBranchId || !deps.priceLookup) return s;
+        const price = await deps.priceLookup.getActivePrice(c, s.serviceId, activeBranchId);
+        return price ? { ...s, cost: Number(price.price) } : s;
+      }),
+    );
+
+    const totalCost = resolvedStages.reduce((sum, s) => sum + s.cost, 0);
+    const totalVisits = resolvedStages.reduce((sum, s) => sum + s.estimatedVisits, 0);
 
     const plan = await repo.insertPlanWithStages(
       c,
@@ -103,7 +136,7 @@ export const createTreatmentPlansService = (deps: {
         notes: input.notes ?? null,
       },
       (planId) =>
-        input.stages.map((s, i) => ({
+        resolvedStages.map((s, i) => ({
           treatmentPlanId: planId,
           sequence: i + 1,
           serviceId: s.serviceId ?? null,

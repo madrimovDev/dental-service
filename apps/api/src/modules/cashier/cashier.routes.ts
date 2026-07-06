@@ -23,7 +23,12 @@ import {
   refundRequestSchema,
   transactionIdParamSchema,
 } from './cashier.schema.ts';
-import { AllocationExceedError, createCashierService } from './cashier.service.ts';
+import {
+  AllocationExceedError,
+  createCashierService,
+  NoActivePriceError,
+  type PriceLookup,
+} from './cashier.service.ts';
 
 /** Standart 404 — get by id uchun. */
 const notFoundResponse = {
@@ -37,13 +42,19 @@ export const cashierRoutes = (deps: {
   db: Database;
   audit: AuditLogger;
   fiscal?: FiscalProvider;
+  /** CLI-443: POS item narxini serverda hisoblash uchun (services.service.ts::getActivePrice). */
+  priceLookup: PriceLookup;
 }) => {
   const app = new OpenAPIHono();
   app.use('*', requireModuleInDesktop('cashier'));
   app.use('*', authMiddleware());
   app.use('*', rlsMiddleware(deps.db));
 
-  const service = createCashierService({ audit: deps.audit, fiscal: deps.fiscal });
+  const service = createCashierService({
+    audit: deps.audit,
+    fiscal: deps.fiscal,
+    priceLookup: deps.priceLookup,
+  });
 
   // ─── GET /transactions — list (paginated) ────────────────────────────────
 
@@ -104,6 +115,12 @@ export const cashierRoutes = (deps: {
     } catch (e) {
       if (e instanceof AllocationExceedError) {
         return c.json(fail('allocations.exceed', 'Allocation sum exceeds paid amount'), 400);
+      }
+      if (e instanceof NoActivePriceError) {
+        return c.json(
+          fail('cashier.no_active_price', 'No active price for this service at this branch'),
+          400,
+        );
       }
       throw e;
     }
