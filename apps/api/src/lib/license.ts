@@ -12,6 +12,11 @@ export interface LicenseData {
   expiresAt: string;
   gracePeriodDays: number;
   issuedAt: string;
+  // CLI-410 — machine fingerprint IS part of the RSA-signed payload (Supervisor
+  // `buildResponse` signs it at activate/heartbeat/reactivate). `isLicenseValid`
+  // requires `fingerprint === localFingerprint`, so a signed payload copied to
+  // another machine is rejected there even though the signature still verifies.
+  fingerprint: string;
   signature: string;
 }
 
@@ -28,6 +33,16 @@ export const getLicensePath = (): string =>
   (process.platform === 'win32'
     ? 'C:\\ProgramData\\DentalService\\license.lic'
     : '/var/lib/dental-service/license.lic');
+
+// CLI-437 — monotonic clock anchor. Alohida fayl (imzolangan `.lic` payload'ga
+// KIRMAYDI — Supervisor uni imzolamaydi, payload'ga qo'shilsa imzo tekshiruvi
+// (verifyLicenseSignature) yiqilardi). Funksiya sifatida — getLicensePath()
+// bilan bir xil "muzlab qolmaslik" sababi (izohga qarang).
+export const getAnchorPath = (): string =>
+  process.env.LICENSE_ANCHOR_PATH ??
+  (process.platform === 'win32'
+    ? 'C:\\ProgramData\\DentalService\\license-anchor.dat'
+    : '/var/lib/dental-service/license-anchor.dat');
 
 export const getFingerprint = async (): Promise<string> => {
   // CLI-432 — network-interface MAC ATAYIN OLINMAYDI. Oldingi fingerprint
@@ -85,19 +100,99 @@ export const readLicense = async (): Promise<LicenseData | null> => {
   }
 };
 
-export const isLicenseValid = (data: LicenseData): boolean => {
+/**
+ * Litsenziya haqiqiyligini tekshiradi (sof funksiya — fingerprint chaqiruvchida
+ * bir marta hisoblanadi, `getFingerprint` async bo'lgani uchun; testda mock oson).
+ *
+ * CLI-410 — imzo tekshiruvidan tashqari `payload.fingerprint === localFingerprint`
+ * ham talab qilinadi: o'g'irlangan/nusxalangan imzolangan payload boshqa mashinada
+ * (`getFingerprint` boshqa) rad etiladi. Fingerprint'siz (eski) payload ham rad
+ * etiladi — majburiy qayta-aktivatsiya (docs/audit-fixes/CLI-410 §0: dala'da eski
+ * `.lic` yo'q).
+ *
+ * CLI-437 — `anchorMs` (monotonik langar, chaqiruvchi `readAnchor()` orqali
+ * beradi) muddat tekshiruvida `Date.now()` bilan birga ishlatiladi:
+ * `effectiveNow = max(Date.now(), anchorMs, issuedAt)`. Mahalliy soat orqaga
+ * surilsa `Date.now()` kichrayadi, lekin `effectiveNow` langar/`issuedAt`da
+ * "yopishib qoladi" — muddati o'tgan litsenziya orqaga-surish bilan qayta
+ * tiklanmaydi. `issuedAt` floor — langar fayli o'chirilgan/topilmagan
+ * (`anchorMs=0`) taqdirda ham chiqarilgan sanadan oldinga o'tolmaydi.
+ */
+export const isLicenseValid = (
+  data: LicenseData,
+  localFingerprint: string,
+  anchorMs = 0,
+): boolean => {
   const { signature, ...payload } = data;
   if (!verifyLicenseSignature(payload, signature, SUPERVISOR_PUBLIC_KEY_PEM)) {
     return false;
   }
+  // Eski (fingerprint'siz) payload yoki mashina mos kelmasligi → rad.
+  if (!payload.fingerprint || payload.fingerprint !== localFingerprint) {
+    return false;
+  }
   const expiry = new Date(data.expiresAt).getTime();
   const grace = data.gracePeriodDays * 86400000;
-  return Date.now() < expiry + grace;
+  const issuedAtMs = Date.parse(data.issuedAt);
+  const effectiveNow = Math.max(Date.now(), anchorMs, Number.isFinite(issuedAtMs) ? issuedAtMs : 0);
+  return effectiveNow < expiry + grace;
+};
+
+/**
+ * Monotonik langar (CLI-437) — AES bilan shifrlangan alohida faylda (imzolangan
+ * payload'dan TASHQARIDA — Supervisor uni imzolamaydi). Fayl yo'q/buzuq → `0`
+ * (chaqiruvchi `data.issuedAt` bilan floor qiladi, `isLicenseValid` ichida).
+ */
+export const readAnchor = async (): Promise<number> => {
+  try {
+    const raw = await readFile(getAnchorPath(), 'utf8');
+    const payload = Buffer.from(raw, 'base64');
+    const iv = payload.subarray(0, 16);
+    const encrypted = payload.subarray(16);
+    const key = await getKey();
+    const decipher = createDecipheriv('aes-256-cbc', key, iv);
+    const json = Buffer.concat([decipher.update(encrypted), decipher.final()]).toString('utf8');
+    const ms = Number(JSON.parse(json));
+    return Number.isFinite(ms) ? ms : 0;
+  } catch {
+    return 0;
+  }
+};
+
+export const writeAnchor = async (ms: number): Promise<void> => {
+  const key = await getKey();
+  const iv = randomBytes(16);
+  const cipher = createCipheriv('aes-256-cbc', key, iv);
+  const json = JSON.stringify(ms);
+  const encrypted = Buffer.concat([cipher.update(json, 'utf8'), cipher.final()]);
+  const payload = Buffer.concat([iv, encrypted]);
+  const anchorPath = getAnchorPath();
+  await mkdir(dirname(anchorPath), { recursive: true });
+  await writeFile(anchorPath, payload.toString('base64'));
 };
 
 export const getActiveModules = async (): Promise<string[]> => {
   const lic = await readLicense();
-  if (!lic || !isLicenseValid(lic)) return [];
+  if (!lic) return [];
+  // Fingerprint hisoblash VM/konteynerda throw qilishi mumkin (FINGERPRINT_UNAVAILABLE)
+  // — ushlab, litsenziyani rad etamiz (modulsiz), desktop start'da xato bermasin.
+  let localFingerprint: string;
+  try {
+    localFingerprint = await getFingerprint();
+  } catch {
+    return [];
+  }
+  const anchorMs = await readAnchor();
+  if (!isLicenseValid(lic, localFingerprint, anchorMs)) return [];
+  // CLI-437 — langarni oldinga suramiz (hech qachon orqaga emas — `max`).
+  // Faylga yozib bo'lmasa ham (masalan disk xatosi) modul ro'yxati baribir
+  // qaytarilsin — langar-advance best-effort telemetriya, muddat tekshiruvi
+  // uchun kritik emas (allaqachon `isLicenseValid` yuqorida o'tdi).
+  try {
+    await writeAnchor(Math.max(anchorMs, Date.now()));
+  } catch {
+    // no-op — anchor faylga yozilmasa ham modul ro'yxati qaytariladi
+  }
   return lic.modules;
 };
 

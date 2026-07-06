@@ -70,6 +70,36 @@ export const getOrCreateJwtSecret = (): string => {
   return secret;
 };
 
+// CLI-442#8 — Postgres superuser (`dental`) paroli. Ilgari `initdb -U dental`
+// hech qanday auth-metod bermasdan chaqirilardi — lokal ulanishlar default
+// `trust` (parolsiz) bo'lib qolardi, ya'ni mashinadagi ISTALGAN lokal jarayon
+// parolsiz `dental` superuser sifatida ulanib RLS'ni TO'LIQ chetlab o'tishi
+// mumkin edi (superuser RLS'ga bo'ysunmaydi). `runFirstSetup` endi shu
+// parolni initdb'dan OLDIN generatsiya qilib, `initdb --pwfile` orqali
+// beradi va `-A scram-sha-256` bilan pg_hba.conf'ni parol-talab qiluvchi
+// qiladi (getOrCreateDbPassword bilan bir xil idempotent fayl-persist
+// pattern). ⚠️ Bilingan cheklov: bu kod versiyasidan OLDIN `-A trust` bilan
+// yaratilgan mavjud klaster superuser'ida umuman parol YO'Q — bu holatda
+// scram-ga o'tish ulanishni rad etadi (klaster qayta yaratilishi kerak,
+// avtomatik migratsiya yo'q — docs/audit-fixes/CLI-442 §8, dala'da ma'lum
+// deploy yo'q, faqat mahalliy dev klasterlarga ta'sir qiladi).
+export const getSuperuserPasswordPath = (): string => join(getDataDir(), 'superuser-password.txt');
+
+export const getOrCreateSuperuserPassword = (): string => {
+  const path = getSuperuserPasswordPath();
+  if (existsSync(path)) {
+    return readFileSync(path, 'utf8').trim();
+  }
+  mkdirSync(getDataDir(), { recursive: true });
+  const password = randomBytes(32).toString('hex');
+  // Trailing newlinesiz — `initdb --pwfile`ning o'zi "faylning BIRINCHI
+  // qatori parol" deb hujjatlaydi, lekin ba'zi versiyalar oxirgi \n'ni ham
+  // parolga qo'shib qo'yishi mumkin (whitespace-sensitivligi noaniq) — shu
+  // sabab hech qanday yangi qator qo'shilmaydi (writeFileSync default xulqi).
+  writeFileSync(path, password, { mode: 0o600 });
+  return password;
+};
+
 // dental_app Postgres roli uchun parol — birinchi ishga tushishda
 // generatsiya qilinadi va `dataDir`da saqlanadi (CLI-390). getOrCreateJwtSecret
 // bilan bir xil idempotent fayl-persist pattern.
@@ -106,16 +136,31 @@ export const runFirstSetup = (): void => {
   mkdirSync(join(dataDir, 'logs'), { recursive: true });
   mkdirSync(pgData, { recursive: true });
 
-  // 2. DB parolini generatsiya qilish/aniqlash — initdb'DAN OLDIN (CLI-390:
+  // 2. DB parollarini generatsiya qilish/aniqlash — initdb'DAN OLDIN (CLI-390:
   //    isFirstRun() PG_VERSION borligiga tayanadi, initdb esa aynan shu
   //    faylni yaratadi — tartib teskari bo'lsa fresh install ham "mavjud
-  //    o'rnatish" deb noto'g'ri aniqlanib qoladi).
+  //    o'rnatish" deb noto'g'ri aniqlanib qoladi). CLI-442#8 — superuser
+  //    paroli ham shu bosqichda, initdb `--pwfile` shu faylni o'qiydi.
   getOrCreateDbPassword();
+  getOrCreateSuperuserPassword();
 
-  // 3. initdb — postgres data dir yaratish
+  // 3. initdb — postgres data dir yaratish. CLI-442#8: `-A scram-sha-256` +
+  //    `--pwfile` — superuser `dental` endi parolsiz (trust) emas, scram-sha-256
+  //    bilan himoyalangan (lokal jarayon RLS'ni parolsiz chetlab o'ta olmaydi).
   const initdb = spawnSync(
     getInitdbPath(),
-    ['-D', pgData, '--encoding=UTF8', '--locale=C', '-U', 'dental'],
+    [
+      '-D',
+      pgData,
+      '--encoding=UTF8',
+      '--locale=C',
+      '-U',
+      'dental',
+      '-A',
+      'scram-sha-256',
+      '--pwfile',
+      getSuperuserPasswordPath(),
+    ],
     { stdio: 'pipe' },
   );
   assertSuccess(initdb, 'initdb');
@@ -140,11 +185,15 @@ export const runMigrations = (apiExePath: string): void => {
   // binary yoniga bundled `drizzle/`+`migrations/rls/` papkalarga ishora
   // qilamiz (electron-builder.yml extraResources — CLI-350 kengaytmasi).
   const apiDir = dirname(apiExePath);
+  // CLI-442#8 — superuser `dental` endi scram-sha-256 bilan himoyalangan
+  // (trust emas) — migratsiya vaqtidagi ulanish ham parol bilan bo'lishi
+  // shart (ilgari hardcoded `dental:dental` — endi persisted tasodifiy parol).
+  const superuserPassword = getOrCreateSuperuserPassword();
   const result = spawnSync(apiExePath, ['migrate'], {
     env: {
       ...process.env,
-      DATABASE_URL: 'postgresql://dental:dental@localhost:5433/dental',
-      DATABASE_ADMIN_URL: 'postgresql://dental:dental@localhost:5433/dental',
+      DATABASE_URL: `postgresql://dental:${superuserPassword}@localhost:5433/dental`,
+      DATABASE_ADMIN_URL: `postgresql://dental:${superuserPassword}@localhost:5433/dental`,
       DENTAL_APP_DB_PASSWORD: getOrCreateDbPassword(), // CLI-390 — dental_app roli shu parol bilan yaratiladi
       UPLOADS_DIR: join(dataDir, 'uploads'),
       MIGRATIONS_DIR: join(apiDir, 'drizzle'),

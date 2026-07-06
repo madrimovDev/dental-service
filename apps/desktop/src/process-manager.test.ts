@@ -62,7 +62,7 @@ process.env.DENTAL_STOP_WAIT_MS = '5';
 // emas) DENTAL_DATA_DIR'da deterministik ishlamaydi.
 rmSync(join('/tmp/dental-pm-test', 'db-password.txt'), { force: true });
 
-const { getOrCreateDbPassword } = await import('./first-run.js');
+const { getOrCreateDbPassword, getOrCreateSuperuserPassword } = await import('./first-run.js');
 
 const {
   startServer,
@@ -118,6 +118,19 @@ describe('process-manager', () => {
     expect(env.DATABASE_URL).toBe(
       `postgresql://dental_app:${getOrCreateDbPassword()}@localhost:5433/dental`,
     );
+    // CLI-442#8 regression guard — DATABASE_ADMIN_URL (the one intentional
+    // superuser connection, used only by the recall worker's admin scan)
+    // must use the persisted scram-sha-256 password, not the old hardcoded
+    // `dental:dental` (which matched a trust-auth cluster with no real
+    // password check at all).
+    expect(env.DATABASE_ADMIN_URL).toBe(
+      `postgresql://dental:${getOrCreateSuperuserPassword()}@localhost:5433/dental`,
+    );
+    expect(env.DATABASE_ADMIN_URL).not.toContain('dental:dental@');
+    // CLI-433 — dedicated desktop-gate signal (WEB_DIST_DIR is unrelated to
+    // licensing and must NOT be the gate signal; process-manager provides
+    // this new flag so requireModuleInDesktop actually activates in prod).
+    expect(env.DENTAL_LOCAL_DESKTOP).toBe('true');
   });
 
   test('stopServer barcha child process\'larni SIGTERM bilan to\'xtatadi, status "stopped"', async () => {
@@ -129,6 +142,54 @@ describe('process-manager', () => {
     for (const proc of spawnedProcesses) {
       expect(proc.kill).toHaveBeenCalledWith('SIGTERM');
     }
+  });
+
+  // CLI-442#9 — SIGTERM -> grace wait -> SIGKILL escalation. Fake processes
+  // never emit 'exit' on kill() (see FakeChildProcess above), so every
+  // waitForExit() call times out at DENTAL_STOP_WAIT_MS (5ms in this test
+  // env) and SIGKILL must follow — this is the regression guard for the
+  // "process orphaned because SIGTERM alone didn't finish in time" bug.
+  test("bola jarayon vaqt ichida SIGTERM'ga javob bermasa — SIGKILL bilan escalate qiladi", async () => {
+    await startServer();
+    await stopServer();
+
+    expect(getServerStatus()).toBe('stopped');
+    for (const proc of spawnedProcesses) {
+      expect(proc.kill).toHaveBeenCalledWith('SIGKILL');
+    }
+  });
+
+  // CLI-442#9 — if the child exits promptly after SIGTERM, stopServer must
+  // NOT escalate to SIGKILL (an unnecessary SIGKILL on an already-dead
+  // process is harmless but the guard proves the escalation is conditional,
+  // not unconditional).
+  test("bola jarayon SIGTERM'dan keyin tez 'exit' bersa — SIGKILL yuborilmaydi", async () => {
+    await startServer();
+    const stopPromise = stopServer();
+    // Listeners are registered synchronously inside stopServer() before its
+    // first `await`, so emitting here (before awaiting stopPromise) is safe.
+    for (const proc of spawnedProcesses) {
+      proc.emit('exit', 0, null);
+    }
+    await stopPromise;
+
+    expect(getServerStatus()).toBe('stopped');
+    for (const proc of spawnedProcesses) {
+      expect(proc.kill).not.toHaveBeenCalledWith('SIGKILL');
+    }
+  });
+
+  // CLI-442#9 — crash-supervision: an unexpected exit (not part of a
+  // stopServer() call) must flip status away from 'running' immediately, so
+  // getServerStatus() never lies about a crashed process still running.
+  test("kutilmagan crash (stopServer() chaqirilmasdan) darhol status='stopped' qiladi", async () => {
+    await startServer();
+    expect(getServerStatus()).toBe('running');
+
+    // Simulate e.g. Postgres crashing on its own (OOM, corruption, ...).
+    spawnedProcesses[0]?.emit('exit', 1, null);
+
+    expect(getServerStatus()).toBe('stopped');
   });
 
   test('valkey binary topilmasa (spawn error) startServer reject qiladi', async () => {

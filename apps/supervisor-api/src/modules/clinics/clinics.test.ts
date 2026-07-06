@@ -75,6 +75,70 @@ describe('POST /v1/admin/clinics', () => {
     const res = await createClinic({ plan: 'not-a-real-plan' });
     expect(res.status).toBe(400);
   });
+
+  // CLI-433 — enterprise MODULE_MAP renamed from erp/inventory/branches (which
+  // matched no apps/api route) to the actual api route names.
+  it("enterprise plan's modules use apps/api's actual route names (CLI-433)", async () => {
+    const res = await createClinic({ plan: 'enterprise' });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as any;
+    expect(body.license.modules.sort()).toEqual(
+      [
+        'patients',
+        'appointments',
+        'queue',
+        'cashier',
+        'reports',
+        'staff',
+        'clinical',
+        'lab-orders',
+        'patient-images',
+        'prescriptions',
+        'consent',
+        'expenses',
+        'stock',
+        'payroll',
+        'notifications',
+        'schedule',
+        'recalls',
+      ].sort(),
+    );
+    // Regression guard — the old (mismatched) names must be gone.
+    expect(body.license.modules).not.toContain('erp');
+    expect(body.license.modules).not.toContain('inventory');
+    expect(body.license.modules).not.toContain('branches');
+  });
+});
+
+// CLI-433 — divergence guard, mirror of apps/api/src/lib/license-middleware.test.ts's
+// "MODULE_MAP — supervisor/api dictionary lockstep" test. Both hardcode the
+// same agreed dictionary (docs/audit-fixes/CLI-433 §2c); if one file's table
+// changes without the other, exactly one of the two guard tests goes red.
+describe('MODULE_MAP — supervisor/api dictionary lockstep (CLI-433)', () => {
+  it("enterprise plan's modules match the agreed cross-app dictionary", async () => {
+    const AGREED_ENTERPRISE_MODULES = [
+      'patients',
+      'appointments',
+      'queue',
+      'cashier',
+      'reports',
+      'staff',
+      'clinical',
+      'lab-orders',
+      'patient-images',
+      'prescriptions',
+      'consent',
+      'expenses',
+      'stock',
+      'payroll',
+      'notifications',
+      'schedule',
+      'recalls',
+    ];
+    const res = await createClinic({ plan: 'enterprise' });
+    const body = (await res.json()) as any;
+    expect(body.license.modules.sort()).toEqual(AGREED_ENTERPRISE_MODULES.sort());
+  });
 });
 
 describe('GET /v1/admin/clinics', () => {

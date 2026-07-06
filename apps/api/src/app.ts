@@ -7,6 +7,7 @@ import { secureHeaders } from 'hono/secure-headers';
 import { db } from './db/client.ts';
 import { createAuditLogger } from './lib/audit-logger.ts';
 import { env } from './lib/env.ts';
+import { requireModuleInDesktop } from './lib/license-middleware.ts';
 import { METRICS_CONTENT_TYPE, renderMetrics } from './lib/metrics.ts';
 import { createLocalStorageAdapter } from './lib/storage.ts';
 import { errorHandler } from './middleware/error-handler.ts';
@@ -147,9 +148,32 @@ export const createApp = () => {
   app.route('/api/consent', consentRoutes({ db, audit }));
   app.route('/api/lab-orders', labOrdersRoutes({ db, audit }));
   // R4 Guruh A: xarajatlar (/api/expense-categories, /api/expenses), ombor (/api/stock)
+  //
+  // CLI-433 — daromad modullari (expenses/stock/payroll/notifications) ilgari
+  // HECH QANDAY litsenziya-gate'ga ega emas edi (starter tarif bilan ham
+  // to'liq ochiq). Gate parent-darajada (`app.use(...)`, sub-app ichida emas —
+  // bu 4 modulning route fayllari file-ownership doirasidan tashqarida)
+  // qo'shiladi, har `app.route(...)`dan DARHOL OLDIN. `expenses` bare `/api`
+  // prefiksiga mount qilinib ikkita top-level yo'lga (expense-categories,
+  // expenses) fan-out qiladi — Hono `/*` wildcard bare prefiksni (masalan
+  // `GET /api/expenses`, sub-path'siz) QAMRAMAYDI, shuning uchun har biri
+  // uchun aniq prefiks + `/*` ikkalasi ham ro'yxatdan o'tkaziladi. Mount-tartib
+  // o'zgarmadi (clinical/patient-images'dan OLDIN — CLI-358 quirk'iga
+  // tegmaydi). `DENTAL_LOCAL_DESKTOP!=='true'` bo'lsa (cloud/dev/CI)
+  // `requireModuleInDesktop` no-op — mavjud test suite/cloud deploy buzilmaydi.
+  app.use('/api/expense-categories', requireModuleInDesktop('expenses'));
+  app.use('/api/expense-categories/*', requireModuleInDesktop('expenses'));
+  app.use('/api/expenses', requireModuleInDesktop('expenses'));
+  app.use('/api/expenses/*', requireModuleInDesktop('expenses'));
   app.route('/api', expensesRoutes({ db, audit }));
+  app.use('/api/stock', requireModuleInDesktop('stock'));
+  app.use('/api/stock/*', requireModuleInDesktop('stock'));
   app.route('/api/stock', stockRoutes({ db, audit, notifications }));
+  app.use('/api/payroll', requireModuleInDesktop('payroll'));
+  app.use('/api/payroll/*', requireModuleInDesktop('payroll'));
   app.route('/api/payroll', payrollRoutes({ db, audit }));
+  app.use('/api/notifications', requireModuleInDesktop('notifications'));
+  app.use('/api/notifications/*', requireModuleInDesktop('notifications'));
   app.route('/api/notifications', notificationsRoutes({ db, sms }));
   // CLI-358: clinical/patient-images are mounted at the BARE `/api` prefix
   // (they fan out to top-level paths like /api/diagnoses, /api/treatment-plans,

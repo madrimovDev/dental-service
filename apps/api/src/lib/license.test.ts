@@ -9,6 +9,8 @@ import { join } from 'node:path';
 let tmpDir: string;
 tmpDir = await mkdtemp(join(tmpdir(), 'license-test-'));
 process.env.LICENSE_PATH = join(tmpDir, 'license.lic');
+// CLI-437 — monotonic anchor file, same isolation reasoning as LICENSE_PATH above.
+process.env.LICENSE_ANCHOR_PATH = join(tmpDir, 'license-anchor.dat');
 
 afterAll(async () => {
   await rm(tmpDir, { recursive: true, force: true });
@@ -106,6 +108,7 @@ describe('writeLicense + readLicense', () => {
       expiresAt: new Date(Date.now() + 86400000 * 365).toISOString(),
       gracePeriodDays: 30,
       issuedAt: new Date().toISOString(),
+      fingerprint: 'test-fp',
       signature: 'mock-signature',
     };
     await writeLicense(data);
@@ -127,6 +130,7 @@ describe('invalidateLicense', () => {
       expiresAt: new Date(Date.now() + 86400000 * 30).toISOString(),
       gracePeriodDays: 30,
       issuedAt: new Date().toISOString(),
+      fingerprint: 'test-fp',
       signature: 'mock-signature',
     };
     await writeLicense(data);
@@ -146,22 +150,27 @@ describe('invalidateLicense', () => {
 
 describe('isLicenseValid', () => {
   test('returns false if expiresAt + gracePeriodDays passed', async () => {
-    const { isLicenseValid } = await import('./license');
-    const expired = {
+    const { isLicenseValid, getFingerprint } = await import('./license');
+    const localFp = await getFingerprint();
+    const payload = {
       licenseKey: 'K',
       clinicId: 'c',
-      modules: [],
+      modules: [] as string[],
       expiresAt: new Date(Date.now() - 86400000 * 60).toISOString(), // 60 kun oldin
       gracePeriodDays: 30,
       issuedAt: new Date().toISOString(),
-      signature: 'sig',
+      fingerprint: localFp,
     };
-    expect(isLicenseValid(expired)).toBe(false);
+    // Properly signed + matching fingerprint — only the expiry gate fails.
+    const signature = signForTest(payload);
+    expect(isLicenseValid({ ...payload, signature }, localFp)).toBe(false);
   });
 });
 
 describe('isLicenseValid — signature verification (CLI-362)', () => {
-  test('accepts a non-expired license whose signature matches the (mocked) public key', async () => {
+  test('accepts a non-expired license whose signature + fingerprint match', async () => {
+    const { isLicenseValid, getFingerprint } = await import('./license');
+    const localFp = await getFingerprint();
     const payload = {
       licenseKey: 'K',
       clinicId: 'c',
@@ -169,14 +178,16 @@ describe('isLicenseValid — signature verification (CLI-362)', () => {
       expiresAt: new Date(Date.now() + 86400000 * 30).toISOString(), // 30 kun keyin
       gracePeriodDays: 0,
       issuedAt: new Date().toISOString(),
+      fingerprint: localFp,
     };
     const signature = signForTest(payload);
 
-    const { isLicenseValid } = await import('./license');
-    expect(isLicenseValid({ ...payload, signature })).toBe(true);
+    expect(isLicenseValid({ ...payload, signature }, localFp)).toBe(true);
   });
 
   test('rejects the same license after modules/expiresAt are tampered with (fingerprint-forge scenario)', async () => {
+    const { isLicenseValid, getFingerprint } = await import('./license');
+    const localFp = await getFingerprint();
     const payload = {
       licenseKey: 'K',
       clinicId: 'c',
@@ -184,6 +195,7 @@ describe('isLicenseValid — signature verification (CLI-362)', () => {
       expiresAt: new Date(Date.now() + 86400000 * 30).toISOString(),
       gracePeriodDays: 0,
       issuedAt: new Date().toISOString(),
+      fingerprint: localFp,
     };
     const signature = signForTest(payload);
 
@@ -196,7 +208,163 @@ describe('isLicenseValid — signature verification (CLI-362)', () => {
       signature, // stale signature, no longer matches the mutated payload
     };
 
-    const { isLicenseValid } = await import('./license');
-    expect(isLicenseValid(forged)).toBe(false);
+    expect(isLicenseValid(forged, localFp)).toBe(false);
+  });
+});
+
+describe('isLicenseValid — machine binding (CLI-410)', () => {
+  const basePayload = () => ({
+    licenseKey: 'K',
+    clinicId: 'c',
+    modules: ['patients'],
+    expiresAt: new Date(Date.now() + 86400000 * 30).toISOString(),
+    gracePeriodDays: 0,
+    issuedAt: new Date().toISOString(),
+  });
+
+  test('rejects a payload validly signed for machine A when checked on machine B', async () => {
+    const { isLicenseValid, getFingerprint } = await import('./license');
+    const localFp = await getFingerprint(); // machine B
+    const machineAFp = 'a'.repeat(64); // some other machine's fingerprint
+    const payload = { ...basePayload(), fingerprint: machineAFp };
+    const signature = signForTest(payload); // legitimately signed for machine A
+
+    // Signature verifies, but the bound fingerprint is not this machine's.
+    expect(isLicenseValid({ ...payload, signature }, localFp)).toBe(false);
+  });
+
+  test('rejects a legacy payload that has no fingerprint field', async () => {
+    const { isLicenseValid, getFingerprint } = await import('./license');
+    const localFp = await getFingerprint();
+    const legacyPayload = basePayload(); // no `fingerprint`
+    const signature = signForTest(legacyPayload); // validly signed (old scheme)
+
+    expect(
+      isLicenseValid(
+        { ...legacyPayload, signature } as unknown as import('./license').LicenseData,
+        localFp,
+      ),
+    ).toBe(false);
+  });
+
+  test('getActiveModules returns [] when the bound fingerprint does not match this machine', async () => {
+    const { writeLicense, getActiveModules, getFingerprint } = await import('./license');
+    const machineAFp = 'b'.repeat(64);
+    const payload = { ...basePayload(), fingerprint: machineAFp };
+    const signature = signForTest(payload);
+    // .lic is AES-encrypted with THIS machine's key, so readLicense decrypts it,
+    // but the signed fingerprint belongs to machine A -> rejected.
+    await writeLicense({ ...payload, signature });
+    expect(await getFingerprint()).not.toBe(machineAFp);
+    expect(await getActiveModules()).toEqual([]);
+  });
+
+  test('getActiveModules returns modules for a matching-fingerprint valid license', async () => {
+    const { writeLicense, getActiveModules, getFingerprint } = await import('./license');
+    const localFp = await getFingerprint();
+    const payload = { ...basePayload(), modules: ['patients', 'queue'], fingerprint: localFp };
+    const signature = signForTest(payload);
+    await writeLicense({ ...payload, signature });
+    expect(await getActiveModules()).toEqual(['patients', 'queue']);
+  });
+});
+
+describe('isLicenseValid — monotonic clock anchor (CLI-437)', () => {
+  test('a clock rollback before expiry is blocked when the anchor is already past expiry+grace', async () => {
+    const { isLicenseValid, getFingerprint } = await import('./license');
+    const localFp = await getFingerprint();
+    const expiresAt = new Date(Date.now() + 86400000).toISOString(); // expires in 1 day
+    const payload = {
+      licenseKey: 'K',
+      clinicId: 'c',
+      modules: ['patients'],
+      expiresAt,
+      gracePeriodDays: 0,
+      issuedAt: new Date().toISOString(),
+      fingerprint: localFp,
+    };
+    const signature = signForTest(payload);
+    // Anchor already 2 days past expiry (e.g. real time moved on before the
+    // clock was rolled back) — even though Date.now() (mocked implicitly via
+    // real clock here, well within the license's validity window) says valid.
+    const anchorMs = new Date(expiresAt).getTime() + 86400000 * 2;
+
+    expect(isLicenseValid({ ...payload, signature }, localFp, anchorMs)).toBe(false);
+  });
+
+  test('a valid license with no anchor (anchorMs=0) is accepted', async () => {
+    const { isLicenseValid, getFingerprint } = await import('./license');
+    const localFp = await getFingerprint();
+    const payload = {
+      licenseKey: 'K',
+      clinicId: 'c',
+      modules: ['patients'],
+      expiresAt: new Date(Date.now() + 86400000 * 30).toISOString(),
+      gracePeriodDays: 0,
+      issuedAt: new Date().toISOString(),
+      fingerprint: localFp,
+    };
+    const signature = signForTest(payload);
+
+    expect(isLicenseValid({ ...payload, signature }, localFp, 0)).toBe(true);
+  });
+
+  test('issuedAt acts as a floor when the anchor file is missing/zero — an already-expired-at-issue license stays invalid', async () => {
+    const { isLicenseValid, getFingerprint } = await import('./license');
+    const localFp = await getFingerprint();
+    // issuedAt itself is already past expiry+grace (pathological, but exercises
+    // the issuedAt floor independent of any anchor file).
+    const payload = {
+      licenseKey: 'K',
+      clinicId: 'c',
+      modules: ['patients'],
+      expiresAt: new Date(Date.now() - 86400000 * 10).toISOString(),
+      gracePeriodDays: 0,
+      issuedAt: new Date().toISOString(), // issued "now", long after expiresAt
+      fingerprint: localFp,
+    };
+    const signature = signForTest(payload);
+
+    expect(isLicenseValid({ ...payload, signature }, localFp, 0)).toBe(false);
+  });
+});
+
+describe('readAnchor + writeAnchor (CLI-437)', () => {
+  test('round-trips the same millisecond value through AES encryption', async () => {
+    const { writeAnchor, readAnchor } = await import('./license');
+    const ms = Date.now();
+    await writeAnchor(ms);
+    expect(await readAnchor()).toBe(ms);
+  });
+
+  test('missing anchor file -> readAnchor returns 0', async () => {
+    const { readAnchor } = await import('./license');
+    process.env.LICENSE_ANCHOR_PATH = join(tmpDir, 'nonexistent-anchor.dat');
+    expect(await readAnchor()).toBe(0);
+  });
+});
+
+describe('getActiveModules — anchor advance (CLI-437)', () => {
+  test('a valid license check advances the anchor forward (never backward)', async () => {
+    process.env.LICENSE_ANCHOR_PATH = join(tmpDir, 'advance-anchor.dat');
+    const { writeLicense, getActiveModules, getFingerprint, readAnchor } = await import(
+      './license'
+    );
+    const localFp = await getFingerprint();
+    const beforeMs = Date.now();
+    const payload = {
+      licenseKey: 'K',
+      clinicId: 'c',
+      modules: ['patients'],
+      expiresAt: new Date(Date.now() + 86400000 * 30).toISOString(),
+      gracePeriodDays: 0,
+      issuedAt: new Date().toISOString(),
+      fingerprint: localFp,
+    };
+    const signature = signForTest(payload);
+    await writeLicense({ ...payload, signature });
+
+    expect(await getActiveModules()).toEqual(['patients']);
+    expect(await readAnchor()).toBeGreaterThanOrEqual(beforeMs);
   });
 });

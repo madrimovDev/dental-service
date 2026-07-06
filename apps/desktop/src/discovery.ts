@@ -70,23 +70,38 @@ export const stopServerDiscovery = (): void => {
 
 // ---- CLIENT SIDE ----
 
-export const findServer = (timeoutMs = 2500): Promise<string | null> =>
-  new Promise((resolve) => {
-    let resolved = false;
-    const client = createSocket('udp4');
+export interface DiscoveredServer {
+  url: string;
+  ip: string;
+  port: number;
+}
 
-    const done = (url: string | null) => {
-      if (resolved) return;
-      resolved = true;
-      client.close();
-      resolve(url);
-    };
+/**
+ * CLI-434 — evil-twin fix (a). Ilgari `findServer` BIRINCHI kelgan
+ * `DENTAL_SERVER_v1:` javobiga jim ishonardi (auth/tasdiqlashsiz) — LAN'dagi
+ * istalgan qurilma soxta javob yuborib klientni o'ziga yo'naltirishi mumkin
+ * edi. `findServers` `timeoutMs` davomida BARCHA javoblarni yig'adi (unikal,
+ * url bo'yicha dedupe) va massiv qaytaradi — birinchisiga sakramaydi.
+ * Chaqiruvchi (`main.ts`) foydalanuvchiga topilgan server(lar)ni ko'rsatib
+ * TASDIQLASHNI so'raydi (TOFU — bir marta tasdiqlangach `config.serverUrl`ga
+ * yoziladi, keyingi startup'lar qayta so'ramaydi). Bo'sh massiv = topilmadi.
+ */
+export const findServers = (timeoutMs = 2500): Promise<DiscoveredServer[]> =>
+  new Promise((resolve) => {
+    const client = createSocket('udp4');
+    const found = new Map<string, DiscoveredServer>();
 
     client.on('message', (msg) => {
       const text = msg.toString();
       if (!text.startsWith(RESPONSE_PREFIX)) return;
-      const { ip, port } = JSON.parse(text.slice(RESPONSE_PREFIX.length));
-      done(`http://${ip}:${port}`);
+      try {
+        const { ip, port } = JSON.parse(text.slice(RESPONSE_PREFIX.length));
+        const url = `http://${ip}:${port}`;
+        if (!found.has(url)) found.set(url, { url, ip, port });
+      } catch {
+        // Buzuq/notanish javob — e'tiborsiz qoldiramiz (parse xatosi bilan
+        // butun discovery'ni yiqitmaymiz).
+      }
     });
 
     client.bind(() => {
@@ -94,5 +109,8 @@ export const findServer = (timeoutMs = 2500): Promise<string | null> =>
       client.send(DISCOVER_MSG, UDP_PORT, '255.255.255.255');
     });
 
-    setTimeout(() => done(null), timeoutMs).unref?.();
+    setTimeout(() => {
+      client.close();
+      resolve(Array.from(found.values()));
+    }, timeoutMs).unref?.();
   });

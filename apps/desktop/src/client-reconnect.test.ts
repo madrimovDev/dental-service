@@ -16,9 +16,9 @@ describe('startClientReconnectLoop', () => {
   });
 
   test("30s (default) interval bilan scheduleInterval'ni chaqiradi", () => {
-    const findServer = mock(async () => null);
+    const findServers = mock(async () => []);
     startClientReconnectLoop({
-      findServer,
+      findServers,
       onFound: mock(() => {}),
       scheduleInterval,
       clearScheduledInterval,
@@ -30,7 +30,7 @@ describe('startClientReconnectLoop', () => {
 
   test('intervalMs berilsa scheduleInterval shu qiymat bilan chaqiriladi', () => {
     startClientReconnectLoop({
-      findServer: mock(async () => null),
+      findServers: mock(async () => []),
       onFound: mock(() => {}),
       scheduleInterval,
       clearScheduledInterval,
@@ -40,36 +40,58 @@ describe('startClientReconnectLoop', () => {
     expect(scheduleInterval.mock.calls[0]?.[1]).toBe(1000);
   });
 
-  test('har tick findServer chaqiradi, topilmasa onFound chaqirilmaydi va interval davom etadi', async () => {
-    const findServer = mock(async () => null);
-    const onFound = mock((_url: string) => {});
-    startClientReconnectLoop({ findServer, onFound, scheduleInterval, clearScheduledInterval });
+  test('har tick findServers chaqiradi, topilmasa onFound chaqirilmaydi va interval davom etadi', async () => {
+    const findServers = mock(async () => []);
+    const onFound = mock((_servers: unknown) => {});
+    startClientReconnectLoop({ findServers, onFound, scheduleInterval, clearScheduledInterval });
 
     scheduledFn?.();
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(findServer).toHaveBeenCalledTimes(1);
+    expect(findServers).toHaveBeenCalledTimes(1);
     expect(onFound).not.toHaveBeenCalled();
     expect(clearScheduledInterval).not.toHaveBeenCalled();
   });
 
-  test('findServer server topsa onFound chaqiradi va intervalni tozalaydi', async () => {
-    const findServer = mock(async () => 'http://10.0.0.5:80');
-    const onFound = mock((_url: string) => {});
-    startClientReconnectLoop({ findServer, onFound, scheduleInterval, clearScheduledInterval });
+  test("findServers server(lar) topsa onFound RO'YXAT bilan chaqiradi va intervalni tozalaydi", async () => {
+    const servers = [{ url: 'http://10.0.0.5:80', ip: '10.0.0.5', port: 80 }];
+    const findServers = mock(async () => servers);
+    const onFound = mock((_servers: unknown) => {});
+    startClientReconnectLoop({ findServers, onFound, scheduleInterval, clearScheduledInterval });
 
     scheduledFn?.();
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(onFound).toHaveBeenCalledWith('http://10.0.0.5:80');
+    expect(onFound).toHaveBeenCalledWith(servers);
     expect(clearScheduledInterval).toHaveBeenCalledWith('fake-handle');
+  });
+
+  // CLI-434 — onFound never auto-connects on its own; it receives the full
+  // list (including multiple/rogue candidates) so the caller (main.ts) can
+  // route it through the same user-confirmation (TOFU) flow as the initial
+  // discovery, instead of silently trusting whichever server answered first.
+  test('bir nechta server topilsa — onFound BARCHASINI oladi (birinchisiga avtomatik ulanmaydi)', async () => {
+    const servers = [
+      { url: 'http://10.0.0.5:80', ip: '10.0.0.5', port: 80 },
+      { url: 'http://10.0.0.66:80', ip: '10.0.0.66', port: 80 },
+    ];
+    const findServers = mock(async () => servers);
+    const onFound = mock((_servers: unknown) => {});
+    startClientReconnectLoop({ findServers, onFound, scheduleInterval, clearScheduledInterval });
+
+    scheduledFn?.();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(onFound).toHaveBeenCalledWith(servers);
+    expect((onFound.mock.calls[0]?.[0] as unknown[]).length).toBe(2);
   });
 
   test('qaytarilgan stop funksiyasi intervalni tozalaydi', () => {
     const stop = startClientReconnectLoop({
-      findServer: mock(async () => null),
+      findServers: mock(async () => []),
       onFound: mock(() => {}),
       scheduleInterval,
       clearScheduledInterval,
@@ -81,10 +103,10 @@ describe('startClientReconnectLoop', () => {
   });
 
   test('stop() chaqirilgach navbatdagi tick onFound chaqirmaydi', async () => {
-    const findServer = mock(async () => 'http://10.0.0.5:80');
-    const onFound = mock((_url: string) => {});
+    const findServers = mock(async () => [{ url: 'http://10.0.0.5:80', ip: '10.0.0.5', port: 80 }]);
+    const onFound = mock((_servers: unknown) => {});
     const stop = startClientReconnectLoop({
-      findServer,
+      findServers,
       onFound,
       scheduleInterval,
       clearScheduledInterval,
