@@ -48,3 +48,50 @@ export const requirePermission =
 
     await next();
   };
+
+/**
+ * CLI-446: ba'zi mutation route'lar bir nechta "domen"ga tegishli maydonlarni
+ * bitta body'da qabul qiladi (masalan `PUT /users/:id/profile` — umumiy profil
+ * maydonlari + payroll maydonlari `baseSalary`/`commissionPercent`). Bunday holda
+ * asosiy `requirePermission` yetarli emas — sezilarli (masalan moliyaviy) maydonlar
+ * body'da bo'lsagina QO'SHIMCHA tor permission talab qilinadi; boshqa maydonlar
+ * uchun asosiy permission yetarli qoladi.
+ *
+ * Raw JSON body'ni o'zi o'qiydi (route'ning `@hono/zod-openapi` validatsiyasidan
+ * OLDIN — `middleware` massivida joylashadi), shuning uchun `c.req.valid('json')`ga
+ * bog'liq emas. Body JSON emas yoki parse qilinmasa — maydon yo'q deb hisoblanadi
+ * (keyingi validatsiya qatlami baribir 400 qaytaradi).
+ */
+export const requirePermissionIfFieldsPresent =
+  <P extends Permission>(fields: readonly string[], code: P): MiddlewareHandler =>
+  async (c, next) => {
+    let body: Record<string, unknown>;
+    try {
+      body = (await c.req.json()) as Record<string, unknown>;
+    } catch {
+      body = {};
+    }
+    const touchesGatedFields =
+      body != null &&
+      typeof body === 'object' &&
+      fields.some((field) => Object.hasOwn(body, field));
+
+    if (!touchesGatedFields) {
+      await next();
+      return;
+    }
+
+    const claims = c.get('accessClaims');
+    if (!claims) {
+      return c.json(fail('auth.required', 'Authentication required'), 401);
+    }
+    if (claims.perms.includes('@owner')) {
+      await next();
+      return;
+    }
+    if (!claims.perms.includes(code)) {
+      return c.json(fail('permission.denied', `Permission required: ${code}`), 403);
+    }
+
+    await next();
+  };
