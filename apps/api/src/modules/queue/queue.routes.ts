@@ -7,6 +7,7 @@ import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openap
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
+import type { AppointmentsService } from '../appointments/appointments.service.ts';
 import { toCheckInCandidateDto, toQueueTicketDto } from './queue.mapper.ts';
 import {
   checkInCandidateDtoSchema,
@@ -25,13 +26,25 @@ const notFoundResponse = {
   },
 };
 
-export const queueRoutes = (deps: { db: Database; audit: AuditLogger }) => {
+export const queueRoutes = (deps: {
+  db: Database;
+  audit: AuditLogger;
+  /**
+   * CLI-425: shared appointment-completion path. app.ts appointmentsService'ni
+   * bir marta qurib beradi (HANDOFF). Berilmasa queue legacy to'g'ridan db.update
+   * yo'liga qaytadi (recall hook OTLAMAYDI).
+   */
+  appointmentsService?: Pick<AppointmentsService, 'update'>;
+}) => {
   const app = new OpenAPIHono();
   app.use('*', requireModuleInDesktop('queue'));
   app.use('*', authMiddleware());
   app.use('*', rlsMiddleware(deps.db));
 
-  const service = createQueueService({ audit: deps.audit });
+  const service = createQueueService({
+    audit: deps.audit,
+    appointments: deps.appointmentsService,
+  });
 
   // ─── GET / — today's queue list ──────────────────────────────────────────
 

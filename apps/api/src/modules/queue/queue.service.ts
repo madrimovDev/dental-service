@@ -3,9 +3,22 @@ import { and, asc, eq, gte, isNull, lt, max, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import type { AppointmentsService } from '../appointments/appointments.service.ts';
+import { AppointmentTransitionError } from '../appointments/appointments.transitions.ts';
 import type { CreateQueueTicketInput, UpdateQueueStatusInput } from './queue.schema.ts';
 
-export const createQueueService = (deps: { audit: AuditLogger }) => {
+/**
+ * CLI-425: queue done→completed shared completion path uchun narrow dep. app.ts
+ * appointmentsService'ni bir marta qurib queue'ga uzatadi (HANDOFF — app.ts
+ * wiring). Inject qilinmagan bo'lsa legacy to'g'ridan-to'g'ri db.update yo'liga
+ * qaytadi (backward-safe; lekin recall/preventive hook OTLAMAYDI).
+ */
+type QueueAppointmentSync = Pick<AppointmentsService, 'update'>;
+
+export const createQueueService = (deps: {
+  audit: AuditLogger;
+  appointments?: QueueAppointmentSync;
+}) => {
   /** Today's queue for a branch */
   async function todayList(c: Context, branchId: string) {
     const db = getDb(c);
@@ -106,25 +119,39 @@ export const createQueueService = (deps: { audit: AuditLogger }) => {
               : null;
 
       if (apptStatus) {
-        const [appt] = await db
-          .select({ id: appointments.id, status: appointments.status })
-          .from(appointments)
-          .where(eq(appointments.id, before.appointmentId));
-
-        // Terminal holatni qayta yozmaslik
-        if (appt && appt.status !== 'cancelled' && appt.status !== 'completed') {
-          await db
-            .update(appointments)
-            .set({ status: apptStatus, updatedAt: now })
+        if (deps.appointments) {
+          // CLI-425: shared completion path — appointmentsService.update() bir
+          // marta preventive-recall hook, state-machine guard (CLI-409), reminder
+          // cleanup va audit'ni bajaradi. Terminal/invalid o'tish (mas. cancelled→
+          // completed) AppointmentTransitionError otadi — bu queue ticket'ni buzmasin:
+          // yutamiz (appointment o'z terminal/cancelled holatida qoladi, ticket done).
+          try {
+            await deps.appointments.update(c, before.appointmentId, { status: apptStatus });
+          } catch (e) {
+            if (!(e instanceof AppointmentTransitionError)) throw e;
+          }
+        } else {
+          // Legacy fallback (app.ts hali appointmentsService'ni ulamaguncha) —
+          // terminal holatni qayta yozmaslik + qo'lda audit. ⚠️ recall hook OTLAMAYDI.
+          const [appt] = await db
+            .select({ id: appointments.id, status: appointments.status })
+            .from(appointments)
             .where(eq(appointments.id, before.appointmentId));
 
-          await deps.audit.record(c, {
-            action: 'status_synced',
-            resourceType: 'appointment',
-            resourceId: before.appointmentId,
-            before: { status: appt.status },
-            after: { status: apptStatus },
-          });
+          if (appt && appt.status !== 'cancelled' && appt.status !== 'completed') {
+            await db
+              .update(appointments)
+              .set({ status: apptStatus, updatedAt: now })
+              .where(eq(appointments.id, before.appointmentId));
+
+            await deps.audit.record(c, {
+              action: 'status_synced',
+              resourceType: 'appointment',
+              resourceId: before.appointmentId,
+              before: { status: appt.status },
+              after: { status: apptStatus },
+            });
+          }
         }
       }
     }
