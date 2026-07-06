@@ -5,6 +5,20 @@ import { getDb } from '../../db/scoped.ts';
 import type { RecallWithPatient } from './recalls.mapper.ts';
 import type { ListRecallsQuery } from './recalls.schema.ts';
 
+/**
+ * A8 (CLI-438): Postgres 42P10 — "no unique or exclusion constraint matching
+ * the ON CONFLICT specification". 0031 migratsiyasi hali qo'llanilmagan
+ * muhitda `onConflictDoNothing` shu bilan otadi (`insertPreventiveIfAbsent`).
+ */
+function isMissingConflictIndex(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'code' in err &&
+    (err as { code?: string }).code === '42P10'
+  );
+}
+
 /** Patient join bilan recall select — DTO uchun nom/telefon kerak. */
 const recallWithPatientSelect = {
   recall: recalls,
@@ -91,6 +105,57 @@ export const createRecallsRepository = () => {
       })
       .returning({ id: recalls.id });
     return inserted.length > 0;
+  }
+
+  /**
+   * A8 (CLI-438): preventive-recall idempotent auto-create — defense-in-depth
+   * qatlami. Service'dagi `hasOpenByReason` check-then-insert bo'lib, race
+   * ostida (ikki concurrent request) ikkita ochiq preventive yaratilishi mumkin
+   * edi (dedupe faqat SELECT'da, INSERT'gacha bo'lgan oynada emas — `hasOpenByReason`
+   * FAQAT dublikat allaqachon mavjud bo'lganda himoya qiladi, oddiy holatda —
+   * bemorda ochiq preventive yo'q — to'g'ridan shu funksiyaga tushamiz). `sourceStageId`
+   * NULL bo'lgani uchun eski `recalls_patient_stage_open_unique` indeks (yuqorida)
+   * NULL'larni distinct deb hisoblab dedupe QILMAYDI (Postgres semantikasi).
+   *
+   * Fix: yangi partial unique index `recalls_patient_preventive_open_unique`
+   * (drizzle/0031 — qo'lda SQL migratsiya, sourceStageId NI EMAS, faqat
+   * `patientId`ni target qiladi, shuning uchun NULL muammosi yo'q) + shu index'ga
+   * mos `onConflictDoNothing`. ⚠️ Index `packages/db-schema` schema.ts'da
+   * DEKLARATSIYA QILINMAGAN (bu fayl shu agent egaligidan tashqari) — DB'da
+   * mavjud bo'lishi kerak, lekin Drizzle snapshot bilan drift bor; db-schema
+   * egasi index'ni schema.ts'ga qo'shishi kerak (kelajakdagi `drizzle-kit
+   * generate` uchun).
+   *
+   * ⚠️ MUHIM: `ON CONFLICT ... WHERE ... DO NOTHING` mos partial unique index
+   * TOPILMASA, Postgres oddiy INSERT'ga "yumshab" QOLMAYDI — `42P10` ("no unique
+   * or exclusion constraint matching ON CONFLICT") xatosi bilan OTADI. Agar 0031
+   * migratsiyasi hali qo'llanilmagan bo'lsa, bu — `autoCreatePreventive`ning
+   * ODDIY (dublikatsiz) yo'lida ham xato degani (appointment allaqachon
+   * completed'ga yozilgan, lekin recall yaratish 500 qaytaradi). Shuning uchun
+   * `42P10`ni ANIQ ushlab, oddiy (himoyasiz, lekin funksional) INSERT'ga
+   * qaytamiz — 0031 hali qo'llanilmagan muhitda ham funksionallik saqlanadi,
+   * faqat DB-darajasidagi qo'shimcha himoya yo'qoladi (service `hasOpenByReason`
+   * pre-check hamon ishlaydi).
+   */
+  async function insertPreventiveIfAbsent(c: Context, values: RecallInsert): Promise<boolean> {
+    const db = getDb(c);
+    try {
+      const inserted = await db
+        .insert(recalls)
+        .values(values)
+        .onConflictDoNothing({
+          target: [recalls.patientId],
+          where: sql`reason = 'preventive' and status in ('pending', 'contacted')`,
+        })
+        .returning({ id: recalls.id });
+      return inserted.length > 0;
+    } catch (err) {
+      if (isMissingConflictIndex(err)) {
+        const [row] = await db.insert(recalls).values(values).returning({ id: recalls.id });
+        return !!row;
+      }
+      throw err;
+    }
   }
 
   /** Bemorda berilgan reason bo'yicha ochiq recall bormi (preventive dedupe, B4). */
@@ -212,6 +277,7 @@ export const createRecallsRepository = () => {
     findById,
     insert,
     insertIfAbsent,
+    insertPreventiveIfAbsent,
     hasOpenByReason,
     findOpenByPatient,
     reopenByAppointment,

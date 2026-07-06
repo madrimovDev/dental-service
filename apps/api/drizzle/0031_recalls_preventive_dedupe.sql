@@ -1,0 +1,20 @@
+-- A8 (CLI-438): preventive-recall dedupe — mavjud `recalls_patient_stage_open_unique`
+-- (patient_id, source_stage_id) partial unique index `sourceStageId IS NULL`
+-- holatini qoplamaydi (Postgres semantikasi: NULL != NULL, hatto unique index
+-- ichida ham). Preventive recall'lar har doim source_stage_id = NULL bilan
+-- yaratiladi (autoCreatePreventive, recalls.service.ts) — shuning uchun eski
+-- index ikki concurrent request'da ikkita ochiq preventive recall yaratilishini
+-- OLDINI OLMAYDI.
+--
+-- Yangi index FAQAT patient_id'ni target qiladi (source_stage_id ustuni index
+-- kalitida YO'Q — shuning uchun NULL muammosi tegishli emas), predikat
+-- `reason = 'preventive' AND status IN ('pending','contacted')` bilan cheklangan
+-- (boshqa reason'lar — manual/treatment_followup/post_op_check — bu index'ga
+-- kirmaydi, ular uchun bir nechta ochiq recall bemor boshiga ruxsat etiladi).
+--
+-- ⚠️ ESLATMA (db-schema egasi uchun): bu index `packages/db-schema/src/tables/
+-- recalls.ts`da DEKLARATSIYA QILINMAGAN (0029_appointments_no_overlap.sql
+-- EXCLUDE constraint bilan bir xil pretsedent — Drizzle EXCLUDE/murakkab partial
+-- index'larni schema DSL orqali to'liq ifodalay olmaydi). Kelajakda schema.ts'ga
+-- qo'shilishi kerak (drizzle-kit snapshot drift'ini bartaraf etish uchun).
+CREATE UNIQUE INDEX "recalls_patient_preventive_open_unique" ON "recalls" ("patient_id") WHERE (reason = 'preventive' AND status IN ('pending', 'contacted'));

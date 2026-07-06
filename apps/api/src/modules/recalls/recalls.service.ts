@@ -195,6 +195,14 @@ export const createRecallsService = (deps: { audit: AuditLogger }) => {
    * NULL → partial index dedupe QILMAYDI; shuning uchun service'da "bemorda ochiq
    * preventive bormi?" tekshiruvi bilan gate'lanadi (bir bemor → bitta ochiq
    * preventive). Transition guard (re-PATCH qayta yoqmasligi) chaqiruvchida.
+   *
+   * A8 (CLI-438): `hasOpenByReason` check-then-insert — ikki concurrent request
+   * (mas. ikki xodim bir vaqtda ikkita appointment'ni "completed" qilsa) SELECT
+   * va INSERT orasidagi oynada ikkita ochiq preventive yaratishi mumkin edi.
+   * Pre-check BIRINCHI QATOR himoya bo'lib qoladi (tezkor common-case); DB
+   * darajasidagi `insertPreventiveIfAbsent` (partial unique index + ON CONFLICT
+   * DO NOTHING, `recalls.repository.ts`) — defense-in-depth ikkinchi qatlam
+   * (race'da haqiqiy kafolat DB constraint'dan keladi).
    */
   async function autoCreatePreventive(
     c: Context,
@@ -204,7 +212,7 @@ export const createRecallsService = (deps: { audit: AuditLogger }) => {
     if (!tenantId) return;
     if (await repo.hasOpenByReason(c, args.patientId, 'preventive')) return;
     const intervalMonths = await repo.getDefaultIntervalMonths(c);
-    await repo.insert(c, {
+    await repo.insertPreventiveIfAbsent(c, {
       tenantId,
       patientId: args.patientId,
       branchId: args.branchId ?? null,
