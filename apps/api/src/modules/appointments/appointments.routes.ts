@@ -23,6 +23,7 @@ import {
   type RecallAppointmentHook,
   type SchedulePredicates,
 } from './appointments.service.ts';
+import { AppointmentTransitionError } from './appointments.transitions.ts';
 
 /** Standart 404 response — get / patch / cancel endpoint'lar uchun. */
 const notFoundResponse = {
@@ -201,7 +202,14 @@ export const appointmentRoutes = (deps: {
   app.openapi(updateRoute, async (c) => {
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const result = await service.update(c, id, body);
+    let result: Awaited<ReturnType<typeof service.update>>;
+    try {
+      result = await service.update(c, id, body);
+    } catch (e) {
+      // CLI-409: state-machine violation → 400 (invalid_transition / terminal).
+      if (e instanceof AppointmentTransitionError) return c.json(fail(e.code, e.message), 400);
+      throw e;
+    }
     if (!result.ok) {
       // Konflikt oilasi (409): doctor_busy + ish-soati/time-off guard'lari (A6).
       if (
@@ -241,7 +249,14 @@ export const appointmentRoutes = (deps: {
   app.openapi(cancelRoute, async (c) => {
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const result = await service.cancel(c, id, body?.reason);
+    let result: Awaited<ReturnType<typeof service.cancel>>;
+    try {
+      result = await service.cancel(c, id, body?.reason);
+    } catch (e) {
+      // CLI-409: completed'ni cancel qilishga urinish → 400 invalid_transition/terminal.
+      if (e instanceof AppointmentTransitionError) return c.json(fail(e.code, e.message), 400);
+      throw e;
+    }
     if (!result.ok) return c.json(fail(result.code, result.code), 400);
     if (!result.appointment)
       return c.json(fail('appointment.not_found', 'Appointment not found'), 400);

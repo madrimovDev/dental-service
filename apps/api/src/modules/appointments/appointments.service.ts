@@ -9,6 +9,12 @@ import type {
   ListAppointmentsQuery,
   UpdateAppointmentInput,
 } from './appointments.schema.ts';
+import {
+  type AppointmentStatus,
+  AppointmentTransitionError,
+  assertAppointmentTransition,
+  isActiveStatus,
+} from './appointments.transitions.ts';
 
 /**
  * Schedule modulidan inject qilinadigan predikatlar (A6, RFC-0009 bog'liqlik
@@ -213,8 +219,33 @@ export const createAppointmentsService = (deps: {
     const [before] = await db.select().from(appointments).where(eq(appointments.id, id));
     if (!before) return { ok: false as const, code: 'not_found' };
 
-    // Conflict + schedule check if time/doctor/branch changing
-    if (input.startTime || input.endTime || input.doctorId) {
+    // CLI-409: state-machine guard. Status o'zgarayotgan bo'lsa transition
+    // matritsasini tekshir (invalid → throw → routes 400 status.invalid_transition).
+    const beforeStatus = before.status as AppointmentStatus;
+    if (input.status && input.status !== beforeStatus) {
+      assertAppointmentTransition(beforeStatus, input.status);
+    }
+    // CLI-409: `completed` — terminal. Status-only idempotent no-op (yuqorida
+    // o'tdi), lekin vaqt/doktor/servis/notes tahriri RAD (throw → 400 status.terminal).
+    if (beforeStatus === 'completed') {
+      const touchesFields =
+        input.startTime !== undefined ||
+        input.endTime !== undefined ||
+        input.doctorId !== undefined ||
+        input.serviceIds !== undefined ||
+        input.assistantId !== undefined ||
+        input.notes !== undefined ||
+        input.cancellationReason !== undefined;
+      if (touchesFields) throw new AppointmentTransitionError('status.terminal', 'completed');
+    }
+
+    // CLI-409: re-validatsiya triggeri — vaqt/doktor o'zgarganda YOKI yangi holat
+    // active (scheduled/confirmed/in_progress) ga o'tganda (vaqt o'zgarmasa ham).
+    // Bu H5'ni yopadi: cancelled→scheduled band slotga endi conflict topadi.
+    const targetStatus = (input.status ?? beforeStatus) as AppointmentStatus;
+    const targetActive = isActiveStatus(targetStatus);
+    const timeOrDoctorChanged = !!(input.startTime || input.endTime || input.doctorId);
+    if (timeOrDoctorChanged || (targetActive && beforeStatus !== targetStatus)) {
       const start = new Date(input.startTime ?? before.startTime);
       const end = new Date(input.endTime ?? before.endTime);
       const doctor = input.doctorId ?? before.doctorId;
