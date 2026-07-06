@@ -1,5 +1,5 @@
 import { mkdir, stat, unlink } from 'node:fs/promises';
-import { dirname, resolve, sep } from 'node:path';
+import { dirname, relative, resolve, sep } from 'node:path';
 
 /**
  * Local desktop deploy uchun MinIO/S3 o'rniga filesystem-backed storage.
@@ -17,6 +17,13 @@ export interface StorageAdapter {
   remove(key: string): Promise<void>;
   exists(key: string): Promise<boolean>;
   serveUrl(key: string): string;
+  /**
+   * `key`ni kanonik (normalizatsiya QILINGAN) `baseDir`-nisbiy yo'lга yechadi.
+   * `baseDir` tashqarisiga chiqsa (path traversal — `..`, absolute yo'l) `null`
+   * qaytaradi (throw EMAS). Tenant-tekshiruvi aynan shu `relKey` (o'qiladigan
+   * string) ustida bajarilishi uchun — CLI-405: tekshirilgan-string ≡ o'qilgan-string.
+   */
+  resolve(key: string): { path: string; relKey: string } | null;
 }
 
 /**
@@ -61,5 +68,13 @@ export const createLocalStorageAdapter = (
   },
   serveUrl(key) {
     return `/uploads/${encodeURIComponent(key)}`;
+  },
+  resolve(key) {
+    const resolvedBase = resolve(baseDir);
+    const resolvedPath = resolve(resolvedBase, key);
+    if (resolvedPath !== resolvedBase && !resolvedPath.startsWith(resolvedBase + sep)) {
+      return null;
+    }
+    return { path: resolvedPath, relKey: relative(resolvedBase, resolvedPath) };
   },
 });
