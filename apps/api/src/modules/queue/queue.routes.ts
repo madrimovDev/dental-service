@@ -16,7 +16,8 @@ import {
   queueTicketIdParamSchema,
   updateQueueStatusSchema,
 } from './queue.schema.ts';
-import { createQueueService } from './queue.service.ts';
+import { createQueueService, QueueValidationError } from './queue.service.ts';
+import { QueueTransitionError } from './queue.transitions.ts';
 
 /** Standart 404 response — ticket topilmadi. */
 const notFoundResponse = {
@@ -25,6 +26,9 @@ const notFoundResponse = {
     description: 'Queue ticket not found',
   },
 };
+
+/** A5 (CLI-438): linked appointment validatsiyasi 400 kodlari — dublikat 409. */
+const conflictQueueCodes = new Set(['queue.duplicate_ticket']);
 
 export const queueRoutes = (deps: {
   db: Database;
@@ -117,13 +121,27 @@ export const queueRoutes = (deps: {
         content: { 'application/json': { schema: errorResponseSchema } },
         description: 'Forbidden',
       },
+      409: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Duplicate open ticket for the linked appointment',
+      },
     },
   });
 
   app.openapi(createRoute_, async (c) => {
     const body = c.req.valid('json');
-    const ticket = await service.create(c, body);
-    return c.json(ok(toQueueTicketDto(ticket)), 201);
+    try {
+      const ticket = await service.create(c, body);
+      return c.json(ok(toQueueTicketDto(ticket)), 201);
+    } catch (e) {
+      // A5 (CLI-438): linked appointment validatsiyasi — mavjudlik/branch/patient/
+      // status/dublikat. Dublikat 409 (conflict), qolgani 400.
+      if (e instanceof QueueValidationError) {
+        if (conflictQueueCodes.has(e.code)) return c.json(fail(e.code, e.code), 409);
+        return c.json(fail(e.code, e.code), 400);
+      }
+      throw e;
+    }
   });
 
   // ─── PATCH /{id}/status — update ticket status ───────────────────────────
@@ -138,15 +156,57 @@ export const queueRoutes = (deps: {
       params: queueTicketIdParamSchema,
       body: { content: { 'application/json': { schema: updateQueueStatusSchema } } },
     },
-    responses: { ...okJson(queueTicketDtoSchema, 'Updated queue ticket'), ...notFoundResponse },
+    responses: {
+      ...okJson(queueTicketDtoSchema, 'Updated queue ticket'),
+      ...notFoundResponse,
+      400: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Invalid status transition',
+      },
+    },
   });
 
   app.openapi(updateStatusRoute, async (c) => {
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const ticket = await service.updateStatus(c, id, body);
+    let ticket: Awaited<ReturnType<typeof service.updateStatus>>;
+    try {
+      ticket = await service.updateStatus(c, id, body);
+    } catch (e) {
+      // A6 (CLI-438): state-machine violation → 400 (status.invalid_transition).
+      if (e instanceof QueueTransitionError) return c.json(fail(e.code, e.message), 400);
+      throw e;
+    }
     if (!ticket) return c.json(fail('ticket.not_found', 'Queue ticket not found'), 404);
     return c.json(ok(toQueueTicketDto(ticket)), 200);
+  });
+
+  // ─── POST /sweep-no-shows — kun oxiri no-show sweep (A6, CLI-438) ────────
+  // ⚠️ Cron/repeatable job registratsiyasi ULANMAGAN (lib/queue.ts + index.ts —
+  // bu agent egaligidan tashqari); bu — qo'lda/kelajakdagi tashqi trigger uchun
+  // manual endpoint (branch manager/admin `queue.manage` bilan).
+
+  const sweepNoShowsRoute = createRoute({
+    method: 'post',
+    path: '/sweep-no-shows',
+    tags: ['queue'],
+    operationId: 'sweepQueueNoShows',
+    middleware: [requirePermission('queue.manage')] as const,
+    request: {
+      body: {
+        required: false,
+        content: {
+          'application/json': { schema: z.object({ branchId: z.uuid().optional() }) },
+        },
+      },
+    },
+    responses: okJson(z.object({ swept: z.number().int() }), 'Number of tickets marked missed'),
+  });
+
+  app.openapi(sweepNoShowsRoute, async (c) => {
+    const body = c.req.valid('json');
+    const swept = await service.sweepNoShows(c, body?.branchId);
+    return c.json(ok({ swept }), 200);
   });
 
   return app;
