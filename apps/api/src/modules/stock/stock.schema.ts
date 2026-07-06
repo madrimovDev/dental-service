@@ -63,9 +63,14 @@ export const createBatchSchema = z.object({
 export type CreateBatchInput = z.infer<typeof createBatchSchema>;
 
 // ===== Query schemas (route-level) =====
+// CLI-442 #3: `page`/`pageSize` ixtiyoriy (additive, mavjud caller'lar buzilmaydi) —
+// uzoq ishlagan itemda minglab movement bitta so'rovda qaytmasin.
 export const movementsQuerySchema = z.object({
   itemId: z.uuid(),
+  page: z.coerce.number().int().positive().optional(),
+  pageSize: z.coerce.number().int().positive().max(200).optional(),
 });
+export type ListMovementsQuery = z.infer<typeof movementsQuerySchema>;
 
 export const bomQuerySchema = z.object({
   serviceId: z.uuid().optional(),

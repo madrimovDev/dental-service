@@ -166,8 +166,8 @@ export const stockRoutes = (deps: {
   });
 
   app.openapi(listMovementsRoute, async (c) => {
-    const { itemId } = c.req.valid('query');
-    const rows = await service.listMovements(c, itemId);
+    const query = c.req.valid('query');
+    const rows = await service.listMovements(c, query);
     return c.json(ok(rows.map(toStockMovementDto)), 200);
   });
 

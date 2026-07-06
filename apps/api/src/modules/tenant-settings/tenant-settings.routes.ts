@@ -46,6 +46,12 @@ export const tenantSettingsRoutes = (deps: { db: Database; audit: AuditLogger })
   });
 
   app.openapi(verticalRoute, async (c) => {
+    // CLI-442 #7: `requirePermission` yo'q — workspace tanlanmagan holatda ham chaqirilishi
+    // mumkin (activeTenantId yo'q). `getOrCreate` bunday holatda 500 (`No tenant context`)
+    // otar edi. Yumshoq default: tenant konteksti yo'q bo'lsa DB'ga tegmasdan schema
+    // default'ini ('dental') qaytaramiz.
+    const tenantId = c.get('activeTenantId');
+    if (!tenantId) return c.json(ok({ vertical: 'dental' as const }), 200);
     const row = await service.getOrCreate(c);
     return c.json(ok({ vertical: row.vertical }), 200);
   });

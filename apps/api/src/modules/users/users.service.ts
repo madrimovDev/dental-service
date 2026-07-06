@@ -26,26 +26,30 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
   /** Joriy tenant'dagi xodimlar (active assignmentlar bilan) */
   async function listAssignments(c: Context) {
     const db = getDb(c);
-    return db
-      .select({
-        assignmentId: userAssignments.id,
-        userId: userAssignments.userId,
-        userEmail: users.email,
-        userPhone: users.phone,
-        userFullName: users.fullName,
-        branchId: userAssignments.branchId,
-        branchName: branches.name,
-        roleId: userAssignments.roleId,
-        roleName: roles.name,
-        validFrom: userAssignments.validFrom,
-        validTo: userAssignments.validTo,
-        isActive: userAssignments.isActive,
-      })
-      .from(userAssignments)
-      .innerJoin(users, eq(users.id, userAssignments.userId))
-      .leftJoin(branches, eq(branches.id, userAssignments.branchId))
-      .innerJoin(roles, eq(roles.id, userAssignments.roleId))
-      .orderBy(users.fullName);
+    return (
+      db
+        .select({
+          assignmentId: userAssignments.id,
+          userId: userAssignments.userId,
+          userEmail: users.email,
+          userPhone: users.phone,
+          userFullName: users.fullName,
+          branchId: userAssignments.branchId,
+          branchName: branches.name,
+          roleId: userAssignments.roleId,
+          roleName: roles.name,
+          validFrom: userAssignments.validFrom,
+          validTo: userAssignments.validTo,
+          isActive: userAssignments.isActive,
+        })
+        .from(userAssignments)
+        .innerJoin(users, eq(users.id, userAssignments.userId))
+        .leftJoin(branches, eq(branches.id, userAssignments.branchId))
+        .innerJoin(roles, eq(roles.id, userAssignments.roleId))
+        // CLI-442 #6: soft-deleted user xodim ro'yxatida ko'rinmasin (deleted_at latent edi).
+        .where(isNull(users.deletedAt))
+        .orderBy(users.fullName)
+    );
   }
 
   /**

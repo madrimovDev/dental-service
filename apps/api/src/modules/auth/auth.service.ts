@@ -652,7 +652,12 @@ export const createAuthService = (deps: AuthServiceDeps) => {
   }
 
   async function requestPasswordReset(input: PasswordResetRequestInput) {
-    const [user] = await db.select().from(users).where(eq(users.phone, input.phone));
+    // CLI-442 #5: soft-deleted user (login:256, workspace-branches:700 bilan izchil)
+    // parol tiklash tokeni ola olmasin.
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(and(eq(users.phone, input.phone), isNull(users.deletedAt)));
 
     // Security: invalid user uchun ham success qaytaramiz (enumeration oldini olish)
     if (!user) return { sent: true };

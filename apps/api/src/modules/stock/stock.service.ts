@@ -12,8 +12,12 @@ import type {
   CreateItemInput,
   CreateMovementInput,
   ListItemsQuery,
+  ListMovementsQuery,
   UpdateItemInput,
 } from './stock.schema.ts';
+
+/** `listMovements` default sahifa hajmi (CLI-442 #3 — chegaralanmagan tarix oldini olish). */
+const DEFAULT_MOVEMENTS_PAGE_SIZE = 50;
 
 /** Qo'lda 'out' harakat manfiy qoldiqqa olib kelganda (negative-stock guard). */
 export class InsufficientStockError extends Error {
@@ -163,13 +167,22 @@ export const createStockService = (deps: {
   }
 
   // ===== Stock Movements =====
-  async function listMovements(c: Context, itemId: string) {
+  /**
+   * CLI-442 #3: sahifalab qaytaradi (default 50/sahifa) — uzoq ishlagan itemda minglab
+   * movement bitta so'rovda qaytmasin. `page`/`pageSize` ixtiyoriy — berilmasa 1-sahifa,
+   * default hajm.
+   */
+  async function listMovements(c: Context, query: ListMovementsQuery) {
     const db = getDb(c);
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? DEFAULT_MOVEMENTS_PAGE_SIZE;
     return db
       .select()
       .from(stockMovements)
-      .where(eq(stockMovements.itemId, itemId))
-      .orderBy(desc(stockMovements.createdAt));
+      .where(eq(stockMovements.itemId, query.itemId))
+      .orderBy(desc(stockMovements.createdAt))
+      .limit(pageSize)
+      .offset((page - 1) * pageSize);
   }
 
   /** Movement insert + stock_items.quantity yangilash — bir tx (RLS tx-bound, set_config qayta). */
