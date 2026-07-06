@@ -10,17 +10,32 @@
  *
  * ⚠️ Infra DOWN paytida YOZILGAN, LEKIN ISHGA TUSHIRILMAGAN (Postgres + MinIO/S3 kerak).
  *   cd apps/api && bun test tests/integration/cli-422-upload-orphan-cleanup.test.ts --env-file=../../.env
+ *
+ * `lib/s3.ts` modul-darajasida `createLocalStorageAdapter()`ni ARGUMENTSIZ chaqiradi
+ * (default baseDir — Linux'da `/var/lib/dental-service`, yozish uchun root kerak).
+ * `UPLOADS_DIR`ни `s3.ts` (va uni import qiluvchi `patient-images.service.ts`) MODUL
+ * YUKLANGANDA o'qiydi — shuning uchun bu env dynamic import'dan OLDIN o'rnatiladi
+ * (cli-359/cli-405 idiomasi bilan bir xil: mock/env import'dan oldin).
  */
 
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { patientImages, patients, tenants, users } from '@dental/db-schema';
 import { eq, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { DbOrTx } from '../../src/db/client.ts';
 import { db } from '../../src/db/client.ts';
 import type { AuditLogger } from '../../src/lib/audit-logger.ts';
-import { deleteObject } from '../../src/lib/s3.ts';
-import { createPatientImagesService } from '../../src/modules/patient-images/patient-images.service.ts';
+
+const testUploadsDir = await mkdtemp(join(tmpdir(), 'cli-422-uploads-'));
+process.env.UPLOADS_DIR = testUploadsDir;
+
+const { deleteObject } = await import('../../src/lib/s3.ts');
+const { createPatientImagesService } = await import(
+  '../../src/modules/patient-images/patient-images.service.ts'
+);
 
 const noopAudit = { record: async () => {} } as unknown as AuditLogger;
 
@@ -76,6 +91,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await db.execute(sql`TRUNCATE users, tenants RESTART IDENTITY CASCADE`);
+  await rm(testUploadsDir, { recursive: true, force: true });
 });
 
 describe('CLI-422 — upload orphan cleanup on insert failure', () => {
