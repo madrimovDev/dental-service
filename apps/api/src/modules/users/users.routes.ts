@@ -5,7 +5,10 @@ import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { requireModuleInDesktop } from '../../lib/license-middleware.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
-import { requirePermission } from '../../middleware/require-permission.ts';
+import {
+  requirePermission,
+  requirePermissionIfFieldsPresent,
+} from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
 import { toStaffProfileDto, toUserAssignmentDto, toUserAssignmentRowDto } from './users.mapper.ts';
 import {
@@ -278,7 +281,13 @@ export const userRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     path: '/{userId}/profile',
     tags: ['users'],
     operationId: 'upsertUserProfile',
-    middleware: [requirePermission('user.manage')] as const,
+    // CLI-446: `baseSalary`/`commissionPercent` — moliyaviy maydonlar; body'da
+    // bo'lsa `user.manage`dan tashqari `payroll.manage` ham talab qilinadi
+    // (boshqa profil maydonlari uchun `user.manage` yetarli qoladi).
+    middleware: [
+      requirePermission('user.manage'),
+      requirePermissionIfFieldsPresent(['baseSalary', 'commissionPercent'], 'payroll.manage'),
+    ] as const,
     request: {
       params: userIdParamSchema,
       body: { content: { 'application/json': { schema: upsertProfileSchema } } },
