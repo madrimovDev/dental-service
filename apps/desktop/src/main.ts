@@ -183,7 +183,11 @@ app.whenReady().then(async () => {
       { serverUrl: localUrl },
       {
         onOpen: () => openBrowser(localUrl),
-        onSettings: () => openBrowser(`${localUrl}/settings`),
+        // `/settings` index route SPA'da YO'Q (App.tsx catch-all uni `/`ga
+        // qaytaradi — tray "Sozlamalar" hech narsa ochmayotganday ko'rinardi,
+        // 2026-07-06 Linux E2E'da topildi). Desktop-ulanish kartasi
+        // (DesktopServerConnectionCard) joylashgan mavjud sahifaga ochamiz.
+        onSettings: () => openBrowser(`${localUrl}/settings/integrations`),
         onStop: async () => {
           stopServerDiscovery();
           await stopServer();
@@ -203,7 +207,8 @@ app.whenReady().then(async () => {
 
     const connectedCallbacks = (url: string) => ({
       onOpen: () => openBrowser(url),
-      onSettings: () => openBrowser(`${url}/settings`),
+      // Server-mode tray bilan bir xil sabab — `/settings` index route yo'q.
+      onSettings: () => openBrowser(`${url}/settings/integrations`),
       onStop: () => app.quit(),
     });
 
