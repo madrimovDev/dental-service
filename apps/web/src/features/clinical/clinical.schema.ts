@@ -35,6 +35,10 @@ export const visitNoteFormSchema = z.object({
   freeNotes: z.string().optional(),
   // Select clearable `null` qaytaradi — nullable (submit'da `?? undefined`).
   appointmentId: z.string().nullable().optional(),
+  // CLI-414: bajarilgan xizmatlar (BOM auto-deduction, Qaror #15). Bo'sh → stock'ga tegilmaydi.
+  // NOTE: `stageId` (visit→stage completion) uchun avval hand-yozilgan `CreateVisitNoteInput`
+  // (packages/api-client) `stageId?: string` bilan kengaytirilishi kerak — handoff (ownership tashqarisi).
+  performedServices: z.array(z.string()).default([]),
 });
 export type VisitNoteFormValues = z.infer<typeof visitNoteFormSchema>;
 
