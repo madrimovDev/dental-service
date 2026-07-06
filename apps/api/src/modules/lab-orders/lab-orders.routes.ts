@@ -18,6 +18,7 @@ import {
   updateLabOrderSchema,
 } from './lab-orders.schema.ts';
 import { createLabOrdersService } from './lab-orders.service.ts';
+import { InvalidLabOrderTransitionError } from './lab-orders.transitions.ts';
 
 /** Standart 404 response — get/patch endpoint'lar uchun. */
 const notFoundResponse = {
@@ -144,15 +145,30 @@ export const labOrdersRoutes = (deps: { db: Database; audit: AuditLogger }) => {
       params: labOrderIdParamSchema,
       body: { content: { 'application/json': { schema: updateLabOrderSchema } } },
     },
-    responses: { ...okJson(labOrderDtoSchema, 'Updated lab order'), ...notFoundResponse },
+    responses: {
+      ...okJson(labOrderDtoSchema, 'Updated lab order'),
+      400: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Invalid status transition',
+      },
+      ...notFoundResponse,
+    },
   });
 
   app.openapi(updateRoute, async (c) => {
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const row = await service.update(c, id, body);
-    if (!row) return c.json(fail('lab_order.not_found', 'Not found'), 404);
-    return c.json(ok(toLabOrderDto(row)), 200);
+    try {
+      const row = await service.update(c, id, body);
+      if (!row) return c.json(fail('lab_order.not_found', 'Not found'), 404);
+      return c.json(ok(toLabOrderDto(row)), 200);
+    } catch (e) {
+      // CLI-439 B2: noto'g'ri status o'tishi (masalan delivered→draft) → 400.
+      if (e instanceof InvalidLabOrderTransitionError) {
+        return c.json(fail('lab_order.invalid_transition', e.message), 400);
+      }
+      throw e;
+    }
   });
 
   return app;

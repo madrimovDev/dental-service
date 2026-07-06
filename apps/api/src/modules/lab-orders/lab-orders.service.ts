@@ -8,6 +8,7 @@ import type {
   ListLabOrdersQuery,
   UpdateLabOrderInput,
 } from './lab-orders.schema.ts';
+import { assertLabOrderTransition, type LabOrderStatus } from './lab-orders.transitions.ts';
 
 export const createLabOrdersService = (deps: { audit: AuditLogger }) => {
   /**
@@ -116,6 +117,15 @@ export const createLabOrdersService = (deps: { audit: AuditLogger }) => {
     const db = getDb(c);
     const [before] = await db.select().from(labOrders).where(eq(labOrders.id, id));
     if (!before) return null;
+
+    // CLI-439 B2: status state-machine guard — istalgan status→status o'tish avval
+    // ruxsat etilardi (`delivered→draft`, `cancelled→delivered`). Endi forward-only
+    // chiziqli oqim (draft→sent→in_progress→ready→delivered) + `cancelled` istalgan
+    // non-terminal holatdan. Orqaga qaytish BUTUNLAY bloklanadi — shu sabab sentDate/
+    // deliveredDate'ni regressда tozalash kerak emas (regress yuz bermaydi).
+    if (input.status && input.status !== before.status) {
+      assertLabOrderTransition(before.status as LabOrderStatus, input.status as LabOrderStatus);
+    }
 
     const patch: Record<string, unknown> = { updatedAt: new Date() };
     if (input.labName) patch.labName = input.labName;

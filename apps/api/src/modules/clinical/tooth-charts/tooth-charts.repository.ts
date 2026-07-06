@@ -2,6 +2,7 @@ import { toothCharts, toothStates } from '@dental/db-schema';
 import { desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../../db/scoped.ts';
+import { dedupeByToothSurface } from './tooth-charts.dedup.ts';
 
 export const createToothChartsRepository = () => {
   /**
@@ -57,7 +58,7 @@ export const createToothChartsRepository = () => {
       await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);
       const [chart] = await tx.insert(toothCharts).values(chartValues).returning();
       if (!chart) throw new Error('Chart insert failed');
-      const states = stateValues(chart.id);
+      const states = dedupeByToothSurface(stateValues(chart.id));
       if (states.length > 0) await tx.insert(toothStates).values(states);
       const fullStates = await tx
         .select()

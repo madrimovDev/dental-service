@@ -21,6 +21,7 @@ import {
 } from './treatment-plans.schema.ts';
 // CLI-114: list endi har planning stage'larini nested qaytaradi (N+1 oldini olish).
 import {
+  ConsentOverwriteError,
   ConsentRequiredError,
   createTreatmentPlansService,
   type RecallStageHook,
@@ -240,9 +241,17 @@ export const treatmentPlansRoutes = (deps: { audit: AuditLogger; recall?: Recall
   app.openapi(consentRoute, async (c) => {
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const plan = await service.setConsent(c, id, body);
-    if (!plan) return c.json(fail('plan.not_found', 'Plan not found'), 404);
-    return c.json(ok(toPlanDto(plan)), 200);
+    try {
+      const plan = await service.setConsent(c, id, body);
+      if (!plan) return c.json(fail('plan.not_found', 'Plan not found'), 404);
+      return c.json(ok(toPlanDto(plan)), 200);
+    } catch (e) {
+      // CLI-439 B5: bo'sh submit mavjud imzoni jim null qilishga urinsa → 400.
+      if (e instanceof ConsentOverwriteError) {
+        return c.json(fail('plan.consent_overwrite', e.message), 400);
+      }
+      throw e;
+    }
   });
 
   // ─── PATCH /treatment-stages/{id} — update stage ──────────────────────────

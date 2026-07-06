@@ -42,6 +42,18 @@ export class ConsentRequiredError extends Error {
   }
 }
 
+/**
+ * CLI-439 B5: mavjud imzoni bo'sh/undefined `consentSignatureUrl` bilan jim NULL
+ * qilishga urinilganda otiladi (routes 400 ga aylantiradi). Yangi (boshqa) qiymat bilan
+ * ataylab qayta imzolash bloklanmaydi — faqat "bo'sh submit eskisini o'chiradi" holati.
+ */
+export class ConsentOverwriteError extends Error {
+  constructor() {
+    super('Existing consent signature cannot be cleared by an empty submission');
+    this.name = 'ConsentOverwriteError';
+  }
+}
+
 export const createTreatmentPlansService = (deps: {
   audit: AuditLogger;
   recall?: RecallStageHook;
@@ -143,17 +155,34 @@ export const createTreatmentPlansService = (deps: {
   async function setConsent(c: Context, id: string, input: ConsentInput) {
     const before = await repo.findPlan(c, id);
     if (!before) return null;
+
+    // CLI-439 B5: mavjud imzoni bo'sh submit bilan jim NULL qilib yubormaslik — bu
+    // haqiqiy yuridik yozuvni yo'qotardi (faqat audit_log'dan tiklanadi edi). Faqat
+    // RE-SIGN holatida (mavjud imzo bor) reject qilinadi; birinchi marta imzolashda
+    // consentSignatureUrl ixtiyoriy bo'lib qoladi (schema semantikasi saqlanadi — faqat
+    // sana bilan imzolash mumkin). Yangi FARQLI qiymat bilan ataylab qayta imzolash
+    // bloklanmaydi (audit before/after bilan kuzatiladi — jim emas).
+    if (before.consentSignatureUrl && !input.consentSignatureUrl) {
+      throw new ConsentOverwriteError();
+    }
+
     const updated = await repo.updatePlan(c, id, {
       consentSignedAt: input.consentSignedAt ? new Date(input.consentSignedAt) : new Date(),
-      consentSignatureUrl: input.consentSignatureUrl ?? null,
+      consentSignatureUrl: input.consentSignatureUrl ?? before.consentSignatureUrl ?? null,
     });
     if (updated) {
       await deps.audit.record(c, {
         action: 'consent_signed',
         resourceType: 'treatment_plan',
         resourceId: id,
-        before: { consentSignedAt: before.consentSignedAt },
-        after: { consentSignedAt: updated.consentSignedAt },
+        before: {
+          consentSignedAt: before.consentSignedAt,
+          hasSignature: !!before.consentSignatureUrl,
+        },
+        after: {
+          consentSignedAt: updated.consentSignedAt,
+          hasSignature: !!updated.consentSignatureUrl,
+        },
       });
     }
     return updated;
@@ -192,10 +221,13 @@ export const createTreatmentPlansService = (deps: {
 
     const updated = await repo.updateStage(c, stageId, patch);
     if (updated) {
+      // CLI-439 B9c: audit'ga `before` (joriy holat, mutatsiyadan oldin) ham yozamiz —
+      // avval faqat `after` bor edi, stage tarixini tiklab bo'lmasdi.
       await deps.audit.record(c, {
         action: 'updated',
         resourceType: 'treatment_stage',
         resourceId: stageId,
+        before: { status: current.status, acceptance: current.acceptance, notes: current.notes },
         after: { status: input.status, acceptance: input.acceptance },
       });
 
@@ -266,6 +298,15 @@ export const createTreatmentPlansService = (deps: {
       .filter((s) => s.acceptance === 'proposed')
       .reduce((sum, s) => sum + s.cost, 0);
     const totalCost = stages.reduce((sum, s) => sum + s.cost, 0);
+
+    // CLI-439 B1: medical_record.view o'qishi — sensitive read (CLAUDE.md §3.10) —
+    // audit_log'ga "viewed" yozuvi qo'shiladi (kontent'siz, faqat ko'rilgani; getPlan/
+    // getMedicalRecord bilan bir xil pattern).
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'treatment_plan_estimate',
+      resourceId: planId,
+    });
 
     return {
       planId,

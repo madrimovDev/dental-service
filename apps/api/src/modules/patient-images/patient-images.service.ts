@@ -165,6 +165,13 @@ export const createPatientImagesService = (deps: {
     if (input.takenDate !== undefined)
       patch.takenDate = input.takenDate ? new Date(input.takenDate) : null;
 
+    // CLI-439 B8: bo'sh body → Drizzle `.set({})` throw qiladi → 500 edi. Guard
+    // (visit-note-templates.service.ts naqshi) — no-op qaytaradi, before allaqachon
+    // topilgan/tekshirilgan.
+    if (Object.keys(patch).length === 0) {
+      return { ...before, url: await presignedGetUrl(before.objectKey) };
+    }
+
     const [row] = await db
       .update(patientImages)
       .set(patch)
