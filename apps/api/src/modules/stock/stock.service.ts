@@ -136,7 +136,8 @@ export const createStockService = (deps: {
     if (input.unit !== undefined) patch.unit = input.unit;
     if (input.category !== undefined) patch.category = input.category;
     if (input.price !== undefined) patch.price = input.price != null ? String(input.price) : null;
-    if (input.quantity !== undefined) patch.quantity = String(input.quantity);
+    // CLI-424: `quantity` PATCH orqali o'zgartirilmaydi (ledger chetlanmasin) — schema'dan
+    // olib tashlangan (`UpdateItemInput`da yo'q). Qoldiq faqat movement/batch orqali.
     if (input.minThreshold !== undefined) patch.minThreshold = String(input.minThreshold);
 
     const [updated] = await db
