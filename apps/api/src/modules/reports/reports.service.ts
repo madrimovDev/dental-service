@@ -87,6 +87,9 @@ async function netServiceAggregates(
   branchId?: string | null,
 ): Promise<NetServiceRow[]> {
   const branchFilter = branchId ? sql`AND t.branch_id = ${branchId}` : sql``;
+  // Date obyekti to'g'ridan raw sql'ga interpolatsiya qilinsa postgres-js
+  // parametrni string-tip sifatida yozishga urinib RangeError beradi — ISO
+  // string sifatida uzatib, Postgres implicit timestamptz cast'iga tayanamiz.
   const rows = await db.execute(sql`
     WITH tx_net AS (
       SELECT
@@ -100,8 +103,8 @@ async function netServiceAggregates(
       FROM cashier_transactions t
       WHERE t.status = 'completed'
         AND t.type = 'payment'
-        AND t.created_at >= ${start}
-        AND t.created_at < ${end}
+        AND t.created_at >= ${start.toISOString()}
+        AND t.created_at < ${end.toISOString()}
         ${branchFilter}
     )
     SELECT
