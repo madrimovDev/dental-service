@@ -140,6 +140,19 @@ const openBrowser = (url: string): void => {
   });
 };
 
+// Linux dev-rejimda oyna identifikatsiyasi (WM_CLASS / Wayland app_id) xom
+// "electron" bo'ladi — panel/dock ilovani electron binary'siga bog'lab,
+// "Yangi oyna ochish" argumentsiz electron'ni (default welcome sahifa)
+// ishga tushirardi. Unikal app-id beramiz — ~/.local/share/applications/
+// dagi dev .desktop fayl (StartupWMClass=dental-service-dev) shu orqali
+// bizning launcher'ga bog'lanadi va ikkinchi nusxani single-instance qulf
+// yutadi. Paketlangan build'da (AppImage/NSIS) electron-builder buni o'zi
+// hal qiladi — shuning uchun faqat !isPackaged.
+if (process.platform === 'linux' && !app.isPackaged) {
+  app.commandLine.appendSwitch('class', 'dental-service-dev'); // X11/XWayland WM_CLASS
+  app.commandLine.appendSwitch('wayland-app-id', 'dental-service-dev'); // Wayland app_id
+}
+
 // Single-instance qulfi — ikkinchi nusxa jim chiqadi, birinchi nusxaning
 // oynasi ko'rsatiladi/fokuslanadi (spec: 2026-07-06-desktop-single-instance).
 // Server rejimida ayniqsa muhim: ikkinchi instans avval postgres/valkey
