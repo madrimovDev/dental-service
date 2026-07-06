@@ -1247,8 +1247,9 @@
     "type_label": {
       "in": "Kirim",
       "out": "Chiqim",
-      "adjustment": "Tuzatish"
+      "adjustment": "Inventarizatsiya"
     },
+    "counted_qty": "Aniqlangan qoldiq",
     "reason": "Sabab",
     "reason_visit": "Vizit (avto)",
     "date": "Sana",

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { applyMovement, isLowStock } from './stock.calc.ts';
+import { adjustmentDelta, applyMovement, isLowStock } from './stock.calc.ts';
 
 describe('isLowStock', () => {
   test('qoldiq chegaradan past → true', () => {
@@ -23,10 +23,31 @@ describe('applyMovement', () => {
   test('out → ayiradi', () => {
     expect(applyMovement(10, 'out', 3)).toBe(7);
   });
-  test("adjustment → qo'shadi", () => {
-    expect(applyMovement(10, 'adjustment', 4)).toBe(14);
+  test('adjustment → set-to-value (100→90, phantom emas)', () => {
+    expect(applyMovement(100, 'adjustment', 90)).toBe(90);
+  });
+  test('adjustment → yuqoriga ham (100→110)', () => {
+    expect(applyMovement(100, 'adjustment', 110)).toBe(110);
+  });
+  test('adjustment → nolga (100→0)', () => {
+    expect(applyMovement(100, 'adjustment', 0)).toBe(0);
+  });
+  test("adjustment → o'zgarishsiz (100→100)", () => {
+    expect(applyMovement(100, 'adjustment', 100)).toBe(100);
   });
   test("out manfiyga ruxsat (guard yo'q)", () => {
     expect(applyMovement(2, 'out', 3)).toBe(-1);
+  });
+});
+
+describe('adjustmentDelta', () => {
+  test('pastga tuzatish → manfiy delta (100→90 = -10)', () => {
+    expect(adjustmentDelta(100, 90)).toBe(-10);
+  });
+  test('yuqoriga tuzatish → musbat delta (100→110 = +10)', () => {
+    expect(adjustmentDelta(100, 110)).toBe(10);
+  });
+  test("o'zgarishsiz → 0 (100→100)", () => {
+    expect(adjustmentDelta(100, 100)).toBe(0);
   });
 });

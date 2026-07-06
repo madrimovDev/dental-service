@@ -106,6 +106,8 @@ export const inviteUserResponseDtoSchema = z
     assignmentId: z.uuid(),
     tempPassword: z.string().nullable().openapi({ example: null }),
     alreadyExists: z.boolean().openapi({ example: false }),
+    // CLI-427: deaktivlangan xodim qayta-taklifda faollashtirildimi (alreadyExists'dan farqli).
+    reactivated: z.boolean().openapi({ example: false }),
   })
   .openapi('InviteUserResponse');
 

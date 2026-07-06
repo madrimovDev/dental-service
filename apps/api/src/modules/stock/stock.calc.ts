@@ -10,12 +10,28 @@ export function isLowStock(quantity: number, minThreshold: number): boolean {
   return quantity < minThreshold;
 }
 
-/** Harakat turiga qarab yangi qoldiq. in/adjustment(+) qo'shadi, out ayiradi. Manfiyga ruxsat (guard yo'q). */
+/**
+ * Harakat turiga qarab yangi qoldiq.
+ *  - `in`  → qo'shadi (`current + qty`)
+ *  - `out` → ayiradi (`current - qty`); manfiyga ruxsat (guard yo'q — chaqiruvchida)
+ *  - `adjustment` → SET-TO-VALUE (inventarizatsiya): `qty` = aniqlangan (sanalgan) qoldiq,
+ *    yangi qoldiq = `qty` (o'zi). Delta uchun `adjustmentDelta` (movement ledger).
+ */
 export function applyMovement(
   current: number,
   type: 'in' | 'out' | 'adjustment',
   qty: number,
 ): number {
   if (type === 'out') return current - qty;
-  return current + qty; // in, adjustment (+)
+  if (type === 'adjustment') return qty; // set-to-value (stocktake)
+  return current + qty; // in
+}
+
+/**
+ * Inventarizatsiya (adjustment) uchun ledger delta — sanalgan qoldiq (`target`) va
+ * joriy qoldiq (`current`) o'rtasidagi imzoli farq. `stock_movements.quantity`ga
+ * shu yoziladi (masalan 100→90 → `-10`). Manfiy bo'lishi mumkin.
+ */
+export function adjustmentDelta(current: number, target: number): number {
+  return target - current;
 }
