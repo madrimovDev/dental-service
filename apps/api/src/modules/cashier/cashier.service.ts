@@ -164,21 +164,31 @@ export const createCashierService = (deps: { audit: AuditLogger; fiscal?: Fiscal
 
       // Per-bosqich allocation rowlar (ijobiy = to'lov). Bir tx ichida (RLS tx-bound).
       if (input.allocations && input.allocations.length > 0) {
-        // Per-bosqich overpay guard: existingPaid + amount ≤ stage.cost.
+        // CLI-413: overpay guard'ni bir REQUEST ichida stage bo'yicha AGREGAT
+        // qilamiz — aks holda [{X,100k},{X,100k}] har biri mustaqil o'tib, 100k
+        // cost'ga 200k tushardi. Stage row'ni `.for('update')` bilan qulflaymiz
+        // (parallel to'lov poygasi — TOCTOU). Deterministik tartib (stageId sort)
+        // deadlock'ni oldini oladi.
+        const requestedByStage = new Map<string, number>();
         for (const a of input.allocations) {
+          requestedByStage.set(a.stageId, (requestedByStage.get(a.stageId) ?? 0) + a.amount);
+        }
+        for (const stageId of [...requestedByStage.keys()].sort()) {
+          const requested = requestedByStage.get(stageId) as number;
           const [stage] = await tx
             .select({ cost: treatmentStages.cost })
             .from(treatmentStages)
-            .where(eq(treatmentStages.id, a.stageId));
+            .where(eq(treatmentStages.id, stageId))
+            .for('update');
           if (!stage) throw new AllocationExceedError();
           const [paidRow] = await tx
             .select({
               paid: sql<string>`COALESCE(SUM(${treatmentStagePayments.amount}), 0)`,
             })
             .from(treatmentStagePayments)
-            .where(eq(treatmentStagePayments.stageId, a.stageId));
+            .where(eq(treatmentStagePayments.stageId, stageId));
           const existingPaid = Number(paidRow?.paid ?? 0);
-          if (existingPaid + a.amount > Number(stage.cost)) {
+          if (existingPaid + requested > Number(stage.cost)) {
             throw new AllocationExceedError();
           }
         }
