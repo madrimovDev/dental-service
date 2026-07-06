@@ -373,6 +373,100 @@ export const createStockService = (deps: {
     }
   }
 
+  /**
+   * CLI-445 — visit-note UPDATE'da `performedServices` reconciliation (CLI-414 §3/§4 spec).
+   * `before`/`after` — occurrence-aware multiset (bir xizmat bir vizitda bir necha marta
+   * bo'lishi mumkin). Har xizmat uchun `delta = after.count - before.count`:
+   *   - `delta > 0` → BOM `delta` marta ayiriladi (`out`, `reason:'visit_auto'`) — CREATE
+   *     yo'lidagi (`deductForServices`) konventsiya bilan bir xil.
+   *   - `delta < 0` → BOM `|delta|` marta qaytariladi (`in`, `reason:'visit_edit_return'`).
+   *   - `delta === 0` → tegilmaydi (bir xil PATCH → nol movement, idempotent).
+   * Har occurrence — alohida `stock_movements` qatori (ledger granularity `deductForServices`
+   * bilan bir xil). Negative-stock guard YO'Q (auto-deduction'dagi kabi — advisor qarori,
+   * vizit yozuvini bloklamaslik). Restock yo'lida ham `maybeAlertLowStock` chaqiriladi
+   * (qoldiq oshganda pastdan yuqoriga o'tsa alert kerak emas, lekin funksiya o'zi faqat
+   * PASTGA o'tishda triggerlanadi — no-op yuqoriga transition uchun).
+   */
+  async function reconcileForServices(
+    c: Context,
+    before: string[],
+    after: string[],
+    sourceVisitNoteId: string,
+  ) {
+    const db = getDb(c);
+    const tenantId = c.get('activeTenantId');
+    if (!tenantId) throw new Error('No tenant context');
+
+    const beforeCount = new Map<string, number>();
+    for (const serviceId of before) {
+      beforeCount.set(serviceId, (beforeCount.get(serviceId) ?? 0) + 1);
+    }
+    const afterCount = new Map<string, number>();
+    for (const serviceId of after) {
+      afterCount.set(serviceId, (afterCount.get(serviceId) ?? 0) + 1);
+    }
+
+    const allServiceIds = new Set([...beforeCount.keys(), ...afterCount.keys()]);
+    const deltas = new Map<string, number>();
+    for (const serviceId of allServiceIds) {
+      const delta = (afterCount.get(serviceId) ?? 0) - (beforeCount.get(serviceId) ?? 0);
+      if (delta !== 0) deltas.set(serviceId, delta);
+    }
+    if (deltas.size === 0) return;
+
+    const boms = await db
+      .select()
+      .from(serviceMaterials)
+      .where(inArray(serviceMaterials.serviceId, [...deltas.keys()]));
+
+    for (const bom of boms) {
+      const delta = deltas.get(bom.serviceId);
+      if (!delta) continue;
+
+      const occurrences = Math.abs(delta);
+      const isDeduction = delta > 0;
+      const movementType = isDeduction ? ('out' as const) : ('in' as const);
+      const reason = isDeduction ? 'visit_auto' : 'visit_edit_return';
+
+      for (let i = 0; i < occurrences; i++) {
+        await db.insert(stockMovements).values({
+          tenantId,
+          itemId: bom.itemId,
+          type: movementType,
+          quantity: bom.qtyPerService,
+          reason,
+          sourceVisitNoteId,
+          createdBy: c.get('user')?.id ?? null,
+        });
+
+        // ⚠️ Negative-stock guard YO'Q (deductForServices bilan bir xil — advisor qarori).
+        const [updated] = await db
+          .update(stockItems)
+          .set({
+            quantity: isDeduction
+              ? sql`${stockItems.quantity} - ${bom.qtyPerService}`
+              : sql`${stockItems.quantity} + ${bom.qtyPerService}`,
+            updatedAt: new Date(),
+          })
+          .where(eq(stockItems.id, bom.itemId))
+          .returning({
+            id: stockItems.id,
+            name: stockItems.name,
+            branchId: stockItems.branchId,
+            quantity: stockItems.quantity,
+            minThreshold: stockItems.minThreshold,
+          });
+        if (updated) {
+          const newQty = Number(updated.quantity);
+          const oldQty = isDeduction
+            ? newQty + Number(bom.qtyPerService)
+            : newQty - Number(bom.qtyPerService);
+          await maybeAlertLowStock(c, db, updated, oldQty, newQty);
+        }
+      }
+    }
+  }
+
   // ===== Stock batches (qabul + expiry/cost/supplier) — V2-2 =====
 
   /** Item bo'yicha partiyalar (yangi avval). */
@@ -462,6 +556,7 @@ export const createStockService = (deps: {
     createBom,
     removeBom,
     deductForServices,
+    reconcileForServices,
     listBatches,
     expiringBatches,
     createBatch,
