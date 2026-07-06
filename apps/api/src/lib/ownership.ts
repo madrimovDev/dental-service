@@ -1,6 +1,7 @@
 import {
   appointments,
   patients,
+  tenants,
   treatmentPlans,
   treatmentStages,
   userAssignments,
@@ -48,9 +49,20 @@ export const createOwnershipValidator = () => {
   /**
    * doctorId platform-level (`users`da tenant_id YO'Q, CLAUDE.md §3.1). Shu sabab
    * "bu tenantda aktiv assignment'i bormi" tekshiruvi — user_assignments RLS-scoped.
+   * Tenant OWNER uchun carve-out: owner implicit superuser (§3.3), hech qachon
+   * `user_assignments` qatoriga ega bo'lishi shart emas (users.service.ts'даgi
+   * bir xil `isOwner` pattern — upsertProfile/addAssignment precedenti).
    */
   async function assertUserExists(c: Context, userId: string): Promise<void> {
     const db = getDb(c);
+    const activeTenantId: string | null | undefined = c.get('activeTenantId');
+    if (activeTenantId) {
+      const [tenant] = await db
+        .select({ ownerUserId: tenants.ownerUserId })
+        .from(tenants)
+        .where(eq(tenants.id, activeTenantId));
+      if (tenant?.ownerUserId === userId) return;
+    }
     const [row] = await db
       .select({ id: userAssignments.id })
       .from(userAssignments)
