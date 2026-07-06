@@ -196,6 +196,35 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
     const [user] = await deps.db.select().from(users).where(eq(users.id, userId));
     if (!user) return null;
 
+    // CLI-429: roleId/branchId joriy tenant'da mavjudligini `getDb(c)` (RLS-bound) orqali
+    // tekshirish — cross-tenant/ghost assignment oldini olish (invite bilan bir xil pattern).
+    const [role] = await db.select().from(roles).where(eq(roles.id, input.roleId));
+    if (!role) return { ok: false as const, code: 'role.not_found' as const };
+
+    if (input.branchId) {
+      const [branch] = await db.select().from(branches).where(eq(branches.id, input.branchId));
+      if (!branch) return { ok: false as const, code: 'branch.not_found' as const };
+    }
+
+    // Dublikat-guard (invite bilan bir xil) — bir xil (user, tenant, role, branch) juftligi
+    // qayta qo'shilmaydi; mavjudni idempotent qaytaramiz.
+    const [existing] = await db
+      .select()
+      .from(userAssignments)
+      .where(
+        and(
+          eq(userAssignments.userId, userId),
+          eq(userAssignments.tenantId, tenantId),
+          eq(userAssignments.roleId, input.roleId),
+          input.branchId
+            ? eq(userAssignments.branchId, input.branchId)
+            : sql`${userAssignments.branchId} IS NULL`,
+        ),
+      );
+    if (existing) {
+      return { ok: true as const, assignment: existing, alreadyExists: true };
+    }
+
     const [assignment] = await db
       .insert(userAssignments)
       .values({
@@ -209,16 +238,16 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
       })
       .returning();
 
-    if (assignment) {
-      await deps.audit.record(c, {
-        action: 'created',
-        resourceType: 'user_assignment',
-        resourceId: assignment.id,
-        after: assignment,
-      });
-    }
+    if (!assignment) return { ok: false as const, code: 'assignment.create_failed' as const };
 
-    return assignment;
+    await deps.audit.record(c, {
+      action: 'created',
+      resourceType: 'user_assignment',
+      resourceId: assignment.id,
+      after: assignment,
+    });
+
+    return { ok: true as const, assignment, alreadyExists: false };
   }
 
   async function updateAssignment(c: Context, assignmentId: string, input: UpdateAssignmentInput) {
