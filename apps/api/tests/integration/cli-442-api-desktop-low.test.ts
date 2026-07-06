@@ -12,7 +12,7 @@
 
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { branches, roles, stockItems, tenants, userAssignments, users } from '@dental/db-schema';
-import { eq, sql } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { DbOrTx } from '../../src/db/client.ts';
 import { db } from '../../src/db/client.ts';
