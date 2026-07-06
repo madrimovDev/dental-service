@@ -119,12 +119,41 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
         );
 
       if (existing) {
+        // CLI-427: haqiqatan aktiv → alreadyExists (o'zgarishsiz). Aks holda (deaktivlangan)
+        // → QAYTA FAOLLASHTIRISH: isActive=true + validTo=null (o'tgan validTo login'ni
+        // bloklamasin) → xodim yana kira oladi (switchWorkspace o'tadi).
+        if (existing.isActive) {
+          return {
+            ok: true as const,
+            userId: user.id,
+            assignmentId: existing.id,
+            tempPassword,
+            alreadyExists: true,
+            reactivated: false,
+          };
+        }
+
+        const now = new Date();
+        await tx
+          .update(userAssignments)
+          .set({ isActive: true, validTo: null, updatedAt: now })
+          .where(eq(userAssignments.id, existing.id));
+
+        await deps.audit.record(c, {
+          action: 'user.reactivated',
+          resourceType: 'user_assignment',
+          resourceId: existing.id,
+          before: existing,
+          after: { ...existing, isActive: true, validTo: null },
+        });
+
         return {
           ok: true as const,
           userId: user.id,
           assignmentId: existing.id,
           tempPassword,
-          alreadyExists: true,
+          alreadyExists: false,
+          reactivated: true,
         };
       }
 
@@ -154,6 +183,7 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
         assignmentId: assignment.id,
         tempPassword,
         alreadyExists: false,
+        reactivated: false,
       };
     });
   }
