@@ -4,6 +4,7 @@ import type { Context } from 'hono';
 import type { AuditLogger } from '../../../lib/audit-logger.ts';
 import { requireModuleInDesktop } from '../../../lib/license-middleware.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../../lib/openapi.ts';
+import { CrossEntityError } from '../../../lib/ownership.ts';
 import { requirePermission } from '../../../middleware/require-permission.ts';
 import { InvalidTransitionError } from '../treatment-plans/treatment-plans.transitions.ts';
 import { toVisitNoteDto } from './visit-notes.mapper.ts';
@@ -12,7 +13,11 @@ import {
   updateVisitNoteSchema,
   visitNoteDtoSchema,
 } from './visit-notes.schema.ts';
-import { createVisitNotesService, type StageCompleteHook } from './visit-notes.service.ts';
+import {
+  createVisitNotesService,
+  type ReconcileStockHook,
+  type StageCompleteHook,
+} from './visit-notes.service.ts';
 
 /** Standart 404 response — get / patch endpoint'lar uchun. */
 const notFoundResponse = {
@@ -26,6 +31,7 @@ export const visitNotesRoutes = (deps: {
   audit: AuditLogger;
   deductStock?: (c: Context, serviceIds: string[], visitNoteId: string) => Promise<void>;
   completeStage?: StageCompleteHook;
+  reconcileStock?: ReconcileStockHook;
 }) => {
   const app = new OpenAPIHono();
   const service = createVisitNotesService(deps);
@@ -96,6 +102,10 @@ export const visitNotesRoutes = (deps: {
       if (!note) throw new Error('Visit note creation failed');
       return c.json(ok(toVisitNoteDto(note)), 201);
     } catch (e) {
+      // CLI-421: cross-entity ownership mismatch → 400 (noto'g'ri havola, resource emas).
+      if (e instanceof CrossEntityError) {
+        return c.json(fail(`ownership.${e.reason}`, e.message), 400);
+      }
       // C5: stageId skipped→completed → guard RAD → 400 (orphan yozuv yaratilmaydi).
       if (e instanceof InvalidTransitionError) {
         return c.json(fail('stage.invalid_transition', e.message), 400);
@@ -161,6 +171,9 @@ export const visitNotesRoutes = (deps: {
       if (!note) return c.json(fail('note.not_found', 'Note not found'), 404);
       return c.json(ok(toVisitNoteDto(note)), 200);
     } catch (e) {
+      if (e instanceof CrossEntityError) {
+        return c.json(fail(`ownership.${e.reason}`, e.message), 400);
+      }
       if (e instanceof InvalidTransitionError) {
         return c.json(fail('stage.invalid_transition', e.message), 400);
       }

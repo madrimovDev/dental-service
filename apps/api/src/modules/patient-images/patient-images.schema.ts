@@ -17,18 +17,23 @@ export const uploadImageMetadataSchema = z.object({
   visitNoteId: z.uuid().optional(),
   title: z.string().max(200).optional(),
   description: z.string().max(2000).optional(),
+  // CLI-422: FDI musbat-butun filtri schema'da (`.filter` mavjud xulqni saqlaydi —
+  // qat'iy 400 emas, NaN/nomusbat qiymatlar tashlanadi).
   toothNumbers: z
     .union([z.string(), z.array(z.coerce.number())])
     .transform((v) => {
-      if (Array.isArray(v)) return v.map(Number).filter((n) => !Number.isNaN(n));
+      if (Array.isArray(v)) {
+        return v.map(Number).filter((n) => Number.isInteger(n) && n > 0);
+      }
       return v
         .split(',')
         .map((s) => Number(s.trim()))
-        .filter((n) => !Number.isNaN(n));
+        .filter((n) => Number.isInteger(n) && n > 0);
     })
     .optional(),
   takenDate: z.iso.datetime().optional(),
 });
+export type UploadImageMetadataInput = z.infer<typeof uploadImageMetadataSchema>;
 
 export const updateImageMetadataSchema = z.object({
   type: imageType.optional(),

@@ -5,6 +5,7 @@ import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { requireModuleInDesktop } from '../../lib/license-middleware.ts';
 import { errorResponseSchema, okJson } from '../../lib/openapi.ts';
+import { CrossEntityError } from '../../lib/ownership.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
@@ -12,7 +13,6 @@ import { toPatientImageDto } from './patient-images.mapper.ts';
 import {
   ALLOWED_CONTENT_TYPES,
   extFromContentType,
-  imageType,
   MAX_UPLOAD_BYTES,
   patientImageDeleteSchema,
   patientImageIdParamSchema,
@@ -20,6 +20,7 @@ import {
   patientImagesByPatientParamSchema,
   patientImagesListQuerySchema,
   updateImageMetadataSchema,
+  uploadImageMetadataSchema,
 } from './patient-images.schema.ts';
 import { createPatientImagesService } from './patient-images.service.ts';
 
@@ -100,21 +101,10 @@ export const patientImagesRoutes = (deps: { db: Database; audit: AuditLogger }) 
     async (c) => {
       const form = await c.req.formData();
       const file = form.get('file');
-      const patientId = form.get('patientId')?.toString();
-      const typeRaw = form.get('type')?.toString();
-      const title = form.get('title')?.toString();
-      const description = form.get('description')?.toString();
-      const toothNumbersRaw = form.get('toothNumbers')?.toString();
-      const takenDate = form.get('takenDate')?.toString();
-      const visitNoteId = form.get('visitNoteId')?.toString() || undefined;
 
       if (!(file instanceof File)) {
         throw new HTTPException(400, { message: 'Missing file' });
       }
-      if (!patientId) throw new HTTPException(400, { message: 'Missing patientId' });
-      const typeParsed = imageType.safeParse(typeRaw);
-      if (!typeParsed.success) throw new HTTPException(400, { message: 'Invalid type' });
-
       if (file.size > MAX_UPLOAD_BYTES) {
         throw new HTTPException(413, { message: `File too large (max ${MAX_UPLOAD_BYTES} bytes)` });
       }
@@ -122,29 +112,52 @@ export const patientImagesRoutes = (deps: { db: Database; audit: AuditLogger }) 
         throw new HTTPException(415, { message: `Unsupported content type: ${file.type}` });
       }
 
-      const toothNumbers = toothNumbersRaw
-        ? toothNumbersRaw
-            .split(',')
-            .map((s) => Number(s.trim()))
-            .filter((n) => Number.isInteger(n) && n > 0)
-        : undefined;
+      // CLI-422: uploadImageMetadataSchema orqali TO'LIQ validatsiya (patientId UUID,
+      // visitNoteId UUID, takenDate ISO datetime, title/description cap, toothNumbers FDI
+      // filtr) — STORAGE YOZISHDAN OLDIN (bad input'da hech qanday object yozilmaydi).
+      // Avval hand ad-hoc tekshiruvlar o'rnini bosadi (patientId `!patientId`, UUID emas
+      // edi → PG cast 500 xavfi; Invalid Date → orphan object xavfi).
+      const parsed = uploadImageMetadataSchema.safeParse({
+        patientId: form.get('patientId')?.toString(),
+        type: form.get('type')?.toString(),
+        visitNoteId: form.get('visitNoteId')?.toString() || undefined,
+        title: form.get('title')?.toString(),
+        description: form.get('description')?.toString(),
+        toothNumbers: form.get('toothNumbers')?.toString(),
+        takenDate: form.get('takenDate')?.toString(),
+      });
+      if (!parsed.success) {
+        return c.json(
+          fail('image.invalid_metadata', 'Invalid upload metadata', parsed.error.issues),
+          400,
+        );
+      }
+      const meta = parsed.data;
 
       const body = await file.arrayBuffer();
 
-      const row = await service.upload(c, {
-        patientId,
-        type: typeParsed.data,
-        title,
-        description,
-        toothNumbers,
-        takenDate,
-        visitNoteId,
-        originalFilename: file.name,
-        contentType: file.type,
-        ext: extFromContentType(file.type),
-        body,
-      });
-      return c.json(ok(toPatientImageDto(row)), 201);
+      try {
+        const row = await service.upload(c, {
+          patientId: meta.patientId,
+          type: meta.type,
+          title: meta.title,
+          description: meta.description,
+          toothNumbers: meta.toothNumbers,
+          takenDate: meta.takenDate,
+          visitNoteId: meta.visitNoteId,
+          originalFilename: file.name,
+          contentType: file.type,
+          ext: extFromContentType(file.type),
+          body,
+        });
+        return c.json(ok(toPatientImageDto(row)), 201);
+      } catch (e) {
+        // CLI-421: cross-entity ownership mismatch (patientId/visitNoteId) → 400.
+        if (e instanceof CrossEntityError) {
+          throw new HTTPException(400, { message: `ownership.${e.reason}: ${e.message}` });
+        }
+        throw e;
+      }
     },
   );
 
