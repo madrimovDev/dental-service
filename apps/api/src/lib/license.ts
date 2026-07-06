@@ -30,15 +30,23 @@ export const getLicensePath = (): string =>
     : '/var/lib/dental-service/license.lic');
 
 export const getFingerprint = async (): Promise<string> => {
-  const [cpu, system, nets] = await Promise.all([si.cpu(), si.system(), si.networkInterfaces()]);
-  const primaryMac = (Array.isArray(nets) ? nets : [nets]).find((n) => n.default)?.mac ?? '';
+  // CLI-432 — network-interface MAC ATAYIN OLINMAYDI. Oldingi fingerprint
+  // default (asosiy) tarmoq interfeysi MAC'ini ham qamrardi; u beqaror
+  // (Wi-Fi <-> Ethernet almashtirish, USB/VPN/virtual adapter default bo'lib
+  // qolishi) — o'zgarsa fingerprint o'zgarib, `getKey()` AES kalitini buzardi
+  // va `.lic` decrypt bo'lmasdi (imzo tekshiruvidan mustaqil false-lockout).
+  // `system.uuid`/`system.serial` — apparat-daraja, tarmoqdan mustaqil,
+  // ko'chib yurishda o'zgarmaydi. Nusxa-himoya baribir imzolangan payload'dagi
+  // fingerprint'ga (CLI-410) tayanadi — MAC anti-copy'ning eng zaif bo'g'ini
+  // edi, uni olib tashlash himoyani zaiflashtirmaydi (docs/audit-fixes/CLI-432).
+  const [cpu, system] = await Promise.all([si.cpu(), si.system()]);
 
   // VM yoki konteynerda bo'sh qaytsa — aniq xato (virtual muhit qo'llab-quvvatlanmaydi)
-  if (!system.uuid && !system.serial && !primaryMac) {
+  if (!system.uuid && !system.serial) {
     throw new Error('FINGERPRINT_UNAVAILABLE');
   }
 
-  const raw = `${cpu.manufacturer}:${cpu.brand}:${system.uuid}:${system.serial}:${primaryMac}`;
+  const raw = `${cpu.manufacturer}:${cpu.brand}:${system.uuid}:${system.serial}`;
   return createHash('sha256').update(raw).digest('hex');
 };
 

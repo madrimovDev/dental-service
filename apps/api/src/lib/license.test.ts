@@ -53,6 +53,47 @@ describe('getFingerprint', () => {
     expect(fp1).toBe(fp2);
     expect(fp1).toMatch(/^[a-f0-9]{64}$/);
   });
+
+  // CLI-432 — the network-interface MAC must NOT influence the fingerprint, so
+  // moving Wi-Fi <-> Ethernet (default interface / MAC changes) never changes
+  // the hash and never breaks the AES-derived `.lic` decrypt key.
+  test('is stable when the default network interface / MAC changes (CLI-432)', async () => {
+    const si = (await import('systeminformation')).default as {
+      networkInterfaces: () => Promise<unknown>;
+    };
+    const original = si.networkInterfaces;
+
+    const { getFingerprint } = await import('./license');
+    // MAC A (default eth0)
+    si.networkInterfaces = async () => [{ iface: 'eth0', mac: 'AA:AA:AA:AA:AA:AA', default: true }];
+    const fpA = await getFingerprint();
+    // MAC B (default wlan0) — same machine, different active NIC
+    si.networkInterfaces = async () => [
+      { iface: 'wlan0', mac: 'BB:BB:BB:BB:BB:BB', default: true },
+    ];
+    const fpB = await getFingerprint();
+    // No default interface at all
+    si.networkInterfaces = async () => [];
+    const fpNone = await getFingerprint();
+
+    si.networkInterfaces = original;
+
+    expect(fpA).toBe(fpB);
+    expect(fpA).toBe(fpNone);
+  });
+
+  test('throws FINGERPRINT_UNAVAILABLE when both uuid and serial are empty (CLI-432)', async () => {
+    const si = (await import('systeminformation')).default as {
+      system: () => Promise<unknown>;
+    };
+    const original = si.system;
+    si.system = async () => ({ uuid: '', serial: '' });
+
+    const { getFingerprint } = await import('./license');
+    await expect(getFingerprint()).rejects.toThrow('FINGERPRINT_UNAVAILABLE');
+
+    si.system = original;
+  });
 });
 
 describe('writeLicense + readLicense', () => {
