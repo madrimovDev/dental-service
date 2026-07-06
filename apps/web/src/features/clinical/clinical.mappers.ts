@@ -307,6 +307,28 @@ const LAB_TONE: Record<LabOrderStatus, Tone> = {
 
 export const labOrderStatusToTone = (s: LabOrderStatus): Tone => LAB_TONE[s];
 
+/**
+ * B2 (CLI-439): lab-order forward-only lifecycle — `draft → sent → in_progress →
+ * ready → delivered`, `cancelled` istalgan tugallanmagan holatdan (delivered/cancelled
+ * TERMINAL). Backend'da hali guard YO'Q (`lab-orders.service.ts` istalgan status→status
+ * qabul qiladi) — bu frontend-only cheklov, LabOrdersTab Select'ida 6ta statusni
+ * shartsiz ko'rsatish o'rniga faqat joriy+ruxsat etilgan keyingi statuslarni beradi.
+ * Backend guard qo'shilganda (Qaror #25 uslubi) bu jadval backend bilan moslashtirilsin.
+ */
+const LAB_ORDER_TRANSITIONS: Record<LabOrderStatus, readonly LabOrderStatus[]> = {
+  draft: ['sent', 'cancelled'],
+  sent: ['in_progress', 'cancelled'],
+  in_progress: ['ready', 'cancelled'],
+  ready: ['delivered', 'cancelled'],
+  delivered: [],
+  cancelled: [],
+};
+
+/** Joriy status + undan ruxsat etilgan keyingi statuslar (Select opsiyalari uchun). */
+export function allowedLabOrderStatuses(current: LabOrderStatus): LabOrderStatus[] {
+  return [current, ...LAB_ORDER_TRANSITIONS[current]];
+}
+
 // DS7: tenant-wide lab buyurtma qatori (ism alohida hal qilinadi).
 export function toLabOrderListRowVM(order: LabOrder): LabOrderListRowVM {
   return {
