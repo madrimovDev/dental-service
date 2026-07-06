@@ -226,8 +226,10 @@ export const createCashierService = (deps: { audit: AuditLogger; fiscal?: Fiscal
    * qolgan) FAQAT plan-linked tranzaksiyada ruxsat (non-plan = semantik noaniqlik,
    * line-item modeli yo'q → faqat to'liq). Mexanizm: kompensatsiya refund txn +
    * PROPORSIONAL negative allocation (per-stage phantom-credit avtomatik oldi olinadi).
-   * Cumulative guard: Σ(refund.paidAmount) ≤ original.paidAmount. Original faqat
-   * cumulative=full bo'lganda void. Advisor qarori + Qaror #24 (allocation filtrlanmaydi).
+   * Cumulative guard: Σ(refund.paidAmount) ≤ original.paidAmount. Original HECH QACHON
+   * void qilinmaydi — manfiy `type='refund'` qatori yagona buxgalteriya izi (CLI-406:
+   * void + refund-qatori ikkalasi daromadни ikki marta ayirardi; qisman-refund modeli
+   * bilan bir xil yagona model). Advisor qarori + Qaror #24 (allocation filtrlanmaydi).
    */
   async function refund(
     c: Context,
@@ -330,13 +332,10 @@ export const createCashierService = (deps: { audit: AuditLogger; fiscal?: Fiscal
         );
       }
 
-      // Original faqat to'liq qaytarilganda void (qisman → completed qoladi).
-      if (alreadyRefunded + refundAmount >= paid) {
-        await tx
-          .update(cashierTransactions)
-          .set({ status: 'voided' })
-          .where(eq(cashierTransactions.id, id));
-      }
+      // CLI-406: original HECH QACHON void qilinmaydi (to'liq refundda ham
+      // `completed` qoladi) — manfiy refund qatori yagona buxgalteriya izi.
+      // Aks holda void completed-filtrdan chiqarardi VA refund qatori negatsiya
+      // qilardi → daromad ikki marta ayirilardi.
 
       await deps.audit.record(c, {
         action: 'refunded',

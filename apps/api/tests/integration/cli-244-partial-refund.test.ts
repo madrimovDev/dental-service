@@ -173,14 +173,15 @@ describe('Qisman refund — balans-darajali', () => {
     expect(res.ok).toBe(false);
   });
 
-  test('ikkinchi partial 60000 → cumulative=full, planDebt 100000, original void', async () => {
+  test('ikkinchi partial 60000 → cumulative=full, planDebt 100000, original completed qoladi (CLI-406)', async () => {
     const res = await withTx((tx) => cashier.refund(ctx(tx), planTxId, 60000));
     expect(res.ok).toBe(true);
     expect(await withTx(planDebt)).toBe(100000);
     const [orig] = await withTx((tx) =>
       tx.select().from(cashierTransactions).where(eq(cashierTransactions.id, planTxId)),
     );
-    expect(orig?.status).toBe('voided');
+    // CLI-406: to'liq refundda ham original void EMAS — refund qatori yagona iz.
+    expect(orig?.status).toBe('completed');
   });
 
   test('to‘liq refund qilingandan keyin yana refund → rad', async () => {
@@ -194,12 +195,13 @@ describe('Qisman refund — balans-darajali', () => {
     if (!res.ok) expect(res.reason).toBe('non_plan_partial');
   });
 
-  test('non-plan full refund (amount yo‘q) → ishlaydi, void', async () => {
+  test('non-plan full refund (amount yo‘q) → ishlaydi, original completed qoladi (CLI-406)', async () => {
     const res = await withTx((tx) => cashier.refund(ctx(tx), nonPlanTxId));
     expect(res.ok).toBe(true);
     const [orig] = await withTx((tx) =>
       tx.select().from(cashierTransactions).where(eq(cashierTransactions.id, nonPlanTxId)),
     );
-    expect(orig?.status).toBe('voided');
+    // CLI-406: original void EMAS — refund qatori yagona iz.
+    expect(orig?.status).toBe('completed');
   });
 });
