@@ -8,7 +8,8 @@ import {
   treatmentPlans,
   treatmentStages,
 } from '@dental/db-schema';
-import { and, between, count, countDistinct, desc, eq, isNull, lt, ne, sql } from 'drizzle-orm';
+import type { Column } from 'drizzle-orm';
+import { and, count, countDistinct, desc, eq, gte, isNull, lt, ne, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
@@ -40,10 +41,22 @@ const WEEKDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 /** Refund → manfiy, to'lov → musbat yig'indisi (COALESCE 0 agar hech narsa yo'q). */
 const signedPaidAmount = sql<string>`COALESCE(SUM(CASE WHEN ${cashierTransactions.type} = 'refund' THEN -${cashierTransactions.paidAmount} ELSE ${cashierTransactions.paidAmount} END), 0)`;
 
-const tashkentRange = (from: string, to: string) => ({
-  start: new Date(`${from}T00:00:00+05:00`),
-  end: new Date(`${to}T23:59:59.999+05:00`),
-});
+/**
+ * Asia/Tashkent (UTC+5, DST yo'q) kun oralig'i — YARIM-OCHIQ (CLI-442 #1).
+ * `start` inklyuziv (from kunining 00:00), `end` EKSKLYUZIV (to kunidan keyingi kun 00:00).
+ * `between(...)` (inklyuziv `…23:59:59.999`) sub-ms tranzaksiyalarni (masalan `23:59:59.9995`)
+ * tushirib qoldirardi — yarim-ochiq `>= start AND < end` teshikni yopadi va kun chegarasi
+ * hech qanday tranzaksiyani ikki kunda hisoblamaydi.
+ */
+const tashkentRange = (from: string, to: string) => {
+  const start = new Date(`${from}T00:00:00+05:00`);
+  const end = new Date(`${to}T00:00:00+05:00`);
+  end.setUTCDate(end.getUTCDate() + 1);
+  return { start, end };
+};
+
+/** Yarim-ochiq kun oralig'i filtri: `col >= start AND col < end` (CLI-442 #1). */
+const inRange = (col: Column, start: Date, end: Date) => and(gte(col, start), lt(col, end));
 
 /** Har kun (from..to) uchun 'sun'..'sat' kaliti — Tashkent kuni, noon-anchored (TZ chegarasi xavfsiz). */
 function* eachWeekday(from: string, to: string): Generator<string> {
@@ -61,7 +74,7 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
     const { start, end } = tashkentRange(from, to);
     const base = [
       eq(cashierTransactions.status, 'completed'),
-      between(cashierTransactions.createdAt, start, end),
+      inRange(cashierTransactions.createdAt, start, end),
     ];
     if (branchId) base.push(eq(cashierTransactions.branchId, branchId));
     const [row] = await db
@@ -77,7 +90,7 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
   ): Promise<number> {
     const db = getDb(c);
     const { start, end } = tashkentRange(from, to);
-    const base = [between(appointments.startTime, start, end)];
+    const base = [inRange(appointments.startTime, start, end)];
     if (branchId) base.push(eq(appointments.branchId, branchId));
     const [row] = await db
       .select({ c: count() })
@@ -112,7 +125,7 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
 
     const base = [
       eq(cashierTransactions.status, 'completed'),
-      between(cashierTransactions.createdAt, start, end),
+      inRange(cashierTransactions.createdAt, start, end),
     ];
     if (branchId) base.push(eq(cashierTransactions.branchId, branchId));
 
@@ -140,7 +153,7 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
     const itemBase = [
       eq(cashierTransactions.status, 'completed'),
       eq(cashierTransactions.type, 'payment'),
-      between(cashierTransactions.createdAt, start, end),
+      inRange(cashierTransactions.createdAt, start, end),
     ];
     if (branchId) itemBase.push(eq(cashierTransactions.branchId, branchId));
     const byService = await db
@@ -212,7 +225,7 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
   ): Promise<AppointmentStatsReport> {
     const db = getDb(c);
     const { start, end } = tashkentRange(from, to);
-    const base = [between(appointments.startTime, start, end)];
+    const base = [inRange(appointments.startTime, start, end)];
     if (branchId) base.push(eq(appointments.branchId, branchId));
 
     const statusRows = await db
@@ -304,7 +317,7 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
   ): Promise<DoctorWorkloadRow[]> {
     const db = getDb(c);
     const { start, end } = tashkentRange(from, to);
-    const base = [between(appointments.startTime, start, end)];
+    const base = [inRange(appointments.startTime, start, end)];
     if (branchId) base.push(eq(appointments.branchId, branchId));
 
     const rows = await db
@@ -353,7 +366,7 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
       .where(
         and(
           sql`${treatmentPlans.status} IN ('accepted','in_progress','completed')`,
-          between(treatmentPlans.createdAt, start, end),
+          inRange(treatmentPlans.createdAt, start, end),
         ),
       )
       .groupBy(treatmentStages.status);
@@ -386,7 +399,7 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
 
     // 1. Procedure-mix — kassa item'lari (completed payment, oraliq, filial).
     const txFilter = [
-      between(cashierTransactions.createdAt, start, end),
+      inRange(cashierTransactions.createdAt, start, end),
       eq(cashierTransactions.type, 'payment'),
       eq(cashierTransactions.status, 'completed'),
     ];
@@ -411,9 +424,9 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
     const [newRow] = await db
       .select({ c: count() })
       .from(patients)
-      .where(between(patients.createdAt, start, end));
+      .where(inRange(patients.createdAt, start, end));
     const apptRetFilter = [
-      between(appointments.startTime, start, end),
+      inRange(appointments.startTime, start, end),
       lt(patients.createdAt, start),
     ];
     if (branchId) apptRetFilter.push(eq(appointments.branchId, branchId));
@@ -429,7 +442,7 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
     const recallRows = await db
       .select({ status: recalls.status, c: count() })
       .from(recalls)
-      .where(between(recalls.createdAt, start, end))
+      .where(inRange(recalls.createdAt, start, end))
       .groupBy(recalls.status);
     const recallByStatus = recallRows.map((r) => ({
       status: r.status as string,
@@ -441,7 +454,7 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
       .reduce((s, r) => s + r.count, 0);
 
     // 4. No-show trend — hafta-kuni bo'yicha (Asia/Tashkent). EXTRACT(DOW) 0=Yak..6=Shan.
-    const nsFilter = [between(appointments.startTime, start, end)];
+    const nsFilter = [inRange(appointments.startTime, start, end)];
     if (branchId) nsFilter.push(eq(appointments.branchId, branchId));
     const nsRows = await db
       .select({
@@ -497,7 +510,7 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
     const { start, end } = tashkentRange(from, to);
     const filter = [
       eq(cashierTransactions.status, 'completed'),
-      between(cashierTransactions.createdAt, start, end),
+      inRange(cashierTransactions.createdAt, start, end),
     ];
     if (branchId) filter.push(eq(cashierTransactions.branchId, branchId));
 

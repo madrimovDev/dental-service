@@ -5,7 +5,7 @@ import {
   staffProfiles,
   treatmentPlans,
 } from '@dental/db-schema';
-import { and, between, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, lt, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
@@ -28,8 +28,11 @@ export const createPayrollService = (deps: { audit: AuditLogger }) => {
     if (!tenantId) throw new Error('No tenant context');
 
     // Asia/Tashkent (UTC+5, DST yo'q) kun chegarasi — cashier/reports bilan izchil.
+    // YARIM-OCHIQ interval (CLI-442 #1): `>= start AND < end` (end = periodTo'dan keyingi
+    // kun 00:00). Inklyuziv `…23:59:59.999` sub-ms tranzaksiyalarni tushirib qoldirardi.
     const start = new Date(`${input.periodFrom}T00:00:00+05:00`);
-    const end = new Date(`${input.periodTo}T23:59:59.999+05:00`);
+    const end = new Date(`${input.periodTo}T00:00:00+05:00`);
+    end.setUTCDate(end.getUTCDate() + 1);
 
     return await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);
@@ -67,7 +70,8 @@ export const createPayrollService = (deps: { audit: AuditLogger }) => {
         .where(
           and(
             eq(cashierTransactions.status, 'completed'),
-            between(cashierTransactions.createdAt, start, end),
+            gte(cashierTransactions.createdAt, start),
+            lt(cashierTransactions.createdAt, end),
           ),
         )
         .groupBy(treatmentPlans.doctorId);
