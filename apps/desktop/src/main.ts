@@ -51,6 +51,7 @@ import {
   stopServer,
 } from './process-manager.js';
 import { registerSettingsIpc } from './settings-ipc.js';
+import { setupSingleInstance } from './single-instance.js';
 import { createTray, setTrayToolTip, updateTray } from './tray.js';
 
 // `electron-updater`ning `autoUpdater` eksporti runtime'da lazy getter orqali
@@ -112,7 +113,12 @@ const openDevWindow = (): void => {
   });
 };
 
+// Ikkinchi nusxa ishga tushirilganda oyna yopiq (tray-only) bo'lsa qayta
+// ochish uchun oxirgi ochilgan URL (single-instance.ts `reopen`).
+let lastOpenedUrl: string | null = null;
+
 const openBrowser = (url: string): void => {
+  lastOpenedUrl = url;
   if (mainWindow) {
     void mainWindow.loadURL(url);
     mainWindow.show();
@@ -134,7 +140,25 @@ const openBrowser = (url: string): void => {
   });
 };
 
+// Single-instance qulfi — ikkinchi nusxa jim chiqadi, birinchi nusxaning
+// oynasi ko'rsatiladi/fokuslanadi (spec: 2026-07-06-desktop-single-instance).
+// Server rejimida ayniqsa muhim: ikkinchi instans avval postgres/valkey
+// portlariga qayta spawn urinib xato dialogi bilan yiqilardi.
+const isPrimaryInstance = setupSingleInstance({
+  requestSingleInstanceLock: () => app.requestSingleInstanceLock(),
+  quit: () => app.quit(),
+  onSecondInstance: (handler) => {
+    app.on('second-instance', handler);
+  },
+  getWindow: () => mainWindow,
+  reopen: () => {
+    if (lastOpenedUrl) openBrowser(lastOpenedUrl);
+  },
+});
+
 app.whenReady().then(async () => {
+  if (!isPrimaryInstance) return; // ikkinchi nusxa — quit() allaqachon chaqirilgan
+
   app.dock?.hide(); // macOS: dock'da ko'rsatmaydi — faqat tray
 
   if (isDevWrapMode()) {
@@ -274,6 +298,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', async () => {
+  if (!isPrimaryInstance) return; // ikkinchi nusxa hech narsa ishga tushirmagan
   if (isDevWrapMode()) return; // dev rejimida process-manager/discovery ishga tushmagan
 
   const config = readConfig();
