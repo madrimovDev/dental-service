@@ -27,6 +27,9 @@ export const revenueReportDtoSchema = z
   .object({
     total: z.number(),
     byBranch: z.array(z.object({ branchId: z.string(), total: z.number() })),
+    // CLI-430: net-of-refund-and-discount (per-tx net-faktor bilan proporsional
+    // taqsimlangan) — xom `Σ item.subtotal` EMAS. `revenue.total` (cash-basis) bilan
+    // izchil (`Σ byService ≈ total`, kichik yaxlitlash farqidan tashqari).
     byService: z.array(z.object({ serviceName: z.string(), total: z.number() })),
     byDoctor: z.array(z.object({ doctorId: z.string().nullable(), total: z.number() })),
     byPeriod: z.array(z.object({ date: z.string(), total: z.number() })),
@@ -94,6 +97,9 @@ export type PlanCompletionReport = z.infer<typeof planCompletionReportDtoSchema>
  */
 export const dentalAnalyticsReportDtoSchema = z
   .object({
+    // CLI-430: net-of-refund-and-discount (netServiceAggregates) — `count` = xom
+    // bajarilgan protsedura soni (SUM quantity), `revenue` = net collected (chegirma +
+    // qisman refund hisobga olingan, `revenue.total` bilan izchil cash-basis).
     procedureMix: z.array(
       z.object({ serviceName: z.string(), count: z.number(), revenue: z.number() }),
     ),
