@@ -36,8 +36,14 @@ mock.module('node:fs', () => ({
   copyFileSync: (...args: unknown[]) => copyFileSyncImpl(...args),
 }));
 
-const { isFirstRun, runFirstSetup, runMigrations, getOrCreateJwtSecret, getOrCreateDbPassword } =
-  await import('./first-run.js');
+const {
+  isFirstRun,
+  runFirstSetup,
+  runMigrations,
+  getOrCreateJwtSecret,
+  getOrCreateDbPassword,
+  getOrCreateSuperuserPassword,
+} = await import('./first-run.js');
 
 describe('isFirstRun', () => {
   let tmpDir: string;
@@ -78,7 +84,12 @@ describe('runFirstSetup', () => {
   });
 
   test("initdb muvaffaqiyatli bo'lsa papkalar yaratiladi, conf fayllar nusxalanadi va JWT_SECRET generatsiya qilinadi", () => {
-    spawnSyncImpl = mock(() => ({ status: 0, stdout: Buffer.from(''), stderr: Buffer.from('') }));
+    const spawnMock = mock((..._args: unknown[]) => ({
+      status: 0,
+      stdout: Buffer.from(''),
+      stderr: Buffer.from(''),
+    }));
+    spawnSyncImpl = spawnMock;
 
     expect(() => runFirstSetup()).not.toThrow();
     expect(existsSync(join(tmpDir, 'uploads'))).toBe(true);
@@ -86,6 +97,16 @@ describe('runFirstSetup', () => {
     expect(existsSync(join(tmpDir, 'postgres', 'data'))).toBe(true);
     expect(copyFileSyncImpl).toHaveBeenCalledTimes(2);
     expect(existsSync(join(tmpDir, 'jwt-secret.txt'))).toBe(true);
+
+    // CLI-442#8 — superuser paroli persisted + initdb scram-sha-256 bilan
+    // chaqirilgan (trust auth EMAS — parolsiz lokal ulanish RLS'ni chetlab
+    // o'tishi mumkin edi).
+    expect(existsSync(join(tmpDir, 'superuser-password.txt'))).toBe(true);
+    const initdbArgs = spawnMock.mock.calls[0]?.[1] as string[];
+    expect(initdbArgs).toContain('-A');
+    expect(initdbArgs).toContain('scram-sha-256');
+    expect(initdbArgs).toContain('--pwfile');
+    expect(initdbArgs).toContain(join(tmpDir, 'superuser-password.txt'));
   });
 
   test("initdb muvaffaqiyatsiz bo'lsa (status != 0) throw qiladi", () => {
@@ -124,8 +145,26 @@ describe('runMigrations', () => {
   });
 
   test("migration muvaffaqiyatli bo'lsa throw qilmaydi", () => {
-    spawnSyncImpl = mock(() => ({ status: 0, stdout: Buffer.from(''), stderr: Buffer.from('') }));
+    const spawnMock = mock((..._args: unknown[]) => ({
+      status: 0,
+      stdout: Buffer.from(''),
+      stderr: Buffer.from(''),
+    }));
+    spawnSyncImpl = spawnMock;
     expect(() => runMigrations('C:\\api.exe')).not.toThrow();
+
+    // CLI-442#8 regression guard — DATABASE_URL/DATABASE_ADMIN_URL use the
+    // persisted superuser password, NOT the hardcoded `dental:dental` literal
+    // (which matched the old trust-auth cluster with no real password).
+    const opts = spawnMock.mock.calls[0]?.[2] as { env: Record<string, string> };
+    const superuserPassword = getOrCreateSuperuserPassword();
+    expect(opts.env.DATABASE_URL).toBe(
+      `postgresql://dental:${superuserPassword}@localhost:5433/dental`,
+    );
+    expect(opts.env.DATABASE_ADMIN_URL).toBe(
+      `postgresql://dental:${superuserPassword}@localhost:5433/dental`,
+    );
+    expect(opts.env.DATABASE_URL).not.toContain('dental:dental@');
   });
 
   test("migration muvaffaqiyatsiz bo'lsa throw qiladi", () => {
@@ -198,5 +237,31 @@ describe('getOrCreateDbPassword', () => {
 
     const password = getOrCreateDbPassword();
     expect(password).toBe('dental_app_local_dev');
+  });
+});
+
+describe('getOrCreateSuperuserPassword (CLI-442#8)', () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'first-run-test-'));
+    process.env.DENTAL_DATA_DIR = tmpDir;
+  });
+
+  afterEach(async () => {
+    delete process.env.DENTAL_DATA_DIR;
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  test('birinchi chaqiruvda tasodifiy parol generatsiya qiladi va faylga yozadi', () => {
+    const password = getOrCreateSuperuserPassword();
+    expect(existsSync(join(tmpDir, 'superuser-password.txt'))).toBe(true);
+    expect(password.length).toBeGreaterThanOrEqual(32);
+  });
+
+  test('idempotent — ikkinchi chaqiruvda bir xil qiymatni qaytaradi (qayta yozmaydi)', () => {
+    const first = getOrCreateSuperuserPassword();
+    const second = getOrCreateSuperuserPassword();
+    expect(second).toBe(first);
   });
 });

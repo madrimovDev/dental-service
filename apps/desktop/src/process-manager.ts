@@ -17,7 +17,11 @@ import { type ChildProcess, spawn } from 'node:child_process';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { app } from 'electron';
-import { getOrCreateDbPassword, getOrCreateJwtSecret } from './first-run.js';
+import {
+  getOrCreateDbPassword,
+  getOrCreateJwtSecret,
+  getOrCreateSuperuserPassword,
+} from './first-run.js';
 
 const getResourcesDir = (): string =>
   app.isPackaged ? process.resourcesPath : join(import.meta.dirname, '..', 'resources');
@@ -135,7 +139,10 @@ const spawnApi = (port: number): Promise<void> =>
         // `createAdminDb()` buni talab qiladi — DATABASE_URL'ga fallback
         // qilmaydi, chunki RLS uni 0 qatorga cheklab qo'yardi). Bu — yagona
         // qasddan RLS-bypass, boshqa hech bir so'rov buni ishlatmaydi.
-        DATABASE_ADMIN_URL: 'postgresql://dental:dental@localhost:5433/dental',
+        // CLI-442#8 — superuser `dental` endi scram-sha-256 bilan
+        // himoyalangan (trust emas, first-run.ts `getOrCreateSuperuserPassword`),
+        // shu sabab hardcoded `dental:dental` o'rniga persisted parol.
+        DATABASE_ADMIN_URL: `postgresql://dental:${getOrCreateSuperuserPassword()}@localhost:5433/dental`,
         REDIS_URL: 'redis://localhost:6380',
         UPLOADS_DIR: join(dataDir, 'uploads'),
         // JWT_SECRET/WEB_ORIGIN — env-schema.ts talab qiladi, lekin
@@ -148,6 +155,11 @@ const spawnApi = (port: number): Promise<void> =>
         // process serve qiladi (apps/api/src/app.ts WEB_DIST_DIR bo'lsa
         // serveStatic+SPA fallback qo'shadi).
         WEB_DIST_DIR: join(getResourcesDir(), 'web'),
+        // CLI-433 — atayin desktop-gate signal (litsenziya module-gating
+        // faqat shu env `=== 'true'` bo'lganda faollashadi; `WEB_DIST_DIR`
+        // litsenziyaga aloqasi bo'lmagan static-serve sozlamasi edi, gate
+        // signali sifatida noto'g'ri edi — license-middleware.ts izohiga qarang).
+        DENTAL_LOCAL_DESKTOP: 'true',
         RUN_REMINDER_WORKER: 'true',
         NODE_ENV: 'production',
       },

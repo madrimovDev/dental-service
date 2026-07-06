@@ -62,7 +62,7 @@ process.env.DENTAL_STOP_WAIT_MS = '5';
 // emas) DENTAL_DATA_DIR'da deterministik ishlamaydi.
 rmSync(join('/tmp/dental-pm-test', 'db-password.txt'), { force: true });
 
-const { getOrCreateDbPassword } = await import('./first-run.js');
+const { getOrCreateDbPassword, getOrCreateSuperuserPassword } = await import('./first-run.js');
 
 const {
   startServer,
@@ -118,6 +118,19 @@ describe('process-manager', () => {
     expect(env.DATABASE_URL).toBe(
       `postgresql://dental_app:${getOrCreateDbPassword()}@localhost:5433/dental`,
     );
+    // CLI-442#8 regression guard — DATABASE_ADMIN_URL (the one intentional
+    // superuser connection, used only by the recall worker's admin scan)
+    // must use the persisted scram-sha-256 password, not the old hardcoded
+    // `dental:dental` (which matched a trust-auth cluster with no real
+    // password check at all).
+    expect(env.DATABASE_ADMIN_URL).toBe(
+      `postgresql://dental:${getOrCreateSuperuserPassword()}@localhost:5433/dental`,
+    );
+    expect(env.DATABASE_ADMIN_URL).not.toContain('dental:dental@');
+    // CLI-433 — dedicated desktop-gate signal (WEB_DIST_DIR is unrelated to
+    // licensing and must NOT be the gate signal; process-manager provides
+    // this new flag so requireModuleInDesktop actually activates in prod).
+    expect(env.DENTAL_LOCAL_DESKTOP).toBe('true');
   });
 
   test('stopServer barcha child process\'larni SIGTERM bilan to\'xtatadi, status "stopped"', async () => {
