@@ -9,6 +9,7 @@ import {
   listServices,
 } from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { scheduleKeys } from '@/features/schedule/schedule.keys';
 import { lookupKeys } from '@/lib/lookup-keys';
 import { appointmentKeys } from './appointments.keys';
 
@@ -77,11 +78,23 @@ export function useBranchAvailability(params: {
   });
 }
 
+/**
+ * A12 (CLI-438): `appointmentKeys.all` allaqachon `appointmentKeys.branchAvailability`ni
+ * (bir xil `['appointments', ...]` prefiks) qamrab oladi, lekin `scheduleKeys.availability`
+ * (NewAppointmentWizard `useAvailability` — mustaqil `['schedule', ...]` prefiks) EMAS.
+ * Shuning uchun ikkalasi ham invalidate qilinadi — aks holda bron/bekor qilingandan
+ * keyin `useAvailability` `staleTime` davomida eski (bo'sh/band) slotni ko'rsatadi.
+ */
+function invalidateAppointmentAndAvailability(qc: ReturnType<typeof useQueryClient>) {
+  void qc.invalidateQueries({ queryKey: appointmentKeys.all });
+  void qc.invalidateQueries({ queryKey: scheduleKeys.all });
+}
+
 export function useCreateAppointment() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: CreateAppointmentBody) => createAppointment(body).then((r) => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: appointmentKeys.all }),
+    onSuccess: () => invalidateAppointmentAndAvailability(qc),
   });
 }
 
@@ -90,6 +103,6 @@ export function useCancelAppointment() {
   return useMutation({
     mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
       cancelAppointment(id, reason !== undefined ? { reason } : undefined).then((r) => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: appointmentKeys.all }),
+    onSuccess: () => invalidateAppointmentAndAvailability(qc),
   });
 }

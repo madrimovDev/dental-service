@@ -5,6 +5,7 @@ import { ChevronRight } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePatients } from '@/features/patients';
+import { fullDayRangeToInstants } from '@/features/schedule/schedule.mappers';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import {
   useAppointments,
@@ -13,7 +14,12 @@ import {
   useDoctors,
   useServices,
 } from '../appointments.api';
-import { localDateKey, localTimeLabel } from '../appointments.mappers';
+import {
+  addDaysToDateKey,
+  localDateKey,
+  localTimeLabel,
+  mondayOfWeek,
+} from '../appointments.mappers';
 import type { AppointmentStatus, CalendarEvent } from '../appointments.types';
 import { CalendarGrid } from './CalendarGrid';
 import { DayStatsCard } from './DayStatsCard';
@@ -23,24 +29,13 @@ import { StatusLegend } from './StatusLegend';
 import { WaitlistCard } from './WaitlistCard';
 import { WeekGrid } from './WeekGrid';
 
-/** Haftaboshi (dushanba) — local. */
-function startOfWeek(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  const day = d.getDay();
-  const diff = (day + 6) % 7; // dushanba = 0
-  d.setDate(d.getDate() - diff);
-  return d;
-}
-
-/** Bugun (local kun)mi — sana sarlavhasi "Bugun" pill uchun. */
-function isToday(date: Date): boolean {
-  const now = new Date();
-  return (
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate()
-  );
+/**
+ * A11 (CLI-438): "Bugun" Tashkent-kalendar kunga qarab aniqlanadi — brauzer
+ * TZ'da emas (aks holda boshqa TZ'dagi brauzerda pill noto'g'ri kunda chiqadi).
+ * `dateKey`/`todayKey` ikkalasi ham `localDateKey` (Tashkent) orqali olinadi.
+ */
+function isToday(dateKey: string): boolean {
+  return dateKey === localDateKey(new Date().toISOString());
 }
 
 /** AppointmentStatus → R0 StatusPill semantik variant. */
@@ -65,24 +60,23 @@ export function CalendarScreen() {
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [cancelReason, setCancelReason] = useState('');
 
+  // A11 (CLI-438): pivot kun — `date` (brauzer-local Date, faqat navigatsiya/display
+  // uchun) qaysi Tashkent kalendar kuniga tegishli ekanini aniqlaydi. Fetch range
+  // shu kalitdan `fullDayRangeToInstants` (Tashkent +05:00 anchor, schedule.mappers)
+  // orqali hisoblanadi — brauzer TZ `setHours(0,0,0,0)` ENDI ishlatilmaydi.
+  const pivotKey = useMemo(() => localDateKey(date.toISOString()), [date]);
+
   const { rangeStart, rangeEnd, dayKeys } = useMemo(() => {
     if (view === 'week') {
-      const start = startOfWeek(date);
-      const end = new Date(start);
-      end.setDate(end.getDate() + 7);
-      const keys = Array.from({ length: 7 }, (_, i) => {
-        const d = new Date(start);
-        d.setDate(d.getDate() + i);
-        return localDateKey(d.toISOString());
-      });
-      return { rangeStart: start, rangeEnd: end, dayKeys: keys };
+      const startKey = mondayOfWeek(pivotKey);
+      const weekEndKey = addDaysToDateKey(startKey, 6);
+      const keys = Array.from({ length: 7 }, (_, i) => addDaysToDateKey(startKey, i));
+      const { startAt, endAt } = fullDayRangeToInstants(startKey, weekEndKey);
+      return { rangeStart: new Date(startAt), rangeEnd: new Date(endAt), dayKeys: keys };
     }
-    const start = new Date(date);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(start);
-    end.setDate(end.getDate() + 1);
-    return { rangeStart: start, rangeEnd: end, dayKeys: [localDateKey(start.toISOString())] };
-  }, [view, date]);
+    const { startAt, endAt } = fullDayRangeToInstants(pivotKey, pivotKey);
+    return { rangeStart: new Date(startAt), rangeEnd: new Date(endAt), dayKeys: [pivotKey] };
+  }, [view, pivotKey]);
 
   const {
     data: appts,
@@ -217,7 +211,7 @@ export function CalendarScreen() {
             >
               {titleLabel}
             </span>
-            {isToday(date) && (
+            {isToday(pivotKey) && (
               // Statik joriy-kun markeri — LOCKED StatusPill `accent` variant
               // (--primary-soft fon, kontrast-validatsiyalangan matn light+dark, DS0/CLI-80).
               <StatusPill status="accent" dot={false}>
@@ -299,7 +293,7 @@ export function CalendarScreen() {
           {/* DS12: jonli "Bo'sh slot" kartasi — faqat `schedule.view` ruxsati
               bo'lganda render (cheklangan rollarda 403 oldini olish, CLI-153). */}
           {hasPermission('schedule.view') && (
-            <FreeSlotsCard branchId={branchId} date={localDateKey(date.toISOString())} enabled />
+            <FreeSlotsCard branchId={branchId} date={pivotKey} enabled />
           )}
           <WaitlistCard appts={apptList} />
         </div>

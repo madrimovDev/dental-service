@@ -22,6 +22,29 @@ export function localDateKey(iso: string): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date(iso));
 }
 
+/**
+ * A11 (CLI-438): sof kalendar arifmetika — 'YYYY-MM-DD' kalitga `delta` kun qo'shadi.
+ * `T00:00:00Z` bilan parse qilinadi (browser TZ'ga bog'liq EMAS) — natija yana
+ * 'YYYY-MM-DD'. Bu haqiqiy vaqt EMAS, faqat kalendar kun-hisoblash vositasi
+ * (Tashkent kun-kalitlari ustida ishlaydi, chunki dateKey allaqachon Tashkent
+ * TZ'da olingan — `localDateKey`).
+ */
+export function addDaysToDateKey(dateKey: string, delta: number): string {
+  const d = new Date(`${dateKey}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + delta);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * A11: berilgan Tashkent kun-kalitini o'z ichiga olgan haftaning dushanbasi
+ * (kalendar kun-nomi TZ'dan mustaqil — 'YYYY-MM-DD' universal fakt).
+ */
+export function mondayOfWeek(dateKey: string): string {
+  const weekday = new Date(`${dateKey}T00:00:00Z`).getUTCDay(); // 0=Yak..6=Shan
+  const diff = (weekday + 6) % 7; // Dushanba=0
+  return addDaysToDateKey(dateKey, -diff);
+}
+
 export function localTimeLabel(iso: string): string {
   return new Intl.DateTimeFormat('en-GB', {
     timeZone: TZ,
