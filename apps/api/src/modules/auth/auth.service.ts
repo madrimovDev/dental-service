@@ -347,7 +347,15 @@ export const createAuthService = (deps: AuthServiceDeps) => {
         .innerJoin(tenants, eq(tenants.id, userAssignments.tenantId))
         .leftJoin(branches, eq(branches.id, userAssignments.branchId))
         .innerJoin(roles, eq(roles.id, userAssignments.roleId))
-        .where(and(eq(userAssignments.userId, userId), eq(userAssignments.isActive, true)));
+        .where(
+          and(
+            eq(userAssignments.userId, userId),
+            eq(userAssignments.isActive, true),
+            // CLI-441 #3: switchWorkspace bilan izchil — muddati o'tgan (validTo < now)
+            // assignment ro'yxatda ko'rinmasin (aks holda ko'rinib, switch'da RAD bo'ladi).
+            or(isNull(userAssignments.validTo), gt(userAssignments.validTo, new Date())),
+          ),
+        );
 
       // Owner uchun assignment bo'lmasligi mumkin — owner sifatida tenant'larni ham qaytaramiz
       const ownerTenants = await tx
@@ -475,12 +483,14 @@ export const createAuthService = (deps: AuthServiceDeps) => {
         if (!assignment) return { code: 'auth.no_workspace_access' as const };
       }
 
-      // branchId tenant ichida ekanligini tekshirish (defense in depth)
+      // branchId tenant ichida VA o'chirilmagan ekanligini tekshirish (defense in depth).
+      // CLI-428: `isNull(deletedAt)` — o'chirilgan branchga stale/saqlangan branchId bilan
+      // to'g'ridan-to'g'ri switch RAD (owner va non-owner ikkala yo'l uchun umumiy chokepoint).
       if (input.branchId) {
         const [branch] = await tx
           .select({ tenantId: branches.tenantId })
           .from(branches)
-          .where(eq(branches.id, input.branchId));
+          .where(and(eq(branches.id, input.branchId), isNull(branches.deletedAt)));
         if (!branch || branch.tenantId !== input.tenantId) {
           return { code: 'auth.invalid_branch' as const };
         }
@@ -642,7 +652,12 @@ export const createAuthService = (deps: AuthServiceDeps) => {
   }
 
   async function requestPasswordReset(input: PasswordResetRequestInput) {
-    const [user] = await db.select().from(users).where(eq(users.phone, input.phone));
+    // CLI-442 #5: soft-deleted user (login:256, workspace-branches:700 bilan izchil)
+    // parol tiklash tokeni ola olmasin.
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(and(eq(users.phone, input.phone), isNull(users.deletedAt)));
 
     // Security: invalid user uchun ham success qaytaramiz (enumeration oldini olish)
     if (!user) return { sent: true };

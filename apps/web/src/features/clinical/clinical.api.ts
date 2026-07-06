@@ -51,6 +51,7 @@ import {
 } from '@tanstack/react-query';
 import { cashierKeys } from '@/features/cashier/cashier.keys.ts';
 import { patientKeys } from '@/features/patients/patients.keys.ts';
+import { recallKeys } from '@/features/recalls/recalls.keys.ts';
 import { api } from '@/lib/api.ts';
 import { lookupKeys } from '@/lib/lookup-keys.ts';
 import { clinicalKeys } from './clinical.keys';
@@ -163,7 +164,13 @@ export function useUpdateStage(patientId: string) {
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: TreatmentStageStatus }) =>
       updateTreatmentStage(id, { status }).then((r) => r.data),
-    onSuccess: () => invalidatePlanFinancials(qc, patientId),
+    // CLI-436: bosqich status o'zgarsa (masalan `completed`) smeta (estimate) + recall ro'yxati
+    // ham o'zgaradi — ularni ham invalidate qilamiz (aks holda 30s stale balans/paid).
+    onSuccess: (stage) => {
+      invalidatePlanFinancials(qc, patientId);
+      void qc.invalidateQueries({ queryKey: clinicalKeys.planEstimate(stage.treatmentPlanId) });
+      void qc.invalidateQueries({ queryKey: recallKeys.patient(patientId) });
+    },
   });
 }
 
@@ -225,7 +232,12 @@ export function useUpdatePlanStatus(patientId: string) {
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: UpdateTreatmentPlanBodyStatus }) =>
       updateTreatmentPlan(id, { status }).then((r) => r.data),
-    onSuccess: () => invalidatePlanFinancials(qc, patientId),
+    // CLI-436: plan status o'zgarsa (masalan `accepted`) smeta ham o'zgaradi — planId
+    // argumentдан olib `planEstimate`ni invalidate qilamiz.
+    onSuccess: (_data, { id }) => {
+      invalidatePlanFinancials(qc, patientId);
+      void qc.invalidateQueries({ queryKey: clinicalKeys.planEstimate(id) });
+    },
   });
 }
 

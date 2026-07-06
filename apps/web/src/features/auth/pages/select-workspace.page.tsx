@@ -12,6 +12,7 @@ import {
   UnstyledButton,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
+import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -31,6 +32,7 @@ type WorkspaceOption = {
 export function SelectWorkspacePage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { activeTenantId, clear, setTokens, setContext } = useAuthStore();
 
   // Auto-select faqat bir marta ishlasin (loop oldini olish).
@@ -50,6 +52,10 @@ export function SelectWorkspacePage() {
       // Switch endi yangi refresh ham qaytaradi — rotation chain'i davom etadi
       setTokens(data.accessToken, data.refreshToken);
       setContext(payload.atid, payload.abid, payload.perms, payload.roleKey ?? null);
+      // CLI-407: cross-tenant stale kesh — navigatsiyadan oldin butun TanStack keshini
+      // tozalaymiz (useBranchSwitch bilan bir xil tartib). Aks holda staleTime ichida
+      // eski tenant ma'lumoti yangi tenantda ko'rinib qoladi.
+      queryClient.clear();
       navigate('/');
     },
     onError: (err) => {

@@ -11,7 +11,7 @@ import { and, between, count, desc, eq, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
-import { computePlanBalance } from './cashier.billing.ts';
+import { computePlanBalance, distributeRefundNegations } from './cashier.billing.ts';
 import type { CreateTransactionInput, ListTransactionsQuery } from './cashier.schema.ts';
 
 const generateReceiptNumber = (): string => {
@@ -164,21 +164,31 @@ export const createCashierService = (deps: { audit: AuditLogger; fiscal?: Fiscal
 
       // Per-bosqich allocation rowlar (ijobiy = to'lov). Bir tx ichida (RLS tx-bound).
       if (input.allocations && input.allocations.length > 0) {
-        // Per-bosqich overpay guard: existingPaid + amount ≤ stage.cost.
+        // CLI-413: overpay guard'ni bir REQUEST ichida stage bo'yicha AGREGAT
+        // qilamiz — aks holda [{X,100k},{X,100k}] har biri mustaqil o'tib, 100k
+        // cost'ga 200k tushardi. Stage row'ni `.for('update')` bilan qulflaymiz
+        // (parallel to'lov poygasi — TOCTOU). Deterministik tartib (stageId sort)
+        // deadlock'ni oldini oladi.
+        const requestedByStage = new Map<string, number>();
         for (const a of input.allocations) {
+          requestedByStage.set(a.stageId, (requestedByStage.get(a.stageId) ?? 0) + a.amount);
+        }
+        for (const stageId of [...requestedByStage.keys()].sort()) {
+          const requested = requestedByStage.get(stageId) as number;
           const [stage] = await tx
             .select({ cost: treatmentStages.cost })
             .from(treatmentStages)
-            .where(eq(treatmentStages.id, a.stageId));
+            .where(eq(treatmentStages.id, stageId))
+            .for('update');
           if (!stage) throw new AllocationExceedError();
           const [paidRow] = await tx
             .select({
               paid: sql<string>`COALESCE(SUM(${treatmentStagePayments.amount}), 0)`,
             })
             .from(treatmentStagePayments)
-            .where(eq(treatmentStagePayments.stageId, a.stageId));
+            .where(eq(treatmentStagePayments.stageId, stageId));
           const existingPaid = Number(paidRow?.paid ?? 0);
-          if (existingPaid + a.amount > Number(stage.cost)) {
+          if (existingPaid + requested > Number(stage.cost)) {
             throw new AllocationExceedError();
           }
         }
@@ -226,8 +236,10 @@ export const createCashierService = (deps: { audit: AuditLogger; fiscal?: Fiscal
    * qolgan) FAQAT plan-linked tranzaksiyada ruxsat (non-plan = semantik noaniqlik,
    * line-item modeli yo'q → faqat to'liq). Mexanizm: kompensatsiya refund txn +
    * PROPORSIONAL negative allocation (per-stage phantom-credit avtomatik oldi olinadi).
-   * Cumulative guard: Σ(refund.paidAmount) ≤ original.paidAmount. Original faqat
-   * cumulative=full bo'lganda void. Advisor qarori + Qaror #24 (allocation filtrlanmaydi).
+   * Cumulative guard: Σ(refund.paidAmount) ≤ original.paidAmount. Original HECH QACHON
+   * void qilinmaydi — manfiy `type='refund'` qatori yagona buxgalteriya izi (CLI-406:
+   * void + refund-qatori ikkalasi daromadни ikki marta ayirardi; qisman-refund modeli
+   * bilan bir xil yagona model). Advisor qarori + Qaror #24 (allocation filtrlanmaydi).
    */
   async function refund(
     c: Context,
@@ -277,7 +289,6 @@ export const createCashierService = (deps: { audit: AuditLogger; fiscal?: Fiscal
         return { ok: false as const, reason: 'non_plan_partial' as const };
       }
 
-      const factor = paid > 0 ? refundAmount / paid : 1;
       const refundSeq =
         (
           await tx
@@ -320,23 +331,23 @@ export const createCashierService = (deps: { audit: AuditLogger; fiscal?: Fiscal
         .where(eq(treatmentStagePayments.transactionId, id));
 
       if (origAllocations.length > 0) {
+        // CLI-418: 2dp yaxlitlash + residue true-up (Σ negatsiya aynan proporsional
+        // maqsad — kasr drift yo'q). `factor` inline ko'paytirish o'rniga sof helper.
+        const negations = distributeRefundNegations(origAllocations, refundAmount, paid);
         await tx.insert(treatmentStagePayments).values(
-          origAllocations.map((a) => ({
+          negations.map((n) => ({
             tenantId: original.tenantId,
             transactionId: refundTx.id,
-            stageId: a.stageId,
-            amount: String(-(Number(a.amount) * factor)),
+            stageId: n.stageId,
+            amount: n.amount,
           })),
         );
       }
 
-      // Original faqat to'liq qaytarilganda void (qisman → completed qoladi).
-      if (alreadyRefunded + refundAmount >= paid) {
-        await tx
-          .update(cashierTransactions)
-          .set({ status: 'voided' })
-          .where(eq(cashierTransactions.id, id));
-      }
+      // CLI-406: original HECH QACHON void qilinmaydi (to'liq refundda ham
+      // `completed` qoladi) — manfiy refund qatori yagona buxgalteriya izi.
+      // Aks holda void completed-filtrdan chiqarardi VA refund qatori negatsiya
+      // qilardi → daromad ikki marta ayirilardi.
 
       await deps.audit.record(c, {
         action: 'refunded',
@@ -361,7 +372,10 @@ export const createCashierService = (deps: { audit: AuditLogger; fiscal?: Fiscal
       .select({
         paymentMethod: cashierTransactions.paymentMethod,
         type: cashierTransactions.type,
-        total: sql<string>`SUM(${cashierTransactions.totalAmount})`,
+        // CLI-419: olingan pul = paidAmount (totalAmount = hisob-faktura; sale kam
+        // to'langan bo'lishi mumkin → kassa qoldig'i totalAmount emas). `type` bo'yicha
+        // guruhlanadi — frontend refundni kassa-chiqim sifatida netlaydi.
+        total: sql<string>`SUM(${cashierTransactions.paidAmount})`,
         count: count(),
       })
       .from(cashierTransactions)

@@ -127,12 +127,10 @@ export const createPatientsService = (deps: { audit: AuditLogger }) => {
           .from(treatmentStagePayments)
           .innerJoin(treatmentStages, eq(treatmentStagePayments.stageId, treatmentStages.id))
           .innerJoin(treatmentPlans, eq(treatmentStages.treatmentPlanId, treatmentPlans.id))
-          .where(
-            and(
-              inArray(treatmentPlans.patientId, ids),
-              inArray(treatmentPlans.status, [...DEBT_PLAN_STATUSES]),
-            ),
-          )
+          // CLI-416: allocation SUM plan-status bo'yicha FILTRLANMAYDI (C4 invariant,
+          // cashier.billing.ts:62-72) — cancelled/draft planga to'langan pul kredit
+          // sifatida saqlanishi kerak, aks holda per-plan balans bilan zid bo'ladi.
+          .where(inArray(treatmentPlans.patientId, ids))
           .groupBy(treatmentPlans.patientId),
         db
           .select({
@@ -199,12 +197,9 @@ export const createPatientsService = (deps: { audit: AuditLogger }) => {
       .from(treatmentStagePayments)
       .innerJoin(treatmentStages, eq(treatmentStagePayments.stageId, treatmentStages.id))
       .innerJoin(treatmentPlans, eq(treatmentStages.treatmentPlanId, treatmentPlans.id))
-      .where(
-        and(
-          eq(treatmentPlans.patientId, patientId),
-          inArray(treatmentPlans.status, [...DEBT_PLAN_STATUSES]),
-        ),
-      );
+      // CLI-416: allocation SUM plan-status bo'yicha FILTRLANMAYDI (C4 invariant) —
+      // cancelled/draft planga to'langan pul kredit sifatida saqlanadi.
+      .where(eq(treatmentPlans.patientId, patientId));
 
     const [nonPlanRow] = await db
       .select({

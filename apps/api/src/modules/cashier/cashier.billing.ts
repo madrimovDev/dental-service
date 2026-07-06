@@ -5,6 +5,34 @@
  */
 
 /**
+ * CLI-418: refund uchun proporsional per-stage negatsiya, 2dp yaxlitlash + residue
+ * true-up. Σ negatsiya AYNAN proporsional maqsad summasiga teng (= refundAmount, agar
+ * allocation to'liq bo'lsa) — yaxlitlash drifti (masalan -333.33×3 = -999.99 ≠ -1000)
+ * yo'qoladi. Sentlarda (×100 butun) ishlanadi — float drift yo'q.
+ *
+ * @returns har allocation uchun MANFIY `amount` (string, numeric(14,2)).
+ */
+export function distributeRefundNegations(
+  allocations: { stageId: string; amount: string }[],
+  refundAmount: number,
+  paid: number,
+): { stageId: string; amount: string }[] {
+  if (allocations.length === 0) return [];
+  const factor = paid > 0 ? refundAmount / paid : 1;
+  // Har stage uchun musbat negatsiya-kattaligi (sentlarda).
+  const rawCents = allocations.map((a) => Math.round(Number(a.amount) * factor * 100));
+  // Maqsad jami (sentlarda) — proporsional to'liq summa.
+  const allocSum = allocations.reduce((s, a) => s + Number(a.amount), 0);
+  const targetCents = Math.round(allocSum * factor * 100);
+  const sumRaw = rawCents.reduce((s, v) => s + v, 0);
+  const residue = targetCents - sumRaw; // oxirgi stage'ga qo'shiladi (Σ = target)
+  return allocations.map((a, i) => {
+    const cents = (rawCents[i] as number) + (i === allocations.length - 1 ? residue : 0);
+    return { stageId: a.stageId, amount: String(-(cents / 100)) };
+  });
+}
+
+/**
  * Qarzga KIRMAYDIGAN bosqich EXECUTION statuslari (Qaror #24).
  * Faqat `status` o'qiga tegishli (acceptance ALOHIDA o'qda — pastga qarang).
  * `Set<string>` — enum bilan ham, kelajakdagi statuslar bilan ham xavfsiz taqqoslash.

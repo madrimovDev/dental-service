@@ -34,7 +34,13 @@ export function PlanFormModal({
   onClose: () => void;
   patientId: string;
   doctorId: string;
-  onCreate: (body: CreateTreatmentPlanInput) => void;
+  // B7 (CLI-439): `onSuccess` callback thread qilingan — muvaffaqiyatli create'дан
+  // keyin faqat modal yopilmasdi, `form.reset()` HAM chaqirilishi kerak edi (mirror
+  // LabOrdersTab/ConsentTab naqshi). Modal `TreatmentPlansTab`da shartsiz mount
+  // qilingan (`opened` faqat ko'rinishni boshqaradi) — `useForm` holati open/close
+  // sikllari orasida saqlanib qolardi, natijada qayta ochilganda eski qiymatlar bilan
+  // tasodifiy dublikat plan submit xavfi bor edi.
+  onCreate: (body: CreateTreatmentPlanInput, callbacks: { onSuccess: () => void }) => void;
   pending: boolean;
 }) {
   const { t } = useTranslation();
@@ -72,21 +78,32 @@ export function PlanFormModal({
   };
 
   const submit = form.onSubmit((values) => {
-    onCreate({
-      patientId,
-      doctorId,
-      title: values.title,
-      notes: values.notes || undefined,
-      stages: values.stages.map((s) => ({
-        serviceId: s.serviceId || undefined,
-        serviceName: s.serviceName,
-        toothNumbers: parseToothNumbers(s.toothNumbersText),
-        estimatedVisits: s.estimatedVisits,
-        estimatedDurationMinutes: s.estimatedDurationMinutes,
-        cost: s.cost,
-        notes: s.notes,
-      })),
-    });
+    onCreate(
+      {
+        patientId,
+        doctorId,
+        title: values.title,
+        notes: values.notes || undefined,
+        stages: values.stages.map((s) => ({
+          serviceId: s.serviceId || undefined,
+          serviceName: s.serviceName,
+          toothNumbers: parseToothNumbers(s.toothNumbersText),
+          estimatedVisits: s.estimatedVisits,
+          estimatedDurationMinutes: s.estimatedDurationMinutes,
+          cost: s.cost,
+          notes: s.notes,
+        })),
+      },
+      {
+        // B7: create muvaffaqiyatli bo'lsa forma tozalanadi (aks holda modal qayta
+        // ochilganda eski qiymatlar qolib, tasodifiy dublikat plan submit qilinishi
+        // mumkin edi).
+        onSuccess: () => {
+          form.reset();
+          onClose();
+        },
+      },
+    );
   });
 
   return (

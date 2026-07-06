@@ -13,7 +13,9 @@ import type {
 import {
   assertPlanTransition,
   assertStageAcceptanceTransition,
+  assertStageMutationAllowedForPlan,
   assertStageStatusTransition,
+  type StageStatus,
 } from './treatment-plans.transitions.ts';
 
 /**
@@ -37,6 +39,18 @@ export class ConsentRequiredError extends Error {
   constructor() {
     super('Consent required before accepting a presented plan');
     this.name = 'ConsentRequiredError';
+  }
+}
+
+/**
+ * CLI-439 B5: mavjud imzoni bo'sh/undefined `consentSignatureUrl` bilan jim NULL
+ * qilishga urinilganda otiladi (routes 400 ga aylantiradi). Yangi (boshqa) qiymat bilan
+ * ataylab qayta imzolash bloklanmaydi — faqat "bo'sh submit eskisini o'chiradi" holati.
+ */
+export class ConsentOverwriteError extends Error {
+  constructor() {
+    super('Existing consent signature cannot be cleared by an empty submission');
+    this.name = 'ConsentOverwriteError';
   }
 }
 
@@ -141,17 +155,34 @@ export const createTreatmentPlansService = (deps: {
   async function setConsent(c: Context, id: string, input: ConsentInput) {
     const before = await repo.findPlan(c, id);
     if (!before) return null;
+
+    // CLI-439 B5: mavjud imzoni bo'sh submit bilan jim NULL qilib yubormaslik — bu
+    // haqiqiy yuridik yozuvni yo'qotardi (faqat audit_log'dan tiklanadi edi). Faqat
+    // RE-SIGN holatida (mavjud imzo bor) reject qilinadi; birinchi marta imzolashda
+    // consentSignatureUrl ixtiyoriy bo'lib qoladi (schema semantikasi saqlanadi — faqat
+    // sana bilan imzolash mumkin). Yangi FARQLI qiymat bilan ataylab qayta imzolash
+    // bloklanmaydi (audit before/after bilan kuzatiladi — jim emas).
+    if (before.consentSignatureUrl && !input.consentSignatureUrl) {
+      throw new ConsentOverwriteError();
+    }
+
     const updated = await repo.updatePlan(c, id, {
       consentSignedAt: input.consentSignedAt ? new Date(input.consentSignedAt) : new Date(),
-      consentSignatureUrl: input.consentSignatureUrl ?? null,
+      consentSignatureUrl: input.consentSignatureUrl ?? before.consentSignatureUrl ?? null,
     });
     if (updated) {
       await deps.audit.record(c, {
         action: 'consent_signed',
         resourceType: 'treatment_plan',
         resourceId: id,
-        before: { consentSignedAt: before.consentSignedAt },
-        after: { consentSignedAt: updated.consentSignedAt },
+        before: {
+          consentSignedAt: before.consentSignedAt,
+          hasSignature: !!before.consentSignatureUrl,
+        },
+        after: {
+          consentSignedAt: updated.consentSignedAt,
+          hasSignature: !!updated.consentSignatureUrl,
+        },
       });
     }
     return updated;
@@ -163,9 +194,11 @@ export const createTreatmentPlansService = (deps: {
     if (!current) return null;
 
     const patch: Record<string, unknown> = {};
+    let toStatus: StageStatus | undefined;
     if (input.status && input.status !== current.status) {
       assertStageStatusTransition(current.status, input.status);
       patch.status = input.status;
+      toStatus = input.status;
       if (input.status === 'completed') patch.completedAt = new Date();
     }
     if (input.acceptance && input.acceptance !== current.acceptance) {
@@ -174,30 +207,39 @@ export const createTreatmentPlansService = (deps: {
     }
     if (input.notes !== undefined) patch.notes = input.notes;
 
-    // Hech narsa o'zgarmadi (idempotent yoki bo'sh PATCH) — qayta yozmaymiz, joriy qaytadi.
+    // Hech narsa o'zgarmadi (idempotent yoki bo'sh PATCH) — plan fetch/guard'dan
+    // OLDIN erta qaytamiz (no-op arzon qoladi; guard'ga yetmaydi — xavfsiz).
     if (Object.keys(patch).length === 0) return current;
+
+    // CLI-415: parent plan BIR MARTA olinadi — guard + recall reuse (qo'shimcha fetch yo'q).
+    // Terminal (cancelled/completed) plan → mutatsiya RAD; draft/presented plan →
+    // completed/in_progress RAD. Xato InvalidTransitionError subklassi → routes 400.
+    const plan = await repo.findPlan(c, current.treatmentPlanId);
+    if (plan) {
+      assertStageMutationAllowedForPlan(plan.status, { toStatus });
+    }
 
     const updated = await repo.updateStage(c, stageId, patch);
     if (updated) {
+      // CLI-439 B9c: audit'ga `before` (joriy holat, mutatsiyadan oldin) ham yozamiz —
+      // avval faqat `after` bor edi, stage tarixini tiklab bo'lmasdi.
       await deps.audit.record(c, {
         action: 'updated',
         resourceType: 'treatment_stage',
         resourceId: stageId,
+        before: { status: current.status, acceptance: current.acceptance, notes: current.notes },
         after: { status: input.status, acceptance: input.acceptance },
       });
 
       // B4: bosqich completed → treatment_followup recall (idempotent). Plan'dan
-      // patientId/branchId kerak (stage'da yo'q). Faqat status endi 'completed'
-      // bo'lganda (re-PATCH'da onConflictDoNothing baribir dedupe qiladi).
-      if (patch.status === 'completed' && deps.recall) {
-        const plan = await repo.findPlan(c, updated.treatmentPlanId);
-        if (plan) {
-          await deps.recall.autoCreateFromStage(c, {
-            patientId: plan.patientId,
-            sourceStageId: updated.id,
-            treatmentPlanId: plan.id,
-          });
-        }
+      // patientId/branchId kerak (stage'da yo'q). Guard cancelled/completed planda
+      // avval otilgani uchun bu yerga faqat ruxsat etilgan plan holatida yetiladi.
+      if (patch.status === 'completed' && deps.recall && plan) {
+        await deps.recall.autoCreateFromStage(c, {
+          patientId: plan.patientId,
+          sourceStageId: updated.id,
+          treatmentPlanId: plan.id,
+        });
       }
     }
     return updated;
@@ -256,6 +298,15 @@ export const createTreatmentPlansService = (deps: {
       .filter((s) => s.acceptance === 'proposed')
       .reduce((sum, s) => sum + s.cost, 0);
     const totalCost = stages.reduce((sum, s) => sum + s.cost, 0);
+
+    // CLI-439 B1: medical_record.view o'qishi — sensitive read (CLAUDE.md §3.10) —
+    // audit_log'ga "viewed" yozuvi qo'shiladi (kontent'siz, faqat ko'rilgani; getPlan/
+    // getMedicalRecord bilan bir xil pattern).
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'treatment_plan_estimate',
+      resourceId: planId,
+    });
 
     return {
       planId,

@@ -5,7 +5,13 @@ import { signLicense } from '../../lib/rsa';
 
 const PRIVATE_KEY = process.env.RSA_PRIVATE_KEY!; // VPS env'dan
 
-const buildResponse = (lic: typeof licenses.$inferSelect, issuedAt: string) => {
+// CLI-410 — `fingerprint` imzolangan payload'ning bir qismi. `fingerprint`
+// NON-NULL bo'lishi kafolatlanadi (activate/reactivate aniq fingerprint beradi;
+// heartbeat CLI-411 NULL-guard'idan keyin chaqiriladi) — shuning uchun param
+// tipi `fingerprint: string` deb toraytiriladi.
+type SignableLicense = Omit<typeof licenses.$inferSelect, 'fingerprint'> & { fingerprint: string };
+
+const buildResponse = (lic: SignableLicense, issuedAt: string) => {
   const payload = {
     licenseKey: lic.licenseKey,
     clinicId: lic.clinicId,
@@ -13,6 +19,7 @@ const buildResponse = (lic: typeof licenses.$inferSelect, issuedAt: string) => {
     expiresAt: lic.expiresAt.toISOString(),
     gracePeriodDays: lic.gracePeriodDays,
     issuedAt,
+    fingerprint: lic.fingerprint,
   };
   return {
     ...payload,
@@ -53,7 +60,18 @@ export const createLicenseService = () => ({
     if (!lic || !lic.isActive) {
       throw Object.assign(new Error('INVALID_KEY'), { status: 403 });
     }
-    if (lic.fingerprint && lic.fingerprint !== fingerprint) {
+    // CLI-411 — heartbeat NIKAKDA fingerprint bog'lamaydi; faqat allaqachon
+    // `activate` (yoki admin `reactivate`) orqali bog'langanini tasdiqlaydi.
+    // Ilgari `lic.fingerprint && ...` — fingerprint NULL (aktivlanmagan) bo'lsa
+    // mismatch-tekshiruvi butunlay o'tkazib yuborilardi → istalgan fingerprint
+    // bilan heartbeat muvaffaqiyatli bo'lib, aktivatsiya bosqichini (rate-limit
+    // + `event:'activated'` audit) chetlab o'tib cheksiz mashinadan ishlash
+    // mumkin edi. Endi NULL → NOT_ACTIVATED (klient allaqachon `.lic`siz —
+    // heartbeat yubormaydi; docs/audit-fixes/CLI-411).
+    if (!lic.fingerprint) {
+      throw Object.assign(new Error('NOT_ACTIVATED'), { status: 403 });
+    }
+    if (lic.fingerprint !== fingerprint) {
       throw Object.assign(new Error('FINGERPRINT_MISMATCH'), { status: 403 });
     }
     await db.update(licenses).set({ lastHeartbeatAt: new Date() }).where(eq(licenses.id, lic.id));
@@ -62,7 +80,9 @@ export const createLicenseService = () => ({
       event: 'heartbeat',
       fingerprint,
     });
-    return buildResponse(lic, new Date().toISOString());
+    // CLI-411 guard yuqorida `lic.fingerprint`'ni non-null qildi — CLI-410
+    // imzolangan payload'ga qo'shish uchun aniq beramiz (TS narrowing).
+    return buildResponse({ ...lic, fingerprint: lic.fingerprint }, new Date().toISOString());
   },
 
   async reactivate(licenseKey: string, newFingerprint: string) {

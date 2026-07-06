@@ -3,6 +3,7 @@ import { and, desc, eq } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { createOwnershipValidator, type OwnershipValidator } from '../../lib/ownership.ts';
 import { deleteObject, patientImageKey, presignedGetUrl, uploadObject } from '../../lib/s3.ts';
 import type { UpdateImageMetadataInput } from './patient-images.schema.ts';
 
@@ -28,7 +29,12 @@ export type UploadInput = {
   body: ArrayBuffer;
 };
 
-export const createPatientImagesService = (deps: { audit: AuditLogger }) => {
+export const createPatientImagesService = (deps: {
+  audit: AuditLogger;
+  ownership?: OwnershipValidator;
+}) => {
+  const ownership = deps.ownership ?? createOwnershipValidator();
+
   async function list(c: Context, patientId: string, visitNoteId?: string) {
     const db = getDb(c);
     const rows = await db
@@ -77,6 +83,13 @@ export const createPatientImagesService = (deps: { audit: AuditLogger }) => {
     const user = c.get('user');
     if (!tenantId) throw new Error('No tenant context');
 
+    // CLI-421: cross-entity ownership — storage write'dan OLDIN (shakl-validatsiya → ownership
+    // → storage → insert). patientId/visitNoteId shu bemorga tegishlimi; cross-tenant/mixed
+    // UUID → CrossEntityError → routes 400, hech qanday object yozilmaydi.
+    await ownership.assertPatientExists(c, input.patientId);
+    if (input.visitNoteId)
+      await ownership.assertVisitNoteBelongsToPatient(c, input.visitNoteId, input.patientId);
+
     // 1) Pre-generate ID + key
     const imageId = crypto.randomUUID();
     const objectKey = patientImageKey({
@@ -89,29 +102,37 @@ export const createPatientImagesService = (deps: { audit: AuditLogger }) => {
     // 2) Upload to MinIO first (if DB insert fails, we'll have orphan; rare, acceptable)
     await uploadObject({ key: objectKey, body: input.body, contentType: input.contentType });
 
-    // 3) Insert DB row
-    const [row] = await db
-      .insert(patientImages)
-      .values({
-        id: imageId,
-        tenantId,
-        patientId: input.patientId,
-        uploadedByUserId: user?.id ?? null,
-        type: input.type,
-        objectKey,
-        originalFilename: input.originalFilename,
-        contentType: input.contentType,
-        sizeBytes: input.body.byteLength,
-        title: input.title ?? null,
-        description: input.description ?? null,
-        toothNumbers: input.toothNumbers ?? null,
-        takenDate: input.takenDate ? new Date(input.takenDate) : null,
-        visitNoteId: input.visitNoteId ?? null,
-      })
-      .returning();
+    // 3) Insert DB row — CLI-422: exception ham (nafaqat bo'sh `returning()`) orphan
+    // cleanup'ni triggerlashi kerak (masalan DB constraint xatosi). try/catch bilan
+    // o'ralgan — throw bo'lsa object o'chiriladi, keyin xato qayta otiladi.
+    let row: typeof patientImages.$inferSelect | undefined;
+    try {
+      [row] = await db
+        .insert(patientImages)
+        .values({
+          id: imageId,
+          tenantId,
+          patientId: input.patientId,
+          uploadedByUserId: user?.id ?? null,
+          type: input.type,
+          objectKey,
+          originalFilename: input.originalFilename,
+          contentType: input.contentType,
+          sizeBytes: input.body.byteLength,
+          title: input.title ?? null,
+          description: input.description ?? null,
+          toothNumbers: input.toothNumbers ?? null,
+          takenDate: input.takenDate ? new Date(input.takenDate) : null,
+          visitNoteId: input.visitNoteId ?? null,
+        })
+        .returning();
+    } catch (e) {
+      await deleteObject(objectKey).catch(() => {});
+      throw e;
+    }
 
     if (!row) {
-      // Cleanup orphan
+      // Cleanup orphan (bo'sh returning — insert throw qilmadi, lekin qator qaytmadi).
       await deleteObject(objectKey).catch(() => {});
       throw new Error('Insert failed after upload');
     }
@@ -143,6 +164,13 @@ export const createPatientImagesService = (deps: { audit: AuditLogger }) => {
     if (input.toothNumbers !== undefined) patch.toothNumbers = input.toothNumbers;
     if (input.takenDate !== undefined)
       patch.takenDate = input.takenDate ? new Date(input.takenDate) : null;
+
+    // CLI-439 B8: bo'sh body → Drizzle `.set({})` throw qiladi → 500 edi. Guard
+    // (visit-note-templates.service.ts naqshi) — no-op qaytaradi, before allaqachon
+    // topilgan/tekshirilgan.
+    if (Object.keys(patch).length === 0) {
+      return { ...before, url: await presignedGetUrl(before.objectKey) };
+    }
 
     const [row] = await db
       .update(patientImages)

@@ -12,11 +12,19 @@ import {
   type ServiceWithPrices,
 } from '@dental/api-client';
 import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { patientKeys } from '@/features/patients/patients.keys';
 import { serviceKeys } from '@/features/services/services.keys';
 import { lookupKeys } from '@/lib/lookup-keys';
 import { cashierKeys } from './cashier.keys';
 
-const todayISO = () => new Date().toISOString().slice(0, 10);
+/**
+ * CLI-440 #2: Asia/Tashkent kalendar kuni (UTC EMAS — `new Date().toISOString().slice(0,10)`
+ * Tashkent 00:00–05:00 oralig'ida hali "kecha"gi UTC sanani berardi, backend esa kun
+ * chegarasini `+05:00`da quradi — "bugungi" ro'yxat/summary noto'g'ri kunni ko'rsatardi).
+ * `schedule.mappers.localDateParam` bilan bir xil naqsh (`Intl.DateTimeFormat('en-CA', ...)`).
+ */
+const todayISO = () =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tashkent' }).format(new Date());
 
 export function useTodayTransactions(branchId: string | null) {
   return useQuery({
@@ -97,6 +105,9 @@ export function useCreateTransaction() {
       void qc.invalidateQueries({ queryKey: cashierKeys.all });
       // Plan billing → balans yangilanishi uchun.
       void qc.invalidateQueries({ queryKey: cashierKeys.plans });
+      // CLI-440 #2: to'lov bemor balansini o'zgartiradi — ro'yxat/detal balans
+      // ustunlari eskirib qolmasligi uchun `patients` keyni ham invalidate qilamiz.
+      void qc.invalidateQueries({ queryKey: patientKeys.all });
     },
   });
 }
@@ -111,6 +122,9 @@ export function useRefund() {
       void qc.invalidateQueries({ queryKey: cashierKeys.all });
       // Refund allocation'larni negate qiladi → plan balans tiklanadi.
       void qc.invalidateQueries({ queryKey: cashierKeys.plans });
+      // CLI-440 #2: refund ham bemor balansini o'zgartiradi (patients.api'dagi
+      // xuddi shu naqsh — clinical.api.ts `invalidatePlanFinancials`).
+      void qc.invalidateQueries({ queryKey: patientKeys.all });
     },
   });
 }

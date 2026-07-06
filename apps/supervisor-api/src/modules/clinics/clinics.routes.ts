@@ -25,6 +25,15 @@ const createClinicSchema = z.object({
 // the same reason). So POST / here auto-creates a "Main" branch for the
 // new clinic, wrapped in a transaction so a mid-way failure never leaves
 // an orphan clinic/branch row.
+//
+// CLI-433 — module-name dictionary reconciled with apps/api's actual route
+// names (was `erp`/`inventory`/`branches`, which don't match any api route —
+// api's gate would never have granted these even for enterprise). Now uses
+// the same names as apps/api/src/lib/license-middleware.ts's MODULE_MAP
+// (`expenses`/`stock`/`payroll`/`notifications`/`schedule`/`recalls`) — the
+// two apps are separate deploy units (no workspace import edge,
+// license-signature.ts precedent), kept in LOCKSTEP BY HAND. If you change
+// this table, update apps/api's MODULE_MAP too (see its guard test).
 const MODULE_MAP: Record<z.infer<typeof createClinicSchema>['plan'], string[]> = {
   starter: ['patients', 'appointments', 'queue'],
   standard: ['patients', 'appointments', 'queue', 'cashier', 'reports', 'staff'],
@@ -53,10 +62,12 @@ const MODULE_MAP: Record<z.infer<typeof createClinicSchema>['plan'], string[]> =
     'patient-images',
     'prescriptions',
     'consent',
-    'erp',
+    'expenses',
+    'stock',
     'payroll',
-    'inventory',
-    'branches',
+    'notifications',
+    'schedule',
+    'recalls',
   ],
 };
 

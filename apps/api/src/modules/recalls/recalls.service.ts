@@ -13,6 +13,24 @@ import type {
 const CLOSED_STATUSES = new Set(['scheduled', 'completed', 'dismissed']);
 
 /**
+ * Rebook relevantlik oynasi (CLI-426): yozilish recall'ni faqat `dueDate − 30 kun`
+ * dan keyin (yoki keyingi) boshlansa yopadi. Uzoq kelajakdagi (mas. +4 oy preventive)
+ * recall bugungi shoshilinch yozilish bilan yopilmaydi.
+ */
+const REBOOK_GRACE_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * Yozilish recall'ni yopishga "yetarlicha yaqin"mi — `appointmentStart >= dueDate − 30d`.
+ * dueDate klinika-local kun string'i ("YYYY-MM-DD"); UTC yarim tunga anchor qilamiz
+ * (grace kun sonida ishlaydi, TZ mayda farqi ahamiyatsiz).
+ */
+export function isRebookRelevant(dueDate: string, appointmentStart: Date): boolean {
+  const dueMs = Date.parse(`${dueDate}T00:00:00Z`);
+  if (Number.isNaN(dueMs)) return true; // noto'g'ri sana → eski xulq (yop)
+  return appointmentStart.getTime() >= dueMs - REBOOK_GRACE_MS;
+}
+
+/**
  * Bugungi klinika-local kun (YYYY-MM-DD) + N oy → due-date string.
  * `date` ustun instant emas — klinika kalendar kuni (Asia/Tashkent) bilan ishlaymiz.
  */
@@ -28,11 +46,22 @@ export function computeDueDate(intervalMonths: number, now: Date = new Date()): 
   const y = get('year');
   const m = get('month'); // 1-12
   const d = get('day');
-  // UTC anchor (kun boshini buzmaslik uchun) + oy qo'shish; oy oxiri overflow'i
-  // Date normalizatsiyasi bilan hal qilinadi (mas. 31-yanvar +1 oy → mart emas?
-  // setUTCMonth oxirgi kunni mos kamaytiradi).
-  const anchor = new Date(Date.UTC(y, m - 1, d));
-  anchor.setUTCMonth(anchor.getUTCMonth() + intervalMonths);
+
+  // A7 (CLI-438): oy-oxiri overflow FIX. Eski kod `setUTCMonth(cur+n)` chaqirardi
+  // — bu kunni SAQLAYDI va ortiqcha kunlarni KEYINGI oyga OSHIRIB YUBORADI (izoh
+  // "oxirgi kunni mos kamaytiradi" deb da'vo qilardi, lekin JS Date BUNDAY
+  // ISHLAMAYDI): 31-yanvar + 1 oy → 3-mart, 28/29-fevral EMAS. To'g'ri clamp:
+  // kunni 1ga qo'yib oy qo'shamiz, so'ng target oyning haqiqiy kun-soniga
+  // (Date.UTC(y, m+1, 0) — keyingi oyning 0-kuni = shu oyning oxirgi kuni)
+  // min() bilan cheklaymiz. Oddiy (o'rta oy) holatlarda xulq o'zgarmaydi.
+  const targetMonthAnchor = new Date(Date.UTC(y, m - 1 + intervalMonths, 1));
+  const daysInTargetMonth = new Date(
+    Date.UTC(targetMonthAnchor.getUTCFullYear(), targetMonthAnchor.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  const clampedDay = Math.min(d, daysInTargetMonth);
+  const anchor = new Date(
+    Date.UTC(targetMonthAnchor.getUTCFullYear(), targetMonthAnchor.getUTCMonth(), clampedDay),
+  );
   return anchor.toISOString().slice(0, 10);
 }
 
@@ -166,6 +195,14 @@ export const createRecallsService = (deps: { audit: AuditLogger }) => {
    * NULL → partial index dedupe QILMAYDI; shuning uchun service'da "bemorda ochiq
    * preventive bormi?" tekshiruvi bilan gate'lanadi (bir bemor → bitta ochiq
    * preventive). Transition guard (re-PATCH qayta yoqmasligi) chaqiruvchida.
+   *
+   * A8 (CLI-438): `hasOpenByReason` check-then-insert — ikki concurrent request
+   * (mas. ikki xodim bir vaqtda ikkita appointment'ni "completed" qilsa) SELECT
+   * va INSERT orasidagi oynada ikkita ochiq preventive yaratishi mumkin edi.
+   * Pre-check BIRINCHI QATOR himoya bo'lib qoladi (tezkor common-case); DB
+   * darajasidagi `insertPreventiveIfAbsent` (partial unique index + ON CONFLICT
+   * DO NOTHING, `recalls.repository.ts`) — defense-in-depth ikkinchi qatlam
+   * (race'da haqiqiy kafolat DB constraint'dan keladi).
    */
   async function autoCreatePreventive(
     c: Context,
@@ -175,7 +212,7 @@ export const createRecallsService = (deps: { audit: AuditLogger }) => {
     if (!tenantId) return;
     if (await repo.hasOpenByReason(c, args.patientId, 'preventive')) return;
     const intervalMonths = await repo.getDefaultIntervalMonths(c);
-    await repo.insert(c, {
+    await repo.insertPreventiveIfAbsent(c, {
       tenantId,
       patientId: args.patientId,
       branchId: args.branchId ?? null,
@@ -189,22 +226,43 @@ export const createRecallsService = (deps: { audit: AuditLogger }) => {
 
   /**
    * Bemor qayta yozilganda (appointments.create) — uning ochiq (pending/contacted)
-   * recall'larini scheduled qiladi va yozilishga bog'laydi (B5). Idempotent:
-   * ochiq recall bo'lmasa no-op.
+   * recall'larini scheduled qiladi va yozilishga bog'laydi (B5). CLI-426: faqat
+   * yozilish recall due-oynasiga RELEVANT bo'lsa (`start >= dueDate − 30d`) yopadi;
+   * uzoq kelajak recall'lar ochiq qoladi (yo'qolmaydi). Idempotent: mos ochiq recall
+   * bo'lmasa no-op.
    */
   async function closeOpenOnRebook(
     c: Context,
     patientId: string,
     newAppointmentId: string,
+    appointmentStart: Date,
   ): Promise<void> {
     const user = c.get('user');
     const open = await repo.findOpenByPatient(c, patientId);
     for (const r of open) {
+      if (!isRebookRelevant(r.dueDate, appointmentStart)) continue;
       await repo.update(c, r.id, {
         status: 'scheduled',
         scheduledAppointmentId: newAppointmentId,
         closedBy: user?.id ?? null,
         closedAt: new Date(),
+      });
+    }
+  }
+
+  /**
+   * Yozilish cancel/no_show bo'lganda (appointments.update) — uni yopgan `scheduled`
+   * recall'larni `pending`ga qaytaradi (CLI-426 reopen). dueDate o'zgarmaydi → recall
+   * dashboardga qaytadi. Faqat SHU yozilish yopgan recall'lar (link bo'yicha).
+   */
+  async function reopenOnCancel(c: Context, appointmentId: string): Promise<void> {
+    const reopened = await repo.reopenByAppointment(c, appointmentId);
+    if (reopened > 0) {
+      await deps.audit.record(c, {
+        action: 'reopened',
+        resourceType: 'recall',
+        resourceId: appointmentId,
+        after: { reopened, appointmentId },
       });
     }
   }
@@ -232,6 +290,7 @@ export const createRecallsService = (deps: { audit: AuditLogger }) => {
     autoCreateFromStage,
     autoCreatePreventive,
     closeOpenOnRebook,
+    reopenOnCancel,
     summary,
   };
 };

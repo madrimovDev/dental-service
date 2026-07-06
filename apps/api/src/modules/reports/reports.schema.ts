@@ -27,6 +27,9 @@ export const revenueReportDtoSchema = z
   .object({
     total: z.number(),
     byBranch: z.array(z.object({ branchId: z.string(), total: z.number() })),
+    // CLI-430: net-of-refund-and-discount (per-tx net-faktor bilan proporsional
+    // taqsimlangan) — xom `Σ item.subtotal` EMAS. `revenue.total` (cash-basis) bilan
+    // izchil (`Σ byService ≈ total`, kichik yaxlitlash farqidan tashqari).
     byService: z.array(z.object({ serviceName: z.string(), total: z.number() })),
     byDoctor: z.array(z.object({ doctorId: z.string().nullable(), total: z.number() })),
     byPeriod: z.array(z.object({ date: z.string(), total: z.number() })),
@@ -89,19 +92,31 @@ export type PlanCompletionReport = z.infer<typeof planCompletionReportDtoSchema>
 
 /**
  * Dental-spetsifik analitika: procedure-mix, bemor retention, recall samaradorligi,
- * no-show trend (hafta-kuni bo'yicha). Filial filtri branch-scoped manbalarga
- * qo'llanadi (procedure-mix/no-show); retention bemor-darajasida (tenant-wide).
+ * no-show trend (hafta-kuni bo'yicha).
+ *
+ * **Filial (`branchId`) scope — sub-metrika bo'yicha izchil hujjatlashtirilgan:**
+ * - `procedureMix`, `noShowByWeekday` — **branch-scoped** (`cashier_transactions` /
+ *   `appointments`da `branchId` bor, filtr qo'llanadi).
+ * - `retention`, `recallEfficacy` — **tenant-wide** (bemor/recall branch-siz, Qaror #29,
+ *   planCompletion pretsedenti; CLI-431 — ilgari `retention.returningPatients` branch-
+ *   scoped edi, `newPatients` esa tenant-wide edi — asimmetriya branchId'ga qarab ichki
+ *   nomuvofiq natija berardi; endi ikkalasi ham branchId'dan mustaqil).
  */
 export const dentalAnalyticsReportDtoSchema = z
   .object({
+    // CLI-430: net-of-refund-and-discount (netServiceAggregates) — `count` = xom
+    // bajarilgan protsedura soni (SUM quantity), `revenue` = net collected (chegirma +
+    // qisman refund hisobga olingan, `revenue.total` bilan izchil cash-basis).
     procedureMix: z.array(
       z.object({ serviceName: z.string(), count: z.number(), revenue: z.number() }),
     ),
+    // Tenant-wide (CLI-431) — branchId'dan mustaqil (branch-invariant).
     retention: z.object({
       newPatients: z.number(),
       returningPatients: z.number(),
       retentionRate: z.number(),
     }),
+    // Tenant-wide — recalls jadvalida branch ustuni yo'q (o'zgarmadi).
     recallEfficacy: z.object({
       total: z.number(),
       converted: z.number(),

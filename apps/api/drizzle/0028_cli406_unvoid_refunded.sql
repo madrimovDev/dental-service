@@ -1,0 +1,13 @@
+-- CLI-406: to'liq refund daromaddan ikki marta ayirilishini tuzatish (data-only).
+-- Ilgari to'liq-refund asl tranzaksiyani `status='voided'` qilardi VA manfiy
+-- `type='refund'` qatori qo'shardi → daromad agregatlari (status='completed' filtri
+-- + signed SUM) reversalni IKKI marta qo'llardi. Endi asl `completed` qoladi.
+--
+-- `voided` status kodda FAQAT bitta joyda o'rnatilardi (cashier.service.ts refund
+-- void bloki) → har `voided` qatori mos `type='refund'` qatoriga ega to'liq-refund
+-- asli. Shuning uchun quyidagi backfill xavfsiz va o'z-o'zini tuzatuvchi:
+-- tarixiy `voided` asllar `completed`ga qaytariladi → daromad bir marta hisoblanadi.
+--
+-- ⚠️ Yopilgan davr revenue/payroll qiymatlari KO'TARILADI (bug tuzatilishi, regressiya
+-- emas). Yakunlangan payroll_runs snapshot'lari (payroll_lines'da muzlatilgan) o'zgarmaydi.
+UPDATE cashier_transactions SET status = 'completed' WHERE status = 'voided';

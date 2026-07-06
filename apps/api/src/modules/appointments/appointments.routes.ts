@@ -4,7 +4,6 @@ import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { requireModuleInDesktop } from '../../lib/license-middleware.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
-import { reminderJobId, reminderQueue } from '../../lib/queue.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
@@ -18,11 +17,8 @@ import {
   listAppointmentsQuery,
   updateAppointmentSchema,
 } from './appointments.schema.ts';
-import {
-  createAppointmentsService,
-  type RecallAppointmentHook,
-  type SchedulePredicates,
-} from './appointments.service.ts';
+import type { AppointmentsService } from './appointments.service.ts';
+import { AppointmentTransitionError } from './appointments.transitions.ts';
 
 /** Standart 404 response — get / patch / cancel endpoint'lar uchun. */
 const notFoundResponse = {
@@ -47,29 +43,19 @@ const conflictResponse = {
 export const appointmentRoutes = (deps: {
   db: Database;
   audit: AuditLogger;
-  schedule?: SchedulePredicates;
-  recall?: RecallAppointmentHook;
+  /**
+   * CLI-425: bir marta app.ts'da qurilgan (reminder-queue wiring bilan) —
+   * queue.routes.ts ham shu xil instansiyani ulaydi (shared completion path,
+   * preventive-recall hook har ikki yo'ldan ham bir xil ishlaydi).
+   */
+  service: AppointmentsService;
 }) => {
   const app = new OpenAPIHono();
   app.use('*', requireModuleInDesktop('appointments'));
   app.use('*', authMiddleware());
   app.use('*', rlsMiddleware(deps.db));
 
-  const service = createAppointmentsService({
-    audit: deps.audit,
-    schedule: deps.schedule,
-    recall: deps.recall,
-    enqueueReminder: async (tenantId, appointmentId, delayMs) => {
-      await reminderQueue.add(
-        'appointment-reminder',
-        { tenantId, appointmentId },
-        { delay: delayMs, jobId: reminderJobId(appointmentId) },
-      );
-    },
-    removeReminder: async (appointmentId) => {
-      await reminderQueue.remove(reminderJobId(appointmentId));
-    },
-  });
+  const service = deps.service;
 
   // ─── GET / — list ─────────────────────────────────────────────────────────
 
@@ -201,7 +187,14 @@ export const appointmentRoutes = (deps: {
   app.openapi(updateRoute, async (c) => {
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const result = await service.update(c, id, body);
+    let result: Awaited<ReturnType<typeof service.update>>;
+    try {
+      result = await service.update(c, id, body);
+    } catch (e) {
+      // CLI-409: state-machine violation → 400 (invalid_transition / terminal).
+      if (e instanceof AppointmentTransitionError) return c.json(fail(e.code, e.message), 400);
+      throw e;
+    }
     if (!result.ok) {
       // Konflikt oilasi (409): doctor_busy + ish-soati/time-off guard'lari (A6).
       if (
@@ -241,7 +234,14 @@ export const appointmentRoutes = (deps: {
   app.openapi(cancelRoute, async (c) => {
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const result = await service.cancel(c, id, body?.reason);
+    let result: Awaited<ReturnType<typeof service.cancel>>;
+    try {
+      result = await service.cancel(c, id, body?.reason);
+    } catch (e) {
+      // CLI-409: completed'ni cancel qilishga urinish → 400 invalid_transition/terminal.
+      if (e instanceof AppointmentTransitionError) return c.json(fail(e.code, e.message), 400);
+      throw e;
+    }
     if (!result.ok) return c.json(fail(result.code, result.code), 400);
     if (!result.appointment)
       return c.json(fail('appointment.not_found', 'Appointment not found'), 400);

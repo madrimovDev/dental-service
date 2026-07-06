@@ -55,7 +55,9 @@ const signForTest = (data: object): string => {
   return sign.sign(testKeypair.privateKey, 'hex');
 };
 
-const { writeLicense, readLicense, invalidateLicense } = await import('../../src/lib/license.ts');
+const { writeLicense, readLicense, invalidateLicense, getFingerprint } = await import(
+  '../../src/lib/license.ts'
+);
 const { requireModule } = await import('../../src/lib/license-middleware.ts');
 const { runLicenseHeartbeatCheck } = await import('../../src/lib/license-heartbeat-scheduler.ts');
 const { sendHeartbeat } = await import('../../src/lib/license-client.ts');
@@ -67,6 +69,11 @@ const buildApp = () => {
   return app;
 };
 
+// CLI-410: signed payload endi mahalliy fingerprint bilan bog'langan —
+// fingerprint'siz payload "legacy" deb rad etiladi. Shu mock systeminformation
+// asosida haqiqiy fingerprint hisoblab, payload'ga kiritamiz.
+const localFingerprint = await getFingerprint();
+
 const activeLicensePayload = (licenseKey: string) => ({
   licenseKey,
   clinicId: 'clinic-387',
@@ -74,6 +81,7 @@ const activeLicensePayload = (licenseKey: string) => ({
   expiresAt: new Date(Date.now() + 86400000 * 30).toISOString(),
   gracePeriodDays: 30,
   issuedAt: new Date().toISOString(),
+  fingerprint: localFingerprint,
 });
 
 describe('CLI-387 — deactivated clinic gets blocked on next heartbeat', () => {

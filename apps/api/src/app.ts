@@ -7,11 +7,13 @@ import { secureHeaders } from 'hono/secure-headers';
 import { db } from './db/client.ts';
 import { createAuditLogger } from './lib/audit-logger.ts';
 import { env } from './lib/env.ts';
+import { requireModuleInDesktop } from './lib/license-middleware.ts';
 import { METRICS_CONTENT_TYPE, renderMetrics } from './lib/metrics.ts';
+import { reminderJobId, reminderQueue } from './lib/queue.ts';
 import { createLocalStorageAdapter } from './lib/storage.ts';
 import { errorHandler } from './middleware/error-handler.ts';
 import { requestId } from './middleware/request-id.ts';
-import { appointmentRoutes } from './modules/appointments/index.ts';
+import { appointmentRoutes, createAppointmentsService } from './modules/appointments/index.ts';
 import { auditRoutes } from './modules/audit/index.ts';
 import { authRoutes } from './modules/auth/index.ts';
 import { branchRoutes } from './modules/branches/index.ts';
@@ -138,19 +140,105 @@ export const createApp = () => {
   // preventive + B5 rebook) va clinical/treatment-plans (B4 stage-followup) ga
   // inject qilamiz (RFC-0009 §4 sof factory DI; to'g'ridan import emas).
   const recall = createRecallsService({ audit });
-  app.route('/api/appointments', appointmentRoutes({ db, audit, schedule, recall }));
+  // CLI-425: appointmentsService bir marta quriladi (reminder-queue wiring
+  // bilan) va appointmentRoutes + queueRoutes ikkalasiga uzatiladi — shared
+  // completion path, queue "done"→completed ham preventive-recall hook'ini
+  // (B4) fire qiladi (ilgari faqat kalendar PATCH orqali yopilgan appointment
+  // recall olardi).
+  const appointmentsService = createAppointmentsService({
+    audit,
+    schedule,
+    recall,
+    // A9 (CLI-438): reminder job hayot-sikli. Ilgari `remove()` keyin `add()`
+    // ketma-ket chaqirilardi — BullMQ bir xil `jobId` bilan `add()`ni MAVJUD
+    // (hali olib tashlanmagan) job'ni qaytarib, delay'ni YANGILAMAYDI (dedupe).
+    // Agar `remove()` job ACTIVE bo'lgani uchun jim muvaffaqiyatsiz bo'lsa
+    // (worker aynan shu daqiqada fire qilayotgan bo'lsa), keyingi `add()` eski
+    // vaqt bilan qolib ketardi → reminder yangi (rescheduled) vaqtda ketmasdi.
+    // Endi: mavjud job'ni AVVAL topib, `changeDelay()` bilan YANGILAYMIZ (job
+    // yo'q qilinmaydi, shuning uchun dedupe race'i yo'q); topilmasa (allaqachon
+    // fire bo'lgan/yo'q) — oddiy `add()`. `removeOnComplete`/`removeOnFail` —
+    // Redis'da tugagan job'lar to'planmasin (CLI-403 bilan bog'liq o'sish).
+    enqueueReminder: async (tenantId, appointmentId, delayMs) => {
+      const jobId = reminderJobId(appointmentId);
+      const existing = await reminderQueue.getJob(jobId);
+      if (existing) {
+        try {
+          await existing.changeDelay(delayMs);
+          return;
+        } catch {
+          // Job ACTIVE/completed bo'lib o'zgartirib bo'lmadi — pastda qayta
+          // qo'shishga urinamiz (eski job hali tursa `add` uni qaytaradi, lekin
+          // bu — worker aynan shu lahzada ishlab turgan chekka holat, kuzatuvga
+          // loyiq bo'lsa-da xavfsiz: fire bo'lgan job endi qayta ishlanmaydi).
+        }
+      }
+      await reminderQueue.add(
+        'appointment-reminder',
+        { tenantId, appointmentId },
+        { delay: delayMs, jobId, removeOnComplete: true, removeOnFail: 100 },
+      );
+    },
+    removeReminder: async (appointmentId) => {
+      const jobId = reminderJobId(appointmentId);
+      const existing = await reminderQueue.getJob(jobId);
+      if (!existing) return;
+      try {
+        await existing.remove();
+      } catch {
+        // Active/locked (fire jarayonida) — worker `shouldSkipReminder` bilan
+        // fire-vaqtida status'ni tekshiradi (cancelled/no_show), xavfsiz no-op.
+      }
+    },
+  });
+  app.route('/api/appointments', appointmentRoutes({ db, audit, service: appointmentsService }));
   app.route('/api/schedule', scheduleRoutes({ db, audit }));
-  app.route('/api/queue', queueRoutes({ db, audit }));
+  app.route('/api/queue', queueRoutes({ db, audit, appointmentsService }));
   app.route('/api/recalls', recallRoutes({ db, audit }));
   // M5 clinical extras
   app.route('/api/prescriptions', prescriptionsRoutes({ db, audit }));
   app.route('/api/consent', consentRoutes({ db, audit }));
   app.route('/api/lab-orders', labOrdersRoutes({ db, audit }));
   // R4 Guruh A: xarajatlar (/api/expense-categories, /api/expenses), ombor (/api/stock)
-  app.route('/api', expensesRoutes({ db, audit }));
+  //
+  // CLI-433 — daromad modullari (expenses/stock/payroll/notifications) ilgari
+  // HECH QANDAY litsenziya-gate'ga ega emas edi (starter tarif bilan ham
+  // to'liq ochiq). Gate parent-darajada (`app.use(...)`, sub-app ichida emas —
+  // bu 4 modulning route fayllari file-ownership doirasidan tashqarida)
+  // qo'shiladi, har `app.route(...)`dan DARHOL OLDIN.
+  //
+  // Mount-tartib (fix-forward, CLI-358 bare-`/api` quirk'i takrorlanди):
+  // `expenses` bare `/api` prefiksiga mount qilinadi (pastga qarang). Bare-`/api`
+  // mount'dan KEYIN ro'yxatdan o'tkazilgan har qanday path-scoped
+  // `app.use(pattern, ...)` gate matching'ini yo'qotadi (quyidagi CLI-358
+  // izohidagi bilan bir xil Hono quirk — runtime probe bilan tasdiqlangan:
+  // expenses'ni stock/payroll/notifications'dан OLDIN qo'ysa ularning gate'i
+  // 401ga tushib qolardi, chunki gate umuman ishlamay next()ga o'tib ketardi).
+  // Shuning uchun stock/payroll/notifications (path-scoped gate) AVVAL, expenses
+  // (bare-`/api`) esa clinical/patient-images bilan bir qatorda — ENG OXIRIDA.
+  app.use('/api/stock', requireModuleInDesktop('stock'));
+  app.use('/api/stock/*', requireModuleInDesktop('stock'));
   app.route('/api/stock', stockRoutes({ db, audit, notifications }));
+  app.use('/api/payroll', requireModuleInDesktop('payroll'));
+  app.use('/api/payroll/*', requireModuleInDesktop('payroll'));
   app.route('/api/payroll', payrollRoutes({ db, audit }));
+  app.use('/api/notifications', requireModuleInDesktop('notifications'));
+  app.use('/api/notifications/*', requireModuleInDesktop('notifications'));
   app.route('/api/notifications', notificationsRoutes({ db, sms }));
+  // `DENTAL_LOCAL_DESKTOP!=='true'` bo'lsa (cloud/dev/CI) `requireModuleInDesktop`
+  // no-op — mavjud test suite/cloud deploy buzilmaydi. `expenses` bare `/api`
+  // prefiksiga mount qilinib ikkita top-level yo'lga (expense-categories,
+  // expenses) fan-out qiladi — Hono `/*` wildcard bare prefiksni (masalan
+  // `GET /api/expenses`, sub-path'siz) QAMRAMAYDI, shuning uchun har biri
+  // uchun aniq prefiks + `/*` ikkalasi ham ro'yxatdan o'tkaziladi. Yuqoridagi
+  // izohga ko'ra — bare-`/api` mount'i bo'lgani uchun ENG OXIRIDA (clinical/
+  // patient-images bilan bir qatorda) turadi, hech qanday path-scoped gate'ни
+  // buzmasin deb.
+  app.use('/api/expense-categories', requireModuleInDesktop('expenses'));
+  app.use('/api/expense-categories/*', requireModuleInDesktop('expenses'));
+  app.use('/api/expenses', requireModuleInDesktop('expenses'));
+  app.use('/api/expenses/*', requireModuleInDesktop('expenses'));
+  app.route('/api', expensesRoutes({ db, audit }));
   // CLI-358: clinical/patient-images are mounted at the BARE `/api` prefix
   // (they fan out to top-level paths like /api/diagnoses, /api/treatment-plans,
   // /api/patients/{id}/images — see each file's own comment) and clinical

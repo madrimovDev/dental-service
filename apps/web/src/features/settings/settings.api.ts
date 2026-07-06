@@ -226,7 +226,13 @@ export function useUpdateTenantSettings() {
   return useMutation({
     mutationFn: (body: UpdateTenantSettingsBody) =>
       updateTenantSettings(body).then((res) => res.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: settingsKeys.tenantSettings() }),
+    // CLI-420: vertical `tenant_settings` yozuvining bir maydoni. Yengil `tenantVertical()`
+    // keshini ham invalidate qilamiz — aks holda `useVertical()` stale qolib, gated tab'lar
+    // (Odontogram/Lab) vertical almashtirilgach reload'gача 403 beradi.
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: settingsKeys.tenantSettings() });
+      qc.invalidateQueries({ queryKey: settingsKeys.tenantVertical() });
+    },
   });
 }
 

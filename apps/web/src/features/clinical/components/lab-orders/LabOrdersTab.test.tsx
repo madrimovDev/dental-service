@@ -43,6 +43,20 @@ describe('LabOrdersTab', () => {
     expect(screen.getByText('Lab X')).toBeInTheDocument();
   });
 
+  // B2 (CLI-439): status Select faqat joriy + ruxsat etilgan keyingi statuslarni
+  // ko'rsatadi — mocked buyurtma status='sent' → ruxsat: sent/in_progress/cancelled.
+  // draft/ready/delivered (orqaga qaytish yoki bosqich sakrash) ko'rinmasligi kerak.
+  it("status Select faqat ruxsat etilgan keyingi statuslarni ko'rsatadi (6ta shartsiz emas)", async () => {
+    renderApp(<LabOrdersTab patientId="p1" />);
+    const input = screen.getByDisplayValue('Yuborilgan');
+    fireEvent.click(input);
+    expect(await screen.findByText('Tayyorlanmoqda')).toBeInTheDocument();
+    expect(screen.getByText('Bekor qilingan')).toBeInTheDocument();
+    expect(screen.queryByText('Qoralama')).not.toBeInTheDocument();
+    expect(screen.queryByText('Tayyor')).not.toBeInTheDocument();
+    expect(screen.queryByText('Yetkazilgan')).not.toBeInTheDocument();
+  });
+
   // Characterization: create-modal submit hozirgi payload shaklini saqlaydi (CLI-117 refactor guard).
   it("create form submit → createLabOrder to'g'ri shape bilan", async () => {
     createMutate.mockClear();

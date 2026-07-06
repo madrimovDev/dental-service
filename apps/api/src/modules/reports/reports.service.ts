@@ -1,15 +1,16 @@
 import {
   appointments,
   branches,
-  cashierTransactionItems,
   cashierTransactions,
   patients,
   recalls,
   treatmentPlans,
   treatmentStages,
 } from '@dental/db-schema';
-import { and, between, count, countDistinct, desc, eq, isNull, lt, ne, sql } from 'drizzle-orm';
+import type { Column } from 'drizzle-orm';
+import { and, count, countDistinct, desc, eq, gte, isNull, lt, ne, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
+import type { DbOrTx } from '../../db/client.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import {
@@ -40,10 +41,92 @@ const WEEKDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 /** Refund → manfiy, to'lov → musbat yig'indisi (COALESCE 0 agar hech narsa yo'q). */
 const signedPaidAmount = sql<string>`COALESCE(SUM(CASE WHEN ${cashierTransactions.type} = 'refund' THEN -${cashierTransactions.paidAmount} ELSE ${cashierTransactions.paidAmount} END), 0)`;
 
-const tashkentRange = (from: string, to: string) => ({
-  start: new Date(`${from}T00:00:00+05:00`),
-  end: new Date(`${to}T23:59:59.999+05:00`),
-});
+/**
+ * Asia/Tashkent (UTC+5, DST yo'q) kun oralig'i — YARIM-OCHIQ (CLI-442 #1).
+ * `start` inklyuziv (from kunining 00:00), `end` EKSKLYUZIV (to kunidan keyingi kun 00:00).
+ * `between(...)` (inklyuziv `…23:59:59.999`) sub-ms tranzaksiyalarni (masalan `23:59:59.9995`)
+ * tushirib qoldirardi — yarim-ochiq `>= start AND < end` teshikni yopadi va kun chegarasi
+ * hech qanday tranzaksiyani ikki kunda hisoblamaydi.
+ */
+const tashkentRange = (from: string, to: string) => {
+  const start = new Date(`${from}T00:00:00+05:00`);
+  const end = new Date(`${to}T00:00:00+05:00`);
+  end.setUTCDate(end.getUTCDate() + 1);
+  return { start, end };
+};
+
+/** Yarim-ochiq kun oralig'i filtri: `col >= start AND col < end` (CLI-442 #1). */
+const inRange = (col: Column, start: Date, end: Date) => and(gte(col, start), lt(col, end));
+
+type NetServiceRow = { serviceName: string; count: number; revenue: number };
+
+/**
+ * CLI-430 — byService / procedureMix net-of-refund-and-discount agregatsiyasi.
+ *
+ * `cashier_transaction_items.subtotal` chegirmadan OLDINGI item narxi — tranzaksiya-
+ * darajali `discount` va qisman refundlar item'larda aks etmaydi (refund tx item'siz,
+ * CLI-406). Shuning uchun per-tranzaksiya "net-faktor" orqali har item subtotal'ini
+ * mutanosib kamaytiramiz:
+ *   txGross  = Σ item.subtotal (shu tx)
+ *   txNet    = tx.paidAmount − Σ (shu tx'ga bog'langan child refundlar.paidAmount)
+ *   factor   = txGross > 0 ? txNet / txGross : 0
+ *   perService = Σ round(item.subtotal × factor)
+ * `revenue.total` (`signedPaidAmount`, cash-basis) bilan izchil bo'lishi uchun. To'liq
+ * refundda (CLI-406dan keyin original `completed` qoladi) factor≈0 → o'sha xizmat
+ * hissasi tabiiy ravishda 0 bo'ladi (voided-status tekshiruvi endi kerak emas).
+ * `count` (procedureMix) — XOM `SUM(quantity)` (bajarilgan protsedura soni, refund
+ * pulni qaytaradi lekin ishni "o'chirmaydi").
+ *
+ * Raw SQL (CTE) — korrelyatsiyalangan child-refund subquery + item-darajasidagi
+ * proporsional taqsimot query-builder'da qulay ifodalanmaydi (self-join alias kerak).
+ */
+async function netServiceAggregates(
+  db: DbOrTx,
+  start: Date,
+  end: Date,
+  branchId?: string | null,
+): Promise<NetServiceRow[]> {
+  const branchFilter = branchId ? sql`AND t.branch_id = ${branchId}` : sql``;
+  // Date obyekti to'g'ridan raw sql'ga interpolatsiya qilinsa postgres-js
+  // parametrni string-tip sifatida yozishga urinib RangeError beradi — ISO
+  // string sifatida uzatib, Postgres implicit timestamptz cast'iga tayanamiz.
+  const rows = await db.execute(sql`
+    WITH tx_net AS (
+      SELECT
+        t.id AS tx_id,
+        (t.paid_amount - COALESCE((
+          SELECT SUM(r.paid_amount) FROM cashier_transactions r
+          WHERE r.parent_transaction_id = t.id AND r.type = 'refund'
+        ), 0)) AS net_paid,
+        (SELECT COALESCE(SUM(i2.subtotal), 0) FROM cashier_transaction_items i2
+          WHERE i2.transaction_id = t.id) AS gross
+      FROM cashier_transactions t
+      WHERE t.status = 'completed'
+        AND t.type = 'payment'
+        AND t.created_at >= ${start.toISOString()}
+        AND t.created_at < ${end.toISOString()}
+        ${branchFilter}
+    )
+    SELECT
+      i.service_name AS "serviceName",
+      COALESCE(SUM(i.quantity), 0) AS "count",
+      COALESCE(SUM(
+        CASE WHEN tn.gross > 0 THEN ROUND((i.subtotal * tn.net_paid / tn.gross)::numeric, 2) ELSE 0 END
+      ), 0) AS "revenue"
+    FROM cashier_transaction_items i
+    JOIN tx_net tn ON tn.tx_id = i.transaction_id
+    GROUP BY i.service_name
+    ORDER BY "revenue" DESC
+  `);
+
+  return (rows as unknown as { serviceName: string; count: string; revenue: string }[]).map(
+    (r) => ({
+      serviceName: r.serviceName,
+      count: Number(r.count),
+      revenue: Number(r.revenue),
+    }),
+  );
+}
 
 /** Har kun (from..to) uchun 'sun'..'sat' kaliti — Tashkent kuni, noon-anchored (TZ chegarasi xavfsiz). */
 function* eachWeekday(from: string, to: string): Generator<string> {
@@ -61,7 +144,7 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
     const { start, end } = tashkentRange(from, to);
     const base = [
       eq(cashierTransactions.status, 'completed'),
-      between(cashierTransactions.createdAt, start, end),
+      inRange(cashierTransactions.createdAt, start, end),
     ];
     if (branchId) base.push(eq(cashierTransactions.branchId, branchId));
     const [row] = await db
@@ -77,7 +160,7 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
   ): Promise<number> {
     const db = getDb(c);
     const { start, end } = tashkentRange(from, to);
-    const base = [between(appointments.startTime, start, end)];
+    const base = [inRange(appointments.startTime, start, end)];
     if (branchId) base.push(eq(appointments.branchId, branchId));
     const [row] = await db
       .select({ c: count() })
@@ -112,7 +195,7 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
 
     const base = [
       eq(cashierTransactions.status, 'completed'),
-      between(cashierTransactions.createdAt, start, end),
+      inRange(cashierTransactions.createdAt, start, end),
     ];
     if (branchId) base.push(eq(cashierTransactions.branchId, branchId));
 
@@ -136,25 +219,9 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
       .groupBy(dayExpr)
       .orderBy(dayExpr);
 
-    // byService — itemli POS (payment, completed)
-    const itemBase = [
-      eq(cashierTransactions.status, 'completed'),
-      eq(cashierTransactions.type, 'payment'),
-      between(cashierTransactions.createdAt, start, end),
-    ];
-    if (branchId) itemBase.push(eq(cashierTransactions.branchId, branchId));
-    const byService = await db
-      .select({
-        serviceName: cashierTransactionItems.serviceName,
-        total: sql<string>`COALESCE(SUM(${cashierTransactionItems.subtotal}), 0)`,
-      })
-      .from(cashierTransactionItems)
-      .innerJoin(
-        cashierTransactions,
-        eq(cashierTransactionItems.transactionId, cashierTransactions.id),
-      )
-      .where(and(...itemBase))
-      .groupBy(cashierTransactionItems.serviceName);
+    // byService — itemli POS (payment, completed), net-of-refund-and-discount (CLI-430).
+    const byServiceNet = await netServiceAggregates(db, start, end, branchId);
+    const byService = byServiceNet.map((r) => ({ serviceName: r.serviceName, total: r.revenue }));
 
     const byPaymentMethod = await db
       .select({ paymentMethod: cashierTransactions.paymentMethod, total: signedPaidAmount })
@@ -212,7 +279,7 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
   ): Promise<AppointmentStatsReport> {
     const db = getDb(c);
     const { start, end } = tashkentRange(from, to);
-    const base = [between(appointments.startTime, start, end)];
+    const base = [inRange(appointments.startTime, start, end)];
     if (branchId) base.push(eq(appointments.branchId, branchId));
 
     const statusRows = await db
@@ -304,7 +371,7 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
   ): Promise<DoctorWorkloadRow[]> {
     const db = getDb(c);
     const { start, end } = tashkentRange(from, to);
-    const base = [between(appointments.startTime, start, end)];
+    const base = [inRange(appointments.startTime, start, end)];
     if (branchId) base.push(eq(appointments.branchId, branchId));
 
     const rows = await db
@@ -353,7 +420,7 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
       .where(
         and(
           sql`${treatmentPlans.status} IN ('accepted','in_progress','completed')`,
-          between(treatmentPlans.createdAt, start, end),
+          inRange(treatmentPlans.createdAt, start, end),
         ),
       )
       .groupBy(treatmentStages.status);
@@ -385,38 +452,24 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
     const { start, end } = tashkentRange(from, to);
 
     // 1. Procedure-mix — kassa item'lari (completed payment, oraliq, filial).
-    const txFilter = [
-      between(cashierTransactions.createdAt, start, end),
-      eq(cashierTransactions.type, 'payment'),
-      eq(cashierTransactions.status, 'completed'),
-    ];
-    if (branchId) txFilter.push(eq(cashierTransactions.branchId, branchId));
-    const mixRows = await db
-      .select({
-        serviceName: cashierTransactionItems.serviceName,
-        count: sql<string>`SUM(${cashierTransactionItems.quantity})`,
-        revenue: sql<string>`SUM(${cashierTransactionItems.subtotal})`,
-      })
-      .from(cashierTransactionItems)
-      .innerJoin(
-        cashierTransactions,
-        eq(cashierTransactionItems.transactionId, cashierTransactions.id),
-      )
-      .where(and(...txFilter))
-      .groupBy(cashierTransactionItems.serviceName)
-      .orderBy(desc(sql`SUM(${cashierTransactionItems.subtotal})`));
+    //    `count` = XOM SUM(quantity) (bajarilgan protsedura soni); `revenue` = net-of-
+    //    refund-and-discount (CLI-430) — `netServiceAggregates` bilan bir xil hisoblash.
+    const mixRows = await netServiceAggregates(db, start, end, branchId);
 
     // 2. Retention — yangi (oraliqda yaratilgan) vs qaytgan (oraliqda yozilgan, lekin
-    //    oraliqdan oldin yaratilgan bemor). Retention bemor-darajasida (tenant-wide, Qaror #29).
+    //    oraliqdan oldin yaratilgan bemor). Retention bemor-darajasida — TENANT-WIDE
+    //    (Qaror #29, planCompletion pretsedenti) — `branchId` ATAYLAB ikkala tomonda
+    //    ham e'tiborga olinmaydi (CLI-431: ilgari `returningPatients` branch-scoped edi,
+    //    `newPatients` esa tenant-wide — asimmetriya branchId'ga qarab ichki nomuvofiq
+    //    natija berardi; endi ikkalasi ham branchId'dan mustaqil, branch-invariant).
     const [newRow] = await db
       .select({ c: count() })
       .from(patients)
-      .where(between(patients.createdAt, start, end));
+      .where(inRange(patients.createdAt, start, end));
     const apptRetFilter = [
-      between(appointments.startTime, start, end),
+      inRange(appointments.startTime, start, end),
       lt(patients.createdAt, start),
     ];
-    if (branchId) apptRetFilter.push(eq(appointments.branchId, branchId));
     const [retRow] = await db
       .select({ c: countDistinct(appointments.patientId) })
       .from(appointments)
@@ -425,11 +478,12 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
     const newPatients = Number(newRow?.c ?? 0);
     const returningPatients = Number(retRow?.c ?? 0);
 
-    // 3. Recall-efficacy — oraliqda yaratilgan recall'lar, status bo'yicha.
+    // 3. Recall-efficacy — oraliqda yaratilgan recall'lar, status bo'yicha. TENANT-WIDE
+    //    (recalls jadvalida branch ustuni yo'q) — retention bilan izchil scope.
     const recallRows = await db
       .select({ status: recalls.status, c: count() })
       .from(recalls)
-      .where(between(recalls.createdAt, start, end))
+      .where(inRange(recalls.createdAt, start, end))
       .groupBy(recalls.status);
     const recallByStatus = recallRows.map((r) => ({
       status: r.status as string,
@@ -441,7 +495,7 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
       .reduce((s, r) => s + r.count, 0);
 
     // 4. No-show trend — hafta-kuni bo'yicha (Asia/Tashkent). EXTRACT(DOW) 0=Yak..6=Shan.
-    const nsFilter = [between(appointments.startTime, start, end)];
+    const nsFilter = [inRange(appointments.startTime, start, end)];
     if (branchId) nsFilter.push(eq(appointments.branchId, branchId));
     const nsRows = await db
       .select({
@@ -461,11 +515,7 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
     });
 
     return {
-      procedureMix: mixRows.map((r) => ({
-        serviceName: r.serviceName,
-        count: Number(r.count),
-        revenue: Number(r.revenue),
-      })),
+      procedureMix: mixRows,
       retention: {
         newPatients,
         returningPatients,
@@ -497,7 +547,7 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
     const { start, end } = tashkentRange(from, to);
     const filter = [
       eq(cashierTransactions.status, 'completed'),
-      between(cashierTransactions.createdAt, start, end),
+      inRange(cashierTransactions.createdAt, start, end),
     ];
     if (branchId) filter.push(eq(cashierTransactions.branchId, branchId));
 

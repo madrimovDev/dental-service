@@ -1,3 +1,4 @@
+import { ApiError } from '@dental/api-client';
 import { Button } from '@dental/ui';
 import { Chip, Group, MultiSelect, Select, Stack, Stepper, Text } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
@@ -14,8 +15,35 @@ import { type WizardValues, wizardSchema } from '../appointments.schema';
 
 type Option = { value: string; label: string };
 
+/**
+ * A10 (CLI-438): backend 409 kodini aniq xabarga aylantiradi. `appointments.conflict`
+ * mavjud kalit faqat `doctor_busy` uchun ishlatiladi. Qolgan ikkitasi (ish-soati /
+ * time-off) uchun yangi i18n kalit kerak bo'lardi, lekin bu pass faqat `apps/web/**`
+ * ownership'ga ega — `packages/i18n`ga tegilmaydi. Inline TODO-literal (uz/ru) —
+ * handoff: keyingi pass `appointments.outside_working_hours` /
+ * `appointments.doctor_on_time_off` i18n kalitlarini qo'shib shu literal'larni
+ * almashtirsin.
+ */
+function conflictMessage(err: unknown, t: (key: string) => string, lang: string): string {
+  if (!(err instanceof ApiError)) return t('common.error');
+  switch (err.code) {
+    case 'conflict.doctor_busy':
+      return t('appointments.conflict');
+    case 'schedule.outside_working_hours':
+      // TODO i18n key: appointments.outside_working_hours (uz.json/ru.json)
+      return lang === 'ru'
+        ? 'Это время вне рабочего графика доктора'
+        : 'Bu vaqt doktor ish jadvalidan tashqarida';
+    case 'schedule.doctor_on_time_off':
+      // TODO i18n key: appointments.doctor_on_time_off (uz.json/ru.json)
+      return lang === 'ru' ? 'Доктор в этот день в отпуске' : "Doktor shu kuni ta'tilda";
+    default:
+      return t('common.error');
+  }
+}
+
 export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { activeBranchId } = useAuthStore();
   const [active, setActive] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -86,8 +114,28 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
     }
   }, [basis]);
 
+  // A10: xato maydon → tegishli qadam (validate() barcha qadamlarni bir yo'la
+  // tekshiradi; xato boshqa qadamda bo'lsa foydalanuvchiga ko'rsatish uchun o'sha
+  // qadamga qaytariladi).
+  const FIELD_STEP: Record<string, number> = {
+    branchId: 0,
+    patientId: 0,
+    doctorId: 1,
+    serviceIds: 1,
+    startTime: 2,
+    endTime: 2,
+  };
+
   const submit = () => {
     setError(null);
+    // A10: patientId (va boshqa majburiy maydonlar) submit'dan oldin majburlanadi —
+    // avval hech qachon chaqirilmagan `form.validate()` inline xato ko'rsatadi.
+    const result = form.validate();
+    if (result.hasErrors) {
+      const errorSteps = Object.keys(result.errors).map((field) => FIELD_STEP[field] ?? 0);
+      if (errorSteps.length > 0) setActive(Math.min(...errorSteps));
+      return;
+    }
     if (!form.values.startTime || !form.values.endTime) return;
     createMut.mutate(
       {
@@ -101,7 +149,7 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
       },
       {
         onSuccess: onClose,
-        onError: () => setError(t('appointments.conflict')),
+        onError: (err) => setError(conflictMessage(err, t, i18n.language)),
       },
     );
   };

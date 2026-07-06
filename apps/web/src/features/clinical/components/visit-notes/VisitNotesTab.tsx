@@ -10,6 +10,7 @@ import {
   useCreateVisitNote,
   useDiagnoses,
   usePatientAppointments,
+  useServiceCatalog,
   useVisitNotes,
 } from '../../clinical.api';
 import { VisitNoteCard } from './VisitNoteCard';
@@ -26,6 +27,7 @@ export function VisitNotesTab({ patientId }: Props) {
   const notesQuery = useVisitNotes(patientId);
   const diagnosesQuery = useDiagnoses();
   const apptQuery = usePatientAppointments(patientId);
+  const servicesQuery = useServiceCatalog();
   const createMut = useCreateVisitNote(patientId);
 
   const diagnosisMap = useMemo(() => {
@@ -33,6 +35,15 @@ export function VisitNotesTab({ patientId }: Props) {
     for (const d of diagnosesQuery.data ?? []) map.set(d.id, d);
     return map;
   }, [diagnosesQuery.data]);
+
+  // CLI-414: BOM auto-deduction uchun aktiv xizmat katalogi.
+  const serviceOptions = useMemo(
+    () =>
+      (servicesQuery.data ?? [])
+        .filter((s) => s.isActive)
+        .map((s) => ({ value: s.id, label: `${s.code} — ${s.nameUz}` })),
+    [servicesQuery.data],
+  );
 
   return (
     <Stack gap="md">
@@ -70,6 +81,7 @@ export function VisitNotesTab({ patientId }: Props) {
           doctorId={user.id}
           diagnoses={diagnosesQuery.data ?? []}
           appointments={apptQuery.data ?? []}
+          services={serviceOptions}
           pending={createMut.isPending}
           onCreate={(body) => createMut.mutate(body, { onSuccess: close })}
         />

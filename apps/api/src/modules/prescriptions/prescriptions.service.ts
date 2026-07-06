@@ -3,9 +3,14 @@ import { and, desc, eq } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { createOwnershipValidator, type OwnershipValidator } from '../../lib/ownership.ts';
 import type { CreatePrescriptionInput, UpdatePrescriptionInput } from './prescriptions.schema.ts';
 
-export const createPrescriptionsService = (deps: { audit: AuditLogger }) => {
+export const createPrescriptionsService = (deps: {
+  audit: AuditLogger;
+  ownership?: OwnershipValidator;
+}) => {
+  const ownership = deps.ownership ?? createOwnershipValidator();
   async function list(c: Context, patientId?: string) {
     const db = getDb(c);
     const filters = [];
@@ -42,6 +47,13 @@ export const createPrescriptionsService = (deps: { audit: AuditLogger }) => {
     const db = getDb(c);
     const tenantId = c.get('activeTenantId');
     if (!tenantId) throw new Error('No tenant context');
+
+    // CLI-421: cross-entity ownership — patientId/doctorId/visitNoteId shu bemorga/tenantga
+    // tegishlimi (cross-tenant/mixed UUID → CrossEntityError → routes 400).
+    await ownership.assertPatientExists(c, input.patientId);
+    await ownership.assertUserExists(c, input.doctorId);
+    if (input.visitNoteId)
+      await ownership.assertVisitNoteBelongsToPatient(c, input.visitNoteId, input.patientId);
 
     const [row] = await db
       .insert(prescriptions)

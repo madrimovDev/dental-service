@@ -39,6 +39,25 @@ export const requireModule = (module: string): MiddlewareHandler => {
  * Tarif → modul ro'yxati xaritasi. `packages/core/vertical-features.ts`dagi
  * dental/general vertical feature-gating'dan alohida qatlam — bu yerda
  * *tarif* (starter/standard/premium/enterprise) bo'yicha modul cheklovi.
+ *
+ * CLI-433 — bu konstanta runtime gate yo'lida ISHLATILMAYDI (gate haqiqiy
+ * yo'li: `getActiveModules()` → `lic.modules` — Supervisor-bergan `.lic`dan —
+ * → `modules.includes(module)`; modul nomi `requireModuleInDesktop('...')`
+ * string-literalidan keladi). Bu — REFERENS/TEST-uchun lug'at, Supervisor
+ * `apps/supervisor-api/src/modules/clinics/clinics.routes.ts` MODULE_MAP bilan
+ * QO'LDA LOCKSTEP saqlanadi (`license-signature.ts` pretsedenti — ikki alohida
+ * deploy birligi, workspace-edge yo'q). Divergensiya `license-middleware.test.ts`
+ * dagi guard-test tomonidan ushlanadi (ikkalasi ham shu lug'atga solishtiriladi).
+ *
+ * ⚠️ `schedule`/`recalls` — kelishilgan jadval (docs/audit-fixes/CLI-433 §2c)
+ * ularni enterprise-only qiladi, lekin haqiqiy `requireModuleInDesktop` gate
+ * `app.ts`da FAQAT bu ro'yxatga QO'SHILMAGAN: web `/schedule` va `/recalls`
+ * sahifalari joriy holatda tarifdan qat'i nazar faqat permission
+ * (`schedule.view`/`recalls...`) bilan cheklangan (starter/standard/premium
+ * tenant ham ulardan foydalanadi) — enterprise-only gate qo'shish shu
+ * tenantlarni buzadi. Shuning uchun bu ikkisi lug'atda (hujjat/til birligi
+ * uchun) bor, lekin `app.ts`da GATE QILINMAGAN (qasddan og'ish, spec §3 edge
+ * case fallback: "shubha bo'lsa schedule'ni gate'siz qoldirish").
  */
 export const MODULE_MAP: Record<string, string[]> = {
   starter: ['patients', 'appointments', 'queue'],
@@ -56,7 +75,25 @@ export const MODULE_MAP: Record<string, string[]> = {
     'prescriptions',
     'consent',
   ],
-  enterprise: ['*'],
+  enterprise: [
+    'patients',
+    'appointments',
+    'queue',
+    'cashier',
+    'reports',
+    'staff',
+    'clinical',
+    'lab-orders',
+    'patient-images',
+    'prescriptions',
+    'consent',
+    'expenses',
+    'stock',
+    'payroll',
+    'notifications',
+    'schedule',
+    'recalls',
+  ],
 };
 
 /**
@@ -66,20 +103,21 @@ export const MODULE_MAP: Record<string, string[]> = {
  * uchun `requireModule`ni shartsiz ulash butun mavjud test suite'ni va
  * cloud deploy'ni buzadi (har doim LICENSE_NOT_FOUND).
  *
- * Bu wrapper `requireModule`ni `process.env.WEB_DIST_DIR` (Local Desktop
- * signali — `app.ts` CSP branch bilan bir xil, `process-manager.ts`
- * `spawnApi()` shu env'ni beradi) bilan shartlaydi: WEB_DIST_DIR yo'q bo'lsa
- * gating butunlay chetlab o'tiladi (no-op), bor bo'lsa `requireModule` bilan
- * bir xil ishlaydi.
+ * CLI-433 — signal ATAYIN `DENTAL_LOCAL_DESKTOP === 'true'` (avval
+ * `WEB_DIST_DIR` mavjudligi edi — bu litsenziyaga aloqasi bo'lmagan
+ * static-serve sozlamasi, `app.ts`da `serveStatic` uchun; agar u boshqa
+ * sabab bilan o'rnatilmasa — masalan alohida deploy topologiyasi — gating
+ * butunlay o'chib qolardi). `process-manager.ts` `spawnApi()` bu yangi env'ni
+ * beradi (Windows-only — jismoniy PC'da qo'lda tasdiqlanadi).
  *
- * `process.env.WEB_DIST_DIR` har so'rovda qayta o'qiladi (frozen `env.ts`
- * singleton emas) — xuddi `getLicensePath()`dagi kabi (license.ts izohi:
- * top-level const bo'lsa import-vaqtida "muzlab qolar edi").
+ * `process.env.DENTAL_LOCAL_DESKTOP` har so'rovda qayta o'qiladi (frozen
+ * `env.ts` singleton emas) — xuddi `getLicensePath()`dagi kabi (license.ts
+ * izohi: top-level const bo'lsa import-vaqtida "muzlab qolar edi").
  */
 export const requireModuleInDesktop = (module: string): MiddlewareHandler => {
   const gate = requireModule(module);
   return async (c, next) => {
-    if (!process.env.WEB_DIST_DIR) {
+    if (process.env.DENTAL_LOCAL_DESKTOP !== 'true') {
       await next();
       return;
     }

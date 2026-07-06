@@ -15,6 +15,7 @@ export function VisitNoteFormModal({
   doctorId,
   diagnoses,
   appointments,
+  services,
   onCreate,
   pending,
 }: {
@@ -24,6 +25,8 @@ export function VisitNoteFormModal({
   doctorId: string;
   diagnoses: Diagnosis[];
   appointments: { id: string; startTime: string }[];
+  // CLI-414: BOM auto-deduction (Qaror #15) uchun aktiv xizmat katalogi opsiyalari.
+  services: { value: string; label: string }[];
   onCreate: (body: CreateVisitNoteInput) => void;
   pending: boolean;
 }) {
@@ -36,6 +39,7 @@ export function VisitNoteFormModal({
       plan: '',
       freeNotes: '',
       appointmentId: null,
+      performedServices: [],
     },
     validate: zod4Resolver(visitNoteFormSchema),
   });
@@ -73,6 +77,8 @@ export function VisitNoteFormModal({
       plan: values.plan || undefined,
       freeNotes: values.freeNotes || undefined,
       appointmentId: values.appointmentId ?? undefined,
+      // CLI-414: bo'sh → undefined (stock'ga tegilmaydi).
+      performedServices: values.performedServices.length > 0 ? values.performedServices : undefined,
     });
   });
 
@@ -107,6 +113,14 @@ export function VisitNoteFormModal({
             {...form.getInputProps('assessmentDiagnoses')}
           />
           <Textarea label={`P: ${t('visit_note.plan')}`} rows={3} {...form.getInputProps('plan')} />
+          <MultiSelect
+            label={t('visit_note.performed_services')}
+            placeholder={t('visit_note.performed_services_placeholder')}
+            searchable
+            clearable
+            data={services}
+            {...form.getInputProps('performedServices')}
+          />
           <Textarea
             label={t('visit_note.free_notes')}
             rows={2}

@@ -231,7 +231,14 @@ describe('B5 rebook linkage (closeOpenOnRebook)', () => {
       svc.autoCreateFromStage(c, { patientId, sourceStageId: crypto.randomUUID() }),
     );
     const apptId = crypto.randomUUID();
-    await run(tenantId, (c) => svc.closeOpenOnRebook(c, patientId, apptId));
+    // CLI-426: relevance-filter uchun appointmentStart kerak. Ikkinchi recall
+    // (autoCreateFromStage) dueDate'i tenant_settings.defaultRecallIntervalMonths
+    // (default 6 oy)dan real `new Date()` asosida hisoblanadi — testda oldindan
+    // aniq bo'lmagan qiymat. Ikkala recall ham "relevant" bo'lishi uchun
+    // appointmentStart'ni ancha kelajakka (400 kun) qo'yamiz — bu ikkala dueDate
+    // − 30 kun chegarasidan ham katta bo'ladi (isRebookRelevant true).
+    const farFutureStart = new Date(Date.now() + 400 * 24 * 3600 * 1000);
+    await run(tenantId, (c) => svc.closeOpenOnRebook(c, patientId, apptId, farFutureStart));
 
     const all = await run(tenantId, (c) => svc.listByPatient(c, patientId));
     expect(all.length).toBe(2);
@@ -243,7 +250,9 @@ describe('B5 rebook linkage (closeOpenOnRebook)', () => {
   });
 
   test('no open recalls → no-op (does not throw)', async () => {
-    await run(tenantId, (c) => svc.closeOpenOnRebook(c, patientId, crypto.randomUUID()));
+    await run(tenantId, (c) =>
+      svc.closeOpenOnRebook(c, patientId, crypto.randomUUID(), new Date('2026-06-01T09:00:00Z')),
+    );
     const all = await run(tenantId, (c) => svc.listByPatient(c, patientId));
     expect(all.length).toBe(0);
   });
@@ -253,7 +262,9 @@ describe('B5 rebook linkage (closeOpenOnRebook)', () => {
       svc.create(c, { patientId, reason: 'manual', dueDate: '2026-06-01' }),
     );
     await run(tenantId, (c) => svc.update(c, r!.id, { status: 'dismissed' }));
-    await run(tenantId, (c) => svc.closeOpenOnRebook(c, patientId, crypto.randomUUID()));
+    await run(tenantId, (c) =>
+      svc.closeOpenOnRebook(c, patientId, crypto.randomUUID(), new Date('2026-06-01T09:00:00Z')),
+    );
     const after = await run(tenantId, (c) => svc.getById(c, r!.id));
     expect(after!.status).toBe('dismissed');
   });
@@ -284,12 +295,17 @@ describe('B4/B5 trigger wiring (through real services)', () => {
     if (!created.ok) return;
     const apptId = created.appointment.id;
 
+    // CLI-409: scheduled→completed bevosita taqiqlangan — avval in_progress'ga.
+    await run(tenantId, (c) => apptSvc.update(c, apptId, { status: 'in_progress' }));
     await run(tenantId, (c) => apptSvc.update(c, apptId, { status: 'completed' }));
     let prev = await run(tenantId, (c) => svc.listByPatient(c, patientId));
     expect(prev.filter((r) => r.reason === 'preventive').length).toBe(1);
 
-    // Re-PATCH completed→completed → transition guard: NO duplicate.
-    await run(tenantId, (c) => apptSvc.update(c, apptId, { status: 'completed', notes: 'x' }));
+    // Re-PATCH completed→completed → transition guard: NO duplicate. Faqat
+    // status (boshqa maydon YO'Q) — CLI-409 terminal-guard completed'da
+    // boshqa maydon (notes/vaqt/doctor) tegilsa status.terminal otadi;
+    // status-only completed→completed idempotent no-op sifatida o'tadi.
+    await run(tenantId, (c) => apptSvc.update(c, apptId, { status: 'completed' }));
     prev = await run(tenantId, (c) => svc.listByPatient(c, patientId));
     expect(prev.filter((r) => r.reason === 'preventive').length).toBe(1);
   });
@@ -298,9 +314,19 @@ describe('B4/B5 trigger wiring (through real services)', () => {
     // Plan + stage seed (RLS context).
     const stageId = await run(tenantId, async (c) => {
       const tx = c.get('db') as DbOrTx;
+      // CLI-415: stage completion parent plan 'accepted'/'in_progress' bo'lishini
+      // talab qiladi (draft'da RAD) — bu test recall-hook'ni tekshiradi, plan
+      // status draft default bilan avvalgi assertion o'rniga to'g'ridan accepted.
       const [plan] = await tx
         .insert(treatmentPlans)
-        .values({ tenantId, patientId, doctorId: ownerId, title: 'Plan', totalCost: '0' })
+        .values({
+          tenantId,
+          patientId,
+          doctorId: ownerId,
+          title: 'Plan',
+          totalCost: '0',
+          status: 'accepted',
+        })
         .returning({ id: treatmentPlans.id });
       const [stage] = await tx
         .insert(treatmentStages)

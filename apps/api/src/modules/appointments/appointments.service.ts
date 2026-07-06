@@ -1,5 +1,11 @@
-import { appointments, roles, userAssignments, users } from '@dental/db-schema';
-import { and, asc, between, eq, gt, gte, lt, lte, ne, sql } from 'drizzle-orm';
+import {
+  appointments,
+  permissions,
+  rolePermissions,
+  userAssignments,
+  users,
+} from '@dental/db-schema';
+import { and, asc, between, eq, gt, gte, lt, lte, ne } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
@@ -9,6 +15,12 @@ import type {
   ListAppointmentsQuery,
   UpdateAppointmentInput,
 } from './appointments.schema.ts';
+import {
+  type AppointmentStatus,
+  AppointmentTransitionError,
+  assertAppointmentTransition,
+  isActiveStatus,
+} from './appointments.transitions.ts';
 
 /**
  * Schedule modulidan inject qilinadigan predikatlar (A6, RFC-0009 bog'liqlik
@@ -33,6 +45,34 @@ export type SchedulePredicates = {
 };
 
 /**
+ * Postgres exclusion_violation (SQLSTATE 23P01) — CLI-408 EXCLUDE gist constraint
+ * `appointments_no_doctor_overlap` buzilganda otiladi. `postgres-js` xatosida
+ * `code` maydoni SQLSTATE'ni beradi. Race edge-case'da (pre-check o'tib, DB
+ * darajasida to'qnashuv) 500 emas, 409 `conflict.doctor_busy` qaytarish uchun.
+ */
+function isExclusionViolation(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'code' in err &&
+    (err as { code?: string }).code === '23P01'
+  );
+}
+
+/**
+ * A2 (CLI-438): o'tmishga bron/reschedule guard'i uchun grace oynasi. Aniq
+ * `start === now` clock race'ini (submit paytida soniya o'tib ketishi) yutish
+ * uchun kichik tolerantlik — availability generatsiyasi (schedule.availability.ts,
+ * boshqa modul mas'ul) alohida "endi"dan oldingi slotlarni chiqarib tashlaydi.
+ */
+const PAST_BOOKING_GRACE_MS = 2 * 60 * 1000;
+
+/** Sof funksiya — berilgan boshlanish vaqti (grace bilan) o'tmishdami. Testlanadigan. */
+export function isInPast(start: Date, now: Date = new Date()): boolean {
+  return start.getTime() < now.getTime() - PAST_BOOKING_GRACE_MS;
+}
+
+/**
  * Recalls modulidan inject qilinadigan narrow dep (B4/B5, RFC-0011 §5).
  * Bog'liqlik yo'nalishi: appointments → recalls (factory injection).
  */
@@ -42,8 +82,18 @@ export type RecallAppointmentHook = {
     c: Context,
     args: { patientId: string; branchId?: string | null },
   ) => Promise<void>;
-  /** Yangi yozilish → bemorning ochiq recall'larini scheduled qiladi (rebook). */
-  closeOpenOnRebook: (c: Context, patientId: string, newAppointmentId: string) => Promise<void>;
+  /**
+   * Yangi yozilish → bemorning ochiq recall'larini scheduled qiladi (rebook).
+   * CLI-426: `appointmentStart` relevantlik filtri uchun (due-oynasiga yaqin recall'gina).
+   */
+  closeOpenOnRebook: (
+    c: Context,
+    patientId: string,
+    newAppointmentId: string,
+    appointmentStart: Date,
+  ) => Promise<void>;
+  /** Yozilish cancel/no_show → uni yopgan scheduled recall'ni pending'ga qaytaradi (CLI-426). */
+  reopenOnCancel: (c: Context, appointmentId: string) => Promise<void>;
 };
 
 export const createAppointmentsService = (deps: {
@@ -116,11 +166,15 @@ export const createAppointmentsService = (deps: {
       filters.push(lte(appointments.startTime, new Date(query.to)));
     }
 
+    // CLI-435: majburiy chegara + barqaror tartib (startTime asc, id tie-break).
+    const offset = (query.page - 1) * query.pageSize;
     return db
       .select()
       .from(appointments)
       .where(filters.length > 0 ? and(...filters) : undefined)
-      .orderBy(asc(appointments.startTime));
+      .orderBy(asc(appointments.startTime), asc(appointments.id))
+      .limit(query.pageSize)
+      .offset(offset);
   }
 
   async function getById(c: Context, id: string) {
@@ -140,6 +194,12 @@ export const createAppointmentsService = (deps: {
     if (end <= start) {
       return { ok: false as const, code: 'time.invalid' };
     }
+    // A2 (CLI-438): o'tmishga bron backend guard — availability endi o'tган
+    // slotlarni ham qaytarishi mumkin (schedule.availability.ts alohida fix
+    // talab qiladi), lekin create() har holda rad etadi.
+    if (isInPast(start)) {
+      return { ok: false as const, code: 'time.in_past' };
+    }
 
     const conflict = await checkConflict(c, input.doctorId, start, end);
     if (conflict) {
@@ -151,21 +211,28 @@ export const createAppointmentsService = (deps: {
     const scheduleCheck = await checkSchedule(c, input.doctorId, input.branchId, start, end);
     if (scheduleCheck) return { ok: false as const, code: scheduleCheck };
 
-    const [appt] = await db
-      .insert(appointments)
-      .values({
-        tenantId,
-        branchId: input.branchId,
-        patientId: input.patientId,
-        doctorId: input.doctorId,
-        assistantId: input.assistantId ?? null,
-        startTime: start,
-        endTime: end,
-        serviceIds: input.serviceIds,
-        notes: input.notes ?? null,
-        createdBy: user?.id ?? null,
-      })
-      .returning();
+    let appt: typeof appointments.$inferSelect | undefined;
+    try {
+      [appt] = await db
+        .insert(appointments)
+        .values({
+          tenantId,
+          branchId: input.branchId,
+          patientId: input.patientId,
+          doctorId: input.doctorId,
+          assistantId: input.assistantId ?? null,
+          startTime: start,
+          endTime: end,
+          serviceIds: input.serviceIds,
+          notes: input.notes ?? null,
+          createdBy: user?.id ?? null,
+        })
+        .returning();
+    } catch (err) {
+      // CLI-408: pre-check o'tdi-yu constraint otdi (concurrent race) → 409.
+      if (isExclusionViolation(err)) return { ok: false as const, code: 'conflict.doctor_busy' };
+      throw err;
+    }
 
     if (!appt) return { ok: false as const, code: 'insert.failed' };
 
@@ -180,8 +247,9 @@ export const createAppointmentsService = (deps: {
     if (delay != null) await deps.enqueueReminder?.(tenantId, appt.id, delay);
 
     // B5: yangi yozilish — bemorning ochiq recall'larini scheduled qiladi va
-    // shu yozilishga bog'laydi (rebook linkage). Ochiq recall yo'q bo'lsa no-op.
-    await deps.recall?.closeOpenOnRebook(c, appt.patientId, appt.id);
+    // shu yozilishga bog'laydi (rebook linkage). CLI-426: relevantlik uchun
+    // yozilish boshlanish vaqti uzatiladi. Ochiq/relevant recall yo'q → no-op.
+    await deps.recall?.closeOpenOnRebook(c, appt.patientId, appt.id, appt.startTime);
 
     return { ok: true as const, appointment: appt };
   }
@@ -191,12 +259,45 @@ export const createAppointmentsService = (deps: {
     const [before] = await db.select().from(appointments).where(eq(appointments.id, id));
     if (!before) return { ok: false as const, code: 'not_found' };
 
-    // Conflict + schedule check if time/doctor/branch changing
-    if (input.startTime || input.endTime || input.doctorId) {
+    // CLI-409: state-machine guard. Status o'zgarayotgan bo'lsa transition
+    // matritsasini tekshir (invalid → throw → routes 400 status.invalid_transition).
+    const beforeStatus = before.status as AppointmentStatus;
+    if (input.status && input.status !== beforeStatus) {
+      assertAppointmentTransition(beforeStatus, input.status);
+    }
+    // CLI-409: `completed` — terminal. Status-only idempotent no-op (yuqorida
+    // o'tdi), lekin vaqt/doktor/servis/notes tahriri RAD (throw → 400 status.terminal).
+    if (beforeStatus === 'completed') {
+      const touchesFields =
+        input.startTime !== undefined ||
+        input.endTime !== undefined ||
+        input.doctorId !== undefined ||
+        input.serviceIds !== undefined ||
+        input.assistantId !== undefined ||
+        input.notes !== undefined ||
+        input.cancellationReason !== undefined;
+      if (touchesFields) throw new AppointmentTransitionError('status.terminal', 'completed');
+    }
+
+    // CLI-409: re-validatsiya triggeri — vaqt/doktor o'zgarganda YOKI yangi holat
+    // active (scheduled/confirmed/in_progress) ga o'tganda (vaqt o'zgarmasa ham).
+    // Bu H5'ni yopadi: cancelled→scheduled band slotga endi conflict topadi.
+    const targetStatus = (input.status ?? beforeStatus) as AppointmentStatus;
+    const targetActive = isActiveStatus(targetStatus);
+    const timeOrDoctorChanged = !!(input.startTime || input.endTime || input.doctorId);
+    if (timeOrDoctorChanged || (targetActive && beforeStatus !== targetStatus)) {
       const start = new Date(input.startTime ?? before.startTime);
       const end = new Date(input.endTime ?? before.endTime);
       const doctor = input.doctorId ?? before.doctorId;
       const branch = before.branchId; // branch update PATCH'da yo'q — mavjudni ishlatamiz
+
+      // A2 (CLI-438): faqat YANGI startTime aniq berilganda o'tmish guard'i —
+      // status-only o'tish (mas. cancelled→scheduled qayta-faollashtirish, yoki
+      // o'tgan 09:00 yozilishni 09:20da completed/no_show qilish) bloklanmasin.
+      if (input.startTime && isInPast(start)) {
+        return { ok: false as const, code: 'time.in_past' };
+      }
+
       const conflict = await checkConflict(c, doctor, start, end, id);
       if (conflict) return { ok: false as const, code: 'conflict.doctor_busy' };
 
@@ -215,11 +316,18 @@ export const createAppointmentsService = (deps: {
     if (input.notes !== undefined) patch.notes = input.notes;
     if (input.cancellationReason !== undefined) patch.cancellationReason = input.cancellationReason;
 
-    const [updated] = await db
-      .update(appointments)
-      .set(patch)
-      .where(eq(appointments.id, id))
-      .returning();
+    let updated: typeof appointments.$inferSelect | undefined;
+    try {
+      [updated] = await db
+        .update(appointments)
+        .set(patch)
+        .where(eq(appointments.id, id))
+        .returning();
+    } catch (err) {
+      // CLI-408: reschedule/reactivation band slotga ustma-ust tushdi → 409.
+      if (isExclusionViolation(err)) return { ok: false as const, code: 'conflict.doctor_busy' };
+      throw err;
+    }
 
     if (updated) {
       await deps.audit.record(c, {
@@ -240,18 +348,42 @@ export const createAppointmentsService = (deps: {
         });
       }
 
+      // CLI-426: yozilish cancel/no_show'ga o'tganda — uni yopgan scheduled
+      // recall'ni pending'ga qaytar (dashboardga qaytadi, follow-up yo'qolmaydi).
+      if (
+        (input.status === 'cancelled' || input.status === 'no_show') &&
+        before.status !== input.status &&
+        deps.recall
+      ) {
+        await deps.recall.reopenOnCancel(c, id);
+      }
+
       // Reschedule eslatma hayot-sikli (CLI-186): startTime o'zgarsa, eski
       // (eski vaqtli) job'ni o'chir, keyin yangi delay > 0 bo'lsa qayta enqueue.
       // BullMQ jobId bo'yicha dedupe qiladi — `add` qayta yozMAYDI, shuning uchun
       // `remove` MAJBURIY. Yangi vaqt o'tgan/lead ichida → faqat o'chir (delay null).
       // Doktor-only o'zgarish re-enqueue talab qilmaydi (worker doctorId'ni live o'qiydi).
+      // A9 (CLI-438): faqat FINAL status ACTIVE bo'lsa re-enqueue qilamiz — bir
+      // PATCH'da startTime va status=cancelled/no_show birga kelsa, bekor
+      // qilingan yozilishga eslatma qayta qo'yilmasin.
       if (input.startTime) {
         const tenantId = c.get('activeTenantId');
         if (tenantId) {
           await deps.removeReminder?.(id);
-          const delay = reminderDelayMs(new Date(updated.startTime), new Date());
-          if (delay != null) await deps.enqueueReminder?.(tenantId, id, delay);
+          if (isActiveStatus(updated.status as AppointmentStatus)) {
+            const delay = reminderDelayMs(new Date(updated.startTime), new Date());
+            if (delay != null) await deps.enqueueReminder?.(tenantId, id, delay);
+          }
         }
+      } else if (
+        (input.status === 'cancelled' || input.status === 'no_show') &&
+        before.status !== input.status
+      ) {
+        // A9 (CLI-438): ilgari cancel/no_show job'ni O'CHIRMASDI — worker fire-
+        // vaqtida `shouldSkipReminder` bilan status'ni tekshirib SMS'ni
+        // yubormasdi, lekin job Redis'da abadiy qolib ketardi (removeOnComplete
+        // yo'qligi bilan birga CLI-403'ga bog'liq o'sish). Endi darhol tozalanadi.
+        await deps.removeReminder?.(id);
       }
     }
     return { ok: true as const, appointment: updated };
@@ -265,8 +397,16 @@ export const createAppointmentsService = (deps: {
    * Joriy tenant'dagi doktor-rolli xodimlar — yozilish wizardi uchun (CLI-154).
    * `appointment.view` bilan ochiq (yengil) — `user.view` (HR `/users/assignments`)
    * o'rniga, shunda Receptionist ham doktorlar ro'yxatini ko'radi.
-   * Rol nomi "doctor" o'z ichiga olganlar (`Doctor`, `Doctor + Assistant`) — mavjud
-   * frontend deteksiyasi (`roleName.includes('doctor')`) bilan izchil.
+   *
+   * A1 (CLI-438): deteksiya rol NOMI substring'iga ("doctor" so'zi) EMAS, balki
+   * `medical_record.edit` permission'iga tayanadi — barqaror signal (tenant rolni
+   * "Shifokor"/"Ortodont" deb qayta nomlasa ham ishlaydi). Role-template'larda
+   * (`packages/core/src/role-templates.ts`) faqat Doctor/Doctor+Assistant/Tenant
+   * Admin shu permission'ga ega; Nurse faqat `.view`, Receptionist/Technician
+   * umuman yo'q — "Doctor's Assistant" (klinik permission'siz) endi ko'rinmaydi.
+   * ⚠️ Ma'lum chegara: yakka egа-doktor (tenant owner) role_permissions orqali EMAS,
+   * implicit superuser sifatida ishlaydi — bu ro'yxatda ko'rinmaydi (eski substring
+   * sxemasida ham ko'rinmasdi, pre-existing gap).
    * RLS tenant'ni filtrlaydi; `selectDistinct` bir userni bir nechta filial
    * assignment'idan dedupe qiladi.
    */
@@ -280,8 +420,9 @@ export const createAppointmentsService = (deps: {
       })
       .from(userAssignments)
       .innerJoin(users, eq(users.id, userAssignments.userId))
-      .innerJoin(roles, eq(roles.id, userAssignments.roleId))
-      .where(and(eq(userAssignments.isActive, true), sql`lower(${roles.name}) like '%doctor%'`))
+      .innerJoin(rolePermissions, eq(rolePermissions.roleId, userAssignments.roleId))
+      .innerJoin(permissions, eq(permissions.id, rolePermissions.permissionId))
+      .where(and(eq(userAssignments.isActive, true), eq(permissions.code, 'medical_record.edit')))
       .orderBy(users.fullName);
 
     return rows.map((r) => ({ id: r.id, name: r.fullName ?? r.phone }));

@@ -199,9 +199,18 @@ describe('CLI-186 worker status guard', () => {
     // Alohida tenant defaultLanguage='ru' — worker tenants'ni withTenant ichida
     // o'qiy olishini va ru render'ga yetishini tasdiqlaydi (uz fallback emas).
     smsSent = [];
+    // Alohida doctor — `appointments_no_doctor_overlap` (CLI-408) doctor_id bo'yicha
+    // TENANT-AGNOSTIK (jismoniy odam ikki joyda bo'la olmaydi, real semantика) —
+    // ownerId'ni qayta ishlatsa boshqa testlarning shu vaqt oralig'idagi
+    // appointment'lariga to'qnashishi mumkin. Bu test SMS til-render'ini
+    // tekshiradi, doctor identifikatorini emas — mustaqil user xavfsizroq.
+    const [ruDoctor] = await db
+      .insert(users)
+      .values({ phone: '+998900000099', passwordHash: 'x', fullName: 'RU Doctor' })
+      .returning({ id: users.id });
     const [ru] = await db
       .insert(tenants)
-      .values({ name: 'RU', slug: 'ru-appt', ownerUserId: ownerId, defaultLanguage: 'ru' })
+      .values({ name: 'RU', slug: 'ru-appt', ownerUserId: ruDoctor!.id, defaultLanguage: 'ru' })
       .returning({ id: tenants.id });
     const ruTenant = ru!.id;
 
@@ -220,7 +229,7 @@ describe('CLI-186 worker status guard', () => {
         .values({
           tenantId: ruTenant,
           branchId: branch!.id,
-          doctorId: ownerId,
+          doctorId: ruDoctor!.id,
           patientId: pt!.id,
           startTime: new Date(`${day}T14:00:00+05:00`),
           endTime: new Date(`${day}T15:00:00+05:00`),

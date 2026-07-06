@@ -2,11 +2,14 @@ import { describe, expect, it } from 'bun:test';
 import {
   assertPlanTransition,
   assertStageAcceptanceTransition,
+  assertStageMutationAllowedForPlan,
   assertStageStatusTransition,
   InvalidTransitionError,
   isValidPlanTransition,
   isValidStageAcceptanceTransition,
   isValidStageStatusTransition,
+  PlanLockedError,
+  PlanNotActiveError,
 } from './treatment-plans.transitions.ts';
 
 describe('plan status transitions', () => {
@@ -93,5 +96,51 @@ describe('stage acceptance transitions', () => {
 
   it('assert throws on invalid type pairing handled by enum (sanity)', () => {
     expect(() => assertStageAcceptanceTransition('proposed', 'accepted')).not.toThrow();
+  });
+});
+
+describe('CLI-415 — stage mutation guarded by parent plan status', () => {
+  it('terminal plan (cancelled/completed) rejects ANY mutation', () => {
+    expect(() => assertStageMutationAllowedForPlan('cancelled', { toStatus: 'completed' })).toThrow(
+      PlanLockedError,
+    );
+    expect(() => assertStageMutationAllowedForPlan('completed', { toStatus: 'skipped' })).toThrow(
+      PlanLockedError,
+    );
+    // acceptance/notes only (no toStatus) — still rejected on terminal plan.
+    expect(() => assertStageMutationAllowedForPlan('cancelled', {})).toThrow(PlanLockedError);
+  });
+
+  it('unworked plan (draft/presented) rejects completed/in_progress', () => {
+    expect(() => assertStageMutationAllowedForPlan('draft', { toStatus: 'completed' })).toThrow(
+      PlanNotActiveError,
+    );
+    expect(() =>
+      assertStageMutationAllowedForPlan('presented', { toStatus: 'in_progress' }),
+    ).toThrow(PlanNotActiveError);
+  });
+
+  it('unworked plan allows skipped / acceptance / notes-only', () => {
+    expect(() => assertStageMutationAllowedForPlan('draft', { toStatus: 'skipped' })).not.toThrow();
+    expect(() => assertStageMutationAllowedForPlan('draft', {})).not.toThrow();
+    expect(() => assertStageMutationAllowedForPlan('presented', {})).not.toThrow();
+  });
+
+  it('active plan (accepted/in_progress) allows completed', () => {
+    expect(() =>
+      assertStageMutationAllowedForPlan('accepted', { toStatus: 'completed' }),
+    ).not.toThrow();
+    expect(() =>
+      assertStageMutationAllowedForPlan('in_progress', { toStatus: 'completed' }),
+    ).not.toThrow();
+  });
+
+  it('guard errors are InvalidTransitionError subclasses (routes convert to 400)', () => {
+    expect(() => assertStageMutationAllowedForPlan('cancelled', {})).toThrow(
+      InvalidTransitionError,
+    );
+    expect(() => assertStageMutationAllowedForPlan('draft', { toStatus: 'completed' })).toThrow(
+      InvalidTransitionError,
+    );
   });
 });

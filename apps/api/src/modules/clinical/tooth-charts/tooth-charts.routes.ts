@@ -1,8 +1,9 @@
-import { ok } from '@dental/core';
+import { fail, ok } from '@dental/core';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { AuditLogger } from '../../../lib/audit-logger.ts';
 import { requireModuleInDesktop } from '../../../lib/license-middleware.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../../lib/openapi.ts';
+import { CrossEntityError } from '../../../lib/ownership.ts';
 import { requireFeature } from '../../../middleware/require-feature.ts';
 import { requirePermission } from '../../../middleware/require-permission.ts';
 import { toToothChartWithStatesDto } from './tooth-charts.mapper.ts';
@@ -111,8 +112,16 @@ export const toothChartsRoutes = (deps: { audit: AuditLogger }) => {
 
   app.openapi(createRoute_, async (c) => {
     const body = c.req.valid('json');
-    const chart = await service.create(c, body);
-    return c.json(ok(toToothChartWithStatesDto(chart)), 201);
+    try {
+      const chart = await service.create(c, body);
+      return c.json(ok(toToothChartWithStatesDto(chart)), 201);
+    } catch (e) {
+      // CLI-421: cross-entity ownership mismatch (patientId/visitNoteId) → 400.
+      if (e instanceof CrossEntityError) {
+        return c.json(fail(`ownership.${e.reason}`, e.message), 400);
+      }
+      throw e;
+    }
   });
 
   return app;
