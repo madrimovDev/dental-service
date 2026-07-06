@@ -143,14 +143,24 @@ export const branchRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     responses: {
       ...okJson(branchDeleteResultSchema, 'Branch deleted'),
       ...notFoundResponse,
+      409: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Branch has active dependencies (staff / future appointments)',
+      },
     },
   });
 
   app.openapi(deleteRoute, async (c) => {
     const { id } = c.req.valid('param');
-    const row = await service.remove(c, id);
-    if (!row) return c.json(fail('branch.not_found', 'Branch not found'), 404);
-    return c.json(ok({ deleted: true as const, id: row.id }), 200);
+    const result = await service.remove(c, id);
+    if (!result) return c.json(fail('branch.not_found', 'Branch not found'), 404);
+    if (!result.ok) {
+      return c.json(
+        fail('branch.has_dependencies', 'Branch has active staff or upcoming appointments'),
+        409,
+      );
+    }
+    return c.json(ok({ deleted: true as const, id: result.branch.id }), 200);
   });
 
   return app;

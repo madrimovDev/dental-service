@@ -475,12 +475,14 @@ export const createAuthService = (deps: AuthServiceDeps) => {
         if (!assignment) return { code: 'auth.no_workspace_access' as const };
       }
 
-      // branchId tenant ichida ekanligini tekshirish (defense in depth)
+      // branchId tenant ichida VA o'chirilmagan ekanligini tekshirish (defense in depth).
+      // CLI-428: `isNull(deletedAt)` — o'chirilgan branchga stale/saqlangan branchId bilan
+      // to'g'ridan-to'g'ri switch RAD (owner va non-owner ikkala yo'l uchun umumiy chokepoint).
       if (input.branchId) {
         const [branch] = await tx
           .select({ tenantId: branches.tenantId })
           .from(branches)
-          .where(eq(branches.id, input.branchId));
+          .where(and(eq(branches.id, input.branchId), isNull(branches.deletedAt)));
         if (!branch || branch.tenantId !== input.tenantId) {
           return { code: 'auth.invalid_branch' as const };
         }
