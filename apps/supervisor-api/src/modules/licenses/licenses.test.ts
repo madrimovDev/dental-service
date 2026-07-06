@@ -86,6 +86,41 @@ describe('POST /v1/heartbeat', () => {
     const body = (await res.json()) as any;
     expect(body.gracePeriodDays).toBe(30);
   });
+
+  // CLI-411 — never-activated license (fingerprint NULL) must be rejected;
+  // heartbeat must NOT silently bind a fingerprint.
+  it('aktivlanmagan litsenziya (fingerprint NULL) uchun 403 NOT_ACTIVATED qaytaradi', async () => {
+    const res = await app.request('/v1/heartbeat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ licenseKey, fingerprint: 'fp-any' }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('aktivlanmagan litsenziyaga heartbeat urinishi fingerprint yozmaydi', async () => {
+    await app.request('/v1/heartbeat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ licenseKey, fingerprint: 'fp-any' }),
+    });
+    const lic = await db.query.licenses.findFirst({ where: eq(licenses.licenseKey, licenseKey) });
+    expect(lic?.fingerprint).toBeNull();
+  });
+
+  it("aktivlangan mashinaning boshqa fingerprint bilan heartbeat'i 403 (FINGERPRINT_MISMATCH)", async () => {
+    await app.request('/v1/activate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ licenseKey, fingerprint: 'fp-abc' }),
+    });
+    const res = await app.request('/v1/heartbeat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ licenseKey, fingerprint: 'fp-other' }),
+    });
+    expect(res.status).toBe(403);
+  });
 });
 
 describe('POST /v1/reactivate', () => {

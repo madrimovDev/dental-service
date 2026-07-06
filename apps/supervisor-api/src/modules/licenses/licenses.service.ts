@@ -53,7 +53,18 @@ export const createLicenseService = () => ({
     if (!lic || !lic.isActive) {
       throw Object.assign(new Error('INVALID_KEY'), { status: 403 });
     }
-    if (lic.fingerprint && lic.fingerprint !== fingerprint) {
+    // CLI-411 — heartbeat NIKAKDA fingerprint bog'lamaydi; faqat allaqachon
+    // `activate` (yoki admin `reactivate`) orqali bog'langanini tasdiqlaydi.
+    // Ilgari `lic.fingerprint && ...` — fingerprint NULL (aktivlanmagan) bo'lsa
+    // mismatch-tekshiruvi butunlay o'tkazib yuborilardi → istalgan fingerprint
+    // bilan heartbeat muvaffaqiyatli bo'lib, aktivatsiya bosqichini (rate-limit
+    // + `event:'activated'` audit) chetlab o'tib cheksiz mashinadan ishlash
+    // mumkin edi. Endi NULL → NOT_ACTIVATED (klient allaqachon `.lic`siz —
+    // heartbeat yubormaydi; docs/audit-fixes/CLI-411).
+    if (!lic.fingerprint) {
+      throw Object.assign(new Error('NOT_ACTIVATED'), { status: 403 });
+    }
+    if (lic.fingerprint !== fingerprint) {
       throw Object.assign(new Error('FINGERPRINT_MISMATCH'), { status: 403 });
     }
     await db.update(licenses).set({ lastHeartbeatAt: new Date() }).where(eq(licenses.id, lic.id));
