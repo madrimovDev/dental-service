@@ -61,7 +61,70 @@ let valkeyProcess: ChildProcess | null = null;
 let apiProcess: ChildProcess | null = null;
 let status: ServerStatus = 'stopped';
 
-const waitMs = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms).unref?.());
+// CLI-442#9 — `stopServer()` bilan qasddan to'xtatilayotgan payt bilan
+// kutilmagan crash'ni ajratish uchun bayroq. Qasddan to'xtatishda `exit`
+// eventi kutilgan (SIGTERM/SIGKILL natijasi) — status'ni yana o'zgartirish
+// shart emas (`stopServer` allaqachon 'stopped' qo'yadi). Kutilmagan chiqishda
+// (`stoppingIntentionally === false`) — soxta "running" holatini oldini olish
+// uchun status darhol 'stopped'ga o'tkaziladi.
+let stoppingIntentionally = false;
+
+/**
+ * CLI-442#9 — crash-supervision: ilgari spawn qilingan bola jarayonlarga
+ * `exit`/`error` tinglovchisi umuman ulanmagan edi. Bola kutilmaganda
+ * crash bo'lsa (masalan Postgres OOM'dan o'lsa) `status` "running" bo'lib
+ * qolar edi — soxta "hammasi yaxshi" holati. Endi har bir bola crash
+ * bo'lganda (`stoppingIntentionally` yolg'on bo'lsa) darhol `status='stopped'`
+ * qo'yiladi va log fayliga yoziladi. Avtomatik qayta ishga tushirish (restart)
+ * QILINMAYDI — spec ruxsat bergan ikkita variantdan ("status='stopped' YOKI
+ * cheklangan restart") soddaroq va xavfsizrog'i tanlandi (restart-loop xavfi
+ * yo'q); foydalanuvchi tray orqali qayta ishga tushirishi mumkin.
+ */
+const attachCrashSupervision = (proc: ChildProcess, label: string): void => {
+  proc.on('exit', (code, signal) => {
+    if (stoppingIntentionally) return; // kutilgan — stopServer() allaqachon 'stopped' qo'yadi
+    status = 'stopped';
+    const logPath = join(getDataDir(), 'logs', `${label}.log`);
+    try {
+      appendFileSync(
+        logPath,
+        `\n[crash-supervision] ${label} kutilmaganda chiqdi (code=${code}, signal=${signal}) — status='stopped'\n`,
+      );
+    } catch {
+      // diskka yozib bo'lmasa ham asosiy oqim to'xtamasin
+    }
+  });
+};
+
+/**
+ * CLI-442#9 — bitta bola jarayonning `exit` eventini (yoki `timeoutMs`
+ * tugashini, qaysi biri OLDIN kelsa) kutadi. `stopServer`ning SIGTERM→SIGKILL
+ * eskalatsiyasi uchun: agar bola `timeoutMs` ichida chiqib ketmasa (Postgres
+ * "Smart Shutdown" sekin javob berishi mumkin), chaqiruvchi `SIGKILL`
+ * yuboradi — aks holda jarayon orphan qolib, keyingi startda port band/
+ * data-dir lock xatosi berardi (`getStopWaitMs()` default 1000ms qat'iy
+ * kutish o'rniga — endi haqiqiy tugashni kutadi, keyin escalate qiladi).
+ */
+const waitForExit = (proc: ChildProcess | null, timeoutMs: number): Promise<boolean> =>
+  new Promise((resolve) => {
+    if (!proc) {
+      resolve(true);
+      return;
+    }
+    let settled = false;
+    const onExit = () => {
+      if (settled) return;
+      settled = true;
+      resolve(true);
+    };
+    proc.once('exit', onExit);
+    setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      proc.off('exit', onExit);
+      resolve(false);
+    }, timeoutMs).unref?.();
+  });
 
 // Har spawn qilingan child process stdout/stderr'ini `<dataDir>/logs/<name>`ga
 // yozadi — avval hech qayerga yozilmasdi (main.ts xato dialogida "Loglarni
@@ -95,6 +158,7 @@ const spawnPostgres = (): Promise<void> =>
       { stdio: 'pipe' },
     );
     pgProcess.on('error', reject);
+    attachCrashSupervision(pgProcess, 'postgres');
     logChildOutput(pgProcess, 'postgres.log');
     // Postgres tayyor bo'lguncha kutamiz (log'da "ready to accept connections")
     pgProcess.stdout?.on('data', (d: Buffer) => {
@@ -116,6 +180,7 @@ const spawnValkey = (): Promise<void> =>
     // Electron main process'ni crash qiladi (CLI-346 qarori: binary
     // topilmadi -> Error throw -> main.ts dialog.showErrorBox()).
     valkeyProcess.on('error', reject);
+    attachCrashSupervision(valkeyProcess, 'valkey');
     logChildOutput(valkeyProcess, 'valkey.log');
     setTimeout(() => resolve(), getValkeyReadyDelayMs()).unref?.();
   });
@@ -167,6 +232,7 @@ const spawnApi = (port: number): Promise<void> =>
     });
     // postgres/valkey bilan bir xil pattern — binary topilmasa reject.
     apiProcess.on('error', reject);
+    attachCrashSupervision(apiProcess, 'api');
     logChildOutput(apiProcess, 'api.log');
     setTimeout(() => resolve(), getApiReadyDelayMs()).unref?.();
   });
@@ -191,12 +257,37 @@ export const startServer = async (port = 80): Promise<void> => {
   await startApiLayer(port);
 };
 
+/**
+ * CLI-442#9 — ilgari faqat `SIGTERM` yuborib qat'iy `getStopWaitMs()`
+ * (default 1000ms) kutar edi, jarayon haqiqatda tugaganini tekshirmasdan.
+ * Postgres SIGTERM'ga (Smart Shutdown) sekin javob berishi mumkin — 1s ichida
+ * tugamasa jarayon ORPHAN bo'lib qolardi (keyingi startda port band/data-dir
+ * lock xatosi). Endi har bola `exit` eventini kutadi (`waitForExit`,
+ * `timeoutMs` ichida chiqmasa `false`); hali tirik bo'lganlarga `SIGKILL`
+ * yuboriladi (escalation).
+ */
 export const stopServer = async (): Promise<void> => {
-  apiProcess?.kill('SIGTERM');
-  valkeyProcess?.kill('SIGTERM');
-  pgProcess?.kill('SIGTERM');
-  await waitMs(getStopWaitMs());
-  status = 'stopped';
+  stoppingIntentionally = true;
+  try {
+    apiProcess?.kill('SIGTERM');
+    valkeyProcess?.kill('SIGTERM');
+    pgProcess?.kill('SIGTERM');
+
+    const waitMsValue = getStopWaitMs();
+    const [apiExited, valkeyExited, pgExited] = await Promise.all([
+      waitForExit(apiProcess, waitMsValue),
+      waitForExit(valkeyProcess, waitMsValue),
+      waitForExit(pgProcess, waitMsValue),
+    ]);
+
+    if (!apiExited) apiProcess?.kill('SIGKILL');
+    if (!valkeyExited) valkeyProcess?.kill('SIGKILL');
+    if (!pgExited) pgProcess?.kill('SIGKILL');
+
+    status = 'stopped';
+  } finally {
+    stoppingIntentionally = false;
+  }
 };
 
 export const getServerStatus = (): ServerStatus => status;
