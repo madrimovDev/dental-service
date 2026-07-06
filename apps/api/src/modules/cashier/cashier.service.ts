@@ -41,6 +41,17 @@ export class NoActivePriceError extends Error {
 }
 
 /**
+ * CLI-444: `discount` erkin POS itemsGross'dan katta bo'lganda routes 400 ga
+ * aylantiradi — avvalgi jim `Math.max(0, ...)` clamp o'rniga.
+ */
+export class DiscountExceedsTotalError extends Error {
+  constructor() {
+    super('Discount exceeds items gross total');
+    this.name = 'DiscountExceedsTotalError';
+  }
+}
+
+/**
  * CLI-443: narrow DI hook (recall pattern bilan bir xil — RecallStageHook,
  * treatment-plans.service.ts). `services.service.ts::getActivePrice` shu shaklga
  * strukturaviy mos keladi — to'g'ridan import qilinmaydi, composition root'da uzatiladi.
@@ -155,9 +166,17 @@ export const createCashierService = (deps: {
         : [];
 
     const itemsGross = resolvedItems.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
-    // Erkin POS: jami − chegirma (manfiy bo'lmaydi). Plan-billing (items bo'sh): allocation = paidAmount.
-    const netTotal =
-      resolvedItems.length > 0 ? Math.max(0, itemsGross - input.discount) : input.paidAmount;
+
+    // CLI-444: discount itemsGross'dan katta bo'lsa jim clamp o'rniga RAD etiladi
+    // (routes 400 `cashier.discount_exceeds_total`). Faqat erkin POS (items bor)
+    // rejimida ma'noli — plan-billing (allocations) discount'dan mustaqil.
+    if (resolvedItems.length > 0 && input.discount > itemsGross) {
+      throw new DiscountExceedsTotalError();
+    }
+
+    // Erkin POS: jami − chegirma (endi manfiy bo'lmasligi kafolatlangan — yuqoridagi guard).
+    // Plan-billing (items bo'sh): allocation = paidAmount.
+    const netTotal = resolvedItems.length > 0 ? itemsGross - input.discount : input.paidAmount;
 
     // Allocation yig'indisi paidAmount'dan oshmasligi shart (qisman ruxsat, oshib ketish RAD).
     if (input.allocations && input.allocations.length > 0) {

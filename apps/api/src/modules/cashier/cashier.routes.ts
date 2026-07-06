@@ -26,6 +26,7 @@ import {
 import {
   AllocationExceedError,
   createCashierService,
+  DiscountExceedsTotalError,
   NoActivePriceError,
   type PriceLookup,
 } from './cashier.service.ts';
@@ -119,6 +120,12 @@ export const cashierRoutes = (deps: {
       if (e instanceof NoActivePriceError) {
         return c.json(
           fail('cashier.no_active_price', 'No active price for this service at this branch'),
+          400,
+        );
+      }
+      if (e instanceof DiscountExceedsTotalError) {
+        return c.json(
+          fail('cashier.discount_exceeds_total', 'Discount exceeds items gross total'),
           400,
         );
       }
