@@ -41,6 +41,8 @@ describe('POST /v1/activate', () => {
     const body = (await res.json()) as any;
     expect(body.modules).toContain('patients');
     expect(body.signature).toBeTruthy();
+    // CLI-410 — the signed payload now carries the bound fingerprint.
+    expect(body.fingerprint).toBe('fp-abc');
 
     const lic = await db.query.licenses.findFirst({ where: eq(licenses.licenseKey, licenseKey) });
     expect(lic?.fingerprint).toBe('fp-abc');

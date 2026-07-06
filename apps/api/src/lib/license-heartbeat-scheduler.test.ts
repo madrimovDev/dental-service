@@ -10,6 +10,7 @@ const makeLicense = (): LicenseData => ({
   expiresAt: new Date(Date.now() + 86400000).toISOString(),
   gracePeriodDays: 30,
   issuedAt: new Date().toISOString(),
+  fingerprint: 'test-fp',
   signature: 'sig',
 });
 

@@ -12,6 +12,11 @@ export interface LicenseData {
   expiresAt: string;
   gracePeriodDays: number;
   issuedAt: string;
+  // CLI-410 — machine fingerprint IS part of the RSA-signed payload (Supervisor
+  // `buildResponse` signs it at activate/heartbeat/reactivate). `isLicenseValid`
+  // requires `fingerprint === localFingerprint`, so a signed payload copied to
+  // another machine is rejected there even though the signature still verifies.
+  fingerprint: string;
   signature: string;
 }
 
@@ -85,9 +90,23 @@ export const readLicense = async (): Promise<LicenseData | null> => {
   }
 };
 
-export const isLicenseValid = (data: LicenseData): boolean => {
+/**
+ * Litsenziya haqiqiyligini tekshiradi (sof funksiya — fingerprint chaqiruvchida
+ * bir marta hisoblanadi, `getFingerprint` async bo'lgani uchun; testda mock oson).
+ *
+ * CLI-410 — imzo tekshiruvidan tashqari `payload.fingerprint === localFingerprint`
+ * ham talab qilinadi: o'g'irlangan/nusxalangan imzolangan payload boshqa mashinada
+ * (`getFingerprint` boshqa) rad etiladi. Fingerprint'siz (eski) payload ham rad
+ * etiladi — majburiy qayta-aktivatsiya (docs/audit-fixes/CLI-410 §0: dala'da eski
+ * `.lic` yo'q).
+ */
+export const isLicenseValid = (data: LicenseData, localFingerprint: string): boolean => {
   const { signature, ...payload } = data;
   if (!verifyLicenseSignature(payload, signature, SUPERVISOR_PUBLIC_KEY_PEM)) {
+    return false;
+  }
+  // Eski (fingerprint'siz) payload yoki mashina mos kelmasligi → rad.
+  if (!payload.fingerprint || payload.fingerprint !== localFingerprint) {
     return false;
   }
   const expiry = new Date(data.expiresAt).getTime();
@@ -97,7 +116,16 @@ export const isLicenseValid = (data: LicenseData): boolean => {
 
 export const getActiveModules = async (): Promise<string[]> => {
   const lic = await readLicense();
-  if (!lic || !isLicenseValid(lic)) return [];
+  if (!lic) return [];
+  // Fingerprint hisoblash VM/konteynerda throw qilishi mumkin (FINGERPRINT_UNAVAILABLE)
+  // — ushlab, litsenziyani rad etamiz (modulsiz), desktop start'da xato bermasin.
+  let localFingerprint: string;
+  try {
+    localFingerprint = await getFingerprint();
+  } catch {
+    return [];
+  }
+  if (!isLicenseValid(lic, localFingerprint)) return [];
   return lic.modules;
 };
 
