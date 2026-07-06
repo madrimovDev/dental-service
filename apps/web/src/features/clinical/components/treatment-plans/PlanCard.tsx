@@ -1,5 +1,6 @@
 import type {
   SignTreatmentPlanConsentBody,
+  TreatmentPlanStatus,
   TreatmentPlanWithStages,
   TreatmentStageAcceptance,
   TreatmentStageStatus,
@@ -7,13 +8,42 @@ import type {
 import { Mono, StatusPill } from '@dental/ui';
 import { Button, Group, Modal, Stack, TextInput } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconCheck, IconFileText, IconReceipt2, IconWritingSign } from '@tabler/icons-react';
+import {
+  IconBan,
+  IconCheck,
+  IconCircleCheck,
+  IconFileText,
+  IconPlayerPlay,
+  IconReceipt2,
+  IconWritingSign,
+} from '@tabler/icons-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toPlanCardVM } from '../../clinical.mappers';
 import { EstimateView } from './EstimateView';
 import { StageRow } from './StageRow';
 import classes from './TreatmentPlansTab.module.css';
+
+// B4 (CLI-439): `accepted`dan tashqari lifecycle amallari (`in_progress`/`completed`/
+// `cancelled`) uchun yangi tugma matnlari kerak edi, lekin bu pass faqat `apps/web/**`
+// egaligiga ega — `packages/i18n`ga tegilmaydi. Inline TODO-literal (uz/ru), handoff:
+// keyingi pass `treatment_plan.start`/`treatment_plan.complete`/`treatment_plan.cancel_plan`
+// i18n kalitlarini qo'shib shu literal'larni almashtirsin. `common.cancel` mavjud kalit —
+// bekor qilish tugmasi shuni ishlatadi (yangi kalit shart emas).
+const PLAN_ACTION_LABEL: Record<'start' | 'complete', { uz: string; ru: string }> = {
+  start: { uz: 'Ijroni boshlash', ru: 'Начать выполнение' },
+  complete: { uz: 'Rejani yakunlash', ru: 'Завершить план' },
+};
+
+// B4: backend transition jadvaliga mos (`treatment-plans.transitions.ts`, Qaror #25) —
+// `cancelled` faqat terminal bo'lmagan statusdan (draft/presented/accepted/in_progress)
+// ruxsat etiladi; UI shu jadvalga ORTIQCHA imkoniyat taklif qilmasligi kerak.
+const CANCELLABLE_PLAN_STATUSES: readonly TreatmentPlanStatus[] = [
+  'draft',
+  'presented',
+  'accepted',
+  'in_progress',
+];
 
 export function PlanCard({
   plan,
@@ -25,6 +55,7 @@ export function PlanCard({
   acceptAllPending,
   onPresentPlan,
   onAcceptPlan,
+  onSetPlanStatus,
   planStatusPending,
   onSignConsent,
   consentPending,
@@ -39,11 +70,15 @@ export function PlanCard({
   acceptAllPending: boolean;
   onPresentPlan: (planId: string) => void;
   onAcceptPlan: (planId: string) => void;
+  // B4: accepted→in_progress/cancelled, in_progress→completed/cancelled va h.k.
+  // (present/accept'dan farqli — bularga maxsus xato-xabar kerak emas, default
+  // global toast — CLI-165 — yetarli).
+  onSetPlanStatus: (planId: string, status: TreatmentPlanStatus) => void;
   planStatusPending: boolean;
   onSignConsent: (planId: string, body: SignTreatmentPlanConsentBody) => void;
   consentPending: boolean;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const vm = toPlanCardVM(plan);
   const [estimateOpened, estimate] = useDisclosure(false);
   const [consentOpened, consent] = useDisclosure(false);
@@ -51,6 +86,8 @@ export function PlanCard({
 
   const proposedStageIds = plan.stages.filter((s) => s.acceptance === 'proposed').map((s) => s.id);
   const hasConsent = plan.consentSignedAt != null;
+  const lang = i18n.language === 'ru' ? 'ru' : 'uz';
+  const canCancelPlan = CANCELLABLE_PLAN_STATUSES.includes(plan.status);
 
   // Yil — plan.createdAt'dan (vizual sarlavha uchun; yangi data YO'Q).
   const year = plan.createdAt ? new Date(plan.createdAt).getFullYear() : null;
@@ -148,6 +185,45 @@ export function PlanCard({
                 onClick={() => onAcceptPlan(plan.id)}
               >
                 {t('treatment_plan.accept_plan')}
+              </Button>
+            )}
+            {/* B4 (CLI-439): accepted→in_progress — avval UI'da yo'q edi, plan "accepted"da
+                qotib qolardi. */}
+            {plan.status === 'accepted' && (
+              <Button
+                size="compact-sm"
+                variant="default"
+                leftSection={<IconPlayerPlay size={14} />}
+                loading={planStatusPending}
+                onClick={() => onSetPlanStatus(plan.id, 'in_progress')}
+              >
+                {PLAN_ACTION_LABEL.start[lang]}
+              </Button>
+            )}
+            {/* B4: in_progress→completed. */}
+            {plan.status === 'in_progress' && (
+              <Button
+                size="compact-sm"
+                color="teal"
+                leftSection={<IconCircleCheck size={14} />}
+                loading={planStatusPending}
+                onClick={() => onSetPlanStatus(plan.id, 'completed')}
+              >
+                {PLAN_ACTION_LABEL.complete[lang]}
+              </Button>
+            )}
+            {/* B4: backend transition jadvaliga mos — cancel istalgan terminal
+                bo'lmagan statusdan (draft/presented/accepted/in_progress). */}
+            {canCancelPlan && (
+              <Button
+                size="compact-sm"
+                variant="subtle"
+                color="red"
+                leftSection={<IconBan size={14} />}
+                loading={planStatusPending}
+                onClick={() => onSetPlanStatus(plan.id, 'cancelled')}
+              >
+                {t('common.cancel')}
               </Button>
             )}
           </div>

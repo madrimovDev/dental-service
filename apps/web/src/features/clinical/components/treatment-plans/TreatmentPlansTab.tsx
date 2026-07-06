@@ -1,6 +1,7 @@
 import {
   ApiError,
   type SignTreatmentPlanConsentBody,
+  type TreatmentPlanStatus,
   type TreatmentStageAcceptance,
   type TreatmentStageStatus,
 } from '@dental/api-client';
@@ -79,6 +80,12 @@ export function TreatmentPlansTab({ patientId }: Props) {
       },
     );
 
+  // B4 (CLI-439): accepted→in_progress/cancelled, in_progress→completed/cancelled va h.k.
+  // (draft/presented→cancelled ham) — present/accept'dan farqli, maxsus xato-xabar
+  // kerak emas (default global toast, CLI-165 yetarli).
+  const onSetPlanStatus = (id: string, status: TreatmentPlanStatus) =>
+    planStatusMut.mutate({ id, status });
+
   const onSignConsent = (id: string, body: SignTreatmentPlanConsentBody) =>
     consentMut.mutate({ id, body });
 
@@ -117,6 +124,7 @@ export function TreatmentPlansTab({ patientId }: Props) {
             acceptAllPending={acceptAllMut.isPending}
             onPresentPlan={onPresentPlan}
             onAcceptPlan={onAcceptPlan}
+            onSetPlanStatus={onSetPlanStatus}
             planStatusPending={planStatusMut.isPending}
             onSignConsent={onSignConsent}
             consentPending={consentMut.isPending}
@@ -131,7 +139,7 @@ export function TreatmentPlansTab({ patientId }: Props) {
           patientId={patientId}
           doctorId={user.id}
           pending={createMut.isPending}
-          onCreate={(body) => createMut.mutate(body, { onSuccess: close })}
+          onCreate={(body, callbacks) => createMut.mutate(body, callbacks)}
         />
       )}
     </Stack>

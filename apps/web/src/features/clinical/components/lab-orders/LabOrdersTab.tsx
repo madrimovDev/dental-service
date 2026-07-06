@@ -22,7 +22,7 @@ import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { useCreateLabOrder, useLabOrders, useUpdateLabOrderStatus } from '../../clinical.api';
-import { parseToothNumbers, toLabOrderVM } from '../../clinical.mappers';
+import { allowedLabOrderStatuses, parseToothNumbers, toLabOrderVM } from '../../clinical.mappers';
 import { type LabOrderFormValues, labOrderFormSchema } from '../../clinical.schema';
 
 type Props = { patientId: string };
@@ -35,15 +35,6 @@ const TYPE_OPTIONS: LabOrderType[] = [
   'denture',
   'inlay_onlay',
   'other',
-];
-
-const STATUS_OPTIONS: LabOrderStatus[] = [
-  'draft',
-  'sent',
-  'in_progress',
-  'ready',
-  'delivered',
-  'cancelled',
 ];
 
 export function LabOrdersTab({ patientId }: Props) {
@@ -262,7 +253,9 @@ export function LabOrdersTab({ patientId }: Props) {
                       onChange={(v) =>
                         v && updateStatusMut.mutate({ id: vm.id, status: v as LabOrderStatus })
                       }
-                      data={STATUS_OPTIONS.map((s) => ({
+                      // B2 (CLI-439): joriy status + faqat ruxsat etilgan keyingi
+                      // statuslar (forward-only + cancelled) — 6ta shartsiz emas.
+                      data={allowedLabOrderStatuses(vm.status).map((s) => ({
                         value: s,
                         label: t(`lab_order.status_${s}`),
                       }))}
