@@ -134,7 +134,11 @@ beforeAll(async () => {
       {
         tenantId,
         patientId: patient.id,
-        reason: 'preventive' as const,
+        // A8 (CLI-438): recalls_patient_preventive_open_unique bitta bemorga bir
+        // vaqtda faqat bitta ochiq (pending/contacted) 'preventive' recallга ruxsat
+        // beradi — ikkinchi 'pending' qator boshqa reason bilan (summary() faqat
+        // status bo'yicha sanaydi, reason'dan mustaqil — assertionlar o'zgarmaydi).
+        reason: 'post_op_check' as const,
         source: 'manual' as const,
         status: 'pending' as const,
         dueDate: '2099-12-31', // kelajak — overdue emas
@@ -212,6 +216,13 @@ describe('DS12-A recall summary — real DB + RLS', () => {
         .returning({ id: patients.id });
       if (!patient) throw new Error('branch filter patient insert failed');
 
+      // A8 (CLI-438): recalls_patient_preventive_open_unique bitta bemorga bir
+      // vaqtda faqat bitta ochiq (pending/contacted) 'preventive' recallга ruxsat
+      // beradi (branch'dan qat'i nazar — index faqat patient_id'ga tayanadi).
+      // Shu sabab bu blokda faqat BITTA qator 'preventive' qoladi, qolganlari
+      // boshqa reason bilan (summary() faqat status bo'yicha sanaydi, reason'dan
+      // mustaqil — assertionlar o'zgarmaydi).
+
       // branchA: 2 ta pending recall
       await tx.insert(recalls).values([
         {
@@ -227,7 +238,7 @@ describe('DS12-A recall summary — real DB + RLS', () => {
           tenantId,
           patientId: patient.id,
           branchId: branchAId,
-          reason: 'preventive' as const,
+          reason: 'treatment_followup' as const,
           source: 'manual' as const,
           status: 'contacted' as const,
           dueDate: '2099-12-31',
@@ -240,7 +251,7 @@ describe('DS12-A recall summary — real DB + RLS', () => {
           tenantId,
           patientId: patient.id,
           branchId: branchBId,
-          reason: 'preventive' as const,
+          reason: 'post_op_check' as const,
           source: 'manual' as const,
           status: 'pending' as const,
           dueDate: '2099-12-31',
@@ -258,7 +269,7 @@ describe('DS12-A recall summary — real DB + RLS', () => {
           tenantId,
           patientId: patient.id,
           branchId: branchBId,
-          reason: 'preventive' as const,
+          reason: 'treatment_followup' as const,
           source: 'manual' as const,
           status: 'contacted' as const,
           dueDate: '2099-12-31',

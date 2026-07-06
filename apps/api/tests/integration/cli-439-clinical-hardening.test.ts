@@ -148,16 +148,21 @@ describe('CLI-439 B1 — estimate() audit', () => {
       await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
       await plansService.estimate(ctx(tx), planId);
     });
-    const rows = await db
-      .select()
-      .from(auditLog)
-      .where(
-        and(
-          eq(auditLog.action, 'viewed'),
-          eq(auditLog.resourceType, 'treatment_plan_estimate'),
-          eq(auditLog.resourceId, planId),
-        ),
-      );
+    // SET LOCAL'siz plain db.select() RLS tufayli har doim 0 qator qaytaradi
+    // (cli-363 pretsedenti) — tekshiruv ham tenant-scoped tx ichida bajariladi.
+    const rows = await db.transaction(async (tx) => {
+      await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
+      return tx
+        .select()
+        .from(auditLog)
+        .where(
+          and(
+            eq(auditLog.action, 'viewed'),
+            eq(auditLog.resourceType, 'treatment_plan_estimate'),
+            eq(auditLog.resourceId, planId),
+          ),
+        );
+    });
     expect(rows.length).toBeGreaterThanOrEqual(1);
   });
 });
@@ -190,8 +195,12 @@ describe('CLI-439 B5 — consent overwrite guard', () => {
       }),
     ).rejects.toBeInstanceOf(ConsentOverwriteError);
 
-    // Signature unaffected by the rejected attempt.
-    const [plan] = await db.select().from(treatmentPlans).where(eq(treatmentPlans.id, planId));
+    // Signature unaffected by the rejected attempt. SET LOCAL'siz plain select
+    // RLS tufayli 0 qator qaytaradi — tekshiruv tenant-scoped tx ichida.
+    const [plan] = await db.transaction(async (tx) => {
+      await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
+      return tx.select().from(treatmentPlans).where(eq(treatmentPlans.id, planId));
+    });
     expect(plan?.consentSignatureUrl).toBe('sig-v1.png');
   });
 
@@ -220,11 +229,16 @@ describe('CLI-439 B9c — updateStage audit before+after', () => {
       await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
       await plansService.updateStage(ctx(tx), stageId, { status: 'in_progress' });
     });
-    const [row] = await db
-      .select()
-      .from(auditLog)
-      .where(and(eq(auditLog.action, 'updated'), eq(auditLog.resourceType, 'treatment_stage')))
-      .orderBy(auditLog.createdAt);
+    // SET LOCAL'siz plain select RLS tufayli 0 qator qaytaradi — tekshiruv
+    // tenant-scoped tx ichida (cli-363 pretsedenti).
+    const [row] = await db.transaction(async (tx) => {
+      await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
+      return tx
+        .select()
+        .from(auditLog)
+        .where(and(eq(auditLog.action, 'updated'), eq(auditLog.resourceType, 'treatment_stage')))
+        .orderBy(auditLog.createdAt);
+    });
     expect(row?.before).not.toBeNull();
     expect((row?.before as { status?: string } | null)?.status).toBe('pending');
     expect((row?.after as { status?: string } | null)?.status).toBe('in_progress');

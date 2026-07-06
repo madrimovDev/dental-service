@@ -8,7 +8,7 @@
  */
 
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { tenants, users } from '@dental/db-schema';
+import { roles, tenants, userAssignments, users } from '@dental/db-schema';
 import { sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { DbOrTx } from '../../src/db/client.ts';
@@ -71,6 +71,20 @@ beforeAll(async () => {
   if (!tenantA || !tenantB) throw new Error('tenant insert failed');
   tenantAId = tenantA.id;
   tenantBId = tenantB.id;
+
+  // CLI-441: upsertProfile endi maqsad userId tenant a'zosi (owner YOKI aktiv
+  // assignment) ekanini talab qiladi — staffA uchun tenantA'da assignment.
+  await db.transaction(async (tx) => {
+    await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantAId}'`));
+    const [role] = await tx
+      .insert(roles)
+      .values({ tenantId: tenantAId, name: 'Doctor' })
+      .returning({ id: roles.id });
+    if (!role) throw new Error('role insert failed');
+    await tx
+      .insert(userAssignments)
+      .values({ userId: staffAId, tenantId: tenantAId, roleId: role.id, isActive: true });
+  });
 });
 
 afterAll(async () => {
@@ -87,7 +101,7 @@ describe('Xodim profili — real DB upsert + get + RLS', () => {
   });
 
   test('upsertProfile: birinchi PUT — INSERT (yangi row)', async () => {
-    const created = await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
       await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantAId}'`));
       return service.upsertProfile(ctx(tx, tenantAId, ownerAId), staffAId, {
         specialty: 'Terapevt',
@@ -98,6 +112,10 @@ describe('Xodim profili — real DB upsert + get + RLS', () => {
       });
     });
 
+    // CLI-441: upsertProfile endi { ok, profile } Result qaytaradi (member-guard
+    // 'user.not_member' signalini throw'siz bera olishi uchun).
+    expect(result.ok).toBe(true);
+    const created = result.ok ? result.profile : undefined;
     expect(created?.tenantId).toBe(tenantAId);
     expect(created?.userId).toBe(staffAId);
     expect(created?.specialty).toBe('Terapevt');
@@ -108,7 +126,7 @@ describe('Xodim profili — real DB upsert + get + RLS', () => {
   });
 
   test('upsertProfile: ikkinchi PUT — onConflict UPDATE (yangi row emas, almashtirish)', async () => {
-    const updated = await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
       await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantAId}'`));
       return service.upsertProfile(ctx(tx, tenantAId, ownerAId), staffAId, {
         // specialty/startedAt omitted → replace semantikasi: null'ga tushadi
@@ -118,6 +136,8 @@ describe('Xodim profili — real DB upsert + get + RLS', () => {
       });
     });
 
+    expect(result.ok).toBe(true);
+    const updated = result.ok ? result.profile : undefined;
     expect(updated?.employmentStatus).toBe('on_leave');
     expect(updated?.specialty).toBeNull();
     expect(updated?.startedAt).toBeNull();

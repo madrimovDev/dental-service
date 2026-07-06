@@ -137,11 +137,21 @@ beforeAll(async () => {
     });
 
     // Recall'lar — branch-siz, tenant-wide (o'zgarmaydi): 2 pending, 1 scheduled → converted=1.
+    // A8 (CLI-438): recalls_patient_preventive_open_unique bitta bemorga bir vaqtda
+    // faqat bitta ochiq 'preventive' recallga ruxsat beradi — ikkinchi 'pending'
+    // qator boshqa reason bilan (recallEfficacy status bo'yicha sanaydi, reason'dan
+    // mustaqil).
     await tx.insert(recalls).values(
-      (['pending', 'pending', 'scheduled'] as const).map((status) => ({
+      (
+        [
+          { status: 'pending', reason: 'preventive' },
+          { status: 'pending', reason: 'treatment_followup' },
+          { status: 'scheduled', reason: 'preventive' },
+        ] as const
+      ).map(({ status, reason }) => ({
         tenantId,
         patientId: returningPatients[0]?.id as string,
-        reason: 'preventive' as const,
+        reason,
         source: 'manual' as const,
         status,
         dueDate: '2026-05-20',

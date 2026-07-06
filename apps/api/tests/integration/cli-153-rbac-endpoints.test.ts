@@ -14,13 +14,15 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import {
   patients,
+  permissions,
+  rolePermissions,
   roles,
   tenants,
   treatmentPlans,
   userAssignments,
   users,
 } from '@dental/db-schema';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { DbOrTx } from '../../src/db/client.ts';
 import { db } from '../../src/db/client.ts';
@@ -97,6 +99,23 @@ beforeAll(async () => {
   tenantAId = tenantA.id;
   tenantBId = tenantB.id;
 
+  // A1 (CLI-438): listDoctors endi 'medical_record.edit' permission'iga tayanadi
+  // (rol-nomi substring emas) — platform-level permission (bo'lmasa qo'shamiz).
+  const [perm] = await db
+    .insert(permissions)
+    .values({ code: 'medical_record.edit', category: 'clinical' })
+    .onConflictDoNothing()
+    .returning({ id: permissions.id });
+  const medicalRecordEditPermId =
+    perm?.id ??
+    (
+      await db
+        .select({ id: permissions.id })
+        .from(permissions)
+        .where(eq(permissions.code, 'medical_record.edit'))
+    )[0]?.id;
+  if (!medicalRecordEditPermId) throw new Error('permission resolve failed');
+
   // Tenant A: rollar + assignmentlar + bemor + reja
   await withTenant(tenantAId, async (tx) => {
     const [doctorRole, doctorAssistRole, receptionRole] = await tx
@@ -108,6 +127,12 @@ beforeAll(async () => {
       ])
       .returning({ id: roles.id });
     if (!doctorRole || !doctorAssistRole || !receptionRole) throw new Error('roles insert failed');
+
+    // Doctor-rolli role'larga 'medical_record.edit' — A1 detektsiyasi shuni talab qiladi.
+    await tx.insert(rolePermissions).values([
+      { roleId: doctorRole.id, permissionId: medicalRecordEditPermId },
+      { roleId: doctorAssistRole.id, permissionId: medicalRecordEditPermId },
+    ]);
 
     await tx.insert(userAssignments).values([
       // doctorA — IKKI assignment (Doctor + Doctor+Assistant): dedupe sinovi
@@ -145,6 +170,9 @@ beforeAll(async () => {
       .values({ tenantId: tenantBId, name: 'Doctor' })
       .returning({ id: roles.id });
     if (!doctorRoleB) throw new Error('roleB insert failed');
+    await tx
+      .insert(rolePermissions)
+      .values({ roleId: doctorRoleB.id, permissionId: medicalRecordEditPermId });
     await tx
       .insert(userAssignments)
       .values({ userId: doctorBId, tenantId: tenantBId, roleId: doctorRoleB.id, isActive: true });

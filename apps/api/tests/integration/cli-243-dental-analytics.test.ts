@@ -118,12 +118,22 @@ beforeAll(async () => {
       subtotal: '200000',
     });
 
-    // Recalls — 4 ta, statuslar: pending, contacted, scheduled, completed → converted=2
+    // Recalls — 4 ta, statuslar: pending, contacted, scheduled, completed → converted=2.
+    // A8 (CLI-438): recalls_patient_preventive_open_unique bitta bemorga bir vaqtda
+    // faqat bitta ochiq (pending/contacted) 'preventive' recallга ruxsat beradi —
+    // shuning uchun faqat 'pending' qatori 'preventive', qolganlari boshqa reason
+    // (recallEfficacy faqat status bo'yicha sanaydi, reason'dan mustaqil).
+    const recallReasonByStatus = {
+      pending: 'preventive',
+      contacted: 'treatment_followup',
+      scheduled: 'post_op_check',
+      completed: 'treatment_followup',
+    } as const;
     await tx.insert(recalls).values(
       (['pending', 'contacted', 'scheduled', 'completed'] as const).map((status) => ({
         tenantId,
         patientId: pOld.id,
-        reason: 'preventive' as const,
+        reason: recallReasonByStatus[status],
         source: 'manual' as const,
         status,
         dueDate: '2026-03-20',
