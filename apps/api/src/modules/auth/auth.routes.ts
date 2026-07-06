@@ -109,12 +109,28 @@ export const authRoutes = (deps: { db: Database }) => {
         description: 'Tenant registered',
       },
       400: errResp('Validation error'),
+      403: errResp('Self-registration disabled (Local Desktop)'),
       409: errResp('Phone already registered'),
       429: errResp('Too many requests'),
     },
   });
 
   app.openapi(registerTenantRoute, async (c) => {
+    // Local Desktop'da klinika (tenant) faqat Supervisor tomonidan oldindan
+    // yaratiladi (`POST /v1/admin/clinics` → licenseKey → /activate) — ilova
+    // ichida o'z-o'zini ro'yxatdan o'tkazish litsenziya modeliga zid.
+    // Signal `requireModuleInDesktop` bilan bir xil (license-middleware.ts):
+    // `process.env` har so'rovda qayta o'qiladi, frozen `env.ts` orqali EMAS.
+    if (process.env.DENTAL_LOCAL_DESKTOP === 'true') {
+      return c.json(
+        fail(
+          'auth.self_registration_disabled',
+          "Desktop versiyada yangi klinika faqat Supervisor orqali qo'shiladi",
+        ),
+        403,
+      );
+    }
+
     const body = c.req.valid('json');
     try {
       const result = await service.registerTenant(body);

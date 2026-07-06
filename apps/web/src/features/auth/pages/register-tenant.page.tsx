@@ -15,7 +15,7 @@ import type { TFunction } from 'i18next';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { PhoneInput } from '@/components/PhoneInput.tsx';
 import { useRegisterTenant } from '../auth.api';
@@ -65,6 +65,13 @@ export function RegisterTenantPage() {
       }
     },
   });
+
+  // Local Desktop'da klinika faqat Supervisor tomonidan oldindan yaratiladi
+  // (/activate litsenziya bilan) — o'z-o'zini ro'yxatdan o'tkazish yo'q.
+  // Hook'lardan KEYIN — conditional-hooks buzilishining oldini olish uchun.
+  if (typeof window !== 'undefined' && window.dentalDesktop) {
+    return <Navigate to="/login" replace />;
+  }
 
   return (
     <Container size={520} py={60}>
