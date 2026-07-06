@@ -13,7 +13,9 @@ import type {
 import {
   assertPlanTransition,
   assertStageAcceptanceTransition,
+  assertStageMutationAllowedForPlan,
   assertStageStatusTransition,
+  type StageStatus,
 } from './treatment-plans.transitions.ts';
 
 /**
@@ -163,9 +165,11 @@ export const createTreatmentPlansService = (deps: {
     if (!current) return null;
 
     const patch: Record<string, unknown> = {};
+    let toStatus: StageStatus | undefined;
     if (input.status && input.status !== current.status) {
       assertStageStatusTransition(current.status, input.status);
       patch.status = input.status;
+      toStatus = input.status;
       if (input.status === 'completed') patch.completedAt = new Date();
     }
     if (input.acceptance && input.acceptance !== current.acceptance) {
@@ -174,8 +178,17 @@ export const createTreatmentPlansService = (deps: {
     }
     if (input.notes !== undefined) patch.notes = input.notes;
 
-    // Hech narsa o'zgarmadi (idempotent yoki bo'sh PATCH) — qayta yozmaymiz, joriy qaytadi.
+    // Hech narsa o'zgarmadi (idempotent yoki bo'sh PATCH) — plan fetch/guard'dan
+    // OLDIN erta qaytamiz (no-op arzon qoladi; guard'ga yetmaydi — xavfsiz).
     if (Object.keys(patch).length === 0) return current;
+
+    // CLI-415: parent plan BIR MARTA olinadi — guard + recall reuse (qo'shimcha fetch yo'q).
+    // Terminal (cancelled/completed) plan → mutatsiya RAD; draft/presented plan →
+    // completed/in_progress RAD. Xato InvalidTransitionError subklassi → routes 400.
+    const plan = await repo.findPlan(c, current.treatmentPlanId);
+    if (plan) {
+      assertStageMutationAllowedForPlan(plan.status, { toStatus });
+    }
 
     const updated = await repo.updateStage(c, stageId, patch);
     if (updated) {
@@ -187,17 +200,14 @@ export const createTreatmentPlansService = (deps: {
       });
 
       // B4: bosqich completed → treatment_followup recall (idempotent). Plan'dan
-      // patientId/branchId kerak (stage'da yo'q). Faqat status endi 'completed'
-      // bo'lganda (re-PATCH'da onConflictDoNothing baribir dedupe qiladi).
-      if (patch.status === 'completed' && deps.recall) {
-        const plan = await repo.findPlan(c, updated.treatmentPlanId);
-        if (plan) {
-          await deps.recall.autoCreateFromStage(c, {
-            patientId: plan.patientId,
-            sourceStageId: updated.id,
-            treatmentPlanId: plan.id,
-          });
-        }
+      // patientId/branchId kerak (stage'da yo'q). Guard cancelled/completed planda
+      // avval otilgani uchun bu yerga faqat ruxsat etilgan plan holatida yetiladi.
+      if (patch.status === 'completed' && deps.recall && plan) {
+        await deps.recall.autoCreateFromStage(c, {
+          patientId: plan.patientId,
+          sourceStageId: updated.id,
+          treatmentPlanId: plan.id,
+        });
       }
     }
     return updated;
