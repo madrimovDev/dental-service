@@ -263,4 +263,114 @@ describe('CLI-446 G3 — payroll_adjustments carry-forward', () => {
       expect(Number(aprLine?.commissionAmount)).toBe(100000); // to'liq, chegirimsiz (ikki marta emas)
     });
   });
+
+  test('T5 (race-fix repro, adversarial verify topilmasi): ikkita draft run (Iyun+Iyul) IKKALASI HAM finalize qilinmasdan oldin yaratilsa, bitta adjustment IKKI MARTA singdirilmaydi', async () => {
+    await db.transaction(async (tx) => {
+      await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
+      const c = ctx(tx, tenantId, ownerId);
+
+      // Mustaqil yangi baza: May 1,000,000 daromad, finalize.
+      const [mayTx] = await tx
+        .insert(cashierTransactions)
+        .values({
+          tenantId,
+          branchId,
+          patientId,
+          treatmentPlanId: planId,
+          // Diqqat: aniq receiptNumber kerak — Yanvar tranzaksiyasi (beforeAll)
+          // receiptNumber'siz (NULL), uning refund'i `null-R1` receipt hosil qiladi;
+          // agar bu qator ham receiptNumber'siz qolsa, refund'i xuddi shu `null-R1`ni
+          // hosil qilib, `cashier_tx_receipt_unique`ni buzadi (UNIQUE, NULL emas).
+          receiptNumber: 'CLI446-T5-MAY',
+          totalAmount: '1000000',
+          paidAmount: '1000000',
+          paymentMethod: 'cash',
+          type: 'payment',
+          status: 'completed',
+          createdAt: new Date('2027-05-10T10:00:00+05:00'),
+        })
+        .returning({ id: cashierTransactions.id });
+      if (!mayTx) throw new Error('may tx insert failed');
+
+      const mayRun = await payrollService.createRun(c, {
+        periodFrom: '2027-05-01',
+        periodTo: '2027-05-31',
+      });
+      expect(Number(mayRun.lines.find((l) => l.userId === doctorId)?.commissionAmount)).toBe(
+        100000,
+      );
+      await payrollService.finalizeRun(c, mayRun.id);
+
+      // Mayning to'lovini TO'LIQ refund — yangi -50,000 adjustment (finalized davrga tushadi).
+      const refundResult = await cashier.refund(c, mayTx.id, 500000);
+      expect(refundResult.ok).toBe(true);
+      const mayRefundTxId = refundResult.ok ? refundResult.refund.id : '';
+
+      // Iyun VA Iyul uchun IKKALASI HAM createRun — HECH BIRI hali finalize QILINMAGAN
+      // (bug reprosi: eski kodda ikkalasi ham bir xil -50,000ni "ko'rib", ikkalasi ham
+      // o'z payrollLines.commissionAmount'iga singdirib qo'yardi).
+      await tx.insert(cashierTransactions).values({
+        tenantId,
+        branchId,
+        patientId,
+        treatmentPlanId: planId,
+        totalAmount: '1000000',
+        paidAmount: '1000000',
+        paymentMethod: 'cash',
+        type: 'payment',
+        status: 'completed',
+        createdAt: new Date('2027-06-10T10:00:00+05:00'),
+      });
+      await tx.insert(cashierTransactions).values({
+        tenantId,
+        branchId,
+        patientId,
+        treatmentPlanId: planId,
+        totalAmount: '1000000',
+        paidAmount: '1000000',
+        paymentMethod: 'cash',
+        type: 'payment',
+        status: 'completed',
+        createdAt: new Date('2027-07-10T10:00:00+05:00'),
+      });
+
+      const juneRun = await payrollService.createRun(c, {
+        periodFrom: '2027-06-01',
+        periodTo: '2027-06-30',
+      });
+      const julyRun = await payrollService.createRun(c, {
+        periodFrom: '2027-07-01',
+        periodTo: '2027-07-31',
+      });
+
+      const juneCommission = Number(
+        juneRun.lines.find((l) => l.userId === doctorId)?.commissionAmount,
+      );
+      const julyCommission = Number(
+        julyRun.lines.find((l) => l.userId === doctorId)?.commissionAmount,
+      );
+
+      // TO'G'RI natija: adjustment FAQAT BIR MARTA singdirilishi kerak — jami
+      // 150,000 (200,000 xom komissiya − 50,000 adjustment, bir marta). Bug bo'lsa
+      // (ikkalasi ham singdirsa) jami 100,000 chiqadi (200,000 − 50,000 − 50,000).
+      expect(juneCommission + julyCommission).toBe(150000);
+
+      await payrollService.finalizeRun(c, juneRun.id);
+      await payrollService.finalizeRun(c, julyRun.id);
+
+      const adjRows = await tx
+        .select()
+        .from(payrollAdjustments)
+        .where(eq(payrollAdjustments.doctorId, doctorId));
+      // Diqqat: amount=-50000 bilan IKKITA adjustment mavjud (T1'niki + shu testniki)
+      // — mayRefundTxId (sourceTransactionId) bo'yicha ANIQ shu testning qatorini topamiz.
+      const mayAdjustment = adjRows.find((r) => r.sourceTransactionId === mayRefundTxId);
+      expect(mayAdjustment).toBeDefined();
+      // Faqat BITTA run (Iyun yoki Iyul) uni "band qilgan" bo'lishi kerak.
+      expect(
+        mayAdjustment?.appliedToRunId === juneRun.id ||
+          mayAdjustment?.appliedToRunId === julyRun.id,
+      ).toBe(true);
+    });
+  });
 });

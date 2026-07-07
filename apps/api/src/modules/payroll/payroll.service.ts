@@ -127,21 +127,29 @@ export const createPayrollService = (deps: { audit: AuditLogger }) => {
           : [];
         const profiles = [...activeProfiles, ...inactiveEarning];
 
-        // 3.5 (CLI-446 G3): shu profillar uchun qo'llanmagan (`appliedToRunId IS NULL`)
-        // payroll_adjustments yig'indisi — komissiyaga qo'shiladi. ALL-OR-NOTHING per
-        // doktor: agar rawCommission+adjustmentSum manfiy chiqsa, BU RUN'DA HECH NARSA
-        // qo'llanmaydi — adjustment BUTUNLAY keyingi runga ko'chadi (qisman-clip YO'Q).
-        // Sabab: `appliedToRunId` binary flag, qisman-summa maydoni yo'q — floor bilan
-        // clip qilib qoldiqni "hali ham qo'llanmagan" deb qoldirsak ham, keyingi run
-        // xuddi shu adjustmentni yana TO'LIQ hisobga olib ikki marta chegirgan bo'lardi
-        // (over-clawback). All-or-nothing shu xatoning oldini oladi.
+        // 3.5 (CLI-446 G3, tuzatilgan — adversarial verify topilmasi): shu profillar
+        // uchun qo'llanmagan (`appliedToRunId IS NULL`) payroll_adjustments qatorlarini
+        // `FOR UPDATE` bilan QULFLAYMIZ (xom qatorlar, aggregatsiya emas — Postgres
+        // `FOR UPDATE`ni GROUP BY/SUM bilan ishlatishga ruxsat bermaydi).
+        //
+        // MUHIM (bug tuzatildi): avvalgi versiyada bu summa faqat O'QILAR, stamp esa
+        // faqat `finalizeRun()`da bosilardi. Agar ikkita davr uchun (masalan Fevral
+        // va Mart) ikkalasi ham finalize qilinmasdan oldin ketma-ket `createRun`
+        // chaqirilsa — ikkalasi ham bir xil "hali qo'llanmagan" adjustmentni ko'rib,
+        // ikkalasi ham o'z `payrollLines.commissionAmount`iga singdirib QO'YAR edi
+        // (frozen qiymat finalize'da qayta yozilmaydi) — natijada bitta adjustment
+        // IKKI MARTA "to'langan komissiyadan" ayirilgan bo'lib chiqardi (doktor kam
+        // to'lanardi). Tuzatish: adjustment endi SHU YERDA, createRun ichida, FOR
+        // UPDATE qulfi ostida DARHOL stemplanadi (pastda, 4-bo'limda) — ikkinchi
+        // parallel/ketma-ket `createRun` endi ushbu qatorni "band qilingan" deb ko'radi.
         const profileUserIds = profiles.map((p) => p.userId).filter((id): id is string => !!id);
-        const unappliedAdjRows =
+        const unappliedAdjRowsRaw =
           profileUserIds.length > 0
             ? await tx
                 .select({
+                  id: payrollAdjustments.id,
                   doctorId: payrollAdjustments.doctorId,
-                  sum: sql<string>`COALESCE(SUM(${payrollAdjustments.amount}), 0)`,
+                  amount: payrollAdjustments.amount,
                 })
                 .from(payrollAdjustments)
                 .where(
@@ -150,11 +158,19 @@ export const createPayrollService = (deps: { audit: AuditLogger }) => {
                     isNull(payrollAdjustments.appliedToRunId),
                   ),
                 )
-                .groupBy(payrollAdjustments.doctorId)
+                .for('update')
             : [];
-        const unappliedAdjByDoctor = new Map(
-          unappliedAdjRows.map((r) => [r.doctorId, Number(r.sum)]),
-        );
+        const unappliedAdjByDoctor = new Map<string, number>();
+        const unappliedAdjIdsByDoctor = new Map<string, string[]>();
+        for (const row of unappliedAdjRowsRaw) {
+          unappliedAdjByDoctor.set(
+            row.doctorId,
+            (unappliedAdjByDoctor.get(row.doctorId) ?? 0) + Number(row.amount),
+          );
+          const ids = unappliedAdjIdsByDoctor.get(row.doctorId) ?? [];
+          ids.push(row.id);
+          unappliedAdjIdsByDoctor.set(row.doctorId, ids);
+        }
 
         // 4. Har eligible profil uchun snapshot qator (0-daromad profillar ham kiritiladi).
         const lines = [];
@@ -173,6 +189,23 @@ export const createPayrollService = (deps: { audit: AuditLogger }) => {
           const absorbable = rawCommission + adjustmentSum >= 0;
           const commissionAmount = absorbable ? rawCommission + adjustmentSum : rawCommission;
           const total = Math.max(0, base + commissionAmount);
+
+          // CLI-446 G3 (bug tuzatildi — quyida): agar TO'LIQ singdirilsa, FOR UPDATE
+          // qulflangan qatorlarga DARHOL (createRun ichida, finalizeRun'da EMAS)
+          // `appliedToRunId = run.id` yoziladi — shu bilan ikkinchi (parallel yoki
+          // ketma-ket) createRun endi bu adjustmentni "band qilingan" deb ko'radi va
+          // qayta hisobga olmaydi. Draft o'chirilsa (`deleteRun`), FK
+          // `ON DELETE SET NULL` orqali avtomatik bo'shaydi (keyingi draft uchun
+          // qayta ochiladi).
+          if (absorbable && adjustmentSum !== 0) {
+            const adjIds = unappliedAdjIdsByDoctor.get(p.userId) ?? [];
+            if (adjIds.length > 0) {
+              await tx
+                .update(payrollAdjustments)
+                .set({ appliedToRunId: run.id })
+                .where(inArray(payrollAdjustments.id, adjIds));
+            }
+          }
 
           const [line] = await tx
             .insert(payrollLines)
@@ -265,74 +298,15 @@ export const createPayrollService = (deps: { audit: AuditLogger }) => {
         .where(eq(payrollRuns.id, runId))
         .returning();
 
-      // CLI-446 G3: shu run'dagi har doktor uchun — qo'llanmagan payroll_adjustments
-      // TO'LIQ singdirilishi mumkin bo'lsa (createRun'dagi bir xil all-or-nothing shart,
-      // LIVE qayta hisoblangan: `payrollLines`da saqlangan `attributedRevenue`/
-      // `commissionPercent`dan `computePayrollLine` bilan xom komissiya qayta olinadi +
-      // joriy qo'llanmagan adjustment yig'indisi qayta so'raladi) — `appliedToRunId`ga
-      // shu run yoziladi.
-      // ⚠️ Tor race oynasi (hujjatlashtirilgan, hal qilinmaydi): agar aynan
-      // createRun→finalizeRun oralig'ida shu doktor uchun YANGI adjustment kelsa,
-      // LIVE qayta hisob createRun paytidagi FROZEN qiymatdan farq qilishi mumkin
-      // (amaliyotda juda tor oyna — bitta admin ketma-ket ishlaydi). Muqobil dizayn:
-      // createRun paytida darhol stamp + `appliedToRunId` FK `ON DELETE SET NULL`
-      // (draft o'chirilsa avtomatik bo'shaydi) — bu yerda QO'LLANMAYDI (spec'ning
-      // "finalizeRun stempaydi" talabiga sodiq qolamiz).
-      const lines = await tx
-        .select({
-          userId: payrollLines.userId,
-          baseSalary: payrollLines.baseSalary,
-          attributedRevenue: payrollLines.attributedRevenue,
-          commissionPercent: payrollLines.commissionPercent,
-        })
-        .from(payrollLines)
-        .where(eq(payrollLines.runId, runId));
-
-      const doctorIds = lines.map((l) => l.userId).filter((id): id is string => !!id);
-      if (doctorIds.length > 0) {
-        const unappliedAdjRows = await tx
-          .select({
-            doctorId: payrollAdjustments.doctorId,
-            sum: sql<string>`COALESCE(SUM(${payrollAdjustments.amount}), 0)`,
-          })
-          .from(payrollAdjustments)
-          .where(
-            and(
-              inArray(payrollAdjustments.doctorId, doctorIds),
-              isNull(payrollAdjustments.appliedToRunId),
-            ),
-          )
-          .groupBy(payrollAdjustments.doctorId);
-        const unappliedAdjByDoctor = new Map(
-          unappliedAdjRows.map((r) => [r.doctorId, Number(r.sum)]),
-        );
-
-        const absorbableDoctorIds = lines
-          .filter((l) => {
-            if (!l.userId) return false;
-            const adjustmentSum = unappliedAdjByDoctor.get(l.userId) ?? 0;
-            if (adjustmentSum === 0) return false; // qo'llanmagan adjustment yo'q
-            const { commissionAmount: rawCommission } = computePayrollLine(
-              Number(l.baseSalary),
-              Number(l.attributedRevenue),
-              Number(l.commissionPercent),
-            );
-            return rawCommission + adjustmentSum >= 0;
-          })
-          .map((l) => l.userId as string);
-
-        if (absorbableDoctorIds.length > 0) {
-          await tx
-            .update(payrollAdjustments)
-            .set({ appliedToRunId: runId })
-            .where(
-              and(
-                inArray(payrollAdjustments.doctorId, absorbableDoctorIds),
-                isNull(payrollAdjustments.appliedToRunId),
-              ),
-            );
-        }
-      }
+      // CLI-446 G3 (bug tuzatildi — verify-agent topilmasi): adjustment claim/stamp
+      // endi `createRun()` ichida, `FOR UPDATE` qulfi ostida, DARHOL bajariladi —
+      // shuning uchun `finalizeRun()` bu yerda payroll_adjustments'ga UMUMAN
+      // tegmaydi (avvalgi versiya shu yerda live-recompute+stamp qilardi, lekin
+      // `payrollLines.commissionAmount` createRun'da FREEZE qilingani uchun ikkita
+      // ketma-ket, hali finalize qilinmagan draft bir xil adjustmentni ikkalasi ham
+      // "singdirib" qo'yishi mumkin edi — real-DB'da reproduce qilingan bug, doktor
+      // kam to'lanardi). Endi createRun'dagi FOR UPDATE + darhol-stamp bu poygani
+      // yopadi (ikkinchi createRun endi qatorni "band" deb ko'radi).
 
       await deps.audit.record(c, {
         action: 'finalized',
