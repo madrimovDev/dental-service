@@ -45,30 +45,33 @@ export const createStockService = (deps: {
   notifications?: NotificationsDep;
 }) => {
   /**
-   * Low-stock alert — qoldiq chegaradan O'TGANDA (transition), har harakatda EMAS.
-   * `stock.manage` egalariga (+ owner) in-app bildirishnoma (smsTo YO'Q → faqat insert,
-   * deduction tx hot-path'ida tashqi gateway latency yo'q). Advisor qarori.
+   * CLI-453 #5: `wasLow`/`isLow` — chaqiruvchi `isLowStock()` bilan oldindan hisoblab
+   * beradi (qoldiq o'zgarganda ESKI/YANGI qoldiqni ESKI/YANGI threshold bilan, yoki
+   * threshold o'zgarganda BIR XIL qoldiqni ESKI/YANGI threshold bilan). Shu orqali
+   * bitta funksiya ikkala trigger-stsenariyni ("miqdor kamaydi" VA "chegara oshirildi")
+   * qamrab oladi — recipient-lookup+notify kodi dublikatsiyasiz.
    */
   async function maybeAlertLowStock(
     c: Context,
     tx: DbOrTx,
     item: { id: string; name: string; branchId: string | null; minThreshold: string },
-    oldQty: number,
-    newQty: number,
+    wasLow: boolean,
+    isLow: boolean,
+    currentQty: number,
   ) {
     if (!deps.notifications) return;
-    const threshold = Number(item.minThreshold);
-    // Faqat chegaradan PASTGA o'tganda (oldin >=, hozir <).
-    if (!(oldQty >= threshold && newQty < threshold)) return;
+    // Faqat YANGI transition (avval past emas edi, hozir past) — har chaqiruvda emas.
+    if (!(!wasLow && isLow)) return;
     const tenantId = c.get('activeTenantId');
     if (!tenantId) return;
+    const threshold = Number(item.minThreshold);
     const recipients = await findRecipientsWithPermission(c, 'stock.manage', item.branchId);
     for (const userId of recipients) {
       await deps.notifications.notifyInTx(tx, tenantId, {
         userId,
         type: 'stock.low_threshold',
         title: `Kam qoldiq: ${item.name}`,
-        body: `Qoldiq: ${newQty} (min: ${threshold})`,
+        body: `Qoldiq: ${currentQty} (min: ${threshold})`,
       });
     }
   }
@@ -162,6 +165,25 @@ export const createStockService = (deps: {
         before,
         after: updated,
       });
+
+      // CLI-453 #5: `minThreshold` PATCH orqali o'zgarganda ham low-stock alert
+      // trigger bo'lishi kerak (avval faqat `quantity` o'zgarganda — createMovement/
+      // deductForServices/reconcileForServices — chaqirilardi). `quantity` o'zi
+      // o'zgarmaydi (CLI-424) — shuning uchun `wasLow`/`isLow` ESKI/YANGI thresholdga
+      // nisbatan BIR XIL qoldiq bilan hisoblanadi.
+      if (input.minThreshold !== undefined) {
+        const quantity = Number(before.quantity);
+        const oldThreshold = Number(before.minThreshold);
+        const newThreshold = Number(updated.minThreshold);
+        await maybeAlertLowStock(
+          c,
+          db,
+          updated,
+          isLowStock(quantity, oldThreshold),
+          isLowStock(quantity, newThreshold),
+          quantity,
+        );
+      }
     }
     return updated;
   }
@@ -248,7 +270,17 @@ export const createStockService = (deps: {
           after: { itemId: input.itemId, type: input.type, quantity: input.quantity, newQuantity },
         });
       }
-      await maybeAlertLowStock(c, tx, item, oldQty, newQuantity);
+      {
+        const threshold = Number(item.minThreshold);
+        await maybeAlertLowStock(
+          c,
+          tx,
+          item,
+          isLowStock(oldQty, threshold),
+          isLowStock(newQuantity, threshold),
+          newQuantity,
+        );
+      }
       return movement;
     });
   }
@@ -367,7 +399,16 @@ export const createStockService = (deps: {
           });
         if (updated) {
           const newQty = Number(updated.quantity);
-          await maybeAlertLowStock(c, db, updated, newQty + Number(bom.qtyPerService), newQty);
+          const oldQty = newQty + Number(bom.qtyPerService);
+          const threshold = Number(updated.minThreshold);
+          await maybeAlertLowStock(
+            c,
+            db,
+            updated,
+            isLowStock(oldQty, threshold),
+            isLowStock(newQty, threshold),
+            newQty,
+          );
         }
       }
     }
@@ -461,7 +502,15 @@ export const createStockService = (deps: {
           const oldQty = isDeduction
             ? newQty + Number(bom.qtyPerService)
             : newQty - Number(bom.qtyPerService);
-          await maybeAlertLowStock(c, db, updated, oldQty, newQty);
+          const threshold = Number(updated.minThreshold);
+          await maybeAlertLowStock(
+            c,
+            db,
+            updated,
+            isLowStock(oldQty, threshold),
+            isLowStock(newQty, threshold),
+            newQty,
+          );
         }
       }
     }

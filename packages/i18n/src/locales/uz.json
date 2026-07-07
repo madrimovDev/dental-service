@@ -1088,6 +1088,7 @@
     "total_revenue": "Jami tushum",
     "expenses_total": "Xarajat",
     "net_cash_flow": "Sof oqim",
+    "cash_out": "Naqd chiqim (refund)",
     "noop_fiscal": "Fiskal hujjat keyinroq Soliqqa yuboriladi",
     "receipt_modal": {
       "print": "Chop etish",

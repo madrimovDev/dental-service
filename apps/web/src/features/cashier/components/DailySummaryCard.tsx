@@ -26,7 +26,7 @@ function sumByType(summary: DailySummary, type: 'payment' | 'refund'): number {
 }
 
 export function DailySummaryCard({ summary }: DailySummaryCardProps) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
 
   // CLI-419: backend `dailySummary` endi `SUM(paidAmount)` qaytaradi (hisob-faktura
   // emas, haqiqatda olingan naqd). Frontend HAM refundlarni endi e'tiborsiz
@@ -45,10 +45,8 @@ export function DailySummaryCard({ summary }: DailySummaryCardProps) {
   const cashShare = totalRevenue > 0 ? Math.round((cashNet / totalRevenue) * 100) : 0;
   const cardShare = totalRevenue > 0 ? Math.round((cardNet / totalRevenue) * 100) : 0;
 
-  // TODO i18n key: cashier.cash_out (packages/i18n bu pass'da tegilmagan — handoff,
-  // uz.json/ru.json'ga qo'shilishi kerak).
-  const cashOutLabel =
-    i18n.language === 'ru' ? 'Возврат наличных (расход)' : 'Naqd chiqim (refund)';
+  // CLI-453 #1: hardcoded til-ternary o'rniga i18n kaliti (uz.json/ru.json qo'shildi).
+  const cashOutLabel = t('cashier.cash_out');
 
   return (
     <Paper withBorder radius="var(--radius-card)" p="lg" style={{ boxShadow: 'var(--shadow-sm)' }}>
