@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computePatientBalance } from './patients.balance.ts';
+import { computeNonPlanRemainder, computePatientBalance } from './patients.balance.ts';
 
 describe('computePatientBalance', () => {
   it("bo'sh — hammasi 0", () => {
@@ -61,5 +61,55 @@ describe('computePatientBalance', () => {
     expect(r.planDebt).toBe(110000);
     expect(r.nonPlanBalance).toBe(30000);
     expect(r.balance).toBe(140000);
+  });
+});
+
+describe('computeNonPlanRemainder', () => {
+  it("bo'sh massiv — 0", () => {
+    expect(computeNonPlanRemainder([])).toBe(0);
+  });
+
+  it("to'liq to'langan, refundsiz — hissasi 0", () => {
+    const result = computeNonPlanRemainder([
+      { totalAmount: 100000, paidAmount: 100000, refundedSum: 0 },
+    ]);
+    expect(result).toBe(0);
+  });
+
+  it("qisman to'langan, refundsiz — hissasi qarz", () => {
+    const result = computeNonPlanRemainder([
+      { totalAmount: 100000, paidAmount: 60000, refundedSum: 0 },
+    ]);
+    expect(result).toBe(40000);
+  });
+
+  it("qisman to'langan (60/100), TO'LIQ refund qilingan (60) — hissasi 0 (CLI-448 fix)", () => {
+    const result = computeNonPlanRemainder([
+      { totalAmount: 100000, paidAmount: 60000, refundedSum: 60000 },
+    ]);
+    expect(result).toBe(0);
+  });
+
+  it("to'liq to'langan (100/100), TO'LIQ refund qilingan (100) — hissasi 0", () => {
+    const result = computeNonPlanRemainder([
+      { totalAmount: 100000, paidAmount: 100000, refundedSum: 100000 },
+    ]);
+    expect(result).toBe(0);
+  });
+
+  it('overpay (paidAmount > totalAmount), refundsiz — manfiy (kredit, CLI-451)', () => {
+    const result = computeNonPlanRemainder([
+      { totalAmount: 100000, paidAmount: 120000, refundedSum: 0 },
+    ]);
+    expect(result).toBe(-20000);
+  });
+
+  it("bir necha qator — yig'indi to'g'ri", () => {
+    const result = computeNonPlanRemainder([
+      { totalAmount: 100000, paidAmount: 60000, refundedSum: 0 }, // 40000 qarz
+      { totalAmount: 50000, paidAmount: 50000, refundedSum: 50000 }, // 0 (bekor)
+      { totalAmount: 30000, paidAmount: 35000, refundedSum: 0 }, // -5000 kredit
+    ]);
+    expect(result).toBe(35000); // 40000 + 0 - 5000
   });
 });
