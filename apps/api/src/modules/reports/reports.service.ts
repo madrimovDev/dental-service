@@ -4,11 +4,26 @@ import {
   cashierTransactions,
   patients,
   recalls,
+  serviceMaterials,
+  stockBatches,
   treatmentPlans,
   treatmentStages,
 } from '@dental/db-schema';
 import type { Column } from 'drizzle-orm';
-import { and, count, countDistinct, desc, eq, gte, isNull, lt, ne, sql } from 'drizzle-orm';
+import {
+  and,
+  count,
+  countDistinct,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  ne,
+  sql,
+} from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { DbOrTx } from '../../db/client.ts';
 import { getDb } from '../../db/scoped.ts';
@@ -17,7 +32,9 @@ import {
   branchOpenMinutes,
   comparisonEntry,
   completionRate,
+  computeServiceMargin,
   DEFAULT_WORK_MINUTES,
+  materialCostByService,
   noShowRate,
   periodLengthDays,
   recallEfficacy,
@@ -58,7 +75,12 @@ const tashkentRange = (from: string, to: string) => {
 /** Yarim-ochiq kun oralig'i filtri: `col >= start AND col < end` (CLI-442 #1). */
 const inRange = (col: Column, start: Date, end: Date) => and(gte(col, start), lt(col, end));
 
-type NetServiceRow = { serviceName: string; count: number; revenue: number };
+type NetServiceRow = {
+  serviceName: string;
+  serviceId: string | null;
+  count: number;
+  revenue: number;
+};
 
 /**
  * CLI-430 — byService / procedureMix net-of-refund-and-discount agregatsiyasi.
@@ -109,6 +131,7 @@ async function netServiceAggregates(
     )
     SELECT
       i.service_name AS "serviceName",
+      MAX(i.service_id::text) AS "serviceId",
       COALESCE(SUM(i.quantity), 0) AS "count",
       COALESCE(SUM(
         CASE WHEN tn.gross > 0 THEN ROUND((i.subtotal * tn.net_paid / tn.gross)::numeric, 2) ELSE 0 END
@@ -119,13 +142,23 @@ async function netServiceAggregates(
     ORDER BY "revenue" DESC
   `);
 
-  return (rows as unknown as { serviceName: string; count: string; revenue: string }[]).map(
-    (r) => ({
-      serviceName: r.serviceName,
-      count: Number(r.count),
-      revenue: Number(r.revenue),
-    }),
-  );
+  return (
+    rows as unknown as {
+      serviceName: string;
+      serviceId: string | null;
+      count: string;
+      revenue: string;
+    }[]
+  ).map((r) => ({
+    serviceName: r.serviceName,
+    // CLI-450: BOM (`service_materials`) `service_id` orqali bog'lanadi — `service_name`
+    // snapshot bo'lgani uchun (xizmat o'chirilsa ham saqlanadi) guruh ichida `MAX`
+    // orqali vakolatli non-null id tanlanadi; barcha qator `service_id IS NULL` bo'lsa
+    // (eski/o'chirilgan xizmat) — `null`, material narxi 0 bo'ladi (dentalAnalytics'da).
+    serviceId: r.serviceId,
+    count: Number(r.count),
+    revenue: Number(r.revenue),
+  }));
 }
 
 /** Har kun (from..to) uchun 'sun'..'sat' kaliti — Tashkent kuni, noon-anchored (TZ chegarasi xavfsiz). */
@@ -456,6 +489,51 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
     //    refund-and-discount (CLI-430) — `netServiceAggregates` bilan bir xil hisoblash.
     const mixRows = await netServiceAggregates(db, start, end, branchId);
 
+    // CLI-450: xizmat margin (BOM + item bo'yicha o'rtacha-narx approksimatsiya, v1 —
+    // dokumentlashtirilgan cheklov: FIFO/batch-consumption tracking yo'q). `serviceId`
+    // yo'q guruhlar (eski/o'chirilgan xizmat snapshot'i) uchun material narxi 0.
+    const mixServiceIds = mixRows.map((r) => r.serviceId).filter((id): id is string => id != null);
+
+    let materialCostByServiceId = new Map<string, number>();
+    if (mixServiceIds.length > 0) {
+      const avgCostRows = await db
+        .select({
+          itemId: stockBatches.itemId,
+          avgCost: sql<string>`AVG(${stockBatches.costPerUnit})`,
+        })
+        .from(stockBatches)
+        .where(isNotNull(stockBatches.costPerUnit))
+        .groupBy(stockBatches.itemId);
+      const avgCostByItemId = new Map(avgCostRows.map((r) => [r.itemId, Number(r.avgCost)]));
+
+      const bomRows = await db
+        .select({
+          serviceId: serviceMaterials.serviceId,
+          itemId: serviceMaterials.itemId,
+          qtyPerService: serviceMaterials.qtyPerService,
+        })
+        .from(serviceMaterials)
+        .where(inArray(serviceMaterials.serviceId, mixServiceIds));
+
+      materialCostByServiceId = materialCostByService(
+        bomRows.map((r) => ({
+          serviceId: r.serviceId,
+          itemId: r.itemId,
+          qtyPerService: Number(r.qtyPerService),
+        })),
+        avgCostByItemId,
+      );
+    }
+
+    const procedureMix = mixRows.map((r) =>
+      computeServiceMargin(
+        r.serviceName,
+        r.count,
+        r.revenue,
+        r.serviceId ? (materialCostByServiceId.get(r.serviceId) ?? 0) : 0,
+      ),
+    );
+
     // 2. Retention — yangi (oraliqda yaratilgan) vs qaytgan (oraliqda yozilgan, lekin
     //    oraliqdan oldin yaratilgan bemor). Retention bemor-darajasida — TENANT-WIDE
     //    (Qaror #29, planCompletion pretsedenti) — `branchId` ATAYLAB ikkala tomonda
@@ -515,7 +593,7 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
     });
 
     return {
-      procedureMix: mixRows,
+      procedureMix,
       retention: {
         newPatients,
         returningPatients,

@@ -9,4 +9,8 @@ export type DentalAnalyticsReportProcedureMixItem = {
   serviceName: string;
   count: number;
   revenue: number;
+  materialCost: number;
+  margin: number;
+  /** @nullable */
+  marginPct: number | null;
 };

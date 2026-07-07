@@ -7,4 +7,15 @@
 
 export type ListStockMovementsParams = {
 itemId: string;
+/**
+ * @minimum 0
+ * @exclusiveMinimum
+ */
+page?: number;
+/**
+ * @minimum 0
+ * @maximum 200
+ * @exclusiveMinimum
+ */
+pageSize?: number;
 };

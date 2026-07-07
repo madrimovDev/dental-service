@@ -107,8 +107,19 @@ export const dentalAnalyticsReportDtoSchema = z
     // CLI-430: net-of-refund-and-discount (netServiceAggregates) — `count` = xom
     // bajarilgan protsedura soni (SUM quantity), `revenue` = net collected (chegirma +
     // qisman refund hisobga olingan, `revenue.total` bilan izchil cash-basis).
+    // CLI-450: `materialCost`/`margin`/`marginPct` — BOM (`service_materials`) + item
+    // bo'yicha o'rtacha narx (`stock_batches.costPerUnit`) asosida, v1 approksimatsiya
+    // (FIFO/batch-consumption tracking yo'q, dokumentlashtirilgan cheklov). `marginPct`
+    // `revenue === 0` bo'lsa `null` (ma'noli foiz yo'q).
     procedureMix: z.array(
-      z.object({ serviceName: z.string(), count: z.number(), revenue: z.number() }),
+      z.object({
+        serviceName: z.string(),
+        count: z.number(),
+        revenue: z.number(),
+        materialCost: z.number(),
+        margin: z.number(),
+        marginPct: z.number().nullable(),
+      }),
     ),
     // Tenant-wide (CLI-431) — branchId'dan mustaqil (branch-invariant).
     retention: z.object({

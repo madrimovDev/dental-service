@@ -28,10 +28,5 @@ export type UpdateStockItemBody = {
    * @minimum 0
    * @nullable
    */
-  quantity?: number | null;
-  /**
-   * @minimum 0
-   * @nullable
-   */
   minThreshold?: number | null;
 };

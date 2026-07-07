@@ -1181,7 +1181,11 @@
     "export_csv": "CSV",
     "export_excel": "Excel",
     "byPaymentMethod": "Структура по способу оплаты",
-    "occupancy": "Тепловая карта записей"
+    "occupancy": "Тепловая карта записей",
+    "service": "Услуга",
+    "material_cost": "Стоимость материалов",
+    "margin": "Маржа",
+    "margin_pct": "Маржа %"
   },
   "payment": {
     "method": {

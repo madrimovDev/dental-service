@@ -93,3 +93,59 @@ export function shiftYears(date: string, years: number): string {
   d.setUTCFullYear(d.getUTCFullYear() + years);
   return d.toISOString().slice(0, 10);
 }
+
+// ─── CLI-450: Xizmat margin hisoboti (BOM + avg-cost approksimatsiya) ────────
+
+/** `service_materials` BOM qatori — sof kirish (Drizzle numeric ustunlar JS number'ga o'girilgan). */
+export type ServiceMaterialRow = {
+  serviceId: string;
+  itemId: string;
+  qtyPerService: number;
+};
+
+/**
+ * BOM + item bo'yicha o'rtacha narx (`avgCostByItemId` — `stock_batches.costPerUnit`
+ * o'rtachasi) dan xizmat uchun BITTA ijro (occurrence) narxini hisoblaydi.
+ * v1 approksimatsiya (dokumentlashtirilgan cheklov): FIFO/batch-consumption tracking
+ * yo'q; itemning hech qanday batchida cost yozilmagan bo'lsa (`avgCostByItemId`da
+ * yo'q) — narxi 0.
+ */
+export function materialCostByService(
+  bom: ServiceMaterialRow[],
+  avgCostByItemId: Map<string, number>,
+): Map<string, number> {
+  const result = new Map<string, number>();
+  for (const row of bom) {
+    const unitCost = avgCostByItemId.get(row.itemId) ?? 0;
+    result.set(row.serviceId, (result.get(row.serviceId) ?? 0) + row.qtyPerService * unitCost);
+  }
+  return result;
+}
+
+/** Xizmat margin qatori — CLI-450 `procedureMix` javobi uchun. */
+export type ServiceMarginRow = {
+  serviceName: string;
+  count: number;
+  revenue: number;
+  materialCost: number;
+  margin: number;
+  marginPct: number | null;
+};
+
+/**
+ * Xizmat margin hisobi: `materialCost = materialCostPerOccurrence × count` (davr
+ * ichida bajarilgan barcha ijrolar — `count` = xom `SUM(quantity)`, `netServiceAggregates`
+ * bilan bir xil miqyos). `margin = revenue - materialCost`. `marginPct = margin / revenue`
+ * (`revenue === 0` → `null`, ma'noli foiz yo'q).
+ */
+export function computeServiceMargin(
+  serviceName: string,
+  count: number,
+  revenue: number,
+  materialCostPerOccurrence: number,
+): ServiceMarginRow {
+  const materialCost = materialCostPerOccurrence * count;
+  const margin = revenue - materialCost;
+  const marginPct = revenue === 0 ? null : margin / revenue;
+  return { serviceName, count, revenue, materialCost, margin, marginPct };
+}

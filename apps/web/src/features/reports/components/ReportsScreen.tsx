@@ -503,12 +503,30 @@ export function ReportsScreen() {
               <Stack gap="xs">
                 <Text fw={600}>{t('reports.procedure_mix')}</Text>
                 {analytics.data.procedureMix.length > 0 ? (
-                  <BarMini
-                    data={analytics.data.procedureMix.map((p) => ({
-                      label: p.serviceName,
-                      value: p.revenue,
-                    }))}
-                  />
+                  <Table>
+                    <Table.Thead>
+                      <Table.Tr>
+                        <Table.Th>{t('reports.service')}</Table.Th>
+                        <Table.Th>{t('reports.count')}</Table.Th>
+                        <Table.Th>{t('reports.revenue')}</Table.Th>
+                        <Table.Th>{t('reports.material_cost')}</Table.Th>
+                        <Table.Th>{t('reports.margin')}</Table.Th>
+                        <Table.Th>{t('reports.margin_pct')}</Table.Th>
+                      </Table.Tr>
+                    </Table.Thead>
+                    <Table.Tbody>
+                      {analytics.data.procedureMix.map((p) => (
+                        <Table.Tr key={p.serviceName}>
+                          <Table.Td>{p.serviceName}</Table.Td>
+                          <Table.Td>{fmt(p.count)}</Table.Td>
+                          <Table.Td>{formatCurrency(p.revenue, t)}</Table.Td>
+                          <Table.Td>{formatCurrency(p.materialCost, t)}</Table.Td>
+                          <Table.Td>{formatCurrency(p.margin, t)}</Table.Td>
+                          <Table.Td>{p.marginPct === null ? '—' : pct(p.marginPct)}</Table.Td>
+                        </Table.Tr>
+                      ))}
+                    </Table.Tbody>
+                  </Table>
                 ) : (
                   <Text c="dimmed">{t('reports.empty')}</Text>
                 )}

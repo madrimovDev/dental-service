@@ -3,8 +3,10 @@ import {
   branchOpenMinutes,
   comparisonEntry,
   completionRate,
+  computeServiceMargin,
   DEFAULT_WORK_MINUTES,
   deltaPct,
+  materialCostByService,
   noShowRate,
   periodLengthDays,
   recallEfficacy,
@@ -65,5 +67,58 @@ describe('ds12-a comparison helpers', () => {
   test('shiftDays / shiftYears', () => {
     expect(shiftDays('2026-06-01', -1)).toBe('2026-05-31');
     expect(shiftYears('2026-06-01', -1)).toBe('2025-06-01');
+  });
+});
+
+describe('CLI-450: materialCostByService', () => {
+  it('BOM + avg-cost — xizmat uchun material narxini SUM(qty × avgCost) hisoblaydi', () => {
+    const bom = [
+      { serviceId: 's1', itemId: 'i1', qtyPerService: 2 },
+      { serviceId: 's1', itemId: 'i2', qtyPerService: 1 },
+      { serviceId: 's2', itemId: 'i1', qtyPerService: 3 },
+    ];
+    const avgCostByItemId = new Map([
+      ['i1', 1000],
+      ['i2', 500],
+    ]);
+    const result = materialCostByService(bom, avgCostByItemId);
+    expect(result.get('s1')).toBe(2500); // 2×1000 + 1×500
+    expect(result.get('s2')).toBe(3000); // 3×1000
+  });
+
+  it("item uchun cost yozilmagan (avgCostByItemId'da yo'q) — narxi 0 (v1 approksimatsiya)", () => {
+    const bom = [{ serviceId: 's1', itemId: 'i-no-cost', qtyPerService: 5 }];
+    const result = materialCostByService(bom, new Map());
+    expect(result.get('s1')).toBe(0);
+  });
+
+  it("bo'sh BOM — bo'sh Map", () => {
+    expect(materialCostByService([], new Map()).size).toBe(0);
+  });
+});
+
+describe('CLI-450: computeServiceMargin', () => {
+  it('materialCost = materialCostPerOccurrence × count; margin = revenue - materialCost', () => {
+    const row = computeServiceMargin('Plomba', 10, 500000, 20000);
+    expect(row).toEqual({
+      serviceName: 'Plomba',
+      count: 10,
+      revenue: 500000,
+      materialCost: 200000, // 20000 × 10
+      margin: 300000,
+      marginPct: 0.6,
+    });
+  });
+
+  it("revenue=0 → marginPct null (ma'noli foiz yo'q)", () => {
+    const row = computeServiceMargin('X', 0, 0, 0);
+    expect(row.marginPct).toBeNull();
+    expect(row.margin).toBe(0);
+  });
+
+  it('materialCost > revenue — manfiy margin (zarar)', () => {
+    const row = computeServiceMargin('Y', 5, 10000, 5000); // materialCost = 5×5000 = 25000
+    expect(row.margin).toBe(-15000);
+    expect(row.marginPct).toBe(-1.5);
   });
 });

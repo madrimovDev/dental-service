@@ -12,6 +12,7 @@ vi.mock('../reports.api', () => ({
       byService: [{ serviceName: 'Plomba', total: 600000 }],
       byDoctor: [],
       byPeriod: [{ date: '2026-06-01', total: 500000 }],
+      byPaymentMethod: [],
     },
     isLoading: false,
     isError: false,
@@ -23,6 +24,7 @@ vi.mock('../reports.api', () => ({
       byStatus: [{ status: 'completed', count: 30 }],
       noShowRate: 0.1,
       slotUtilization: 0.75,
+      occupancy: [],
     },
     isLoading: false,
     isError: false,
@@ -42,7 +44,19 @@ vi.mock('../reports.api', () => ({
   }),
   useDentalAnalytics: () => ({
     data: {
-      procedureMix: [],
+      // CLI-450: nom atayin `revenue.data.byService`dagi 'Plomba'dan farqli — ikkalasi
+      // ham bir sahifada BarMini ("Top xizmatlar") va yangi Table (procedureMix)
+      // orqali render qilinadi, bir xil nom bo'lsa `getByText` ko'p element topib xato beradi.
+      procedureMix: [
+        {
+          serviceName: 'Kanal davolash',
+          count: 10,
+          revenue: 500000,
+          materialCost: 200000,
+          margin: 300000,
+          marginPct: 0.6,
+        },
+      ],
       retention: { newPatients: 5, returningPatients: 3, retentionRate: 0.6 },
       recallEfficacy: { converted: 2, total: 4, efficacy: 0.5 },
       noShowByWeekday: [],
@@ -75,5 +89,9 @@ describe('ReportsScreen (DS8 re-skin)', () => {
     // titlangan grafik chrome
     expect(screen.getByText('Tushum dinamikasi')).toBeInTheDocument();
     expect(screen.getByText('Top xizmatlar')).toBeInTheDocument();
+    // CLI-450: procedureMix jadvali — material xarajati/margin ustunlari
+    expect(screen.getByText('Kanal davolash')).toBeInTheDocument();
+    expect(screen.getByText('Material xarajati')).toBeInTheDocument();
+    expect(screen.getByText('Margin')).toBeInTheDocument();
   });
 });
