@@ -35,18 +35,24 @@ export type NonPlanTransactionRow = {
 };
 
 /**
- * Non-plan qoldiq — CLI-448: to'liq refund qilingan qator (refundedSum >= paidAmount)
- * savdo bekor qilingan hisoblanadi, hissasi 0 (avval: refund butunlay chiqarib
- * tashlanardi, qarz o'zgarmasdan qolardi). Non-plan uchun qisman refund server
- * darajasida taqiqlangan (`cashier.service.ts` `non_plan_partial` guard) — shuning
- * uchun amalda `refundedSum` har doim 0 yoki aynan `paidAmount`ga teng, lekin
- * formula umumiy holatda ham to'g'ri ishlaydi (himoya sifatida).
+ * Non-plan qoldiq — CLI-448: to'liq refund qilingan qator (paidAmount > 0 VA
+ * refundedSum >= paidAmount) savdo bekor qilingan hisoblanadi, hissasi 0 (avval:
+ * refund butunlay chiqarib tashlanardi, qarz o'zgarmasdan qolardi). Non-plan uchun
+ * qisman refund server darajasida taqiqlangan (`cashier.service.ts`
+ * `non_plan_partial` guard) — shuning uchun amalda `refundedSum` har doim 0 yoki
+ * aynan `paidAmount`ga teng, lekin formula umumiy holatda ham to'g'ri ishlaydi
+ * (himoya sifatida).
+ * MUHIM: `paidAmount > 0` sharti — adversarial verify topilmasi. `paidAmount>0`
+ * bo'lmasa (hali umuman to'lanmagan, refundsiz savdo — qarzga yozish), eski guard
+ * `0 >= 0` bilan yolg'ondan "bekor qilingan" deb hisoblab, TO'LIQ qarzni (totalAmount)
+ * 0'ga tushirib yuborardi. Endi bunday qator to'g'ridan "aks holda" tarmog'iga
+ * tushadi: `totalAmount - (0 - 0) = totalAmount` (to'g'ri qarz).
  * CLI-451: overpay (paidAmount > totalAmount) uchun qo'shimcha guard yo'q — natija
  * tabiiy ravishda manfiy (kredit) bo'ladi.
  */
 export function computeNonPlanRemainder(rows: NonPlanTransactionRow[]): number {
   return rows.reduce((sum, row) => {
-    if (row.refundedSum >= row.paidAmount) return sum;
+    if (row.paidAmount > 0 && row.refundedSum >= row.paidAmount) return sum;
     return sum + (row.totalAmount - (row.paidAmount - row.refundedSum));
   }, 0);
 }

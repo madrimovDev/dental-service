@@ -104,6 +104,16 @@ describe('computeNonPlanRemainder', () => {
     expect(result).toBe(-20000);
   });
 
+  it("hali umuman to'lanmagan (paidAmount=0), refundsiz — to'liq qarz (verify-agent topilmasi, regressiya)", () => {
+    // Bug edi: eski guard `refundedSum >= paidAmount` → `0 >= 0` = true → yolg'ondan
+    // "bekor qilingan" deb hisoblab, qarzni 0'ga tushirib yuborardi. To'g'risi: bu
+    // hali to'lanmagan (qarzga yozilgan) savdo — to'liq totalAmount qarz bo'lishi kerak.
+    const result = computeNonPlanRemainder([
+      { totalAmount: 100000, paidAmount: 0, refundedSum: 0 },
+    ]);
+    expect(result).toBe(100000);
+  });
+
   it("bir necha qator — yig'indi to'g'ri", () => {
     const result = computeNonPlanRemainder([
       { totalAmount: 100000, paidAmount: 60000, refundedSum: 0 }, // 40000 qarz
