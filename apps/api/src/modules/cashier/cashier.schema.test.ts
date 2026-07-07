@@ -36,4 +36,16 @@ describe('createTransactionSchema', () => {
     });
     expect(r.success).toBe(false);
   });
+
+  it("items VA allocations ikkalasi ham to'ldirilgan — RAD etiladi (CLI-453 #3)", () => {
+    const r = createTransactionSchema.safeParse({
+      branchId,
+      treatmentPlanId: '44444444-4444-4444-8444-444444444444',
+      items: [{ serviceId, quantity: 1, unitPrice: 50000, serviceName: 'Konsultatsiya' }],
+      allocations: [{ stageId, amount: 50000 }],
+      paidAmount: 50000,
+      paymentMethod: 'cash',
+    });
+    expect(r.success).toBe(false);
+  });
 });

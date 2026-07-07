@@ -34,6 +34,13 @@ export const createTransactionSchema = z
   .refine((v) => v.items.length > 0 || (v.allocations?.length ?? 0) > 0, {
     message: 'items yoki allocations talab qilinadi',
     path: ['items'],
+  })
+  // CLI-453 #3: ikkalasi BIRGA to'ldirilishi taqiqlanadi — bitta tranzaksiya yo erkin
+  // POS (items) YOKI plan-billing (allocations), aralash-rejim semantik jihatdan
+  // noaniq (netTotal/allocation guard'lari bir-biriga mos kelmaydi).
+  .refine((v) => !(v.items.length > 0 && (v.allocations?.length ?? 0) > 0), {
+    message: 'items va allocations bir vaqtda to‘ldirilishi mumkin emas',
+    path: ['allocations'],
   });
 export type CreateTransactionInput = z.infer<typeof createTransactionSchema>;
 
