@@ -1,11 +1,12 @@
 import {
   cashierTransactions,
+  payrollAdjustments,
   payrollLines,
   payrollRuns,
   staffProfiles,
   treatmentPlans,
 } from '@dental/db-schema';
-import { and, desc, eq, gte, inArray, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNull, lt, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
@@ -126,13 +127,85 @@ export const createPayrollService = (deps: { audit: AuditLogger }) => {
           : [];
         const profiles = [...activeProfiles, ...inactiveEarning];
 
+        // 3.5 (CLI-446 G3, tuzatilgan — adversarial verify topilmasi): shu profillar
+        // uchun qo'llanmagan (`appliedToRunId IS NULL`) payroll_adjustments qatorlarini
+        // `FOR UPDATE` bilan QULFLAYMIZ (xom qatorlar, aggregatsiya emas — Postgres
+        // `FOR UPDATE`ni GROUP BY/SUM bilan ishlatishga ruxsat bermaydi).
+        //
+        // MUHIM (bug tuzatildi): avvalgi versiyada bu summa faqat O'QILAR, stamp esa
+        // faqat `finalizeRun()`da bosilardi. Agar ikkita davr uchun (masalan Fevral
+        // va Mart) ikkalasi ham finalize qilinmasdan oldin ketma-ket `createRun`
+        // chaqirilsa — ikkalasi ham bir xil "hali qo'llanmagan" adjustmentni ko'rib,
+        // ikkalasi ham o'z `payrollLines.commissionAmount`iga singdirib QO'YAR edi
+        // (frozen qiymat finalize'da qayta yozilmaydi) — natijada bitta adjustment
+        // IKKI MARTA "to'langan komissiyadan" ayirilgan bo'lib chiqardi (doktor kam
+        // to'lanardi). Tuzatish: adjustment endi SHU YERDA, createRun ichida, FOR
+        // UPDATE qulfi ostida DARHOL stemplanadi (pastda, 4-bo'limda) — ikkinchi
+        // parallel/ketma-ket `createRun` endi ushbu qatorni "band qilingan" deb ko'radi.
+        const profileUserIds = profiles.map((p) => p.userId).filter((id): id is string => !!id);
+        const unappliedAdjRowsRaw =
+          profileUserIds.length > 0
+            ? await tx
+                .select({
+                  id: payrollAdjustments.id,
+                  doctorId: payrollAdjustments.doctorId,
+                  amount: payrollAdjustments.amount,
+                })
+                .from(payrollAdjustments)
+                .where(
+                  and(
+                    inArray(payrollAdjustments.doctorId, profileUserIds),
+                    isNull(payrollAdjustments.appliedToRunId),
+                  ),
+                )
+                .for('update')
+            : [];
+        const unappliedAdjByDoctor = new Map<string, number>();
+        const unappliedAdjIdsByDoctor = new Map<string, string[]>();
+        for (const row of unappliedAdjRowsRaw) {
+          unappliedAdjByDoctor.set(
+            row.doctorId,
+            (unappliedAdjByDoctor.get(row.doctorId) ?? 0) + Number(row.amount),
+          );
+          const ids = unappliedAdjIdsByDoctor.get(row.doctorId) ?? [];
+          ids.push(row.id);
+          unappliedAdjIdsByDoctor.set(row.doctorId, ids);
+        }
+
         // 4. Har eligible profil uchun snapshot qator (0-daromad profillar ham kiritiladi).
         const lines = [];
         for (const p of profiles) {
           const base = Number(p.baseSalary);
           const percent = Number(p.commissionPercent);
           const attributedRevenue = revByDoctor.get(p.userId) ?? 0;
-          const { commissionAmount, total } = computePayrollLine(base, attributedRevenue, percent);
+          const { commissionAmount: rawCommission } = computePayrollLine(
+            base,
+            attributedRevenue,
+            percent,
+          );
+
+          // CLI-446 G3: adjustment faqat TO'LIQ singdirilsa qo'llanadi (all-or-nothing).
+          const adjustmentSum = unappliedAdjByDoctor.get(p.userId) ?? 0;
+          const absorbable = rawCommission + adjustmentSum >= 0;
+          const commissionAmount = absorbable ? rawCommission + adjustmentSum : rawCommission;
+          const total = Math.max(0, base + commissionAmount);
+
+          // CLI-446 G3 (bug tuzatildi — quyida): agar TO'LIQ singdirilsa, FOR UPDATE
+          // qulflangan qatorlarga DARHOL (createRun ichida, finalizeRun'da EMAS)
+          // `appliedToRunId = run.id` yoziladi — shu bilan ikkinchi (parallel yoki
+          // ketma-ket) createRun endi bu adjustmentni "band qilingan" deb ko'radi va
+          // qayta hisobga olmaydi. Draft o'chirilsa (`deleteRun`), FK
+          // `ON DELETE SET NULL` orqali avtomatik bo'shaydi (keyingi draft uchun
+          // qayta ochiladi).
+          if (absorbable && adjustmentSum !== 0) {
+            const adjIds = unappliedAdjIdsByDoctor.get(p.userId) ?? [];
+            if (adjIds.length > 0) {
+              await tx
+                .update(payrollAdjustments)
+                .set({ appliedToRunId: run.id })
+                .where(inArray(payrollAdjustments.id, adjIds));
+            }
+          }
 
           const [line] = await tx
             .insert(payrollLines)
@@ -225,6 +298,16 @@ export const createPayrollService = (deps: { audit: AuditLogger }) => {
         .where(eq(payrollRuns.id, runId))
         .returning();
 
+      // CLI-446 G3 (bug tuzatildi — verify-agent topilmasi): adjustment claim/stamp
+      // endi `createRun()` ichida, `FOR UPDATE` qulfi ostida, DARHOL bajariladi —
+      // shuning uchun `finalizeRun()` bu yerda payroll_adjustments'ga UMUMAN
+      // tegmaydi (avvalgi versiya shu yerda live-recompute+stamp qilardi, lekin
+      // `payrollLines.commissionAmount` createRun'da FREEZE qilingani uchun ikkita
+      // ketma-ket, hali finalize qilinmagan draft bir xil adjustmentni ikkalasi ham
+      // "singdirib" qo'yishi mumkin edi — real-DB'da reproduce qilingan bug, doktor
+      // kam to'lanardi). Endi createRun'dagi FOR UPDATE + darhol-stamp bu poygani
+      // yopadi (ikkinchi createRun endi qatorni "band" deb ko'radi).
+
       await deps.audit.record(c, {
         action: 'finalized',
         resourceType: 'payroll_run',
@@ -271,7 +354,65 @@ export const createPayrollService = (deps: { audit: AuditLogger }) => {
     });
   }
 
-  return { createRun, listRuns, getRun, finalizeRun, deleteRun };
+  /**
+   * CLI-446 G3: `cashier.service.ts::refund()`dan chaqiriladigan narrow DI hook
+   * (recall/priceLookup pattern — cashier o'zining `PayrollAdjustmentHook` tipini
+   * mustaqil e'lon qiladi, bu yerda faqat strukturaviy mos funksiya bor, to'g'ridan
+   * import YO'Q). Faqat FINALIZED run diapazoniga tushgan refund uchun adjustment
+   * yozadi — draft davr qo'lda o'chirib qayta yaratilishi mumkin (CLI-417
+   * `deleteRun`), refund shu bilan tabiiy hisobga olinadi.
+   */
+  async function recordRefundAdjustment(
+    c: Context,
+    args: {
+      doctorId: string;
+      branchId: string;
+      sourceTransactionId: string;
+      refundAmount: number;
+      transactionCreatedAt: Date;
+    },
+  ): Promise<void> {
+    const db = getDb(c);
+    const tenantId = c.get('activeTenantId');
+    if (!tenantId) throw new Error('No tenant context');
+
+    // Asia/Tashkent (UTC+5, DST yo'q) kalendar kuni — createRun'dagi start/end
+    // hisoblash metodologiyasi bilan izchil (teskari yo'nalish: timestamptz → sana).
+    const tashkentDateStr = new Date(args.transactionCreatedAt.getTime() + 5 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+
+    const [run] = await db
+      .select({ id: payrollRuns.id })
+      .from(payrollRuns)
+      .where(
+        and(
+          eq(payrollRuns.status, 'finalized'),
+          sql`daterange(${payrollRuns.periodFrom}, ${payrollRuns.periodTo}, '[]') @> ${tashkentDateStr}::date`,
+        ),
+      )
+      .limit(1);
+    if (!run) return; // finalized davrga tushmagan — draft qayta yaratilganda tabiiy hisobga olinadi.
+
+    const [line] = await db
+      .select({ commissionPercent: payrollLines.commissionPercent })
+      .from(payrollLines)
+      .where(and(eq(payrollLines.runId, run.id), eq(payrollLines.userId, args.doctorId)));
+    if (!line) return; // doktor shu run'da komissiya olmagan — tuzatish hisoblab bo'lmaydi.
+
+    const percent = Number(line.commissionPercent);
+    const amount = -(Math.round(args.refundAmount * percent) / 100);
+
+    await db.insert(payrollAdjustments).values({
+      tenantId,
+      branchId: args.branchId,
+      doctorId: args.doctorId,
+      sourceTransactionId: args.sourceTransactionId,
+      amount: String(amount),
+    });
+  }
+
+  return { createRun, listRuns, getRun, finalizeRun, deleteRun, recordRefundAdjustment };
 };
 
 export type PayrollService = ReturnType<typeof createPayrollService>;

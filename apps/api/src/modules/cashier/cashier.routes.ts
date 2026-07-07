@@ -28,6 +28,7 @@ import {
   createCashierService,
   DiscountExceedsTotalError,
   NoActivePriceError,
+  type PayrollAdjustmentHook,
   type PriceLookup,
 } from './cashier.service.ts';
 
@@ -45,6 +46,8 @@ export const cashierRoutes = (deps: {
   fiscal?: FiscalProvider;
   /** CLI-443: POS item narxini serverda hisoblash uchun (services.service.ts::getActivePrice). */
   priceLookup: PriceLookup;
+  /** CLI-446 G3: refund finalized payroll davriga tushsa carry-forward tuzatish yozish uchun. */
+  payrollAdjustment?: PayrollAdjustmentHook;
 }) => {
   const app = new OpenAPIHono();
   app.use('*', requireModuleInDesktop('cashier'));
@@ -55,6 +58,7 @@ export const cashierRoutes = (deps: {
     audit: deps.audit,
     fiscal: deps.fiscal,
     priceLookup: deps.priceLookup,
+    payrollAdjustment: deps.payrollAdjustment,
   });
 
   // ─── GET /transactions — list (paginated) ────────────────────────────────

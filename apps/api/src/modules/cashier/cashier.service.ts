@@ -12,7 +12,12 @@ import { and, between, count, desc, eq, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
-import { computePlanBalance, distributeRefundNegations } from './cashier.billing.ts';
+import {
+  computePlanBalance,
+  distributeRefundNegations,
+  fromCents,
+  toCents,
+} from './cashier.billing.ts';
 import type { CreateTransactionInput, ListTransactionsQuery } from './cashier.schema.ts';
 
 const generateReceiptNumber = (): string => {
@@ -75,10 +80,31 @@ const userHasExpenseAccess = (c: Context): boolean => {
   return perms.includes('@owner') || perms.includes('expense.view');
 };
 
+/**
+ * CLI-446 G3: narrow DI hook (recall/priceLookup pattern bilan bir xil) — payroll
+ * modulidan inject qilinadi. Refund finalized payroll davriga tushsa, keyingi run
+ * uchun carry-forward komissiya tuzatish yozadi (`payroll_adjustments`). Bog'liqlik
+ * yo'nalishi: cashier → payroll (factory injection, to'g'ridan import emas).
+ */
+export type PayrollAdjustmentHook = {
+  recordRefundAdjustment: (
+    c: Context,
+    args: {
+      doctorId: string;
+      branchId: string;
+      sourceTransactionId: string;
+      refundAmount: number;
+      transactionCreatedAt: Date;
+    },
+  ) => Promise<void>;
+};
+
 export const createCashierService = (deps: {
   audit: AuditLogger;
   fiscal?: FiscalProvider;
   priceLookup?: PriceLookup;
+  /** CLI-446 G3: refund finalized payroll davriga tushsa carry-forward tuzatish yozish uchun. */
+  payrollAdjustment?: PayrollAdjustmentHook;
 }) => {
   // DI: env'da SOLIQ_* bo'lsa real Soliq provider, aks holda NoOp (V3-1).
   const fiscal: FiscalProvider = deps.fiscal ?? createNoOpFiscalProvider();
@@ -176,23 +202,32 @@ export const createCashierService = (deps: {
           )
         : [];
 
-    const itemsGross = resolvedItems.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
+    // CLI-453 #4: guard taqqoslashlari sentlarda (×100, butun son) — distributeRefundNegations
+    // uslubi (cashier.billing.ts). Xulq o'zgarmaydi (butun so'm summalar uchun natija bir
+    // xil), faqat kelajakdagi kasr-summa float-drift xavfi bartaraf etiladi.
+    const itemsGrossCents = resolvedItems.reduce(
+      (sum, i) => sum + toCents(i.unitPrice) * i.quantity,
+      0,
+    );
+    const discountCents = toCents(input.discount);
 
     // CLI-444: discount itemsGross'dan katta bo'lsa jim clamp o'rniga RAD etiladi
     // (routes 400 `cashier.discount_exceeds_total`). Faqat erkin POS (items bor)
     // rejimida ma'noli — plan-billing (allocations) discount'dan mustaqil.
-    if (resolvedItems.length > 0 && input.discount > itemsGross) {
+    if (resolvedItems.length > 0 && discountCents > itemsGrossCents) {
       throw new DiscountExceedsTotalError();
     }
 
     // Erkin POS: jami − chegirma (endi manfiy bo'lmasligi kafolatlangan — yuqoridagi guard).
     // Plan-billing (items bo'sh): allocation = paidAmount.
-    const netTotal = resolvedItems.length > 0 ? itemsGross - input.discount : input.paidAmount;
+    const netTotalCents =
+      resolvedItems.length > 0 ? itemsGrossCents - discountCents : toCents(input.paidAmount);
+    const netTotal = fromCents(netTotalCents);
 
     // Allocation yig'indisi paidAmount'dan oshmasligi shart (qisman ruxsat, oshib ketish RAD).
     if (input.allocations && input.allocations.length > 0) {
-      const allocSum = input.allocations.reduce((s, a) => s + a.amount, 0);
-      if (allocSum > input.paidAmount) {
+      const allocSumCents = input.allocations.reduce((s, a) => s + toCents(a.amount), 0);
+      if (allocSumCents > toCents(input.paidAmount)) {
         throw new AllocationExceedError();
       }
     }
@@ -280,10 +315,12 @@ export const createCashierService = (deps: {
         );
       }
 
-      // Fiscal (NoOp — M3 da)
+      // Fiscal (NoOp — M3 da). CLI-449: paidAmount (haqiqatda olingan naqd) —
+      // totalAmount (nominal/hisob-faktura) EMAS, qisman to'langan savdoda fiskal
+      // chek haqiqiy qabul qilingan summaga mos bo'lishi uchun.
       const fiscalResult = await fiscal.createReceipt({
         id: transaction.id,
-        amount: Number(transaction.totalAmount),
+        amount: Number(transaction.paidAmount),
         items: items,
       });
 
@@ -329,7 +366,7 @@ export const createCashierService = (deps: {
   > {
     const db = getDb(c);
 
-    return await db.transaction(async (tx) => {
+    const txResult = await db.transaction(async (tx) => {
       // Row-lock: ikki parallel refund poygasini oldini olish (TOCTOU). Guard tx ichida.
       const [original] = await tx
         .select()
@@ -435,8 +472,49 @@ export const createCashierService = (deps: {
         after: refundTx,
       });
 
-      return { ok: true as const, refund: refundTx };
+      // CLI-446 G3: payroll carry-forward hook uchun kerakli maydonlarni tx
+      // ichidan tashqariga olib chiqamiz (tx yopilgandan keyin hook chaqiriladi).
+      // Faqat plan-linked tranzaksiyada doktor bor (treatmentPlans.doctorId) —
+      // non-plan savdo payroll attributsiyasiga umuman bog'lanmagan (createRun
+      // ham faqat treatmentPlanId orqali join qiladi), shuning uchun bu yerda
+      // ANIQLASH kifoya, hookni CHAQIRISH emas.
+      let payrollDoctorId: string | null = null;
+      if (original.treatmentPlanId) {
+        const [plan] = await tx
+          .select({ doctorId: treatmentPlans.doctorId })
+          .from(treatmentPlans)
+          .where(eq(treatmentPlans.id, original.treatmentPlanId));
+        payrollDoctorId = plan?.doctorId ?? null;
+      }
+
+      return {
+        ok: true as const,
+        refund: refundTx,
+        payrollDoctorId,
+        payrollBranchId: original.branchId,
+        payrollRefundAmount: refundAmount,
+        payrollTransactionCreatedAt: original.createdAt,
+      };
     });
+
+    // CLI-446 G3: tx (savepoint) commit qilingandan KEYIN, lekin hali umumiy
+    // request-tranzaksiya (rlsMiddleware) ichida chaqiriladi — `deps.recall.
+    // autoCreateFromStage(c, ...)` bilan bir xil naqsh (treatment-plans.service.ts).
+    // Agar hook otsa — butun request-tranzaksiya rollback bo'ladi (refund + adjustment
+    // baribir bir-biriga bog'liq atomik holda qoladi: yozib bo'lmagan adjustment
+    // refundni ham bekor qiladi).
+    if (txResult.ok && txResult.payrollDoctorId && deps.payrollAdjustment) {
+      await deps.payrollAdjustment.recordRefundAdjustment(c, {
+        doctorId: txResult.payrollDoctorId,
+        branchId: txResult.payrollBranchId,
+        sourceTransactionId: txResult.refund.id,
+        refundAmount: txResult.payrollRefundAmount,
+        transactionCreatedAt: txResult.payrollTransactionCreatedAt,
+      });
+    }
+
+    if (!txResult.ok) return txResult;
+    return { ok: true as const, refund: txResult.refund };
   }
 
   /** Daily summary for cashier close */

@@ -1,5 +1,33 @@
 import { describe, expect, it } from 'bun:test';
-import { computePlanBalance, distributeRefundNegations } from './cashier.billing.ts';
+import {
+  computePlanBalance,
+  distributeRefundNegations,
+  fromCents,
+  toCents,
+} from './cashier.billing.ts';
+
+describe('toCents / fromCents (CLI-453 #4 — sent-asosidagi arifmetika, distributeRefundNegations uslubi)', () => {
+  it("butun so'm — round-trip aynan", () => {
+    expect(toCents(100000)).toBe(10000000);
+    expect(fromCents(10000000)).toBe(100000);
+  });
+
+  it('kasr summa (0.1) — sentga aylantirilganda butun son', () => {
+    expect(toCents(0.1)).toBe(10);
+    expect(fromCents(10)).toBe(0.1);
+  });
+
+  it("uch marta 33333.33 — sentlarda yig'indi aniq (9999999), float drift yo'q", () => {
+    const cents = toCents(33333.33) * 3;
+    expect(cents).toBe(9999999);
+    expect(fromCents(cents)).toBe(99999.99);
+  });
+
+  it('0 — round-trip 0', () => {
+    expect(toCents(0)).toBe(0);
+    expect(fromCents(0)).toBe(0);
+  });
+});
 
 describe('distributeRefundNegations (CLI-418)', () => {
   const sum = (rows: { amount: string }[]) => rows.reduce((s, r) => s + Number(r.amount), 0);
