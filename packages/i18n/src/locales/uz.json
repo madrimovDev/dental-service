@@ -1086,6 +1086,7 @@
     "daily_summary": "Kunlik xulosa",
     "cash_today": "Bugungi kassa",
     "total_revenue": "Jami tushum",
+    "cash_out": "Naqd chiqim (refund)",
     "noop_fiscal": "Fiskal hujjat keyinroq Soliqqa yuboriladi",
     "receipt_modal": {
       "print": "Chop etish",
