@@ -14,7 +14,8 @@ import { and, count, desc, eq, ilike, inArray, isNotNull, isNull, ne, or, sql } 
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
-import { computePatientBalance } from './patients.balance.ts';
+import type { NonPlanTransactionRow } from './patients.balance.ts';
+import { computeNonPlanRemainder, computePatientBalance } from './patients.balance.ts';
 import type {
   AddEmergencyContactInput,
   AddRelativeInput,
@@ -98,7 +99,7 @@ export const createPatientsService = (deps: { audit: AuditLogger }) => {
     const balanceById = new Map<string, number>();
 
     if (ids.length > 0) {
-      const [costRows, allocRows, nonPlanRows] = await Promise.all([
+      const [costRows, allocRows, nonPlanOriginals] = await Promise.all([
         db
           .select({
             patientId: treatmentPlans.patientId,
@@ -134,8 +135,10 @@ export const createPatientsService = (deps: { audit: AuditLogger }) => {
           .groupBy(treatmentPlans.patientId),
         db
           .select({
+            id: cashierTransactions.id,
             patientId: cashierTransactions.patientId,
-            sum: sql<string>`COALESCE(SUM(${cashierTransactions.totalAmount} - ${cashierTransactions.paidAmount}), 0)`,
+            totalAmount: cashierTransactions.totalAmount,
+            paidAmount: cashierTransactions.paidAmount,
           })
           .from(cashierTransactions)
           .where(
@@ -145,21 +148,52 @@ export const createPatientsService = (deps: { audit: AuditLogger }) => {
               eq(cashierTransactions.status, 'completed'),
               isNull(cashierTransactions.treatmentPlanId),
             ),
-          )
-          .groupBy(cashierTransactions.patientId),
+          ),
       ]);
 
       const costById = new Map(costRows.map((r) => [r.patientId, Number(r.sum)]));
       const allocById = new Map(allocRows.map((r) => [r.patientId, Number(r.sum)]));
-      const nonPlanByIdRaw = new Map(
-        nonPlanRows.map((r) => [r.patientId as string, Number(r.sum)]),
+
+      // CLI-448: har original non-plan to'lovning refund'ini parentTransactionId
+      // orqali topamiz (bitta qo'shimcha guruhlangan so'rov — N+1 emas).
+      const originalIds = nonPlanOriginals.map((r) => r.id);
+      const refundSumRows =
+        originalIds.length > 0
+          ? await db
+              .select({
+                parentTransactionId: cashierTransactions.parentTransactionId,
+                sum: sql<string>`COALESCE(SUM(${cashierTransactions.paidAmount}), 0)`,
+              })
+              .from(cashierTransactions)
+              .where(
+                and(
+                  eq(cashierTransactions.type, 'refund'),
+                  inArray(cashierTransactions.parentTransactionId, originalIds),
+                ),
+              )
+              .groupBy(cashierTransactions.parentTransactionId)
+          : [];
+      const refundedByParentId = new Map(
+        refundSumRows.map((r) => [r.parentTransactionId as string, Number(r.sum)]),
       );
+
+      const nonPlanRowsByPatientId = new Map<string, NonPlanTransactionRow[]>();
+      for (const row of nonPlanOriginals) {
+        const pid = row.patientId as string;
+        const list = nonPlanRowsByPatientId.get(pid) ?? [];
+        list.push({
+          totalAmount: Number(row.totalAmount),
+          paidAmount: Number(row.paidAmount),
+          refundedSum: refundedByParentId.get(row.id) ?? 0,
+        });
+        nonPlanRowsByPatientId.set(pid, list);
+      }
 
       for (const id of ids) {
         const { balance } = computePatientBalance({
           stageCostSum: costById.get(id) ?? 0,
           allocationSum: allocById.get(id) ?? 0,
-          nonPlanRemainder: nonPlanByIdRaw.get(id) ?? 0,
+          nonPlanRemainder: computeNonPlanRemainder(nonPlanRowsByPatientId.get(id) ?? []),
         });
         balanceById.set(id, balance);
       }
@@ -201,9 +235,11 @@ export const createPatientsService = (deps: { audit: AuditLogger }) => {
       // cancelled/draft planga to'langan pul kredit sifatida saqlanadi.
       .where(eq(treatmentPlans.patientId, patientId));
 
-    const [nonPlanRow] = await db
+    const nonPlanOriginals = await db
       .select({
-        sum: sql<string>`COALESCE(SUM(${cashierTransactions.totalAmount} - ${cashierTransactions.paidAmount}), 0)`,
+        id: cashierTransactions.id,
+        totalAmount: cashierTransactions.totalAmount,
+        paidAmount: cashierTransactions.paidAmount,
       })
       .from(cashierTransactions)
       .where(
@@ -215,10 +251,37 @@ export const createPatientsService = (deps: { audit: AuditLogger }) => {
         ),
       );
 
+    const originalIds = nonPlanOriginals.map((r) => r.id);
+    const refundSumRows =
+      originalIds.length > 0
+        ? await db
+            .select({
+              parentTransactionId: cashierTransactions.parentTransactionId,
+              sum: sql<string>`COALESCE(SUM(${cashierTransactions.paidAmount}), 0)`,
+            })
+            .from(cashierTransactions)
+            .where(
+              and(
+                eq(cashierTransactions.type, 'refund'),
+                inArray(cashierTransactions.parentTransactionId, originalIds),
+              ),
+            )
+            .groupBy(cashierTransactions.parentTransactionId)
+        : [];
+    const refundedByParentId = new Map(
+      refundSumRows.map((r) => [r.parentTransactionId as string, Number(r.sum)]),
+    );
+
+    const nonPlanRows: NonPlanTransactionRow[] = nonPlanOriginals.map((row) => ({
+      totalAmount: Number(row.totalAmount),
+      paidAmount: Number(row.paidAmount),
+      refundedSum: refundedByParentId.get(row.id) ?? 0,
+    }));
+
     return computePatientBalance({
       stageCostSum: Number(costRow?.sum ?? 0),
       allocationSum: Number(allocRow?.sum ?? 0),
-      nonPlanRemainder: Number(nonPlanRow?.sum ?? 0),
+      nonPlanRemainder: computeNonPlanRemainder(nonPlanRows),
     });
   }
 
