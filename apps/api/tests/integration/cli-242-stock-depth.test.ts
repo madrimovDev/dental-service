@@ -252,4 +252,44 @@ describe('Ombor chuqurligi — recipient + guard + alert + batch', () => {
     const list = await withTx((tx) => stock.listBatches(ctx(tx), itemId));
     expect(list).toHaveLength(1);
   });
+
+  test('CLI-453 #5: minThreshold PATCH orqali oshirilsa va joriy quantity yangi chegaradan past bo‘lsa — alert trigger', async () => {
+    const freshItem = await withTx((tx) =>
+      tx
+        .insert(stockItems)
+        .values({
+          tenantId: t1,
+          branchId,
+          name: 'Gipsli material',
+          unit: 'kg',
+          quantity: '8',
+          minThreshold: '5',
+        })
+        .returning({ id: stockItems.id })
+        .then((r) => r[0]),
+    );
+    if (!freshItem) throw new Error('fresh item insert failed');
+
+    const before = await withTx(lowStockCount);
+
+    // minThreshold 5 → 10: 8 < 10 → YANGI transition (avval 8>=5 — past emas edi, endi 8<10 — past).
+    await withTx((tx) => stock.updateItem(ctx(tx), freshItem.id, { minThreshold: 10 }));
+
+    expect(await withTx(lowStockCount)).toBe(before + 2); // U1 + owner
+  });
+
+  test('CLI-453 #5: minThreshold qayta PATCH (10→10, o‘zgarishsiz) — YANGI alert YO‘Q', async () => {
+    const item = await withTx((tx) =>
+      tx
+        .select({ id: stockItems.id })
+        .from(stockItems)
+        .where(eq(stockItems.name, 'Gipsli material'))
+        .then((r) => r[0]),
+    );
+    if (!item) throw new Error('item not found');
+
+    const before = await withTx(lowStockCount);
+    await withTx((tx) => stock.updateItem(ctx(tx), item.id, { minThreshold: 10 }));
+    expect(await withTx(lowStockCount)).toBe(before); // allaqachon 8<10 edi — YANGI transition emas
+  });
 });
