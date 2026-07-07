@@ -169,24 +169,30 @@ describe("CLI-448: to'liq refund qilingan non-plan savdo — qarz 0 (bekor qilin
     });
   });
 
-  test("list() ham bir xil formulani qo'llaydi (bulk-aggregate)", async () => {
+  test("list() ham bir xil formulani qo'llaydi (bulk-aggregate) — qisman to'lov + to'liq refund", async () => {
     await db.transaction(async (tx) => {
       await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
       const c = ctx(tx, ownerId);
 
+      // Diqqat: test 1'dagi kabi DISKRIMINATIV stsenariy (qisman to'lov, keyin
+      // to'langan qismning TO'LIQ refundi) — eski formula bunda 40000 qaytarardi
+      // (refund qatori type='refund' bo'lgani uchun butunlay chiqarib tashlanardi).
+      // To'liq-to'liq (100000/100000) stsenariy eski formulada ham 0 chiqaradi
+      // (refund qatorining borligi/yo'qligidan qat'i nazar), shuning uchun
+      // list()'ning CLI-448 fix'ini isbotlamas edi.
       const sale = await cashierWithPrice.create(c, {
         branchId,
         patientId,
         items: [{ serviceId, quantity: 1, unitPrice: 100000, serviceName: 'X' }],
         discount: 0,
-        paidAmount: 100000,
+        paidAmount: 60000,
         paymentMethod: 'cash',
       } as never);
-      await cashierWithPrice.refund(c, sale.id, 100000);
+      await cashierWithPrice.refund(c, sale.id, 60000);
 
       const result = await patientsSvc.list(c, { page: 1, pageSize: 20, archived: false } as never);
       const row = result.data.find((p) => p.id === patientId);
-      expect(row?.balance).toBe(0); // to'liq refund — bekor qilingan
+      expect(row?.balance).toBe(0); // to'liq refund — bekor qilingan (avval 40000 bo'lib qolardi)
     });
   });
 });
