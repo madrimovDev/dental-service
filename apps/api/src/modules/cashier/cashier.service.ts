@@ -269,10 +269,12 @@ export const createCashierService = (deps: {
         );
       }
 
-      // Fiscal (NoOp — M3 da)
+      // Fiscal (NoOp — M3 da). CLI-449: paidAmount (haqiqatda olingan naqd) —
+      // totalAmount (nominal/hisob-faktura) EMAS, qisman to'langan savdoda fiskal
+      // chek haqiqiy qabul qilingan summaga mos bo'lishi uchun.
       const fiscalResult = await fiscal.createReceipt({
         id: transaction.id,
-        amount: Number(transaction.totalAmount),
+        amount: Number(transaction.paidAmount),
         items: items,
       });
 
