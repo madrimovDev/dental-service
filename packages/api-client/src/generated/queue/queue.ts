@@ -11,6 +11,8 @@ import type {
   GetCheckInCandidatesParams,
   GetQueueToday200,
   GetQueueTodayParams,
+  SweepQueueNoShows200,
+  SweepQueueNoShowsBody,
   UpdateQueueTicketStatus200,
   UpdateQueueTicketStatusBody
 } from '.././model';
@@ -58,7 +60,18 @@ import { customInstance } from '../../mutator';
     },
       );
     }
+  export const sweepQueueNoShows = (
+    sweepQueueNoShowsBody?: SweepQueueNoShowsBody,
+ ) => {
+      return customInstance<SweepQueueNoShows200>(
+      {url: `/api/queue/sweep-no-shows`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: sweepQueueNoShowsBody
+    },
+      );
+    }
   export type GetQueueTodayResult = NonNullable<Awaited<ReturnType<typeof getQueueToday>>>
 export type CreateQueueTicketResult = NonNullable<Awaited<ReturnType<typeof createQueueTicket>>>
 export type GetCheckInCandidatesResult = NonNullable<Awaited<ReturnType<typeof getCheckInCandidates>>>
 export type UpdateQueueTicketStatusResult = NonNullable<Awaited<ReturnType<typeof updateQueueTicketStatus>>>
+export type SweepQueueNoShowsResult = NonNullable<Awaited<ReturnType<typeof sweepQueueNoShows>>>

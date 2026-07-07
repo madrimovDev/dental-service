@@ -11,4 +11,15 @@ doctorId?: string;
 patientId?: string;
 from?: string;
 to?: string;
+/**
+ * @minimum 0
+ * @exclusiveMinimum
+ */
+page?: number;
+/**
+ * @minimum 0
+ * @maximum 100
+ * @exclusiveMinimum
+ */
+pageSize?: number;
 };
