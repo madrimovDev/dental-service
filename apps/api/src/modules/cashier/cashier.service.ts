@@ -64,10 +64,31 @@ export type PriceLookup = {
   ) => Promise<{ price: string } | null>;
 };
 
+/**
+ * CLI-446 G3: narrow DI hook (recall/priceLookup pattern bilan bir xil) — payroll
+ * modulidan inject qilinadi. Refund finalized payroll davriga tushsa, keyingi run
+ * uchun carry-forward komissiya tuzatish yozadi (`payroll_adjustments`). Bog'liqlik
+ * yo'nalishi: cashier → payroll (factory injection, to'g'ridan import emas).
+ */
+export type PayrollAdjustmentHook = {
+  recordRefundAdjustment: (
+    c: Context,
+    args: {
+      doctorId: string;
+      branchId: string;
+      sourceTransactionId: string;
+      refundAmount: number;
+      transactionCreatedAt: Date;
+    },
+  ) => Promise<void>;
+};
+
 export const createCashierService = (deps: {
   audit: AuditLogger;
   fiscal?: FiscalProvider;
   priceLookup?: PriceLookup;
+  /** CLI-446 G3: refund finalized payroll davriga tushsa carry-forward tuzatish yozish uchun. */
+  payrollAdjustment?: PayrollAdjustmentHook;
 }) => {
   // DI: env'da SOLIQ_* bo'lsa real Soliq provider, aks holda NoOp (V3-1).
   const fiscal: FiscalProvider = deps.fiscal ?? createNoOpFiscalProvider();
@@ -320,7 +341,7 @@ export const createCashierService = (deps: {
   > {
     const db = getDb(c);
 
-    return await db.transaction(async (tx) => {
+    const txResult = await db.transaction(async (tx) => {
       // Row-lock: ikki parallel refund poygasini oldini olish (TOCTOU). Guard tx ichida.
       const [original] = await tx
         .select()
@@ -426,8 +447,49 @@ export const createCashierService = (deps: {
         after: refundTx,
       });
 
-      return { ok: true as const, refund: refundTx };
+      // CLI-446 G3: payroll carry-forward hook uchun kerakli maydonlarni tx
+      // ichidan tashqariga olib chiqamiz (tx yopilgandan keyin hook chaqiriladi).
+      // Faqat plan-linked tranzaksiyada doktor bor (treatmentPlans.doctorId) —
+      // non-plan savdo payroll attributsiyasiga umuman bog'lanmagan (createRun
+      // ham faqat treatmentPlanId orqali join qiladi), shuning uchun bu yerda
+      // ANIQLASH kifoya, hookni CHAQIRISH emas.
+      let payrollDoctorId: string | null = null;
+      if (original.treatmentPlanId) {
+        const [plan] = await tx
+          .select({ doctorId: treatmentPlans.doctorId })
+          .from(treatmentPlans)
+          .where(eq(treatmentPlans.id, original.treatmentPlanId));
+        payrollDoctorId = plan?.doctorId ?? null;
+      }
+
+      return {
+        ok: true as const,
+        refund: refundTx,
+        payrollDoctorId,
+        payrollBranchId: original.branchId,
+        payrollRefundAmount: refundAmount,
+        payrollTransactionCreatedAt: original.createdAt,
+      };
     });
+
+    // CLI-446 G3: tx (savepoint) commit qilingandan KEYIN, lekin hali umumiy
+    // request-tranzaksiya (rlsMiddleware) ichida chaqiriladi — `deps.recall.
+    // autoCreateFromStage(c, ...)` bilan bir xil naqsh (treatment-plans.service.ts).
+    // Agar hook otsa — butun request-tranzaksiya rollback bo'ladi (refund + adjustment
+    // baribir bir-biriga bog'liq atomik holda qoladi: yozib bo'lmagan adjustment
+    // refundni ham bekor qiladi).
+    if (txResult.ok && txResult.payrollDoctorId && deps.payrollAdjustment) {
+      await deps.payrollAdjustment.recordRefundAdjustment(c, {
+        doctorId: txResult.payrollDoctorId,
+        branchId: txResult.payrollBranchId,
+        sourceTransactionId: txResult.refund.id,
+        refundAmount: txResult.payrollRefundAmount,
+        transactionCreatedAt: txResult.payrollTransactionCreatedAt,
+      });
+    }
+
+    if (!txResult.ok) return txResult;
+    return { ok: true as const, refund: txResult.refund };
   }
 
   /** Daily summary for cashier close */

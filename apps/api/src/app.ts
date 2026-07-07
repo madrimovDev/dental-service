@@ -26,7 +26,7 @@ import { labOrdersRoutes } from './modules/lab-orders/index.ts';
 import { createNotificationsService, notificationsRoutes } from './modules/notifications/index.ts';
 import { patientImagesRoutes } from './modules/patient-images/index.ts';
 import { patientRoutes } from './modules/patients/index.ts';
-import { payrollRoutes } from './modules/payroll/index.ts';
+import { createPayrollService, payrollRoutes } from './modules/payroll/index.ts';
 import { permissionRoutes } from './modules/permissions/index.ts';
 import { prescriptionsRoutes } from './modules/prescriptions/index.ts';
 import { queueRoutes } from './modules/queue/index.ts';
@@ -67,6 +67,13 @@ export const createApp = () => {
     audit,
     categories: createServiceCategoriesService({ audit }),
   });
+  // CLI-446 G3: payroll carry-forward hook — cashier.refund() finalized payroll
+  // davriga tushgan refund uchun `payroll_adjustments` yozishi kerak. Bir marta
+  // (early) quriladi va cashierRoutes'ga narrow `payrollAdjustment` hook sifatida
+  // uzatiladi. `payrollRoutes` (pastda) o'zining ALOHIDA instance'ini quradi —
+  // ikkalasi ham stateless factory, bir xil DB'ga o'qiydi, churn kamaytirish uchun
+  // bitta umumiy instance shart emas (priceLookup bilan bir xil qaror, :62-69).
+  const payrollAdjustmentHook = createPayrollService({ audit });
 
   // Global middleware
   app.use('*', requestId());
@@ -141,7 +148,10 @@ export const createApp = () => {
   app.route('/api/patients', patientRoutes({ db, audit }));
   app.route('/api/services', serviceRoutes({ db, audit }));
   app.route('/api/service-categories', serviceCategoryRoutes({ db, audit }));
-  app.route('/api/cashier', cashierRoutes({ db, audit, fiscal, priceLookup }));
+  app.route(
+    '/api/cashier',
+    cashierRoutes({ db, audit, fiscal, priceLookup, payrollAdjustment: payrollAdjustmentHook }),
+  );
   app.route('/api/reports', reportsRoutes({ db, audit }));
   app.route('/api/audit', auditRoutes({ db }));
   // Epic A: doktor jadvali + time-off + availability. Service'ni bir marta

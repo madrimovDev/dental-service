@@ -1,11 +1,12 @@
 import {
   cashierTransactions,
+  payrollAdjustments,
   payrollLines,
   payrollRuns,
   staffProfiles,
   treatmentPlans,
 } from '@dental/db-schema';
-import { and, desc, eq, gte, inArray, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNull, lt, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
@@ -126,13 +127,52 @@ export const createPayrollService = (deps: { audit: AuditLogger }) => {
           : [];
         const profiles = [...activeProfiles, ...inactiveEarning];
 
+        // 3.5 (CLI-446 G3): shu profillar uchun qo'llanmagan (`appliedToRunId IS NULL`)
+        // payroll_adjustments yig'indisi — komissiyaga qo'shiladi. ALL-OR-NOTHING per
+        // doktor: agar rawCommission+adjustmentSum manfiy chiqsa, BU RUN'DA HECH NARSA
+        // qo'llanmaydi — adjustment BUTUNLAY keyingi runga ko'chadi (qisman-clip YO'Q).
+        // Sabab: `appliedToRunId` binary flag, qisman-summa maydoni yo'q — floor bilan
+        // clip qilib qoldiqni "hali ham qo'llanmagan" deb qoldirsak ham, keyingi run
+        // xuddi shu adjustmentni yana TO'LIQ hisobga olib ikki marta chegirgan bo'lardi
+        // (over-clawback). All-or-nothing shu xatoning oldini oladi.
+        const profileUserIds = profiles.map((p) => p.userId).filter((id): id is string => !!id);
+        const unappliedAdjRows =
+          profileUserIds.length > 0
+            ? await tx
+                .select({
+                  doctorId: payrollAdjustments.doctorId,
+                  sum: sql<string>`COALESCE(SUM(${payrollAdjustments.amount}), 0)`,
+                })
+                .from(payrollAdjustments)
+                .where(
+                  and(
+                    inArray(payrollAdjustments.doctorId, profileUserIds),
+                    isNull(payrollAdjustments.appliedToRunId),
+                  ),
+                )
+                .groupBy(payrollAdjustments.doctorId)
+            : [];
+        const unappliedAdjByDoctor = new Map(
+          unappliedAdjRows.map((r) => [r.doctorId, Number(r.sum)]),
+        );
+
         // 4. Har eligible profil uchun snapshot qator (0-daromad profillar ham kiritiladi).
         const lines = [];
         for (const p of profiles) {
           const base = Number(p.baseSalary);
           const percent = Number(p.commissionPercent);
           const attributedRevenue = revByDoctor.get(p.userId) ?? 0;
-          const { commissionAmount, total } = computePayrollLine(base, attributedRevenue, percent);
+          const { commissionAmount: rawCommission } = computePayrollLine(
+            base,
+            attributedRevenue,
+            percent,
+          );
+
+          // CLI-446 G3: adjustment faqat TO'LIQ singdirilsa qo'llanadi (all-or-nothing).
+          const adjustmentSum = unappliedAdjByDoctor.get(p.userId) ?? 0;
+          const absorbable = rawCommission + adjustmentSum >= 0;
+          const commissionAmount = absorbable ? rawCommission + adjustmentSum : rawCommission;
+          const total = Math.max(0, base + commissionAmount);
 
           const [line] = await tx
             .insert(payrollLines)
@@ -225,6 +265,75 @@ export const createPayrollService = (deps: { audit: AuditLogger }) => {
         .where(eq(payrollRuns.id, runId))
         .returning();
 
+      // CLI-446 G3: shu run'dagi har doktor uchun — qo'llanmagan payroll_adjustments
+      // TO'LIQ singdirilishi mumkin bo'lsa (createRun'dagi bir xil all-or-nothing shart,
+      // LIVE qayta hisoblangan: `payrollLines`da saqlangan `attributedRevenue`/
+      // `commissionPercent`dan `computePayrollLine` bilan xom komissiya qayta olinadi +
+      // joriy qo'llanmagan adjustment yig'indisi qayta so'raladi) — `appliedToRunId`ga
+      // shu run yoziladi.
+      // ⚠️ Tor race oynasi (hujjatlashtirilgan, hal qilinmaydi): agar aynan
+      // createRun→finalizeRun oralig'ida shu doktor uchun YANGI adjustment kelsa,
+      // LIVE qayta hisob createRun paytidagi FROZEN qiymatdan farq qilishi mumkin
+      // (amaliyotda juda tor oyna — bitta admin ketma-ket ishlaydi). Muqobil dizayn:
+      // createRun paytida darhol stamp + `appliedToRunId` FK `ON DELETE SET NULL`
+      // (draft o'chirilsa avtomatik bo'shaydi) — bu yerda QO'LLANMAYDI (spec'ning
+      // "finalizeRun stempaydi" talabiga sodiq qolamiz).
+      const lines = await tx
+        .select({
+          userId: payrollLines.userId,
+          baseSalary: payrollLines.baseSalary,
+          attributedRevenue: payrollLines.attributedRevenue,
+          commissionPercent: payrollLines.commissionPercent,
+        })
+        .from(payrollLines)
+        .where(eq(payrollLines.runId, runId));
+
+      const doctorIds = lines.map((l) => l.userId).filter((id): id is string => !!id);
+      if (doctorIds.length > 0) {
+        const unappliedAdjRows = await tx
+          .select({
+            doctorId: payrollAdjustments.doctorId,
+            sum: sql<string>`COALESCE(SUM(${payrollAdjustments.amount}), 0)`,
+          })
+          .from(payrollAdjustments)
+          .where(
+            and(
+              inArray(payrollAdjustments.doctorId, doctorIds),
+              isNull(payrollAdjustments.appliedToRunId),
+            ),
+          )
+          .groupBy(payrollAdjustments.doctorId);
+        const unappliedAdjByDoctor = new Map(
+          unappliedAdjRows.map((r) => [r.doctorId, Number(r.sum)]),
+        );
+
+        const absorbableDoctorIds = lines
+          .filter((l) => {
+            if (!l.userId) return false;
+            const adjustmentSum = unappliedAdjByDoctor.get(l.userId) ?? 0;
+            if (adjustmentSum === 0) return false; // qo'llanmagan adjustment yo'q
+            const { commissionAmount: rawCommission } = computePayrollLine(
+              Number(l.baseSalary),
+              Number(l.attributedRevenue),
+              Number(l.commissionPercent),
+            );
+            return rawCommission + adjustmentSum >= 0;
+          })
+          .map((l) => l.userId as string);
+
+        if (absorbableDoctorIds.length > 0) {
+          await tx
+            .update(payrollAdjustments)
+            .set({ appliedToRunId: runId })
+            .where(
+              and(
+                inArray(payrollAdjustments.doctorId, absorbableDoctorIds),
+                isNull(payrollAdjustments.appliedToRunId),
+              ),
+            );
+        }
+      }
+
       await deps.audit.record(c, {
         action: 'finalized',
         resourceType: 'payroll_run',
@@ -271,7 +380,65 @@ export const createPayrollService = (deps: { audit: AuditLogger }) => {
     });
   }
 
-  return { createRun, listRuns, getRun, finalizeRun, deleteRun };
+  /**
+   * CLI-446 G3: `cashier.service.ts::refund()`dan chaqiriladigan narrow DI hook
+   * (recall/priceLookup pattern — cashier o'zining `PayrollAdjustmentHook` tipini
+   * mustaqil e'lon qiladi, bu yerda faqat strukturaviy mos funksiya bor, to'g'ridan
+   * import YO'Q). Faqat FINALIZED run diapazoniga tushgan refund uchun adjustment
+   * yozadi — draft davr qo'lda o'chirib qayta yaratilishi mumkin (CLI-417
+   * `deleteRun`), refund shu bilan tabiiy hisobga olinadi.
+   */
+  async function recordRefundAdjustment(
+    c: Context,
+    args: {
+      doctorId: string;
+      branchId: string;
+      sourceTransactionId: string;
+      refundAmount: number;
+      transactionCreatedAt: Date;
+    },
+  ): Promise<void> {
+    const db = getDb(c);
+    const tenantId = c.get('activeTenantId');
+    if (!tenantId) throw new Error('No tenant context');
+
+    // Asia/Tashkent (UTC+5, DST yo'q) kalendar kuni — createRun'dagi start/end
+    // hisoblash metodologiyasi bilan izchil (teskari yo'nalish: timestamptz → sana).
+    const tashkentDateStr = new Date(args.transactionCreatedAt.getTime() + 5 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+
+    const [run] = await db
+      .select({ id: payrollRuns.id })
+      .from(payrollRuns)
+      .where(
+        and(
+          eq(payrollRuns.status, 'finalized'),
+          sql`daterange(${payrollRuns.periodFrom}, ${payrollRuns.periodTo}, '[]') @> ${tashkentDateStr}::date`,
+        ),
+      )
+      .limit(1);
+    if (!run) return; // finalized davrga tushmagan — draft qayta yaratilganda tabiiy hisobga olinadi.
+
+    const [line] = await db
+      .select({ commissionPercent: payrollLines.commissionPercent })
+      .from(payrollLines)
+      .where(and(eq(payrollLines.runId, run.id), eq(payrollLines.userId, args.doctorId)));
+    if (!line) return; // doktor shu run'da komissiya olmagan — tuzatish hisoblab bo'lmaydi.
+
+    const percent = Number(line.commissionPercent);
+    const amount = -(Math.round(args.refundAmount * percent) / 100);
+
+    await db.insert(payrollAdjustments).values({
+      tenantId,
+      branchId: args.branchId,
+      doctorId: args.doctorId,
+      sourceTransactionId: args.sourceTransactionId,
+      amount: String(amount),
+    });
+  }
+
+  return { createRun, listRuns, getRun, finalizeRun, deleteRun, recordRefundAdjustment };
 };
 
 export type PayrollService = ReturnType<typeof createPayrollService>;
