@@ -5,6 +5,21 @@
  */
 
 /**
+ * CLI-453 #4: pul summasini sentlarga (butun songa) aylantiradi — `distributeRefundNegations`
+ * bilan bir xil naqsh (Math.round(...×100)). Guard taqqoslashlar (itemsGross, netTotal,
+ * allocSum) shu orqali float-drift'siz bajariladi (masalan 33333.33×3 kabi qayta-qayta
+ * ko'paytirish/qo'shish natijasida JS float epsilon xatosi yig'ilishi mumkin edi).
+ */
+export function toCents(amount: number): number {
+  return Math.round(amount * 100);
+}
+
+/** Sentlardan pul summasiga qaytarish — `toCents` ning teskarisi. */
+export function fromCents(cents: number): number {
+  return cents / 100;
+}
+
+/**
  * CLI-418: refund uchun proporsional per-stage negatsiya, 2dp yaxlitlash + residue
  * true-up. Σ negatsiya AYNAN proporsional maqsad summasiga teng (= refundAmount, agar
  * allocation to'liq bo'lsa) — yaxlitlash drifti (masalan -333.33×3 = -999.99 ≠ -1000)

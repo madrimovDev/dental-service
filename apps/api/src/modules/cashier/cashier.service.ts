@@ -11,7 +11,12 @@ import { and, between, count, desc, eq, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
-import { computePlanBalance, distributeRefundNegations } from './cashier.billing.ts';
+import {
+  computePlanBalance,
+  distributeRefundNegations,
+  fromCents,
+  toCents,
+} from './cashier.billing.ts';
 import type { CreateTransactionInput, ListTransactionsQuery } from './cashier.schema.ts';
 
 const generateReceiptNumber = (): string => {
@@ -186,23 +191,32 @@ export const createCashierService = (deps: {
           )
         : [];
 
-    const itemsGross = resolvedItems.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
+    // CLI-453 #4: guard taqqoslashlari sentlarda (×100, butun son) — distributeRefundNegations
+    // uslubi (cashier.billing.ts). Xulq o'zgarmaydi (butun so'm summalar uchun natija bir
+    // xil), faqat kelajakdagi kasr-summa float-drift xavfi bartaraf etiladi.
+    const itemsGrossCents = resolvedItems.reduce(
+      (sum, i) => sum + toCents(i.unitPrice) * i.quantity,
+      0,
+    );
+    const discountCents = toCents(input.discount);
 
     // CLI-444: discount itemsGross'dan katta bo'lsa jim clamp o'rniga RAD etiladi
     // (routes 400 `cashier.discount_exceeds_total`). Faqat erkin POS (items bor)
     // rejimida ma'noli — plan-billing (allocations) discount'dan mustaqil.
-    if (resolvedItems.length > 0 && input.discount > itemsGross) {
+    if (resolvedItems.length > 0 && discountCents > itemsGrossCents) {
       throw new DiscountExceedsTotalError();
     }
 
     // Erkin POS: jami − chegirma (endi manfiy bo'lmasligi kafolatlangan — yuqoridagi guard).
     // Plan-billing (items bo'sh): allocation = paidAmount.
-    const netTotal = resolvedItems.length > 0 ? itemsGross - input.discount : input.paidAmount;
+    const netTotalCents =
+      resolvedItems.length > 0 ? itemsGrossCents - discountCents : toCents(input.paidAmount);
+    const netTotal = fromCents(netTotalCents);
 
     // Allocation yig'indisi paidAmount'dan oshmasligi shart (qisman ruxsat, oshib ketish RAD).
     if (input.allocations && input.allocations.length > 0) {
-      const allocSum = input.allocations.reduce((s, a) => s + a.amount, 0);
-      if (allocSum > input.paidAmount) {
+      const allocSumCents = input.allocations.reduce((s, a) => s + toCents(a.amount), 0);
+      if (allocSumCents > toCents(input.paidAmount)) {
         throw new AllocationExceedError();
       }
     }
