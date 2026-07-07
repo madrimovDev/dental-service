@@ -39,12 +39,13 @@ aks holda:
 
 Umumiy non-plan qarz (yoki kredit, manfiy bo'lsa) = `SUM(debtContribution)` shu bemorning barcha non-plan `type='payment'` qatorlari bo'yicha.
 
+**Muhim cheklov (kod tekshiruvida aniqlandi, `cashier.service.ts:353-357`):** non-plan tranzaksiyada **faqat to'liq refund** ruxsat etiladi — qisman refund yoki ketma-ket ikkinchi refund `non_plan_partial` xatosi bilan RAD etiladi (`isPartial || alreadyRefunded > 0` guard). Shuning uchun amalda `refundedSum` non-plan uchun har doim yoki `0` (refundsiz), yoki aynan `original.paidAmount`ga teng (bir martalik to'liq refund) — oraliq qiymat hech qachon bo'lmaydi. "aks holda" tarmog'i shunchaki himoya sifatida qoladi (agar kelajakda biznes-qoida o'zgarsa), amaliy testlar faqat quyidagi ikki holatni qamrab oladi.
+
 **Tekshirish misollari (DoD uchun ham ishlatiladi):**
-- To'liq to'langan, refundsiz: totalAmount=100, paidAmount=100 → hissasi 0.
+- To'liq to'langan, refundsiz: totalAmount=100, paidAmount=100 → hissasi 100-100=0.
 - Qisman to'langan, refundsiz: totalAmount=100, paidAmount=60 → hissasi 40 (qarz).
 - To'liq to'langan, TO'LIQ refund qilingan: totalAmount=100, paidAmount=100, refund=100 → hissasi **0** (avvalgi holatda ham 0 edi, o'zgarish yo'q — lekin endi to'g'ri sabab bilan: bekor qilingan, "refund chiqarib tashlangani uchun" emas).
-- Qisman to'langan (60/100), TO'LIQ refund qilingan (60): refundedSum(60) >= paidAmount(60) → hissasi **0** (avval: 40 — bug tuzatiladi).
-- Qisman to'langan (100/100), QISMAN refund qilingan (30): refundedSum(30) < paidAmount(100) → hissasi = 100-(100-30) = **30** (avval: 0 — bug tuzatiladi, klinika 30 qaytargani uchun endi 30 qarzdor sifatida ko'rinadi).
+- Qisman to'langan (60/100), TO'LIQ refund qilingan (60, ruxsat etilgan — `paid`ning 100%i qaytarilgan): refundedSum(60) >= paidAmount(60) → hissasi **0** (avval: 40 — bug tuzatiladi).
 - Overpay (CLI-451): totalAmount=100, paidAmount=120, refundsiz → hissasi = 100-120 = **-20** (kredit).
 
 **Implementatsiya:** `patients.service.ts` ikkala query (list + `balanceFor`) uchun raw-SQL CTE/correlated-subquery, `netServiceAggregates` (`reports.service.ts:83-129`) namunasi asosida — parametrlashgan, Date-interpolatsiya xatosi (CLI-430/441 darsi) qaytarilmasin.
