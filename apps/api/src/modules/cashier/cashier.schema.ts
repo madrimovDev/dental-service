@@ -141,7 +141,12 @@ export const cashierListResponseDtoSchema = z
   .openapi('CashierListResponse');
 export type CashierListResponseDto = z.infer<typeof cashierListResponseDtoSchema>;
 
-/** Kunlik summary — kassa yopilishi uchun (breakdown.total = numeric → string). */
+/**
+ * Kunlik summary — kassa yopilishi uchun (breakdown.total = numeric → string).
+ * `expensesTotal`/`netCashFlow` — CLI-452: FAQAT so'rovchida `expense.view`
+ * (yoki `@owner`) bo'lsa javobga qo'shiladi (`cashier.service.ts::userHasExpenseAccess`).
+ * Ruxsat bo'lmasa — bu ikki maydon javobda UMUMAN YO'Q (frontend shartli ko'rsatadi).
+ */
 export const dailySummaryDtoSchema = z
   .object({
     date: z.string(),
@@ -154,6 +159,8 @@ export const dailySummaryDtoSchema = z
         count: z.number().int(),
       }),
     ),
+    expensesTotal: z.number().optional(),
+    netCashFlow: z.number().optional(),
   })
   .openapi('DailySummary');
 export type DailySummaryDto = z.infer<typeof dailySummaryDtoSchema>;
