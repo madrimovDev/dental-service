@@ -26,6 +26,7 @@ export * from './tables/patient-emergency-contacts.ts';
 export * from './tables/patient-images.ts';
 export * from './tables/patient-relatives.ts';
 export * from './tables/patients.ts';
+export * from './tables/payroll-adjustments.ts';
 export * from './tables/payroll-lines.ts';
 export * from './tables/payroll-runs.ts';
 export * from './tables/permissions.ts';
