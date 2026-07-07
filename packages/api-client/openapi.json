@@ -2181,6 +2181,12 @@
                 "count"
               ]
             }
+          },
+          "expensesTotal": {
+            "type": "number"
+          },
+          "netCashFlow": {
+            "type": "number"
           }
         },
         "required": [

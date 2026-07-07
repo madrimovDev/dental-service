@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import {
   cashierTransactionItems,
   cashierTransactions,
+  expenses,
   treatmentPlans,
   treatmentStagePayments,
   treatmentStages,
@@ -62,6 +63,16 @@ export type PriceLookup = {
     serviceId: string,
     branchId: string,
   ) => Promise<{ price: string } | null>;
+};
+
+/**
+ * CLI-452: `dailySummary` xarajat maydonlarini (`expensesTotal`/`netCashFlow`)
+ * FAQAT shu ruxsat bo'lsa qaytaradi. `patients.service.ts::userHasPiiAccess`
+ * bilan BIR XIL naqsh — yangi route middleware YO'Q, maydon-darajasidagi gate.
+ */
+const userHasExpenseAccess = (c: Context): boolean => {
+  const perms = c.get('accessClaims')?.perms ?? [];
+  return perms.includes('@owner') || perms.includes('expense.view');
 };
 
 export const createCashierService = (deps: {
@@ -462,7 +473,34 @@ export const createCashierService = (deps: {
       after: { date: dateStr, count: rows.length },
     });
 
-    return { date: dateStr, branchId, breakdown: rows };
+    const base = { date: dateStr, branchId, breakdown: rows };
+
+    // CLI-452: expensesTotal/netCashFlow FAQAT `expense.view` (yoki `@owner`)
+    // bo'lsa qo'shiladi — routes'da yangi middleware YO'Q, maydon-darajasidagi gate.
+    if (!userHasExpenseAccess(c)) return base;
+
+    // `expenses.date` — naive `date` ustuni (calendar kun, instant emas) —
+    // expenses.service.ts bilan bir xil to'g'ridan-to'g'ri string taqqoslash
+    // (Tashkent T00:00 arifmetikasi kerak emas). branchId=null (tenant-darajali,
+    // masalan ijara) xarajatlar QASDDAN hisobga OLINMAYDI — "shu filial uchun"
+    // literal talqin (Architecture izohi, kelajakda kengaytirilishi mumkin).
+    const [expenseRow] = await db
+      .select({ total: sql<string>`COALESCE(SUM(${expenses.amount}), 0)` })
+      .from(expenses)
+      .where(and(eq(expenses.branchId, branchId), eq(expenses.date, dateStr)));
+    const expensesTotal = Number(expenseRow?.total ?? 0);
+
+    // Sof tushum — `DailySummaryCard.tsx`dagi `totalPayment - totalRefund` bilan
+    // AYNAN bir xil formula (`void` HISOBGA OLINMAYDI — reports moduli
+    // `signedPaidAmount`sidan farqli, bu yerda frontend kartaga mos bo'lish kerak).
+    const netRevenue = rows.reduce((sum, r) => {
+      const amount = Number(r.total);
+      if (r.type === 'payment') return sum + amount;
+      if (r.type === 'refund') return sum - amount;
+      return sum;
+    }, 0);
+
+    return { ...base, expensesTotal, netCashFlow: netRevenue - expensesTotal };
   }
 
   /** Plan balansi — sof o'qish (treatment_stages + allocation yig'indilari). Saqlanmaydi. */

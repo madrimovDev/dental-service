@@ -1086,6 +1086,8 @@
     "daily_summary": "Дневной отчёт",
     "cash_today": "Касса за сегодня",
     "total_revenue": "Общая выручка",
+    "expenses_total": "Расход",
+    "net_cash_flow": "Чистый поток",
     "noop_fiscal": "Фискальный документ будет отправлен в налоговую позже",
     "receipt_modal": {
       "print": "Печать",

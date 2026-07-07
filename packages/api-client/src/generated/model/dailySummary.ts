@@ -10,4 +10,6 @@ export interface DailySummary {
   date: string;
   branchId: string;
   breakdown: DailySummaryBreakdownItem[];
+  expensesTotal?: number;
+  netCashFlow?: number;
 }

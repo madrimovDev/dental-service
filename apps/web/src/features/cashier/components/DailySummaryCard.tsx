@@ -116,6 +116,56 @@ export function DailySummaryCard({ summary }: DailySummaryCardProps) {
                 </Text>
               </Box>
             )}
+
+            {/* CLI-452: backend `expense.view` bo'lmasa bu maydonlarni umuman
+                qaytarmaydi — shunda qator ko'rsatilmaydi (403/xato YO'Q, jim
+                yashirin). `summary.expensesTotal !== undefined` — 0 qiymatni
+                ham to'g'ri ko'rsatish uchun (falsy 0 emas, presence tekshiruvi). */}
+            {summary.expensesTotal !== undefined && (
+              <Box
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  background: 'var(--surface-2)',
+                  borderRadius: 10,
+                  padding: '8px 12px',
+                }}
+              >
+                <Text style={{ fontSize: 12, color: 'var(--ink-2)' }}>
+                  {t('cashier.expenses_total')}
+                </Text>
+                <Text fw={600} style={{ fontFamily: 'var(--font-mono)', fontSize: 14 }}>
+                  −{formatCurrency(summary.expensesTotal, t)}
+                </Text>
+              </Box>
+            )}
+
+            {summary.netCashFlow !== undefined && (
+              <Box
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  borderRadius: 10,
+                  padding: '8px 12px',
+                }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-2)' }}>
+                  {t('cashier.net_cash_flow')}
+                </Text>
+                <Text
+                  fw={700}
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 16,
+                    color: summary.netCashFlow < 0 ? 'var(--danger)' : 'var(--primary)',
+                  }}
+                >
+                  {formatCurrency(summary.netCashFlow, t)}
+                </Text>
+              </Box>
+            )}
           </Stack>
         )}
       </Stack>
