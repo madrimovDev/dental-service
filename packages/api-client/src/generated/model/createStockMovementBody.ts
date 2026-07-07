@@ -11,9 +11,9 @@ export type CreateStockMovementBody = {
   type: CreateStockMovementBodyType;
   /**
    * @minimum 0
-   * @exclusiveMinimum
+   * @nullable
    */
-  quantity: number;
+  quantity: number | null;
   /** @maxLength 500 */
   reason?: string;
 };

@@ -12,4 +12,5 @@ export interface InviteUserResponse {
   /** @nullable */
   tempPassword: string | null;
   alreadyExists: boolean;
+  reactivated: boolean;
 }
