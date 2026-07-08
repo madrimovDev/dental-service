@@ -10,7 +10,11 @@ describe('lookupKeys (cross-feature)', () => {
   it("umumiy lookup key string lari o'zgarmaydi", () => {
     expect(lookupKeys.branches()).toEqual(['branches']);
     expect(lookupKeys.services()).toEqual(['services']);
-    expect(lookupKeys.patientsAll()).toEqual(['patients', 'list-all']);
+    // CLI-454: `search` endi key'ga kiradi (debounced server-search — cache
+    // search-bo'yicha ajratiladi); bo'sh qidiruv hali ham cross-feature "hamma
+    // bemor" cache yozuviga mos keladi.
+    expect(lookupKeys.patientsAll()).toEqual(['patients', 'list-all', '']);
+    expect(lookupKeys.patientsAll('Vali')).toEqual(['patients', 'list-all', 'Vali']);
     expect(lookupKeys.userAssignments()).toEqual(['users', 'assignments']);
   });
 });

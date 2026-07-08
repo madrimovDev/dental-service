@@ -3,6 +3,7 @@ import { Button } from '@dental/ui';
 import { Chip, Group, MultiSelect, Select, Stack, Stepper, Text } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { useForm } from '@mantine/form';
+import { useDebouncedValue } from '@mantine/hooks';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -48,7 +49,16 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
   const [active, setActive] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const { data: doctors } = useDoctors();
-  const { data: patientsData } = usePatients({ page: 1, pageSize: 100 });
+  // CLI-454: bemor ro'yxati avval pageSize:100 bilan qidiruvsiz cheklangan edi —
+  // 100 tadan ortiq bemorli tenant'da kerakli bemor Select'da ko'rinmasdi. Endi
+  // qidiruv matni debounced holda serverga uzatiladi (backend `ilike` filtri).
+  const [patientSearch, setPatientSearch] = useState('');
+  const [debouncedPatientSearch] = useDebouncedValue(patientSearch, 300);
+  const { data: patientsData } = usePatients({
+    search: debouncedPatientSearch,
+    page: 1,
+    pageSize: 100,
+  });
   const { data: servicesData } = useServices();
   const { data: branchesData } = useBranches();
   const createMut = useCreateAppointment();
@@ -181,6 +191,8 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
               placeholder={t('appointments.patient')}
               searchable
               data={patients}
+              searchValue={patientSearch}
+              onSearchChange={setPatientSearch}
               {...form.getInputProps('patientId')}
             />
           </Stack>
