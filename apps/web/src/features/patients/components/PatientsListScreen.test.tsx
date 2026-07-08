@@ -81,6 +81,19 @@ describe('PatientsListScreen', () => {
     expect(usePatientsMock).toHaveBeenCalledWith(expect.objectContaining({ archived: true }));
   });
 
+  it("arxivlangan filtrda 'Arxivlash' tugmasi ko'rinmaydi (L11 bug fix)", () => {
+    renderApp(<PatientsListScreen />);
+    // Boshida (archived=false) tugma ko'rinadi.
+    expect(screen.getByLabelText('Arxivlash')).toBeInTheDocument();
+    // "Arxiv" filtr pill'ini bosamiz.
+    const pills = screen.getAllByRole('button').filter((b) => b.dataset.active != null);
+    const archivedPill = pills[1];
+    if (!archivedPill) throw new Error('archived filter pill not found');
+    fireEvent.click(archivedPill);
+    // Arxivlangan ro'yxatda qayta-arxivlash ma'nosiz (backend unarchive yo'q) — tugma yo'q.
+    expect(screen.queryByLabelText('Arxivlash')).not.toBeInTheDocument();
+  });
+
   it("bo'sh ro'yxatda empty-state CTA tugmasi ko'rinadi", () => {
     patientsResult = {
       data: { items: [], meta: { page: 1, pageSize: 20, total: 0 } },

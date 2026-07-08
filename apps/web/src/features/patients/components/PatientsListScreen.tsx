@@ -168,7 +168,8 @@ export function PatientsListScreen() {
                   >
                     <Eye size={16} />
                   </IconButton>
-                  {hasPermission('patient.delete') && (
+                  {/* L11: arxivlangan ro'yxatda "Arxivlash" ma'nosiz — unarchive endpoint yo'q */}
+                  {!archived && hasPermission('patient.delete') && (
                     <IconButton
                       label={t('common.archive')}
                       disabled={archiveMut.isPending}
