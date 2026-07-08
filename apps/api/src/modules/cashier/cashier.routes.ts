@@ -25,6 +25,8 @@ import {
 } from './cashier.schema.ts';
 import {
   AllocationExceedError,
+  AllocationMismatchError,
+  AllocationPlanMismatchError,
   createCashierService,
   DiscountExceedsTotalError,
   NoActivePriceError,
@@ -120,6 +122,18 @@ export const cashierRoutes = (deps: {
     } catch (e) {
       if (e instanceof AllocationExceedError) {
         return c.json(fail('allocations.exceed', 'Allocation sum exceeds paid amount'), 400);
+      }
+      if (e instanceof AllocationMismatchError) {
+        return c.json(
+          fail(
+            'cashier.allocation_mismatch',
+            "To'lov summasi taqsimotlar yig'indisiga teng bo'lishi kerak",
+          ),
+          400,
+        );
+      }
+      if (e instanceof AllocationPlanMismatchError) {
+        return c.json(fail('cashier.allocation_plan_mismatch', e.message), 400);
       }
       if (e instanceof NoActivePriceError) {
         return c.json(
