@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { patientFormSchema } from './patients.schema';
+import { patientEditSchema, patientFormSchema } from './patients.schema';
 
 const base = { fullName: 'Ali Valiyev', tags: [] };
 
@@ -59,5 +59,30 @@ describe("patientFormSchema — sug'urta refine (CLI-469)", () => {
     if (!r.success) {
       expect(r.error.issues.some((i) => i.path.join('.') === 'insurance.policyNumber')).toBe(true);
     }
+  });
+});
+
+describe('patientEditSchema — telefon regex (L13)', () => {
+  it('noto‘g‘ri formatdagi telefonni rad etadi', () => {
+    const r = patientEditSchema.safeParse({ fullName: 'Ali Valiyev', phone: 'not-a-phone' });
+    expect(r.success).toBe(false);
+  });
+
+  it('noto‘g‘ri formatdagi phoneSecondary‘ni rad etadi', () => {
+    const r = patientEditSchema.safeParse({
+      fullName: 'Ali Valiyev',
+      phoneSecondary: 'abc',
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it('to‘g‘ri formatdagi telefonni qabul qiladi', () => {
+    const r = patientEditSchema.safeParse({ fullName: 'Ali Valiyev', phone: '+998901234567' });
+    expect(r.success).toBe(true);
+  });
+
+  it('bo‘sh satrni qabul qiladi (optional maydon)', () => {
+    const r = patientEditSchema.safeParse({ fullName: 'Ali Valiyev', phone: '' });
+    expect(r.success).toBe(true);
   });
 });

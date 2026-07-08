@@ -217,15 +217,12 @@ function GeneralEditForm({ patientId }: { patientId: string }) {
             />
           </SimpleGrid>
           <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-            <PhoneInput
-              label={t('patients.form.phone')}
-              value={form.values.phone}
-              onChange={(v) => form.setFieldValue('phone', v)}
-            />
+            {/* L13: patientEditSchema endi telefon formatini tekshiradi — error endi wire qilingan
+                (aks holda noto'g'ri format kiritilganda submit jim bloklanardi). */}
+            <PhoneInput label={t('patients.form.phone')} {...form.getInputProps('phone')} />
             <PhoneInput
               label={t('patients.form.phone_secondary')}
-              value={form.values.phoneSecondary}
-              onChange={(v) => form.setFieldValue('phoneSecondary', v)}
+              {...form.getInputProps('phoneSecondary')}
             />
           </SimpleGrid>
           <Input

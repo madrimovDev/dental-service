@@ -1,19 +1,21 @@
 import { z } from 'zod';
 
+/**
+ * Ixtiyoriy telefon maydoni — bo'sh satr yoki `+998XXXXXXXXX`-ko'rinishidagi format.
+ * `patientFormSchema` (create) va `patientEditSchema` (edit) ikkalasida ham ishlatiladi (DRY).
+ */
+const phoneOptionalSchema = z
+  .string()
+  .regex(/^\+?\d{9,15}$/)
+  .optional()
+  .or(z.literal(''));
+
 export const patientFormSchema = z.object({
   fullName: z.string().min(2).max(120),
   dateOfBirth: z.string().optional(),
   gender: z.enum(['male', 'female', 'other']).optional(),
-  phone: z
-    .string()
-    .regex(/^\+?\d{9,15}$/)
-    .optional()
-    .or(z.literal('')),
-  phoneSecondary: z
-    .string()
-    .regex(/^\+?\d{9,15}$/)
-    .optional()
-    .or(z.literal('')),
+  phone: phoneOptionalSchema,
+  phoneSecondary: phoneOptionalSchema,
   passport: z.string().max(64).optional(),
   address: z.string().max(500).optional(),
   notes: z.string().max(2000).optional(),
@@ -60,8 +62,8 @@ export const patientEditSchema = z.object({
   fullName: z.string().min(2).max(120),
   dateOfBirth: z.string().optional(),
   gender: z.enum(['male', 'female', 'other']).optional(),
-  phone: z.string().optional(),
-  phoneSecondary: z.string().optional(),
+  phone: phoneOptionalSchema,
+  phoneSecondary: phoneOptionalSchema,
   passport: z.string().optional(),
   address: z.string().optional(),
   notes: z.string().optional(),
