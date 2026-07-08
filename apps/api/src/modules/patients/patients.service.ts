@@ -14,6 +14,7 @@ import { and, count, desc, eq, ilike, inArray, isNotNull, isNull, ne, or, sql } 
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { createOwnershipValidator, type OwnershipValidator } from '../../lib/ownership.ts';
 import type { NonPlanTransactionRow } from './patients.balance.ts';
 import { computeNonPlanRemainder, computePatientBalance } from './patients.balance.ts';
 import type {
@@ -61,7 +62,12 @@ const userHasPiiAccess = (c: Context): boolean => {
 /** Qarzga kiruvchi reja statuslari — draft/presented/cancelled chiqariladi. */
 const DEBT_PLAN_STATUSES = ['accepted', 'in_progress', 'completed'] as const;
 
-export const createPatientsService = (deps: { audit: AuditLogger }) => {
+export const createPatientsService = (deps: {
+  audit: AuditLogger;
+  ownership?: OwnershipValidator;
+}) => {
+  const ownership = deps.ownership ?? createOwnershipValidator();
+
   async function list(c: Context, query: ListQuery) {
     const db = getDb(c);
     const offset = (query.page - 1) * query.pageSize;
@@ -572,6 +578,12 @@ export const createPatientsService = (deps: { audit: AuditLogger }) => {
     const tenantId = c.get('activeTenantId');
     if (!tenantId) throw new Error('No tenant context');
 
+    // CLI-421: cross-entity ownership — ikkala tomon ham shu tenant'ga tegishli
+    // haqiqiy bemor ekanini tekshiramiz (avval FK constraint'ga tayanardi — xom
+    // 500 o'rniga toza CrossEntityError → routes 400).
+    await ownership.assertPatientExists(c, patientId);
+    await ownership.assertPatientExists(c, input.relativePatientId);
+
     const [link] = await db
       .insert(patientRelatives)
       .values({
@@ -644,6 +656,10 @@ export const createPatientsService = (deps: { audit: AuditLogger }) => {
     const db = getDb(c);
     const tenantId = c.get('activeTenantId');
     if (!tenantId) throw new Error('No tenant context');
+
+    // CLI-421: cross-entity ownership — URL patientId shu tenant'ga tegishli
+    // haqiqiy bemor ekanini tekshiramiz.
+    await ownership.assertPatientExists(c, patientId);
 
     const [contact] = await db
       .insert(patientEmergencyContacts)

@@ -85,6 +85,13 @@ export const createPrescriptionsService = (deps: {
     const [before] = await db.select().from(prescriptions).where(eq(prescriptions.id, id));
     if (!before) return null;
 
+    // CLI-421: cross-entity ownership — patientId o'zgармаydi (update schema omit
+    // qiladi), shu sabab before.patientId'ga nisbatan tekshiramiz. Faqat yuborilgan
+    // maydonlar (visit-notes.service.ts::update() bilan bir xil naqsh).
+    if (input.doctorId) await ownership.assertUserExists(c, input.doctorId);
+    if (input.visitNoteId)
+      await ownership.assertVisitNoteBelongsToPatient(c, input.visitNoteId, before.patientId);
+
     const patch: Record<string, unknown> = { updatedAt: new Date() };
     if (input.doctorId) patch.doctorId = input.doctorId;
     if (input.visitNoteId !== undefined) patch.visitNoteId = input.visitNoteId;

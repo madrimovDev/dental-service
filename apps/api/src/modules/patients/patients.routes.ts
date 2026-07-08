@@ -4,6 +4,7 @@ import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { requireModuleInDesktop } from '../../lib/license-middleware.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
+import { CrossEntityError } from '../../lib/ownership.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
@@ -328,9 +329,17 @@ export const patientRoutes = (deps: { db: Database; audit: AuditLogger }) => {
   app.openapi(addRelativeRoute, async (c) => {
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const row = await service.addRelative(c, id, body);
-    if (!row) throw new Error('Relative link creation failed');
-    return c.json(ok(toPatientRelativeDto(row)), 201);
+    try {
+      const row = await service.addRelative(c, id, body);
+      if (!row) throw new Error('Relative link creation failed');
+      return c.json(ok(toPatientRelativeDto(row)), 201);
+    } catch (e) {
+      // CLI-421: cross-entity ownership mismatch (patientId/relativePatientId) → 400.
+      if (e instanceof CrossEntityError) {
+        return c.json(fail(`ownership.${e.reason}`, e.message), 400);
+      }
+      throw e;
+    }
   });
 
   const removeRelativeRoute = createRoute({
@@ -404,9 +413,17 @@ export const patientRoutes = (deps: { db: Database; audit: AuditLogger }) => {
   app.openapi(addEmergencyContactRoute, async (c) => {
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const row = await service.addEmergencyContact(c, id, body);
-    if (!row) throw new Error('Emergency contact creation failed');
-    return c.json(ok(toEmergencyContactDto(row)), 201);
+    try {
+      const row = await service.addEmergencyContact(c, id, body);
+      if (!row) throw new Error('Emergency contact creation failed');
+      return c.json(ok(toEmergencyContactDto(row)), 201);
+    } catch (e) {
+      // CLI-421: cross-entity ownership mismatch (URL patientId) → 400.
+      if (e instanceof CrossEntityError) {
+        return c.json(fail(`ownership.${e.reason}`, e.message), 400);
+      }
+      throw e;
+    }
   });
 
   const removeEmergencyContactRoute = createRoute({

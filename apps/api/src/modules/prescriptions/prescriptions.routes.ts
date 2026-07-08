@@ -140,9 +140,17 @@ export const prescriptionsRoutes = (deps: { db: Database; audit: AuditLogger }) 
   app.openapi(updateRoute, async (c) => {
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const row = await service.update(c, id, body);
-    if (!row) return c.json(fail('prescription.not_found', 'Not found'), 404);
-    return c.json(ok(toPrescriptionDto(row)), 200);
+    try {
+      const row = await service.update(c, id, body);
+      if (!row) return c.json(fail('prescription.not_found', 'Not found'), 404);
+      return c.json(ok(toPrescriptionDto(row)), 200);
+    } catch (e) {
+      // CLI-421: cross-entity ownership mismatch (doctorId/visitNoteId) → 400.
+      if (e instanceof CrossEntityError) {
+        return c.json(fail(`ownership.${e.reason}`, e.message), 400);
+      }
+      throw e;
+    }
   });
 
   // ─── DELETE /{id} — delete ───────────────────────────────────────────────
