@@ -38,7 +38,7 @@ import {
   updateMedicalRecordSchema,
   updatePatientSchema,
 } from './patients.schema.ts';
-import { createPatientsService } from './patients.service.ts';
+import { createPatientsService, PatientRelativeConflictError } from './patients.service.ts';
 
 /** Standart 404 — get / patch / archive / medical endpoint'lar uchun. */
 const patientNotFound = {
@@ -337,6 +337,10 @@ export const patientRoutes = (deps: { db: Database; audit: AuditLogger }) => {
       // CLI-421: cross-entity ownership mismatch (patientId/relativePatientId) → 400.
       if (e instanceof CrossEntityError) {
         return c.json(fail(`ownership.${e.reason}`, e.message), 400);
+      }
+      // CLI-474 (L4): o'z-o'ziga havola → 400.
+      if (e instanceof PatientRelativeConflictError) {
+        return c.json(fail(`patient_relative.${e.code}`, e.message), 400);
       }
       throw e;
     }

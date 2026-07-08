@@ -30,6 +30,19 @@ import type {
 const PII_FIELDS = ['phone', 'phoneSecondary', 'passport', 'address'] as const;
 
 /**
+ * CLI-474 (L4) — `addRelative` domen-validatsiya xatosi (o'z-o'ziga havola).
+ * `ownership.ts`dagi `CrossEntityError`dan farqli — bu ikkala tomon ham HAQIQIY
+ * bemor, lekin ular orasidagi MUNOSABAT noto'g'ri (queue.service.ts
+ * `QueueValidationError` bilan bir xil naqsh — routes try/catch orqali map qilinadi).
+ */
+export class PatientRelativeConflictError extends Error {
+  constructor(readonly code: 'self_link') {
+    super(code);
+    this.name = 'PatientRelativeConflictError';
+  }
+}
+
+/**
  * PII fieldlarni masklash — user `patient.view_pii` permission yo'q bo'lsa
  */
 const maskPii = <
@@ -577,6 +590,12 @@ export const createPatientsService = (deps: {
     const db = getDb(c);
     const tenantId = c.get('activeTenantId');
     if (!tenantId) throw new Error('No tenant context');
+
+    // CLI-474 (L4): o'z-o'ziga havola — arzon input tekshiruvi, DB'ga tegmasdan
+    // birinchi bo'lib rad etiladi.
+    if (input.relativePatientId === patientId) {
+      throw new PatientRelativeConflictError('self_link');
+    }
 
     // CLI-421: cross-entity ownership — ikkala tomon ham shu tenant'ga tegishli
     // haqiqiy bemor ekanini tekshiramiz (avval FK constraint'ga tayanardi — xom
