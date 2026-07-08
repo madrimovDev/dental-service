@@ -11,10 +11,7 @@ export type AddPatientEmergencyContactBody = {
    * @maxLength 120
    */
   name: string;
-  /**
-   * @minLength 1
-   * @maxLength 40
-   */
+  /** @pattern ^\+?\d{9,15}$ */
   phone: string;
   /**
    * @minLength 1

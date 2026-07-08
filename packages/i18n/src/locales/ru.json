@@ -321,7 +321,9 @@
     "vertical_dental": "Стоматология",
     "vertical_general": "Общая клиника",
     "currency": "Валюта",
-    "reminder_lead_hours": "Напоминание заранее (часы)"
+    "reminder_lead_hours": "Напоминание заранее (часы)",
+    "max_discount_percent": "Максимальный процент скидки",
+    "max_discount_percent_hint": "Наибольшая скидка на одну услугу в кассе. 100% = без ограничений. Изменяет только администратор клиники."
   },
   "settings": {
     "title": "Настройки",

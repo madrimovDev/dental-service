@@ -15,6 +15,7 @@ export interface TenantSettings {
   currency: string;
   /** @nullable */
   onboardingDismissedAt: string | null;
+  maxDiscountPercent: number;
   notificationSettings: NotificationSettings;
   integrationSettings: IntegrationSettings;
   createdAt: string;

@@ -215,29 +215,36 @@
     {
       "idx": 30,
       "version": "7",
-      "when": 1783600000000,
+      "when": 1783343068802,
       "tag": "0030_payroll_run_no_overlap",
       "breakpoints": true
     },
     {
       "idx": 31,
       "version": "7",
-      "when": 1783600000001,
+      "when": 1783343068803,
       "tag": "0031_recalls_preventive_dedupe",
       "breakpoints": true
     },
     {
       "idx": 32,
       "version": "7",
-      "when": 1783600000002,
+      "when": 1783343068804,
       "tag": "0032_youthful_scalphunter",
       "breakpoints": true
     },
     {
       "idx": 33,
       "version": "7",
-      "when": 1783600000003,
+      "when": 1783343068805,
       "tag": "0033_chunky_sentinel",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1783343068806,
+      "tag": "0034_abandoned_cobalt_man",
       "breakpoints": true
     }
   ]

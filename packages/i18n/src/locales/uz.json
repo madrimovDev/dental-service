@@ -321,7 +321,9 @@
     "vertical_dental": "Stomatologiya",
     "vertical_general": "Umumiy klinika",
     "currency": "Valyuta",
-    "reminder_lead_hours": "Eslatma oldindan (soat)"
+    "reminder_lead_hours": "Eslatma oldindan (soat)",
+    "max_discount_percent": "Maksimal chegirma foizi",
+    "max_discount_percent_hint": "Kassada bitta xizmatga beriladigan eng yuqori chegirma. 100% = cheklovsiz. Faqat klinika administratori o'zgartira oladi."
   },
   "settings": {
     "title": "Sozlamalar",

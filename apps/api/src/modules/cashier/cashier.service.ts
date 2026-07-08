@@ -3,6 +3,7 @@ import {
   cashierTransactionItems,
   cashierTransactions,
   expenses,
+  tenantSettings,
   treatmentPlans,
   treatmentStagePayments,
   treatmentStages,
@@ -84,6 +85,19 @@ export class DiscountExceedsTotalError extends Error {
   constructor() {
     super('Discount exceeds items gross total');
     this.name = 'DiscountExceedsTotalError';
+  }
+}
+
+/**
+ * CLI-444: erkin POS chegirmasi tenant-configurable maksimal foizdan
+ * (`tenant_settings.max_discount_percent`, default 100) oshganda routes 400
+ * `cashier.discount_exceeds_max` ga aylantiradi. `DiscountExceedsTotalError`dan
+ * qat'iyroq — u itemsGross (100%) chegarasi, bu esa tenant limiti (masalan 30%).
+ */
+export class DiscountExceedsMaxError extends Error {
+  constructor(public readonly maxPercent: number) {
+    super(`Discount exceeds max ${maxPercent}%`);
+    this.name = 'DiscountExceedsMaxError';
   }
 }
 
@@ -246,6 +260,23 @@ export const createCashierService = (deps: {
     // rejimida ma'noli — plan-billing (allocations) discount'dan mustaqil.
     if (resolvedItems.length > 0 && discountCents > itemsGrossCents) {
       throw new DiscountExceedsTotalError();
+    }
+
+    // CLI-444: chegirma tenant-configurable maksimal foizdan oshmasligi
+    // (`tenant_settings.max_discount_percent`, default 100 = cheklovsiz). Yuqoridagi
+    // `> itemsGross` (100%) chekidan KEYIN — default holatda o'sha chek oldin otiladi,
+    // shuning uchun bu faqat maxPct < 100 uchun faollashadi (backward-compatible).
+    // Faqat erkin POS rejimida ma'noli. Butun-son arifmetikasi — float yaxlitlashsiz.
+    // Faqat Tenant Admin/Owner (`tenant_settings.edit`) limitni o'zgartiradi — kassir emas.
+    if (resolvedItems.length > 0) {
+      const [settingsRow] = await db
+        .select({ maxDiscountPercent: tenantSettings.maxDiscountPercent })
+        .from(tenantSettings)
+        .limit(1);
+      const maxPct = settingsRow?.maxDiscountPercent ?? 100;
+      if (discountCents * 100 > itemsGrossCents * maxPct) {
+        throw new DiscountExceedsMaxError(maxPct);
+      }
     }
 
     // Erkin POS: jami − chegirma (endi manfiy bo'lmasligi kafolatlangan — yuqoridagi guard).

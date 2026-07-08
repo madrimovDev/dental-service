@@ -13,18 +13,35 @@ export type UpdatePatientBody = {
    * @maxLength 120
    */
   fullName?: string;
-  dateOfBirth?: string;
+  /** @nullable */
+  dateOfBirth?: string | null;
+  /** @nullable */
   gender?: UpdatePatientBodyGender;
-  /** @pattern ^\+?\d{9,15}$ */
-  phone?: string;
-  /** @pattern ^\+?\d{9,15}$ */
-  phoneSecondary?: string;
-  /** @maxLength 64 */
-  passport?: string;
-  /** @maxLength 500 */
-  address?: string;
-  /** @maxLength 2000 */
-  notes?: string;
+  /**
+   * @nullable
+   * @pattern ^\+?\d{9,15}$
+   */
+  phone?: string | null;
+  /**
+   * @nullable
+   * @pattern ^\+?\d{9,15}$
+   */
+  phoneSecondary?: string | null;
+  /**
+   * @maxLength 64
+   * @nullable
+   */
+  passport?: string | null;
+  /**
+   * @maxLength 500
+   * @nullable
+   */
+  address?: string | null;
+  /**
+   * @maxLength 2000
+   * @nullable
+   */
+  notes?: string | null;
   /** @maxItems 20 */
   tags?: string[];
   /** @maxLength 80 */

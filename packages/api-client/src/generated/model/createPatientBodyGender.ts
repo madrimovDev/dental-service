@@ -5,7 +5,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type CreatePatientBodyGender = typeof CreatePatientBodyGender[keyof typeof CreatePatientBodyGender];
+/**
+ * @nullable
+ */
+export type CreatePatientBodyGender = typeof CreatePatientBodyGender[keyof typeof CreatePatientBodyGender] | null;
 
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare

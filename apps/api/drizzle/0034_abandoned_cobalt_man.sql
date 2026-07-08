@@ -1,0 +1,1 @@
+ALTER TABLE "tenant_settings" ADD COLUMN "max_discount_percent" integer DEFAULT 100 NOT NULL;

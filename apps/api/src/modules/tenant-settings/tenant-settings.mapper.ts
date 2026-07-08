@@ -91,6 +91,7 @@ export const toTenantSettingsDto = (row: TenantSettings): TenantSettingsDto => (
   reminderLeadHours: row.reminderLeadHours,
   currency: row.currency,
   onboardingDismissedAt: row.onboardingDismissedAt ? row.onboardingDismissedAt.toISOString() : null,
+  maxDiscountPercent: row.maxDiscountPercent,
   notificationSettings: toNotificationSettingsDto(row.notificationSettings),
   integrationSettings: toIntegrationSettingsDto(row.integrationSettings),
   createdAt: row.createdAt.toISOString(),

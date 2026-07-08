@@ -28,6 +28,7 @@ import {
   AllocationMismatchError,
   AllocationPlanMismatchError,
   createCashierService,
+  DiscountExceedsMaxError,
   DiscountExceedsTotalError,
   NoActivePriceError,
   type PayrollAdjustmentHook,
@@ -144,6 +145,15 @@ export const cashierRoutes = (deps: {
       if (e instanceof DiscountExceedsTotalError) {
         return c.json(
           fail('cashier.discount_exceeds_total', 'Discount exceeds items gross total'),
+          400,
+        );
+      }
+      if (e instanceof DiscountExceedsMaxError) {
+        return c.json(
+          fail(
+            'cashier.discount_exceeds_max',
+            `Discount exceeds the maximum allowed ${e.maxPercent}%`,
+          ),
           400,
         );
       }

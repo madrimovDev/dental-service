@@ -19,6 +19,7 @@ describe('toTenantSettingsDto', () => {
       defaultRecallIntervalMonths: 6,
       timezone: 'Asia/Tashkent',
       recallSendHourLocal: 10,
+      maxDiscountPercent: 100,
       notificationSettings: null,
       integrationSettings: null,
       createdAt: new Date('2026-06-12T10:00:00.000Z'),
@@ -42,6 +43,7 @@ describe('toTenantSettingsDto', () => {
       defaultRecallIntervalMonths: 6,
       timezone: 'Asia/Tashkent',
       recallSendHourLocal: 10,
+      maxDiscountPercent: 100,
       notificationSettings: null,
       integrationSettings: null,
       createdAt: new Date('2026-06-12T10:00:00.000Z'),
@@ -62,6 +64,7 @@ describe('toTenantSettingsDto', () => {
       defaultRecallIntervalMonths: 6,
       timezone: 'Asia/Tashkent',
       recallSendHourLocal: 10,
+      maxDiscountPercent: 100,
       notificationSettings: null,
       integrationSettings: null,
       createdAt: new Date('2026-06-12T10:00:00.000Z'),
@@ -77,6 +80,26 @@ describe('toTenantSettingsDto', () => {
       telegram: { enabled: false, botUsername: null },
       eskiz: { enabled: false, sender: null },
     });
+  });
+
+  test('maps maxDiscountPercent through (CLI-444)', () => {
+    const row = {
+      id: 'id-1',
+      tenantId: 't-1',
+      vertical: 'dental',
+      reminderLeadHours: 24,
+      currency: 'UZS',
+      onboardingDismissedAt: null,
+      defaultRecallIntervalMonths: 6,
+      timezone: 'Asia/Tashkent',
+      recallSendHourLocal: 10,
+      maxDiscountPercent: 30,
+      notificationSettings: null,
+      integrationSettings: null,
+      createdAt: new Date('2026-06-12T10:00:00.000Z'),
+      updatedAt: new Date('2026-06-12T11:00:00.000Z'),
+    };
+    expect(toTenantSettingsDto(row).maxDiscountPercent).toBe(30);
   });
 });
 

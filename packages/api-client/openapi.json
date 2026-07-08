@@ -423,6 +423,10 @@
             "nullable": true,
             "example": null
           },
+          "maxDiscountPercent": {
+            "type": "integer",
+            "example": 100
+          },
           "notificationSettings": {
             "$ref": "#/components/schemas/NotificationSettings"
           },
@@ -445,6 +449,7 @@
           "reminderLeadHours",
           "currency",
           "onboardingDismissedAt",
+          "maxDiscountPercent",
           "notificationSettings",
           "integrationSettings",
           "createdAt",
@@ -7122,6 +7127,11 @@
                     "nullable": true,
                     "format": "date-time"
                   },
+                  "maxDiscountPercent": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
                   "notificationSettings": {
                     "type": "object",
                     "properties": {
@@ -9251,34 +9261,42 @@
                   },
                   "dateOfBirth": {
                     "type": "string",
+                    "nullable": true,
                     "format": "date"
                   },
                   "gender": {
                     "type": "string",
+                    "nullable": true,
                     "enum": [
                       "male",
                       "female",
-                      "other"
+                      "other",
+                      null
                     ]
                   },
                   "phone": {
                     "type": "string",
+                    "nullable": true,
                     "pattern": "^\\+?\\d{9,15}$"
                   },
                   "phoneSecondary": {
                     "type": "string",
+                    "nullable": true,
                     "pattern": "^\\+?\\d{9,15}$"
                   },
                   "passport": {
                     "type": "string",
+                    "nullable": true,
                     "maxLength": 64
                   },
                   "address": {
                     "type": "string",
+                    "nullable": true,
                     "maxLength": 500
                   },
                   "notes": {
                     "type": "string",
+                    "nullable": true,
                     "maxLength": 2000
                   },
                   "tags": {
@@ -9510,34 +9528,42 @@
                   },
                   "dateOfBirth": {
                     "type": "string",
+                    "nullable": true,
                     "format": "date"
                   },
                   "gender": {
                     "type": "string",
+                    "nullable": true,
                     "enum": [
                       "male",
                       "female",
-                      "other"
+                      "other",
+                      null
                     ]
                   },
                   "phone": {
                     "type": "string",
+                    "nullable": true,
                     "pattern": "^\\+?\\d{9,15}$"
                   },
                   "phoneSecondary": {
                     "type": "string",
+                    "nullable": true,
                     "pattern": "^\\+?\\d{9,15}$"
                   },
                   "passport": {
                     "type": "string",
+                    "nullable": true,
                     "maxLength": 64
                   },
                   "address": {
                     "type": "string",
+                    "nullable": true,
                     "maxLength": 500
                   },
                   "notes": {
                     "type": "string",
+                    "nullable": true,
                     "maxLength": 2000
                   },
                   "tags": {
@@ -10379,6 +10405,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Duplicate relative link (CLI-474 L5)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -10585,8 +10621,7 @@
                   },
                   "phone": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 40
+                    "pattern": "^\\+?\\d{9,15}$"
                   },
                   "relationship": {
                     "type": "string",

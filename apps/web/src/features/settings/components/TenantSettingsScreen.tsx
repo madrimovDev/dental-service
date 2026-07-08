@@ -77,7 +77,12 @@ export function TenantSettingsScreen() {
   });
 
   const settingsForm = useForm<TenantSettingsFormValues>({
-    initialValues: { vertical: 'dental', currency: 'UZS', reminderLeadHours: 24 },
+    initialValues: {
+      vertical: 'dental',
+      currency: 'UZS',
+      reminderLeadHours: 24,
+      maxDiscountPercent: 100,
+    },
     validate: zod4Resolver(tenantSettingsSchema),
   });
 
@@ -103,6 +108,7 @@ export function TenantSettingsScreen() {
         vertical: (settings.data.vertical as 'dental' | 'general') ?? 'dental',
         currency: settings.data.currency ?? 'UZS',
         reminderLeadHours: settings.data.reminderLeadHours ?? 24,
+        maxDiscountPercent: settings.data.maxDiscountPercent ?? 100,
       });
     }
   }, [settings.data]);
@@ -266,6 +272,19 @@ export function TenantSettingsScreen() {
                   disabled={!canEditSettings}
                   styles={INPUT_STYLES}
                   {...settingsForm.getInputProps('reminderLeadHours')}
+                />
+
+                <NumberInput
+                  style={{ gridColumn: 'span 2' }}
+                  label={t('tenant_settings.max_discount_percent')}
+                  description={t('tenant_settings.max_discount_percent_hint')}
+                  min={0}
+                  max={100}
+                  suffix="%"
+                  clampBehavior="strict"
+                  disabled={!canEditSettings}
+                  styles={INPUT_STYLES}
+                  {...settingsForm.getInputProps('maxDiscountPercent')}
                 />
               </div>
             )}

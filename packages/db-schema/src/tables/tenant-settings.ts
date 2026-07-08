@@ -21,6 +21,11 @@ export const tenantSettings = pgTable(
     vertical: text('vertical').notNull().default('dental'),
     reminderLeadHours: integer('reminder_lead_hours').notNull().default(24),
     currency: text('currency').notNull().default('UZS'),
+    // CLI-444: kassa erkin POS chegirmasining maksimal foizi (0–100). Default 100 =
+    // cheklovsiz (backward-compatible — itemsGross'gacha ruxsat, mavjud xulq). Faqat
+    // `tenant_settings.edit` egasi (Tenant Admin/Owner) o'zgartiradi; kassir/registrator
+    // limitni ko'tara olmaydi. Enforcement: cashier.service.ts::create.
+    maxDiscountPercent: integer('max_discount_percent').notNull().default(100),
     onboardingDismissedAt: timestamp('onboarding_dismissed_at', { withTimezone: true }),
     // Recall subsystem (RFC-0011): default interval (oy), klinika vaqt zonasi va
     // recall SMS yuborish soati (klinika-local). Scheduler shu sozlamalarga amal qiladi.

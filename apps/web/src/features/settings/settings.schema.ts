@@ -46,6 +46,8 @@ export const tenantSettingsSchema = z.object({
   vertical: z.enum(['dental', 'general']),
   currency: z.string().min(1).max(8),
   reminderLeadHours: z.number().int().min(0).max(168),
+  // CLI-444: kassa erkin POS chegirmasining maksimal foizi (0–100, 100 = cheklovsiz).
+  maxDiscountPercent: z.number().int().min(0).max(100),
 });
 export type TenantSettingsFormValues = z.infer<typeof tenantSettingsSchema>;
 

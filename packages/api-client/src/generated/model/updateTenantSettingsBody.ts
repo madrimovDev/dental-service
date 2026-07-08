@@ -22,6 +22,11 @@ export type UpdateTenantSettingsBody = {
   currency?: string;
   /** @nullable */
   onboardingDismissedAt?: string | null;
+  /**
+   * @minimum 0
+   * @maximum 100
+   */
+  maxDiscountPercent?: number;
   notificationSettings?: UpdateTenantSettingsBodyNotificationSettings;
   integrationSettings?: UpdateTenantSettingsBodyIntegrationSettings;
 };
