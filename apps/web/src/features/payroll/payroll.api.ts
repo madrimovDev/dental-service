@@ -3,21 +3,26 @@ import {
   finalizePayrollRun,
   getPayrollRun,
   listPayrollRuns,
-  listUserAssignments,
+  listPayrollStaffNames,
 } from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { lookupKeys } from '@/lib/lookup-keys';
 import { payrollKeys } from './payroll.keys';
 
 /**
  * UserId → ism xaritasi uchun (payroll line faqat userId tashiydi).
- * `lookupKeys.userAssignments()` (`['users','assignments']`) audit feature bilan bir xil
- * key — cache ATAYLAB bo'lishiladi.
+ *
+ * CLI-470: avval `useUserAssignments()` (`GET /users/assignments`, `user.view`)
+ * ishlatilardi — Accountant rol shabloni `payroll.view`/`payroll.manage`ga ega,
+ * `user.view`ga EGA EMAS → Payroll ekranini ochganda bu so'rov jim 403 yeb,
+ * xodim ismlari o'rniga bo'sh/ID ko'rinardi (CLI-153/154/155 bilan bir xil
+ * takrorlanuvchi cross-domen RBAC gap pattern). Fix: yengil `payroll.view`-gated
+ * `GET /payroll/staff-names` — `fullName` allaqachon backendda resolve qilingan
+ * (bo'sh bo'lsa `phone`ga fallback qilingan, `listDoctors` bilan bir xil pattern).
  */
-export function useUserAssignments() {
+export function useStaffNames() {
   return useQuery({
-    queryKey: lookupKeys.userAssignments(),
-    queryFn: () => listUserAssignments().then((r) => r.data),
+    queryKey: payrollKeys.staffNames(),
+    queryFn: () => listPayrollStaffNames().then((r) => r.data),
   });
 }
 

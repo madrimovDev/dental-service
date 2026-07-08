@@ -12,7 +12,7 @@ import {
   useFinalizeRun,
   usePayrollRun,
   usePayrollRuns,
-  useUserAssignments,
+  useStaffNames,
 } from '../payroll.api';
 import { toLocalDate, toPayrollLineVM, toPayrollRunVM } from '../payroll.mappers';
 import { periodFormSchema } from '../payroll.schema';
@@ -29,16 +29,16 @@ export function PayrollScreen() {
   const createRun = useCreateRun();
   const finalizeRun = useFinalizeRun();
 
-  // Xodim nomlarini yechish uchun (line faqat userId tashiydi).
-  const assignments = useUserAssignments();
+  // Xodim nomlarini yechish uchun (line faqat userId tashiydi). CLI-470:
+  // `payroll.view`-gated (`fullName` backendda allaqachon resolve qilingan).
+  const staffNames = useStaffNames();
   const nameByUserId = useMemo(() => {
     const map = new Map<string, string>();
-    for (const a of assignments.data ?? []) {
-      if (a.userFullName) map.set(a.userId, a.userFullName);
-      else map.set(a.userId, a.userPhone);
+    for (const s of staffNames.data ?? []) {
+      map.set(s.userId, s.fullName);
     }
     return map;
-  }, [assignments.data]);
+  }, [staffNames.data]);
 
   const form = useForm<{ period: [Date | null, Date | null] }>({
     initialValues: { period: [null, null] },
