@@ -1,4 +1,4 @@
-import { Mono } from '@dental/ui';
+import { Mono, StateView } from '@dental/ui';
 import { Badge, Group, Paper, Stack, Text } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { BalanceBadge } from '@/components/BalanceBadge';
@@ -10,7 +10,19 @@ export function PaymentsTab({ patientId }: { patientId: string }) {
   const query = usePatientPayments(patientId);
   const balanceQuery = usePatientBalance(patientId);
 
-  if (query.isLoading) return <Text>{t('common.loading')}</Text>;
+  if (query.isLoading) return <StateView status="loading" skeleton="table" />;
+  // CLI-456: xato holati avval "bo'sh" bilan bir xil ko'rinardi (faqat isLoading
+  // tekshirilardi) — endi StateView status="error" + retry (refetch chaqiradi).
+  if (query.isError) {
+    return (
+      <StateView
+        status="error"
+        title={t('states.error_title')}
+        retryLabel={t('states.retry')}
+        onRetry={() => query.refetch()}
+      />
+    );
+  }
 
   const rows = query.data?.data ?? [];
   const locale = i18n.language === 'ru' ? 'ru-RU' : 'uz-UZ';

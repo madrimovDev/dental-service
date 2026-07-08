@@ -1,11 +1,12 @@
 import { screen } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderApp } from '../../../test-utils';
 import { PatientCard } from './PatientCard';
 
-const { medicalHolder } = vi.hoisted(() => ({
+const { medicalHolder, permsHolder } = vi.hoisted(() => ({
   medicalHolder: { current: null as unknown },
+  permsHolder: { current: [] as string[] },
 }));
 
 vi.mock('../patients.api', () => ({
@@ -34,7 +35,19 @@ vi.mock('../patients.api', () => ({
   useUpdatePatient: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
+// CLI-456: 'pay' tab endi `cashier.view` bilan gate qilinadi — real Zustand store
+// (default permissions: []) o'rniga mock, per-test toggle qilinadigan ro'yxat bilan.
+vi.mock('@/stores/auth-store.ts', () => ({
+  useAuthStore: () => ({
+    hasPermission: (code: string) => permsHolder.current.includes(code),
+  }),
+}));
+
 describe('PatientCard', () => {
+  beforeEach(() => {
+    permsHolder.current = [];
+  });
+
   it("bemor ismi + tablarni ko'rsatadi", () => {
     medicalHolder.current = null;
     renderApp(
@@ -59,5 +72,27 @@ describe('PatientCard', () => {
     );
     // Data-driven (i18n'dan mustaqil) — allergiya bari render bo'lganini tasdiqlaydi.
     expect(screen.getByText('Lidokain')).toBeInTheDocument();
+  });
+
+  it("cashier.view ruxsati bo'lmasa 'To'lovlar' tab ko'rinmaydi (CLI-456)", () => {
+    permsHolder.current = [];
+    renderApp(
+      <Routes>
+        <Route path="/patients/:id" element={<PatientCard />} />
+      </Routes>,
+      { route: '/patients/p1' },
+    );
+    expect(screen.queryByText("To'lovlar")).not.toBeInTheDocument();
+  });
+
+  it("cashier.view ruxsati bilan 'To'lovlar' tab ko'rinadi (CLI-456)", () => {
+    permsHolder.current = ['cashier.view'];
+    renderApp(
+      <Routes>
+        <Route path="/patients/:id" element={<PatientCard />} />
+      </Routes>,
+      { route: '/patients/p1' },
+    );
+    expect(screen.getByText("To'lovlar")).toBeInTheDocument();
   });
 });

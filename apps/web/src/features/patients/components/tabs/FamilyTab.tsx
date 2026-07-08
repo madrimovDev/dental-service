@@ -1,4 +1,4 @@
-import { Button, Card, Input } from '@dental/ui';
+import { Button, Card, Input, StateView } from '@dental/ui';
 import {
   ActionIcon,
   Badge,
@@ -159,9 +159,16 @@ function EmergencyContactsSection({ patientId }: { patientId: string }) {
       <Text fw={600}>{t('patients.emergency.title')}</Text>
       <Paper withBorder p="md" radius="var(--radius-card)">
         {query.isLoading ? (
-          <Text>{t('common.loading')}</Text>
+          <StateView status="loading" skeleton="table" />
+        ) : query.isError ? (
+          <StateView
+            status="error"
+            title={t('states.error_title')}
+            retryLabel={t('states.retry')}
+            onRetry={() => query.refetch()}
+          />
         ) : rows.length === 0 ? (
-          <Text c="dimmed">{t('patients.emergency.empty')}</Text>
+          <StateView status="empty" title={t('patients.emergency.empty')} />
         ) : (
           <Table striped highlightOnHover>
             <Table.Thead>
@@ -224,9 +231,16 @@ export function FamilyTab({ patientId }: { patientId: string }) {
     <Stack gap="md">
       <Paper withBorder p="md" radius="var(--radius-card)">
         {query.isLoading ? (
-          <Text>{t('common.loading')}</Text>
+          <StateView status="loading" skeleton="table" />
+        ) : query.isError ? (
+          <StateView
+            status="error"
+            title={t('states.error_title')}
+            retryLabel={t('states.retry')}
+            onRetry={() => query.refetch()}
+          />
         ) : rows.length === 0 ? (
-          <Text c="dimmed">{t('patients.relatives.empty')}</Text>
+          <StateView status="empty" title={t('patients.relatives.empty')} />
         ) : (
           <Table striped highlightOnHover>
             <Table.Thead>

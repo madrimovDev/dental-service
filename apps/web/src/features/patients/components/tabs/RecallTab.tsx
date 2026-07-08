@@ -1,15 +1,5 @@
-import { Card, StatusPill } from '@dental/ui';
-import {
-  Button,
-  Group,
-  NumberInput,
-  Paper,
-  Select,
-  Stack,
-  Table,
-  Text,
-  Textarea,
-} from '@mantine/core';
+import { Card, StateView, StatusPill } from '@dental/ui';
+import { Button, Group, NumberInput, Paper, Select, Stack, Table, Textarea } from '@mantine/core';
 import { DateInput } from '@mantine/dates';
 import { useForm } from '@mantine/form';
 import { IconPlus } from '@tabler/icons-react';
@@ -138,9 +128,16 @@ export function RecallTab({ patientId }: { patientId: string }) {
     <Stack gap="md">
       <Paper withBorder p="md" radius="var(--radius-card)">
         {query.isLoading ? (
-          <Text>{t('common.loading')}</Text>
+          <StateView status="loading" skeleton="table" />
+        ) : query.isError ? (
+          <StateView
+            status="error"
+            title={t('states.error_title')}
+            retryLabel={t('states.retry')}
+            onRetry={() => query.refetch()}
+          />
         ) : rows.length === 0 ? (
-          <Text c="dimmed">{t('recall.tab.empty')}</Text>
+          <StateView status="empty" title={t('recall.tab.empty')} />
         ) : (
           <Table striped highlightOnHover>
             <Table.Thead>
