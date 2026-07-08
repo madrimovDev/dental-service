@@ -492,6 +492,14 @@ export const createPatientsService = (deps: { audit: AuditLogger }) => {
       .where(eq(medicalRecords.patientId, patientId));
     if (!record) return [];
 
+    // CLI-439: getMedicalRecord() bilan bir xil sensitive-read audit —
+    // medical_record.view bilan gate qilingan boshqa o'qish ham yoziladi.
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'medical_record',
+      resourceId: record.id,
+    });
+
     return db
       .select({
         id: auditLog.id,
