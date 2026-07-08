@@ -4,6 +4,7 @@ import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { requireModuleInDesktop } from '../../lib/license-middleware.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
+import { CrossEntityError } from '../../lib/ownership.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
@@ -37,7 +38,7 @@ import {
   updateMedicalRecordSchema,
   updatePatientSchema,
 } from './patients.schema.ts';
-import { createPatientsService } from './patients.service.ts';
+import { createPatientsService, PatientRelativeConflictError } from './patients.service.ts';
 
 /** Standart 404 — get / patch / archive / medical endpoint'lar uchun. */
 const patientNotFound = {
@@ -284,7 +285,10 @@ export const patientRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     path: '/{id}/relatives',
     tags: ['patients'],
     operationId: 'listPatientRelatives',
-    middleware: [requirePermission('patient.edit')] as const,
+    // CLI-474 (L1): LIST (READ) — `patient.view` yetarli, `patient.edit` emas
+    // (Nurse/Technician/Accountant `patient.edit`ga ega emas, lekin favqulodda
+    // aloqani ko'ra olishi kerak). Faqat WRITE (POST/DELETE) `patient.edit` talab qiladi.
+    middleware: [requirePermission('patient.view')] as const,
     request: { params: patientIdParamSchema },
     responses: okJson(z.array(patientRelativeViewSchema), 'List of patient relatives'),
   });
@@ -322,15 +326,32 @@ export const patientRoutes = (deps: { db: Database; audit: AuditLogger }) => {
         content: { 'application/json': { schema: errorResponseSchema } },
         description: 'Forbidden',
       },
+      409: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Duplicate relative link (CLI-474 L5)',
+      },
     },
   });
 
   app.openapi(addRelativeRoute, async (c) => {
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const row = await service.addRelative(c, id, body);
-    if (!row) throw new Error('Relative link creation failed');
-    return c.json(ok(toPatientRelativeDto(row)), 201);
+    try {
+      const row = await service.addRelative(c, id, body);
+      if (!row) throw new Error('Relative link creation failed');
+      return c.json(ok(toPatientRelativeDto(row)), 201);
+    } catch (e) {
+      // CLI-421: cross-entity ownership mismatch (patientId/relativePatientId) → 400.
+      if (e instanceof CrossEntityError) {
+        return c.json(fail(`ownership.${e.reason}`, e.message), 400);
+      }
+      // CLI-474 (L4): o'z-o'ziga havola → 400; (L5): reciprocal/takroriy juftlik → 409.
+      if (e instanceof PatientRelativeConflictError) {
+        const status = e.code === 'duplicate_link' ? 409 : 400;
+        return c.json(fail(`patient_relative.${e.code}`, e.message), status);
+      }
+      throw e;
+    }
   });
 
   const removeRelativeRoute = createRoute({
@@ -360,7 +381,9 @@ export const patientRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     path: '/{id}/emergency-contacts',
     tags: ['patients'],
     operationId: 'listPatientEmergencyContacts',
-    middleware: [requirePermission('patient.edit')] as const,
+    // CLI-474 (L1): LIST (READ) — `patient.view` yetarli, `patient.edit` emas (relatives
+    // list bilan bir xil qaror — quyidagi izohga qarang).
+    middleware: [requirePermission('patient.view')] as const,
     request: { params: patientIdParamSchema },
     responses: okJson(z.array(emergencyContactDtoSchema), 'List of patient emergency contacts'),
   });
@@ -404,9 +427,17 @@ export const patientRoutes = (deps: { db: Database; audit: AuditLogger }) => {
   app.openapi(addEmergencyContactRoute, async (c) => {
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const row = await service.addEmergencyContact(c, id, body);
-    if (!row) throw new Error('Emergency contact creation failed');
-    return c.json(ok(toEmergencyContactDto(row)), 201);
+    try {
+      const row = await service.addEmergencyContact(c, id, body);
+      if (!row) throw new Error('Emergency contact creation failed');
+      return c.json(ok(toEmergencyContactDto(row)), 201);
+    } catch (e) {
+      // CLI-421: cross-entity ownership mismatch (URL patientId) → 400.
+      if (e instanceof CrossEntityError) {
+        return c.json(fail(`ownership.${e.reason}`, e.message), 400);
+      }
+      throw e;
+    }
   });
 
   const removeEmergencyContactRoute = createRoute({

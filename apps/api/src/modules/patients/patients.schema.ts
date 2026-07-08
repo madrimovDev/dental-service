@@ -38,21 +38,36 @@ const testResultsSchema = z
 
 // ─── Request schemas (SAQLANADI — hand client REQUEST tiplari) ───────────────
 
+/** Bugungi sana (server, UTC) ISO date-only shaklda — dateOfBirth yuqori chegarasi. */
+const todayIsoDate = () => new Date().toISOString().slice(0, 10);
+
 export const createPatientSchema = z.object({
   fullName: z.string().min(2).max(120),
-  dateOfBirth: z.iso.date().optional(),
-  gender: z.enum(['male', 'female', 'other']).optional(),
+  // CLI-464: kelajak sana rad etiladi — refine har parse'da joriy sanaga solishtiradi.
+  dateOfBirth: z.iso
+    .date()
+    .nullable()
+    .optional()
+    .refine((v) => v == null || v <= todayIsoDate(), {
+      message: 'dateOfBirth cannot be in the future',
+    }),
+  gender: z.enum(['male', 'female', 'other']).nullable().optional(),
+  // CLI-455: .nullable() — ixtiyoriy PII/kontakt maydonni `null` bilan tozalash
+  // mumkin bo'lishi uchun (insurance bilan bir xil naqsh); kalit umuman yo'q
+  // bo'lsa (`undefined`) — service.update() tegmaydi (no-op, PATCH semantikasi).
   phone: z
     .string()
     .regex(/^\+?\d{9,15}$/)
+    .nullable()
     .optional(),
   phoneSecondary: z
     .string()
     .regex(/^\+?\d{9,15}$/)
+    .nullable()
     .optional(),
-  passport: z.string().max(64).optional(),
-  address: z.string().max(500).optional(),
-  notes: z.string().max(2000).optional(),
+  passport: z.string().max(64).nullable().optional(),
+  address: z.string().max(500).nullable().optional(),
+  notes: z.string().max(2000).nullable().optional(),
   tags: z.array(z.string().min(1).max(40)).max(20).optional(),
   source: z.string().max(80).optional(),
   insurance: insuranceInputSchema.nullable().optional(),
@@ -102,7 +117,8 @@ export type AddRelativeInput = z.infer<typeof addRelativeSchema>;
 /** Erkin emergency contact (tizimda bemor BO'LMAGAN shaxs) — add input. */
 export const addEmergencyContactSchema = z.object({
   name: z.string().min(1).max(120),
-  phone: z.string().min(1).max(40),
+  // CLI-474 (L3): patient.phone bilan bir xil regex (avval erkin 40-belgigacha matn edi).
+  phone: z.string().regex(/^\+?\d{9,15}$/),
   relationship: z.string().min(1).max(60).optional(),
   isPrimary: z.boolean().optional(),
 });

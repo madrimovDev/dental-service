@@ -14,6 +14,7 @@ import { and, count, desc, eq, ilike, inArray, isNotNull, isNull, ne, or, sql } 
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { createOwnershipValidator, type OwnershipValidator } from '../../lib/ownership.ts';
 import type { NonPlanTransactionRow } from './patients.balance.ts';
 import { computeNonPlanRemainder, computePatientBalance } from './patients.balance.ts';
 import type {
@@ -27,6 +28,20 @@ import type {
 } from './patients.schema.ts';
 
 const PII_FIELDS = ['phone', 'phoneSecondary', 'passport', 'address'] as const;
+
+/**
+ * CLI-474 (L4/L5) — `addRelative` domen-validatsiya xatosi (o'z-o'ziga havola yoki
+ * takroriy/reciprocal juftlik). `ownership.ts`dagi `CrossEntityError`dan farqli —
+ * bu ikkala tomon ham HAQIQIY bemor, lekin ular orasidagi MUNOSABAT noto'g'ri
+ * (queue.service.ts `QueueValidationError` bilan bir xil naqsh — routes try/catch
+ * orqali map qilinadi).
+ */
+export class PatientRelativeConflictError extends Error {
+  constructor(readonly code: 'self_link' | 'duplicate_link') {
+    super(code);
+    this.name = 'PatientRelativeConflictError';
+  }
+}
 
 /**
  * PII fieldlarni masklash — user `patient.view_pii` permission yo'q bo'lsa
@@ -61,7 +76,12 @@ const userHasPiiAccess = (c: Context): boolean => {
 /** Qarzga kiruvchi reja statuslari — draft/presented/cancelled chiqariladi. */
 const DEBT_PLAN_STATUSES = ['accepted', 'in_progress', 'completed'] as const;
 
-export const createPatientsService = (deps: { audit: AuditLogger }) => {
+export const createPatientsService = (deps: {
+  audit: AuditLogger;
+  ownership?: OwnershipValidator;
+}) => {
+  const ownership = deps.ownership ?? createOwnershipValidator();
+
   async function list(c: Context, query: ListQuery) {
     const db = getDb(c);
     const offset = (query.page - 1) * query.pageSize;
@@ -203,6 +223,17 @@ export const createPatientsService = (deps: { audit: AuditLogger }) => {
     const masked = hasPii ? rows : rows.map(maskPii);
     const data = masked.map((p) => ({ ...p, balance: balanceById.get(p.id) ?? 0 }));
     const total = totalRows[0]?.total ?? 0;
+
+    // CLI-458: findById()dagi bilan bir xil sensitive-read audit, lekin bulk —
+    // har row uchun alohida emas, bitta batch yozuv (N+1 audit yo'q).
+    if (hasPii && rows.length > 0) {
+      await deps.audit.record(c, {
+        action: 'viewed_pii',
+        resourceType: 'patient',
+        resourceId: null,
+        after: { count: rows.length, patientIds: rows.map((r) => r.id) },
+      });
+    }
 
     return { data, meta: { page: query.page, pageSize: query.pageSize, total } };
   }
@@ -354,11 +385,24 @@ export const createPatientsService = (deps: { audit: AuditLogger }) => {
     const [before] = await db.select().from(patients).where(eq(patients.id, id));
     if (!before) return null;
 
-    const [updated] = await db
-      .update(patients)
-      .set({ ...input, updatedAt: new Date() })
-      .where(eq(patients.id, id))
-      .returning();
+    // CLI-455: explicit patch — kalit yo'q (`undefined`) bo'lsa ustunga tegmaydi,
+    // `null` bo'lsa ustunni tozalaydi. Zod schema `.nullable()` bo'lgani uchun
+    // ikkalasi runtime'da farqlanadi (`in`/`!== undefined` emas, oddiy tekshiruv
+    // yetarli — JSON body'dan `undefined` qiymat hech qachon kelmaydi).
+    const patch: Record<string, unknown> = { updatedAt: new Date() };
+    if (input.fullName !== undefined) patch.fullName = input.fullName;
+    if (input.dateOfBirth !== undefined) patch.dateOfBirth = input.dateOfBirth;
+    if (input.gender !== undefined) patch.gender = input.gender;
+    if (input.phone !== undefined) patch.phone = input.phone;
+    if (input.phoneSecondary !== undefined) patch.phoneSecondary = input.phoneSecondary;
+    if (input.passport !== undefined) patch.passport = input.passport;
+    if (input.address !== undefined) patch.address = input.address;
+    if (input.notes !== undefined) patch.notes = input.notes;
+    if (input.tags !== undefined) patch.tags = input.tags;
+    if (input.source !== undefined) patch.source = input.source;
+    if (input.insurance !== undefined) patch.insurance = input.insurance;
+
+    const [updated] = await db.update(patients).set(patch).where(eq(patients.id, id)).returning();
 
     if (updated) {
       await deps.audit.record(c, {
@@ -468,6 +512,14 @@ export const createPatientsService = (deps: { audit: AuditLogger }) => {
       .where(eq(medicalRecords.patientId, patientId));
     if (!record) return [];
 
+    // CLI-439: getMedicalRecord() bilan bir xil sensitive-read audit —
+    // medical_record.view bilan gate qilingan boshqa o'qish ham yoziladi.
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'medical_record',
+      resourceId: record.id,
+    });
+
     return db
       .select({
         id: auditLog.id,
@@ -539,6 +591,43 @@ export const createPatientsService = (deps: { audit: AuditLogger }) => {
     const db = getDb(c);
     const tenantId = c.get('activeTenantId');
     if (!tenantId) throw new Error('No tenant context');
+
+    // CLI-474 (L4): o'z-o'ziga havola — arzon input tekshiruvi, DB'ga tegmasdan
+    // birinchi bo'lib rad etiladi.
+    if (input.relativePatientId === patientId) {
+      throw new PatientRelativeConflictError('self_link');
+    }
+
+    // CLI-421: cross-entity ownership — ikkala tomon ham shu tenant'ga tegishli
+    // haqiqiy bemor ekanini tekshiramiz (avval FK constraint'ga tayanardi — xom
+    // 500 o'rniga toza CrossEntityError → routes 400).
+    await ownership.assertPatientExists(c, patientId);
+    await ownership.assertPatientExists(c, input.relativePatientId);
+
+    // CLI-474 (L5): unique constraint (patient_id, relative_patient_id) faqat AYNAN
+    // bir xil yo'nalishni bloklaydi — reciprocal (B→A, A→B mavjud bo'lganda) alohida
+    // qator sifatida yozilaverardi. Ikkala yo'nalishni ham oldindan tekshiramiz —
+    // shu bilan bir vaqtda aynan bir xil yo'nalishdagi takror ham xom Postgres unique
+    // violation (500) o'rniga toza PatientRelativeConflictError (409) qaytaradi.
+    const [existing] = await db
+      .select({ id: patientRelatives.id })
+      .from(patientRelatives)
+      .where(
+        or(
+          and(
+            eq(patientRelatives.patientId, patientId),
+            eq(patientRelatives.relativePatientId, input.relativePatientId),
+          ),
+          and(
+            eq(patientRelatives.patientId, input.relativePatientId),
+            eq(patientRelatives.relativePatientId, patientId),
+          ),
+        ),
+      )
+      .limit(1);
+    if (existing) {
+      throw new PatientRelativeConflictError('duplicate_link');
+    }
 
     const [link] = await db
       .insert(patientRelatives)
@@ -613,17 +702,51 @@ export const createPatientsService = (deps: { audit: AuditLogger }) => {
     const tenantId = c.get('activeTenantId');
     if (!tenantId) throw new Error('No tenant context');
 
-    const [contact] = await db
-      .insert(patientEmergencyContacts)
-      .values({
-        tenantId,
-        patientId,
-        name: input.name,
-        phone: input.phone,
-        relationship: input.relationship ?? null,
-        isPrimary: input.isPrimary ?? false,
-      })
-      .returning();
+    // CLI-421: cross-entity ownership — URL patientId shu tenant'ga tegishli
+    // haqiqiy bemor ekanini tekshiramiz.
+    await ownership.assertPatientExists(c, patientId);
+
+    const isPrimary = input.isPrimary ?? false;
+
+    // CLI-463: isPrimary=true bo'lsa, shu bemorning boshqa contact'larini AVVAL
+    // demote qilamiz (bitta tranzaksiya ichida) — bir nechta contact bir vaqtda
+    // primary bo'lib qolmasligi uchun (listEmergencyContacts bitta-primary
+    // semantikasini nazarda tutadi, `isPrimary DESC` tartib).
+    const [contact] = isPrimary
+      ? await db.transaction(async (tx) => {
+          await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);
+          await tx
+            .update(patientEmergencyContacts)
+            .set({ isPrimary: false })
+            .where(
+              and(
+                eq(patientEmergencyContacts.patientId, patientId),
+                eq(patientEmergencyContacts.isPrimary, true),
+              ),
+            );
+          return tx
+            .insert(patientEmergencyContacts)
+            .values({
+              tenantId,
+              patientId,
+              name: input.name,
+              phone: input.phone,
+              relationship: input.relationship ?? null,
+              isPrimary: true,
+            })
+            .returning();
+        })
+      : await db
+          .insert(patientEmergencyContacts)
+          .values({
+            tenantId,
+            patientId,
+            name: input.name,
+            phone: input.phone,
+            relationship: input.relationship ?? null,
+            isPrimary: false,
+          })
+          .returning();
 
     if (contact) {
       await deps.audit.record(c, {
