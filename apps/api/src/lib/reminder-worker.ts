@@ -48,12 +48,28 @@ export async function processReminderJob(
       startTime: appt.startTime,
     });
 
+    // CLI-465: bemor telefoni yo'q bo'lganda SMS avval jim (kuzatilmagan)
+    // o'tkazib yuborilardi. recall-worker.ts'dagi outcome:'no_phone' pattern'iga
+    // mos — `notifications` jadvali reminder worker uchun mavjud persistence
+    // (fayl boshidagi izoh: "Yozilish eslatmasi (reminder worker)"), shuning
+    // uchun yangi jadval/migratsiya shart emas — alohida `type` bilan doktorga
+    // kuzatiladigan in-app yozuv qoldiramiz, SMS umuman urinilmaydi.
+    if (!patient?.phone) {
+      await svc.notifyInTx(tx, tenantId, {
+        userId: appt.doctorId,
+        type: 'appointment_reminder_no_phone',
+        title,
+        body: `${body} — Bemor telefoni yo‘q, SMS yuborilmadi`,
+      });
+      return;
+    }
+
     await svc.notifyInTx(tx, tenantId, {
       userId: appt.doctorId,
       type: 'appointment_reminder',
       title,
       body,
-      smsTo: patient?.phone ?? undefined,
+      smsTo: patient.phone,
     });
   });
 }
