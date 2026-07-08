@@ -9,6 +9,7 @@ import {
   listUserAssignments,
 } from '@dental/api-client';
 import { useQuery } from '@tanstack/react-query';
+import { useAuthStore } from '@/stores/auth-store.ts';
 import { dashboardKeys } from './dashboard.keys';
 import { filterActiveLabOrders, toBranchNameMap, toDoctorNameMap } from './dashboard.mappers';
 
@@ -73,12 +74,20 @@ export function useDoctorAppointments(
   });
 }
 
-/** Faol (delivered/cancelled bo'lmagan) lab buyurtmalari — texnik navbati. */
+/**
+ * Faol (delivered/cancelled bo'lmagan) lab buyurtmalari — texnik navbati.
+ *
+ * CLI-412: Technician rol shabloni endi `lab_order.view`ga ega (backend gate ochiq),
+ * lekin himoya sifatida (graceful degrade) so'rov faqat ruxsat bor bo'lsa yuboriladi —
+ * kelajakda boshqa rol shu dashboard'ni ochsa 403 portlamasin.
+ */
 export function useActiveLabOrders() {
+  const { hasPermission } = useAuthStore();
   return useQuery({
     queryKey: dashboardKeys.labOrders(),
     queryFn: () => listLabOrders().then((r) => r.data.data),
     select: filterActiveLabOrders,
+    enabled: hasPermission('lab_order.view'),
   });
 }
 

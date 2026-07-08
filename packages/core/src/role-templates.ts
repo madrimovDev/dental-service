@@ -81,6 +81,15 @@ export const ROLE_TEMPLATES = [
       'schedule.manage',
       'recall.view',
       'recall.manage',
+      // M5 shell permissions (CLI-412)
+      'prescription.view',
+      'prescription.manage',
+      'consent.view',
+      'consent.manage',
+      'lab_order.view',
+      'lab_order.manage',
+      'patient_image.view',
+      'patient_image.upload',
     ],
   },
   {
@@ -120,6 +129,11 @@ export const ROLE_TEMPLATES = [
       'schedule.manage',
       'recall.view',
       'recall.manage',
+      // M5 shell permissions (CLI-412) — faqat *.view (manage/upload YO'Q)
+      'prescription.view',
+      'consent.view',
+      'lab_order.view',
+      'patient_image.view',
     ],
   },
   {
@@ -144,6 +158,15 @@ export const ROLE_TEMPLATES = [
       'stock.manage',
       'schedule.view',
       'recall.view',
+      // M5 shell permissions (CLI-412)
+      'prescription.view',
+      'prescription.manage',
+      'consent.view',
+      'consent.manage',
+      'lab_order.view',
+      'lab_order.manage',
+      'patient_image.view',
+      'patient_image.upload',
     ],
   },
   {
@@ -171,6 +194,15 @@ export const ROLE_TEMPLATES = [
       'stock.view',
       'stock.manage',
       'schedule.view',
+      // M5 shell permissions (CLI-412)
+      'prescription.view',
+      'prescription.manage',
+      'consent.view',
+      'consent.manage',
+      'lab_order.view',
+      'lab_order.manage',
+      'patient_image.view',
+      'patient_image.upload',
     ],
   },
   {
@@ -187,6 +219,12 @@ export const ROLE_TEMPLATES = [
       'queue.view',
       'stock.view',
       'stock.manage',
+      // M5 shell permissions (CLI-412) — *.view + patient_image.upload (manage YO'Q)
+      'prescription.view',
+      'consent.view',
+      'lab_order.view',
+      'patient_image.view',
+      'patient_image.upload',
     ],
   },
   {
@@ -247,7 +285,9 @@ export const ROLE_TEMPLATES = [
       'tenant.view',
       'branch.view',
       'patient.view',
-      // M5 da: lab_order.view, lab_order.edit
+      // M5 shell permissions (CLI-412) — faqat lab_order.*
+      'lab_order.view',
+      'lab_order.manage',
     ],
   },
 ] as const satisfies readonly RoleTemplate[];
