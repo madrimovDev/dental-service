@@ -698,7 +698,6 @@
     "consent_signed": "Rozilik imzolangan",
     "consent_signed_at": "Imzolangan sana",
     "consent_required": "Avval rozilikni imzolang",
-    "consent_signature_url": "Imzo havolasi (ixtiyoriy)",
     "financial_summary": "Moliyaviy xulosa",
     "total_plan": "Jami reja",
     "pdf_consent": "Reja PDF · konsent",
@@ -826,7 +825,12 @@
     "patient_signature_name": "Bemor F.I.SH. (imzo o'rniga)",
     "empty": "Imzolangan konsent yo'q",
     "no_templates": "Shablonlar yo'q",
-    "sign": "Imzolash"
+    "sign": "Imzolash",
+    "is_perpetual": "Muddatsiz (doimiy amal qiladi)",
+    "expires_at": "Amal qilish muddati",
+    "select_form": "Konsent-formani tanlang",
+    "no_valid_forms": "Amaldagi konsent-forma topilmadi. Avval \"Rozilik\" bo'limida imzolang.",
+    "expires_label": "Muddati: {{date}}"
   },
   "lab_order": {
     "title": "Laboratoriya buyurtmalari",

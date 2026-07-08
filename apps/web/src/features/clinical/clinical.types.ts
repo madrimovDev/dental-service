@@ -169,6 +169,11 @@ export type ConsentFormVM = {
   signedAtText: string;
   signerName: string | null;
   bodyPreview: string;
+  // CLI-461: treatment-plan accept gate consent tanlagichi (PlanCard) shu ikkalasini
+  // ishlatadi — faqat "isValid" formalarni tanlash uchun ko'rsatadi.
+  isPerpetual: boolean;
+  expiryText: string | null; // null = muddatsiz YOKI expiresAt yo'q
+  isValid: boolean; // isPerpetual YOKI expiresAt > hozir
 };
 
 // ===== C: Image =====

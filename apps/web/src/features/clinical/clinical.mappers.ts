@@ -374,6 +374,9 @@ export function toLabOrderVM(order: LabOrder): LabOrderVM {
 // ===== B: consent =====
 export function toConsentFormVM(form: ConsentForm): ConsentFormVM {
   const trimmed = form.bodyText.slice(0, 240);
+  // CLI-461: gate bilan bir xil qoida (backend `isConsentFormCurrentlyValid`) —
+  // isPerpetual=true YOKI expiresAt hali kelmagan bo'lsa "amaldagi".
+  const isValid = form.isPerpetual || (!!form.expiresAt && new Date(form.expiresAt) > new Date());
   return {
     id: form.id,
     title: form.title,
@@ -383,6 +386,9 @@ export function toConsentFormVM(form: ConsentForm): ConsentFormVM {
     signedAtText: dts(form.signedAt),
     signerName: form.patientSignatureName || null,
     bodyPreview: form.bodyText.length > 240 ? `${trimmed}...` : trimmed,
+    isPerpetual: form.isPerpetual,
+    expiryText: form.expiresAt ? dt(form.expiresAt) : null,
+    isValid,
   };
 }
 

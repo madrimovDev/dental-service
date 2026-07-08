@@ -6,7 +6,7 @@ import type {
   TreatmentStageStatus,
 } from '@dental/api-client';
 import { Mono, StatusPill } from '@dental/ui';
-import { Button, Group, Modal, Stack, TextInput } from '@mantine/core';
+import { Button, Group, Modal, Select, Stack, Text } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import {
   IconBan,
@@ -19,7 +19,8 @@ import {
 } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { toPlanCardVM } from '../../clinical.mappers';
+import { useConsentForms } from '../../clinical.api';
+import { toConsentFormVM, toPlanCardVM } from '../../clinical.mappers';
 import { EstimateView } from './EstimateView';
 import { StageRow } from './StageRow';
 import classes from './TreatmentPlansTab.module.css';
@@ -82,10 +83,13 @@ export function PlanCard({
   const vm = toPlanCardVM(plan);
   const [estimateOpened, estimate] = useDisclosure(false);
   const [consentOpened, consent] = useDisclosure(false);
-  const [signatureUrl, setSignatureUrl] = useState('');
+  const [selectedConsentFormId, setSelectedConsentFormId] = useState<string | null>(null);
 
+  // CLI-461 — "to'liq bog'lash": planni asoslovchi haqiqiy consent_forms yozuvi
+  // linklanganmi (avval `consentSignedAt` cache tekshirilardi — endi haqiqiy manba
+  // `consentFormId`, cache faqat informatsion).
   const proposedStageIds = plan.stages.filter((s) => s.acceptance === 'proposed').map((s) => s.id);
-  const hasConsent = plan.consentSignedAt != null;
+  const hasConsent = plan.consentFormId != null;
   const lang = i18n.language === 'ru' ? 'ru' : 'uz';
   const canCancelPlan = CANCELLABLE_PLAN_STATUSES.includes(plan.status);
 
@@ -97,10 +101,21 @@ export function PlanCard({
   const completedStages = plan.stages.filter((s) => s.status === 'completed').length;
   const progressPct = totalStages > 0 ? Math.round((completedStages / totalStages) * 100) : 0;
 
+  // CLI-461: konsent endi bo'sh/URL-only payload emas — bemorning MAVJUD, AMALDAGI
+  // 'treatment' turidagi consent_forms yozuvlaridan biriga ("to'liq bog'lash")
+  // havola qilinadi. `useConsentForms` faqat modal ochilganda kerak, lekin hook
+  // shart-qoidasiz chaqirilishi kerak (React hooks qoidasi) — `enabled` orqali
+  // yopiq holatda so'rov yubormaymiz.
+  const consentFormsQuery = useConsentForms(plan.patientId, { enabled: consentOpened });
+  const validConsentOptions = (consentFormsQuery.data ?? [])
+    .map(toConsentFormVM)
+    .filter((f) => f.type === 'treatment' && f.isValid);
+
   const submitConsent = () => {
-    onSignConsent(plan.id, signatureUrl ? { consentSignatureUrl: signatureUrl } : {});
+    if (!selectedConsentFormId) return;
+    onSignConsent(plan.id, { consentFormId: selectedConsentFormId });
     consent.close();
-    setSignatureUrl('');
+    setSelectedConsentFormId(null);
   };
 
   return (
@@ -297,16 +312,33 @@ export function PlanCard({
         title={t('treatment_plan.sign_consent')}
       >
         <Stack gap="md">
-          <TextInput
-            label={t('treatment_plan.consent_signature_url')}
-            value={signatureUrl}
-            onChange={(e) => setSignatureUrl(e.currentTarget.value)}
-          />
+          {consentFormsQuery.isLoading ? (
+            <Text c="dimmed">{t('common.loading')}</Text>
+          ) : validConsentOptions.length === 0 ? (
+            <Text c="dimmed">{t('consent.no_valid_forms')}</Text>
+          ) : (
+            <Select
+              label={t('consent.select_form')}
+              placeholder={t('common.select')}
+              data={validConsentOptions.map((f) => ({
+                value: f.id,
+                label: f.isPerpetual
+                  ? f.title
+                  : `${f.title} — ${t('consent.expires_label', { date: f.expiryText })}`,
+              }))}
+              value={selectedConsentFormId}
+              onChange={setSelectedConsentFormId}
+            />
+          )}
           <Group justify="flex-end">
             <Button variant="default" onClick={consent.close}>
               {t('common.cancel')}
             </Button>
-            <Button loading={consentPending} onClick={submitConsent}>
+            <Button
+              loading={consentPending}
+              disabled={!selectedConsentFormId}
+              onClick={submitConsent}
+            >
               {t('treatment_plan.sign_consent')}
             </Button>
           </Group>
