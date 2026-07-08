@@ -245,11 +245,18 @@ export const createRecallsRepository = () => {
     return row?.months ?? 6;
   }
 
-  /** Status bo'yicha sanoq + overdue (dueDate < bugun, ochiq) + efficacy. RLS tenant-scoped. */
-  async function summary(c: Context, branchId?: string) {
+  /**
+   * Status bo'yicha sanoq + overdue (dueDate < bugun, ochiq) + efficacy. RLS
+   * tenant-scoped. `today` — chaqiruvchi (recalls.service.ts) tomonidan
+   * hisoblangan klinika-local (Asia/Tashkent) kun string'i (CLI-466: DB
+   * `CURRENT_DATE` session TZ'ga bog'liq — bu yerda parametr sifatida
+   * bog'lanadi, `list()`dagi `lte(recalls.dueDate, query.date)` pattern'iga mos).
+   */
+  async function summary(c: Context, branchId?: string, today?: string) {
     const db = getDb(c);
     const filters = branchId ? [eq(recalls.branchId, branchId)] : [];
     const where = filters.length ? and(...filters) : undefined;
+    const todayParam = today ?? new Date().toISOString().slice(0, 10);
     const [row] = await db
       .select({
         pending: sql<number>`COUNT(*) FILTER (WHERE ${recalls.status} = 'pending')`,
@@ -257,7 +264,7 @@ export const createRecallsRepository = () => {
         scheduled: sql<number>`COUNT(*) FILTER (WHERE ${recalls.status} = 'scheduled')`,
         completed: sql<number>`COUNT(*) FILTER (WHERE ${recalls.status} = 'completed')`,
         total: count(),
-        overdue: sql<number>`COUNT(*) FILTER (WHERE ${recalls.dueDate} < CURRENT_DATE AND ${recalls.status} IN ('pending','contacted'))`,
+        overdue: sql<number>`COUNT(*) FILTER (WHERE ${recalls.dueDate} < ${todayParam} AND ${recalls.status} IN ('pending','contacted'))`,
       })
       .from(recalls)
       .where(where);

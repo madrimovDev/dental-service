@@ -13,6 +13,23 @@ import type {
 const CLOSED_STATUSES = new Set(['scheduled', 'completed', 'dismissed']);
 
 /**
+ * Klinika-local (Asia/Tashkent) bugungi kun (YYYY-MM-DD). CLI-466: `summary()`
+ * overdue hisobida DB `CURRENT_DATE` o'rniga shu ishlatiladi — `CURRENT_DATE`
+ * Postgres session TZ'ga bog'liq (odatda UTC), Tashkent (+5) bilan farqi
+ * kuni chegarasida (00:00–04:59 Tashkent) noto'g'ri natija berardi.
+ * `queue.service.ts::tashkentDayStart()` / `recall-worker.ts::localDateString()`
+ * bilan bir xil pattern (Qaror #22, fixed offset, DST yo'q).
+ */
+function tashkentTodayString(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: CLINIC_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now);
+}
+
+/**
  * Rebook relevantlik oynasi (CLI-426): yozilish recall'ni faqat `dueDate − 30 kun`
  * dan keyin (yoki keyingi) boshlansa yopadi. Uzoq kelajakdagi (mas. +4 oy preventive)
  * recall bugungi shoshilinch yozilish bilan yopilmaydi.
@@ -267,8 +284,9 @@ export const createRecallsService = (deps: { audit: AuditLogger }) => {
     }
   }
 
-  async function summary(c: Context, branchId?: string) {
-    const s = await repo.summary(c, branchId);
+  async function summary(c: Context, branchId?: string, now: Date = new Date()) {
+    const today = tashkentTodayString(now);
+    const s = await repo.summary(c, branchId, today);
     const converted = s.scheduled + s.completed;
     const efficacyPct = s.total === 0 ? 0 : (converted / s.total) * 100;
     return {

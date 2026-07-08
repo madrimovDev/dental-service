@@ -84,6 +84,20 @@ export const createQueueService = (deps: {
     return await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);
 
+      // CLI-457: navbat raqami race condition — `MAX(queueNumber)+1` qulfsiz
+      // hisoblanardi. `ticketDate` mikrosekund-aniq `defaultNow()` bo'lgani uchun
+      // `UNIQUE(tenantId,branchId,ticketDate,queueNumber)` deyarli hech qachon
+      // to'qnashmaydi — parallel so'rovlar bir xil MAX'ni ko'rib bir xil
+      // queueNumber olishi mumkin edi. `SELECT ... FOR UPDATE` bu yerda ishlamaydi
+      // (a) aggregat `MAX()` bilan FOR UPDATE Postgres'da taqiqlangan, (b) kunning
+      // BIRINCHI tiketida qulflanadigan qator umuman yo'q (phantom insert).
+      // Transaction-scoped advisory lock — tenant+branch+kun bo'yicha — ikkinchi
+      // parallel so'rovni birinchisi commit bo'lguncha kutkazadi (avto-bo'shaydi,
+      // RLS'dan mustaqil, boshqa tenant/branch/kun bilan to'qnashmaydi).
+      const lockDay = tashkentDayStart().toISOString().slice(0, 10);
+      const lockKey = `queue-ticket:${tenantId}:${input.branchId}:${lockDay}`;
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`);
+
       // A5 (CLI-438): linked appointment validatsiyasi — mavjudlik + branch/
       // patient mosligi + status (cancelled emas) + dublikat-ochiq-tiket rad.
       // Ilgari bular tekshirilmasdi (dedupe faqat candidates query'da, create'da
