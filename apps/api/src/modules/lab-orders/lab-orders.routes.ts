@@ -4,6 +4,7 @@ import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { requireModuleInDesktop } from '../../lib/license-middleware.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
+import { CrossEntityError } from '../../lib/ownership.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requireFeature } from '../../middleware/require-feature.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
@@ -107,9 +108,17 @@ export const labOrdersRoutes = (deps: { db: Database; audit: AuditLogger }) => {
 
   app.openapi(createRoute_, async (c) => {
     const body = c.req.valid('json');
-    const row = await service.create(c, body);
-    if (!row) throw new Error('Lab order creation failed');
-    return c.json(ok(toLabOrderDto(row)), 201);
+    try {
+      const row = await service.create(c, body);
+      if (!row) throw new Error('Lab order creation failed');
+      return c.json(ok(toLabOrderDto(row)), 201);
+    } catch (e) {
+      // L12: cross-entity ownership mismatch → 400 (noto'g'ri havola, resource emas).
+      if (e instanceof CrossEntityError) {
+        return c.json(fail(`ownership.${e.reason}`, e.message), 400);
+      }
+      throw e;
+    }
   });
 
   // ─── GET /{id} — get by id ────────────────────────────────────────────────────
