@@ -130,15 +130,21 @@ async function netServiceAggregates(
         ${branchFilter}
     )
     SELECT
-      i.service_name AS "serviceName",
-      MAX(i.service_id::text) AS "serviceId",
+      MAX(i.service_name) AS "serviceName",
+      i.service_id::text AS "serviceId",
       COALESCE(SUM(i.quantity), 0) AS "count",
       COALESCE(SUM(
         CASE WHEN tn.gross > 0 THEN ROUND((i.subtotal * tn.net_paid / tn.gross)::numeric, 2) ELSE 0 END
       ), 0) AS "revenue"
     FROM cashier_transaction_items i
     JOIN tx_net tn ON tn.tx_id = i.transaction_id
-    GROUP BY i.service_name
+    -- CLI-473: guruh kaliti endi service_id (mavjud bo'lsa) — bir xil nomli,
+    -- lekin turli service_id'li xizmatlar endi ALOHIDA qatorda hisoblanadi
+    -- (avval GROUP BY service_name ularni birlashtirib, serviceId'ni ixtiyoriy
+    -- MAX() orqali tanlardi — CLI-450 BOM lookup noto'g'ri xizmatga bog'lanardi).
+    -- service_id IS NULL (eski/o'chirilgan xizmat snapshot) uchun eskicha
+    -- fallback guruh — nom bo'yicha — saqlanadi (CASE ikkinchi ustun sifatida).
+    GROUP BY i.service_id, CASE WHEN i.service_id IS NULL THEN i.service_name END
     ORDER BY "revenue" DESC
   `);
 
@@ -151,10 +157,10 @@ async function netServiceAggregates(
     }[]
   ).map((r) => ({
     serviceName: r.serviceName,
-    // CLI-450: BOM (`service_materials`) `service_id` orqali bog'lanadi — `service_name`
-    // snapshot bo'lgani uchun (xizmat o'chirilsa ham saqlanadi) guruh ichida `MAX`
-    // orqali vakolatli non-null id tanlanadi; barcha qator `service_id IS NULL` bo'lsa
-    // (eski/o'chirilgan xizmat) — `null`, material narxi 0 bo'ladi (dentalAnalytics'da).
+    // CLI-450: BOM (`service_materials`) `service_id` orqali bog'lanadi. CLI-473:
+    // guruh kaliti endi bevosita `service_id` (SQL GROUP BY'da) — bu yerda faqat
+    // o'sha ustunni o'qiydi, `MAX` orqali ixtiyoriy tanlash yo'q. `null` bo'lsa
+    // (eski/o'chirilgan xizmat snapshot) — material narxi 0 bo'ladi (dentalAnalytics'da).
     serviceId: r.serviceId,
     count: Number(r.count),
     revenue: Number(r.revenue),
