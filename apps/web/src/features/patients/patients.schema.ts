@@ -27,8 +27,29 @@ export const patientFormSchema = z.object({
       expiryDate: z.string().optional(),
       isActive: z.boolean().optional(),
     })
-    .refine((v) => (v.provider.trim() === '') === (v.policyNumber.trim() === ''), {
-      path: ['policyNumber'],
+    // CLI-469: provider bo'sh bo'lsa-da coverageType/expiryDate/isActive to'ldirilgan bo'lishi
+    // mumkin edi — submit vaqtida hammasi jim yo'qolib ketardi (PatientNewScreen.tsx).
+    // Endi: policyNumber yoki boshqa sug'urta maydonlaridan biri to'ldirilsa, provider majburiy.
+    .superRefine((v, ctx) => {
+      const providerFilled = v.provider.trim() !== '';
+      const policyFilled = v.policyNumber.trim() !== '';
+      const hasOtherDetails =
+        v.coverageType !== undefined || (v.expiryDate ?? '').trim() !== '' || v.isActive === true;
+
+      if (providerFilled !== policyFilled) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['policyNumber'],
+          message: 'patients.form.insurance_policy_required',
+        });
+      }
+      if (!providerFilled && hasOtherDetails) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['provider'],
+          message: 'patients.form.insurance_provider_required',
+        });
+      }
     })
     .nullable()
     .optional(),

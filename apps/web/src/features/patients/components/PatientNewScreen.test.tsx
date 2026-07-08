@@ -66,4 +66,22 @@ describe('PatientNewScreen', () => {
     });
     expect(screen.getByTestId('checklist-dot-name')).toHaveAttribute('data-filled', 'true');
   });
+
+  it("sug'urta 'faol' belgilanib provider bo'sh qolsa validatsiya xatosi ko'rinadi va submit bloklanadi (CLI-469)", async () => {
+    renderApp(<PatientNewScreen />);
+    fireEvent.change(screen.getByLabelText("To'liq ism"), {
+      target: { value: 'Ali Valiyev' },
+    });
+    // provider/policyNumber bo'sh qoldiriladi, faqat isActive belgilanadi
+    fireEvent.click(screen.getByLabelText("Sug'urta faol"));
+    fireEvent.click(screen.getByText('Saqlash'));
+    await vi.waitFor(() =>
+      expect(
+        screen.getByText(
+          "Sug'urta ma'lumotlarini to'ldirsangiz, kompaniya nomi ham kiritilishi shart",
+        ),
+      ).toBeInTheDocument(),
+    );
+    expect(createMock).not.toHaveBeenCalled();
+  });
 });

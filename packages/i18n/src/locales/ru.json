@@ -570,6 +570,8 @@
       "insurance_coverage": "Тип покрытия",
       "insurance_expiry": "Срок действия",
       "insurance_active": "Страховка активна",
+      "insurance_provider_required": "Если вы заполняете данные страховки, укажите также название компании",
+      "insurance_policy_required": "Страховая компания и номер полиса — оба поля обязательны",
       "coverage_dental": "Стоматологическое",
       "coverage_general": "Общее",
       "coverage_other": "Другое",
