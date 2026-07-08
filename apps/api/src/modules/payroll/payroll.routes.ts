@@ -12,6 +12,7 @@ import {
   payrollRunDtoSchema,
   payrollRunWithLinesDtoSchema,
   runIdParamSchema,
+  staffNameDtoSchema,
 } from './payroll.schema.ts';
 import { createPayrollService, PayrollOverlapError } from './payroll.service.ts';
 
@@ -44,6 +45,24 @@ export const payrollRoutes = (deps: { db: Database; audit: AuditLogger }) => {
   app.openapi(listRunsRoute, async (c) => {
     const rows = await service.listRuns(c);
     return c.json(ok(rows.map(toPayrollRunDto)), 200);
+  });
+
+  // ─── GET /staff-names — xodim ismlari (CLI-470, payroll.view-gated) ───────
+  // `GET /users/assignments` (`user.view`) o'rniga — Accountant template'da
+  // `user.view` YO'Q (CLI-154/155 precedenti, RBAC gap fix pattern).
+
+  const listStaffNamesRoute = createRoute({
+    method: 'get',
+    path: '/staff-names',
+    tags: ['payroll'],
+    operationId: 'listPayrollStaffNames',
+    middleware: [requirePermission('payroll.view')] as const,
+    responses: okJson(z.array(staffNameDtoSchema), 'Staff names for payroll display'),
+  });
+
+  app.openapi(listStaffNamesRoute, async (c) => {
+    const rows = await service.listStaffNames(c);
+    return c.json(ok(rows), 200);
   });
 
   // ─── POST /runs — create (snapshot run) ──────────────────────────────────
