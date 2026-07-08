@@ -5,8 +5,13 @@
  *   B1: GET /treatment-plans/{id}/estimate — audit_log'ga 'viewed' yozuvi yozadi.
  *   B2: lab-orders service.update — delivered→draft RAD (InvalidLabOrderTransitionError);
  *       draft→sent OK + sentDate auto-set.
- *   B5: setConsent — bo'sh submit mavjud imzoni null qilmaydi (ConsentOverwriteError);
- *       yangi (farqli) qiymat bilan qayta imzolash ruxsat etiladi + audit before/after.
+ *   B5: setConsent — CLI-461 bu blokni SUPERSEDE qildi (qarang pastda). Eski
+ *       `consentSignatureUrl`-overwrite guard (`ConsentOverwriteError`) endi
+ *       MAVJUD EMAS — yangi API shakli (`consentFormId` required, haqiqiy
+ *       `consent_forms` yozuviga bog'lanish) bo'sh submit'ni SCHEMA darajasida
+ *       rad etadi, "bo'sh URL eskisini o'chiradi" holati strukturaviy imkonsiz
+ *       bo'lib qoldi. Batafsil invariantlar:
+ *       `tests/integration/cli-461-consent-gate.test.ts`.
  *   B8: patient-images updateMetadata — bo'sh body 500 emas, no-op qaytaradi.
  *   B9c: updateStage audit — before + after ikkalasi ham yoziladi.
  *
@@ -17,6 +22,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import {
   auditLog,
+  consentForms,
   labOrders,
   patientImages,
   patients,
@@ -30,10 +36,7 @@ import type { Context } from 'hono';
 import type { DbOrTx } from '../../src/db/client.ts';
 import { db } from '../../src/db/client.ts';
 import { createAuditLogger } from '../../src/lib/audit-logger.ts';
-import {
-  ConsentOverwriteError,
-  createTreatmentPlansService,
-} from '../../src/modules/clinical/treatment-plans/treatment-plans.service.ts';
+import { createTreatmentPlansService } from '../../src/modules/clinical/treatment-plans/treatment-plans.service.ts';
 import { createLabOrdersService } from '../../src/modules/lab-orders/lab-orders.service.ts';
 import { InvalidLabOrderTransitionError } from '../../src/modules/lab-orders/lab-orders.transitions.ts';
 import { createPatientImagesService } from '../../src/modules/patient-images/patient-images.service.ts';
@@ -50,6 +53,8 @@ let planId: string;
 let stageId: string;
 let labOrderId: string;
 let imageId: string;
+let consentFormIdA: string;
+let consentFormIdB: string;
 
 const ctx = (tx: DbOrTx): Context =>
   ({
@@ -135,6 +140,41 @@ beforeAll(async () => {
       .returning({ id: patientImages.id });
     if (!img) throw new Error('image insert failed');
     imageId = img.id;
+
+    // CLI-461: setConsent endi haqiqiy, amaldagi consent_forms yozuvi talab qiladi
+    // (bo'sh/URL-only payload endi qabul qilinmaydi) — B5 blokidagi re-sign testi
+    // uchun ikkita mustaqil amaldagi ('treatment', isPerpetual) forma kerak.
+    const [formA] = await tx
+      .insert(consentForms)
+      .values({
+        tenantId,
+        patientId,
+        type: 'treatment',
+        title: 'Rozilik A',
+        bodyText: 'Matn A',
+        language: 'uz',
+        signedByUserId: ownerId,
+        isPerpetual: true,
+      })
+      .returning({ id: consentForms.id });
+    if (!formA) throw new Error('consent form A insert failed');
+    consentFormIdA = formA.id;
+
+    const [formB] = await tx
+      .insert(consentForms)
+      .values({
+        tenantId,
+        patientId,
+        type: 'treatment',
+        title: 'Rozilik B',
+        bodyText: 'Matn B',
+        language: 'uz',
+        signedByUserId: ownerId,
+        isPerpetual: true,
+      })
+      .returning({ id: consentForms.id });
+    if (!formB) throw new Error('consent form B insert failed');
+    consentFormIdB = formB.id;
   });
 });
 
@@ -178,38 +218,26 @@ describe('CLI-439 B2 — lab-order status state machine', () => {
   });
 });
 
-describe('CLI-439 B5 — consent overwrite guard', () => {
-  test('first sign with URL → OK', async () => {
+describe('CLI-439 B5 (CLI-461 bilan SUPERSEDE qilingan) — setConsent re-link', () => {
+  test('birinchi link (formA) → OK, consentFormId + consentSignedAt saqlanadi', async () => {
     const updated = await db.transaction(async (tx) => {
       await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
-      return plansService.setConsent(ctx(tx), planId, { consentSignatureUrl: 'sig-v1.png' });
+      return plansService.setConsent(ctx(tx), planId, { consentFormId: consentFormIdA });
     });
-    expect(updated?.consentSignatureUrl).toBe('sig-v1.png');
+    expect(updated?.consentFormId).toBe(consentFormIdA);
+    expect(updated?.consentSignedAt).not.toBeNull();
   });
 
-  test('empty submit over existing signature → RAD (ConsentOverwriteError)', async () => {
-    await expect(
-      db.transaction(async (tx) => {
-        await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
-        return plansService.setConsent(ctx(tx), planId, {});
-      }),
-    ).rejects.toBeInstanceOf(ConsentOverwriteError);
+  // CLI-461: eski "bo'sh submit mavjud imzoni jim o'chiradi" xavfi endi
+  // STRUKTURAVIY imkonsiz — `consentFormId` schema darajasida required, bo'sh
+  // `{}` Hono validatsiyasida 400 bilan RAD etiladi (routes qatlamiga yetmaydi ham).
 
-    // Signature unaffected by the rejected attempt. SET LOCAL'siz plain select
-    // RLS tufayli 0 qator qaytaradi — tekshiruv tenant-scoped tx ichida.
-    const [plan] = await db.transaction(async (tx) => {
-      await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
-      return tx.select().from(treatmentPlans).where(eq(treatmentPlans.id, planId));
-    });
-    expect(plan?.consentSignatureUrl).toBe('sig-v1.png');
-  });
-
-  test('deliberate re-sign with a NEW value → allowed (not silently blocked)', async () => {
+  test('ataylab BOSHQA amaldagi formga qayta linklash → ruxsat etiladi (jim bloklanmaydi)', async () => {
     const updated = await db.transaction(async (tx) => {
       await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
-      return plansService.setConsent(ctx(tx), planId, { consentSignatureUrl: 'sig-v2.png' });
+      return plansService.setConsent(ctx(tx), planId, { consentFormId: consentFormIdB });
     });
-    expect(updated?.consentSignatureUrl).toBe('sig-v2.png');
+    expect(updated?.consentFormId).toBe(consentFormIdB);
   });
 });
 

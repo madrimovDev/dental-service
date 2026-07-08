@@ -2,6 +2,7 @@ import type { ConsentTemplate, ConsentType } from '@dental/api-client';
 import { Card, Mono, StateView, Tag } from '@dental/ui';
 import {
   Button,
+  Checkbox,
   Group,
   Modal,
   Select,
@@ -11,6 +12,7 @@ import {
   TextInput,
   Title,
 } from '@mantine/core';
+import { DatePickerInput } from '@mantine/dates';
 import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
 import { IconFileText, IconPlus, IconWriting } from '@tabler/icons-react';
@@ -54,6 +56,10 @@ export function ConsentTab({ patientId }: Props) {
       title: '',
       bodyText: '',
       patientSignatureName: '',
+      // CLI-461: default muddatsiz — avvalgi (muddat tushunchasi yo'q) xulqni
+      // saqlaydi; staff aniq muddat qo'yishni tanlasa checkbox'ni o'chiradi.
+      isPerpetual: true,
+      expiresAt: null,
     },
     validate: zod4Resolver(consentSignFormSchema),
   });
@@ -117,6 +123,9 @@ export function ConsentTab({ patientId }: Props) {
         bodyText: values.bodyText,
         language: lang,
         patientSignatureName: values.patientSignatureName || undefined,
+        // CLI-461
+        isPerpetual: values.isPerpetual,
+        expiresAt: values.isPerpetual ? undefined : (values.expiresAt?.toISOString() ?? undefined),
       },
       {
         onSuccess: () => {
@@ -230,6 +239,20 @@ export function ConsentTab({ patientId }: Props) {
               label={t('consent.patient_signature_name')}
               {...signForm.getInputProps('patientSignatureName')}
             />
+            {/* CLI-461: muddat — treatment-plan accept gate shu ikkalasiga tayanadi. */}
+            <Checkbox
+              label={t('consent.is_perpetual')}
+              checked={signForm.values.isPerpetual}
+              onChange={(e) => signForm.setFieldValue('isPerpetual', e.currentTarget.checked)}
+            />
+            {!signForm.values.isPerpetual && (
+              <DatePickerInput
+                label={t('consent.expires_at')}
+                minDate={new Date()}
+                clearable
+                {...signForm.getInputProps('expiresAt')}
+              />
+            )}
             <Group justify="flex-end">
               <Button variant="default" onClick={closeSign}>
                 {t('common.cancel')}

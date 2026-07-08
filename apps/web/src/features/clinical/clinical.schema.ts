@@ -85,6 +85,13 @@ export const consentSignFormSchema = z.object({
   title: z.string().min(1),
   bodyText: z.string().min(10),
   patientSignatureName: z.string().optional(),
+  // CLI-461: muddat — treatment-plan accept gate shu ikkalasiga tayanadi
+  // (isPerpetual=true YOKI expiresAt>now bo'lsa "amaldagi"). Default true —
+  // avvalgi (muddatsiz) xulqni saqlaydi, staff aniq muddat qo'yishni tanlasa
+  // checkbox'ni o'chiradi va DatePickerInput ko'rinadi.
+  isPerpetual: z.boolean(),
+  // DatePickerInput clearable `null` qaytaradi.
+  expiresAt: z.date().nullable().optional(),
 });
 export type ConsentSignFormValues = z.infer<typeof consentSignFormSchema>;
 

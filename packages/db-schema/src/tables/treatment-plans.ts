@@ -9,6 +9,7 @@ import {
   timestamp,
   uuid,
 } from 'drizzle-orm/pg-core';
+import { consentForms } from './consent.ts';
 import { patients } from './patients.ts';
 import { services } from './services.ts';
 import { tenants } from './tenants.ts';
@@ -47,8 +48,18 @@ export const treatmentPlans = pgTable(
     currency: text('currency').notNull().default('UZS'),
 
     status: treatmentPlanStatusEnum('status').notNull().default('draft'),
+    // CLI-461: eski ustunlar (backward-compat, migration risk kamaytirish uchun
+    // saqlanadi) — endi accept gate mantig'ida MUSTAQIL ishlatilmaydi. `consentSignedAt`
+    // faqat `consentFormId` orqali bog'langan haqiqiy consent_forms yozuvining
+    // `signedAt`'idan denormalized cache sifatida yoziladi (informatsion, gate emas).
     consentSignedAt: timestamp('consent_signed_at', { withTimezone: true }),
     consentSignatureUrl: text('consent_signature_url'),
+    // CLI-461: "to'liq bog'lash" — reja qabul qilinishini asoslovchi HAQIQIY consent_forms
+    // yozuvi. Gate (`presented→accepted`) doim shu yozuvni JONLI qayta tekshiradi
+    // (isPerpetual=true YOKI expiresAt > now()) — cache'langan timestamp emas.
+    consentFormId: uuid('consent_form_id').references(() => consentForms.id, {
+      onDelete: 'set null',
+    }),
 
     notes: text('notes'),
 

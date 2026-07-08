@@ -1,4 +1,9 @@
-import { treatmentPlans, treatmentStagePayments, treatmentStages } from '@dental/db-schema';
+import {
+  consentForms,
+  treatmentPlans,
+  treatmentStagePayments,
+  treatmentStages,
+} from '@dental/db-schema';
 import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../../db/scoped.ts';
@@ -105,6 +110,20 @@ export const createTreatmentPlansRepository = () => {
     return stage ?? null;
   }
 
+  /**
+   * CLI-461: raw consent_forms qatorini o'qiydi (biznes mantiqsiz — "amaldagimi"
+   * tekshiruvi service qatlamida). `consent` moduli bilan bir xil `consent_forms`
+   * jadvaliga to'g'ridan Drizzle orqali murojaat — `treatmentStagePayments`
+   * pretsedentiga mos (repository qatlami boshqa "domen" jadvalini to'g'ridan
+   * o'qishi RFC-0009'da taqiqlanmagan; DI hook faqat business-logic orkestratsiya
+   * — masalan `getActivePrice`, `autoCreateFromStage` — uchun ishlatiladi).
+   */
+  async function findConsentForm(c: Context, id: string) {
+    const db = getDb(c);
+    const [row] = await db.select().from(consentForms).where(eq(consentForms.id, id));
+    return row ?? null;
+  }
+
   /** C6: estimate uchun plan bosqichlariga tegishli allocation'lar (RLS filtrlaydi). */
   async function listStageAllocations(c: Context, planId: string) {
     const db = getDb(c);
@@ -152,6 +171,7 @@ export const createTreatmentPlansRepository = () => {
     insertPlanWithStages,
     findPlan,
     findStage,
+    findConsentForm,
     listStageAllocations,
     updatePlan,
     updateStage,

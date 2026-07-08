@@ -346,10 +346,11 @@ export function useUpdateLabOrderStatus(patientId: string) {
 }
 
 // ===== B: consent =====
-export function useConsentForms(patientId: string) {
+export function useConsentForms(patientId: string, opts?: { enabled?: boolean }) {
   return useQuery({
     queryKey: clinicalKeys.consentForms(patientId),
     queryFn: () => listConsentForms({ patientId }).then((r) => r.data),
+    enabled: opts?.enabled ?? true,
   });
 }
 

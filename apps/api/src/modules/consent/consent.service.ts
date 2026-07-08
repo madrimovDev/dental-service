@@ -137,6 +137,9 @@ export const createConsentService = (deps: { audit: AuditLogger }) => {
         signedByUserId: user.id,
         patientSignatureName: input.patientSignatureName ?? null,
         notes: input.notes ?? null,
+        // CLI-461
+        isPerpetual: input.isPerpetual,
+        expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
       })
       .returning();
 

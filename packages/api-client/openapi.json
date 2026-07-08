@@ -4024,6 +4024,15 @@
             "nullable": true,
             "example": null
           },
+          "isPerpetual": {
+            "type": "boolean",
+            "example": false
+          },
+          "expiresAt": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          },
           "createdAt": {
             "type": "string",
             "example": "2026-06-12T10:00:00.000Z"
@@ -4042,6 +4051,8 @@
           "signedByUserId",
           "patientSignatureName",
           "notes",
+          "isPerpetual",
+          "expiresAt",
           "createdAt"
         ]
       },
@@ -5213,6 +5224,12 @@
             "nullable": true,
             "example": null
           },
+          "consentFormId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid",
+            "example": null
+          },
           "notes": {
             "type": "string",
             "nullable": true,
@@ -5238,6 +5255,7 @@
           "totalVisits",
           "consentSignedAt",
           "consentSignatureUrl",
+          "consentFormId",
           "notes",
           "createdAt",
           "updatedAt"
@@ -16519,6 +16537,17 @@
                   "notes": {
                     "type": "string",
                     "maxLength": 1000
+                  },
+                  "isPerpetual": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "true bo'lsa `expiresAt` e'tiborga olinmaydi (hech qachon eskirmaydi)"
+                  },
+                  "expiresAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "example": "2026-12-31T00:00:00.000Z",
+                    "description": "Amal qilish muddati (isPerpetual=false bo'lsa tavsiya etiladi)"
                   }
                 },
                 "required": [
@@ -20684,17 +20713,15 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "consentSignedAt": {
+                  "consentFormId": {
                     "type": "string",
-                    "format": "date-time",
-                    "example": "2026-06-21T10:00:00.000Z",
-                    "description": "Defaults to now if omitted"
-                  },
-                  "consentSignatureUrl": {
-                    "type": "string",
-                    "maxLength": 1000
+                    "format": "uuid",
+                    "description": "Mavjud, amaldagi consent_forms yozuvi ID'si (avval `consent` moduli — POST /consent/forms — orqali imzolangan bo'lishi kerak)."
                   }
-                }
+                },
+                "required": [
+                  "consentFormId"
+                ]
               }
             }
           }

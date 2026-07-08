@@ -232,6 +232,13 @@
       "when": 1783600000002,
       "tag": "0032_youthful_scalphunter",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1783600000003,
+      "tag": "0033_chunky_sentinel",
+      "breakpoints": true
     }
   ]
 }

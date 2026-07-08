@@ -26,4 +26,8 @@ export type SignConsentFormBody = {
   patientSignatureName?: string;
   /** @maxLength 1000 */
   notes?: string;
+  /** true bo'lsa `expiresAt` e'tiborga olinmaydi (hech qachon eskirmaydi) */
+  isPerpetual?: boolean;
+  /** Amal qilish muddati (isPerpetual=false bo'lsa tavsiya etiladi) */
+  expiresAt?: string;
 };

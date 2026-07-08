@@ -22,5 +22,8 @@ export interface ConsentForm {
   patientSignatureName: string | null;
   /** @nullable */
   notes: string | null;
+  isPerpetual: boolean;
+  /** @nullable */
+  expiresAt: string | null;
   createdAt: string;
 }

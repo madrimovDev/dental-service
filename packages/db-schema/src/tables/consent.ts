@@ -75,6 +75,14 @@ export const consentForms = pgTable(
     patientSignatureName: text('patient_signature_name'),
     notes: text('notes'),
 
+    // CLI-461: consent muddati. `isPerpetual=true` bo'lsa `expiresAt` e'tiborga
+    // olinmaydi (hech qachon eskirmaydi). Default `isPerpetual=false` + `expiresAt=null`
+    // — ataylab: signer aniq tanlov qilmasa (muddatsiz YOKI muddat), consent
+    // treatment-plan accept gate uchun "amaldagi emas" hisoblanadi (bo'sh/mazmunsiz
+    // consent bilan plan accept bo'lmasligi kerak — CLI-461 asosiy talabi).
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    isPerpetual: boolean('is_perpetual').notNull().default(false),
+
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

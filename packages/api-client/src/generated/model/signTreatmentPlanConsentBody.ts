@@ -6,8 +6,6 @@
  */
 
 export type SignTreatmentPlanConsentBody = {
-  /** Defaults to now if omitted */
-  consentSignedAt?: string;
-  /** @maxLength 1000 */
-  consentSignatureUrl?: string;
+  /** Mavjud, amaldagi consent_forms yozuvi ID'si (avval `consent` moduli — POST /consent/forms — orqali imzolangan bo'lishi kerak). */
+  consentFormId: string;
 };

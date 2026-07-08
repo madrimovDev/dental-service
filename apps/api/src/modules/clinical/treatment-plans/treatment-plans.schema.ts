@@ -40,13 +40,19 @@ export const updateStageSchema = z.object({
 });
 export type UpdateStageInput = z.infer<typeof updateStageSchema>;
 
-/** C3 — plan consent linkage (presented→accepted REQUIRES consent). */
+/**
+ * CLI-461 — plan consent linkage ("to'liq bog'lash"): presented→accepted uchun
+ * bo'sh/ixtiyoriy payload YETARLI EMAS — `consent` moduli orqali OLDINDAN
+ * imzolangan, HAQIQIY `consent_forms` yozuvi ID'si talab etiladi. Server bu
+ * yozuvni (shu bemor + 'treatment' turi + isPerpetual=true YOKI expiresAt>now)
+ * tasdiqlaydi — aks holda `plan.consent_invalid` (400).
+ */
 export const consentSchema = z.object({
-  consentSignedAt: z.iso
-    .datetime()
-    .optional()
-    .openapi({ example: '2026-06-21T10:00:00.000Z', description: 'Defaults to now if omitted' }),
-  consentSignatureUrl: z.string().max(1000).optional(),
+  consentFormId: z.uuid().openapi({
+    description:
+      "Mavjud, amaldagi consent_forms yozuvi ID'si (avval `consent` moduli — POST " +
+      "/consent/forms — orqali imzolangan bo'lishi kerak).",
+  }),
 });
 export type ConsentInput = z.infer<typeof consentSchema>;
 
@@ -127,8 +133,12 @@ export const treatmentPlanDtoSchema = z
     status: treatmentPlanStatusEnum.openapi({ example: 'draft' }),
     totalCost: z.string().openapi({ example: '450000.00' }),
     totalVisits: z.number().int().openapi({ example: 3 }),
+    // CLI-461: eski ustunlar backward-compat cache sifatida saqlanadi (gate mantig'ida
+    // MUSTAQIL ishlatilmaydi — haqiqiy manba `consentFormId`).
     consentSignedAt: z.string().nullable().openapi({ example: null }),
     consentSignatureUrl: z.string().nullable().openapi({ example: null }),
+    /** CLI-461 — "to'liq bog'lash": planni accept qilishni asoslovchi haqiqiy consent_forms yozuvi. */
+    consentFormId: z.uuid().nullable().openapi({ example: null }),
     notes: z.string().nullable().openapi({ example: null }),
     createdAt: z.string().openapi({ example: '2026-06-12T10:00:00.000Z' }),
     updatedAt: z.string().openapi({ example: '2026-06-12T10:00:00.000Z' }),

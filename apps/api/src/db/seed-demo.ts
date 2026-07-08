@@ -1118,6 +1118,9 @@ async function seed() {
         signedAt: daysFromNow(-4),
         signedByUserId: DOC1,
         patientSignatureName: 'Akmal Karimov',
+        // CLI-461: demo consent-lar muddatsiz (isPerpetual) — accept gate demo
+        // oqimida ("Rejani qabul qilish") darhol amaldagi hisoblanadi.
+        isPerpetual: true,
       },
       {
         tenantId: TENANT_ID,
@@ -1130,9 +1133,25 @@ async function seed() {
         signedAt: daysFromNow(-2),
         signedByUserId: DOC2,
         patientSignatureName: 'Bobur Toshmatov',
+        isPerpetual: true,
+      },
+      {
+        // PLAN3 (id(502), status='presented') — id(304) bemoriga tegishli;
+        // CLI-461 demo oqimi uchun 'treatment' turidagi amaldagi consent.
+        tenantId: TENANT_ID,
+        patientId: id(304),
+        templateId: CT1,
+        type: 'treatment',
+        title: 'Davolashga rozilik',
+        bodyText: 'Men taklif etilgan implantatsiya rejasi bilan tanishdim va roziman.',
+        language: 'uz',
+        signedAt: daysFromNow(-1),
+        signedByUserId: DOC1,
+        patientSignatureName: 'Diyor Rashidov',
+        isPerpetual: true,
       },
     ]);
-    console.log('  ✓ consent_templates: +2, consent_forms: +2');
+    console.log('  ✓ consent_templates: +2, consent_forms: +3');
   } else {
     console.log('  · consent_templates: already seeded, skip');
   }

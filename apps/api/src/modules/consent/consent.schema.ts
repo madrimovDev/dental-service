@@ -27,6 +27,18 @@ export const signFormSchema = z.object({
   language: z.enum(['uz', 'ru']),
   patientSignatureName: z.string().min(2).max(200).optional(),
   notes: z.string().max(1000).optional(),
+  // CLI-461: consent muddati — treatment-plan accept gate shu ikkalasiga tayanadi
+  // (isPerpetual=true YOKI expiresAt>now bo'lsa "amaldagi"). Default `isPerpetual:
+  // false` (DB ustun default'i bilan mos) — signer aniq tanlov qilmasa (na
+  // muddatsiz, na muddat), forma treatment-plan accept gate uchun "amaldagi emas"
+  // hisoblanadi (bo'sh/mazmunsiz consent bilan reja accept bo'lmasligi kerak).
+  isPerpetual: z.boolean().default(false).openapi({
+    description: "true bo'lsa `expiresAt` e'tiborga olinmaydi (hech qachon eskirmaydi)",
+  }),
+  expiresAt: z.iso.datetime().optional().openapi({
+    example: '2026-12-31T00:00:00.000Z',
+    description: "Amal qilish muddati (isPerpetual=false bo'lsa tavsiya etiladi)",
+  }),
 });
 export type SignFormInput = z.infer<typeof signFormSchema>;
 
@@ -91,6 +103,10 @@ export const consentFormDtoSchema = z
     signedByUserId: z.uuid(),
     patientSignatureName: z.string().nullable().openapi({ example: null }),
     notes: z.string().nullable().openapi({ example: null }),
+    // CLI-461: muddat maydonlari — treatment-plan accept gate + frontend consent
+    // tanlagichi (faqat "amaldagi" formalarni ko'rsatish uchun) shularga tayanadi.
+    isPerpetual: z.boolean().openapi({ example: false }),
+    expiresAt: z.string().nullable().openapi({ example: null }),
     createdAt: z.string().openapi({ example: '2026-06-12T10:00:00.000Z' }),
   })
   .openapi('ConsentForm');
