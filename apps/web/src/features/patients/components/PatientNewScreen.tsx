@@ -42,7 +42,15 @@ export function PatientNewScreen() {
     validate: zod4Resolver(patientFormSchema),
   });
 
+  // Zod refine (CLI-469) validatsiya xabari — raw i18n kalitni t() orqali tarjima qiladi.
+  const insuranceError = (key: 'insurance.provider' | 'insurance.policyNumber') => {
+    const err = form.errors[key];
+    return typeof err === 'string' ? t(err) : err;
+  };
+
   const submit = form.onSubmit((values) => {
+    // Zod refine kafolatlaydi: provider bo'lmasa, coverageType/expiryDate/isActive ham bo'sh
+    // bo'lishi shart (aks holda form submit bo'lmaydi) — shu sabab bu yerda xavfsiz tashlanadi.
     const insurance = values.insurance?.provider ? values.insurance : null;
     createMut.mutate(
       {
@@ -222,7 +230,7 @@ export function PatientNewScreen() {
                       label={t('patients.form.insurance')}
                       placeholder={t('patients.form.insurance_provider')}
                       value={form.values.insurance?.provider ?? ''}
-                      error={form.errors['insurance.provider']}
+                      error={insuranceError('insurance.provider')}
                       onChange={(v) => form.setFieldValue('insurance.provider', v)}
                     />
                   </div>
@@ -230,7 +238,7 @@ export function PatientNewScreen() {
                     <Input
                       label={t('patients.form.insurance_policy')}
                       value={form.values.insurance?.policyNumber ?? ''}
-                      error={form.errors['insurance.policyNumber']}
+                      error={insuranceError('insurance.policyNumber')}
                       onChange={(v) => form.setFieldValue('insurance.policyNumber', v)}
                     />
                   </div>
