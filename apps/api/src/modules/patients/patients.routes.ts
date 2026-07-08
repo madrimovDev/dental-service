@@ -285,7 +285,10 @@ export const patientRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     path: '/{id}/relatives',
     tags: ['patients'],
     operationId: 'listPatientRelatives',
-    middleware: [requirePermission('patient.edit')] as const,
+    // CLI-474 (L1): LIST (READ) — `patient.view` yetarli, `patient.edit` emas
+    // (Nurse/Technician/Accountant `patient.edit`ga ega emas, lekin favqulodda
+    // aloqani ko'ra olishi kerak). Faqat WRITE (POST/DELETE) `patient.edit` talab qiladi.
+    middleware: [requirePermission('patient.view')] as const,
     request: { params: patientIdParamSchema },
     responses: okJson(z.array(patientRelativeViewSchema), 'List of patient relatives'),
   });
@@ -378,7 +381,9 @@ export const patientRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     path: '/{id}/emergency-contacts',
     tags: ['patients'],
     operationId: 'listPatientEmergencyContacts',
-    middleware: [requirePermission('patient.edit')] as const,
+    // CLI-474 (L1): LIST (READ) — `patient.view` yetarli, `patient.edit` emas (relatives
+    // list bilan bir xil qaror — quyidagi izohga qarang).
+    middleware: [requirePermission('patient.view')] as const,
     request: { params: patientIdParamSchema },
     responses: okJson(z.array(emergencyContactDtoSchema), 'List of patient emergency contacts'),
   });

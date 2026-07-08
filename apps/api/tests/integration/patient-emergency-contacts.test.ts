@@ -1,8 +1,16 @@
 /**
  * Erkin emergency contact (V2-5, CLI-245) integration test — listEmergencyContacts/
- * addEmergencyContact/removeEmergencyContact ni REAL DB'da. isPrimary ordering +
- * cross-tenant RLS izolyatsiya tekshiriladi (relatives `patient.edit` permission'ini
- * mirror qiladi — yangi RBAC gap yo'q).
+ * addEmergencyContact/removeEmergencyContact ni REAL DB'da (service-darajasida,
+ * `@owner` bilan — permission kodini bu fayl sinamaydi). isPrimary ordering +
+ * cross-tenant RLS izolyatsiya tekshiriladi.
+ *
+ * ⚠️ CLI-474 (L1): avval bu izohda "relatives `patient.edit`ni mirror qiladi —
+ * yangi RBAC gap yo'q" deyilgan edi — bu qasddan og'ish emas, haqiqiy gap edi
+ * (Nurse/Technician/Accountant `patient.view`ga ega, `patient.edit`ga EGA EMAS,
+ * ro'yxatni ko'ra olmasdi). Tuzatildi: `patients.routes.ts` LIST (GET) route'lari
+ * endi `patient.view` bilan gate qilingan, faqat WRITE (POST/DELETE) `patient.edit`
+ * talab qiladi — real HTTP + rol-permset tasdig'i uchun
+ * `cli-474-l1-relatives-view-permission.test.ts`ga qarang.
  *
  * Talab: Postgres running, DATABASE_URL .env'da, migration 0022 + RLS 0014 apply.
  * Ishga tushirish: `cd apps/api && bun test --env-file=../../.env patient-emergency-contacts`
