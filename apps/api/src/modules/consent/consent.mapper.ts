@@ -28,5 +28,7 @@ export const toConsentFormDto = (row: ConsentForm): ConsentFormDto => ({
   signedByUserId: row.signedByUserId,
   patientSignatureName: row.patientSignatureName ?? null,
   notes: row.notes ?? null,
+  isPerpetual: row.isPerpetual,
+  expiresAt: row.expiresAt ? row.expiresAt.toISOString() : null,
   createdAt: row.createdAt.toISOString(),
 });

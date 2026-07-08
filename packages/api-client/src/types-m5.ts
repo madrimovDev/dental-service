@@ -35,6 +35,9 @@ export type SignFormInput = {
   language: 'uz' | 'ru';
   patientSignatureName?: string;
   notes?: string;
+  // CLI-461: muddat — treatment-plan accept gate shu ikkalasiga tayanadi.
+  isPerpetual?: boolean;
+  expiresAt?: string;
 };
 
 // ===== Lab Orders — hand type aliases =====

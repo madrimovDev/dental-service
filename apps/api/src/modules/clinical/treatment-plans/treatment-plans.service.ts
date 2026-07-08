@@ -19,6 +19,23 @@ import {
 } from './treatment-plans.transitions.ts';
 
 /**
+ * CLI-461: berilgan consent_forms qatori shu bemor uchun, 'treatment' turida va
+ * HOZIR amaldagimi (isPerpetual=true YOKI expiresAt>now) — sof funksiya (DB/Context
+ * yo'q), `setConsent` VA accept-gate (`updatePlan`) ikkalasida ishlatiladi (bitta
+ * qoidaning ikki joyda drift qilishining oldini oladi).
+ */
+function isConsentFormCurrentlyValid(
+  form: { patientId: string; type: string; isPerpetual: boolean; expiresAt: Date | null } | null,
+  patientId: string,
+): boolean {
+  if (!form) return false;
+  if (form.patientId !== patientId) return false;
+  if (form.type !== 'treatment') return false;
+  if (form.isPerpetual) return true;
+  return form.expiresAt !== null && form.expiresAt.getTime() > Date.now();
+}
+
+/**
  * Recalls modulidan inject qilinadigan narrow dep (B4, RFC-0011 §5). Bog'liqlik
  * yo'nalishi: treatment-plans → recalls (factory injection, to'g'ridan import emas).
  */
@@ -48,7 +65,12 @@ export type PriceLookup = {
   ) => Promise<{ price: string } | null>;
 };
 
-/** presented→accepted consent yo'q bo'lsa otiladi; routes 400 ga aylantiradi. */
+/**
+ * presented→accepted uchun amaldagi (haqiqiy, muddati o'tmagan) linklangan consent
+ * yo'q bo'lsa otiladi; routes 400 (`plan.consent_required`) ga aylantiradi. CLI-461:
+ * gate cache'langan `consentSignedAt`ga emas, `consent_forms`ni JONLI qayta so'rashga
+ * tayanadi — `setConsent` bilan accept orasida muddat tugab qolgan holatni ham qamraydi.
+ */
 export class ConsentRequiredError extends Error {
   constructor() {
     super('Consent required before accepting a presented plan');
@@ -57,14 +79,19 @@ export class ConsentRequiredError extends Error {
 }
 
 /**
- * CLI-439 B5: mavjud imzoni bo'sh/undefined `consentSignatureUrl` bilan jim NULL
- * qilishga urinilganda otiladi (routes 400 ga aylantiradi). Yangi (boshqa) qiymat bilan
- * ataylab qayta imzolash bloklanmaydi — faqat "bo'sh submit eskisini o'chiradi" holati.
+ * CLI-461: `setConsent`ga berilgan `consentFormId` — mavjud emas, boshqa bemorga
+ * tegishli, noto'g'ri turdagi (treatment plan uchun `type='treatment'` shart) yoki
+ * muddati o'tgan/aniq belgilanmagan (isPerpetual=false ∧ expiresAt=null|o'tgan) bo'lsa
+ * otiladi. Routes 400 (`plan.consent_invalid`) ga aylantiradi. "Mavjud emas" va
+ * "boshqa bemorga tegishli" holatlarini ATAYLAB bitta xato bilan qamraydi (cross-patient
+ * mavjudlikni oshkor qilmaslik uchun).
  */
-export class ConsentOverwriteError extends Error {
+export class ConsentInvalidError extends Error {
   constructor() {
-    super('Existing consent signature cannot be cleared by an empty submission');
-    this.name = 'ConsentOverwriteError';
+    super(
+      'Referenced consent form is missing, expired, of the wrong type, or does not match this patient',
+    );
+    this.name = 'ConsentInvalidError';
   }
 }
 
@@ -165,9 +192,17 @@ export const createTreatmentPlansService = (deps: {
     // C2 guard: plan status o'tishi (draft→presented→accepted→in_progress→completed/cancelled).
     if (input.status && input.status !== before.status) {
       assertPlanTransition(before.status, input.status);
-      // C3: presented→accepted KONSENT talab qiladi (imzo yo'q bo'lsa RAD).
-      if (input.status === 'accepted' && !before.consentSignedAt) {
-        throw new ConsentRequiredError();
+      // C3/CLI-461: presented→accepted KONSENT talab qiladi — linklangan
+      // `consentFormId` yo'q BO'LSA yoki (JONLI qayta so'ralganda) endi amaldagi
+      // bo'lmasa RAD. Cache'langan `consentSignedAt` EMAS — `setConsent`dan keyin,
+      // accept'dan oldin muddat tugashi mumkin (real-time re-validation).
+      if (input.status === 'accepted') {
+        const linkedForm = before.consentFormId
+          ? await repo.findConsentForm(c, before.consentFormId)
+          : null;
+        if (!isConsentFormCurrentlyValid(linkedForm, before.patientId)) {
+          throw new ConsentRequiredError();
+        }
       }
     }
 
@@ -184,38 +219,35 @@ export const createTreatmentPlansService = (deps: {
     return updated;
   }
 
-  /** C3: plan konsent imzosini saqlash (accept oldidan kerak). */
+  /**
+   * CLI-461: reja konsentini HAQIQIY, oldindan imzolangan `consent_forms` yozuviga
+   * ("to'liq bog'lash") bog'laydi — bo'sh/mazmunsiz payload endi qabul qilinmaydi
+   * (`consentFormId` schema darajasida required). Form mavjud+shu bemor+
+   * type='treatment'+amaldagi (isPerpetual YOKI expiresAt>now) bo'lmasa
+   * `ConsentInvalidError`. Eski `consentSignedAt` ustuni bog'langan formaning
+   * `signedAt`idan denormalized CACHE sifatida yoziladi (gate mantig'ida
+   * ishlatilmaydi — faqat informatsion/backward-compat).
+   */
   async function setConsent(c: Context, id: string, input: ConsentInput) {
     const before = await repo.findPlan(c, id);
     if (!before) return null;
 
-    // CLI-439 B5: mavjud imzoni bo'sh submit bilan jim NULL qilib yubormaslik — bu
-    // haqiqiy yuridik yozuvni yo'qotardi (faqat audit_log'dan tiklanadi edi). Faqat
-    // RE-SIGN holatida (mavjud imzo bor) reject qilinadi; birinchi marta imzolashda
-    // consentSignatureUrl ixtiyoriy bo'lib qoladi (schema semantikasi saqlanadi — faqat
-    // sana bilan imzolash mumkin). Yangi FARQLI qiymat bilan ataylab qayta imzolash
-    // bloklanmaydi (audit before/after bilan kuzatiladi — jim emas).
-    if (before.consentSignatureUrl && !input.consentSignatureUrl) {
-      throw new ConsentOverwriteError();
+    const form = await repo.findConsentForm(c, input.consentFormId);
+    if (!isConsentFormCurrentlyValid(form, before.patientId) || !form) {
+      throw new ConsentInvalidError();
     }
 
     const updated = await repo.updatePlan(c, id, {
-      consentSignedAt: input.consentSignedAt ? new Date(input.consentSignedAt) : new Date(),
-      consentSignatureUrl: input.consentSignatureUrl ?? before.consentSignatureUrl ?? null,
+      consentFormId: form.id,
+      consentSignedAt: form.signedAt,
     });
     if (updated) {
       await deps.audit.record(c, {
-        action: 'consent_signed',
+        action: 'consent_linked',
         resourceType: 'treatment_plan',
         resourceId: id,
-        before: {
-          consentSignedAt: before.consentSignedAt,
-          hasSignature: !!before.consentSignatureUrl,
-        },
-        after: {
-          consentSignedAt: updated.consentSignedAt,
-          hasSignature: !!updated.consentSignatureUrl,
-        },
+        before: { consentFormId: before.consentFormId ?? null },
+        after: { consentFormId: updated.consentFormId, consentFormType: form.type },
       });
     }
     return updated;

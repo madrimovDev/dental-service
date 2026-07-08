@@ -20,6 +20,8 @@ export interface TreatmentPlan {
   /** @nullable */
   consentSignatureUrl: string | null;
   /** @nullable */
+  consentFormId: string | null;
+  /** @nullable */
   notes: string | null;
   createdAt: string;
   updatedAt: string;

@@ -37,6 +37,7 @@ export const toPlanDto = (row: PlanRow): TreatmentPlanDto => ({
   totalVisits: row.totalVisits,
   consentSignedAt: row.consentSignedAt ? row.consentSignedAt.toISOString() : null,
   consentSignatureUrl: row.consentSignatureUrl ?? null,
+  consentFormId: row.consentFormId ?? null,
   notes: row.notes ?? null,
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(),

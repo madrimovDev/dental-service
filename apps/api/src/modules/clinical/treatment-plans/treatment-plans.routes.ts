@@ -21,7 +21,7 @@ import {
 } from './treatment-plans.schema.ts';
 // CLI-114: list endi har planning stage'larini nested qaytaradi (N+1 oldini olish).
 import {
-  ConsentOverwriteError,
+  ConsentInvalidError,
   ConsentRequiredError,
   createTreatmentPlansService,
   type PriceLookup,
@@ -218,7 +218,7 @@ export const treatmentPlansRoutes = (deps: {
     }
   });
 
-  // ─── POST /treatment-plans/{id}/consent — C3 consent linkage ───────────────
+  // ─── POST /treatment-plans/{id}/consent — CLI-461 consent linkage (to'liq bog'lash) ──
 
   const consentRoute = createRoute({
     method: 'post',
@@ -251,9 +251,10 @@ export const treatmentPlansRoutes = (deps: {
       if (!plan) return c.json(fail('plan.not_found', 'Plan not found'), 404);
       return c.json(ok(toPlanDto(plan)), 200);
     } catch (e) {
-      // CLI-439 B5: bo'sh submit mavjud imzoni jim null qilishga urinsa → 400.
-      if (e instanceof ConsentOverwriteError) {
-        return c.json(fail('plan.consent_overwrite', e.message), 400);
+      // CLI-461: consentFormId mavjud emas/boshqa bemorga tegishli/noto'g'ri
+      // turdagi/muddati o'tgan → 400 (bo'sh/mazmunsiz consent bilan link bo'lmaydi).
+      if (e instanceof ConsentInvalidError) {
+        return c.json(fail('plan.consent_invalid', e.message), 400);
       }
       throw e;
     }
