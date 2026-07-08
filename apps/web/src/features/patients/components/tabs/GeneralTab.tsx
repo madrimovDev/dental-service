@@ -1,4 +1,4 @@
-import { Button, Card, Input, Mono, Select } from '@dental/ui';
+import { Button, Card, Input, Mono, Select, StateView } from '@dental/ui';
 import { Badge, Group, SimpleGrid, Stack, Text, Textarea } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
@@ -167,20 +167,49 @@ function GeneralEditForm({ patientId }: { patientId: string }) {
     }
   }, [rawQuery.data]);
 
-  if (!rawQuery.data) {
-    return <Text>{t('common.loading')}</Text>;
+  // CLI-467: avval faqat `!rawQuery.data` tekshirilardi — xato holatida ham
+  // cheksiz "loading" matni chiqardi (isLoading/isError ajratilmagan edi).
+  if (rawQuery.isLoading) {
+    return <StateView status="loading" skeleton="detail" />;
   }
+  if (rawQuery.isError) {
+    return (
+      <StateView
+        status="error"
+        title={t('states.error_title')}
+        retryLabel={t('states.retry')}
+        onRetry={() => rawQuery.refetch()}
+      />
+    );
+  }
+  if (!rawQuery.data) {
+    return null;
+  }
+
+  // CLI-455 (frontend qismi): `values.field || undefined` bo'sh stringni har doim
+  // undefined'ga aylantirar edi — backend PATCH kalitni butunlay tashlab yuborardi,
+  // ya'ni foydalanuvchi maydonni ANIQ bo'shatsa ham eski qiymat serverda saqlanib qolardi.
+  // Endi original (serverdan yuklangan) qiymat bilan solishtiramiz:
+  //  - joriy '' va original ham bo'sh/yo'q edi → undefined (haqiqiy o'zgarish yo'q)
+  //  - joriy '' lekin original qiymatga ega edi → null (foydalanuvchi ANIQ bo'shatdi)
+  //  - joriy bo'sh emas → o'sha qiymat
+  // Backend nullable qo'llovi alohida worktree'da (CLI-455 backend qismi) — generated
+  // `UpdatePatientBody` hali `null` qabul qilmaydi, shu sabab tor `as` kasting kerak;
+  // backend merge + api-client regenerate qilingach olib tashlash mumkin.
+  const original = rawQuery.data;
+  const clearedOrKept = (current: string, prev: string | null | undefined) =>
+    (current === '' ? (prev ? null : undefined) : current) as string | undefined;
 
   const submit = form.onSubmit((values) =>
     updateMut.mutate({
       fullName: values.fullName,
       gender: values.gender ?? undefined,
-      dateOfBirth: values.dateOfBirth || undefined,
-      phone: values.phone || undefined,
-      phoneSecondary: values.phoneSecondary || undefined,
-      passport: values.passport || undefined,
-      address: values.address || undefined,
-      notes: values.notes || undefined,
+      dateOfBirth: clearedOrKept(values.dateOfBirth, original.dateOfBirth),
+      phone: clearedOrKept(values.phone, original.phone),
+      phoneSecondary: clearedOrKept(values.phoneSecondary, original.phoneSecondary),
+      passport: clearedOrKept(values.passport, original.passport),
+      address: clearedOrKept(values.address, original.address),
+      notes: clearedOrKept(values.notes, original.notes),
     }),
   );
 

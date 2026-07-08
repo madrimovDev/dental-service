@@ -1,5 +1,5 @@
 import type { AllergyEntry, MedicalRecordHistoryEntry } from '@dental/api-client';
-import { Button, Card, Input, Select } from '@dental/ui';
+import { Button, Card, Input, Select, StateView } from '@dental/ui';
 import {
   Accordion,
   Alert,
@@ -111,8 +111,23 @@ export function MedicalTab({ patientId }: { patientId: string }) {
   if (!canView) {
     return <Alert color="yellow">{t('patients.no_medical_permission')}</Alert>;
   }
+  // CLI-467: avval faqat `!medicalQuery.data` tekshirilardi — xato holatida ham
+  // cheksiz "loading" matni chiqardi (isLoading/isError ajratilmagan edi).
+  if (medicalQuery.isLoading) {
+    return <StateView status="loading" skeleton="detail" />;
+  }
+  if (medicalQuery.isError) {
+    return (
+      <StateView
+        status="error"
+        title={t('states.error_title')}
+        retryLabel={t('states.retry')}
+        onRetry={() => medicalQuery.refetch()}
+      />
+    );
+  }
   if (!medicalQuery.data) {
-    return <Text>{t('common.loading')}</Text>;
+    return null;
   }
 
   const updateAllergy = (index: number, patch: Partial<AllergyEntry>) =>

@@ -69,7 +69,7 @@ const TABS: PatientTabDef[] = [
   { key: 'cons', labelKey: 'patients.tab.consent', permission: 'consent.view' },
   { key: 'rec', labelKey: 'recall.tab.title', permission: 'recall.view' },
   { key: 'fam', labelKey: 'patients.tab.family' },
-  { key: 'pay', labelKey: 'patients.tab.payments' },
+  { key: 'pay', labelKey: 'patients.tab.payments', permission: 'cashier.view' },
 ];
 
 export function PatientCard() {

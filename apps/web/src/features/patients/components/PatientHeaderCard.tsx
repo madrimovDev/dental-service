@@ -1,6 +1,7 @@
 import type { AllergyEntry } from '@dental/api-client';
 import { Button, Mono } from '@dental/ui';
 import { useTranslation } from 'react-i18next';
+import { formatCurrency } from '@/lib/format';
 import type { PatientDetail } from '../patients.types';
 
 type HeaderPatient = Pick<
@@ -170,7 +171,7 @@ export function PatientHeaderCard({
                   fontWeight: 600,
                 }}
               >
-                <Mono>{Math.abs(balance).toLocaleString('ru-RU')}</Mono>
+                <Mono>{formatCurrency(Math.abs(balance), t)}</Mono>
               </div>
             </div>
             {onCollectPayment && (
