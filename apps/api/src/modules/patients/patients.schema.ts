@@ -117,7 +117,8 @@ export type AddRelativeInput = z.infer<typeof addRelativeSchema>;
 /** Erkin emergency contact (tizimda bemor BO'LMAGAN shaxs) — add input. */
 export const addEmergencyContactSchema = z.object({
   name: z.string().min(1).max(120),
-  phone: z.string().min(1).max(40),
+  // CLI-474 (L3): patient.phone bilan bir xil regex (avval erkin 40-belgigacha matn edi).
+  phone: z.string().regex(/^\+?\d{9,15}$/),
   relationship: z.string().min(1).max(60).optional(),
   isPrimary: z.boolean().optional(),
 });

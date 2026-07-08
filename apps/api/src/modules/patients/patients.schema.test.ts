@@ -4,9 +4,14 @@
  * CLI-455: ixtiyoriy PII/kontakt maydonlar `.nullable()` bo'lishi kerak (insurance
  * bilan bir xil) — `null` orqali maydonni "tozalash" mumkin bo'lishi uchun.
  * CLI-464: `dateOfBirth` kelajak sanani rad etishi kerak.
+ * CLI-474 (L3): `addEmergencyContactSchema.phone` patient.phone bilan bir xil regex.
  */
 import { describe, expect, test } from 'bun:test';
-import { createPatientSchema, updatePatientSchema } from './patients.schema.ts';
+import {
+  addEmergencyContactSchema,
+  createPatientSchema,
+  updatePatientSchema,
+} from './patients.schema.ts';
 
 describe('CLI-455 — updatePatientSchema ixtiyoriy maydonlar nullable', () => {
   const nullableFields = [
@@ -69,6 +74,28 @@ describe('CLI-464 — dateOfBirth kelajak sanani rad etadi', () => {
 
   test('dateOfBirth: null — muammosiz (CLI-455 bilan mos)', () => {
     const result = createPatientSchema.safeParse({ fullName: 'Ali Valiyev', dateOfBirth: null });
+    expect(result.success).toBe(true);
+  });
+});
+
+describe('CLI-474 (L3) — emergency contact phone format tekshiriladi', () => {
+  test("noto'g'ri format — rad etiladi", () => {
+    const result = addEmergencyContactSchema.safeParse({ name: 'Ali', phone: 'not-a-phone' });
+    expect(result.success).toBe(false);
+  });
+
+  test('juda qisqa raqam — rad etiladi', () => {
+    const result = addEmergencyContactSchema.safeParse({ name: 'Ali', phone: '12345' });
+    expect(result.success).toBe(false);
+  });
+
+  test("to'g'ri format (+998...) — qabul qilinadi", () => {
+    const result = addEmergencyContactSchema.safeParse({ name: 'Ali', phone: '+998901234567' });
+    expect(result.success).toBe(true);
+  });
+
+  test("to'g'ri format (prefixsiz raqam) — qabul qilinadi", () => {
+    const result = addEmergencyContactSchema.safeParse({ name: 'Ali', phone: '998901234567' });
     expect(result.success).toBe(true);
   });
 });
