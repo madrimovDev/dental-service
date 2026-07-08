@@ -8,7 +8,7 @@ import {
   treatmentStages,
 } from '@dental/db-schema';
 import { createNoOpFiscalProvider, type FiscalProvider } from '@dental/fiscal';
-import { and, between, count, desc, eq, sql } from 'drizzle-orm';
+import { and, between, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
@@ -46,6 +46,22 @@ export class AllocationMismatchError extends Error {
   constructor() {
     super('Allocation sum must equal paid amount');
     this.name = 'AllocationMismatchError';
+  }
+}
+
+/**
+ * CLI-460: allocation'lar (`stageId`) HAQIQATDA bitta umumiy davolash rejasiga
+ * tegishli emas, YOKI client yuborgan `treatmentPlanId`/`patientId` DB'dan
+ * aniqlangan haqiqiy qiymatga mos kelmaydi (client qiymatiga ISHONILMAYDI —
+ * CLI-443 "serverda hisobla" patterni). Mos kelmasa yoki allocation'lar aralash
+ * planlarga tegishli bo'lsa — RAD (aks holda noto'g'ri/bo'sh `treatmentPlanId`
+ * `payroll.service.ts`dagi INNER JOIN'ni o'tkazib yuborib, doktor komissiyasini
+ * yo'qotadi).
+ */
+export class AllocationPlanMismatchError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AllocationPlanMismatchError';
   }
 }
 
@@ -247,6 +263,55 @@ export const createCashierService = (deps: {
       }
     }
 
+    // CLI-460: allocations berilganda `treatmentPlanId`/`patientId` client'dan
+    // ISHONCH bilan qabul qilinmaydi — stageId'larning HAQIQIY egaligi DB'dan
+    // aniqlanadi (treatmentStages.treatmentPlanId doim NOT NULL, o'zgarmas —
+    // tx ochilishidan OLDIN sof o'qish, priceLookup bilan bir xil naqsh).
+    // `input.treatmentPlanId`/`patientId` berilsa — mos kelishi SHART (aks holda
+    // AllocationPlanMismatchError); berilmasa — aniqlangan qiymat DERIVE qilinadi.
+    let resolvedTreatmentPlanId: string | null = input.treatmentPlanId ?? null;
+    let resolvedPatientId: string | null = input.patientId ?? null;
+
+    if (input.allocations && input.allocations.length > 0) {
+      const stageIds = [...new Set(input.allocations.map((a) => a.stageId))];
+      const stagePlans = await db
+        .select({
+          treatmentPlanId: treatmentStages.treatmentPlanId,
+          patientId: treatmentPlans.patientId,
+        })
+        .from(treatmentStages)
+        .innerJoin(treatmentPlans, eq(treatmentStages.treatmentPlanId, treatmentPlans.id))
+        .where(inArray(treatmentStages.id, stageIds));
+
+      // Topilmagan stageId (boshqa tenant/mavjud emas) — bu yerda jim o'tkaziladi,
+      // mavjud per-stage cost-cap guard (tx ichida, `.for('update')`) baribir
+      // AllocationExceedError tashlaydi. Faqat TOPILGANLAR plan izchilligi tekshiriladi.
+      const distinctPlanIds = new Set(stagePlans.map((s) => s.treatmentPlanId));
+      if (distinctPlanIds.size > 1) {
+        throw new AllocationPlanMismatchError(
+          "Barcha allocationlar bitta davolash rejasiga tegishli bo'lishi kerak",
+        );
+      }
+
+      const derivedPlanId = stagePlans[0]?.treatmentPlanId ?? null;
+      const derivedPatientId = stagePlans[0]?.patientId ?? null;
+
+      if (derivedPlanId) {
+        if (input.treatmentPlanId && input.treatmentPlanId !== derivedPlanId) {
+          throw new AllocationPlanMismatchError(
+            'treatmentPlanId allocation bosqichlarining haqiqiy rejasiga mos kelmaydi',
+          );
+        }
+        if (input.patientId && input.patientId !== derivedPatientId) {
+          throw new AllocationPlanMismatchError(
+            'patientId allocation bosqichlarining haqiqiy bemoriga mos kelmaydi',
+          );
+        }
+        resolvedTreatmentPlanId = derivedPlanId;
+        resolvedPatientId = derivedPatientId;
+      }
+    }
+
     const receiptNumber = generateReceiptNumber();
 
     return await db.transaction(async (tx) => {
@@ -257,8 +322,8 @@ export const createCashierService = (deps: {
         .values({
           tenantId,
           branchId: input.branchId,
-          patientId: input.patientId ?? null,
-          treatmentPlanId: input.treatmentPlanId ?? null,
+          patientId: resolvedPatientId,
+          treatmentPlanId: resolvedTreatmentPlanId,
           receiptNumber,
           totalAmount: String(netTotal),
           paidAmount: String(input.paidAmount),

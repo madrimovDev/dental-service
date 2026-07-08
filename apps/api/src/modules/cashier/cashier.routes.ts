@@ -26,6 +26,7 @@ import {
 import {
   AllocationExceedError,
   AllocationMismatchError,
+  AllocationPlanMismatchError,
   createCashierService,
   DiscountExceedsTotalError,
   NoActivePriceError,
@@ -130,6 +131,9 @@ export const cashierRoutes = (deps: {
           ),
           400,
         );
+      }
+      if (e instanceof AllocationPlanMismatchError) {
+        return c.json(fail('cashier.allocation_plan_mismatch', e.message), 400);
       }
       if (e instanceof NoActivePriceError) {
         return c.json(
