@@ -38,9 +38,19 @@ const testResultsSchema = z
 
 // ─── Request schemas (SAQLANADI — hand client REQUEST tiplari) ───────────────
 
+/** Bugungi sana (server, UTC) ISO date-only shaklda — dateOfBirth yuqori chegarasi. */
+const todayIsoDate = () => new Date().toISOString().slice(0, 10);
+
 export const createPatientSchema = z.object({
   fullName: z.string().min(2).max(120),
-  dateOfBirth: z.iso.date().nullable().optional(),
+  // CLI-464: kelajak sana rad etiladi — refine har parse'da joriy sanaga solishtiradi.
+  dateOfBirth: z.iso
+    .date()
+    .nullable()
+    .optional()
+    .refine((v) => v == null || v <= todayIsoDate(), {
+      message: 'dateOfBirth cannot be in the future',
+    }),
   gender: z.enum(['male', 'female', 'other']).nullable().optional(),
   // CLI-455: .nullable() — ixtiyoriy PII/kontakt maydonni `null` bilan tozalash
   // mumkin bo'lishi uchun (insurance bilan bir xil naqsh); kalit umuman yo'q
