@@ -3,6 +3,7 @@ import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import type { AuditLogger } from '../../../lib/audit-logger.ts';
 import { requireModuleInDesktop } from '../../../lib/license-middleware.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../../lib/openapi.ts';
+import { CrossEntityError } from '../../../lib/ownership.ts';
 import { requirePermission } from '../../../middleware/require-permission.ts';
 import { toPlanDto, toPlanWithStagesDto, toStageDto } from './treatment-plans.mapper.ts';
 import {
@@ -117,8 +118,16 @@ export const treatmentPlansRoutes = (deps: {
 
   app.openapi(createRoute_, async (c) => {
     const body = c.req.valid('json');
-    const plan = await service.createPlan(c, body);
-    return c.json(ok(toPlanWithStagesDto(plan)), 201);
+    try {
+      const plan = await service.createPlan(c, body);
+      return c.json(ok(toPlanWithStagesDto(plan)), 201);
+    } catch (e) {
+      // L12: cross-entity ownership mismatch → 400 (noto'g'ri havola, resource emas).
+      if (e instanceof CrossEntityError) {
+        return c.json(fail(`ownership.${e.reason}`, e.message), 400);
+      }
+      throw e;
+    }
   });
 
   // ─── GET /treatment-plans/{id} — get by id ─────────────────────────────────

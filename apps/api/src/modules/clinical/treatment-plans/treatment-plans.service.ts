@@ -1,5 +1,6 @@
 import type { Context } from 'hono';
 import type { AuditLogger } from '../../../lib/audit-logger.ts';
+import { createOwnershipValidator, type OwnershipValidator } from '../../../lib/ownership.ts';
 // C6: C4 qarz predikatini YAGONA manbadan ishlatish (cashier billing pure fn).
 import { computePlanBalance } from '../../cashier/cashier.billing.ts';
 import { createTreatmentPlansRepository } from './treatment-plans.repository.ts';
@@ -73,8 +74,10 @@ export const createTreatmentPlansService = (deps: {
   recall?: RecallStageHook;
   /** CLI-443: bosqich narxini serverda hisoblash uchun (faqat `serviceId` bor bosqichlarga). */
   priceLookup?: PriceLookup;
+  ownership?: OwnershipValidator;
 }) => {
   const repo = createTreatmentPlansRepository();
+  const ownership = deps.ownership ?? createOwnershipValidator();
 
   const listPlans = async (c: Context, query: ListPlansQuery) => {
     const result = await repo.listPlans(c, query);
@@ -102,6 +105,14 @@ export const createTreatmentPlansService = (deps: {
   async function createPlan(c: Context, input: CreateTreatmentPlanInput) {
     const tenantId = c.get('activeTenantId');
     if (!tenantId) throw new Error('No tenant context');
+
+    // L12 (audit 2026-07-06): cross-entity ownership — schema-validatsiyadan KEYIN,
+    // narx-hisoblash/insert'dan OLDIN. patientId/doctorId shu tenantga tegishlimi
+    // (cross-tenant/mavjud bo'lmagan UUID → CrossEntityError → routes 400). Avval
+    // FK constraint xatosi xom 500 qaytarardi (visit-notes.service.ts CLI-421
+    // pattern bilan bir xil — routes 400'ga aylantiradi).
+    await ownership.assertPatientExists(c, input.patientId);
+    await ownership.assertUserExists(c, input.doctorId);
 
     // CLI-443: serviceId bor bosqich uchun narx SERVERDA `getActivePrice` orqali
     // hisoblanadi (client'ning `cost`i e'tiborga olinmaydi) — filial JWT'dagi

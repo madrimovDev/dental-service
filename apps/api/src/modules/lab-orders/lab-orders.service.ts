@@ -3,6 +3,7 @@ import { and, count, desc, eq, lt, notInArray } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { createOwnershipValidator, type OwnershipValidator } from '../../lib/ownership.ts';
 import type {
   CreateLabOrderInput,
   ListLabOrdersQuery,
@@ -10,7 +11,11 @@ import type {
 } from './lab-orders.schema.ts';
 import { assertLabOrderTransition, type LabOrderStatus } from './lab-orders.transitions.ts';
 
-export const createLabOrdersService = (deps: { audit: AuditLogger }) => {
+export const createLabOrdersService = (deps: {
+  audit: AuditLogger;
+  ownership?: OwnershipValidator;
+}) => {
+  const ownership = deps.ownership ?? createOwnershipValidator();
   /**
    * DS7: tenant-wide yoki patientId-filtered ro'yxat. RLS tenant bo'yicha filtrlaydi
    * (explicit WHERE tenant_id YO'Q). Pagination + ixtiyoriy status filtri; jami count alohida.
@@ -86,6 +91,11 @@ export const createLabOrdersService = (deps: { audit: AuditLogger }) => {
     const db = getDb(c);
     const tenantId = c.get('activeTenantId');
     if (!tenantId) throw new Error('No tenant context');
+
+    // L12 (audit 2026-07-06): cross-entity ownership — mavjud bo'lmagan/cross-tenant
+    // patientId oldindan tekshiriladi (FK constraint xom 500 o'rniga toza 400,
+    // visit-notes.service.ts CLI-421 pattern bilan bir xil — routes 400'ga aylantiradi).
+    await ownership.assertPatientExists(c, input.patientId);
 
     const [row] = await db
       .insert(labOrders)
