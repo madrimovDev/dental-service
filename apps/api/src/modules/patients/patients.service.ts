@@ -354,11 +354,24 @@ export const createPatientsService = (deps: { audit: AuditLogger }) => {
     const [before] = await db.select().from(patients).where(eq(patients.id, id));
     if (!before) return null;
 
-    const [updated] = await db
-      .update(patients)
-      .set({ ...input, updatedAt: new Date() })
-      .where(eq(patients.id, id))
-      .returning();
+    // CLI-455: explicit patch — kalit yo'q (`undefined`) bo'lsa ustunga tegmaydi,
+    // `null` bo'lsa ustunni tozalaydi. Zod schema `.nullable()` bo'lgani uchun
+    // ikkalasi runtime'da farqlanadi (`in`/`!== undefined` emas, oddiy tekshiruv
+    // yetarli — JSON body'dan `undefined` qiymat hech qachon kelmaydi).
+    const patch: Record<string, unknown> = { updatedAt: new Date() };
+    if (input.fullName !== undefined) patch.fullName = input.fullName;
+    if (input.dateOfBirth !== undefined) patch.dateOfBirth = input.dateOfBirth;
+    if (input.gender !== undefined) patch.gender = input.gender;
+    if (input.phone !== undefined) patch.phone = input.phone;
+    if (input.phoneSecondary !== undefined) patch.phoneSecondary = input.phoneSecondary;
+    if (input.passport !== undefined) patch.passport = input.passport;
+    if (input.address !== undefined) patch.address = input.address;
+    if (input.notes !== undefined) patch.notes = input.notes;
+    if (input.tags !== undefined) patch.tags = input.tags;
+    if (input.source !== undefined) patch.source = input.source;
+    if (input.insurance !== undefined) patch.insurance = input.insurance;
+
+    const [updated] = await db.update(patients).set(patch).where(eq(patients.id, id)).returning();
 
     if (updated) {
       await deps.audit.record(c, {

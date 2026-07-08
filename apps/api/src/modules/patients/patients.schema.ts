@@ -40,19 +40,24 @@ const testResultsSchema = z
 
 export const createPatientSchema = z.object({
   fullName: z.string().min(2).max(120),
-  dateOfBirth: z.iso.date().optional(),
-  gender: z.enum(['male', 'female', 'other']).optional(),
+  dateOfBirth: z.iso.date().nullable().optional(),
+  gender: z.enum(['male', 'female', 'other']).nullable().optional(),
+  // CLI-455: .nullable() — ixtiyoriy PII/kontakt maydonni `null` bilan tozalash
+  // mumkin bo'lishi uchun (insurance bilan bir xil naqsh); kalit umuman yo'q
+  // bo'lsa (`undefined`) — service.update() tegmaydi (no-op, PATCH semantikasi).
   phone: z
     .string()
     .regex(/^\+?\d{9,15}$/)
+    .nullable()
     .optional(),
   phoneSecondary: z
     .string()
     .regex(/^\+?\d{9,15}$/)
+    .nullable()
     .optional(),
-  passport: z.string().max(64).optional(),
-  address: z.string().max(500).optional(),
-  notes: z.string().max(2000).optional(),
+  passport: z.string().max(64).nullable().optional(),
+  address: z.string().max(500).nullable().optional(),
+  notes: z.string().max(2000).nullable().optional(),
   tags: z.array(z.string().min(1).max(40)).max(20).optional(),
   source: z.string().max(80).optional(),
   insurance: insuranceInputSchema.nullable().optional(),
