@@ -36,6 +36,20 @@ export class AllocationExceedError extends Error {
 }
 
 /**
+ * CLI-459: plan-billing rejimida (`items=[]`) allocation yig'indisi `paidAmount`ga
+ * AYNAN TENG bo'lishi shart — ilgari guard bir-tomonlama edi (faqat oshib ketish
+ * RAD etilardi), `allocSum < paidAmount` bo'lganda esa `netTotalCents` to'g'ridan-
+ * to'g'ri `paidAmount`dan olingani sababli "ko'rinmas" pul (allocatsiya qilinmagan
+ * qoldiq) hech qanday buxgalteriya izisiz kassaga kirib kelardi.
+ */
+export class AllocationMismatchError extends Error {
+  constructor() {
+    super('Allocation sum must equal paid amount');
+    this.name = 'AllocationMismatchError';
+  }
+}
+
+/**
  * CLI-443: POS item uchun filialda faol narx topilmasa — routes 400 ga aylantiradi.
  * Narxsiz xizmat POS orqali sotib bo'lmaydi (moliyaviy nazoratsizlik xavfi).
  */
@@ -224,11 +238,12 @@ export const createCashierService = (deps: {
       resolvedItems.length > 0 ? itemsGrossCents - discountCents : toCents(input.paidAmount);
     const netTotal = fromCents(netTotalCents);
 
-    // Allocation yig'indisi paidAmount'dan oshmasligi shart (qisman ruxsat, oshib ketish RAD).
+    // CLI-459: allocation yig'indisi paidAmount'ga AYNAN TENG bo'lishi shart
+    // (avval bir-tomonlama edi — kam bo'lishi jim o'tar edi, "ko'rinmas" pul).
     if (input.allocations && input.allocations.length > 0) {
       const allocSumCents = input.allocations.reduce((s, a) => s + toCents(a.amount), 0);
-      if (allocSumCents > toCents(input.paidAmount)) {
-        throw new AllocationExceedError();
+      if (allocSumCents !== toCents(input.paidAmount)) {
+        throw new AllocationMismatchError();
       }
     }
 
