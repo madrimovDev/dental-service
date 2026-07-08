@@ -5,6 +5,8 @@ import {
   payrollRuns,
   staffProfiles,
   treatmentPlans,
+  userAssignments,
+  users,
 } from '@dental/db-schema';
 import { and, desc, eq, gte, inArray, isNull, lt, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
@@ -254,6 +256,30 @@ export const createPayrollService = (deps: { audit: AuditLogger }) => {
     return runs;
   }
 
+  /**
+   * CLI-470: xodim ismlarini yechish uchun yengil `payroll.view`-gated endpoint
+   * (`GET /users/assignments`, `user.view` o'rniga — Accountant template'da
+   * `user.view` YO'Q, CLI-154/155 precedenti). `users`/`user_assignments`ni
+   * `listAssignments` (users.service) kabi to'liq join qilmasdan, faqat
+   * `{userId, fullName}` distinct qaytaradi — `fullName` bo'sh bo'lsa `phone`ga
+   * fallback (listDoctors bilan bir xil resolve pattern, backendda qilinadi).
+   */
+  async function listStaffNames(c: Context) {
+    const db = getDb(c);
+    const rows = await db
+      .selectDistinct({
+        userId: users.id,
+        fullName: users.fullName,
+        phone: users.phone,
+      })
+      .from(userAssignments)
+      .innerJoin(users, eq(users.id, userAssignments.userId))
+      .where(isNull(users.deletedAt))
+      .orderBy(users.fullName);
+
+    return rows.map((r) => ({ userId: r.userId, fullName: r.fullName ?? r.phone }));
+  }
+
   async function getRun(c: Context, runId: string) {
     const db = getDb(c);
     const [run] = await db.select().from(payrollRuns).where(eq(payrollRuns.id, runId));
@@ -412,7 +438,15 @@ export const createPayrollService = (deps: { audit: AuditLogger }) => {
     });
   }
 
-  return { createRun, listRuns, getRun, finalizeRun, deleteRun, recordRefundAdjustment };
+  return {
+    createRun,
+    listRuns,
+    listStaffNames,
+    getRun,
+    finalizeRun,
+    deleteRun,
+    recordRefundAdjustment,
+  };
 };
 
 export type PayrollService = ReturnType<typeof createPayrollService>;

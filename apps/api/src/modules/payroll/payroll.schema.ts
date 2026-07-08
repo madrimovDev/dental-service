@@ -71,3 +71,18 @@ export const payrollRunWithLinesDtoSchema = payrollRunDtoSchema
   .openapi('PayrollRunWithLines');
 
 export type PayrollRunWithLinesDto = z.infer<typeof payrollRunWithLinesDtoSchema>;
+
+/**
+ * StaffName DTO — CLI-470: xodim ismini yechish uchun yengil `payroll.view`-gated
+ * javob (`GET /payroll/staff-names`). `fullName` allaqachon resolve qilingan
+ * (bo'sh bo'lsa `phone`ga fallback qilingan, backendda) — frontend qo'shimcha
+ * fallback mantiqi shart emas.
+ */
+export const staffNameDtoSchema = z
+  .object({
+    userId: z.uuid(),
+    fullName: z.string(),
+  })
+  .openapi('StaffName');
+
+export type StaffNameDto = z.infer<typeof staffNameDtoSchema>;

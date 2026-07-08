@@ -365,6 +365,7 @@ export type {
   SignConsentFormBodyLanguage,
   SignConsentFormBodyType,
   SignTreatmentPlanConsentBody,
+  StaffName,
   StaffProfile,
   StaffProfileEmploymentStatus,
   StageBalance,
@@ -526,12 +527,14 @@ export type {
   FinalizePayrollRunResult,
   GetPayrollRunResult,
   ListPayrollRunsResult,
+  ListPayrollStaffNamesResult,
 } from './generated/payroll/payroll.ts';
 export {
   createPayrollRun,
   finalizePayrollRun,
   getPayrollRun,
   listPayrollRuns,
+  listPayrollStaffNames,
 } from './generated/payroll/payroll.ts';
 // Generated (orval) — permissions
 export type { ListPermissionsResult } from './generated/permissions/permissions.ts';
