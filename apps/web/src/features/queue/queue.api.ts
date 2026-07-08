@@ -54,11 +54,15 @@ export function useUpdateQueueStatus() {
   });
 }
 
-/** Lookup ma'lumotlari (bemor/xizmat nomlari + branch ro'yxati). */
-export function usePatientsAll() {
+/**
+ * Lookup ma'lumotlari (bemor/xizmat nomlari + branch ro'yxati). CLI-454: `search` —
+ * debounced server-side qidiruv; ro'yxat endi oxirgi 100 yozuv bilan cheklanmaydi
+ * (backend `ilike` filtri bilan qidiradi, `pageSize:100` faqat natija sahifasi hajmi).
+ */
+export function usePatientsAll(search = '') {
   return useQuery({
-    queryKey: lookupKeys.patientsAll(),
-    queryFn: () => listPatients({ pageSize: 100 }).then((r) => r.data),
+    queryKey: lookupKeys.patientsAll(search),
+    queryFn: () => listPatients({ search: search || undefined, pageSize: 100 }).then((r) => r.data),
   });
 }
 

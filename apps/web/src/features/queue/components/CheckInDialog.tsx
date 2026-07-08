@@ -1,4 +1,5 @@
 import { Button, Group, Modal, Select, Stack, Tabs, Text } from '@mantine/core';
+import { useDebouncedValue } from '@mantine/hooks';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCheckInCandidates, useCreateTicket, usePatientsAll, useServices } from '../queue.api';
@@ -14,12 +15,21 @@ export function CheckInDialog({
 }) {
   const { t } = useTranslation();
   const candidates = useCheckInCandidates(branchId);
+  // Yozuvdan check-in tab'idagi bemor-nomi qidiruvi ("Bemor" ustuni) qidiruvdan
+  // mustaqil — cheklanmagan (search='') chaqiruv shu uchun saqlanadi.
   const patients = usePatientsAll();
   const services = useServices();
   const createTicket = useCreateTicket();
 
   const [walkInPatient, setWalkInPatient] = useState<string | null>(null);
   const [walkInService, setWalkInService] = useState<string | null>(null);
+  // CLI-454: walk-in bemor Select avval pageSize:100 bilan qidiruvsiz cheklangan edi —
+  // 100 tadan ortiq bemorli tenant'da kerakli bemor ko'rinmasdi. Endi qidiruv matni
+  // debounced holda serverga uzatiladi (backend `ilike` filtri); "yozuvdan" tab'idagi
+  // nom lookup'iga ta'sir qilmaydi (yuqoridagi `patients`, alohida chaqiruv).
+  const [walkInPatientSearch, setWalkInPatientSearch] = useState('');
+  const [debouncedWalkInPatientSearch] = useDebouncedValue(walkInPatientSearch, 300);
+  const walkInPatients = usePatientsAll(debouncedWalkInPatientSearch);
 
   function hhmm(iso: string) {
     return new Date(iso).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
@@ -28,6 +38,7 @@ export function CheckInDialog({
   const handleClose = () => {
     setWalkInPatient(null);
     setWalkInService(null);
+    setWalkInPatientSearch('');
     onClose();
   };
 
@@ -90,11 +101,15 @@ export function CheckInDialog({
           <Stack gap="md">
             <Select
               label={t('queue.patient')}
-              data={patients.data?.data.map((p) => ({ value: p.id, label: p.fullName })) ?? []}
+              data={
+                walkInPatients.data?.data.map((p) => ({ value: p.id, label: p.fullName })) ?? []
+              }
               searchable
               clearable
               value={walkInPatient}
               onChange={setWalkInPatient}
+              searchValue={walkInPatientSearch}
+              onSearchChange={setWalkInPatientSearch}
             />
             <Select
               label={t('queue.service')}

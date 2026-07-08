@@ -1,5 +1,6 @@
 import { PageHead, StateView } from '@dental/ui';
 import { Box, Flex, Group, Paper, SegmentedControl, Select, Stack } from '@mantine/core';
+import { useDebouncedValue } from '@mantine/hooks';
 import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth-store.ts';
@@ -16,6 +17,11 @@ export function CashierScreen() {
 
   const [branchId, setBranchId] = useState<string | null>(activeBranchId);
   const [patientId, setPatientId] = useState<string | null>(null);
+  // CLI-454: bemor Select avval pageSize:100 bilan qidiruvsiz cheklangan edi — 100 tadan
+  // ortiq bemorli tenant'da kerakli bemor ko'rinmasdi. Endi qidiruv matni debounced
+  // holda serverga uzatiladi (backend `ilike` filtri).
+  const [patientSearch, setPatientSearch] = useState('');
+  const [debouncedPatientSearch] = useDebouncedValue(patientSearch, 300);
   const [mode, setMode] = useState<CashierMode>('payment');
   // POS savatida to'ldirilmagan satr borligini kuzatadi (rejim almashganda yo'qotishni ogohlantirish).
   const posCartDirty = useRef(false);
@@ -37,7 +43,7 @@ export function CashierScreen() {
   }, []);
 
   const branchesQuery = useBranches();
-  const patientsQuery = usePatientsAll();
+  const patientsQuery = usePatientsAll(debouncedPatientSearch);
   const txQuery = useTodayTransactions(branchId);
   const summaryQuery = useDailySummary(branchId);
 
@@ -67,6 +73,8 @@ export function CashierScreen() {
           onChange={setPatientId}
           searchable
           clearable
+          searchValue={patientSearch}
+          onSearchChange={setPatientSearch}
           w={280}
         />
         <SegmentedControl

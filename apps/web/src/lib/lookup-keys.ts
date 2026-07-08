@@ -10,6 +10,9 @@
 export const lookupKeys = {
   branches: () => ['branches'] as const,
   services: () => ['services'] as const,
-  patientsAll: () => ['patients', 'list-all'] as const,
+  // CLI-454: `search` key'ga kiradi — debounced server-search har xil so'rov uchun
+  // alohida cache yozuvi oladi (bo'sh qidiruv = eski "hamma bemor" yozuvi bilan bir
+  // xil key, shuning uchun cross-feature cache-sharing buzilmaydi).
+  patientsAll: (search = '') => ['patients', 'list-all', search] as const,
   userAssignments: () => ['users', 'assignments'] as const,
 };

@@ -65,11 +65,15 @@ export function useServices() {
   });
 }
 
-/** Lookup: barcha bemorlar (selektor uchun). */
-export function usePatientsAll() {
+/**
+ * Lookup: bemorlar (selektor uchun). CLI-454: `search` — debounced server-side
+ * qidiruv; ro'yxat endi oxirgi 100 yozuv bilan cheklanmaydi (backend `ilike` filtri
+ * bilan qidiradi, `pageSize:100` faqat natija sahifasi hajmi).
+ */
+export function usePatientsAll(search = '') {
   return useQuery({
-    queryKey: lookupKeys.patientsAll(),
-    queryFn: () => listPatients({ pageSize: 100 }).then((r) => r.data),
+    queryKey: lookupKeys.patientsAll(search),
+    queryFn: () => listPatients({ search: search || undefined, pageSize: 100 }).then((r) => r.data),
   });
 }
 

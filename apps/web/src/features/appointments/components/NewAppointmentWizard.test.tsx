@@ -34,8 +34,15 @@ vi.mock('../appointments.api', () => ({
 vi.mock('@/features/schedule/schedule.api', () => ({
   useAvailability: () => availabilityMock,
 }));
+// usePatients chaqiruv argumentini (search) kuzatamiz — CLI-454: debounced server-search
+// pageSize:100 bilan cheklangan static ro'yxat o'rniga.
+const usePatientsSpy = vi.hoisted(() =>
+  vi.fn((_params?: unknown) => ({
+    data: { items: [{ id: 'p1', fullName: 'Aliyev Vali' }], meta: {} },
+  })),
+);
 vi.mock('@/features/patients', () => ({
-  usePatients: () => ({ data: { items: [{ id: 'p1', fullName: 'Aliyev Vali' }], meta: {} } }),
+  usePatients: (params: unknown) => usePatientsSpy(params),
 }));
 vi.mock('@/lib/api.ts', () => ({
   api: {
@@ -44,6 +51,11 @@ vi.mock('@/lib/api.ts', () => ({
     branches: { list: vi.fn(() => Promise.resolve([])) },
   },
 }));
+// debounce'ni o'tkazib, qidiruv darhol uzatilsin (CommandPalette.test.tsx naqshi).
+vi.mock('@mantine/hooks', async (orig) => {
+  const actual = (await orig()) as Record<string, unknown>;
+  return { ...actual, useDebouncedValue: (v: unknown) => [v] };
+});
 
 const mockAuth = vi.hoisted(() => ({ activeBranchId: 'b1' as string | null }));
 vi.mock('@/stores/auth-store.ts', () => ({ useAuthStore: () => mockAuth }));
@@ -52,6 +64,21 @@ describe('NewAppointmentWizard', () => {
   afterEach(() => {
     mockAuth.activeBranchId = 'b1';
     createMock.mockReset();
+    usePatientsSpy.mockClear();
+  });
+
+  // CLI-454: avval bemor Select faqat oldindan yuklangan (pageSize:100, qidiruvsiz)
+  // ro'yxatni client-side filtrlar edi — 100 tadan ortiq bemorli tenant'da yangi/eski
+  // bemorlar ko'rinmasdi. Endi qidiruv matni debounced holda `usePatients`ga uzatiladi.
+  it("bemor qidiruv input o'zgarganda usePatients debounced search bilan chaqiriladi", async () => {
+    renderApp(<NewAppointmentWizard onClose={vi.fn()} />);
+    const input = screen.getByPlaceholderText('Bemor');
+    fireEvent.change(input, { target: { value: 'Vali' } });
+    await waitFor(() =>
+      expect(usePatientsSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ search: 'Vali', page: 1, pageSize: 100 }),
+      ),
+    );
   });
 
   it("birinchi qadam (Bemor) ko'rsatadi", () => {
