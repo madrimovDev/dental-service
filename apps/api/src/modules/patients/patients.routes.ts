@@ -323,6 +323,10 @@ export const patientRoutes = (deps: { db: Database; audit: AuditLogger }) => {
         content: { 'application/json': { schema: errorResponseSchema } },
         description: 'Forbidden',
       },
+      409: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Duplicate relative link (CLI-474 L5)',
+      },
     },
   });
 
@@ -338,9 +342,10 @@ export const patientRoutes = (deps: { db: Database; audit: AuditLogger }) => {
       if (e instanceof CrossEntityError) {
         return c.json(fail(`ownership.${e.reason}`, e.message), 400);
       }
-      // CLI-474 (L4): o'z-o'ziga havola → 400.
+      // CLI-474 (L4): o'z-o'ziga havola → 400; (L5): reciprocal/takroriy juftlik → 409.
       if (e instanceof PatientRelativeConflictError) {
-        return c.json(fail(`patient_relative.${e.code}`, e.message), 400);
+        const status = e.code === 'duplicate_link' ? 409 : 400;
+        return c.json(fail(`patient_relative.${e.code}`, e.message), status);
       }
       throw e;
     }

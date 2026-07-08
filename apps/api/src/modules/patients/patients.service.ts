@@ -30,13 +30,14 @@ import type {
 const PII_FIELDS = ['phone', 'phoneSecondary', 'passport', 'address'] as const;
 
 /**
- * CLI-474 (L4) — `addRelative` domen-validatsiya xatosi (o'z-o'ziga havola).
- * `ownership.ts`dagi `CrossEntityError`dan farqli — bu ikkala tomon ham HAQIQIY
- * bemor, lekin ular orasidagi MUNOSABAT noto'g'ri (queue.service.ts
- * `QueueValidationError` bilan bir xil naqsh — routes try/catch orqali map qilinadi).
+ * CLI-474 (L4/L5) — `addRelative` domen-validatsiya xatosi (o'z-o'ziga havola yoki
+ * takroriy/reciprocal juftlik). `ownership.ts`dagi `CrossEntityError`dan farqli —
+ * bu ikkala tomon ham HAQIQIY bemor, lekin ular orasidagi MUNOSABAT noto'g'ri
+ * (queue.service.ts `QueueValidationError` bilan bir xil naqsh — routes try/catch
+ * orqali map qilinadi).
  */
 export class PatientRelativeConflictError extends Error {
-  constructor(readonly code: 'self_link') {
+  constructor(readonly code: 'self_link' | 'duplicate_link') {
     super(code);
     this.name = 'PatientRelativeConflictError';
   }
@@ -602,6 +603,31 @@ export const createPatientsService = (deps: {
     // 500 o'rniga toza CrossEntityError → routes 400).
     await ownership.assertPatientExists(c, patientId);
     await ownership.assertPatientExists(c, input.relativePatientId);
+
+    // CLI-474 (L5): unique constraint (patient_id, relative_patient_id) faqat AYNAN
+    // bir xil yo'nalishni bloklaydi — reciprocal (B→A, A→B mavjud bo'lganda) alohida
+    // qator sifatida yozilaverardi. Ikkala yo'nalishni ham oldindan tekshiramiz —
+    // shu bilan bir vaqtda aynan bir xil yo'nalishdagi takror ham xom Postgres unique
+    // violation (500) o'rniga toza PatientRelativeConflictError (409) qaytaradi.
+    const [existing] = await db
+      .select({ id: patientRelatives.id })
+      .from(patientRelatives)
+      .where(
+        or(
+          and(
+            eq(patientRelatives.patientId, patientId),
+            eq(patientRelatives.relativePatientId, input.relativePatientId),
+          ),
+          and(
+            eq(patientRelatives.patientId, input.relativePatientId),
+            eq(patientRelatives.relativePatientId, patientId),
+          ),
+        ),
+      )
+      .limit(1);
+    if (existing) {
+      throw new PatientRelativeConflictError('duplicate_link');
+    }
 
     const [link] = await db
       .insert(patientRelatives)
