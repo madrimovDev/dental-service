@@ -684,6 +684,8 @@
     "accept_all_partial": "Не удалось принять этапов: {{rejected}}",
     "present": "Показать пациенту",
     "accept_plan": "Утвердить план",
+    "start_execution": "Начать выполнение",
+    "complete_plan": "Завершить план",
     "estimate": "Смета",
     "estimate_open": "Смета / показать",
     "estimate_empty": "Нет этапов",

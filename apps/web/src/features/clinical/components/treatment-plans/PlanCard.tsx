@@ -24,17 +24,6 @@ import { EstimateView } from './EstimateView';
 import { StageRow } from './StageRow';
 import classes from './TreatmentPlansTab.module.css';
 
-// B4 (CLI-439): `accepted`dan tashqari lifecycle amallari (`in_progress`/`completed`/
-// `cancelled`) uchun yangi tugma matnlari kerak edi, lekin bu pass faqat `apps/web/**`
-// egaligiga ega — `packages/i18n`ga tegilmaydi. Inline TODO-literal (uz/ru), handoff:
-// keyingi pass `treatment_plan.start`/`treatment_plan.complete`/`treatment_plan.cancel_plan`
-// i18n kalitlarini qo'shib shu literal'larni almashtirsin. `common.cancel` mavjud kalit —
-// bekor qilish tugmasi shuni ishlatadi (yangi kalit shart emas).
-const PLAN_ACTION_LABEL: Record<'start' | 'complete', { uz: string; ru: string }> = {
-  start: { uz: 'Ijroni boshlash', ru: 'Начать выполнение' },
-  complete: { uz: 'Rejani yakunlash', ru: 'Завершить план' },
-};
-
 // B4: backend transition jadvaliga mos (`treatment-plans.transitions.ts`, Qaror #25) —
 // `cancelled` faqat terminal bo'lmagan statusdan (draft/presented/accepted/in_progress)
 // ruxsat etiladi; UI shu jadvalga ORTIQCHA imkoniyat taklif qilmasligi kerak.
@@ -78,7 +67,7 @@ export function PlanCard({
   onSignConsent: (planId: string, body: SignTreatmentPlanConsentBody) => void;
   consentPending: boolean;
 }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const vm = toPlanCardVM(plan);
   const [estimateOpened, estimate] = useDisclosure(false);
   const [consentOpened, consent] = useDisclosure(false);
@@ -86,7 +75,6 @@ export function PlanCard({
 
   const proposedStageIds = plan.stages.filter((s) => s.acceptance === 'proposed').map((s) => s.id);
   const hasConsent = plan.consentSignedAt != null;
-  const lang = i18n.language === 'ru' ? 'ru' : 'uz';
   const canCancelPlan = CANCELLABLE_PLAN_STATUSES.includes(plan.status);
 
   // Yil — plan.createdAt'dan (vizual sarlavha uchun; yangi data YO'Q).
@@ -197,7 +185,7 @@ export function PlanCard({
                 loading={planStatusPending}
                 onClick={() => onSetPlanStatus(plan.id, 'in_progress')}
               >
-                {PLAN_ACTION_LABEL.start[lang]}
+                {t('treatment_plan.start_execution')}
               </Button>
             )}
             {/* B4: in_progress→completed. */}
@@ -209,7 +197,7 @@ export function PlanCard({
                 loading={planStatusPending}
                 onClick={() => onSetPlanStatus(plan.id, 'completed')}
               >
-                {PLAN_ACTION_LABEL.complete[lang]}
+                {t('treatment_plan.complete_plan')}
               </Button>
             )}
             {/* B4: backend transition jadvaliga mos — cancel istalgan terminal

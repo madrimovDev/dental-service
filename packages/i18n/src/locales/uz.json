@@ -684,6 +684,8 @@
     "accept_all_partial": "{{rejected}} ta bosqichni qabul qilib bo'lmadi",
     "present": "Bemorga taqdim qilish",
     "accept_plan": "Rejani tasdiqlash",
+    "start_execution": "Ijroni boshlash",
+    "complete_plan": "Rejani yakunlash",
     "estimate": "Smeta",
     "estimate_open": "Smeta / taqdim qilish",
     "estimate_empty": "Bosqichlar yo'q",
