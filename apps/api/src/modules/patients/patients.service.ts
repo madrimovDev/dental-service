@@ -204,6 +204,17 @@ export const createPatientsService = (deps: { audit: AuditLogger }) => {
     const data = masked.map((p) => ({ ...p, balance: balanceById.get(p.id) ?? 0 }));
     const total = totalRows[0]?.total ?? 0;
 
+    // CLI-458: findById()dagi bilan bir xil sensitive-read audit, lekin bulk —
+    // har row uchun alohida emas, bitta batch yozuv (N+1 audit yo'q).
+    if (hasPii && rows.length > 0) {
+      await deps.audit.record(c, {
+        action: 'viewed_pii',
+        resourceType: 'patient',
+        resourceId: null,
+        after: { count: rows.length, patientIds: rows.map((r) => r.id) },
+      });
+    }
+
     return { data, meta: { page: query.page, pageSize: query.pageSize, total } };
   }
 
