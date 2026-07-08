@@ -706,17 +706,47 @@ export const createPatientsService = (deps: {
     // haqiqiy bemor ekanini tekshiramiz.
     await ownership.assertPatientExists(c, patientId);
 
-    const [contact] = await db
-      .insert(patientEmergencyContacts)
-      .values({
-        tenantId,
-        patientId,
-        name: input.name,
-        phone: input.phone,
-        relationship: input.relationship ?? null,
-        isPrimary: input.isPrimary ?? false,
-      })
-      .returning();
+    const isPrimary = input.isPrimary ?? false;
+
+    // CLI-463: isPrimary=true bo'lsa, shu bemorning boshqa contact'larini AVVAL
+    // demote qilamiz (bitta tranzaksiya ichida) — bir nechta contact bir vaqtda
+    // primary bo'lib qolmasligi uchun (listEmergencyContacts bitta-primary
+    // semantikasini nazarda tutadi, `isPrimary DESC` tartib).
+    const [contact] = isPrimary
+      ? await db.transaction(async (tx) => {
+          await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);
+          await tx
+            .update(patientEmergencyContacts)
+            .set({ isPrimary: false })
+            .where(
+              and(
+                eq(patientEmergencyContacts.patientId, patientId),
+                eq(patientEmergencyContacts.isPrimary, true),
+              ),
+            );
+          return tx
+            .insert(patientEmergencyContacts)
+            .values({
+              tenantId,
+              patientId,
+              name: input.name,
+              phone: input.phone,
+              relationship: input.relationship ?? null,
+              isPrimary: true,
+            })
+            .returning();
+        })
+      : await db
+          .insert(patientEmergencyContacts)
+          .values({
+            tenantId,
+            patientId,
+            name: input.name,
+            phone: input.phone,
+            relationship: input.relationship ?? null,
+            isPrimary: false,
+          })
+          .returning();
 
     if (contact) {
       await deps.audit.record(c, {
