@@ -37,6 +37,16 @@ recall.worker.on('failed', (job, err) =>
 );
 await registerRecallScheduler();
 
+// CLI-379: Telegram bot-manager — boots a Telegraf poller per tenant with a
+// saved bot token (admin conn, RLS bypass, same pattern as recall worker) and
+// reloads on tenant token changes via the `telegram:reload` pub/sub channel.
+const { createAdminDb } = await import('./db/client.ts');
+const { withTenant } = await import('./db/scoped.ts');
+const { startTelegramBotManager } = await import('./lib/telegram-bot-manager.ts');
+const admin = createAdminDb();
+const botManager = startTelegramBotManager({ adminDb: admin.db, withTenant });
+logger.info('🛠️  Telegram bot-manager started');
+
 logger.info('🛠️  Worker process started (reminder + recall)');
 
 // Graceful shutdown: stop accepting jobs, finish in-flight, close DB pools.
@@ -48,6 +58,8 @@ async function shutdown(signal: string): Promise<void> {
   try {
     await worker.close(); // waits for in-flight jobs, then closes the Redis conn
     await recall.close(); // closes recall worker + admin db pool
+    await botManager.stopAll(); // stops all Telegraf pollers + reload sub
+    await admin.client.end({ timeout: 5 }); // closes bot-manager's admin db pool
     await dbClient.end({ timeout: 5 });
   } catch (err) {
     logger.error({ err }, 'Error during worker shutdown');
