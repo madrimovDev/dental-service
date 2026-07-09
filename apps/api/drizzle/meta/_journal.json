@@ -260,6 +260,13 @@
       "when": 1783592344888,
       "tag": "0036_violet_scorpion",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1783593542070,
+      "tag": "0037_damp_shatterstar",
+      "breakpoints": true
     }
   ]
 }

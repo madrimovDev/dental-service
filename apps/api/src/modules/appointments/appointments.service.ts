@@ -110,12 +110,24 @@ export type RecallAppointmentHook = {
   reopenOnCancel: (c: Context, appointmentId: string) => Promise<void>;
 };
 
+/**
+ * CLI-474 (L7): no_show transition'da bemor strike'ini yozuvchi narrow dep.
+ * Bog'liqlik: appointments → no-show-strikes (factory injection).
+ */
+export type NoShowStrikeHook = {
+  recordOnNoShow: (
+    c: Context,
+    args: { tenantId: string; patientId: string; appointmentId: string },
+  ) => Promise<void>;
+};
+
 export const createAppointmentsService = (deps: {
   audit: AuditLogger;
   schedule?: SchedulePredicates;
   enqueueReminder?: (tenantId: string, appointmentId: string, delayMs: number) => Promise<void>;
   removeReminder?: (appointmentId: string) => Promise<void>;
   recall?: RecallAppointmentHook;
+  noShowStrike?: NoShowStrikeHook;
 }) => {
   async function checkConflict(
     c: Context,
@@ -419,6 +431,19 @@ export const createAppointmentsService = (deps: {
         deps.recall
       ) {
         await deps.recall.reopenOnCancel(c, id);
+      }
+
+      // CLI-474 (L7): no_show'ga O'TGANDA bemor strike'i (transition edge —
+      // re-PATCH no_show→no_show qayta yozmaydi; unique appointmentId ham himoya).
+      if (input.status === 'no_show' && before.status !== 'no_show' && deps.noShowStrike) {
+        const tenantId = c.get('activeTenantId');
+        if (tenantId) {
+          await deps.noShowStrike.recordOnNoShow(c, {
+            tenantId,
+            patientId: updated.patientId,
+            appointmentId: id,
+          });
+        }
       }
 
       // Reschedule eslatma hayot-sikli (CLI-186): startTime o'zgarsa, eski

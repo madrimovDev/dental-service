@@ -23,6 +23,7 @@ import { consentRoutes } from './modules/consent/index.ts';
 import { expensesRoutes } from './modules/expenses/index.ts';
 import { healthRoutes } from './modules/health/index.ts';
 import { labOrdersRoutes } from './modules/lab-orders/index.ts';
+import { createNoShowStrikesService } from './modules/no-show-strikes/index.ts';
 import { createNotificationsService, notificationsRoutes } from './modules/notifications/index.ts';
 import { patientImagesRoutes } from './modules/patient-images/index.ts';
 import { patientRoutes } from './modules/patients/index.ts';
@@ -164,6 +165,8 @@ export const createApp = () => {
   // preventive + B5 rebook) va clinical/treatment-plans (B4 stage-followup) ga
   // inject qilamiz (RFC-0009 §4 sof factory DI; to'g'ridan import emas).
   const recall = createRecallsService({ audit });
+  // CLI-474 (L7): no-show strike service — hook appointments'ga inject qilinadi.
+  const noShowStrike = createNoShowStrikesService({ audit });
   // CLI-425: appointmentsService bir marta quriladi (reminder-queue wiring
   // bilan) va appointmentRoutes + queueRoutes ikkalasiga uzatiladi — shared
   // completion path, queue "done"→completed ham preventive-recall hook'ini
@@ -173,6 +176,7 @@ export const createApp = () => {
     audit,
     schedule,
     recall,
+    noShowStrike,
     // A9 (CLI-438): reminder job hayot-sikli. Ilgari `remove()` keyin `add()`
     // ketma-ket chaqirilardi — BullMQ bir xil `jobId` bilan `add()`ni MAVJUD
     // (hali olib tashlanmagan) job'ni qaytarib, delay'ni YANGILAMAYDI (dedupe).
