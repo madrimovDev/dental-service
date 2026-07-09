@@ -65,10 +65,6 @@ export const envSchema = z
     SOLIQ_API_KEY: z.string().optional(),
     SOLIQ_FISCAL_ID: z.string().optional(),
 
-    // Telegram (V3-2, optional). Bo'lsa notification PRIORITET Telegram>SMS
-    // (createNotificationChannel). Jonli: bemor telegram_user_id + worker dispatch (TODO).
-    TELEGRAM_BOT_TOKEN: z.string().optional(),
-
     // Observability (D7) — Sentry error tracking. NoOp when unset.
     SENTRY_DSN: z.string().optional(),
 

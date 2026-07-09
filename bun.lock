@@ -96,14 +96,6 @@
         "drizzle-kit": "^0.31.10",
       },
     },
-    "apps/telegram-bot": {
-      "name": "@dental/telegram-bot",
-      "version": "0.1.0",
-      "dependencies": {
-        "@dental/notifications": "workspace:*",
-        "telegraf": "^4.16.3",
-      },
-    },
     "apps/web": {
       "name": "@dental/web",
       "version": "0.1.0",
@@ -326,8 +318,6 @@
     "@dental/i18n": ["@dental/i18n@workspace:packages/i18n"],
 
     "@dental/notifications": ["@dental/notifications@workspace:packages/notifications"],
-
-    "@dental/telegram-bot": ["@dental/telegram-bot@workspace:apps/telegram-bot"],
 
     "@dental/ui": ["@dental/ui@workspace:packages/ui"],
 
