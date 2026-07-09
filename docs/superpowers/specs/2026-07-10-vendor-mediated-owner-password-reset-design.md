@@ -49,7 +49,8 @@ Oqim (`apps/api/src/routes/reset-owner-password.ts` yoki `auth` moduli):
 
 ## Xavfsizlik
 
-- Token bir martalik (`consumed_at` atomik), 24h muddat, fingerprint-bound (shu qurilma), rate-limited (activate naqshi).
+- Token bir martalik (`consumed_at` atomik), 24h muddat, rate-limited (activate naqshi — 10 urinish/15 daqiqa, IP+licenseKey bo'yicha).
+- `fingerprint` **enforced bind EMAS** — admin token chiqarganda mijozning qurilma fingerprint'ini bilmaydi, shuning uchun `createResetToken` uni hech qachon o'rnatmaydi (token qatorida doim NULL). `verifyReset`dagi fingerprint-mos-kelish tekshiruvi kodda qoladi (kelajakda bind-on-issue oqimi qo'shilsa ishlaydi — hozircha no-op, chunki NULL har doim mos deb hisoblanadi) va tekshiruvda ishlatilgan `fingerprint` `license_events`'ning `'password_reset'` yozuviga **audit sifatida yoziladi** (qaysi qurilmadan tiklangani keyinroq tekshirilishi mumkin). Brute-force'ga qarshi haqiqiy himoya — token o'zi (bir martalik, 24h, hash-saqlangan) + yuqoridagi rate-limit, fingerprint EMAS.
 - FAQAT tenant owner paroli — desktop owner'ni `tenants.owner_user_id`dan aniqlaydi, so'rovda user tanlanmaydi (spoofing yo'q).
 - Vendor mijoz parolini BILMAYDI (mijoz o'zi kiritadi).
 - Litsenziya/DB o'zgarmaydi (faqat owner password_hash).
