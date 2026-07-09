@@ -188,6 +188,9 @@ export const createRecallsService = (deps: { audit: AuditLogger }) => {
       sourceStageId: string;
       treatmentPlanId?: string | null;
       branchId?: string | null;
+      // CLI-474 (L9): chaqiruvchi (davolash rejasi doktori) uzatadi — recall
+      // mas'ul doktorga biriktiriladi (ilgari doim NULL edi).
+      assignedDoctorId?: string | null;
     },
   ): Promise<void> {
     const tenantId = c.get('activeTenantId');
@@ -197,6 +200,7 @@ export const createRecallsService = (deps: { audit: AuditLogger }) => {
       tenantId,
       patientId: args.patientId,
       branchId: args.branchId ?? null,
+      assignedDoctorId: args.assignedDoctorId ?? null,
       reason: 'treatment_followup',
       status: 'pending',
       source: 'treatment_stage',
@@ -223,7 +227,8 @@ export const createRecallsService = (deps: { audit: AuditLogger }) => {
    */
   async function autoCreatePreventive(
     c: Context,
-    args: { patientId: string; branchId?: string | null },
+    // CLI-474 (L9): `assignedDoctorId` — appointment doktori uzatadi (ilgari NULL).
+    args: { patientId: string; branchId?: string | null; assignedDoctorId?: string | null },
   ): Promise<void> {
     const tenantId = c.get('activeTenantId');
     if (!tenantId) return;
@@ -233,6 +238,7 @@ export const createRecallsService = (deps: { audit: AuditLogger }) => {
       tenantId,
       patientId: args.patientId,
       branchId: args.branchId ?? null,
+      assignedDoctorId: args.assignedDoctorId ?? null,
       reason: 'preventive',
       status: 'pending',
       source: 'appointment',

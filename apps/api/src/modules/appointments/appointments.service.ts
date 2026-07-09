@@ -94,7 +94,7 @@ export type RecallAppointmentHook = {
   /** Yozilish completed → profilaktik recall (transition guard chaqiruvchida). */
   autoCreatePreventive: (
     c: Context,
-    args: { patientId: string; branchId?: string | null },
+    args: { patientId: string; branchId?: string | null; assignedDoctorId?: string | null },
   ) => Promise<void>;
   /**
    * Yangi yozilish → bemorning ochiq recall'larini scheduled qiladi (rebook).
@@ -406,6 +406,8 @@ export const createAppointmentsService = (deps: {
         await deps.recall.autoCreatePreventive(c, {
           patientId: updated.patientId,
           branchId: updated.branchId,
+          // CLI-474 (L9): profilaktik recall'ni yozilish doktoriga biriktir.
+          assignedDoctorId: updated.doctorId,
         });
       }
 

@@ -300,6 +300,8 @@ describe('B4/B5 trigger wiring (through real services)', () => {
     await run(tenantId, (c) => apptSvc.update(c, apptId, { status: 'completed' }));
     let prev = await run(tenantId, (c) => svc.listByPatient(c, patientId));
     expect(prev.filter((r) => r.reason === 'preventive').length).toBe(1);
+    // CLI-474 (L9): preventive recall yozilish doktoriga biriktirilgan (NULL emas).
+    expect(prev.find((r) => r.reason === 'preventive')?.assignedDoctorId).toBe(ownerId);
 
     // Re-PATCH completed→completed → transition guard: NO duplicate. Faqat
     // status (boshqa maydon YO'Q) — CLI-409 terminal-guard completed'da
@@ -345,6 +347,8 @@ describe('B4/B5 trigger wiring (through real services)', () => {
     const followups = fu.filter((r) => r.reason === 'treatment_followup');
     expect(followups.length).toBe(1);
     expect(followups[0]!.sourceStageId).toBe(stageId);
+    // CLI-474 (L9): treatment_followup recall davolash rejasi doktoriga biriktirilgan.
+    expect(followups[0]!.assignedDoctorId).toBe(ownerId);
 
     // Re-complete same stage → idempotent (partial unique index): still 1.
     await run(tenantId, (c) => tpSvc.updateStage(c, stageId, { status: 'completed' }));
