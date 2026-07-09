@@ -127,101 +127,140 @@ export async function processRecallScan(deps: RecallScanDeps): Promise<RecallSca
     const lang: SmsLang = row.defaultLanguage === 'ru' ? 'ru' : 'uz';
 
     // 3. Tenant RLS context — status re-check (race guard) → SMS → contacted + log.
-    await deps.withTenant(row.tenantId, async (tx) => {
-      const [live] = await tx
-        .select({ status: recalls.status, attempts: recalls.contactAttempts })
-        .from(recalls)
-        .where(eq(recalls.id, row.recallId))
-        .limit(1);
-      // Boshqa scan allaqachon contacted qildi (overlap) → skip.
-      if (!live || live.status !== 'pending') {
-        result.skipped++;
-        return;
-      }
-
-      // CLI-474 (L8): bemor telefoni yo'q + rozilik (allowEmergencyRecall) bo'lsa —
-      // favqulodda aloqa (primary: is_primary DESC, keyin eng eski) raqamiga fallback.
-      let targetPhone = row.patientPhone;
-      let emergencyFallback = false;
-      if (!targetPhone && row.allowEmergencyRecall) {
-        const [ec] = await tx
-          .select({ phone: patientEmergencyContacts.phone })
-          .from(patientEmergencyContacts)
-          .where(eq(patientEmergencyContacts.patientId, row.patientId))
-          .orderBy(
-            desc(patientEmergencyContacts.isPrimary),
-            asc(patientEmergencyContacts.createdAt),
-          )
+    // ⚠️ Har recall MUSTAQIL izolyatsiya qilinadi (try/catch loop darajasida, ichkarida
+    // EMAS — `withTenant`ning o'zi tutmaydi): `resolveTenantChannel` → `decryptSecret`
+    // buzuq/decrypt-qilib bo'lmaydigan ciphertext (masalan, MESSAGING_SECRET rotatsiya
+    // qilingan yoki row buzilgan) holatida THROW qiladi. Bu tutilmasa — BITTA tenant
+    // butun scan siklini to'xtatib, boshqa barcha due tenant'lar sukut bilan o'tkazib
+    // yuboriladi (audit izsiz). Shuning uchun throw shu yerda ushlanadi: faqat shu
+    // recall failed deb belgilanadi, scan keyingi tenant/recall'ga davom etadi.
+    try {
+      await deps.withTenant(row.tenantId, async (tx) => {
+        const [live] = await tx
+          .select({ status: recalls.status, attempts: recalls.contactAttempts })
+          .from(recalls)
+          .where(eq(recalls.id, row.recallId))
           .limit(1);
-        if (ec?.phone) {
-          targetPhone = ec.phone;
-          emergencyFallback = true;
+        // Boshqa scan allaqachon contacted qildi (overlap) → skip.
+        if (!live || live.status !== 'pending') {
+          result.skipped++;
+          return;
         }
-      }
 
-      // CLI-379/400: per-tenant kanal — Telegram(chat_id) > Eskiz SMS(phone) > NoOp.
-      // `targetPhone` shu yerga kirguncha allaqachon favqulodda-fallback bilan
-      // aniqlangan (yuqorida) — resolveTenantChannel Telegram bo'lsa telefonsiz
-      // ham ishlaydi, aks holda shu (potentsial fallback) telefonga tayanadi.
-      const resolved = resolveTenantChannel(
-        row.integrationSettings,
-        row.telegramChatId,
-        targetPhone,
-      );
-      // Hech qanday tenant-credential sozlanmagan ("none") holatda ham `to` bor —
-      // faqat shu holatda test/legacy fallback (`deps.sms`) beriladi bo'lsa ishlatiladi.
-      const channel: NotificationChannel =
-        resolved.source === 'none' && deps.sms ? deps.sms : resolved.channel;
-      const to = resolved.to;
+        // CLI-474 (L8): bemor telefoni yo'q + rozilik (allowEmergencyRecall) bo'lsa —
+        // favqulodda aloqa (primary: is_primary DESC, keyin eng eski) raqamiga fallback.
+        let targetPhone = row.patientPhone;
+        let emergencyFallback = false;
+        if (!targetPhone && row.allowEmergencyRecall) {
+          const [ec] = await tx
+            .select({ phone: patientEmergencyContacts.phone })
+            .from(patientEmergencyContacts)
+            .where(eq(patientEmergencyContacts.patientId, row.patientId))
+            .orderBy(
+              desc(patientEmergencyContacts.isPrimary),
+              asc(patientEmergencyContacts.createdAt),
+            )
+            .limit(1);
+          if (ec?.phone) {
+            targetPhone = ec.phone;
+            emergencyFallback = true;
+          }
+        }
 
-      if (!to) {
+        // CLI-379/400: per-tenant kanal — Telegram(chat_id) > Eskiz SMS(phone) > NoOp.
+        // `targetPhone` shu yerga kirguncha allaqachon favqulodda-fallback bilan
+        // aniqlangan (yuqorida) — resolveTenantChannel Telegram bo'lsa telefonsiz
+        // ham ishlaydi, aks holda shu (potentsial fallback) telefonga tayanadi.
+        // ⚠️ `decryptSecret` (Telegram/Eskiz cred ochilganda) shu yerda THROW qilishi
+        // mumkin (buzuq ciphertext / rotatsiya qilingan kalit) — tashqi try/catch
+        // (loop darajasida) ushlaydi, quyida qo'shimcha himoya shart emas.
+        const resolved = resolveTenantChannel(
+          row.integrationSettings,
+          row.telegramChatId,
+          targetPhone,
+        );
+        // Hech qanday tenant-credential sozlanmagan ("none") holatda ham `to` bor —
+        // faqat shu holatda test/legacy fallback (`deps.sms`) beriladi bo'lsa ishlatiladi.
+        const channel: NotificationChannel =
+          resolved.source === 'none' && deps.sms ? deps.sms : resolved.channel;
+        const to = resolved.to;
+
+        if (!to) {
+          await tx.insert(recallLogs).values({
+            tenantId: row.tenantId,
+            recallId: row.recallId,
+            channel: 'sms',
+            outcome: 'no_phone',
+            detail: 'Bemor telefoni yo‘q',
+          });
+          result.failed++;
+          return;
+        }
+
+        const { title, body } = renderRecallSms({
+          lang,
+          patientName: row.patientName ?? '',
+          clinicName: row.clinicName ?? '',
+        });
+        const text = `${title} — ${body}`;
+
+        const sendRes = await channel.send(to, { text });
+
         await tx.insert(recallLogs).values({
           tenantId: row.tenantId,
           recallId: row.recallId,
           channel: 'sms',
-          outcome: 'no_phone',
-          detail: 'Bemor telefoni yo‘q',
+          outcome: sendRes.ok ? 'sent' : 'failed',
+          detail: emergencyFallback
+            ? `Favqulodda aloqaga yuborildi${sendRes.ok ? '' : ' (xato)'}`
+            : sendRes.ok
+              ? (sendRes.providerId ?? null)
+              : (sendRes.error ?? 'send failed'),
         });
-        result.failed++;
-        return;
-      }
 
-      const { title, body } = renderRecallSms({
-        lang,
-        patientName: row.patientName ?? '',
-        clinicName: row.clinicName ?? '',
+        if (sendRes.ok) {
+          await tx
+            .update(recalls)
+            .set({
+              status: 'contacted',
+              lastContactedAt: now,
+              contactAttempts: live.attempts + 1,
+              updatedAt: now,
+            })
+            .where(eq(recalls.id, row.recallId));
+          result.sent++;
+        } else {
+          result.failed++;
+        }
       });
-      const text = `${title} — ${body}`;
-
-      const sendRes = await channel.send(to, { text });
-
-      await tx.insert(recallLogs).values({
-        tenantId: row.tenantId,
-        recallId: row.recallId,
-        channel: 'sms',
-        outcome: sendRes.ok ? 'sent' : 'failed',
-        detail: emergencyFallback
-          ? `Favqulodda aloqaga yuborildi${sendRes.ok ? '' : ' (xato)'}`
-          : sendRes.ok
-            ? (sendRes.providerId ?? null)
-            : (sendRes.error ?? 'send failed'),
-      });
-
-      if (sendRes.ok) {
-        await tx
-          .update(recalls)
-          .set({
-            status: 'contacted',
-            lastContactedAt: now,
-            contactAttempts: live.attempts + 1,
-            updatedAt: now,
-          })
-          .where(eq(recalls.id, row.recallId));
-        result.sent++;
-      } else {
-        result.failed++;
+    } catch (err) {
+      // Bitta recall'ning kanal-resolution/send xatosi (masalan, `decryptSecret`
+      // throw) BOSHQA tenant/recall'larni bloklamasligi shart. Xato faqat shu
+      // recall'ni failed qiladi — audit uchun `detail` FIXED matn (hech qachon
+      // `err.message`/decrypt qilingan token emas — secret leak xavfsizligi).
+      logger.error(
+        { err, tenantId: row.tenantId, recallId: row.recallId },
+        'Recall scan: tenant kanal xatosi — recall failed, scan davom etadi',
+      );
+      result.failed++;
+      try {
+        // `tx` allaqachon rollback qilingan (throw'dan keyin) — yangi tx kerak.
+        await deps.withTenant(row.tenantId, (tx) =>
+          tx.insert(recallLogs).values({
+            tenantId: row.tenantId,
+            recallId: row.recallId,
+            channel: 'sms',
+            outcome: 'failed',
+            detail: 'channel resolution failed',
+          }),
+        );
+      } catch (logErr) {
+        logger.error(
+          { err: logErr, tenantId: row.tenantId, recallId: row.recallId },
+          'Recall scan: failed-log yozib bo‘lmadi',
+        );
       }
-    });
+    }
   }
 
   return result;

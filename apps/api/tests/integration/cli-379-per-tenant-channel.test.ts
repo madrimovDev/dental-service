@@ -73,6 +73,7 @@ let ownerId: string;
 let tTelegram: string;
 let tSms: string;
 let tNone: string;
+let tCorrupt: string;
 
 const seedTenant = async (slug: string, name: string) => {
   const [t] = await db
@@ -124,6 +125,7 @@ beforeAll(async () => {
   tTelegram = await seedTenant('cli379-tg', 'Telegram Clinic');
   tSms = await seedTenant('cli379-sms', 'SMS Clinic');
   tNone = await seedTenant('cli379-none', 'Unconfigured Clinic');
+  tCorrupt = await seedTenant('cli379-corrupt', 'Corrupt Creds Clinic');
 
   // tTelegram — Telegram bot token sozlangan (encrypt-on-write, CLI-379/400).
   await withTenant(tTelegram, (tx) =>
@@ -145,6 +147,18 @@ beforeAll(async () => {
     }),
   );
   // tNone — tenant_settings row umuman yo'q (integrationSettings null, real creds sozlanmagan).
+
+  // tCorrupt (Finding 1 — CLI-379/400 review) — `botTokenEnc` QASDDAN buzuq (GCM
+  // auth-tag mos kelmaydigan ciphertext, masalan MESSAGING_SECRET rotatsiyasidan
+  // keyin qolgan eski qator). `decryptSecret` shu qatorni ochishga urinishda THROW
+  // qiladi — `processRecallScan` loop darajasidagi try/catch buni ushlab, FAQAT shu
+  // tenant/recall'ni failed qilishi va boshqa (yaxshi) tenant'larni bloklamasligi shart.
+  await withTenant(tCorrupt, (tx) =>
+    tx.insert(tenantSettings).values({
+      tenantId: tCorrupt,
+      integrationSettings: { telegram: { botTokenEnc: 'AAAA:BBBB:CCCC' } },
+    }),
+  );
 });
 
 afterAll(async () => {
@@ -216,5 +230,43 @@ describe('CLI-379/400 per-tenant channel resolution (recall worker)', () => {
       tx.select({ status: recalls.status }).from(recalls).where(eq(recalls.id, rId)),
     );
     expect(row!.status).toBe('contacted');
+  });
+
+  // Finding 1 (CLI-379/400 review): buzuq ciphertext BITTA tenant'ni failed qilishi
+  // shart, boshqa due tenant'larni scan'dan chiqarib tashlamasligi shart.
+  test('buzuq botTokenEnc → decryptSecret throw ushlanadi, faqat shu recall failed, boshqa tenant baribir sent bo‘ladi', async () => {
+    const rCorrupt = await seedRecall(tCorrupt, {
+      phone: '+998904440004',
+      telegramChatId: '777444', // botTokenEnc bor + chat_id bor → Telegram tarmog'i tanlanadi → decryptSecret chaqiriladi.
+    });
+    // Shu scan ichida ikkinchi (sog'lom) tenant recall'i ham due — throw undan keyin
+    // ham ishlov berilishini isbotlaydi (loop davom etadi).
+    const rGood = await seedRecall(tSms, { phone: '+998905550005' });
+
+    const res = await processRecallScan({ adminDb: admin.db, sms: spySms, withTenant, now });
+
+    // Buzuq tenant — hech qanday tarmoqqa chiqilmagan (decryptSecret channel.send'dan
+    // OLDIN throw qildi), failed hisoblangan.
+    expect(res.failed).toBe(1);
+    expect(res.sent).toBe(1);
+
+    const [corruptRow] = await withTenant(tCorrupt, (tx) =>
+      tx.select({ status: recalls.status }).from(recalls).where(eq(recalls.id, rCorrupt)),
+    );
+    expect(corruptRow!.status).toBe('pending'); // contacted'ga o'tmagan
+    const corruptLogs = await withTenant(tCorrupt, (tx) =>
+      tx.select().from(recallLogs).where(eq(recallLogs.recallId, rCorrupt)),
+    );
+    expect(corruptLogs).toHaveLength(1);
+    expect(corruptLogs[0]!.outcome).toBe('failed');
+    // Detail — FIXED xavfsiz matn, hech qachon decrypt qilinayotgan token/xato tafsiloti emas.
+    expect(corruptLogs[0]!.detail).toBe('channel resolution failed');
+
+    // Ikkinchi (sog'lom) tenant — buzuq tenant'dan KEYIN ham to'liq ishlov berilgan
+    // (loop to'xtamagan) — bu izolyatsiyaning to'g'ridan-to'g'ri isboti.
+    const [goodRow] = await withTenant(tSms, (tx) =>
+      tx.select({ status: recalls.status }).from(recalls).where(eq(recalls.id, rGood)),
+    );
+    expect(goodRow!.status).toBe('contacted');
   });
 });
