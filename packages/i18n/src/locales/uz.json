@@ -110,6 +110,7 @@
       "submit": "Kirish",
       "forgot": "Parolni unutdingizmi?",
       "register_clinic": "Klinika ro'yxatdan o'tish",
+      "reset_owner": "Parolni unutdingizmi? Xizmat ko'rsatuvchiga murojaat qiling",
       "invalid_credentials": "Telefon yoki parol noto'g'ri"
     },
     "register": {
@@ -162,6 +163,21 @@
       "error_fingerprint_mismatch": "Bu litsenziya boshqa qurilmada faol. Supervisor bilan bog'laning.",
       "error_fingerprint_unavailable": "Bu qurilmani aniqlab bo'lmadi (virtual muhit qo'llab-quvvatlanmaydi)",
       "error_generic": "Litsenziyani faollashtirib bo'lmadi. Qaytadan urinib ko'ring."
+    },
+    "reset_owner": {
+      "title": "Klinika egasi parolini tiklash",
+      "description": "Xizmat ko'rsatuvchidan (Supervisor) olingan bir martalik tokenni va yangi parolni kiriting.",
+      "token": "Tiklash tokeni",
+      "token_hint": "Xizmat ko'rsatuvchi bergan XXXXX-XXXXX-XXXXX formatidagi token",
+      "token_invalid": "Token XXXXX-XXXXX-XXXXX formatida bo'lishi kerak",
+      "new_password": "Yangi parol",
+      "password_placeholder": "Kamida 8 belgi",
+      "confirm_password": "Yangi parolni tasdiqlash",
+      "passwords_not_match": "Parollar mos kelmadi",
+      "submit": "Parolni tiklash",
+      "success": "Parol muvaffaqiyatli tiklandi. Endi yangi parol bilan kiring.",
+      "error_invalid_token": "Token yaroqsiz yoki muddati o'tgan",
+      "error_generic": "Parolni tiklab bo'lmadi. Qaytadan urinib ko'ring."
     }
   },
   "layout": {

@@ -11,6 +11,9 @@ const LoginPage = lazy(() => import('./pages/login.page').then((m) => ({ default
 const RegisterTenantPage = lazy(() =>
   import('./pages/register-tenant.page').then((m) => ({ default: m.RegisterTenantPage })),
 );
+const ResetOwnerPasswordPage = lazy(() =>
+  import('./pages/reset-owner-password.page').then((m) => ({ default: m.ResetOwnerPasswordPage })),
+);
 const ResetPasswordPage = lazy(() =>
   import('./pages/reset-password.page').then((m) => ({ default: m.ResetPasswordPage })),
 );
@@ -25,5 +28,6 @@ export const authRoutes: AppRoute[] = [
   { path: '/register-tenant', element: <RegisterTenantPage /> },
   { path: '/forgot-password', element: <ForgotPasswordPage /> },
   { path: '/reset-password', element: <ResetPasswordPage /> },
+  { path: '/reset-owner-password', element: <ResetOwnerPasswordPage /> },
   { path: '/select-workspace', element: <SelectWorkspacePage /> },
 ];
