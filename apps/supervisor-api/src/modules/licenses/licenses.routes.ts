@@ -44,5 +44,17 @@ export const licensesRoutes = () => {
     }
   });
 
+  // CLI-226 — vendor admin panelidan bir martalik owner parol-tiklash tokeni
+  // yaratadi (litsenziya ID bo'yicha, admin JWT talab qiladi).
+  app.post('/:id/reset-token', adminJwtMiddleware, async (c) => {
+    const id = c.req.param('id');
+    try {
+      const data = await service.createResetToken(id);
+      return c.json({ resetToken: data.resetToken, expiresAt: data.expiresAt });
+    } catch (e: any) {
+      return c.json({ error: { code: e.message } }, e.status ?? 400);
+    }
+  });
+
   return app;
 };

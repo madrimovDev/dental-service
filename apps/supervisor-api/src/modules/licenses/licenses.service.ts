@@ -1,7 +1,14 @@
-import { eq } from 'drizzle-orm';
+import { createHash, randomBytes } from 'node:crypto';
+import { and, eq, isNull } from 'drizzle-orm';
 import { db } from '../../db/client';
-import { licenseEvents, licenses } from '../../db/schema';
+import { licenseEvents, licenseResetTokens, licenses } from '../../db/schema';
 import { signLicense } from '../../lib/rsa';
+
+// CLI-226 — vendor-vositachiligidagi owner parol-tiklash tokeni. Format
+// clinics.routes.ts'dagi license-key generator bilan bir xil uslub: 3ta
+// 5-belgili HEX-upper segment (`XXXXX-XXXXX-XXXXX`).
+const genSegment = () => randomBytes(3).toString('hex').toUpperCase().slice(0, 5);
+const genResetToken = () => `${genSegment()}-${genSegment()}-${genSegment()}`;
 
 const PRIVATE_KEY = process.env.RSA_PRIVATE_KEY!; // VPS env'dan
 
@@ -101,5 +108,25 @@ export const createLicenseService = () => ({
       metadata: { previousFingerprint: lic.fingerprint },
     });
     return buildResponse({ ...lic, fingerprint: newFingerprint }, new Date().toISOString());
+  },
+
+  // Vendor admin panel — bir martalik owner parol-tiklash tokeni yaratadi
+  // (litsenziya ID bo'yicha). Avvalgi ishlatilmagan tokenlarni bekor qiladi
+  // (bir vaqtda faqat bitta faol token bo'lishi kerak).
+  async createResetToken(licenseId: string) {
+    await db
+      .update(licenseResetTokens)
+      .set({ consumedAt: new Date() })
+      .where(
+        and(eq(licenseResetTokens.licenseId, licenseId), isNull(licenseResetTokens.consumedAt)),
+      );
+    const resetToken = genResetToken();
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await db.insert(licenseResetTokens).values({
+      licenseId,
+      tokenHash: createHash('sha256').update(resetToken).digest('hex'),
+      expiresAt,
+    });
+    return { resetToken, expiresAt };
   },
 });
