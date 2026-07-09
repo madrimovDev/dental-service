@@ -1,7 +1,14 @@
-import { eq } from 'drizzle-orm';
+import { createHash, randomBytes } from 'node:crypto';
+import { and, eq, gt, isNull } from 'drizzle-orm';
 import { db } from '../../db/client';
-import { licenseEvents, licenses } from '../../db/schema';
+import { licenseEvents, licenseResetTokens, licenses } from '../../db/schema';
 import { signLicense } from '../../lib/rsa';
+
+// CLI-226 — vendor-vositachiligidagi owner parol-tiklash tokeni. Format
+// clinics.routes.ts'dagi license-key generator bilan bir xil uslub: 3ta
+// 5-belgili HEX-upper segment (`XXXXX-XXXXX-XXXXX`).
+const genSegment = () => randomBytes(3).toString('hex').toUpperCase().slice(0, 5);
+const genResetToken = () => `${genSegment()}-${genSegment()}-${genSegment()}`;
 
 const PRIVATE_KEY = process.env.RSA_PRIVATE_KEY!; // VPS env'dan
 
@@ -101,5 +108,71 @@ export const createLicenseService = () => ({
       metadata: { previousFingerprint: lic.fingerprint },
     });
     return buildResponse({ ...lic, fingerprint: newFingerprint }, new Date().toISOString());
+  },
+
+  // Vendor admin panel — bir martalik owner parol-tiklash tokeni yaratadi
+  // (litsenziya ID bo'yicha). Avvalgi ishlatilmagan tokenlarni bekor qiladi
+  // (bir vaqtda faqat bitta faol token bo'lishi kerak). `createdBy` — qaysi
+  // admin chiqarganini audit qiladi (CLAUDE.md §3.10).
+  async createResetToken(licenseId: string, createdBy?: string) {
+    await db
+      .update(licenseResetTokens)
+      .set({ consumedAt: new Date() })
+      .where(
+        and(eq(licenseResetTokens.licenseId, licenseId), isNull(licenseResetTokens.consumedAt)),
+      );
+    const resetToken = genResetToken();
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await db.insert(licenseResetTokens).values({
+      licenseId,
+      tokenHash: createHash('sha256').update(resetToken).digest('hex'),
+      expiresAt,
+      createdBy,
+    });
+    return { resetToken, expiresAt };
+  },
+
+  // Desktop (online, pre-auth) — vendor-berilgan tokenni bir martalik atomik
+  // consume qiladi. Muvaffaqiyatli bo'lsa `license_events`ga 'password_reset'
+  // yozadi. Litsenziya/tenant/boshqa foydalanuvchilarga TEGMAYDI — faqat
+  // qaror qabul qiladi (owner password_hash'ni yangilash chaqiruvchi
+  // (apps/api) tomonda amalga oshadi).
+  async verifyReset(licenseKey: string, fingerprint: string, resetToken: string) {
+    const lic = await db.query.licenses.findFirst({
+      where: eq(licenses.licenseKey, licenseKey),
+    });
+    if (!lic) return { ok: false as const };
+    const hash = createHash('sha256').update(resetToken).digest('hex');
+    const [tok] = await db
+      .select()
+      .from(licenseResetTokens)
+      .where(
+        and(
+          eq(licenseResetTokens.licenseId, lic.id),
+          eq(licenseResetTokens.tokenHash, hash),
+          isNull(licenseResetTokens.consumedAt),
+          gt(licenseResetTokens.expiresAt, new Date()),
+        ),
+      )
+      .limit(1);
+    if (!tok) return { ok: false as const };
+    if (tok.fingerprint && tok.fingerprint !== fingerprint) return { ok: false as const };
+    // Consume + audit-event bitta tranzaksiyada — agar event-insert xato
+    // qilsa, token consume bo'lmasdan qoladi (token yo'q joyda audit izsiz
+    // "yonib" ketmasligi + handler 500 emas, izchil holat qaytarishi uchun).
+    return await db.transaction(async (tx) => {
+      // Atomik consume — faqat hali consumedAt NULL bo'lsa muvaffaqiyatli
+      // (bir vaqtda ikkita so'rov kelsa ham bittasi g'olib chiqadi).
+      const consumed = await tx
+        .update(licenseResetTokens)
+        .set({ consumedAt: new Date() })
+        .where(and(eq(licenseResetTokens.id, tok.id), isNull(licenseResetTokens.consumedAt)))
+        .returning();
+      if (consumed.length === 0) return { ok: false as const };
+      await tx
+        .insert(licenseEvents)
+        .values({ licenseId: lic.id, event: 'password_reset', fingerprint });
+      return { ok: true as const };
+    });
   },
 });

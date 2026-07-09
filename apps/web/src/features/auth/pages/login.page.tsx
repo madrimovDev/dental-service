@@ -88,6 +88,9 @@ export function LoginPage() {
               <Anchor component={Link} to="/forgot-password" size="sm">
                 {t('auth.login.forgot')}
               </Anchor>
+              <Anchor component={Link} to="/reset-owner-password" size="sm">
+                {t('auth.login.reset_owner')}
+              </Anchor>
               {(typeof window === 'undefined' || !window.dentalDesktop) && (
                 <Anchor component={Link} to="/register-tenant" size="sm">
                   {t('auth.login.register_clinic')}

@@ -30,3 +30,20 @@ describe("LoginPage — desktop'da \"ro'yxatdan o'tish\" havolasi yashirilishi",
     expect(screen.queryByText(i18n.t('auth.login.register_clinic'))).not.toBeInTheDocument();
   });
 });
+
+describe('LoginPage — vendor-vositachiligidagi owner parol-tiklash havolasi (CLI-226)', () => {
+  it("havola doim ko'rinadi (brauzer/Local Desktop farqisiz) va /reset-owner-password'ga yo'naltiradi", () => {
+    renderApp(<LoginPage />);
+    const link = screen.getByText(i18n.t('auth.login.reset_owner'));
+    expect(link).toBeInTheDocument();
+    expect(link.closest('a')).toHaveAttribute('href', '/reset-owner-password');
+  });
+
+  it("window.dentalDesktop mavjud bo'lsa ham havola ko'rinadi", () => {
+    window.dentalDesktop = {
+      setServerUrl: async () => ({ ok: true, connected: true, serverUrl: 'x' }),
+    };
+    renderApp(<LoginPage />);
+    expect(screen.getByText(i18n.t('auth.login.reset_owner'))).toBeInTheDocument();
+  });
+});

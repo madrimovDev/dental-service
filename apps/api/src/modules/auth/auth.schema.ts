@@ -13,7 +13,9 @@ const phone = z
   .regex(/^\+?\d{9,15}$/)
   .describe('Telefon raqami (+998 ... yoki 998... format)');
 
-const password = z.string().min(12).max(128);
+// Boshqa modullar (masalan `routes/reset-owner-password.ts`) shu siyosatni
+// reuse qilishi uchun eksport qilingan — parol qoidasi bitta joyda.
+export const password = z.string().min(12).max(128);
 
 // ─── Request schemalar (SAQLANADI — frontend ham validatsiya qiladi) ──────────
 
