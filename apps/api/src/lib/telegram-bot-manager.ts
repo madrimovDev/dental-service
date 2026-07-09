@@ -62,7 +62,14 @@ export function startTelegramBotManager(deps: ManagerDeps) {
           : '⚠️ Raqamingiz topilmadi. Klinikaga murojaat qiling.',
       );
     });
-    await bot.launch(); // long-poll (non-blocking promise resolves when started)
+    // NOTE: `bot.launch()`'s promise does NOT resolve on start — it resolves only
+    // after `bot.stop()` (Telegraf's `Polling.loop()` is a `for await` that runs
+    // until `abortController.abort()`; confirmed against the installed
+    // `telegraf` source, `node_modules/telegraf/lib/polling.js`). `await`-ing it
+    // here would hang `bootAll()`'s per-tenant loop on the first tenant with a
+    // token, and `bots.set(...)` below would never run during normal operation.
+    // Fire-and-forget instead — same API, just not awaited.
+    void bot.launch().catch((err) => logger.error({ err, tenantId }, 'bot launch failed'));
     bots.set(tenantId, bot);
     logger.info({ tenantId }, 'Telegram bot launched');
   };
