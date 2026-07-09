@@ -6,8 +6,12 @@ import { getActiveModules } from './license.ts';
  * `/activate` va `/api/activate` — license faol bo'lmasa ham ochiq (public).
  * Electron (Task 9) startup'da `.lic` topilmasa brauzer shu sahifaga ochiladi;
  * bu route'lar orqali foydalanuvchi license key kiritib aktivatsiya qiladi.
+ *
+ * `/api/reset-owner-password` (CLI-226) — vendor-mediated owner parol
+ * tiklash. Litsenziya muddati o'tgan/topilmagan holatda ham ochiq bo'lishi
+ * shart (aks holda `LICENSE_NOT_FOUND` reset oqimini ham blokka oladi).
  */
-const WHITELIST = ['/activate', '/api/activate'];
+const WHITELIST = ['/activate', '/api/activate', '/api/reset-owner-password'];
 
 /**
  * Hono middleware — berilgan modul joriy litsenziyada yoqilganmi tekshiradi.
