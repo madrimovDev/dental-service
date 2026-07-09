@@ -1,7 +1,7 @@
 import type { Diagnosis, VisitNote } from '@dental/api-client';
 import { Mono } from '@dental/ui';
-import { Badge, Box, Group, Image, SimpleGrid, Stack, Text } from '@mantine/core';
-import { IconCalendar } from '@tabler/icons-react';
+import { ActionIcon, Badge, Box, Group, Image, SimpleGrid, Stack, Text } from '@mantine/core';
+import { IconCalendar, IconPencil } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { usePatientImages } from '../../clinical.api';
 import { toVisitNoteVM } from '../../clinical.mappers';
@@ -10,9 +10,12 @@ import classes from './VisitNoteCard.module.css';
 export function VisitNoteCard({
   note,
   diagnosisMap,
+  onEdit,
 }: {
   note: VisitNote;
   diagnosisMap: Map<string, Diagnosis>;
+  // CLI-447: berilsa header'da tahrirlash tugmasi (medical_record.edit).
+  onEdit?: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const vm = toVisitNoteVM(note, diagnosisMap, i18n.language === 'ru' ? 'ru' : 'uz');
@@ -42,6 +45,16 @@ export function VisitNoteCard({
             <Text className={classes.title}>{t('visit_note.title')}</Text>
             <Mono>{vm.visitDateText}</Mono>
           </div>
+          {onEdit && (
+            <ActionIcon
+              variant="subtle"
+              onClick={onEdit}
+              ml="auto"
+              aria-label={t('visit_note.edit')}
+            >
+              <IconPencil size={16} />
+            </ActionIcon>
+          )}
         </div>
 
         {vm.diagnoses.length > 0 && (

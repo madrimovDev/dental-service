@@ -59,5 +59,13 @@ export type CreateVisitNoteInput = {
   assessmentDiagnoses?: string[];
   plan?: string;
   performedServices?: string[];
+  // CLI-447: bosqichni yakunlash (visit → stage completion). Backend
+  // `createVisitNoteSchema` (stageId + stock reconcile) allaqachon qo'llaydi —
+  // endi web forma ham uzatadi (RFC-0010 hand-maintained istisnosi kengaytirildi).
+  stageId?: string;
   freeNotes?: string;
 };
+
+// CLI-447: vizit yozuvini tahrirlash — patientId'siz Partial (backend
+// `updateVisitNoteSchema = createVisitNoteSchema.partial().omit({patientId})`ga mos).
+export type UpdateVisitNoteInput = Partial<Omit<CreateVisitNoteInput, 'patientId'>>;
