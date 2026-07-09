@@ -39,7 +39,11 @@ export const defaultCheckTelegram = async (token: string) => {
   }
 };
 
-/** Real Eskiz `auth/login` call — 200 response iff email/password are valid. */
+/**
+ * Real Eskiz `auth/login` call — mirrors `packages/notifications/src/eskiz.ts`:
+ * Eskiz can answer HTTP 200 with an error body for bad credentials, so `res.ok`
+ * alone is not a valid success signal. Only `data.token` presence counts.
+ */
 export const defaultCheckEskiz = async (email: string, password: string) => {
   try {
     const r = await fetch('https://notify.eskiz.uz/api/auth/login', {
@@ -47,7 +51,9 @@ export const defaultCheckEskiz = async (email: string, password: string) => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email, password }),
     });
-    return { ok: r.ok };
+    const json = (await r.json()) as { data?: { token?: string } };
+    const token = json.data?.token ?? null;
+    return { ok: !!token };
   } catch {
     return { ok: false };
   }
