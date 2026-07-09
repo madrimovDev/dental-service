@@ -1,9 +1,10 @@
 import { ApiError } from '@dental/api-client';
 import { Button } from '@dental/ui';
-import { Chip, Group, MultiSelect, Select, Stack, Stepper, Text } from '@mantine/core';
+import { Alert, Chip, Group, MultiSelect, Select, Stack, Stepper, Text } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { useForm } from '@mantine/form';
 import { useDebouncedValue } from '@mantine/hooks';
+import { AlertTriangle } from 'lucide-react';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -172,6 +173,9 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
 
   const selectedDoctor = doctorOptions.find((d) => d.value === form.values.doctorId)?.label ?? '—';
   const selectedPatient = patients.find((p) => p.value === form.values.patientId)?.label ?? '—';
+  // CLI-474 (L7): tanlangan bemorning no-show flag holati (list DTO'dan, qo'shimcha API'siz).
+  const selectedPatientFlagged =
+    patientsData?.items.find((p) => p.id === form.values.patientId) ?? null;
   const slotPicked = form.values.startTime != null;
 
   return (
@@ -198,6 +202,12 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
               onSearchChange={setPatientSearch}
               {...form.getInputProps('patientId')}
             />
+            {/* CLI-474 (L7): tanlangan bemor no-show chegarasidan oshgan bo'lsa ogohlantirish. */}
+            {selectedPatientFlagged != null && selectedPatientFlagged.flagged && (
+              <Alert color="red" variant="light" icon={<AlertTriangle size={16} />}>
+                {t('appointments.patient_flagged', { count: selectedPatientFlagged.noShowStrikes })}
+              </Alert>
+            )}
           </Stack>
         </Stepper.Step>
         <Stepper.Step label={t('appointments.step_service')}>

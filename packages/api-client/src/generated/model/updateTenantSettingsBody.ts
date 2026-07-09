@@ -27,6 +27,11 @@ export type UpdateTenantSettingsBody = {
    * @maximum 100
    */
   maxDiscountPercent?: number;
+  /**
+   * @minimum 0
+   * @maximum 50
+   */
+  noShowStrikeThreshold?: number;
   notificationSettings?: UpdateTenantSettingsBodyNotificationSettings;
   integrationSettings?: UpdateTenantSettingsBodyIntegrationSettings;
 };

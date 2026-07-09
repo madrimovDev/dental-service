@@ -1,6 +1,6 @@
 import { Button, Card, IconButton, Input, StateView } from '@dental/ui';
 import { Pagination } from '@mantine/core';
-import { Archive, Eye, Plus, Search } from 'lucide-react';
+import { AlertTriangle, Archive, Eye, Plus, Search } from 'lucide-react';
 import type { MouseEvent } from 'react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -141,6 +141,16 @@ export function PatientsListScreen() {
                 <div className={classes.identity}>
                   <div className={classes.nameRow}>
                     <span className={classes.name}>{p.fullName}</span>
+                    {/* CLI-474 (L7): no-show strike chegarasidan oshgan bemor bayrog'i. */}
+                    {p.flagged && (
+                      <span
+                        className={classes.flagPill}
+                        title={t('patients.no_show_flag', { count: p.noShowStrikes })}
+                      >
+                        <AlertTriangle size={12} />
+                        {p.noShowStrikes}
+                      </span>
+                    )}
                     {p.tags[0] && <span className={classes.tagPill}>{p.tags[0]}</span>}
                   </div>
                 </div>

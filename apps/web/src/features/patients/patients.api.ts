@@ -7,6 +7,7 @@ import {
   getMedicalRecordHistory,
   getPatient,
   getPatientBalance,
+  getPatientNoShowStrikes,
   listCashierTransactions,
   listPatientEmergencyContacts,
   listPatientRelatives,
@@ -15,6 +16,7 @@ import {
   removePatientRelative,
   updateMedicalRecord,
   updatePatient,
+  waiveNoShowStrike,
 } from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -182,5 +184,27 @@ export function useRemoveEmergencyContact(id: string) {
     mutationFn: (contactId: string) =>
       removePatientEmergencyContact(id, contactId).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: patientKeys.emergencyContacts(id) }),
+  });
+}
+
+// CLI-474 (L7): bemor no-show strike xulosasi (tarix + count + chegara + flag).
+export function usePatientNoShowStrikes(id: string, enabled = true) {
+  return useQuery({
+    queryKey: patientKeys.noShowStrikes(id),
+    queryFn: () => getPatientNoShowStrikes(id).then((r) => r.data),
+    enabled,
+  });
+}
+
+// CLI-474 (L7): strike'ni kechirish (waive) — appointment.edit permission (backend).
+export function useWaiveNoShowStrike(patientId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { id: string; reason?: string | null }) =>
+      waiveNoShowStrike(args.id, { reason: args.reason ?? null }).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: patientKeys.noShowStrikes(patientId) });
+      qc.invalidateQueries({ queryKey: patientKeys.all });
+    },
   });
 }

@@ -184,9 +184,14 @@ export const patientDtoSchema = z
   .openapi('Patient');
 export type PatientDto = z.infer<typeof patientDtoSchema>;
 
-/** List item DTO — Patient + computed balance (number). */
+/** List item DTO — Patient + computed balance + CLI-474 (L7) no-show strike flag. */
 export const patientListItemDtoSchema = patientDtoSchema
-  .extend({ balance: z.number() })
+  .extend({
+    balance: z.number(),
+    // CLI-474 (L7): faol (waivedmas, hali no_show) strike soni + chegara belgisi.
+    noShowStrikes: z.number().int(),
+    flagged: z.boolean(),
+  })
   .openapi('PatientListItem');
 export type PatientListItemDto = z.infer<typeof patientListItemDtoSchema>;
 

@@ -7,4 +7,6 @@
 
 export type PatientListItemAllOf = {
   balance: number;
+  noShowStrikes: number;
+  flagged: boolean;
 };

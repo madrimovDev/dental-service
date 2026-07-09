@@ -9,7 +9,7 @@
  *   cd apps/api && bun test tests/integration/cli-474-l7-no-show-strikes.test.ts --env-file=../../.env
  */
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { branches, patients, tenants, users } from '@dental/db-schema';
+import { branches, patients, tenantSettings, tenants, users } from '@dental/db-schema';
 import { sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { DbOrTx } from '../../src/db/client.ts';
@@ -148,6 +148,25 @@ describe('CLI-474 L7 — no-show strikes', () => {
     const res = await run(tenantId, (c) => strikeSvc.waive(c, strikeId, { reason: null }));
     expect(res.ok).toBe(false);
     expect((res as { code: string }).code).toBe('already_waived');
+  });
+
+  test('patientSummary — tenant chegara bo‘yicha flagged + tarix', async () => {
+    // tenant_settings row yo'q bo'lsa getThreshold 0 (tizim o'chiq) — bu yerda 1 o'rnatamiz.
+    await run(tenantId, async (c) => {
+      const tx = c.get('db') as DbOrTx;
+      await tx
+        .insert(tenantSettings)
+        .values({ tenantId, noShowStrikeThreshold: 1 })
+        .onConflictDoNothing();
+    });
+    const patientId = await seedPatient('Summary');
+    const apptId = await createAppt(patientId);
+    await run(tenantId, (c) => apptSvc.update(c, apptId, { status: 'no_show' }));
+    const s = await run(tenantId, (c) => strikeSvc.patientSummary(c, patientId));
+    expect(s.activeCount).toBe(1);
+    expect(s.threshold).toBe(1);
+    expect(s.flagged).toBe(true); // 1 >= 1
+    expect(s.strikes).toHaveLength(1);
   });
 
   test('activeCountForPatients (grouped) — ro‘yxat uchun', async () => {

@@ -10,6 +10,9 @@ export type PatientListItem = {
   genderLabel: string;
   tags: string[];
   balance: number;
+  // CLI-474 (L7): faol no-show strike soni + chegara belgisi.
+  noShowStrikes: number;
+  flagged: boolean;
 };
 
 export type PatientDetail = {

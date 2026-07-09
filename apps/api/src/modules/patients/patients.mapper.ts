@@ -94,10 +94,14 @@ export const toPatientDto = (row: Patient): PatientDto => ({
   updatedAt: row.updatedAt.toISOString(),
 });
 
-/** List item — Patient DTO + computed balance (already masked upstream). */
-export const toPatientListItemDto = (row: Patient & { balance: number }): PatientListItemDto => ({
+/** List item — Patient DTO + computed balance + no-show flag (masked upstream). */
+export const toPatientListItemDto = (
+  row: Patient & { balance: number; noShowStrikes: number; flagged: boolean },
+): PatientListItemDto => ({
   ...toPatientDto(row),
   balance: row.balance,
+  noShowStrikes: row.noShowStrikes,
+  flagged: row.flagged,
 });
 
 /** Medical record DB row → wire DTO. Timestamps ISO; JSONB fields passthrough. */

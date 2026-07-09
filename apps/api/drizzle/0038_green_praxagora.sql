@@ -1,0 +1,1 @@
+ALTER TABLE "tenant_settings" ADD COLUMN "no_show_strike_threshold" integer DEFAULT 3 NOT NULL;

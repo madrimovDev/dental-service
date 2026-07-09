@@ -1,4 +1,4 @@
-import { appointments, patientNoShowStrikes } from '@dental/db-schema';
+import { appointments, patientNoShowStrikes, tenantSettings } from '@dental/db-schema';
 import { and, count, desc, eq, inArray } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
@@ -117,6 +117,16 @@ export const createNoShowStrikesRepository = () => {
     return row ?? null;
   };
 
+  /** Tenant no-show strike chegarasi (0 = tizim o'chiq). RLS bitta row kafolatlaydi. */
+  const getThreshold = async (c: Context): Promise<number> => {
+    const db = getDb(c);
+    const [row] = await db
+      .select({ t: tenantSettings.noShowStrikeThreshold })
+      .from(tenantSettings)
+      .limit(1);
+    return row?.t ?? 0;
+  };
+
   return {
     recordIfAbsent,
     activeCountByPatient,
@@ -124,6 +134,7 @@ export const createNoShowStrikesRepository = () => {
     listByPatient,
     getById,
     waive,
+    getThreshold,
   };
 };
 

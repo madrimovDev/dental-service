@@ -26,6 +26,9 @@ let canEdit = true;
 vi.mock('../../patients.api', () => ({
   usePatientRaw: () => rawResult,
   useUpdatePatient: () => ({ mutate: updateMutate, isPending: false }),
+  // CLI-474 (L7): NoShowStrikesCard hook'lari — strike yo'q (Card render qilmaydi).
+  usePatientNoShowStrikes: () => ({ data: undefined }),
+  useWaiveNoShowStrike: () => ({ mutate: () => {}, isPending: false }),
 }));
 
 vi.mock('@/stores/auth-store.ts', () => ({

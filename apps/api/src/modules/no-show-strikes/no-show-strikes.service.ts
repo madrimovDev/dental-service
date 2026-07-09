@@ -30,6 +30,21 @@ export const createNoShowStrikesService = (deps: {
 
   const listByPatient = (c: Context, patientId: string) => repo.listByPatient(c, patientId);
 
+  /** Bemor kartasi uchun: strike tarixi + faol count + tenant chegara + flag. */
+  const patientSummary = async (c: Context, patientId: string) => {
+    const [strikes, activeCount, threshold] = await Promise.all([
+      repo.listByPatient(c, patientId),
+      repo.activeCountByPatient(c, patientId),
+      repo.getThreshold(c),
+    ]);
+    return {
+      strikes,
+      activeCount,
+      threshold,
+      flagged: threshold > 0 && activeCount >= threshold,
+    };
+  };
+
   const waive = async (c: Context, id: string, args: { reason: string | null }) => {
     const before = await repo.getById(c, id);
     if (!before) return { ok: false as const, code: 'not_found' as const };
@@ -47,7 +62,14 @@ export const createNoShowStrikesService = (deps: {
     return { ok: true as const, strike: updated };
   };
 
-  return { recordOnNoShow, activeCount, activeCountForPatients, listByPatient, waive };
+  return {
+    recordOnNoShow,
+    activeCount,
+    activeCountForPatients,
+    listByPatient,
+    patientSummary,
+    waive,
+  };
 };
 
 export type NoShowStrikesService = ReturnType<typeof createNoShowStrikesService>;

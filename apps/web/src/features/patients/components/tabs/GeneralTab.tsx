@@ -9,6 +9,7 @@ import { useAuthStore } from '@/stores/auth-store.ts';
 import { usePatientRaw, useUpdatePatient } from '../../patients.api';
 import { patientEditSchema } from '../../patients.schema';
 import type { PatientDetail } from '../../patients.types';
+import { NoShowStrikesCard } from '../NoShowStrikesCard';
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -296,9 +297,15 @@ function GeneralEditForm({ patientId }: { patientId: string }) {
 export function GeneralTab({ patient }: { patient: PatientDetail }) {
   const { hasPermission } = useAuthStore();
 
-  if (hasPermission('patient.edit')) {
-    return <GeneralEditForm patientId={patient.id} />;
-  }
-
-  return <GeneralReadOnly patient={patient} />;
+  return (
+    <Stack gap="md">
+      {hasPermission('patient.edit') ? (
+        <GeneralEditForm patientId={patient.id} />
+      ) : (
+        <GeneralReadOnly patient={patient} />
+      )}
+      {/* CLI-474 (L7): no-show strike xulosasi (chegara/strike bo'lmasa yashirin). */}
+      <NoShowStrikesCard patientId={patient.id} />
+    </Stack>
+  );
 }

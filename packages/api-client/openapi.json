@@ -427,6 +427,10 @@
             "type": "integer",
             "example": 100
           },
+          "noShowStrikeThreshold": {
+            "type": "integer",
+            "example": 3
+          },
           "notificationSettings": {
             "$ref": "#/components/schemas/NotificationSettings"
           },
@@ -450,6 +454,7 @@
           "currency",
           "onboardingDismissedAt",
           "maxDiscountPercent",
+          "noShowStrikeThreshold",
           "notificationSettings",
           "integrationSettings",
           "createdAt",
@@ -1092,10 +1097,18 @@
             "properties": {
               "balance": {
                 "type": "number"
+              },
+              "noShowStrikes": {
+                "type": "integer"
+              },
+              "flagged": {
+                "type": "boolean"
               }
             },
             "required": [
-              "balance"
+              "balance",
+              "noShowStrikes",
+              "flagged"
             ]
           }
         ]
@@ -1706,6 +1719,91 @@
         "required": [
           "removed",
           "id"
+        ]
+      },
+      "PatientNoShowStrikeSummary": {
+        "type": "object",
+        "properties": {
+          "strikes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoShowStrike"
+            }
+          },
+          "activeCount": {
+            "type": "integer"
+          },
+          "threshold": {
+            "type": "integer"
+          },
+          "flagged": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "strikes",
+          "activeCount",
+          "threshold",
+          "flagged"
+        ]
+      },
+      "NoShowStrike": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "appointmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "waived": {
+            "type": "boolean"
+          },
+          "waivedReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "waivedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "appointmentStatus": {
+            "type": "string"
+          },
+          "startTime": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "appointmentId",
+          "waived",
+          "waivedReason",
+          "waivedAt",
+          "createdAt",
+          "appointmentStatus",
+          "startTime"
+        ]
+      },
+      "WaivedStrike": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "waived": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "waived"
         ]
       },
       "Service": {
@@ -7136,6 +7234,11 @@
                     "minimum": 0,
                     "maximum": 100
                   },
+                  "noShowStrikeThreshold": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 50
+                  },
                   "notificationSettings": {
                     "type": "object",
                     "properties": {
@@ -10793,6 +10896,194 @@
           },
           "404": {
             "description": "Emergency contact not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/no-show-strikes/patient/{patientId}": {
+      "get": {
+        "tags": [
+          "no-show-strikes"
+        ],
+        "operationId": "getPatientNoShowStrikes",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "patientId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Patient no-show strike summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/PatientNoShowStrikeSummary"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/no-show-strikes/{id}/waive": {
+      "post": {
+        "tags": [
+          "no-show-strikes"
+        ],
+        "operationId": "waiveNoShowStrike",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 500
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Strike waived",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/WaivedStrike"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Strike not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Strike already waived",
             "content": {
               "application/json": {
                 "schema": {
