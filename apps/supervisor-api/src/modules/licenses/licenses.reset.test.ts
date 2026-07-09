@@ -6,6 +6,7 @@ import { db } from '../../db/client';
 import { branches, clinics, licenseEvents, licenseResetTokens, licenses } from '../../db/schema';
 import { resetRateLimitStore } from '../../lib/rate-limit';
 import { signAdminTestToken } from '../../lib/test-helpers';
+import { licensesRoutes } from './licenses.routes';
 import { createLicenseService } from './licenses.service';
 
 const app = createApp();
@@ -69,15 +70,21 @@ describe('createResetToken', () => {
   });
 });
 
-describe('POST /v1/:id/reset-token', () => {
+// CLI-477 #3 — reset-token endi boshqa admin license op'lar bilan izchil
+// `/v1/admin/licenses/...` namespace ostida (modules'ning
+// `/v1/admin/licenses/:key/modules` bilan bir xil), public `/v1/:id/...` da EMAS
+// (kelajakdagi `:id` to'qnashuvidan qochish).
+describe('POST /v1/admin/licenses/:id/reset-token', () => {
   it("admin JWT bo'lmasa 401", async () => {
-    const res = await app.request(`/v1/${licenseId}/reset-token`, { method: 'POST' });
+    const res = await app.request(`/v1/admin/licenses/${licenseId}/reset-token`, {
+      method: 'POST',
+    });
     expect(res.status).toBe(401);
   });
 
   it('valid admin JWT bilan resetToken qaytaradi', async () => {
     const token = await signAdminTestToken();
-    const res = await app.request(`/v1/${licenseId}/reset-token`, {
+    const res = await app.request(`/v1/admin/licenses/${licenseId}/reset-token`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -89,7 +96,7 @@ describe('POST /v1/:id/reset-token', () => {
 
   it("chiqargan admin ID'sini createdBy'ga yozadi (audit)", async () => {
     const token = await signAdminTestToken('audit-admin-42');
-    await app.request(`/v1/${licenseId}/reset-token`, {
+    await app.request(`/v1/admin/licenses/${licenseId}/reset-token`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -181,6 +188,32 @@ describe('POST /v1/verify-reset', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { ok: boolean };
     expect(body.ok).toBe(true);
+  });
+
+  // CLI-477 #1 — verifyReset service kutilmagan xato (DB/transient) tashlasa,
+  // route Hono'ning default HTML 500'ini EMAS, JSON {ok:false} qaytarishi kerak.
+  // Desktop klient (license-client.ts) javob body'ni `res.json()` bilan o'qiydi —
+  // HTML kelsa `res.json()` throw qiladi (catch → {ok:false}); JSON kelsa
+  // `ok:false`ni izchil o'qiydi. activate/heartbeat/reactivate bilan bir xil uslub.
+  it('verifyReset kutilmagan xato tashlasa JSON {ok:false} qaytaradi (HTML 500 emas)', async () => {
+    const base = createLicenseService();
+    const throwingApp = licensesRoutes({
+      service: {
+        ...base,
+        verifyReset: async () => {
+          throw new Error('DB transient failure');
+        },
+      },
+    });
+    const res = await throwingApp.request('/verify-reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ licenseKey, fingerprint: 'fp-x', resetToken: 'AAAAA-BBBBB-CCCCC' }),
+    });
+    expect(res.headers.get('content-type')).toContain('application/json');
+    const body = (await res.json()) as { ok: boolean };
+    expect(body.ok).toBe(false);
+    expect(res.status).toBe(500);
   });
 
   it('yaroqsiz token uchun 400 qaytaradi', async () => {

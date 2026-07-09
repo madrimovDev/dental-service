@@ -38,13 +38,36 @@ const maskEnc = (enc: string | undefined): { configured: boolean; hint: string |
   }
 };
 
+/**
+ * CLI-475 B4 — Eskiz SMS credential maskasi. `configured` — PAROL mavjudligiga
+ * bog'liq (avvalgi xulq bilan izchil), lekin `hint` EMAIL oxirgi 4 belgisidan
+ * olinadi (avval PAROL oxirgi 4 edi — `tenant_settings.view` egasiga qisman
+ * parol oshkor bo'lardi). "Qaysi akkaunt" signali saqlanadi, parol oshkor emas.
+ */
+const maskSmsEnc = (
+  emailEnc: string | undefined,
+  passwordEnc: string | undefined,
+): { configured: boolean; hint: string | null } => {
+  if (!passwordEnc) return { configured: false, hint: null };
+  if (!emailEnc) return { configured: true, hint: null };
+  try {
+    const email = decryptSecret(emailEnc);
+    return { configured: true, hint: `••••${email.slice(-4)}` };
+  } catch {
+    return { configured: true, hint: null };
+  }
+};
+
 /** Saqlangan integration JSONB (xom cred) → maskalangan DTO (configured/hint). */
 const toIntegrationDto = (settings: Record<string, unknown> | null) => {
   const tg = (settings?.telegram ?? null) as { botTokenEnc?: string } | null;
-  const sms = (settings?.sms ?? null) as { eskizPasswordEnc?: string } | null;
+  const sms = (settings?.sms ?? null) as {
+    eskizEmailEnc?: string;
+    eskizPasswordEnc?: string;
+  } | null;
   return {
     telegram: maskEnc(tg?.botTokenEnc),
-    sms: maskEnc(sms?.eskizPasswordEnc),
+    sms: maskSmsEnc(sms?.eskizEmailEnc, sms?.eskizPasswordEnc),
   };
 };
 

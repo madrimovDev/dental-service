@@ -1,7 +1,8 @@
 import { patients } from '@dental/db-schema';
-import { eq, inArray } from 'drizzle-orm';
+import { asc, eq, inArray } from 'drizzle-orm';
 import IORedis from 'ioredis';
 import { Telegraf } from 'telegraf';
+import { message } from 'telegraf/filters';
 import type { Database, DbOrTx } from '../db/client.ts';
 import { decryptSecret } from './crypto.ts';
 import { env } from './env.ts';
@@ -43,14 +44,20 @@ export function startTelegramBotManager(deps: ManagerDeps) {
         },
       }),
     );
-    bot.on('contact', async (ctx) => {
+    // CLI-475 B7 — `message('contact')` filter (Telegraf'ning eskirgan
+    // `bot.on('contact', …)` overload'i o'rniga); `ctx.message.contact` tip-xavfsiz.
+    bot.on(message('contact'), async (ctx) => {
       const phone = normalizePhone(ctx.message.contact.phone_number);
       const chatId = String(ctx.chat.id);
       const outcome = await deps.withTenant(tenantId, async (tx) => {
+        // CLI-475 B7 — bir xil telefonli bir nechta bemor bo'lsa (tenant ichida
+        // dublikat telefon mumkin), tartibsiz `.limit(1)` DB-tartibiga bog'liq
+        // bo'lardi. Deterministik: eng eski bemor (createdAt asc) bog'lanadi.
         const [p] = await tx
           .select({ id: patients.id })
           .from(patients)
           .where(inArray(patients.phone, [phone, phone.replace(/^\+/, '')]))
+          .orderBy(asc(patients.createdAt))
           .limit(1);
         if (!p) return 'not_found';
         await tx.update(patients).set({ telegramChatId: chatId }).where(eq(patients.id, p.id));

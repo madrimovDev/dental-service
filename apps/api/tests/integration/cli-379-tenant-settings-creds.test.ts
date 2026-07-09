@@ -118,7 +118,9 @@ describe('tenant-settings — CLI-379/400 encrypt-on-write (real DB)', () => {
 
     const dto = toTenantSettingsDto(reread);
     expect(dto.integrationSettings.telegram).toEqual({ configured: true, hint: '••••oken' });
-    expect(dto.integrationSettings.sms).toEqual({ configured: true, hint: '••••tPW!' });
+    // CLI-475 B4 — SMS hint EMAIL oxirgi 4 belgisi ('clinic@eskiz.uz' → 'z.uz'),
+    // PAROL emas (avval 'tPW!' edi — `tenant_settings.view` egasiga parol oshkorligi).
+    expect(dto.integrationSettings.sms).toEqual({ configured: true, hint: '••••z.uz' });
   });
 
   test('PATCH telegram: null clears only telegram — sms survives (2-level merge)', async () => {

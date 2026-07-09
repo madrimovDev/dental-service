@@ -15,7 +15,7 @@ import { createNotificationsService } from '../modules/notifications/index.ts';
 import { env } from './env.ts';
 import type { ReminderJob } from './queue.ts';
 import { renderReminderSms, type SmsLang } from './sms-templates.ts';
-import { resolveTenantChannel } from './tenant-channel.ts';
+import { type ResolvedTenantChannel, resolveTenantChannel } from './tenant-channel.ts';
 
 /**
  * Status guard (CLI-186): bekor qilingan / kelmagan yozilishga eslatma SMS
@@ -88,11 +88,28 @@ export async function processReminderJob(
     // `targetPhone` shu yerga kirguncha allaqachon favqulodda-fallback bilan
     // aniqlangan (yuqorida) — resolveTenantChannel Telegram bo'lsa telefonsiz
     // ham ishlaydi.
-    const resolved = resolveTenantChannel(
-      settingsRow?.integrationSettings ?? null,
-      patient?.telegramChatId ?? null,
-      targetPhone,
-    );
+    // CLI-475 B3: `resolveTenantChannel` → `decryptSecret` buzuq/eskirgan cred
+    // (MESSAGING_SECRET rotatsiyasi yoki buzilgan row) holatida THROW qiladi.
+    // Tutilmasa — butun `withTenant` tx rollback bo'lib, doktor in-app eslatmasini
+    // ham OLMAYDI (audit izsiz job fail). recall-worker'dagi izolyatsiya bilan bir
+    // xil: xato tutiladi, doktorga kuzatiladigan in-app eslatma qoldiriladi, SMS
+    // urinilmaydi. Xato matni/token HECH QACHON body'ga kirmaydi (secret leak).
+    let resolved: ResolvedTenantChannel;
+    try {
+      resolved = resolveTenantChannel(
+        settingsRow?.integrationSettings ?? null,
+        patient?.telegramChatId ?? null,
+        targetPhone,
+      );
+    } catch {
+      await svc.notifyInTx(tx, tenantId, {
+        userId: appt.doctorId,
+        type: 'appointment_reminder_no_phone',
+        title,
+        body: `${body} — Bildirishnoma kanali sozlamasida xatolik, SMS yuborilmadi`,
+      });
+      return;
+    }
 
     if (!resolved.to) {
       await svc.notifyInTx(tx, tenantId, {
@@ -108,7 +125,22 @@ export async function processReminderJob(
       userId: appt.doctorId,
       type: 'appointment_reminder',
       title,
-      body: emergencyFallback ? `${body} — Favqulodda aloqaga yuborildi` : body,
+      // CLI-475 B7 — "Favqulodda aloqaga yuborildi" matni FAQAT xabar haqiqatan
+      // favqulodda telefonga ketganda ko'rsatiladi. Telegram (chat_id) tanlansa,
+      // `emergencyFallback` (telefon-fallback) true bo'lsa ham favqulodda TELEFON
+      // ishlatilmaydi (xabar bemor chat_id'ga ketadi) — matn noto'g'ri bo'lardi.
+      // `source !== 'telegram'` (sms YOKI none — ikkalasida ham `resolved.to`
+      // telefonga yuboriladi) bilan gate qilamiz.
+      // CLI-475 B7 — "Favqulodda aloqaga yuborildi" matni FAQAT xabar haqiqatan
+      // favqulodda telefonga ketganda ko'rsatiladi. Telegram (chat_id) tanlansa,
+      // `emergencyFallback` (telefon-fallback) true bo'lsa ham favqulodda TELEFON
+      // ishlatilmaydi (xabar bemor chat_id'ga ketadi) — matn noto'g'ri bo'lardi.
+      // `source !== 'telegram'` (sms YOKI none — ikkalasida ham `resolved.to`
+      // telefonga yuboriladi) bilan gate qilamiz.
+      body:
+        emergencyFallback && resolved.source !== 'telegram'
+          ? `${body} — Favqulodda aloqaga yuborildi`
+          : body,
       smsTo: resolved.to,
       // "none" (tenant hech narsa sozlamagan) holatda `channel` berilmaydi —
       // `svc`ning o'z fallback kanaliga (createNotificationsService({sms}))

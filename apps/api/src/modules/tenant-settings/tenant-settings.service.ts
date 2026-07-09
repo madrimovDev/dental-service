@@ -19,6 +19,18 @@ const getRedisPub = (): IORedis => {
   return redisPub;
 };
 
+/**
+ * CLI-475 B5 — graceful shutdown/test uchun `telegram:reload` publish ulanishini
+ * yopadi (rate-limit.ts `closeRateLimitRedis` bilan bir xil pattern). Ochilmagan
+ * holatda no-op (idempotent) — shutdown ikki signal olsa ham xavfsiz.
+ */
+export const closeRedisPub = async (): Promise<void> => {
+  if (redisPub) {
+    await redisPub.quit().catch(() => {});
+    redisPub = null;
+  }
+};
+
 export const createTenantSettingsService = (deps: { audit: AuditLogger }) => {
   /**
    * Tenant settings row'ni oladi; yo'q bo'lsa default qiymatlar bilan yaratadi.

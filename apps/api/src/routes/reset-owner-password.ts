@@ -59,8 +59,15 @@ export const resetOwnerPasswordRoutes = (
       return c.json(fail('reset.invalid_token', "Token yaroqsiz yoki muddati o'tgan"), 400);
     }
 
-    // Desktop = bitta tenant (single-tenant EXE, CLI-338/348).
-    const tenant = await db.query.tenants.findFirst();
+    // Desktop = bitta tenant (single-tenant EXE, CLI-338/348). Deterministik
+    // orderBy (CLI-477 #2) — bu route public + shartsiz mount qilingan; bir
+    // nechta tenant holatida tartibsiz `findFirst` DB-tartibiga bog'liq bo'lardi
+    // (latent footgun). Eng eski (createdAt asc) tenant har doim bir xil
+    // tanlanadi — single-tenant desktop'da yagona tenant, cloud'da esa bu yo'l
+    // `readLicense()→null` tufayli hech qachon shu yergacha yetmaydi.
+    const tenant = await db.query.tenants.findFirst({
+      orderBy: (t, { asc }) => asc(t.createdAt),
+    });
     if (!tenant) {
       return c.json(fail('reset.no_tenant', 'Tenant topilmadi'), 400);
     }

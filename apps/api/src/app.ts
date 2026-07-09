@@ -1,5 +1,5 @@
 import { createFiscalProvider } from '@dental/fiscal';
-import { createSmsChannel } from '@dental/notifications';
+import { createNoOpChannel } from '@dental/notifications';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { serveStatic } from 'hono/bun';
 import { cors } from 'hono/cors';
@@ -53,7 +53,13 @@ export const createApp = () => {
   const audit = createAuditLogger({ db });
   // Notifications service — bir marta yaratiladi, bir nechta modulga ulanadi
   // (notifications routes + stock low-stock alert + clinical auto-deduction alert).
-  const sms = createSmsChannel({ eskizEmail: env.ESKIZ_EMAIL, eskizPassword: env.ESKIZ_PASSWORD });
+  // CLI-475 B2 — bu HTTP-kontekst iste'molchilarining HECH BIRI `notifyInTx`ga
+  // `smsTo` bermaydi (faqat in-app yozuv qoldiradi; SMS'ni faqat reminder/recall
+  // WORKER'lar per-tenant `resolveTenantChannel` orqali yuboradi). Shuning uchun
+  // avvalgi global `createSmsChannel({env.ESKIZ_*})` default'i O'LIK edi — hech
+  // qachon chaqirilmaydi. NoOp bilan almashtirildi (env-SMS'ni bu yerdan uzib,
+  // per-tenant messaging qaroriga izchil qildik; auth OTP SMS alohida ticket'da).
+  const sms = createNoOpChannel();
   const notifications = createNotificationsService({ sms });
   // Fiskal provider (V3-1) — SOLIQ_* env bo'lsa real Soliq, aks holda NoOp.
   const fiscal = createFiscalProvider({

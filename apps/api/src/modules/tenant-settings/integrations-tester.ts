@@ -12,16 +12,13 @@
  * actually encrypts+saves via `tenant-settings.service.ts`).
  */
 
-export type IntegrationsTestInput = {
-  target: 'telegram' | 'sms';
-  telegram?: { botToken: string };
-  sms?: { eskizEmail: string; eskizPassword: string };
-};
+// CLI-475 B7 — `IntegrationsTestInput`/`IntegrationsTestResult` avval bu yerda
+// QO'LDA takrorlangan edi (Zod `integrationsTestSchema` bilan bir xil shakl).
+// Yagona manba — `tenant-settings.schema.ts` (OpenAPI + validation source of
+// truth); type-only import, circular runtime bog'liqlik yo'q.
+import type { IntegrationsTestInput, IntegrationsTestResultDto } from './tenant-settings.schema.ts';
 
-export type IntegrationsTestResult = {
-  ok: boolean;
-  detail: string | null;
-};
+export type { IntegrationsTestInput, IntegrationsTestResultDto };
 
 export type IntegrationsTesterDeps = {
   checkTelegram: (token: string) => Promise<{ ok: boolean; username?: string }>;
@@ -65,7 +62,7 @@ export const createIntegrationsTester = (
     checkEskiz: defaultCheckEskiz,
   },
 ) => ({
-  test: async (input: IntegrationsTestInput): Promise<IntegrationsTestResult> => {
+  test: async (input: IntegrationsTestInput): Promise<IntegrationsTestResultDto> => {
     if (input.target === 'telegram' && input.telegram) {
       const r = await deps.checkTelegram(input.telegram.botToken);
       return { ok: r.ok, detail: r.username ? `@${r.username}` : null };

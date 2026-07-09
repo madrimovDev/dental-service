@@ -89,7 +89,9 @@ export const ClinicDetailPage = () => {
   const generateResetToken = useMutation({
     mutationFn: async () => {
       if (!data?.license?.id) return null;
-      const res = await authFetch(`/v1/${data.license.id}/reset-token`, {
+      // CLI-477 #3 — `/v1/admin/licenses/...` namespace (boshqa admin license
+      // op'lar bilan izchil); avvalgi public `/v1/:id/...` dan ko'chirildi.
+      const res = await authFetch(`/v1/admin/licenses/${data.license.id}/reset-token`, {
         method: 'POST',
       });
       if (!res.ok) throw new Error("Parol-tiklash tokenini yaratib bo'lmadi");

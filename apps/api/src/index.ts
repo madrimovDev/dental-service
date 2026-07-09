@@ -24,6 +24,7 @@ if (process.argv[2] === 'migrate') {
   const { startRecallWorker } = await import('./lib/recall-worker.ts');
   const { startReminderWorker } = await import('./lib/reminder-worker.ts');
   const { startTelegramBotManager } = await import('./lib/telegram-bot-manager.ts');
+  const { closeRedisPub } = await import('./modules/tenant-settings/tenant-settings.service.ts');
   const { initSentry } = await import('./lib/sentry.ts');
 
   // Error tracking (no-op when SENTRY_DSN unset).
@@ -96,6 +97,7 @@ if (process.argv[2] === 'migrate') {
       stopLicenseHeartbeat?.();
       await reminderQueue.close();
       await recallQueue.close();
+      await closeRedisPub(); // CLI-475 B5 — telegram:reload publish ulanishini yopadi
       await dbClient.end({ timeout: 5 });
     } catch (err) {
       logger.error({ err }, 'Error during shutdown');

@@ -211,11 +211,17 @@ export async function processRecallScan(deps: RecallScanDeps): Promise<RecallSca
           recallId: row.recallId,
           channel: 'sms',
           outcome: sendRes.ok ? 'sent' : 'failed',
-          detail: emergencyFallback
-            ? `Favqulodda aloqaga yuborildi${sendRes.ok ? '' : ' (xato)'}`
-            : sendRes.ok
-              ? (sendRes.providerId ?? null)
-              : (sendRes.error ?? 'send failed'),
+          // CLI-475 B7 — "Favqulodda aloqaga yuborildi" FAQAT xabar haqiqatan
+          // favqulodda telefonga ketganda. Telegram (chat_id) tanlansa
+          // `emergencyFallback` true bo'lsa ham favqulodda TELEFON ishlatilmaydi
+          // (xabar bemor chat_id'ga ketadi) — `source !== 'telegram'` bilan gate
+          // (sms YOKI none — ikkalasida ham `to` telefonga yuboriladi).
+          detail:
+            emergencyFallback && resolved.source !== 'telegram'
+              ? `Favqulodda aloqaga yuborildi${sendRes.ok ? '' : ' (xato)'}`
+              : sendRes.ok
+                ? (sendRes.providerId ?? null)
+                : (sendRes.error ?? 'send failed'),
         });
 
         if (sendRes.ok) {
