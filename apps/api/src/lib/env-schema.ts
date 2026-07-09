@@ -47,6 +47,11 @@ export const envSchema = z
     JWT_SECRET: z.string().min(32),
     JWT_ACCESS_EXPIRES: z.string().default('15m'),
     JWT_REFRESH_EXPIRES: z.string().default('7d'),
+
+    // AES-256-GCM key for per-tenant messaging credentials (Telegram bot
+    // token / Eskiz SMS password) at-rest encryption (CLI-379/400, optional
+    // — desktop falls back to a persisted dataDir file when unset).
+    MESSAGING_SECRET: z.string().optional(),
     WEB_ORIGIN: z.url(),
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 
