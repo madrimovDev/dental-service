@@ -151,4 +151,27 @@ describe('POST /api/reset-owner-password', () => {
     const body = (await res.json()) as { error?: { code: string } };
     expect(body.error?.code).toBe('INVALID_REQUEST');
   });
+
+  // Platforma parol siyosati (auth.schema.ts `password` — min 12) reset
+  // yo'lida ham majburiy — registratsiyadan zaifroq parol reset orqali
+  // o'rnatib bo'lmasligi kerak. Bu describe blokidagi testlar `beforeAll`
+  // orqali holatni ulashadi (oldingi test owner parolini allaqachon
+  // 'BrandNewOwnerPass1'ga o'zgartirgan) — shuning uchun bu yerda hardcoded
+  // eski parolga emas, so'rovdan OLDINGI hash'ga solishtiramiz (tartibga
+  // bog'liq emas).
+  test('11 belgili newPassword (platforma min-12 siyosatidan zaifroq) → 400 INVALID_REQUEST, owner hash unchanged', async () => {
+    const [before] = await db.select().from(users).where(eq(users.id, ownerId));
+
+    const app = buildApp(async () => ({ ok: true }));
+    const res = await postReset(app, {
+      resetToken: 'XXXXX-YYYYY-ZZZZZ',
+      newPassword: 'Short1Pass1', // 11 chars
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error?: { code: string } };
+    expect(body.error?.code).toBe('INVALID_REQUEST');
+
+    const [after] = await db.select().from(users).where(eq(users.id, ownerId));
+    expect(after?.passwordHash).toBe(before?.passwordHash);
+  });
 });

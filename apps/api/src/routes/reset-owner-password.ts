@@ -7,6 +7,7 @@ import { env } from '../lib/env.ts';
 import { verifyReset as defaultVerifyReset } from '../lib/license-client.ts';
 import { hashPassword } from '../lib/password.ts';
 import { rateLimit } from '../lib/rate-limit.ts';
+import { password as passwordPolicySchema } from '../modules/auth/auth.schema.ts';
 
 /**
  * `POST /api/reset-owner-password` — Local Desktop klinika egasi parolini
@@ -43,8 +44,14 @@ export const resetOwnerPasswordRoutes = (
     const json = await c.req.json().catch(() => null);
     const resetToken = (json as { resetToken?: string } | null)?.resetToken;
     const newPassword = (json as { newPassword?: string } | null)?.newPassword;
-    if (!resetToken || !newPassword || newPassword.length < 8) {
-      return c.json(fail('INVALID_REQUEST', 'resetToken va newPassword (>=8) majburiy'), 400);
+    // Platforma parol siyosati bilan bir xil (auth.schema.ts `password` —
+    // registratsiya/login'da qo'llanadigan min-12/max-128) — reset orqali
+    // registratsiyadan zaifroq parol o'rnatib bo'lmaydi.
+    if (!resetToken || !newPassword || !passwordPolicySchema.safeParse(newPassword).success) {
+      return c.json(
+        fail('INVALID_REQUEST', 'resetToken va newPassword (12-128 belgi) majburiy'),
+        400,
+      );
     }
 
     const v = await verifyReset(resetToken);
