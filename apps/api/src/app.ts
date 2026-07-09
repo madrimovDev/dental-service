@@ -98,7 +98,10 @@ export const createApp = () => {
             scriptSrc: ["'self'"],
             styleSrc: ["'self'", "'unsafe-inline'"],
             imgSrc: ["'self'", 'data:'],
-            fontSrc: ["'self'"],
+            // CLI-402: Vite ba'zi shriftlarni `data:font/woff2;base64,...` sifatida
+            // inline qiladi — `data:` bo'lmasa BrowserWindow har sahifada shriftni
+            // rad etadi (console'da 8-10 xato, fallback shriftga tushadi).
+            fontSrc: ["'self'", 'data:'],
             connectSrc: ["'self'"],
             frameAncestors: ["'none'"],
           }
