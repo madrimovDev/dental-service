@@ -146,6 +146,11 @@ describe('toTenantSettingsDto', () => {
     expect(dto.integrationSettings.telegram.hint).toBe('••••Fbcd');
     expect(JSON.stringify(dto)).not.toContain('123456'); // no raw token anywhere
     expect(dto.integrationSettings.sms.configured).toBe(true);
+    // CLI-475 B4 — SMS hint EMAIL oxirgi 4 belgisi ('a@b.uz' → '••••b.uz'), PAROL
+    // EMAS (avval parol oxirgi 4 edi → `tenant_settings.view` egasiga qisman parol
+    // oshkor bo'lardi). "Qaysi akkaunt" signali saqlanadi, parol oshkor emas.
+    expect(dto.integrationSettings.sms.hint).toBe('••••b.uz');
+    expect(JSON.stringify(dto)).not.toContain('xyz'); // parol hech qayerda oshkor emas
   });
 });
 

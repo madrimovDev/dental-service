@@ -33,6 +33,7 @@ import {
   appointments,
   branches,
   notifications,
+  patientEmergencyContacts,
   patients,
   tenantSettings,
   tenants,
@@ -87,9 +88,11 @@ let ownerId: string;
 let tTelegram: string;
 let tSms: string;
 let tNone: string;
+let tCorrupt: string;
 let branchTelegram: string;
 let branchSms: string;
 let branchNone: string;
+let branchCorrupt: string;
 
 const seedTenant = async (slug: string, name: string) => {
   const [t] = await db
@@ -150,6 +153,7 @@ beforeAll(async () => {
   tTelegram = await seedTenant('cli400-tg', 'Reminder Telegram Clinic');
   tSms = await seedTenant('cli400-sms', 'Reminder SMS Clinic');
   tNone = await seedTenant('cli400-none', 'Reminder Unconfigured Clinic');
+  tCorrupt = await seedTenant('cli477-corrupt', 'Reminder Corrupt-Cred Clinic');
 
   branchTelegram = await withTenant(tTelegram, async (tx) => {
     const [b] = await tx.insert(branches).values({ tenantId: tTelegram, name: 'B' }).returning({
@@ -165,6 +169,12 @@ beforeAll(async () => {
   });
   branchNone = await withTenant(tNone, async (tx) => {
     const [b] = await tx.insert(branches).values({ tenantId: tNone, name: 'B' }).returning({
+      id: branches.id,
+    });
+    return b!.id;
+  });
+  branchCorrupt = await withTenant(tCorrupt, async (tx) => {
+    const [b] = await tx.insert(branches).values({ tenantId: tCorrupt, name: 'B' }).returning({
       id: branches.id,
     });
     return b!.id;
@@ -190,6 +200,15 @@ beforeAll(async () => {
     }),
   );
   // tNone — tenant_settings row umuman yo'q (integrationSettings null).
+  // tCorrupt — botTokenEnc BUZUQ ciphertext (masalan MESSAGING_SECRET rotatsiyasi
+  // yoki row buzilishi) — `resolveTenantChannel` → `decryptSecret` THROW qiladi
+  // (CLI-475 B3 izolyatsiya testi).
+  await withTenant(tCorrupt, (tx) =>
+    tx.insert(tenantSettings).values({
+      tenantId: tCorrupt,
+      integrationSettings: { telegram: { botTokenEnc: 'CORRUPT-not-valid-ciphertext' } },
+    }),
+  );
 });
 
 afterAll(async () => {
@@ -273,5 +292,93 @@ describe('CLI-379/400 per-tenant channel resolution (reminder worker)', () => {
     // Telefon bor edi → smsTo berilgan → NoOp "ok:true" qaytaradi →
     // 'appointment_reminder' (no_phone EMAS) yozuv yoziladi.
     expect(rows.some((r) => r.type === 'appointment_reminder')).toBe(true);
+  });
+
+  // CLI-475 B3 — buzuq/eskirgan cred `resolveTenantChannel` ichida `decryptSecret`
+  // THROW qildirsa, butun reminder job (tx) yiqilmasligi kerak (recall-worker'dagi
+  // izolyatsiya bilan bir xil). Doktor hech bo'lmasa kuzatiladigan in-app eslatma
+  // olishi + tashqi kanalga chiqilmasligi shart.
+  test('buzuq cred (decrypt throw) → job crash bo‘lmaydi, doktorga in-app eslatma qoldiriladi', async () => {
+    const apptId = await seedAppointment(tCorrupt, branchCorrupt, {
+      phone: '+998904440044',
+      telegramChatId: '999222',
+      hourOffset: 3,
+    });
+
+    // Throw QILMASLIGI kerak (izolyatsiya) — throw bo'lsa test shu yerda yiqiladi.
+    await processReminderJob(svc, { tenantId: tCorrupt, appointmentId: apptId });
+
+    // Kanal ochilmadi → tashqi fetch yo'q.
+    expect(fetchCalls).toHaveLength(0);
+
+    // Doktorga kuzatiladigan in-app eslatma qoldirilgan (SMS yuborilmadi).
+    const rows = await withTenant(tCorrupt, (tx) =>
+      tx
+        .select({ type: notifications.type })
+        .from(notifications)
+        .where(eq(notifications.userId, ownerId)),
+    );
+    expect(rows.some((r) => r.type === 'appointment_reminder_no_phone')).toBe(true);
+  });
+
+  // CLI-475 B7 — telefonsiz bemor + rozilik + favqulodda kontakt + telegramChatId
+  // holatida `resolveTenantChannel` TELEGRAM'ni tanlaydi (chat_id) — favqulodda
+  // TELEFON ishlatilmaydi (xabar bemor chat_id'ga ketadi). Shuning uchun doktor
+  // in-app eslatmasi "Favqulodda aloqaga yuborildi" DEMASLIGI kerak (avval
+  // `emergencyFallback` bayrog'i source'dan qat'i nazar matnni qo'shardi).
+  test('Telegram tanlanganda emergencyFallback matni ko‘rsatilmaydi (favqulodda telefon ishlatilmaydi)', async () => {
+    const apptId = await withTenant(tTelegram, async (tx) => {
+      const [p] = await tx
+        .insert(patients)
+        .values({
+          tenantId: tTelegram,
+          fullName: 'Emergency Bemor',
+          phone: null,
+          allowEmergencyRecall: true,
+          telegramChatId: '888999',
+        })
+        .returning({ id: patients.id });
+      await tx.insert(patientEmergencyContacts).values({
+        tenantId: tTelegram,
+        patientId: p!.id,
+        name: 'Ota',
+        phone: '+998905550055',
+        isPrimary: true,
+      });
+      const [a] = await tx
+        .insert(appointments)
+        .values({
+          tenantId: tTelegram,
+          branchId: branchTelegram,
+          doctorId: ownerId,
+          patientId: p!.id,
+          startTime: new Date(`${day}T13:00:00+05:00`),
+          endTime: new Date(`${day}T14:00:00+05:00`),
+          status: 'scheduled',
+        })
+        .returning({ id: appointments.id });
+      return a!.id;
+    });
+
+    await processReminderJob(svc, { tenantId: tTelegram, appointmentId: apptId });
+
+    // Telegram tanlangan (chat_id) — favqulodda telefonga SMS EMAS.
+    const tgCalls = fetchCalls.filter((c) => c.url.includes('api.telegram.org'));
+    expect(tgCalls.some((c) => c.body.includes('"chat_id":"888999"'))).toBe(true);
+
+    // Doktor in-app eslatmasi "Favqulodda"ni O'Z ICHIGA OLMAYDI (Telegram'ga ketdi).
+    const rows = await withTenant(tTelegram, (tx) =>
+      tx
+        .select({ type: notifications.type, body: notifications.body })
+        .from(notifications)
+        .where(eq(notifications.userId, ownerId)),
+    );
+    // Bemor nomi bilan ajratamiz — bu faylda boshqa testlar ham tTelegram'da
+    // 'appointment_reminder' yozadi (TRUNCATE bir marta beforeAll'da).
+    const reminder = rows.find(
+      (r) => r.type === 'appointment_reminder' && (r.body ?? '').includes('Emergency Bemor'),
+    );
+    expect(reminder).toBeDefined();
+    expect(reminder!.body ?? '').not.toContain('Favqulodda');
   });
 });

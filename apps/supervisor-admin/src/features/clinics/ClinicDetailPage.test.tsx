@@ -299,10 +299,10 @@ describe('ClinicDetailPage', () => {
     await vi.waitFor(() => expect(getCallCount).toBe(2));
   });
 
-  it("'Parol-tiklash tokeni yaratish' bosilganda litsenziya ID bilan POST /v1/:id/reset-token chaqiriladi va natija bir marta ko'rsatiladi", async () => {
+  it("'Parol-tiklash tokeni yaratish' bosilganda litsenziya ID bilan POST /v1/admin/licenses/:id/reset-token chaqiriladi va natija bir marta ko'rsatiladi", async () => {
     fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
-      if (init?.method === 'POST' && url.endsWith(`/v1/${license.id}/reset-token`)) {
+      if (init?.method === 'POST' && url.endsWith(`/v1/admin/licenses/${license.id}/reset-token`)) {
         return jsonResponse({
           resetToken: 'ABCDE-12345-FEDCB',
           expiresAt: '2026-01-02T00:00:00.000Z',
@@ -322,7 +322,7 @@ describe('ClinicDetailPage', () => {
 
     await vi.waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringContaining(`/v1/${license.id}/reset-token`),
+        expect.stringContaining(`/v1/admin/licenses/${license.id}/reset-token`),
         expect.objectContaining({ method: 'POST' }),
       ),
     );
@@ -336,7 +336,7 @@ describe('ClinicDetailPage', () => {
   it("reset-token so'rovi muvaffaqiyatsiz bo'lsa xato xabarini ko'rsatadi", async () => {
     fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
-      if (init?.method === 'POST' && url.endsWith(`/v1/${license.id}/reset-token`)) {
+      if (init?.method === 'POST' && url.endsWith(`/v1/admin/licenses/${license.id}/reset-token`)) {
         return jsonResponse({ error: { code: 'SERVER_ERROR' } }, false);
       }
       if (url.endsWith('/v1/admin/clinics/c1')) {
