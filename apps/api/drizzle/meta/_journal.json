@@ -274,6 +274,13 @@
       "when": 1783594409776,
       "tag": "0038_green_praxagora",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1783616696286,
+      "tag": "0039_bitter_cerebro",
+      "breakpoints": true
     }
   ]
 }
