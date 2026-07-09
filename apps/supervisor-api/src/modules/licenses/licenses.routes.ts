@@ -9,6 +9,12 @@ const activateSchema = z.object({
   fingerprint: z.string().min(1),
 });
 
+const verifyResetSchema = z.object({
+  licenseKey: z.string().min(1),
+  fingerprint: z.string().min(1),
+  resetToken: z.string().min(1),
+});
+
 export const licensesRoutes = () => {
   const app = new Hono();
   const service = createLicenseService();
@@ -31,6 +37,15 @@ export const licensesRoutes = () => {
     } catch (e: any) {
       return c.json({ error: { code: e.message } }, e.status ?? 500);
     }
+  });
+
+  // CLI-226 — desktop (online, pre-auth) vendor-berilgan owner parol-tiklash
+  // tokenini tekshiradi + bir martalik consume qiladi. Public — activate'ga
+  // o'xshab hech qanday admin/user auth talab qilmaydi.
+  app.post('/verify-reset', zValidator('json', verifyResetSchema), async (c) => {
+    const { licenseKey, fingerprint, resetToken } = c.req.valid('json');
+    const data = await service.verifyReset(licenseKey, fingerprint, resetToken);
+    return c.json(data, data.ok ? 200 : 400);
   });
 
   // Admin JWT talab qiladi (login: POST /v1/admin/auth/login — Task 4)

@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, gt, isNull } from 'drizzle-orm';
 import { db } from '../../db/client';
 import { licenseEvents, licenseResetTokens, licenses } from '../../db/schema';
 import { signLicense } from '../../lib/rsa';
@@ -128,5 +128,44 @@ export const createLicenseService = () => ({
       expiresAt,
     });
     return { resetToken, expiresAt };
+  },
+
+  // Desktop (online, pre-auth) — vendor-berilgan tokenni bir martalik atomik
+  // consume qiladi. Muvaffaqiyatli bo'lsa `license_events`ga 'password_reset'
+  // yozadi. Litsenziya/tenant/boshqa foydalanuvchilarga TEGMAYDI — faqat
+  // qaror qabul qiladi (owner password_hash'ni yangilash chaqiruvchi
+  // (apps/api) tomonda amalga oshadi).
+  async verifyReset(licenseKey: string, fingerprint: string, resetToken: string) {
+    const lic = await db.query.licenses.findFirst({
+      where: eq(licenses.licenseKey, licenseKey),
+    });
+    if (!lic) return { ok: false as const };
+    const hash = createHash('sha256').update(resetToken).digest('hex');
+    const [tok] = await db
+      .select()
+      .from(licenseResetTokens)
+      .where(
+        and(
+          eq(licenseResetTokens.licenseId, lic.id),
+          eq(licenseResetTokens.tokenHash, hash),
+          isNull(licenseResetTokens.consumedAt),
+          gt(licenseResetTokens.expiresAt, new Date()),
+        ),
+      )
+      .limit(1);
+    if (!tok) return { ok: false as const };
+    if (tok.fingerprint && tok.fingerprint !== fingerprint) return { ok: false as const };
+    // Atomik consume — faqat hali consumedAt NULL bo'lsa muvaffaqiyatli
+    // (bir vaqtda ikkita so'rov kelsa ham bittasi g'olib chiqadi).
+    const consumed = await db
+      .update(licenseResetTokens)
+      .set({ consumedAt: new Date() })
+      .where(and(eq(licenseResetTokens.id, tok.id), isNull(licenseResetTokens.consumedAt)))
+      .returning();
+    if (consumed.length === 0) return { ok: false as const };
+    await db
+      .insert(licenseEvents)
+      .values({ licenseId: lic.id, event: 'password_reset', fingerprint });
+    return { ok: true as const };
   },
 });
