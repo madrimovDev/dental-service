@@ -14,7 +14,15 @@ const getSecretPath = (): string =>
 
 export const getOrCreateMessagingSecret = (): Buffer => {
   const fromEnv = env.MESSAGING_SECRET;
-  if (fromEnv && fromEnv.length >= 32) {
+  if (fromEnv) {
+    // Set but too short — this is a misconfiguration, not the legitimate
+    // "unset" desktop path. Silently falling through to the file key here
+    // would let a cloud deploy with a bad MESSAGING_SECRET regenerate a new
+    // file key on every redeploy (ephemeral container, no persistent volume),
+    // orphaning every previously encrypted credential without any signal.
+    if (fromEnv.length < 32) {
+      throw new Error('MESSAGING_SECRET must be >=32 chars');
+    }
     return Buffer.from(fromEnv).subarray(0, 32);
   }
   const path = getSecretPath();

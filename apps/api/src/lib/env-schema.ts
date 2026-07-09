@@ -126,6 +126,22 @@ export const envSchema = z
           'JWT_SECRET is a known placeholder/dev-default value and must not be used in production. Set a strong, unique secret (>= 32 chars).',
       });
     }
+    // MESSAGING_SECRET unset/short in a cloud (ephemeral, no persistent volume)
+    // container makes `getOrCreateMessagingSecret` fall back to a file key that
+    // regenerates on every redeploy — all encrypted per-tenant creds (Telegram
+    // bot token / Eskiz password) become permanently undecryptable, silently.
+    // Desktop is fine unset (persisted dataDir file, machine-local, by design).
+    if (
+      data.NODE_ENV === 'production' &&
+      (!data.MESSAGING_SECRET || data.MESSAGING_SECRET.length < 32)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['MESSAGING_SECRET'],
+        message:
+          'MESSAGING_SECRET must be set (>= 32 chars) in production. Unset/short values silently fall back to an ephemeral file key, orphaning all encrypted per-tenant messaging credentials on redeploy.',
+      });
+    }
   });
 
 export type Env = z.infer<typeof envSchema>;
