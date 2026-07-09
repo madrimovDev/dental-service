@@ -298,4 +298,58 @@ describe('ClinicDetailPage', () => {
 
     await vi.waitFor(() => expect(getCallCount).toBe(2));
   });
+
+  it("'Parol-tiklash tokeni yaratish' bosilganda litsenziya ID bilan POST /v1/:id/reset-token chaqiriladi va natija bir marta ko'rsatiladi", async () => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === 'POST' && url.endsWith(`/v1/${license.id}/reset-token`)) {
+        return jsonResponse({
+          resetToken: 'ABCDE-12345-FEDCB',
+          expiresAt: '2026-01-02T00:00:00.000Z',
+        });
+      }
+      if (url.endsWith('/v1/admin/clinics/c1')) {
+        return jsonResponse({ clinic, license });
+      }
+      throw new Error(`unhandled fetch: ${url} ${init?.method ?? 'GET'}`);
+    });
+
+    renderDetail();
+    await screen.findByText('Clinic One');
+
+    const genButton = screen.getByRole('button', { name: 'Parol-tiklash tokeni yaratish' });
+    fireEvent.click(genButton);
+
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining(`/v1/${license.id}/reset-token`),
+        expect.objectContaining({ method: 'POST' }),
+      ),
+    );
+
+    expect(await screen.findByDisplayValue('ABCDE-12345-FEDCB')).toBeInTheDocument();
+    expect(
+      screen.getByText("Bir marta ko'rsatiladi — mijozga bering. 24 soat amal qiladi."),
+    ).toBeInTheDocument();
+  });
+
+  it("reset-token so'rovi muvaffaqiyatsiz bo'lsa xato xabarini ko'rsatadi", async () => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === 'POST' && url.endsWith(`/v1/${license.id}/reset-token`)) {
+        return jsonResponse({ error: { code: 'SERVER_ERROR' } }, false);
+      }
+      if (url.endsWith('/v1/admin/clinics/c1')) {
+        return jsonResponse({ clinic, license });
+      }
+      throw new Error(`unhandled fetch: ${url} ${init?.method ?? 'GET'}`);
+    });
+
+    renderDetail();
+    await screen.findByText('Clinic One');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Parol-tiklash tokeni yaratish' }));
+
+    expect(await screen.findByText("Parol-tiklash tokenini yaratib bo'lmadi")).toBeInTheDocument();
+  });
 });

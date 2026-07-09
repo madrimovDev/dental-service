@@ -1,4 +1,14 @@
-import { Button, Group, Paper, Stack, Switch, Text, Title } from '@mantine/core';
+import {
+  Button,
+  CopyButton,
+  Group,
+  Paper,
+  Stack,
+  Switch,
+  Text,
+  TextInput,
+  Title,
+} from '@mantine/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
@@ -27,6 +37,7 @@ export const ClinicDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
   const [mutationError, setMutationError] = useState<string | null>(null);
+  const [resetToken, setResetToken] = useState<string | null>(null);
 
   const { data, isError } = useQuery({
     queryKey: ['clinic', id],
@@ -71,6 +82,26 @@ export const ClinicDetailPage = () => {
     onError: (err) => {
       setMutationError(
         err instanceof Error ? err.message : "Litsenziyani qayta faollashtirib bo'lmadi",
+      );
+    },
+  });
+
+  const generateResetToken = useMutation({
+    mutationFn: async () => {
+      if (!data?.license?.id) return null;
+      const res = await authFetch(`/v1/${data.license.id}/reset-token`, {
+        method: 'POST',
+      });
+      if (!res.ok) throw new Error("Parol-tiklash tokenini yaratib bo'lmadi");
+      return res.json() as Promise<{ resetToken: string; expiresAt: string }>;
+    },
+    onSuccess: (result) => {
+      setMutationError(null);
+      if (result) setResetToken(result.resetToken);
+    },
+    onError: (err) => {
+      setMutationError(
+        err instanceof Error ? err.message : "Parol-tiklash tokenini yaratib bo'lmadi",
       );
     },
   });
@@ -146,7 +177,36 @@ export const ClinicDetailPage = () => {
           <Button size="xs" variant="outline" color="red" onClick={() => deactivate.mutate()}>
             Bekor qilish
           </Button>
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={() => generateResetToken.mutate()}
+            loading={generateResetToken.isPending}
+          >
+            Parol-tiklash tokeni yaratish
+          </Button>
         </Group>
+        {resetToken && (
+          <Stack gap={4} mt="sm">
+            <TextInput
+              label="Parol-tiklash tokeni"
+              value={resetToken}
+              readOnly
+              rightSection={
+                <CopyButton value={resetToken}>
+                  {({ copied, copy }) => (
+                    <Button size="xs" variant="subtle" onClick={copy}>
+                      {copied ? 'Nusxalandi' : 'Nusxalash'}
+                    </Button>
+                  )}
+                </CopyButton>
+              }
+            />
+            <Text size="sm" c="dimmed">
+              Bir marta ko'rsatiladi — mijozga bering. 24 soat amal qiladi.
+            </Text>
+          </Stack>
+        )}
       </Paper>
       <Title order={4} mb="sm">
         Modullar
