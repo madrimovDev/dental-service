@@ -1,11 +1,23 @@
 import { tenantSettings } from '@dental/db-schema';
 import { sql } from 'drizzle-orm';
 import type { Context } from 'hono';
+import IORedis from 'ioredis';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { encryptSecret } from '../../lib/crypto.ts';
+import { env } from '../../lib/env.ts';
+import { logger } from '../../lib/logger.ts';
 import { mergeNotificationSettings } from './tenant-settings.mapper.ts';
 import type { UpdateSettingsInput } from './tenant-settings.schema.ts';
+
+// CLI-379: bot-manager reload signal. Lazy singleton — faqat telegram cred
+// o'zgarganda ishlatiladi; alohida pub connection (Redis subscribe holatiga
+// aralashmaslik uchun).
+let redisPub: IORedis | null = null;
+const getRedisPub = (): IORedis => {
+  if (!redisPub) redisPub = new IORedis(env.REDIS_URL);
+  return redisPub;
+};
 
 export const createTenantSettingsService = (deps: { audit: AuditLogger }) => {
   /**
@@ -96,6 +108,20 @@ export const createTenantSettingsService = (deps: { audit: AuditLogger }) => {
         before,
         after: updated,
       });
+    }
+
+    // CLI-379: telegram cred o'zgargandan keyin bot-manager'ga reload signal
+    // yuboriladi (token yangilanishi/o'chirilishi bot'ni qayta ishga tushirishi
+    // kerak). Best-effort — Redis xatosi settings save'ni HECH QACHON buzmaydi.
+    if (telegram !== undefined) {
+      const tenantId = c.get('activeTenantId');
+      if (tenantId) {
+        try {
+          await getRedisPub().publish('telegram:reload', tenantId);
+        } catch (err) {
+          logger.error({ err, tenantId }, 'telegram:reload publish failed');
+        }
+      }
     }
 
     return updated ?? before;
