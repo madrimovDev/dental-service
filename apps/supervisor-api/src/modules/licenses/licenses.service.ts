@@ -157,17 +157,22 @@ export const createLicenseService = () => ({
       .limit(1);
     if (!tok) return { ok: false as const };
     if (tok.fingerprint && tok.fingerprint !== fingerprint) return { ok: false as const };
-    // Atomik consume — faqat hali consumedAt NULL bo'lsa muvaffaqiyatli
-    // (bir vaqtda ikkita so'rov kelsa ham bittasi g'olib chiqadi).
-    const consumed = await db
-      .update(licenseResetTokens)
-      .set({ consumedAt: new Date() })
-      .where(and(eq(licenseResetTokens.id, tok.id), isNull(licenseResetTokens.consumedAt)))
-      .returning();
-    if (consumed.length === 0) return { ok: false as const };
-    await db
-      .insert(licenseEvents)
-      .values({ licenseId: lic.id, event: 'password_reset', fingerprint });
-    return { ok: true as const };
+    // Consume + audit-event bitta tranzaksiyada — agar event-insert xato
+    // qilsa, token consume bo'lmasdan qoladi (token yo'q joyda audit izsiz
+    // "yonib" ketmasligi + handler 500 emas, izchil holat qaytarishi uchun).
+    return await db.transaction(async (tx) => {
+      // Atomik consume — faqat hali consumedAt NULL bo'lsa muvaffaqiyatli
+      // (bir vaqtda ikkita so'rov kelsa ham bittasi g'olib chiqadi).
+      const consumed = await tx
+        .update(licenseResetTokens)
+        .set({ consumedAt: new Date() })
+        .where(and(eq(licenseResetTokens.id, tok.id), isNull(licenseResetTokens.consumedAt)))
+        .returning();
+      if (consumed.length === 0) return { ok: false as const };
+      await tx
+        .insert(licenseEvents)
+        .values({ licenseId: lic.id, event: 'password_reset', fingerprint });
+      return { ok: true as const };
+    });
   },
 });

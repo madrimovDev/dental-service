@@ -1,6 +1,7 @@
 import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { rateLimit } from '../../lib/rate-limit';
 import { adminJwtMiddleware } from '../auth/jwt.middleware';
 import { createLicenseService } from './licenses.service';
 
@@ -18,6 +19,25 @@ const verifyResetSchema = z.object({
 export const licensesRoutes = () => {
   const app = new Hono<{ Variables: { adminUserId?: string } }>();
   const service = createLicenseService();
+
+  // CLI-226 fix — public'dan reachable, brute-force-lanadigan reset-token
+  // urinishlarini cheklaydi. auth.routes.ts'dagi loginRateLimit bilan bir xil
+  // uslub/limit (10 urinish / 15 daqiqa). Kalitga `resetToken`ni QO'SHMAYMIZ —
+  // u aynan taxmin qilinayotgan sir; har noto'g'ri urinishda boshqa token
+  // sinalsa yangi bucket ochilib limit chetlab o'tiladi (reset-owner-password.ts
+  // precedenti). `licenseKey` mijoz qo'lidagi non-secret identifikator —
+  // IP + licenseKey bo'yicha cheklaydi.
+  const verifyResetRateLimit = rateLimit({
+    name: 'verify-reset',
+    limit: 10,
+    windowSeconds: 900,
+    keyFromBody: (b) =>
+      typeof b === 'object' &&
+      b !== null &&
+      typeof (b as { licenseKey?: unknown }).licenseKey === 'string'
+        ? (b as { licenseKey: string }).licenseKey
+        : undefined,
+  });
 
   app.post('/activate', zValidator('json', activateSchema), async (c) => {
     try {
@@ -42,11 +62,16 @@ export const licensesRoutes = () => {
   // CLI-226 — desktop (online, pre-auth) vendor-berilgan owner parol-tiklash
   // tokenini tekshiradi + bir martalik consume qiladi. Public — activate'ga
   // o'xshab hech qanday admin/user auth talab qilmaydi.
-  app.post('/verify-reset', zValidator('json', verifyResetSchema), async (c) => {
-    const { licenseKey, fingerprint, resetToken } = c.req.valid('json');
-    const data = await service.verifyReset(licenseKey, fingerprint, resetToken);
-    return c.json(data, data.ok ? 200 : 400);
-  });
+  app.post(
+    '/verify-reset',
+    verifyResetRateLimit,
+    zValidator('json', verifyResetSchema),
+    async (c) => {
+      const { licenseKey, fingerprint, resetToken } = c.req.valid('json');
+      const data = await service.verifyReset(licenseKey, fingerprint, resetToken);
+      return c.json(data, data.ok ? 200 : 400);
+    },
+  );
 
   // Admin JWT talab qiladi (login: POST /v1/admin/auth/login — Task 4)
   app.post('/reactivate', adminJwtMiddleware, zValidator('json', activateSchema), async (c) => {

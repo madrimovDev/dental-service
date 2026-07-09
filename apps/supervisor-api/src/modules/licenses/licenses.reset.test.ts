@@ -4,6 +4,7 @@ import { and, eq, isNull } from 'drizzle-orm';
 import { createApp } from '../../app';
 import { db } from '../../db/client';
 import { branches, clinics, licenseEvents, licenseResetTokens, licenses } from '../../db/schema';
+import { resetRateLimitStore } from '../../lib/rate-limit';
 import { signAdminTestToken } from '../../lib/test-helpers';
 import { createLicenseService } from './licenses.service';
 
@@ -14,6 +15,7 @@ let licenseId: string;
 let licenseKey: string;
 
 beforeEach(async () => {
+  resetRateLimitStore();
   const [clinic] = await db.insert(clinics).values({ name: 'Reset Test Clinic' }).returning();
   if (!clinic) throw new Error('clinic insert returned no row');
   const [branch] = await db
@@ -194,5 +196,28 @@ describe('POST /v1/verify-reset', () => {
     expect(res.status).toBe(400);
     const body = (await res.json()) as { ok: boolean };
     expect(body.ok).toBe(false);
+  });
+
+  // CLI-226 fix — public endpoint, licenseKey mijoz qo'lida (non-secret) →
+  // brute-force resetToken taxminiga qarshi 10 urinish/15 daqiqa cheklov
+  // (auth.routes.ts loginRateLimit precedenti).
+  it('bir xil IP+licenseKey uchun 10 urinishdan keyin 429 qaytaradi', async () => {
+    const ip = '10.99.2.1';
+    let lastRes: Response | undefined;
+    for (let i = 0; i < 11; i++) {
+      lastRes = await app.request('/v1/verify-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-forwarded-for': ip },
+        body: JSON.stringify({
+          licenseKey,
+          fingerprint: 'fp-public',
+          resetToken: 'AAAAA-BBBBB-CCCCC',
+        }),
+      });
+    }
+    expect(lastRes?.status).toBe(429);
+    expect(lastRes?.headers.get('retry-after')).toBeTruthy();
+    const body = (await lastRes?.json()) as { error?: { code: string } };
+    expect(body.error?.code).toBe('RATE_LIMITED');
   });
 });
