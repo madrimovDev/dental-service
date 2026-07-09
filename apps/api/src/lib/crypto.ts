@@ -5,7 +5,6 @@ import { env } from './env.ts';
 
 // 32-byte AES-256 key. Cloud: MESSAGING_SECRET env (hex/utf8, >=32 chars).
 // Desktop: persisted file in dataDir (jwt-secret.txt pattern) — machine-local.
-let cachedKey: Buffer | null = null;
 
 const getSecretPath = (): string =>
   process.env.MESSAGING_SECRET_PATH ??
@@ -14,11 +13,9 @@ const getSecretPath = (): string =>
     : `${process.env.DENTAL_DATA_DIR ?? '/var/lib/dental-service'}/messaging-secret.txt`);
 
 export const getOrCreateMessagingSecret = (): Buffer => {
-  if (cachedKey) return cachedKey;
   const fromEnv = env.MESSAGING_SECRET;
   if (fromEnv && fromEnv.length >= 32) {
-    cachedKey = Buffer.from(fromEnv).subarray(0, 32);
-    return cachedKey;
+    return Buffer.from(fromEnv).subarray(0, 32);
   }
   const path = getSecretPath();
   let hex: string;
@@ -29,8 +26,7 @@ export const getOrCreateMessagingSecret = (): Buffer => {
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, hex, { mode: 0o600 });
   }
-  cachedKey = Buffer.from(hex, 'hex').subarray(0, 32);
-  return cachedKey;
+  return Buffer.from(hex, 'hex').subarray(0, 32);
 };
 
 export const encryptSecret = (plain: string): string => {
