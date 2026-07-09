@@ -6,7 +6,7 @@ import {
   tenantSettings,
   tenants,
 } from '@dental/db-schema';
-import { createNotificationChannel, type NotificationChannel } from '@dental/notifications';
+import type { NotificationChannel } from '@dental/notifications';
 import { Worker } from 'bullmq';
 import { and, asc, desc, eq, lte } from 'drizzle-orm';
 import { createAdminDb, type Database, type DbOrTx } from '../db/client.ts';
@@ -15,6 +15,7 @@ import { env } from './env.ts';
 import { logger } from './logger.ts';
 import { RECALL_QUEUE_NAME } from './queue.ts';
 import { CLINIC_TZ, renderRecallSms, type SmsLang } from './sms-templates.ts';
+import { resolveTenantChannel } from './tenant-channel.ts';
 
 /** Klinika-local kun (YYYY-MM-DD) berilgan TZ'da. */
 export function localDateString(tz: string, now: Date = new Date()): string {
@@ -41,7 +42,16 @@ export function localHour(tz: string, now: Date = new Date()): number {
 export type RecallScanDeps = {
   /** RLS-bypass admin connection — cross-tenant scan uchun (Qaror #23). */
   adminDb: Database;
-  sms: NotificationChannel;
+  /**
+   * CLI-379/400: endi HAR RECALL o'z tenant'ining `integration_settings`i
+   * (+ bemor `telegramChatId`) asosida `resolveTenantChannel` orqali kanal
+   * tanlaydi (Telegram > Eskiz SMS > NoOp) — bitta global kanal EMAS. `sms`
+   * shu bilan optional bo'ldi: faqat tenant hech qanday messaging credential
+   * sozlamagan ("none") holatda ishlatiladigan test-only fallback/spy
+   * (production'da berilmaydi — unconfigured tenant haqiqatan NoOp bo'ladi,
+   * boshqa tenant'ning umumiy akkauntidan foydalanilmaydi).
+   */
+  sms?: NotificationChannel;
   /** Tenant-scoped tx ochuvchi (RLS context) — odatda `withTenant`. */
   withTenant: <T>(tenantId: string, fn: (tx: DbOrTx) => Promise<T>) => Promise<T>;
   now?: Date;
@@ -58,7 +68,8 @@ export type RecallScanResult = { scanned: number; sent: number; failed: number; 
  *      tenant'lar bu sikldan o'tkazib yuboriladi (kunlik cron 11:00 default'da
  *      doim qanoatlantiradi).
  *   3. Har recall uchun `withTenant(tenantId)` → status re-check (race guard) →
- *      Eskiz SMS (renderRecallSms) → status=contacted + recall_logs.
+ *      per-tenant kanal (CLI-379/400 `resolveTenantChannel`: Telegram > Eskiz SMS >
+ *      NoOp, renderRecallSms matni) → status=contacted + recall_logs.
  */
 export async function processRecallScan(deps: RecallScanDeps): Promise<RecallScanResult> {
   const now = deps.now ?? new Date();
@@ -75,6 +86,9 @@ export async function processRecallScan(deps: RecallScanDeps): Promise<RecallSca
       patientPhone: patients.phone,
       // CLI-474 (L8): rozilik bo'lsa bemor telefoni yo'qligida favqulodda aloqaga fallback.
       allowEmergencyRecall: patients.allowEmergencyRecall,
+      // CLI-379/400: per-tenant kanal tanlovi uchun (resolveTenantChannel).
+      telegramChatId: patients.telegramChatId,
+      integrationSettings: tenantSettings.integrationSettings,
       defaultLanguage: tenants.defaultLanguage,
       clinicName: tenants.name,
       dueDate: recalls.dueDate,
@@ -145,7 +159,22 @@ export async function processRecallScan(deps: RecallScanDeps): Promise<RecallSca
         }
       }
 
-      if (!targetPhone) {
+      // CLI-379/400: per-tenant kanal — Telegram(chat_id) > Eskiz SMS(phone) > NoOp.
+      // `targetPhone` shu yerga kirguncha allaqachon favqulodda-fallback bilan
+      // aniqlangan (yuqorida) — resolveTenantChannel Telegram bo'lsa telefonsiz
+      // ham ishlaydi, aks holda shu (potentsial fallback) telefonga tayanadi.
+      const resolved = resolveTenantChannel(
+        row.integrationSettings,
+        row.telegramChatId,
+        targetPhone,
+      );
+      // Hech qanday tenant-credential sozlanmagan ("none") holatda ham `to` bor —
+      // faqat shu holatda test/legacy fallback (`deps.sms`) beriladi bo'lsa ishlatiladi.
+      const channel: NotificationChannel =
+        resolved.source === 'none' && deps.sms ? deps.sms : resolved.channel;
+      const to = resolved.to;
+
+      if (!to) {
         await tx.insert(recallLogs).values({
           tenantId: row.tenantId,
           recallId: row.recallId,
@@ -164,7 +193,7 @@ export async function processRecallScan(deps: RecallScanDeps): Promise<RecallSca
       });
       const text = `${title} — ${body}`;
 
-      const sendRes = await deps.sms.send(targetPhone, { text });
+      const sendRes = await channel.send(to, { text });
 
       await tx.insert(recallLogs).values({
         tenantId: row.tenantId,
@@ -199,25 +228,24 @@ export async function processRecallScan(deps: RecallScanDeps): Promise<RecallSca
 }
 
 /**
- * Real worker — admin client + Eskiz SMS + Redis Worker. Dedicated worker
- * process'da boot qilinadi (worker.ts). Har repeatable trigger'da scan ishlaydi.
+ * Real worker — admin client + Redis Worker. Dedicated worker process'da boot
+ * qilinadi (worker.ts). Har repeatable trigger'da scan ishlaydi.
+ *
+ * CLI-379/400: global `TELEGRAM_BOT_TOKEN`/`ESKIZ_*` env-based kanal OLIB
+ * TASHLANDI — har recall endi o'z tenant'ining `integration_settings`i
+ * asosida `processRecallScan` ichida (`resolveTenantChannel`) kanal tanlaydi.
+ * `deps.sms` bu yerda BERILMAYDI: tenant o'z messaging credential'ini
+ * sozlamagan bo'lsa — NoOp (boshqa tenant'ning umumiy akkauntiga fallback YO'Q).
+ * ⚠️ recall_logs.channel enum hozircha 'sms'/'manual' — 'telegram' log qiymati
+ * Telegram jonli faollashganda (CLI-379) enum migration bilan qo'shiladi.
  */
 export function startRecallWorker(): { worker: Worker; close: () => Promise<void> } {
   const { db: adminDb, client: adminClient } = createAdminDb();
-  // CLI-474 (L10): priority factory (Telegram > SMS) — TELEGRAM_BOT_TOKEN bo'lsa
-  // Telegram, aks holda Eskiz/NoOp SMS. Ilgari to'g'ridan `createSmsChannel` edi.
-  // ⚠️ recall_logs.channel enum hozircha 'sms'/'manual' — 'telegram' log qiymati
-  // Telegram jonli faollashganda (CLI-379) enum migration bilan qo'shiladi.
-  const sms = createNotificationChannel({
-    telegramBotToken: env.TELEGRAM_BOT_TOKEN,
-    eskizEmail: env.ESKIZ_EMAIL,
-    eskizPassword: env.ESKIZ_PASSWORD,
-  });
 
   const worker = new Worker(
     RECALL_QUEUE_NAME,
     async () => {
-      const res = await processRecallScan({ adminDb, sms, withTenant });
+      const res = await processRecallScan({ adminDb, withTenant });
       logger.info({ ...res }, 'Recall scan finished');
     },
     { connection: { url: env.REDIS_URL } },
