@@ -1,18 +1,20 @@
-// NOTE (deviation from brief, documented in task-1-report.md): a static
-// `import ... from './crypto.ts'` is hoisted by the ESM evaluator and runs
-// BEFORE any top-level statement in this file — including the
-// `process.env.MESSAGING_SECRET = ...` assignment below — regardless of
-// their textual order (verified empirically). That means `./crypto.ts`'s
-// `env.ts` import would snapshot `Bun.env` with MESSAGING_SECRET still
-// unset, defeating the deterministic-key goal. A dynamic `import()` runs as
-// a normal expression in source order, so the env var is set before the
-// module (and its `env.ts` snapshot) loads. Assertions are unchanged from
-// the brief.
-process.env.MESSAGING_SECRET = 'test-only-messaging-secret-32chars-long';
+// CLI-379/400: `getOrCreateMessagingSecret` reads `process.env.MESSAGING_SECRET_PATH`
+// LIVE (plain `process.env` access) at *call* time, not `env.ts`'s import-time
+// validated `MESSAGING_SECRET` snapshot — so setting it here (before any
+// encrypt/decrypt call) is load-order safe, and static imports are fine (see
+// `tests/integration/cli-379-tenant-settings-creds.test.ts` for the same pattern).
+import { afterAll, describe, expect, test } from 'bun:test';
+import { existsSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { decryptSecret, encryptSecret } from './crypto.ts';
 
-import { describe, expect, test } from 'bun:test';
+const secretPath = join(tmpdir(), `dental-crypto-test-${process.pid}-messaging-secret.txt`);
+process.env.MESSAGING_SECRET_PATH = secretPath;
 
-const { decryptSecret, encryptSecret } = await import('./crypto.ts');
+afterAll(() => {
+  if (existsSync(secretPath)) rmSync(secretPath);
+});
 
 describe('crypto (AES-256-GCM)', () => {
   test('round-trips a secret', () => {

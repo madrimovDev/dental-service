@@ -1,17 +1,25 @@
-// CLI-379/400: mapper imports `../../lib/crypto.ts` (transitively `env.ts`, which
-// validates `Bun.env` at import time). A static `import` is hoisted and evaluated
-// BEFORE this assignment regardless of source-order (see task-1-report.md /
-// crypto.test.ts for the empirical repro) — so both the tested module and
-// `encryptSecret` (used to build fixtures below) are loaded via dynamic
-// `import()`, which runs as a normal expression in source order.
-process.env.MESSAGING_SECRET = 'test-only-messaging-secret-32chars-long';
+// CLI-379/400: `getOrCreateMessagingSecret` reads `process.env.MESSAGING_SECRET_PATH`
+// LIVE (plain `process.env` access) at *call* time, not `env.ts`'s import-time
+// validated `MESSAGING_SECRET` snapshot — so setting it here (before any
+// encrypt/decrypt call) is load-order safe, and static imports are fine (see
+// `tests/integration/cli-379-tenant-settings-creds.test.ts` for the same pattern).
+import { afterAll, describe, expect, test } from 'bun:test';
+import { existsSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { encryptSecret } from '../../lib/crypto.ts';
+import {
+  mergeNotificationSettings,
+  toNotificationSettingsDto,
+  toTenantSettingsDto,
+} from './tenant-settings.mapper.ts';
 
-import { describe, expect, test } from 'bun:test';
+const secretPath = join(tmpdir(), `dental-mapper-test-${process.pid}-messaging-secret.txt`);
+process.env.MESSAGING_SECRET_PATH = secretPath;
 
-const { encryptSecret } = await import('../../lib/crypto.ts');
-const { mergeNotificationSettings, toNotificationSettingsDto, toTenantSettingsDto } = await import(
-  './tenant-settings.mapper.ts'
-);
+afterAll(() => {
+  if (existsSync(secretPath)) rmSync(secretPath);
+});
 
 describe('toTenantSettingsDto', () => {
   test('maps Date timestamps to ISO strings', () => {
