@@ -112,8 +112,9 @@ export const createLicenseService = () => ({
 
   // Vendor admin panel — bir martalik owner parol-tiklash tokeni yaratadi
   // (litsenziya ID bo'yicha). Avvalgi ishlatilmagan tokenlarni bekor qiladi
-  // (bir vaqtda faqat bitta faol token bo'lishi kerak).
-  async createResetToken(licenseId: string) {
+  // (bir vaqtda faqat bitta faol token bo'lishi kerak). `createdBy` — qaysi
+  // admin chiqarganini audit qiladi (CLAUDE.md §3.10).
+  async createResetToken(licenseId: string, createdBy?: string) {
     await db
       .update(licenseResetTokens)
       .set({ consumedAt: new Date() })
@@ -126,6 +127,7 @@ export const createLicenseService = () => ({
       licenseId,
       tokenHash: createHash('sha256').update(resetToken).digest('hex'),
       expiresAt,
+      createdBy,
     });
     return { resetToken, expiresAt };
   },

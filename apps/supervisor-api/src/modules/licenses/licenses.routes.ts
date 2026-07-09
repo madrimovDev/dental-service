@@ -16,7 +16,7 @@ const verifyResetSchema = z.object({
 });
 
 export const licensesRoutes = () => {
-  const app = new Hono();
+  const app = new Hono<{ Variables: { adminUserId?: string } }>();
   const service = createLicenseService();
 
   app.post('/activate', zValidator('json', activateSchema), async (c) => {
@@ -63,8 +63,9 @@ export const licensesRoutes = () => {
   // yaratadi (litsenziya ID bo'yicha, admin JWT talab qiladi).
   app.post('/:id/reset-token', adminJwtMiddleware, async (c) => {
     const id = c.req.param('id');
+    const adminUserId = c.get('adminUserId');
     try {
-      const data = await service.createResetToken(id);
+      const data = await service.createResetToken(id, adminUserId);
       return c.json({ resetToken: data.resetToken, expiresAt: data.expiresAt });
     } catch (e: any) {
       return c.json({ error: { code: e.message } }, e.status ?? 400);

@@ -84,6 +84,19 @@ describe('POST /v1/:id/reset-token', () => {
     expect(body.resetToken).toMatch(/^[0-9A-F]{5}-[0-9A-F]{5}-[0-9A-F]{5}$/);
     expect(body.expiresAt).toBeTruthy();
   });
+
+  it("chiqargan admin ID'sini createdBy'ga yozadi (audit)", async () => {
+    const token = await signAdminTestToken('audit-admin-42');
+    await app.request(`/v1/${licenseId}/reset-token`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const [row] = await db
+      .select()
+      .from(licenseResetTokens)
+      .where(eq(licenseResetTokens.licenseId, licenseId));
+    expect(row?.createdBy).toBe('audit-admin-42');
+  });
 });
 
 describe('verifyReset', () => {
