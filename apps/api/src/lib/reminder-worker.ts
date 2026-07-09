@@ -1,5 +1,5 @@
 import { appointments, patients, tenants } from '@dental/db-schema';
-import { createSmsChannel } from '@dental/notifications';
+import { createNotificationChannel } from '@dental/notifications';
 import { Worker } from 'bullmq';
 import { eq } from 'drizzle-orm';
 import type { DbOrTx } from '../db/client.ts';
@@ -75,7 +75,16 @@ export async function processReminderJob(
 }
 
 export function startReminderWorker() {
-  const sms = createSmsChannel({ eskizEmail: env.ESKIZ_EMAIL, eskizPassword: env.ESKIZ_PASSWORD });
+  // CLI-474 (L10): priority factory (Telegram > SMS) — TELEGRAM_BOT_TOKEN bo'lsa
+  // Telegram, aks holda Eskiz/NoOp SMS. Ilgari to'g'ridan `createSmsChannel` edi,
+  // shuning uchun Telegram token qo'shilsa ham reminder'lar SMS'da qolardi.
+  // ⚠️ recall_logs.channel enum hozircha 'sms'/'manual' — 'telegram' log qiymati
+  // Telegram jonli faollashganda (CLI-379) enum migration bilan qo'shiladi.
+  const sms = createNotificationChannel({
+    telegramBotToken: env.TELEGRAM_BOT_TOKEN,
+    eskizEmail: env.ESKIZ_EMAIL,
+    eskizPassword: env.ESKIZ_PASSWORD,
+  });
   const svc = createNotificationsService({ sms });
   return new Worker<ReminderJob>(
     'appointment-reminder',

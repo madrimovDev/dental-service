@@ -1,5 +1,5 @@
 import { patients, recallLogs, recalls, tenantSettings, tenants } from '@dental/db-schema';
-import { createSmsChannel, type NotificationChannel } from '@dental/notifications';
+import { createNotificationChannel, type NotificationChannel } from '@dental/notifications';
 import { Worker } from 'bullmq';
 import { and, eq, lte } from 'drizzle-orm';
 import { createAdminDb, type Database, type DbOrTx } from '../db/client.ts';
@@ -170,7 +170,15 @@ export async function processRecallScan(deps: RecallScanDeps): Promise<RecallSca
  */
 export function startRecallWorker(): { worker: Worker; close: () => Promise<void> } {
   const { db: adminDb, client: adminClient } = createAdminDb();
-  const sms = createSmsChannel({ eskizEmail: env.ESKIZ_EMAIL, eskizPassword: env.ESKIZ_PASSWORD });
+  // CLI-474 (L10): priority factory (Telegram > SMS) — TELEGRAM_BOT_TOKEN bo'lsa
+  // Telegram, aks holda Eskiz/NoOp SMS. Ilgari to'g'ridan `createSmsChannel` edi.
+  // ⚠️ recall_logs.channel enum hozircha 'sms'/'manual' — 'telegram' log qiymati
+  // Telegram jonli faollashganda (CLI-379) enum migration bilan qo'shiladi.
+  const sms = createNotificationChannel({
+    telegramBotToken: env.TELEGRAM_BOT_TOKEN,
+    eskizEmail: env.ESKIZ_EMAIL,
+    eskizPassword: env.ESKIZ_PASSWORD,
+  });
 
   const worker = new Worker(
     RECALL_QUEUE_NAME,
