@@ -111,23 +111,41 @@ const defaultCheckConnection = async (serverUrl: string): Promise<boolean> => {
   }
 };
 
-export const registerSettingsIpc = (deps: SettingsIpcDeps): void => {
-  const { ipcMain, writeConfig, checkConnection = defaultCheckConnection, onConnected } = deps;
+/**
+ * serverUrl'ni qo'llash yadrosi (validate → writeConfig → health-check →
+ * onConnected). IPC handler (web `/settings`) VA CLI-404 native prompt (tray
+ * "Server topilmadi" holatida) — ikkalasi shu funksiyani chaqiradi (DRY, bir
+ * xil CLI-434 validatsiya + evil-twin himoyasi). `ipcMain`siz — sof, testlanadi.
+ */
+export const applyServerUrl = async (
+  raw: unknown,
+  deps: {
+    writeConfig: (partial: { serverUrl: string }) => void;
+    checkConnection?: (serverUrl: string) => Promise<boolean>;
+    onConnected?: (serverUrl: string) => void;
+  },
+): Promise<SetServerUrlResult> => {
+  const { writeConfig, checkConnection = defaultCheckConnection, onConnected } = deps;
+  const validation = validateServerUrl(raw);
+  if (!validation.ok || !validation.url) {
+    // CLI-434 — invalid scheme/host: writeConfig is NOT called (no rogue URL
+    // ever persisted) and checkConnection is never reached (no health-check
+    // request goes out to a public/attacker host either).
+    return { ok: false, code: validation.code ?? 'INVALID_URL' } satisfies SetServerUrlResult;
+  }
+  const url = validation.url;
+  writeConfig({ serverUrl: url });
+  const connected = await checkConnection(url);
+  if (connected) {
+    onConnected?.(url);
+  }
+  return { ok: true, connected, serverUrl: url } satisfies SetServerUrlResult;
+};
 
-  ipcMain.handle(SET_SERVER_URL_CHANNEL, async (_event, serverUrl: unknown) => {
-    const validation = validateServerUrl(serverUrl);
-    if (!validation.ok || !validation.url) {
-      // CLI-434 — invalid scheme/host: writeConfig is NOT called (no rogue
-      // URL ever persisted) and checkConnection is never reached (no
-      // health-check request goes out to a public/attacker host either).
-      return { ok: false, code: validation.code ?? 'INVALID_URL' } satisfies SetServerUrlResult;
-    }
-    const url = validation.url;
-    writeConfig({ serverUrl: url });
-    const connected = await checkConnection(url);
-    if (connected) {
-      onConnected?.(url);
-    }
-    return { ok: true, connected, serverUrl: url } satisfies SetServerUrlResult;
-  });
+export const registerSettingsIpc = (deps: SettingsIpcDeps): void => {
+  const { ipcMain, writeConfig, checkConnection, onConnected } = deps;
+
+  ipcMain.handle(SET_SERVER_URL_CHANNEL, async (_event, serverUrl: unknown) =>
+    applyServerUrl(serverUrl, { writeConfig, checkConnection, onConnected }),
+  );
 };
