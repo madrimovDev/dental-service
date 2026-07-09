@@ -5,8 +5,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type UpdateTenantSettingsBodyIntegrationSettingsEskiz = {
-  enabled?: boolean;
+export type TenantSettingsIntegrationSettingsSms = {
+  configured: boolean;
   /** @nullable */
-  sender?: string | null;
+  hint: string | null;
 };

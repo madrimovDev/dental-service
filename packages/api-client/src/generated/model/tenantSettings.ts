@@ -5,7 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { NotificationSettings } from './notificationSettings';
-import type { IntegrationSettings } from './integrationSettings';
+import type { TenantSettingsIntegrationSettings } from './tenantSettingsIntegrationSettings';
 
 export interface TenantSettings {
   id: string;
@@ -18,7 +18,7 @@ export interface TenantSettings {
   maxDiscountPercent: number;
   noShowStrikeThreshold: number;
   notificationSettings: NotificationSettings;
-  integrationSettings: IntegrationSettings;
+  integrationSettings: TenantSettingsIntegrationSettings;
   createdAt: string;
   updatedAt: string;
 }

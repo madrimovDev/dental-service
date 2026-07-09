@@ -5,8 +5,8 @@ import { renderApp } from '../../../test-utils';
 import { IntegrationsSettingsScreen } from './IntegrationsSettingsScreen';
 
 const integrationSettings = {
-  eskiz: { enabled: true, sender: 'CLINIC' },
-  telegram: { enabled: false, botUsername: null },
+  sms: { configured: true, hint: '••••INIC' },
+  telegram: { configured: false, hint: null },
 };
 
 vi.mock('../settings.api', () => ({
@@ -23,11 +23,11 @@ describe('IntegrationsSettingsScreen', () => {
     expect(grid.children).toHaveLength(4);
   });
 
-  it('holat backend integration_settings dan keladi (eskiz on, telegram off, soliq/onec scaffold off)', () => {
+  it('holat backend integration_settings dan keladi (eskiz configured, telegram off, soliq/onec scaffold off)', () => {
     const { container } = renderApp(<IntegrationsSettingsScreen />);
     const success = container.querySelectorAll('[data-status="success"]');
     const neutral = container.querySelectorAll('[data-status="neutral"]');
-    // FAQAT eskiz.enabled=true → 1 success; telegram off + soliq/onec scaffold → 3 neutral.
+    // FAQAT sms.configured=true → 1 success; telegram off + soliq/onec scaffold → 3 neutral.
     expect(success).toHaveLength(1);
     expect(neutral).toHaveLength(3);
   });

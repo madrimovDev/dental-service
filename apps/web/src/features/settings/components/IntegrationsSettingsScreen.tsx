@@ -15,12 +15,14 @@ import { SettingsShell } from './SettingsShell';
 
 /**
  * Integratsiya kartalari. Holat (`connected`) backend
- * `tenant_settings.integration_settings` JSONB'dan o'qiladi (GET): `eskiz`/`telegram`
- * provayderlari uchun `enabled`. `soliq`/`onec` hali backend-tomondan boshqarilmaydi
- * (scaffold — Faza 3 jonli faollashtirish), shu sabab doimo «Ulanmagan».
+ * `tenant_settings.integration_settings` JSONB'dan o'qiladi (GET): `telegram`/`sms`
+ * (Eskiz) provayderlari uchun maskalangan `configured` (CLI-379/400 — xom kredensial
+ * hech qachon qaytarilmaydi, faqat "sozlangan/mi" + oxirgi 4 belgi hint). `soliq`/`onec`
+ * hali backend-tomondan boshqarilmaydi (scaffold — Faza 3 jonli faollashtirish), shu
+ * sabab doimo «Ulanmagan».
  *
- * Connect/Configure tugmalari scaffold (maxfiy cred yig'ish + faollashtirish Faza 3'da) —
- * backend hech qachon sirlarni qaytarmaydi, shuning uchun holat faqat GET'dan keladi.
+ * Connect/Configure tugmalari scaffold — real cred-yig'ish forma Task 8'da keladi
+ * (bu ekran hozircha faqat `configured` holatini ko'rsatadi, disabled tugmalar bilan).
  */
 type IntegrationCard = {
   id: string;
@@ -37,7 +39,7 @@ const CARDS: IntegrationCard[] = [
     nameKey: 'settings.integration_eskiz_name',
     descKey: 'settings.integration_eskiz_desc',
     icon: IconMessage,
-    provider: 'eskiz',
+    provider: 'sms',
   },
   {
     id: 'telegram',
@@ -82,7 +84,7 @@ export function IntegrationsSettingsScreen() {
         >
           {CARDS.map((card) => {
             const Icon = card.icon;
-            const connected = card.provider ? integrations[card.provider].enabled : false;
+            const connected = card.provider ? integrations[card.provider].configured : false;
             return (
               <div
                 key={card.id}

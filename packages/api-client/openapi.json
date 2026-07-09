@@ -435,7 +435,55 @@
             "$ref": "#/components/schemas/NotificationSettings"
           },
           "integrationSettings": {
-            "$ref": "#/components/schemas/IntegrationSettings"
+            "type": "object",
+            "properties": {
+              "telegram": {
+                "type": "object",
+                "properties": {
+                  "configured": {
+                    "type": "boolean"
+                  },
+                  "hint": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "configured",
+                  "hint"
+                ]
+              },
+              "sms": {
+                "type": "object",
+                "properties": {
+                  "configured": {
+                    "type": "boolean"
+                  },
+                  "hint": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "configured",
+                  "hint"
+                ]
+              }
+            },
+            "required": [
+              "telegram",
+              "sms"
+            ],
+            "example": {
+              "telegram": {
+                "configured": false,
+                "hint": null
+              },
+              "sms": {
+                "configured": false,
+                "hint": null
+              }
+            }
           },
           "createdAt": {
             "type": "string",
@@ -478,47 +526,6 @@
           "appointmentReminder",
           "recallSms",
           "paymentReceipt"
-        ]
-      },
-      "IntegrationSettings": {
-        "type": "object",
-        "properties": {
-          "telegram": {
-            "type": "object",
-            "properties": {
-              "enabled": {
-                "type": "boolean"
-              },
-              "botUsername": {
-                "type": "string",
-                "nullable": true
-              }
-            },
-            "required": [
-              "enabled",
-              "botUsername"
-            ]
-          },
-          "eskiz": {
-            "type": "object",
-            "properties": {
-              "enabled": {
-                "type": "boolean"
-              },
-              "sender": {
-                "type": "string",
-                "nullable": true
-              }
-            },
-            "required": [
-              "enabled",
-              "sender"
-            ]
-          }
-        },
-        "required": [
-          "telegram",
-          "eskiz"
         ]
       },
       "TenantVertical": {
@@ -7253,34 +7260,39 @@
                       }
                     }
                   },
-                  "integrationSettings": {
+                  "telegram": {
                     "type": "object",
+                    "nullable": true,
                     "properties": {
-                      "telegram": {
-                        "type": "object",
-                        "properties": {
-                          "enabled": {
-                            "type": "boolean"
-                          },
-                          "botUsername": {
-                            "type": "string",
-                            "nullable": true
-                          }
-                        }
-                      },
-                      "eskiz": {
-                        "type": "object",
-                        "properties": {
-                          "enabled": {
-                            "type": "boolean"
-                          },
-                          "sender": {
-                            "type": "string",
-                            "nullable": true
-                          }
-                        }
+                      "botToken": {
+                        "type": "string",
+                        "minLength": 20,
+                        "maxLength": 200
                       }
-                    }
+                    },
+                    "required": [
+                      "botToken"
+                    ]
+                  },
+                  "sms": {
+                    "type": "object",
+                    "nullable": true,
+                    "properties": {
+                      "eskizEmail": {
+                        "type": "string",
+                        "maxLength": 160,
+                        "format": "email"
+                      },
+                      "eskizPassword": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                      }
+                    },
+                    "required": [
+                      "eskizEmail",
+                      "eskizPassword"
+                    ]
                   }
                 }
               }
