@@ -937,6 +937,7 @@
     "services": "Xizmatlar",
     "notes": "Eslatma",
     "conflict": "Doktor bu vaqtda band",
+    "patient_conflict": "Bemor shu vaqtda boshqa yozilishga ega",
     "empty": "Yozuvlar yo'q",
     "empty_week": "Bu hafta yozilishlar yo'q",
     "cancel_reason": "Bekor qilish sababi",

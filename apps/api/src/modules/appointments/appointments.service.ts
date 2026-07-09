@@ -45,18 +45,32 @@ export type SchedulePredicates = {
 };
 
 /**
- * Postgres exclusion_violation (SQLSTATE 23P01) — CLI-408 EXCLUDE gist constraint
- * `appointments_no_doctor_overlap` buzilganda otiladi. `postgres-js` xatosida
- * `code` maydoni SQLSTATE'ni beradi. Race edge-case'da (pre-check o'tib, DB
- * darajasida to'qnashuv) 500 emas, 409 `conflict.doctor_busy` qaytarish uchun.
+ * Postgres exclusion_violation (SQLSTATE 23P01) — appointments EXCLUDE gist
+ * constraint'lari buzilganda otiladi: CLI-408 `appointments_no_doctor_overlap`
+ * (doctor) va CLI-471 `appointments_no_patient_overlap` (patient). `postgres-js`
+ * (v3) xatosida `code` SQLSTATE'ni, `constraint_name` esa aynan buzilgan
+ * constraint nomini beradi. Race edge-case'da (pre-check o'tib, DB darajasida
+ * to'qnashuv) 500 emas — constraint nomiga qarab MOS 409 kodini qaytarish uchun.
+ *
+ * ⚠️ Ikki constraint mavjud bo'lgani uchun 23P01'ni ko'r-ko'rona `doctor_busy`ga
+ * map qilib bo'lmaydi — patient-overlap DB backstop'iga tushsa `patient_busy`
+ * qaytarilishi shart, aks holda xato noto'g'ri xabar bilan ko'rinadi.
  */
-function isExclusionViolation(err: unknown): boolean {
-  return (
-    typeof err === 'object' &&
-    err !== null &&
-    'code' in err &&
-    (err as { code?: string }).code === '23P01'
-  );
+function exclusionConflictCode(
+  err: unknown,
+): 'conflict.doctor_busy' | 'conflict.patient_busy' | null {
+  if (
+    typeof err !== 'object' ||
+    err === null ||
+    !('code' in err) ||
+    (err as { code?: string }).code !== '23P01'
+  ) {
+    return null;
+  }
+  const constraint = (err as { constraint_name?: string }).constraint_name;
+  if (constraint === 'appointments_no_patient_overlap') return 'conflict.patient_busy';
+  // `appointments_no_doctor_overlap` yoki noma'lum → doctor (mavjud xulq).
+  return 'conflict.doctor_busy';
 }
 
 /**
@@ -117,6 +131,37 @@ export const createAppointmentsService = (deps: {
       // Yarim-ochiq [start, end): existing.start < new.end AND existing.end > new.start.
       // `gt` (gte EMAS) — back-to-back (oldingi 11:00 tugaydi, yangi 11:00 boshlanadi)
       // konflikt EMAS.
+      lt(appointments.startTime, end),
+      gt(appointments.endTime, start),
+    ];
+    if (excludeId) filters.push(ne(appointments.id, excludeId));
+
+    const [row] = await db
+      .select({ id: appointments.id })
+      .from(appointments)
+      .where(and(...filters))
+      .limit(1);
+
+    return !!row;
+  }
+
+  /**
+   * CLI-471: bemor darajasidagi kesishuv (bir bemor bir vaqtda ikki xil doktorga
+   * yozila olmaydi). `checkConflict`ni aynan mirror qiladi, faqat filtr `patientId`
+   * bo'yicha. Yarim-ochiq [start, end) — back-to-back kesishuv EMAS. Pre-check
+   * race'ni yopmaydi; DB `appointments_no_patient_overlap` EXCLUDE backstop qiladi.
+   */
+  async function checkPatientConflict(
+    c: Context,
+    patientId: string,
+    start: Date,
+    end: Date,
+    excludeId?: string,
+  ): Promise<boolean> {
+    const db = getDb(c);
+    const filters = [
+      eq(appointments.patientId, patientId),
+      ne(appointments.status, 'cancelled' as const),
       lt(appointments.startTime, end),
       gt(appointments.endTime, start),
     ];
@@ -206,6 +251,13 @@ export const createAppointmentsService = (deps: {
       return { ok: false as const, code: 'conflict.doctor_busy' };
     }
 
+    // CLI-471: bemor darajasidagi kesishuv — bir bemor bir vaqtda ikki xil
+    // doktorga yozila olmaydi (doctor check'dan KEYIN, kod ajratilishi uchun).
+    const patientConflict = await checkPatientConflict(c, input.patientId, start, end);
+    if (patientConflict) {
+      return { ok: false as const, code: 'conflict.patient_busy' };
+    }
+
     // A6: ish-soati + time-off guard'lari (checkConflict'dan KEYIN). Schedule
     // dep inject qilinmagan bo'lsa o'tkazib yuboriladi (backward-safe).
     const scheduleCheck = await checkSchedule(c, input.doctorId, input.branchId, start, end);
@@ -229,8 +281,10 @@ export const createAppointmentsService = (deps: {
         })
         .returning();
     } catch (err) {
-      // CLI-408: pre-check o'tdi-yu constraint otdi (concurrent race) → 409.
-      if (isExclusionViolation(err)) return { ok: false as const, code: 'conflict.doctor_busy' };
+      // CLI-408/471: pre-check o'tdi-yu EXCLUDE constraint otdi (concurrent race)
+      // → constraint nomiga qarab 409 doctor_busy / patient_busy.
+      const conflictCode = exclusionConflictCode(err);
+      if (conflictCode) return { ok: false as const, code: conflictCode };
       throw err;
     }
 
@@ -301,6 +355,11 @@ export const createAppointmentsService = (deps: {
       const conflict = await checkConflict(c, doctor, start, end, id);
       if (conflict) return { ok: false as const, code: 'conflict.doctor_busy' };
 
+      // CLI-471: bemor darajasidagi kesishuv. PATCH patientId'ni o'zgartirmaydi —
+      // shuning uchun `before.patientId` bo'yicha tekshiramiz (o'zini exclude).
+      const patientConflict = await checkPatientConflict(c, before.patientId, start, end, id);
+      if (patientConflict) return { ok: false as const, code: 'conflict.patient_busy' };
+
       // A6: ish-soati + time-off guard'lari (checkConflict'dan KEYIN).
       const scheduleCheck = await checkSchedule(c, doctor, branch, start, end);
       if (scheduleCheck) return { ok: false as const, code: scheduleCheck };
@@ -324,8 +383,10 @@ export const createAppointmentsService = (deps: {
         .where(eq(appointments.id, id))
         .returning();
     } catch (err) {
-      // CLI-408: reschedule/reactivation band slotga ustma-ust tushdi → 409.
-      if (isExclusionViolation(err)) return { ok: false as const, code: 'conflict.doctor_busy' };
+      // CLI-408/471: reschedule/reactivation band slotga ustma-ust tushdi →
+      // constraint nomiga qarab 409 doctor_busy / patient_busy.
+      const conflictCode = exclusionConflictCode(err);
+      if (conflictCode) return { ok: false as const, code: conflictCode };
       throw err;
     }
 

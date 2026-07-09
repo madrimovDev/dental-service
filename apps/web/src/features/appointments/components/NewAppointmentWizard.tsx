@@ -30,6 +30,9 @@ function conflictMessage(err: unknown, t: (key: string) => string, lang: string)
   switch (err.code) {
     case 'conflict.doctor_busy':
       return t('appointments.conflict');
+    case 'conflict.patient_busy':
+      // CLI-471: bemor shu vaqtda boshqa yozilishga ega.
+      return t('appointments.patient_conflict');
     case 'schedule.outside_working_hours':
       // TODO i18n key: appointments.outside_working_hours (uz.json/ru.json)
       return lang === 'ru'
