@@ -35,6 +35,8 @@ export function toPatientListItem(p: PatientListItemDto, t: TFn): PatientListIte
     genderLabel: genderLabel(p.gender, t),
     tags: p.tags ?? [],
     balance: p.balance,
+    noShowStrikes: p.noShowStrikes,
+    flagged: p.flagged,
   };
 }
 

@@ -38,9 +38,11 @@ import {
   type TreatmentStageAcceptance,
   type TreatmentStageStatus,
   type UpdateTreatmentPlanBodyStatus,
+  type UpdateVisitNoteInput,
   updateLabOrder,
   updateTreatmentPlan,
   updateTreatmentStage,
+  updateVisitNote,
 } from '@dental/api-client';
 import {
   type QueryClient,
@@ -274,6 +276,21 @@ export function useCreateVisitNote(patientId: string) {
   return useMutation({
     mutationFn: (body: CreateVisitNoteInput) => createVisitNote(body).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: clinicalKeys.visitNotes(patientId) }),
+  });
+}
+
+// CLI-447: vizit yozuvini tahrirlash (PATCH) — performedServices o'zgarsa backend
+// stock reconcile'ni (CLI-445) trigger qiladi. Stock/plan invalidatsiya ham kerak.
+export function useUpdateVisitNote(patientId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: UpdateVisitNoteInput }) =>
+      updateVisitNote(id, body).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: clinicalKeys.visitNotes(patientId) });
+      // stageId completion / performedServices reconcile plan+stock holatiga ta'sir qiladi.
+      qc.invalidateQueries({ queryKey: clinicalKeys.plans(patientId) });
+    },
   });
 }
 

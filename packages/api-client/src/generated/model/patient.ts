@@ -34,6 +34,7 @@ export interface Patient {
   /** @nullable */
   insurance: PatientInsurance;
   insuranceStatus: PatientInsuranceStatus;
+  allowEmergencyRecall: boolean;
   /** @nullable */
   archivedAt: string | null;
   createdAt: string;

@@ -24,6 +24,7 @@ export * from './tables/notifications.ts';
 export * from './tables/password-reset-tokens.ts';
 export * from './tables/patient-emergency-contacts.ts';
 export * from './tables/patient-images.ts';
+export * from './tables/patient-no-show-strikes.ts';
 export * from './tables/patient-relatives.ts';
 export * from './tables/patients.ts';
 export * from './tables/payroll-adjustments.ts';

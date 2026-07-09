@@ -90,6 +90,8 @@ export const updateSettingsSchema = z.object({
   onboardingDismissedAt: z.iso.datetime().nullable().optional(),
   // CLI-444: kassa erkin POS chegirmasining maksimal foizi (0–100, 100 = cheklovsiz).
   maxDiscountPercent: z.number().int().min(0).max(100).optional(),
+  // CLI-474 (L7): no-show strike chegarasi (0 = o'chiq).
+  noShowStrikeThreshold: z.number().int().min(0).max(50).optional(),
   notificationSettings: updateNotificationSettingsSchema.optional(),
   integrationSettings: updateIntegrationSettingsSchema.optional(),
 });
@@ -106,6 +108,7 @@ export const tenantSettingsDtoSchema = z
     currency: z.string().openapi({ example: 'UZS' }),
     onboardingDismissedAt: z.string().nullable().openapi({ example: null }),
     maxDiscountPercent: z.number().int().openapi({ example: 100 }),
+    noShowStrikeThreshold: z.number().int().openapi({ example: 3 }),
     notificationSettings: notificationSettingsDtoSchema,
     integrationSettings: integrationSettingsDtoSchema,
     createdAt: z.string().openapi({ example: '2026-06-12T10:00:00.000Z' }),

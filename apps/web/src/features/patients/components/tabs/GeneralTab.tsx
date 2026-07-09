@@ -1,5 +1,5 @@
 import { Button, Card, Input, Mono, Select, StateView } from '@dental/ui';
-import { Badge, Group, SimpleGrid, Stack, Text, Textarea } from '@mantine/core';
+import { Badge, Checkbox, Group, SimpleGrid, Stack, Text, Textarea } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useEffect } from 'react';
@@ -9,6 +9,7 @@ import { useAuthStore } from '@/stores/auth-store.ts';
 import { usePatientRaw, useUpdatePatient } from '../../patients.api';
 import { patientEditSchema } from '../../patients.schema';
 import type { PatientDetail } from '../../patients.types';
+import { NoShowStrikesCard } from '../NoShowStrikesCard';
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -146,6 +147,7 @@ function GeneralEditForm({ patientId }: { patientId: string }) {
       passport: '',
       address: '',
       notes: '',
+      allowEmergencyRecall: false,
     },
     validate: zod4Resolver(patientEditSchema),
   });
@@ -163,6 +165,7 @@ function GeneralEditForm({ patientId }: { patientId: string }) {
         passport: p.passport ?? '',
         address: p.address ?? '',
         notes: p.notes ?? '',
+        allowEmergencyRecall: p.allowEmergencyRecall,
       });
     }
   }, [rawQuery.data]);
@@ -210,6 +213,7 @@ function GeneralEditForm({ patientId }: { patientId: string }) {
       passport: clearedOrKept(values.passport, original.passport),
       address: clearedOrKept(values.address, original.address),
       notes: clearedOrKept(values.notes, original.notes),
+      allowEmergencyRecall: values.allowEmergencyRecall,
     }),
   );
 
@@ -272,6 +276,13 @@ function GeneralEditForm({ patientId }: { patientId: string }) {
             value={form.values.notes}
             onChange={(e) => form.setFieldValue('notes', e.currentTarget.value)}
           />
+          {/* CLI-474 (L8): favqulodda aloqaga recall/reminder fallback roziligi. */}
+          <Checkbox
+            label={t('patients.form.allow_emergency_recall')}
+            description={t('patients.form.allow_emergency_recall_hint')}
+            checked={form.values.allowEmergencyRecall}
+            onChange={(e) => form.setFieldValue('allowEmergencyRecall', e.currentTarget.checked)}
+          />
           <Group justify="flex-end">
             <Button type="submit" variant="primary" disabled={updateMut.isPending}>
               {t('common.save')}
@@ -286,9 +297,15 @@ function GeneralEditForm({ patientId }: { patientId: string }) {
 export function GeneralTab({ patient }: { patient: PatientDetail }) {
   const { hasPermission } = useAuthStore();
 
-  if (hasPermission('patient.edit')) {
-    return <GeneralEditForm patientId={patient.id} />;
-  }
-
-  return <GeneralReadOnly patient={patient} />;
+  return (
+    <Stack gap="md">
+      {hasPermission('patient.edit') ? (
+        <GeneralEditForm patientId={patient.id} />
+      ) : (
+        <GeneralReadOnly patient={patient} />
+      )}
+      {/* CLI-474 (L7): no-show strike xulosasi (chegara/strike bo'lmasa yashirin). */}
+      <NoShowStrikesCard patientId={patient.id} />
+    </Stack>
+  );
 }

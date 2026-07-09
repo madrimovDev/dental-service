@@ -26,6 +26,9 @@ export const tenantSettings = pgTable(
     // `tenant_settings.edit` egasi (Tenant Admin/Owner) o'zgartiradi; kassir/registrator
     // limitni ko'tara olmaydi. Enforcement: cashier.service.ts::create.
     maxDiscountPercent: integer('max_discount_percent').notNull().default(100),
+    // CLI-474 (L7): bemor faol no-show strike soni shu chegaraga yetsa "flagged"
+    // (kartada rozetka + yozilishda ogohlantirish). Default 3; 0 = tizim o'chiq.
+    noShowStrikeThreshold: integer('no_show_strike_threshold').notNull().default(3),
     onboardingDismissedAt: timestamp('onboarding_dismissed_at', { withTimezone: true }),
     // Recall subsystem (RFC-0011): default interval (oy), klinika vaqt zonasi va
     // recall SMS yuborish soati (klinika-local). Scheduler shu sozlamalarga amal qiladi.

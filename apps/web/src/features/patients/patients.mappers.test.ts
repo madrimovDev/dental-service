@@ -18,6 +18,7 @@ const base: Patient = {
   source: 'Tavsiya',
   insurance: null,
   insuranceStatus: 'none',
+  allowEmergencyRecall: false,
   archivedAt: null,
   createdAt: '2026-01-01',
   updatedAt: '2026-01-01',
@@ -33,7 +34,10 @@ describe('patients.mappers', () => {
     expect(formatDate(null)).toBeNull();
   });
   it('toPatientListItem gender label + tags + balance', () => {
-    const vm = toPatientListItem({ ...base, balance: 150000 }, (k) => k);
+    const vm = toPatientListItem(
+      { ...base, balance: 150000, noShowStrikes: 0, flagged: false },
+      (k) => k,
+    );
     expect(vm.genderLabel).toBe('patients.gender.male');
     expect(vm.tags).toEqual(['VIP']);
     expect(vm.age).toBeGreaterThan(0);

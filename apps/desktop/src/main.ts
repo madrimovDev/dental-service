@@ -61,7 +61,8 @@ import {
   startServer,
   stopServer,
 } from './process-manager.js';
-import { registerSettingsIpc, validateServerUrl } from './settings-ipc.js';
+import { type PromptWindowLike, promptServerUrl } from './server-url-prompt.js';
+import { applyServerUrl, registerSettingsIpc, validateServerUrl } from './settings-ipc.js';
 import { setupSingleInstance } from './single-instance.js';
 import { createTray, setTrayToolTip, updateTray } from './tray.js';
 
@@ -339,22 +340,34 @@ app.whenReady().then(async () => {
       onStop: () => app.quit(),
     });
 
+    // Ulanish muvaffaqiyatli bo'lganda (web `/settings` IPC YOKI CLI-404 native
+    // prompt orqali) — fon reconnect'ni to'xtat, tray'ni ulangan holatga o'tkaz,
+    // brauzerni och. Ikkala yo'l ham shu bitta handler'ni ishlatadi (DRY).
+    const onServerConnected = (url: string) => {
+      stopClientReconnectLoop?.();
+      stopClientReconnectLoop = null;
+      updateTray('client', { serverUrl: url }, connectedCallbacks(url));
+      openBrowser(url);
+    };
+
+    // CLI-404: "Server topilmadi" holatidagi native prompt oynasi (web yo'q).
+    const createPromptWindow = (): PromptWindowLike =>
+      new BrowserWindow({
+        width: 400,
+        height: 250,
+        resizable: false,
+        fullscreenable: false,
+        title: 'Server manzili',
+        webPreferences: { nodeIntegration: false, contextIsolation: true },
+      }) as unknown as PromptWindowLike;
+
     // Sozlamalar'da (web `/settings`, `preload.ts` orqali) qo'lda kiritilgan
     // serverUrl — `writeConfig()` + reconnect urinishi (CLI-348 qaror 5).
     // `registerSettingsIpc` o'zi `validateServerUrl` bilan gate qiladi
     // (CLI-434(b) — settings-ipc.ts), shuning uchun bu yerda qo'shimcha
     // tekshiruv shart emas. Muvaffaqiyatli ulansa tray/brauzer yangi
     // manzilga o'tadi, joriy fon discovery retry (bo'lsa) to'xtatiladi.
-    registerSettingsIpc({
-      ipcMain,
-      writeConfig,
-      onConnected: (url) => {
-        stopClientReconnectLoop?.();
-        stopClientReconnectLoop = null;
-        updateTray('client', { serverUrl: url }, connectedCallbacks(url));
-        openBrowser(url);
-      },
-    });
+    registerSettingsIpc({ ipcMain, writeConfig, onConnected: onServerConnected });
 
     if (trustedUrl) {
       createTray('client', { serverUrl: trustedUrl }, connectedCallbacks(trustedUrl));
@@ -382,7 +395,29 @@ app.whenReady().then(async () => {
           { serverUrl: '', serverFound: false },
           {
             onOpen: () => {},
-            onSettings: () => {},
+            // CLI-404: server yo'q → web `/settings` ham serve qilinmaydi
+            // (chicken-egg). Native prompt oynasida serverUrl qo'lda kiritiladi →
+            // `applyServerUrl` (CLI-434 validatsiya + writeConfig + health-check) →
+            // ulansa `onServerConnected` tray/brauzerni ulangan holatga o'tkazadi.
+            onSettings: async () => {
+              const entered = await promptServerUrl(createPromptWindow);
+              if (!entered) return;
+              const res = await applyServerUrl(entered, {
+                writeConfig,
+                onConnected: onServerConnected,
+              });
+              if (!res.ok) {
+                dialog.showErrorBox(
+                  "Noto'g'ri manzil",
+                  'Faqat mahalliy tarmoq manzili qabul qilinadi (masalan http://192.168.1.5:8000).',
+                );
+              } else if (!res.connected) {
+                dialog.showErrorBox(
+                  "Ulanib bo'lmadi",
+                  'Server javob bermadi. Manzilni va serverning ishlayotganini tekshiring.',
+                );
+              }
+            },
             onStop: () => {
               stopClientReconnectLoop?.();
               app.quit();

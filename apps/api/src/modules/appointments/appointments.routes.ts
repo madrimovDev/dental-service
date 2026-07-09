@@ -30,13 +30,14 @@ const notFoundResponse = {
 
 /**
  * 409 Conflict response — create / patch endpoint'lar uchun. Kodlar:
- * `conflict.doctor_busy`, `schedule.outside_working_hours` (A6),
- * `schedule.doctor_on_time_off` (A6).
+ * `conflict.doctor_busy`, `conflict.patient_busy` (CLI-471),
+ * `schedule.outside_working_hours` (A6), `schedule.doctor_on_time_off` (A6).
  */
 const conflictResponse = {
   409: {
     content: { 'application/json': { schema: errorResponseSchema } },
-    description: 'Scheduling conflict (doctor busy / outside working hours / on time-off)',
+    description:
+      'Scheduling conflict (doctor busy / patient busy / outside working hours / on time-off)',
   },
 };
 
@@ -116,6 +117,7 @@ export const appointmentRoutes = (deps: {
       // Konflikt oilasi (409): doctor_busy + ish-soati/time-off guard'lari (A6).
       if (
         result.code === 'conflict.doctor_busy' ||
+        result.code === 'conflict.patient_busy' ||
         result.code === 'schedule.outside_working_hours' ||
         result.code === 'schedule.doctor_on_time_off'
       )
@@ -199,6 +201,7 @@ export const appointmentRoutes = (deps: {
       // Konflikt oilasi (409): doctor_busy + ish-soati/time-off guard'lari (A6).
       if (
         result.code === 'conflict.doctor_busy' ||
+        result.code === 'conflict.patient_busy' ||
         result.code === 'schedule.outside_working_hours' ||
         result.code === 'schedule.doctor_on_time_off'
       )

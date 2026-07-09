@@ -5,6 +5,7 @@ import {
   patientEmergencyContacts,
   patientRelatives,
   patients,
+  tenantSettings,
   treatmentPlans,
   treatmentStagePayments,
   treatmentStages,
@@ -79,6 +80,10 @@ const DEBT_PLAN_STATUSES = ['accepted', 'in_progress', 'completed'] as const;
 export const createPatientsService = (deps: {
   audit: AuditLogger;
   ownership?: OwnershipValidator;
+  // CLI-474 (L7): bemor ro'yxatida no-show strike bayrog'i (grouped count).
+  noShowStrike?: {
+    activeCountForPatients: (c: Context, patientIds: string[]) => Promise<Map<string, number>>;
+  };
 }) => {
   const ownership = deps.ownership ?? createOwnershipValidator();
 
@@ -219,9 +224,32 @@ export const createPatientsService = (deps: {
       }
     }
 
+    // CLI-474 (L7): no-show strike flag — tenant threshold (0=o'chiq) + grouped
+    // faol count (join-anchored). Threshold 0 bo'lsa umuman hisoblamaymiz (perf).
+    let strikeById = new Map<string, number>();
+    let strikeThreshold = 0;
+    if (deps.noShowStrike && ids.length > 0) {
+      const [settingsRow] = await db
+        .select({ t: tenantSettings.noShowStrikeThreshold })
+        .from(tenantSettings)
+        .limit(1);
+      strikeThreshold = settingsRow?.t ?? 0;
+      if (strikeThreshold > 0) {
+        strikeById = await deps.noShowStrike.activeCountForPatients(c, ids);
+      }
+    }
+
     const hasPii = userHasPiiAccess(c);
     const masked = hasPii ? rows : rows.map(maskPii);
-    const data = masked.map((p) => ({ ...p, balance: balanceById.get(p.id) ?? 0 }));
+    const data = masked.map((p) => {
+      const noShowStrikes = strikeById.get(p.id) ?? 0;
+      return {
+        ...p,
+        balance: balanceById.get(p.id) ?? 0,
+        noShowStrikes,
+        flagged: strikeThreshold > 0 && noShowStrikes >= strikeThreshold,
+      };
+    });
     const total = totalRows[0]?.total ?? 0;
 
     // CLI-458: findById()dagi bilan bir xil sensitive-read audit, lekin bulk —
@@ -358,6 +386,7 @@ export const createPatientsService = (deps: {
           tags: input.tags ?? [],
           source: input.source ?? null,
           insurance: input.insurance ?? null,
+          allowEmergencyRecall: input.allowEmergencyRecall ?? false,
         })
         .returning();
 
@@ -401,6 +430,8 @@ export const createPatientsService = (deps: {
     if (input.tags !== undefined) patch.tags = input.tags;
     if (input.source !== undefined) patch.source = input.source;
     if (input.insurance !== undefined) patch.insurance = input.insurance;
+    if (input.allowEmergencyRecall !== undefined)
+      patch.allowEmergencyRecall = input.allowEmergencyRecall;
 
     const [updated] = await db.update(patients).set(patch).where(eq(patients.id, id)).returning();
 

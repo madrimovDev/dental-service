@@ -16,6 +16,7 @@ export interface TenantSettings {
   /** @nullable */
   onboardingDismissedAt: string | null;
   maxDiscountPercent: number;
+  noShowStrikeThreshold: number;
   notificationSettings: NotificationSettings;
   integrationSettings: IntegrationSettings;
   createdAt: string;

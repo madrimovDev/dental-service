@@ -164,6 +164,22 @@
   white-space: nowrap;
 }
 
+/* CLI-474 (L7): no-show strike chegarasidan oshgan bemor bayrog'i. */
+.flagPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill, 99px);
+  background: var(--token-danger-soft, #fde8e8);
+  color: var(--token-danger, #dc2626);
+  font-size: 10.5px;
+  font-weight: 700;
+  font-family: var(--font-sans);
+  white-space: nowrap;
+}
+
 /* ---- Cell: phone ---- */
 .phone {
   font-family: var(--font-mono);

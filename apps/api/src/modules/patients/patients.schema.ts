@@ -71,6 +71,9 @@ export const createPatientSchema = z.object({
   tags: z.array(z.string().min(1).max(40)).max(20).optional(),
   source: z.string().max(80).optional(),
   insurance: insuranceInputSchema.nullable().optional(),
+  // CLI-474 (L8): bemor rozi bo'lsagina telefoni yo'qligida recall/reminder SMS'i
+  // favqulodda aloqaga fallback qilinadi (opt-in maxfiylik roziligi).
+  allowEmergencyRecall: z.boolean().optional(),
 });
 export type CreatePatientInput = z.infer<typeof createPatientSchema>;
 
@@ -172,6 +175,8 @@ export const patientDtoSchema = z
       .nullable(),
     /** Computed: active | expired | inactive | none (V3-5). */
     insuranceStatus: z.enum(['active', 'expired', 'inactive', 'none']),
+    /** CLI-474 (L8): favqulodda aloqaga recall/reminder fallback roziligi. */
+    allowEmergencyRecall: z.boolean(),
     archivedAt: z.string().nullable(),
     createdAt: z.string(),
     updatedAt: z.string(),
@@ -179,9 +184,14 @@ export const patientDtoSchema = z
   .openapi('Patient');
 export type PatientDto = z.infer<typeof patientDtoSchema>;
 
-/** List item DTO — Patient + computed balance (number). */
+/** List item DTO — Patient + computed balance + CLI-474 (L7) no-show strike flag. */
 export const patientListItemDtoSchema = patientDtoSchema
-  .extend({ balance: z.number() })
+  .extend({
+    balance: z.number(),
+    // CLI-474 (L7): faol (waivedmas, hali no_show) strike soni + chegara belgisi.
+    noShowStrikes: z.number().int(),
+    flagged: z.boolean(),
+  })
   .openapi('PatientListItem');
 export type PatientListItemDto = z.infer<typeof patientListItemDtoSchema>;
 

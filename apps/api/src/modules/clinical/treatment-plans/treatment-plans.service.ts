@@ -48,6 +48,7 @@ export type RecallStageHook = {
       sourceStageId: string;
       treatmentPlanId?: string | null;
       branchId?: string | null;
+      assignedDoctorId?: string | null;
     },
   ) => Promise<void>;
 };
@@ -315,6 +316,8 @@ export const createTreatmentPlansService = (deps: {
           patientId: plan.patientId,
           sourceStageId: updated.id,
           treatmentPlanId: plan.id,
+          // CLI-474 (L9): recall'ni davolash rejasi doktoriga biriktir.
+          assignedDoctorId: plan.doctorId,
         });
       }
     }

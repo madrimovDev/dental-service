@@ -309,6 +309,7 @@ export type {
   MarkRecallContacted,
   MarkRecallContacted200,
   MedicalRecordHistoryEntry,
+  NoShowStrike,
   Notification,
   NotificationMarkAllReadResult,
   NotificationMarkReadResult,
@@ -320,6 +321,7 @@ export type {
   PatientGender as Gender,
   PatientImage,
   PatientListItem,
+  PatientNoShowStrikeSummary,
   PatientRelativeView,
   PayrollLine,
   PayrollRun,
@@ -451,6 +453,7 @@ export type {
   UserAssignment,
   UserAssignmentRow,
   VisitNote,
+  WaiveNoShowStrikeBody,
   WorkingHoursSegment,
   WorkingHoursSegmentDto,
 } from './generated/model/index.ts';
@@ -462,6 +465,11 @@ export {
   RecallDtoStatus,
   UpdateRecallStatus,
 } from './generated/model/index.ts';
+// Generated (orval) — no-show-strikes (CLI-474 L7)
+export {
+  getPatientNoShowStrikes,
+  waiveNoShowStrike,
+} from './generated/no-show-strikes/no-show-strikes.ts';
 // Generated (orval) — notifications
 export type {
   ListNotificationsResult,

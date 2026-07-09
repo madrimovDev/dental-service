@@ -33,7 +33,8 @@ describe('VisitNoteFormModal', () => {
         appointments={appointments}
         services={services}
         pending={false}
-        onCreate={onCreate}
+        stages={[]}
+        onSubmit={onCreate}
       />,
     );
     fireEvent.click(screen.getByText(/Saqlash|Saqla/i));
@@ -55,7 +56,8 @@ describe('VisitNoteFormModal', () => {
         appointments={appointments}
         services={services}
         pending={false}
-        onCreate={onCreate}
+        stages={[]}
+        onSubmit={onCreate}
       />,
     );
     fireEvent.click(screen.getByText(/Saqlash|Saqla/i));

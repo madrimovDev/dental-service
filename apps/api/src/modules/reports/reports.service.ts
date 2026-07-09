@@ -553,6 +553,11 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
     const apptRetFilter = [
       inRange(appointments.startTime, start, end),
       lt(patients.createdAt, start),
+      // CLI-474 (L6): faqat HAQIQATDA kelgan (yakunlangan) vizit "bemor qaytdi"
+      // deb sanaladi — cancelled/no_show/scheduled retention'ni sun'iy oshirardi
+      // (bemor kelmagan bo'lsa ham "qaytgan" hisoblanardi). Appointment enum'da
+      // alohida `attended` yo'q → `completed` = kelib ko'rilgan vizit.
+      eq(appointments.status, 'completed'),
     ];
     const [retRow] = await db
       .select({ c: countDistinct(appointments.patientId) })

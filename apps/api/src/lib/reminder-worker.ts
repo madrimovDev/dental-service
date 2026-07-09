@@ -1,7 +1,7 @@
-import { appointments, patients, tenants } from '@dental/db-schema';
-import { createSmsChannel } from '@dental/notifications';
+import { appointments, patientEmergencyContacts, patients, tenants } from '@dental/db-schema';
+import { createNotificationChannel } from '@dental/notifications';
 import { Worker } from 'bullmq';
-import { eq } from 'drizzle-orm';
+import { asc, desc, eq } from 'drizzle-orm';
 import type { DbOrTx } from '../db/client.ts';
 import { withTenant } from '../db/scoped.ts';
 import type { NotificationsService } from '../modules/notifications/index.ts';
@@ -54,7 +54,24 @@ export async function processReminderJob(
     // (fayl boshidagi izoh: "Yozilish eslatmasi (reminder worker)"), shuning
     // uchun yangi jadval/migratsiya shart emas — alohida `type` bilan doktorga
     // kuzatiladigan in-app yozuv qoldiramiz, SMS umuman urinilmaydi.
-    if (!patient?.phone) {
+    // CLI-474 (L8): bemor telefoni yo'q + rozilik (allowEmergencyRecall) bo'lsa —
+    // favqulodda aloqa (primary) raqamiga fallback. recall-worker bilan bir xil.
+    let targetPhone = patient?.phone ?? null;
+    let emergencyFallback = false;
+    if (!targetPhone && patient?.allowEmergencyRecall) {
+      const [ec] = await tx
+        .select({ phone: patientEmergencyContacts.phone })
+        .from(patientEmergencyContacts)
+        .where(eq(patientEmergencyContacts.patientId, appt.patientId))
+        .orderBy(desc(patientEmergencyContacts.isPrimary), asc(patientEmergencyContacts.createdAt))
+        .limit(1);
+      if (ec?.phone) {
+        targetPhone = ec.phone;
+        emergencyFallback = true;
+      }
+    }
+
+    if (!targetPhone) {
       await svc.notifyInTx(tx, tenantId, {
         userId: appt.doctorId,
         type: 'appointment_reminder_no_phone',
@@ -68,14 +85,23 @@ export async function processReminderJob(
       userId: appt.doctorId,
       type: 'appointment_reminder',
       title,
-      body,
-      smsTo: patient.phone,
+      body: emergencyFallback ? `${body} — Favqulodda aloqaga yuborildi` : body,
+      smsTo: targetPhone,
     });
   });
 }
 
 export function startReminderWorker() {
-  const sms = createSmsChannel({ eskizEmail: env.ESKIZ_EMAIL, eskizPassword: env.ESKIZ_PASSWORD });
+  // CLI-474 (L10): priority factory (Telegram > SMS) — TELEGRAM_BOT_TOKEN bo'lsa
+  // Telegram, aks holda Eskiz/NoOp SMS. Ilgari to'g'ridan `createSmsChannel` edi,
+  // shuning uchun Telegram token qo'shilsa ham reminder'lar SMS'da qolardi.
+  // ⚠️ recall_logs.channel enum hozircha 'sms'/'manual' — 'telegram' log qiymati
+  // Telegram jonli faollashganda (CLI-379) enum migration bilan qo'shiladi.
+  const sms = createNotificationChannel({
+    telegramBotToken: env.TELEGRAM_BOT_TOKEN,
+    eskizEmail: env.ESKIZ_EMAIL,
+    eskizPassword: env.ESKIZ_PASSWORD,
+  });
   const svc = createNotificationsService({ sms });
   return new Worker<ReminderJob>(
     'appointment-reminder',

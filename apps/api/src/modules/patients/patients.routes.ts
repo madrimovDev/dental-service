@@ -69,13 +69,23 @@ const emergencyContactNotFound = {
   },
 };
 
-export const patientRoutes = (deps: { db: Database; audit: AuditLogger }) => {
+export const patientRoutes = (deps: {
+  db: Database;
+  audit: AuditLogger;
+  // CLI-474 (L7): bemor ro'yxati no-show strike bayrog'i uchun narrow hook.
+  noShowStrike?: {
+    activeCountForPatients: (
+      c: import('hono').Context,
+      patientIds: string[],
+    ) => Promise<Map<string, number>>;
+  };
+}) => {
   const app = new OpenAPIHono();
   app.use('*', requireModuleInDesktop('patients'));
   app.use('*', authMiddleware());
   app.use('*', rlsMiddleware(deps.db));
 
-  const service = createPatientsService({ audit: deps.audit });
+  const service = createPatientsService({ audit: deps.audit, noShowStrike: deps.noShowStrike });
 
   // ─── GET / — list ────────────────────────────────────────────────────────
 

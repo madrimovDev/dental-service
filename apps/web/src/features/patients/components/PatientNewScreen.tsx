@@ -38,6 +38,7 @@ export function PatientNewScreen() {
       tags: [],
       source: '',
       insurance: { provider: '', policyNumber: '' },
+      allowEmergencyRecall: false,
     },
     validate: zod4Resolver(patientFormSchema),
   });
@@ -65,6 +66,7 @@ export function PatientNewScreen() {
         tags: values.tags,
         source: values.source || undefined,
         insurance,
+        allowEmergencyRecall: values.allowEmergencyRecall,
       },
       { onSuccess: (p) => navigate(`/patients/${p.id}`) },
     );
@@ -277,6 +279,16 @@ export function PatientNewScreen() {
                   }
                 />
               </div>
+              {/* CLI-474 (L8): favqulodda aloqaga recall/reminder fallback roziligi. */}
+              <Checkbox
+                mt="md"
+                label={t('patients.form.allow_emergency_recall')}
+                description={t('patients.form.allow_emergency_recall_hint')}
+                checked={form.values.allowEmergencyRecall}
+                onChange={(e) =>
+                  form.setFieldValue('allowEmergencyRecall', e.currentTarget.checked)
+                }
+              />
             </div>
           </Card>
         </div>
