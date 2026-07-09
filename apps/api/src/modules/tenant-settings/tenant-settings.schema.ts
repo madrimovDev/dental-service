@@ -40,40 +40,31 @@ export const updateNotificationSettingsSchema = notificationSettingsObject.parti
 export type UpdateNotificationSettingsInput = z.infer<typeof updateNotificationSettingsSchema>;
 
 /**
- * Integratsiya konfiguratsiyasi — provider bo'yicha. FAQAT sezgir bo'lmagan
- * config qaytariladi (`enabled` + non-secret label); maxfiy token/kalit hech
- * qachon response'da qaytarilmaydi (DS scaffold chegarasi — jonli faollashtirish
- * Faza 3'da foydalanuvchi sirlari bilan).
+ * Integratsiya kredensiallari — CLI-379/400: xom cred (Telegram bot token,
+ * Eskiz email/parol) hech qachon response'da qaytarilmaydi. Service ularni
+ * AES-256-GCM bilan shifrlab `integration_settings` JSONB'ga saqlaydi
+ * (`{ telegram: { botTokenEnc, botUsername? } | null, sms: { eskizEmailEnc,
+ * eskizPasswordEnc } | null }`); mapper o'qishda faqat `{ configured, hint }`
+ * maskalangan holatni chiqaradi (`toIntegrationDto`, tenant-settings.mapper.ts).
  */
-const telegramConfigObject = z.object({
-  enabled: z.boolean(),
-  botUsername: z.string().nullable(),
-});
-const eskizConfigObject = z.object({
-  enabled: z.boolean(),
-  sender: z.string().nullable(),
-});
-const integrationSettingsObject = z.object({
-  telegram: telegramConfigObject,
-  eskiz: eskizConfigObject,
+const integrationStatusObject = z.object({
+  configured: z.boolean(),
+  hint: z.string().nullable(),
 });
 
-export type IntegrationSettingsDto = z.infer<typeof integrationSettingsObject>;
+export const integrationSettingsDtoSchema = z
+  .object({
+    telegram: integrationStatusObject,
+    sms: integrationStatusObject,
+  })
+  .openapi({
+    example: {
+      telegram: { configured: false, hint: null },
+      sms: { configured: false, hint: null },
+    },
+  });
 
-export const INTEGRATION_DEFAULTS: IntegrationSettingsDto = {
-  telegram: { enabled: false, botUsername: null },
-  eskiz: { enabled: false, sender: null },
-};
-
-export const integrationSettingsDtoSchema =
-  integrationSettingsObject.openapi('IntegrationSettings');
-
-/** PATCH — provider va provider ichidagi maydonlar ixtiyoriy (2-darajali qisman). */
-export const updateIntegrationSettingsSchema = z.object({
-  telegram: telegramConfigObject.partial().optional(),
-  eskiz: eskizConfigObject.partial().optional(),
-});
-export type UpdateIntegrationSettingsInput = z.infer<typeof updateIntegrationSettingsSchema>;
+export type IntegrationSettingsDto = z.infer<typeof integrationSettingsDtoSchema>;
 
 /**
  * Tenant settings update DTO — barcha maydonlar optional (partial update).
@@ -81,7 +72,9 @@ export type UpdateIntegrationSettingsInput = z.infer<typeof updateIntegrationSet
  * - `vertical` — klinika vertikali (masalan 'dental', 'cosmetology').
  * - `reminderLeadHours` — vizitdan necha soat oldin eslatma (0–168, ya'ni 0..7 kun).
  * - `currency` — valyuta kodi (masalan 'UZS').
- * - `notificationSettings` / `integrationSettings` — DS10 bo'limlari (merge update).
+ * - `notificationSettings` — DS10 bo'lim (merge update).
+ * - `telegram` / `sms` — CLI-379/400 xom kredensiallar; service AES bilan
+ *   shifrlab `integration_settings`ga saqlaydi. `null` → integration o'chiriladi.
  */
 export const updateSettingsSchema = z.object({
   vertical: z.string().min(1).optional(),
@@ -93,7 +86,16 @@ export const updateSettingsSchema = z.object({
   // CLI-474 (L7): no-show strike chegarasi (0 = o'chiq).
   noShowStrikeThreshold: z.number().int().min(0).max(50).optional(),
   notificationSettings: updateNotificationSettingsSchema.optional(),
-  integrationSettings: updateIntegrationSettingsSchema.optional(),
+  // CLI-379/400: xom kredensiallar — service AES bilan shifrlab saqlaydi.
+  // `null` → integration o'chiriladi.
+  telegram: z
+    .object({ botToken: z.string().min(20).max(200) })
+    .nullable()
+    .optional(),
+  sms: z
+    .object({ eskizEmail: z.email().max(160), eskizPassword: z.string().min(1).max(200) })
+    .nullable()
+    .optional(),
 });
 
 export type UpdateSettingsInput = z.infer<typeof updateSettingsSchema>;
@@ -127,3 +129,34 @@ export const tenantVerticalDtoSchema = z
   .openapi('TenantVertical');
 
 export type TenantVerticalDto = z.infer<typeof tenantVerticalDtoSchema>;
+
+/**
+ * CLI-379/400 — `POST /tenant-settings/integrations/test` body. Validates
+ * Telegram bot token (via `getMe`) or Eskiz email/password (via `auth/login`)
+ * BEFORE saving — a pure "test these creds" action, never persisted. Mirrors
+ * the shape of `updateSettingsSchema`'s `telegram`/`sms` fields but requires
+ * exactly one payload matching `target` (not nullable — nothing to "clear" here).
+ */
+export const integrationsTestSchema = z
+  .object({
+    target: z.enum(['telegram', 'sms']),
+    telegram: z.object({ botToken: z.string().min(20).max(200) }).optional(),
+    sms: z
+      .object({ eskizEmail: z.email().max(160), eskizPassword: z.string().min(1).max(200) })
+      .optional(),
+  })
+  .openapi('IntegrationsTestInput', {
+    example: { target: 'telegram', telegram: { botToken: '123456:ABC-DEF...' } },
+  });
+
+export type IntegrationsTestInput = z.infer<typeof integrationsTestSchema>;
+
+/** `POST /tenant-settings/integrations/test` response — `detail` is human-readable (e.g. `@botusername`), `null` when N/A. */
+export const integrationsTestResultSchema = z
+  .object({
+    ok: z.boolean(),
+    detail: z.string().nullable(),
+  })
+  .openapi('IntegrationsTestResult', { example: { ok: true, detail: '@clinicbot' } });
+
+export type IntegrationsTestResultDto = z.infer<typeof integrationsTestResultSchema>;

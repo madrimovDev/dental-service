@@ -1,11 +1,25 @@
-import { describe, expect, test } from 'bun:test';
+// CLI-379/400: `getOrCreateMessagingSecret` reads `process.env.MESSAGING_SECRET_PATH`
+// LIVE (plain `process.env` access) at *call* time, not `env.ts`'s import-time
+// validated `MESSAGING_SECRET` snapshot — so setting it here (before any
+// encrypt/decrypt call) is load-order safe, and static imports are fine (see
+// `tests/integration/cli-379-tenant-settings-creds.test.ts` for the same pattern).
+import { afterAll, describe, expect, test } from 'bun:test';
+import { existsSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { encryptSecret } from '../../lib/crypto.ts';
 import {
-  mergeIntegrationSettings,
   mergeNotificationSettings,
-  toIntegrationSettingsDto,
   toNotificationSettingsDto,
   toTenantSettingsDto,
 } from './tenant-settings.mapper.ts';
+
+const secretPath = join(tmpdir(), `dental-mapper-test-${process.pid}-messaging-secret.txt`);
+process.env.MESSAGING_SECRET_PATH = secretPath;
+
+afterAll(() => {
+  if (existsSync(secretPath)) rmSync(secretPath);
+});
 
 describe('toTenantSettingsDto', () => {
   test('maps Date timestamps to ISO strings', () => {
@@ -80,8 +94,8 @@ describe('toTenantSettingsDto', () => {
       paymentReceipt: false,
     });
     expect(dto.integrationSettings).toEqual({
-      telegram: { enabled: false, botUsername: null },
-      eskiz: { enabled: false, sender: null },
+      telegram: { configured: false, hint: null },
+      sms: { configured: false, hint: null },
     });
   });
 
@@ -105,6 +119,34 @@ describe('toTenantSettingsDto', () => {
     };
     expect(toTenantSettingsDto(row).maxDiscountPercent).toBe(30);
   });
+
+  test('CLI-379/400: integration credentials are masked, never raw', () => {
+    const row = {
+      id: 'id-1',
+      tenantId: 't-1',
+      vertical: 'dental',
+      reminderLeadHours: 24,
+      currency: 'UZS',
+      onboardingDismissedAt: null,
+      defaultRecallIntervalMonths: 6,
+      timezone: 'Asia/Tashkent',
+      recallSendHourLocal: 10,
+      maxDiscountPercent: 100,
+      noShowStrikeThreshold: 3,
+      notificationSettings: null,
+      integrationSettings: {
+        telegram: { botTokenEnc: encryptSecret('123456:ABCDEFbcd'), botUsername: 'clinicbot' },
+        sms: { eskizEmailEnc: encryptSecret('a@b.uz'), eskizPasswordEnc: encryptSecret('pw-xyz') },
+      },
+      createdAt: new Date('2026-06-12T10:00:00.000Z'),
+      updatedAt: new Date('2026-06-12T11:00:00.000Z'),
+    };
+    const dto = toTenantSettingsDto(row as never);
+    expect(dto.integrationSettings.telegram.configured).toBe(true);
+    expect(dto.integrationSettings.telegram.hint).toBe('••••Fbcd');
+    expect(JSON.stringify(dto)).not.toContain('123456'); // no raw token anywhere
+    expect(dto.integrationSettings.sms.configured).toBe(true);
+  });
 });
 
 describe('toNotificationSettingsDto', () => {
@@ -114,16 +156,6 @@ describe('toNotificationSettingsDto', () => {
       recallSms: false,
       paymentReceipt: false,
     });
-  });
-});
-
-describe('toIntegrationSettingsDto', () => {
-  test('merges stored partial provider over defaults', () => {
-    const dto = toIntegrationSettingsDto({
-      telegram: { enabled: true, botUsername: '@clinicbot' },
-    });
-    expect(dto.telegram).toEqual({ enabled: true, botUsername: '@clinicbot' });
-    expect(dto.eskiz).toEqual({ enabled: false, sender: null });
   });
 });
 
@@ -143,29 +175,5 @@ describe('mergeNotificationSettings', () => {
       recallSms: true,
       paymentReceipt: false,
     });
-  });
-});
-
-describe('mergeIntegrationSettings', () => {
-  test('partial telegram patch preserves untouched config (botUsername)', () => {
-    const stored = {
-      telegram: { enabled: false, botUsername: '@clinicbot' },
-      eskiz: { enabled: true, sender: 'CLINIC' },
-    };
-    // Patch only flips telegram.enabled — botUsername and the whole eskiz must survive.
-    const merged = mergeIntegrationSettings(stored, { telegram: { enabled: true } });
-    expect(merged).toEqual({
-      telegram: { enabled: true, botUsername: '@clinicbot' },
-      eskiz: { enabled: true, sender: 'CLINIC' },
-    });
-  });
-
-  test('explicit null clears a config field', () => {
-    const stored = {
-      telegram: { enabled: true, botUsername: '@old' },
-      eskiz: { enabled: false, sender: null },
-    };
-    const merged = mergeIntegrationSettings(stored, { telegram: { botUsername: null } });
-    expect(merged.telegram).toEqual({ enabled: true, botUsername: null });
   });
 });

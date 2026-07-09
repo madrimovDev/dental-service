@@ -13,8 +13,19 @@ export type NotifyPayload = {
   type: string;
   title: string;
   body?: string;
-  /** Berilsa — SMS ham yuboriladi (NoOp/Eskiz kanal orqali). */
+  /**
+   * Berilsa — bemorga ham xabar yuboriladi (`channel` orqali, aks holda
+   * `deps.sms`). Nomi tarixiy ("smsTo") — CLI-379/400dan buyon Telegram
+   * kanalida bu Telegram `chat_id` bo'lishi ham mumkin, telefon shart emas.
+   */
   smsTo?: string;
+  /**
+   * CLI-379/400: per-tenant kanal override (reminder-worker.ts —
+   * `resolveTenantChannel`). Berilmasa — factory'ga berilgan `deps.sms`
+   * ishlatiladi (eski xulq, boshqa chaqiruvchilar — stock.service.ts,
+   * notifications.routes.ts — buni bilishi shart emas).
+   */
+  channel?: NotificationChannel;
 };
 
 /**
@@ -46,7 +57,8 @@ export const createNotificationsService = (deps: { sms: NotificationChannel }) =
     if (payload.smsTo) {
       try {
         const text = payload.title + (payload.body ? ` — ${payload.body}` : '');
-        const res = await deps.sms.send(payload.smsTo, { text });
+        const channel = payload.channel ?? deps.sms;
+        const res = await channel.send(payload.smsTo, { text });
         if (!res.ok) {
           console.error(`[notifications] SMS yuborilmadi (${payload.smsTo}): ${res.error}`);
         }

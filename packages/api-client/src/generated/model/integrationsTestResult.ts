@@ -5,8 +5,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type IntegrationSettingsTelegram = {
-  enabled: boolean;
+export interface IntegrationsTestResult {
+  ok: boolean;
   /** @nullable */
-  botUsername: string | null;
-};
+  detail: string | null;
+}

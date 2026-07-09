@@ -1,10 +1,23 @@
 import { tenantSettings } from '@dental/db-schema';
 import { sql } from 'drizzle-orm';
 import type { Context } from 'hono';
+import IORedis from 'ioredis';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
-import { mergeIntegrationSettings, mergeNotificationSettings } from './tenant-settings.mapper.ts';
+import { encryptSecret } from '../../lib/crypto.ts';
+import { env } from '../../lib/env.ts';
+import { logger } from '../../lib/logger.ts';
+import { mergeNotificationSettings } from './tenant-settings.mapper.ts';
 import type { UpdateSettingsInput } from './tenant-settings.schema.ts';
+
+// CLI-379: bot-manager reload signal. Lazy singleton — faqat telegram cred
+// o'zgarganda ishlatiladi; alohida pub connection (Redis subscribe holatiga
+// aralashmaslik uchun).
+let redisPub: IORedis | null = null;
+const getRedisPub = (): IORedis => {
+  if (!redisPub) redisPub = new IORedis(env.REDIS_URL);
+  return redisPub;
+};
 
 export const createTenantSettingsService = (deps: { audit: AuditLogger }) => {
   /**
@@ -50,9 +63,10 @@ export const createTenantSettingsService = (deps: { audit: AuditLogger }) => {
     const before = await getOrCreate(c);
 
     // `onboardingDismissedAt` wire'da ISO string keladi; Drizzle ustun Date kutadi.
-    // DS10: `notificationSettings`/`integrationSettings` — saqlangan JSONB ustiga
-    // MERGE qilinadi (to'liq almashtirilmaydi), shuning uchun `...rest`'dan ajratiladi.
-    const { onboardingDismissedAt, notificationSettings, integrationSettings, ...rest } = input;
+    // DS10: `notificationSettings` — saqlangan JSONB ustiga MERGE qilinadi (to'liq
+    // almashtirilmaydi); `telegram`/`sms` — CLI-379/400 xom kredensiallar (pastda
+    // AES bilan shifrlanadi), shuning uchun barchasi `...rest`'dan ajratiladi.
+    const { onboardingDismissedAt, notificationSettings, telegram, sms, ...rest } = input;
     const patch: Record<string, unknown> = { ...rest, updatedAt: new Date() };
     if (onboardingDismissedAt !== undefined) {
       patch.onboardingDismissedAt = onboardingDismissedAt ? new Date(onboardingDismissedAt) : null;
@@ -63,11 +77,25 @@ export const createTenantSettingsService = (deps: { audit: AuditLogger }) => {
         notificationSettings,
       );
     }
-    if (integrationSettings !== undefined) {
-      patch.integrationSettings = mergeIntegrationSettings(
-        before.integrationSettings,
-        integrationSettings,
-      );
+    // CLI-379/400: telegram/sms xom cred → AES shifrlab integration_settings'ga.
+    // `null` → integration o'chiriladi (boshqa provider saqlanadi — 2-darajali merge).
+    if (telegram !== undefined || sms !== undefined) {
+      const current = (before.integrationSettings ?? {}) as Record<string, unknown>;
+      const next = { ...current };
+      if (telegram !== undefined) {
+        next.telegram =
+          telegram === null ? null : { botTokenEnc: encryptSecret(telegram.botToken) };
+      }
+      if (sms !== undefined) {
+        next.sms =
+          sms === null
+            ? null
+            : {
+                eskizEmailEnc: encryptSecret(sms.eskizEmail),
+                eskizPasswordEnc: encryptSecret(sms.eskizPassword),
+              };
+      }
+      patch.integrationSettings = next;
     }
 
     const [updated] = await db.update(tenantSettings).set(patch).returning();
@@ -80,6 +108,20 @@ export const createTenantSettingsService = (deps: { audit: AuditLogger }) => {
         before,
         after: updated,
       });
+    }
+
+    // CLI-379: telegram cred o'zgargandan keyin bot-manager'ga reload signal
+    // yuboriladi (token yangilanishi/o'chirilishi bot'ni qayta ishga tushirishi
+    // kerak). Best-effort — Redis xatosi settings save'ni HECH QACHON buzmaydi.
+    if (telegram !== undefined) {
+      const tenantId = c.get('activeTenantId');
+      if (tenantId) {
+        try {
+          await getRedisPub().publish('telegram:reload', tenantId);
+        } catch (err) {
+          logger.error({ err, tenantId }, 'telegram:reload publish failed');
+        }
+      }
     }
 
     return updated ?? before;

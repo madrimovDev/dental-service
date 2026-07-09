@@ -435,7 +435,55 @@
             "$ref": "#/components/schemas/NotificationSettings"
           },
           "integrationSettings": {
-            "$ref": "#/components/schemas/IntegrationSettings"
+            "type": "object",
+            "properties": {
+              "telegram": {
+                "type": "object",
+                "properties": {
+                  "configured": {
+                    "type": "boolean"
+                  },
+                  "hint": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "configured",
+                  "hint"
+                ]
+              },
+              "sms": {
+                "type": "object",
+                "properties": {
+                  "configured": {
+                    "type": "boolean"
+                  },
+                  "hint": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "configured",
+                  "hint"
+                ]
+              }
+            },
+            "required": [
+              "telegram",
+              "sms"
+            ],
+            "example": {
+              "telegram": {
+                "configured": false,
+                "hint": null
+              },
+              "sms": {
+                "configured": false,
+                "hint": null
+              }
+            }
           },
           "createdAt": {
             "type": "string",
@@ -480,47 +528,6 @@
           "paymentReceipt"
         ]
       },
-      "IntegrationSettings": {
-        "type": "object",
-        "properties": {
-          "telegram": {
-            "type": "object",
-            "properties": {
-              "enabled": {
-                "type": "boolean"
-              },
-              "botUsername": {
-                "type": "string",
-                "nullable": true
-              }
-            },
-            "required": [
-              "enabled",
-              "botUsername"
-            ]
-          },
-          "eskiz": {
-            "type": "object",
-            "properties": {
-              "enabled": {
-                "type": "boolean"
-              },
-              "sender": {
-                "type": "string",
-                "nullable": true
-              }
-            },
-            "required": [
-              "enabled",
-              "sender"
-            ]
-          }
-        },
-        "required": [
-          "telegram",
-          "eskiz"
-        ]
-      },
       "TenantVertical": {
         "type": "object",
         "properties": {
@@ -532,6 +539,79 @@
         "required": [
           "vertical"
         ]
+      },
+      "IntegrationsTestResult": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "ok",
+          "detail"
+        ],
+        "example": {
+          "ok": true,
+          "detail": "@clinicbot"
+        }
+      },
+      "IntegrationsTestInput": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string",
+            "enum": [
+              "telegram",
+              "sms"
+            ]
+          },
+          "telegram": {
+            "type": "object",
+            "properties": {
+              "botToken": {
+                "type": "string",
+                "minLength": 20,
+                "maxLength": 200
+              }
+            },
+            "required": [
+              "botToken"
+            ]
+          },
+          "sms": {
+            "type": "object",
+            "properties": {
+              "eskizEmail": {
+                "type": "string",
+                "maxLength": 160,
+                "format": "email"
+              },
+              "eskizPassword": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "required": [
+              "eskizEmail",
+              "eskizPassword"
+            ]
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "example": {
+          "target": "telegram",
+          "telegram": {
+            "botToken": "123456:ABC-DEF..."
+          }
+        }
       },
       "Branch": {
         "type": "object",
@@ -7253,34 +7333,39 @@
                       }
                     }
                   },
-                  "integrationSettings": {
+                  "telegram": {
                     "type": "object",
+                    "nullable": true,
                     "properties": {
-                      "telegram": {
-                        "type": "object",
-                        "properties": {
-                          "enabled": {
-                            "type": "boolean"
-                          },
-                          "botUsername": {
-                            "type": "string",
-                            "nullable": true
-                          }
-                        }
-                      },
-                      "eskiz": {
-                        "type": "object",
-                        "properties": {
-                          "enabled": {
-                            "type": "boolean"
-                          },
-                          "sender": {
-                            "type": "string",
-                            "nullable": true
-                          }
-                        }
+                      "botToken": {
+                        "type": "string",
+                        "minLength": 20,
+                        "maxLength": 200
                       }
-                    }
+                    },
+                    "required": [
+                      "botToken"
+                    ]
+                  },
+                  "sms": {
+                    "type": "object",
+                    "nullable": true,
+                    "properties": {
+                      "eskizEmail": {
+                        "type": "string",
+                        "maxLength": 160,
+                        "format": "email"
+                      },
+                      "eskizPassword": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                      }
+                    },
+                    "required": [
+                      "eskizEmail",
+                      "eskizPassword"
+                    ]
                   }
                 }
               }
@@ -7368,6 +7453,80 @@
                     },
                     "data": {
                       "$ref": "#/components/schemas/TenantVertical"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tenant-settings/integrations/test": {
+      "post": {
+        "tags": [
+          "tenant-settings"
+        ],
+        "operationId": "testTenantIntegration",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IntegrationsTestInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Integration credential test result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/IntegrationsTestResult"
                     }
                   },
                   "required": [

@@ -9,6 +9,7 @@ import {
   getTenantSettings,
   getTenantVertical,
   getUserProfile,
+  type IntegrationsTestInput,
   inviteUser,
   listBranches,
   listPermissions,
@@ -17,6 +18,7 @@ import {
   resetUserPassword,
   setRolePermissions,
   type TransferTenantOwnershipBody,
+  testTenantIntegration,
   transferTenantOwnership,
   type UpdateBranchBody,
   type UpdateTenantBody,
@@ -233,6 +235,17 @@ export function useUpdateTenantSettings() {
       qc.invalidateQueries({ queryKey: settingsKeys.tenantSettings() });
       qc.invalidateQueries({ queryKey: settingsKeys.tenantVertical() });
     },
+  });
+}
+
+/**
+ * CLI-379/400 — "test these creds" action (Telegram getMe / Eskiz login). Never persists
+ * anything server-side, so no query invalidation; caller inspects `{ ok, detail }` in
+ * its own `onSuccess` to show a toast.
+ */
+export function useTestIntegration() {
+  return useMutation({
+    mutationFn: (body: IntegrationsTestInput) => testTenantIntegration(body).then((r) => r.data),
   });
 }
 

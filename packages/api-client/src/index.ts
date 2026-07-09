@@ -261,6 +261,8 @@ export type {
   GetRole200,
   GetService200,
   GetTenant200,
+  IntegrationsTestInput,
+  IntegrationsTestResult,
   LabOrder,
   LabOrderItemsItem,
   LabOrderOrderType,
@@ -717,11 +719,13 @@ export {
 export type {
   GetTenantSettingsResult,
   GetTenantVerticalResult,
+  TestTenantIntegrationResult,
   UpdateTenantSettingsResult,
 } from './generated/tenant-settings/tenant-settings.ts';
 export {
   getTenantSettings,
   getTenantVertical,
+  testTenantIntegration,
   updateTenantSettings,
 } from './generated/tenant-settings/tenant-settings.ts';
 // Generated (orval) — tooth-charts

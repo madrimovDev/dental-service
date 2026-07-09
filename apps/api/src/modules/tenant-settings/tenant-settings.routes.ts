@@ -6,8 +6,11 @@ import { okJson } from '../../lib/openapi.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
+import { createIntegrationsTester } from './integrations-tester.ts';
 import { toTenantSettingsDto } from './tenant-settings.mapper.ts';
 import {
+  integrationsTestResultSchema,
+  integrationsTestSchema,
   tenantSettingsDtoSchema,
   tenantVerticalDtoSchema,
   updateSettingsSchema,
@@ -72,6 +75,28 @@ export const tenantSettingsRoutes = (deps: { db: Database; audit: AuditLogger })
     const body = c.req.valid('json');
     const row = await service.update(c, body);
     return c.json(ok(toTenantSettingsDto(row)), 200);
+  });
+
+  // CLI-379/400: "test these creds" action — validates a Telegram bot token
+  // (getMe) or Eskiz email/password (auth/login) BEFORE the user saves them
+  // via PATCH. Never persists anything.
+  const integrationsTestRoute = createRoute({
+    method: 'post',
+    path: '/integrations/test',
+    tags: ['tenant-settings'],
+    operationId: 'testTenantIntegration',
+    middleware: [requirePermission('tenant_settings.edit')] as const,
+    request: {
+      body: { content: { 'application/json': { schema: integrationsTestSchema } } },
+    },
+    responses: okJson(integrationsTestResultSchema, 'Integration credential test result'),
+  });
+
+  app.openapi(integrationsTestRoute, async (c) => {
+    const body = c.req.valid('json');
+    const tester = createIntegrationsTester();
+    const result = await tester.test(body);
+    return c.json(ok(result), 200);
   });
 
   return app;

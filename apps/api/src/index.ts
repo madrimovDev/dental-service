@@ -14,7 +14,8 @@ if (process.argv[2] === 'migrate') {
 } else {
   const { createApp } = await import('./app.ts');
   const { seedDiagnoses, seedPermissions } = await import('./db/boot-seed.ts');
-  const { db, dbClient } = await import('./db/client.ts');
+  const { createAdminDb, db, dbClient } = await import('./db/client.ts');
+  const { withTenant } = await import('./db/scoped.ts');
   const { env } = await import('./lib/env.ts');
   const { startLicenseHeartbeatScheduler } = await import('./lib/license-heartbeat-scheduler.ts');
   const { logger } = await import('./lib/logger.ts');
@@ -22,6 +23,7 @@ if (process.argv[2] === 'migrate') {
   const { registerRecallScheduler } = await import('./lib/recall-scheduler.ts');
   const { startRecallWorker } = await import('./lib/recall-worker.ts');
   const { startReminderWorker } = await import('./lib/reminder-worker.ts');
+  const { startTelegramBotManager } = await import('./lib/telegram-bot-manager.ts');
   const { initSentry } = await import('./lib/sentry.ts');
 
   // Error tracking (no-op when SENTRY_DSN unset).
@@ -53,6 +55,18 @@ if (process.argv[2] === 'migrate') {
     env.NODE_ENV !== 'test' && env.RUN_REMINDER_WORKER ? startRecallWorker() : null;
   if (inProcessRecall) await registerRecallScheduler();
 
+  // CLI-379: Telegram bot-manager — same gating as the reminder/recall workers
+  // above. Desktop/dev (RUN_REMINDER_WORKER=true, the default) boot it here,
+  // in-process — this IS the primary target (desktop never runs worker.ts).
+  // Cloud sets RUN_REMINDER_WORKER=false on the api service and runs the
+  // dedicated worker process (worker.ts), which boots its own bot-manager —
+  // so exactly one of the two processes ever starts it, never both.
+  const messagingAdmin =
+    env.NODE_ENV !== 'test' && env.RUN_REMINDER_WORKER ? createAdminDb() : null;
+  const inProcessBotManager = messagingAdmin
+    ? startTelegramBotManager({ adminDb: messagingAdmin.db, withTenant })
+    : null;
+
   // CLI-387 — License heartbeat: only relevant for Local Desktop (WEB_DIST_DIR
   // signal, same one requireModuleInDesktop uses — apps/api/src/lib/license-middleware.ts).
   // Cloud/dev/CI never write a .lic file, so this is a no-op there (readLicense()
@@ -77,6 +91,8 @@ if (process.argv[2] === 'migrate') {
       await server.stop();
       if (inProcessWorker) await inProcessWorker.close();
       if (inProcessRecall) await inProcessRecall.close();
+      if (inProcessBotManager) await inProcessBotManager.stopAll();
+      if (messagingAdmin) await messagingAdmin.client.end({ timeout: 5 });
       stopLicenseHeartbeat?.();
       await reminderQueue.close();
       await recallQueue.close();

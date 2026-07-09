@@ -5,7 +5,8 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { UpdateTenantSettingsBodyNotificationSettings } from './updateTenantSettingsBodyNotificationSettings';
-import type { UpdateTenantSettingsBodyIntegrationSettings } from './updateTenantSettingsBodyIntegrationSettings';
+import type { UpdateTenantSettingsBodyTelegram } from './updateTenantSettingsBodyTelegram';
+import type { UpdateTenantSettingsBodySms } from './updateTenantSettingsBodySms';
 
 export type UpdateTenantSettingsBody = {
   /** @minLength 1 */
@@ -33,5 +34,8 @@ export type UpdateTenantSettingsBody = {
    */
   noShowStrikeThreshold?: number;
   notificationSettings?: UpdateTenantSettingsBodyNotificationSettings;
-  integrationSettings?: UpdateTenantSettingsBodyIntegrationSettings;
+  /** @nullable */
+  telegram?: UpdateTenantSettingsBodyTelegram;
+  /** @nullable */
+  sms?: UpdateTenantSettingsBodySms;
 };

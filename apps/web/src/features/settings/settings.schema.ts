@@ -56,3 +56,16 @@ export const transferSchema = z.object({
   currentPassword: z.string().min(1),
 });
 export type TransferFormValues = z.infer<typeof transferSchema>;
+
+// CLI-379/400: integratsiya kredensiallari — backend `updateSettingsSchema`/`integrationsTestSchema`
+// (apps/api/src/modules/tenant-settings/tenant-settings.schema.ts) bilan mos chegaralar.
+export const telegramIntegrationSchema = z.object({
+  botToken: z.string().min(20).max(200),
+});
+export type TelegramIntegrationFormValues = z.infer<typeof telegramIntegrationSchema>;
+
+export const eskizIntegrationSchema = z.object({
+  eskizEmail: z.email().max(160),
+  eskizPassword: z.string().min(1).max(200),
+});
+export type EskizIntegrationFormValues = z.infer<typeof eskizIntegrationSchema>;

@@ -51,6 +51,9 @@ export const patients = pgTable(
     // uchinchi shaxsga rozilіksiz yubormaslik uchun (maxfiylik).
     allowEmergencyRecall: boolean('allow_emergency_recall').notNull().default(false),
 
+    // CLI-379: Telegram bemor-linking (contact-share) natijasi — bot chat_id.
+    telegramChatId: text('telegram_chat_id'),
+
     // R2: teg / manba / sug'urta (CLI-38)
     tags: text('tags').array().notNull().default(sql`'{}'`),
     source: text('source'),

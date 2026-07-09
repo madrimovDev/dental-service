@@ -30,7 +30,6 @@ COPY apps/api/package.json apps/api/
 COPY apps/desktop/package.json apps/desktop/
 COPY apps/supervisor-admin/package.json apps/supervisor-admin/
 COPY apps/supervisor-api/package.json apps/supervisor-api/
-COPY apps/telegram-bot/package.json apps/telegram-bot/
 COPY apps/web/package.json apps/web/
 COPY packages/api-client/package.json packages/api-client/
 COPY packages/core/package.json packages/core/

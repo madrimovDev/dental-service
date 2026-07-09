@@ -40,7 +40,12 @@ describe('parseEnv JWT_SECRET guard', () => {
   });
 
   test('accepts a strong JWT_SECRET in production', () => {
-    const result = parseEnv({ ...baseRaw, NODE_ENV: 'production', JWT_SECRET: STRONG_SECRET });
+    const result = parseEnv({
+      ...baseRaw,
+      NODE_ENV: 'production',
+      JWT_SECRET: STRONG_SECRET,
+      MESSAGING_SECRET: STRONG_SECRET,
+    });
     expect(result.success).toBe(true);
   });
 
@@ -57,6 +62,51 @@ describe('parseEnv JWT_SECRET guard', () => {
   test('still enforces min(32) length', () => {
     const result = parseEnv({ ...baseRaw, NODE_ENV: 'development', JWT_SECRET: 'tooshort' });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('parseEnv MESSAGING_SECRET guard (CLI-379)', () => {
+  test('rejects missing MESSAGING_SECRET in production', () => {
+    const result = parseEnv({ ...baseRaw, NODE_ENV: 'production', JWT_SECRET: STRONG_SECRET });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const onMessaging = result.error.issues.some((i) => i.path.includes('MESSAGING_SECRET'));
+      expect(onMessaging).toBe(true);
+    }
+  });
+
+  test('rejects short MESSAGING_SECRET (<32 chars) in production', () => {
+    const result = parseEnv({
+      ...baseRaw,
+      NODE_ENV: 'production',
+      JWT_SECRET: STRONG_SECRET,
+      MESSAGING_SECRET: 'tooshort',
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const onMessaging = result.error.issues.some((i) => i.path.includes('MESSAGING_SECRET'));
+      expect(onMessaging).toBe(true);
+    }
+  });
+
+  test('accepts a strong MESSAGING_SECRET in production', () => {
+    const result = parseEnv({
+      ...baseRaw,
+      NODE_ENV: 'production',
+      JWT_SECRET: STRONG_SECRET,
+      MESSAGING_SECRET: STRONG_SECRET,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  test('allows missing MESSAGING_SECRET in development (desktop file-key path)', () => {
+    const result = parseEnv({ ...baseRaw, NODE_ENV: 'development', JWT_SECRET: STRONG_SECRET });
+    expect(result.success).toBe(true);
+  });
+
+  test('allows missing MESSAGING_SECRET in test', () => {
+    const result = parseEnv({ ...baseRaw, NODE_ENV: 'test', JWT_SECRET: STRONG_SECRET });
+    expect(result.success).toBe(true);
   });
 });
 

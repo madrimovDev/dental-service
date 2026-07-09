@@ -1,5 +1,11 @@
-import { appointments, patientEmergencyContacts, patients, tenants } from '@dental/db-schema';
-import { createNotificationChannel } from '@dental/notifications';
+import {
+  appointments,
+  patientEmergencyContacts,
+  patients,
+  tenantSettings,
+  tenants,
+} from '@dental/db-schema';
+import { createNoOpChannel } from '@dental/notifications';
 import { Worker } from 'bullmq';
 import { asc, desc, eq } from 'drizzle-orm';
 import type { DbOrTx } from '../db/client.ts';
@@ -9,6 +15,7 @@ import { createNotificationsService } from '../modules/notifications/index.ts';
 import { env } from './env.ts';
 import type { ReminderJob } from './queue.ts';
 import { renderReminderSms, type SmsLang } from './sms-templates.ts';
+import { resolveTenantChannel } from './tenant-channel.ts';
 
 /**
  * Status guard (CLI-186): bekor qilingan / kelmagan yozilishga eslatma SMS
@@ -42,6 +49,12 @@ export async function processReminderJob(
       .where(eq(tenants.id, tenantId));
     const lang: SmsLang = tenant?.defaultLanguage === 'ru' ? 'ru' : 'uz';
 
+    // CLI-379/400: per-tenant kanal tanlovi uchun (resolveTenantChannel).
+    const [settingsRow] = await tx
+      .select({ integrationSettings: tenantSettings.integrationSettings })
+      .from(tenantSettings)
+      .where(eq(tenantSettings.tenantId, tenantId));
+
     const { title, body } = renderReminderSms({
       lang,
       patientName: patient?.fullName ?? '',
@@ -71,7 +84,17 @@ export async function processReminderJob(
       }
     }
 
-    if (!targetPhone) {
+    // CLI-379/400: per-tenant kanal — Telegram(chat_id) > Eskiz SMS(phone) > NoOp.
+    // `targetPhone` shu yerga kirguncha allaqachon favqulodda-fallback bilan
+    // aniqlangan (yuqorida) — resolveTenantChannel Telegram bo'lsa telefonsiz
+    // ham ishlaydi.
+    const resolved = resolveTenantChannel(
+      settingsRow?.integrationSettings ?? null,
+      patient?.telegramChatId ?? null,
+      targetPhone,
+    );
+
+    if (!resolved.to) {
       await svc.notifyInTx(tx, tenantId, {
         userId: appt.doctorId,
         type: 'appointment_reminder_no_phone',
@@ -86,23 +109,26 @@ export async function processReminderJob(
       type: 'appointment_reminder',
       title,
       body: emergencyFallback ? `${body} — Favqulodda aloqaga yuborildi` : body,
-      smsTo: targetPhone,
+      smsTo: resolved.to,
+      // "none" (tenant hech narsa sozlamagan) holatda `channel` berilmaydi —
+      // `svc`ning o'z fallback kanaliga (createNotificationsService({sms}))
+      // tushadi (test-only spy yoki NoOp; CLI-379/400 boshqa tenant'ning
+      // umumiy akkauntiga fallback qilmaydi — recall-worker bilan bir xil qaror).
+      channel: resolved.source === 'none' ? undefined : resolved.channel,
     });
   });
 }
 
+/**
+ * CLI-379/400: global `TELEGRAM_BOT_TOKEN`/`ESKIZ_*` env-based kanal OLIB
+ * TASHLANDI — har eslatma endi o'z tenant'ining `integration_settings`i
+ * asosida `processReminderJob` ichida (`resolveTenantChannel`) kanal tanlaydi.
+ * `svc`ga shu yerda faqat NoOp beriladi — tenant o'z messaging credential'ini
+ * sozlamagan bo'lsa haqiqatan NoOp (boshqa tenant'ning umumiy akkauntiga
+ * fallback YO'Q; recall-worker.ts bilan bir xil qaror).
+ */
 export function startReminderWorker() {
-  // CLI-474 (L10): priority factory (Telegram > SMS) — TELEGRAM_BOT_TOKEN bo'lsa
-  // Telegram, aks holda Eskiz/NoOp SMS. Ilgari to'g'ridan `createSmsChannel` edi,
-  // shuning uchun Telegram token qo'shilsa ham reminder'lar SMS'da qolardi.
-  // ⚠️ recall_logs.channel enum hozircha 'sms'/'manual' — 'telegram' log qiymati
-  // Telegram jonli faollashganda (CLI-379) enum migration bilan qo'shiladi.
-  const sms = createNotificationChannel({
-    telegramBotToken: env.TELEGRAM_BOT_TOKEN,
-    eskizEmail: env.ESKIZ_EMAIL,
-    eskizPassword: env.ESKIZ_PASSWORD,
-  });
-  const svc = createNotificationsService({ sms });
+  const svc = createNotificationsService({ sms: createNoOpChannel() });
   return new Worker<ReminderJob>(
     'appointment-reminder',
     async (job) => {

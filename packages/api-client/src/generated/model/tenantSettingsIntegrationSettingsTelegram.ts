@@ -5,8 +5,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type IntegrationSettingsEskiz = {
-  enabled: boolean;
+export type TenantSettingsIntegrationSettingsTelegram = {
+  configured: boolean;
   /** @nullable */
-  sender: string | null;
+  hint: string | null;
 };

@@ -47,6 +47,11 @@ export const envSchema = z
     JWT_SECRET: z.string().min(32),
     JWT_ACCESS_EXPIRES: z.string().default('15m'),
     JWT_REFRESH_EXPIRES: z.string().default('7d'),
+
+    // AES-256-GCM key for per-tenant messaging credentials (Telegram bot
+    // token / Eskiz SMS password) at-rest encryption (CLI-379/400, optional
+    // — desktop falls back to a persisted dataDir file when unset).
+    MESSAGING_SECRET: z.string().optional(),
     WEB_ORIGIN: z.url(),
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 
@@ -59,10 +64,6 @@ export const envSchema = z
     SOLIQ_API_URL: z.string().optional(),
     SOLIQ_API_KEY: z.string().optional(),
     SOLIQ_FISCAL_ID: z.string().optional(),
-
-    // Telegram (V3-2, optional). Bo'lsa notification PRIORITET Telegram>SMS
-    // (createNotificationChannel). Jonli: bemor telegram_user_id + worker dispatch (TODO).
-    TELEGRAM_BOT_TOKEN: z.string().optional(),
 
     // Observability (D7) — Sentry error tracking. NoOp when unset.
     SENTRY_DSN: z.string().optional(),
@@ -123,6 +124,22 @@ export const envSchema = z
         path: ['JWT_SECRET'],
         message:
           'JWT_SECRET is a known placeholder/dev-default value and must not be used in production. Set a strong, unique secret (>= 32 chars).',
+      });
+    }
+    // MESSAGING_SECRET unset/short in a cloud (ephemeral, no persistent volume)
+    // container makes `getOrCreateMessagingSecret` fall back to a file key that
+    // regenerates on every redeploy — all encrypted per-tenant creds (Telegram
+    // bot token / Eskiz password) become permanently undecryptable, silently.
+    // Desktop is fine unset (persisted dataDir file, machine-local, by design).
+    if (
+      data.NODE_ENV === 'production' &&
+      (!data.MESSAGING_SECRET || data.MESSAGING_SECRET.length < 32)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['MESSAGING_SECRET'],
+        message:
+          'MESSAGING_SECRET must be set (>= 32 chars) in production. Unset/short values silently fall back to an ephemeral file key, orphaning all encrypted per-tenant messaging credentials on redeploy.',
       });
     }
   });

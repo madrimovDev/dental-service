@@ -1,60 +1,105 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/lib/i18n.ts';
 import { renderApp } from '../../../test-utils';
 import { IntegrationsSettingsScreen } from './IntegrationsSettingsScreen';
 
 const integrationSettings = {
-  eskiz: { enabled: true, sender: 'CLINIC' },
-  telegram: { enabled: false, botUsername: null },
+  sms: { configured: true, hint: '••••INIC' },
+  telegram: { configured: false, hint: null },
 };
+
+const updateSettingsMutate = vi.fn();
+const testMutate = vi.fn();
 
 vi.mock('../settings.api', () => ({
   useTenantSettings: () => ({ isLoading: false, data: { integrationSettings } }),
+  useUpdateTenantSettings: () => ({ mutate: updateSettingsMutate, isPending: false }),
+  useTestIntegration: () => ({ mutate: testMutate, isPending: false }),
 }));
 
-const t = (key: string) => i18n.t(key);
+vi.mock('@/stores/auth-store.ts', () => ({
+  useAuthStore: () => ({ hasPermission: () => true }),
+}));
+
+const t = (key: string, opts?: Record<string, unknown>) => i18n.t(key, opts);
 
 describe('IntegrationsSettingsScreen', () => {
-  it('4 ta integratsiya kartasi render qiladi', () => {
-    const { container } = renderApp(<IntegrationsSettingsScreen />);
-    const grid = container.querySelector('[style*="repeat(2, 1fr)"]') as HTMLElement;
-    expect(grid).toBeTruthy();
-    expect(grid.children).toHaveLength(4);
+  it('Telegram va Eskiz kartalarini + soliq/1C scaffold kartalarini render qiladi', () => {
+    renderApp(<IntegrationsSettingsScreen />);
+    expect(screen.getByTestId('telegram-integration-card')).toBeInTheDocument();
+    expect(screen.getByTestId('eskiz-integration-card')).toBeInTheDocument();
+    expect(screen.getByText(t('settings.integration_soliq_name'))).toBeInTheDocument();
+    expect(screen.getByText(t('settings.integration_onec_name'))).toBeInTheDocument();
   });
 
-  it('holat backend integration_settings dan keladi (eskiz on, telegram off, soliq/onec scaffold off)', () => {
-    const { container } = renderApp(<IntegrationsSettingsScreen />);
-    const success = container.querySelectorAll('[data-status="success"]');
-    const neutral = container.querySelectorAll('[data-status="neutral"]');
-    // FAQAT eskiz.enabled=true → 1 success; telegram off + soliq/onec scaffold → 3 neutral.
-    expect(success).toHaveLength(1);
-    expect(neutral).toHaveLength(3);
+  it('sms.configured=true → Eskiz kartada "Ulangan" badge + hint; telegram off → "Ulanmagan"', () => {
+    renderApp(<IntegrationsSettingsScreen />);
+    const eskizCard = screen.getByTestId('eskiz-integration-card');
+    expect(
+      within(eskizCard).getByText(t('settings.integration_status_connected')),
+    ).toBeInTheDocument();
+    expect(
+      within(eskizCard).getByText(t('settings.integration_configured_hint', { hint: '••••INIC' })),
+    ).toBeInTheDocument();
+
+    const telegramCard = screen.getByTestId('telegram-integration-card');
+    expect(
+      within(telegramCard).getByText(t('settings.integration_status_off')),
+    ).toBeInTheDocument();
   });
 
-  it('ulangan karta «Sozlash», ulanmagan «Ulash» ko‘rsatadi', () => {
-    const { getAllByRole } = renderApp(<IntegrationsSettingsScreen />);
-    const labels = getAllByRole('button').map((b) => b.textContent);
-    expect(labels.filter((l) => l === t('settings.integration_configure'))).toHaveLength(1);
-    expect(labels.filter((l) => l === t('settings.integration_connect'))).toHaveLength(3);
+  it('Eskiz forma to‘ldirilgach «Saqlash» bosilsa updateTenantSettings mutate({sms:{...}}) chaqiradi', () => {
+    updateSettingsMutate.mockClear();
+    renderApp(<IntegrationsSettingsScreen />);
+    const eskizCard = screen.getByTestId('eskiz-integration-card');
+
+    fireEvent.change(
+      within(eskizCard).getByLabelText(t('settings.integration_eskiz_email_label')),
+      {
+        target: { value: 'clinic@example.com' },
+      },
+    );
+    fireEvent.change(
+      within(eskizCard).getByLabelText(t('settings.integration_eskiz_password_label')),
+      { target: { value: 'secret-pass' } },
+    );
+    fireEvent.click(within(eskizCard).getByRole('button', { name: t('common.save') }));
+
+    expect(updateSettingsMutate).toHaveBeenCalledWith({
+      sms: { eskizEmail: 'clinic@example.com', eskizPassword: 'secret-pass' },
+    });
   });
 
-  it('Connect/Configure tugmalari disabled va "tez orada" tooltip ko‘rsatadi', async () => {
-    const { getAllByRole } = renderApp(<IntegrationsSettingsScreen />);
-    const buttons = getAllByRole('button');
-    // 4 karta — har birida bitta Connect yoki Configure tugma, hammasi disabled bo'lishi kerak
-    expect(buttons).toHaveLength(4);
-    for (const button of buttons) {
-      expect(button).toBeDisabled();
-    }
+  it('Telegram forma bo‘sh holda «Tekshir» bosilsa validatsiya bloklaydi (mutate chaqirilmaydi)', () => {
+    testMutate.mockClear();
+    renderApp(<IntegrationsSettingsScreen />);
+    const telegramCard = screen.getByTestId('telegram-integration-card');
+    fireEvent.click(
+      within(telegramCard).getByRole('button', { name: t('settings.integration_test_button') }),
+    );
+    expect(testMutate).not.toHaveBeenCalled();
+  });
 
-    // Tooltip'ning hover-nishoni — disabled tugmani o'rab turgan <span> (Tooltip.tsx
-    // komponent kodida tugma emas, span'ga bog'langan: disabled tugma pointer-hodisa
-    // otmaydi). Mantine Tooltip label'ni faqat `opened` bo'lganda mount qiladi —
-    // shuning uchun getByText emas, findByText (async) ishlatiladi.
-    const firstButtonWrapper = buttons[0]?.parentElement;
-    expect(firstButtonWrapper).toBeTruthy();
-    fireEvent.mouseEnter(firstButtonWrapper as HTMLElement);
-    expect(await screen.findByText(i18n.t('shell.coming_soon'))).toBeInTheDocument();
+  it('Telegram token to‘ldirilgach «Tekshir» bosilsa testTenantIntegration mutate({target:telegram,...}) chaqiradi', () => {
+    testMutate.mockClear();
+    renderApp(<IntegrationsSettingsScreen />);
+    const telegramCard = screen.getByTestId('telegram-integration-card');
+
+    fireEvent.change(
+      within(telegramCard).getByLabelText(t('settings.integration_telegram_bot_token_label')),
+      { target: { value: '123456789:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' } },
+    );
+    fireEvent.click(
+      within(telegramCard).getByRole('button', { name: t('settings.integration_test_button') }),
+    );
+
+    expect(testMutate).toHaveBeenCalledWith(
+      {
+        target: 'telegram',
+        telegram: { botToken: '123456789:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' },
+      },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
   });
 });

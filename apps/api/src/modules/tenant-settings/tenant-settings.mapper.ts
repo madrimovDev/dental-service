@@ -1,11 +1,9 @@
 import type { TenantSettings } from '@dental/db-schema';
+import { decryptSecret } from '../../lib/crypto.ts';
 import {
-  INTEGRATION_DEFAULTS,
-  type IntegrationSettingsDto,
   NOTIFICATION_DEFAULTS,
   type NotificationSettingsDto,
   type TenantSettingsDto,
-  type UpdateIntegrationSettingsInput,
   type UpdateNotificationSettingsInput,
 } from './tenant-settings.schema.ts';
 
@@ -24,20 +22,29 @@ export const toNotificationSettingsDto = (
   };
 };
 
-/** Saqlangan integration JSONB ustiga default'lar — provider bo'yicha to'liq DTO. */
-export const toIntegrationSettingsDto = (
-  stored: Record<string, unknown> | null | undefined,
-): IntegrationSettingsDto => {
-  const s = (stored ?? {}) as Partial<IntegrationSettingsDto>;
+/**
+ * CLI-379/400: xom kredensial (`botTokenEnc`/`eskizPasswordEnc`) hech qachon
+ * response'da qaytarilmaydi — faqat "configured" + oxirgi 4 belgi hint.
+ * Shifr buzilgan/eskirgan bo'lsa (masalan kalit almashgan) — `configured: true`
+ * lekin `hint: null` (mavjudligi ma'lum, lekin ko'rsatib bo'lmaydi).
+ */
+const maskEnc = (enc: string | undefined): { configured: boolean; hint: string | null } => {
+  if (!enc) return { configured: false, hint: null };
+  try {
+    const raw = decryptSecret(enc);
+    return { configured: true, hint: `••••${raw.slice(-4)}` };
+  } catch {
+    return { configured: true, hint: null };
+  }
+};
+
+/** Saqlangan integration JSONB (xom cred) → maskalangan DTO (configured/hint). */
+const toIntegrationDto = (settings: Record<string, unknown> | null) => {
+  const tg = (settings?.telegram ?? null) as { botTokenEnc?: string } | null;
+  const sms = (settings?.sms ?? null) as { eskizPasswordEnc?: string } | null;
   return {
-    telegram: {
-      enabled: s.telegram?.enabled ?? INTEGRATION_DEFAULTS.telegram.enabled,
-      botUsername: s.telegram?.botUsername ?? INTEGRATION_DEFAULTS.telegram.botUsername,
-    },
-    eskiz: {
-      enabled: s.eskiz?.enabled ?? INTEGRATION_DEFAULTS.eskiz.enabled,
-      sender: s.eskiz?.sender ?? INTEGRATION_DEFAULTS.eskiz.sender,
-    },
+    telegram: maskEnc(tg?.botTokenEnc),
+    sms: maskEnc(sms?.eskizPasswordEnc),
   };
 };
 
@@ -58,31 +65,6 @@ export const mergeNotificationSettings = (
   };
 };
 
-/**
- * PATCH merge — 2-darajali: faqat berilgan provider va uning berilgan maydonlari
- * yangilanadi; qolgan provider config (masalan `telegram.botUsername`) saqlanadi.
- * `null` aniq berilsa saqlanadi (`!== undefined` tekshiruvi).
- */
-export const mergeIntegrationSettings = (
-  stored: Record<string, unknown> | null | undefined,
-  patch: UpdateIntegrationSettingsInput,
-): IntegrationSettingsDto => {
-  const current = toIntegrationSettingsDto(stored);
-  return {
-    telegram: {
-      enabled: patch.telegram?.enabled ?? current.telegram.enabled,
-      botUsername:
-        patch.telegram?.botUsername !== undefined
-          ? patch.telegram.botUsername
-          : current.telegram.botUsername,
-    },
-    eskiz: {
-      enabled: patch.eskiz?.enabled ?? current.eskiz.enabled,
-      sender: patch.eskiz?.sender !== undefined ? patch.eskiz.sender : current.eskiz.sender,
-    },
-  };
-};
-
 /** DB row (Date timestamp) → wire DTO (ISO string). Envelope type-check uchun zarur. */
 export const toTenantSettingsDto = (row: TenantSettings): TenantSettingsDto => ({
   id: row.id,
@@ -94,7 +76,7 @@ export const toTenantSettingsDto = (row: TenantSettings): TenantSettingsDto => (
   maxDiscountPercent: row.maxDiscountPercent,
   noShowStrikeThreshold: row.noShowStrikeThreshold,
   notificationSettings: toNotificationSettingsDto(row.notificationSettings),
-  integrationSettings: toIntegrationSettingsDto(row.integrationSettings),
+  integrationSettings: toIntegrationDto(row.integrationSettings as Record<string, unknown> | null),
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(),
 });
