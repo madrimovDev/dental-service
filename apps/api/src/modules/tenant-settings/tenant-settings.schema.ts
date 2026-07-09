@@ -129,3 +129,34 @@ export const tenantVerticalDtoSchema = z
   .openapi('TenantVertical');
 
 export type TenantVerticalDto = z.infer<typeof tenantVerticalDtoSchema>;
+
+/**
+ * CLI-379/400 — `POST /tenant-settings/integrations/test` body. Validates
+ * Telegram bot token (via `getMe`) or Eskiz email/password (via `auth/login`)
+ * BEFORE saving — a pure "test these creds" action, never persisted. Mirrors
+ * the shape of `updateSettingsSchema`'s `telegram`/`sms` fields but requires
+ * exactly one payload matching `target` (not nullable — nothing to "clear" here).
+ */
+export const integrationsTestSchema = z
+  .object({
+    target: z.enum(['telegram', 'sms']),
+    telegram: z.object({ botToken: z.string().min(20).max(200) }).optional(),
+    sms: z
+      .object({ eskizEmail: z.email().max(160), eskizPassword: z.string().min(1).max(200) })
+      .optional(),
+  })
+  .openapi('IntegrationsTestInput', {
+    example: { target: 'telegram', telegram: { botToken: '123456:ABC-DEF...' } },
+  });
+
+export type IntegrationsTestInput = z.infer<typeof integrationsTestSchema>;
+
+/** `POST /tenant-settings/integrations/test` response — `detail` is human-readable (e.g. `@botusername`), `null` when N/A. */
+export const integrationsTestResultSchema = z
+  .object({
+    ok: z.boolean(),
+    detail: z.string().nullable(),
+  })
+  .openapi('IntegrationsTestResult', { example: { ok: true, detail: '@clinicbot' } });
+
+export type IntegrationsTestResultDto = z.infer<typeof integrationsTestResultSchema>;

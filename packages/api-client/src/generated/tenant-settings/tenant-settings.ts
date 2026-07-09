@@ -7,6 +7,8 @@
 import type {
   GetTenantSettings200,
   GetTenantVertical200,
+  IntegrationsTestInput,
+  TestTenantIntegration200,
   UpdateTenantSettings200,
   UpdateTenantSettingsBody
 } from '.././model';
@@ -41,6 +43,17 @@ import { customInstance } from '../../mutator';
     },
       );
     }
+  export const testTenantIntegration = (
+    integrationsTestInput: IntegrationsTestInput,
+ ) => {
+      return customInstance<TestTenantIntegration200>(
+      {url: `/api/tenant-settings/integrations/test`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: integrationsTestInput
+    },
+      );
+    }
   export type GetTenantSettingsResult = NonNullable<Awaited<ReturnType<typeof getTenantSettings>>>
 export type UpdateTenantSettingsResult = NonNullable<Awaited<ReturnType<typeof updateTenantSettings>>>
 export type GetTenantVerticalResult = NonNullable<Awaited<ReturnType<typeof getTenantVertical>>>
+export type TestTenantIntegrationResult = NonNullable<Awaited<ReturnType<typeof testTenantIntegration>>>
