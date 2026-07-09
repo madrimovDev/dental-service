@@ -1,5 +1,15 @@
 import { sql } from 'drizzle-orm';
-import { date, index, jsonb, pgEnum, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  date,
+  index,
+  jsonb,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from 'drizzle-orm/pg-core';
 import { tenants } from './tenants.ts';
 
 export const genderEnum = pgEnum('patient_gender', ['male', 'female', 'other']);
@@ -34,6 +44,12 @@ export const patients = pgTable(
 
     photoUrl: text('photo_url'),
     notes: text('notes'),
+
+    // CLI-474 (L8): bemor rozi bo'lsagina — bemor telefoni yo'q bo'lganda
+    // recall/reminder SMS'i favqulodda aloqa (patient_emergency_contacts primary)
+    // raqamiga fallback qilinadi. Opt-in (default false) — klinika xabarini
+    // uchinchi shaxsga rozilіksiz yubormaslik uchun (maxfiylik).
+    allowEmergencyRecall: boolean('allow_emergency_recall').notNull().default(false),
 
     // R2: teg / manba / sug'urta (CLI-38)
     tags: text('tags').array().notNull().default(sql`'{}'`),

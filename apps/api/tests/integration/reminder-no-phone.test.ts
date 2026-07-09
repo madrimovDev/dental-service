@@ -10,7 +10,15 @@
  *   cd apps/api && bun test tests/integration/reminder-no-phone.test.ts --env-file=../../.env
  */
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { appointments, branches, notifications, patients, tenants, users } from '@dental/db-schema';
+import {
+  appointments,
+  branches,
+  notifications,
+  patientEmergencyContacts,
+  patients,
+  tenants,
+  users,
+} from '@dental/db-schema';
 import { createNoOpChannel } from '@dental/notifications';
 import { eq, sql } from 'drizzle-orm';
 import { db } from '../../src/db/client.ts';
@@ -102,5 +110,48 @@ describe('CLI-465 reminder no-phone tracking', () => {
 
     const noPhoneRows = rows.filter((r) => r.type === 'appointment_reminder_no_phone');
     expect(noPhoneRows.length).toBe(1);
+  });
+
+  // CLI-474 (L8): rozilik + favqulodda aloqa bo'lsa telefonsiz bemor SMS'i
+  // favqulodda raqamga fallback qiladi.
+  test('telefon yo‘q + rozilik + favqulodda aloqa → favqulodda raqamga SMS', async () => {
+    smsSent = [];
+    const apptId = await db.transaction(async (tx) => {
+      await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
+      const [p] = await tx
+        .insert(patients)
+        .values({
+          tenantId,
+          fullName: 'Rozi Bemor',
+          phone: null,
+          allowEmergencyRecall: true,
+        })
+        .returning({ id: patients.id });
+      await tx.insert(patientEmergencyContacts).values({
+        tenantId,
+        patientId: p!.id,
+        name: 'Ona',
+        phone: '+998907779988',
+        isPrimary: true,
+      });
+      const [a] = await tx
+        .insert(appointments)
+        .values({
+          tenantId,
+          branchId,
+          doctorId: ownerId,
+          patientId: p!.id,
+          startTime: new Date(`${day}T11:00:00+05:00`),
+          endTime: new Date(`${day}T12:00:00+05:00`),
+          status: 'scheduled',
+        })
+        .returning({ id: appointments.id });
+      return a!.id;
+    });
+
+    await processReminderJob(notifSvc, { tenantId, appointmentId: apptId });
+
+    expect(smsSent).toHaveLength(1);
+    expect(smsSent[0]!.to).toBe('+998907779988');
   });
 });

@@ -1208,6 +1208,9 @@
               "none"
             ]
           },
+          "allowEmergencyRecall": {
+            "type": "boolean"
+          },
           "archivedAt": {
             "type": "string",
             "nullable": true
@@ -1235,6 +1238,7 @@
           "source",
           "insurance",
           "insuranceStatus",
+          "allowEmergencyRecall",
           "archivedAt",
           "createdAt",
           "updatedAt"
@@ -9346,6 +9350,9 @@
                       "provider",
                       "policyNumber"
                     ]
+                  },
+                  "allowEmergencyRecall": {
+                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -9613,6 +9620,9 @@
                       "provider",
                       "policyNumber"
                     ]
+                  },
+                  "allowEmergencyRecall": {
+                    "type": "boolean"
                   }
                 }
               }
@@ -13494,7 +13504,7 @@
             }
           },
           "409": {
-            "description": "Scheduling conflict (doctor busy / outside working hours / on time-off)",
+            "description": "Scheduling conflict (doctor busy / patient busy / outside working hours / on time-off)",
             "content": {
               "application/json": {
                 "schema": {
@@ -13796,7 +13806,7 @@
             }
           },
           "409": {
-            "description": "Scheduling conflict (doctor busy / outside working hours / on time-off)",
+            "description": "Scheduling conflict (doctor busy / patient busy / outside working hours / on time-off)",
             "content": {
               "application/json": {
                 "schema": {

@@ -48,4 +48,5 @@ export type CreatePatientBody = {
   source?: string;
   /** @nullable */
   insurance?: CreatePatientBodyInsurance;
+  allowEmergencyRecall?: boolean;
 };

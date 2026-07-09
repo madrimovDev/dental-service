@@ -18,6 +18,7 @@ const base: Patient = {
   source: 'Tavsiya',
   insurance: null,
   insuranceStatus: 'none',
+  allowEmergencyRecall: false,
   archivedAt: null,
   createdAt: '2026-01-01',
   updatedAt: '2026-01-01',

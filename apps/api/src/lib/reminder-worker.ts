@@ -1,7 +1,7 @@
-import { appointments, patients, tenants } from '@dental/db-schema';
+import { appointments, patientEmergencyContacts, patients, tenants } from '@dental/db-schema';
 import { createNotificationChannel } from '@dental/notifications';
 import { Worker } from 'bullmq';
-import { eq } from 'drizzle-orm';
+import { asc, desc, eq } from 'drizzle-orm';
 import type { DbOrTx } from '../db/client.ts';
 import { withTenant } from '../db/scoped.ts';
 import type { NotificationsService } from '../modules/notifications/index.ts';
@@ -54,7 +54,24 @@ export async function processReminderJob(
     // (fayl boshidagi izoh: "Yozilish eslatmasi (reminder worker)"), shuning
     // uchun yangi jadval/migratsiya shart emas — alohida `type` bilan doktorga
     // kuzatiladigan in-app yozuv qoldiramiz, SMS umuman urinilmaydi.
-    if (!patient?.phone) {
+    // CLI-474 (L8): bemor telefoni yo'q + rozilik (allowEmergencyRecall) bo'lsa —
+    // favqulodda aloqa (primary) raqamiga fallback. recall-worker bilan bir xil.
+    let targetPhone = patient?.phone ?? null;
+    let emergencyFallback = false;
+    if (!targetPhone && patient?.allowEmergencyRecall) {
+      const [ec] = await tx
+        .select({ phone: patientEmergencyContacts.phone })
+        .from(patientEmergencyContacts)
+        .where(eq(patientEmergencyContacts.patientId, appt.patientId))
+        .orderBy(desc(patientEmergencyContacts.isPrimary), asc(patientEmergencyContacts.createdAt))
+        .limit(1);
+      if (ec?.phone) {
+        targetPhone = ec.phone;
+        emergencyFallback = true;
+      }
+    }
+
+    if (!targetPhone) {
       await svc.notifyInTx(tx, tenantId, {
         userId: appt.doctorId,
         type: 'appointment_reminder_no_phone',
@@ -68,8 +85,8 @@ export async function processReminderJob(
       userId: appt.doctorId,
       type: 'appointment_reminder',
       title,
-      body,
-      smsTo: patient.phone,
+      body: emergencyFallback ? `${body} — Favqulodda aloqaga yuborildi` : body,
+      smsTo: targetPhone,
     });
   });
 }

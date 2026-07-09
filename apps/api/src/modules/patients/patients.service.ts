@@ -358,6 +358,7 @@ export const createPatientsService = (deps: {
           tags: input.tags ?? [],
           source: input.source ?? null,
           insurance: input.insurance ?? null,
+          allowEmergencyRecall: input.allowEmergencyRecall ?? false,
         })
         .returning();
 
@@ -401,6 +402,8 @@ export const createPatientsService = (deps: {
     if (input.tags !== undefined) patch.tags = input.tags;
     if (input.source !== undefined) patch.source = input.source;
     if (input.insurance !== undefined) patch.insurance = input.insurance;
+    if (input.allowEmergencyRecall !== undefined)
+      patch.allowEmergencyRecall = input.allowEmergencyRecall;
 
     const [updated] = await db.update(patients).set(patch).where(eq(patients.id, id)).returning();
 

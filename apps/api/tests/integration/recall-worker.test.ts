@@ -7,7 +7,14 @@
  *   cd apps/api && bun test tests/integration/recall-worker.test.ts --env-file=../../.env
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
-import { branches, patients, recallLogs, recalls, tenants } from '@dental/db-schema';
+import {
+  branches,
+  patientEmergencyContacts,
+  patients,
+  recallLogs,
+  recalls,
+  tenants,
+} from '@dental/db-schema';
 import { eq, sql } from 'drizzle-orm';
 import { createAdminDb, db } from '../../src/db/client.ts';
 import { withTenant } from '../../src/db/scoped.ts';
@@ -38,14 +45,34 @@ const seedTenant = async (slug: string, lang: 'uz' | 'ru', name: string) => {
 
 const seedRecall = async (
   tenantId: string,
-  opts: { dueDate: string; phone: string | null; patientName?: string },
+  opts: {
+    dueDate: string;
+    phone: string | null;
+    patientName?: string;
+    allowEmergencyRecall?: boolean;
+    emergencyPhone?: string | null;
+  },
 ) =>
   withTenant(tenantId, async (tx) => {
     await tx.insert(branches).values({ tenantId, name: 'B' });
     const [p] = await tx
       .insert(patients)
-      .values({ tenantId, fullName: opts.patientName ?? 'Bemor', phone: opts.phone })
+      .values({
+        tenantId,
+        fullName: opts.patientName ?? 'Bemor',
+        phone: opts.phone,
+        allowEmergencyRecall: opts.allowEmergencyRecall ?? false,
+      })
       .returning({ id: patients.id });
+    if (opts.emergencyPhone) {
+      await tx.insert(patientEmergencyContacts).values({
+        tenantId,
+        patientId: p!.id,
+        name: 'Ota',
+        phone: opts.emergencyPhone,
+        isPrimary: true,
+      });
+    }
     const [r] = await tx
       .insert(recalls)
       .values({
@@ -158,5 +185,50 @@ describe('B7 processRecallScan cross-tenant', () => {
     const res = await processRecallScan({ adminDb: admin.db, sms, withTenant, now });
     expect(res.scanned).toBe(0);
     expect(smsSent.length).toBe(0);
+  });
+
+  // CLI-474 (L8): favqulodda aloqaga opt-in fallback.
+  test('no phone + rozilik + emergency contact → favqulodda raqamga yuboriladi (sent)', async () => {
+    const r = await seedRecall(tA, {
+      dueDate: yesterday,
+      phone: null,
+      allowEmergencyRecall: true,
+      emergencyPhone: '+998907778899',
+    });
+    const res = await processRecallScan({ adminDb: admin.db, sms, withTenant, now });
+    expect(res.sent).toBe(1);
+    expect(res.failed).toBe(0);
+    expect(smsSent).toHaveLength(1);
+    expect(smsSent[0]!.to).toBe('+998907778899');
+    const [s, logs] = await withTenant(tA, async (tx) => [
+      await tx.select({ status: recalls.status }).from(recalls).where(eq(recalls.id, r)),
+      await tx.select().from(recallLogs).where(eq(recallLogs.recallId, r)),
+    ]);
+    expect(s[0]!.status).toBe('contacted');
+    expect(logs[0]!.outcome).toBe('sent');
+    expect(logs[0]!.detail).toContain('Favqulodda');
+  });
+
+  test('no phone + rozilik + emergency contact YO‘Q → no_phone (fallback yo‘q)', async () => {
+    await seedRecall(tA, { dueDate: yesterday, phone: null, allowEmergencyRecall: true });
+    const res = await processRecallScan({ adminDb: admin.db, sms, withTenant, now });
+    expect(res.failed).toBe(1);
+    expect(smsSent).toHaveLength(0);
+  });
+
+  test('no phone + rozilik YO‘Q + emergency contact bor → no_phone (opt-in gate)', async () => {
+    const r = await seedRecall(tA, {
+      dueDate: yesterday,
+      phone: null,
+      allowEmergencyRecall: false,
+      emergencyPhone: '+998907778899',
+    });
+    const res = await processRecallScan({ adminDb: admin.db, sms, withTenant, now });
+    expect(res.failed).toBe(1);
+    expect(smsSent).toHaveLength(0);
+    const logs = await withTenant(tA, (tx) =>
+      tx.select().from(recallLogs).where(eq(recallLogs.recallId, r)),
+    );
+    expect(logs[0]!.outcome).toBe('no_phone');
   });
 });

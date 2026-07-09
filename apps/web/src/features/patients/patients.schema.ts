@@ -55,6 +55,8 @@ export const patientFormSchema = z.object({
     })
     .nullable()
     .optional(),
+  // CLI-474 (L8): favqulodda aloqaga recall/reminder fallback roziligi (opt-in).
+  allowEmergencyRecall: z.boolean().default(false),
 });
 export type PatientFormValues = z.infer<typeof patientFormSchema>;
 
@@ -67,6 +69,7 @@ export const patientEditSchema = z.object({
   passport: z.string().optional(),
   address: z.string().optional(),
   notes: z.string().optional(),
+  allowEmergencyRecall: z.boolean().default(false),
 });
 export type PatientEditValues = z.infer<typeof patientEditSchema>;
 

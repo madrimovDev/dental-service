@@ -88,6 +88,7 @@ export const toPatientDto = (row: Patient): PatientDto => ({
       }
     : null,
   insuranceStatus: computeInsuranceStatus(row.insurance),
+  allowEmergencyRecall: row.allowEmergencyRecall,
   archivedAt: row.archivedAt ? row.archivedAt.toISOString() : null,
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(),

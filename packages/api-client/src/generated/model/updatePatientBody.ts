@@ -48,4 +48,5 @@ export type UpdatePatientBody = {
   source?: string;
   /** @nullable */
   insurance?: UpdatePatientBodyInsurance;
+  allowEmergencyRecall?: boolean;
 };

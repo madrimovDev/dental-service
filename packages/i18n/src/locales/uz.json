@@ -572,6 +572,8 @@
       "insurance_coverage": "Qamrov turi",
       "insurance_expiry": "Amal qilish muddati",
       "insurance_active": "Sug'urta faol",
+      "allow_emergency_recall": "Favqulodda aloqaga eslatma yuborishga ruxsat",
+      "allow_emergency_recall_hint": "Bemor telefoni bo'lmasa, eslatma/chaqiruv SMS'i favqulodda aloqa raqamiga yuboriladi",
       "insurance_provider_required": "Sug'urta ma'lumotlarini to'ldirsangiz, kompaniya nomi ham kiritilishi shart",
       "insurance_policy_required": "Sug'urta kompaniyasi va polis raqami — ikkalasi ham to'ldirilishi shart",
       "coverage_dental": "Stomatologik",

@@ -1,0 +1,1 @@
+ALTER TABLE "patients" ADD COLUMN "allow_emergency_recall" boolean DEFAULT false NOT NULL;
