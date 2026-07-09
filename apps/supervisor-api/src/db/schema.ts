@@ -45,7 +45,7 @@ export const licenseEvents = pgTable('license_events', {
   licenseId: uuid('license_id')
     .notNull()
     .references(() => licenses.id, { onDelete: 'cascade' }),
-  event: text('event').notNull(), // 'activated'|'heartbeat'|'reactivated'|'deactivated'
+  event: text('event').notNull(), // 'activated'|'heartbeat'|'reactivated'|'deactivated'|'password_reset'
   fingerprint: text('fingerprint'),
   metadata: jsonb('metadata'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -59,8 +59,25 @@ export const adminUsers = pgTable('admin_users', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+// Vendor-vositachiligidagi owner parol-tiklash tokenlari (CLI-226). Bir
+// martalik: `consumedAt` non-null bo'lsa endi ishlatib bo'lmaydi. Xom token
+// hech qachon saqlanmaydi — faqat SHA-256 hash (`tokenHash`).
+export const licenseResetTokens = pgTable('license_reset_tokens', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  licenseId: uuid('license_id')
+    .notNull()
+    .references(() => licenses.id, { onDelete: 'cascade' }),
+  tokenHash: text('token_hash').notNull(),
+  fingerprint: text('fingerprint'),
+  expiresAt: timestamp('expires_at').notNull(),
+  consumedAt: timestamp('consumed_at'),
+  createdBy: text('created_by'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 export type Clinics = typeof clinics.$inferSelect;
 export type Branches = typeof branches.$inferSelect;
 export type Licenses = typeof licenses.$inferSelect;
 export type LicenseEvents = typeof licenseEvents.$inferSelect;
 export type AdminUsers = typeof adminUsers.$inferSelect;
+export type LicenseResetTokens = typeof licenseResetTokens.$inferSelect;
