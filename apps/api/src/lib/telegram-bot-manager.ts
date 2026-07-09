@@ -1,5 +1,5 @@
 import { patients } from '@dental/db-schema';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import IORedis from 'ioredis';
 import { Telegraf } from 'telegraf';
 import type { Database, DbOrTx } from '../db/client.ts';
@@ -50,7 +50,7 @@ export function startTelegramBotManager(deps: ManagerDeps) {
         const [p] = await tx
           .select({ id: patients.id })
           .from(patients)
-          .where(eq(patients.phone, phone))
+          .where(inArray(patients.phone, [phone, phone.replace(/^\+/, '')]))
           .limit(1);
         if (!p) return 'not_found';
         await tx.update(patients).set({ telegramChatId: chatId }).where(eq(patients.id, p.id));
@@ -95,8 +95,12 @@ export function startTelegramBotManager(deps: ManagerDeps) {
       .select({ tenantId: tenantSettings.tenantId, s: tenantSettings.integrationSettings })
       .from(tenantSettings);
     for (const r of rows) {
-      const enc = (r.s as { telegram?: { botTokenEnc?: string } } | null)?.telegram?.botTokenEnc;
-      if (enc) await launch(r.tenantId, decryptSecret(enc));
+      try {
+        const enc = (r.s as { telegram?: { botTokenEnc?: string } } | null)?.telegram?.botTokenEnc;
+        if (enc) await launch(r.tenantId, decryptSecret(enc));
+      } catch (err) {
+        logger.error({ err, tenantId: r.tenantId }, 'bot bootAll: tenant failed, skipping');
+      }
     }
   };
 
