@@ -123,8 +123,6 @@ services:
       JWT_REFRESH_EXPIRES: ${JWT_REFRESH_EXPIRES:-7d}
       WEB_ORIGIN: ${WEB_ORIGIN:?set WEB_ORIGIN}
       LOG_LEVEL: ${LOG_LEVEL:-info}
-      ESKIZ_EMAIL: ${ESKIZ_EMAIL:-}
-      ESKIZ_PASSWORD: ${ESKIZ_PASSWORD:-}
       SENTRY_DSN: ${SENTRY_DSN:-}
       # API does NOT run the in-process reminder worker — the `worker` service does.
       RUN_REMINDER_WORKER: 'false'
@@ -154,8 +152,6 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       WEB_ORIGIN: ${WEB_ORIGIN}
       LOG_LEVEL: ${LOG_LEVEL:-info}
-      ESKIZ_EMAIL: ${ESKIZ_EMAIL:-}
-      ESKIZ_PASSWORD: ${ESKIZ_PASSWORD:-}
       SENTRY_DSN: ${SENTRY_DSN:-}
     depends_on:
       postgres:

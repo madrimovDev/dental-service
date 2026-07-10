@@ -55,10 +55,6 @@ export const envSchema = z
     WEB_ORIGIN: z.url(),
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 
-    // Eskiz SMS (optional — yo'q bo'lsa NoOp kanal ishlatiladi)
-    ESKIZ_EMAIL: z.string().optional(),
-    ESKIZ_PASSWORD: z.string().optional(),
-
     // Soliq fiskal (V3-1, optional — yo'q bo'lsa NoOpFiscalProvider). Jonli ishlashi
     // uchun Soliq.uz API endpoint + kalit + TLS sertifikat kerak (TODO: V3-1 jonli).
     SOLIQ_API_URL: z.string().optional(),
@@ -88,7 +84,6 @@ export const envSchema = z
     AUTH_RATE_LIMIT_WINDOW_SEC: z.coerce.number().int().positive().default(900), // 15 daqiqa
     AUTH_LOGIN_RATE_LIMIT: z.coerce.number().int().positive().default(10),
     AUTH_REFRESH_RATE_LIMIT: z.coerce.number().int().positive().default(60),
-    AUTH_RESET_RATE_LIMIT: z.coerce.number().int().positive().default(5),
 
     // Register-tenant rate limiting (CLI-388) — IP-only (ownerPhone attacker
     // tanlaydi, keyFromBody bo'lsa chetlab o'tiladi — activate.ts precedenti).
