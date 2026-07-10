@@ -85,9 +85,6 @@ export function LoginPage() {
             </Button>
 
             <Stack gap={4} align="center">
-              <Anchor component={Link} to="/forgot-password" size="sm">
-                {t('auth.login.forgot')}
-              </Anchor>
               <Anchor component={Link} to="/reset-owner-password" size="sm">
                 {t('auth.login.reset_owner')}
               </Anchor>

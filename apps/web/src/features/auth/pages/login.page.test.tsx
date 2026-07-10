@@ -46,4 +46,11 @@ describe('LoginPage — vendor-vositachiligidagi owner parol-tiklash havolasi (C
     renderApp(<LoginPage />);
     expect(screen.getByText(i18n.t('auth.login.reset_owner'))).toBeInTheDocument();
   });
+
+  it("forgot-password havolasi ko'rinmaydi (SMS OTP reset olib tashlandi — CLI-478)", () => {
+    renderApp(<LoginPage />);
+    expect(screen.queryByText(i18n.t('auth.login.forgot'))).not.toBeInTheDocument();
+    // reset-owner havolasi hamon bor:
+    expect(screen.getByText(i18n.t('auth.login.reset_owner'))).toBeInTheDocument();
+  });
 });
