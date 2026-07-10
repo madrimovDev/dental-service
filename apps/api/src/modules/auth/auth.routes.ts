@@ -20,10 +20,6 @@ import {
   logoutResponseSchema,
   logoutSchema,
   membershipsResponseSchema,
-  passwordResetRequestResponseSchema,
-  passwordResetRequestSchema,
-  passwordResetResponseSchema,
-  passwordResetSchema,
   refreshSchema,
   registerTenantResponseSchema,
   registerTenantSchema,
@@ -67,18 +63,6 @@ export const authRoutes = (deps: { db: Database }) => {
     limit: env.AUTH_REFRESH_RATE_LIMIT,
     windowSeconds: window,
     // refresh body'da telefon yo'q → faqat IP bo'yicha.
-  });
-  const resetRequestRateLimit = rateLimit({
-    name: 'reset-request',
-    limit: env.AUTH_RESET_RATE_LIMIT,
-    windowSeconds: window,
-    keyFromBody: phoneKey,
-  });
-  const resetRateLimit = rateLimit({
-    name: 'reset',
-    limit: env.AUTH_RESET_RATE_LIMIT,
-    windowSeconds: window,
-    keyFromBody: phoneKey,
   });
   const registerRateLimit = rateLimit({
     name: 'register-tenant',
@@ -329,55 +313,6 @@ export const authRoutes = (deps: { db: Database }) => {
       return c.json(fail(result.code, msg), status as 400 | 401 | 403 | 404);
     }
     return c.json(ok(toTokenPairDto(result)), 200);
-  });
-
-  // ─── POST /password-reset-request — public, mock OTP ─────────────────────
-
-  const passwordResetRequestRoute = createRoute({
-    method: 'post',
-    path: '/password-reset-request',
-    tags: ['auth'],
-    operationId: 'passwordResetRequest',
-    middleware: [resetRequestRateLimit] as const,
-    request: {
-      body: { content: { 'application/json': { schema: passwordResetRequestSchema } } },
-    },
-    responses: {
-      ...okJson(passwordResetRequestResponseSchema, 'Reset code sent (if user exists)'),
-      429: errResp('Too many requests'),
-    },
-  });
-
-  app.openapi(passwordResetRequestRoute, async (c) => {
-    const body = c.req.valid('json');
-    await service.requestPasswordReset(body);
-    return c.json(ok({ sent: true as const }), 200);
-  });
-
-  // ─── POST /password-reset — public ───────────────────────────────────────
-
-  const passwordResetRoute = createRoute({
-    method: 'post',
-    path: '/password-reset',
-    tags: ['auth'],
-    operationId: 'passwordReset',
-    middleware: [resetRateLimit] as const,
-    request: {
-      body: { content: { 'application/json': { schema: passwordResetSchema } } },
-    },
-    responses: {
-      ...okJson(passwordResetResponseSchema, 'Password reset'),
-      429: errResp('Too many requests'),
-    },
-  });
-
-  app.openapi(passwordResetRoute, async (c) => {
-    const body = c.req.valid('json');
-    const result = await service.resetPassword(body);
-    if (!result) {
-      return c.json(fail('auth.invalid_reset_token', "Token noto'g'ri yoki muddati tugagan"), 400);
-    }
-    return c.json(ok({ ok: true as const }), 200);
   });
 
   // ─── POST /change-password — authenticated, joriy parol bilan ────────────

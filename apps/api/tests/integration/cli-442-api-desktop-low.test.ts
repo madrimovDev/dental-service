@@ -1,7 +1,6 @@
 /**
- * CLI-442 — LOW-E: API cross-cutting hardening (sub-items #3, #5, #6, #7).
+ * CLI-442 — LOW-E: API cross-cutting hardening (sub-items #3, #6, #7).
  *  #3 `listMovements` sahifalanadi (pageSize) — chegaralanmagan tarix yo'q.
- *  #5 `requestPasswordReset` soft-deleted user'ga token bermaydi.
  *  #6 `listAssignments` soft-deleted user'ni ro'yxatdan chiqaradi.
  *  #7 `GET /tenant-settings/vertical` workspace'siz 500 EMAS, default 'dental' 200.
  * (#4 check-rls-coverage FORCE — `bun run scripts/check-rls-coverage.ts` orqali statik
@@ -17,12 +16,10 @@ import type { Context } from 'hono';
 import type { DbOrTx } from '../../src/db/client.ts';
 import { db } from '../../src/db/client.ts';
 import type { AuditLogger } from '../../src/lib/audit-logger.ts';
-import { createAuthService } from '../../src/modules/auth/auth.service.ts';
 import { createStockService } from '../../src/modules/stock/stock.service.ts';
 import { createUsersService } from '../../src/modules/users/users.service.ts';
 
 const noopAudit = { record: async () => {} } as unknown as AuditLogger;
-const authService = createAuthService({ db });
 const usersService = createUsersService({ db, audit: noopAudit });
 const stockService = createStockService({ audit: noopAudit });
 
@@ -149,18 +146,6 @@ describe('CLI-442 #3 listMovements pagination', () => {
   test('page/pageSize berilmasa → default (50) bilan hammasi qaytadi (5 ta)', async () => {
     const rows = await withTx((tx) => stockService.listMovements(ctx(tx), { itemId }));
     expect(rows).toHaveLength(5);
-  });
-});
-
-describe('CLI-442 #5 requestPasswordReset soft-delete filter', () => {
-  test('soft-deleted user token ola olmaydi (enumeration-safe {sent:true})', async () => {
-    const res = await authService.requestPasswordReset({
-      phone: '+998900004422',
-    } as Parameters<typeof authService.requestPasswordReset>[0]);
-    expect(res).toEqual({ sent: true });
-    // Token yaratilmaganini bilvosita tasdiqlash: aktiv user uchun token yaratiladi,
-    // deleted uchun yo'q — bu xulq (early-return, `!user`) service ichida to'g'ridan
-    // tekshiriladi; bu yerda faqat enumeration-safe javob shakli tasdiqlanadi.
   });
 });
 
