@@ -13,10 +13,6 @@ import type {
   LoginBody,
   Logout200,
   LogoutBody,
-  PasswordReset200,
-  PasswordResetBody,
-  PasswordResetRequest200,
-  PasswordResetRequestBody,
   Refresh200,
   RefreshBody,
   RegisterTenant201,
@@ -95,26 +91,6 @@ import { customInstance } from '../../mutator';
     },
       );
     }
-  export const passwordResetRequest = (
-    passwordResetRequestBody: PasswordResetRequestBody,
- ) => {
-      return customInstance<PasswordResetRequest200>(
-      {url: `/api/auth/password-reset-request`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: passwordResetRequestBody
-    },
-      );
-    }
-  export const passwordReset = (
-    passwordResetBody: PasswordResetBody,
- ) => {
-      return customInstance<PasswordReset200>(
-      {url: `/api/auth/password-reset`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: passwordResetBody
-    },
-      );
-    }
   export const changePassword = (
     changePasswordBody: ChangePasswordBody,
  ) => {
@@ -132,6 +108,4 @@ export type LogoutResult = NonNullable<Awaited<ReturnType<typeof logout>>>
 export type GetMeResult = NonNullable<Awaited<ReturnType<typeof getMe>>>
 export type GetWorkspaceBranchesResult = NonNullable<Awaited<ReturnType<typeof getWorkspaceBranches>>>
 export type SwitchWorkspaceResult = NonNullable<Awaited<ReturnType<typeof switchWorkspace>>>
-export type PasswordResetRequestResult = NonNullable<Awaited<ReturnType<typeof passwordResetRequest>>>
-export type PasswordResetResult = NonNullable<Awaited<ReturnType<typeof passwordReset>>>
 export type ChangePasswordResult = NonNullable<Awaited<ReturnType<typeof changePassword>>>

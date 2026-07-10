@@ -66,21 +66,6 @@ export const switchWorkspaceSchema = z.object({
 });
 export type SwitchWorkspaceInput = z.infer<typeof switchWorkspaceSchema>;
 
-export const passwordResetRequestSchema = z.object({
-  phone,
-});
-export type PasswordResetRequestInput = z.infer<typeof passwordResetRequestSchema>;
-
-export const passwordResetSchema = z.object({
-  // ⚠️ CLI-226 ATO fix: token endi FOYDALANUVCHIGA bog'langan — phone majburiy.
-  // Token userId bo'yicha topiladi (faqat hash bo'yicha global EMAS) → A foydalanuvchi
-  // kodi B foydalanuvchini reset qila olmaydi + per-user brute-force limiti ishlaydi.
-  phone,
-  token: z.string().min(1),
-  newPassword: password,
-});
-export type PasswordResetInput = z.infer<typeof passwordResetSchema>;
-
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1),
   newPassword: password,
@@ -158,18 +143,6 @@ export const logoutResponseSchema = z
   .object({ loggedOut: z.literal(true) })
   .openapi('LogoutResponse');
 export type LogoutResponseDto = z.infer<typeof logoutResponseSchema>;
-
-/** POST /password-reset-request javobi (enumeration oldini olish — doim sent). */
-export const passwordResetRequestResponseSchema = z
-  .object({ sent: z.literal(true) })
-  .openapi('PasswordResetRequestResponse');
-export type PasswordResetRequestResponseDto = z.infer<typeof passwordResetRequestResponseSchema>;
-
-/** POST /password-reset javobi. */
-export const passwordResetResponseSchema = z
-  .object({ ok: z.literal(true) })
-  .openapi('PasswordResetResponse');
-export type PasswordResetResponseDto = z.infer<typeof passwordResetResponseSchema>;
 
 /** POST /change-password javobi. */
 export const changePasswordResponseSchema = z

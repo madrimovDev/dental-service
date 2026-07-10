@@ -108,7 +108,6 @@
       "phone": "Telefon raqami",
       "password": "Parol",
       "submit": "Kirish",
-      "forgot": "Parolni unutdingizmi?",
       "register_clinic": "Klinika ro'yxatdan o'tish",
       "reset_owner": "Parolni unutdingizmi? Xizmat ko'rsatuvchiga murojaat qiling",
       "invalid_credentials": "Telefon yoki parol noto'g'ri"
@@ -136,22 +135,6 @@
       "session_expired_message": "Iltimos, qayta login qiling. Eski refresh token endi yaroqsiz.",
       "switch_failed": "Workspace almashtirib bo'lmadi"
     },
-    "forgot": {
-      "title": "Parolni qaytarish",
-      "submit": "Reset kod yuborish",
-      "sent": "Reset kod yuborildi (agar telefon mavjud bo'lsa).",
-      "mock_otp_notice": "Hozir kod faqat server console'da log qilinadi. SMS keyingi bosqichda.",
-      "back_to_login": "Kirish sahifasiga qaytish"
-    },
-    "reset": {
-      "title": "Yangi parol o'rnatish",
-      "code": "Reset kod",
-      "code_hint": "Console log yoki SMS'dan olingan 6-raqamli kod",
-      "new_password": "Yangi parol",
-      "submit": "Parolni yangilash",
-      "invalid": "Kod noto'g'ri yoki muddati tugagan",
-      "password_placeholder": "Kamida 12 belgi"
-    },
     "activate": {
       "title": "Litsenziyani faollashtirish",
       "description": "Dental Service'dan foydalanish uchun klinikangizga berilgan litsenziya kalitini kiriting.",
@@ -177,7 +160,8 @@
       "submit": "Parolni tiklash",
       "success": "Parol muvaffaqiyatli tiklandi. Endi yangi parol bilan kiring.",
       "error_invalid_token": "Token yaroqsiz yoki muddati o'tgan",
-      "error_generic": "Parolni tiklab bo'lmadi. Qaytadan urinib ko'ring."
+      "error_generic": "Parolni tiklab bo'lmadi. Qaytadan urinib ko'ring.",
+      "back_to_login": "Kirish sahifasiga qaytish"
     }
   },
   "layout": {

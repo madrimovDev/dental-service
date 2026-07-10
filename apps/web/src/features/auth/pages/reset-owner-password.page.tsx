@@ -144,7 +144,7 @@ export function ResetOwnerPasswordPage() {
             </Button>
 
             <Anchor component={Link} to="/login" size="sm" ta="center">
-              {t('auth.forgot.back_to_login')}
+              {t('auth.reset_owner.back_to_login')}
             </Anchor>
           </Stack>
         </form>

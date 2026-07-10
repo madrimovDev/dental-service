@@ -3,8 +3,6 @@ import {
   getMe,
   getWorkspaceBranches,
   login,
-  passwordReset,
-  passwordResetRequest,
   registerTenant,
   switchWorkspace,
 } from '@dental/api-client';
@@ -39,26 +37,6 @@ export function useRegisterTenant(
 ) {
   return useMutation({
     mutationFn: (body: RegisterVars) => registerTenant(body).then((r) => r.data),
-    ...opts,
-  });
-}
-
-type ResetRequestVars = { phone: string };
-export function usePasswordResetRequest(
-  opts?: UseMutationOptions<Data<typeof passwordResetRequest>, ApiError, ResetRequestVars>,
-) {
-  return useMutation({
-    mutationFn: (body: ResetRequestVars) => passwordResetRequest(body).then((r) => r.data),
-    ...opts,
-  });
-}
-
-type ResetVars = { phone: string; token: string; newPassword: string };
-export function usePasswordReset(
-  opts?: UseMutationOptions<Data<typeof passwordReset>, ApiError, ResetVars>,
-) {
-  return useMutation({
-    mutationFn: (body: ResetVars) => passwordReset(body).then((r) => r.data),
     ...opts,
   });
 }
