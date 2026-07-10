@@ -23,13 +23,7 @@ const RLS_DIR = join(import.meta.dir, '..', 'apps', 'api', 'migrations', 'rls');
  * Bu list'ga yangi jadval qo'shilsa, ehtiyot bo'ling: tenant izolyatsiyasi
  * shu jadval orqali sizib chiqishi mumkin.
  */
-const PLATFORM_TABLES = new Set([
-  'users',
-  'tenants',
-  'permissions',
-  'refresh_tokens',
-  'password_reset_tokens',
-]);
+const PLATFORM_TABLES = new Set(['users', 'tenants', 'permissions', 'refresh_tokens']);
 
 async function findTablesWithTenantId(): Promise<{ name: string; file: string }[]> {
   const files = (await readdir(SCHEMA_DIR)).filter((f) => f.endsWith('.ts'));
