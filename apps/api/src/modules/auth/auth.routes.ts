@@ -39,8 +39,8 @@ export const authRoutes = (deps: { db: Database }) => {
   // ⚠️ Auth modul app-level rlsMiddleware ISHLATMAYDI. Public route'lar auth'siz;
   // himoyalangan route'lar (/me, /switch-workspace, /change-password) PER-ROUTE
   // authMiddleware() bilan.
-  // ⚠️ app.ts faqat `{ db }` uzatadi (uni o'zgartira olmaymiz) — qolgan deps (sms,
-  // audit) shu yerda env'dan quriladi (reminder-worker precedenti).
+  // ⚠️ app.ts faqat `{ db }` uzatadi (uni o'zgartira olmaymiz) — audit logger shu
+  // yerda `db`'dan quriladi.
   const app = new OpenAPIHono();
   const service = createAuthService(deps);
   const audit = createAuditLogger({ db: deps.db });
