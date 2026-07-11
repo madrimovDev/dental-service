@@ -1,8 +1,33 @@
 import type { Context } from 'hono';
 import type { AuditLogger } from '../../../lib/audit-logger.ts';
 import { createOwnershipValidator, type OwnershipValidator } from '../../../lib/ownership.ts';
+import { InvalidTransitionError } from '../treatment-plans/treatment-plans.transitions.ts';
 import { createVisitNotesRepository } from './visit-notes.repository.ts';
 import type { CreateVisitNoteInput, UpdateVisitNoteInput } from './visit-notes.schema.ts';
+
+/**
+ * CLI-481 — vizit yozuvining stage bog'lanishini QAYTA yo'naltirishni bloklaydi.
+ *
+ * Vizit yaratilganda/yangilanganda `stageId` berilsa, o'sha bosqich `completed` qilinadi
+ * (+ auto-recall). `completed` — terminal holat (revert yo'q). Shu sabab bir vizit
+ * allaqachon bir bosqichni yopgan bo'lsa (`before.stageId` non-null), uni BOSHQA
+ * bosqichga ko'chirish eski bosqichni phantom-`completed` (endi hech bir vizit ishora
+ * qilmaydi) + uning recall'ini orphan qoldiradi va yangi bosqich ikkinchi completed+
+ * recall oladi. Blok bu holatni oldini oladi — bosqich holatini o'zgartirish kerak
+ * bo'lsa `/treatment-stages` endpoint'i orqali. `InvalidTransitionError` subklassi
+ * (PlanLockedError precedenti) → visit-notes/treatment-plans routes'dagi mavjud
+ * `instanceof InvalidTransitionError` catch uni 400 (`stage.invalid_transition`) ga
+ * aylantiradi (route o'zgarishi shart emas).
+ */
+export class VisitStageRepointError extends InvalidTransitionError {
+  constructor(fromStageId: string, toStageId: string) {
+    super('stage_status', `stage:${fromStageId}`, `stage:${toStageId}`);
+    this.name = 'VisitStageRepointError';
+    this.message =
+      'Cannot re-point a visit note to a different treatment stage: the previously ' +
+      'linked stage is already completed. Change stage status via /treatment-stages.';
+  }
+}
 
 /**
  * C5 (CLI-222) — treatment-plans modulidan inject qilinadigan narrow dep.
@@ -115,6 +140,17 @@ export const createVisitNotesService = (deps: {
   async function update(c: Context, id: string, input: UpdateVisitNoteInput) {
     const before = await repo.find(c, id);
     if (!before) return null;
+
+    // CLI-481: re-point blok — ownership/completeStage'dan OLDIN. Bu vizit allaqachon
+    // bir bosqichni 'completed' qilgan bo'lsa (before.stageId non-null), yangi va
+    // boshqa stageId RAD (phantom-completed + orphan recall oldini olish).
+    if (
+      input.stageId !== undefined &&
+      before.stageId !== null &&
+      input.stageId !== before.stageId
+    ) {
+      throw new VisitStageRepointError(before.stageId, input.stageId);
+    }
 
     // CLI-421: cross-entity ownership — patientId o'zgармаydi (update schema omit qiladi),
     // shu sabab before.patientId'ga nisbatan tekshiramiz. Faqat yuborilgan maydonlar.
