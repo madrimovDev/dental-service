@@ -6,10 +6,15 @@
  */
 import type { UpdateTreatmentStageBodyStatus } from './updateTreatmentStageBodyStatus';
 import type { UpdateTreatmentStageBodyAcceptance } from './updateTreatmentStageBodyAcceptance';
+import type { UpdateTreatmentStageBodyResultingToothState } from './updateTreatmentStageBodyResultingToothState';
 
 export type UpdateTreatmentStageBody = {
   status?: UpdateTreatmentStageBodyStatus;
   acceptance?: UpdateTreatmentStageBodyAcceptance;
   /** @maxLength 500 */
   notes?: string;
+  /** @nullable */
+  labOrderId?: string | null;
+  /** @nullable */
+  resultingToothState?: UpdateTreatmentStageBodyResultingToothState;
 };

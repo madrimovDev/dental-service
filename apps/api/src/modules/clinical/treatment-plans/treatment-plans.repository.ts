@@ -135,7 +135,7 @@ export const createTreatmentPlansRepository = () => {
   async function findLabOrderStatus(c: Context, labOrderId: string) {
     const db = getDb(c);
     const [row] = await db
-      .select({ status: labOrders.status })
+      .select({ status: labOrders.status, patientId: labOrders.patientId })
       .from(labOrders)
       .where(eq(labOrders.id, labOrderId))
       .limit(1);

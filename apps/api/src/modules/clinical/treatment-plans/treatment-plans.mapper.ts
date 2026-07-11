@@ -23,6 +23,8 @@ export const toStageDto = (row: StageRow): TreatmentStageDto => ({
   acceptance: row.acceptance,
   notes: row.notes ?? null,
   completedAt: row.completedAt ? row.completedAt.toISOString() : null,
+  labOrderId: row.labOrderId ?? null,
+  resultingToothState: row.resultingToothState ?? null,
 });
 
 /** DB row → TreatmentPlan wire DTO (no stages). */

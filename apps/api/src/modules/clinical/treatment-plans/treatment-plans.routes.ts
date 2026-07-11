@@ -308,6 +308,10 @@ export const treatmentPlansRoutes = (deps: {
       if (e instanceof InvalidTransitionError) {
         return c.json(fail('stage.invalid_transition', e.message), 400);
       }
+      // CLI-487: lab-order linkage cross-entity mismatch → 400 (noto'g'ri havola).
+      if (e instanceof CrossEntityError) {
+        return c.json(fail(`ownership.${e.reason}`, e.message), 400);
+      }
       throw e;
     }
   });

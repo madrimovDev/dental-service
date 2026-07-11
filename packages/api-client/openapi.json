@@ -5312,6 +5312,30 @@
             "type": "string",
             "nullable": true,
             "example": null
+          },
+          "labOrderId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid",
+            "example": null
+          },
+          "resultingToothState": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "healthy",
+              "caries",
+              "filling",
+              "crown",
+              "implant",
+              "missing",
+              "root_canal",
+              "to_extract",
+              "temporary",
+              "veneer",
+              null
+            ],
+            "example": null
           }
         },
         "required": [
@@ -5327,7 +5351,9 @@
           "status",
           "acceptance",
           "notes",
-          "completedAt"
+          "completedAt",
+          "labOrderId",
+          "resultingToothState"
         ]
       },
       "TreatmentPlan": {
@@ -21106,6 +21132,28 @@
                   "notes": {
                     "type": "string",
                     "maxLength": 500
+                  },
+                  "labOrderId": {
+                    "type": "string",
+                    "nullable": true,
+                    "format": "uuid"
+                  },
+                  "resultingToothState": {
+                    "type": "string",
+                    "nullable": true,
+                    "enum": [
+                      "healthy",
+                      "caries",
+                      "filling",
+                      "crown",
+                      "implant",
+                      "missing",
+                      "root_canal",
+                      "to_extract",
+                      "temporary",
+                      "veneer",
+                      null
+                    ]
                   }
                 }
               }

@@ -1,7 +1,11 @@
 import type { ToothStateValue } from '@dental/db-schema';
 import type { Context } from 'hono';
 import type { AuditLogger } from '../../../lib/audit-logger.ts';
-import { createOwnershipValidator, type OwnershipValidator } from '../../../lib/ownership.ts';
+import {
+  CrossEntityError,
+  createOwnershipValidator,
+  type OwnershipValidator,
+} from '../../../lib/ownership.ts';
 // C6: C4 qarz predikatini YAGONA manbadan ishlatish (cashier billing pure fn).
 import { computePlanBalance } from '../../cashier/cashier.billing.ts';
 import { createTreatmentPlansRepository } from './treatment-plans.repository.ts';
@@ -304,6 +308,13 @@ export const createTreatmentPlansService = (deps: {
       patch.acceptance = input.acceptance;
     }
     if (input.notes !== undefined) patch.notes = input.notes;
+    // CLI-487/488 (API wiring): lab-order linkage + resulting tooth state. `!== undefined`
+    // → `null` aniq uzadi, "yo'q" tegmaydi (patch.notes precedenti). Ownership guard
+    // (labOrderId) plan fetch'dan KEYIN (patientId kerak).
+    if (input.resultingToothState !== undefined) {
+      patch.resultingToothState = input.resultingToothState;
+    }
+    if (input.labOrderId !== undefined) patch.labOrderId = input.labOrderId;
 
     // Hech narsa o'zgarmadi (idempotent yoki bo'sh PATCH) — plan fetch/guard'dan
     // OLDIN erta qaytamiz (no-op arzon qoladi; guard'ga yetmaydi — xavfsiz).
@@ -317,11 +328,25 @@ export const createTreatmentPlansService = (deps: {
       assertStageMutationAllowedForPlan(plan.status, { toStatus });
     }
 
+    // CLI-487 (API wiring): lab-order'ni bosqichga bog'lashda u shu bemorga tegishli
+    // bo'lishi shart (RLS tenant'ni, guard patientId'ni tekshiradi — FK RLS'ni chetlab
+    // o'tadi). `null` → uzish (guard yo'q). Plan fetch'dan KEYIN (patientId kerak).
+    if (input.labOrderId != null) {
+      const lab = await repo.findLabOrderStatus(c, input.labOrderId);
+      if (!lab) throw new CrossEntityError('lab_order', 'not_found');
+      if (plan && lab.patientId !== plan.patientId) {
+        throw new CrossEntityError('lab_order', 'mismatch');
+      }
+    }
+
     // CLI-487: lab-order gate — bosqichni 'completed' qilishda bog'langan lab-order
     // 'delivered' bo'lishi shart. Plan-guard'dan KEYIN, persist'dan OLDIN (completed
-    // yozilmaydi). Cross-tenant/mavjud bo'lmagan link (RLS → null) → fail-safe blok.
-    if (toStatus === 'completed' && current.labOrderId) {
-      const lab = await repo.findLabOrderStatus(c, current.labOrderId);
+    // yozilmaydi). `effectiveLabOrderId` — ayni PATCH'da bog'langan yangi link'ni ham
+    // qamraydi (link + complete bir chaqiruvda). RLS → null → fail-safe blok.
+    const effectiveLabOrderId =
+      input.labOrderId !== undefined ? input.labOrderId : current.labOrderId;
+    if (toStatus === 'completed' && effectiveLabOrderId) {
+      const lab = await repo.findLabOrderStatus(c, effectiveLabOrderId);
       if (!lab || lab.status !== 'delivered') {
         throw new StageLabPendingError(lab?.status ?? 'missing');
       }

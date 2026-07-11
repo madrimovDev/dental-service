@@ -6,6 +6,7 @@
  */
 import type { TreatmentStageStatus } from './treatmentStageStatus';
 import type { TreatmentStageAcceptance } from './treatmentStageAcceptance';
+import type { TreatmentStageResultingToothState } from './treatmentStageResultingToothState';
 
 export interface TreatmentStage {
   id: string;
@@ -26,4 +27,8 @@ export interface TreatmentStage {
   notes: string | null;
   /** @nullable */
   completedAt: string | null;
+  /** @nullable */
+  labOrderId: string | null;
+  /** @nullable */
+  resultingToothState: TreatmentStageResultingToothState;
 }

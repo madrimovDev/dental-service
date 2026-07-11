@@ -1,5 +1,24 @@
 import { z } from '@hono/zod-openapi';
 
+/**
+ * CLI-488: tooth_state enum qiymatlari (packages/db-schema `toothStateEnum` bilan bir xil).
+ * treatment_stages.resulting_tooth_state uchun — bosqich completed bo'lganda odontogram
+ * shu holatga o'tadi.
+ */
+const toothStateValues = [
+  'healthy',
+  'caries',
+  'filling',
+  'crown',
+  'implant',
+  'missing',
+  'root_canal',
+  'to_extract',
+  'temporary',
+  'veneer',
+] as const;
+export const toothStateSchema = z.enum(toothStateValues);
+
 // ─── Request schemas ──────────────────────────────────────────────────────────
 
 export const createTreatmentPlanSchema = z.object({
@@ -37,6 +56,11 @@ export const updateStageSchema = z.object({
   // Qaror #25: acceptance — ALOHIDA o'q (status'dan mustaqil). Qarz faqat 'accepted'.
   acceptance: z.enum(['proposed', 'accepted', 'rejected']).optional(),
   notes: z.string().max(500).optional(),
+  // CLI-487: bosqichga lab-order bog'lash (`null` → uzish). Bog'langan lab-order
+  // 'delivered' bo'lmasa bosqich 'completed' bo'la olmaydi (service gate).
+  labOrderId: z.uuid().nullable().optional(),
+  // CLI-488: bosqich 'completed' bo'lganda odontogram shu holatga o'tadi (`null` → o'tmaydi).
+  resultingToothState: toothStateSchema.nullable().optional(),
 });
 export type UpdateStageInput = z.infer<typeof updateStageSchema>;
 
@@ -117,6 +141,9 @@ export const treatmentStageDtoSchema = z
     acceptance: treatmentStageAcceptanceEnum.openapi({ example: 'proposed' }),
     notes: z.string().nullable().openapi({ example: null }),
     completedAt: z.string().nullable().openapi({ example: null }),
+    // CLI-487/488: bosqichga bog'langan lab-order + completed'da o'tadigan tish holati.
+    labOrderId: z.uuid().nullable().openapi({ example: null }),
+    resultingToothState: toothStateSchema.nullable().openapi({ example: null }),
   })
   .openapi('TreatmentStage');
 
