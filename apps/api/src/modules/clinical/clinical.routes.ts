@@ -7,6 +7,7 @@ import type { NotificationsService } from '../notifications/notifications.servic
 import { createStockService } from '../stock/stock.service.ts';
 import { diagnosesRoutes } from './diagnoses/index.ts';
 import { toothChartsRoutes } from './tooth-charts/index.ts';
+import { createToothChartsService } from './tooth-charts/tooth-charts.service.ts';
 import { treatmentPlansRoutes } from './treatment-plans/index.ts';
 import {
   createTreatmentPlansService,
@@ -78,12 +79,20 @@ export const clinicalRoutes = (deps: {
     notifications: deps.notifications,
   });
 
+  // CLI-488: odontogramma auto-update hook — tooth-charts service instance (stateless
+  // factory; audit shared). Bosqich 'completed' bo'lganda toothNumbers uchun yangi
+  // tooth_chart snapshot yozadi. toothChartsRoutes o'z alohida instance'ini ishlatadi
+  // (treatmentPlansService double-instance pattern bilan bir xil — quyida).
+  const toothChartsService = createToothChartsService({ audit: deps.audit });
+  const toothChart = { recordStageCompletion: toothChartsService.recordStageCompletion };
+
   // C5: vizit→bosqich completed hook (factory injection, recall pattern bilan bir xil).
-  // Bosqich completed → recall ham fire bo'ladi (treatment-plans.service ichida).
+  // Bosqich completed → recall + odontogramma (CLI-488) ham fire bo'ladi (service ichida).
   const treatmentPlansService = createTreatmentPlansService({
     audit: deps.audit,
     recall: deps.recall,
     priceLookup: deps.priceLookup,
+    toothChart,
   });
 
   // CLI-414/CLI-445: visit-note UPDATE'da `performedServices` reconciliation — stock modul
@@ -96,9 +105,16 @@ export const clinicalRoutes = (deps: {
 
   app.route('/', diagnosesRoutes({ db: deps.db }));
   // B4: bosqich completed → treatment_followup recall (factory injection).
+  // CLI-488: shu instance (PATCH /treatment-stages yo'li) ham toothChart hook oladi —
+  // visit-note yo'lidagi standalone instance bilan simmetrik (ikkalasi ham auto-update).
   app.route(
     '/',
-    treatmentPlansRoutes({ audit: deps.audit, recall: deps.recall, priceLookup: deps.priceLookup }),
+    treatmentPlansRoutes({
+      audit: deps.audit,
+      recall: deps.recall,
+      priceLookup: deps.priceLookup,
+      toothChart,
+    }),
   );
   app.route(
     '/',

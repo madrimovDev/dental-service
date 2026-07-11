@@ -14,6 +14,7 @@ import { labOrders } from './lab-orders.ts';
 import { patients } from './patients.ts';
 import { services } from './services.ts';
 import { tenants } from './tenants.ts';
+import { toothStateEnum } from './tooth-charts.ts';
 import { users } from './users.ts';
 
 export const treatmentPlanStatusEnum = pgEnum('treatment_plan_status', [
@@ -113,6 +114,11 @@ export const treatmentStages = pgTable(
     labOrderId: uuid('lab_order_id').references(() => labOrders.id, { onDelete: 'set null' }),
     serviceName: text('service_name').notNull(),
     toothNumbers: integer('tooth_numbers').array(), // FDI: 11-48, 51-85
+    // CLI-488: bosqich 'completed' bo'lganda toothNumbers uchun odontogramma'ga
+    // yoziladigan yakuniy tish holati (yangi immutable tooth_chart snapshot). Ixtiyoriy
+    // — yo'q (yoki toothNumbers bo'sh) bo'lsa auto-update fire etmaydi. Backend-only
+    // (bu round API'da set qilinmaydi).
+    resultingToothState: toothStateEnum('resulting_tooth_state'),
     estimatedVisits: integer('estimated_visits').notNull().default(1),
     estimatedDurationMinutes: integer('estimated_duration_minutes'),
     cost: numeric('cost', { precision: 14, scale: 2 }).notNull(),

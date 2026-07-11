@@ -27,6 +27,7 @@ import {
   createTreatmentPlansService,
   type PriceLookup,
   type RecallStageHook,
+  type ToothChartStageHook,
 } from './treatment-plans.service.ts';
 import { InvalidTransitionError } from './treatment-plans.transitions.ts';
 
@@ -50,6 +51,8 @@ export const treatmentPlansRoutes = (deps: {
   audit: AuditLogger;
   recall?: RecallStageHook;
   priceLookup?: PriceLookup;
+  /** CLI-488: bosqich completed → odontogramma auto-update (createTreatmentPlansService'ga forward). */
+  toothChart?: ToothChartStageHook;
 }) => {
   const app = new OpenAPIHono();
   const service = createTreatmentPlansService(deps);

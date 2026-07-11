@@ -74,6 +74,9 @@ export const toothStateEnum = pgEnum('tooth_state', [
   'veneer',
 ]);
 
+/** Tooth state enum qiymatlar union (CLI-488: treatment_stages.resulting_tooth_state tipi). */
+export type ToothStateValue = (typeof toothStateEnum.enumValues)[number];
+
 /**
  * Tooth State — har snapshot ichida, har tish va yuza uchun holat.
  */
