@@ -1,0 +1,46 @@
+# IP/HTTP-only variant of the Supervisor edge — for TESTING against a VM that
+# has NO domain (Caddy's Let's Encrypt automatic HTTPS requires a domain +
+# DNS). Serves plain HTTP on :80 and additionally hosts the Windows desktop
+# DB binaries under /bins/* (consumed by scripts/download-portable-bins.sh via
+# POSTGRES_WIN_URL / VALKEY_WIN_URL during the desktop build).
+#
+# ⚠️ NO TLS — test only. For production use ./Caddyfile (domain + auto-HTTPS).
+# Never merge these two files.
+#
+# Routing mirrors ./Caddyfile: /v1/* → api:3101, everything else → admin SPA,
+# plus the /bins/* static route.
+{
+	auto_https off
+}
+
+:80 {
+	encode gzip zstd
+
+	handle /v1/* {
+		reverse_proxy api:3101
+	}
+
+	# Windows Postgres/Valkey portable binaries for the desktop installer build.
+	# e.g. http://<VM-IP>/bins/postgres-16-win.zip , /bins/valkey-win.zip
+	# (served from the ./bins host dir mounted at /srv/bins by docker-compose.ip.yml)
+	handle_path /bins/* {
+		root * /srv/bins
+		file_server browse
+	}
+
+	handle {
+		reverse_proxy admin:80
+	}
+
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

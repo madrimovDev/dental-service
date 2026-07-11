@@ -1,0 +1,99 @@
+# IP/HTTP TEST orchestration for the Supervisor — for a VM with NO domain.
+#
+# ⚠️ TEST ONLY (no TLS). Mirrors docker-compose.prod.yml but the edge (caddy)
+# serves plain HTTP on :80 via Caddyfile.ip and also hosts the Windows desktop
+# DB binaries under /bins/* (from the ./bins host dir). For production use
+# docker-compose.prod.yml (domain + auto-HTTPS). This file is kept separate so
+# the production compose/Caddyfile stay pristine.
+#
+# Usage (from infra/supervisor/):
+#   docker compose -f docker-compose.ip.yml --env-file .env.production build
+#   docker compose -f docker-compose.ip.yml --env-file .env.production run --rm migrate
+#   docker compose -f docker-compose.ip.yml --env-file .env.production up -d api admin caddy
+#
+# .env.production needs (IP mode — DOMAIN / ACME_EMAIL NOT required):
+#   POSTGRES_USER, POSTGRES_PASSWORD
+#   DATABASE_URL=postgres://<user>:<pass>@postgres:5432/supervisor
+#   RSA_PRIVATE_KEY  (the freshly generated private half; public half → packages/core/supervisor-public-key.ts)
+#   JWT_SECRET       (>=32 chars)
+#   ADMIN_SEED_EMAIL, ADMIN_SEED_PASSWORD
+#
+# Put the Windows binaries in ./bins/  (postgres-16-win.zip, valkey-win.zip).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: supervisor
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [internal]
+
+  migrate:
+    image: ${SUPERVISOR_API_IMAGE:-supervisor-api:latest}
+    build:
+      context: ../..
+      dockerfile: apps/supervisor-api/Dockerfile
+    command: ['bun', 'run', 'src/db/migrate.ts']
+    restart: 'no'
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
+      ADMIN_SEED_EMAIL: ${ADMIN_SEED_EMAIL:?set ADMIN_SEED_EMAIL}
+      ADMIN_SEED_PASSWORD: ${ADMIN_SEED_PASSWORD:?set ADMIN_SEED_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [internal]
+
+  api:
+    image: ${SUPERVISOR_API_IMAGE:-supervisor-api:latest}
+    build:
+      context: ../..
+      dockerfile: apps/supervisor-api/Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
+      RSA_PRIVATE_KEY: ${RSA_PRIVATE_KEY:?set RSA_PRIVATE_KEY}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
+      API_PORT: 3101
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [internal]
+
+  admin:
+    image: ${SUPERVISOR_ADMIN_IMAGE:-supervisor-admin:latest}
+    build:
+      context: ../..
+      dockerfile: apps/supervisor-admin/Dockerfile
+    restart: unless-stopped
+    networks: [internal]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    # HTTP only (no 443) — IP/test mode.
+    ports: ['80:80']
+    volumes:
+      - ./Caddyfile.ip:/etc/caddy/Caddyfile:ro
+      - ./bins:/srv/bins:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [api, admin]
+    networks: [internal]
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:
