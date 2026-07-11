@@ -2,20 +2,21 @@
 // The matching private key lives ONLY in the Supervisor VPS's
 // `.env.production` (`RSA_PRIVATE_KEY`), never in this repo.
 //
-// RESOLVED (CLI-401, 2026-07-06): the locally-generated dev RSA_PRIVATE_KEY
-// (gitignored apps/supervisor-api/.env) was chosen as the permanent root of
-// trust — this is its public half, derived via
-// `crypto.createPublicKey(privateKeyPem).export({ type: 'spki', format: 'pem' })`.
-// Any future production deploy must keep using this same keypair (or update
-// both this file and the VPS `.env.production` together) — swapping one
-// without the other breaks all existing `.lic` signatures.
+// UPDATED (CLI-361, 2026-07-11): freshly generated production RSA keypair for
+// the VM deploy (replaces the old dev keypair of CLI-401). This is the SPKI
+// public half; the matching PKCS8 private half lives ONLY in the Supervisor
+// VM's env (`RSA_PRIVATE_KEY`), never in this repo. Generated via
+// `apps/supervisor-api/src/lib/rsa.ts` generateKeyPair() (RSA-2048, SHA256).
+// The keypair MUST stay matched: swapping one half without the other breaks
+// all existing `.lic` signatures. Desktop builds bake THIS public key, so any
+// keypair change requires rebuilding + redistributing the desktop app.
 export const SUPERVISOR_PUBLIC_KEY_PEM = `-----BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuTI9WMh1rY7DC66dCmcT
-XaKQ+B0fiVt+xGxxJoB1qapV8W2JC/1X2fFJIIyq7zppbJ5AC04LHQG2Mqf8lAYs
-XZQefLGbR5aYaJy3l2dlVCHiLXe7T2X19okTp6jNqkTnIZPZqGChodXndqekEOW0
-/yqq3geiGDnhW7tH6skihxF0KqL4F8f7XgG0TZbQeBvw6ZVysAH76TU7fN+npWq1
-/iTRg6GJ5wmo78jAx6utMzzqV1mkP2aOqnyYr/UFTWEAvAYwuE+xawf2DUWma62G
-X3ZPCt00xzFwR5cZwvmx6kL9hprYVkCdvhvrPyPMCnXD2+MvZ74lkcMR8duGuMur
-WQIDAQAB
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAq0vbIWAqHLHwMCPCUaqf
+Heez0fvyPcHbKBqODNPkYke/L0cv/ysHqRnKqpWycSHgVsTpiHMsnuD0RLsQznwh
+aKYAT+vNgdDcCe0kvt4ey2xjLcvN++W88O8o0T0gvPuVbmbqipiwOv1WXLKfoa8A
+ztH+cNJ2P4eR8cIyE7kub+UdeE7zD2yiM2hVVDBbzdRnNDi6bDQEMdJFojDUxKcM
+O787ITrDRQPUXxIiDHJ/EzXwVjVpK5LVwQpr61SuVbkwunRp34J9WtUPrXuZOo06
+MSn8sQTl7KHvUrXx6tA6+/+4XA+EnyC8UA1mDX1c3S4udoldRkKgmd+wIvvNFa8D
+XwIDAQAB
 -----END PUBLIC KEY-----
 `;
