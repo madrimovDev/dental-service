@@ -93,6 +93,19 @@ export const createPayrollService = (deps: { audit: AuditLogger }) => {
               eq(cashierTransactions.status, 'completed'),
               gte(cashierTransactions.createdAt, start),
               lt(cashierTransactions.createdAt, end),
+              // CLI-479 (double-clawback fix, Variant A): asl to'lovi FINALIZED davrga
+              // tushgan refund `recordRefundAdjustment` orqali carry-forward
+              // `payroll_adjustment` oladi; agar shu refund qatorining O'ZI joriy ochiq
+              // davrga tushsa (refund "hozir" bo'ladi, asl to'lov o'tmishda), bu revenue
+              // netting uni IKKINCHI marta ayirardi. Invariant: bitta refund FAQAT BIR
+              // marta clawback qilinadi — YOKI jonli netting (o'z davri hali ochiq) YOKI
+              // adjustment (asl davr finalized), ikkovi birga EMAS. Adjustment yo'lini
+              // ustun qo'yamiz: u clawbackni ASL finalized-snapshot komissiya foizida
+              // (aynan to'langan miqdor) hisoblaydi — joriy foiz o'zgargan bo'lsa netting
+              // noto'g'ri chiqadi. `source_transaction_id` = refund tx id, shuning uchun
+              // faqat adjustmentli refund chiqariladi; oddiy to'lov + adjustmentsiz
+              // refund (asl davr ochiq edi) avvalgidek netlanaveradi.
+              sql`NOT EXISTS (SELECT 1 FROM ${payrollAdjustments} WHERE ${payrollAdjustments.sourceTransactionId} = ${cashierTransactions.id})`,
             ),
           )
           .groupBy(treatmentPlans.doctorId);
