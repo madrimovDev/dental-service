@@ -174,6 +174,8 @@ function stage(over: Partial<TreatmentStage> = {}): TreatmentStage {
     acceptance: 'proposed',
     notes: null,
     completedAt: null,
+    labOrderId: null,
+    resultingToothState: null,
     ...over,
   };
 }
