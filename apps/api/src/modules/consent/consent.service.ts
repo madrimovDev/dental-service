@@ -3,9 +3,18 @@ import { and, desc, eq } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import {
+  CrossEntityError,
+  createOwnershipValidator,
+  type OwnershipValidator,
+} from '../../lib/ownership.ts';
 import type { CreateTemplateInput, SignFormInput, UpdateTemplateInput } from './consent.schema.ts';
 
-export const createConsentService = (deps: { audit: AuditLogger }) => {
+export const createConsentService = (deps: {
+  audit: AuditLogger;
+  ownership?: OwnershipValidator;
+}) => {
+  const ownership = deps.ownership ?? createOwnershipValidator();
   // ===== Templates =====
   async function listTemplates(c: Context, type?: string, activeOnly = true) {
     const db = getDb(c);
@@ -123,6 +132,21 @@ export const createConsentService = (deps: { audit: AuditLogger }) => {
     const tenantId = c.get('activeTenantId');
     const user = c.get('user');
     if (!tenantId || !user) throw new Error('No tenant context');
+
+    // CLI-484: cross-entity ownership — patientId shu tenantga tegishlimi (FK
+    // RLS'ni chetlab o'tadi: cross-tenant/mavjud bo'lmagan UUID xom 500 o'rniga toza
+    // CrossEntityError → routes 400; prescriptions.create patterni). templateId
+    // ixtiyoriy — berilsa, RLS-scoped select bilan shu tenantnikimi tekshiriladi
+    // (FK cross-tenant template'ni ham qabul qilardi).
+    await ownership.assertPatientExists(c, input.patientId);
+    if (input.templateId) {
+      const [template] = await db
+        .select({ id: consentTemplates.id })
+        .from(consentTemplates)
+        .where(eq(consentTemplates.id, input.templateId))
+        .limit(1);
+      if (!template) throw new CrossEntityError('consent_template', 'not_found');
+    }
 
     const [row] = await db
       .insert(consentForms)
