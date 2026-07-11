@@ -121,6 +121,23 @@ export type NoShowStrikeHook = {
   ) => Promise<void>;
 };
 
+/**
+ * CLI-482: teskari sync (appointments → queue) narrow dep. Yozilish cancel/
+ * complete/no_show'ga o'tganda bog'langan OCHIQ (waiting/in_progress) queue
+ * ticket'ni arvoh qolib ketmasin deb yopadi. `closeLinkedOpenTicket` ticket
+ * qatorini TO'G'RIDAN-TO'G'RI (queue.updateStatus'siz) yopadi — aks holda
+ * forward-sync (queue→appt) qayta otilib rekursiyaga tushardi. Idempotent
+ * (ochiq ticket yo'q bo'lsa no-op). Wiring: app.ts (deferred ref, chunki
+ * queue→appt forward-sync bilan aylanma bog'liqlik).
+ */
+export type QueueReverseSyncHook = {
+  closeLinkedOpenTicket: (
+    c: Context,
+    appointmentId: string,
+    ticketStatus: 'done' | 'missed',
+  ) => Promise<void>;
+};
+
 export const createAppointmentsService = (deps: {
   audit: AuditLogger;
   schedule?: SchedulePredicates;
@@ -128,6 +145,7 @@ export const createAppointmentsService = (deps: {
   removeReminder?: (appointmentId: string) => Promise<void>;
   recall?: RecallAppointmentHook;
   noShowStrike?: NoShowStrikeHook;
+  queue?: QueueReverseSyncHook;
 }) => {
   async function checkConflict(
     c: Context,
@@ -431,6 +449,38 @@ export const createAppointmentsService = (deps: {
         deps.recall
       ) {
         await deps.recall.reopenOnCancel(c, id);
+      }
+
+      // CLI-482: teskari sync — yozilish cancel/complete/no_show'ga o'tganda
+      // bog'langan ochiq queue ticket'ni yop (arvoh ticket qolib ketmasin).
+      // Yopilish holatiga o'tishda VA status haqiqatan o'zgarganda (idempotent
+      // re-PATCH qayta otmaydi). completed→'done', cancelled/no_show→'missed'.
+      // (Plan cancel/complete deydi; no_show'ni ham qamrab olamiz — bir xil
+      // "yopish" semantikasi va xavfsiz: queue-driven no_show'da ticket allaqachon
+      // 'missed' terminal → no-op; kalendar-driven no_show'da esa ochiq ticket
+      // to'g'ri yopiladi.)
+      if (
+        input.status &&
+        input.status !== before.status &&
+        (input.status === 'completed' ||
+          input.status === 'cancelled' ||
+          input.status === 'no_show') &&
+        deps.queue
+      ) {
+        const ticketStatus = input.status === 'completed' ? ('done' as const) : ('missed' as const);
+        await deps.queue.closeLinkedOpenTicket(c, id, ticketStatus);
+      }
+
+      // CLI-486: qayta-faollashtirish (cancelled/no_show → scheduled) — yozilish
+      // qayta ochilganda bemorning ochiq recall'ini `create()`dagi kabi rebook
+      // qil (closeOpenOnRebook faqat create()da otilardi → recall `pending`da
+      // qolib ketardi). Faqat mavjud recall metodi chaqiriladi (call-only).
+      if (
+        input.status === 'scheduled' &&
+        (before.status === 'cancelled' || before.status === 'no_show') &&
+        deps.recall
+      ) {
+        await deps.recall.closeOpenOnRebook(c, updated.patientId, id, updated.startTime);
       }
 
       // CLI-474 (L7): no_show'ga O'TGANDA bemor strike'i (transition edge —

@@ -30,7 +30,7 @@ import { patientRoutes } from './modules/patients/index.ts';
 import { createPayrollService, payrollRoutes } from './modules/payroll/index.ts';
 import { permissionRoutes } from './modules/permissions/index.ts';
 import { prescriptionsRoutes } from './modules/prescriptions/index.ts';
-import { queueRoutes } from './modules/queue/index.ts';
+import { createQueueService, type QueueService, queueRoutes } from './modules/queue/index.ts';
 import { createRecallsService, recallRoutes } from './modules/recalls/index.ts';
 import { reportsRoutes } from './modules/reports/index.ts';
 import { roleRoutes } from './modules/roles/index.ts';
@@ -185,11 +185,23 @@ export const createApp = () => {
   // completion path, queue "done"→completed ham preventive-recall hook'ini
   // (B4) fire qiladi (ilgari faqat kalendar PATCH orqali yopilgan appointment
   // recall olardi).
+  // CLI-482: queueService bir marta quriladi va appointmentRoutes-queueRoutes
+  // hamda appointmentsService (teskari sync hook) o'rtasida ULASHILADI. Aylanma
+  // bog'liqlik (queue→appt forward-sync, appt→queue reverse-sync) deferred ref
+  // bilan hal qilinadi — hook runtime'da chaqiriladi, shu vaqtga queueService
+  // allaqachon tayinlangan bo'ladi.
+  let queueService: QueueService | undefined;
   const appointmentsService = createAppointmentsService({
     audit,
     schedule,
     recall,
     noShowStrike,
+    // CLI-482: teskari sync — yozilish cancel/complete/no_show'ga o'tganda
+    // bog'langan ochiq queue ticket'ni yopadi (arvoh ticket'ni oldini oladi).
+    queue: {
+      closeLinkedOpenTicket: (c, appointmentId, ticketStatus) =>
+        queueService?.closeLinkedOpenTicket(c, appointmentId, ticketStatus) ?? Promise.resolve(),
+    },
     // A9 (CLI-438): reminder job hayot-sikli. Ilgari `remove()` keyin `add()`
     // ketma-ket chaqirilardi — BullMQ bir xil `jobId` bilan `add()`ni MAVJUD
     // (hali olib tashlanmagan) job'ni qaytarib, delay'ni YANGILAMAYDI (dedupe).
@@ -234,7 +246,11 @@ export const createApp = () => {
   });
   app.route('/api/appointments', appointmentRoutes({ db, audit, service: appointmentsService }));
   app.route('/api/schedule', scheduleRoutes({ db, audit }));
-  app.route('/api/queue', queueRoutes({ db, audit, appointmentsService }));
+  // CLI-482: queueService'ni shu yerda quramiz (deferred ref'ni to'ldiradi) va
+  // queueRoutes'ga uzatamiz — forward-sync (queue→appt) VA teskari sync
+  // (appt→queue) bitta instansiyani ULASHADI.
+  queueService = createQueueService({ audit, appointments: appointmentsService });
+  app.route('/api/queue', queueRoutes({ db, audit, service: queueService }));
   app.route('/api/recalls', recallRoutes({ db, audit }));
   // M5 clinical extras
   app.route('/api/prescriptions', prescriptionsRoutes({ db, audit }));
