@@ -1,5 +1,6 @@
 import {
   consentForms,
+  labOrders,
   treatmentPlans,
   treatmentStagePayments,
   treatmentStages,
@@ -124,6 +125,23 @@ export const createTreatmentPlansRepository = () => {
     return row ?? null;
   }
 
+  /**
+   * CLI-487: bosqichga bog'langan lab-order statusini o'qiydi (biznes mantiqsiz —
+   * "delivered'mi" tekshiruvi service qatlamida). `findConsentForm` precedenti bilan
+   * bir xil — repository qatlami boshqa domen jadvalini to'g'ridan o'qishi RFC-0009'da
+   * taqiqlanmagan. RLS tenant bo'yicha filtrlaydi → cross-tenant/mavjud bo'lmagan
+   * labOrderId → null (service uni "delivered emas" deb bloklaydi, fail-safe).
+   */
+  async function findLabOrderStatus(c: Context, labOrderId: string) {
+    const db = getDb(c);
+    const [row] = await db
+      .select({ status: labOrders.status })
+      .from(labOrders)
+      .where(eq(labOrders.id, labOrderId))
+      .limit(1);
+    return row ?? null;
+  }
+
   /** C6: estimate uchun plan bosqichlariga tegishli allocation'lar (RLS filtrlaydi). */
   async function listStageAllocations(c: Context, planId: string) {
     const db = getDb(c);
@@ -172,6 +190,7 @@ export const createTreatmentPlansRepository = () => {
     findPlan,
     findStage,
     findConsentForm,
+    findLabOrderStatus,
     listStageAllocations,
     updatePlan,
     updateStage,

@@ -16,6 +16,7 @@ import {
   assertStageAcceptanceTransition,
   assertStageMutationAllowedForPlan,
   assertStageStatusTransition,
+  StageLabPendingError,
   type StageStatus,
 } from './treatment-plans.transitions.ts';
 
@@ -294,6 +295,16 @@ export const createTreatmentPlansService = (deps: {
     const plan = await repo.findPlan(c, current.treatmentPlanId);
     if (plan) {
       assertStageMutationAllowedForPlan(plan.status, { toStatus });
+    }
+
+    // CLI-487: lab-order gate — bosqichni 'completed' qilishda bog'langan lab-order
+    // 'delivered' bo'lishi shart. Plan-guard'dan KEYIN, persist'dan OLDIN (completed
+    // yozilmaydi). Cross-tenant/mavjud bo'lmagan link (RLS → null) → fail-safe blok.
+    if (toStatus === 'completed' && current.labOrderId) {
+      const lab = await repo.findLabOrderStatus(c, current.labOrderId);
+      if (!lab || lab.status !== 'delivered') {
+        throw new StageLabPendingError(lab?.status ?? 'missing');
+      }
     }
 
     const updated = await repo.updateStage(c, stageId, patch);

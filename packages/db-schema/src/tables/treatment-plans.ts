@@ -10,6 +10,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { consentForms } from './consent.ts';
+import { labOrders } from './lab-orders.ts';
 import { patients } from './patients.ts';
 import { services } from './services.ts';
 import { tenants } from './tenants.ts';
@@ -106,6 +107,10 @@ export const treatmentStages = pgTable(
       .references(() => treatmentPlans.id, { onDelete: 'cascade' }),
     sequence: integer('sequence').notNull(),
     serviceId: uuid('service_id').references(() => services.id, { onDelete: 'set null' }),
+    // CLI-487: ixtiyoriy lab-order bog'lanishi. Bosqichni 'completed' qilishda bog'langan
+    // lab-order 'delivered' bo'lishi shart (aks holda StageLabPendingError). Backend-only
+    // (bu round API'da set qilinmaydi); onDelete:set null — lab-order o'chsa link uziladi.
+    labOrderId: uuid('lab_order_id').references(() => labOrders.id, { onDelete: 'set null' }),
     serviceName: text('service_name').notNull(),
     toothNumbers: integer('tooth_numbers').array(), // FDI: 11-48, 51-85
     estimatedVisits: integer('estimated_visits').notNull().default(1),
