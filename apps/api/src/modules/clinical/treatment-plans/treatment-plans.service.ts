@@ -1,3 +1,4 @@
+import type { ToothStateValue } from '@dental/db-schema';
 import type { Context } from 'hono';
 import type { AuditLogger } from '../../../lib/audit-logger.ts';
 import { createOwnershipValidator, type OwnershipValidator } from '../../../lib/ownership.ts';
@@ -16,6 +17,7 @@ import {
   assertStageAcceptanceTransition,
   assertStageMutationAllowedForPlan,
   assertStageStatusTransition,
+  StageLabPendingError,
   type StageStatus,
 } from './treatment-plans.transitions.ts';
 
@@ -51,6 +53,23 @@ export type RecallStageHook = {
       assignedDoctorId?: string | null;
     },
   ) => Promise<void>;
+};
+
+/**
+ * CLI-488: tooth-charts modulidan inject qilinadigan narrow dep (recall pattern bilan
+ * bir xil bog'liqlik yo'nalishi: treatment-plans → tooth-charts, to'g'ridan import emas).
+ * Bosqich 'completed' bo'lganda `toothNumbers` uchun yangi odontogramma snapshot yozadi.
+ */
+export type ToothChartStageHook = {
+  recordStageCompletion: (
+    c: Context,
+    args: {
+      patientId: string;
+      toothNumbers: number[];
+      state: ToothStateValue;
+      sourceStageId: string;
+    },
+  ) => Promise<unknown>;
 };
 
 /**
@@ -103,6 +122,8 @@ export const createTreatmentPlansService = (deps: {
   /** CLI-443: bosqich narxini serverda hisoblash uchun (faqat `serviceId` bor bosqichlarga). */
   priceLookup?: PriceLookup;
   ownership?: OwnershipValidator;
+  /** CLI-488: bosqich 'completed' bo'lganda odontogramma auto-update (tooth-charts DI hook). */
+  toothChart?: ToothChartStageHook;
 }) => {
   const repo = createTreatmentPlansRepository();
   const ownership = deps.ownership ?? createOwnershipValidator();
@@ -296,6 +317,16 @@ export const createTreatmentPlansService = (deps: {
       assertStageMutationAllowedForPlan(plan.status, { toStatus });
     }
 
+    // CLI-487: lab-order gate — bosqichni 'completed' qilishda bog'langan lab-order
+    // 'delivered' bo'lishi shart. Plan-guard'dan KEYIN, persist'dan OLDIN (completed
+    // yozilmaydi). Cross-tenant/mavjud bo'lmagan link (RLS → null) → fail-safe blok.
+    if (toStatus === 'completed' && current.labOrderId) {
+      const lab = await repo.findLabOrderStatus(c, current.labOrderId);
+      if (!lab || lab.status !== 'delivered') {
+        throw new StageLabPendingError(lab?.status ?? 'missing');
+      }
+    }
+
     const updated = await repo.updateStage(c, stageId, patch);
     if (updated) {
       // CLI-439 B9c: audit'ga `before` (joriy holat, mutatsiyadan oldin) ham yozamiz —
@@ -308,17 +339,30 @@ export const createTreatmentPlansService = (deps: {
         after: { status: input.status, acceptance: input.acceptance },
       });
 
-      // B4: bosqich completed → treatment_followup recall (idempotent). Plan'dan
-      // patientId/branchId kerak (stage'da yo'q). Guard cancelled/completed planda
-      // avval otilgani uchun bu yerga faqat ruxsat etilgan plan holatida yetiladi.
-      if (patch.status === 'completed' && deps.recall && plan) {
-        await deps.recall.autoCreateFromStage(c, {
-          patientId: plan.patientId,
-          sourceStageId: updated.id,
-          treatmentPlanId: plan.id,
-          // CLI-474 (L9): recall'ni davolash rejasi doktoriga biriktir.
-          assignedDoctorId: plan.doctorId,
-        });
+      // Bosqich completed → hook'lar (idempotent — completed-o'tish faqat bir marta,
+      // qayta PATCH yuqorida erta qaytadi). Guard cancelled/completed planda avval
+      // otilgani uchun bu yerga faqat ruxsat etilgan plan holatida yetiladi.
+      if (patch.status === 'completed' && plan) {
+        // B4: treatment_followup recall. Plan'dan patientId/doctorId kerak (stage'da yo'q).
+        if (deps.recall) {
+          await deps.recall.autoCreateFromStage(c, {
+            patientId: plan.patientId,
+            sourceStageId: updated.id,
+            treatmentPlanId: plan.id,
+            // CLI-474 (L9): recall'ni davolash rejasi doktoriga biriktir.
+            assignedDoctorId: plan.doctorId,
+          });
+        }
+        // CLI-488: odontogramma auto-update — bosqichda resultingToothState + toothNumbers
+        // bo'lsa yangi tooth_chart snapshot (immutable model; tooth-charts DI hook).
+        if (deps.toothChart && updated.resultingToothState && updated.toothNumbers?.length) {
+          await deps.toothChart.recordStageCompletion(c, {
+            patientId: plan.patientId,
+            toothNumbers: updated.toothNumbers,
+            state: updated.resultingToothState,
+            sourceStageId: updated.id,
+          });
+        }
       }
     }
     return updated;

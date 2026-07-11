@@ -128,6 +128,22 @@ export class PlanNotActiveError extends InvalidTransitionError {
 }
 
 /**
+ * CLI-487: bog'langan lab-order hali 'delivered' emas — bosqichni 'completed' qilib
+ * bo'lmaydi. InvalidTransitionError SUBKLASSI (PlanLockedError precedenti) →
+ * visit-notes/treatment-plans routes'dagi mavjud `instanceof InvalidTransitionError`
+ * catch uni 400 (`stage.invalid_transition`) ga aylantiradi (route o'zgarishi shart emas).
+ * `labStatus` — bloklovchi joriy lab-order statusi (draft/sent/in_progress/ready/
+ * cancelled) yoki 'missing' (link uzilib qolgan/cross-tenant → fail-safe blok).
+ */
+export class StageLabPendingError extends InvalidTransitionError {
+  constructor(readonly labStatus: string) {
+    super('stage_status', `lab:${labStatus}`, 'completed');
+    this.name = 'StageLabPendingError';
+    this.message = `Cannot complete stage: linked lab order is '${labStatus}', not 'delivered'.`;
+  }
+}
+
+/**
  * CLI-415: bosqich mutatsiyasini parent plan statusiga qarshi tekshiradi.
  *   - cancelled/completed plan → har qanday bosqich mutatsiyasi RAD (PlanLockedError).
  *   - draft/presented plan → bosqichni completed/in_progress qilib bo'lmaydi

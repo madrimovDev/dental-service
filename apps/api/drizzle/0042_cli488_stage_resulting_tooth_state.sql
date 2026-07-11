@@ -1,0 +1,1 @@
+ALTER TABLE "treatment_stages" ADD COLUMN "resulting_tooth_state" "tooth_state";
