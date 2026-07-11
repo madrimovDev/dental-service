@@ -6,7 +6,9 @@
  *   - scheduled ↔ confirmed (ikki yo'nali)
  *   - scheduled/confirmed → in_progress → completed (klinik oqim)
  *   - scheduled/confirmed/in_progress → cancelled
- *   - scheduled/confirmed → no_show
+ *   - scheduled/confirmed/in_progress → no_show
+ *     (CLI-480: chaqirilib kelmagan/ketib qolgan = no-show; queue `in_progress→
+ *      missed` sync'i endi jim yiqilmaydi — appt to'g'ri `no_show`ga o'tadi)
  *   - cancelled → scheduled (qayta-faollashtirish) — conflict/schedule QAYTA tekshiriladi
  *   - no_show → scheduled (qayta bron) — xuddi shunday re-validatsiya
  *   - completed — TERMINAL (hech qanday chiqish; vaqt/doktor tahriri ham RAD)
@@ -36,7 +38,7 @@ export function isActiveStatus(s: AppointmentStatus): boolean {
 const ALLOWED_TRANSITIONS: Record<AppointmentStatus, readonly AppointmentStatus[]> = {
   scheduled: ['confirmed', 'in_progress', 'no_show', 'cancelled'],
   confirmed: ['scheduled', 'in_progress', 'no_show', 'cancelled'],
-  in_progress: ['completed', 'cancelled'],
+  in_progress: ['completed', 'cancelled', 'no_show'],
   completed: [], // terminal
   no_show: ['scheduled'],
   cancelled: ['scheduled'],

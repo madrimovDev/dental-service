@@ -16,7 +16,7 @@ import {
   queueTicketIdParamSchema,
   updateQueueStatusSchema,
 } from './queue.schema.ts';
-import { createQueueService, QueueValidationError } from './queue.service.ts';
+import { createQueueService, type QueueService, QueueValidationError } from './queue.service.ts';
 import { QueueTransitionError } from './queue.transitions.ts';
 
 /** Standart 404 response — ticket topilmadi. */
@@ -39,16 +39,25 @@ export const queueRoutes = (deps: {
    * yo'liga qaytadi (recall hook OTLAMAYDI).
    */
   appointmentsService?: Pick<AppointmentsService, 'update'>;
+  /**
+   * CLI-482: app.ts queueService'ni bir marta qurib beradi (teskari sync
+   * `closeLinkedOpenTicket` uchun appointmentsService'ga ham inject qilinadi —
+   * aylanma bog'liqlik deferred-ref bilan hal qilinadi). Berilmasa bu yerda
+   * lokal quriladi (backward-safe: reverse-sync ulanmagan holat).
+   */
+  service?: QueueService;
 }) => {
   const app = new OpenAPIHono();
   app.use('*', requireModuleInDesktop('queue'));
   app.use('*', authMiddleware());
   app.use('*', rlsMiddleware(deps.db));
 
-  const service = createQueueService({
-    audit: deps.audit,
-    appointments: deps.appointmentsService,
-  });
+  const service =
+    deps.service ??
+    createQueueService({
+      audit: deps.audit,
+      appointments: deps.appointmentsService,
+    });
 
   // ─── GET / — today's queue list ──────────────────────────────────────────
 

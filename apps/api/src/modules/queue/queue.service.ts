@@ -271,6 +271,53 @@ export const createQueueService = (deps: {
     return updated;
   }
 
+  /**
+   * CLI-482: teskari sync (appointments → queue). Yozilish cancel/complete/
+   * no_show'ga o'tganda (appointments.service.update hook orqali) shu yozilishga
+   * bog'langan OCHIQ (waiting/in_progress) ticket(lar)ni yopadi — aks holda
+   * ticket board'da arvoh bo'lib qolardi. Ticket qatorini TO'G'RIDAN-TO'G'RI
+   * yangilaymiz (updateStatus'siz): updateStatus forward-sync'ni (queue→appt)
+   * qayta otib rekursiyaga tushardi; bu yerda appt allaqachon o'z yakuniy
+   * holatida, faqat ticket'ni yopamiz. Idempotent — ochiq ticket yo'q bo'lsa
+   * no-op. Bir necha ochiq ticket bo'lsa (kutilmaydi — create() dedupe qiladi)
+   * hammasini yopamiz (himoya).
+   */
+  async function closeLinkedOpenTicket(
+    c: Context,
+    appointmentId: string,
+    ticketStatus: 'done' | 'missed',
+  ): Promise<void> {
+    const db = getDb(c);
+    const now = new Date();
+
+    const openTickets = await db
+      .select({ id: queueTickets.id, status: queueTickets.status })
+      .from(queueTickets)
+      .where(
+        and(
+          eq(queueTickets.appointmentId, appointmentId),
+          sql`${queueTickets.status} in ('waiting','in_progress')`,
+        ),
+      );
+
+    for (const ticket of openTickets) {
+      // State-machine izchilligi: waiting/in_progress → done|missed ruxsat etilgan.
+      assertQueueTransition(ticket.status as QueueTicketStatus, ticketStatus);
+      await db
+        .update(queueTickets)
+        .set({ status: ticketStatus, finishedAt: now })
+        .where(eq(queueTickets.id, ticket.id));
+
+      await deps.audit.record(c, {
+        action: 'status_synced',
+        resourceType: 'queue_ticket',
+        resourceId: ticket.id,
+        before: { status: ticket.status },
+        after: { status: ticketStatus },
+      });
+    }
+  }
+
   /** Bugungi scheduled/confirmed appointment'lar, navbatga olinmaganlari. */
   async function checkInCandidates(c: Context, branchId: string) {
     const db = getDb(c);
@@ -346,10 +393,49 @@ export const createQueueService = (deps: {
       const updated = await updateStatus(c, ticket.id, { status: 'missed' });
       if (updated) swept++;
     }
+
+    // CLI-483: check-in'siz (queue-ticket'siz) umuman kelmagan bemorlar ham
+    // no-show sanalishi kerak. Yuqoridagi ticket-sweep faqat `queue_tickets`ni
+    // supuradi — hech qachon ticket olmagan o'tmish yozilishlar abadiy
+    // `scheduled`/`confirmed` bo'lib qolar, `reports.noShowRate` ularni
+    // qamramas edi. Bu yerda o'tgan kun(lar)dagi (startTime < bugungi kun
+    // boshi — bugungi hali kutayotgan yozilishlar TEGILMAYDI, kun tugamagan),
+    // ticket'i YO'Q `scheduled`/`confirmed` yozilishlarni topamiz va
+    // appointments seam orqali `no_show` qilamiz — bu strike (CLI-474) + recall
+    // reopen (CLI-426) hook'larini ham otadi. Appointments dep inject qilinmagan
+    // legacy holatда o'tkazib yuboriladi (backward-safe).
+    if (deps.appointments) {
+      const apptFilters = [
+        lt(appointments.startTime, todayStart),
+        isNull(queueTickets.id),
+        sql`${appointments.status} in ('scheduled','confirmed')`,
+      ];
+      if (branchId) apptFilters.push(eq(appointments.branchId, branchId));
+
+      const ticketlessAppts = await db
+        .select({ id: appointments.id })
+        .from(appointments)
+        .leftJoin(queueTickets, eq(queueTickets.appointmentId, appointments.id))
+        .where(and(...apptFilters));
+
+      for (const appt of ticketlessAppts) {
+        const res = await deps.appointments.update(c, appt.id, { status: 'no_show' });
+        if (res.ok) swept++;
+      }
+    }
+
     return swept;
   }
 
-  return { todayList, nextNumber, create, updateStatus, checkInCandidates, sweepNoShows };
+  return {
+    todayList,
+    nextNumber,
+    create,
+    updateStatus,
+    closeLinkedOpenTicket,
+    checkInCandidates,
+    sweepNoShows,
+  };
 };
 
 export type QueueService = ReturnType<typeof createQueueService>;
