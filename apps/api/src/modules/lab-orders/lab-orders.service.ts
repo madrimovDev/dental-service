@@ -96,6 +96,10 @@ export const createLabOrdersService = (deps: {
     // patientId oldindan tekshiriladi (FK constraint xom 500 o'rniga toza 400,
     // visit-notes.service.ts CLI-421 pattern bilan bir xil — routes 400'ga aylantiradi).
     await ownership.assertPatientExists(c, input.patientId);
+    // CLI-485: doctorId ham cross-entity ownership tekshiruvidan o'tadi (platform-level
+    // user; assertUserExists shu tenantda aktiv assignment'i/owner ekanini tasdiqlaydi —
+    // cross-tenant/mavjud bo'lmagan doctorId xom 500 emas, toza 400).
+    await ownership.assertUserExists(c, input.doctorId);
 
     const [row] = await db
       .insert(labOrders)

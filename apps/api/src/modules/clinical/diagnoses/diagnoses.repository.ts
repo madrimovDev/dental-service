@@ -15,7 +15,9 @@ export const createDiagnosesRepository = (deps: { db: Database }) => {
         .orderBy(asc(diagnoses.code))
         .limit(100);
     }
-    return deps.db.select().from(diagnoses).orderBy(asc(diagnoses.code));
+    // CLI-489: search'siz shox ham bounded (ICD-10 katalog o'sib ketsa unbounded
+    // scan/response bo'lmasligi uchun) — search shoxi bilan bir xil ≤100 chegara.
+    return deps.db.select().from(diagnoses).orderBy(asc(diagnoses.code)).limit(100);
   }
 
   return { list };

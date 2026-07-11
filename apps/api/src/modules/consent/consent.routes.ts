@@ -4,6 +4,7 @@ import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { requireModuleInDesktop } from '../../lib/license-middleware.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
+import { CrossEntityError } from '../../lib/ownership.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
@@ -195,9 +196,17 @@ export const consentRoutes = (deps: { db: Database; audit: AuditLogger }) => {
 
   app.openapi(signFormRoute, async (c) => {
     const body = c.req.valid('json');
-    const row = await service.signForm(c, body);
-    if (!row) throw new Error('Consent form signing failed');
-    return c.json(ok(toConsentFormDto(row)), 201);
+    try {
+      const row = await service.signForm(c, body);
+      if (!row) throw new Error('Consent form signing failed');
+      return c.json(ok(toConsentFormDto(row)), 201);
+    } catch (e) {
+      // CLI-484: cross-entity ownership mismatch → 400 (noto'g'ri havola, resource emas).
+      if (e instanceof CrossEntityError) {
+        return c.json(fail(`ownership.${e.reason}`, e.message), 400);
+      }
+      throw e;
+    }
   });
 
   return app;
