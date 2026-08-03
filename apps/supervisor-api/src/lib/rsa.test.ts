@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { createSign } from 'node:crypto';
 import { generateKeyPair, signLicense, verifySignature } from './rsa';
 
 describe('RSA license signing', () => {
@@ -49,8 +50,12 @@ describe('rsa flat-payload guard', () => {
 
   it('nested payload tekshiruvi throw emas, false qaytaradi', () => {
     const data = { clinicId: 'abc', provisioning: { ownerPassword: 'maxfiy' } };
-    // Guard'gacha imzolangan (yoki qo'lda yasalgan) imzo — tekshiruv fail-closed.
-    const sig = 'ff'.repeat(32);
+    // Guard'gacha yozilgan imzo — `signLicense`ni chetlab, guard'siz imzolaymiz.
+    // Bu imzo guard'siz `true` bo'lardi (canonicalize nested kalitlarni tashlab
+    // `{"clinicId":"abc","provisioning":{}}` beradi) — endi fail-closed `false`.
+    const sign = createSign('SHA256');
+    sign.update(JSON.stringify(data, Object.keys(data).sort()));
+    const sig = sign.sign(privateKey, 'hex');
     expect(() => verifySignature(data, sig, publicKey)).not.toThrow();
     expect(verifySignature(data, sig, publicKey)).toBe(false);
   });
