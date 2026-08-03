@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { createSign, generateKeyPairSync } from 'node:crypto';
-import { verifyLicenseSignature } from './license-signature';
+import { assertFlatSignaturePayload, verifyLicenseSignature } from './license-signature';
 
 const generateKeyPair = () => {
   const { privateKey, publicKey } = generateKeyPairSync('rsa', {
@@ -46,5 +46,37 @@ describe('verifyLicenseSignature', () => {
     const sig = signForTest(data, privateKey);
     expect(() => verifyLicenseSignature(data, sig, 'not-a-real-pem')).not.toThrow();
     expect(verifyLicenseSignature(data, sig, 'not-a-real-pem')).toBe(false);
+  });
+});
+
+describe('assertFlatSignaturePayload', () => {
+  it('tekis obyektni qabul qiladi (string, number, boolean, string[])', () => {
+    expect(() =>
+      assertFlatSignaturePayload({ a: 'x', b: 1, c: true, d: ['p', 'q'] }),
+    ).not.toThrow();
+  });
+
+  it('nested obyektda xato beradi — canonicalize uni jim tashlab yuboradi', () => {
+    expect(() => assertFlatSignaturePayload({ a: 'x', nested: { b: 'y' } })).toThrow(
+      'SIGNATURE_PAYLOAD_NOT_FLAT',
+    );
+  });
+
+  it('obyektlar massivida ham xato beradi', () => {
+    expect(() => assertFlatSignaturePayload({ a: [{ b: 'y' }] })).toThrow(
+      'SIGNATURE_PAYLOAD_NOT_FLAT',
+    );
+  });
+
+  it('null qiymatga ruxsat beradi', () => {
+    expect(() => assertFlatSignaturePayload({ a: null })).not.toThrow();
+  });
+
+  it('nested payload uchun imzo tekshiruvi false qaytaradi (throw emas)', () => {
+    const { privateKey, publicKey } = generateKeyPair();
+    const data = { clinicId: 'abc', provisioning: { ownerPassword: 'maxfiy' } };
+    const sig = signForTest(data, privateKey);
+    expect(() => verifyLicenseSignature(data, sig, publicKey)).not.toThrow();
+    expect(verifyLicenseSignature(data, sig, publicKey)).toBe(false);
   });
 });

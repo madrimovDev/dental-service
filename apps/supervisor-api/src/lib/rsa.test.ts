@@ -21,3 +21,37 @@ describe('RSA license signing', () => {
     expect(verifySignature(tampered, sig, publicKey)).toBe(false);
   });
 });
+
+describe('rsa flat-payload guard', () => {
+  const { privateKey, publicKey } = generateKeyPair();
+
+  it('tekis payload imzolanadi va tekshiriladi', () => {
+    const payload = {
+      licenseKey: 'K',
+      modules: ['patients'],
+      issuedAt: '2026-08-03T00:00:00.000Z',
+    };
+    const sig = signLicense(payload, privateKey);
+    expect(verifySignature(payload, sig, publicKey)).toBe(true);
+  });
+
+  it('nested payload imzolashda xato beradi', () => {
+    expect(() => signLicense({ a: 'x', nested: { b: 'y' } }, privateKey)).toThrow(
+      'SIGNATURE_PAYLOAD_NOT_FLAT',
+    );
+  });
+
+  it("obyektlar massivi bo'lgan payload ham imzolanmaydi", () => {
+    expect(() => signLicense({ a: [{ b: 'y' }] }, privateKey)).toThrow(
+      'SIGNATURE_PAYLOAD_NOT_FLAT',
+    );
+  });
+
+  it('nested payload tekshiruvi throw emas, false qaytaradi', () => {
+    const data = { clinicId: 'abc', provisioning: { ownerPassword: 'maxfiy' } };
+    // Guard'gacha imzolangan (yoki qo'lda yasalgan) imzo — tekshiruv fail-closed.
+    const sig = 'ff'.repeat(32);
+    expect(() => verifySignature(data, sig, publicKey)).not.toThrow();
+    expect(verifySignature(data, sig, publicKey)).toBe(false);
+  });
+});
