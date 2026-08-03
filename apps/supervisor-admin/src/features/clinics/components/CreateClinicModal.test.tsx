@@ -162,6 +162,13 @@ describe('CreateClinicModal', () => {
     // "Til" Select'iga ataylab tegilmaydi — Mantine v7 non-searchable Select
     // readOnly combobox render qiladi (yuqoridagi "Tarif" izohiga qarang),
     // shuning uchun initialValues'dagi 'uz' default'i tekshiriladi.
+    // Select'ning ko'rinadigan qiymati uning FORMA MAYDONIGA to'g'ri
+    // bog'langanini isbotlaydi: noto'g'ri maydonga ulansa (masalan
+    // `branchPhone`) input bo'sh qolardi, "O'zbekcha" emas.
+    // `selector: 'input'` — Mantine Select'ning ochilgan listbox'i ham xuddi shu
+    // label'ga bog'langan (`aria-labelledby`), shuning uchun input aniq tanlanadi.
+    expect(screen.getByLabelText('Til', { selector: 'input' })).toHaveValue("O'zbekcha");
+    expect(screen.getByLabelText('Tarif', { selector: 'input' })).toHaveValue("Boshlang'ich");
 
     fireEvent.click(screen.getByRole('button', { name: 'Yaratish' }));
 
