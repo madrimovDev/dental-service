@@ -4,6 +4,16 @@
 # Auto-update publish provider — quyida `publish:` (CLI-357, Task 12).
 appId: uz.dental.service
 productName: Dental Service
+# Native-modul rebuild o'chirilgan (CLI-361 real Windows build'da topildi).
+# Sabab: electron-builder paket-menejerni `npm_execpath`dan aniqlab uni
+# `node <execpath>` ko'rinishida chaqiradi — bun monorepo'da bu ikki xil
+# yo'l bilan qulaydi: npm bilan `workspace:*` protokoli tushunilmaydi
+# ("EUNSUPPORTEDPROTOCOL"), bun bilan esa `bun.exe` JS fayl sifatida
+# parse qilinadi ("Invalid or unexpected token").
+# Xavfsiz: apps/desktop bog'liqliklari (@homebridge/ciao, electron-updater)
+# sof JS — kompilyatsiya qilinadigan native addon yo'q. Kelajakda native
+# modul qo'shilsa bu qayta ko'rib chiqilishi SHART.
+npmRebuild: false
 directories:
   output: release
   buildResources: build
@@ -50,6 +60,11 @@ nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
   installerLanguages: [uz, ru]
+  # NSIS'ning o'zbek tarjima faylida `MULTIUSER_TEXT_INSTALLMODE_TITLE` yo'q —
+  # ingliz fallback'i ishlatiladi va bu ogohlantirish default'da xatoga
+  # aylantirilib build'ni to'xtatardi (CLI-361 real Windows build'da topildi).
+  # Faqat shu kosmetik fallback uchun `uz` tilini tashlab yubormaymiz.
+  warningsAsErrors: false
   include: build/installer.nsh    # rol tanlash dialog
 linux:
   target: AppImage
