@@ -334,7 +334,7 @@ git commit -m "feat(core): normalizePhone — telefon raqamining yagona kanonik 
 - Produces: `clinics.ownerFullName`, `clinics.ownerPhone`, `clinics.ownerTempPassword`,
   `clinics.defaultLanguage`, `licenses.provisionedAt` — Task 4, 5 ishlatadi.
 
-- [ ] **Step 1: Sxemani o'zgartirish**
+- [x] **Step 1: Sxemani o'zgartirish**
 
 `apps/supervisor-api/src/db/schema.ts`, `clinics` jadvaliga:
 
@@ -360,11 +360,11 @@ export const clinics = pgTable('clinics', {
   provisionedAt: timestamp('provisioned_at'),
 ```
 
-- [ ] **Step 2: Migratsiya generatsiya qilish**
+- [x] **Step 2: Migratsiya generatsiya qilish**
 
 Run: `cd apps/supervisor-api && bun run db:generate`
 
-- [ ] **Step 3: Migratsiyani mavjud qatorlar uchun xavfsiz qilish**
+- [x] **Step 3: Migratsiyani mavjud qatorlar uchun xavfsiz qilish**
 
 Generatsiya qilingan SQL `NOT NULL` ustunlarni bo'sh jadval sifatida qo'shadi va
 mavjud qatorlarda yiqiladi. Faylni qo'lda quyidagi tartibga keltiring:
@@ -385,12 +385,25 @@ ALTER TABLE "clinics" ALTER COLUMN "owner_full_name" SET NOT NULL;
 ALTER TABLE "clinics" ALTER COLUMN "owner_phone" SET NOT NULL;
 ```
 
-- [ ] **Step 4: Migratsiyani lokal bazada sinash**
+- [x] **Step 4: Migratsiyani lokal bazada sinash**
 
 Run: `cd apps/supervisor-api && bun run db:migrate`
 Kutiladi: xatosiz o'tadi; `\d clinics` yangi ustunlarni ko'rsatadi.
 
-- [ ] **Step 5: Typecheck + commit**
+> **Tekshiruv natijasi (2026-08-04, mustaqil verify):** migratsiya ikki yo'lda
+> ham sinaldi — (a) bo'sh bazada 0000→0002 to'liq, (b) 0001 holatidagi bazada
+> mavjud clinic/branch/license qatorlari bilan (prod VM 103 stsenariysi). Keyin
+> haqiqiy lokal dev bazasida (`supervisor`, 648 clinic / 643 license) ishga
+> tushirildi — xatosiz. Natija: `owner_full_name`/`owner_phone` NOT NULL
+> majburlanadi (NULL bilan INSERT rad etiladi), `owner_temp_password` va
+> `licenses.provisioned_at` nullable, `default_language` NOT NULL DEFAULT `'uz'`,
+> eski 648 qator `Noma'lum` / `''` / `'uz'` bilan to'ldirilgan. Ustunlar
+> `drizzle/meta/0002_snapshot.json` bilan aynan mos — `bun run db:generate`
+> qayta ishga tushirilganda "No schema changes" (qo'lda tahrirlangan SQL
+> snapshot'dan chetlashmagan). `cd apps/supervisor-api && bun run test` →
+> 77 pass / 0 fail.
+
+- [x] **Step 5: Typecheck + commit**
 
 ```bash
 bun run typecheck
@@ -711,6 +724,15 @@ const buildProvisioning = async (
 ```
 
 `clinics` va `branches` importlarini `../../db/schema`dan qo'shing.
+
+> ⚠️ **Task 3 migratsiyasidan kelib chiqadigan chekka holat:** eski (provisioning
+> joriy qilinishidan oldingi) klinika qatorlarida `owner_phone` bo'sh satr
+> (`''`) bilan to'ldirilgan — Supervisor prod bazasida 648 shunday qator bor.
+> `ownerTempPassword` NULL bo'lgani uchun ular yuqoridagi guard'dan o'tmaydi va
+> provisioning bloki qurilmaydi. Shunga qaramay himoyani ikkilantirish uchun
+> guard'ni `if (!clinic?.ownerTempPassword || !clinic.ownerPhone) return null;`
+> qilib yozing — `ownerPhone` klinika tomonida login identifikatori
+> (CLAUDE.md §3.1) va bo'sh telefonli hisob yaratilib qolmasin.
 
 - [ ] **Step 3: `activate()`ga ulash**
 
