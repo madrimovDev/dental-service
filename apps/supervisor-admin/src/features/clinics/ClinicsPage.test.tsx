@@ -121,11 +121,14 @@ describe('ClinicsPage', () => {
           name: 'New Clinic',
           contactEmail: null,
           contactPhone: null,
+          ownerFullName: 'Ali Valiyev',
+          ownerPhone: '+998901234567',
           createdAt: '2026-07-04T00:00:00.000Z',
         };
         return jsonResponse({
           clinic: newClinic,
           license: licenseFor('c3', { plan: 'standard' }),
+          credentials: { loginPhone: '+998901234567', tempPassword: 'AbCdEfGh2345' },
         });
       }
       if (url.endsWith('/v1/admin/clinics')) {
@@ -153,6 +156,12 @@ describe('ClinicsPage', () => {
       target: { value: '2027-07-04' },
     });
     fireEvent.change(within(dialog).getByLabelText('Tarif'), { target: { value: 'standard' } });
+    fireEvent.change(within(dialog).getByLabelText('Owner F.I.Sh.'), {
+      target: { value: 'Ali Valiyev' },
+    });
+    fireEvent.change(within(dialog).getByLabelText('Owner telefoni'), {
+      target: { value: '901234567' },
+    });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Yaratish' }));
 
     expect(await screen.findByText(/KEY-c3/)).toBeInTheDocument();

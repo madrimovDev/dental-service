@@ -1,5 +1,5 @@
 import { authFetch } from '../../lib/api';
-import type { Clinic, ClinicDetail, CreateClinicInput } from './clinics.types';
+import type { Clinic, ClinicDetail, CreateClinicInput, CreateClinicResult } from './clinics.types';
 
 export const fetchClinics = async (): Promise<Clinic[]> => {
   const res = await authFetch('/v1/admin/clinics');
@@ -13,7 +13,7 @@ export const fetchClinicDetail = async (id: string): Promise<ClinicDetail> => {
   return res.json();
 };
 
-export const createClinic = async (input: CreateClinicInput): Promise<ClinicDetail> => {
+export const createClinic = async (input: CreateClinicInput): Promise<CreateClinicResult> => {
   const res = await authFetch('/v1/admin/clinics', {
     method: 'POST',
     body: JSON.stringify(input),

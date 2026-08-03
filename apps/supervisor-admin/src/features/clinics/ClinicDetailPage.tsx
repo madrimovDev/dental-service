@@ -1,5 +1,7 @@
 import {
+  Alert,
   Button,
+  Code,
   CopyButton,
   Group,
   Paper,
@@ -167,6 +169,26 @@ export const ClinicDetailPage = () => {
         <Text c={data.license?.isActive ? 'teal' : 'red'} mt="xs">
           Holat: {data.license?.isActive ? 'Faol' : 'Bekor qilingan'}
         </Text>
+        {/* Vaqtinchalik owner paroli aktivatsiyadan keyin Supervisor bazasidan
+            o'chiriladi — mavjudligi provisioning hali ko'chirilmaganini bildiradi. */}
+        <Alert
+          color={data.clinic.ownerTempPassword ? 'yellow' : 'green'}
+          variant="light"
+          mt="sm"
+          data-testid="provisioning-status"
+        >
+          {data.clinic.ownerTempPassword ? (
+            <>
+              Aktivatsiya kutilmoqda. Login: <b>{data.clinic.ownerPhone}</b>, vaqtinchalik parol:{' '}
+              <Code>{data.clinic.ownerTempPassword}</Code>
+            </>
+          ) : (
+            <>
+              Aktivatsiya qilingan — vaqtinchalik parol o'chirilgan. Parol unutilsa "Parol-tiklash
+              tokeni yaratish" tugmasidan foydalaning.
+            </>
+          )}
+        </Alert>
         <Group mt="sm">
           <Button
             size="xs"

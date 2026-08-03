@@ -31,6 +31,8 @@ describe('CreateClinicModal', () => {
       name: 'New Clinic',
       contactEmail: null,
       contactPhone: null,
+      ownerFullName: 'Ali Valiyev',
+      ownerPhone: '+998901234567',
       createdAt: '2026-07-04T00:00:00.000Z',
     };
     const license = {
@@ -48,7 +50,13 @@ describe('CreateClinicModal', () => {
       activatedAt: null,
       createdAt: '2026-07-04T00:00:00.000Z',
     };
-    fetchMock.mockResolvedValueOnce(jsonResponse({ clinic, license }));
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        clinic,
+        license,
+        credentials: { loginPhone: '+998901234567', tempPassword: 'AbCdEfGh2345' },
+      }),
+    );
 
     const onClose = vi.fn();
     renderApp(<CreateClinicModal opened onClose={onClose} />);
@@ -58,6 +66,12 @@ describe('CreateClinicModal', () => {
     });
     fireEvent.change(screen.getByLabelText('Amal qilish muddati'), {
       target: { value: '2027-07-04' },
+    });
+    fireEvent.change(screen.getByLabelText('Owner F.I.Sh.'), {
+      target: { value: 'Ali Valiyev' },
+    });
+    fireEvent.change(screen.getByLabelText('Owner telefoni'), {
+      target: { value: '901234567' },
     });
     // Tarif maydonini bu testda ataylab tegmaymiz — Mantine v7ning
     // non-searchable Select'i readOnly combobox input render qiladi;
@@ -85,6 +99,95 @@ describe('CreateClinicModal', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it("owner maydonlari majburiy — bo'sh qoldirilsa validatsiya xatosi chiqadi va so'rov yuborilmaydi", async () => {
+    renderApp(<CreateClinicModal opened onClose={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText('Klinika nomi'), { target: { value: 'New Clinic' } });
+    fireEvent.change(screen.getByLabelText('Amal qilish muddati'), {
+      target: { value: '2027-07-04' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Yaratish' }));
+
+    expect(await screen.findByText('Owner F.I.Sh. kiritilishi shart')).toBeInTheDocument();
+    expect(screen.getByText('Owner telefoni kiritilishi shart')).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("yaratilgandan keyin login telefoni va vaqtinchalik parolni ko'rsatadi va nusxalaydi", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        clinic: {
+          id: 'c1',
+          name: 'New Clinic',
+          contactEmail: null,
+          contactPhone: null,
+          ownerFullName: 'Ali Valiyev',
+          ownerPhone: '+998901234567',
+          createdAt: '2026-08-03T00:00:00.000Z',
+        },
+        license: {
+          id: 'lic1',
+          clinicId: 'c1',
+          branchId: 'b1',
+          licenseKey: 'ABCDE-FGHIJ-KLMNO-PQRST',
+          fingerprint: null,
+          plan: 'starter',
+          modules: ['patients'],
+          gracePeriodDays: 30,
+          expiresAt: '2027-07-04T00:00:00.000Z',
+          isActive: true,
+          lastHeartbeatAt: null,
+          activatedAt: null,
+          createdAt: '2026-08-03T00:00:00.000Z',
+        },
+        credentials: { loginPhone: '+998901234567', tempPassword: 'AbCdEfGh2345' },
+      }),
+    );
+
+    renderApp(<CreateClinicModal opened onClose={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText('Klinika nomi'), { target: { value: 'New Clinic' } });
+    fireEvent.change(screen.getByLabelText('Amal qilish muddati'), {
+      target: { value: '2027-07-04' },
+    });
+    fireEvent.change(screen.getByLabelText('Owner F.I.Sh.'), {
+      target: { value: 'Ali Valiyev' },
+    });
+    fireEvent.change(screen.getByLabelText('Owner telefoni'), {
+      target: { value: '901234567' },
+    });
+    fireEvent.change(screen.getByLabelText('Filial manzili'), {
+      target: { value: 'Toshkent, Chilonzor 12' },
+    });
+    // "Til" Select'iga ataylab tegilmaydi — Mantine v7 non-searchable Select
+    // readOnly combobox render qiladi (yuqoridagi "Tarif" izohiga qarang),
+    // shuning uchun initialValues'dagi 'uz' default'i tekshiriladi.
+
+    fireEvent.click(screen.getByRole('button', { name: 'Yaratish' }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const [, init] = fetchMock.mock.calls[0] as [unknown, RequestInit & { body: string }];
+    expect(JSON.parse(init.body)).toMatchObject({
+      ownerFullName: 'Ali Valiyev',
+      ownerPhone: '901234567',
+      defaultLanguage: 'uz',
+      branchName: 'Bosh filial',
+      branchAddress: 'Toshkent, Chilonzor 12',
+    });
+
+    // Login sifatida serverdan qaytgan normallashtirilgan telefon ko'rsatiladi
+    // (formadagi xom qiymat emas).
+    expect(await screen.findByText('+998901234567')).toBeInTheDocument();
+    expect(screen.getByText('AbCdEfGh2345')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: "Kirish ma'lumotlarini nusxalash" }));
+    await waitFor(() =>
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+        'Login: +998901234567\nParol: AbCdEfGh2345',
+      ),
+    );
+  });
+
   it("server xato qaytarsa forma view ichida xato xabarini ko'rsatadi (forma qayta ishlatiladi)", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ success: false }, false));
     renderApp(<CreateClinicModal opened onClose={vi.fn()} />);
@@ -94,6 +197,12 @@ describe('CreateClinicModal', () => {
     });
     fireEvent.change(screen.getByLabelText('Amal qilish muddati'), {
       target: { value: '2027-07-04' },
+    });
+    fireEvent.change(screen.getByLabelText('Owner F.I.Sh.'), {
+      target: { value: 'Ali Valiyev' },
+    });
+    fireEvent.change(screen.getByLabelText('Owner telefoni'), {
+      target: { value: '901234567' },
     });
     // Tarifga tegilmaydi — 'starter' default'i required-validatsiyani
     // qondirish uchun yetarli (bu testda plan qiymati tekshirilmaydi).

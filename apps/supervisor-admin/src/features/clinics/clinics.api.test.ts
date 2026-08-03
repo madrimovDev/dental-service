@@ -11,12 +11,14 @@ describe('createClinic', () => {
     vi.stubGlobal('fetch', fetchMock);
   });
 
-  it("POST /v1/admin/clinics ga to'g'ri body yuboradi va { clinic, license } qaytaradi", async () => {
+  it("POST /v1/admin/clinics ga to'g'ri body yuboradi va { clinic, license, credentials } qaytaradi", async () => {
     const clinic = {
       id: 'c1',
       name: 'New Clinic',
       contactEmail: 'new@test.com',
       contactPhone: null,
+      ownerFullName: 'Ali Valiyev',
+      ownerPhone: '+998901234567',
       createdAt: '2026-07-04T00:00:00.000Z',
     };
     const license = {
@@ -34,7 +36,8 @@ describe('createClinic', () => {
       activatedAt: null,
       createdAt: '2026-07-04T00:00:00.000Z',
     };
-    fetchMock.mockResolvedValueOnce(jsonResponse({ clinic, license }));
+    const credentials = { loginPhone: '+998901234567', tempPassword: 'AbCdEfGh2345' };
+    fetchMock.mockResolvedValueOnce(jsonResponse({ clinic, license, credentials }));
 
     const result = await createClinic({
       name: 'New Clinic',
@@ -42,6 +45,10 @@ describe('createClinic', () => {
       plan: 'standard',
       expiresAt: '2027-07-04',
       gracePeriodDays: 30,
+      ownerFullName: 'Ali Valiyev',
+      ownerPhone: '901234567',
+      defaultLanguage: 'uz',
+      branchName: 'Bosh filial',
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
@@ -54,10 +61,14 @@ describe('createClinic', () => {
           plan: 'standard',
           expiresAt: '2027-07-04',
           gracePeriodDays: 30,
+          ownerFullName: 'Ali Valiyev',
+          ownerPhone: '901234567',
+          defaultLanguage: 'uz',
+          branchName: 'Bosh filial',
         }),
       }),
     );
-    expect(result).toEqual({ clinic, license });
+    expect(result).toEqual({ clinic, license, credentials });
   });
 
   it('server 400/500 qaytarsa generic xato tashlaydi', async () => {
@@ -69,6 +80,10 @@ describe('createClinic', () => {
         plan: 'starter',
         expiresAt: '2027-01-01',
         gracePeriodDays: 30,
+        ownerFullName: 'Ali Valiyev',
+        ownerPhone: '901234567',
+        defaultLanguage: 'uz',
+        branchName: 'Bosh filial',
       }),
     ).rejects.toThrow("Klinika yaratib bo'lmadi");
   });

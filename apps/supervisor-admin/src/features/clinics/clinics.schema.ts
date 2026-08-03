@@ -11,6 +11,14 @@ export const createClinicFormSchema = z.object({
   }),
   expiresAt: z.string().min(1, 'Amal qilish muddatini tanlang'),
   gracePeriodDays: z.number().int().min(1).max(365),
+  // Provisioning — klinika lokal bazasida yaratiladigan birlamchi ma'lumot.
+  // Telefon normalizatsiyasi (+998XXXXXXXXX) serverda bajariladi.
+  ownerFullName: z.string().min(2, 'Owner F.I.Sh. kiritilishi shart'),
+  ownerPhone: z.string().min(9, 'Owner telefoni kiritilishi shart'),
+  defaultLanguage: z.enum(['uz', 'ru']),
+  branchName: z.string().min(1, 'Filial nomi kiritilishi shart'),
+  branchAddress: z.string().optional(),
+  branchPhone: z.string().optional(),
 });
 
 export type CreateClinicFormValues = z.infer<typeof createClinicFormSchema>;

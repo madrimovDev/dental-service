@@ -10,6 +10,8 @@ export interface Clinic {
   name: string;
   contactEmail: string | null;
   contactPhone: string | null;
+  ownerFullName: string;
+  ownerPhone: string;
   createdAt: string;
   license: ClinicLicenseSummary | null;
 }
@@ -31,7 +33,9 @@ export interface License {
 }
 
 export interface ClinicDetail {
-  clinic: Clinic;
+  // `ownerTempPassword` faqat detal javobida keladi (ro'yxatda emas) va
+  // klinika aktivatsiya qilgach Supervisor bazasida NULL ga aylanadi.
+  clinic: Clinic & { ownerTempPassword?: string | null };
   license: License | null;
 }
 
@@ -42,4 +46,19 @@ export interface CreateClinicInput {
   plan: 'starter' | 'standard' | 'premium' | 'enterprise';
   expiresAt: string;
   gracePeriodDays: number;
+  ownerFullName: string;
+  ownerPhone: string;
+  defaultLanguage: 'uz' | 'ru';
+  branchName: string;
+  branchAddress?: string;
+  branchPhone?: string;
+}
+
+/**
+ * `POST /v1/admin/clinics` javobi — `ClinicDetail`ga qo'shimcha ravishda
+ * vaqtinchalik owner paroli qaytariladi. Parol AYNAN shu javobda va faqat
+ * shu yerda ochiq ko'rinadi.
+ */
+export interface CreateClinicResult extends ClinicDetail {
+  credentials: { loginPhone: string; tempPassword: string };
 }

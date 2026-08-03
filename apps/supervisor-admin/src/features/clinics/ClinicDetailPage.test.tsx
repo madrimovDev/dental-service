@@ -333,6 +333,55 @@ describe('ClinicDetailPage', () => {
     ).toBeInTheDocument();
   });
 
+  it("aktivatsiyagacha login telefoni va vaqtinchalik parolni ko'rsatadi", async () => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/v1/admin/clinics/c1')) {
+        return jsonResponse({
+          clinic: {
+            ...clinic,
+            ownerFullName: 'Ali Valiyev',
+            ownerPhone: '+998901234567',
+            ownerTempPassword: 'AbCdEfGh2345',
+          },
+          license,
+        });
+      }
+      throw new Error(`unhandled fetch: ${url} ${init?.method ?? 'GET'}`);
+    });
+
+    renderDetail();
+    await screen.findByText('Clinic One');
+
+    expect(await screen.findByText(/Aktivatsiya kutilmoqda/)).toBeInTheDocument();
+    expect(screen.getByText('+998901234567')).toBeInTheDocument();
+    expect(screen.getByText('AbCdEfGh2345')).toBeInTheDocument();
+  });
+
+  it("aktivatsiyadan keyin vaqtinchalik parol ko'rsatilmaydi", async () => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/v1/admin/clinics/c1')) {
+        return jsonResponse({
+          clinic: {
+            ...clinic,
+            ownerFullName: 'Ali Valiyev',
+            ownerPhone: '+998901234567',
+            ownerTempPassword: null,
+          },
+          license,
+        });
+      }
+      throw new Error(`unhandled fetch: ${url} ${init?.method ?? 'GET'}`);
+    });
+
+    renderDetail();
+    await screen.findByText('Clinic One');
+
+    expect(await screen.findByText(/vaqtinchalik parol o'chirilgan/)).toBeInTheDocument();
+    expect(screen.queryByText(/Aktivatsiya kutilmoqda/)).not.toBeInTheDocument();
+  });
+
   it("reset-token so'rovi muvaffaqiyatsiz bo'lsa xato xabarini ko'rsatadi", async () => {
     fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
