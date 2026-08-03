@@ -53,7 +53,7 @@ import {
   stopServerDiscovery,
 } from './discovery.js';
 import { isFirstRun, runFirstSetup, runMigrations } from './first-run.js';
-import { hasLicense } from './license-status.js';
+import { hasLicense, licenseGatedUrl } from './license-status.js';
 import {
   getApiCommand,
   startApiLayer,
@@ -304,12 +304,16 @@ app.whenReady().then(async () => {
       'server',
       { serverUrl: localUrl },
       {
-        onOpen: () => openBrowser(localUrl),
+        // `licenseGatedUrl` — qaror BOSILGAN paytda hisoblanadi, startup'dagi
+        // bir martalik `hasLicense()` emas (CLI-361 real Windows test'da
+        // topildi: litsenziyasiz tray'dan `Sozlamalar` bosilsa `/login`ga
+        // uloqtirilib, `/activate`ga qaytish imkonsiz bo'lib qolardi).
+        onOpen: () => openBrowser(licenseGatedUrl(localUrl)),
         // `/settings` index route SPA'da YO'Q (App.tsx catch-all uni `/`ga
         // qaytaradi — tray "Sozlamalar" hech narsa ochmayotganday ko'rinardi,
         // 2026-07-06 Linux E2E'da topildi). Desktop-ulanish kartasi
         // (DesktopServerConnectionCard) joylashgan mavjud sahifaga ochamiz.
-        onSettings: () => openBrowser(`${localUrl}/settings/integrations`),
+        onSettings: () => openBrowser(licenseGatedUrl(localUrl, '/settings/integrations')),
         onStop: async () => {
           stopServerDiscovery();
           await stopServer();
@@ -322,7 +326,7 @@ app.whenReady().then(async () => {
     // `/activate` sahifasi qurilgan va ro'yxatdan o'tgan
     // (`apps/web/src/features/auth/pages/activate.page.tsx`, commit 7670124)
     // — bu yerda faqat desktop-tomon signal+redirect ulanadi.
-    openBrowser(hasLicense() ? localUrl : `${localUrl}/activate`);
+    openBrowser(licenseGatedUrl(localUrl));
   } else {
     // Klient rejimi — CLI-434: TOFU. `config.serverUrl` (avval foydalanuvchi
     // tomonidan tasdiqlangan) mavjud VA hali ham yaroqli host/scheme'ga ega

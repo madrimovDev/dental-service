@@ -25,3 +25,18 @@ const getLicensePath = (): string =>
     : '/var/lib/dental-service/license.lic');
 
 export const hasLicense = (): boolean => existsSync(getLicensePath());
+
+/**
+ * Litsenziya-gate'langan navigatsiya manzili (CLI-361 real Windows test'da
+ * topildi). Tray callback'lari (`Ochish` / `Sozlamalar`) `hasLicense()`ni
+ * BOSILGAN PAYTDA tekshirishi shart — startup'dagi bir martalik tekshiruv
+ * (main.ts) yetarli emas edi: litsenziya faollashtirilmagan holda tray'dan
+ * `Sozlamalar` bosilsa `/settings/integrations` ochilar, auth talab qilinib
+ * SPA `/login`ga uloqtirar edi — foydalanuvchi `/activate`ga qaytolmay
+ * qopqonda qolardi (ilovani qayta ishga tushirishdan boshqa yo'l yo'q).
+ *
+ * Chaqiruv-vaqtida hisoblanadi — aktivatsiyadan keyin (`.lic` yozilgach)
+ * o'sha tray menyusi qayta qurilmasdan to'g'ri manzilga o'tadi.
+ */
+export const licenseGatedUrl = (baseUrl: string, path = ''): string =>
+  hasLicense() ? `${baseUrl}${path}` : `${baseUrl}/activate`;
