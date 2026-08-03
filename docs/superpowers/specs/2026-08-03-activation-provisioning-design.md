@@ -205,15 +205,26 @@ yozilmaydi:
 Bu — CLI-476'da topilgan "o'lik fingerprint bog'lash" xatosi bilan bir sinfdagi
 muammo.
 
+**`.lic`ga aynan nima yoziladi.** `isLicenseValid` (`lib/license.ts`)
+`const { signature, ...payload }` qiladi — ya'ni faylga tushgan **har qanday
+qo'shimcha maydon** imzo tekshiruviga kiradi va uni buzadi. Shuning uchun
+`writeLicense()`ga Supervisor javobi butunligicha uzatilmaydi; faqat
+`LicenseData` maydonlari aniq tanlab olinadi (`licenseKey`, `clinicId`,
+`modules`, `expiresAt`, `gracePeriodDays`, `issuedAt`, `fingerprint`,
+`signature`). Buni test qoplaydi: provisioning bilan aktivatsiyadan keyin
+`readLicense()` + `isLicenseValid()` → `true`.
+
 **`activateRoutes` signaturasi.** Hozir `activateRoutes()` dep qabul qilmaydi va
 oddiy `Hono` qaytaradi (`routes/activate.ts:18`). Provisioning uchun `db` kerak →
 `activateRoutes(deps)` bo'ladi va `app.ts` chaqiruvi yangilanadi.
 
 ### 6.3 `/register-tenant` yopilishi
 
-Signal — `process.env.DENTAL_LOCAL_DESKTOP === 'true'` (CLI-433'da qaror
-qilingan yagona desktop belgisi; `license-middleware.ts:124` shuni ishlatadi).
-Shu rejimda `POST /auth/register-tenant` → `403 REGISTRATION_DISABLED`.
+⚠️ **Backend qismi allaqachon bajarilgan.** `auth.routes.ts:107` desktop rejimida
+(`process.env.DENTAL_LOCAL_DESKTOP === 'true'`) `POST /auth/register-tenant`ni
+`403 auth.self_registration_disabled` bilan rad etadi. Ya'ni backend teshigi yo'q
+— muammo faqat UX: sahifa ochiladi, foydalanuvchi formani to'ldiradi va faqat
+yuborgandan keyin 403 oladi.
 
 Web tomonda: `/register-tenant` route'i desktop rejimida ro'yxatdan
 chiqariladi. Frontend bu belgini bilishi uchun mavjud
@@ -230,6 +241,10 @@ Yagona `normalizePhone(input: string): string` — `packages/core`:
 1. Raqamdan boshqa barcha belgilar olib tashlanadi.
 2. 9 xonali bo'lsa `998` prefiksi qo'shiladi.
 3. Natija `+` + raqamlar (`+998XXXXXXXXX`).
+
+⚠️ Supervisor `@dental/core`ga bog'liq EMAS (alohida deploy unit, hatto Zod 3
+ishlatadi) — `normalizePhone` u yerda **qo'lda dublikat** qilinadi, xuddi
+`license-signature.ts` kabi, lockstep izohi bilan.
 
 Qo'llanadigan joylar — implementatsiyadan oldin `grep -rn "users\.phone"
 apps/api/src` bilan to'liq ro'yxat qayta tekshiriladi. Hozir aniqlangan
@@ -307,8 +322,8 @@ ketmasin. Bu — §11 dagi `licenses.service.ts` o'zgarishlariga kiradi.
   qiladi; tekis payload uchun chiqish mavjud imzolar bilan mos qoladi (§3).
 - Ikki marta aktivatsiya → owner `password_hash` o'zgarmaydi, tenant dublikat bo'lmaydi.
 - Provisioning'dan keyin 8 rol shabloni mavjud (rol-bo'yicha tekshiruv, `@owner` emas).
-- `DENTAL_LOCAL_DESKTOP=true` da `POST /auth/register-tenant` → 403; `false` da 200.
-- `GET /auth/registration-enabled` ikkala rejimda to'g'ri qiymat qaytaradi.
+- `GET /auth/registration-enabled` ikkala rejimda to'g'ri qiymat qaytaradi
+  (`register-tenant` 403 xulqi allaqachon mavjud va test bilan qoplangan).
 - `normalizePhone` birlik testlari + migratsiya dublikat guard testi.
 - Mavjud: `routes/activate.test.ts`, `tests/integration/cli-370-activate-rate-limit.test.ts` yangilanadi.
 
