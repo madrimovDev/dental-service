@@ -17,7 +17,14 @@ let licenseKey: string;
 
 beforeEach(async () => {
   resetRateLimitStore();
-  const [clinic] = await db.insert(clinics).values({ name: 'Reset Test Clinic' }).returning();
+  const [clinic] = await db
+    .insert(clinics)
+    .values({
+      name: 'Reset Test Clinic',
+      ownerFullName: 'Reset Owner',
+      ownerPhone: '+998901234567',
+    })
+    .returning();
   if (!clinic) throw new Error('clinic insert returned no row');
   const [branch] = await db
     .insert(branches)

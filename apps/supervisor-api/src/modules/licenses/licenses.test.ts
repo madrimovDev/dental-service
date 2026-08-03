@@ -10,7 +10,10 @@ const app = createApp();
 let licenseKey: string;
 
 beforeEach(async () => {
-  const [clinic] = await db.insert(clinics).values({ name: 'Test Clinic' }).returning();
+  const [clinic] = await db
+    .insert(clinics)
+    .values({ name: 'Test Clinic', ownerFullName: 'Test Owner', ownerPhone: '+998901234567' })
+    .returning();
   if (!clinic) throw new Error('clinic insert returned no row');
   const [branch] = await db
     .insert(branches)

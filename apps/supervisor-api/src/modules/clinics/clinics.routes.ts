@@ -131,6 +131,10 @@ export const clinicsRoutes = () => {
           name: data.name,
           contactEmail: data.contactEmail,
           contactPhone: data.contactPhone,
+          // Vaqtinchalik placeholder — owner maydonlari formadan Task 4 da
+          // (klinika yaratish + owner hisobi) keladi.
+          ownerFullName: "Noma'lum",
+          ownerPhone: '',
         })
         .returning();
       if (!clinic) throw new Error('clinic insert returned no row');

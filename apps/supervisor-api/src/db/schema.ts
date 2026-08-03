@@ -5,6 +5,12 @@ export const clinics = pgTable('clinics', {
   name: text('name').notNull(),
   contactEmail: text('contact_email'),
   contactPhone: text('contact_phone'),
+  // Provisioning (2026-08-03) — klinika lokal bazasida yaratiladigan owner
+  // hisobi. `ownerTempPassword` faqat aktivatsiyagacha saqlanadi, keyin NULL.
+  ownerFullName: text('owner_full_name').notNull(),
+  ownerPhone: text('owner_phone').notNull(),
+  ownerTempPassword: text('owner_temp_password'),
+  defaultLanguage: text('default_language').notNull().default('uz'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
@@ -36,6 +42,9 @@ export const licenses = pgTable('licenses', {
   isActive: boolean('is_active').notNull().default(true),
   lastHeartbeatAt: timestamp('last_heartbeat_at'),
   activatedAt: timestamp('activated_at'),
+  // Provisioning bloki klinikaga muvaffaqiyatli yetkazilgan payt (bir marta
+  // yoziladi) — vaqtinchalik parol o'chirilgani bilan birga belgilanadi.
+  provisionedAt: timestamp('provisioned_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 

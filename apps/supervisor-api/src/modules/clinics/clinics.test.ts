@@ -182,7 +182,11 @@ describe('GET /v1/admin/clinics', () => {
   it('returns license: null for a clinic with no license row', async () => {
     const [orphan] = await db
       .insert(clinicsTable)
-      .values({ name: `Orphan Clinic ${crypto.randomUUID()}` })
+      .values({
+        name: `Orphan Clinic ${crypto.randomUUID()}`,
+        ownerFullName: 'Orphan Owner',
+        ownerPhone: '+998901234567',
+      })
       .returning();
     if (!orphan) throw new Error('orphan clinic insert returned no row');
 
