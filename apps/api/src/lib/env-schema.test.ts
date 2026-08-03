@@ -108,6 +108,30 @@ describe('parseEnv MESSAGING_SECRET guard (CLI-379)', () => {
     const result = parseEnv({ ...baseRaw, NODE_ENV: 'test', JWT_SECRET: STRONG_SECRET });
     expect(result.success).toBe(true);
   });
+
+  // CLI-361 — Local Desktop production'da MESSAGING_SECRET'ni ATAYIN
+  // o'rnatmaydi; `crypto.ts` mashina-lokal `messaging-secret.txt` fayl
+  // fallback'ini ishlatadi. `DENTAL_LOCAL_DESKTOP === 'true'` bo'lsa production
+  // talabidan istisno qilinadi (busiz packaged desktop api.exe boot bo'lmasdi).
+  test('allows missing MESSAGING_SECRET in production when DENTAL_LOCAL_DESKTOP=true', () => {
+    const result = parseEnv({
+      ...baseRaw,
+      NODE_ENV: 'production',
+      JWT_SECRET: STRONG_SECRET,
+      DENTAL_LOCAL_DESKTOP: 'true',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  test('still rejects missing MESSAGING_SECRET in production when DENTAL_LOCAL_DESKTOP=false', () => {
+    const result = parseEnv({
+      ...baseRaw,
+      NODE_ENV: 'production',
+      JWT_SECRET: STRONG_SECRET,
+      DENTAL_LOCAL_DESKTOP: 'false',
+    });
+    expect(result.success).toBe(false);
+  });
 });
 
 describe('MINIO_* is optional (dead since storage.ts local-filesystem, CLI-340)', () => {

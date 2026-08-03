@@ -109,6 +109,15 @@ export const envSchema = z
       .int()
       .positive()
       .default(4 * 60 * 60 * 1000), // 4 soat
+
+    // CLI-433 — atayin Local Desktop gate signali (`process-manager.ts`
+    // `spawnApi()`da `'true'`). Cloud/dev/CI'da bo'sh. Bu yerda schema'ga
+    // qo'shildi (avval faqat `process.env` orqali o'qilardi) — pastdagi
+    // superRefine desktop'ni MESSAGING_SECRET production talabidan istisno
+    // qilishi uchun (desktop `crypto.ts`ning mashina-lokal fayl fallback'ini
+    // ishlatadi — CLI-361 real Windows build'da topildi: busiz api.exe
+    // production'da boot bo'lmasdan qulardi).
+    DENTAL_LOCAL_DESKTOP: z.enum(['true', 'false']).optional(),
   })
   // Reject known-placeholder secrets in production. Dev/test intentionally keep
   // the placeholder so local boot + `bun test --env-file=../../.env` work.
@@ -125,9 +134,13 @@ export const envSchema = z
     // container makes `getOrCreateMessagingSecret` fall back to a file key that
     // regenerates on every redeploy — all encrypted per-tenant creds (Telegram
     // bot token / Eskiz password) become permanently undecryptable, silently.
-    // Desktop is fine unset (persisted dataDir file, machine-local, by design).
+    // Desktop is fine unset (persisted dataDir file, machine-local, by design)
+    // — shuning uchun Local Desktop (`DENTAL_LOCAL_DESKTOP === 'true'`) istisno
+    // qilinadi; u yerda `crypto.ts` mashina-lokal `messaging-secret.txt`ni
+    // ishlatadi va ephemeral-konteyner xavfi umuman qo'llanmaydi (CLI-361).
     if (
       data.NODE_ENV === 'production' &&
+      data.DENTAL_LOCAL_DESKTOP !== 'true' &&
       (!data.MESSAGING_SECRET || data.MESSAGING_SECRET.length < 32)
     ) {
       ctx.addIssue({
