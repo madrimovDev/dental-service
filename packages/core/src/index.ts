@@ -2,6 +2,7 @@
 
 export * from './diagnoses-seed.ts';
 export * from './permissions.ts';
+export * from './phone.ts';
 export * from './role-templates.ts';
 export * from './supervisor-public-key.ts';
 export * from './types/api-response.ts';

@@ -228,7 +228,7 @@ nested payload imzo bilan himoyalanmasdi."
 - Consumes: —
 - Produces: `normalizePhone(input: string): string` — Task 4, 8, 9, 11 ishlatadi.
 
-- [ ] **Step 1: Failing test**
+- [x] **Step 1: Failing test**
 
 `packages/core/src/phone.test.ts`:
 
@@ -263,12 +263,12 @@ describe('normalizePhone', () => {
 });
 ```
 
-- [ ] **Step 2: Testni ishga tushirib, yiqilishini tasdiqlash**
+- [x] **Step 2: Testni ishga tushirib, yiqilishini tasdiqlash**
 
 Run: `cd packages/core && bun test src/phone.test.ts`
 Kutiladi: FAIL — `./phone` moduli yo'q.
 
-- [ ] **Step 3: Implementatsiya**
+- [x] **Step 3: Implementatsiya**
 
 `packages/core/src/phone.ts`:
 
@@ -294,11 +294,11 @@ export const normalizePhone = (input: string): string => {
 
 `packages/core/src/index.ts` ga eksport qo'shing (mavjud eksport uslubiga mos).
 
-- [ ] **Step 4: Testni ishga tushirib, o'tishini tasdiqlash**
+- [x] **Step 4: Testni ishga tushirib, o'tishini tasdiqlash**
 
 Run: `cd packages/core && bun test src/phone.test.ts` → PASS
 
-- [ ] **Step 5: Supervisor dublikati**
+- [x] **Step 5: Supervisor dublikati**
 
 `apps/supervisor-api/src/lib/phone.ts` — bir xil kod, izoh sarlavhasi:
 
@@ -312,7 +312,7 @@ Run: `cd packages/core && bun test src/phone.test.ts` → PASS
 `apps/supervisor-api/src/lib/phone.test.ts` — Step 1 dagi testlarning nusxasi
 (import yo'li `./phone`).
 
-- [ ] **Step 6: Testlar + typecheck + commit**
+- [x] **Step 6: Testlar + typecheck + commit**
 
 ```bash
 cd apps/supervisor-api && bun test src/lib/phone.test.ts
