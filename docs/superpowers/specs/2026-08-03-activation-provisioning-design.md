@@ -61,10 +61,19 @@ canonicalize(A) === canonicalize(B)  →  true
 Ya'ni **nested obyekt imzo bilan himoyalanmaydi** — MITM uni erkin almashtira
 oladi. VM hozir IP/HTTP orqali ishlaydi, shuning uchun bu nazariy risk emas.
 
-**Qoida (hujjatlashtiriladi + test bilan majburlanadi):** imzolanadigan har qanday
+**Qoida (hujjatlashtiriladi + kodda majburlanadi):** imzolanadigan har qanday
 obyekt **tekis (flat)** bo'lishi shart — faqat string / number / boolean va
 string massivlari (massiv elementlariga replacer qo'llanmaydi, shuning uchun
 mavjud `modules: string[]` xavfsiz).
+
+Majburlash ikki qatlamda:
+
+1. **`canonicalize` o'zi qattiqlashtiriladi** (ikkala faylda ham): massiv
+   bo'lmagan obyekt qiymati uchraganda `throw`. Tekis payload'lar uchun natija
+   bayt-ma-bayt bir xil qoladi → mavjud `.lic` fayllari va imzolar buzilmaydi.
+   Bu men o'ylab topmagan payload shakllarini ham himoya qiladi.
+2. **Regressiya testi** (§9) — nested obyekt bilan imzolashga urinish xato
+   berishini tasdiqlaydi.
 
 ## 4. Oqim
 
@@ -137,8 +146,13 @@ bo'lsa foydalanuvchi qayta urinishi mumkin. Provisioning imzosi noto'g'ri bo'lsa
 - Ichma-ich obyekt **yo'q** (§3).
 - Bo'sh maydonlar (`branchAddress`, `branchPhone`) doim `''` — hech qachon
   `undefined`, aks holda `JSON.stringify` kalitni tashlab imzo mos kelmaydi.
-- `issuedAt` — ISO string, javob generatsiya vaqti.
+- `issuedAt` — ISO string, javob generatsiya vaqti; litsenziya payload'idagi
+  `issuedAt` bilan **bir xil** bo'lishi shart (bog'lash uchun, §6.2).
 - Imzo: `signLicense(provisioning, PRIVATE_KEY)` → javobda `provisioningSignature`.
+- `ownerPassword` **hech qachon loglanmaydi** — na `apps/api`, na Supervisor
+  tomonda, na audit `after` maydonida. (Mavjud precedent: `users.service.ts:104`
+  xodim taklifida vaqtinchalik parolni `logger.warn` bilan yozadi — bu alohida
+  masala, shu spec scope'ida emas, lekin naqsh takrorlanmasligi kerak.)
 
 ## 6. `apps/api` o'zgarishlari
 
@@ -164,6 +178,7 @@ Supervisor javobi
   → provisioning bloki bormi?
       yo'q  → eski xulq (orqaga moslik)
       bor   → provisioningSignature tekshiruvi (xato → 403, .lic yozilmaydi)
+            → BOG'LASH tekshiruvi (xato → 403, .lic yozilmaydi)
   → lokal tenant bormi?
       bor   → provisioning sokin o'tkaziladi
       yo'q  → provisionFromLicense (bitta tranzaksiya)
@@ -174,6 +189,25 @@ Supervisor javobi
 
 `ownerPhone` javobga qo'shiladi — `/activate` sahifasi loginni ko'rsatishi uchun
 (parol emas: mijoz uni vendordan alohida oladi).
+
+**Bog'lash tekshiruvi (imzo yetarli EMAS).** Faqat imzoni tekshirish har qanday
+haqiqiy vendor-imzolangan blokni qabul qiladi — boshqa klinikaning javobidan
+olingan blok ham. IP/HTTP transportda bu real hujum: A klinikasi aktivatsiya
+qilayotganda B klinikasining bloki almashtirilsa imzo baribir to'g'ri chiqadi.
+Shuning uchun quyidagilar **majburiy** va biror biri mos kelmasa 403 + `.lic`
+yozilmaydi:
+
+- `provisioning.licenseKey` === foydalanuvchi kiritgan kalit **va** ===
+  `licensePayload.licenseKey`
+- `provisioning.clinicId` === `licensePayload.clinicId`
+- `provisioning.issuedAt` === `licensePayload.issuedAt`
+
+Bu — CLI-476'da topilgan "o'lik fingerprint bog'lash" xatosi bilan bir sinfdagi
+muammo.
+
+**`activateRoutes` signaturasi.** Hozir `activateRoutes()` dep qabul qilmaydi va
+oddiy `Hono` qaytaradi (`routes/activate.ts:18`). Provisioning uchun `db` kerak →
+`activateRoutes(deps)` bo'ladi va `app.ts` chaqiruvi yangilanadi.
 
 ### 6.3 `/register-tenant` yopilishi
 
@@ -197,13 +231,34 @@ Yagona `normalizePhone(input: string): string` — `packages/core`:
 2. 9 xonali bo'lsa `998` prefiksi qo'shiladi.
 3. Natija `+` + raqamlar (`+998XXXXXXXXX`).
 
-Qo'llanadigan joylar: `login`, `register-tenant`, xodim taklifi (`users`),
-Supervisor create formasi, provisioning bloki.
+Qo'llanadigan joylar — implementatsiyadan oldin `grep -rn "users\.phone"
+apps/api/src` bilan to'liq ro'yxat qayta tekshiriladi. Hozir aniqlangan
+solishtirish/yozish nuqtalari:
 
-Migratsiya (`users.phone`): avval **dublikat tekshiruvi** — normalizatsiyadan
-keyin ikki qator to'qnashsa migratsiya to'xtaydi va konfliktli qatorlarni
-ro'yxatlaydi. Jim ma'lumot yo'qotish yoki hisob birlashib ketishi bo'lmasligi
-shart.
+| Fayl | Nima qiladi |
+|---|---|
+| `auth.service.ts:235` | login — `eq(users.phone, input.phone)` |
+| `auth.service.ts:156` | register-tenant — owner yozuvi |
+| `users.service.ts:83` | xodim taklifi — mavjud user aniqlash (CLI-158 `alreadyExists`) |
+| `users.service.ts:94` | xodim taklifi — yangi user yozuvi |
+| `routes/reset-owner-password.ts` | owner topish |
+| Supervisor `clinics` formasi | `owner_phone` yozuvi |
+
+⚠️ Bitta nuqta o'tkazib yuborilsa login ishlaydi-yu, boshqa qidiruv jim ravishda
+mos kelmay qoladi — bu o'zgarishning eng yomon nosozlik shakli. (`patients.phone`
+bunga kirmaydi — bemor telefoni login identifikatori emas, tegilmaydi.)
+
+**Migratsiya (`users.phone`).** `users.phone` platform bo'yicha unique, shuning
+uchun oddiy `UPDATE` to'qnashuvda unique-indeks xatosi bilan yiqiladi (konfliktni
+"ro'yxatlash" emas). Kerakli mexanizm — `DO` bloki:
+
+1. Normalizatsiyadan keyin bir xil bo'lib qoladigan qatorlarni oldindan tanlash.
+2. Topilsa — `RAISE EXCEPTION` konfliktli `id`/`phone` juftliklari bilan;
+   migratsiya to'xtaydi, ma'lumot o'zgarmaydi.
+3. Konflikt yo'q bo'lsagina `UPDATE`.
+
+Konflikt chiqsa — qo'lda hal qilinadi (qaysi hisob haqiqiy ekanini faqat inson
+biladi). Jim birlashtirish yoki o'chirish yo'q.
 
 ## 7. Supervisor admin paneli
 
@@ -224,15 +279,32 @@ shart.
 | Provisioning imzosi noto'g'ri | Aktivatsiya rad, `.lic` yozilmaydi, `PROVISIONING_SIGNATURE_INVALID` (403) |
 | Provisioning bloki yo'q (eski Supervisor) | Aktivatsiya avvalgidek o'tadi, provisioning'siz |
 | Owner telefoni bazada allaqachon bor | Tranzaksiya bekor, `PROVISIONING_CONFLICT` (409), `.lic` yozilmaydi |
-| Lokal tenant allaqachon bor | Provisioning sokin o'tkaziladi, `.lic` yoziladi |
+| Provisioning boshqa klinikaga tegishli (bog'lash mos emas) | 403 `PROVISIONING_MISMATCH`, `.lic` yozilmaydi |
+| Lokal tenant allaqachon bor | Provisioning o'tkaziladi, `.lic` yoziladi, audit `tenant.provisioning_skipped` |
 | `POST /v1/provisioned` yetib bormadi | Aktivatsiya muvaffaqiyatli; parol keyingi heartbeat'da tozalanadi |
 | Fingerprint mos emas / kalit yaroqsiz | Mavjud xulq o'zgarmaydi |
+
+**Yarim-provisioning qilingan o'rnatish.** Agar mashinada allaqachon mijozning
+o'zi yaratgan tenant bo'lsa (hozirgi Windows test mashinasi shundoq), aktivatsiya
+muvaffaqiyatli o'tadi, lekin vendor bergan login/parol **ishlamaydi** — bu
+qasddan qilingan xavfsizlik xulqi (kalitga ega har kim owner parolini bosib
+o'tolmasligi uchun). Tiklash yo'li: aktivatsiyadan oldin lokal bazani tozalash
+(yangi o'rnatish). Holat jim qolmasligi uchun `tenant.provisioning_skipped`
+audit yozuvi yoziladi — diagnostika shu orqali.
+
+**Heartbeat tozalash yo'li.** `licenses.service.ts` `heartbeat()` ham
+`owner_temp_password = NULL` qiladi va `provisioned_at` bo'sh bo'lsa to'ldiradi.
+Sabab: `POST /v1/provisioned` yetib bormasa parol Supervisor bazasida qolib
+ketmasin. Bu — §11 dagi `licenses.service.ts` o'zgarishlariga kiradi.
 
 ## 9. Testlar (TDD)
 
 **`apps/api`:**
 - Provisioning imzo tekshiruvi: to'g'ri imzo → tenant yaratiladi; buzilgan imzo → 403 va `.lic` yozilmaydi.
-- **Nested-obyekt regressiya testi**: imzolanadigan payload tekis ekanini majburlaydi (§3 teshigi qaytmasligi uchun).
+- **Bog'lash testi:** boshqa klinikaning haqiqiy imzolangan bloki (boshqa
+  `licenseKey`/`clinicId`/`issuedAt`) → 403, `.lic` yozilmaydi.
+- **Nested-obyekt regressiya testi**: `canonicalize` nested obyektda `throw`
+  qiladi; tekis payload uchun chiqish mavjud imzolar bilan mos qoladi (§3).
 - Ikki marta aktivatsiya → owner `password_hash` o'zgarmaydi, tenant dublikat bo'lmaydi.
 - Provisioning'dan keyin 8 rol shabloni mavjud (rol-bo'yicha tekshiruv, `@owner` emas).
 - `DENTAL_LOCAL_DESKTOP=true` da `POST /auth/register-tenant` → 403; `false` da 200.
@@ -244,6 +316,8 @@ shart.
 - Klinika yaratish owner maydonlari bilan; parol generatsiya qilinadi va qaytariladi.
 - `/v1/activate` provisioning blokini imzo bilan qaytaradi; aktivatsiyadan keyin
   `/v1/provisioned` parolni `NULL` qiladi va `'provisioned'` hodisasini yozadi.
+- `heartbeat` ham `owner_temp_password`ni tozalaydi (tasdiq so'rovi yetib
+  bormagan ssenariy).
 - Mavjud: `licenses.test.ts`, `clinics` route testlari yangilanadi.
 
 **Supervisor admin:**
@@ -263,15 +337,21 @@ shart.
 ## 11. Ta'sir qiladigan fayllar
 
 **Supervisor:** `db/schema.ts` + migratsiya · `modules/clinics/clinics.routes.ts` ·
-`modules/licenses/licenses.service.ts` (`buildResponse`, `activate`, yangi
-`provisioned`) · `modules/licenses/licenses.routes.ts` · `lib/rsa.ts` (tekis-obyekt qoidasi izohi)
+`modules/licenses/licenses.service.ts` (`buildResponse`, `activate`, `heartbeat`
+— parol tozalash, yangi `provisioned`) · `modules/licenses/licenses.routes.ts` ·
+`lib/rsa.ts` (tekis-obyekt guard + izoh)
 
 **Klinika (`apps/api`):** `lib/license.ts` (`LicenseData` tipi, `writeLicense`) ·
 `lib/license-client.ts` (`activateLicense` javob tipi, `markProvisioned`) ·
-`routes/activate.ts` · `modules/auth/auth.service.ts` (`provisionTenantInTx`) ·
-`modules/auth/auth.routes.ts` (`register-tenant` gate) · `modules/auth/auth.schema.ts`
+`routes/activate.ts` (`activateRoutes(deps)` — yangi signatura) · `app.ts`
+(chaqiruv yangilanadi) · `modules/auth/auth.service.ts` (`provisionTenantInTx`,
+`provisionFromLicense`) · `modules/auth/auth.routes.ts` (`register-tenant` gate,
+`registration-enabled`) · `modules/auth/auth.schema.ts` ·
+`modules/users/users.service.ts` (telefon normalizatsiyasi) ·
+`routes/reset-owner-password.ts` (telefon normalizatsiyasi) · migratsiya
+(`users.phone` normalizatsiyasi, `DO` bloki bilan)
 
-**Umumiy:** `packages/core/src/license-signature.ts` (izoh + tekis-obyekt guard) ·
+**Umumiy:** `packages/core/src/license-signature.ts` (tekis-obyekt guard + izoh) ·
 `packages/core` `normalizePhone`
 
 **Web:** `features/auth/pages/activate.page.tsx` · `features/auth/auth.routes.tsx` ·
