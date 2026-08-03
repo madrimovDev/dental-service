@@ -85,7 +85,7 @@ apps/supervisor-api: **Zod 3**) · React 18 + Mantine v7 · Vitest (web/admin) �
 - Produces: `canonicalize` endi nested obyektda `throw new Error('SIGNATURE_PAYLOAD_NOT_FLAT')`.
   Tekis payload uchun chiqish **bayt-ma-bayt o'zgarmaydi** (mavjud `.lic` fayllari ishlayveradi).
 
-- [ ] **Step 1: Failing test yozish (core)**
+- [x] **Step 1: Failing test yozish (core)**
 
 `packages/core/src/license-signature.test.ts` fayliga qo'shing:
 
@@ -118,12 +118,12 @@ describe('assertFlatSignaturePayload', () => {
 });
 ```
 
-- [ ] **Step 2: Testni ishga tushirib, yiqilishini tasdiqlash**
+- [x] **Step 2: Testni ishga tushirib, yiqilishini tasdiqlash**
 
 Run: `cd packages/core && bun test src/license-signature.test.ts`
 Kutiladi: FAIL — `assertFlatSignaturePayload` eksport qilinmagan.
 
-- [ ] **Step 3: Implementatsiya (core)**
+- [x] **Step 3: Implementatsiya (core)**
 
 `packages/core/src/license-signature.ts` — `canonicalize`dan oldin qo'shing:
 
@@ -163,12 +163,12 @@ export const assertFlatSignaturePayload = (data: object): void => {
 (mavjud `try/catch` `false` qaytaradi — nested payload'li imzo tekshiruvi
 `false` bo'ladi, bu to'g'ri xulq.)
 
-- [ ] **Step 4: Testni ishga tushirib, o'tishini tasdiqlash**
+- [x] **Step 4: Testni ishga tushirib, o'tishini tasdiqlash**
 
 Run: `cd packages/core && bun test src/license-signature.test.ts`
 Kutiladi: PASS (barcha mavjud testlar ham yashil).
 
-- [ ] **Step 5: Supervisor tomonida bir xil guard**
+- [x] **Step 5: Supervisor tomonida bir xil guard**
 
 `apps/supervisor-api/src/lib/rsa.ts` — xuddi shu `assertFlatSignaturePayload`
 funksiyasi (nusxa, lockstep izohi bilan: "Verify-only duplicate — see
@@ -176,7 +176,7 @@ packages/core/src/license-signature.ts"). `signLicense` va `verifySignature`
 ikkalasi ham chaqiradi. `signLicense`da **throw o'tkazib yuboriladi** (ushlab
 qolinmaydi) — noto'g'ri payload imzolanmasin.
 
-- [ ] **Step 6: Supervisor testi**
+- [x] **Step 6: Supervisor testi**
 
 `apps/supervisor-api/src/lib/rsa.test.ts`:
 
@@ -203,7 +203,7 @@ describe('rsa flat-payload guard', () => {
 
 Run: `cd apps/supervisor-api && bun test src/lib/rsa.test.ts` → PASS
 
-- [ ] **Step 7: Typecheck + commit**
+- [x] **Step 7: Typecheck + commit**
 
 ```bash
 bun run typecheck
