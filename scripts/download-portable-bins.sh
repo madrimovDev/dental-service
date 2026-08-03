@@ -30,6 +30,10 @@ curl -L -o /tmp/postgres-win.zip "$POSTGRES_WIN_URL"
 unzip -q /tmp/postgres-win.zip -d /tmp/pg-extract
 cp -r /tmp/pg-extract/pgsql/bin "$RESOURCES_DIR/postgres/"
 cp -r /tmp/pg-extract/pgsql/lib "$RESOURCES_DIR/postgres/"
+# share/ — initdb bootstrap (postgres.bki, tizim kataloglari, timezone) uchun
+# MAJBURIY; busiz `initdb` "postgres.bki does not exist" bilan qulaydi (CLI-361
+# real Windows build'da topildi).
+cp -r /tmp/pg-extract/pgsql/share "$RESOURCES_DIR/postgres/"
 
 # Valkey Windows binary (o'z serverdan)
 echo "Downloading Valkey..."
