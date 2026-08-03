@@ -11,9 +11,14 @@ const canonicalize = (data: object): string =>
  * tekis bo'lishi shart. Tekis payload uchun canonicalize chiqishi o'zgarmaydi —
  * mavjud `.lic` fayllari va imzolar buzilmaydi.
  *
- * Verify-only duplicate — see packages/core/src/license-signature.ts. Klinika
- * (`apps/api`) va Supervisor alohida deploy unit, ular orasida workspace import
- * qirrasi YO'Q — ikkala nusxa QO'LDA LOCKSTEP saqlanadi.
+ * Bu fayl — MANBA (imzolovchi ham, tekshiruvchi ham);
+ * `packages/core/src/license-signature.ts` esa uning verify-only NUSXASI.
+ * Klinika (`apps/api`) va Supervisor alohida deploy unit, ular orasida
+ * workspace import qirrasi YO'Q — ikkala nusxa QO'LDA LOCKSTEP saqlanadi:
+ * bu funksiya o'zgarsa, core nusxasi ham AYNAN shunday o'zgarishi shart, aks
+ * holda Supervisor imzolagan payload klinikada rad etiladi (yoki aksincha).
+ * Ikkala tomonning xulq-pariteti har ikki test faylidagi bir xil holatlar
+ * (tekis / nested / obyektlar massivi / `null`) bilan qo'riqlanadi.
  */
 export const assertFlatSignaturePayload = (data: object): void => {
   for (const value of Object.values(data)) {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { createSign } from 'node:crypto';
-import { generateKeyPair, signLicense, verifySignature } from './rsa';
+import { assertFlatSignaturePayload, generateKeyPair, signLicense, verifySignature } from './rsa';
 
 describe('RSA license signing', () => {
   it('sign + verify round-trip', () => {
@@ -58,5 +58,32 @@ describe('rsa flat-payload guard', () => {
     const sig = sign.sign(privateKey, 'hex');
     expect(() => verifySignature(data, sig, publicKey)).not.toThrow();
     expect(verifySignature(data, sig, publicKey)).toBe(false);
+  });
+});
+
+// Lockstep pariteti: aynan shu holatlar `packages/core/src/license-signature.test.ts`
+// dagi `assertFlatSignaturePayload` bloki bilan bir xil. Ikki nusxa xulqi ajralib
+// ketsa (masalan biri `null`ni rad eta boshlasa) shu yerda ushlanadi.
+describe('assertFlatSignaturePayload (core nusxasi bilan parite)', () => {
+  it('tekis obyektni qabul qiladi (string, number, boolean, string[])', () => {
+    expect(() =>
+      assertFlatSignaturePayload({ a: 'x', b: 1, c: true, d: ['p', 'q'] }),
+    ).not.toThrow();
+  });
+
+  it('nested obyektda xato beradi', () => {
+    expect(() => assertFlatSignaturePayload({ a: 'x', nested: { b: 'y' } })).toThrow(
+      'SIGNATURE_PAYLOAD_NOT_FLAT',
+    );
+  });
+
+  it('obyektlar massivida ham xato beradi', () => {
+    expect(() => assertFlatSignaturePayload({ a: [{ b: 'y' }] })).toThrow(
+      'SIGNATURE_PAYLOAD_NOT_FLAT',
+    );
+  });
+
+  it('null qiymatga ruxsat beradi', () => {
+    expect(() => assertFlatSignaturePayload({ a: null })).not.toThrow();
   });
 });
