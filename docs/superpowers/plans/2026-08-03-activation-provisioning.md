@@ -1461,6 +1461,11 @@ git commit -m "fix(auth): telefon raqami barcha kirish nuqtalarida kanonik shakl
    `'998 90 123 45 67'` 400 qaytaradi. Testda qabul mezoni probe'i aynan
    (`998901239999`) + 9 xonali mahalliy variant ishlatildi. Regex **kengaytirilmadi**
    (u frontendga ham re-export qilinadi).
+4. Rejada YO'Q, lekin shu o'zgarishning oqibati: `auth.routes.ts` login
+   rate-limit kaliti (`keyFromBody`) XOM telefonni ishlatardi. `login`
+   normallashtirilgach barcha yozilishlar bitta hisobga olib boradi, ya'ni
+   brute-force qiluvchi kvotani formatni almashtirib ko'paytira olardi. Kalit
+   ham `normalizePhone` orqali o'tkazildi (alohida commit, testi bor).
 
 ---
 
