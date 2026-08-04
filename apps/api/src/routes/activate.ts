@@ -70,7 +70,21 @@ const applyProvisioning = async (db: Database, p: ProvisioningBlock): Promise<bo
   return true;
 };
 
-export const activateRoutes = (deps: { db: Database }) => {
+export const activateRoutes = (deps: {
+  db: Database;
+  /**
+   * Provisioning imzosini tekshiruvchi ochiq kalit. Default — build'ga
+   * qotirilgan production kaliti; PROD'da hech qachon berilmaydi.
+   *
+   * Test seam: `mock.module('@dental/core/supervisor-public-key')` bu yerda
+   * ISHONCHSIZ — `bun test` butun katalogni bitta jarayonda ishga tushiradi
+   * va bu modul `activate.ts` birinchi import qilinganda "muzlab" qoladi
+   * (qaysi test fayli birinchi yuklagan bo'lsa, o'shaning holati). Kalitni
+   * parametr sifatida berish testni fayl tartibidan mustaqil qiladi.
+   */
+  supervisorPublicKeyPem?: string;
+}) => {
+  const publicKeyPem = deps.supervisorPublicKeyPem ?? SUPERVISOR_PUBLIC_KEY_PEM;
   const app = new Hono();
 
   // ─── Rate limiting (CLI-370) — Redis fixed-window, IP-only ───────────────
@@ -110,7 +124,7 @@ export const activateRoutes = (deps: { db: Database }) => {
       //    ochiq kaliti build'ga qotirilgan).
       if (
         !provisioningSignature ||
-        !verifyLicenseSignature(provisioning, provisioningSignature, SUPERVISOR_PUBLIC_KEY_PEM)
+        !verifyLicenseSignature(provisioning, provisioningSignature, publicKeyPem)
       ) {
         return c.json(
           fail('PROVISIONING_SIGNATURE_INVALID', "Provisioning ma'lumoti ishonchsiz"),

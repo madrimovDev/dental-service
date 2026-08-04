@@ -26,7 +26,7 @@
  *   cd apps/api && bun test --env-file=../../.env tests/integration/provisioning-activate.test.ts
  */
 
-import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
+import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createSign, generateKeyPairSync } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -34,33 +34,30 @@ import { join } from 'node:path';
 import { auditLog, branches, roles, tenants, users } from '@dental/db-schema';
 import { eq, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
-import type { Database } from '../../src/db/client.ts';
+import { db } from '../../src/db/client.ts';
+import { getFingerprint, readLicense } from '../../src/lib/license.ts';
+import { verifyPassword } from '../../src/lib/password.ts';
+import { closeRateLimitRedis } from '../../src/lib/rate-limit.ts';
+import { activateRoutes } from '../../src/routes/activate.ts';
 
 const tmpDir = await mkdtemp(join(tmpdir(), 'provisioning-activate-'));
 process.env.LICENSE_PATH = join(tmpDir, 'license.lic');
 process.env.LICENSE_ANCHOR_PATH = join(tmpDir, 'license-anchor.dat');
 
-// systeminformation — `../../src/lib/license.ts` dinamik import'idan OLDIN
-// mock qilinadi (bun `mock.module` oldindan ro'yxatdan o'tishi shart;
-// cli-387-license-heartbeat.test.ts naqshi).
-mock.module('systeminformation', () => {
-  const cpu = async () => ({ manufacturer: 'Intel', brand: 'i7' });
-  const system = async () => ({ uuid: 'task8-uuid', serial: 'task8-serial' });
-  const networkInterfaces = async () => [
-    { iface: 'eth0', mac: 'aa:bb:cc:dd:ee:01', default: true },
-  ];
-  return { default: { cpu, system, networkInterfaces }, cpu, system, networkInterfaces };
-});
-
+// ⚠️ Bu fayl ATAYIN `mock.module` ISHLATMAYDI. `bun test` butun katalogni
+// bitta jarayonda ishga tushiradi, `mock.module` esa RESOLVED PATH bo'yicha
+// GLOBAL va modul birinchi import qilinganda "muzlab" qoladi — ya'ni
+// `@dental/core/supervisor-public-key`ni mock qilish faqat shu fayl birinchi
+// yuklansa ishlaydi (CLAUDE.md CLI-437 "anchor fayl izolyatsiyasi" sinfi;
+// isbot: to'liq `tests/integration/` yugurishida bu faylning 12 testi ham
+// yiqilardi). Buning o'rniga ochiq kalit `activateRoutes`ga parametr sifatida
+// beriladi, `getFingerprint` esa haqiqiy qiymat qaytaradi (qaysi bo'lishidan
+// qat'i nazar, payload va `.lic` bir xil qiymatdan foydalanadi).
 const testKeypair = generateKeyPairSync('rsa', {
   modulusLength: 2048,
   privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
   publicKeyEncoding: { type: 'spki', format: 'pem' },
 });
-
-mock.module('@dental/core/supervisor-public-key', () => ({
-  SUPERVISOR_PUBLIC_KEY_PEM: testKeypair.publicKey,
-}));
 
 /** Supervisor `signLicense` bilan bir xil kanonik shakl (tekis payload). */
 const signForTest = (data: object): string => {
@@ -69,12 +66,6 @@ const signForTest = (data: object): string => {
   sign.update(canonical);
   return sign.sign(testKeypair.privateKey, 'hex');
 };
-
-const { db } = await import('../../src/db/client.ts');
-const { getFingerprint, isLicenseValid, readLicense } = await import('../../src/lib/license.ts');
-const { verifyPassword } = await import('../../src/lib/password.ts');
-const { activateRoutes } = await import('../../src/routes/activate.ts');
-const { closeRateLimitRedis } = await import('../../src/lib/rate-limit.ts');
 
 const localFingerprint = await getFingerprint();
 
@@ -180,7 +171,7 @@ const supervisorFetch = (async (input: RequestInfo | URL, init?: RequestInit) =>
 }) as unknown as typeof fetch;
 
 const app = new Hono();
-app.route('/api/activate', activateRoutes({ db: db as Database }));
+app.route('/api/activate', activateRoutes({ db, supervisorPublicKeyPem: testKeypair.publicKey }));
 
 /** Har so'rov boshqa IP'dan — rate-limit oynasi testlarni bloklamasin. */
 const activate = (licenseKey: string = LICENSE_KEY) =>
@@ -278,18 +269,39 @@ describe('aktivatsiya provisioning — muvaffaqiyatli yo‘l', () => {
     expect(provisionedCalls[0]?.licenseKey).toBe(LICENSE_KEY);
   });
 
-  test('yozilgan `.lic` haqiqiy qoladi va parolni saqlamaydi', async () => {
+  test('yozilgan `.lic` faqat `LicenseData` maydonlarini saqlaydi', async () => {
     await activate();
 
     const lic = await readLicense();
     expect(lic).not.toBeNull();
-    expect(isLicenseValid(lic as NonNullable<typeof lic>, localFingerprint)).toBe(true);
+
+    // 🔴 Imzo tekshiruvining o'zagi: `isLicenseValid` `{ signature, ...payload }`
+    // qiladi, shuning uchun faylga tushgan HAR QANDAY ortiqcha maydon imzoni
+    // buzadi. Kalitlar to'plamini aynan qulflash `isLicenseValid(...) === true`
+    // bilan bir xil invariantni tekshiradi, lekin `mock.module`ga (ya'ni test
+    // fayllari tartibiga) bog'liq emas — yuqoridagi izohga qarang.
+    expect(Object.keys(lic as object).sort()).toEqual(
+      [
+        'clinicId',
+        'expiresAt',
+        'fingerprint',
+        'gracePeriodDays',
+        'issuedAt',
+        'licenseKey',
+        'modules',
+        'signature',
+      ].sort(),
+    );
+    expect(lic?.licenseKey).toBe(LICENSE_KEY);
+    expect(lic?.clinicId).toBe(CLINIC_ID);
+    expect(lic?.fingerprint).toBe(localFingerprint);
 
     const raw = JSON.stringify(lic);
     expect(raw).not.toContain('ownerPassword');
     expect(raw).not.toContain(OWNER_PASSWORD);
     // Supervisor javobidagi begona maydon faylga tushmagan
     expect(raw).not.toContain('junk-field-must-not-reach-lic');
+    expect(raw).not.toContain('provisioning');
   });
 
   test('owner telefoni kanonik shaklga keltiriladi (javob = bazadagi login)', async () => {
@@ -379,8 +391,8 @@ describe('aktivatsiya provisioning — idempotentlik', () => {
 
     // `.lic` baribir yoziladi (litsenziya yangilanishi to'sib qo'yilmaydi)
     const lic = await readLicense();
-    expect(lic).not.toBeNull();
-    expect(isLicenseValid(lic as NonNullable<typeof lic>, localFingerprint)).toBe(true);
+    expect(lic?.licenseKey).toBe(LICENSE_KEY);
+    expect(lic?.fingerprint).toBe(localFingerprint);
   });
 });
 
@@ -397,7 +409,7 @@ describe('aktivatsiya provisioning — blok qaytarilmasa', () => {
     expect(provisionedCalls.length).toBe(0);
 
     const lic = await readLicense();
-    expect(lic).not.toBeNull();
-    expect(isLicenseValid(lic as NonNullable<typeof lic>, localFingerprint)).toBe(true);
+    expect(lic?.licenseKey).toBe(LICENSE_KEY);
+    expect(lic?.fingerprint).toBe(localFingerprint);
   });
 });
