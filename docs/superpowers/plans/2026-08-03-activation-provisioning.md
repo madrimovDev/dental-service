@@ -1467,6 +1467,41 @@ git commit -m "fix(auth): telefon raqami barcha kirish nuqtalarida kanonik shakl
    brute-force qiluvchi kvotani formatni almashtirib ko'paytira olardi. Kalit
    ham `normalizePhone` orqali o'tkazildi (alohida commit, testi bor).
 
+> **Tekshiruv natijasi (2026-08-04, mustaqil verify):** har uch himoya mutatsiya
+> sinovi bilan tasdiqlandi — `login`dagi `normalizePhone` olib tashlanganda 2
+> test, `invite`dagisi olib tashlanganda boshqa 2 test, rate-limit kaliti xom
+> qiymatga qaytarilganda aynan rate-limit testi qizil bo'ladi (429 → 401).
+> Qabul mezoni suite tashqarisida ham probe bilan bajarildi: `register-tenant`
+> (`998901239999`) → 201, so'ng `+998901239999` / `998901239999` / `901239999`
+> uchalasi ham 200 va AYNI `user.id`. Ajratuvchi belgili yozilishlar
+> (`+998-90-…`, bo'shliqli) 400 (schema regex) — foydalanuvchiga yetib bormaydi,
+> chunki web `PhoneInput` doim `+998XXXXXXXXX` chiqaradi (§3 og'ish to'g'ri).
+>
+> Migratsiya 0043 bir martalik alohida bazada sinaldi (loyiha bazalariga
+> tegilmadi): (a) soft-deleted `901234567` ↔ tirik `+998901234567` juftligida
+> `RAISE EXCEPTION` konfliktli id'lar bilan ishga tushdi; (b) AYNI ma'lumotda
+> rejadagi variant (`deleted_at IS NULL` filtri bilan) guard'dan o'tib
+> `users_phone_unique` buzilishiga uchradi — §2 og'ish HAQIQIY xatoning oldini
+> oladi; (c) to'qnashuvsiz beshta turli yozilish to'g'ri kanonik shaklga o'tdi,
+> raqamsiz qator (`'abc'`) tegilmadi (`phone` NOT NULL — TS `normalizePhone`
+> bo'sh satr qaytarardi, SQL esa qatorni chetlab o'tadi; yozishda regex
+> validatsiyasi tufayli bunday qator amalda paydo bo'lolmaydi). Haqiqiy `dental`
+> bazasida: 43 migratsiya qo'llangan, `phone !~ '^\+[0-9]+$'` → 0 qator,
+> `users_phone_unique` — to'liq (partial emas) indeks (og'ish asosi tasdiqlandi).
+>
+> Qo'shimcha topilma va tuzatish: `register-tenant` dublikat telefonni faqat
+> `users_phone_unique` buzilishini ushlab aniqlaydi — normalizatsiyasiz bir odam
+> `+998…` va `901…` bilan IKKI platform hisobiga ega bo'lardi (indeks buzilmasdi,
+> 409 ham qaytmasdi). Xulq endi to'g'ri (409 `auth.phone_taken`), lekin testda
+> qulflanmagan edi — `phone-normalization.test.ts`ga regressiya testi qo'shildi
+> (mutatsiya bilan tasdiqlandi). `apps/supervisor-api/src/lib/phone.ts` ↔
+> `packages/core/src/phone.ts` lockstep dublikati baytma-bayt bir xil.
+>
+> Eslatma: Step 6 buyrug'i (`bun test src/modules/auth/ src/modules/users/`) hech
+> qanday faylga tushmaydi — bu modullarda `*.test.ts` yo'q; regressiya qamrovi
+> `tests/integration/` orqali (11 fayllik nishonli to'plam A/B: yangi fayl bilan
+> 59/0, fayl'siz 54/0 — blast-radius yo'q).
+
 ---
 
 ## Task 10: Web — aktivatsiya sahifasi va `/register-tenant` ko'rinishi

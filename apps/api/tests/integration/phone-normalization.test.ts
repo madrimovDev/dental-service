@@ -199,6 +199,23 @@ describe('Task 9 — telefon normalizatsiyasi', () => {
     expect(other.status).toBe(429);
   });
 
+  test('boshqa formatda qayta ro‘yxatdan o‘tish → phone_taken (ikkinchi hisob YARATILMAYDI)', async () => {
+    // `register-tenant` dublikatni `users_phone_unique` buzilishini ushlab
+    // aniqlaydi (auth.routes.ts). Normalizatsiyasiz `+998…` va `901…` ikki
+    // ALOHIDA qator bo'lib sig'ardi — indeks buzilmasdi, xato ham qaytmasdi va
+    // bitta odam ikki platform hisobiga ega bo'lib qolardi (CLAUDE.md §3.1).
+    const first = await registerTenant('+998901237171', 'Dublikat Klinika');
+    expect(first.status).toBe(201);
+
+    const second = await registerTenant('901237171', 'Dublikat Klinika 2');
+    expect(second.status).toBe(409);
+    const body = (await second.json()) as { error?: { code?: string } };
+    expect(body.error?.code).toBe('auth.phone_taken');
+
+    const rows = await db.select().from(users);
+    expect(rows.filter((u) => u.phone === '+998901237171').length).toBe(1);
+  });
+
   test('yangi xodim taklifi kanonik shaklda saqlanadi', async () => {
     await withTx((tx) =>
       usersService.invite(ctx(tx), {
