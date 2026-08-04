@@ -17,7 +17,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { PhoneInput } from '@/components/PhoneInput.tsx';
 import { useAuthStore } from '@/stores/auth-store.ts';
-import { useLogin } from '../auth.api';
+import { useLogin, useRegistrationEnabled } from '../auth.api';
 
 const makeSchema = (t: TFunction) =>
   z.object({
@@ -35,6 +35,12 @@ export function LoginPage() {
     initialValues: { phone: '', password: '' },
     validate: zod4Resolver(makeSchema(t)),
   });
+
+  // Server-tomon signali — `RegisterTenantPage` darvozasi bilan AYNI semantika.
+  // Sabab: `window.dentalDesktop` faqat Electron oynasida mavjud; klinika
+  // xodimi desktop serverga LAN orqali BRAUZERdan kirsa u yo'q, va havola
+  // ko'rinib qolardi (bosilganda sahifa /login'ga qaytaradi — foydasiz sayr).
+  const registration = useRegistrationEnabled();
 
   const loginMut = useLogin({
     onSuccess: (data) => {
@@ -88,11 +94,15 @@ export function LoginPage() {
               <Anchor component={Link} to="/reset-owner-password" size="sm">
                 {t('auth.login.reset_owner')}
               </Anchor>
-              {(typeof window === 'undefined' || !window.dentalDesktop) && (
-                <Anchor component={Link} to="/register-tenant" size="sm">
-                  {t('auth.login.register_clinic')}
-                </Anchor>
-              )}
+              {/* Fail-open (`!== false`): javob kelmasa yoki eski backend
+                  endpointni bilmasa havola KO'RINADI — cloud foydalanuvchisidan
+                  ro'yxatdan o'tish imkoniyati tortib olinmaydi. */}
+              {(typeof window === 'undefined' || !window.dentalDesktop) &&
+                registration.data?.enabled !== false && (
+                  <Anchor component={Link} to="/register-tenant" size="sm">
+                    {t('auth.login.register_clinic')}
+                  </Anchor>
+                )}
             </Stack>
           </Stack>
         </form>

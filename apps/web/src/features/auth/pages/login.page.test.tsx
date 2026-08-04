@@ -4,8 +4,18 @@ import { i18n } from '@/lib/i18n.ts';
 import { renderApp } from '../../../test-utils';
 import { LoginPage } from './login.page';
 
+// `vi.mock` factory BUTUN modulni almashtiradi — sahifa ishlatadigan HAR bir
+// hook shu yerda bo'lishi shart, aks holda "not a function" xatosi chiqadi.
+const registrationEnabled = vi.hoisted(() => ({
+  value: { data: { enabled: true }, isLoading: false } as {
+    data?: { enabled: boolean };
+    isLoading: boolean;
+  },
+}));
+
 vi.mock('../auth.api', () => ({
   useLogin: () => ({ mutate: vi.fn(), isPending: false }),
+  useRegistrationEnabled: () => registrationEnabled.value,
 }));
 
 vi.mock('@/stores/auth-store.ts', () => ({
@@ -14,6 +24,7 @@ vi.mock('@/stores/auth-store.ts', () => ({
 
 afterEach(() => {
   delete window.dentalDesktop;
+  registrationEnabled.value = { data: { enabled: true }, isLoading: false };
 });
 
 describe("LoginPage — desktop'da \"ro'yxatdan o'tish\" havolasi yashirilishi", () => {
@@ -28,6 +39,27 @@ describe("LoginPage — desktop'da \"ro'yxatdan o'tish\" havolasi yashirilishi",
     };
     renderApp(<LoginPage />);
     expect(screen.queryByText(i18n.t('auth.login.register_clinic'))).not.toBeInTheDocument();
+  });
+
+  // ⚠️ LAN stsenariysi: klinika xodimi desktop serverga BRAUZERdan kiradi —
+  // u yerda `window.dentalDesktop` YO'Q, ya'ni yuqoridagi darvoza ishlamaydi.
+  // Server signali (`GET /auth/registration-enabled`) — YAGONA darvoza.
+  // Havolasiz bo'lsa foydalanuvchi formaga bekorga bormaydi (RegisterTenantPage
+  // baribir /login'ga qaytaradi — bu yerda kirish nuqtasining o'zi yopiladi).
+  it("brauzerdan LAN orqali: server enabled=false qaytarsa — havola ko'rinmaydi", () => {
+    registrationEnabled.value = { data: { enabled: false }, isLoading: false };
+    renderApp(<LoginPage />);
+    expect(screen.queryByText(i18n.t('auth.login.register_clinic'))).not.toBeInTheDocument();
+  });
+
+  // Fail-open: so'rov xato bersa yoki eski backend endpointni bilmasa
+  // (`data` undefined), havola KO'RINADI — cloud foydalanuvchisidan
+  // ro'yxatdan o'tish imkoniyati tortib olinmaydi. `RegisterTenantPage`
+  // darvozasi bilan bir xil semantika (`enabled === false` bo'lsagina yopiladi).
+  it("so'rov javob bermasa (fail-open) — havola ko'rinadi", () => {
+    registrationEnabled.value = { data: undefined, isLoading: false };
+    renderApp(<LoginPage />);
+    expect(screen.getByText(i18n.t('auth.login.register_clinic'))).toBeInTheDocument();
   });
 });
 
