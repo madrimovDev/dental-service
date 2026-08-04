@@ -6,7 +6,7 @@ import { db } from '../../db/client';
 import { branches, clinics, licenseEvents, licenses } from '../../db/schema';
 import { verifySignature } from '../../lib/rsa';
 import { signAdminTestToken } from '../../lib/test-helpers';
-import { createLicenseService } from './licenses.service';
+import { createLicenseService, type ProvisioningBlock } from './licenses.service';
 
 const app = createApp();
 const service = createLicenseService();
@@ -196,22 +196,23 @@ describe('provisioning bloki', () => {
   it('aktivatsiya provisioning blokini imzo bilan qaytaradi', async () => {
     const res = await service.activate(licenseKey, 'fp-1');
     expect(res.provisioning).toBeDefined();
-    expect(res.provisioning?.ownerPhone).toBe('+998901234567');
-    expect(res.provisioning?.ownerPassword).toBe('Temp-Parol-123');
-    expect(res.provisioning?.licenseKey).toBe(licenseKey);
-    expect(res.provisioning?.clinicId).toBe(clinicId);
-    expect(res.provisioning?.issuedAt).toBe(res.issuedAt);
-    expect(res.provisioning?.tenantName).toBe('Test Clinic');
-    expect(res.provisioning?.defaultLanguage).toBe('uz');
-    expect(res.provisioning?.branchName).toBe('Main');
+    // Aniq tiplangan lokal — `as object` cast qilinsa `ProvisioningBlock`ning
+    // maydon-pariteti kompilyatsiya vaqtida tekshirilmay qolardi.
+    const prov: ProvisioningBlock = res.provisioning as ProvisioningBlock;
+    expect(prov.ownerPhone).toBe('+998901234567');
+    expect(prov.ownerPassword).toBe('Temp-Parol-123');
+    expect(prov.licenseKey).toBe(licenseKey);
+    expect(prov.clinicId).toBe(clinicId);
+    expect(prov.issuedAt).toBe(res.issuedAt);
+    expect(prov.tenantName).toBe('Test Clinic');
+    expect(prov.defaultLanguage).toBe('uz');
+    expect(prov.branchName).toBe('Main');
     // Bo'sh maydon HECH QACHON undefined emas — `undefined` bo'lsa
     // JSON.stringify kalitni butunlay tashlaydi va klient tomondagi imzo
     // tekshiruvi mos kelmaydi.
-    expect(res.provisioning?.branchAddress).toBe('');
-    expect(res.provisioning?.branchPhone).toBe('');
-    expect(
-      verifySignature(res.provisioning as object, res.provisioningSignature as string, publicKey),
-    ).toBe(true);
+    expect(prov.branchAddress).toBe('');
+    expect(prov.branchPhone).toBe('');
+    expect(verifySignature(prov, res.provisioningSignature as string, publicKey)).toBe(true);
   });
 
   it("parol o'chirilgach provisioning bloki qaytarilmaydi", async () => {
