@@ -9,9 +9,15 @@ import * as realLicense from './license';
 // bo'lib qoladi (fayllar tartibiga bog'liq, racy). Haqiqiy modulni spread
 // qilib faqat kerakli funksiyani override qilamiz — qolganlari real bo'lib
 // qoladi.
+// `fingerprintImpl` — testdan-testga almashtiriladigan ilgak: `mock.module`
+// jarayonga bir marta ro'yxatdan o'tadi, shuning uchun uni qayta chaqirish
+// o'rniga ichkaridagi implementatsiyani almashtiramiz (default xulq — barcha
+// mavjud testlar uchun o'zgarishsiz sobit fingerprint).
+let fingerprintImpl = async (): Promise<string> => 'abc123fingerprint';
+
 mock.module('./license', () => ({
   ...realLicense,
-  getFingerprint: async () => 'abc123fingerprint',
+  getFingerprint: async () => fingerprintImpl(),
 }));
 
 describe('activateLicense', () => {
@@ -123,9 +129,12 @@ describe('activateLicense — provisioning bloki', () => {
 
 describe('markProvisioned', () => {
   const originalFetch = globalThis.fetch;
+  const originalFingerprint = fingerprintImpl;
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
+    // Keyingi describe'lar (sendHeartbeat) sobit fingerprint'ni kutadi
+    fingerprintImpl = originalFingerprint;
   });
 
   test('Supervisor /v1/provisioned ga licenseKey va fingerprint yuboradi', async () => {
@@ -161,6 +170,20 @@ describe('markProvisioned', () => {
 
     const { markProvisioned } = await import('./license-client');
     await expect(markProvisioned('KEY-1')).resolves.toBeUndefined();
+  });
+
+  // JSDoc «fingerprint hisoblab bo'lmasligi (VM/konteyner) throw QILMAYDI»
+  // va'dasi — `getFingerprint()` chaqiruvi ham try ichida qolishini qulflaydi.
+  test("fingerprint hisoblanmasa throw qilmaydi va so'rov yubormaydi", async () => {
+    const fetchMock = mock(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    fingerprintImpl = async () => {
+      throw new Error('FINGERPRINT_UNAVAILABLE');
+    };
+
+    const { markProvisioned } = await import('./license-client');
+    await expect(markProvisioned('KEY-1')).resolves.toBeUndefined();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 
