@@ -1502,6 +1502,56 @@ git commit -m "fix(auth): telefon raqami barcha kirish nuqtalarida kanonik shakl
 > `tests/integration/` orqali (11 fayllik nishonli to'plam A/B: yangi fayl bilan
 > 59/0, fayl'siz 54/0 — blast-radius yo'q).
 
+> **Ikkinchi mustaqil verify (2026-08-04) — reliz gate qayta o'lchandi.**
+> Qabul mezoni 3(a) BAJARILGAN: `register-tenant` (`998901239999`) → 201, so'ng
+> `login` (`998901239999`) → **200**, AYNI `user.id` (jonli probe, suite'dan
+> tashqarida).
+>
+> Qabul mezoni 3(b) — uch formatdan **ikkitasi** bitta hisobga tushadi, uchinchisi
+> YO'Q. `+998901234567` hisobiga qarshi o'lchangan haqiqiy statuslar:
+>
+> | Kiritma | Status | user.id |
+> |---|---|---|
+> | `'998901234567'` | 200 | `f032116b…` (AYNI) |
+> | `'901234567'` | 200 | `f032116b…` (AYNI) |
+> | `'+998901234567'` | 200 | `f032116b…` (AYNI) |
+> | `'+998 90 123 45 67'` | **400** | — |
+> | `'+998-90-123-45-67'` | **400** | — |
+>
+> Sabab: ajratuvchi belgili yozilish `phone` schema regexiga (`^\+?\d{9,15}$`)
+> tushmaydi va `normalizePhone`gacha YETIB BORMAYDI (Zod handler'dan OLDIN
+> validatsiya qiladi). Bu **qasddan qoldirilgan** (§3 og'ishi) va **MINOR** deb
+> baholandi, chunki: (a) mahsulot UI'sidan yetib bo'lmaydi — `PhoneInput`
+> `\D` belgilarni tashlab doim `+998XXXXXXXXX` chiqaradi, login formasining o'z
+> regexi ham xuddi shunday; (b) Supervisor tomoni ajratuvchili kiritmani QABUL
+> qiladi (`z.string().min(9).max(20)`) va `normalizePhone` bilan kanonik shaklda
+> saqlaydi, ya'ni vendor bo'sh joy bilan yozsa ham klinikada login buzilmaydi;
+> (c) regex 8+ joyda (patients/branches/users/settings) dublikat — faqat auth'da
+> kengaytirish kontraktni ayri tushirardi (CLAUDE.md "theme-convergent, ommaviy
+> migration EMAS" pretsedenti). Kengaytirish kerak bo'lsa — alohida ticket,
+> hamma joyda birga.
+>
+> Mustaqil qayta tasdiqlangan: `grep -rn "users\.phone" apps/api/src` — yozish/
+> qidirish joylari AYNAN uchta va uchalasi ham normallashtirilgan
+> (`auth.service.ts:130` insert, `:294` login, `users.service.ts:83` invite);
+> qolganlari (`appointments:557`, `payroll:286`, `users.service.ts:36`) — faqat
+> SELECT proyeksiyasi, predikat emas. `reset-owner-password.ts`da `phone` so'zi
+> UMUMAN yo'q (0 mos kelish) — og'ish §1 to'g'ri.
+> `lib/telegram-bot-manager.ts:11` da UCHINCHI `normalizePhone` dublikati bor,
+> lekin u `patients.phone` bilan ishlaydi (Task 9 doirasidan tashqari).
+>
+> Migratsiya 0043 bir martalik `verify_task9_tmp` bazasida qayta sinaldi (loyiha
+> bazalariga tegilmadi, oxirida `DROP DATABASE`): (a) soft-deleted `901234567` ↔
+> tirik `+998901234567` juftligida `RAISE EXCEPTION` konfliktli id'lar bilan
+> ishga tushdi; (b) AYNI ma'lumotda rejadagi asl variant (`deleted_at IS NULL`
+> filtri) guard'dan O'TDI ("guard TOZA dedi") va keyin
+> `duplicate key value violates unique constraint "users_phone_unique"` bilan
+> yiqildi — §2 og'ishi HAQIQIY xatoning oldini oladi; (c) to'qnashuvsiz 5 xil
+> yozilish to'g'ri kanonik shaklga o'tdi (AQSH raqami `+12025550123` ham
+> saqlanib qoldi) va ikkinchi ishga tushirish AYNAN o'sha natijani berdi —
+> **idempotent**. Haqiqiy `dental` bazasi: 43 migratsiya qo'llangan,
+> `phone !~ '^\+[0-9]+$'` → 0 qator.
+
 ---
 
 ## Task 10: Web — aktivatsiya sahifasi va `/register-tenant` ko'rinishi
@@ -1610,6 +1660,33 @@ cd ../.. && bun run typecheck
 git add apps/api/src/modules/auth/ apps/web/src/features/auth/ packages/i18n/ packages/api-client/
 git commit -m "feat(web): aktivatsiyadan keyin login telefonini ko'rsatish + desktopda ro'yxatdan o'tishni yashirish"
 ```
+
+> **Tekshiruv natijasi (2026-08-04, mustaqil verify):** Task 10 qabul qilindi.
+> Har uch himoya mutatsiya sinovi bilan tasdiqlandi: env taqqoslash teskari
+> qilinganda (`!== 'true'` → `=== 'true'`) 5 api testdan 4 tasi qizil;
+> `setOwnerPhone(...)` olib tashlanganda `activate.page` testi qizil;
+> `enabled === false` → `=== true` qilinganda `register-tenant.page`ning 2 testi
+> qizil. Kodgeneratsiya sinxron: `generate:openapi` + `generate:api-client`
+> qayta ishga tushirildi → `git status` BO'SH (qo'lda tahrirlangan barrel
+> manbaga mos). i18n `auth.activate.login_hint` ikkala faylda ham bor
+> (`locales/uz.json:145`, `locales/ru.json:145`).
+>
+> **Topilgan va TUZATILGAN nuqson (commit `8562738`):** darvoza sahifada bor
+> edi, lekin unga olib boruvchi KIRISH NUQTASIda yo'q — `login.page.tsx`
+> "ro'yxatdan o'tish" havolasini faqat `window.dentalDesktop` bo'yicha
+> yashirardi. Bu belgi Electron oynasidagina mavjud; LAN orqali BRAUZERdan
+> kirgan xodimda yo'q — ya'ni aynan shu endpoint yaratilgan stsenariyda havola
+> ko'rinib, bosilganda foydalanuvchi `/register-tenant` → darhol `/login`ga
+> qaytarilardi. Havola endi `useRegistrationEnabled()` bilan ham gate qilinadi,
+> `RegisterTenantPage` bilan AYNI fail-open semantikada (`!== false`), shuning
+> uchun ikki darvoza qarama-qarshi bo'la olmaydi.
+>
+> Regressiya: web to'liq suite 527/529 (2 qizil — `Sidebar.test.tsx`
+> "Tranzaksiyalar aria-disabled" va `PlanFormModal.test.tsx` "Reja nomi" label —
+> ikkalasi ham OLDINDAN MAVJUD, `git diff d4e4e52~1..HEAD` bu fayllarga
+> tegmagan); api integratsiya 40/40 yashil (registration-enabled,
+> phone-normalization, desktop-register-tenant-block, provisioning-activate,
+> provisioning-tenant, cli-427). Typecheck 16/16 toza.
 
 ---
 
