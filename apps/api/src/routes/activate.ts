@@ -83,8 +83,27 @@ export const activateRoutes = (deps: {
    * parametr sifatida berish testni fayl tartibidan mustaqil qiladi.
    */
   supervisorPublicKeyPem?: string;
+  /**
+   * Supervisor klienti va `.lic` yozuvchisi — PROD'da hech qachon berilmaydi
+   * (default = haqiqiy implementatsiya). `reset-owner-password.ts`ning
+   * `deps.verifyReset ?? defaultVerifyReset` pretsedenti.
+   *
+   * Nega parametr, `mock.module` emas: `bun test` butun katalogni BITTA
+   * jarayonda ishga tushiradi va `mock.module` RESOLVED PATH bo'yicha GLOBAL —
+   * `cli-370-activate-rate-limit.test.ts` `license-client.ts`ni butun jarayon
+   * uchun almashtiradi, ya'ni boshqa test faylining Supervisor mock'i JIM
+   * chetlab o'tiladi (isbot: to'liq `tests/integration/` yugurishida
+   * provisioning testlari yiqilardi). Parametr bilan har test o'z klientini
+   * beradi va fayl tartibiga bog'liq bo'lmaydi.
+   */
+  activate?: typeof activateLicense;
+  markProvisioned?: typeof markProvisioned;
+  writeLicense?: typeof writeLicense;
 }) => {
   const publicKeyPem = deps.supervisorPublicKeyPem ?? SUPERVISOR_PUBLIC_KEY_PEM;
+  const requestActivation = deps.activate ?? activateLicense;
+  const confirmProvisioned = deps.markProvisioned ?? markProvisioned;
+  const persistLicense = deps.writeLicense ?? writeLicense;
   const app = new Hono();
 
   // ─── Rate limiting (CLI-370) — Redis fixed-window, IP-only ───────────────
@@ -106,7 +125,7 @@ export const activateRoutes = (deps: {
 
     let data: Awaited<ReturnType<typeof activateLicense>>;
     try {
-      data = await activateLicense(parsed.data.licenseKey);
+      data = await requestActivation(parsed.data.licenseKey);
     } catch (err) {
       const code = err instanceof Error ? err.message : 'ACTIVATION_FAILED';
       // FINGERPRINT_UNAVAILABLE — mahalliy muhit muammosi (VM/konteyner);
@@ -189,7 +208,7 @@ export const activateRoutes = (deps: {
     // tekshiruvini BUZARDI. Shuning uchun butun javob emas, maydonlar aniq
     // tanlanadi.
     try {
-      await writeLicense({
+      await persistLicense({
         licenseKey: licensePayload.licenseKey,
         clinicId: licensePayload.clinicId,
         modules: licensePayload.modules,
@@ -209,7 +228,7 @@ export const activateRoutes = (deps: {
 
     // Best-effort — Supervisor vaqtinchalik owner parolini bazasidan o'chirsin.
     // `markProvisioned` hech qachon throw qilmaydi (license-client.ts).
-    if (provisioning) await markProvisioned(parsed.data.licenseKey);
+    if (provisioning) await confirmProvisioned(parsed.data.licenseKey);
 
     return c.json(
       ok({ modules: licensePayload.modules, expiresAt: licensePayload.expiresAt, ownerPhone }),

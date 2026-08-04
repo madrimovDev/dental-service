@@ -1,5 +1,5 @@
 /**
- * Task 8 — `POST /api/activate` provisioning (REAL DB + REAL `.lic` fayl).
+ * Task 8 — `POST /api/activate` provisioning (REAL DB).
  *
  * Uchta kritik invariant qulflanadi:
  *
@@ -9,7 +9,7 @@
  *     tahdid). Blok aynan shu aktivatsiyaga tegishli ekani majburlanadi:
  *     `licenseKey` (foydalanuvchi KIRITGAN kalit bilan ham), `clinicId`,
  *     `issuedAt`. Mos kelmasa 403 va `.lic` YOZILMAYDI.
- *  2. **`.lic` faylga aynan `LicenseData` maydonlari.** `isLicenseValid`
+ *  2. **`.lic`ka aynan `LicenseData` maydonlari.** `isLicenseValid`
  *     `{ signature, ...payload }` qiladi — faylga tushgan har qanday
  *     qo'shimcha maydon imzo tekshiruvini buzadi. Shuning uchun Supervisor
  *     javobi ATAYIN "junk" maydon bilan qaytariladi: agar biror kun
@@ -18,41 +18,38 @@
  *     o'tkaziladi va owner paroli HECH QACHON qayta yozilmaydi — aks holda
  *     litsenziya kalitiga ega har kim owner hisobini egallardi.
  *
- * Supervisor `globalThis.fetch` darajasida mock qilinadi (license-client emas)
- * — shunda haqiqiy `activateLicense` + `markProvisioned` kodi ishlaydi.
+ * Supervisor klienti va `.lic` yozuvchisi `activateRoutes`ga PARAMETR sifatida
+ * beriladi (global mock EMAS — pastdagi izohga qarang).
  *
  * Talab: Postgres (5433) + Redis (rate-limit; fail-open, lekin ulanish
  * yopiladi). Ishga tushirish:
  *   cd apps/api && bun test --env-file=../../.env tests/integration/provisioning-activate.test.ts
  */
 
-import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { afterAll, beforeEach, describe, expect, test } from 'bun:test';
 import { createSign, generateKeyPairSync } from 'node:crypto';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { auditLog, branches, roles, tenants, users } from '@dental/db-schema';
 import { eq, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { db } from '../../src/db/client.ts';
-import { getFingerprint, readLicense } from '../../src/lib/license.ts';
 import { verifyPassword } from '../../src/lib/password.ts';
 import { closeRateLimitRedis } from '../../src/lib/rate-limit.ts';
 import { activateRoutes } from '../../src/routes/activate.ts';
 
-const tmpDir = await mkdtemp(join(tmpdir(), 'provisioning-activate-'));
-process.env.LICENSE_PATH = join(tmpDir, 'license.lic');
-process.env.LICENSE_ANCHOR_PATH = join(tmpDir, 'license-anchor.dat');
-
-// ⚠️ Bu fayl ATAYIN `mock.module` ISHLATMAYDI. `bun test` butun katalogni
-// bitta jarayonda ishga tushiradi, `mock.module` esa RESOLVED PATH bo'yicha
-// GLOBAL va modul birinchi import qilinganda "muzlab" qoladi — ya'ni
-// `@dental/core/supervisor-public-key`ni mock qilish faqat shu fayl birinchi
-// yuklansa ishlaydi (CLAUDE.md CLI-437 "anchor fayl izolyatsiyasi" sinfi;
-// isbot: to'liq `tests/integration/` yugurishida bu faylning 12 testi ham
-// yiqilardi). Buning o'rniga ochiq kalit `activateRoutes`ga parametr sifatida
-// beriladi, `getFingerprint` esa haqiqiy qiymat qaytaradi (qaysi bo'lishidan
-// qat'i nazar, payload va `.lic` bir xil qiymatdan foydalanadi).
+// ⚠️ Bu fayl ATAYIN NA `mock.module`, NA `globalThis.fetch` almashtirishini
+// ishlatadi — hech qanday global holat. Sabab: `bun test` butun katalogni
+// BITTA jarayonda ishga tushiradi va `mock.module` RESOLVED PATH bo'yicha
+// GLOBAL. Isbotlangan ikki tomonlama zarar (to'liq `tests/integration/`
+// yugurishi):
+//   · `cli-370-...test.ts` `license-client.ts`ni butun jarayon uchun
+//     almashtiradi → bu faylning Supervisor mock'i jim chetlab o'tilardi va
+//     12 test ham yiqilardi;
+//   · bu faylning `license.ts` importi/mock'i esa `cli-387-...test.ts`ni
+//     buzardi (o'sha CLI-437 "anchor fayl izolyatsiyasi" sinfi).
+// Yechim — `activateRoutes`ga DI: Supervisor klienti va `.lic` yozuvchisi
+// parametr sifatida beriladi (`reset-owner-password.ts` pretsedenti).
+// `.lic` fayli DISKKA umuman yozilmaydi: `writeLicense`ga uzatilgan obyekt
+// ushlanadi — invariant #2 uchun aynan shu muhim.
 const testKeypair = generateKeyPairSync('rsa', {
   modulusLength: 2048,
   privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
@@ -67,12 +64,12 @@ const signForTest = (data: object): string => {
   return sign.sign(testKeypair.privateKey, 'hex');
 };
 
-const localFingerprint = await getFingerprint();
+/** Supervisor imzolagan payload'dagi fingerprint (haqiqiy `getFingerprint` shart emas). */
+const FINGERPRINT = 'a'.repeat(64);
 
 const LICENSE_KEY = 'PROV1-PROV2-PROV3-PROV4';
 const CLINIC_ID = 'clinic-task8';
 const OWNER_PASSWORD = 'VendorParol12345';
-const licensePath = join(tmpDir, 'license.lic');
 
 type ProvisioningBlock = {
   licenseKey: string;
@@ -126,7 +123,7 @@ const buildSupervisorResponse = (opts: ResponseOptions = {}): Record<string, unk
     expiresAt: new Date(Date.now() + 86400000 * 365).toISOString(),
     gracePeriodDays: 30,
     issuedAt,
-    fingerprint: localFingerprint,
+    fingerprint: FINGERPRINT,
   };
   // ⚠️ ATAYIN qo'shimcha maydon: `.lic`ka butun javob yozilsa imzo tekshiruvi
   // buziladi va `.lic`-haqiqiylik testi qizil bo'ladi (regressiya qulfi).
@@ -144,34 +141,27 @@ const buildSupervisorResponse = (opts: ResponseOptions = {}): Record<string, unk
   return base;
 };
 
-// ─── Supervisor fetch mock ────────────────────────────────────────────────
-// ⚠️ `globalThis.fetch` MODUL DARAJASIDA emas, `beforeEach`da o'rnatiladi va
-// `afterEach`da tiklanadi. `bun test` butun katalogni BITTA jarayonda ishga
-// tushiradi — modul darajasidagi almashtirish shu fayldan keyin yuklanadigan
-// HAMMA test fayliga ta'sir qilardi (ular Supervisor'ga bo'lmagan so'rovda
-// `UNEXPECTED_SUPERVISOR_CALL` olardi). Bu — CLAUDE.md'dagi
-// `license.test.ts`/`license-middleware.test.ts` interferensiyasi sinfi.
-const originalFetch = globalThis.fetch;
+// ─── Soxta Supervisor klienti (global mock EMAS — DI) ─────────────────────
 let supervisorResponse: Record<string, unknown> = buildSupervisorResponse();
-let provisionedCalls: Array<{ licenseKey?: string }> = [];
-
-const supervisorFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-  const url = String(input);
-  const jsonRes = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), {
-      status,
-      headers: { 'content-type': 'application/json' },
-    });
-  if (url.endsWith('/v1/activate')) return jsonRes(supervisorResponse);
-  if (url.endsWith('/v1/provisioned')) {
-    provisionedCalls.push(JSON.parse(String(init?.body ?? '{}')));
-    return jsonRes({ ok: true });
-  }
-  return jsonRes({ error: { code: 'UNEXPECTED_SUPERVISOR_CALL' } }, 500);
-}) as unknown as typeof fetch;
+let provisionedCalls: string[] = [];
+/** `.lic`ka yozilishi kerak bo'lgan obyektlar — invariant #2 shu yerda qulflanadi. */
+let writtenLicenses: Array<Record<string, unknown>> = [];
 
 const app = new Hono();
-app.route('/api/activate', activateRoutes({ db, supervisorPublicKeyPem: testKeypair.publicKey }));
+app.route(
+  '/api/activate',
+  activateRoutes({
+    db,
+    supervisorPublicKeyPem: testKeypair.publicKey,
+    activate: async () => supervisorResponse as never,
+    markProvisioned: async (licenseKey: string) => {
+      provisionedCalls.push(licenseKey);
+    },
+    writeLicense: async (data) => {
+      writtenLicenses.push(data as unknown as Record<string, unknown>);
+    },
+  }),
+);
 
 /** Har so'rov boshqa IP'dan — rate-limit oynasi testlarni bloklamasin. */
 const activate = (licenseKey: string = LICENSE_KEY) =>
@@ -196,24 +186,15 @@ const scoped = <T>(
   });
 
 beforeEach(async () => {
-  globalThis.fetch = supervisorFetch;
   await truncate();
-  // `.lic` har testda toza — aks holda oldingi testning haqiqiy fayli
-  // "yozilmadi" tasdiqlarini yolg'on yashil qiladi.
-  await rm(licensePath, { force: true });
   provisionedCalls = [];
+  writtenLicenses = [];
   supervisorResponse = buildSupervisorResponse();
 });
 
-afterEach(() => {
-  globalThis.fetch = originalFetch;
-});
-
 afterAll(async () => {
-  globalThis.fetch = originalFetch;
   await truncate();
   await closeRateLimitRedis();
-  await rm(tmpDir, { recursive: true, force: true });
 });
 
 describe('aktivatsiya provisioning — muvaffaqiyatli yo‘l', () => {
@@ -266,21 +247,19 @@ describe('aktivatsiya provisioning — muvaffaqiyatli yo‘l', () => {
   test('Supervisor’ga provisioning tasdig‘i yuboriladi (markProvisioned)', async () => {
     await activate();
     expect(provisionedCalls.length).toBe(1);
-    expect(provisionedCalls[0]?.licenseKey).toBe(LICENSE_KEY);
+    expect(provisionedCalls[0]).toBe(LICENSE_KEY);
   });
 
-  test('yozilgan `.lic` faqat `LicenseData` maydonlarini saqlaydi', async () => {
+  test('`.lic`ka AYNAN `LicenseData` maydonlari uzatiladi', async () => {
     await activate();
 
-    const lic = await readLicense();
-    expect(lic).not.toBeNull();
+    expect(writtenLicenses).toHaveLength(1);
+    const lic = writtenLicenses[0] as Record<string, unknown>;
 
-    // 🔴 Imzo tekshiruvining o'zagi: `isLicenseValid` `{ signature, ...payload }`
-    // qiladi, shuning uchun faylga tushgan HAR QANDAY ortiqcha maydon imzoni
-    // buzadi. Kalitlar to'plamini aynan qulflash `isLicenseValid(...) === true`
-    // bilan bir xil invariantni tekshiradi, lekin `mock.module`ga (ya'ni test
-    // fayllari tartibiga) bog'liq emas — yuqoridagi izohga qarang.
-    expect(Object.keys(lic as object).sort()).toEqual(
+    // 🔴 Invariant #2 o'zagi: `isLicenseValid` `{ signature, ...payload }`
+    // qiladi — faylga tushgan HAR QANDAY ortiqcha maydon imzo tekshiruvini
+    // buzadi. Kalitlar to'plamini AYNAN qulflash shu invariantni tekshiradi.
+    expect(Object.keys(lic).sort()).toEqual(
       [
         'clinicId',
         'expiresAt',
@@ -292,14 +271,15 @@ describe('aktivatsiya provisioning — muvaffaqiyatli yo‘l', () => {
         'signature',
       ].sort(),
     );
-    expect(lic?.licenseKey).toBe(LICENSE_KEY);
-    expect(lic?.clinicId).toBe(CLINIC_ID);
-    expect(lic?.fingerprint).toBe(localFingerprint);
+    expect(lic.licenseKey).toBe(LICENSE_KEY);
+    expect(lic.clinicId).toBe(CLINIC_ID);
+    expect(lic.fingerprint).toBe(FINGERPRINT);
+    expect(lic.signature).toBe(supervisorResponse.signature);
 
     const raw = JSON.stringify(lic);
     expect(raw).not.toContain('ownerPassword');
     expect(raw).not.toContain(OWNER_PASSWORD);
-    // Supervisor javobidagi begona maydon faylga tushmagan
+    // Supervisor javobidagi begona maydonlar uzatilmagan
     expect(raw).not.toContain('junk-field-must-not-reach-lic');
     expect(raw).not.toContain('provisioning');
   });
@@ -323,7 +303,7 @@ describe('aktivatsiya provisioning — imzo va bog‘lash tekshiruvi', () => {
     expect(body.error.code).toBe(code);
     // Hech qanday yon ta'sir: tenant ham, `.lic` ham yo'q
     expect((await db.select().from(tenants)).length).toBe(0);
-    expect(await readLicense()).toBeNull();
+    expect(writtenLicenses).toHaveLength(0);
   };
 
   test('buzilgan imzo → 403 PROVISIONING_SIGNATURE_INVALID', async () => {
@@ -389,10 +369,10 @@ describe('aktivatsiya provisioning — idempotentlik', () => {
     expect((await db.select().from(tenants)).length).toBe(1);
     expect((await db.select().from(users)).length).toBe(1);
 
-    // `.lic` baribir yoziladi (litsenziya yangilanishi to'sib qo'yilmaydi)
-    const lic = await readLicense();
-    expect(lic?.licenseKey).toBe(LICENSE_KEY);
-    expect(lic?.fingerprint).toBe(localFingerprint);
+    // Provisioning o'tkazib yuborilgan bo'lsa ham `.lic` baribir yoziladi —
+    // litsenziya yangilanishi bloklanmaydi (ikki aktivatsiya = ikki yozuv).
+    expect(writtenLicenses).toHaveLength(2);
+    expect(writtenLicenses[1]?.licenseKey).toBe(LICENSE_KEY);
   });
 });
 
@@ -408,8 +388,7 @@ describe('aktivatsiya provisioning — blok qaytarilmasa', () => {
     expect((await db.select().from(tenants)).length).toBe(0);
     expect(provisionedCalls.length).toBe(0);
 
-    const lic = await readLicense();
-    expect(lic?.licenseKey).toBe(LICENSE_KEY);
-    expect(lic?.fingerprint).toBe(localFingerprint);
+    expect(writtenLicenses).toHaveLength(1);
+    expect(writtenLicenses[0]?.licenseKey).toBe(LICENSE_KEY);
   });
 });
