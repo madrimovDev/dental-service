@@ -834,6 +834,35 @@ git commit -m "feat(supervisor): aktivatsiyada imzolangan provisioning bloki + /
 4. `/v1/provisioned` rate-limit'siz (izoh route'da) — fingerprint bog'lanishi
    himoya qiladi, eng yomon holat heartbeat baribir bajaradigan ish.
 
+**Mustaqil tekshiruv (verify-agent) natijasi va qo'shimchalari:**
+
+- **Mutatsiya sinovi:** `|| !clinic.ownerPhone` guard'ini olib tashlash HECH
+  QANDAY testni yiqitmasdi — Step 2 ⚠️ bloki aniq talab qilgan himoya
+  qoplanmagan edi. Regressiya testi qo'shildi ("bo'sh ownerPhone'li klinikada
+  blok qurilmaydi"); endi mutatsiya o'ldiriladi.
+- **Audit bo'shlig'i (CLAUDE.md §3.10):** `heartbeat` yo'li vaqtinchalik
+  parolni o'chirar, lekin `license_events`ga hech nima yozmasdi — maxfiy
+  ma'lumot izsiz yo'q bo'lardi. `heartbeat` endi `event:'provisioned'` +
+  `metadata:{ source:'heartbeat' }` yozadi (aniq tasdiqdan ajratish uchun);
+  `provisionedAt` to'lgach takrorlanmaydi. Test bilan qulflandi.
+- **Cross-app imzo tasdig'i:** provisioning bloki `apps/supervisor-api`da
+  imzolanib, `packages/core`ning `verifyLicenseSignature`i (klinika tomoni
+  ishlatadigan verify nusxasi) bilan `true` beradi; bitta maydon o'zgartirilsa
+  `false`. `issuedAt` litsenziya payloadi bilan aynan bir xil (mutatsiya bilan
+  tasdiqlangan). Blok 11 ta tekis `string` maydon, JSON round-trip'da kalit
+  tushmaydi.
+- **Task 4 xavfsizlik (qiymat bo'yicha):** parol qiymati faqat `POST /`
+  javobidagi `credentials` va `GET /:id` detalida uchraydi; `GET /` va
+  `PATCH /:id/deactivate` javoblarida yo'q. `generateTempPassword`
+  `node:crypto.randomBytes` ishlatadi (200 ta chaqiruvda 0 takror, 16 belgi,
+  siyosat min 12). Supervisor'da so'rov/javob logger middleware'i umuman yo'q,
+  parol hech qayerda loglanmaydi.
+- **Ochiq follow-up (yangi ticket):** (a) `reactivate()` provisioning blokini
+  qaytarmaydi — mashina almashtirilganda yangi lokal bazada owner hisobini
+  yaratish yo'li yo'q; (b) `assertFlatSignaturePayload` `undefined` qiymatni
+  rad etmaydi — tushib qolgan kalit imzo tekshiruvini jim buzadi (ikki deploy
+  unitda lockstep tuzatish kerak).
+
 ---
 
 ## Task 6: `apps/api` — license-client provisioning tiplari

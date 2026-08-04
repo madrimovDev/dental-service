@@ -246,11 +246,44 @@ describe('provisioning bloki', () => {
     expect(clinic?.ownerTempPassword).toBe('Temp-Parol-123');
   });
 
+  // Reja Task 5 Step 2 ⚠️ bloki AYNAN shuni talab qiladi: provisioning joriy
+  // qilinishidan OLDINGI klinika qatorlarida migratsiya `owner_phone`ni bo'sh
+  // satr bilan to'ldirgan. Telefon klinika tomonida login identifikatori
+  // (CLAUDE.md §3.1) — telefonsiz owner hisobi yaratilib qolmasin.
+  it("bo'sh ownerPhone'li klinikada blok qurilmaydi (migratsiya qatorlari)", async () => {
+    await db.update(clinics).set({ ownerPhone: '' }).where(eq(clinics.id, clinicId));
+    const res = await service.activate(licenseKey, 'fp-1');
+    expect(res.provisioning).toBeUndefined();
+    expect(res.provisioningSignature).toBeUndefined();
+  });
+
   it('heartbeat ham parolni tozalaydi (tasdiq yetib bormagan ssenariy)', async () => {
     await service.activate(licenseKey, 'fp-1');
     await service.heartbeat(licenseKey, 'fp-1');
     const clinic = await db.query.clinics.findFirst({ where: eq(clinics.id, clinicId) });
     expect(clinic?.ownerTempPassword).toBeNull();
+  });
+
+  // CLAUDE.md §3.10 — maxfiy ma'lumot (vaqtinchalik parol) izsiz o'chmasin.
+  // `provisioned()` o'z hodisasini yozadi; heartbeat yo'li ham yozishi shart,
+  // aks holda audit jurnalida parol qachon/nima sababdan yo'qolgani ko'rinmaydi.
+  it("heartbeat parolni tozalaganda 'provisioned' hodisasi yoziladi", async () => {
+    await service.activate(licenseKey, 'fp-1');
+    await service.heartbeat(licenseKey, 'fp-1');
+    const events = await db
+      .select()
+      .from(licenseEvents)
+      .where(eq(licenseEvents.licenseId, licenseId));
+    const prov = events.filter((e) => e.event === 'provisioned');
+    expect(prov).toHaveLength(1);
+    expect(prov[0]?.metadata).toEqual({ source: 'heartbeat' });
+    // Ikkinchi heartbeat takroriy hodisa yozmaydi (provisionedAt to'lgan).
+    await service.heartbeat(licenseKey, 'fp-1');
+    const after = await db
+      .select()
+      .from(licenseEvents)
+      .where(eq(licenseEvents.licenseId, licenseId));
+    expect(after.filter((e) => e.event === 'provisioned')).toHaveLength(1);
   });
 
   it('POST /v1/provisioned route ishlaydi', async () => {

@@ -177,6 +177,14 @@ export const createLicenseService = () => ({
     // `provisionedAt` to'lgach har heartbeat'da UPDATE yubormaymiz.
     if (!lic.provisionedAt) {
       await clearTempPassword(lic);
+      // CLAUDE.md §3.10 — maxfiy ma'lumot izsiz o'chmasin. `metadata.source`
+      // bu yo'lni klinikaning aniq tasdig'idan (`provisioned()`) ajratadi.
+      await db.insert(licenseEvents).values({
+        licenseId: lic.id,
+        event: 'provisioned',
+        fingerprint,
+        metadata: { source: 'heartbeat' },
+      });
     }
     // CLI-411 guard yuqorida `lic.fingerprint`'ni non-null qildi — CLI-410
     // imzolangan payload'ga qo'shish uchun aniq beramiz (TS narrowing).
