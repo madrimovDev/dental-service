@@ -1289,6 +1289,37 @@ git add apps/api/src/routes/activate.ts apps/api/src/app.ts apps/api/tests/integ
 git commit -m "feat(api): aktivatsiyada provisioning — imzo + bog'lash tekshiruvi, idempotent tenant yaratish"
 ```
 
+> **Tekshiruv natijasi (2026-08-04, mustaqil verify — commit `cc7494d`):** uchta
+> himoya mutatsiya sinovi bilan tasdiqlandi — bog'lashning har uch maydoni
+> (`licenseKey`/`clinicId`/`issuedAt`) alohida-alohida o'chirilganda aynan bitta
+> mos test qizil bo'ladi; imzo tekshiruvi olib tashlanganda ikkala imzo testi;
+> idempotentlik guard'i (`if (existing.length > 0)`) o'chirilganda parol-qayta-yozish
+> testi; `seedSystemRolesInTx` olib tashlanganda Task 7 (3 test) va Task 8 (rol
+> soni) birga. `.lic` haqiqiyligi suite tashqarisida ham tekshirildi: real
+> `writeLicense`→`readLicense` round-trip AYNAN 8 `LicenseData` kalitini qaytaradi,
+> `ownerPassword` yo'q. To'liq `tests/integration/` A/B (yangi fayl bilan / fayl
+> olib tashlangan holda) — qolgan fail'lar ikkala yugurishda ham bir xil sinfda va
+> OLDINDAN MAVJUD: CLI-408/CLI-471 concurrency + nomsiz 5s hook timeout'lar, hamda
+> IP'siz so'rov yuboradigan fayllarning `rl:reset-owner-password:unknown:-` Redis
+> bucket'i (o'lchandi: 10 > limit 5; kalit o'chirilgach o'sha 6 test yashil).
+>
+> Uch nuqson topilib TUZATILDI (`cc7494d`):
+> 1. `ownerPhone` provisioning SKIP holatida ham qaytarilardi (`applyProvisioning`
+>    `boolean` qaytarardi, chaqiruv joyi e'tiborsiz qoldirardi) — mijoz o'zi
+>    `/register-tenant` orqali ro'yxatdan o'tgan bo'lsa Task 10 sahifasi lokal
+>    bazada mavjud bo'lmagan vendor telefonini "login" deb ko'rsatardi.
+> 2. `.lic` testi faqat KALITLAR to'plamini qulflardi — buzilgan QIYMAT (masalan
+>    `modules` qayta tartiblanishi) sezilmasdan o'tib, `.lic` o'qilganda imzo
+>    tekshiruvini yiqitardi. Endi `verifyLicenseSignature` bilan tekshiriladi.
+> 3. `provisioning.licenseKey !== licensePayload.licenseKey` bandi mutatsiya
+>    sinovida OMON QOLGAN edi (test qoplamasi yo'q) — yangi test qo'shildi.
+>
+> Bundan tashqari test fayli FLAKY edi: `beforeEach`dagi `TRUNCATE ... CASCADE`
+> (~50 jadval, har chaqiruvda yangi relfilenode) ~660ms dan 3–5s ga sekinlashib
+> `bun test`ning 5s hook timeout'iga uriladi — 6 yugurishdan 3 tasi tasodifan
+> qizil edi. FK `ON DELETE CASCADE`'ga tayanuvchi `DELETE` bilan almashtirildi
+> (~10ms): fayl 9.8–41s dan 1.15s ga tushdi, 5/5 barqaror yashil.
+
 ---
 
 ## Task 9: Telefon normalizatsiyasi — qolgan chaqiruv joylari + migratsiya
