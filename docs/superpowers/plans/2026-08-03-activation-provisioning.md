@@ -1517,7 +1517,7 @@ git commit -m "fix(auth): telefon raqami barcha kirish nuqtalarida kanonik shakl
 - Consumes: Task 8 javobi (`data.ownerPhone`).
 - Produces: `GET /api/auth/registration-enabled` → `{ data: { enabled: boolean } }`.
 
-- [ ] **Step 1: Backend endpoint (auth.routes.ts)**
+- [x] **Step 1: Backend endpoint (auth.routes.ts)**
 
 `register-tenant` route'idan keyin, **`requirePermission`siz va authsiz** (CLI-154/155
 precedenti — pre-auth sahifa uchun kerak):
@@ -1536,7 +1536,7 @@ precedenti — pre-auth sahifa uchun kerak):
 `operationId: 'registrationEnabled'`, javob schema
 `apiResponseSchema(z.object({ enabled: z.boolean() }))`.
 
-- [ ] **Step 2: Test (api)**
+- [x] **Step 2: Test (api)**
 
 ```ts
 it("desktop rejimida ro'yxatdan o'tish o'chirilgan deb qaytaradi", async () => {
@@ -1548,13 +1548,13 @@ it("desktop rejimida ro'yxatdan o'tish o'chirilgan deb qaytaradi", async () => {
 
 Run: `cd apps/api && bun test --env-file=../../.env src/modules/auth/` → PASS
 
-- [ ] **Step 3: OpenAPI klientni qayta generatsiya qilish**
+- [x] **Step 3: OpenAPI klientni qayta generatsiya qilish**
 
 ```bash
 bun run generate:openapi && bun run generate:api-client
 ```
 
-- [ ] **Step 4: `activate.page.tsx` — login telefonini ko'rsatish**
+- [x] **Step 4: `activate.page.tsx` — login telefonini ko'rsatish**
 
 `ActivateResponse` tipini kengaytiring:
 
@@ -1589,21 +1589,21 @@ i18n kalitlari (`uz.json` / `ru.json`):
 Yo'naltirish kechikishini `1500` → `4000` ms qiling — foydalanuvchi telefonni
 o'qib ulgursin.
 
-- [ ] **Step 5: `/register-tenant` route'ini shartli qilish**
+- [x] **Step 5: `/register-tenant` route'ini shartli qilish**
 
 `auth.routes.tsx` — `authRoutes` massivi statik qoladi, lekin
 `RegisterTenantPage` ichida `registrationEnabled` false bo'lsa `/login`ga
 `<Navigate replace>` qiling va yuklanayotganda `StateView` loading ko'rsating.
 Sabab: route registry SPA yuklanishida sinxron kerak, endpoint javobi esa async.
 
-- [ ] **Step 6: Web testlari**
+- [x] **Step 6: Web testlari**
 
 ```bash
 cd apps/web && bunx vitest run src/features/auth/
 ```
 Kutiladi: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 cd ../.. && bun run typecheck

@@ -387,6 +387,8 @@ export * from './registerTenant201';
 export * from './registerTenantBody';
 export * from './registerTenantBodyDefaultLanguage';
 export * from './registerTenantResponse';
+export * from './registrationEnabled200';
+export * from './registrationEnabledResponse';
 export * from './removePatientEmergencyContact200';
 export * from './removePatientRelative200';
 export * from './removeStockBom200';

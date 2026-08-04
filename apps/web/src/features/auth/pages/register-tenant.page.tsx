@@ -1,3 +1,4 @@
+import { StateView } from '@dental/ui';
 import {
   Alert,
   Anchor,
@@ -18,7 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { PhoneInput } from '@/components/PhoneInput.tsx';
-import { useRegisterTenant } from '../auth.api';
+import { useRegisterTenant, useRegistrationEnabled } from '../auth.api';
 
 const makeSchema = (t: TFunction) =>
   z.object({
@@ -53,6 +54,11 @@ export function RegisterTenantPage() {
     validate: zod4Resolver(makeSchema(t)),
   });
 
+  // Server-tomon signali: desktop backendida o'z-o'zini ro'yxatdan o'tkazish
+  // o'chirilgan (`GET /auth/registration-enabled`). Hook'lar SHARTSIZ chaqiriladi
+  // — erta return'lar hammasidan KEYIN.
+  const registration = useRegistrationEnabled();
+
   const registerMut = useRegisterTenant({
     onSuccess: () => {
       navigate('/login');
@@ -70,6 +76,20 @@ export function RegisterTenantPage() {
   // (/activate litsenziya bilan) — o'z-o'zini ro'yxatdan o'tkazish yo'q.
   // Hook'lardan KEYIN — conditional-hooks buzilishining oldini olish uchun.
   if (typeof window !== 'undefined' && window.dentalDesktop) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // Route registry SPA yuklanishida SINXRON kerak, endpoint javobi esa async —
+  // shuning uchun route statik qoladi, darvoza shu yerda: javob kelguncha
+  // loading (forma yaltirab o'tmasin), `enabled === false` bo'lsa /login.
+  if (registration.isLoading) {
+    return (
+      <Container size={520} py={60}>
+        <StateView status="loading" skeleton="detail" />
+      </Container>
+    );
+  }
+  if (registration.data?.enabled === false) {
     return <Navigate to="/login" replace />;
   }
 

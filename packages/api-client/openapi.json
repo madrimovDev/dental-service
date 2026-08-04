@@ -65,6 +65,17 @@
           "error"
         ]
       },
+      "RegistrationEnabledResponse": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ]
+      },
       "LoginResponse": {
         "type": "object",
         "properties": {
@@ -6077,6 +6088,41 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/registration-enabled": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "registrationEnabled",
+        "responses": {
+          "200": {
+            "description": "Whether self-registration is available on this instance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/RegistrationEnabledResponse"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }

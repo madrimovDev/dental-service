@@ -101,6 +101,15 @@ export const registerTenantResponseSchema = z
   .openapi('RegisterTenantResponse');
 export type RegisterTenantResponseDto = z.infer<typeof registerTenantResponseSchema>;
 
+/**
+ * GET /registration-enabled javobi — SPA `/register-tenant` sahifasini
+ * ko'rsatish/yashirish uchun pre-auth signal.
+ */
+export const registrationEnabledResponseSchema = z
+  .object({ enabled: z.boolean() })
+  .openapi('RegistrationEnabledResponse');
+export type RegistrationEnabledResponseDto = z.infer<typeof registrationEnabledResponseSchema>;
+
 /** Refresh / switch-workspace javobi — yangi access + refresh juftligi. */
 export const tokenPairResponseSchema = z
   .object({

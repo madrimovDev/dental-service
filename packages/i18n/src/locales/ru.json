@@ -142,6 +142,7 @@
       "license_key_placeholder": "XXXXX-XXXXX-XXXXX-XXXXX",
       "submit": "Активировать",
       "success": "Лицензия успешно активирована. Перенаправление...",
+      "login_hint": "Телефон для входа: {{phone}}. Пароль получите у поставщика.",
       "error_invalid_key": "Неверный лицензионный ключ",
       "error_fingerprint_mismatch": "Эта лицензия активна на другом устройстве. Свяжитесь с Supervisor.",
       "error_fingerprint_unavailable": "Не удалось определить это устройство (виртуальная среда не поддерживается)",

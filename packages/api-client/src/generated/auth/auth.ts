@@ -17,6 +17,7 @@ import type {
   RefreshBody,
   RegisterTenant201,
   RegisterTenantBody,
+  RegistrationEnabled200,
   SwitchWorkspace200,
   SwitchWorkspaceBody
 } from '.././model';
@@ -32,6 +33,14 @@ import { customInstance } from '../../mutator';
       {url: `/api/auth/register-tenant`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
       data: registerTenantBody
+    },
+      );
+    }
+  export const registrationEnabled = (
+    
+ ) => {
+      return customInstance<RegistrationEnabled200>(
+      {url: `/api/auth/registration-enabled`, method: 'GET'
     },
       );
     }
@@ -102,6 +111,7 @@ import { customInstance } from '../../mutator';
       );
     }
   export type RegisterTenantResult = NonNullable<Awaited<ReturnType<typeof registerTenant>>>
+export type RegistrationEnabledResult = NonNullable<Awaited<ReturnType<typeof registrationEnabled>>>
 export type LoginResult = NonNullable<Awaited<ReturnType<typeof login>>>
 export type RefreshResult = NonNullable<Awaited<ReturnType<typeof refresh>>>
 export type LogoutResult = NonNullable<Awaited<ReturnType<typeof logout>>>

@@ -7,7 +7,10 @@ import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
 type ActivateResponse =
-  | { success: true; data: { modules: string[]; expiresAt: string } }
+  // `ownerPhone` — Supervisor provisioning bloki bilan owner hisobi AYNAN SHU
+  // aktivatsiyada yaratilgan bo'lsagina qaytadi (hisob avvaldan bor bo'lsa —
+  // yo'q), shuning uchun ixtiyoriy.
+  | { success: true; data: { modules: string[]; expiresAt: string; ownerPhone?: string } }
   | { success: false; error: { code: string; message: string } };
 
 // Hand-written raw fetch (not through generated api-client) — this endpoint
@@ -34,6 +37,7 @@ export function ActivatePage() {
   const { t } = useTranslation();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [ownerPhone, setOwnerPhone] = useState<string | null>(null);
 
   const schema = z.object({
     licenseKey: z.string().min(1, t('validation.required')),
@@ -50,13 +54,16 @@ export function ActivatePage() {
       if (res.success) {
         setError(null);
         setSuccess(true);
+        setOwnerPhone(res.data.ownerPhone ?? null);
       } else {
         setSuccess(false);
+        setOwnerPhone(null);
         setError(t(ERROR_KEY_MAP[res.error.code] ?? 'auth.activate.error_generic'));
       }
     },
     onError: () => {
       setSuccess(false);
+      setOwnerPhone(null);
       setError(t('auth.activate.error_generic'));
     },
   });
@@ -64,11 +71,12 @@ export function ActivatePage() {
   // Faollashtirish muvaffaqiyatli bo'lgach asosiy ilovaga o'tish — hard
   // reload (SPA navigate emas), chunki litsenziya holati serverda
   // saqlanadi, klient-tomon route guard'i yo'q.
+  // Kechikish 4000 ms — foydalanuvchi kirish telefonini o'qib ulgursin.
   useEffect(() => {
     if (!success) return;
     const timer = setTimeout(() => {
       window.location.href = '/login';
-    }, 1500);
+    }, 4000);
     return () => clearTimeout(timer);
   }, [success]);
 
@@ -99,6 +107,11 @@ export function ActivatePage() {
           {success && (
             <Alert color="green" variant="light" mb="md">
               {t('auth.activate.success')}
+              {ownerPhone && (
+                <Text size="sm" mt="xs">
+                  {t('auth.activate.login_hint', { phone: ownerPhone })}
+                </Text>
+              )}
             </Alert>
           )}
 

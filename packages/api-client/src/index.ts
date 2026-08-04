@@ -31,6 +31,7 @@ export type {
   LogoutResult,
   RefreshResult,
   RegisterTenantResult,
+  RegistrationEnabledResult,
   SwitchWorkspaceResult,
 } from './generated/auth/auth.ts';
 export {
@@ -41,6 +42,7 @@ export {
   logout,
   refresh,
   registerTenant,
+  registrationEnabled,
   switchWorkspace,
 } from './generated/auth/auth.ts';
 export type {

@@ -142,6 +142,7 @@
       "license_key_placeholder": "XXXXX-XXXXX-XXXXX-XXXXX",
       "submit": "Faollashtirish",
       "success": "Litsenziya muvaffaqiyatli faollashtirildi. Yo'naltirilmoqda...",
+      "login_hint": "Kirish uchun telefon: {{phone}}. Parolni yetkazib beruvchidan oling.",
       "error_invalid_key": "Litsenziya kaliti noto'g'ri",
       "error_fingerprint_mismatch": "Bu litsenziya boshqa qurilmada faol. Supervisor bilan bog'laning.",
       "error_fingerprint_unavailable": "Bu qurilmani aniqlab bo'lmadi (virtual muhit qo'llab-quvvatlanmaydi)",

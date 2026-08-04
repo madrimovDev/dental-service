@@ -23,6 +23,7 @@ import {
   refreshSchema,
   registerTenantResponseSchema,
   registerTenantSchema,
+  registrationEnabledResponseSchema,
   switchWorkspaceSchema,
   tokenPairResponseSchema,
   workspaceBranchesResponseSchema,
@@ -138,6 +139,35 @@ export const authRoutes = (deps: { db: Database }) => {
       throw err;
     }
   });
+
+  // ─── GET /registration-enabled — public (auth'siz, permission'siz) ───────
+
+  // Pre-auth: SPA `/register-tenant` havolasini ko'rsatish/yashirish uchun.
+  // `requirePermission` YO'Q va authMiddleware YO'Q — sahifa login'dan OLDIN
+  // ochiladi (CLI-154/155 pretsedenti: rolga/kontekstga mos tor endpoint).
+  // Desktop rejimida o'z-o'zini ro'yxatdan o'tkazish o'chirilgan
+  // (`register-tenant` handleri allaqachon 403 qaytaradi) — bu endpoint faqat
+  // UI foydalanuvchini bekorga formaga yubormasligi uchun.
+  const registrationEnabledRoute = createRoute({
+    method: 'get',
+    path: '/registration-enabled',
+    tags: ['auth'],
+    operationId: 'registrationEnabled',
+    responses: {
+      200: {
+        content: {
+          'application/json': { schema: apiResponseSchema(registrationEnabledResponseSchema) },
+        },
+        description: 'Whether self-registration is available on this instance',
+      },
+    },
+  });
+
+  app.openapi(registrationEnabledRoute, async (c) =>
+    // ⚠️ `process.env` — frozen `env.ts` orqali EMAS (register-tenant gate'i bilan
+    // bir xil signal, har so'rovda qayta o'qiladi).
+    c.json(ok({ enabled: process.env.DENTAL_LOCAL_DESKTOP !== 'true' }), 200),
+  );
 
   // ─── POST /login — public ────────────────────────────────────────────────
 

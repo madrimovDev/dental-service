@@ -4,6 +4,7 @@ import {
   getWorkspaceBranches,
   login,
   registerTenant,
+  registrationEnabled,
   switchWorkspace,
 } from '@dental/api-client';
 import { notifications } from '@mantine/notifications';
@@ -38,6 +39,21 @@ export function useRegisterTenant(
   return useMutation({
     mutationFn: (body: RegisterVars) => registerTenant(body).then((r) => r.data),
     ...opts,
+  });
+}
+
+/**
+ * Bu instansiyada o'z-o'zini ro'yxatdan o'tkazish (`/register-tenant`) ochiqmi.
+ * Pre-auth: token bilan GATE QILINMAYDI (`useMe` naqshidan farqli) — sahifa
+ * login'dan oldin ochiladi. Instansiya rejimi sessiya davomida o'zgarmaydi,
+ * shuning uchun qayta so'rovlar keraksiz.
+ */
+export function useRegistrationEnabled() {
+  return useQuery({
+    queryKey: authKeys.registrationEnabled(),
+    queryFn: () => registrationEnabled().then((r) => r.data),
+    staleTime: Number.POSITIVE_INFINITY,
+    retry: false,
   });
 }
 
