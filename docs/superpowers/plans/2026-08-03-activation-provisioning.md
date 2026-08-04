@@ -833,7 +833,7 @@ git commit -m "feat(supervisor): aktivatsiyada imzolangan provisioning bloki + /
   - `markProvisioned(licenseKey: string): Promise<void>` — xatoni yutadi (best-effort).
   - Task 8 shularni ishlatadi.
 
-- [ ] **Step 1: Failing test**
+- [x] **Step 1: Failing test**
 
 ```ts
 it('activateLicense provisioning blokini o\'zgarishsiz qaytaradi', async () => {
@@ -852,7 +852,7 @@ it('markProvisioned tarmoq xatosida throw qilmaydi', async () => {
 Run: `bun test --env-file=../../.env src/lib/license-client.test.ts` (apps/api ichidan)
 Kutiladi: FAIL.
 
-- [ ] **Step 2: Implementatsiya**
+- [x] **Step 2: Implementatsiya**
 
 ```ts
 export type ProvisioningBlock = {
@@ -900,7 +900,7 @@ export const markProvisioned = async (licenseKey: string): Promise<void> => {
 };
 ```
 
-- [ ] **Step 3: Test → PASS, typecheck, commit**
+- [x] **Step 3: Test → PASS, typecheck, commit**
 
 ```bash
 cd apps/api && bun test --env-file=../../.env src/lib/license-client.test.ts
