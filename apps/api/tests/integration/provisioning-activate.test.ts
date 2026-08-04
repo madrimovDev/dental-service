@@ -28,6 +28,7 @@
 
 import { afterAll, beforeEach, describe, expect, test } from 'bun:test';
 import { createSign, generateKeyPairSync } from 'node:crypto';
+import { verifyLicenseSignature } from '@dental/core/license-signature';
 import { auditLog, branches, roles, tenants, users } from '@dental/db-schema';
 import { eq, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -174,7 +175,26 @@ const activate = (licenseKey: string = LICENSE_KEY) =>
     body: JSON.stringify({ licenseKey }),
   });
 
-const truncate = () => db.execute(sql`TRUNCATE users, tenants RESTART IDENTITY CASCADE`);
+/**
+ * Bazani tozalash — `TRUNCATE ... CASCADE` EMAS, ataylab `DELETE`.
+ *
+ * Bu fayl har testda toza baza talab qiladi (`tenants` soni 0/1 bo'yicha
+ * assert'lar), ya'ni reset `beforeEach`da 12 marta ishlaydi. `TRUNCATE users,
+ * tenants RESTART IDENTITY CASCADE` ~50 ta jadvalga cascade bo'ladi va har
+ * chaqiruvda yangi relfilenode yaratadi — o'lchangan natija: dastlab ~660ms,
+ * bir necha yugurishdan keyin katalog shishishi tufayli 3–5s ga chiqadi va
+ * `bun test`ning 5s hook timeout'iga urилиб fayl TASODIFAN qizil bo'ladi
+ * (3/6 yugurishda kuzatilgan). `DELETE` esa FK ON DELETE CASCADE orqali xuddi
+ * shu qatorlarni tozalaydi (branches/roles/role_permissions/audit_log — 0 ga
+ * tushishi tekshirilgan), lekin ~10ms turadi va sekinlashmaydi.
+ *
+ * Tartib muhim: `tenants.owner_user_id` → `users` FK'si RESTRICT, shuning
+ * uchun avval `tenants`, keyin `users`.
+ */
+const truncate = async () => {
+  await db.execute(sql`DELETE FROM tenants`);
+  await db.execute(sql`DELETE FROM users`);
+};
 
 const scoped = <T>(
   tenantId: string,
@@ -276,6 +296,15 @@ describe('aktivatsiya provisioning — muvaffaqiyatli yo‘l', () => {
     expect(lic.fingerprint).toBe(FINGERPRINT);
     expect(lic.signature).toBe(supervisorResponse.signature);
 
+    // 🔴 Kalitlar to'plami YETARLI EMAS: buzilgan QIYMAT (masalan `modules`
+    // qayta tartiblansa yoki `issuedAt` qayta stringify qilinsa) kalitlarni
+    // o'zgartirmaydi, lekin `.lic` o'qilganda imzo tekshiruvi yiqiladi —
+    // klinika "litsenziya yaroqsiz" holatida qulflanib qolardi. Shuning uchun
+    // yozilgan obyekt `isLicenseValid` bilan AYNAN bir xil usulda
+    // (`{ signature, ...payload }`) tekshiriladi.
+    const { signature, ...payload } = lic as { signature: string } & Record<string, unknown>;
+    expect(verifyLicenseSignature(payload, signature, testKeypair.publicKey)).toBe(true);
+
     const raw = JSON.stringify(lic);
     expect(raw).not.toContain('ownerPassword');
     expect(raw).not.toContain(OWNER_PASSWORD);
@@ -334,6 +363,17 @@ describe('aktivatsiya provisioning — imzo va bog‘lash tekshiruvi', () => {
     await expectRejected(await activate(), 'PROVISIONING_MISMATCH');
   });
 
+  test('litsenziya payloadi boshqa kalitga tegishli bo‘lsa → 403 PROVISIONING_MISMATCH', async () => {
+    // Blok foydalanuvchi kiritgan kalitga MOS (1-band o'tadi), lekin Supervisor
+    // javobidagi litsenziya payloadi boshqa kalitniki — `.lic`ka begona
+    // litsenziya yozilardi. Buni FAQAT
+    // `provisioning.licenseKey !== licensePayload.licenseKey` bandi ushlaydi.
+    supervisorResponse = buildSupervisorResponse({
+      license: { licenseKey: 'BOSHQ-BOSHQ-BOSHQ-BOSHQ' },
+    });
+    await expectRejected(await activate(LICENSE_KEY), 'PROVISIONING_MISMATCH');
+  });
+
   test('clinicId mos kelmasa → 403 PROVISIONING_MISMATCH', async () => {
     supervisorResponse = buildSupervisorResponse({ provisioning: { clinicId: 'boshqa-klinika' } });
     await expectRejected(await activate(), 'PROVISIONING_MISMATCH');
@@ -359,6 +399,13 @@ describe('aktivatsiya provisioning — idempotentlik', () => {
     });
     const res = await activate();
     expect(res.status).toBe(200);
+
+    // 🔴 Provisioning o'tkazib yuborilgan bo'lsa `ownerPhone` QAYTARILMAYDI:
+    // aks holda mijoz o'zi `/register-tenant` orqali boshqa telefon bilan
+    // ro'yxatdan o'tgan holatda aktivatsiya sahifasi (Task 10) lokal bazada
+    // MAVJUD BO'LMAGAN vendor telefonini "login" deb ko'rsatardi.
+    const skipBody = (await res.json()) as { data: { ownerPhone?: string } };
+    expect(skipBody.data.ownerPhone).toBeUndefined();
 
     const [after] = await db.select().from(users).where(eq(users.phone, '+998901234567'));
     expect(after?.passwordHash).toBe(before?.passwordHash ?? '');

@@ -177,15 +177,20 @@ export const activateRoutes = (deps: {
         );
       }
 
-      // Kanonik shakl — javobda ko'rsatilgan login `users.phone` bilan
-      // bayt-ma-bayt bir xil bo'lsin (`provisionTenantInTx` ham normallashtiradi).
-      ownerPhone = normalizePhone(provisioning.ownerPhone);
-
       try {
         // Natija (`true` — qo'llandi, `false` — idempotent skip) `.lic`
         // yozilishiga TA'SIR QILMAYDI: skip holatida ham litsenziya
-        // yangilanishi bloklanmasligi kerak.
-        await applyProvisioning(deps.db, provisioning);
+        // yangilanishi bloklanmasligi kerak. Lekin `ownerPhone` javobga FAQAT
+        // hisob HAQIQATAN yaratilgan bo'lsa qo'shiladi: skip holatida lokal
+        // owner boshqa (mijoz o'zi `/register-tenant` orqali kiritgan) telefon
+        // bilan mavjud bo'lishi mumkin va vendor telefonini "login" deb
+        // ko'rsatish (Task 10 sahifasi) mavjud bo'lmagan hisobga yo'llardi.
+        //
+        // Kanonik shakl — ko'rsatilgan login `users.phone` bilan bayt-ma-bayt
+        // bir xil bo'lsin (`provisionTenantInTx` ham normallashtiradi).
+        if (await applyProvisioning(deps.db, provisioning)) {
+          ownerPhone = normalizePhone(provisioning.ownerPhone);
+        }
       } catch (err) {
         // Bazaga yozish xatosi mijoz xatosi EMAS — uni yuqoridagi Supervisor
         // catch'iga qo'shib yuborish xato matnini javobdagi `code`ga
