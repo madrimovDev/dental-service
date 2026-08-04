@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { normalizePhone } from '@dental/core';
 import {
   branches,
   refreshTokens,
@@ -75,12 +76,18 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
       if (!branch) return { ok: false as const, code: 'branch.not_found' };
     }
 
+    // Yagona kanonik shakl (+998XXXXXXXXX) — qidiruv ham, yozish ham SHU
+    // qiymat bilan. Aks holda bitta odam `901234567` va `+998901234567`
+    // ko'rinishida ikki alohida platform hisobi bo'lib qolardi (`users.phone`
+    // platform bo'yicha UNIQUE — CLAUDE.md §3.1) va login topa olmasdi.
+    const phone = normalizePhone(input.phone);
+
     // User mavjudmi? users — platform-level, RLS yo'q, lekin transaction'dagi tx ham ishlatadi
     return await dbContext.transaction(async (tx) => {
       // Tenant context'ni saqlash (transaction ichida)
       await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);
 
-      let [user] = await tx.select().from(users).where(eq(users.phone, input.phone));
+      let [user] = await tx.select().from(users).where(eq(users.phone, phone));
       let tempPassword: string | null = null;
 
       if (!user) {
@@ -91,7 +98,7 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
         const [created] = await tx
           .insert(users)
           .values({
-            phone: input.phone,
+            phone,
             passwordHash,
             fullName: input.fullName,
           })

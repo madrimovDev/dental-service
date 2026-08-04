@@ -1335,7 +1335,7 @@ git commit -m "feat(api): aktivatsiyada provisioning — imzo + bog'lash tekshir
 - Consumes: Task 2 `normalizePhone`.
 - Produces: barcha `users.phone` yozish/qidirish nuqtalari kanonik shaklda.
 
-- [ ] **Step 1: Chaqiruv joylarini to'liq aniqlash**
+- [x] **Step 1: Chaqiruv joylarini to'liq aniqlash**
 
 Run: `grep -rn "users\.phone" apps/api/src --include="*.ts" | grep -v "\.test\.ts"`
 
@@ -1343,7 +1343,7 @@ Ro'yxatni Step 2 dagi bilan solishtiring. **Yangi joy topilsa** — uni ham
 normallashtiring va rejaga qo'shing. (`patients.phone` TEGILMAYDI — bemor
 telefoni login identifikatori emas.)
 
-- [ ] **Step 2: Failing test**
+- [x] **Step 2: Failing test**
 
 ```ts
 it('login formati boshqacha yozilgan raqam bilan ham ishlaydi', async () => {
@@ -1364,7 +1364,7 @@ it("xodim taklifi mavjud foydalanuvchini boshqa formatda ham topadi", async () =
 });
 ```
 
-- [ ] **Step 3: Implementatsiya**
+- [x] **Step 3: Implementatsiya**
 
 `auth.service.ts` `login()`:
 
@@ -1379,7 +1379,7 @@ ikkala joyda ishlating).
 `routes/reset-owner-password.ts`: owner telefonini qidirish/yozish joylarida
 xuddi shunday.
 
-- [ ] **Step 4: Migratsiya**
+- [x] **Step 4: Migratsiya**
 
 `apps/api/drizzle/00XX_normalize_user_phones.sql` (raqamni mavjud eng katta
 migratsiyadan keyingisi qilib qo'ying):
@@ -1425,7 +1425,7 @@ BEGIN
 END $$;
 ```
 
-- [ ] **Step 5: Migratsiyani sinash**
+- [x] **Step 5: Migratsiyani sinash**
 
 ```bash
 cd apps/api && bun run drizzle:migrate
@@ -1433,18 +1433,34 @@ bun test --env-file=../../.env tests/integration/phone-normalization.test.ts
 ```
 Ikkalasi ham muvaffaqiyatli.
 
-- [ ] **Step 6: Regressiya — mavjud auth testlari**
+- [x] **Step 6: Regressiya — mavjud auth testlari**
 
 Run: `cd apps/api && bun test --env-file=../../.env src/modules/auth/ src/modules/users/`
 Kutiladi: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 cd ../.. && bun run typecheck
 git add apps/api/src/modules/auth/ apps/api/src/modules/users/ apps/api/src/routes/reset-owner-password.ts apps/api/drizzle/ apps/api/tests/integration/phone-normalization.test.ts
 git commit -m "fix(auth): telefon raqami barcha kirish nuqtalarida kanonik shaklga keltiriladi"
 ```
+
+**Ijro eslatmasi (bajarilgandan keyin qo'shildi):**
+
+1. Chaqiruv joylari — **uchta**, to'rtta emas: `auth.service.ts:290` (`login`),
+   `users.service.ts:83` (qidiruv) va `:94` (insert). `routes/reset-owner-password.ts`
+   owner'ni `tenants.ownerUserId` bo'yicha topadi, telefon predikati YO'Q —
+   **o'zgartirilmadi**.
+2. Migratsiya predikati rejadagidan farq qiladi: `users_phone_unique` — **to'liq**
+   (partial EMAS) indeks, shuning uchun `deleted_at IS NULL` filtri aniqlashdan
+   OLIB TASHLANDI (aks holda soft-deleted↔tirik to'qnashuv guard'dan o'tib,
+   UPDATE aynan o'zi oldini olmoqchi bo'lgan unique-xatoga uchrardi). Aniqlash va
+   UPDATE predikatlari endi bayt-ma-bayt bir xil: `regexp_replace(phone,'\D','','g') <> ''`.
+3. Test formati: `phone` schema `^\+?\d{9,15}$` — rejadagi bo'shliqli
+   `'998 90 123 45 67'` 400 qaytaradi. Testda qabul mezoni probe'i aynan
+   (`998901239999`) + 9 xonali mahalliy variant ishlatildi. Regex **kengaytirilmadi**
+   (u frontendga ham re-export qilinadi).
 
 ---
 

@@ -284,10 +284,14 @@ export const createAuthService = (deps: AuthServiceDeps) => {
     | { ok: false; reason: 'no_user' | 'bad_password'; userId: string | null };
 
   async function login(input: LoginInput): Promise<LoginResult> {
+    // `users.phone` bazada FAQAT kanonik shaklda saqlanadi (`provisionTenantInTx`,
+    // `users.service.invite`), lekin schema `+`siz va mahalliy 9 xonali kiritmani
+    // ham qabul qiladi. Qidiruvni ham normallashtirmasak, vendor/registratsiya
+    // yaratgan hisob `998...` bilan login qilganda topilmay 401 qaytarardi.
     const [user] = await db
       .select()
       .from(users)
-      .where(and(eq(users.phone, input.phone), isNull(users.deletedAt)));
+      .where(and(eq(users.phone, normalizePhone(input.phone)), isNull(users.deletedAt)));
 
     if (!user) return { ok: false, reason: 'no_user', userId: null };
 
