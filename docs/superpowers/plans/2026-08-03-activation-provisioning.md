@@ -961,7 +961,10 @@ git commit -m "feat(api): license-client provisioning tiplari + markProvisioned"
 
 **Files:**
 - Modify: `apps/api/src/modules/auth/auth.service.ts:148-212`
-- Test: `apps/api/src/modules/auth/auth.service.test.ts` (mavjud bo'lmasa yarating)
+- Test: `apps/api/tests/integration/provisioning-tenant.test.ts` (yangi)
+  > ⚠️ Rejadagi `src/modules/auth/auth.service.test.ts` o'rniga — CLAUDE.md §Testing:
+  > real DB testlari `tests/integration/`da. `src/**/*.test.ts` fayllari DB'siz
+  > (bu invariant `TRUNCATE`li test bilan buzilmasin).
 
 **Interfaces:**
 - Consumes: Task 2 `normalizePhone`.
@@ -982,7 +985,7 @@ git commit -m "feat(api): license-client provisioning tiplari + markProvisioned"
   ```
   Task 8 `provisionFromLicense` orqali ishlatadi.
 
-- [ ] **Step 1: Failing test**
+- [x] **Step 1: Failing test**
 
 ```ts
 it('provisionTenantInTx filial nomi va manzilini qabul qiladi', async () => {
@@ -1011,7 +1014,7 @@ it('provisionTenantInTx 8 rol shablonini seed qiladi', async () => {
 });
 ```
 
-- [ ] **Step 2: Ajratish**
+- [x] **Step 2: Ajratish**
 
 `registerTenant` tanasini `provisionTenantInTx(tx, input)`ga ko'chiring.
 O'zgarishlar:
@@ -1060,13 +1063,13 @@ O'zgarishlar:
 `provisionTenantInTx` modul darajasida (factory tashqarisida) eksport qilinadi —
 `activate.ts` uni `createAuthService`siz chaqira olsin.
 
-- [ ] **Step 3: Test → PASS**
+- [x] **Step 3: Test → PASS**
 
 Run: `cd apps/api && bun test --env-file=../../.env src/modules/auth/`
 Kutiladi: PASS — mavjud `registerTenant` testlari ham yashil (xulq o'zgarmadi,
 telefon endi normallashtiriladi).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 bun run typecheck

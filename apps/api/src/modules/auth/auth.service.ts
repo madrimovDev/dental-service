@@ -1,5 +1,10 @@
 import { randomBytes } from 'node:crypto';
-import { OWNER_ONLY_PERMISSIONS, type Permission, ROLE_TEMPLATES } from '@dental/core';
+import {
+  normalizePhone,
+  OWNER_ONLY_PERMISSIONS,
+  type Permission,
+  ROLE_TEMPLATES,
+} from '@dental/core';
 import {
   auditLog,
   branches,
@@ -69,6 +74,116 @@ async function seedSystemRolesInTx(tx: DbTransaction, tenantId: string): Promise
   }
 
   return createdRoleIds;
+}
+
+/**
+ * Yangi klinika (tenant) uchun to'liq boshlang'ich holat: owner foydalanuvchi →
+ * tenant → RLS konteksti → filial → 8 rol shabloni → audit yozuvi.
+ *
+ * MODUL DARAJASIDA eksport qilingan (factory tashqarisida) — ikki chaqiruvchi
+ * bor va ikkalasi ham bitta yo'ldan yurishi shart:
+ *  1. `registerTenant` (self-service ro'yxatdan o'tish);
+ *  2. aktivatsiyadagi provisioning (`routes/activate.ts`) — u `createAuthService`
+ *     qurmasdan, faqat `tx` bilan chaqiradi.
+ *
+ * 🔴 `seedSystemRolesInTx` HECH QACHON chetlab o'tilmaydi: rol shablonlarisiz
+ * tenantda owner'dan boshqa hech kim ishlay olmaydi (bu xato sinfi loyihada
+ * uch marta takrorlangan — CLAUDE.md `project_rbac_role_gaps`).
+ *
+ * ⚠️ `set_config('app.current_tenant_id', ...)` shu funksiya ICHIDA o'rnatiladi:
+ * aktivatsiya yo'lida request middleware'i yo'q, tenant hali endigina yaratildi.
+ *
+ * ⚠️ `input.ownerPassword` hech qayerga (log/audit) yozilmaydi — audit `after`
+ * faqat `{ name, slug }`.
+ */
+export type ProvisionTenantInput = {
+  tenantName: string;
+  ownerPhone: string;
+  ownerFullName: string;
+  ownerPassword: string;
+  defaultLanguage: 'uz' | 'ru';
+  branchName?: string;
+  branchAddress?: string | null;
+  branchPhone?: string | null;
+  /** Audit `action` kodi; default `tenant.registered`. */
+  auditAction?: string;
+};
+
+export type ProvisionTenantResult = {
+  userId: string;
+  tenantId: string;
+  slug: string;
+  branchId: string;
+};
+
+export async function provisionTenantInTx(
+  tx: DbTransaction,
+  input: ProvisionTenantInput,
+): Promise<ProvisionTenantResult> {
+  const passwordHash = await hashPassword(input.ownerPassword);
+
+  const [user] = await tx
+    .insert(users)
+    .values({
+      // Yagona kanonik shakl (+998XXXXXXXXX) — vendor kiritgan va klinika
+      // kiritgan raqam bitta hisobga tushishi uchun.
+      phone: normalizePhone(input.ownerPhone),
+      passwordHash,
+      fullName: input.ownerFullName,
+      preferredLanguage: input.defaultLanguage,
+    })
+    .returning({ id: users.id, phone: users.phone });
+
+  if (!user) throw new Error('User insert failed');
+
+  const baseSlug = slugify(input.tenantName);
+  // Unique slug suffix bilan
+  const slug = `${baseSlug}-${randomBytes(3).toString('hex')}`;
+
+  const [tenant] = await tx
+    .insert(tenants)
+    .values({
+      name: input.tenantName,
+      slug,
+      ownerUserId: user.id,
+      defaultLanguage: input.defaultLanguage,
+    })
+    .returning({ id: tenants.id, slug: tenants.slug });
+
+  if (!tenant) throw new Error('Tenant insert failed');
+
+  // RLS context o'rnatish — keyingi insert'lar (branches, roles, role_permissions,
+  // audit_log) shu tenant_id bilan o'tadi
+  await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenant.id}, true)`);
+
+  // Default branch
+  const [branch] = await tx
+    .insert(branches)
+    .values({
+      tenantId: tenant.id,
+      name: input.branchName?.trim() || 'Bosh filial',
+      address: input.branchAddress ?? null,
+      phone: input.branchPhone ? normalizePhone(input.branchPhone) : null,
+    })
+    .returning({ id: branches.id });
+
+  if (!branch) throw new Error('Branch insert failed');
+
+  // System role templates seed — MAJBURIY, hech qachon o'tkazib yuborilmaydi
+  await seedSystemRolesInTx(tx, tenant.id);
+
+  // Audit (platform-level event) — parol YOZILMAYDI
+  await tx.insert(auditLog).values({
+    tenantId: tenant.id,
+    userId: user.id,
+    action: input.auditAction ?? 'tenant.registered',
+    resourceType: 'tenant',
+    resourceId: tenant.id,
+    before: null,
+    after: { name: input.tenantName, slug: tenant.slug },
+  });
+
+  return { userId: user.id, tenantId: tenant.id, slug: tenant.slug, branchId: branch.id };
 }
 
 type ContextPermissions = {
@@ -146,69 +261,9 @@ export const createAuthService = (deps: AuthServiceDeps) => {
   const { db } = deps;
 
   async function registerTenant(input: RegisterTenantInput) {
-    // Atomic transaction: user + tenant + branch + 8 role templates + (no owner assignment row)
-    return await db.transaction(async (tx) => {
-      const passwordHash = await hashPassword(input.ownerPassword);
-
-      const [user] = await tx
-        .insert(users)
-        .values({
-          phone: input.ownerPhone,
-          passwordHash,
-          fullName: input.ownerFullName,
-          preferredLanguage: input.defaultLanguage,
-        })
-        .returning({ id: users.id, phone: users.phone });
-
-      if (!user) throw new Error('User insert failed');
-
-      const baseSlug = slugify(input.tenantName);
-      // Unique slug suffix bilan
-      const slug = `${baseSlug}-${randomBytes(3).toString('hex')}`;
-
-      const [tenant] = await tx
-        .insert(tenants)
-        .values({
-          name: input.tenantName,
-          slug,
-          ownerUserId: user.id,
-          defaultLanguage: input.defaultLanguage,
-        })
-        .returning({ id: tenants.id, slug: tenants.slug });
-
-      if (!tenant) throw new Error('Tenant insert failed');
-
-      // RLS context o'rnatish — keyingi insert'lar (branches, roles, role_permissions, audit_log)
-      // shu tenant_id bilan o'tadi
-      await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenant.id}, true)`);
-
-      // Default branch
-      const [branch] = await tx
-        .insert(branches)
-        .values({
-          tenantId: tenant.id,
-          name: 'Bosh filial',
-        })
-        .returning({ id: branches.id });
-
-      if (!branch) throw new Error('Branch insert failed');
-
-      // System role templates seed
-      await seedSystemRolesInTx(tx, tenant.id);
-
-      // Audit (platform-level event)
-      await tx.insert(auditLog).values({
-        tenantId: tenant.id,
-        userId: user.id,
-        action: 'tenant.registered',
-        resourceType: 'tenant',
-        resourceId: tenant.id,
-        before: null,
-        after: { name: input.tenantName, slug: tenant.slug },
-      });
-
-      return { userId: user.id, tenantId: tenant.id, slug: tenant.slug, branchId: branch.id };
-    });
+    // Atomic transaction: user + tenant + branch + 8 role templates + (no owner assignment row).
+    // Mantiq `provisionTenantInTx`da — aktivatsiya provisioning'i bilan bitta yo'l.
+    return await db.transaction((tx) => provisionTenantInTx(tx, input));
   }
 
   /**
