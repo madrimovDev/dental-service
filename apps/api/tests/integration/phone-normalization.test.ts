@@ -22,6 +22,7 @@ import type { Context } from 'hono';
 import type { DbOrTx } from '../../src/db/client.ts';
 import { db } from '../../src/db/client.ts';
 import type { AuditLogger } from '../../src/lib/audit-logger.ts';
+import { env } from '../../src/lib/env.ts';
 import { closeRateLimitRedis } from '../../src/lib/rate-limit.ts';
 import { authRoutes } from '../../src/modules/auth/auth.routes.ts';
 import { createUsersService } from '../../src/modules/users/users.service.ts';
@@ -173,6 +174,29 @@ describe('Task 9 — telefon normalizatsiyasi', () => {
 
     const after = (await db.select().from(users)).length;
     expect(after).toBe(before);
+  });
+
+  test('login rate-limit bucket telefon FORMATIGA emas, HISOBGA bog‘lanadi', async () => {
+    // Login endi barcha yozilishlarni bitta hisobga olib boradi. Agar rate-limit
+    // kaliti XOM telefonni ishlatsa, brute-force qiluvchi shu bitta hisob uchun
+    // kvotani formatni almashtirib (`+998…`, `998…`, `901…`) ko'paytira olardi.
+    const ip = freshIp();
+    const attempt = (phone: string) =>
+      app.request('/api/auth/login', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-forwarded-for': ip },
+        body: JSON.stringify({ phone, password: 'WrongPasswordHere1' }),
+      });
+
+    // Kvotani BITTA yozilish bilan tugatamiz (noto'g'ri parol → 401, lekin
+    // hisoblagich baribir sanaydi).
+    for (let i = 0; i < env.AUTH_LOGIN_RATE_LIMIT; i++) {
+      await attempt('+998901235555');
+    }
+
+    // Boshqa yozilish — AYNI hisob → o'sha bucket → 429 (yangi kvota emas).
+    const other = await attempt('901235555');
+    expect(other.status).toBe(429);
   });
 
   test('yangi xodim taklifi kanonik shaklda saqlanadi', async () => {

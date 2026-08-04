@@ -1,4 +1,4 @@
-import { fail, ok } from '@dental/core';
+import { fail, normalizePhone, ok } from '@dental/core';
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import type { Database } from '../../db/client.ts';
 import { createAuditLogger } from '../../lib/audit-logger.ts';
@@ -47,9 +47,13 @@ export const authRoutes = (deps: { db: Database }) => {
 
   // ─── Rate limiting (CLI-227) — Redis fixed-window, IP+telefon ────────────────
   const window = env.AUTH_RATE_LIMIT_WINDOW_SEC;
+  // Kalit KANONIK telefon bo'yicha: `login` endi `998…`, `+998…` va mahalliy
+  // `901…` yozilishlarini bitta hisobga olib boradi, shuning uchun xom qiymat
+  // kalit bo'lganda brute-force qiluvchi AYNI hisob uchun kvotani formatni
+  // almashtirib ko'paytira olardi.
   const phoneKey = (b: unknown): string | undefined =>
     typeof b === 'object' && b !== null && typeof (b as { phone?: unknown }).phone === 'string'
-      ? (b as { phone: string }).phone
+      ? normalizePhone((b as { phone: string }).phone)
       : undefined;
 
   const loginRateLimit = rateLimit({
