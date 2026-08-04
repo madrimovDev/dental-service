@@ -1,7 +1,14 @@
 import { describe, expect, mock, test } from 'bun:test';
 import { Hono } from 'hono';
+import type { Database } from '../db/client.ts';
 import * as realLicense from '../lib/license.ts';
 import * as realLicenseClient from '../lib/license-client.ts';
+
+// Bu fayl HERMETIK (DB'siz). `activateRoutes` `db`ni FAQAT provisioning bloki
+// kelganda ishlatadi (`applyProvisioning`) — bu yerdagi Supervisor mock'lari
+// esa hech qachon blok qaytarmaydi, shuning uchun stub yetarli. Provisioning
+// yo'li real bazada sinaladi: tests/integration/provisioning-activate.test.ts.
+const fakeDb = {} as Database;
 
 // Mock BEFORE the dynamic import of './activate.ts' resolves it (bun
 // mock.module must be registered up front — same pattern as
@@ -35,10 +42,17 @@ mock.module('../lib/license.ts', () => ({
 
 const { activateRoutes } = await import('./activate.ts');
 
+// Har so'rov boshqa IP'dan. Rate-limit (ACTIVATE_RATE_LIMIT=5 / 1 soat) REAL
+// Redis'da hisoblanadi va bucket test jarayonidan keyin ham qolib ketadi —
+// IP'siz (`unknown`) so'rovlar bilan bu fayl bir soat ichida faqat BIR MARTA
+// yashil bo'lardi (ikkinchi ishga tushirishda hammasi 429). cli-370 naqshi.
 const post = (app: Hono, body: unknown) =>
   app.request('/', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-forwarded-for': `10.232.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250 + 1)}`,
+    },
     body: JSON.stringify(body),
   });
 
@@ -46,7 +60,7 @@ describe('activateRoutes', () => {
   test('valid licenseKey -> writes license, returns modules+expiresAt', async () => {
     writeLicenseCalls = [];
     const app = new Hono();
-    app.route('/', activateRoutes());
+    app.route('/', activateRoutes({ db: fakeDb }));
 
     const res = await post(app, { licenseKey: 'AAAAA-BBBBB-CCCCC-DDDDD' });
 
@@ -60,7 +74,7 @@ describe('activateRoutes', () => {
   test('missing licenseKey -> 400, license never written', async () => {
     writeLicenseCalls = [];
     const app = new Hono();
-    app.route('/', activateRoutes());
+    app.route('/', activateRoutes({ db: fakeDb }));
 
     const res = await post(app, {});
 
@@ -74,7 +88,7 @@ describe('activateRoutes', () => {
     };
     writeLicenseCalls = [];
     const app = new Hono();
-    app.route('/', activateRoutes());
+    app.route('/', activateRoutes({ db: fakeDb }));
 
     const res = await post(app, { licenseKey: 'WRONG-WRONG-WRONG-WRONG' });
 
@@ -89,7 +103,7 @@ describe('activateRoutes', () => {
       throw new Error('FINGERPRINT_UNAVAILABLE');
     };
     const app = new Hono();
-    app.route('/', activateRoutes());
+    app.route('/', activateRoutes({ db: fakeDb }));
 
     const res = await post(app, { licenseKey: 'AAAAA-BBBBB-CCCCC-DDDDD' });
 

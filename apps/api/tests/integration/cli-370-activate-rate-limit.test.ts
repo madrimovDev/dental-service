@@ -17,6 +17,7 @@
 
 import { afterAll, describe, expect, mock, test } from 'bun:test';
 import { Hono } from 'hono';
+import type { Database } from '../../src/db/client.ts';
 import * as realLicense from '../../src/lib/license.ts';
 import * as realLicenseClient from '../../src/lib/license-client.ts';
 
@@ -42,7 +43,10 @@ const { env } = await import('../../src/lib/env.ts');
 const { closeRateLimitRedis } = await import('../../src/lib/rate-limit.ts');
 
 const app = new Hono();
-app.route('/api/activate', activateRoutes());
+// `db` stub — bu test faqat rate-limit'ni tekshiradi, Supervisor mock'i
+// provisioning bloki qaytarmaydi, shuning uchun `applyProvisioning` (yagona
+// db chaqiruvi) hech qachon ishga tushmaydi.
+app.route('/api/activate', activateRoutes({ db: {} as Database }));
 
 const activateReq = (ip: string) =>
   app.request('/api/activate', {

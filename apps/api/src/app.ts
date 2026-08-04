@@ -140,7 +140,7 @@ export const createApp = () => {
   app.route('/api/auth', authRoutes({ db }));
   // Local Desktop litsenziya faollashtirish (CLI-348 qaror 1) — auth yo'q,
   // license-middleware.ts WHITELIST'i bilan bir xil yo'l.
-  app.route('/api/activate', activateRoutes());
+  app.route('/api/activate', activateRoutes({ db }));
   // Vendor-mediated owner password reset (CLI-226) — auth yo'q (owner login
   // qila olmaydi), license-middleware.ts WHITELIST'i bilan bir xil yo'l.
   app.route('/api/reset-owner-password', resetOwnerPasswordRoutes());

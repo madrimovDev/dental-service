@@ -1093,7 +1093,7 @@ git commit -m "refactor(api): provisionTenantInTx ajratildi — registerTenant v
 - Produces: `activateRoutes(deps: { db: Database })`; javob
   `{ modules, expiresAt, ownerPhone?: string }`.
 
-- [ ] **Step 1: Failing testlar**
+- [x] **Step 1: Failing testlar**
 
 `apps/api/tests/integration/provisioning-activate.test.ts`:
 
@@ -1151,7 +1151,7 @@ it('yozilgan .lic haqiqiy qoladi (provisioning fayl payloadiga kirmaydi)', async
 Run: `cd apps/api && bun test --env-file=../../.env tests/integration/provisioning-activate.test.ts`
 Kutiladi: FAIL.
 
-- [ ] **Step 2: `activate.ts` implementatsiyasi**
+- [x] **Step 2: `activate.ts` implementatsiyasi**
 
 ```ts
 export const activateRoutes = (deps: { db: Database }) => {
@@ -1262,7 +1262,7 @@ const applyProvisioning = async (db: Database, p: ProvisioningBlock): Promise<vo
 
 ⚠️ `logger.warn`da **parol yo'q** — faqat `clinicId`.
 
-- [ ] **Step 3: `app.ts` yangilash**
+- [x] **Step 3: `app.ts` yangilash**
 
 `apps/api/src/app.ts:143`:
 
@@ -1270,7 +1270,7 @@ const applyProvisioning = async (db: Database, p: ProvisioningBlock): Promise<vo
   app.route('/api/activate', activateRoutes({ db }));
 ```
 
-- [ ] **Step 4: Testlar → PASS**
+- [x] **Step 4: Testlar → PASS**
 
 Run:
 ```bash
@@ -1281,7 +1281,7 @@ bun test --env-file=../../.env tests/integration/cli-370-activate-rate-limit.tes
 ```
 Uchalasi ham PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd ../.. && bun run typecheck
