@@ -20,7 +20,7 @@
  *   cd apps/api && bun test --env-file=../../.env tests/integration/provisioning-tenant.test.ts
  */
 
-import { beforeAll, describe, expect, test } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { ROLE_TEMPLATES } from '@dental/core';
 import { auditLog, branches, rolePermissions, roles, tenants, users } from '@dental/db-schema';
 import { eq, sql } from 'drizzle-orm';
@@ -78,6 +78,13 @@ beforeAll(async () => {
       defaultLanguage: 'ru',
     }),
   );
+});
+
+// Bu fayl 2 ta tenant + 2 ta owner yaratadi. Ular bazada qolib ketmasin —
+// `tests/integration/` bitta umumiy bazadan foydalanadi (cli-388 pretsedenti:
+// beforeAll + afterAll TRUNCATE).
+afterAll(async () => {
+  await db.execute(sql`TRUNCATE users, tenants RESTART IDENTITY CASCADE`);
 });
 
 describe('provisionTenantInTx — foydalanuvchi va tenant', () => {
