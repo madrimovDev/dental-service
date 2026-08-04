@@ -5,9 +5,38 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { db } from '../../db/client';
 import { branches, clinics, licenseEvents, licenses } from '../../db/schema';
+import { normalizePhone } from '../../lib/phone';
 import { adminJwtMiddleware } from '../auth/jwt.middleware';
 
 const uuidSchema = z.string().uuid();
+
+// Vaqtinchalik owner paroli. Operator uni og'zaki/qo'lda yetkazishi mumkin —
+// chalkashadigan belgilar (0/O, 1/l/I) alifbodan chiqarilgan. 16 belgi
+// (apps/api `password` siyosati min 12 talab qiladi).
+const PASSWORD_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+export const generateTempPassword = (): string =>
+  Array.from(crypto.randomBytes(16), (b) => PASSWORD_ALPHABET[b % PASSWORD_ALPHABET.length]).join(
+    '',
+  );
+
+/**
+ * Klinika qatorining ochiq (parolsiz) ko'rinishi. `ownerTempPassword` ATAYIN
+ * chiqarib tashlangan — u faqat ikki joyda ko'rinadi: yaratish javobidagi
+ * `credentials` va `GET /:id` detali (spec §7, admin panel aktivatsiyagacha
+ * operatorga ko'rsatadi).
+ *
+ * `...clinic` spread'i o'rniga aniq tanlash: `clinics` jadvaliga kelajakda
+ * qo'shiladigan har qanday maxfiy ustun jim sizib chiqmasin.
+ */
+const pickClinicPublic = (clinic: typeof clinics.$inferSelect) => ({
+  id: clinic.id,
+  name: clinic.name,
+  contactEmail: clinic.contactEmail,
+  contactPhone: clinic.contactPhone,
+  ownerFullName: clinic.ownerFullName,
+  ownerPhone: clinic.ownerPhone,
+  createdAt: clinic.createdAt,
+});
 
 const createClinicSchema = z.object({
   name: z.string().min(1),
@@ -16,6 +45,14 @@ const createClinicSchema = z.object({
   plan: z.enum(['starter', 'standard', 'premium', 'enterprise']),
   expiresAt: z.string(), // ISO date
   gracePeriodDays: z.number().int().min(1).max(365).default(30),
+  // Provisioning — klinika lokal bazasida yaratiladigan birlamchi ma'lumot
+  // (spec §5.2). Telefon `normalizePhone` bilan kanonik shaklga keltiriladi.
+  ownerFullName: z.string().min(2).max(120),
+  ownerPhone: z.string().min(9).max(20),
+  defaultLanguage: z.enum(['uz', 'ru']).default('uz'),
+  branchName: z.string().min(1).max(120).default('Bosh filial'),
+  branchAddress: z.string().max(255).optional(),
+  branchPhone: z.string().max(20).optional(),
 });
 
 // NOTE: brief's Step 2 snippet inserted a license with no branchId, but
@@ -110,7 +147,7 @@ export const clinicsRoutes = () => {
     const data = rows.map((clinic) => {
       const l = licenseByClinic.get(clinic.id);
       return {
-        ...clinic,
+        ...pickClinicPublic(clinic),
         license: l
           ? { licenseKey: l.licenseKey, plan: l.plan, isActive: l.isActive, expiresAt: l.expiresAt }
           : null,
@@ -125,23 +162,34 @@ export const clinicsRoutes = () => {
     const data = c.req.valid('json');
 
     const result = await db.transaction(async (tx) => {
+      const tempPassword = generateTempPassword();
+      // Klinika tomonida bu telefon login identifikatori bo'ladi (CLAUDE.md
+      // §3.1) — kanonik shakl `+998XXXXXXXXX`, aks holda mijoz kiritgan xom
+      // qiymat login qidiruviga mos kelmaydi.
+      const ownerPhone = normalizePhone(data.ownerPhone);
+
       const [clinic] = await tx
         .insert(clinics)
         .values({
           name: data.name,
           contactEmail: data.contactEmail,
           contactPhone: data.contactPhone,
-          // Vaqtinchalik placeholder — owner maydonlari formadan Task 4 da
-          // (klinika yaratish + owner hisobi) keladi.
-          ownerFullName: "Noma'lum",
-          ownerPhone: '',
+          ownerFullName: data.ownerFullName,
+          ownerPhone,
+          ownerTempPassword: tempPassword,
+          defaultLanguage: data.defaultLanguage,
         })
         .returning();
       if (!clinic) throw new Error('clinic insert returned no row');
 
       const [branch] = await tx
         .insert(branches)
-        .values({ clinicId: clinic.id, name: 'Main' })
+        .values({
+          clinicId: clinic.id,
+          name: data.branchName,
+          address: data.branchAddress ?? null,
+          phone: data.branchPhone ? normalizePhone(data.branchPhone) : null,
+        })
         .returning();
       if (!branch) throw new Error('branch insert returned no row');
 
@@ -165,10 +213,16 @@ export const clinicsRoutes = () => {
         .returning();
       if (!license) throw new Error('license insert returned no row');
 
-      return { clinic, branch, license };
+      return { clinic, branch, license, tempPassword };
     });
 
-    return c.json({ clinic: result.clinic, license: result.license });
+    // Parol AYNAN shu yerda va faqat shu yerda ochiq qaytariladi — hech qachon
+    // loglanmaydi (spec §5.2). Klinika obyektining o'zi parolsiz.
+    return c.json({
+      clinic: pickClinicPublic(result.clinic),
+      license: result.license,
+      credentials: { loginPhone: result.clinic.ownerPhone, tempPassword: result.tempPassword },
+    });
   });
 
   // Klinika litsenziyasi + modullar
@@ -182,6 +236,11 @@ export const clinicsRoutes = () => {
     const clinic = await db.query.clinics.findFirst({ where: eq(clinics.id, idResult.data) });
     if (!clinic) return c.json({ error: { code: 'NOT_FOUND' } }, 404);
     const license = await db.query.licenses.findFirst({ where: eq(licenses.clinicId, clinic.id) });
+    // ATAYIN xom qator (`ownerTempPassword` bilan) — admin panel detali
+    // aktivatsiyagacha vaqtinchalik parolni operatorga ko'rsatadi (spec §7).
+    // Bu yerda `pickClinicPublic` ISHLATILMAYDI; "tozalash" niyatida
+    // almashtirmang, aks holda panel holati jim buziladi (clinics.test.ts
+    // "GET /:id (detal) ... ATAYIN bor" testi buni qulflaydi).
     return c.json({ clinic, license });
   });
 
@@ -208,7 +267,7 @@ export const clinicsRoutes = () => {
     const updatedLicense = await db.query.licenses.findFirst({
       where: eq(licenses.id, license.id),
     });
-    return c.json({ clinic, license: updatedLicense });
+    return c.json({ clinic: pickClinicPublic(clinic), license: updatedLicense });
   });
 
   return app;

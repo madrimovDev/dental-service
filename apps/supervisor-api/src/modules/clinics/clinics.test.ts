@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import { createApp } from '../../app';
 import { db } from '../../db/client';
-import { clinics as clinicsTable, licenseEvents } from '../../db/schema';
+import { branches as branchesTable, clinics as clinicsTable, licenseEvents } from '../../db/schema';
 import { signAdminTestToken } from '../../lib/test-helpers';
 
 const app = createApp();
@@ -22,6 +22,12 @@ const createClinic = async (overrides: Partial<Record<string, unknown>> = {}) =>
       plan: 'standard',
       expiresAt: new Date(Date.now() + 86400000 * 365).toISOString(),
       gracePeriodDays: 30,
+      // Provisioning maydonlari majburiy (createClinicSchema) — ularsiz POST
+      // 400 qaytaradi.
+      ownerFullName: 'Ali Valiyev',
+      ownerPhone: '901234567',
+      defaultLanguage: 'uz',
+      branchName: 'Bosh filial',
       ...overrides,
     }),
   });
@@ -107,6 +113,122 @@ describe('POST /v1/admin/clinics', () => {
     expect(body.license.modules).not.toContain('erp');
     expect(body.license.modules).not.toContain('inventory');
     expect(body.license.modules).not.toContain('branches');
+  });
+});
+
+// Provisioning (spec 2026-08-03 §4.1, §5.2) — Supervisor klinika uchun owner
+// hisobi va filial ma'lumotlarini yaratadi; vaqtinchalik parol AYNAN ikki
+// joyda ochiladi: POST javobidagi `credentials` va GET /:id detali. Boshqa
+// hech qanday javobda bo'lmasligi kerak.
+describe('POST /v1/admin/clinics — provisioning (owner + filial)', () => {
+  it("klinika yaratishda owner va filial ma'lumoti saqlanadi", async () => {
+    const res = await createClinic({
+      plan: 'premium',
+      ownerFullName: 'Ali Valiyev',
+      ownerPhone: '901234567',
+      branchName: 'Chilonzor filiali',
+      branchAddress: 'Toshkent, Chilonzor 12',
+      branchPhone: '712001020',
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as any;
+
+    // Telefon serverda normallashtiriladi — klinika tomonida login shu shaklda
+    // qidiriladi.
+    expect(body.credentials.loginPhone).toBe('+998901234567');
+    expect(body.credentials.tempPassword.length).toBeGreaterThanOrEqual(12);
+    expect(body.clinic.ownerFullName).toBe('Ali Valiyev');
+    expect(body.clinic.ownerPhone).toBe('+998901234567');
+
+    const [branch] = await db
+      .select()
+      .from(branchesTable)
+      .where(eq(branchesTable.clinicId, body.clinic.id));
+    expect(branch?.name).toBe('Chilonzor filiali');
+    expect(branch?.address).toBe('Toshkent, Chilonzor 12');
+    expect(branch?.phone).toBe('+998712001020');
+
+    const stored = await db.query.clinics.findFirst({
+      where: eq(clinicsTable.id, body.clinic.id),
+    });
+    expect(stored?.ownerTempPassword).toBe(body.credentials.tempPassword);
+  });
+
+  it("bo'sh filial maydonlari NULL sifatida saqlanadi (frontend `undefined` yuboradi)", async () => {
+    const res = await createClinic();
+    const body = (await res.json()) as any;
+    const [branch] = await db
+      .select()
+      .from(branchesTable)
+      .where(eq(branchesTable.clinicId, body.clinic.id));
+    expect(branch?.name).toBe('Bosh filial');
+    expect(branch?.address).toBeNull();
+    expect(branch?.phone).toBeNull();
+  });
+
+  it("owner maydonlarisiz so'rov 400 qaytaradi", async () => {
+    const res = await app.request('/v1/admin/clinics', {
+      method: 'POST',
+      headers: await authHeaders(),
+      body: JSON.stringify({
+        name: 'Ownersiz klinika',
+        plan: 'standard',
+        expiresAt: new Date(Date.now() + 86400000).toISOString(),
+      }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("POST javobidagi `clinic` obyektida vaqtinchalik parol YO'Q (faqat `credentials` da)", async () => {
+    const res = await createClinic();
+    const body = (await res.json()) as any;
+    const tempPassword = body.credentials.tempPassword;
+
+    expect(tempPassword).toBeTruthy();
+    expect(body.clinic.ownerTempPassword).toBeUndefined();
+    expect(JSON.stringify(body.clinic)).not.toContain(tempPassword);
+  });
+});
+
+describe("Vaqtinchalik parolning sizib chiqishi — endpoint bo'yicha qulf", () => {
+  it("GET / (ro'yxat) javobida vaqtinchalik parol yo'q", async () => {
+    const created = (await (await createClinic()).json()) as any;
+    const tempPassword = created.credentials.tempPassword;
+
+    const res = await app.request('/v1/admin/clinics', { headers: await authHeaders() });
+    expect(res.status).toBe(200);
+    const raw = JSON.stringify(await res.json());
+    expect(raw).not.toContain('ownerTempPassword');
+    expect(raw).not.toContain(tempPassword);
+  });
+
+  it("PATCH /:id/deactivate javobida vaqtinchalik parol yo'q", async () => {
+    const created = (await (await createClinic()).json()) as any;
+    const tempPassword = created.credentials.tempPassword;
+
+    const res = await app.request(`/v1/admin/clinics/${created.clinic.id}/deactivate`, {
+      method: 'PATCH',
+      headers: await authHeaders(),
+    });
+    expect(res.status).toBe(200);
+    const raw = JSON.stringify(await res.json());
+    expect(raw).not.toContain('ownerTempPassword');
+    expect(raw).not.toContain(tempPassword);
+  });
+
+  // ATAYIN: detal javobi parolni ko'rsatadi — admin panel aktivatsiyagacha uni
+  // operatorga ko'rsatishi kerak (spec §7). Bu testni "tozalash" niyatida
+  // o'chirmang, aks holda panel holati jim buziladi.
+  it('GET /:id (detal) javobida vaqtinchalik parol ATAYIN bor', async () => {
+    const created = (await (await createClinic()).json()) as any;
+
+    const res = await app.request(`/v1/admin/clinics/${created.clinic.id}`, {
+      headers: await authHeaders(),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as any;
+    expect(body.clinic.ownerTempPassword).toBe(created.credentials.tempPassword);
+    expect(body.clinic.ownerPhone).toBe(created.credentials.loginPhone);
   });
 });
 

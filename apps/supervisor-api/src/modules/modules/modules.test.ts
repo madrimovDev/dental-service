@@ -21,6 +21,11 @@ const createClinicWithLicense = async (plan = 'standard') => {
       plan,
       expiresAt: new Date(Date.now() + 86400000 * 365).toISOString(),
       gracePeriodDays: 30,
+      // Owner (provisioning) maydonlari `createClinicSchema`da majburiy —
+      // ularsiz POST 400 qaytaradi va `license` undefined bo'lib qoladi.
+      // `defaultLanguage`/`branchName` — Zod default'lari bor.
+      ownerFullName: 'Modules Test Owner',
+      ownerPhone: '901234567',
     }),
   });
   return (await res.json()) as any;

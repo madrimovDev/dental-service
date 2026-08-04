@@ -143,8 +143,10 @@ TOKEN=$(curl -s -X POST http://192.168.3.242/v1/admin/auth/login \
 
 curl -s -X POST http://192.168.3.242/v1/admin/clinics \
   -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
-  -d '{"name":"Yangi Klinika","plan":"premium","expiresAt":"2027-12-31T00:00:00Z","gracePeriodDays":30}'
-# → licenseKey (XXXXX-XXXXX-XXXXX)
+  -d '{"name":"Yangi Klinika","plan":"premium","expiresAt":"2027-12-31T00:00:00Z","gracePeriodDays":30,
+       "ownerFullName":"Ali Valiyev","ownerPhone":"901234567","defaultLanguage":"uz",
+       "branchName":"Bosh filial"}'
+# → licenseKey (XXXXX-XXXXX-XXXXX) + credentials { loginPhone, tempPassword }
 ```
 `plan`: `starter` | `standard` | `premium` | `enterprise` (har biri turli modul to'plami — `apps/supervisor-api/src/modules/clinics/clinics.routes.ts` `MODULE_MAP`).
 

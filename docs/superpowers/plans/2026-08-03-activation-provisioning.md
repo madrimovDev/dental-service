@@ -425,7 +425,7 @@ git commit -m "feat(supervisor): clinics jadvaliga owner (login) ustunlari + lic
   `{ clinic, license, credentials: { loginPhone: string; tempPassword: string } }`
   — Task 11 (admin UI) shu shaklga tayanadi.
 
-- [ ] **Step 1: Failing test**
+- [x] **Step 1: Failing test**
 
 ```ts
 import { describe, expect, it } from 'bun:test';
@@ -449,7 +449,7 @@ describe('generateTempPassword', () => {
 Run: `cd apps/supervisor-api && bun test src/modules/clinics/clinics.routes.test.ts`
 Kutiladi: FAIL — `generateTempPassword` eksport qilinmagan.
 
-- [ ] **Step 2: `generateTempPassword` implementatsiyasi**
+- [x] **Step 2: `generateTempPassword` implementatsiyasi**
 
 `clinics.routes.ts` faylining yuqorisiga:
 
@@ -466,7 +466,7 @@ export const generateTempPassword = (): string =>
 
 Run: test → PASS
 
-- [ ] **Step 3: Schema kengaytirish**
+- [x] **Step 3: Schema kengaytirish**
 
 `createClinicSchema`ga (Zod **3** sintaksisi — supervisor Zod 3 ishlatadi):
 
@@ -488,7 +488,7 @@ const createClinicSchema = z.object({
 });
 ```
 
-- [ ] **Step 4: `POST /` handlerini yangilash**
+- [x] **Step 4: `POST /` handlerini yangilash**
 
 Tranzaksiya ichida:
 
@@ -541,7 +541,7 @@ Javob (parol AYNAN shu yerda va faqat shu yerda qaytariladi — loglanmaydi):
 admin panel aktivatsiyagacha uni ko'rsatishi kerak (spec §7). Lekin `GET /`
 (ro'yxat) javobiga qo'shmang: u faqat `GET /:id` detalida ko'rinadi.
 
-- [ ] **Step 5: Ro'yxat javobidan parolni chiqarib tashlash**
+- [x] **Step 5: Ro'yxat javobidan parolni chiqarib tashlash**
 
 `GET /` handleridagi `rows.map(...)` da `...clinic` spread'i endi
 `ownerTempPassword`ni ham qamrab oladi. Aniq tanlash bilan almashtiring:
@@ -564,7 +564,7 @@ admin panel aktivatsiyagacha uni ko'rsatishi kerak (spec §7). Lekin `GET /`
     });
 ```
 
-- [ ] **Step 6: Integratsiya testi**
+- [x] **Step 6: Integratsiya testi**
 
 ```ts
 it("klinika yaratishda owner va filial ma'lumoti saqlanadi", async () => {
@@ -602,7 +602,7 @@ it("ro'yxat javobida vaqtinchalik parol yo'q", async () => {
 
 Run: `cd apps/supervisor-api && bun test src/modules/clinics/` → PASS
 
-- [ ] **Step 7: Typecheck + commit**
+- [x] **Step 7: Typecheck + commit**
 
 ```bash
 bun run typecheck
