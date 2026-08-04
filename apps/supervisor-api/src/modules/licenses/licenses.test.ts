@@ -1,36 +1,62 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
+import { createPublicKey } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { createApp } from '../../app'; // Hono instansiyasini quradigan factory (index.ts Bun.serve'siz)
 import { db } from '../../db/client';
-import { branches, clinics, licenses } from '../../db/schema';
+import { branches, clinics, licenseEvents, licenses } from '../../db/schema';
+import { verifySignature } from '../../lib/rsa';
 import { signAdminTestToken } from '../../lib/test-helpers';
+import { createLicenseService } from './licenses.service';
 
 const app = createApp();
+const service = createLicenseService();
+
+// Servis imzolagan kalitning JUFTI — yangi `generateKeyPair()` EMAS (boshqa
+// juft bilan `verifySignature` doim `false` qaytarib, yo'q joyda
+// canonicalization bug'i qidirishga olib keladi).
+const publicKey = createPublicKey(process.env.RSA_PRIVATE_KEY as string)
+  .export({ type: 'spki', format: 'pem' })
+  .toString();
 
 let licenseKey: string;
+let licenseId: string;
+let clinicId: string;
 
 beforeEach(async () => {
   const [clinic] = await db
     .insert(clinics)
-    .values({ name: 'Test Clinic', ownerFullName: 'Test Owner', ownerPhone: '+998901234567' })
+    .values({
+      name: 'Test Clinic',
+      ownerFullName: 'Test Owner',
+      ownerPhone: '+998901234567',
+      // Provisioning bloki faqat vaqtinchalik parol hali mavjud bo'lganda
+      // quriladi — fixture uni aniq beradi.
+      ownerTempPassword: 'Temp-Parol-123',
+    })
     .returning();
   if (!clinic) throw new Error('clinic insert returned no row');
+  clinicId = clinic.id;
   const [branch] = await db
     .insert(branches)
     .values({ clinicId: clinic.id, name: 'Main' })
     .returning();
   if (!branch) throw new Error('branch insert returned no row');
   licenseKey = `TEST-${crypto.randomUUID()}`;
-  await db.insert(licenses).values({
-    clinicId: clinic.id,
-    branchId: branch.id,
-    licenseKey,
-    plan: 'standard',
-    modules: ['patients', 'appointments', 'cashier'],
-    gracePeriodDays: 30,
-    expiresAt: new Date(Date.now() + 86400000 * 365),
-    isActive: true,
-  });
+  const [license] = await db
+    .insert(licenses)
+    .values({
+      clinicId: clinic.id,
+      branchId: branch.id,
+      licenseKey,
+      plan: 'standard',
+      modules: ['patients', 'appointments', 'cashier'],
+      gracePeriodDays: 30,
+      expiresAt: new Date(Date.now() + 86400000 * 365),
+      isActive: true,
+    })
+    .returning();
+  if (!license) throw new Error('license insert returned no row');
+  licenseId = license.id;
 });
 
 describe('POST /v1/activate', () => {
@@ -163,5 +189,88 @@ describe('POST /v1/reactivate', () => {
 
     const lic = await db.query.licenses.findFirst({ where: eq(licenses.licenseKey, licenseKey) });
     expect(lic?.isActive).toBe(true);
+  });
+});
+
+describe('provisioning bloki', () => {
+  it('aktivatsiya provisioning blokini imzo bilan qaytaradi', async () => {
+    const res = await service.activate(licenseKey, 'fp-1');
+    expect(res.provisioning).toBeDefined();
+    expect(res.provisioning?.ownerPhone).toBe('+998901234567');
+    expect(res.provisioning?.ownerPassword).toBe('Temp-Parol-123');
+    expect(res.provisioning?.licenseKey).toBe(licenseKey);
+    expect(res.provisioning?.clinicId).toBe(clinicId);
+    expect(res.provisioning?.issuedAt).toBe(res.issuedAt);
+    expect(res.provisioning?.tenantName).toBe('Test Clinic');
+    expect(res.provisioning?.defaultLanguage).toBe('uz');
+    expect(res.provisioning?.branchName).toBe('Main');
+    // Bo'sh maydon HECH QACHON undefined emas — `undefined` bo'lsa
+    // JSON.stringify kalitni butunlay tashlaydi va klient tomondagi imzo
+    // tekshiruvi mos kelmaydi.
+    expect(res.provisioning?.branchAddress).toBe('');
+    expect(res.provisioning?.branchPhone).toBe('');
+    expect(
+      verifySignature(res.provisioning as object, res.provisioningSignature as string, publicKey),
+    ).toBe(true);
+  });
+
+  it("parol o'chirilgach provisioning bloki qaytarilmaydi", async () => {
+    await service.activate(licenseKey, 'fp-1');
+    await service.provisioned(licenseKey, 'fp-1');
+    const res = await service.activate(licenseKey, 'fp-1');
+    expect(res.provisioning).toBeUndefined();
+    expect(res.provisioningSignature).toBeUndefined();
+  });
+
+  it('provisioned() parolni tozalaydi va hodisa yozadi', async () => {
+    await service.activate(licenseKey, 'fp-1');
+    await service.provisioned(licenseKey, 'fp-1');
+    const clinic = await db.query.clinics.findFirst({ where: eq(clinics.id, clinicId) });
+    expect(clinic?.ownerTempPassword).toBeNull();
+    const lic = await db.query.licenses.findFirst({ where: eq(licenses.id, licenseId) });
+    expect(lic?.provisionedAt).not.toBeNull();
+    const events = await db
+      .select()
+      .from(licenseEvents)
+      .where(eq(licenseEvents.licenseId, licenseId));
+    expect(events.some((e) => e.event === 'provisioned')).toBe(true);
+  });
+
+  it('provisioned() boshqa fingerprint bilan 403 (FINGERPRINT_MISMATCH)', async () => {
+    await service.activate(licenseKey, 'fp-1');
+    await expect(service.provisioned(licenseKey, 'fp-boshqa')).rejects.toThrow(
+      'FINGERPRINT_MISMATCH',
+    );
+    const clinic = await db.query.clinics.findFirst({ where: eq(clinics.id, clinicId) });
+    expect(clinic?.ownerTempPassword).toBe('Temp-Parol-123');
+  });
+
+  it('heartbeat ham parolni tozalaydi (tasdiq yetib bormagan ssenariy)', async () => {
+    await service.activate(licenseKey, 'fp-1');
+    await service.heartbeat(licenseKey, 'fp-1');
+    const clinic = await db.query.clinics.findFirst({ where: eq(clinics.id, clinicId) });
+    expect(clinic?.ownerTempPassword).toBeNull();
+  });
+
+  it('POST /v1/provisioned route ishlaydi', async () => {
+    await service.activate(licenseKey, 'fp-1');
+    const res = await app.request('/v1/provisioned', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ licenseKey, fingerprint: 'fp-1' }),
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    const clinic = await db.query.clinics.findFirst({ where: eq(clinics.id, clinicId) });
+    expect(clinic?.ownerTempPassword).toBeNull();
+  });
+
+  it("POST /v1/provisioned noma'lum kalit uchun 403", async () => {
+    const res = await app.request('/v1/provisioned', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ licenseKey: 'WRONG-KEY', fingerprint: 'fp-1' }),
+    });
+    expect(res.status).toBe(403);
   });
 });

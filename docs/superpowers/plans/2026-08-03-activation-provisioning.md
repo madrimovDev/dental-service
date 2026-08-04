@@ -630,7 +630,7 @@ git commit -m "feat(supervisor): klinika yaratishda owner hisobi va filial ma'lu
   - Yangi `POST /v1/provisioned` → `{ ok: true }`.
   - Task 6 va Task 8 shu shakllarga tayanadi.
 
-- [ ] **Step 1: Failing test**
+- [x] **Step 1: Failing test**
 
 `licenses.test.ts`ga:
 
@@ -670,7 +670,7 @@ it('heartbeat ham parolni tozalaydi (tasdiq yetib bormagan ssenariy)', async () 
 Run: `cd apps/supervisor-api && bun test src/modules/licenses/licenses.test.ts`
 Kutiladi: FAIL.
 
-- [ ] **Step 2: Provisioning bloki qurilishi**
+- [x] **Step 2: Provisioning bloki qurilishi**
 
 `licenses.service.ts`ga:
 
@@ -734,7 +734,7 @@ const buildProvisioning = async (
 > qilib yozing — `ownerPhone` klinika tomonida login identifikatori
 > (CLAUDE.md §3.1) va bo'sh telefonli hisob yaratilib qolmasin.
 
-- [ ] **Step 3: `activate()`ga ulash**
+- [x] **Step 3: `activate()`ga ulash**
 
 `activate()` oxirida:
 
@@ -748,7 +748,7 @@ const buildProvisioning = async (
 ⚠️ `buildResponse` chaqiruvi o'zgarmaydi — provisioning **litsenziya imzosiga
 kirmaydi**, o'zining alohida imzosi bor.
 
-- [ ] **Step 4: `provisioned()` metodi**
+- [x] **Step 4: `provisioned()` metodi**
 
 ```ts
   /**
@@ -790,7 +790,7 @@ const clearTempPassword = async (lic: typeof licenses.$inferSelect) => {
 `heartbeat()`da `lastHeartbeatAt` yangilangandan keyin `await clearTempPassword(lic);`
 qo'shing.
 
-- [ ] **Step 5: Route qo'shish**
+- [x] **Step 5: Route qo'shish**
 
 `licenses.routes.ts`:
 
@@ -808,7 +808,7 @@ qo'shing.
   });
 ```
 
-- [ ] **Step 6: Testlar + typecheck + commit**
+- [x] **Step 6: Testlar + typecheck + commit**
 
 ```bash
 cd apps/supervisor-api && bun test src/modules/licenses/
@@ -816,6 +816,23 @@ cd ../.. && bun run typecheck
 git add apps/supervisor-api/src/modules/licenses/
 git commit -m "feat(supervisor): aktivatsiyada imzolangan provisioning bloki + /v1/provisioned"
 ```
+
+**Ijro paytidagi og'ishlar (qasddan):**
+
+1. `provisioned()` `heartbeat` kabi `NOT_ACTIVATED` guard'iga ega
+   (`lic.fingerprint` NULL → 403). Rejadagi snippet faqat mismatch'ni
+   tekshirardi — NULL fingerprint `null !== 'fp'` bo'lgani uchun baribir
+   mismatch beradi, lekin xato kodi chalg'ituvchi edi. Provisioning faqat
+   aktivatsiya orqali yetkaziladi (CLI-411 fail-closed precedenti).
+2. `heartbeat()`da `clearTempPassword` `if (!lic.provisionedAt)` bilan
+   o'ralgan — aks holda har heartbeat'da `clinics` jadvaliga ma'nosiz UPDATE
+   yuborilardi (parol allaqachon NULL).
+3. Testlar service darajasida (`licenses.reset.test.ts` precedenti) + route
+   wiring uchun ikkita `app.request('/v1/provisioned')` testi. Imzo tekshiruvi
+   `RSA_PRIVATE_KEY`dan `createPublicKey` bilan olingan JUFT kalit bilan
+   (`generateKeyPair()` yangi juft yasab, doim `false` berardi).
+4. `/v1/provisioned` rate-limit'siz (izoh route'da) — fingerprint bog'lanishi
+   himoya qiladi, eng yomon holat heartbeat baribir bajaradigan ish.
 
 ---
 

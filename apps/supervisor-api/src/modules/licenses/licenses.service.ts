@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { and, eq, gt, isNull } from 'drizzle-orm';
 import { db } from '../../db/client';
-import { licenseEvents, licenseResetTokens, licenses } from '../../db/schema';
+import { branches, clinics, licenseEvents, licenseResetTokens, licenses } from '../../db/schema';
 import { signLicense } from '../../lib/rsa';
 
 // CLI-226 — vendor-vositachiligidagi owner parol-tiklash tokeni. Format
@@ -34,8 +34,89 @@ const buildResponse = (lic: SignableLicense, issuedAt: string) => {
   };
 };
 
+/**
+ * Aktivatsiya javobiga qo'shiladigan provisioning bloki — klinikaning lokal
+ * bazasida tenant + owner + filialni birinchi marta yaratish uchun.
+ *
+ * ⚠️ LOCKSTEP: `apps/api/src/lib/license-client.ts` dagi `ProvisioningBlock`
+ * bilan AYNAN bir xil bo'lishi shart (ikki app alohida deploy unit — ular
+ * orasida workspace import qirrasi YO'Q, `license-signature.ts` precedenti).
+ */
+export type ProvisioningBlock = {
+  licenseKey: string;
+  clinicId: string;
+  issuedAt: string;
+  tenantName: string;
+  defaultLanguage: string;
+  ownerFullName: string;
+  ownerPhone: string;
+  ownerPassword: string;
+  branchName: string;
+  branchAddress: string;
+  branchPhone: string;
+};
+
+/**
+ * Provisioning bloki QAT'IY TEKIS — `canonicalize` nested obyekt kalitlarini
+ * tashlab yuboradi (`lib/rsa.ts` izohiga qarang; `signLicense` endi bunday
+ * payload uchun throw qiladi). Bo'sh maydonlar `''` bilan to'ldiriladi:
+ * `undefined` bo'lsa `JSON.stringify` kalitni butunlay tashlaydi va klient
+ * tomondagi imzo tekshiruvi mos kelmaydi.
+ *
+ * Blok faqat `ownerTempPassword` hali mavjud bo'lganda quriladi — klinika
+ * allaqachon provision qilingan bo'lsa (parol NULL) qaytarilmaydi.
+ *
+ * `ownerPhone` bo'sh bo'lsa ham qaytarilmaydi: provisioning joriy qilinishidan
+ * OLDINGI klinika qatorlarida migratsiya `owner_phone`ni bo'sh satr bilan
+ * to'ldirgan (prod'da 648 qator). Ularda `ownerTempPassword` baribir NULL,
+ * lekin telefon klinika tomonida login identifikatori (CLAUDE.md §3.1) —
+ * telefonsiz hisob yaratilib qolmasligi uchun himoyani ikkilantiramiz.
+ */
+const buildProvisioning = async (
+  lic: typeof licenses.$inferSelect,
+  issuedAt: string,
+): Promise<{ provisioning: ProvisioningBlock; provisioningSignature: string } | null> => {
+  const clinic = await db.query.clinics.findFirst({ where: eq(clinics.id, lic.clinicId) });
+  if (!clinic?.ownerTempPassword || !clinic.ownerPhone) return null;
+  const branch = await db.query.branches.findFirst({ where: eq(branches.id, lic.branchId) });
+
+  const provisioning: ProvisioningBlock = {
+    licenseKey: lic.licenseKey,
+    clinicId: lic.clinicId,
+    issuedAt,
+    tenantName: clinic.name,
+    defaultLanguage: clinic.defaultLanguage,
+    ownerFullName: clinic.ownerFullName,
+    ownerPhone: clinic.ownerPhone,
+    ownerPassword: clinic.ownerTempPassword,
+    branchName: branch?.name ?? 'Bosh filial',
+    branchAddress: branch?.address ?? '',
+    branchPhone: branch?.phone ?? '',
+  };
+  return { provisioning, provisioningSignature: signLicense(provisioning, PRIVATE_KEY) };
+};
+
+/**
+ * Vaqtinchalik owner parolini Supervisor bazasidan o'chiradi — bundan keyin
+ * uni faqat mijoz biladi. `/v1/provisioned` tasdig'i tarmoq sababli yetib
+ * bormasligi mumkin, shuning uchun `heartbeat` ham shu ishni bajaradi (parol
+ * Supervisor bazasida cheksiz qolib ketmasin).
+ */
+const clearTempPassword = async (lic: typeof licenses.$inferSelect) => {
+  await db.update(clinics).set({ ownerTempPassword: null }).where(eq(clinics.id, lic.clinicId));
+  if (!lic.provisionedAt) {
+    await db.update(licenses).set({ provisionedAt: new Date() }).where(eq(licenses.id, lic.id));
+  }
+};
+
+/** `/v1/activate` javobi — litsenziya ma'lumoti + ixtiyoriy provisioning. */
+type ActivateResult = ReturnType<typeof buildResponse> & {
+  provisioning?: ProvisioningBlock;
+  provisioningSignature?: string;
+};
+
 export const createLicenseService = () => ({
-  async activate(licenseKey: string, fingerprint: string) {
+  async activate(licenseKey: string, fingerprint: string): Promise<ActivateResult> {
     const lic = await db.query.licenses.findFirst({
       where: eq(licenses.licenseKey, licenseKey),
     });
@@ -57,7 +138,11 @@ export const createLicenseService = () => ({
       fingerprint,
     });
     const issuedAt = new Date().toISOString();
-    return buildResponse({ ...lic, fingerprint }, issuedAt);
+    // ⚠️ `buildResponse` o'zgarmaydi — provisioning litsenziya imzosiga
+    // KIRMAYDI, o'zining alohida imzosi bor (`.lic` fayliga ham yozilmaydi).
+    const base = buildResponse({ ...lic, fingerprint }, issuedAt);
+    const prov = await buildProvisioning(lic, issuedAt);
+    return prov ? { ...base, ...prov } : base;
   },
 
   async heartbeat(licenseKey: string, fingerprint: string) {
@@ -87,9 +172,42 @@ export const createLicenseService = () => ({
       event: 'heartbeat',
       fingerprint,
     });
+    // Klinika ishlayapti demak provisioning qo'llangan — `/v1/provisioned`
+    // tasdig'i yetib bormagan bo'lsa ham parolni tozalaymiz. Bir marta:
+    // `provisionedAt` to'lgach har heartbeat'da UPDATE yubormaymiz.
+    if (!lic.provisionedAt) {
+      await clearTempPassword(lic);
+    }
     // CLI-411 guard yuqorida `lic.fingerprint`'ni non-null qildi — CLI-410
     // imzolangan payload'ga qo'shish uchun aniq beramiz (TS narrowing).
     return buildResponse({ ...lic, fingerprint: lic.fingerprint }, new Date().toISOString());
+  },
+
+  /**
+   * Klinika provisioning'ni muvaffaqiyatli qo'llagach chaqiriladi (apps/api
+   * `/api/activate`dan). Vaqtinchalik parolni Supervisor bazasidan o'chiradi.
+   * `activate` kabi fail-closed: fingerprint bog'lanmagan (hali aktivlanmagan)
+   * yoki boshqa mashinaning fingerprint'i bo'lsa rad etiladi — provisioning
+   * faqat aktivatsiya orqali yetkaziladi (CLI-411 precedenti).
+   */
+  async provisioned(licenseKey: string, fingerprint: string) {
+    const lic = await db.query.licenses.findFirst({
+      where: eq(licenses.licenseKey, licenseKey),
+    });
+    if (!lic) throw Object.assign(new Error('INVALID_KEY'), { status: 403 });
+    if (!lic.fingerprint) {
+      throw Object.assign(new Error('NOT_ACTIVATED'), { status: 403 });
+    }
+    if (lic.fingerprint !== fingerprint) {
+      throw Object.assign(new Error('FINGERPRINT_MISMATCH'), { status: 403 });
+    }
+    await clearTempPassword(lic);
+    await db.insert(licenseEvents).values({
+      licenseId: lic.id,
+      event: 'provisioned',
+      fingerprint,
+    });
+    return { ok: true as const };
   },
 
   async reactivate(licenseKey: string, newFingerprint: string) {

@@ -61,6 +61,22 @@ export const licensesRoutes = (deps: { service?: LicenseService } = {}) => {
     }
   });
 
+  // Klinika provisioning blokini muvaffaqiyatli qo'lladi — vaqtinchalik owner
+  // parolini Supervisor bazasidan o'chiradi. Public (activate kabi) — auth
+  // yo'q, fingerprint bog'lanishi himoya qiladi.
+  // Rate-limit ATAYIN qo'yilmagan: servis aktiv fingerprint mosligini talab
+  // qiladi (mos kelmasa 403), eng yomon holatda vaqtinchalik parol erta
+  // tozalanadi — buni keyingi heartbeat baribir bajaradi.
+  app.post('/provisioned', zValidator('json', activateSchema), async (c) => {
+    try {
+      const { licenseKey, fingerprint } = c.req.valid('json');
+      const data = await service.provisioned(licenseKey, fingerprint);
+      return c.json(data);
+    } catch (e: any) {
+      return c.json({ error: { code: e.message } }, e.status ?? 500);
+    }
+  });
+
   // CLI-226 — desktop (online, pre-auth) vendor-berilgan owner parol-tiklash
   // tokenini tekshiradi + bir martalik consume qiladi. Public — activate'ga
   // o'xshab hech qanday admin/user auth talab qilmaydi.

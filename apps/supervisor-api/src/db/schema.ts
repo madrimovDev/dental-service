@@ -54,7 +54,7 @@ export const licenseEvents = pgTable('license_events', {
   licenseId: uuid('license_id')
     .notNull()
     .references(() => licenses.id, { onDelete: 'cascade' }),
-  event: text('event').notNull(), // 'activated'|'heartbeat'|'reactivated'|'deactivated'|'password_reset'
+  event: text('event').notNull(), // 'activated'|'heartbeat'|'reactivated'|'deactivated'|'password_reset'|'provisioned'
   fingerprint: text('fingerprint'),
   metadata: jsonb('metadata'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
