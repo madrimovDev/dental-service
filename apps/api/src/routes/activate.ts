@@ -36,6 +36,12 @@ const activateSchema = z.object({ licenseKey: z.string().min(1) });
  * kalitiga ega har kim aktivatsiyani qayta ishga tushirib owner hisobini
  * egallardi. Parol unutilsa — CLI-476 vendor-mediated reset oqimi.
  *
+ * ⚠️ Guard ATAYIN "har qanday tenant bormi?" (`limit 1`) — "shu klinikaning
+ * tenant'i bormi?" EMAS. Local Desktop deploy'i = BITTA klinika = bitta
+ * tenant, va `clinicId` lokal bazada umuman saqlanmaydi. Uni
+ * `where clinicId = ...` ga "tuzatish" parolni qayta yozish yo'lini qaytadan
+ * ochib yuboradi.
+ *
  * @returns `true` — provisioning qo'llandi; `false` — sokin o'tkazib yuborildi.
  */
 const applyProvisioning = async (db: Database, p: ProvisioningBlock): Promise<boolean> => {

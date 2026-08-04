@@ -26,7 +26,7 @@
  *   cd apps/api && bun test --env-file=../../.env tests/integration/provisioning-activate.test.ts
  */
 
-import { afterAll, beforeEach, describe, expect, mock, test } from 'bun:test';
+import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import { createSign, generateKeyPairSync } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -154,11 +154,17 @@ const buildSupervisorResponse = (opts: ResponseOptions = {}): Record<string, unk
 };
 
 // ─── Supervisor fetch mock ────────────────────────────────────────────────
+// ⚠️ `globalThis.fetch` MODUL DARAJASIDA emas, `beforeEach`da o'rnatiladi va
+// `afterEach`da tiklanadi. `bun test` butun katalogni BITTA jarayonda ishga
+// tushiradi — modul darajasidagi almashtirish shu fayldan keyin yuklanadigan
+// HAMMA test fayliga ta'sir qilardi (ular Supervisor'ga bo'lmagan so'rovda
+// `UNEXPECTED_SUPERVISOR_CALL` olardi). Bu — CLAUDE.md'dagi
+// `license.test.ts`/`license-middleware.test.ts` interferensiyasi sinfi.
 const originalFetch = globalThis.fetch;
 let supervisorResponse: Record<string, unknown> = buildSupervisorResponse();
 let provisionedCalls: Array<{ licenseKey?: string }> = [];
 
-globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+const supervisorFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = String(input);
   const jsonRes = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), {
@@ -199,12 +205,17 @@ const scoped = <T>(
   });
 
 beforeEach(async () => {
+  globalThis.fetch = supervisorFetch;
   await truncate();
   // `.lic` har testda toza — aks holda oldingi testning haqiqiy fayli
   // "yozilmadi" tasdiqlarini yolg'on yashil qiladi.
   await rm(licensePath, { force: true });
   provisionedCalls = [];
   supervisorResponse = buildSupervisorResponse();
+});
+
+afterEach(() => {
+  globalThis.fetch = originalFetch;
 });
 
 afterAll(async () => {
