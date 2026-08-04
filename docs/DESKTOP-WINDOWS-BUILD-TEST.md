@@ -114,6 +114,30 @@ Binariylar installer ichida bundled.
    - Machine-fingerprint binding (birinchi aktivatsiyada kalit shu mashinaga bog'lanadi)
    - Module-gating (premium → 11 modul ochiq)
    - Joriy tuzatishlar (ayniqsa treatment-plans: lab-gate + odontogram yangi API)
+   - **Provisioning (2026-08-04):** aktivatsiyadan keyin `/login` sahifasida
+     **vendor bergan telefon + vaqtinchalik parol** bilan kiring. Klinika,
+     filial, owner hisobi va 8 rol shabloni aktivatsiya paytida avtomatik
+     yaratiladi — `/register-tenant` orqali qo'lda yaratish SHART EMAS.
+
+### 4.1 Provisioning'ni sinashdan oldin — ikki majburiy shart
+
+**(a) Lokal baza BO'SH bo'lishi kerak.** Agar mashinada allaqachon tenant
+mavjud bo'lsa (masalan avvalgi testda `/register-tenant` orqali yaratilgan),
+provisioning **ataylab sokin o'tkazib yuboriladi** va vendor bergan parol
+ishlamaydi. Bu xavfsizlik xulqi: aks holda litsenziya kalitiga ega har kim
+owner parolini bosib o'tishi mumkin bo'lardi. Log'da `tenant.provisioning_skipped`
+ko'rinadi. Sinash uchun `C:\ProgramData\DentalService\` ostidagi Postgres
+ma'lumot katalogini o'chirib, toza o'rnatishdan boshlang.
+
+**(b) Yangilashda migratsiya `0043` QONUNIY ravishda TO'XTASHI mumkin.**
+`users.phone` endi kanonik `+998XXXXXXXXX` shaklga keltiriladi. Migratsiya avval
+to'qnashuvni tekshiradi: normalizatsiyadan keyin ikki foydalanuvchi bir xil
+raqamga tushsa `RAISE EXCEPTION` konfliktli `id`/`phone` ro'yxati bilan ishga
+tushadi va yangilash to'xtaydi. **Qayta urinish (retry) YORDAM BERMAYDI** —
+qaysi hisob haqiqiy ekanini faqat inson hal qila oladi; jim birlashtirish
+ataylab qilinmagan. Konflikt chiqsa: xato xabaridagi `id`larni ko'rib,
+ortiqcha hisobni o'chiring yoki telefonini o'zgartiring, so'ng yangilashni
+qayta ishga tushiring.
 
 ---
 
