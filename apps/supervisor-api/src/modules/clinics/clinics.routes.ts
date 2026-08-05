@@ -6,18 +6,10 @@ import { z } from 'zod';
 import { db } from '../../db/client';
 import { branches, clinics, licenseEvents, licenses } from '../../db/schema';
 import { normalizePhone } from '../../lib/phone';
+import { generateTempPassword } from '../../lib/temp-password';
 import { adminJwtMiddleware } from '../auth/jwt.middleware';
 
 const uuidSchema = z.string().uuid();
-
-// Vaqtinchalik owner paroli. Operator uni og'zaki/qo'lda yetkazishi mumkin —
-// chalkashadigan belgilar (0/O, 1/l/I) alifbodan chiqarilgan. 16 belgi
-// (apps/api `password` siyosati min 12 talab qiladi).
-const PASSWORD_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-export const generateTempPassword = (): string =>
-  Array.from(crypto.randomBytes(16), (b) => PASSWORD_ALPHABET[b % PASSWORD_ALPHABET.length]).join(
-    '',
-  );
 
 /**
  * Klinika qatorining ochiq (parolsiz) ko'rinishi. `ownerTempPassword` ATAYIN

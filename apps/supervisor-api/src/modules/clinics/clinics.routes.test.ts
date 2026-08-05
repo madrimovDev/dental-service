@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { generateTempPassword } from './clinics.routes';
+import { generateTempPassword } from '../../lib/temp-password';
 
 describe('generateTempPassword', () => {
   it('kamida 12 belgi (apps/api password siyosati: min(12).max(128))', () => {

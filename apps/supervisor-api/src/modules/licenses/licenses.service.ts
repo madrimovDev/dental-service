@@ -3,6 +3,7 @@ import { and, eq, gt, isNull } from 'drizzle-orm';
 import { db } from '../../db/client';
 import { branches, clinics, licenseEvents, licenseResetTokens, licenses } from '../../db/schema';
 import { signLicense } from '../../lib/rsa';
+import { generateTempPassword } from '../../lib/temp-password';
 
 // CLI-226 — vendor-vositachiligidagi owner parol-tiklash tokeni. Format
 // clinics.routes.ts'dagi license-key generator bilan bir xil uslub: 3ta
@@ -216,6 +217,54 @@ export const createLicenseService = () => ({
       fingerprint,
     });
     return { ok: true as const };
+  },
+
+  /**
+   * Vendor amali: klinikani QAYTA O'RNATISHGA tayyorlaydi (audit C1).
+   *
+   * Ikki ish BIRGA bajariladi — alohida tugmalarda noto'g'ri tartib
+   * (avval `reactivate`) aktivatsiyani "muvaffaqiyatli" ko'rsatib, provisioning
+   * bloki yo'qligi sababli jim qulflanishni QAYTARARDI:
+   *  1. yangi vaqtinchalik parol → `buildProvisioning` yana blok qaytaradi;
+   *  2. `fingerprint = NULL` → keyingi `/activate` ISTALGAN mashinaga bog'lanadi
+   *     (yangi kompyuter yoki o'sha mashinada tozalangan baza — bir xil yo'l).
+   *
+   * 🔴 `provisionedAt` ATAYIN O'ZGARTIRILMAYDI. `buildProvisioning` faqat
+   * `ownerTempPassword && ownerPhone`ga qaraydi — `provisionedAt`ga EMAS.
+   * Agar u NULL qilinsa, `heartbeat`dagi `if (!lic.provisionedAt)` sharti
+   * ochilib, birinchi heartbeat (boot'da + har 4 soat) parolni mijoz
+   * aktivatsiya qilishga ULGURMASDAN o'chirib yuboradi. Buni
+   * "soddalashtirib" NULL qilmang.
+   */
+  async prepareReinstall(clinicId: string, adminId?: string) {
+    const clinic = await db.query.clinics.findFirst({ where: eq(clinics.id, clinicId) });
+    if (!clinic) throw Object.assign(new Error('CLINIC_NOT_FOUND'), { status: 404 });
+    // Provisioning bloki `ownerPhone`siz qurilmaydi (buildProvisioning) —
+    // parol yozib qo'yish behuda bo'lardi. Migratsiya eski qatorlarni bo'sh
+    // satr bilan to'ldirgan.
+    if (!clinic.ownerPhone) {
+      throw Object.assign(new Error('OWNER_PHONE_MISSING'), { status: 400 });
+    }
+
+    const lic = await db.query.licenses.findFirst({ where: eq(licenses.clinicId, clinicId) });
+    if (!lic) throw Object.assign(new Error('LICENSE_NOT_FOUND'), { status: 404 });
+
+    const tempPassword = generateTempPassword();
+
+    await db.transaction(async (tx) => {
+      await tx
+        .update(clinics)
+        .set({ ownerTempPassword: tempPassword })
+        .where(eq(clinics.id, clinicId));
+      await tx.update(licenses).set({ fingerprint: null }).where(eq(licenses.id, lic.id));
+      await tx.insert(licenseEvents).values({
+        licenseId: lic.id,
+        event: 'prepare_reinstall',
+        metadata: { createdBy: adminId ?? null, previousFingerprint: lic.fingerprint },
+      });
+    });
+
+    return { loginPhone: clinic.ownerPhone, tempPassword };
   },
 
   async reactivate(licenseKey: string, newFingerprint: string) {
