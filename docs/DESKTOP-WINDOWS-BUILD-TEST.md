@@ -139,6 +139,35 @@ ataylab qilinmagan. Konflikt chiqsa: xato xabaridagi `id`larni ko'rib,
 ortiqcha hisobni o'chiring yoki telefonini o'zgartiring, so'ng yangilashni
 qayta ishga tushiring.
 
+### 4.2 Startup gate (`bootstrap-status`) — nimani kutish kerak
+
+Ilova ochilganda Electron lokal API'dan `GET /api/bootstrap-status` so'raydi va
+javobga qarab oynani `/activate` yoki asosiy UI'da ochadi
+(`apps/desktop/src/license-status.ts` — `fetchBootstrapStatus` / `resolveStartupUrl`).
+
+| Holat | Kutilgan oyna |
+|---|---|
+| `.lic` yo'q | `/activate` — kalit kiritish formasi |
+| `.lic` bor, lokal bazada tenant YO'Q (baza yo'qolgan / yangi PC) | `/activate` — "ta'minotchiga murojaat qiling" matni |
+| `.lic` bor + tenant bor | asosiy UI |
+| **So'rov javob bermadi** (2s timeout, API hali ko'tarilmagan) | eski `.lic`-asosidagi xulq — gate **bloklamaydi** |
+
+Ikki nozik nuqta, ikkalasi ham **kutilgan xulq**, bug emas:
+
+1. **Sekin boot'da gate jim o'chadi.** So'rov `startApiLayer`dan keyin bir marta
+   yuboriladi, API tayyorligi qat'iy kechikish bilan (`DENTAL_API_READY_DELAY_MS`,
+   default 2000 ms) taxmin qilinadi — health-check emas. Sekin mashinada javob
+   ulgurmasa `null` qaytadi va oyna eski qoida bo'yicha ochiladi. Bu qasddan:
+   gate startup'ni hech qachon ushlab qolmasligi shart (spec §3.4). Bunday
+   holatda ham foydalanuvchi qopqonda qolmaydi — web `/login` darvozasi
+   `bootstrap-status`ni qayta so'rab `/activate`ga uloqtiradi.
+2. **Gate faqat STARTUP'da hisoblanadi.** Oyna yopilib tray'dan «Ochish»
+   bosilsa, faqat `.lic` tekshiriladi (`licenseGatedUrl`) — tenant yo'q bo'lsa
+   asosiy UI ochiladi, keyin SPA `/login`ga, u yerdan `/activate`ga o'tadi
+   (bitta ortiqcha sakrash). Eskirgan JWT bilan ham shu yo'l: har so'rov 401 →
+   `apps/web/src/lib/api.ts` `window.location.href = '/login'` → gate.
+   Ya'ni `/activate`ga borish kafolatlangan, lekin darhol emas.
+
 ---
 
 ## 5. Caveats / troubleshooting
