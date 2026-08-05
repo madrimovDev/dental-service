@@ -103,6 +103,12 @@ describe("ActivatePage — aktivatsiyadan keyingi login ma'lumoti", () => {
 // uchun forma umuman ko'rsatilmaydi — foydalanuvchi vendorga yo'naltiriladi.
 describe("ActivatePage — tenant yo'q holati (audit C1)", () => {
   it("litsenziya bor lekin tenant yo'q — vendorga murojaat matni, forma YO'Q", async () => {
+    // Guard: kalit tarjimada yo'q bo'lsa `t()` XOM KALITNI qaytaradi va
+    // komponent ham o'sha xom kalitni render qiladi → test soxta yashil
+    // bo'lardi (mavjud `login_hint` guard'i bilan bir xil sabab).
+    expect(i18n.t('auth.activate.needs_vendor_title')).not.toBe('auth.activate.needs_vendor_title');
+    expect(i18n.t('auth.activate.needs_vendor_body')).not.toBe('auth.activate.needs_vendor_body');
+
     bootstrapStatus.value = { data: { hasLicense: true, hasTenant: false } };
     renderApp(<ActivatePage />);
 

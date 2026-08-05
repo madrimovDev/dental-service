@@ -132,4 +132,20 @@ describe("LoginPage — tenant yo'q holatida /activate ga yo'naltirish (audit C1
     expect(screen.getByText(i18n.t('auth.login.phone'))).toBeInTheDocument();
     expect(navigateMock).not.toHaveBeenCalled();
   });
+
+  // ⚠️ XARAKTERIZATSIYA testi — bu XULQ TASDIQLANGAN emas, QULFLANGAN.
+  // Reja darvozani qasddan shartsiz `hasTenant === false` deb yozgan
+  // (`hasLicense` tekshirilmaydi). Natijada YANGI cloud/brauzer o'rnatmasi
+  // (litsenziyasiz, tenantsiz) ham `/login` → `/activate` ga sakraydi va
+  // LoginPage'dagi `/register-tenant` havolasi navigatsiya orqali
+  // yetib bo'lmas bo'lib qoladi.
+  // Tor variant bir qatorlik: `hasLicense === true && hasTenant === false`.
+  // Reja AYNAN bajarilishi kerak, shuning uchun o'zgartirilmadi — hukmni
+  // verify agenti chiqaradi, lekin xulq ko'rinmas qolmasin.
+  it("litsenziya YO'Q + tenant yo'q — hozircha ham yo'naltiradi (reja bo'yicha)", async () => {
+    bootstrapStatus.value = { data: { hasLicense: false, hasTenant: false } };
+    renderApp(<LoginPage />);
+
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/activate', { replace: true }));
+  });
 });
