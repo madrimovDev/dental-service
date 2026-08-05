@@ -12,7 +12,7 @@ import {
   treatmentStages,
   users,
 } from '@dental/db-schema';
-import { and, count, desc, eq, ilike, inArray, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
@@ -29,6 +29,7 @@ import type {
   UpdateMedicalRecordInput,
   UpdatePatientInput,
 } from './patients.schema.ts';
+import { buildPatientSearchFilter } from './patients.search.ts';
 
 const PII_FIELDS = ['phone', 'phoneSecondary', 'passport', 'address'] as const;
 
@@ -97,16 +98,10 @@ export const createPatientsService = (deps: {
     if (!query.archived) filters.push(isNull(patients.archivedAt));
     else filters.push(isNotNull(patients.archivedAt));
 
-    if (query.search) {
-      const term = `%${query.search}%`;
-      filters.push(
-        or(
-          ilike(patients.fullName, term),
-          ilike(patients.phone, term),
-          ilike(patients.passport, term),
-        ),
-      );
-    }
+    // Telefon bazada kanonik saqlanadi (Task 8) — qidiruv predikati xom matn
+    // bilan birga kanonik variantni ham sinaydi (`patients.search.ts`).
+    const searchFilter = query.search ? buildPatientSearchFilter(query.search) : undefined;
+    if (searchFilter) filters.push(searchFilter);
 
     const where = filters.length > 0 ? and(...filters) : undefined;
 
