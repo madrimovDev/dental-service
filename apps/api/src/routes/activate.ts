@@ -1,7 +1,8 @@
 import { fail, normalizePhone, ok } from '@dental/core';
 import { verifyLicenseSignature } from '@dental/core/license-signature';
 import { SUPERVISOR_PUBLIC_KEY_PEM } from '@dental/core/supervisor-public-key';
-import { tenants } from '@dental/db-schema';
+import { tenants, users } from '@dental/db-schema';
+import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { Database } from '../db/client.ts';
@@ -42,17 +43,37 @@ const activateSchema = z.object({ licenseKey: z.string().min(1) });
  * `where clinicId = ...` ga "tuzatish" parolni qayta yozish yo'lini qaytadan
  * ochib yuboradi.
  *
- * @returns `true` — provisioning qo'llandi; `false` — sokin o'tkazib yuborildi.
+ * @returns `applied` — provisioning qo'llandimi (`false` = sokin o'tkazib
+ * yuborildi); `ownerPhone` — foydalanuvchiga ko'rsatiladigan login telefoni
+ * kanonik shaklda (`users.phone` bilan bayt-ma-bayt bir xil).
+ *
+ * 🔴 Skip holatida ham telefon qaytariladi, lekin MAVJUD owner'niki — vendor
+ * blokidagi telefonni ko'rsatish mijozni lokal bazada MAVJUD BO'LMAGAN hisobga
+ * yo'llardi (u o'zi `/register-tenant` orqali boshqa raqam bilan ro'yxatdan
+ * o'tgan bo'lishi mumkin). Yangi ma'lumot oshkor qilinmaydi: bu allaqachon shu
+ * mashinaning egasi.
  */
-const applyProvisioning = async (db: Database, p: ProvisioningBlock): Promise<boolean> => {
-  const existing = await db.select({ id: tenants.id }).from(tenants).limit(1);
-  if (existing.length > 0) {
+const applyProvisioning = async (
+  db: Database,
+  p: ProvisioningBlock,
+): Promise<{ applied: boolean; ownerPhone: string | null }> => {
+  const [existing] = await db
+    .select({ id: tenants.id, ownerUserId: tenants.ownerUserId })
+    .from(tenants)
+    .limit(1);
+  if (existing) {
     // ⚠️ Faqat `clinicId` loglanadi — parol (va telefon) HECH QACHON emas.
     logger.warn(
       { clinicId: p.clinicId, event: 'tenant.provisioning_skipped' },
       'tenant.provisioning_skipped — lokal bazada tenant mavjud, owner paroli qayta yozilmadi',
     );
-    return false;
+    // `users`da RLS yo'q (platform-darajali jadval, `tenant_id` ustuni yo'q) —
+    // pre-auth kontekstda ham o'qiladi.
+    const [owner] = await db
+      .select({ phone: users.phone })
+      .from(users)
+      .where(eq(users.id, existing.ownerUserId));
+    return { applied: false, ownerPhone: owner?.phone ?? null };
   }
   await db.transaction((tx) =>
     provisionTenantInTx(tx, {
@@ -67,7 +88,7 @@ const applyProvisioning = async (db: Database, p: ProvisioningBlock): Promise<bo
       auditAction: 'tenant.provisioned',
     }),
   );
-  return true;
+  return { applied: true, ownerPhone: normalizePhone(p.ownerPhone) };
 };
 
 export const activateRoutes = (deps: {
@@ -178,19 +199,25 @@ export const activateRoutes = (deps: {
       }
 
       try {
-        // Natija (`true` — qo'llandi, `false` — idempotent skip) `.lic`
+        // `applied` (`true` — qo'llandi, `false` — idempotent skip) `.lic`
         // yozilishiga TA'SIR QILMAYDI: skip holatida ham litsenziya
-        // yangilanishi bloklanmasligi kerak. Lekin `ownerPhone` javobga FAQAT
-        // hisob HAQIQATAN yaratilgan bo'lsa qo'shiladi: skip holatida lokal
-        // owner boshqa (mijoz o'zi `/register-tenant` orqali kiritgan) telefon
-        // bilan mavjud bo'lishi mumkin va vendor telefonini "login" deb
-        // ko'rsatish (Task 10 sahifasi) mavjud bo'lmagan hisobga yo'llardi.
+        // yangilanishi bloklanmasligi kerak.
         //
+        // 🔴 `ownerPhone` ikkala holatda ham qaytariladi, lekin MANBASI
+        // boshqa: qo'llanganda — vendor bloki, skip'da — lokal bazadagi
+        // MAVJUD owner (`applyProvisioning` izohiga qarang). Shu sababli bu
+        // yerda `provisioning.ownerPhone` QAYTA O'QILMAYDI — aks holda skip
+        // holatida mijozga mavjud bo'lmagan hisobning telefoni "login" deb
+        // ko'rsatilardi (M1).
+        //
+        // ⚠️ Qaytish qiymati obyekt — uni to'g'ridan-to'g'ri `if (await ...)`
+        // shartiga qo'yish HAR DOIM truthy bo'ladi va typecheck buni
+        // ushlamaydi. Doim `.applied`/`.ownerPhone` bo'yicha o'qing.
+        const result = await applyProvisioning(deps.db, provisioning);
         // Kanonik shakl — ko'rsatilgan login `users.phone` bilan bayt-ma-bayt
-        // bir xil bo'lsin (`provisionTenantInTx` ham normallashtiradi).
-        if (await applyProvisioning(deps.db, provisioning)) {
-          ownerPhone = normalizePhone(provisioning.ownerPhone);
-        }
+        // bir xil (`provisionTenantInTx` ham normallashtiradi, skip yo'lida esa
+        // qiymat bevosita `users.phone`dan olinadi).
+        ownerPhone = result.ownerPhone ?? undefined;
       } catch (err) {
         // Bazaga yozish xatosi mijoz xatosi EMAS — uni yuqoridagi Supervisor
         // catch'iga qo'shib yuborish xato matnini javobdagi `code`ga
