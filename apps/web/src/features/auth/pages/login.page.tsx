@@ -11,13 +11,13 @@ import {
 import { useForm } from '@mantine/form';
 import type { TFunction } from 'i18next';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { PhoneInput } from '@/components/PhoneInput.tsx';
 import { useAuthStore } from '@/stores/auth-store.ts';
-import { useLogin, useRegistrationEnabled } from '../auth.api';
+import { useBootstrapStatus, useLogin, useRegistrationEnabled } from '../auth.api';
 
 const makeSchema = (t: TFunction) =>
   z.object({
@@ -41,6 +41,19 @@ export function LoginPage() {
   // xodimi desktop serverga LAN orqali BRAUZERdan kirsa u yo'q, va havola
   // ko'rinib qolardi (bosilganda sahifa /login'ga qaytaradi — foydasiz sayr).
   const registration = useRegistrationEnabled();
+
+  // Audit C1 — `.lic` bor, lekin lokal bazada tenant yo'q (baza yo'qolgan /
+  // yangi kompyuter). Bunda login HAR DOIM 401 beradi va foydalanuvchi
+  // sababni bilmaydi. `/activate` sahifasi holatni o'zi aniqlab "vendorga
+  // murojaat" matnini ko'rsatadi (yangi route qo'shilmaydi).
+  //
+  // FAIL-OPEN: `data` undefined bo'lsa (xato / eski backend) yo'naltirilmaydi.
+  const bootstrap = useBootstrapStatus();
+  useEffect(() => {
+    if (bootstrap.data?.hasTenant === false) {
+      navigate('/activate', { replace: true });
+    }
+  }, [bootstrap.data?.hasTenant, navigate]);
 
   const loginMut = useLogin({
     onSuccess: (data) => {
