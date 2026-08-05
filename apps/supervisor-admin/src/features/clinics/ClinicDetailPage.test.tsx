@@ -382,6 +382,64 @@ describe('ClinicDetailPage', () => {
     expect(screen.queryByText(/Aktivatsiya kutilmoqda/)).not.toBeInTheDocument();
   });
 
+  // Qayta o'rnatishga tayyorlash (audit C1) — vendor mijozga yangi login +
+  // vaqtinchalik parol beradi, fingerprint bekor qilinadi.
+  it("qayta o'rnatishga tayyorlash tugmasi tasdiqlangandan keyin kredensiallarni ko'rsatadi", async () => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === 'POST' && url.endsWith('/v1/admin/clinics/c1/prepare-reinstall')) {
+        return jsonResponse({
+          credentials: { loginPhone: '+998901234567', tempPassword: 'AbCdEfGhJkLmNpQr' },
+        });
+      }
+      if (url.endsWith('/v1/admin/clinics/c1')) {
+        return jsonResponse({ clinic, license });
+      }
+      throw new Error(`unhandled fetch: ${url} ${init?.method ?? 'GET'}`);
+    });
+
+    renderDetail();
+    await screen.findByText('Clinic One');
+
+    // Tasdiqsiz hech qanday so'rov ketmaydi — amal destruktiv (eski parol
+    // ishlamay qoladi, qurilma bog'lanishi uziladi).
+    fireEvent.click(screen.getByRole('button', { name: "Qayta o'rnatishga tayyorlash" }));
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Tasdiqlash' }));
+
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/v1/admin/clinics/c1/prepare-reinstall'),
+        expect.objectContaining({ method: 'POST' }),
+      ),
+    );
+
+    expect(await screen.findByText('AbCdEfGhJkLmNpQr')).toBeInTheDocument();
+    expect(screen.getByText('+998901234567')).toBeInTheDocument();
+  });
+
+  it("qayta o'rnatishga tayyorlash so'rovi muvaffaqiyatsiz bo'lsa xato kodini ko'rsatadi", async () => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === 'POST' && url.endsWith('/v1/admin/clinics/c1/prepare-reinstall')) {
+        return jsonResponse({ error: { code: 'OWNER_PHONE_MISSING' } }, false);
+      }
+      if (url.endsWith('/v1/admin/clinics/c1')) {
+        return jsonResponse({ clinic, license });
+      }
+      throw new Error(`unhandled fetch: ${url} ${init?.method ?? 'GET'}`);
+    });
+
+    renderDetail();
+    await screen.findByText('Clinic One');
+
+    fireEvent.click(screen.getByRole('button', { name: "Qayta o'rnatishga tayyorlash" }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Tasdiqlash' }));
+
+    expect(await screen.findByText('OWNER_PHONE_MISSING')).toBeInTheDocument();
+  });
+
   it("reset-token so'rovi muvaffaqiyatsiz bo'lsa xato xabarini ko'rsatadi", async () => {
     fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);

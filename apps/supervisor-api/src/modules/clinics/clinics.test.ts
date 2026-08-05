@@ -2,7 +2,12 @@ import { describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import { createApp } from '../../app';
 import { db } from '../../db/client';
-import { branches as branchesTable, clinics as clinicsTable, licenseEvents } from '../../db/schema';
+import {
+  branches as branchesTable,
+  clinics as clinicsTable,
+  licenseEvents,
+  licenses as licensesTable,
+} from '../../db/schema';
 import { signAdminTestToken } from '../../lib/test-helpers';
 
 const app = createApp();
@@ -420,5 +425,61 @@ describe('PATCH /v1/admin/clinics/:id/deactivate', () => {
       headers: await authHeaders(),
     });
     expect(res.status).toBe(404);
+  });
+});
+
+// Qayta o'rnatishga tayyorlash (audit C1) — mijoz mashinasi almashsa yoki
+// lokal baza yo'qolsa. Route testlari ATAYIN shu faylda (rejada
+// `clinics.routes.test.ts` deyilgan edi, lekin u sof unit fayl: DB ham,
+// `app`/`authHeaders` setup'i ham yo'q — reja "faylning mavjud konvensiyasiga
+// moslang, yangi setup yozmang" deydi).
+describe('POST /v1/admin/clinics/:id/prepare-reinstall', () => {
+  it('kredensiallar qaytaradi (yangi parol + fingerprint tozalanadi)', async () => {
+    const created = (await (await createClinic()).json()) as any;
+    const oldPassword = created.credentials.tempPassword;
+
+    const res = await app.request(`/v1/admin/clinics/${created.clinic.id}/prepare-reinstall`, {
+      method: 'POST',
+      headers: await authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as any;
+    // `createClinic()` `ownerPhone: '901234567'` yuboradi — server uni kanonik
+    // shaklga keltiradi.
+    expect(body.credentials.loginPhone).toBe('+998901234567');
+    expect(body.credentials.tempPassword).toHaveLength(16);
+    expect(body.credentials.tempPassword).not.toBe(oldPassword);
+
+    const lic = await db.query.licenses.findFirst({
+      where: eq(licensesTable.id, created.license.id),
+    });
+    expect(lic?.fingerprint).toBeNull();
+  });
+
+  it('auth siz 401', async () => {
+    const created = (await (await createClinic()).json()) as any;
+    const res = await app.request(`/v1/admin/clinics/${created.clinic.id}/prepare-reinstall`, {
+      method: 'POST',
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it("noto'g'ri uuid → 404", async () => {
+    const res = await app.request('/v1/admin/clinics/not-a-uuid/prepare-reinstall', {
+      method: 'POST',
+      headers: await authHeaders(),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("mavjud bo'lmagan klinika → 404 CLINIC_NOT_FOUND", async () => {
+    const res = await app.request(`/v1/admin/clinics/${crypto.randomUUID()}/prepare-reinstall`, {
+      method: 'POST',
+      headers: await authHeaders(),
+    });
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as any;
+    expect(body.error.code).toBe('CLINIC_NOT_FOUND');
   });
 });

@@ -8,6 +8,7 @@ import { branches, clinics, licenseEvents, licenses } from '../../db/schema';
 import { normalizePhone } from '../../lib/phone';
 import { generateTempPassword } from '../../lib/temp-password';
 import { adminJwtMiddleware } from '../auth/jwt.middleware';
+import { createLicenseService } from '../licenses/licenses.service';
 
 const uuidSchema = z.string().uuid();
 
@@ -100,8 +101,14 @@ const MODULE_MAP: Record<z.infer<typeof createClinicSchema>['plan'], string[]> =
   ],
 };
 
+// `adminJwtMiddleware` (jwt.middleware.ts:17) tokenning `sub`'ini
+// `adminUserId` deb yozadi. Hono instansiyasi tiplanmasa `c.get(...)`
+// `never` beradi — audit `createdBy` uchun uni aniq e'lon qilamiz.
+type AdminEnv = { Variables: { adminUserId?: string } };
+
 export const clinicsRoutes = () => {
-  const app = new Hono();
+  const app = new Hono<AdminEnv>();
+  const service = createLicenseService();
   app.use('*', adminJwtMiddleware);
 
   // Klinikalar ro'yxati + litsenziya summary (frontend ClinicsPage jadvali
@@ -260,6 +267,24 @@ export const clinicsRoutes = () => {
       where: eq(licenses.id, license.id),
     });
     return c.json({ clinic: pickClinicPublic(clinic), license: updatedLicense });
+  });
+
+  // Qayta o'rnatishga tayyorlash (audit C1) — mijoz mashinasi almashsa yoki
+  // lokal baza yo'qolsa. Yangi vaqtinchalik parol + fingerprint tozalash BIRGA
+  // (licenses.service.ts `prepareReinstall` izohiga qarang).
+  app.post('/:id/prepare-reinstall', async (c) => {
+    const idResult = uuidSchema.safeParse(c.req.param('id'));
+    if (!idResult.success) return c.json({ error: { code: 'NOT_FOUND' } }, 404);
+
+    const adminId = c.get('adminUserId');
+    try {
+      const credentials = await service.prepareReinstall(idResult.data, adminId);
+      return c.json({ credentials });
+    } catch (err) {
+      const code = err instanceof Error ? err.message : 'UNKNOWN';
+      const status = (err as { status?: number }).status ?? 500;
+      return c.json({ error: { code } }, status as 400 | 404 | 500);
+    }
   });
 
   return app;
