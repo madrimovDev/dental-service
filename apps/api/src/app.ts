@@ -45,6 +45,7 @@ import { tenantSettingsRoutes } from './modules/tenant-settings/index.ts';
 import { tenantRoutes } from './modules/tenants/index.ts';
 import { userRoutes } from './modules/users/index.ts';
 import { activateRoutes } from './routes/activate.ts';
+import { bootstrapStatusRoutes } from './routes/bootstrap-status.ts';
 import { resetOwnerPasswordRoutes } from './routes/reset-owner-password.ts';
 import { uploadsRoutes } from './routes/uploads.ts';
 
@@ -141,6 +142,9 @@ export const createApp = () => {
   // Local Desktop litsenziya faollashtirish (CLI-348 qaror 1) — auth yo'q,
   // license-middleware.ts WHITELIST'i bilan bir xil yo'l.
   app.route('/api/activate', activateRoutes({ db }));
+  // Pre-auth diagnostika (audit C1): `.lic` bor, lekin lokal bazada tenant
+  // yo'q holatini oshkor qiladi — web/desktop login gate'i shunga qaraydi.
+  app.route('/api/bootstrap-status', bootstrapStatusRoutes({ db }));
   // Vendor-mediated owner password reset (CLI-226) — auth yo'q (owner login
   // qila olmaydi), license-middleware.ts WHITELIST'i bilan bir xil yo'l.
   app.route('/api/reset-owner-password', resetOwnerPasswordRoutes());

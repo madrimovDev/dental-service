@@ -24,6 +24,7 @@ export type { GetRecentActivityResult, ListAuditLogResult } from './generated/au
 export { getRecentActivity, listAuditLog } from './generated/audit/audit.ts';
 // Generated (orval) — auth
 export type {
+  BootstrapStatusResult,
   ChangePasswordResult,
   GetMeResult,
   GetWorkspaceBranchesResult,
@@ -35,6 +36,7 @@ export type {
   SwitchWorkspaceResult,
 } from './generated/auth/auth.ts';
 export {
+  bootstrapStatus,
   changePassword,
   getMe,
   getWorkspaceBranches,

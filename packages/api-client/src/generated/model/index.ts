@@ -29,6 +29,8 @@ export * from './auditLogEntryBefore';
 export * from './auditRecentItem';
 export * from './availability';
 export * from './availabilitySlot';
+export * from './bootstrapStatus200';
+export * from './bootstrapStatusResponse';
 export * from './branch';
 export * from './branchAvailability';
 export * from './branchDeleteResult';

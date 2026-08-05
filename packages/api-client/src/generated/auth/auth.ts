@@ -5,6 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type {
+  BootstrapStatus200,
   ChangePassword200,
   ChangePasswordBody,
   GetMe200,
@@ -110,6 +111,14 @@ import { customInstance } from '../../mutator';
     },
       );
     }
+  export const bootstrapStatus = (
+    
+ ) => {
+      return customInstance<BootstrapStatus200>(
+      {url: `/api/bootstrap-status`, method: 'GET'
+    },
+      );
+    }
   export type RegisterTenantResult = NonNullable<Awaited<ReturnType<typeof registerTenant>>>
 export type RegistrationEnabledResult = NonNullable<Awaited<ReturnType<typeof registrationEnabled>>>
 export type LoginResult = NonNullable<Awaited<ReturnType<typeof login>>>
@@ -119,3 +128,4 @@ export type GetMeResult = NonNullable<Awaited<ReturnType<typeof getMe>>>
 export type GetWorkspaceBranchesResult = NonNullable<Awaited<ReturnType<typeof getWorkspaceBranches>>>
 export type SwitchWorkspaceResult = NonNullable<Awaited<ReturnType<typeof switchWorkspace>>>
 export type ChangePasswordResult = NonNullable<Awaited<ReturnType<typeof changePassword>>>
+export type BootstrapStatusResult = NonNullable<Awaited<ReturnType<typeof bootstrapStatus>>>
