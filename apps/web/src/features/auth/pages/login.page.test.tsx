@@ -133,19 +133,18 @@ describe("LoginPage — tenant yo'q holatida /activate ga yo'naltirish (audit C1
     expect(navigateMock).not.toHaveBeenCalled();
   });
 
-  // ⚠️ XARAKTERIZATSIYA testi — bu XULQ TASDIQLANGAN emas, QULFLANGAN.
-  // Reja darvozani qasddan shartsiz `hasTenant === false` deb yozgan
-  // (`hasLicense` tekshirilmaydi). Natijada YANGI cloud/brauzer o'rnatmasi
-  // (litsenziyasiz, tenantsiz) ham `/login` → `/activate` ga sakraydi va
-  // LoginPage'dagi `/register-tenant` havolasi navigatsiya orqali
-  // yetib bo'lmas bo'lib qoladi.
-  // Tor variant bir qatorlik: `hasLicense === true && hasTenant === false`.
-  // Reja AYNAN bajarilishi kerak, shuning uchun o'zgartirilmadi — hukmni
-  // verify agenti chiqaradi, lekin xulq ko'rinmas qolmasin.
-  it("litsenziya YO'Q + tenant yo'q — hozircha ham yo'naltiradi (reja bo'yicha)", async () => {
+  // ⚠️ REGRESSIYA QULFI (verify bosqichi). Darvoza `hasLicense === true` ni
+  // ham talab qiladi: litsenziyasiz + tenantsiz — bu YANGI cloud/dev
+  // o'rnatmasi, u yerda birinchi tenant `/register-tenant` orqali yaratiladi
+  // va u havola aynan shu LoginPage'da. Shartsiz yo'naltirish o'sha oqimni
+  // yopib qo'yardi. Litsenziyasiz desktop bundan zarar ko'rmaydi — Electron
+  // `licenseGatedUrl()` brauzerni to'g'ridan-to'g'ri `/activate`ga ochadi.
+  it("litsenziya YO'Q + tenant yo'q (yangi cloud o'rnatmasi) — yo'naltirish YO'Q", async () => {
     bootstrapStatus.value = { data: { hasLicense: false, hasTenant: false } };
     renderApp(<LoginPage />);
 
-    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/activate', { replace: true }));
+    expect(screen.getByText(i18n.t('auth.login.phone'))).toBeInTheDocument();
+    // `useEffect` mikrotaskdan keyin ham ishlamasligi kerak
+    await waitFor(() => expect(navigateMock).not.toHaveBeenCalled());
   });
 });

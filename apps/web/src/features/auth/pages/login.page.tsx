@@ -48,12 +48,24 @@ export function LoginPage() {
   // murojaat" matnini ko'rsatadi (yangi route qo'shilmaydi).
   //
   // FAIL-OPEN: `data` undefined bo'lsa (xato / eski backend) yo'naltirilmaydi.
+  //
+  // ⚠️ `hasLicense === true` SHARTI MAJBURIY (verify bosqichida topildi).
+  // Faqat `hasTenant === false` ga qarasak, YANGI cloud/dev o'rnatmasi
+  // (litsenziya YO'Q + hali birorta tenant yo'q) ham `/login`dan `/activate`ga
+  // uloqtirilardi va shu sahifadagi `/register-tenant` havolasi navigatsiya
+  // orqali yetib bo'lmas bo'lib qolardi — birinchi tenantni ro'yxatdan
+  // o'tkazish oqimi buzilardi (`registration-enabled` cloud'da `true`).
+  // Litsenziyasiz DESKTOP holati bundan zarar ko'rmaydi: Electron
+  // `licenseGatedUrl()` (`apps/desktop/src/license-status.ts`) `.lic` yo'q
+  // bo'lsa brauzerni allaqachon to'g'ridan-to'g'ri `/activate`ga ochadi.
   const bootstrap = useBootstrapStatus();
+  const needsActivation =
+    bootstrap.data?.hasLicense === true && bootstrap.data?.hasTenant === false;
   useEffect(() => {
-    if (bootstrap.data?.hasTenant === false) {
+    if (needsActivation) {
       navigate('/activate', { replace: true });
     }
-  }, [bootstrap.data?.hasTenant, navigate]);
+  }, [needsActivation, navigate]);
 
   const loginMut = useLogin({
     onSuccess: (data) => {
