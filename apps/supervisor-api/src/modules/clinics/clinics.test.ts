@@ -477,6 +477,21 @@ describe('POST /v1/admin/clinics/:id/prepare-reinstall', () => {
     // D5 — `provisionedAt` TEGILMAYDI. Qulf ikkinchi nusxada ham (route
     // qatlamida) turadi, `licenses.reinstall.test.ts` o'chirilsa ham saqlansin.
     expect(lic?.provisionedAt?.toISOString()).toBe(provisionedAt.toISOString());
+
+    // CLAUDE.md §3.10 + spec §3.1 — `createdBy` = amalni bajargan admin.
+    // Faqat ROUTE qatlami `c.get('adminUserId')`ni service'ga uzatadi; service
+    // testi uni qo'lda beradi, shuning uchun bu seam alohida qulflanadi
+    // (`signAdminTestToken()` sub = 'test-admin-id').
+    const events = await db
+      .select()
+      .from(licenseEvents)
+      .where(eq(licenseEvents.licenseId, created.license.id));
+    const ev = events.find((e) => e.event === 'prepare_reinstall');
+    expect(ev).toBeDefined();
+    expect(ev?.metadata).toMatchObject({
+      createdBy: 'test-admin-id',
+      previousFingerprint: 'eski-mashina-fp',
+    });
   });
 
   it('auth siz 401', async () => {

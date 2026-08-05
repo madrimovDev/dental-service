@@ -8,6 +8,7 @@ const service = createLicenseService();
 
 let clinicId: string;
 let licenseId: string;
+let licenseKey: string;
 
 // ⚠️ Bu fayl jadvallarni TRUNCATE QILMAYDI (rejadagi snippetdan og'ish).
 // `db.delete(clinics)` branches/licenses/license_events bo'ylab cascade qilib
@@ -31,14 +32,16 @@ beforeEach(async () => {
 
   const [branch] = await db.insert(branches).values({ clinicId, name: 'Bosh filial' }).returning();
 
+  // Unikal kalit: `licenses.license_key` UNIQUE, truncate qilmaganimiz
+  // uchun qat'iy qiymat takroriy yugurishda to'qnashardi.
+  licenseKey = `REINSTALL-${crypto.randomUUID()}`;
+
   const [lic] = await db
     .insert(licenses)
     .values({
       clinicId,
       branchId: branch!.id,
-      // Unikal kalit: `licenses.license_key` UNIQUE, truncate qilmaganimiz
-      // uchun qat'iy qiymat takroriy yugurishda to'qnashardi.
-      licenseKey: `REINSTALL-${crypto.randomUUID()}`,
+      licenseKey,
       plan: 'premium',
       modules: ['patients'],
       gracePeriodDays: 30,
@@ -73,6 +76,34 @@ describe('prepareReinstall', () => {
     const lic = await db.query.licenses.findFirst({ where: eq(licenses.id, licenseId) });
     expect(lic!.provisionedAt).not.toBeNull();
     expect(lic!.provisionedAt!.toISOString()).toBe(new Date('2026-08-01').toISOString());
+  });
+
+  // Spec §6 ("Qamrov") ATAYIN talab qiladigan qadam: yuqoridagi testlar HOLATNI
+  // (parol yozildi, fingerprint tozalandi, provisionedAt saqlandi) isbotlaydi,
+  // bu esa OQIBATNI — C1 zanjirining haqiqiy kafolati. Amaldagi tekshiruv
+  // `provisioning.ownerPassword === tempPassword`: vendor operatorga o'qib
+  // beradigan parol AYNAN mijoz mashinasi provision qiladigan parol.
+  //
+  // Service qatlamida (route emas) — `POST /v1/activate` request sxemasi
+  // fixture'imizdagi `REINSTALL-<uuid>` kalitini formati bo'yicha rad etishi
+  // mumkin, bu esa fantom xato quvishga olib borardi.
+  test('undan keyin activate provisioning blokini QAYTARADI (C1 oqibati)', async () => {
+    const { tempPassword } = await service.prepareReinstall(clinicId, 'admin-1');
+
+    const act = await service.activate(licenseKey, 'yangi-mashina-fp');
+
+    expect(act.provisioning).toBeDefined();
+    expect(act.provisioningSignature).toBeTruthy();
+    expect(act.provisioning!.ownerPassword).toBe(tempPassword);
+    expect(act.provisioning!.ownerPhone).toBe('+998901234567');
+    expect(act.provisioning!.tenantName).toBe('Test Klinika');
+
+    // D5 ning OQIBATI: boot'dagi birinchi heartbeat parolni o'chirib
+    // yubormaydi (mijoz hali provisioning'ni qo'llashga ulgurmagan).
+    // `provisionedAt` NULL bo'lsa shu yerda parol yo'qolardi.
+    await service.heartbeat(licenseKey, 'yangi-mashina-fp');
+    const clinic = await db.query.clinics.findFirst({ where: eq(clinics.id, clinicId) });
+    expect(clinic!.ownerTempPassword).toBe(tempPassword);
   });
 
   test('audit event yozadi', async () => {
