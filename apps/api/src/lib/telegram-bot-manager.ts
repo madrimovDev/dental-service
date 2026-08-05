@@ -1,3 +1,4 @@
+import { normalizePhone } from '@dental/core';
 import { patients } from '@dental/db-schema';
 import { asc, eq, inArray } from 'drizzle-orm';
 import IORedis from 'ioredis';
@@ -7,11 +8,6 @@ import type { Database, DbOrTx } from '../db/client.ts';
 import { decryptSecret } from './crypto.ts';
 import { env } from './env.ts';
 import { logger } from './logger.ts';
-
-export const normalizePhone = (raw: string): string => {
-  const digits = raw.replace(/[^\d]/g, '');
-  return `+${digits}`;
-};
 
 type ManagerDeps = {
   adminDb: Database;
@@ -47,6 +43,9 @@ export function startTelegramBotManager(deps: ManagerDeps) {
     // CLI-475 B7 — `message('contact')` filter (Telegraf'ning eskirgan
     // `bot.on('contact', …)` overload'i o'rniga); `ctx.message.contact` tip-xavfsiz.
     bot.on(message('contact'), async (ctx) => {
+      // H1 — kanonik `@dental/core` funksiyasi (lokal nusxa o'chirildi).
+      // Telegram 9 xonali mahalliy raqam ham qaytarishi mumkin; eski nusxa uni
+      // `+901234567` qilib bemorni topa olmasdi.
       const phone = normalizePhone(ctx.message.contact.phone_number);
       const chatId = String(ctx.chat.id);
       const outcome = await deps.withTenant(tenantId, async (tx) => {
