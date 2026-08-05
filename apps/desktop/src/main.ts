@@ -53,7 +53,7 @@ import {
   stopServerDiscovery,
 } from './discovery.js';
 import { isFirstRun, runFirstSetup, runMigrations } from './first-run.js';
-import { hasLicense, licenseGatedUrl } from './license-status.js';
+import { fetchBootstrapStatus, licenseGatedUrl, resolveStartupUrl } from './license-status.js';
 import {
   getApiCommand,
   startApiLayer,
@@ -114,8 +114,13 @@ const isDevWrapMode = (): boolean =>
 
 const DEV_URL = process.env.DENTAL_DEV_URL ?? 'http://localhost:8000';
 
-const openDevWindow = (): void => {
-  const target = hasLicense() ? DEV_URL : `${DEV_URL}/activate`;
+const openDevWindow = async (): Promise<void> => {
+  // Audit C1 — `.lic` bor, lekin lokal bazada tenant yo'q (baza yo'qolgan /
+  // yangi kompyuter): fayl-mavjudligi gate'i asosiy UI'ni ochib yuborardi,
+  // login esa 401 berib sababni tushuntirmasdi. `bootstrap-status` ikkalasini
+  // ajratadi; so'rov muvaffaqiyatsiz bo'lsa (dev-server hali ko'tarilmagan)
+  // `null` qaytadi va hozirgi `.lic` xulqi saqlanadi — gate bloklamaydi.
+  const target = resolveStartupUrl(DEV_URL, await fetchBootstrapStatus(DEV_URL));
   openBrowser(target);
   mainWindow?.webContents.openDevTools({ mode: 'detach' });
   // `turbo dev --parallel` bilan Electron web dev-serverdan oldin ochilishi
@@ -260,7 +265,7 @@ app.whenReady().then(async () => {
   app.dock?.hide(); // macOS: dock'da ko'rsatmaydi — faqat tray
 
   if (isDevWrapMode()) {
-    openDevWindow();
+    await openDevWindow();
     return;
   }
 
@@ -326,7 +331,14 @@ app.whenReady().then(async () => {
     // `/activate` sahifasi qurilgan va ro'yxatdan o'tgan
     // (`apps/web/src/features/auth/pages/activate.page.tsx`, commit 7670124)
     // — bu yerda faqat desktop-tomon signal+redirect ulanadi.
-    openBrowser(licenseGatedUrl(localUrl));
+    //
+    // Audit C1 — `.lic` bor, lekin lokal bazada tenant yo'q (baza yo'qolgan /
+    // yangi kompyuter) holatini fayl-mavjudligi gate'i ajrata olmaydi:
+    // asosiy UI ochilar, login 401 berar, foydalanuvchi sababni bilmasdi.
+    // `bootstrap-status` shu ikkisini ajratadi. So'rov `createTray`dan KEYIN —
+    // API boot'i sekin bo'lsa ham tray darhol ko'rinadi; javob kelmasa
+    // (timeout/xato) `null` qaytadi va hozirgi `.lic` xulqi saqlanadi.
+    openBrowser(resolveStartupUrl(localUrl, await fetchBootstrapStatus(localUrl)));
   } else {
     // Klient rejimi — CLI-434: TOFU. `config.serverUrl` (avval foydalanuvchi
     // tomonidan tasdiqlangan) mavjud VA hali ham yaroqli host/scheme'ga ega
