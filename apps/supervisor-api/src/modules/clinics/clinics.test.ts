@@ -438,6 +438,20 @@ describe('POST /v1/admin/clinics/:id/prepare-reinstall', () => {
     const created = (await (await createClinic()).json()) as any;
     const oldPassword = created.credentials.tempPassword;
 
+    // Haqiqiy tiklanish holatini quramiz: klinika ALLAQACHON aktivatsiya
+    // qilingan (parol o'chirilgan, fingerprint bog'langan, provisionedAt
+    // to'lgan). `createClinic()` fingerprint'siz litsenziya yaratadi —
+    // ularsiz `toBeNull()` hech nimani isbotlamas, o'zi ham NULL edi.
+    const provisionedAt = new Date('2026-08-01T00:00:00.000Z');
+    await db
+      .update(clinicsTable)
+      .set({ ownerTempPassword: null })
+      .where(eq(clinicsTable.id, created.clinic.id));
+    await db
+      .update(licensesTable)
+      .set({ fingerprint: 'eski-mashina-fp', provisionedAt })
+      .where(eq(licensesTable.id, created.license.id));
+
     const res = await app.request(`/v1/admin/clinics/${created.clinic.id}/prepare-reinstall`, {
       method: 'POST',
       headers: await authHeaders(),
@@ -451,10 +465,18 @@ describe('POST /v1/admin/clinics/:id/prepare-reinstall', () => {
     expect(body.credentials.tempPassword).toHaveLength(16);
     expect(body.credentials.tempPassword).not.toBe(oldPassword);
 
+    const storedClinic = await db.query.clinics.findFirst({
+      where: eq(clinicsTable.id, created.clinic.id),
+    });
+    expect(storedClinic?.ownerTempPassword).toBe(body.credentials.tempPassword);
+
     const lic = await db.query.licenses.findFirst({
       where: eq(licensesTable.id, created.license.id),
     });
     expect(lic?.fingerprint).toBeNull();
+    // D5 — `provisionedAt` TEGILMAYDI. Qulf ikkinchi nusxada ham (route
+    // qatlamida) turadi, `licenses.reinstall.test.ts` o'chirilsa ham saqlansin.
+    expect(lic?.provisionedAt?.toISOString()).toBe(provisionedAt.toISOString());
   });
 
   it('auth siz 401', async () => {
