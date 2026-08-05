@@ -4,6 +4,7 @@ import {
   Code,
   CopyButton,
   Group,
+  Modal,
   Paper,
   Stack,
   Switch,
@@ -40,6 +41,11 @@ export const ClinicDetailPage = () => {
   const qc = useQueryClient();
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [resetToken, setResetToken] = useState<string | null>(null);
+  const [reinstallCreds, setReinstallCreds] = useState<{
+    loginPhone: string;
+    tempPassword: string;
+  } | null>(null);
+  const [reinstallConfirm, setReinstallConfirm] = useState(false);
 
   const { data, isError } = useQuery({
     queryKey: ['clinic', id],
@@ -107,6 +113,37 @@ export const ClinicDetailPage = () => {
       setMutationError(
         err instanceof Error ? err.message : "Parol-tiklash tokenini yaratib bo'lmadi",
       );
+    },
+  });
+
+  // Qayta o'rnatishga tayyorlash (audit C1) — mijoz mashinasi almashsa yoki
+  // lokal baza yo'qolsa. Server yangi vaqtinchalik parol yozadi va litsenziya
+  // fingerprint'ini tozalaydi (ikkalasi BIRGA — `licenses.service.ts`
+  // `prepareReinstall` izohiga qarang), shu sababli `reactivate`dan alohida
+  // tugma.
+  const prepareReinstall = useMutation({
+    mutationFn: async () => {
+      const res = await authFetch(`/v1/admin/clinics/${id}/prepare-reinstall`, {
+        method: 'POST',
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: { code?: string } } | null;
+        throw new Error(body?.error?.code ?? "Qayta o'rnatishga tayyorlab bo'lmadi");
+      }
+      return res.json() as Promise<{
+        credentials: { loginPhone: string; tempPassword: string };
+      }>;
+    },
+    onSuccess: (result) => {
+      setMutationError(null);
+      setReinstallCreds(result.credentials);
+      setReinstallConfirm(false);
+      // Fingerprint endi NULL — detal kartasi buni ko'rsatishi kerak.
+      qc.invalidateQueries({ queryKey: ['clinic', id] });
+    },
+    onError: (err) => {
+      setReinstallConfirm(false);
+      setMutationError(err instanceof Error ? err.message : "Qayta o'rnatishga tayyorlab bo'lmadi");
     },
   });
 
@@ -209,7 +246,47 @@ export const ClinicDetailPage = () => {
           >
             Parol-tiklash tokeni yaratish
           </Button>
+          <Button size="xs" variant="outline" onClick={() => setReinstallConfirm(true)}>
+            Qayta o'rnatishga tayyorlash
+          </Button>
         </Group>
+        <Modal
+          opened={reinstallConfirm}
+          onClose={() => setReinstallConfirm(false)}
+          title="Qayta o'rnatishga tayyorlash"
+        >
+          <Text size="sm" mb="md">
+            Yangi vaqtinchalik parol yaratiladi va qurilma bog'lanishi (fingerprint) bekor qilinadi.
+            Mijoz istalgan kompyuterda litsenziya kalitini kiritib klinikani qaytadan o'rnata oladi.
+            Eski parol ishlamay qoladi.
+          </Text>
+          <Button onClick={() => prepareReinstall.mutate()} loading={prepareReinstall.isPending}>
+            Tasdiqlash
+          </Button>
+        </Modal>
+        {reinstallCreds && (
+          <Paper withBorder p="md" mt="md">
+            <Text fw={600} mb="xs">
+              Mijozga yetkazing (bir marta ko'rsatiladi)
+            </Text>
+            {/* Qiymatlar ATAYIN alohida elementda (`<b>` / `<Code>`) —
+                yuqoridagi provisioning Alert'i bilan bir xil idiom, matn
+                bo'yicha aniq qidirish shuni talab qiladi. */}
+            <Text size="sm">
+              Login (telefon): <b>{reinstallCreds.loginPhone}</b>
+            </Text>
+            <Text size="sm">
+              Vaqtinchalik parol: <Code>{reinstallCreds.tempPassword}</Code>
+            </Text>
+            <CopyButton value={reinstallCreds.tempPassword}>
+              {({ copied, copy }) => (
+                <Button size="xs" variant="subtle" onClick={copy}>
+                  {copied ? 'Nusxalandi' : 'Parolni nusxalash'}
+                </Button>
+              )}
+            </CopyButton>
+          </Paper>
+        )}
         {resetToken && (
           <Stack gap={4} mt="sm">
             <TextInput

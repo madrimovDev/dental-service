@@ -6,18 +6,11 @@ import { z } from 'zod';
 import { db } from '../../db/client';
 import { branches, clinics, licenseEvents, licenses } from '../../db/schema';
 import { normalizePhone } from '../../lib/phone';
+import { generateTempPassword } from '../../lib/temp-password';
 import { adminJwtMiddleware } from '../auth/jwt.middleware';
+import { createLicenseService } from '../licenses/licenses.service';
 
 const uuidSchema = z.string().uuid();
-
-// Vaqtinchalik owner paroli. Operator uni og'zaki/qo'lda yetkazishi mumkin —
-// chalkashadigan belgilar (0/O, 1/l/I) alifbodan chiqarilgan. 16 belgi
-// (apps/api `password` siyosati min 12 talab qiladi).
-const PASSWORD_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-export const generateTempPassword = (): string =>
-  Array.from(crypto.randomBytes(16), (b) => PASSWORD_ALPHABET[b % PASSWORD_ALPHABET.length]).join(
-    '',
-  );
 
 /**
  * Klinika qatorining ochiq (parolsiz) ko'rinishi. `ownerTempPassword` ATAYIN
@@ -108,8 +101,14 @@ const MODULE_MAP: Record<z.infer<typeof createClinicSchema>['plan'], string[]> =
   ],
 };
 
+// `adminJwtMiddleware` (jwt.middleware.ts:17) tokenning `sub`'ini
+// `adminUserId` deb yozadi. Hono instansiyasi tiplanmasa `c.get(...)`
+// `never` beradi — audit `createdBy` uchun uni aniq e'lon qilamiz.
+type AdminEnv = { Variables: { adminUserId?: string } };
+
 export const clinicsRoutes = () => {
-  const app = new Hono();
+  const app = new Hono<AdminEnv>();
+  const service = createLicenseService();
   app.use('*', adminJwtMiddleware);
 
   // Klinikalar ro'yxati + litsenziya summary (frontend ClinicsPage jadvali
@@ -268,6 +267,24 @@ export const clinicsRoutes = () => {
       where: eq(licenses.id, license.id),
     });
     return c.json({ clinic: pickClinicPublic(clinic), license: updatedLicense });
+  });
+
+  // Qayta o'rnatishga tayyorlash (audit C1) — mijoz mashinasi almashsa yoki
+  // lokal baza yo'qolsa. Yangi vaqtinchalik parol + fingerprint tozalash BIRGA
+  // (licenses.service.ts `prepareReinstall` izohiga qarang).
+  app.post('/:id/prepare-reinstall', async (c) => {
+    const idResult = uuidSchema.safeParse(c.req.param('id'));
+    if (!idResult.success) return c.json({ error: { code: 'NOT_FOUND' } }, 404);
+
+    const adminId = c.get('adminUserId');
+    try {
+      const credentials = await service.prepareReinstall(idResult.data, adminId);
+      return c.json({ credentials });
+    } catch (err) {
+      const code = err instanceof Error ? err.message : 'UNKNOWN';
+      const status = (err as { status?: number }).status ?? 500;
+      return c.json({ error: { code } }, status as 400 | 404 | 500);
+    }
   });
 
   return app;
