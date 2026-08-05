@@ -82,6 +82,65 @@ describe("ActivatePage — aktivatsiyadan keyingi login ma'lumoti", () => {
     ).not.toBeInTheDocument();
   });
 
+  // 🔴 Lane-lar kesishmasi (L3 M1 × L2 sahifasi). M1 dan keyin `ownerPhone`
+  // idempotent SKIP holatida ham qaytadi — lekin skip'da vendor bergan
+  // vaqtinchalik parol QO'LLANMAYDI. `login_hint` matni «Parolni yetkazib
+  // beruvchidan oling» deydi, ya'ni mijozni ishlamaydigan parol ortidan
+  // yuborardi. Javobdagi `provisioned: false` shu ikki holatni ajratadi.
+  it("skip holatida (provisioned=false) vendor paroli maslahati KO'RSATILMAYDI", async () => {
+    const phone = '+998911111111';
+    // Guard: kalitlar tarjimada yo'q bo'lsa `t()` xom kalitni qaytaradi va
+    // ikkala assertion ham soxta yashil bo'lardi.
+    expect(i18n.t('auth.activate.login_hint_existing', { phone })).toContain(phone);
+    expect(i18n.t('auth.activate.login_hint_existing', { phone })).not.toBe(
+      i18n.t('auth.activate.login_hint', { phone }),
+    );
+
+    mockActivate({
+      success: true,
+      data: {
+        modules: ['patients'],
+        expiresAt: '2030-01-01T00:00:00.000Z',
+        ownerPhone: phone,
+        provisioned: false,
+      },
+    });
+    renderApp(<ActivatePage />);
+    submit();
+
+    await waitFor(() => {
+      expect(screen.getByText(i18n.t('auth.activate.success'))).toBeInTheDocument();
+    });
+    // Telefon KO'RSATILADI (login identifikatori to'g'ri), lekin parol
+    // haqidagi maslahat — vendorniki EMAS, mavjud parolniki.
+    expect(
+      screen.getByText(i18n.t('auth.activate.login_hint_existing', { phone })),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(i18n.t('auth.activate.login_hint', { phone })),
+    ).not.toBeInTheDocument();
+  });
+
+  it('provisioned=true — vendor paroli maslahati saqlanadi', async () => {
+    const phone = '+998901234567';
+    mockActivate({
+      success: true,
+      data: {
+        modules: ['patients'],
+        expiresAt: '2030-01-01T00:00:00.000Z',
+        ownerPhone: phone,
+        provisioned: true,
+      },
+    });
+    renderApp(<ActivatePage />);
+    submit();
+
+    await waitFor(() => {
+      expect(screen.getByText(i18n.t('auth.activate.success'))).toBeInTheDocument();
+    });
+    expect(screen.getByText(i18n.t('auth.activate.login_hint', { phone }))).toBeInTheDocument();
+  });
+
   it("xato javobda maslahat ham, muvaffaqiyat ham ko'rsatilmaydi", async () => {
     mockActivate({
       success: false,

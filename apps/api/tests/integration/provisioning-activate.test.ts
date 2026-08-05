@@ -457,6 +457,33 @@ describe('aktivatsiya provisioning — idempotentlik', () => {
     expect((await db.select().from(tenants)).length).toBe(1);
     expect((await db.select().from(users)).length).toBe(1);
   });
+
+  /**
+   * 🔴 Lane-lar kesishmasi (L3 M1 × L2 web sahifasi).
+   *
+   * M1 skip yo'lida ham `ownerPhone` qaytaradigan qildi. Web sahifasi esa
+   * `ownerPhone` bor bo'lsa `auth.activate.login_hint` matnini ko'rsatadi —
+   * «Kirish uchun telefon: X. **Parolni yetkazib beruvchidan oling**».
+   * Skip'da vendor bergan vaqtinchalik parol QO'LLANMAYDI (aynan shu
+   * idempotentlik guard'i uni bloklaydi), ya'ni bu maslahat mijozni
+   * ishlamaydigan parol so'rashga yo'llaydi.
+   *
+   * Sahifa ikki holatni faqat javob orqali ajrata oladi — shuning uchun
+   * `provisioned` bayrog'i oshkor qilinadi. Telefon bilan bir xil xavfsizlik
+   * profili: yangi ma'lumot emas, faqat "parolingiz almashdimi" signali.
+   */
+  test("javobdagi `provisioned` bayrog'i skip'ni qo'llanishdan ajratadi", async () => {
+    const freshBody = (await (await activate()).json()) as {
+      data: { provisioned?: boolean };
+    };
+    expect(freshBody.data.provisioned).toBe(true);
+
+    // Ikkinchi chaqiruv — tenant allaqachon bor → skip.
+    const skipBody = (await (await activate()).json()) as {
+      data: { provisioned?: boolean };
+    };
+    expect(skipBody.data.provisioned).toBe(false);
+  });
 });
 
 describe('aktivatsiya provisioning — blok qaytarilmasa', () => {

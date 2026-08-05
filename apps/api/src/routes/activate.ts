@@ -159,6 +159,19 @@ export const activateRoutes = (deps: {
     const { provisioning, provisioningSignature, ...licensePayload } = data;
 
     let ownerPhone: string | undefined;
+    /**
+     * Vendor bergan vaqtinchalik parol HAQIQATAN qo'llandimi.
+     *
+     * `undefined` — provisioning bloki umuman kelmadi (litsenziya yangilash).
+     * `true` — yangi tenant yaratildi, vendor kredensiallari amal qiladi.
+     * `false` — idempotent skip: hisob avvaldan bor, MAVJUD parol saqlandi.
+     *
+     * 🔴 Web sahifasi login maslahatini AYNAN shu bayroq bo'yicha tanlaydi.
+     * `ownerPhone` bor-yo'qligi yetarli EMAS: M1 dan keyin u skip'da ham
+     * qaytadi, ya'ni "parolni yetkazib beruvchidan oling" matni mijozni
+     * hech qachon qo'llanmagan parol ortidan yuborardi.
+     */
+    let provisioned: boolean | undefined;
     if (provisioning) {
       // 1) IMZO — blokni haqiqatan vendor imzolaganmi (RSA, Supervisor'ning
       //    ochiq kaliti build'ga qotirilgan).
@@ -214,6 +227,7 @@ export const activateRoutes = (deps: {
         // shartiga qo'yish HAR DOIM truthy bo'ladi va typecheck buni
         // ushlamaydi. Doim `.applied`/`.ownerPhone` bo'yicha o'qing.
         const result = await applyProvisioning(deps.db, provisioning);
+        provisioned = result.applied;
         // Kanonik shakl — ko'rsatilgan login `users.phone` bilan bayt-ma-bayt
         // bir xil (`provisionTenantInTx` ham normallashtiradi, skip yo'lida esa
         // qiymat bevosita `users.phone`dan olinadi).
@@ -263,7 +277,12 @@ export const activateRoutes = (deps: {
     if (provisioning) await confirmProvisioned(parsed.data.licenseKey);
 
     return c.json(
-      ok({ modules: licensePayload.modules, expiresAt: licensePayload.expiresAt, ownerPhone }),
+      ok({
+        modules: licensePayload.modules,
+        expiresAt: licensePayload.expiresAt,
+        ownerPhone,
+        provisioned,
+      }),
     );
   });
 

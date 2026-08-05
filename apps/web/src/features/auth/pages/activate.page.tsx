@@ -8,10 +8,23 @@ import { z } from 'zod';
 import { useBootstrapStatus } from '../auth.api';
 
 type ActivateResponse =
-  // `ownerPhone` — Supervisor provisioning bloki bilan owner hisobi AYNAN SHU
-  // aktivatsiyada yaratilgan bo'lsagina qaytadi (hisob avvaldan bor bo'lsa —
-  // yo'q), shuning uchun ixtiyoriy.
-  | { success: true; data: { modules: string[]; expiresAt: string; ownerPhone?: string } }
+  // `ownerPhone` — kirish uchun telefon. Provisioning bloki kelgan har qanday
+  // holatda qaytadi: hisob shu aktivatsiyada yaratilgan bo'lsa — vendor
+  // blokidan, avvaldan bor bo'lsa — LOKAL bazadagi mavjud owner'niki (M1).
+  //
+  // `provisioned` — vendor bergan vaqtinchalik parol qo'llandimi. `false`
+  // (idempotent skip) bo'lsa mijozning AVVALGI paroli kuchda qoladi, shuning
+  // uchun "parolni yetkazib beruvchidan oling" maslahati ko'rsatilmaydi.
+  // `undefined` — provisioning bloki umuman kelmagan (litsenziya yangilash).
+  | {
+      success: true;
+      data: {
+        modules: string[];
+        expiresAt: string;
+        ownerPhone?: string;
+        provisioned?: boolean;
+      };
+    }
   | { success: false; error: { code: string; message: string } };
 
 // Hand-written raw fetch (not through generated api-client) — this endpoint
@@ -39,6 +52,9 @@ export function ActivatePage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [ownerPhone, setOwnerPhone] = useState<string | null>(null);
+  // `null` — provisioning bloki kelmagan; aks holda vendor paroli
+  // qo'llandimi (`false` = idempotent skip, avvalgi parol kuchda).
+  const [provisioned, setProvisioned] = useState<boolean | null>(null);
 
   // Audit C1 — `.lic` bor, lekin lokal bazada tenant yo'q (baza yo'qolgan /
   // yangi kompyuter). Kalitni QAYTA kiritish bu holatni tuzatmaydi: Supervisor
@@ -68,15 +84,18 @@ export function ActivatePage() {
         setError(null);
         setSuccess(true);
         setOwnerPhone(res.data.ownerPhone ?? null);
+        setProvisioned(res.data.provisioned ?? null);
       } else {
         setSuccess(false);
         setOwnerPhone(null);
+        setProvisioned(null);
         setError(t(ERROR_KEY_MAP[res.error.code] ?? 'auth.activate.error_generic'));
       }
     },
     onError: () => {
       setSuccess(false);
       setOwnerPhone(null);
+      setProvisioned(null);
       setError(t('auth.activate.error_generic'));
     },
   });
@@ -130,7 +149,13 @@ export function ActivatePage() {
                 {t('auth.activate.success')}
                 {ownerPhone && (
                   <Text size="sm" mt="xs">
-                    {t('auth.activate.login_hint', { phone: ownerPhone })}
+                    {/* Skip'da (`provisioned === false`) vendor bergan parol
+                        QO'LLANMAGAN — mijozni undan parol so'rashga
+                        yo'llamaymiz. Eski backend `provisioned` yubormasa
+                        (`null`) mavjud matn saqlanadi. */}
+                    {provisioned === false
+                      ? t('auth.activate.login_hint_existing', { phone: ownerPhone })
+                      : t('auth.activate.login_hint', { phone: ownerPhone })}
                   </Text>
                 )}
               </Alert>

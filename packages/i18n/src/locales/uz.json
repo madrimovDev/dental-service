@@ -143,6 +143,7 @@
       "submit": "Faollashtirish",
       "success": "Litsenziya muvaffaqiyatli faollashtirildi. Yo'naltirilmoqda...",
       "login_hint": "Kirish uchun telefon: {{phone}}. Parolni yetkazib beruvchidan oling.",
+      "login_hint_existing": "Kirish uchun telefon: {{phone}}. Avvalgi parolingiz o'zgarmadi.",
       "error_invalid_key": "Litsenziya kaliti noto'g'ri",
       "error_fingerprint_mismatch": "Bu litsenziya boshqa qurilmada faol. Supervisor bilan bog'laning.",
       "error_fingerprint_unavailable": "Bu qurilmani aniqlab bo'lmadi (virtual muhit qo'llab-quvvatlanmaydi)",
