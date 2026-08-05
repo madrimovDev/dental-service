@@ -309,6 +309,13 @@
       "when": 1785835982137,
       "tag": "0043_normalize_user_phones",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1785955813581,
+      "tag": "0044_normalize_patient_phones",
+      "breakpoints": true
     }
   ]
 }

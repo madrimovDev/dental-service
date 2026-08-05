@@ -1,3 +1,4 @@
+import { normalizePhone } from '@dental/core';
 import {
   auditLog,
   cashierTransactions,
@@ -18,6 +19,7 @@ import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { createOwnershipValidator, type OwnershipValidator } from '../../lib/ownership.ts';
 import type { NonPlanTransactionRow } from './patients.balance.ts';
 import { computeNonPlanRemainder, computePatientBalance } from './patients.balance.ts';
+import { normalizeOptionalPhone } from './patients.phone.ts';
 import type {
   AddEmergencyContactInput,
   AddRelativeInput,
@@ -378,8 +380,10 @@ export const createPatientsService = (deps: {
           fullName: input.fullName,
           dateOfBirth: input.dateOfBirth ?? null,
           gender: input.gender ?? null,
-          phone: input.phone ?? null,
-          phoneSecondary: input.phoneSecondary ?? null,
+          // Telefon HAR DOIM kanonik shaklda saqlanadi — telegram bemor linking
+          // va telefon qidiruvi `+<raqamlar>` shaklini kutadi.
+          phone: normalizeOptionalPhone(input.phone),
+          phoneSecondary: normalizeOptionalPhone(input.phoneSecondary),
           passport: input.passport ?? null,
           address: input.address ?? null,
           notes: input.notes ?? null,
@@ -422,8 +426,11 @@ export const createPatientsService = (deps: {
     if (input.fullName !== undefined) patch.fullName = input.fullName;
     if (input.dateOfBirth !== undefined) patch.dateOfBirth = input.dateOfBirth;
     if (input.gender !== undefined) patch.gender = input.gender;
-    if (input.phone !== undefined) patch.phone = input.phone;
-    if (input.phoneSecondary !== undefined) patch.phoneSecondary = input.phoneSecondary;
+    // `null` — ustunni tozalash (PATCH semantikasi saqlanadi), qiymat bo'lsa
+    // kanonik shaklga keltiriladi.
+    if (input.phone !== undefined) patch.phone = normalizeOptionalPhone(input.phone);
+    if (input.phoneSecondary !== undefined)
+      patch.phoneSecondary = normalizeOptionalPhone(input.phoneSecondary);
     if (input.passport !== undefined) patch.passport = input.passport;
     if (input.address !== undefined) patch.address = input.address;
     if (input.notes !== undefined) patch.notes = input.notes;
@@ -761,7 +768,9 @@ export const createPatientsService = (deps: {
               tenantId,
               patientId,
               name: input.name,
-              phone: input.phone,
+              // Ustun NOT NULL, schema regex kamida 9 raqam talab qiladi —
+              // `normalizePhone` hech qachon bo'sh satr qaytarmaydi.
+              phone: normalizePhone(input.phone),
               relationship: input.relationship ?? null,
               isPrimary: true,
             })
@@ -773,7 +782,7 @@ export const createPatientsService = (deps: {
             tenantId,
             patientId,
             name: input.name,
-            phone: input.phone,
+            phone: normalizePhone(input.phone),
             relationship: input.relationship ?? null,
             isPrimary: false,
           })
