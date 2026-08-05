@@ -35,6 +35,7 @@ import { Hono } from 'hono';
 import { db } from '../../src/db/client.ts';
 import { verifyPassword } from '../../src/lib/password.ts';
 import { closeRateLimitRedis } from '../../src/lib/rate-limit.ts';
+import { provisionTenantInTx } from '../../src/modules/auth/auth.service.ts';
 import { activateRoutes } from '../../src/routes/activate.ts';
 
 // ⚠️ Bu fayl ATAYIN NA `mock.module`, NA `globalThis.fetch` almashtirishini
@@ -400,12 +401,19 @@ describe('aktivatsiya provisioning — idempotentlik', () => {
     const res = await activate();
     expect(res.status).toBe(200);
 
-    // 🔴 Provisioning o'tkazib yuborilgan bo'lsa `ownerPhone` QAYTARILMAYDI:
-    // aks holda mijoz o'zi `/register-tenant` orqali boshqa telefon bilan
-    // ro'yxatdan o'tgan holatda aktivatsiya sahifasi (Task 10) lokal bazada
-    // MAVJUD BO'LMAGAN vendor telefonini "login" deb ko'rsatardi.
+    // 🔴 Skip holatida `ownerPhone` — MAVJUD owner'niki, vendor blokidagi
+    // telefon EMAS (M1). Bu yerda ikkalasi ustma-ust tushadi (birinchi
+    // aktivatsiya aynan vendor bloki bilan yaratgan), shuning uchun farqni
+    // isbotlovchi alohida test pastda: mavjud owner boshqa telefon bilan
+    // yaratiladi va javob AYNAN o'shani qaytarishi shart.
+    //
+    // Nega umuman qaytariladi: mijoz o'zi `/register-tenant` orqali boshqa
+    // telefon bilan ro'yxatdan o'tgan bo'lsa, vendor telefonini "login" deb
+    // ko'rsatish uni MAVJUD BO'LMAGAN hisobga yo'llardi — mavjud owner'niki
+    // esa to'g'ri login va yangi ma'lumot oshkor qilmaydi (bu allaqachon shu
+    // mashinaning egasi).
     const skipBody = (await res.json()) as { data: { ownerPhone?: string } };
-    expect(skipBody.data.ownerPhone).toBeUndefined();
+    expect(skipBody.data.ownerPhone).toBe('+998901234567');
 
     const [after] = await db.select().from(users).where(eq(users.phone, '+998901234567'));
     expect(after?.passwordHash).toBe(before?.passwordHash ?? '');
@@ -420,6 +428,34 @@ describe('aktivatsiya provisioning — idempotentlik', () => {
     // litsenziya yangilanishi bloklanmaydi (ikki aktivatsiya = ikki yozuv).
     expect(writtenLicenses).toHaveLength(2);
     expect(writtenLicenses[1]?.licenseKey).toBe(LICENSE_KEY);
+  });
+
+  test('tenant allaqachon bor — javobda MAVJUD owner telefoni qaytadi (M1)', async () => {
+    // Mavjud tenant + owner, vendor blokidagi telefondan ATAYIN FARQLI
+    // (`+998901234567` emas) — javob vendor blokidan emas, bazadan olinishi
+    // shu farq bilan isbotlanadi.
+    await db.transaction((tx) =>
+      provisionTenantInTx(tx, {
+        tenantName: 'Mavjud klinika',
+        ownerPhone: '+998911111111',
+        ownerFullName: 'Mavjud Egasi',
+        ownerPassword: 'MavjudParol12345',
+        defaultLanguage: 'uz',
+      }),
+    );
+
+    const res = await activate();
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as { data: { ownerPhone?: string } };
+    // 🔴 M1 qulfi: eski xulqda bu `undefined` edi, undan oldingi (noto'g'ri)
+    // variantda esa vendor bloki `+998901234567` qaytarardi — ikkalasi ham
+    // mijozni mavjud bo'lmagan hisobga yo'llardi.
+    expect(body.data.ownerPhone).toBe('+998911111111');
+
+    // Yon ta'sir yo'q: ikkinchi tenant/owner yaratilmagan
+    expect((await db.select().from(tenants)).length).toBe(1);
+    expect((await db.select().from(users)).length).toBe(1);
   });
 });
 
