@@ -64,6 +64,18 @@ describe('requireModule', () => {
     expect(res.status).toBe(200);
   });
 
+  // Audit C1 — `/api/bootstrap-status` litsenziya YO'Q holatni ANIQLASH uchun
+  // ishlatiladi, shuning uchun uning o'zi litsenziya gate'i ostida bo'lmaydi.
+  // `activeModules = []` MAJBURIY: aks holda test oldingi testdan qolgan faol
+  // modullarni meros olib, WHITELIST'siz ham yashil bo'lardi (soxta yashil).
+  test('whitelists /api/bootstrap-status route even without an active license', async () => {
+    activeModules = [];
+    const app = new Hono();
+    app.get('/api/bootstrap-status', requireModule('patients'), (c) => c.json({ ok: true }));
+    const res = await app.request('/api/bootstrap-status');
+    expect(res.status).toBe(200);
+  });
+
   test('enterprise wildcard (*) grants access to any module', async () => {
     activeModules = ['*'];
     const app = new Hono();

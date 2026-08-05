@@ -5,4 +5,5 @@ export const authKeys = {
   me: () => ['auth', 'me'] as const,
   workspaceBranches: (tenantId: string | null) => ['auth', 'workspace-branches', tenantId] as const,
   registrationEnabled: () => ['auth', 'registration-enabled'] as const,
+  bootstrapStatus: () => ['auth', 'bootstrap-status'] as const,
 };

@@ -11,7 +11,14 @@ import { getActiveModules } from './license.ts';
  * tiklash. Litsenziya muddati o'tgan/topilmagan holatda ham ochiq bo'lishi
  * shart (aks holda `LICENSE_NOT_FOUND` reset oqimini ham blokka oladi).
  */
-const WHITELIST = ['/activate', '/api/activate', '/api/reset-owner-password'];
+const WHITELIST = [
+  '/activate',
+  '/api/activate',
+  '/api/reset-owner-password',
+  // Pre-auth diagnostika (audit C1) — `.lic` yo'q holatni ANIQLASH uchun
+  // ishlatiladi, shuning uchun uning o'zi litsenziya gate'i ostida bo'lmaydi.
+  '/api/bootstrap-status',
+];
 
 /**
  * Hono middleware — berilgan modul joriy litsenziyada yoqilganmi tekshiradi.
