@@ -4,8 +4,23 @@ import { i18n } from '@/lib/i18n.ts';
 import { renderApp } from '../../../test-utils';
 import { ActivatePage } from './activate.page';
 
-// Sahifa generated api-client'ni EMAS, xom `fetch`ni ishlatadi (pre-tenant,
-// spec'dan qasddan chetda) — shuning uchun global fetch mock qilinadi.
+// `vi.mock` factory BUTUN modulni almashtiradi — sahifa `../auth.api`dan
+// ishlatadigan HAR bir hook shu yerda bo'lishi shart.
+// Default: litsenziya YO'Q, tenant YO'Q → oddiy aktivatsiya formasi shoxi.
+// Mavjud testlar shu shoxda ishlaydi va yashil qoladi.
+const bootstrapStatus = vi.hoisted(() => ({
+  value: { data: { hasLicense: false, hasTenant: false } } as {
+    data?: { hasLicense: boolean; hasTenant: boolean };
+  },
+}));
+
+vi.mock('../auth.api', () => ({
+  useBootstrapStatus: () => bootstrapStatus.value,
+}));
+
+// Sahifa aktivatsiya so'rovida generated api-client'ni EMAS, xom `fetch`ni
+// ishlatadi (pre-tenant, spec'dan qasddan chetda) — shuning uchun global
+// fetch mock qilinadi.
 const mockActivate = (payload: unknown) => {
   vi.stubGlobal(
     'fetch',
@@ -28,6 +43,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  bootstrapStatus.value = { data: { hasLicense: false, hasTenant: false } };
 });
 
 describe("ActivatePage — aktivatsiyadan keyingi login ma'lumoti", () => {
@@ -78,5 +94,41 @@ describe("ActivatePage — aktivatsiyadan keyingi login ma'lumoti", () => {
       expect(screen.getByText(i18n.t('auth.activate.error_invalid_key'))).toBeInTheDocument();
     });
     expect(screen.queryByText(i18n.t('auth.activate.success'))).not.toBeInTheDocument();
+  });
+});
+
+// Audit C1 — `.lic` bor, lekin lokal bazada tenant yo'q (baza yo'qolgan /
+// yangi kompyuter). Litsenziya kalitini qayta kiritish YORDAM BERMAYDI
+// (Supervisor fingerprint bog'langan + provisioning bloki yo'q), shuning
+// uchun forma umuman ko'rsatilmaydi — foydalanuvchi vendorga yo'naltiriladi.
+describe("ActivatePage — tenant yo'q holati (audit C1)", () => {
+  it("litsenziya bor lekin tenant yo'q — vendorga murojaat matni, forma YO'Q", async () => {
+    bootstrapStatus.value = { data: { hasLicense: true, hasTenant: false } };
+    renderApp(<ActivatePage />);
+
+    expect(await screen.findByText(i18n.t('auth.activate.needs_vendor_title'))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('auth.activate.needs_vendor_body'))).toBeInTheDocument();
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: i18n.t('auth.activate.submit') }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("litsenziya yo'q — oddiy aktivatsiya formasi ko'rinadi", async () => {
+    bootstrapStatus.value = { data: { hasLicense: false, hasTenant: false } };
+    renderApp(<ActivatePage />);
+
+    expect(await screen.findByRole('textbox')).toBeInTheDocument();
+    expect(screen.queryByText(i18n.t('auth.activate.needs_vendor_title'))).not.toBeInTheDocument();
+  });
+
+  // Fail-open: so'rov javob bermasa (`data` undefined) forma KO'RINADI —
+  // aks holda tarmoq/endpoint xatosi mijozni aktivatsiyadan butunlay
+  // mahrum qilardi (`useRegistrationEnabled` bilan bir xil semantika).
+  it("bootstrap javobi kelmasa — forma ko'rinadi (fail-open)", async () => {
+    bootstrapStatus.value = { data: undefined };
+    renderApp(<ActivatePage />);
+
+    expect(await screen.findByRole('textbox')).toBeInTheDocument();
   });
 });

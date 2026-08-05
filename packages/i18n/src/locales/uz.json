@@ -146,7 +146,9 @@
       "error_invalid_key": "Litsenziya kaliti noto'g'ri",
       "error_fingerprint_mismatch": "Bu litsenziya boshqa qurilmada faol. Supervisor bilan bog'laning.",
       "error_fingerprint_unavailable": "Bu qurilmani aniqlab bo'lmadi (virtual muhit qo'llab-quvvatlanmaydi)",
-      "error_generic": "Litsenziyani faollashtirib bo'lmadi. Qaytadan urinib ko'ring."
+      "error_generic": "Litsenziyani faollashtirib bo'lmadi. Qaytadan urinib ko'ring.",
+      "needs_vendor_title": "Klinika ma'lumotlari topilmadi",
+      "needs_vendor_body": "Litsenziya faollashtirilgan, lekin klinika ma'lumotlari bu kompyuterda topilmadi. Ta'minotchiga murojaat qiling — u \"qayta o'rnatishga tayyorlash\"ni bajarib, sizga yangi login va vaqtinchalik parol beradi."
     },
     "reset_owner": {
       "title": "Klinika egasi parolini tiklash",

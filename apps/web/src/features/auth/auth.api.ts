@@ -1,5 +1,6 @@
 import {
   ApiError,
+  bootstrapStatus,
   getMe,
   getWorkspaceBranches,
   login,
@@ -53,6 +54,28 @@ export function useRegistrationEnabled() {
     queryKey: authKeys.registrationEnabled(),
     queryFn: () => registrationEnabled().then((r) => r.data),
     staleTime: Number.POSITIVE_INFINITY,
+    retry: false,
+  });
+}
+
+/**
+ * Bu o'rnatma umuman ishlashga tayyormi (audit C1): `.lic` bormi va lokal
+ * bazada tenant bormi. Pre-auth — login sahifasidan OLDIN chaqiriladi
+ * (`useRegistrationEnabled` pretsedenti, token bilan gate QILINMAYDI).
+ *
+ * `staleTime: 0` — qulflanish holati sahifa ochilganda qayta aniqlanadi;
+ * keshdan eskirgan javob bilan foydalanuvchini noto'g'ri ekranda ushlab
+ * qolmaslik uchun (vendor "qayta o'rnatishga tayyorlash"ni bajargach holat
+ * o'zgaradi).
+ *
+ * `retry: false` — xato bo'lsa `data` `undefined` qoladi va iste'molchilar
+ * FAIL-OPEN qiladi (forma/login ko'rinadi), tarmoq xatosi mijozni bloklamaydi.
+ */
+export function useBootstrapStatus() {
+  return useQuery({
+    queryKey: authKeys.bootstrapStatus(),
+    queryFn: () => bootstrapStatus().then((r) => r.data),
+    staleTime: 0,
     retry: false,
   });
 }

@@ -5,6 +5,7 @@ import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
+import { useBootstrapStatus } from '../auth.api';
 
 type ActivateResponse =
   // `ownerPhone` — Supervisor provisioning bloki bilan owner hisobi AYNAN SHU
@@ -38,6 +39,18 @@ export function ActivatePage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [ownerPhone, setOwnerPhone] = useState<string | null>(null);
+
+  // Audit C1 — `.lic` bor, lekin lokal bazada tenant yo'q (baza yo'qolgan /
+  // yangi kompyuter). Kalitni QAYTA kiritish bu holatni tuzatmaydi: Supervisor
+  // litsenziyani eski fingerprint'ga bog'lab qo'ygan va javobda provisioning
+  // bloki bo'lmaydi. Yagona yo'l — vendor "qayta o'rnatishga tayyorlash"ni
+  // bajarishi. Shuning uchun forma umuman ko'rsatilmaydi.
+  //
+  // FAIL-OPEN: so'rov xato bersa yoki eski backend endpointni bilmasa
+  // (`data` undefined) forma KO'RINADI — aks holda tarmoq xatosi mijozni
+  // aktivatsiyadan butunlay mahrum qilardi.
+  const bootstrap = useBootstrapStatus();
+  const needsVendor = bootstrap.data?.hasLicense === true && bootstrap.data?.hasTenant === false;
 
   const schema = z.object({
     licenseKey: z.string().min(1, t('validation.required')),
@@ -85,50 +98,59 @@ export function ActivatePage() {
       <Title order={2} ta="center" mb="lg">
         {t('app.name')}
       </Title>
-      <Paper withBorder shadow="md" p="xl" radius="md">
-        <form
-          onSubmit={form.onSubmit((values) => {
-            setError(null);
-            activateMut.mutate(values);
-          })}
-        >
+      {needsVendor ? (
+        <Paper withBorder shadow="md" p="xl" radius="md">
           <Title order={3} mb="xs">
-            {t('auth.activate.title')}
+            {t('auth.activate.needs_vendor_title')}
           </Title>
-          <Text size="sm" c="dimmed" mb="md">
-            {t('auth.activate.description')}
-          </Text>
+          <Text size="sm">{t('auth.activate.needs_vendor_body')}</Text>
+        </Paper>
+      ) : (
+        <Paper withBorder shadow="md" p="xl" radius="md">
+          <form
+            onSubmit={form.onSubmit((values) => {
+              setError(null);
+              activateMut.mutate(values);
+            })}
+          >
+            <Title order={3} mb="xs">
+              {t('auth.activate.title')}
+            </Title>
+            <Text size="sm" c="dimmed" mb="md">
+              {t('auth.activate.description')}
+            </Text>
 
-          {error && (
-            <Alert color="red" variant="light" mb="md">
-              {error}
-            </Alert>
-          )}
-          {success && (
-            <Alert color="green" variant="light" mb="md">
-              {t('auth.activate.success')}
-              {ownerPhone && (
-                <Text size="sm" mt="xs">
-                  {t('auth.activate.login_hint', { phone: ownerPhone })}
-                </Text>
-              )}
-            </Alert>
-          )}
+            {error && (
+              <Alert color="red" variant="light" mb="md">
+                {error}
+              </Alert>
+            )}
+            {success && (
+              <Alert color="green" variant="light" mb="md">
+                {t('auth.activate.success')}
+                {ownerPhone && (
+                  <Text size="sm" mt="xs">
+                    {t('auth.activate.login_hint', { phone: ownerPhone })}
+                  </Text>
+                )}
+              </Alert>
+            )}
 
-          <TextInput
-            label={t('auth.activate.license_key')}
-            placeholder={t('auth.activate.license_key_placeholder')}
-            required
-            disabled={success}
-            {...form.getInputProps('licenseKey')}
-            mb="md"
-          />
+            <TextInput
+              label={t('auth.activate.license_key')}
+              placeholder={t('auth.activate.license_key_placeholder')}
+              required
+              disabled={success}
+              {...form.getInputProps('licenseKey')}
+              mb="md"
+            />
 
-          <Button type="submit" loading={activateMut.isPending} disabled={success} fullWidth>
-            {t('auth.activate.submit')}
-          </Button>
-        </form>
-      </Paper>
+            <Button type="submit" loading={activateMut.isPending} disabled={success} fullWidth>
+              {t('auth.activate.submit')}
+            </Button>
+          </form>
+        </Paper>
+      )}
     </Container>
   );
 }
