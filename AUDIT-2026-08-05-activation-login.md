@@ -3,6 +3,41 @@
 **Sabab:** Windows'da qo'lda test boshlangach muammolar chiqa boshladi. E2E'dan oldin
 aktivatsiya/login zanjirini statik tekshirish.
 
+> ## ✅ YAKUN (2026-08-06) — barcha topilmalar YOPILDI
+>
+> | # | Holat | Commit |
+> |---|---|---|
+> | **C1** Baza yo'qolsa tiklanish yo'li yo'q | ✅ Yopildi — Supervisor «Qayta o'rnatishga tayyorlash» (A-variant) + ikki tomonlama `bootstrap-status` gate (B-variant) | `dc5783c`, `35cf441`, `5b71be0` |
+> | **H1** `normalizePhone` divergent nusxasi | ✅ Yopildi — `@dental/core` yagona manba; bemor telefonlari ham kanonik (migratsiya 0044) | `78e0621`, `427aec6`, `486739f` |
+> | **M1** Skip'da login telefoni | ✅ Yopildi — mavjud owner telefoni qaytariladi | `2824ece` |
+> | **L1** `reactivate` provisioning bermaydi | ✅ Yopildi — bitta koordinatsiyalangan amal (fingerprint tozalash + yangi parol) | `a19606e` |
+>
+> **Ijro:** spec → 10-taskli reja → `Workflow` orkestratsiyasi (11 agent, 5 lane,
+> parallel implement + serial verify) → whole-branch review.
+> Spec: `docs/superpowers/specs/2026-08-05-activation-recovery-design.md` ·
+> Reja: `docs/superpowers/plans/2026-08-05-activation-recovery.md`
+>
+> **Review va keyingi round topgan qo'shimcha nuqsonlar (ular ham yopildi):**
+> - **L2×L3 kesishmasi** (`0a55cac`) — M1 dan keyin aktivatsiya sahifasi skip
+>   holatida ham «parolni ta'minotchidan oling» deb yozardi, holbuki o'sha parol
+>   qo'llanmaydi. Javobga `provisioned` bayrog'i qo'shildi.
+> - **Tayyorlangan kredensial yonib ketishi** (`a5ac5c5`) — `confirmProvisioned`
+>   `applied`ga qaramasdan chaqirilardi; endi skip'da Supervisor parolni saqlaydi
+>   va `provisioning_skipped` hodisasini yozadi.
+> - **heartbeat sweep bog'liqligi** (`f5a04c1`) — regressiya testi bilan qulflandi
+>   (mutatsiya bilan tasdiqlangan).
+>
+> **Qasddan O'ZGARTIRILMAGAN:** heartbeat scheduler faqat `INVALID_KEY` da `.lic`ni
+> bekor qiladi. Ya'ni eski o'rnatma «qayta o'rnatishga tayyorlash»dan keyin ham
+> muddat tugagunicha ishlaydi — o'tish davri uchun to'g'ri xulq. Darhol to'xtatish
+> kerak bo'lsa litsenziya deaktivatsiya qilinadi (`docs/DESKTOP-WINDOWS-BUILD-TEST.md`
+> §4.3).
+>
+> **Ochiq follow-up (ticket kerak):** vendor tomonida «tayyorlangan kredensialni
+> bekor qilish» tugmasi yo'q — parol ishlatilmaguncha, qayta tayyorlanmaguncha yoki
+> litsenziya deaktivatsiya qilinmaguncha Supervisor bazasida turadi (klinikada
+> ko'pi bilan bitta).
+
 **Usul:** solo statik trace (subagent/Workflow ISHLATILMADI). Modul bo'yicha emas —
 **sovuq mashina bosib o'tadigan ketma-ketlik** bo'yicha, har qadamda bitta savol bilan:
 _"bu qadam qanday holat ALLAQACHON mavjud deb hisoblaydi?"_
