@@ -168,6 +168,33 @@ Ikki nozik nuqta, ikkalasi ham **kutilgan xulq**, bug emas:
    `apps/web/src/lib/api.ts` `window.location.href = '/login'` → gate.
    Ya'ni `/activate`ga borish kafolatlangan, lekin darhol emas.
 
+### 4.3 Qayta o'rnatish / mashina almashtirish (vendor amali)
+
+Mijoz kompyuterini almashtirsa yoki lokal baza yo'qolsa, mijoz tomonida hech
+qanday chiqish yo'li YO'Q — aktivatsiya qayta ishlaydi, lekin provisioning bloki
+kelmaydi (vaqtinchalik parol birinchi muvaffaqiyatli o'rnatishda o'chirilgan).
+Buni **faqat vendor** ochadi:
+
+**Admin panel → klinika → «Qayta o'rnatishga tayyorlash»** — yangi vaqtinchalik
+parol yaratadi va `fingerprint`ni tozalaydi. Natijada keyingi `/activate`
+istalgan mashinaga bog'lanadi va provisioning blokini oladi.
+
+Uchta xulq testda ajablantirmasligi uchun:
+
+1. **Eski o'rnatma darhol to'xtamaydi.** `fingerprint = NULL` bo'lgach eski
+   mashinaning heartbeat'i 403 `NOT_ACTIVATED` oladi, lekin klient faqat
+   `INVALID_KEY` da `.lic`ni bekor qiladi — qolgani "vaqtinchalik" deb
+   hisoblanadi (offline-resilience). Eski o'rnatma muddat/grace tugagunicha
+   ishlashda davom etadi. O'tish davri uchun bu **to'g'ri**; darhol to'xtatish
+   kerak bo'lsa litsenziyani **deaktivatsiya** qiling.
+2. **Tayyorlangan parol kutib turadi.** U ishlatilmaguncha, amal qayta
+   bajarilmaguncha yoki litsenziya deaktivatsiya qilinmaguncha Supervisor
+   bazasida qoladi. Agar mijoz bazasi BUTUN mashinada aktivatsiya qilsa,
+   provisioning skip bo'ladi va parol **o'chirilmaydi** — u hali kerak.
+   Bunday holat `license_events`da `provisioning_skipped` bilan ko'rinadi.
+3. **Bir klinikada bir vaqtda ko'pi bilan bitta tayyorlangan parol** — amalni
+   qayta bosish eskisini almashtiradi, to'plamaydi.
+
 ---
 
 ## 5. Caveats / troubleshooting

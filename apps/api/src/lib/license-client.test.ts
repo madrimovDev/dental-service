@@ -142,13 +142,39 @@ describe('markProvisioned', () => {
     globalThis.fetch = fetchMock as unknown as typeof fetch;
 
     const { markProvisioned } = await import('./license-client');
-    await markProvisioned('KEY-1');
+    await markProvisioned('KEY-1', true);
 
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/v1/provisioned'),
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ licenseKey: 'KEY-1', fingerprint: 'abc123fingerprint' }),
+        body: JSON.stringify({
+          licenseKey: 'KEY-1',
+          fingerprint: 'abc123fingerprint',
+          applied: true,
+        }),
+      }),
+    );
+  });
+
+  // Idempotent skip — Supervisor vaqtinchalik parolni SAQLASHI kerak, ya'ni
+  // `applied` bayrog'i haqiqatan uzatilishi shart (aks holda default `true`
+  // qo'llanib parol o'chib ketardi).
+  test('applied:false uzatiladi — skip holatida parol saqlanishi uchun', async () => {
+    const fetchMock = mock(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const { markProvisioned } = await import('./license-client');
+    await markProvisioned('KEY-1', false);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/v1/provisioned'),
+      expect.objectContaining({
+        body: JSON.stringify({
+          licenseKey: 'KEY-1',
+          fingerprint: 'abc123fingerprint',
+          applied: false,
+        }),
       }),
     );
   });
@@ -159,7 +185,7 @@ describe('markProvisioned', () => {
     }) as unknown as typeof fetch;
 
     const { markProvisioned } = await import('./license-client');
-    await expect(markProvisioned('KEY-1')).resolves.toBeUndefined();
+    await expect(markProvisioned('KEY-1', true)).resolves.toBeUndefined();
   });
 
   test('Supervisor 500 qaytarsa ham throw qilmaydi', async () => {
@@ -169,7 +195,7 @@ describe('markProvisioned', () => {
     ) as unknown as typeof fetch;
 
     const { markProvisioned } = await import('./license-client');
-    await expect(markProvisioned('KEY-1')).resolves.toBeUndefined();
+    await expect(markProvisioned('KEY-1', true)).resolves.toBeUndefined();
   });
 
   // JSDoc «fingerprint hisoblab bo'lmasligi (VM/konteyner) throw QILMAYDI»
@@ -182,7 +208,7 @@ describe('markProvisioned', () => {
     };
 
     const { markProvisioned } = await import('./license-client');
-    await expect(markProvisioned('KEY-1')).resolves.toBeUndefined();
+    await expect(markProvisioned('KEY-1', true)).resolves.toBeUndefined();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

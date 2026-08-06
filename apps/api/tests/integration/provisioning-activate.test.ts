@@ -145,7 +145,7 @@ const buildSupervisorResponse = (opts: ResponseOptions = {}): Record<string, unk
 
 // ─── Soxta Supervisor klienti (global mock EMAS — DI) ─────────────────────
 let supervisorResponse: Record<string, unknown> = buildSupervisorResponse();
-let provisionedCalls: string[] = [];
+let provisionedCalls: Array<{ licenseKey: string; applied: boolean }> = [];
 /** `.lic`ka yozilishi kerak bo'lgan obyektlar — invariant #2 shu yerda qulflanadi. */
 let writtenLicenses: Array<Record<string, unknown>> = [];
 
@@ -156,8 +156,8 @@ app.route(
     db,
     supervisorPublicKeyPem: testKeypair.publicKey,
     activate: async () => supervisorResponse as never,
-    markProvisioned: async (licenseKey: string) => {
-      provisionedCalls.push(licenseKey);
+    markProvisioned: async (licenseKey: string, applied: boolean) => {
+      provisionedCalls.push({ licenseKey, applied });
     },
     writeLicense: async (data) => {
       writtenLicenses.push(data as unknown as Record<string, unknown>);
@@ -268,7 +268,32 @@ describe('aktivatsiya provisioning — muvaffaqiyatli yo‘l', () => {
   test('Supervisor’ga provisioning tasdig‘i yuboriladi (markProvisioned)', async () => {
     await activate();
     expect(provisionedCalls.length).toBe(1);
-    expect(provisionedCalls[0]).toBe(LICENSE_KEY);
+    expect(provisionedCalls[0]?.licenseKey).toBe(LICENSE_KEY);
+    // Provisioning HAQIQATAN qo'llandi — Supervisor vaqtinchalik parolni
+    // o'chirishi kerak.
+    expect(provisionedCalls[0]?.applied).toBe(true);
+  });
+
+  test('idempotent skip’da Supervisor’ga `applied:false` uzatiladi', async () => {
+    // 🔴 Ssenariy: vendor `prepare-reinstall` bajardi, lekin mijoz bazasi
+    // BUTUN mashinada aktivatsiya qildi → tenant bor → provisioning skip.
+    // Ilgari `markProvisioned` shartsiz chaqirilardi va Supervisor
+    // QO'LLANMAGAN vaqtinchalik parolni o'chirib yuborardi — vendor amalni
+    // qaytadan bajarishga majbur bo'lardi.
+    await db.transaction((tx) =>
+      provisionTenantInTx(tx, {
+        tenantName: 'Mavjud klinika',
+        ownerPhone: '+998911111111',
+        ownerFullName: 'Mavjud Egasi',
+        ownerPassword: 'parol-12-belgi',
+        defaultLanguage: 'uz',
+      }),
+    );
+
+    await activate();
+
+    expect(provisionedCalls.length).toBe(1);
+    expect(provisionedCalls[0]?.applied).toBe(false);
   });
 
   test('`.lic`ka AYNAN `LicenseData` maydonlari uzatiladi', async () => {

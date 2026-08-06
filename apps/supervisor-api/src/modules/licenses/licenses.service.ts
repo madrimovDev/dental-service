@@ -199,7 +199,7 @@ export const createLicenseService = () => ({
    * yoki boshqa mashinaning fingerprint'i bo'lsa rad etiladi — provisioning
    * faqat aktivatsiya orqali yetkaziladi (CLI-411 precedenti).
    */
-  async provisioned(licenseKey: string, fingerprint: string) {
+  async provisioned(licenseKey: string, fingerprint: string, applied = true) {
     const lic = await db.query.licenses.findFirst({
       where: eq(licenses.licenseKey, licenseKey),
     });
@@ -210,6 +210,26 @@ export const createLicenseService = () => ({
     if (lic.fingerprint !== fingerprint) {
       throw Object.assign(new Error('FINGERPRINT_MISMATCH'), { status: 403 });
     }
+
+    // 🔴 `applied === false` — klinika tomonida provisioning IDEMPOTENT SKIP
+    // qilindi (lokal bazada tenant allaqachon bor). Vaqtinchalik parol
+    // QO'LLANMAGAN, shuning uchun o'chirilmaydi: aks holda vendor
+    // `prepare-reinstall` bilan tayyorlagan kredensial hech qachon
+    // ishlatilmasdan yonib ketardi va u amalni qaytadan bajarishga majbur
+    // bo'lardi.
+    //
+    // Hodisa baribir yoziladi — gate qo'yilgunga qadar vendorning yagona
+    // signali parolning yo'qolishi edi; endi skip ALOHIDA hodisa bilan
+    // ko'rinadi (CLAUDE.md §3.10).
+    if (!applied) {
+      await db.insert(licenseEvents).values({
+        licenseId: lic.id,
+        event: 'provisioning_skipped',
+        fingerprint,
+      });
+      return { ok: true as const };
+    }
+
     await clearTempPassword(lic);
     await db.insert(licenseEvents).values({
       licenseId: lic.id,
@@ -235,6 +255,31 @@ export const createLicenseService = () => ({
    * ochilib, birinchi heartbeat (boot'da + har 4 soat) parolni mijoz
    * aktivatsiya qilishga ULGURMASDAN o'chirib yuboradi. Buni
    * "soddalashtirib" NULL qilmang.
+   *
+   * ⚠️ TAYYORLANGAN KREDENSIAL QANCHA TURADI. Parol quyidagi uch holatdan biri
+   * yuz bermaguncha bazada saqlanadi:
+   *   (a) mijoz uni ISHLATADI — aktivatsiyada provisioning qo'llanadi va
+   *       `/v1/provisioned {applied:true}` uni o'chiradi;
+   *   (b) vendor bu amalni QAYTA bajaradi — parol ustiga yoziladi (to'planmaydi,
+   *       har klinikada ko'pi bilan bitta);
+   *   (c) litsenziya deaktivatsiya qilinadi.
+   * Aktivatsiya bo'lib, lekin provisioning skip qilinsa (`applied:false`) parol
+   * ATAYIN saqlanadi — u qo'llanmagan, ya'ni hali kerak. Bu — qabul qilingan
+   * murosa: kredensial "kutib turadi", chunki uni muddatidan oldin yo'q qilish
+   * vendorni amalni qaytadan bajarishga majbur qiladi. Vendor tomonidan qo'lda
+   * bekor qilish tugmasi hozircha YO'Q (follow-up ticket).
+   *
+   * ⚠️ ESKI O'RNATMA DARHOL TO'XTAMAYDI. `fingerprint = NULL` bo'lgach eski
+   * mashinaning heartbeat'i `NOT_ACTIVATED` (403) oladi, lekin
+   * `apps/api/src/lib/license-heartbeat-scheduler.ts` FAQAT `INVALID_KEY` da
+   * `.lic`ni bekor qiladi — qolgan barcha kodlar "vaqtinchalik" deb
+   * hisoblanadi (offline-resilience, qasddan). Ya'ni eski o'rnatma keshlangan
+   * litsenziya bilan muddat/grace tugagunicha ishlashda davom etadi. Bu
+   * mashina almashtirish uchun TO'G'RI xulq (o'tish davrida ikkalasi ham
+   * ishlaydi). Darhol to'xtatish kerak bo'lsa — `PATCH /:id/deactivate`.
+   * Scheduler'ni "tuzatib" `NOT_ACTIVATED`ni ham invalidatsiya qiluvchi
+   * qilmang: unda har bir nosoz Supervisor javobi klinikani litsenziyasiz
+   * qoldiradi.
    */
   async prepareReinstall(clinicId: string, adminId?: string) {
     const clinic = await db.query.clinics.findFirst({ where: eq(clinics.id, clinicId) });

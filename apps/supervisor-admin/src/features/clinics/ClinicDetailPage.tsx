@@ -260,6 +260,11 @@ export const ClinicDetailPage = () => {
             Mijoz istalgan kompyuterda litsenziya kalitini kiritib klinikani qaytadan o'rnata oladi.
             Eski parol ishlamay qoladi.
           </Text>
+          <Text size="sm" c="dimmed" mb="md">
+            Eslatma: eski o'rnatma darhol to'xtamaydi — u keshlangan litsenziya bilan muddat
+            tugagunicha ishlashda davom etadi. Darhol to'xtatish kerak bo'lsa litsenziyani alohida
+            deaktivatsiya qiling.
+          </Text>
           <Button onClick={() => prepareReinstall.mutate()} loading={prepareReinstall.isPending}>
             Tasdiqlash
           </Button>

@@ -272,9 +272,21 @@ export const activateRoutes = (deps: {
       return c.json(fail('LICENSE_WRITE_FAILED', "Litsenziya faylini yozib bo'lmadi"), 500);
     }
 
-    // Best-effort — Supervisor vaqtinchalik owner parolini bazasidan o'chirsin.
-    // `markProvisioned` hech qachon throw qilmaydi (license-client.ts).
-    if (provisioning) await confirmProvisioned(parsed.data.licenseKey);
+    // Best-effort — natijani Supervisor'ga bildiramiz. `markProvisioned` hech
+    // qachon throw qilmaydi (license-client.ts).
+    //
+    // 🔴 `provisioned === true` bo'lgandagina Supervisor vaqtinchalik parolni
+    // O'CHIRADI. Idempotent skip'da (`false`) parol SAQLANADI: u qo'llanmagan,
+    // ya'ni vendor `prepare-reinstall` bilan tayyorlagan kredensial hali
+    // kerak. Ilgari bu chaqiruv shartsiz edi va tayyorlangan parol hech
+    // ishlatilmasdan yonib ketardi — vendor amalni qaytadan bajarishga majbur
+    // bo'lardi.
+    //
+    // Skip holatida ham chaqiramiz (`applied: false`) — Supervisor
+    // `provisioning_skipped` hodisasini yozsin. Gate qo'yilgunga qadar
+    // vendorning yagona signali parolning yo'qolishi edi; usiz skip
+    // ko'rinmas bo'lib qolardi.
+    if (provisioning) await confirmProvisioned(parsed.data.licenseKey, provisioned === true);
 
     return c.json(
       ok({

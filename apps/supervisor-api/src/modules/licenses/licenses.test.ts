@@ -59,6 +59,44 @@ beforeEach(async () => {
   licenseId = license.id;
 });
 
+describe('POST /v1/provisioned', () => {
+  it('applied:false yuborilsa vaqtinchalik parol SAQLANADI', async () => {
+    await app.request('/v1/activate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ licenseKey, fingerprint: 'fp-abc' }),
+    });
+
+    const res = await app.request('/v1/provisioned', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ licenseKey, fingerprint: 'fp-abc', applied: false }),
+    });
+
+    expect(res.status).toBe(200);
+    const clinic = await db.query.clinics.findFirst({ where: eq(clinics.id, clinicId) });
+    expect(clinic?.ownerTempPassword).toBe('Temp-Parol-123');
+  });
+
+  it('`applied` berilmasa eski xulq saqlanadi (parol tozalanadi) — orqaga moslik', async () => {
+    await app.request('/v1/activate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ licenseKey, fingerprint: 'fp-abc' }),
+    });
+
+    const res = await app.request('/v1/provisioned', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ licenseKey, fingerprint: 'fp-abc' }),
+    });
+
+    expect(res.status).toBe(200);
+    const clinic = await db.query.clinics.findFirst({ where: eq(clinics.id, clinicId) });
+    expect(clinic?.ownerTempPassword).toBeNull();
+  });
+});
+
 describe('POST /v1/activate', () => {
   it("activates a valid license key va fingerprint bog'laydi", async () => {
     const res = await app.request('/v1/activate', {
@@ -235,6 +273,41 @@ describe('provisioning bloki', () => {
       .from(licenseEvents)
       .where(eq(licenseEvents.licenseId, licenseId));
     expect(events.some((e) => e.event === 'provisioned')).toBe(true);
+  });
+
+  it('provisioned(applied=false) parolni SAQLAYDI — tayyorlangan kredensial behuda yonmasin', async () => {
+    // Ssenariy: vendor `prepare-reinstall` bajardi, lekin mijoz bazasi BUTUN
+    // mashinada aktivatsiya qildi → `applyProvisioning` idempotent skip qildi.
+    // Vaqtinchalik parol QO'LLANMAGAN, shuning uchun o'chirilmasligi kerak —
+    // aks holda vendor amalni qaytadan bajarishga majbur bo'lardi.
+    await service.activate(licenseKey, 'fp-1');
+    await service.provisioned(licenseKey, 'fp-1', false);
+
+    const clinic = await db.query.clinics.findFirst({ where: eq(clinics.id, clinicId) });
+    expect(clinic?.ownerTempPassword).toBe('Temp-Parol-123');
+  });
+
+  it("provisioned(applied=false) 'provisioning_skipped' hodisasini yozadi", async () => {
+    // Vendor uchun yagona signal: parol yo'qolishi. Gate qo'yilgach bu signal
+    // yo'qoladi — shuning uchun skip ALOHIDA hodisa bilan ko'rinadigan qoladi.
+    await service.activate(licenseKey, 'fp-1');
+    await service.provisioned(licenseKey, 'fp-1', false);
+
+    const events = await db
+      .select()
+      .from(licenseEvents)
+      .where(eq(licenseEvents.licenseId, licenseId));
+    expect(events.some((e) => e.event === 'provisioning_skipped')).toBe(true);
+    expect(events.some((e) => e.event === 'provisioned')).toBe(false);
+  });
+
+  it('provisioned(applied=false) keyin provisioning bloki HALI ham qaytariladi', async () => {
+    // Parol saqlangani uchun mijoz haqiqatan qayta o'rnatganda blok keladi.
+    await service.activate(licenseKey, 'fp-1');
+    await service.provisioned(licenseKey, 'fp-1', false);
+
+    const res = await service.activate(licenseKey, 'fp-1');
+    expect(res.provisioning).toBeDefined();
   });
 
   it('provisioned() boshqa fingerprint bilan 403 (FINGERPRINT_MISMATCH)', async () => {

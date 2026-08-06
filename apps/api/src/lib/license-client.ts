@@ -71,13 +71,17 @@ export const sendHeartbeat = async (licenseKey: string): Promise<LicenseData> =>
  * heartbeat'da parolni baribir tozalaydi. Shu sababli javob `res.ok`/`res.json()`
  * ATAYIN tekshirilmaydi.
  */
-export const markProvisioned = async (licenseKey: string): Promise<void> => {
+export const markProvisioned = async (licenseKey: string, applied: boolean): Promise<void> => {
   try {
     const fingerprint = await getFingerprint();
     await fetch(`${SUPERVISOR_URL}/v1/provisioned`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ licenseKey, fingerprint }),
+      // 🔴 `applied` — provisioning HAQIQATAN qo'llandimi. `false` bo'lsa
+      // Supervisor vaqtinchalik parolni SAQLAYDI: u qo'llanmagan, ya'ni vendor
+      // `prepare-reinstall` bilan tayyorlagan kredensial hali kerak.
+      // Supervisor tomonda maydon ixtiyoriy va default `true` (orqaga moslik).
+      body: JSON.stringify({ licenseKey, fingerprint, applied }),
     });
   } catch {
     // no-op — best-effort

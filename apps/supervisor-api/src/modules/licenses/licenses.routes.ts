@@ -10,6 +10,16 @@ const activateSchema = z.object({
   fingerprint: z.string().min(1),
 });
 
+// `/provisioned` — `activate`/`heartbeat` dan farqli, klinika provisioning
+// blokini HAQIQATAN qo'llaganini bildiradi. `applied` IXTIYORIY va default
+// `true`: eski klient (yangilanmagan o'rnatma) maydonsiz yuboradi va o'sha
+// paytdagi xulqni oladi — parol tozalanadi.
+const provisionedSchema = z.object({
+  licenseKey: z.string().min(1),
+  fingerprint: z.string().min(1),
+  applied: z.boolean().optional(),
+});
+
 const verifyResetSchema = z.object({
   licenseKey: z.string().min(1),
   fingerprint: z.string().min(1),
@@ -67,10 +77,10 @@ export const licensesRoutes = (deps: { service?: LicenseService } = {}) => {
   // Rate-limit ATAYIN qo'yilmagan: servis aktiv fingerprint mosligini talab
   // qiladi (mos kelmasa 403), eng yomon holatda vaqtinchalik parol erta
   // tozalanadi — buni keyingi heartbeat baribir bajaradi.
-  app.post('/provisioned', zValidator('json', activateSchema), async (c) => {
+  app.post('/provisioned', zValidator('json', provisionedSchema), async (c) => {
     try {
-      const { licenseKey, fingerprint } = c.req.valid('json');
-      const data = await service.provisioned(licenseKey, fingerprint);
+      const { licenseKey, fingerprint, applied } = c.req.valid('json');
+      const data = await service.provisioned(licenseKey, fingerprint, applied ?? true);
       return c.json(data);
     } catch (e: any) {
       return c.json({ error: { code: e.message } }, e.status ?? 500);
