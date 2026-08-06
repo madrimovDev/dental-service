@@ -126,6 +126,26 @@ describe('prepareReinstall', () => {
     );
   });
 
+  // 🔴 NOZIK BOG'LIQLIK. `heartbeat` `if (!lic.provisionedAt)` shartida
+  // `clearTempPassword` chaqiradi — ya'ni `provisionedAt` NULL bo'lgan
+  // klinikada u tayyorlangan parolni mijoz aktivatsiya qilishga ulgurmasdan
+  // o'chirib yuborishi MUMKIN edi. Buni ikki narsa birgalikda to'sadi:
+  //   1. `prepareReinstall` `fingerprint = NULL` qiladi;
+  //   2. `heartbeat` `!lic.fingerprint` → `NOT_ACTIVATED` guard'i
+  //      `clearTempPassword`dan OLDIN turadi.
+  // Ikkalasidan birortasi o'zgarsa (guard tartibi yoki fingerprint tozalash
+  // olib tashlansa) parol jimgina yonib ketadi. Shu test o'sha juftlikni
+  // qulflaydi — mutatsiya bilan tekshirilgan.
+  test("tayyorlangandan keyin eski mashinaning heartbeat'i parolni O'CHIRMAYDI", async () => {
+    await db.update(licenses).set({ provisionedAt: null }).where(eq(licenses.id, licenseId));
+    const { tempPassword } = await service.prepareReinstall(clinicId, 'admin-1');
+
+    await expect(service.heartbeat(licenseKey, 'eski-mashina-fp')).rejects.toThrow('NOT_ACTIVATED');
+
+    const clinic = await db.query.clinics.findFirst({ where: eq(clinics.id, clinicId) });
+    expect(clinic?.ownerTempPassword).toBe(tempPassword);
+  });
+
   test('klinika topilmasa rad etadi', async () => {
     await expect(
       service.prepareReinstall('00000000-0000-0000-0000-000000000000', 'admin-1'),
