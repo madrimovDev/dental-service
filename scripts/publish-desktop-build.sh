@@ -17,7 +17,7 @@ BASE_URL="${BASE_URL:-http://192.168.3.242}"
 TARGET_DIR="dental-service/infra/supervisor/releases"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION="$(grep -m1 '"version"' "$ROOT_DIR/apps/desktop/package.json" | sed -E 's/.*"version"[^"]*"([^"]+)".*/\1/')"
+VERSION="$(grep -m1 '"version"' "$ROOT_DIR/apps/desktop/package.json" | sed -E 's/.*"version"[^"]*"([^"]+)".*/\1/')" || true
 
 if [ -z "$VERSION" ]; then
   echo "XATO: apps/desktop/package.json dan versiya o'qib bo'lmadi" >&2
@@ -72,7 +72,7 @@ exe_code="$(curl -s -o /dev/null -r 0-1024 -w '%{http_code}' "$BASE_URL/download
 [ "$exe_code" = "206" ] || { echo "  installer -> $exe_code (206 kutilgan)" >&2; fail=1; }
 
 remote_json="$(curl -s "$BASE_URL/download/release.json")"
-remote_size="$(printf '%s' "$remote_json" | grep -oE '"size"[[:space:]]*:[[:space:]]*[0-9]+' | grep -oE '[0-9]+$')"
+remote_size="$(printf '%s' "$remote_json" | grep -oE '"size"[[:space:]]*:[[:space:]]*[0-9]+' | grep -oE '[0-9]+$')" || true
 if [ "$remote_size" != "$SIZE" ]; then
   echo "  release.json hajmi mos emas: $remote_size != $SIZE" >&2
   fail=1
@@ -81,7 +81,7 @@ fi
 # Serverdagi FAYLNING haqiqiy hajmi (JSON da nima yozilganidan mustaqil) —
 # HEAD so'rovi, 135 MB yuklab olinmaydi.
 served_size="$(curl -sI "$BASE_URL/download/dental-service-setup.exe" \
-  | grep -i '^content-length:' | tr -d '\r' | awk '{print $2}')"
+  | grep -i '^content-length:' | tr -d '\r' | awk '{print $2}')" || true
 if [ -n "$served_size" ] && [ "$served_size" != "$SIZE" ]; then
   echo "  serverdagi fayl hajmi mos emas: $served_size != $SIZE" >&2
   fail=1
