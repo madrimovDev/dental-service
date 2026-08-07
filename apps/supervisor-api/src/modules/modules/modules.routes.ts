@@ -8,7 +8,12 @@ import { adminJwtMiddleware } from '../auth/jwt.middleware';
 
 const updateModulesSchema = z.object({
   modules: z.array(z.string()),
-  gracePeriodDays: z.number().int().optional(),
+  // 1..365 — `createClinicSchema` (clinics.routes.ts) bilan AYNI chegara.
+  // Grace period muddat tekshiruviga to'g'ridan-to'g'ri qo'shiladi (apps/api
+  // `isLicenseValid`: `hozir < expiresAt + gracePeriodDays`), shuning uchun
+  // chegarasiz qiymat litsenziyani amalda cheksiz uzaytirardi va yaratishdagi
+  // cheklov shu bitta endpoint orqali chetlab o'tilardi.
+  gracePeriodDays: z.number().int().min(1).max(365).optional(),
 });
 
 export const modulesRoutes = () => {

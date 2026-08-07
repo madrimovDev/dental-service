@@ -84,4 +84,35 @@ describe('PATCH /v1/admin/licenses/:key/modules', () => {
     const body = (await res.json()) as any;
     expect(body.error.code).toBe('NOT_FOUND');
   });
+
+  // Grace period muddat tekshiruviga TO'G'RIDAN-TO'G'RI qo'shiladi (apps/api
+  // `isLicenseValid`: `hozir < expiresAt + gracePeriodDays`), ya'ni chegarasiz
+  // qiymat litsenziyani amalda cheksiz uzaytiradi. Klinika yaratishda
+  // `createClinicSchema` 1..365 ni majburlaydi — bu yangilash yo'li ham xuddi
+  // shu chegarada bo'lishi shart, aks holda cheklov bitta endpoint orqali
+  // chetlab o'tiladi.
+  const OUT_OF_RANGE: [string, number][] = [
+    ['0 (juda kichik)', 0],
+    ['-5 (manfiy)', -5],
+    ['366 (365 dan katta)', 366],
+    ['100000 (amalda cheksiz)', 100000],
+  ];
+  for (const [label, gracePeriodDays] of OUT_OF_RANGE) {
+    it(`rejects gracePeriodDays ${label}`, async () => {
+      const { license } = await createClinicWithLicense('starter');
+      const res = await app.request(`/v1/admin/licenses/${license.licenseKey}/modules`, {
+        method: 'PATCH',
+        headers: await authHeaders(),
+        body: JSON.stringify({ modules: ['patients'], gracePeriodDays }),
+      });
+      expect(res.status).toBe(400);
+
+      // Rad etilgan so'rov modullarni ham o'zgartirmasligi shart.
+      const untouched = await db.query.licenses.findFirst({
+        where: eq(licenses.licenseKey, license.licenseKey),
+      });
+      expect(untouched?.gracePeriodDays).toBe(30);
+      expect(untouched?.modules).not.toEqual(['patients']);
+    });
+  }
 });
