@@ -28,6 +28,7 @@ kaliti endi mavjud emas.**
 | Owner login telefoni | `+998901112233` (F.I.Sh. «Firdavs Madrimov») |
 | Owner vaqtinchalik paroli | Supervisor admin panelidan olinadi (bu hujjatga commit qilinmaydi) — yo'qolsa `POST /v1/admin/clinics/<id>/prepare-reinstall` yangisini beradi |
 | Admin panel | `http://192.168.3.242` (login: `admin@dental.local` / parol — VM'dagi `infra/supervisor/.env.production` ичидаги `ADMIN_SEED_PASSWORD`) |
+| Yuklab olish sahifasi | `http://192.168.3.242/start` |
 
 > ✅ **Aktivatsiya zanjiri Linux'da jonli tekshirildi (2026-08-07)** — shu VM'ga qarshi, toza
 > bazada: `bootstrap-status {false,false}` → `POST /api/activate` → imzolangan provisioning
@@ -83,6 +84,24 @@ Nima uchun ishlaydi:
 **Faqat Windows'da bajarilishi mumkin bo'lgan qism — build EMAS, ishga tushirish:** o'rnatish,
 first-run `initdb`, process-manager, fingerprint bog'lash. Ya'ni Linux'da yig'ib, chiqqan
 `.exe` faylni Windows mashinasiga ko'chirib, faqat sinovni o'sha yerda o'tkazish mumkin.
+
+### Relizni chiqarish
+
+Build tugagach installerni Supervisor VM'ga chiqarish:
+
+```bash
+bash scripts/publish-desktop-build.sh
+```
+
+Skript PE32 ekanini tekshiradi (Linux'da `--target` tushib qolgan holatni
+ushlaydi), `release.json` yozadi, VM'ga yuklaydi va `curl` bilan tasdiqlaydi.
+So'ng sahifa: `http://192.168.3.242/start`.
+
+⚠️ Agar kelajakda VM'dagi butun `~/dental-service` daraxtini `rsync --delete`
+bilan qayta sinxronlaydigan buyruq qo'shilsa, unga ham `bins`dagi kabi
+`--exclude 'infra/supervisor/releases'` qo'shilishi SHART — aks holda 135 MB
+installer o'chib ketadi. Joriy holatda bu hujjatda daraxtni to'liq
+sinxronlaydigan rsync buyrug'i yo'q (VM 2026-08-07 da qo'lda qayta qurilgan).
 
 ---
 
