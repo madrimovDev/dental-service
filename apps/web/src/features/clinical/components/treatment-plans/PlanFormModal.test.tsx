@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { act, fireEvent, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { renderApp } from '../../../../test-utils';
 import { PlanFormModal } from './PlanFormModal';
@@ -34,7 +34,10 @@ describe('PlanFormModal (B7 — CLI-439)', () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText('Reja nomi'), { target: { value: 'Reja X' } });
+    // `required` TextInput label'iga aria-hidden yulduzcha qo'shadi ("Reja nomi *"),
+    // shuning uchun aniq mos kelish emas — prefiks bo'yicha qidiriladi.
+    const titleLabel = /^Reja nomi/;
+    fireEvent.change(screen.getByLabelText(titleLabel), { target: { value: 'Reja X' } });
     fireEvent.click(screen.getByRole('button', { name: "Bosqich qo'shish" }));
     fireEvent.change(screen.getByLabelText('Xizmat nomi'), { target: { value: 'Tozalash' } });
     fireEvent.click(screen.getByRole('button', { name: 'Rejani saqlash' }));
@@ -46,9 +49,13 @@ describe('PlanFormModal (B7 — CLI-439)', () => {
 
     // Backend muvaffaqiyatli javob bergan deb faraz — mutation onSuccess'ini
     // (TreatmentPlansTab `createMut.mutate(body, callbacks)` orqali) simulyatsiya qilamiz.
-    onCreate.mock.calls[0]?.[1]?.onSuccess();
+    // `form.reset()` React holatini yangilaydi — act() ichida chaqirilmasa
+    // assert'gacha render flush bo'lmaydi.
+    act(() => {
+      onCreate.mock.calls[0]?.[1]?.onSuccess();
+    });
 
-    expect((screen.getByLabelText('Reja nomi') as HTMLInputElement).value).toBe('');
+    expect((screen.getByLabelText(titleLabel) as HTMLInputElement).value).toBe('');
     expect(onClose).toHaveBeenCalled();
   });
 });

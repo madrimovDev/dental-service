@@ -11,7 +11,7 @@
     "worker:prod": "bun run src/worker.ts",
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "test": "bun test",
+    "test": "bun test --env-file=../../.env --timeout 30000",
     "db:generate": "bun --env-file=../../.env x drizzle-kit generate",
     "db:migrate": "bun --env-file=../../.env run src/db/migrate.ts",
     "db:migrate:prod": "bun run src/db/migrate.ts",

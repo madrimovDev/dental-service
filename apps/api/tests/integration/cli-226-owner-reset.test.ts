@@ -40,10 +40,18 @@ const buildApp = (verifyReset: (t: string) => Promise<{ ok: boolean }>) => {
   return app;
 };
 
+// Rate-limit bucket kaliti `rl:reset-owner-password:<ip>:-` — IP berilmasa
+// 'unknown' bo'ladi va BARCHA test so'rovlari bitta bucket'ni bo'lishadi
+// (limit 5, oyna 1 soat, Redis ishlab tursa qiymat run'lar orasida saqlanadi)
+// → 5-so'rovdan keyin 400 o'rniga 429 qaytardi. Har so'rovga unikal IP.
+let ipSeq = 0;
 const postReset = (app: Hono, body: unknown) =>
   app.request('/api/reset-owner-password', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: {
+      'content-type': 'application/json',
+      'x-real-ip': `10.226.0.${++ipSeq}`,
+    },
     body: JSON.stringify(body),
   });
 

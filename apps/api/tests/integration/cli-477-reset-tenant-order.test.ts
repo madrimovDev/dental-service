@@ -87,7 +87,9 @@ describe('CLI-477 #2 — reset-owner-password deterministik tenant tanlash', () 
     const newPassword = 'DeterministicNew1';
     const res = await app.request('/api/reset-owner-password', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      // Unikal IP — reset-owner-password rate-limit bucket'i (limit 5 / 1 soat)
+      // boshqa testlar bilan bo'lishilmasin (cli-226 dagi bilan bir xil sabab).
+      headers: { 'content-type': 'application/json', 'x-real-ip': '10.4.77.1' },
       body: JSON.stringify({ resetToken: 'XXXXX-YYYYY-ZZZZZ', newPassword }),
     });
     expect(res.status).toBe(200);

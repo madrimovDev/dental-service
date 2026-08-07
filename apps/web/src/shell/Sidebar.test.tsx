@@ -48,16 +48,17 @@ describe('Sidebar', () => {
     expect(screen.queryByText('Kassa')).toBeNull(); // cashier.view yo'q
   });
 
-  it('FUTURE (disabled) element non-owner uchun yashirin (CLI-161)', () => {
+  // `4ce4b07` transactions'ni FUTURE'dan LIVE'ga chiqargan (permission: cashier.view) —
+  // endi u ruxsat bilan boshqariladi, owner-only disabled element emas.
+  it('transactions ruxsatsiz yashirin, cashier.view bilan haqiqiy link (4ce4b07 dan keyin)', () => {
     renderApp(<Sidebar />);
-    expect(screen.queryByText('Tranzaksiyalar')).toBeNull(); // transactions FUTURE — owner emas
-  });
+    expect(screen.queryByText('Tranzaksiyalar')).toBeNull();
 
-  it("FUTURE (disabled) element owner uchun aria-disabled bilan ko'rinadi (CLI-161)", () => {
-    mockPermissions = ['@owner'];
+    mockPermissions = ['cashier.view'];
     renderApp(<Sidebar />);
-    const transactions = screen.getByText('Tranzaksiyalar');
-    expect(transactions.closest('[aria-disabled="true"]')).not.toBeNull();
+    const transactions = screen.getAllByText('Tranzaksiyalar')[0];
+    expect(transactions?.closest('a')).not.toBeNull();
+    expect(transactions?.closest('[aria-disabled="true"]')).toBeNull();
   });
 
   it("R4 LIVE element permission bilan haqiqiy link sifatida ko'rinadi (FUTURE emas)", () => {

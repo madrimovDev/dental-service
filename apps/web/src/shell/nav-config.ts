@@ -214,7 +214,13 @@ export const NAV_GROUPS: NavGroup[] = [
  * FUTURE (disabled) → faqat owner (hali realizatsiya qilinmagan, boshqa rollarda
  * butunlay yashiriladi); LIVE → permissionsiz yoki hasPermission.
  */
-function isVisible(
+/**
+ * Bitta element ko'rinadimi. Eksport qilingan — FUTURE (disabled) qoidasi qaysi
+ * element hozir qulfdan chiqarilganidan qat'i nazar test bilan qulflanadi
+ * (CLI-161; `4ce4b07` barcha FUTURE elementlarni LIVE qilgach real element
+ * ustidagi test eskirib qolgan edi).
+ */
+export function isVisible(
   item: NavItem,
   has: (p: string) => boolean,
   vertical: Vertical,

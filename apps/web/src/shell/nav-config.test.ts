@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NAV_GROUPS, visibleGroups } from './nav-config';
+import { isVisible, NAV_GROUPS, type NavItem, visibleGroups } from './nav-config';
 
 const ALL = () => true;
 
@@ -117,5 +117,26 @@ describe('nav-config', () => {
   it("vertical default 'dental' (parametr berilmasa) → lab ko'rinadi", () => {
     const items = visibleGroups(() => true, undefined, true).flatMap((g) => g.items);
     expect(items.find((i) => i.key === 'lab')).toBeDefined();
+  });
+});
+
+// CLI-161 — FUTURE (disabled) qoidasi. Sintetik element ustida sinaladi: ilgari bu
+// qoida real `transactions` elementi orqali tekshirilardi va `4ce4b07` uni LIVE
+// qilgach test jimgina eskirib qoldi. Nav-config tarkibiga bog'lanmasin.
+describe('FUTURE (disabled) element qoidasi (CLI-161)', () => {
+  const futureItem: NavItem = {
+    key: '__future__',
+    labelKey: 'nav.__future__',
+    icon: NAV_GROUPS[0]?.items[0]?.icon as NavItem['icon'],
+    path: '/__future__',
+    disabled: true,
+  };
+
+  it("owner uchun ko'rinadi (ruxsati bo'lmasa ham)", () => {
+    expect(isVisible(futureItem, () => false, 'dental', true)).toBe(true);
+  });
+
+  it("non-owner uchun yashirin (barcha ruxsat bo'lsa ham)", () => {
+    expect(isVisible(futureItem, ALL, 'dental', false)).toBe(false);
   });
 });
