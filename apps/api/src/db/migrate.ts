@@ -67,17 +67,26 @@ const APP_ROLE_PASSWORD = process.env.DENTAL_APP_DB_PASSWORD ?? 'dental_app_loca
 
 async function ensureAppRole(): Promise<void> {
   const existing = await adminDb.execute(sql`SELECT 1 FROM pg_roles WHERE rolname = ${APP_ROLE}`);
-  if (existing.length > 0) return;
+  if (existing.length === 0) {
+    logger.info({ role: APP_ROLE }, "App (non-superuser, NOBYPASSRLS) role yo'q — yaratilmoqda");
+    await adminDb.execute(
+      sql.raw(
+        `CREATE ROLE ${APP_ROLE} WITH LOGIN PASSWORD '${APP_ROLE_PASSWORD.replace(/'/g, "''")}'`,
+      ),
+    );
+    await adminDb.execute(
+      sql.raw(`ALTER ROLE ${APP_ROLE} NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE`),
+    );
+  }
 
-  logger.info({ role: APP_ROLE }, "App (non-superuser, NOBYPASSRLS) role yo'q — yaratilmoqda");
-  await adminDb.execute(
-    sql.raw(
-      `CREATE ROLE ${APP_ROLE} WITH LOGIN PASSWORD '${APP_ROLE_PASSWORD.replace(/'/g, "''")}'`,
-    ),
-  );
-  await adminDb.execute(
-    sql.raw(`ALTER ROLE ${APP_ROLE} NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE`),
-  );
+  // ⚠️ Grant'lar rol yaratilishidan MUSTAQIL qo'llanadi. Rol Postgres'da
+  // KLASTER darajasida yashaydi, grant'lar esa BAZA darajasida — "rol bor"
+  // dan "grant'lar berilgan" kelib chiqmaydi. Ilgari ikkalasi bitta erta
+  // `return` ortida edi: shu klasterda ikkinchi baza yaratilsa (dev'da e2e
+  // bazasi, desktop'da baza tiklash/qayta yaratish) rol allaqachon mavjud
+  // bo'lgani uchun grant bosqichi butunlay o'tkazib yuborilardi va API
+  // boot'da `permission denied for table permissions` bilan yiqilardi.
+  // GRANT'lar idempotent — har migratsiyada qayta berilishi xavfsiz.
   const dbName = decodeURIComponent(new URL(adminUrl).pathname.slice(1));
   await adminDb.execute(sql.raw(`GRANT CONNECT ON DATABASE "${dbName}" TO ${APP_ROLE}`));
   await adminDb.execute(sql.raw(`GRANT USAGE ON SCHEMA public TO ${APP_ROLE}`));

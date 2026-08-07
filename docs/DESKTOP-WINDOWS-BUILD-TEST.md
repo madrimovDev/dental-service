@@ -7,18 +7,40 @@
 
 ---
 
-## 0. Deploy holati — Supervisor TAYYOR (2026-07-11)
+## 0. Deploy holati — Supervisor QAYTA DEPLOY QILINDI (2026-08-07)
 
 Supervisor **VM 103** (`server3`, `192.168.3.242`) da ishlayapti (IP/HTTP, domensiz test rejimi).
-Yangi RSA keypair generatsiya qilingan; desktop build baked public key (`packages/core/src/supervisor-public-key.ts`) shunga mos.
+RSA keypair **o'zgarmadi** — VM'dagi `~/supervisor-private.pem` desktop build'ga baked qilingan
+ochiq kalit (`packages/core/src/supervisor-public-key.ts`) bilan juft (SHA prefiks `9c147ae6…`).
+
+2026-08-07 da baza **butunlay tozalandi** (`supervisor_postgres_data` volume o'chirildi) va
+joriy `main` kodi bilan qayta qurildi — shu bilan aktivatsiya provisioning (2026-08-03) va
+tiklanish (2026-08-06) epiklari birinchi marta VM'ga yetib bordi. **Eski `CB628-48559-B871D-69758`
+kaliti endi mavjud emas.**
 
 | Nima | Qiymat |
 |---|---|
 | `SUPERVISOR_URL` | `http://192.168.3.242` |
 | `POSTGRES_WIN_URL` | `http://192.168.3.242/bins/postgres-16-win.zip` |
 | `VALKEY_WIN_URL` | `http://192.168.3.242/bins/valkey-win.zip` |
-| Test litsenziya kaliti | `CB628-48559-B871D-69758` (premium, 11 modul, 2027-12-31 gacha) |
-| Admin panel | `http://192.168.3.242` (login: `admin@dental.local` / parol — deploy paytida generatsiya, chatда berilgan, bu hujjatga commit qilinmadi) |
+| Test litsenziya kaliti | `4F25F-4085C-13F1F-2E3E5` (premium, 11 modul, 2027-12-31 gacha) |
+| Klinika | «Test Klinika (Windows E2E)», filial «Bosh filial», `clinicId` `3bca0927-4668-4ba7-8334-9b082015802d` |
+| Owner login telefoni | `+998901112233` (F.I.Sh. «Firdavs Madrimov») |
+| Owner vaqtinchalik paroli | Supervisor admin panelidan olinadi (bu hujjatga commit qilinmaydi) — yo'qolsa `POST /v1/admin/clinics/<id>/prepare-reinstall` yangisini beradi |
+| Admin panel | `http://192.168.3.242` (login: `admin@dental.local` / parol — VM'dagi `infra/supervisor/.env.production` ичидаги `ADMIN_SEED_PASSWORD`) |
+
+> ✅ **Aktivatsiya zanjiri Linux'da jonli tekshirildi (2026-08-07)** — shu VM'ga qarshi, toza
+> bazada: `bootstrap-status {false,false}` → `POST /api/activate` → imzolangan provisioning
+> bloki → tenant + owner + filial + **8 rol shabloni** yaratildi → owner telefoni va
+> vaqtinchalik paroli bilan login **200** → `bootstrap-status {true,true}` → Supervisor'da
+> vaqtinchalik parol o'chirildi, fingerprint bog'landi. So'ng `prepare-reinstall` bilan
+> fingerprint tozalanib yangi vaqtinchalik parol berildi (Qaror #43 ham jonli tasdiqlandi).
+> **Ya'ni Windows sessiyasi endi faqat Windows'ga xos yo'llarni sinaydi** (installer,
+> first-run `initdb`, process-manager, fingerprint binding) — aktivatsiya mantig'ini emas.
+>
+> ⚠️ Windows'da aktivatsiya qilishdan oldin vaqtinchalik parolni admin paneldan oling.
+> Agar `FINGERPRINT_MISMATCH` chiqsa (litsenziya boshqa mashinaga bog'langan) — admin
+> paneldagi **prepare-reinstall** bitta amalda fingerprint'ni tozalaydi va yangi parol beradi.
 
 > ⚠️ **Tarmoq:** bu IP **ichki LAN** (`192.168.3.x`). Windows mashina shu tarmoqda bo'lishi shart
 > (masalan VM 102 `.245`, yoki LAN'dagi shaxsiy PC). Tashqarida bo'lsa — Supervisor'ni Traefik
@@ -109,7 +131,7 @@ Binariylar installer ichida bundled.
    ```
    (PowerShell admin: `[Environment]::SetEnvironmentVariable("SUPERVISOR_URL","http://192.168.3.242","Machine")` — keyin qayta login yoki ilovani yangi sessiyada oching.)
 3. Ilovani oching → first-run Postgres(5433)+Valkey(6380) ko'taradi + migratsiya (~5-15s) → `/activate` sahifasi ochiladi.
-4. Litsenziya kalitini kiriting: **`CB628-48559-B871D-69758`** → aktivatsiya → ilova yuklanadi.
+4. Litsenziya kalitini kiriting: **`4F25F-4085C-13F1F-2E3E5`** → aktivatsiya → ilova yuklanadi.
 5. Kuzating:
    - Machine-fingerprint binding (birinchi aktivatsiyada kalit shu mashinaga bog'lanadi)
    - Module-gating (premium → 11 modul ochiq)
