@@ -70,3 +70,6 @@ apps/desktop/infra
 
 # Playwright MCP sessiya artefaktlari (console log, page snapshot, screenshot)
 .playwright-mcp/
+
+# Desktop reliz artefaktlari (installer + metadata) — VM'ga rsync qilinadi, git'da EMAS
+infra/supervisor/releases/
