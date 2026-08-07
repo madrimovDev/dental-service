@@ -27,7 +27,7 @@ kaliti endi mavjud emas.**
 | Klinika | «Test Klinika (Windows E2E)», filial «Bosh filial», `clinicId` `3bca0927-4668-4ba7-8334-9b082015802d` |
 | Owner login telefoni | `+998901112233` (F.I.Sh. «Firdavs Madrimov») |
 | Owner vaqtinchalik paroli | Supervisor admin panelidan olinadi (bu hujjatga commit qilinmaydi) — yo'qolsa `POST /v1/admin/clinics/<id>/prepare-reinstall` yangisini beradi |
-| Admin panel | `http://192.168.3.242` (login: `admin@dental.local` / parol — VM'dagi `infra/supervisor/.env.production` ичидаги `ADMIN_SEED_PASSWORD`) |
+| Admin panel | `http://192.168.3.242` (login: `admin@dental.local` / parol — VM'dagi `infra/supervisor/.env.production` ichidagi `ADMIN_SEED_PASSWORD`) |
 | Yuklab olish sahifasi | `http://192.168.3.242/start` |
 
 > ✅ **Aktivatsiya zanjiri Linux'da jonli tekshirildi (2026-08-07)** — shu VM'ga qarshi, toza
@@ -87,6 +87,17 @@ first-run `initdb`, process-manager, fingerprint bog'lash. Ya'ni Linux'da yig'ib
 
 ### Relizni chiqarish
 
+> ⚠️ **Bir martalik bootstrap — birinchi publish'dan OLDIN.** Yangi
+> `Caddyfile.ip` (landing `/start` + `/download/*`) va `docker-compose.ip.yml`
+> (`./landing`, `./releases` mountlari) VM'da bo'lishi va caddy shu bilan
+> ko'tarilgan bo'lishi SHART. Yangi volume mount `docker compose … restart caddy`
+> bilan ILINMAYDI — konteyner qayta yaratilishi kerak:
+> `docker compose -f docker-compose.ip.yml --env-file .env.production up -d caddy`.
+> Agar bu bosqich o'tkazib yuborilsa: `/start` hali eski admin SPA'ni 200 bilan
+> qaytaradi (skript "muvaffaqiyatli" o'tadi), faqat installer tekshiruvi
+> `installer -> 200 (206 kutilgan)` bilan qulaydi — bu range-request muammosi
+> EMAS, `/download/*` route'i hali deploy qilinmaganini bildiradi.
+
 Build tugagach installerni Supervisor VM'ga chiqarish:
 
 ```bash
@@ -131,12 +142,12 @@ export VALKEY_WIN_URL="http://192.168.3.242/bins/valkey-win.zip"
 
 cd apps/desktop
 bun run prebuild    # download-bins (PG16+Valkey) + api.exe (bun compile) + web build
-bun run build       # build:main (tsc) + electron-builder → release\ ичида NSIS installer
+bun run build       # build:main (tsc) + electron-builder → release\ ichida NSIS installer
 ```
 
 **`prebuild` nima qiladi** (`apps/desktop/package.json`):
 1. `scripts/download-portable-bins.sh` → `POSTGRES_WIN_URL`/`VALKEY_WIN_URL`'dan yuklab, `apps/desktop/resources/postgres/{bin,lib}` + `resources/valkey/valkey-server.exe` ga chiqaradi.
-2. `build:api` → `cd apps/api && bun build --compile --outfile ../../dist/api.exe src/index.ts` (Windows'da `api.exe`).
+2. `build:api` → `cd apps/api && bun build --compile --target=bun-windows-x64 --outfile ../../dist/api.exe src/index.ts` (Windows'da `api.exe`; bayroq §0b'da tushuntirilgan sababga ko'ra MAJBURIY).
 3. `build:web` → `apps/web/dist`.
 
 **Qo'lda alternativa** (agar `.sh`/prebuild muammo bersa):
@@ -152,7 +163,7 @@ cd ../web && bun run build
 cd ../desktop && bun run build
 ```
 
-Natija: `apps/desktop/release/` ичida NSIS installer (`Dental Service Setup <ver>.exe`).
+Natija: `apps/desktop/release/` ichida NSIS installer (`Dental Service Setup <ver>.exe`).
 
 ---
 
@@ -169,7 +180,7 @@ Binariylar installer ichida bundled.
 - `postgres.exe` → **5433**, `valkey-server.exe` → **6380** child-process sifatida ishga tushadi
 - `api.exe` ishga tushib ularga ulanadi
 
-**Har keyingi startda:** process-manager Postgres+Valkey'ni avto qayta ishga tushiradi (Windows-service EMAS — ilova ochiq turганда yashaydi).
+**Har keyingi startda:** process-manager Postgres+Valkey'ni avto qayta ishga tushiradi (Windows-service EMAS — ilova ochiq turganda yashaydi).
 
 ➡️ **Foydalanuvchi Postgres/Valkey'ni qo'lda o'rnatmaydi/sozlamaydi.** Ilova self-contained.
 
@@ -285,7 +296,7 @@ Uchta xulq testda ajablantirmasligi uchun:
 | Aktivatsiya "invalid signature" | Desktop `main`dagi YANGI public key bilan build qilinganini tekshiring (`packages/core/src/supervisor-public-key.ts`); VM'dagi private kalitga mos |
 | Aktivatsiya Supervisor'ga ulanmadi | `SUPERVISOR_URL` env to'g'ri + Windows LAN'da `.242`ga yetadi (brauzerda tekshiring) |
 | Postgres/Valkey ko'tarilmadi | `C:\ProgramData\DentalService\logs\{postgres,valkey}.log` ni ko'ring |
-| Auto-update ishlamaydi | `UPDATE_URL` sozlanmagan (CLI-377) — qo'lda testда ta'sirsiz |
+| Auto-update ishlamaydi | `UPDATE_URL` sozlanmagan (CLI-377) — qo'lda testda ta'sirsiz |
 
 ---
 

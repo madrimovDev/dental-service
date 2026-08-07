@@ -71,5 +71,9 @@ apps/desktop/infra
 # Playwright MCP sessiya artefaktlari (console log, page snapshot, screenshot)
 .playwright-mcp/
 
-# Desktop reliz artefaktlari (installer + metadata) — VM'ga rsync qilinadi, git'da EMAS
-infra/supervisor/releases/
+# Desktop reliz artefaktlari (installer + metadata) — VM'ga rsync qilinadi, git'da EMAS.
+# Papka o'zi TRACKED (`.gitkeep` orqali) — toza clone'da yo'q bo'lsa, docker compose
+# bind-mount uni root:root yaratadi va publish-desktop-build.sh rsync qadamida
+# "Permission denied"ga uchraydi (haqiqiy sabab yashiringan xato bilan).
+infra/supervisor/releases/*
+!infra/supervisor/releases/.gitkeep
