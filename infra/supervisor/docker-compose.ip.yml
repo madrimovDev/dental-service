@@ -84,6 +84,8 @@ services:
     volumes:
       - ./Caddyfile.ip:/etc/caddy/Caddyfile:ro
       - ./bins:/srv/bins:ro
+      - ./landing:/srv/landing:ro
+      - ./releases:/srv/releases:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on: [api, admin]

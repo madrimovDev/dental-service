@@ -28,6 +28,23 @@
 		file_server browse
 	}
 
+	# Landing sahifa — BITTA fayl, shuning uchun `rewrite` bilan beriladi
+	# (papka listingi/traversal yuzasi ochilmaydi). Umumiy `handle` dan
+	# OLDIN turishi SHART, aks holda admin SPA hamma narsani ushlaydi.
+	handle /start {
+		root * /srv/landing
+		rewrite * /index.html
+		file_server
+	}
+
+	# Mijozga beriladigan reliz artefaktlari (installer + release.json).
+	# `bins/` dan ATAYIN alohida: bins = build KIRISHLARI (prebuild
+	# iste'mol qiladi), releases = mijozga CHIQISH.
+	handle_path /download/* {
+		root * /srv/releases
+		file_server
+	}
+
 	handle {
 		reverse_proxy admin:80
 	}
