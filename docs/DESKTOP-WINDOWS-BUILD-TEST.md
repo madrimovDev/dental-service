@@ -97,11 +97,13 @@ Skript PE32 ekanini tekshiradi (Linux'da `--target` tushib qolgan holatni
 ushlaydi), `release.json` yozadi, VM'ga yuklaydi va `curl` bilan tasdiqlaydi.
 So'ng sahifa: `http://192.168.3.242/start`.
 
-⚠️ Agar kelajakda VM'dagi butun `~/dental-service` daraxtini `rsync --delete`
-bilan qayta sinxronlaydigan buyruq qo'shilsa, unga ham `bins`dagi kabi
-`--exclude 'infra/supervisor/releases'` qo'shilishi SHART — aks holda 135 MB
-installer o'chib ketadi. Joriy holatda bu hujjatda daraxtni to'liq
-sinxronlaydigan rsync buyrug'i yo'q (VM 2026-08-07 da qo'lda qayta qurilgan).
+⚠️ VM'dagi `~/dental-service` daraxti **git klon EMAS** — transport `rsync`
+(qo'lda ishga tushiriladi, bu hujjatda skript sifatida commit qilinmagan;
+2026-08-07 qayta deploy'da `bins/` va `.env.production` exclude qilingan edi —
+qarang CLAUDE.md). Daraxtni shu rsync bilan qayta sinxronlaganda endi
+`infra/supervisor/releases` ham `--exclude 'infra/supervisor/releases'` bilan
+qo'shilishi SHART — aks holda `--delete` 135 MB installerni o'chirib yuboradi
+(xuddi `bins/` uchun ehtiyot chorasi bir xil sababdan).
 
 ---
 
