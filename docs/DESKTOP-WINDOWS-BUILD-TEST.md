@@ -52,7 +52,41 @@ kaliti endi mavjud emas.**
 
 ---
 
-## 1. Windows prerequisites
+## 0b. Build'ni LINUXDA qilish mumkin (2026-08-07 da amalda tekshirildi)
+
+Windows installerni Windows mashinasida yig'ish **shart emas** — butun zanjir Linux'da
+ishlaydi va `Dental Service Setup <ver>.exe` (NSIS, ~136 MB) chiqaradi:
+
+```bash
+export POSTGRES_WIN_URL="http://192.168.3.242/bins/postgres-16-win.zip"
+export VALKEY_WIN_URL="http://192.168.3.242/bins/valkey-win.zip"
+export UPDATE_URL="http://192.168.3.242/updates"   # electron-builder `publish:` uchun MAJBURIY
+
+bash scripts/download-portable-bins.sh              # curl+unzip — platformadan mustaqil
+(cd apps/api  && bun build --compile --target=bun-windows-x64 --outfile ../../dist/api.exe src/index.ts)
+(cd apps/web  && bun run build)
+(cd apps/desktop && bun run build:main && bunx electron-builder --config electron-builder.yml --win)
+```
+
+Nima uchun ishlaydi:
+- **`api.exe`** — Bun cross-compile qiladi (`--target=bun-windows-x64` → haqiqiy PE32+ binariy).
+  ⚠️ Bu bayroq **hayotiy muhim**: usiz `bun build --compile` HOST platformasiga quradi, ya'ni
+  Linux'da ELF binariy yasab uni `api.exe` deb ataydi. Installer muammosiz yig'iladi va faqat
+  mijoz mashinasida ishlamaydi. `package.json`dagi `build:api` endi bayroqni doim beradi
+  (Windows'da build qilinsa ham natija bir xil).
+- **Portable binariylar** — Supervisor VM'dan tayyor Windows zip sifatida yuklab olinadi,
+  hech narsa kompilyatsiya qilinmaydi.
+- **electron-builder** — NSIS/winCodeSign vositalarini o'zi yuklab oladi; imzo sertifikati
+  bo'lmagani uchun signtool bosqichi jimgina o'tkazib yuboriladi (`signHook=false`).
+  Wine talab qilinmadi.
+
+**Faqat Windows'da bajarilishi mumkin bo'lgan qism — build EMAS, ishga tushirish:** o'rnatish,
+first-run `initdb`, process-manager, fingerprint bog'lash. Ya'ni Linux'da yig'ib, chiqqan
+`.exe` faylni Windows mashinasiga ko'chirib, faqat sinovni o'sha yerda o'tkazish mumkin.
+
+---
+
+## 1. Windows prerequisites (agar build'ni Windows'da qilmoqchi bo'lsangiz)
 
 - **Bun** (Windows) — `powershell -c "irm bun.sh/install.ps1 | iex"` yoki [bun.sh](https://bun.sh)
 - **Git** + **Git Bash** (yoki WSL) — `prebuild` `.sh` skript ishlatadi (`scripts/download-portable-bins.sh`)
