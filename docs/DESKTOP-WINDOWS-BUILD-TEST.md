@@ -156,7 +156,7 @@ bun run build       # build:main (tsc) + electron-builder → release\ ichida NS
 #    resources/postgres/{bin,lib}   (postgres.exe + initdb.exe bilan)
 #    resources/valkey/valkey-server.exe
 # 2) api.exe:
-cd apps/api && bun build --compile --outfile ../../dist/api.exe src/index.ts
+cd apps/api && bun build --compile --target=bun-windows-x64 --outfile ../../dist/api.exe src/index.ts
 # 3) web:
 cd ../web && bun run build
 # 4) installer:
