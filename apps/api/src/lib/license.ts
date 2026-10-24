@@ -44,7 +44,39 @@ export const getAnchorPath = (): string =>
     ? 'C:\\ProgramData\\DentalService\\license-anchor.dat'
     : '/var/lib/dental-service/license-anchor.dat');
 
+// Hisoblangan fingerprint jarayon davomida keshlanadi.
+//
+// ⚠️ Bu ishlash uchun EMAS, ishlab turishi uchun kerak. `si.cpu()`/`si.system()`
+// Linux'da `/proc`dan o'qiydi (millisekund), Windows'da esa WMI/PowerShell'ga
+// murojaat qiladi — har biri ~1.5 s. `getActiveModules()` bitta so'rovda
+// fingerprint'ni TO'RT marta hisoblardi (readLicense→getKey, o'zi,
+// readAnchor→getKey, writeAnchor→getKey), natijada real Windows o'rnatmasida
+// har modul-gated endpoint ~6 soniya olardi (gate ostida bo'lmagan
+// `/api/services` esa ~50 ms). 2026-08-07 Windows sinovida HAR bilan o'lchandi.
+//
+// Xavfsizlikka ta'sir qilmaydi: nusxa-himoya imzolangan payload'dagi
+// fingerprint solishtiruviga (CLI-410) tayanadi va u har chaqiruvda bajariladi;
+// bu yerda faqat LOKAL apparat o'qishi keshlanadi. Apparat jarayon ishlab
+// turganda o'zgarmaydi, ilova qayta ishga tushganda kesh ham yangilanadi.
+// ⚠️ Kesh `globalThis`da, modul-darajali `let` da EMAS. `bun test` `mock.module`
+// bilan shu modulning bir NECHA nusxasini yaratishi mumkin; modul-darajali
+// o'zgaruvchida har nusxa o'z keshiga ega bo'lardi va testdagi
+// `resetFingerprintCache()` kod ishlatayotgan nusxaga ta'sir qilmasdi
+// (amalda tekshirildi: to'liq to'plamda license.test.ts yiqilishlari 4→9 o'sdi).
+// Jarayon bo'yicha yagona kesh ishlab chiqarish uchun ham to'g'riroq — bir
+// mashina, bir fingerprint.
+const FP_CACHE_KEY = Symbol.for('dental.license.fingerprintCache');
+type FpCarrier = { [FP_CACHE_KEY]?: string | null };
+
+/** Faqat testlar uchun — apparat mock'i o'zgarganda qayta hisoblash imkonini beradi. */
+export const resetFingerprintCache = (): void => {
+  (globalThis as FpCarrier)[FP_CACHE_KEY] = null;
+};
+
 export const getFingerprint = async (): Promise<string> => {
+  const cached = (globalThis as FpCarrier)[FP_CACHE_KEY];
+  if (cached) return cached;
+
   // CLI-432 — network-interface MAC ATAYIN OLINMAYDI. Oldingi fingerprint
   // default (asosiy) tarmoq interfeysi MAC'ini ham qamrardi; u beqaror
   // (Wi-Fi <-> Ethernet almashtirish, USB/VPN/virtual adapter default bo'lib
@@ -62,7 +94,12 @@ export const getFingerprint = async (): Promise<string> => {
   }
 
   const raw = `${cpu.manufacturer}:${cpu.brand}:${system.uuid}:${system.serial}`;
-  return createHash('sha256').update(raw).digest('hex');
+  // Kesh FAQAT muvaffaqiyatli natija uchun — `FINGERPRINT_UNAVAILABLE` yuqorida
+  // throw qiladi va keshlanmaydi, aks holda vaqtinchalik apparat xatosi
+  // litsenziyani jarayon oxirigacha o'lik qoldirardi.
+  const fp = createHash('sha256').update(raw).digest('hex');
+  (globalThis as FpCarrier)[FP_CACHE_KEY] = fp;
+  return fp;
 };
 
 const getKey = async () => {

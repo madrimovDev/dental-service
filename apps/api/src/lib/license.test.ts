@@ -65,20 +65,27 @@ describe('getFingerprint', () => {
     };
     const original = si.networkInterfaces;
 
-    const { getFingerprint } = await import('./license');
+    const { getFingerprint, resetFingerprintCache } = await import('./license');
+    // ⚠️ Har chaqiruvdan oldin kesh tozalanadi — aks holda keshlangan qiymat
+    // qaytib, test MAC hisobga olinsa ham YASHIL bo'lardi (ya'ni hech narsani
+    // tekshirmasdi).
     // MAC A (default eth0)
     si.networkInterfaces = async () => [{ iface: 'eth0', mac: 'AA:AA:AA:AA:AA:AA', default: true }];
+    resetFingerprintCache();
     const fpA = await getFingerprint();
     // MAC B (default wlan0) — same machine, different active NIC
     si.networkInterfaces = async () => [
       { iface: 'wlan0', mac: 'BB:BB:BB:BB:BB:BB', default: true },
     ];
+    resetFingerprintCache();
     const fpB = await getFingerprint();
     // No default interface at all
     si.networkInterfaces = async () => [];
+    resetFingerprintCache();
     const fpNone = await getFingerprint();
 
     si.networkInterfaces = original;
+    resetFingerprintCache();
 
     expect(fpA).toBe(fpB);
     expect(fpA).toBe(fpNone);
@@ -91,10 +98,74 @@ describe('getFingerprint', () => {
     const original = si.system;
     si.system = async () => ({ uuid: '', serial: '' });
 
-    const { getFingerprint } = await import('./license');
+    const { getFingerprint, resetFingerprintCache } = await import('./license');
+    // Fingerprint jarayon davomida keshlanadi — bu test apparatni "o'zgartirib"
+    // qayta hisoblanishini talab qiladi, shuning uchun kesh tozalanadi.
+    resetFingerprintCache();
     await expect(getFingerprint()).rejects.toThrow('FINGERPRINT_UNAVAILABLE');
 
     si.system = original;
+    resetFingerprintCache();
+  });
+
+  // Windows'da `si.cpu()`/`si.system()` WMI'ga murojaat qiladi (~1.5s har biri).
+  // `getActiveModules()` bitta so'rovda fingerprint'ni TO'RT marta hisoblardi
+  // (readLicense→getKey, o'zi, readAnchor→getKey, writeAnchor→getKey) — real
+  // Windows testida modul-gated endpoint'lar ~6 soniya olardi, gate ostida
+  // bo'lmagan `/api/services` esa ~50ms. Apparat jarayon ishlab turganda
+  // o'zgarmaydi, shuning uchun natija keshlanadi.
+  test("apparatni faqat BIR marta so'raydi (keshlanadi)", async () => {
+    const si = (await import('systeminformation')).default as {
+      cpu: () => Promise<unknown>;
+      system: () => Promise<unknown>;
+    };
+    const originalCpu = si.cpu;
+    const originalSystem = si.system;
+    let cpuCalls = 0;
+    let systemCalls = 0;
+    si.cpu = async () => {
+      cpuCalls++;
+      return { physicalCores: 4, manufacturer: 'Intel', brand: 'i5' };
+    };
+    si.system = async () => {
+      systemCalls++;
+      return { uuid: 'test-uuid-1234', serial: 'SN123456' };
+    };
+
+    const { getFingerprint, resetFingerprintCache } = await import('./license');
+    resetFingerprintCache();
+    const a = await getFingerprint();
+    const b = await getFingerprint();
+    const c = await getFingerprint();
+
+    si.cpu = originalCpu;
+    si.system = originalSystem;
+    resetFingerprintCache();
+
+    expect(a).toBe(b);
+    expect(b).toBe(c);
+    expect(cpuCalls).toBe(1);
+    expect(systemCalls).toBe(1);
+  });
+
+  // Muvaffaqiyatsiz natija KESHLANMAYDI — aks holda vaqtinchalik apparat
+  // xatosi jarayon oxirigacha litsenziyani o'lik qoldirardi.
+  test('xato keshlanmaydi — keyingi chaqiruv qayta uriniladi', async () => {
+    const si = (await import('systeminformation')).default as {
+      system: () => Promise<unknown>;
+    };
+    const original = si.system;
+    const { getFingerprint, resetFingerprintCache } = await import('./license');
+    resetFingerprintCache();
+
+    si.system = async () => ({ uuid: '', serial: '' });
+    await expect(getFingerprint()).rejects.toThrow('FINGERPRINT_UNAVAILABLE');
+
+    si.system = original;
+    const fp = await getFingerprint();
+    expect(fp).toMatch(/^[a-f0-9]{64}$/);
+
+    resetFingerprintCache();
   });
 });
 
