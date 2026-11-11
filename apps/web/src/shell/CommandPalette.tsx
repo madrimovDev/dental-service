@@ -12,12 +12,12 @@ import { useUsers, useVertical } from '@/features/settings/settings.api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import classes from './CommandPalette.module.css';
 import { buildPatientActions, buildQuickActions, buildStaffActions } from './command-actions';
-import { visibleGroups } from './nav-config';
+import { paletteNavItems } from './nav-config';
 
 export function CommandPalette() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { hasPermission } = useAuthStore();
+  const { hasPermission, permissions } = useAuthStore();
   const vertical = useVertical();
 
   const [query, setQuery] = useState('');
@@ -35,18 +35,20 @@ export function CommandPalette() {
   // bo'lganda va query bo'lsa olinadi (ruxsatsiz rolda 403 oldini oladi).
   const { data: staffData } = useUsers({ enabled: canSearchStaff && hasQuery });
 
-  const navActions: SpotlightActionData[] = visibleGroups(hasPermission, vertical)
-    .flatMap((g) => g.items)
-    .filter((item) => !item.disabled)
-    .map((item) => {
-      const Icon = item.icon;
-      return {
-        id: `nav-${item.key}`,
-        label: t(item.labelKey),
-        leftSection: <Icon size={18} />,
-        onClick: () => navigate(item.path),
-      };
-    });
+  // Rolga qaramasdan BARCHA ruxsatli sahifalar (menyu rolga moslashgan, ⌘K — to'liq).
+  const navActions: SpotlightActionData[] = paletteNavItems(
+    hasPermission,
+    vertical,
+    permissions.includes('@owner'),
+  ).map((item) => {
+    const Icon = item.icon;
+    return {
+      id: `nav-${item.key}`,
+      label: t(item.labelKey),
+      leftSection: <Icon size={18} />,
+      onClick: () => navigate(item.path),
+    };
+  });
 
   const quickActions: SpotlightActionData[] = buildQuickActions({
     t,

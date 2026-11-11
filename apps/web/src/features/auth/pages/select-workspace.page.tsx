@@ -1,9 +1,7 @@
 import { ApiError } from '@dental/api-client';
+import { AlertBanner, Card, StatusPill } from '@dental/ui';
 import {
-  Alert,
-  Badge,
   Button,
-  Card,
   Container,
   Group,
   Loader,
@@ -141,20 +139,21 @@ export function SelectWorkspacePage() {
       </Title>
 
       {options.length === 0 && (
-        <Alert color="yellow" variant="light">
-          {t('auth.select_workspace.no_workspaces')}
-        </Alert>
+        <AlertBanner tier={2}>{t('auth.select_workspace.no_workspaces')}</AlertBanner>
       )}
 
       {invites.length > 0 && (
         <Stack gap="sm" mb="lg">
           <Title order={4}>{t('auth.invitations.title')}</Title>
           {invites.map((inv) => (
-            <Card key={inv.id} withBorder padding="md" radius="md">
+            <Card key={inv.id}>
               <Group justify="space-between" wrap="nowrap">
-                <Stack gap={2}>
-                  <Text fw={600}>{inv.tenantName}</Text>
-                  <Text size="sm" c="dimmed">
+                <Stack gap={4}>
+                  <Group gap="xs">
+                    <Text fw={600}>{inv.tenantName}</Text>
+                    <StatusPill status="waiting">{t('settings.users.pending')}</StatusPill>
+                  </Group>
+                  <Text size="sm" c="var(--text-2)">
                     {inv.branchName ?? t('auth.select_workspace.all_branches')} · {inv.roleName}
                   </Text>
                 </Stack>
@@ -202,16 +201,18 @@ export function SelectWorkspacePage() {
             }}
             disabled={switchMut.isPending}
           >
-            <Card withBorder padding="md" radius="md">
+            <Card>
               <Group justify="space-between">
                 <Stack gap={2}>
                   <Text fw={600}>{opt.tenantName}</Text>
-                  <Text size="sm" c="dimmed">
+                  <Text size="sm" c="var(--text-2)">
                     {opt.branchName ?? t('auth.select_workspace.all_branches')} · {opt.roleName}
                   </Text>
                 </Stack>
                 {opt.isOwner && (
-                  <Badge color="teal">{t('auth.select_workspace.owner_badge')}</Badge>
+                  <StatusPill status="confirmed">
+                    {t('auth.select_workspace.owner_badge')}
+                  </StatusPill>
                 )}
               </Group>
             </Card>

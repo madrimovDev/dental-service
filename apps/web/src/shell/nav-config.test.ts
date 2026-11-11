@@ -1,5 +1,14 @@
+import { ROLE_TEMPLATES } from '@dental/core';
 import { describe, expect, it } from 'vitest';
-import { isVisible, NAV_GROUPS, type NavItem, visibleGroups } from './nav-config';
+import {
+  isVisible,
+  layoutForRole,
+  NAV_GROUPS,
+  type NavItem,
+  paletteNavItems,
+  sidebarModel,
+  visibleGroups,
+} from './nav-config';
 
 const ALL = () => true;
 
@@ -138,5 +147,155 @@ describe('FUTURE (disabled) element qoidasi (CLI-161)', () => {
 
   it("non-owner uchun yashirin (barcha ruxsat bo'lsa ham)", () => {
     expect(isVisible(futureItem, ALL, 'dental', false)).toBe(false);
+  });
+});
+
+// UI-0 1.5 — rolga moslashuvchi menyu. Fixture'lar REAL rol shablonlari (packages/core),
+// `@owner` emas (RBAC ekran<->endpoint bo'shlig'i darsi).
+const permsOf = (templateKey: string): Set<string> => {
+  const t = ROLE_TEMPLATES.find((r) => r.templateKey === templateKey);
+  if (!t) throw new Error(`template yo'q: ${templateKey}`);
+  return new Set<string>(t.permissions);
+};
+const hasOf = (perms: Set<string>) => (p: string) => perms.has(p);
+const shape = (m: ReturnType<typeof sidebarModel>) =>
+  m.groups.map((g) => [g.labelKey, g.items.map((i) => i.key)]);
+
+describe('rolga moslashuvchi sidebar (1.5)', () => {
+  it("layoutForRole: owner -> rahbar, noma'lum/custom -> null", () => {
+    expect(layoutForRole(null, true)).toBe('rahbar');
+    expect(layoutForRole('receptionist', false)).toBe('registrator');
+    expect(layoutForRole('doctor', false)).toBe('shifokor');
+    expect(layoutForRole('technician', false)).toBe('texnik');
+    expect(layoutForRole('accountant', false)).toBeNull();
+    expect(layoutForRole(null, false)).toBeNull();
+  });
+
+  it("Receptionist: 'Bugungi ish' + 'Bemorlar va pul', Sozlamalar menyuda YO'Q", () => {
+    const m = sidebarModel({
+      roleKey: 'receptionist',
+      has: hasOf(permsOf('receptionist')),
+    });
+    expect(m.layout).toBe('registrator');
+    const keys = m.groups.flatMap((g) => g.items.map((i) => i.key));
+    expect(m.groups.map((g) => g.labelKey)).toEqual([
+      'nav.role_group.today',
+      'nav.role_group.patients_money',
+    ]);
+    expect(keys).toEqual(expect.arrayContaining(['home', 'appointments', 'queue', 'patients']));
+    expect(keys).not.toContain('settings');
+    expect(m.footer).toEqual([]);
+  });
+
+  it("Receptionist: ruxsat (tenant.view) bor -> Sozlamalar menyuda yo'q, lekin ⌘K'da bor", () => {
+    const perms = permsOf('receptionist');
+    expect(perms.has('tenant.view')).toBe(true); // fixture haqiqatan ruxsatli
+    const m = sidebarModel({ roleKey: 'receptionist', has: hasOf(perms) });
+    expect([...m.groups.flatMap((g) => g.items), ...m.footer].map((i) => i.key)).not.toContain(
+      'settings',
+    );
+    expect(paletteNavItems(hasOf(perms)).map((i) => i.key)).toContain('settings');
+  });
+
+  it('Doctor: Mening kunim + Navbat; Davolash — Bemorlar, rejalar, laboratoriya', () => {
+    const m = sidebarModel({ roleKey: 'doctor', has: hasOf(permsOf('doctor')) });
+    expect(shape(m)).toEqual([
+      ['nav.role_group.today', ['home', 'queue']],
+      ['nav.role_group.treatment', ['patients', 'plans', 'lab']],
+    ]);
+    expect(m.groups[0]?.items[0]?.labelKey).toBe('nav.role.my_day');
+  });
+
+  it("Doctor, vertical 'general' -> laboratoriya tushadi", () => {
+    const m = sidebarModel({
+      roleKey: 'doctor',
+      has: hasOf(permsOf('doctor')),
+      vertical: 'general',
+    });
+    expect(m.groups.flatMap((g) => g.items.map((i) => i.key))).not.toContain('lab');
+  });
+
+  it('Tenant Admin: Umumiy + Boshqaruv, Sozlamalar pastda (rahbar)', () => {
+    const m = sidebarModel({ roleKey: 'tenant_admin', has: hasOf(permsOf('tenant_admin')) });
+    expect(m.layout).toBe('rahbar');
+    expect(m.groups.map((g) => g.labelKey)).toEqual([
+      'nav.role_group.general',
+      'nav.group.boshqaruv',
+    ]);
+    const keys = m.groups.flatMap((g) => g.items.map((i) => i.key));
+    expect(keys).toEqual(
+      expect.arrayContaining([
+        'home',
+        'appointments',
+        'patients',
+        'cashier',
+        'reports',
+        'stock',
+        'users',
+      ]),
+    );
+    expect(m.footer.map((i) => i.key)).toEqual(['settings']);
+  });
+
+  it('Owner (@owner, roleKey yoq): rahbar maketi + Sozlamalar', () => {
+    const m = sidebarModel({ roleKey: null, has: () => true, isOwner: true });
+    expect(m.layout).toBe('rahbar');
+    expect(m.footer.map((i) => i.key)).toEqual(['settings']);
+  });
+
+  it('Technician: faqat Buyurtmalar (lab)', () => {
+    const m = sidebarModel({ roleKey: 'technician', has: hasOf(permsOf('technician')) });
+    expect(shape(m)).toEqual([['nav.role_group.laboratory', ['lab']]]);
+    expect(m.groups[0]?.items[0]?.labelKey).toBe('nav.role.lab_orders');
+    expect(m.footer).toEqual([]);
+  });
+
+  it("Custom rol (roleKey yo'q, faqat patient.view + appointment.view): menyu BO'SH EMAS, 3-guruh fallback", () => {
+    const m = sidebarModel({
+      roleKey: null,
+      has: hasOf(new Set(['patient.view', 'appointment.view'])),
+    });
+    expect(m.layout).toBeNull();
+    const keys = m.groups.flatMap((g) => g.items.map((i) => i.key));
+    expect(keys).toEqual(expect.arrayContaining(['home', 'appointments', 'patients']));
+    expect(keys).not.toContain('settings');
+  });
+
+  it('Accountant (maketsiz shablon): permission-filter fallback', () => {
+    const m = sidebarModel({ roleKey: 'accountant', has: hasOf(permsOf('accountant')) });
+    expect(m.layout).toBeNull();
+    expect(m.groups.length).toBeGreaterThan(0);
+  });
+
+  it("maket bor, lekin hech band ruxsatli emas -> fallback (bo'sh menyu yo'q)", () => {
+    const m = sidebarModel({ roleKey: 'technician', has: hasOf(new Set(['patient.view'])) });
+    expect(m.layout).toBeNull();
+    expect(m.groups.flatMap((g) => g.items.map((i) => i.key))).toContain('patients');
+  });
+
+  it("har rol: menyudagi har band ruxsatli (ruxsatsiz band yo'q)", () => {
+    for (const t of ROLE_TEMPLATES) {
+      const perms = new Set<string>(t.permissions);
+      const m = sidebarModel({ roleKey: t.templateKey, has: hasOf(perms) });
+      for (const i of [...m.groups.flatMap((g) => g.items), ...m.footer]) {
+        const need = i.permission
+          ? Array.isArray(i.permission)
+            ? i.permission
+            : [i.permission]
+          : [];
+        expect(need.length === 0 || need.some((p) => perms.has(p))).toBe(true);
+      }
+    }
+  });
+
+  it("⌘K: menyudagi har band paletada ham bor (topib bo'lmaydigan sahifa yo'q)", () => {
+    for (const t of ROLE_TEMPLATES) {
+      const has = hasOf(new Set<string>(t.permissions));
+      const m = sidebarModel({ roleKey: t.templateKey, has });
+      const palette = new Set(paletteNavItems(has).map((i) => i.key));
+      for (const i of [...m.groups.flatMap((g) => g.items), ...m.footer]) {
+        expect(palette.has(i.key)).toBe(true);
+      }
+    }
   });
 });

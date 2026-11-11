@@ -254,3 +254,178 @@ export function visibleGroups(
     items: g.items.filter((i) => isVisible(i, has, vertical, isOwner)),
   })).filter((g) => g.items.length > 0);
 }
+
+// ---------------------------------------------------------------------------
+// Rolga moslashuvchi menyu (UI-0 1.5)
+// ---------------------------------------------------------------------------
+
+/** Menyu maketi — `roleKey` (roles.template_key) yoki owner'dan aniqlanadi. */
+export type RoleLayoutKind = 'registrator' | 'shifokor' | 'rahbar' | 'texnik';
+
+/** templateKey → maket. Ro'yxatda yo'q (accountant, custom rol, no-context) → permission-filter fallback. */
+const LAYOUT_BY_ROLE_KEY: Record<string, RoleLayoutKind> = {
+  receptionist: 'registrator',
+  doctor: 'shifokor',
+  doctor_assistant: 'shifokor',
+  nurse: 'shifokor',
+  tenant_admin: 'rahbar',
+  branch_manager: 'rahbar',
+  technician: 'texnik',
+};
+
+export function layoutForRole(roleKey: string | null, isOwner: boolean): RoleLayoutKind | null {
+  if (isOwner) return 'rahbar';
+  return roleKey ? (LAYOUT_BY_ROLE_KEY[roleKey] ?? null) : null;
+}
+
+/** Maket bandi — katalog (`NAV_GROUPS`) elementiga havola, ixtiyoriy qisqa yorliq bilan. */
+type LayoutEntry = { key: string; labelKey?: string };
+type LayoutGroup = { labelKey: string; entries: LayoutEntry[] };
+type RoleLayout = { groups: LayoutGroup[]; footer: LayoutEntry[] };
+
+export const ROLE_LAYOUTS: Record<RoleLayoutKind, RoleLayout> = {
+  registrator: {
+    groups: [
+      {
+        labelKey: 'nav.role_group.today',
+        entries: [
+          { key: 'home', labelKey: 'nav.role.today' },
+          { key: 'appointments' },
+          { key: 'queue', labelKey: 'nav.role.queue' },
+        ],
+      },
+      {
+        labelKey: 'nav.role_group.patients_money',
+        entries: [
+          { key: 'patients', labelKey: 'nav.role.patients' },
+          { key: 'cashier' },
+          { key: 'recalls', labelKey: 'nav.role.recalls' },
+        ],
+      },
+    ],
+    footer: [],
+  },
+  shifokor: {
+    groups: [
+      {
+        labelKey: 'nav.role_group.today',
+        entries: [
+          { key: 'home', labelKey: 'nav.role.my_day' },
+          { key: 'queue', labelKey: 'nav.role.queue' },
+        ],
+      },
+      {
+        labelKey: 'nav.role_group.treatment',
+        entries: [
+          { key: 'patients', labelKey: 'nav.role.patients' },
+          { key: 'plans' },
+          { key: 'lab', labelKey: 'nav.role.lab' },
+        ],
+      },
+    ],
+    footer: [],
+  },
+  rahbar: {
+    groups: [
+      {
+        labelKey: 'nav.role_group.general',
+        entries: [
+          { key: 'home', labelKey: 'nav.role.today' },
+          { key: 'appointments' },
+          { key: 'patients', labelKey: 'nav.role.patients' },
+          { key: 'cashier' },
+        ],
+      },
+      {
+        labelKey: 'nav.group.boshqaruv',
+        entries: [
+          { key: 'reports' },
+          { key: 'stock' },
+          { key: 'users', labelKey: 'nav.role.staff' },
+          { key: 'expenses' },
+          { key: 'payroll' },
+        ],
+      },
+    ],
+    // Sozlamalar faqat rahbarda — menyu pastida
+    footer: [{ key: 'settings' }],
+  },
+  texnik: {
+    groups: [
+      {
+        labelKey: 'nav.role_group.laboratory',
+        entries: [{ key: 'lab', labelKey: 'nav.role.lab_orders' }],
+      },
+    ],
+    footer: [],
+  },
+};
+
+const CATALOGUE: Map<string, NavItem> = new Map(
+  NAV_GROUPS.flatMap((g) => g.items).map((i) => [i.key, i]),
+);
+
+function resolveEntries(
+  entries: LayoutEntry[],
+  has: (p: string) => boolean,
+  vertical: Vertical,
+  isOwner: boolean,
+): NavItem[] {
+  const out: NavItem[] = [];
+  for (const e of entries) {
+    const base = CATALOGUE.get(e.key);
+    if (!base || !isVisible(base, has, vertical, isOwner)) continue;
+    out.push(e.labelKey ? { ...base, labelKey: e.labelKey } : base);
+  }
+  return out;
+}
+
+export type SidebarModel = {
+  /** Asosiy guruhlar (bo'sh guruh tushirilgan). */
+  groups: NavGroup[];
+  /** Menyu pastidagi elementlar (rahbar: Sozlamalar). */
+  footer: NavItem[];
+  layout: RoleLayoutKind | null;
+};
+
+/**
+ * Sidebar modeli. Maket rolga bog'liq, lekin har band baribir permission/vertical bilan
+ * filtrlanadi. Maket yo'q (custom rol, accountant, no-context) yoki maketdan hech narsa
+ * qolmasa → mavjud 3-guruh permission-filter (menyu hech qachon bo'sh qolmaydi).
+ */
+export function sidebarModel(input: {
+  roleKey: string | null;
+  has: (p: string) => boolean;
+  vertical?: Vertical;
+  isOwner?: boolean;
+}): SidebarModel {
+  const { roleKey, has, vertical = 'dental', isOwner = false } = input;
+  const layout = layoutForRole(roleKey, isOwner);
+  if (layout) {
+    const def = ROLE_LAYOUTS[layout];
+    const groups = def.groups
+      .map((g) => ({
+        labelKey: g.labelKey,
+        items: resolveEntries(g.entries, has, vertical, isOwner),
+      }))
+      .filter((g) => g.items.length > 0);
+    if (groups.length > 0) {
+      return { groups, footer: resolveEntries(def.footer, has, vertical, isOwner), layout };
+    }
+  }
+  return { groups: visibleGroups(has, vertical, isOwner), footer: [], layout: null };
+}
+
+/**
+ * ⌘K uchun: rolga qaramasdan BARCHA ruxsatli sahifalar (katalog superseti). Menyuda
+ * ko'rinmaydigan ruxsatli sahifa (masalan registratorda Sozlamalar) shu yerdan topiladi.
+ */
+export function paletteNavItems(
+  has: (p: string) => boolean,
+  vertical: Vertical = 'dental',
+  isOwner = false,
+): NavItem[] {
+  return visibleGroups(has, vertical, isOwner)
+    .flatMap((g) => g.items)
+    .filter((i) => !i.disabled);
+}

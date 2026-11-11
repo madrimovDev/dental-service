@@ -1,4 +1,5 @@
-import { Button, Center, Stack, Text, Title } from '@mantine/core';
+import { AlertBanner, Button, StateView } from '@dental/ui';
+import { Lock } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -25,22 +26,27 @@ export function LicenseBlockedScreen() {
   };
 
   return (
-    <Center mih="100vh" p="md">
-      <Stack align="center" gap="sm" maw={480}>
-        <Title order={2}>{t('license.blocked.title')}</Title>
-        <Text ta="center">{t('license.blocked.body')}</Text>
-        <Text ta="center" c="dimmed">
-          {t('license.blocked.internet')}
-        </Text>
-        {stillExpired && (
-          <Text c="red" role="alert">
-            {t('license.blocked.stillExpired')}
-          </Text>
-        )}
-        <Button onClick={onRecheck} loading={recheck.isPending}>
-          {t('license.blocked.recheck')}
-        </Button>
-      </Stack>
-    </Center>
+    <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 16 }}>
+      <div style={{ maxWidth: 520, width: '100%' }}>
+        <StateView
+          status="error"
+          icon={<Lock size={22} aria-hidden="true" />}
+          title={t('license.blocked.title')}
+          description={`${t('license.blocked.body')} ${t('license.blocked.internet')}`}
+          action={
+            <div
+              style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}
+            >
+              {stillExpired && (
+                <AlertBanner tier={2}>{t('license.blocked.stillExpired')}</AlertBanner>
+              )}
+              <Button variant="primary" onClick={onRecheck} disabled={recheck.isPending}>
+                {t('license.blocked.recheck')}
+              </Button>
+            </div>
+          }
+        />
+      </div>
+    </div>
   );
 }
