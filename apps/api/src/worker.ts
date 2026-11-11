@@ -48,6 +48,9 @@ const botManager = startTelegramBotManager({ adminDb: admin.db, withTenant });
 // L8: SaaS tenantlarni Supervisor'ga ro'yxatga olish retry + obuna sinxroni (token yo'q → no-op).
 const { startSupervisorSyncScheduler } = await import('./lib/supervisor-saas.ts');
 const stopSupervisorSync = startSupervisorSyncScheduler({ adminDb: admin.db });
+// Lab Hub (W2): outbox push + 60 s poll (`LAB_HUB_URL` yo'q → no-op).
+const { startLabHubScheduler } = await import('./lib/lab-hub/sync.ts');
+const stopLabHubSync = startLabHubScheduler({ adminDb: admin.db });
 logger.info('🛠️  Telegram bot-manager started');
 
 logger.info('🛠️  Worker process started (reminder + recall)');
@@ -62,6 +65,7 @@ async function shutdown(signal: string): Promise<void> {
     await worker.close(); // waits for in-flight jobs, then closes the Redis conn
     await recall.close(); // closes recall worker + admin db pool
     stopSupervisorSync();
+    stopLabHubSync();
     await botManager.stopAll(); // stops all Telegraf pollers + reload sub
     await admin.client.end({ timeout: 5 }); // closes bot-manager's admin db pool
     await dbClient.end({ timeout: 5 });

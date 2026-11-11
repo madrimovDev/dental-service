@@ -11,15 +11,8 @@ import { allowedLabOrderStatuses, toLabOrderVM } from '../../clinical.mappers';
 import { LabOrderChain } from './LabOrderChain';
 import { LabOrderFiles } from './LabOrderFiles';
 import classes from './LabOrderForm.module.css';
+import { LabOrderHubPanel } from './LabOrderHubPanel';
 import { formatDueDate, type LabOrderWire } from './lab-order.helpers';
-
-const initials = (name: string) =>
-  name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => `${p[0]?.toUpperCase()}.`)
-    .join(' ');
 
 /** Buyurtma sahifasi `/lab-orders/:id`: tafsilot, holat zanjiri, fayllar, remake. */
 export function LabOrderDetailPage() {
@@ -162,16 +155,27 @@ export function LabOrderDetailPage() {
             )}
           </section>
 
+          <LabOrderHubPanel order={order} canManage={canManage} />
+
           <section className={classes.card}>
             <h3 className={classes.cardTitle}>{t('labOrder.sees_title')}</h3>
             <div className={classes.seesGrid} data-testid="lab-sees">
               <span className={classes.seesKey}>{t('labOrder.sees_patient')}</span>
               <span className={classes.seesVal}>
+                {/* L3: laboratoriya bemorning TO'LIQ ismini ko'radi (telefon/manzil — yo'q). */}
                 {patient
-                  ? [initials(patient.fullName), patient.genderLabel, patient.age]
+                  ? [patient.fullName, patient.genderLabel, patient.age]
                       .filter((x) => x != null && x !== '')
                       .join(' · ')
                   : dash}
+              </span>
+              <span className={classes.seesKey}>{t('labHubClinic.sees_code')}</span>
+              <span className={classes.seesVal}>
+                <Mono>
+                  {order.orderNumber != null
+                    ? `LO-${order.orderNumber}`
+                    : `LO-${order.id.slice(0, 8)}`}
+                </Mono>
               </span>
               <span className={classes.seesKey}>{t('labOrder.sees_contact')}</span>
               <span className={classes.seesHidden}>{t('labOrder.sees_hidden')}</span>

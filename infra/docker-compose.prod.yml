@@ -91,6 +91,9 @@ services:
       # L8: SaaS tenantlarni Supervisor'da ro'yxatga olish + obuna holati (bo'sh = o'chiq).
       SUPERVISOR_URL: ${SUPERVISOR_URL:-}
       SUPERVISOR_SAAS_TOKEN: ${SUPERVISOR_SAAS_TOKEN:-}
+      # Lab Hub (W2): klinika → laboratoriya portali (bo'sh = o'chiq). Xizmat kaliti = Hub SAAS_HUB_TOKEN.
+      LAB_HUB_URL: ${LAB_HUB_URL:-}
+      LAB_HUB_SERVICE_TOKEN: ${LAB_HUB_SERVICE_TOKEN:-}
     volumes:
       - uploads_data:/data/uploads
     depends_on:
@@ -120,6 +123,9 @@ services:
       SENTRY_DSN: ${SENTRY_DSN:-}
       SUPERVISOR_URL: ${SUPERVISOR_URL:-}
       SUPERVISOR_SAAS_TOKEN: ${SUPERVISOR_SAAS_TOKEN:-}
+      # Lab Hub (W2): klinika → laboratoriya portali (bo'sh = o'chiq). Xizmat kaliti = Hub SAAS_HUB_TOKEN.
+      LAB_HUB_URL: ${LAB_HUB_URL:-}
+      LAB_HUB_SERVICE_TOKEN: ${LAB_HUB_SERVICE_TOKEN:-}
     depends_on:
       postgres:
         condition: service_healthy

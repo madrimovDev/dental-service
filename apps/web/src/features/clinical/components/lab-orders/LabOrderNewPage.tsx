@@ -31,6 +31,7 @@ import {
 import { parseToothNumbers } from '../../clinical.mappers';
 import { LabOrderChain } from './LabOrderChain';
 import classes from './LabOrderForm.module.css';
+import { activeLabs, useLabHubLabs, useLabHubStatus, useSendToLabHub } from './lab-hub.api';
 import { useUploadLabOrderFile } from './lab-order.api';
 import {
   compareDueWithAppointment,
@@ -76,14 +77,6 @@ const formatBytes = (n: number) =>
     ? `${(n / 1024 / 1024).toFixed(1)} MB`
     : `${Math.max(1, Math.round(n / 1024))} KB`;
 
-const initials = (name: string) =>
-  name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => `${p[0]?.toUpperCase()}.`)
-    .join(' ');
-
 /**
  * Yangi lab buyurtma — alohida sahifa `/patients/:id/lab-orders/new` (modal o'rniga).
  * `?remakeOf=<buyurtma id>` — «qayta tayyorlash» oldindan belgilanadi.
@@ -109,13 +102,22 @@ export function LabOrderNewPage() {
     [existingQuery.data],
   );
   const tenantOrdersQuery = useLabOrdersList({ pageSize: 100 });
-  const labs = useMemo(
-    () => summarizeLabs(tenantOrdersQuery.data?.data ?? []).slice(0, 4),
-    [tenantOrdersQuery.data],
-  );
+  // Lab Hub (W2): faol ulangan portal lablari — tanlansa «Yuborish» ishni portal orqali jo'natadi.
+  const hubStatus = useLabHubStatus();
+  const hubConnected = hubStatus.data?.connected === true;
+  const hubLabsQuery = useLabHubLabs({ enabled: hubConnected });
+  const hubLabs = useMemo(() => activeLabs(hubLabsQuery.data?.labs), [hubLabsQuery.data]);
+  const [hubLabId, setHubLabId] = useState<string | null>(null);
+  const labs = useMemo(() => {
+    const hubNames = new Set(hubLabs.map((l) => l.name.trim().toLowerCase()));
+    return summarizeLabs(tenantOrdersQuery.data?.data ?? [])
+      .filter((l) => !hubNames.has(l.name.toLowerCase()))
+      .slice(0, 4);
+  }, [tenantOrdersQuery.data, hubLabs]);
   const createMut = useCreateLabOrder(patientId);
   const statusMut = useUpdateLabOrderStatus(patientId);
   const uploadMut = useUploadLabOrderFile();
+  const sendHubMut = useSendToLabHub();
   // Technician'da `patient.view` yo'q — keraksiz 403 so'rovi yuborilmaydi.
   const canViewPatient = useAuthStore((s) => s.hasPermission('patient.view'));
   const patientQuery = usePatient(canViewPatient ? patientId : '');
@@ -200,7 +202,16 @@ export function LabOrderNewPage() {
             failed += 1;
           }
         }
-        if (send) {
+        const hubLab = hubLabId ? hubLabs.find((l) => l.id === hubLabId) : undefined;
+        if (send && hubLab) {
+          // Portal orqali: ish navbatga tushadi (internet yo'q bo'lsa — qaytganda ketadi).
+          try {
+            await sendHubMut.mutateAsync({ labOrderId: order.id, labId: hubLab.id });
+            notifications.show({ message: t('labHubClinic.sent_toast') });
+          } catch {
+            notifications.show({ color: 'yellow', message: t('labHubClinic.send_failed_draft') });
+          }
+        } else if (send) {
           await statusMut.mutateAsync({ id: order.id, status: 'sent' as LabOrderStatus });
         }
         if (failed > 0) {
@@ -212,7 +223,8 @@ export function LabOrderNewPage() {
       }
     });
 
-  const busy = createMut.isPending || statusMut.isPending || uploadMut.isPending;
+  const busy =
+    createMut.isPending || statusMut.isPending || uploadMut.isPending || sendHubMut.isPending;
 
   return (
     <div className={classes.page}>
@@ -232,17 +244,40 @@ export function LabOrderNewPage() {
           <Stack gap="md">
             <section className={classes.card}>
               <h3 className={classes.cardTitle}>{t('labOrder.lab_section')}</h3>
-              {labs.length > 0 && (
+              {(labs.length > 0 || hubLabs.length > 0) && (
                 <div className={classes.labGrid}>
+                  {hubLabs.map((l) => (
+                    <button
+                      key={l.id}
+                      type="button"
+                      className={classes.labCard}
+                      aria-pressed={hubLabId === l.id}
+                      onClick={() => {
+                        setHubLabId(l.id);
+                        form.setFieldValue('labName', l.name);
+                      }}
+                    >
+                      <span className={classes.labName}>{l.name}</span>
+                      <span className={classes.labMeta}>{t('labHubClinic.portal_badge')}</span>
+                    </button>
+                  ))}
                   {labs.map((l) => (
                     <button
                       key={l.name}
                       type="button"
                       className={classes.labCard}
-                      aria-pressed={v.labName.trim().toLowerCase() === l.name.toLowerCase()}
-                      onClick={() => form.setFieldValue('labName', l.name)}
+                      aria-pressed={
+                        !hubLabId && v.labName.trim().toLowerCase() === l.name.toLowerCase()
+                      }
+                      onClick={() => {
+                        setHubLabId(null);
+                        form.setFieldValue('labName', l.name);
+                      }}
                     >
                       <span className={classes.labName}>{l.name}</span>
+                      {hubLabs.length > 0 && (
+                        <span className={classes.labMeta}>{t('labHubClinic.manual_badge')}</span>
+                      )}
                       <span className={classes.labMeta}>
                         {t(
                           l.avgDays === null ? 'labOrders.lab_stats_nodays' : 'labOrders.lab_stats',
@@ -262,6 +297,13 @@ export function LabOrderNewPage() {
                 description={t('labOrder.lab_name_hint')}
                 required
                 {...form.getInputProps('labName')}
+                onChange={(e) => {
+                  const value = e.currentTarget.value;
+                  form.setFieldValue('labName', value);
+                  // Qo'lda boshqa nom yozilsa — portal labi tanlovi bekor bo'ladi.
+                  const picked = hubLabs.find((l) => l.id === hubLabId);
+                  if (picked && picked.name !== value) setHubLabId(null);
+                }}
                 error={err('labName')}
               />
             </section>
@@ -506,9 +548,10 @@ export function LabOrderNewPage() {
               <div className={classes.seesGrid} data-testid="lab-sees">
                 <span className={classes.seesKey}>{t('labOrder.sees_patient')}</span>
                 <span className={classes.seesVal}>
+                  {/* L3: laboratoriya bemorning TO'LIQ ismini ko'radi (telefon/manzil — yo'q). */}
                   {patient
                     ? [
-                        initials(patient.fullName),
+                        patient.fullName,
                         patient.genderLabel,
                         patient.age != null ? `${patient.age}` : null,
                       ]
@@ -516,6 +559,8 @@ export function LabOrderNewPage() {
                         .join(' · ')
                     : '—'}
                 </span>
+                <span className={classes.seesKey}>{t('labHubClinic.sees_code')}</span>
+                <span className={classes.seesVal}>{t('labHubClinic.code_after_save')}</span>
                 <span className={classes.seesKey}>{t('labOrder.sees_job')}</span>
                 <span className={classes.seesVal}>{v.orderType ? autoDescription : '—'}</span>
                 <span className={classes.seesKey}>{t('labOrder.shade')}</span>

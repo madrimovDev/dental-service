@@ -1,4 +1,4 @@
-import type { LabOrder } from '@dental/api-client';
+import type { LabOrder, LabOrderHubFields } from '@dental/api-client';
 
 /** UI-D5: remake sabab kodlari — backend `LAB_REMAKE_REASONS` bilan sinxron. */
 export const LAB_REMAKE_REASONS = [
@@ -39,7 +39,7 @@ export type LabOrderExtras = {
   remakeOfId?: string | null;
   remakeReason?: LabRemakeReason | null;
 };
-export type LabOrderWire = LabOrder & LabOrderExtras;
+export type LabOrderWire = LabOrder & LabOrderExtras & LabOrderHubFields;
 /** Create body'ga qo'shimcha majburiy maydonlar (generated `CreateLabOrderInput` ga hali kirmagan). */
 export type LabOrderCreateExtras = {
   shade: string;
