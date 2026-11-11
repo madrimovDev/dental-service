@@ -4,7 +4,12 @@ import { recalls } from './recalls.ts';
 import { tenants } from './tenants.ts';
 
 /** SMS yetkazish natijasi (RFC-0011 §3). */
-export const recallLogOutcomeEnum = pgEnum('recall_log_outcome', ['sent', 'failed', 'no_phone']);
+export const recallLogOutcomeEnum = pgEnum('recall_log_outcome', [
+  'sent',
+  'failed',
+  'no_phone',
+  'skipped_no_channel',
+]);
 
 /** Yuborish kanali. */
 export const recallLogChannelEnum = pgEnum('recall_log_channel', ['sms', 'manual']);

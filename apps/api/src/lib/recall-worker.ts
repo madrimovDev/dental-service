@@ -185,6 +185,20 @@ export async function processRecallScan(deps: RecallScanDeps): Promise<RecallSca
           resolved.source === 'none' && deps.sms ? deps.sms : resolved.channel;
         const to = resolved.to;
 
+        // P9: kanal sozlanmagan (tenant credential yo'q va legacy `deps.sms` yo'q) —
+        // send CHAQIRILMAYDI; recall pending qoladi, urinish hisoblanmaydi.
+        if (resolved.source === 'none' && !deps.sms) {
+          await tx.insert(recallLogs).values({
+            tenantId: row.tenantId,
+            recallId: row.recallId,
+            channel: 'sms',
+            outcome: 'skipped_no_channel',
+            detail: 'Xabar kanali sozlanmagan',
+          });
+          result.skipped++;
+          return;
+        }
+
         if (!to) {
           await tx.insert(recallLogs).values({
             tenantId: row.tenantId,

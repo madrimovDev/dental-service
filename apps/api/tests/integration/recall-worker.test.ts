@@ -232,3 +232,38 @@ describe('B7 processRecallScan cross-tenant', () => {
     expect(logs[0]!.outcome).toBe('no_phone');
   });
 });
+
+// P9 — kanal sozlanmagan (deps.sms yo'q, tenant credential yo'q): recall jim
+// "contacted" bo'lmasligi, urinish hisoblanmasligi, log 'skipped_no_channel'.
+describe('P9 NoOp tenant (kanal sozlanmagan)', () => {
+  test('bir necha scan: recall pending, contactAttempts=0, har safar skipped_no_channel', async () => {
+    const r = await seedRecall(tA, { dueDate: yesterday, phone: '+998901112233' });
+
+    for (let i = 0; i < 2; i++) {
+      const res = await processRecallScan({ adminDb: admin.db, withTenant, now });
+      expect(res.sent).toBe(0);
+      expect(res.skipped).toBe(1);
+    }
+
+    const [row] = await withTenant(tA, (tx) =>
+      tx
+        .select({ status: recalls.status, attempts: recalls.contactAttempts })
+        .from(recalls)
+        .where(eq(recalls.id, r)),
+    );
+    expect(row!.status).toBe('pending');
+    expect(row!.attempts).toBe(0);
+    const logs = await withTenant(tA, (tx) =>
+      tx.select().from(recallLogs).where(eq(recallLogs.recallId, r)),
+    );
+    expect(logs.length).toBe(2);
+    expect(logs.every((l) => l.outcome === 'skipped_no_channel')).toBe(true);
+  });
+
+  test('NoOp kanalning o‘zi ok:false/not_configured qaytaradi', async () => {
+    const { createNoOpChannel } = await import('../../../../packages/notifications/src/noop.ts');
+    const res = await createNoOpChannel(() => {}).send('+998901112233', { text: 'x' });
+    expect(res.ok).toBe(false);
+    expect(res.error).toBe('not_configured');
+  });
+});
