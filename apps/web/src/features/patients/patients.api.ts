@@ -2,8 +2,9 @@ import {
   addPatientEmergencyContact,
   addPatientRelative,
   archivePatient,
+  checkPatientPhone,
+  confirmMedicalRecord,
   createPatient,
-  customInstance,
   getMedicalRecord,
   getMedicalRecordHistory,
   getPatient,
@@ -23,7 +24,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { patientKeys } from './patients.keys';
 import { toPatientDetail, toPatientListItem } from './patients.mappers';
-import type { ListParams, MedicalRecordView, PhoneCheckMatch } from './patients.types';
+import type { ListParams, MedicalRecordView } from './patients.types';
 
 export function usePatients(params: ListParams, options?: { enabled?: boolean }) {
   const { t } = useTranslation();
@@ -44,8 +45,7 @@ export function usePatients(params: ListParams, options?: { enabled?: boolean })
 
 /**
  * UI-R6: telefon dublikat tekshiruvi (`GET /api/patients/phone-check`). To'liq raqam
- * (+998XXXXXXXXX) bo'lgandagina so'raydi. Generated klient (`checkPatientPhone`) kontrakt
- * regeneratsiyasidan keyin paydo bo'ladi — shu paytgacha envelope-mutator orqali to'g'ridan.
+ * (+998XXXXXXXXX) bo'lgandagina so'raydi. Generated klient
  */
 export function usePhoneCheck(phone: string) {
   const digits = phone.replace(/\D/g, '');
@@ -55,11 +55,7 @@ export function usePhoneCheck(phone: string) {
     enabled: digits.length >= 12,
     staleTime: 15_000,
     queryFn: async () => {
-      const res = await customInstance<{ data: { matches: PhoneCheckMatch[] } }>({
-        url: '/api/patients/phone-check',
-        method: 'GET',
-        params: { phone },
-      });
+      const res = await checkPatientPhone({ phone });
       return res.data.matches;
     },
   });
@@ -134,17 +130,13 @@ export function useUpdateMedicalRecord(id: string) {
 
 /**
  * UI-D2: anamnezni tasdiqlash (`POST /api/patients/{id}/medical-record/confirm`, `medical_record.edit`).
- * Generated klient kontrakt regeneratsiyasidan keyin paydo bo'ladi — shu paytgacha envelope-mutator.
  */
 export function useConfirmMedicalRecord(id: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async () => {
-      const res = await customInstance<{ data: MedicalRecordView }>({
-        url: `/api/patients/${id}/medical-record/confirm`,
-        method: 'POST',
-      });
-      return res.data;
+      const res = await confirmMedicalRecord(id);
+      return res.data as MedicalRecordView;
     },
     onSuccess: (record) => {
       qc.setQueryData(patientKeys.medical(id), record);

@@ -1,7 +1,7 @@
 import {
   type CreateQueueTicketBody,
+  callOwnQueueTicket,
   createQueueTicket,
-  customInstance,
   getCheckInCandidates,
   getQueueToday,
   listBranches,
@@ -72,16 +72,11 @@ export function useUpdateQueueStatus() {
 
 /**
  * Shifokor o'z bemorini chaqiradi (`POST /queue/{id}/call-own`, queue.manage SHART EMAS).
- * TODO(generate:contract): generated `callOwnQueueTicket` paydo bo'lgach shu yerni almashtiring.
  */
 export function useCallOwnTicket() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) =>
-      customInstance<{ data: SyncAware }>({
-        url: `/api/queue/${id}/call-own`,
-        method: 'POST',
-      }).then((r) => r.data),
+    mutationFn: (id: string) => callOwnQueueTicket(id).then((r) => r.data),
     onSuccess: (ticket) => {
       warnIfAppointmentSyncFailed(ticket);
       void qc.invalidateQueries({ queryKey: queueKeys.all });

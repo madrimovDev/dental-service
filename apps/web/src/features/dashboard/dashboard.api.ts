@@ -1,8 +1,15 @@
+import type {
+  DebtAgingReport,
+  BackupStatus as GeneratedBackupStatus,
+  OwnerTodayReport,
+} from '@dental/api-client';
 import {
   ApiError,
-  customInstance,
   getAppointmentStatsReport,
+  getBackupStatus,
+  getDebtAgingReport,
   getDoctorWorkloadReport,
+  getOwnerTodayReport,
   getPlanCompletionReport,
   getRevenueReport,
   listAppointments,
@@ -131,36 +138,20 @@ export function useManagerKpi(range: KpiRange) {
   return { revenue, appointments, doctors, treatmentPlans };
 }
 
-// TODO(integratsiya): `generate:contract`dan keyin generated `getDebtAgingReport` /
-// `getBackupStatus`ga almashtiring (bu lane generate qilmaydi).
-export interface DebtAging {
-  totalDebt: number;
-  patientCount: number;
-  over90Count: number;
-  buckets: { key: 'd0_30' | 'd31_60' | 'd61_90' | 'd90_plus'; amount: number; patients: number }[];
-}
+export type DebtAging = DebtAgingReport;
 
 /** Bemorlar qarzi muddat bo'yicha — faqat `report.view` bo'lsa so'raladi. */
 export function useDebtAging() {
   const { hasPermission } = useAuthStore();
   return useQuery({
     queryKey: dashboardKeys.debtAging(),
-    queryFn: () =>
-      customInstance<{ data: DebtAging }>({ url: '/api/reports/debt-aging', method: 'GET' }).then(
-        (r) => r.data,
-      ),
+    queryFn: () => getDebtAgingReport().then((r) => r.data),
     enabled: hasPermission('report.view'),
     retry: false,
   });
 }
 
-export interface BackupStatus {
-  mode: 'desktop' | 'cloud';
-  folder: string | null;
-  lastSuccessAt: string | null;
-  lastError: string | null;
-  files: { name: string; sizeBytes: number; createdAt: string }[];
-}
+export type BackupStatus = GeneratedBackupStatus;
 
 /**
  * Zaxira holati (lane D kontrakti). 404 yoki 403 (endpoint yo'q / ruxsat yo'q) → `null`:
@@ -171,10 +162,7 @@ export function useBackupStatus() {
     queryKey: dashboardKeys.backupStatus(),
     queryFn: async (): Promise<BackupStatus | null> => {
       try {
-        const r = await customInstance<{ data: BackupStatus }>({
-          url: '/api/backup/status',
-          method: 'GET',
-        });
+        const r = await getBackupStatus();
         return r.data;
       } catch (e) {
         if (e instanceof ApiError && (e.status === 404 || e.status === 403)) return null;
@@ -186,31 +174,14 @@ export function useBackupStatus() {
   });
 }
 
-export interface OwnerToday {
-  date: string;
-  netTotal: number;
-  refunded: number;
-  byPaymentMethod: { paymentMethod: string; total: number }[];
-  branches: {
-    branchId: string;
-    name: string;
-    netRevenue: number;
-    patients: number;
-    occupancy: number;
-    status: 'active' | 'idle';
-  }[];
-  doctors: { doctorId: string; done: number; planned: number; revenue: number }[];
-}
+export type OwnerToday = OwnerTodayReport;
 
 /** Bugungi sof tushum (P13: refund ayirilgan), filial va shifokor bo'yicha — `report.view`. */
 export function useOwnerToday() {
   const { hasPermission } = useAuthStore();
   return useQuery({
     queryKey: dashboardKeys.ownerToday(),
-    queryFn: () =>
-      customInstance<{ data: OwnerToday }>({ url: '/api/reports/owner-today', method: 'GET' }).then(
-        (r) => r.data,
-      ),
+    queryFn: () => getOwnerTodayReport().then((r) => r.data),
     enabled: hasPermission('report.view'),
     retry: false,
   });

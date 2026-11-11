@@ -2,7 +2,7 @@ import type { CreateAppointmentBody } from '@dental/api-client';
 import {
   cancelAppointment,
   createAppointment,
-  customInstance,
+  getBookingContext,
   getBranchAvailability,
   listAppointments,
   listBranches,
@@ -14,7 +14,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { scheduleKeys } from '@/features/schedule/schedule.keys';
 import { lookupKeys } from '@/lib/lookup-keys';
 import { appointmentKeys } from './appointments.keys';
-import type { Appointment, AppointmentStatus, BookingContext } from './appointments.types';
+import type { Appointment, AppointmentStatus } from './appointments.types';
 
 /** Server sahifa hajmi (API `.max(100)`); kun/hafta oralig'i sahifalab TO'LIQ olinadi (SC-02). */
 const PAGE_SIZE = 100;
@@ -144,18 +144,11 @@ export function useUpdateAppointmentStatus() {
 /**
  * UI-R3: bemorning ochiq lab buyurtmalari (muddat ogohlantirishi) + faol reja bosqichi
  * (taklif). `appointment.create` — registratorda `lab_order.view` yo'q, shuning uchun tor endpoint.
- * ⚠️ Vaqtinchalik qo'lda (`customInstance`) — `generate:contract`dan keyin generated
- * `getBookingContext` ishlatiladi.
  */
 export function useBookingContext(patientId: string | null) {
   return useQuery({
     queryKey: appointmentKeys.bookingContext(patientId ?? ''),
     enabled: !!patientId,
-    queryFn: () =>
-      customInstance<{ data: BookingContext }>({
-        url: '/api/appointments/booking-context',
-        method: 'GET',
-        params: { patientId },
-      }).then((r) => r.data),
+    queryFn: () => getBookingContext({ patientId: patientId ?? '' }).then((r) => r.data),
   });
 }

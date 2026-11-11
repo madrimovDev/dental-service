@@ -13,29 +13,7 @@ export type Doctor = { id: string; name: string };
 export type UnavailableReason = 'past' | 'busy' | 'lunch' | 'time_off' | 'too_short';
 export type UnavailableSlot = { start: string; end: string; reason: UnavailableReason };
 
-/**
- * UI-R3: `GET /appointments/booking-context`. ⚠️ Generated api-client'da hali yo'q —
- * `generate:contract` dan keyin `getBookingContext` generated tipga almashtiriladi.
- */
-export type BookingContext = {
-  openLabOrders: {
-    id: string;
-    labName: string;
-    orderType: string;
-    status: string;
-    expectedDate: string | null;
-  }[];
-  nextPlanStage: {
-    planId: string;
-    planTitle: string;
-    doctorId: string;
-    stageId: string;
-    sequence: number;
-    serviceId: string | null;
-    serviceName: string;
-    estimatedDurationMinutes: number | null;
-  } | null;
-};
+export type { BookingContext } from '@dental/api-client';
 
 /** Grid pozitsiyasi (px). */
 export type SlotPosition = { top: number; height: number; lane: number; laneCount: number };

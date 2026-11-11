@@ -1,4 +1,5 @@
-import { customInstance } from '@dental/api-client';
+import type { DoctorPending } from '@dental/api-client';
+import { getDoctorPending } from '@dental/api-client';
 import { useQuery } from '@tanstack/react-query';
 import { dashboardKeys } from './dashboard.keys';
 
@@ -26,19 +27,9 @@ export interface DoctorNextPatient {
   } | null;
   lastVisit: { date: string; summary: string | null } | null;
 }
-export interface DoctorPending {
-  nextPatient: DoctorNextPatient | null;
-  unsignedVisitNotes: { count: number; items: DoctorPendingItem[] };
-  unreviewedImages: { count: number; items: DoctorPendingItem[] };
-  plansAwaitingResponse: { count: number; oldestDays: number | null; items: DoctorPendingItem[] };
-}
+export type { DoctorPending };
 
-// TODO(contract): `generate:contract`dan keyin generated `getDoctorPending` bilan almashtiriladi.
-const fetchDoctorPending = () =>
-  customInstance<{ success: true; data: DoctorPending }>({
-    url: '/api/dashboard/doctor-pending',
-    method: 'GET',
-  }).then((r) => r.data);
+const fetchDoctorPending = () => getDoctorPending().then((r) => r.data);
 
 /** «Mendan kutilmoqda» — appointment.view + medical_record.view bilan gate (403 portlamasin). */
 export function useDoctorPending(enabled: boolean) {
