@@ -8,9 +8,11 @@ import { describe, expect, it } from 'vitest';
 import {
   appointmentsToRows,
   doctorsToRows,
+  neutralizeFormula,
   oneCToRows,
   planCompletionToRows,
   revenueToRows,
+  toCsv,
 } from './reports.export';
 
 describe('revenueToRows', () => {
@@ -162,5 +164,40 @@ describe('oneCToRows (V3-4)', () => {
     expect(rows[0]).toEqual(['Дата', 'Документ', 'Тип', 'Метод', 'Сумма', 'Контрагент']);
     expect(rows[1]).toEqual(['2026-03-01', 'R-1', 'payment', 'cash', '100000', 'Ali']);
     expect(rows[2]?.[4]).toBe('-40000');
+  });
+});
+
+describe('FU-33 CSV formula-injection himoyasi', () => {
+  it("=,+,-,@ bilan boshlangan MATN `'` bilan prefikslanadi", () => {
+    expect(neutralizeFormula('=HYPERLINK("http://x","y")')).toBe('\'=HYPERLINK("http://x","y")');
+    expect(neutralizeFormula('@SUM(A1)')).toBe("'@SUM(A1)");
+    expect(neutralizeFormula('-2+3+cmd|calc')).toBe("'-2+3+cmd|calc");
+    expect(neutralizeFormula('+cmd|calc')).toBe("'+cmd|calc");
+    expect(neutralizeFormula('\t=1+1')).toBe("'\t=1+1");
+  });
+
+  it('oddiy matn va sonlar (manfiy summa, telefon) o‘zgarmaydi', () => {
+    expect(neutralizeFormula('Ali Valiyev')).toBe('Ali Valiyev');
+    expect(neutralizeFormula('-40000')).toBe('-40000');
+    expect(neutralizeFormula('+998901234567')).toBe('+998901234567');
+    expect(neutralizeFormula('12.5')).toBe('12.5');
+    expect(neutralizeFormula('')).toBe('');
+  });
+
+  it("toCsv: kontragent nomi formula bo'lsa 1C CSV'da zararsiz, ajratkich/qo'shtirnoq saqlanadi", () => {
+    const rows = oneCToRows([
+      {
+        date: '2026-03-01',
+        receiptNumber: 'R-1',
+        type: 'payment',
+        paymentMethod: 'cash',
+        amount: -40000,
+        patientName: "=cmd|' /C calc'!A0",
+      },
+    ]);
+    const csv = toCsv(rows, ';');
+    const line = csv.split('\r\n')[1] ?? '';
+    expect(line).toBe("2026-03-01;R-1;payment;cash;-40000;'=cmd|' /C calc'!A0");
+    expect(toCsv([['a;b', '"q"']], ';')).toBe('"a;b";"""q"""');
   });
 });

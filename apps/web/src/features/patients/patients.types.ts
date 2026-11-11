@@ -2,7 +2,14 @@ import type { getMedicalRecord, Patient } from '@dental/api-client';
 
 type MedicalRecord = Awaited<ReturnType<typeof getMedicalRecord>>['data'];
 
-export type ListParams = { search?: string; archived?: boolean; page: number; pageSize?: number };
+export type ListParams = {
+  search?: string;
+  archived?: boolean;
+  /** FU-24: «Qarzdorlar» filtri (balans > 0). */
+  debt?: boolean;
+  page: number;
+  pageSize?: number;
+};
 
 export type PatientListItem = {
   id: string;
@@ -12,6 +19,8 @@ export type PatientListItem = {
   genderLabel: string;
   tags: string[];
   balance: number;
+  // FU-24: eng yaqin kelajak faol yozilish (ISO) — `appointment.view`siz null.
+  nextAppointmentAt: string | null;
   // CLI-474 (L7): faol no-show strike soni + chegara belgisi.
   noShowStrikes: number;
   flagged: boolean;

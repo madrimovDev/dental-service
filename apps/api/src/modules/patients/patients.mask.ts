@@ -31,3 +31,9 @@ export const userHasPiiAccess = (c: Context): boolean => {
   const perms = c.get('accessClaims')?.perms ?? [];
   return perms.includes('@owner') || perms.includes('patient.view_pii');
 };
+
+/** «Keyingi tashrif» ustuni faqat yozilishlarni ko'ra oladigan rolga ochiladi. */
+export const userCanViewAppointments = (c: Context): boolean => {
+  const perms = c.get('accessClaims')?.perms ?? [];
+  return perms.includes('@owner') || perms.includes('appointment.view');
+};

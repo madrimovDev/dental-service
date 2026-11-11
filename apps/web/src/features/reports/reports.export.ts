@@ -118,12 +118,29 @@ export function procedureMixToRows(r: DentalAnalyticsReport['procedureMix']): st
 
 // ── Download helpers (thin wrappers — test qilinmaydi) ────────────────────────
 
-const escapeCsvCell = (cell: string): string => {
-  if (/[",\n\r]/.test(cell)) {
+/**
+ * FU-33: CSV formula-injection himoyasi. Excel/1C katakni `=`, `+`, `-`, `@` (yoki TAB/CR) bilan
+ * boshlansa FORMULA deb ishga tushiradi (`=HYPERLINK(...)`, DDE). Bunday matn `'` bilan
+ * prefikslanadi. Oddiy sonlar (`-40000`, `+998901234567`) — formula emas, o'zgarmaydi.
+ */
+export const neutralizeFormula = (cell: string): string => {
+  if (!/^[=+\-@\t\r]/.test(cell)) return cell;
+  if (/^[+-]?\d+([.,]\d+)?$/.test(cell)) return cell;
+  return `'${cell}`;
+};
+
+const escapeCsvCell = (raw: string, delimiter: ',' | ';'): string => {
+  const cell = neutralizeFormula(raw);
+  // Ajratkich (`;` 1C uchun) ham qo'shtirnoqqa olinadi — aks holda katak ikkiga bo'linadi.
+  if (cell.includes(delimiter) || /["\n\r]/.test(cell)) {
     return `"${cell.replace(/"/g, '""')}"`;
   }
   return cell;
 };
+
+/** Qatorlarni CSV matniga aylantiradi (formula-injection himoyasi bilan). Sof funksiya. */
+export const toCsv = (rows: string[][], delimiter: ',' | ';'): string =>
+  rows.map((row) => row.map((cell) => escapeCsvCell(cell, delimiter)).join(delimiter)).join('\r\n');
 
 /**
  * 1C buxgalteriya eksporti — tranzaksiya qatorlari (V3-4). ⚠️ FORMAT PROVIZIONAL:
@@ -148,13 +165,13 @@ export function oneCToRows(rows: OneCExportRow[]): string[][] {
 
 /** 1C CSV — nuqta-vergul ajratkichi (1C/RU Excel konvensiyasi). */
 export function download1C(rows: string[][], filename: string): void {
-  const csv = rows.map((row) => row.map(escapeCsvCell).join(';')).join('\r\n');
+  const csv = toCsv(rows, ';');
   const blob = new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8;' });
   triggerDownload(blob, filename.endsWith('.csv') ? filename : `${filename}.csv`);
 }
 
 export function downloadCsv(rows: string[][], filename: string): void {
-  const csv = rows.map((row) => row.map(escapeCsvCell).join(',')).join('\r\n');
+  const csv = toCsv(rows, ',');
   // BOM (U+FEFF) — Excel UTF-8 (lotin diakritika) to'g'ri o'qishi uchun.
   const blob = new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8;' });
   triggerDownload(blob, filename.endsWith('.csv') ? filename : `${filename}.csv`);

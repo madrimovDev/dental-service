@@ -1,5 +1,6 @@
 import { normalizePhone } from '@dental/core';
 import {
+  appointments,
   auditLog,
   cashierTransactions,
   medicalRecords,
@@ -12,19 +13,22 @@ import {
   treatmentStages,
   users,
 } from '@dental/db-schema';
-import { and, count, desc, eq, inArray, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gte, inArray, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { createOwnershipValidator, type OwnershipValidator } from '../../lib/ownership.ts';
 import type { NonPlanTransactionRow } from './patients.balance.ts';
 import { computeNonPlanRemainder, computePatientBalance } from './patients.balance.ts';
-import { maskPii, userHasPiiAccess } from './patients.mask.ts';
+import { parseImportRow } from './patients.import.ts';
+import { maskPii, userCanViewAppointments, userHasPiiAccess } from './patients.mask.ts';
 import { normalizeOptionalPhone } from './patients.phone.ts';
 import type {
   AddEmergencyContactInput,
   AddRelativeInput,
   CreatePatientInput,
+  ImportPatientsInput,
+  ImportPatientsResult,
   ListQuery,
   PatientRelativeView,
   UpdateMedicalRecordInput,
@@ -61,6 +65,123 @@ export const createPatientsService = (deps: {
 }) => {
   const ownership = deps.ownership ?? createOwnershipValidator();
 
+  /**
+   * Bemorlar balansi — 3 ta guruhlangan aggregate (N+1 yo'q, fan-out yo'q).
+   * `scope` berilsa faqat shu bemorlar; berilmasa tenant'dagi BARCHA bemorlar (FU-24:
+   * «Qarzdorlar» filtri sahifalashdan oldin qarzdorlarni aniqlashi uchun). `balance > 0` = qarz.
+   */
+  async function computeBalances(
+    db: ReturnType<typeof getDb>,
+    scope?: string[],
+  ): Promise<Map<string, number>> {
+    const balanceById = new Map<string, number>();
+    if (scope && scope.length === 0) return balanceById;
+    const [costRows, allocRows, nonPlanOriginals] = await Promise.all([
+      db
+        .select({
+          patientId: treatmentPlans.patientId,
+          sum: sql<string>`COALESCE(SUM(${treatmentStages.cost}), 0)`,
+        })
+        .from(treatmentStages)
+        .innerJoin(treatmentPlans, eq(treatmentStages.treatmentPlanId, treatmentPlans.id))
+        .where(
+          and(
+            scope ? inArray(treatmentPlans.patientId, scope) : undefined,
+            inArray(treatmentPlans.status, [...DEBT_PLAN_STATUSES]),
+            // Qaror #24/#25 (CLI-184/221): qarz COST predikati — skipped chiqariladi
+            // VA faqat acceptance='accepted' kiradi (proposed/rejected chiqariladi).
+            // DIQQAT: faqat COST SUM filtrlangan — allocation SUM (pastda) FILTRLANMAYDI,
+            // shunda skip/reject-after-pay to'lovi saqlanib, manfiy (kredit) balans chiqadi.
+            ne(treatmentStages.status, 'skipped'),
+            eq(treatmentStages.acceptance, 'accepted'),
+          ),
+        )
+        .groupBy(treatmentPlans.patientId),
+      db
+        .select({
+          patientId: treatmentPlans.patientId,
+          sum: sql<string>`COALESCE(SUM(${treatmentStagePayments.amount}), 0)`,
+        })
+        .from(treatmentStagePayments)
+        .innerJoin(treatmentStages, eq(treatmentStagePayments.stageId, treatmentStages.id))
+        .innerJoin(treatmentPlans, eq(treatmentStages.treatmentPlanId, treatmentPlans.id))
+        // CLI-416: allocation SUM plan-status bo'yicha FILTRLANMAYDI (C4 invariant,
+        // cashier.billing.ts:62-72) — cancelled/draft planga to'langan pul kredit
+        // sifatida saqlanishi kerak, aks holda per-plan balans bilan zid bo'ladi.
+        .where(scope ? inArray(treatmentPlans.patientId, scope) : undefined)
+        .groupBy(treatmentPlans.patientId),
+      db
+        .select({
+          id: cashierTransactions.id,
+          patientId: cashierTransactions.patientId,
+          totalAmount: cashierTransactions.totalAmount,
+          paidAmount: cashierTransactions.paidAmount,
+        })
+        .from(cashierTransactions)
+        .where(
+          and(
+            scope
+              ? inArray(cashierTransactions.patientId, scope)
+              : isNotNull(cashierTransactions.patientId),
+            eq(cashierTransactions.type, 'payment'),
+            eq(cashierTransactions.status, 'completed'),
+            isNull(cashierTransactions.treatmentPlanId),
+          ),
+        ),
+    ]);
+
+    const costById = new Map(costRows.map((r) => [r.patientId, Number(r.sum)]));
+    const allocById = new Map(allocRows.map((r) => [r.patientId, Number(r.sum)]));
+
+    // CLI-448: har original non-plan to'lovning refund'ini parentTransactionId
+    // orqali topamiz (bitta qo'shimcha guruhlangan so'rov — N+1 emas).
+    const originalIds = nonPlanOriginals.map((r) => r.id);
+    const refundSumRows =
+      originalIds.length > 0
+        ? await db
+            .select({
+              parentTransactionId: cashierTransactions.parentTransactionId,
+              sum: sql<string>`COALESCE(SUM(${cashierTransactions.paidAmount}), 0)`,
+            })
+            .from(cashierTransactions)
+            .where(
+              and(
+                eq(cashierTransactions.type, 'refund'),
+                inArray(cashierTransactions.parentTransactionId, originalIds),
+              ),
+            )
+            .groupBy(cashierTransactions.parentTransactionId)
+        : [];
+    const refundedByParentId = new Map(
+      refundSumRows.map((r) => [r.parentTransactionId as string, Number(r.sum)]),
+    );
+
+    const nonPlanRowsByPatientId = new Map<string, NonPlanTransactionRow[]>();
+    for (const row of nonPlanOriginals) {
+      const pid = row.patientId as string;
+      const list = nonPlanRowsByPatientId.get(pid) ?? [];
+      list.push({
+        totalAmount: Number(row.totalAmount),
+        paidAmount: Number(row.paidAmount),
+        refundedSum: refundedByParentId.get(row.id) ?? 0,
+      });
+      nonPlanRowsByPatientId.set(pid, list);
+    }
+
+    const targetIds = scope ?? [
+      ...new Set([...costById.keys(), ...allocById.keys(), ...nonPlanRowsByPatientId.keys()]),
+    ];
+    for (const id of targetIds) {
+      const { balance } = computePatientBalance({
+        stageCostSum: costById.get(id) ?? 0,
+        allocationSum: allocById.get(id) ?? 0,
+        nonPlanRemainder: computeNonPlanRemainder(nonPlanRowsByPatientId.get(id) ?? []),
+      });
+      balanceById.set(id, balance);
+    }
+    return balanceById;
+  }
+
   async function list(c: Context, query: ListQuery) {
     const db = getDb(c);
     const offset = (query.page - 1) * query.pageSize;
@@ -78,6 +199,18 @@ export const createPatientsService = (deps: {
       : undefined;
     if (searchFilter) filters.push(searchFilter);
 
+    // FU-24: «Qarzdorlar» — qarzdorlar (balans > 0) avval butun tenant bo'yicha aniqlanadi,
+    // keyin shu id'lar bilan sahifalanadi (meta.total ham filtrlangan bo'ladi).
+    let debtBalances: Map<string, number> | undefined;
+    if (query.debt) {
+      const all = await computeBalances(db);
+      debtBalances = new Map([...all].filter(([, balance]) => balance > 0));
+      if (debtBalances.size === 0) {
+        return { data: [], meta: { page: query.page, pageSize: query.pageSize, total: 0 } };
+      }
+      filters.push(inArray(patients.id, [...debtBalances.keys()]));
+    }
+
     const where = filters.length > 0 ? and(...filters) : undefined;
 
     const [rows, totalRows] = await Promise.all([
@@ -91,110 +224,10 @@ export const createPatientsService = (deps: {
       db.select({ total: count() }).from(patients).where(where),
     ]);
 
-    // Sahifa bemorlari uchun balansni 3 ta guruhlangan aggregate bilan (N+1 yo'q, fan-out yo'q)
     const ids = rows.map((r) => r.id);
-    const balanceById = new Map<string, number>();
-
-    if (ids.length > 0) {
-      const [costRows, allocRows, nonPlanOriginals] = await Promise.all([
-        db
-          .select({
-            patientId: treatmentPlans.patientId,
-            sum: sql<string>`COALESCE(SUM(${treatmentStages.cost}), 0)`,
-          })
-          .from(treatmentStages)
-          .innerJoin(treatmentPlans, eq(treatmentStages.treatmentPlanId, treatmentPlans.id))
-          .where(
-            and(
-              inArray(treatmentPlans.patientId, ids),
-              inArray(treatmentPlans.status, [...DEBT_PLAN_STATUSES]),
-              // Qaror #24/#25 (CLI-184/221): qarz COST predikati — skipped chiqariladi
-              // VA faqat acceptance='accepted' kiradi (proposed/rejected chiqariladi).
-              // DIQQAT: faqat COST SUM filtrlangan — allocation SUM (pastda) FILTRLANMAYDI,
-              // shunda skip/reject-after-pay to'lovi saqlanib, manfiy (kredit) balans chiqadi.
-              ne(treatmentStages.status, 'skipped'),
-              eq(treatmentStages.acceptance, 'accepted'),
-            ),
-          )
-          .groupBy(treatmentPlans.patientId),
-        db
-          .select({
-            patientId: treatmentPlans.patientId,
-            sum: sql<string>`COALESCE(SUM(${treatmentStagePayments.amount}), 0)`,
-          })
-          .from(treatmentStagePayments)
-          .innerJoin(treatmentStages, eq(treatmentStagePayments.stageId, treatmentStages.id))
-          .innerJoin(treatmentPlans, eq(treatmentStages.treatmentPlanId, treatmentPlans.id))
-          // CLI-416: allocation SUM plan-status bo'yicha FILTRLANMAYDI (C4 invariant,
-          // cashier.billing.ts:62-72) — cancelled/draft planga to'langan pul kredit
-          // sifatida saqlanishi kerak, aks holda per-plan balans bilan zid bo'ladi.
-          .where(inArray(treatmentPlans.patientId, ids))
-          .groupBy(treatmentPlans.patientId),
-        db
-          .select({
-            id: cashierTransactions.id,
-            patientId: cashierTransactions.patientId,
-            totalAmount: cashierTransactions.totalAmount,
-            paidAmount: cashierTransactions.paidAmount,
-          })
-          .from(cashierTransactions)
-          .where(
-            and(
-              inArray(cashierTransactions.patientId, ids),
-              eq(cashierTransactions.type, 'payment'),
-              eq(cashierTransactions.status, 'completed'),
-              isNull(cashierTransactions.treatmentPlanId),
-            ),
-          ),
-      ]);
-
-      const costById = new Map(costRows.map((r) => [r.patientId, Number(r.sum)]));
-      const allocById = new Map(allocRows.map((r) => [r.patientId, Number(r.sum)]));
-
-      // CLI-448: har original non-plan to'lovning refund'ini parentTransactionId
-      // orqali topamiz (bitta qo'shimcha guruhlangan so'rov — N+1 emas).
-      const originalIds = nonPlanOriginals.map((r) => r.id);
-      const refundSumRows =
-        originalIds.length > 0
-          ? await db
-              .select({
-                parentTransactionId: cashierTransactions.parentTransactionId,
-                sum: sql<string>`COALESCE(SUM(${cashierTransactions.paidAmount}), 0)`,
-              })
-              .from(cashierTransactions)
-              .where(
-                and(
-                  eq(cashierTransactions.type, 'refund'),
-                  inArray(cashierTransactions.parentTransactionId, originalIds),
-                ),
-              )
-              .groupBy(cashierTransactions.parentTransactionId)
-          : [];
-      const refundedByParentId = new Map(
-        refundSumRows.map((r) => [r.parentTransactionId as string, Number(r.sum)]),
-      );
-
-      const nonPlanRowsByPatientId = new Map<string, NonPlanTransactionRow[]>();
-      for (const row of nonPlanOriginals) {
-        const pid = row.patientId as string;
-        const list = nonPlanRowsByPatientId.get(pid) ?? [];
-        list.push({
-          totalAmount: Number(row.totalAmount),
-          paidAmount: Number(row.paidAmount),
-          refundedSum: refundedByParentId.get(row.id) ?? 0,
-        });
-        nonPlanRowsByPatientId.set(pid, list);
-      }
-
-      for (const id of ids) {
-        const { balance } = computePatientBalance({
-          stageCostSum: costById.get(id) ?? 0,
-          allocationSum: allocById.get(id) ?? 0,
-          nonPlanRemainder: computeNonPlanRemainder(nonPlanRowsByPatientId.get(id) ?? []),
-        });
-        balanceById.set(id, balance);
-      }
-    }
+    // Sahifa bemorlari uchun balans (3 ta guruhlangan aggregate, N+1 yo'q).
+    // Debt filtri bo'lsa balans allaqachon hisoblangan (butun tenant bo'yicha).
+    const balanceById = debtBalances ?? (await computeBalances(db, ids));
 
     // CLI-474 (L7): no-show strike flag — tenant threshold (0=o'chiq) + grouped
     // faol count (join-anchored).
@@ -226,12 +259,34 @@ export const createPatientsService = (deps: {
       for (const r of allergyRows) allergyIds.add(r.patientId);
     }
 
+    // FU-24: «Keyingi tashrif» — har bemorning eng yaqin kelajak faol yozilishi (bitta
+    // guruhlangan so'rov). Yozilish ma'lumoti `appointment.view`siz ochilmaydi → null.
+    const nextApptById = new Map<string, Date>();
+    if (ids.length > 0 && userCanViewAppointments(c)) {
+      const apptRows = await db
+        .select({
+          patientId: appointments.patientId,
+          next: sql<Date | string>`MIN(${appointments.startTime})`,
+        })
+        .from(appointments)
+        .where(
+          and(
+            inArray(appointments.patientId, ids),
+            gte(appointments.startTime, new Date()),
+            inArray(appointments.status, ['scheduled', 'confirmed', 'in_progress']),
+          ),
+        )
+        .groupBy(appointments.patientId);
+      for (const r of apptRows) nextApptById.set(r.patientId, new Date(r.next));
+    }
+
     const masked = hasPii ? rows : rows.map(maskPii);
     const data = masked.map((p) => {
       const noShowStrikes = strikeById.get(p.id) ?? 0;
       return {
         ...p,
         balance: balanceById.get(p.id) ?? 0,
+        nextAppointmentAt: nextApptById.get(p.id) ?? null,
         hasAllergy: allergyIds.has(p.id),
         noShowStrikes,
         flagged: strikeThreshold > 0 && noShowStrikes >= strikeThreshold,
@@ -449,20 +504,130 @@ export const createPatientsService = (deps: {
    */
   async function phoneCheck(c: Context, rawPhone: string) {
     const phone = normalizeOptionalPhone(rawPhone);
-    if (!phone || phone.replace(/\D/g, '').length < 9) return { matches: [] };
+    if (!phone || phone.replace(/\D/g, '').length < 9) return { count: 0, matches: [] };
     const db = getDb(c);
+    const where = and(
+      isNull(patients.archivedAt),
+      or(eq(patients.phone, phone), eq(patients.phoneSecondary, phone)),
+    );
+    // FU-23: `patient.view_pii`siz faqat son — ism (PII) sizib chiqmasin.
+    if (!userHasPiiAccess(c)) {
+      const [row] = await db.select({ n: count() }).from(patients).where(where);
+      return { count: row?.n ?? 0, matches: [] };
+    }
     const rows = await db
       .select({ id: patients.id, fullName: patients.fullName })
       .from(patients)
-      .where(
-        and(
-          isNull(patients.archivedAt),
-          or(eq(patients.phone, phone), eq(patients.phoneSecondary, phone)),
-        ),
-      )
+      .where(where)
       .orderBy(desc(patients.createdAt))
       .limit(5);
-    return { matches: rows };
+    return { count: rows.length, matches: rows };
+  }
+
+  /**
+   * FU-24: Excel/CSV import. Har qator ALOHIDA tekshiriladi — xato qator butun importni
+   * buzmaydi (`errors`), mavjud telefon (bazada YOKI faylning oldingi qatorida) yangi bemor
+   * yaratmaydi (`skipped_duplicate`). `dryRun` hisoblaydi, lekin yozmaydi. Bitta audit yozuvi
+   * (soni bilan) — har bemor uchun alohida emas.
+   */
+  async function importPatients(
+    c: Context,
+    input: ImportPatientsInput,
+  ): Promise<ImportPatientsResult> {
+    const db = getDb(c);
+    const tenantId = c.get('activeTenantId');
+    if (!tenantId) throw new Error('No tenant context');
+    const dryRun = input.dryRun === true;
+
+    type Prepared = {
+      row: number;
+      value: typeof patients.$inferInsert;
+    };
+    const results: ImportPatientsResult['results'] = [];
+    const prepared: Prepared[] = [];
+
+    // 1) Qator darajasidagi tekshiruv (xom → kanonik).
+    for (const [i, raw] of input.rows.entries()) {
+      const parsed = parseImportRow(raw);
+      if (!parsed.ok) {
+        results.push({ row: i + 1, status: 'error', code: parsed.code });
+        continue;
+      }
+      prepared.push({ row: i + 1, value: { ...parsed.value, tenantId } });
+    }
+
+    // 2) Bazadagi mavjud telefonlar (arxivlanganlar ham — arxivdagi bemorni qayta yaratmaymiz).
+    const phones = [
+      ...new Set(
+        prepared
+          .flatMap((p) => [p.value.phone, p.value.phoneSecondary])
+          .filter((v): v is string => !!v),
+      ),
+    ];
+    const existing = new Set<string>();
+    for (let i = 0; i < phones.length; i += 500) {
+      const chunk = phones.slice(i, i + 500);
+      const rows = await db
+        .select({ phone: patients.phone, phoneSecondary: patients.phoneSecondary })
+        .from(patients)
+        .where(or(inArray(patients.phone, chunk), inArray(patients.phoneSecondary, chunk)));
+      for (const r of rows) {
+        if (r.phone) existing.add(r.phone);
+        if (r.phoneSecondary) existing.add(r.phoneSecondary);
+      }
+    }
+
+    // 3) Dublikatlarni ajratish (bazada yoki faylning oldingi qabul qilingan qatorida).
+    const seen = new Set<string>();
+    const toInsert: Prepared[] = [];
+    for (const p of prepared) {
+      const mine = [p.value.phone, p.value.phoneSecondary].filter((v): v is string => !!v);
+      if (mine.some((ph) => existing.has(ph) || seen.has(ph))) {
+        results.push({ row: p.row, status: 'skipped_duplicate' });
+        continue;
+      }
+      for (const ph of mine) seen.add(ph);
+      toInsert.push(p);
+      results.push({ row: p.row, status: 'created' });
+    }
+
+    if (!dryRun && toInsert.length > 0) {
+      for (let i = 0; i < toInsert.length; i += 200) {
+        const chunk = toInsert.slice(i, i + 200);
+        const inserted = await db
+          .insert(patients)
+          .values(chunk.map((p) => p.value))
+          .returning({ id: patients.id });
+        // Avtomatik bo'sh medical record (create() bilan bir xil 1-to-1 invariant).
+        await db
+          .insert(medicalRecords)
+          .values(inserted.map((p) => ({ tenantId, patientId: p.id })));
+      }
+    }
+
+    results.sort((a, b) => a.row - b.row);
+    const summary = {
+      dryRun,
+      created: toInsert.length,
+      skippedDuplicate: results.filter((r) => r.status === 'skipped_duplicate').length,
+      errorCount: results.filter((r) => r.status === 'error').length,
+      results,
+    };
+
+    if (!dryRun) {
+      await deps.audit.record(c, {
+        action: 'imported',
+        resourceType: 'patient',
+        resourceId: null,
+        after: {
+          rows: input.rows.length,
+          created: summary.created,
+          skippedDuplicate: summary.skippedDuplicate,
+          errors: summary.errorCount,
+        },
+      });
+    }
+    return summary;
   }
 
   /** Arxivlash (soft delete) */
@@ -872,6 +1037,7 @@ export const createPatientsService = (deps: {
   return {
     list,
     phoneCheck,
+    importPatients,
     findById,
     balanceFor,
     create,

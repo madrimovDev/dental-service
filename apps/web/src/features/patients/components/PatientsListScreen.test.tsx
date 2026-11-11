@@ -18,6 +18,7 @@ const dataResult = {
         balance: 150000,
         flagged: false,
         noShowStrikes: 2,
+        nextAppointmentAt: null as string | null,
         flags: { allergy: true, debt: true, noShows: 2, telegram: true },
       },
     ],
@@ -34,6 +35,7 @@ const usePatientsMock = vi.fn((_params?: unknown) => patientsResult);
 vi.mock('../patients.api', () => ({
   usePatients: (params: unknown) => usePatientsMock(params),
   useArchivePatient: () => ({ mutate: archiveMock, isPending: false }),
+  useImportPatients: () => ({ mutateAsync: vi.fn(), isPending: false, reset: vi.fn() }),
 }));
 let allowedPerms: ((code: string) => boolean) | undefined;
 vi.mock('@/stores/auth-store.ts', () => ({
@@ -78,11 +80,7 @@ describe('PatientsListScreen', () => {
     // Initial render: archived false.
     expect(usePatientsMock).toHaveBeenCalledWith(expect.objectContaining({ archived: false }));
     usePatientsMock.mockClear();
-    // The second filter pill is "Arxiv".
-    const pills = screen.getAllByRole('button').filter((b) => b.dataset.active != null);
-    const archivedPill = pills[1];
-    if (!archivedPill) throw new Error('archived filter pill not found');
-    fireEvent.click(archivedPill);
+    fireEvent.click(screen.getByRole('button', { name: 'Arxiv' }));
     expect(usePatientsMock).toHaveBeenCalledWith(expect.objectContaining({ archived: true }));
   });
 
@@ -91,10 +89,7 @@ describe('PatientsListScreen', () => {
     // Boshida (archived=false) tugma ko'rinadi.
     expect(screen.getByLabelText('Arxivlash')).toBeInTheDocument();
     // "Arxiv" filtr pill'ini bosamiz.
-    const pills = screen.getAllByRole('button').filter((b) => b.dataset.active != null);
-    const archivedPill = pills[1];
-    if (!archivedPill) throw new Error('archived filter pill not found');
-    fireEvent.click(archivedPill);
+    fireEvent.click(screen.getByRole('button', { name: 'Arxiv' }));
     // Arxivlangan ro'yxatda qayta-arxivlash ma'nosiz (backend unarchive yo'q) — tugma yo'q.
     expect(screen.queryByLabelText('Arxivlash')).not.toBeInTheDocument();
   });
@@ -177,6 +172,60 @@ describe('PatientsListScreen — UI-R6', () => {
     allowedPerms = (code) => code !== 'appointment.create';
     renderApp(<PatientsListScreen />);
     expect(screen.queryByRole('button', { name: 'Yozish' })).not.toBeInTheDocument();
+  });
+});
+
+describe('PatientsListScreen — FU-24', () => {
+  beforeEach(() => {
+    patientsResult = dataResult;
+    allowedPerms = undefined;
+    usePatientsMock.mockClear();
+  });
+
+  it('«Qarzdorlar» chip usePatients ni debt:true bilan chaqiradi va qayta bosilsa o‘chiradi', () => {
+    renderApp(<PatientsListScreen />);
+    expect(usePatientsMock).toHaveBeenCalledWith(expect.objectContaining({ debt: false }));
+    fireEvent.click(screen.getByRole('button', { name: 'Qarzdorlar' }));
+    expect(usePatientsMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ debt: true, archived: false }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Qarzdorlar' }));
+    expect(usePatientsMock).toHaveBeenLastCalledWith(expect.objectContaining({ debt: false }));
+  });
+
+  it("debt filtri URL'dan o‘qiladi", () => {
+    renderApp(<PatientsListScreen />, { route: '/patients?debt=1' });
+    expect(usePatientsMock).toHaveBeenCalledWith(expect.objectContaining({ debt: true }));
+  });
+
+  it('«Keyingi tashrif» ustuni appointment.view bilan; sana bor bo‘lsa ko‘rsatiladi', () => {
+    patientsResult = {
+      ...dataResult,
+      data: {
+        ...dataResult.data,
+        items: [{ ...dataResult.data.items[0], nextAppointmentAt: '2026-11-20T09:30:00.000Z' }],
+      },
+    };
+    renderApp(<PatientsListScreen />);
+    expect(screen.getByText('Keyingi tashrif')).toBeInTheDocument();
+    expect(screen.getByText(/noy/i)).toBeInTheDocument();
+  });
+
+  it('appointment.view yo‘q bo‘lsa «Keyingi tashrif» ustuni yo‘q', () => {
+    allowedPerms = (code) => code !== 'appointment.view';
+    renderApp(<PatientsListScreen />);
+    expect(screen.queryByText('Keyingi tashrif')).not.toBeInTheDocument();
+  });
+
+  it("«Excel'dan import» faqat patient.import bilan ko‘rinadi", () => {
+    renderApp(<PatientsListScreen />);
+    expect(screen.getByRole('button', { name: /Excel/ })).toBeInTheDocument();
+  });
+
+  it('patient.import yo‘q (Receptionist) → import tugmasi yo‘q', () => {
+    allowedPerms = (code) => code !== 'patient.import';
+    renderApp(<PatientsListScreen />);
+    expect(screen.queryByRole('button', { name: /Excel/ })).not.toBeInTheDocument();
   });
 });
 
