@@ -65,4 +65,40 @@ describe('DailySummaryCard', () => {
     renderApp(<DailySummaryCard summary={noRefundSummary} />);
     expect(screen.queryByText(/naqd chiqim/i)).not.toBeInTheDocument();
   });
+
+  // UI-R5: karta jami sub-turlar bo'yicha bo'linadi, qaytarilgan sub-turdan ayiriladi.
+  it('karta sub-turlar bo‘yicha bo‘linadi; refund ayiriladi', () => {
+    const split = {
+      date: '2026-06-22',
+      branchId: 'b1',
+      breakdown: [
+        { paymentMethod: 'cash', cardProvider: null, type: 'payment', total: '200000', count: 2 },
+        {
+          paymentMethod: 'card',
+          cardProvider: 'terminal',
+          type: 'payment',
+          total: '160000',
+          count: 1,
+        },
+        {
+          paymentMethod: 'card',
+          cardProvider: 'click',
+          type: 'payment',
+          total: '140000',
+          count: 1,
+        },
+        { paymentMethod: 'card', cardProvider: 'click', type: 'refund', total: '60000', count: 1 },
+      ],
+    } as unknown as DailySummary;
+    renderApp(<DailySummaryCard summary={split} />);
+    const box = screen.getByTestId('card-providers');
+    expect(box.textContent).toContain('Terminal');
+    expect(box.textContent).toMatch(/160\s000\sso'm/);
+    expect(box.textContent).toContain('Click');
+    // click: 140000 − 60000
+    expect(box.textContent).toMatch(/Click\s*80\s000\sso'm/);
+    // sof: 200000 + 160000 + 140000 − 60000 = 440000
+    expect(screen.getByText(/^440\s000\sso'm$/)).toBeTruthy();
+    expect(screen.getByText('Kassada sof')).toBeTruthy();
+  });
 });

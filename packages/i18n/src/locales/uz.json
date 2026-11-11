@@ -1513,5 +1513,48 @@
       "recheck": "Qayta tekshirish",
       "stillExpired": "Litsenziya hali ham faol emas"
     }
+  },
+  "cashierPos": {
+    "price_locked": "Narx qulflangan",
+    "method_hint": {
+      "cash": "qaytim hisoblanadi",
+      "card": "Terminal · Click · Payme",
+      "transfer": "hisob raqamiga"
+    },
+    "card_provider": "Karta turi",
+    "provider": {
+      "terminal": "Terminal",
+      "click": "Click",
+      "payme": "Payme",
+      "other": "Boshqa",
+      "unspecified": "Ko'rsatilmagan"
+    },
+    "received": "Bemor berdi",
+    "paid_now": "To'landi",
+    "change": "Qaytim",
+    "debt_left": "Qarz qoladi",
+    "net_to_pay": "To'lanadi",
+    "fiscal": {
+      "label": "Fiskal chek",
+      "not_sent": "Yuborilmagan",
+      "sent": "Yuborilgan",
+      "hint": "Fiskal chek hozircha yuborilmaydi — hujjat keyinroq Soliqqa jo'natiladi"
+    },
+    "summary": {
+      "title": "Bugungi kassa",
+      "refunded": "Qaytarildi",
+      "net": "Kassada sof",
+      "transfer": "O'tkazma",
+      "other": "Boshqa",
+      "refund_note": "Qaytarilgan pul tushumdan ayiriladi — hisobot va dashboard bilan bir xil formula."
+    },
+    "receipt": {
+      "loading": "Chek yuklanmoqda…",
+      "load_error": "Chekni yuklab bo'lmadi",
+      "fiscal": "Fiskal holat",
+      "card_provider": "Karta turi",
+      "paid": "To'langan",
+      "change": "Qaytim"
+    }
   }
 }

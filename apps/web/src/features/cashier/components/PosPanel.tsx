@@ -1,4 +1,5 @@
 import type { CashierTransaction, PaymentMethod, Service } from '@dental/api-client';
+import { StatusPill } from '@dental/ui';
 import {
   Box,
   Card,
@@ -28,10 +29,16 @@ import { fetchServicePrices, useCreateTransaction, useServices } from '../cashie
 import {
   buildCreatePayload,
   computeNetTotal,
+  computeTender,
   findActivePrice,
   toTransactionVM,
 } from '../cashier.mappers';
-import type { CartItem, TransactionVM } from '../cashier.types';
+import {
+  CARD_PROVIDERS,
+  type CardProvider,
+  type CartItem,
+  type TransactionVM,
+} from '../cashier.types';
 import { CartTable } from './CartTable';
 import { ReceiptModal } from './ReceiptModal';
 
@@ -85,11 +92,27 @@ type DiscountPct = (typeof DISCOUNT_PCTS)[number];
 const PAYMENT_OPTIONS: ReadonlyArray<{
   value: Extract<PaymentMethod, 'cash' | 'card' | 'transfer'>;
   i18nKey: string;
+  hintKey: string;
   Icon: typeof IconCash;
 }> = [
-  { value: 'cash', i18nKey: 'cashier.method.cash', Icon: IconCash },
-  { value: 'card', i18nKey: 'cashier.method.card', Icon: IconCreditCard },
-  { value: 'transfer', i18nKey: 'cashier.method.transfer', Icon: IconBuildingBank },
+  {
+    value: 'cash',
+    i18nKey: 'cashier.method.cash',
+    hintKey: 'cashierPos.method_hint.cash',
+    Icon: IconCash,
+  },
+  {
+    value: 'card',
+    i18nKey: 'cashier.method.card',
+    hintKey: 'cashierPos.method_hint.card',
+    Icon: IconCreditCard,
+  },
+  {
+    value: 'transfer',
+    i18nKey: 'cashier.method.transfer',
+    hintKey: 'cashierPos.method_hint.transfer',
+    Icon: IconBuildingBank,
+  },
 ];
 
 /**
@@ -114,6 +137,7 @@ export function PosPanel({ branchId, patientId, onDirtyChange }: PosPanelProps) 
   const [discountPct, setDiscountPct] = useState<DiscountPct>(0);
   const [paidAmount, setPaidAmount] = useState<number | ''>('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
+  const [cardProvider, setCardProvider] = useState<CardProvider>('terminal');
   const [notes, setNotes] = useState('');
   const [receipt, setReceipt] = useState<ReceiptSnapshot | null>(null);
 
@@ -121,6 +145,12 @@ export function PosPanel({ branchId, patientId, onDirtyChange }: PosPanelProps) 
   const gross = computeNetTotal(cart, 0);
   const discAmt = Math.round((gross * discountPct) / 100);
   const netTotal = computeNetTotal(cart, discAmt);
+  // Naqdda qaytim, qarz qoldig'i (sof hisob — mappers.computeTender).
+  const tender = computeTender(
+    paymentMethod,
+    netTotal,
+    typeof paidAmount === 'number' ? paidAmount : null,
+  );
 
   // Savat holatini ota-komponentga bildirish (rejim almashganda yo'qotishni ogohlantirish uchun).
   useEffect(() => {
@@ -180,8 +210,10 @@ export function PosPanel({ branchId, patientId, onDirtyChange }: PosPanelProps) 
       patientId,
       cart,
       discount: discAmt,
-      paidAmount: typeof paidAmount === 'number' ? paidAmount : null,
+      // Bemor ortiqcha bergan bo'lsa ham serverga net yoziladi (qaytim kassada qoladi).
+      paidAmount: tender.paid,
       paymentMethod,
+      cardProvider: paymentMethod === 'card' ? cardProvider : null,
       notes,
     });
     // Savat snapshot'i (charge'dan oldin — onSuccess reset'idan keyin ham mavjud bo'lsin).
@@ -196,6 +228,7 @@ export function PosPanel({ branchId, patientId, onDirtyChange }: PosPanelProps) 
         setSearch('');
         setDiscountPct(0);
         setPaidAmount('');
+        setCardProvider('terminal');
         setNotes('');
       },
     });
@@ -345,48 +378,132 @@ export function PosPanel({ branchId, patientId, onDirtyChange }: PosPanelProps) 
             {t('cashier.payment_method')}
           </Text>
           <Box style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-            {PAYMENT_OPTIONS.map(({ value, i18nKey, Icon }) => {
+            {PAYMENT_OPTIONS.map(({ value, i18nKey, hintKey, Icon }) => {
               const active = paymentMethod === value;
               return (
                 <UnstyledButton
                   key={value}
                   onClick={() => setPaymentMethod(value)}
+                  aria-pressed={active}
                   style={{
                     display: 'flex',
                     flexDirection: 'column',
-                    alignItems: 'center',
+                    alignItems: 'flex-start',
                     justifyContent: 'center',
-                    gap: 4,
-                    height: 54,
+                    gap: 2,
+                    minHeight: 56,
+                    padding: '8px 12px',
                     borderRadius: 10,
                     border: active ? '1.5px solid var(--primary)' : '1.5px solid var(--border)',
                     background: active ? 'var(--primary-soft)' : 'var(--surface)',
                     color: active ? 'var(--primary)' : 'var(--ink-2)',
-                    fontSize: 12.5,
-                    fontWeight: 600,
                     fontFamily: 'var(--font-sans)',
                   }}
                 >
-                  <Icon size={18} />
-                  {t(i18nKey)}
+                  <Group gap={6} wrap="nowrap">
+                    <Icon size={16} />
+                    <Text inherit fw={700} style={{ fontSize: 13.5 }}>
+                      {t(i18nKey)}
+                    </Text>
+                  </Group>
+                  <Text inherit style={{ fontSize: 11.5, color: 'var(--ink-3)', fontWeight: 500 }}>
+                    {t(hintKey)}
+                  </Text>
                 </UnstyledButton>
               );
             })}
           </Box>
+
+          {/* Karta sub-turi (faqat karta tanlanganda) — tashqi integratsiya yo'q, faqat yorliq. */}
+          {paymentMethod === 'card' && (
+            <Group gap={8} mt={10} role="radiogroup" aria-label={t('cashierPos.card_provider')}>
+              {CARD_PROVIDERS.map((p) => {
+                const active = cardProvider === p;
+                return (
+                  <UnstyledButton
+                    key={p}
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => setCardProvider(p)}
+                    style={{
+                      height: 30,
+                      padding: '0 12px',
+                      borderRadius: 99,
+                      fontSize: 12.5,
+                      fontWeight: 600,
+                      fontFamily: 'var(--font-sans)',
+                      border: active ? '1px solid var(--primary)' : '1px solid var(--border)',
+                      background: active ? 'var(--primary)' : 'var(--surface)',
+                      color: active ? 'var(--on-primary)' : 'var(--ink-2)',
+                    }}
+                  >
+                    {t(`cashierPos.provider.${p}`)}
+                  </UnstyledButton>
+                );
+              })}
+            </Group>
+          )}
         </Box>
 
-        {/* To'langan summa + eslatma */}
+        {/* Bemor berdi · Qaytim · Qarz qoladi + eslatma */}
         <Box style={{ padding: '0 18px 14px' }}>
           <Stack gap="sm">
-            <NumberInput
-              label={t('cashier.paid_amount')}
-              value={paidAmount}
-              onChange={(v) => setPaidAmount(typeof v === 'number' ? v : '')}
-              min={0}
-              step={1000}
-              thousandSeparator=" "
-              suffix={` ${t('common.currency')}`}
-            />
+            <Box
+              style={{
+                display: 'grid',
+                gridTemplateColumns: paymentMethod === 'cash' ? '1.2fr 1fr 1fr' : '1.2fr 1fr',
+                gap: 12,
+                alignItems: 'end',
+              }}
+            >
+              <NumberInput
+                label={
+                  paymentMethod === 'cash' ? t('cashierPos.received') : t('cashier.paid_amount')
+                }
+                value={paidAmount}
+                onChange={(v) => setPaidAmount(typeof v === 'number' ? v : '')}
+                placeholder={formatCurrency(netTotal, t)}
+                min={0}
+                step={1000}
+                thousandSeparator=" "
+                suffix={` ${t('common.currency')}`}
+                styles={{ input: { fontFamily: 'var(--font-mono)', fontWeight: 600 } }}
+              />
+              {paymentMethod === 'cash' && (
+                <Box data-testid="tender-change">
+                  <Text style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-2)' }}>
+                    {t('cashierPos.change')}
+                  </Text>
+                  <Text
+                    fw={700}
+                    style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 16,
+                      color: 'var(--primary)',
+                      marginTop: 6,
+                    }}
+                  >
+                    {formatCurrency(tender.change, t)}
+                  </Text>
+                </Box>
+              )}
+              <Box data-testid="tender-debt">
+                <Text style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-2)' }}>
+                  {t('cashierPos.debt_left')}
+                </Text>
+                <Text
+                  fw={700}
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 16,
+                    marginTop: 6,
+                    color: tender.debt > 0 ? 'var(--danger)' : 'var(--ink-2)',
+                  }}
+                >
+                  {formatCurrency(tender.debt, t)}
+                </Text>
+              </Box>
+            </Box>
             <Textarea
               label={t('cashier.notes')}
               rows={2}
@@ -395,6 +512,27 @@ export function PosPanel({ branchId, patientId, onDirtyChange }: PosPanelProps) 
             />
           </Stack>
         </Box>
+
+        {/* Fiskal chek holati (NoOp provider → «Yuborilmagan»; Soliq real bo'lganda yangilanadi). */}
+        <Group
+          gap={10}
+          wrap="nowrap"
+          data-testid="fiscal-state"
+          style={{
+            margin: '0 18px 14px',
+            padding: '10px 12px',
+            borderRadius: 10,
+            background: 'var(--surface-2)',
+          }}
+        >
+          <Text style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink)' }}>
+            {t('cashierPos.fiscal.label')}
+          </Text>
+          <StatusPill status="waiting">{t('cashierPos.fiscal.not_sent')}</StatusPill>
+          <Text style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>
+            {t('cashierPos.fiscal.hint')}
+          </Text>
+        </Group>
 
         {/* Accept */}
         <Box style={{ padding: '0 18px 18px' }}>
@@ -429,10 +567,6 @@ export function PosPanel({ branchId, patientId, onDirtyChange }: PosPanelProps) 
             )}
             {t('cashier.charge')}
           </UnstyledButton>
-          {/* NoOp fiskal eslatma (Soliq scaffold — Phase 2). i18n stub → Task F. */}
-          <Text style={{ fontSize: 11, color: 'var(--ink-3)', textAlign: 'center', marginTop: 8 }}>
-            {t('cashier.noop_fiscal')}
-          </Text>
         </Box>
       </Card>
 

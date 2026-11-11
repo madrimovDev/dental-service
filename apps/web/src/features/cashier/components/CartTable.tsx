@@ -1,5 +1,5 @@
 import { Box, NumberInput, Stack, Text } from '@mantine/core';
-import { IconX } from '@tabler/icons-react';
+import { IconLock, IconX } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import type { CartItem } from '../cashier.types';
 
@@ -62,7 +62,7 @@ export function CartTable({ cart, onUpdate, onRemove }: CartTableProps) {
             ) : null}
           </Box>
 
-          {/* Tahrirlanadigan soni + narx (funksiya saqlanadi, inline/kichik). */}
+          {/* Tahrirlanadigan soni + qulflangan narx. */}
           <Box
             style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'flex-end' }}
           >
@@ -74,16 +74,18 @@ export function CartTable({ cart, onUpdate, onRemove }: CartTableProps) {
               w={56}
               size="xs"
             />
+            {/* MO-02: narx serverdan (filial narxi) olinadi — kassir o'zgartira olmaydi. */}
             <NumberInput
               aria-label={t('cashier.price')}
+              title={t('cashierPos.price_locked')}
               value={i.unitPrice}
-              onChange={(v) => onUpdate(i.service.id, { unitPrice: typeof v === 'number' ? v : 0 })}
-              min={0}
-              step={1000}
-              w={120}
+              readOnly
+              w={132}
               size="xs"
+              hideControls
               thousandSeparator=" "
               suffix={` ${t('common.currency')}`}
+              rightSection={<IconLock size={12} style={{ color: 'var(--ink-3)' }} />}
               styles={{ input: { fontFamily: 'var(--font-mono)', textAlign: 'right' } }}
             />
           </Box>

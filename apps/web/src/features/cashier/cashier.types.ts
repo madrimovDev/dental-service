@@ -5,6 +5,13 @@ import type {
   TransactionType,
 } from '@dental/api-client';
 
+/**
+ * Karta sub-turi (UI-R5). Backend `card_provider` — generated api-client qayta
+ * generatsiya qilingach (`generate:contract`) shu tip generated modeldan ham keladi.
+ */
+export type CardProvider = 'terminal' | 'click' | 'payme' | 'other';
+export const CARD_PROVIDERS: readonly CardProvider[] = ['terminal', 'click', 'payme', 'other'];
+
 /** POS savat satri. `unitPrice` filial narxidan avto-to'ldiriladi, qo'lda override mumkin. */
 export type CartItem = {
   service: Service;
@@ -20,10 +27,14 @@ export type TransactionVM = {
   paidAmount: number;
   discount: number;
   paymentMethod: PaymentMethod;
+  /** Faqat `card` uchun; boshqa usullarda null. */
+  cardProvider: CardProvider | null;
   type: TransactionType;
   status: TransactionStatus;
   createdAt: string;
   refundable: boolean;
+  /** Fiskal chek yuborilganmi (NoOp provider → false → «Yuborilmagan»). */
+  fiscalSent: boolean;
   /** Plan-linked bo'lsa qisman refund ruxsat (V2-4). */
   planLinked: boolean;
 };

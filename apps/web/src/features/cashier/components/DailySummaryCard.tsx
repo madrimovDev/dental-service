@@ -3,47 +3,30 @@ import { Box, Group, Paper, Stack, Text, Title } from '@mantine/core';
 import { IconChartBar, IconCornerDownLeft } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { formatCurrency, formatNumber } from '@/lib/format';
-import { netCashTotal } from '../cashier.mappers';
+import { summarizeBreakdown } from '../cashier.mappers';
+import { CARD_PROVIDERS } from '../cashier.types';
 
 export interface DailySummaryCardProps {
   summary: DailySummary;
 }
 
-/** Berilgan metod+type bo'yicha breakdown yig'indisi (displey-only agregatsiya). */
-function sumByMethodAndType(
-  summary: DailySummary,
-  method: 'cash' | 'card',
-  type: 'payment' | 'refund',
-): number {
-  return summary.breakdown
-    .filter((b) => b.type === type && b.paymentMethod === method)
-    .reduce((acc, b) => acc + Number(b.total), 0);
-}
-
-function sumByType(summary: DailySummary, type: 'payment' | 'refund'): number {
-  return summary.breakdown
-    .filter((b) => b.type === type)
-    .reduce((acc, b) => acc + Number(b.total), 0);
-}
-
 export function DailySummaryCard({ summary }: DailySummaryCardProps) {
   const { t } = useTranslation();
 
-  // CLI-419: backend `dailySummary` endi `SUM(paidAmount)` qaytaradi (hisob-faktura
-  // emas, haqiqatda olingan naqd). Frontend HAM refundlarni endi e'tiborsiz
-  // qoldirmaydi — har metod bo'yicha SOF (payment − refund) ko'rsatiladi + refund
-  // bo'lsa ko'rinadigan kassa-chiqim qatori (avval faqat gross to'lov ko'rsatilardi).
-  const cashPayment = sumByMethodAndType(summary, 'cash', 'payment');
-  const cashRefund = sumByMethodAndType(summary, 'cash', 'refund');
-  const cashNet = cashPayment - cashRefund;
-  const cardPayment = sumByMethodAndType(summary, 'card', 'payment');
-  const cardRefund = sumByMethodAndType(summary, 'card', 'refund');
-  const cardNet = cardPayment - cardRefund;
-
-  const totalRefund = sumByType(summary, 'refund');
-  const totalRevenue = netCashTotal(summary.breakdown);
+  // CLI-419/P13: har usul bo'yicha SOF (payment − refund) — `summarizeBreakdown`
+  // `netCashTotal` bilan bir xil formula. UI-R5: karta sub-turlar bo'yicha bo'linadi.
+  const sum = summarizeBreakdown(summary.breakdown);
+  const cashNet = sum.cash;
+  const cardNet = sum.card;
+  const totalRefund = sum.refunded;
+  const totalRevenue = sum.net;
   const cashShare = totalRevenue > 0 ? Math.round((cashNet / totalRevenue) * 100) : 0;
   const cardShare = totalRevenue > 0 ? Math.round((cardNet / totalRevenue) * 100) : 0;
+  // Sub-tur qatorlari: faqat kamida bitta sub-tur ko'rsatilgan bo'lsa.
+  const hasProviders = CARD_PROVIDERS.some((p) => (sum.cardByProvider[p] ?? 0) !== 0);
+  const providerRows = [...CARD_PROVIDERS, 'unspecified' as const]
+    .map((p) => ({ key: p, amount: sum.cardByProvider[p] ?? 0 }))
+    .filter((r) => r.amount !== 0);
 
   // CLI-453 #1: hardcoded til-ternary o'rniga i18n kaliti (uz.json/ru.json qo'shildi).
   const cashOutLabel = t('cashier.cash_out');
@@ -64,7 +47,7 @@ export function DailySummaryCard({ summary }: DailySummaryCardProps) {
                 (Σ payment − Σ refund), avval faqat gross to'lov edi. */}
             <Box>
               <Text style={{ fontSize: 12, color: 'var(--ink-3)' }}>
-                {t('cashier.total_revenue')}
+                {t('cashierPos.summary.net')}
               </Text>
               <Text
                 fw={700}
@@ -86,6 +69,42 @@ export function DailySummaryCard({ summary }: DailySummaryCardProps) {
                 amount={formatCurrency(cardNet, t)}
               />
             </Group>
+
+            {hasProviders && (
+              <Stack gap={4} data-testid="card-providers" style={{ paddingLeft: 12 }}>
+                {providerRows.map((r) => (
+                  <Group key={r.key} justify="space-between" wrap="nowrap">
+                    <Text style={{ fontSize: 12, color: 'var(--ink-2)' }}>
+                      {t(`cashierPos.provider.${r.key}`)}
+                    </Text>
+                    <Text style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600 }}>
+                      {formatCurrency(r.amount, t)}
+                    </Text>
+                  </Group>
+                ))}
+              </Stack>
+            )}
+
+            {sum.transfer !== 0 && (
+              <Group justify="space-between" wrap="nowrap" style={{ padding: '0 12px' }}>
+                <Text style={{ fontSize: 12, color: 'var(--ink-2)' }}>
+                  {t('cashierPos.summary.transfer')}
+                </Text>
+                <Text style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600 }}>
+                  {formatCurrency(sum.transfer, t)}
+                </Text>
+              </Group>
+            )}
+            {sum.other !== 0 && (
+              <Group justify="space-between" wrap="nowrap" style={{ padding: '0 12px' }}>
+                <Text style={{ fontSize: 12, color: 'var(--ink-2)' }}>
+                  {t('cashierPos.summary.other')}
+                </Text>
+                <Text style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600 }}>
+                  {formatCurrency(sum.other, t)}
+                </Text>
+              </Group>
+            )}
 
             {totalRefund > 0 && (
               <Box
@@ -114,6 +133,10 @@ export function DailySummaryCard({ summary }: DailySummaryCardProps) {
                 </Text>
               </Box>
             )}
+
+            <Text style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>
+              {t('cashierPos.summary.refund_note')}
+            </Text>
 
             {/* CLI-452: backend `expense.view` bo'lmasa bu maydonlarni umuman
                 qaytarmaydi — shunda qator ko'rsatilmaydi (403/xato YO'Q, jim
