@@ -116,6 +116,8 @@ Desktop serveri tashqaridan ochilmaydi va **ochilmasligi kerak**. Faqat chiquvch
 4. ✅ **QAROR (2026-11-12): lab taklif qiladi, klinika tasdiqlaydi**; tasdiqlangan narx klinika `expenses`ga avtomatik tushadi. ~~**Narx kimda?** Lab narx taklif qiladi va klinika tasdiqlaydimi, yoki klinika belgilaydimi? Lab xarajati klinika `expenses`ga avtomatik tushsinmi?~~
 5. ✅ **QAROR (2026-11-12):** ma'lumot VPS'ga chiqadi (relay/portal bulutda), **qattiq shifrlangan**: TLS + saqlashda shifrlash (fayllar ham), joylashuv muhim emas. E2E (server o'qiy olmaydigan) shifrlash tanlanmadi — C variantining server tomonidagi lab UI'si bilan mos emas. ~~**Relay/portal ma'lumot saqlashi** — PHI klinikadan tashqarida (bulutda) saqlanishiga klinikalar va qonun (O'zbekiston shaxsiy ma'lumotlar qonuni, mahalliylashtirish talabi) ruxsat beradimi?~~
 
+> ✅ **2026-11-12:** L5 ulanish — ochiq lablar katalogi; L6 — vendor yaratadi, pullik obuna; L7 MVP — taqsimlash, yozishma, akt-sverka, prays-list. Dizayn qoralamasi: `docs/superpowers/specs/2026-11-12-lab-portal-design.md`.
+
 ## 5. Bu tadqiqotda qo'shimcha aniqlangan nuqsonlar
 - Technician `lab_order.manage` bilan **buyurtma yaratadi** va istalgan `doctorId`ni tanlaydi (`lab-orders.service.ts:102` faqat user mavjudligini tekshiradi).
 - `lab_orders`da `branchId` yo'q, shuning uchun lab buyurtmalarini filial bo'yicha ajratib bo'lmaydi (multi-branch klinikada).
