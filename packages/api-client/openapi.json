@@ -104,6 +104,9 @@
               "lang"
             ]
           },
+          "mustChangePassword": {
+            "type": "boolean"
+          },
           "accessToken": {
             "type": "string"
           },
@@ -117,6 +120,7 @@
         },
         "required": [
           "user",
+          "mustChangePassword",
           "accessToken",
           "refreshToken",
           "accessExpiresAt"
@@ -9167,7 +9171,7 @@
             }
           },
           "400": {
-            "description": "Validation error",
+            "description": "Owner cannot reset own password via this route",
             "content": {
               "application/json": {
                 "schema": {
@@ -9187,7 +9191,7 @@
             }
           },
           "403": {
-            "description": "Forbidden (user not in tenant or cannot reset owner)",
+            "description": "Forbidden (owner only, or user not in tenant)",
             "content": {
               "application/json": {
                 "schema": {

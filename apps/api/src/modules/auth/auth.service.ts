@@ -277,6 +277,7 @@ export const createAuthService = (deps: AuthServiceDeps) => {
         ok: true;
         userId: string;
         user: { id: string; phone: string; fullName: string | null; lang: string };
+        mustChangePassword: boolean;
         accessToken: string;
         refreshToken: string;
         accessExpiresAt: Date;
@@ -306,6 +307,7 @@ export const createAuthService = (deps: AuthServiceDeps) => {
       perms: [],
       roleKey: null,
       lang: (user.preferredLanguage as 'uz' | 'ru') ?? 'uz',
+      ...(user.mustChangePassword ? { pwc: true } : {}),
     });
     const refresh = await signRefresh(user.id);
 
@@ -324,6 +326,7 @@ export const createAuthService = (deps: AuthServiceDeps) => {
         fullName: user.fullName,
         lang: user.preferredLanguage,
       },
+      mustChangePassword: user.mustChangePassword,
       accessToken: access.token,
       refreshToken: refresh.token,
       accessExpiresAt: access.expiresAt,
@@ -563,6 +566,7 @@ export const createAuthService = (deps: AuthServiceDeps) => {
         perms: perms as Permission[],
         roleKey,
         lang: (user.preferredLanguage as 'uz' | 'ru') ?? 'uz',
+        ...(user.mustChangePassword ? { pwc: true } : {}),
       });
 
       const [newRow] = await tx
@@ -655,6 +659,8 @@ export const createAuthService = (deps: AuthServiceDeps) => {
         perms: (hasWorkspace ? perms : []) as Permission[],
         roleKey: hasWorkspace ? roleKey : null,
         lang: (user.preferredLanguage as 'uz' | 'ru') ?? 'uz',
+        // P6: bayroq HAR safar DB'dan o'qiladi — refresh orqali pwc'dan qochib bo'lmaydi.
+        ...(user.mustChangePassword ? { pwc: true } : {}),
       });
 
       const [newRow] = await tx
@@ -706,7 +712,7 @@ export const createAuthService = (deps: AuthServiceDeps) => {
     await db.transaction(async (tx) => {
       await tx
         .update(users)
-        .set({ passwordHash: newHash, updatedAt: now })
+        .set({ passwordHash: newHash, mustChangePassword: false, updatedAt: now })
         .where(eq(users.id, userId));
       // Barcha boshqa refresh tokenlarni revoke (xavfsizlik: boshqa qurilmalardan logout)
       await tx

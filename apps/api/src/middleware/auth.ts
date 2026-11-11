@@ -9,6 +9,16 @@ declare module 'hono' {
 }
 
 /**
+ * P6: `pwc` (vaqtinchalik parol bilan kirilgan) token faqat shu yo'llarni o'tkazadi.
+ * Yo'l `c.req.path` bo'yicha to'liq (mount prefiksi bilan) solishtiriladi.
+ */
+const PASSWORD_CHANGE_ALLOWED_PATHS = new Set([
+  '/api/auth/change-password',
+  '/api/auth/me',
+  '/api/auth/logout',
+]);
+
+/**
  * JWT auth middleware — Bearer token parse, claims c.set qiladi.
  *
  * - `Authorization: Bearer <token>` header'dan o'qiydi
@@ -35,6 +45,16 @@ export const authMiddleware = (): MiddlewareHandler => async (c, next) => {
     claims = await verifyAccess(token);
   } catch {
     return c.json(fail('auth.invalid_token', 'Token invalid or expired'), 401);
+  }
+
+  if (claims.pwc === true) {
+    const path = c.req.path.length > 1 ? c.req.path.replace(/\/+$/, '') : c.req.path;
+    if (!PASSWORD_CHANGE_ALLOWED_PATHS.has(path)) {
+      return c.json(
+        fail('auth.password_change_required', 'Avval vaqtinchalik parolni almashtiring'),
+        403,
+      );
+    }
   }
 
   c.set('accessClaims', claims);

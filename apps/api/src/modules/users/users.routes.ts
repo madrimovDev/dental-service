@@ -233,7 +233,7 @@ export const userRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     path: '/{userId}/reset-password',
     tags: ['users'],
     operationId: 'resetUserPassword',
-    middleware: [requirePermission('user.manage')] as const,
+    // P6: faqat owner — `requirePermission` o'rniga servisda `@owner` tekshiriladi.
     request: {
       params: userIdParamSchema,
     },
@@ -242,7 +242,11 @@ export const userRoutes = (deps: { db: Database; audit: AuditLogger }) => {
       ...userNotFoundResponse,
       403: {
         content: { 'application/json': { schema: errorResponseSchema } },
-        description: 'Forbidden (user not in tenant or cannot reset owner)',
+        description: 'Forbidden (owner only, or user not in tenant)',
+      },
+      400: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Owner cannot reset own password via this route',
       },
     },
   });
@@ -253,7 +257,8 @@ export const userRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     if (!result.ok) {
       const msgs: Record<string, [string, number]> = {
         'user.not_in_tenant': ['Foydalanuvchi bu klinikaga tegishli emas', 403],
-        'user.cannot_reset_owner': ["Klinika egasi parolini boshqa admin o'zgartira olmaydi", 403],
+        'user.reset_owner_only': ['Parolni faqat klinika egasi tiklaydi', 403],
+        'user.reset_self': ["O'z parolingizni 'Parolni almashtirish' orqali o'zgartiring", 400],
         'user.not_found': ['Foydalanuvchi topilmadi', 404],
       };
       const [msg, status] = msgs[result.code] ?? ['Reset failed', 400];

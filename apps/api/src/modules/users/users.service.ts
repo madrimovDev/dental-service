@@ -337,18 +337,27 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
   }
 
   /**
-   * Admin tomonidan xodim parolini qayta tiklash.
-   *  - User joriy tenantda assignment yoki owner bo'lishi kerak (cross-tenant zarbasiz)
-   *  - Yangi 16-belgili vaqtinchalik parol generate qilinadi (login validator min 12)
-   *  - Foydalanuvchining hamma refresh tokenlari revoke qilinadi (logout boshqa qurilmalardan)
-   *  - Audit yoziladi
-   *  - Yangi parol qaytariladi (UI'da admin'ga ko'rsatiladi, u xodimga beradi)
+   * P6 — xodim parolini FAQAT klinika egasi (owner) tiklaydi.
+   *  - Chaqiruvchi owner bo'lishi shart (`@owner`), aks holda `user.reset_owner_only`
+   *  - Owner o'zini bu yo'l bilan tiklamaydi (`user.reset_self` — `/auth/change-password` bor)
+   *  - Maqsad shu tenant a'zosi bo'lishi kerak (cross-tenant zarbasiz)
+   *  - Yangi 16-belgili vaqtinchalik parol generate qilinadi va `must_change_password = true`
+   *    qo'yiladi: shu parol bilan kirilganda faqat parol almashtirish ochiladi
+   *  - Foydalanuvchining hamma refresh tokenlari revoke qilinadi
+   *  - Audit yoziladi; ochiq parol LOGGA YOZILMAYDI (faqat javobda qaytadi)
    */
   async function resetUserPassword(c: Context, targetUserId: string) {
     const dbContext = getDb(c);
     const tenantId = c.get('activeTenantId');
     const actor = c.get('user');
     if (!tenantId || !actor) throw new Error('No tenant context');
+
+    if (!c.get('accessClaims')?.perms.includes('@owner')) {
+      return { ok: false as const, code: 'user.reset_owner_only' };
+    }
+    if (actor.id === targetUserId) {
+      return { ok: false as const, code: 'user.reset_self' };
+    }
 
     // Target user shu tenantda ekanligini tekshirish (assignment yoki owner)
     return await dbContext.transaction(async (tx) => {
@@ -380,12 +389,6 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
         return { ok: false as const, code: 'user.not_in_tenant' };
       }
 
-      // Tenant owner parolini faqat o'zi yoki tenant owner reset qila oladi
-      // (boshqa adminlar tenant owner'ning parolini o'zgartira olmaydi — xavfsizlik)
-      if (isOwner && actor.id !== tenant?.ownerUserId) {
-        return { ok: false as const, code: 'user.cannot_reset_owner' };
-      }
-
       const [target] = await tx.select().from(users).where(eq(users.id, targetUserId));
       if (!target) return { ok: false as const, code: 'user.not_found' };
 
@@ -395,7 +398,7 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
 
       await tx
         .update(users)
-        .set({ passwordHash: newHash, updatedAt: now })
+        .set({ passwordHash: newHash, mustChangePassword: true, updatedAt: now })
         .where(eq(users.id, targetUserId));
 
       // Barcha refresh tokenlarni revoke (boshqa qurilmalardan logout)
@@ -405,16 +408,14 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
         .where(and(eq(refreshTokens.userId, targetUserId), isNull(refreshTokens.revokedAt)));
 
       await deps.audit.record(c, {
-        action: 'password_reset_by_admin',
+        action: 'password_reset_by_owner',
         resourceType: 'user',
         resourceId: targetUserId,
         after: { phone: target.phone, by: actor.id },
       });
 
-      logger.warn(
-        { adminId: actor.id, userId: targetUserId, phone: target.phone, newPassword },
-        `🔐 Admin reset password — production'da SMS orqali yuboriladi`,
-      );
+      // ⚠️ Ochiq parol log'ga YOZILMAYDI — faqat javob orqali owner'ga qaytadi.
+      logger.info({ ownerId: actor.id, userId: targetUserId }, 'Owner reset staff password');
 
       return {
         ok: true as const,
