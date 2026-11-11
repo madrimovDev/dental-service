@@ -6,6 +6,9 @@ import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { useDoctorAppointments, useTodayRange } from '../dashboard.api.ts';
+import { useDoctorPending } from '../doctor.api.ts';
+import { usePatientNames } from '../reception.api.ts';
+import { buildPendingRows, DoctorPendingPanel } from './widgets/DoctorPendingPanel.tsx';
 import { ScheduleList } from './widgets/ScheduleList.tsx';
 import { StatCard } from './widgets/StatCard.tsx';
 
@@ -58,6 +61,12 @@ export function DoctorDashboard() {
   const appts = appointments.data ?? [];
 
   const canAppointment = hasPermission('appointment.view');
+  const canPending = canAppointment && hasPermission('medical_record.view');
+  const pending = useDoctorPending(canPending);
+  const names = usePatientNames(appts.map((a) => a.patientId));
+  const nextAppt = [...appts]
+    .sort((a, b) => a.startTime.localeCompare(b.startTime))
+    .find((a) => a.status === 'scheduled' || a.status === 'confirmed');
   const canCashier = hasPermission('cashier.view');
 
   return (
@@ -99,6 +108,55 @@ export function DoctorDashboard() {
             <StatCard label={t('dashboard.today_total')} value={appts.length} tone="primary" />
           </Box>
 
+          {nextAppt && (
+            <Box
+              style={{
+                border: '1px solid var(--border)',
+                borderRadius: 12,
+                background: 'var(--surface)',
+                padding: '16px 20px',
+              }}
+            >
+              <Text size="sm" c="dimmed">
+                {t('doctorDay.next_patient', 'Keyingi bemor')} · {fmtTime(nextAppt.startTime)}
+              </Text>
+              <Group justify="space-between" mt={4}>
+                <Text fw={700} fz={20}>
+                  {names.get(nextAppt.patientId) ?? '—'}
+                </Text>
+                <Text
+                  component={Link}
+                  to={`/patients/${nextAppt.patientId}`}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    height: 44,
+                    padding: '0 18px',
+                    borderRadius: 10,
+                    background: 'var(--accent)',
+                    color: '#fff',
+                    fontWeight: 600,
+                    textDecoration: 'none',
+                  }}
+                >
+                  {t('doctorDay.open_card', 'Kartani ochish')}
+                </Text>
+              </Group>
+            </Box>
+          )}
+
+          {canPending && pending.data && (
+            <DoctorPendingPanel
+              title={t('doctorDay.pending_title', 'Mendan kutilmoqda')}
+              emptyText={t('doctorDay.pending_empty', 'Hammasi bajarilgan')}
+              rows={buildPendingRows(
+                pending.data,
+                (key, n) => t(`doctorDay.pending_${key}`, { count: n }),
+                (days) => t('doctorDay.pending_plans_oldest', { count: days ?? 0 }),
+              )}
+            />
+          )}
+
           {/* Doctor: rail yo'q (navbat/recall/faollik OMIT — data-gap, ds12) → bitta ustun jadval. */}
           <ScheduleList
             title={t('dashboard.today_appointments')}
@@ -107,8 +165,7 @@ export function DoctorDashboard() {
             rows={appts.map((a) => ({
               id: a.id,
               time: fmtTime(a.startTime),
-              // Bemor ismi dashboard data'sida yo'q (faqat ID) — placeholder, hook qo'shilmaydi.
-              patient: '—',
+              patient: names.get(a.patientId) ?? '—',
               duration: fmtDuration(a.startTime, a.endTime),
               status: a.status,
               statusLabel: t(`appointments.status.${a.status}`, a.status),

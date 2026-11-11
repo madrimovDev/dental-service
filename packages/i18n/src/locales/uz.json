@@ -1691,5 +1691,15 @@
       "paid": "To'langan",
       "change": "Qaytim"
     }
+  },
+  "doctorDay": {
+    "next_patient": "Keyingi bemor",
+    "open_card": "Kartani ochish",
+    "pending_title": "Mendan kutilmoqda",
+    "pending_empty": "Hammasi bajarilgan",
+    "pending_notes": "Imzolanmagan vizit yozuvi: {{count}}",
+    "pending_images": "Ko'rib chiqilmagan rasm: {{count}}",
+    "pending_plans": "Bemor javobini kutayotgan reja: {{count}}",
+    "pending_plans_oldest": "eng eskisi {{count}} kun oldin taklif qilingan"
   }
 }

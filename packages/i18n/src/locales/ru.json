@@ -1691,5 +1691,15 @@
       "paid": "Оплачено",
       "change": "Сдача"
     }
+  },
+  "doctorDay": {
+    "next_patient": "Следующий пациент",
+    "open_card": "Открыть карту",
+    "pending_title": "Ждёт от меня",
+    "pending_empty": "Всё выполнено",
+    "pending_notes": "Неподписанные записи визита: {{count}}",
+    "pending_images": "Непросмотренные снимки: {{count}}",
+    "pending_plans": "Планы, ожидающие ответа пациента: {{count}}",
+    "pending_plans_oldest": "самый старый предложен {{count}} дн. назад"
   }
 }
