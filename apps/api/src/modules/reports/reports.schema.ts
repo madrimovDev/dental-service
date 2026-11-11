@@ -170,3 +170,21 @@ export const oneCExportReportDtoSchema = z
   .array(oneCExportRowDtoSchema)
   .openapi('OneCExportReport');
 export type OneCExportRow = z.infer<typeof oneCExportRowDtoSchema>;
+
+// ─── Debt aging (UI-M1) ──────────────────────────────────────────────────────
+export const debtAgingBucketKeys = ['d0_30', 'd31_60', 'd61_90', 'd90_plus'] as const;
+export const debtAgingReportDtoSchema = z
+  .object({
+    totalDebt: z.number(),
+    patientCount: z.number().int(),
+    over90Count: z.number().int(),
+    buckets: z.array(
+      z.object({
+        key: z.enum(debtAgingBucketKeys),
+        amount: z.number(),
+        patients: z.number().int(),
+      }),
+    ),
+  })
+  .openapi('DebtAgingReport');
+export type DebtAgingReport = z.infer<typeof debtAgingReportDtoSchema>;

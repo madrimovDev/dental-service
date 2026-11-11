@@ -1,4 +1,6 @@
 import {
+  ApiError,
+  customInstance,
   getAppointmentStatsReport,
   getDoctorWorkloadReport,
   getPlanCompletionReport,
@@ -127,4 +129,59 @@ export function useManagerKpi(range: KpiRange) {
     queryFn: () => getPlanCompletionReport(q).then((r) => r.data),
   });
   return { revenue, appointments, doctors, treatmentPlans };
+}
+
+// TODO(integratsiya): `generate:contract`dan keyin generated `getDebtAgingReport` /
+// `getBackupStatus`ga almashtiring (bu lane generate qilmaydi).
+export interface DebtAging {
+  totalDebt: number;
+  patientCount: number;
+  over90Count: number;
+  buckets: { key: 'd0_30' | 'd31_60' | 'd61_90' | 'd90_plus'; amount: number; patients: number }[];
+}
+
+/** Bemorlar qarzi muddat bo'yicha — faqat `report.view` bo'lsa so'raladi. */
+export function useDebtAging() {
+  const { hasPermission } = useAuthStore();
+  return useQuery({
+    queryKey: dashboardKeys.debtAging(),
+    queryFn: () =>
+      customInstance<{ data: DebtAging }>({ url: '/api/reports/debt-aging', method: 'GET' }).then(
+        (r) => r.data,
+      ),
+    enabled: hasPermission('report.view'),
+    retry: false,
+  });
+}
+
+export interface BackupStatus {
+  mode: 'desktop' | 'cloud';
+  folder: string | null;
+  lastSuccessAt: string | null;
+  lastError: string | null;
+  files: { name: string; sizeBytes: number; createdAt: string }[];
+}
+
+/**
+ * Zaxira holati (lane D kontrakti). 404 yoki 403 (endpoint yo'q / ruxsat yo'q) → `null`:
+ * plitka umuman ko'rinmaydi.
+ */
+export function useBackupStatus() {
+  return useQuery({
+    queryKey: dashboardKeys.backupStatus(),
+    queryFn: async (): Promise<BackupStatus | null> => {
+      try {
+        const r = await customInstance<{ data: BackupStatus }>({
+          url: '/api/backup/status',
+          method: 'GET',
+        });
+        return r.data;
+      } catch (e) {
+        if (e instanceof ApiError && (e.status === 404 || e.status === 403)) return null;
+        throw e;
+      }
+    },
+    retry: false,
+    refetchInterval: 5 * 60_000,
+  });
 }

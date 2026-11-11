@@ -7,6 +7,7 @@ import {
   serviceMaterials,
   stockBatches,
   treatmentPlans,
+  treatmentStagePayments,
   treatmentStages,
 } from '@dental/db-schema';
 import type { Column } from 'drizzle-orm';
@@ -28,6 +29,8 @@ import type { Context } from 'hono';
 import type { DbOrTx } from '../../db/client.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import type { NonPlanTransactionRow } from '../patients/patients.balance.ts';
+import { computeNonPlanRemainder, computePatientBalance } from '../patients/patients.balance.ts';
 import {
   branchOpenMinutes,
   comparisonEntry,
@@ -45,6 +48,7 @@ import {
 } from './reports.aggregations.ts';
 import type {
   AppointmentStatsReport,
+  DebtAgingReport,
   DentalAnalyticsReport,
   DoctorWorkloadRow,
   OneCExportRow,
@@ -52,6 +56,7 @@ import type {
   ReportRange,
   RevenueReport,
 } from './reports.schema.ts';
+import { debtAgingBucketKeys } from './reports.schema.ts';
 
 const WEEKDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 
@@ -672,7 +677,136 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
     }));
   }
 
+  /**
+   * Bemorlar qarzi muddat bo'yicha (UI-M1). Qarz = bemor balansi > 0
+   * (plan qarzi + non-plan qoldiq, patients.balance bilan bir xil formula).
+   * Yosh = qarz "langari"dan hozirgacha kun: bajarilgan qarz-bosqichi `completedAt`
+   * yoki reja `createdAt` (eng eskisi), non-plan to'lov `createdAt`.
+   * Bemorlar tenant-darajali (Qaror #29) — filial bo'yicha bo'linmaydi.
+   */
+  async function debtAging(c: Context): Promise<DebtAgingReport> {
+    const db = getDb(c);
+    const now = Date.now();
+
+    const planRows = await db
+      .select({
+        patientId: treatmentPlans.patientId,
+        cost: sql<string>`COALESCE(SUM(${treatmentStages.cost}), 0)`,
+        anchor: sql<
+          string | null
+        >`MIN(COALESCE(${treatmentStages.completedAt}, ${treatmentPlans.createdAt}))`,
+      })
+      .from(treatmentStages)
+      .innerJoin(treatmentPlans, eq(treatmentStages.treatmentPlanId, treatmentPlans.id))
+      .where(
+        and(
+          inArray(treatmentPlans.status, ['accepted', 'in_progress', 'completed']),
+          ne(treatmentStages.status, 'skipped'),
+          eq(treatmentStages.acceptance, 'accepted'),
+        ),
+      )
+      .groupBy(treatmentPlans.patientId);
+
+    const allocRows = await db
+      .select({
+        patientId: treatmentPlans.patientId,
+        sum: sql<string>`COALESCE(SUM(${treatmentStagePayments.amount}), 0)`,
+      })
+      .from(treatmentStagePayments)
+      .innerJoin(treatmentStages, eq(treatmentStagePayments.stageId, treatmentStages.id))
+      .innerJoin(treatmentPlans, eq(treatmentStages.treatmentPlanId, treatmentPlans.id))
+      .groupBy(treatmentPlans.patientId);
+
+    const npOriginals = await db
+      .select({
+        id: cashierTransactions.id,
+        patientId: cashierTransactions.patientId,
+        totalAmount: cashierTransactions.totalAmount,
+        paidAmount: cashierTransactions.paidAmount,
+        createdAt: cashierTransactions.createdAt,
+      })
+      .from(cashierTransactions)
+      .where(
+        and(
+          eq(cashierTransactions.type, 'payment'),
+          eq(cashierTransactions.status, 'completed'),
+          isNull(cashierTransactions.treatmentPlanId),
+          isNotNull(cashierTransactions.patientId),
+        ),
+      );
+    const refundRows = await db
+      .select({
+        parent: cashierTransactions.parentTransactionId,
+        sum: sql<string>`COALESCE(SUM(${cashierTransactions.paidAmount}), 0)`,
+      })
+      .from(cashierTransactions)
+      .where(
+        and(
+          eq(cashierTransactions.type, 'refund'),
+          isNotNull(cashierTransactions.parentTransactionId),
+        ),
+      )
+      .groupBy(cashierTransactions.parentTransactionId);
+    const refunded = new Map(refundRows.map((r) => [r.parent as string, Number(r.sum)]));
+
+    const planCost = new Map(planRows.map((r) => [r.patientId, Number(r.cost)]));
+    const planAnchor = new Map<string, number>();
+    for (const r of planRows)
+      if (r.anchor) planAnchor.set(r.patientId, new Date(r.anchor).getTime());
+    const alloc = new Map(allocRows.map((r) => [r.patientId, Number(r.sum)]));
+    const npRows = new Map<string, NonPlanTransactionRow[]>();
+    const npAnchor = new Map<string, number>();
+    for (const r of npOriginals) {
+      const pid = r.patientId as string;
+      const list = npRows.get(pid) ?? [];
+      list.push({
+        totalAmount: Number(r.totalAmount),
+        paidAmount: Number(r.paidAmount),
+        refundedSum: refunded.get(r.id) ?? 0,
+      });
+      npRows.set(pid, list);
+      const t = new Date(r.createdAt).getTime();
+      npAnchor.set(pid, Math.min(npAnchor.get(pid) ?? t, t));
+    }
+
+    const buckets = debtAgingBucketKeys.map((key) => ({ key, amount: 0, patients: 0 }));
+    let totalDebt = 0;
+    let patientCount = 0;
+    const ids = new Set<string>([...planCost.keys(), ...npRows.keys()]);
+    for (const id of ids) {
+      const { balance } = computePatientBalance({
+        stageCostSum: planCost.get(id) ?? 0,
+        allocationSum: alloc.get(id) ?? 0,
+        nonPlanRemainder: computeNonPlanRemainder(npRows.get(id) ?? []),
+      });
+      if (balance <= 0) continue;
+      const anchor = Math.min(planAnchor.get(id) ?? now, npAnchor.get(id) ?? now);
+      const days = Math.max(0, Math.floor((now - anchor) / 86_400_000));
+      const idx = days <= 30 ? 0 : days <= 60 ? 1 : days <= 90 ? 2 : 3;
+      const b = buckets[idx] as { amount: number; patients: number };
+      b.amount += balance;
+      b.patients += 1;
+      totalDebt += balance;
+      patientCount += 1;
+    }
+
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'report',
+      resourceId: null,
+      after: { report: 'debt_aging' },
+    });
+
+    return {
+      totalDebt,
+      patientCount,
+      over90Count: (buckets[3] as { patients: number }).patients,
+      buckets,
+    };
+  }
+
   return {
+    debtAging,
     revenue,
     appointmentStats,
     doctorWorkload,

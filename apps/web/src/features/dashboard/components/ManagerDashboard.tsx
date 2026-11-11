@@ -11,12 +11,14 @@ import { formatCurrency } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import {
   useBranchNames,
+  useDebtAging,
   useDefaultPeriod,
   useDoctorNames,
   useManagerKpi,
 } from '../dashboard.api.ts';
 import { toStatDelta } from '../dashboard.mappers';
 import { OnboardingChecklist } from './OnboardingChecklist.tsx';
+import { OwnerAlertsPanel } from './OwnerAlertsPanel.tsx';
 import { BarMini } from './widgets/BarMini.tsx';
 import { MiniList } from './widgets/MiniList.tsx';
 import { Sparkline } from './widgets/Sparkline.tsx';
@@ -99,6 +101,15 @@ function CardShell({ children }: { children: ReactNode }) {
   );
 }
 
+/** KPI kartani bosiladigan qiladi (spec UI-M1: «4 KPI bosiladi»). */
+function KpiLink({ to, children }: { to: string; children: ReactNode }) {
+  return (
+    <Link to={to} style={{ color: 'inherit', textDecoration: 'none', display: 'block' }}>
+      {children}
+    </Link>
+  );
+}
+
 /** DS1 header amal-tugmasi (token surface, permission bilan gate qilinadi). */
 function HeaderAction({ to, icon, label }: { to: string; icon: ReactNode; label: string }) {
   return (
@@ -130,13 +141,13 @@ export function ManagerDashboard() {
   const { t } = useTranslation();
   const { hasPermission } = useAuthStore();
   const period = useDefaultPeriod();
-  const { revenue, appointments, doctors, treatmentPlans } = useManagerKpi(period);
+  const { revenue, appointments, doctors } = useManagerKpi(period);
   const branchNames = useBranchNames();
   const doctorNames = useDoctorNames();
+  const debt = useDebtAging().data;
 
   const rev = revenue.data;
   const appt = appointments.data;
-  const plan = treatmentPlans.data;
 
   const canAppointment = hasPermission('appointment.view');
   const canCashier = hasPermission('cashier.view');
@@ -186,25 +197,44 @@ export function ManagerDashboard() {
               gap: KPI_GAP,
             }}
           >
-            <StatCard
-              label={t('dashboard.revenue_total')}
-              value={rev ? formatCurrency(rev.total, t) : '—'}
-              color="teal"
-              delta={toStatDelta(rev?.comparison?.previous, t)}
-              spark={<Sparkline points={(rev?.byPeriod ?? []).map((p) => p.total)} />}
-            />
-            <StatCard
-              label={t('dashboard.no_show_rate')}
-              value={appt ? fmtPct(appt.noShowRate) : '—'}
-            />
-            <StatCard
-              label={t('dashboard.slot_utilization')}
-              value={appt ? fmtPct(appt.slotUtilization) : '—'}
-            />
-            <StatCard
-              label={t('dashboard.plan_completion')}
-              value={plan ? fmtPct(plan.rate) : '—'}
-            />
+            <KpiLink to="/reports">
+              <StatCard
+                label={t('dashboard.revenue_total')}
+                value={rev ? formatCurrency(rev.total, t) : '—'}
+                color="teal"
+                delta={toStatDelta(rev?.comparison?.previous, t)}
+                spark={<Sparkline points={(rev?.byPeriod ?? []).map((p) => p.total)} />}
+              />
+            </KpiLink>
+            {hasPermission('report.view') && (
+              <KpiLink to="/reports">
+                <StatCard
+                  label={t('ownerHome.kpiDebt')}
+                  value={debt ? formatCurrency(debt.totalDebt, t) : '—'}
+                  color={debt && debt.over90Count > 0 ? 'var(--danger)' : undefined}
+                  hint={
+                    debt
+                      ? t('ownerHome.kpiDebtHint', {
+                          count: debt.patientCount,
+                          over: debt.over90Count,
+                        })
+                      : undefined
+                  }
+                />
+              </KpiLink>
+            )}
+            <KpiLink to="/appointments">
+              <StatCard
+                label={t('ownerHome.kpiUtil')}
+                value={appt ? fmtPct(appt.slotUtilization) : '—'}
+              />
+            </KpiLink>
+            <KpiLink to="/reports">
+              <StatCard
+                label={t('ownerHome.kpiNoShow')}
+                value={appt ? fmtPct(appt.noShowRate) : '—'}
+              />
+            </KpiLink>
           </Box>
 
           {/* 1c. Ikki ustunli tana — minmax(0,1fr) 360px, gap 16, align-items:start. */}
@@ -239,6 +269,7 @@ export function ManagerDashboard() {
             {/* O'ng rail (360px) — revenue-by-branch + top-doctors ro'yxatlari saqlanadi.
                 Navbat/recall/faollik kartalari OMIT (data-gap, ds12 — manager'da hook yo'q). */}
             <Stack gap={16}>
+              <OwnerAlertsPanel />
               <MiniList
                 title={t('dashboard.revenue_by_branch')}
                 items={(rev?.byBranch ?? []).map((b) => ({

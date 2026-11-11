@@ -16,5 +16,7 @@ export const dashboardKeys = {
   managerRevenue: (q: Q) => ['dashboard', 'manager-revenue', q] as const,
   managerAppointments: (q: Q) => ['dashboard', 'manager-appointments', q] as const,
   managerDoctors: (q: Q) => ['dashboard', 'manager-doctors', q] as const,
+  debtAging: () => ['dashboard', 'debt-aging'] as const,
+  backupStatus: () => ['dashboard', 'backup-status'] as const,
   managerPlans: (q: Q) => ['dashboard', 'manager-plans', q] as const,
 };

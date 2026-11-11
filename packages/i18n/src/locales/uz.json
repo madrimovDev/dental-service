@@ -1968,5 +1968,32 @@
     "validationEmpty": "Kamida shikoyat, tashxis yoki bajarilgan ishdan birini kiriting",
     "plan": "Reja",
     "freeNotes": "Qo‘shimcha izoh"
+  },
+  "ownerHome": {
+    "title": "Siz hal qiladigan masalalar",
+    "allClear": "Hozircha hal qiladigan masala yo‘q",
+    "levelCritical": "Kritik",
+    "levelWarning": "Diqqat",
+    "levelInfo": "Ma‘lumot",
+    "kpiDebt": "Bemorlar qarzi",
+    "kpiDebtHint": "{{count}} bemor · {{over}} tasi 90 kundan oshgan",
+    "kpiNoShow": "Kelmaganlar",
+    "kpiUtil": "Kreslo bandligi",
+    "backupStaleTitle": "Zaxira nusxa {{days}} kundan beri olinmagan",
+    "backupNeverTitle": "Zaxira nusxa hali olinmagan",
+    "backupText": "Kompyuter buzilsa, ma‘lumot yo‘qolishi mumkin.",
+    "backupErrorTitle": "Zaxira nusxa olishda xato",
+    "backupCta": "Zaxirani tekshirish",
+    "licenseTitle": "Litsenziya {{count}} kunda tugaydi",
+    "licenseGraceTitle": "To‘lov kechikdi, {{count}} kundan keyin dastur to‘xtaydi",
+    "licenseText": "Ish to‘xtab qolmasligi uchun ta‘minotchiga yozing.",
+    "licenseCta": "Litsenziya",
+    "debtTitle": "{{count}} bemorning qarzi 90 kundan oshgan",
+    "debtText": "Jami muddati o‘tgan qarz: {{amount}}",
+    "debtCta": "Qarzdorlarni ko‘rish",
+    "branches": "Filiallar",
+    "branchRevenue": "Tushum",
+    "backupTile": "Zaxira nusxa",
+    "backupOk": "Oxirgi: {{date}}"
   }
 }

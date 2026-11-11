@@ -16,6 +16,7 @@ import {
 } from './reports.mapper.ts';
 import {
   appointmentStatsReportDtoSchema,
+  debtAgingReportDtoSchema,
   dentalAnalyticsReportDtoSchema,
   doctorWorkloadReportDtoSchema,
   oneCExportReportDtoSchema,
@@ -103,6 +104,22 @@ export const reportsRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     const range = c.req.valid('query');
     const result = await service.planCompletion(c, range);
     return c.json(ok(toPlanCompletionReportDto(result)), 200);
+  });
+
+  // ─── GET /debt-aging (UI-M1) ────────────────────────────────────────────────
+
+  const debtAgingRoute = createRoute({
+    method: 'get',
+    path: '/debt-aging',
+    tags: ['reports'],
+    operationId: 'getDebtAgingReport',
+    middleware: [requirePermission('report.view')] as const,
+    responses: okJson(debtAgingReportDtoSchema, 'Patient debt aging'),
+  });
+
+  app.openapi(debtAgingRoute, async (c) => {
+    const result = await service.debtAging(c);
+    return c.json(ok(result), 200);
   });
 
   // ─── GET /dental-analytics (V2-3) ────────────────────────────────────────
