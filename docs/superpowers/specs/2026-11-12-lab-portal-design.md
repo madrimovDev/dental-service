@@ -1,6 +1,6 @@
 # Laboratoriya portali (Lab Hub) — dizayn (2026-11-12)
 
-> Holat: **qoralama, foydalanuvchi ko'rib chiqishi kerak.** Asos: `docs/LAB-TECHNICIAN-ACCESS-2026-11-11.md` (C + D1 variantlari), kanvas `docs/design/ui-redesign-2026-11/canvas/LabPortal.dc.html`, roadmap §3 «Lab portali».
+> Holat: **qarorlar yopildi (2026-11-12), reja yozishga tayyor.** Asos: `docs/LAB-TECHNICIAN-ACCESS-2026-11-11.md` (C + D1 variantlari), kanvas `docs/design/ui-redesign-2026-11/canvas/LabPortal.dc.html`, roadmap §3 «Lab portali».
 
 ## 1. Qarorlar (foydalanuvchi, 2026-11-11/12)
 
@@ -12,6 +12,9 @@
 | L4 | Narx | **Lab taklif qiladi, klinika tasdiqlaydi**; tasdiqlangan narx klinika `expenses`ga avtomatik tushadi |
 | L5 | Ulanish | **Ochiq lablar katalogi**: klinika katalogdan lab tanlab so'rov yuboradi, lab tasdiqlaydi |
 | L6 | Lab hisobi | **Vendor yaratadi** (Supervisor), **pullik obuna**; katalogda faqat vendor yaratgan lablar |
+| L8 | SaaS klinikalar | **SaaS tenantlar ham Supervisor'da** klinika sifatida (obuna muddati, P18 kabi) — Hub barcha klinikani Supervisor orqali bir xil tekshiradi |
+| L9 | Saqlash | `delivered`dan **12 oy** keyin bemor ismi va fayllar o'chadi, narx/akt qoladi |
+| L10 | Lab obunasi | **Faqat muddat** (P18 naqshi: 7 kun imtiyoz, keyin portal bloki); tariflar yo'q |
 | L7 | MVP | Texnikka taqsimlash, ish ichida yozishma (fayl bilan), klinikalar bo'yicha hisob-kitob (akt-sverka), prays-list |
 
 ## 2. Arxitektura (tavsiya)
@@ -31,8 +34,7 @@ Supervisor ── lab yaratish/obuna (admin API) ──▶ Lab Hub
 
 ### 2.1 Klinika identifikatsiyasi Hub'da
 - **Desktop klinika:** litsenziya kaliti + fingerprint bilan Hub'ga birinchi marta ulanadi → Hub Supervisor'dan litsenziyani tekshiradi (ichki admin API) → klinikaga **Hub kaliti** (tasodifiy 256-bit, Hub'da SHA-256 saqlanadi) beradi; klinika uni `tenant_settings`da AES-256-GCM bilan saqlaydi (Qaror #38 naqshi). Litsenziya muddati tugasa (P18) Hub ham rad etadi.
-- **SaaS klinika:** SaaS deploy'ga bitta **xizmat kaliti** (env, Hub'da ro'yxatdan o'tgan) + har so'rovda `tenantId`; Hub klinikani `(saas_deployment, tenant_id)` juftligi bilan taniydi.
-- ❓ Ochiq: SaaS klinikasi Supervisor'da yo'q — SaaS obunasi qayerda boshqariladi? (Hozircha Hub SaaS tenantni xizmat kaliti bilan ishonadi.)
+- **SaaS klinika (L8):** har SaaS tenant Supervisor'da `clinics.mode = 'saas'` sifatida ro'yxatga olinadi (register-tenant'da SaaS API Supervisor'ga xizmat kaliti bilan yozadi; obuna muddati — P18 kabi). SaaS API Hub'ga shu klinika identifikatori + xizmat kaliti bilan ulanadi; Hub har ikkala turni Supervisor orqali tekshiradi. ⚠️ Bu SaaS rejimiga obuna/blokni ham olib keladi — alohida kichik ish (bosqich 0).
 
 ### 2.2 Ma'lumot modeli (Hub)
 `labs` (vendor yaratadi: nom, shahar, tavsif, katalogda ko'rinish, obuna `expires_at`), `lab_users` (lab rahbari / texnik; login telefon+parol, Hub'ga xos), `clinics` (desktop|saas identifikatori, nom), `lab_clinic_links` (`pending|active|rejected|revoked`), `price_list_items` (ish turi, material, narx), `cases` (klinika ish nusxasi: `clinic_case_ref`, bemor to'liq ismi*, jins, yosh, klinika kodi, shifokor ismi, tishlar, ish turi, material, rang*, muddat, izoh*, `status`, `assigned_technician_id`, `proposed_price`, `approved_price`, `approved_at`), `case_files`* (STL/surat), `case_messages`*, `case_events` (audit), `settlements` (klinika bo'yicha oylik akt: jami tasdiqlangan narx, to'langan — lab qo'lda belgilaydi).
@@ -50,7 +52,7 @@ Klinika: `draft → sent` (Hub'ga push) · Lab: `sent → accepted → in_progre
 - **Transport:** faqat HTTPS (Caddy, TLS 1.2+), HSTS; klinika serveri Hub sertifikatini tekshiradi (public CA).
 - **Saqlashda:** konvert shifrlash — har lab uchun alohida ma'lumot kaliti (DEK, AES-256-GCM), DEK'lar master kalit (KEK, VPS'da env/fayl, bazada emas) bilan o'ralgan. Shifrlanadi: bemor ismi, izohlar, xabarlar, rang tavsifi, **fayllar** (diskda faqat shifrlangan blob). Qidiruv uchun kerakli maydonlar (status, muddat, klinika) ochiq.
 - **Zaxira:** `pg_dump` + fayllar — allaqachon shifrlangan holda; KEK zaxiraga qo'shilmaydi (alohida saqlanadi, README).
-- **Saqlash muddati:** `delivered`dan 12 oy keyin bemor ismi va fayllar o'chiriladi (narx/akt qoladi). ❓ muddatni tasdiqlash.
+- **Saqlash muddati (L9):** `delivered`dan 12 oy keyin bemor ismi va fayllar o'chiriladi (narx/akt qoladi) — kunlik worker.
 - E2E (server o'qiy olmaydigan) shifrlash **tanlanmadi** — lab portali server tomonida render qilinadi.
 
 ## 4. Ekranlar
@@ -59,6 +61,7 @@ Klinika: `draft → sent` (Hub'ga push) · Lab: `sent → accepted → in_progre
 - **Supervisor admin:** «Laboratoriyalar» — yaratish, obuna muddati, uzaytirish, lab rahbari vaqtinchalik paroli (provisioning naqshi).
 
 ## 5. Bosqichlar (reja yozilganda)
+0. SaaS tenantlarni Supervisor'ga ro'yxatlash + SaaS obuna muddati (L8).
 1. Hub skeleti + shifrlash qatlami + Supervisor'dan lab yaratish + lab login.
 2. Katalog + klinika ulanishi (desktop va SaaS identifikatsiyasi).
 3. Ish yuborish/sinxronlash (outbox + poll) + holat oqimi.
@@ -67,6 +70,4 @@ Klinika: `draft → sent` (Hub'ga push) · Lab: `sent → accepted → in_progre
 6. Deploy (infra bosqichi bilan, VPS/domen kerak).
 
 ## 6. Ochiq savollar
-1. SaaS klinikalar obunasi va Hub identifikatsiyasi (§2.1).
-2. Bemor ismi va fayllarni saqlash muddati (§3, tavsiya 12 oy).
-3. Lab obunasi narxi/tariflari — Supervisor'da faqat muddat (P18 naqshi) yetarlimi?
+Yo'q — L1–L10 yopildi.
