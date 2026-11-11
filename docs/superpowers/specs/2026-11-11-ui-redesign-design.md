@@ -91,6 +91,19 @@ Dalil: darajasiz tizimda jiddiy ogohlantirishlarning 34% i, darajali tizimda 100
 
 ---
 
+### 1.6 P bosqichi ekranlari → primitivlar (UI-0 Task 4)
+
+P bosqichlarida qurilgan ekranlar qayta qurilmaydi — yangi primitivlarga ko'chiriladi.
+
+| Ekran / fayl | Hozir | Yangi primitiv |
+|---|---|---|
+| `features/license/components/LicenseBanner.tsx` | Mantine Alert | `AlertBanner` (2-daraja) |
+| `features/license/components/LicenseBlockedScreen.tsx` | maxsus layout | `StateView` / `AlertBanner` uslubi |
+| `features/auth/pages/change-password-required.page.tsx` | oddiy forma | yangi tokenlar + primitivlar |
+| `features/auth/pages/select-workspace.page.tsx` (takliflar kartasi) | Mantine Card/Badge | yangi tokenlar + `StatusPill` |
+| `UsersSettingsScreen` «Kutilmoqda» | Badge | `StatusPill waiting` |
+| Yozilish, navbat, lab ekranlaridagi eski `StatusPill` variantlari | eski nomlar | 6 ma'noga map (Task 2) |
+
 ## 2. Ekranlar → kod xaritasi
 
 Ustunlar:
@@ -161,14 +174,16 @@ Har bosqich oxirida:
 
 ---
 
-## 4. Qaror kutayotgan savollar (foydalanuvchi)
+## 4. Qarorlar (savollarga javoblar)
 
-1. **Shifokor navbatdan bemorni o'zi chaqiradimi?** Dizayn «ha» deb chizilgan. Hozir shifokorda `queue.manage` yo'q (SC-10).
-2. **Kreslo modeli.** Kalendarda «Kreslolar» ko'rinishi uchun filialda kreslo (operatoriya) obyekti kerak — hozir yo'q. Qo'shiladimi?
-3. **Laboratoriya ko'radigan bemor ma'lumoti.** Bosh harflar, jins, yosh va klinika kodi yetarlimi?
-4. **Zaxira nusxa.** Har kuni 20:00 da USB diskka va tarifda bo'lsa bulutga. Tasdiqlansinmi?
-5. **QR to'lov.** Click/Payme alohida `payment_method` bo'ladimi yoki `card` ichida qoladimi?
-6. **Bemor kartasi.** «12 tab → 4 bo'lim» qarori usability testi bilan tasdiqlansinmi? Tadqiqot: 3–5 ta haqiqiy xodim bilan, NIST uslubida.
+Manba: yakunlash roadmap'i §4 (`2026-11-11-completion-roadmap-design.md`).
+
+1. **Shifokor navbatdan bemorni chaqiradimi?** Ikkalasi: registrator hammani chaqiradi; shifokor faqat o'ziga yozilgan bemorni (tor endpoint, yangi permission yo'q).
+2. **Kreslo modeli.** YO'Q. Kalendar faqat shifokorlar bo'yicha; Calendar «Kreslolar» ko'rinishi qurilmaydi.
+3. **Lab ko'radigan bemor ma'lumoti.** Lab portali brainstormiga ko'chirildi (alohida bosqich).
+4. **Zaxira nusxa.** Diskdagi papkaga (USB/boshqa disk/tarmoq papkasi ham) + tiklash UI orqali (owner). Bulutga yuborish yo'q.
+5. **QR to'lov.** Alohida `payment_method` emas: `card` ichida sub-tur (Terminal / Click / Payme / Boshqa), integratsiyasiz.
+6. **Bemor kartasi.** 4 bo'lim quriladi, usability testisiz.
 
 ## 5. Qilinmaydigan narsalar (anti-goals)
 
