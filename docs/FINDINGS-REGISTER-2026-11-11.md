@@ -356,12 +356,12 @@ To'liq: [`LAB-TECHNICIAN-ACCESS-2026-11-11.md`](./LAB-TECHNICIAN-ACCESS-2026-11-
 | UI-00 ✅ | UI-0 | Tokenlar (`Tokens.dc.html`): 15px matn, kontrast, 44/60px | — |
 | UI-01 ✅ | UI-0 | Komponentlar (`Components.dc.html`): StatusPill 6 ma‘no, AlertTier, CriticalActionDialog, UndoToast, StateView.forbidden, ConnectionStatus, UpdateBanner | — |
 | UI-02 ✅ | UI-0 | Rolga moslashuvchi menyu (`Sidebar.dc.html`) | — |
-| UI-R1 | UI-1 | Bugun — registrator (`Main.dc.html`) | P10; T2 bilan `booking_requests` |
-| UI-R2 | UI-1 | Kalendar (`Calendar.dc.html`) | SC-01/02/03; kreslo modeli (qaror) |
-| UI-R3 | UI-1 | Yangi yozilish (`Booking.dc.html`) | SC-07, P10 |
-| UI-R4 | UI-1 | Navbat (`Queue.dc.html`) | SC-09, SC-10 (qaror) |
-| UI-R5 | UI-1 | Kassa (`Cashier.dc.html`) | P7, P13, MO-02, QR to‘lov usuli |
-| UI-R6 | UI-1 | Bemorlar (`Patients.dc.html`) | PT-01…04, dublikat tekshiruvi |
+| UI-R1 ✅ | UI-1 | Bugun — registrator (`Main.dc.html`) | P10; T2 bilan `booking_requests` |
+| UI-R2 ✅ | UI-1 | Kalendar (`Calendar.dc.html`) | SC-01/02/03; kreslo modeli (qaror) |
+| UI-R3 ✅ | UI-1 | Yangi yozilish (`Booking.dc.html`) | SC-07, P10 |
+| UI-R4 ✅ | UI-1 | Navbat (`Queue.dc.html`) | SC-09, SC-10 (qaror) |
+| UI-R5 ✅ | UI-1 | Kassa (`Cashier.dc.html`) | P7, P13, MO-02, QR to‘lov usuli |
+| UI-R6 ✅ | UI-1 | Bemorlar (`Patients.dc.html`) | PT-01…04, dublikat tekshiruvi |
 | UI-D1 | UI-2 | Mening kunim (`DoctorDay.dc.html`) | — |
 | UI-D2 | UI-2 | Bemor kartasi (`Patient.dc.html`) | P11, anamnez `confirmedAt` |
 | UI-D3 | UI-2 | Tish xaritasi (`Odontogram.dc.html`) | CL-01, tashxis qidiruvi |
@@ -423,7 +423,7 @@ Sinov 3 ta haqiqiy nuqson topdi (hammasi tuzatildi, testlar bilan): (1) jadvali 
 | ID | J | Qisqa | Qilinadigan ish |
 |---|---|---|---|
 | FU-15 | M | Telefonni oldindan ro'yxatdan o'tkazish (P6 qoldiq xavfi) | klinika platformada hali yo'q telefon uchun hisob yaratib, vaqtinchalik parolni bilib qoladi; keyin o'sha odam boshqa klinika taklifini olsa, birinchi klinika uning nomidan kirib qabul qilishi mumkin. Yopish = telefon egaligini tasdiqlash (SMS/Telegram OTP) — 👤 qaror kerak |
-| FU-16 | L | Kassa xulosasi «cash · payment» tarjimasiz | UI-1 Kassa ekrani bilan |
+| FU-16 ✅ | L | Kassa xulosasi «cash · payment» tarjimasiz (UI-1 da yopildi) | UI-1 Kassa ekrani bilan |
 | FU-17 | L | Filial bo'yicha availability (FreeSlotsCard) jadvalsiz doktorni ko'rsatmaydi | single-doctor availability'dagi fallback filial-darajasiga ham |
 
 ## 18. UI-0 dan keyingi follow-up'lar
@@ -433,4 +433,14 @@ Sinov 3 ta haqiqiy nuqson topdi (hammasi tuzatildi, testlar bilan): (1) jadvali 
 | FU-18 | L | `roleKey = assignments[0]?.templateKey` ORDER BY'siz | bir nechta rolli foydalanuvchida menyu tartibi login'dan login'ga o'zgarishi mumkin (permission'ga ta'sir yo'q) — deterministik tartib (masalan rol ustuvorligi) |
 | FU-19 | L | DesignSystemPage (dev UI kit) demo matnlari hardcoded | faqat DEV sahifa; xohlansa i18n |
 | FU-20 | L | `--text-xs`=`--text-sm`=13px, `--text-base`=`--text-md`=15px | UI-1 ekranlarida ierarxiya kerak bo'lsa ajratish |
+
+## 19. UI-1 dan keyingi follow-up'lar
+
+| ID | J | Qisqa | Qilinadigan ish |
+|---|---|---|---|
+| FU-21 | M | PT-04 backend'da: `view_pii`siz foydalanuvchi PATCH orqali PII maydonlarini o'zgartira oladi | faqat web cheklangan — `patients.update`da `view_pii`siz PII maydonlari 403 |
+| FU-22 | L | Bugun ekrani bemor ismini har bemor uchun alohida so'raydi | B.1 qo'shgan `appointment.patientName` (JOIN) dan foydalanish |
+| FU-23 | L | `GET /patients/phone-check` `patient.create` bilan ism qaytaradi | `view_pii`siz faqat `count` qaytarish |
+| FU-24 | L | Kanvas elementlari qurilmagan: Qarzdorlar chip, Excel import, «Keyingi tashrif» ustuni, drag «ushlab turish», narx chip'lari | UI sayqal / P2 |
+| FU-25 | — | Telegram bron so'rovlari (`booking_requests`) | UI-4 (T2) |
 
