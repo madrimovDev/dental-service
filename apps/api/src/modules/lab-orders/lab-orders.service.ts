@@ -9,6 +9,7 @@ import {
   type OwnershipValidator,
 } from '../../lib/ownership.ts';
 import { deleteObject, labOrderFileKey, presignedGetUrl, uploadObject } from '../../lib/s3.ts';
+import { enqueueLabHub, type LabOrderHubOp } from './lab-orders.hub.ts';
 import type {
   CreateLabOrderInput,
   ListLabOrdersQuery,
@@ -211,6 +212,23 @@ export const createLabOrdersService = (deps: {
     if (input.notes !== undefined) patch.notes = input.notes;
 
     const [row] = await db.update(labOrders).set(patch).where(eq(labOrders.id, id)).returning();
+    // Lab Hub: Hub'ga yuborilgan buyurtma — «yetkazildi» Hub'ga ham ketadi; ish hali `sent`
+    // holatida bo'lsa (lab qabul qilmagan) tahrir qayta push qilinadi (idempotent PUT).
+    if (row?.labHubCaseRef) {
+      const ops: { op: LabOrderHubOp }[] = [];
+      const contentChanged =
+        input.items !== undefined ||
+        input.shade !== undefined ||
+        input.dueDate !== undefined ||
+        input.notes !== undefined ||
+        input.orderType !== undefined;
+      if (input.status === 'delivered' && before.status !== 'delivered') {
+        ops.push({ op: 'delivered' });
+      } else if (contentChanged && (row.hubStatus === null || row.hubStatus === 'sent')) {
+        ops.push({ op: 'upsert_case' });
+      }
+      await enqueueLabHub(c, db, row.tenantId, id, ops);
+    }
     if (row) {
       await deps.audit.record(c, {
         action: 'updated',
@@ -258,7 +276,7 @@ export const createLabOrdersService = (deps: {
 
     // Buyurtma shu tenantda bo'lishi shart (RLS) — storage yozishdan OLDIN.
     const [order] = await db
-      .select({ id: labOrders.id })
+      .select({ id: labOrders.id, hubRef: labOrders.labHubCaseRef })
       .from(labOrders)
       .where(eq(labOrders.id, labOrderId));
     if (!order) return null;
@@ -290,6 +308,13 @@ export const createLabOrdersService = (deps: {
     if (!row) {
       await deleteObject(objectKey).catch(() => {});
       throw new Error('Insert failed after upload');
+    }
+
+    // Hub'ga allaqachon yuborilgan buyurtmaga keyin qo'shilgan fayl ham labga ketadi.
+    if (order.hubRef) {
+      await enqueueLabHub(c, db, tenantId, labOrderId, [
+        { op: 'file', payload: { fileId: row.id } },
+      ]);
     }
 
     await deps.audit.record(c, {

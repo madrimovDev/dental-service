@@ -1,6 +1,14 @@
 export type { ApiClient, ApiClientConfig } from './client.ts';
 export { ApiError, createApiClient } from './client.ts';
-export type { Endpoints, LabOrderFileRecord } from './endpoints.ts';
+export type {
+  Endpoints,
+  LabHubLabRecord,
+  LabHubMessageRecord,
+  LabHubPriceApprovalRecord,
+  LabHubStatusRecord,
+  LabOrderFileRecord,
+  LabOrderHubFields,
+} from './endpoints.ts';
 export { createEndpoints } from './endpoints.ts';
 // Generated (orval) — appointments
 export type {

@@ -26,7 +26,7 @@ describe('SettingsShell', () => {
     navDataMock.mockReturnValue({ pills: {}, showLicense: false, showBackup: false });
   });
 
-  it('left-nav: eyebrow + 7 nav buttonni ko’rsatadi (desktop-faqat bo’limlarsiz)', () => {
+  it('left-nav: eyebrow + 8 nav buttonni ko’rsatadi (desktop-faqat bo’limlarsiz)', () => {
     hasPermissionMock.mockReturnValue(true);
     renderApp(
       <SettingsShell active="roles">
@@ -34,14 +34,15 @@ describe('SettingsShell', () => {
       </SettingsShell>,
     );
     const nav = screen.getByRole('navigation');
-    // Eyebrow ("Sozlamalar") + 7 nav buttons (litsenziya/zaxira — faqat desktopda).
+    // Eyebrow ("Sozlamalar") + 8 nav buttons (litsenziya/zaxira — faqat desktopda; +Laboratoriyalar).
     expect(within(nav).getByText('Sozlamalar')).toBeInTheDocument();
     expect(within(nav).getByText('Klinika')).toBeInTheDocument();
     expect(within(nav).getByText('Rollar')).toBeInTheDocument();
     expect(within(nav).getByText('Filiallar')).toBeInTheDocument();
     expect(within(nav).getByText('Xodimlar')).toBeInTheDocument();
     expect(within(nav).getByText('Xizmatlar va narxlar')).toBeInTheDocument();
-    expect(within(nav).getAllByRole('button')).toHaveLength(7);
+    expect(within(nav).getByText('Laboratoriyalar')).toBeInTheDocument();
+    expect(within(nav).getAllByRole('button')).toHaveLength(8);
     expect(screen.getByText('content')).toBeInTheDocument();
   });
 
@@ -68,7 +69,7 @@ describe('SettingsShell', () => {
     expect(within(bk).getByText('3 kun')).toBeInTheDocument();
     const users = within(nav).getByText('Xodimlar').closest('button') as HTMLElement;
     expect(within(users).getByText('9')).toBeInTheDocument();
-    expect(within(nav).getAllByRole('button')).toHaveLength(9);
+    expect(within(nav).getAllByRole('button')).toHaveLength(10);
   });
 
   it('nav buttoni bosilganda navigate(path) chaqiradi', () => {
@@ -98,8 +99,10 @@ describe('SettingsShell', () => {
     expect(within(nav).queryByText('Rollar')).not.toBeInTheDocument();
     expect(within(nav).queryByText('Filiallar')).not.toBeInTheDocument();
     expect(within(nav).queryByText('Xodimlar')).not.toBeInTheDocument();
-    // tenant + notify + integrations — uchalasi tenant_settings.view ostida (xizmatlar: service.view).
+    // tenant + notify + integrations — uchalasi tenant_settings.view ostida (xizmatlar: service.view;
+    // Laboratoriyalar — qo'shimcha lab_order.view talab qiladi).
     expect(within(nav).getAllByRole('button')).toHaveLength(3);
+    expect(within(nav).queryByText('Laboratoriyalar')).not.toBeInTheDocument();
     expect(within(nav).queryByText('Xizmatlar va narxlar')).not.toBeInTheDocument();
   });
 

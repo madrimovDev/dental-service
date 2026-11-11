@@ -19,6 +19,7 @@ export * from './tables/doctor-schedules.ts';
 export * from './tables/doctor-time-off.ts';
 export * from './tables/expense-categories.ts';
 export * from './tables/expenses.ts';
+export * from './tables/lab-hub.ts';
 export * from './tables/lab-orders.ts';
 export * from './tables/medical-records.ts';
 export * from './tables/notifications.ts';
