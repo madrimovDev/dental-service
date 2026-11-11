@@ -1,6 +1,10 @@
 import { sql } from 'drizzle-orm';
 import type { MiddlewareHandler } from 'hono';
+import { type AfterCommitFn, runAfterCommit } from '../db/after-commit.ts';
 import type { Database } from '../db/client.ts';
+
+// Ichki sentinel: tranzaksiyani bekor qiladi, lekin tayyor javobni saqlaydi.
+const ROLLBACK = Symbol('rls-rollback');
 
 /**
  * RLS middleware — transaction-per-request + SET LOCAL app.current_tenant_id
@@ -29,15 +33,30 @@ export const rlsMiddleware =
 
     // Tenant kontekst: transaction ochib SET LOCAL chaqirish
     let nextError: unknown;
-    await db.transaction(async (tx) => {
-      await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);
-      c.set('db', tx);
-      try {
-        await next();
-      } catch (err) {
-        nextError = err;
-        throw err; // rollback transaction
-      }
-    });
+    // P4: side-effect'lar tx ichida ro'yxatga olinadi, commit'dan keyin bajariladi.
+    const afterCommit: AfterCommitFn[] = [];
+    try {
+      await db.transaction(async (tx) => {
+        await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);
+        c.set('db', tx);
+        c.set('afterCommit', afterCommit);
+        try {
+          await next();
+        } catch (err) {
+          nextError = err;
+          throw err; // rollback transaction
+        }
+        // Hono `app.onError` xatoni compose ichida yutadi (`await next()` throw
+        // qilmaydi) — shuning uchun `c.error` yoki 5xx javobni o'zimiz tekshirib
+        // rollback qilamiz (P1). `fail()` bilan qaytarilgan 4xx — COMMIT (qasddan).
+        if (c.error || c.res.status >= 500) throw ROLLBACK;
+      });
+    } catch (err) {
+      // Javob allaqachon `c.res`da — sentinel klientga oqib chiqmaydi.
+      if (err === ROLLBACK) return;
+      throw err;
+    }
     if (nextError) throw nextError;
+    // Tranzaksiya muvaffaqiyatli commit bo'ldi — best-effort side-effect'lar.
+    await runAfterCommit(afterCommit, c.get('requestId'));
   };

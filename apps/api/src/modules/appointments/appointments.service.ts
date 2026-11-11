@@ -7,6 +7,7 @@ import {
 } from '@dental/db-schema';
 import { and, asc, between, eq, gt, gte, lt, lte, ne } from 'drizzle-orm';
 import type { Context } from 'hono';
+import { onAfterCommit } from '../../db/after-commit.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { reminderDelayMs } from '../../lib/reminder-delay.ts';
@@ -328,7 +329,10 @@ export const createAppointmentsService = (deps: {
     });
 
     const delay = reminderDelayMs(start, new Date());
-    if (delay != null) await deps.enqueueReminder?.(tenantId, appt.id, delay);
+    if (delay != null && deps.enqueueReminder) {
+      const enqueue = deps.enqueueReminder;
+      await onAfterCommit(c, () => enqueue(tenantId, appt.id, delay));
+    }
 
     // B5: yangi yozilish — bemorning ochiq recall'larini scheduled qiladi va
     // shu yozilishga bog'laydi (rebook linkage). CLI-426: relevantlik uchun
@@ -507,11 +511,29 @@ export const createAppointmentsService = (deps: {
       if (input.startTime) {
         const tenantId = c.get('activeTenantId');
         if (tenantId) {
-          await deps.removeReminder?.(id);
+          if (deps.removeReminder) {
+            const remove = deps.removeReminder;
+            await onAfterCommit(c, () => remove(id));
+          }
           if (isActiveStatus(updated.status as AppointmentStatus)) {
             const delay = reminderDelayMs(new Date(updated.startTime), new Date());
-            if (delay != null) await deps.enqueueReminder?.(tenantId, id, delay);
+            if (delay != null && deps.enqueueReminder) {
+              const enqueue = deps.enqueueReminder;
+              await onAfterCommit(c, () => enqueue(tenantId, id, delay));
+            }
           }
+        }
+      } else if (
+        (before.status === 'cancelled' || before.status === 'no_show') &&
+        isActiveStatus(updated.status as AppointmentStatus)
+      ) {
+        // P4: status-only qayta faollashtirish (cancelled/no_show → active) —
+        // bekor qilishda eslatma o'chirilgan edi, endi qayta qo'yiladi.
+        const tenantId = c.get('activeTenantId');
+        const delay = reminderDelayMs(new Date(updated.startTime), new Date());
+        if (tenantId && delay != null && deps.enqueueReminder) {
+          const enqueue = deps.enqueueReminder;
+          await onAfterCommit(c, () => enqueue(tenantId, id, delay));
         }
       } else if (
         (input.status === 'cancelled' || input.status === 'no_show') &&
@@ -521,7 +543,10 @@ export const createAppointmentsService = (deps: {
         // vaqtida `shouldSkipReminder` bilan status'ni tekshirib SMS'ni
         // yubormasdi, lekin job Redis'da abadiy qolib ketardi (removeOnComplete
         // yo'qligi bilan birga CLI-403'ga bog'liq o'sish). Endi darhol tozalanadi.
-        await deps.removeReminder?.(id);
+        if (deps.removeReminder) {
+          const remove = deps.removeReminder;
+          await onAfterCommit(c, () => remove(id));
+        }
       }
     }
     return { ok: true as const, appointment: updated };

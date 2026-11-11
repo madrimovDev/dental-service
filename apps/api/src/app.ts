@@ -9,7 +9,8 @@ import { createAuditLogger } from './lib/audit-logger.ts';
 import { env } from './lib/env.ts';
 import { requireModuleInDesktop } from './lib/license-middleware.ts';
 import { METRICS_CONTENT_TYPE, renderMetrics } from './lib/metrics.ts';
-import { reminderJobId, reminderQueue } from './lib/queue.ts';
+import { reminderQueue } from './lib/queue.ts';
+import { createReminderScheduler } from './lib/reminder-scheduler.ts';
 import { createLocalStorageAdapter } from './lib/storage.ts';
 import { errorHandler } from './middleware/error-handler.ts';
 import { requestId } from './middleware/request-id.ts';
@@ -195,6 +196,8 @@ export const createApp = () => {
   // bilan hal qilinadi — hook runtime'da chaqiriladi, shu vaqtga queueService
   // allaqachon tayinlangan bo'ladi.
   let queueService: QueueService | undefined;
+  // P4: eslatma enqueue/remove mantig'i `lib/reminder-scheduler.ts`da (A9/CLI-438 izohlari o'sha yerda).
+  const reminderScheduler = createReminderScheduler(reminderQueue);
   const appointmentsService = createAppointmentsService({
     audit,
     schedule,
@@ -216,37 +219,8 @@ export const createApp = () => {
     // yo'q qilinmaydi, shuning uchun dedupe race'i yo'q); topilmasa (allaqachon
     // fire bo'lgan/yo'q) — oddiy `add()`. `removeOnComplete`/`removeOnFail` —
     // Redis'da tugagan job'lar to'planmasin (CLI-403 bilan bog'liq o'sish).
-    enqueueReminder: async (tenantId, appointmentId, delayMs) => {
-      const jobId = reminderJobId(appointmentId);
-      const existing = await reminderQueue.getJob(jobId);
-      if (existing) {
-        try {
-          await existing.changeDelay(delayMs);
-          return;
-        } catch {
-          // Job ACTIVE/completed bo'lib o'zgartirib bo'lmadi — pastda qayta
-          // qo'shishga urinamiz (eski job hali tursa `add` uni qaytaradi, lekin
-          // bu — worker aynan shu lahzada ishlab turgan chekka holat, kuzatuvga
-          // loyiq bo'lsa-da xavfsiz: fire bo'lgan job endi qayta ishlanmaydi).
-        }
-      }
-      await reminderQueue.add(
-        'appointment-reminder',
-        { tenantId, appointmentId },
-        { delay: delayMs, jobId, removeOnComplete: true, removeOnFail: 100 },
-      );
-    },
-    removeReminder: async (appointmentId) => {
-      const jobId = reminderJobId(appointmentId);
-      const existing = await reminderQueue.getJob(jobId);
-      if (!existing) return;
-      try {
-        await existing.remove();
-      } catch {
-        // Active/locked (fire jarayonida) — worker `shouldSkipReminder` bilan
-        // fire-vaqtida status'ni tekshiradi (cancelled/no_show), xavfsiz no-op.
-      }
-    },
+    enqueueReminder: reminderScheduler.enqueueReminder,
+    removeReminder: reminderScheduler.removeReminder,
   });
   app.route('/api/appointments', appointmentRoutes({ db, audit, service: appointmentsService }));
   app.route('/api/schedule', scheduleRoutes({ db, audit }));

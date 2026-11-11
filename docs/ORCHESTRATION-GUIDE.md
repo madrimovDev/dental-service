@@ -89,7 +89,8 @@ Tartib:
 ### 5.3 Lane'ga alohida test bazasi va Redis
 ✅ Spike natijasi: shell'dagi `DATABASE_URL` `--env-file`dagi qiymatdan **ustun**; `dental_test_lane1` yaratilib `migrate.ts` bilan to'liq migratsiya qilindi va integration test unga qarshi o'tdi.
 
-- Har lane: `dental_test_<stage>_<lane>` (controller yaratadi + migratsiya qiladi) va `REDIS_URL=…/<N>` (N = 1…15, lane bo'yicha) — rate-limit va BullMQ kalitlari aralashmaydi.
+- Har lane: `dental_test_<stage>_<lane>` (controller yaratadi + `migrate.ts` + **`seedPermissions`/`seedDiagnoses`** — permission katalogi migratsiyada emas, API boot'da seed qilinadi; seed'siz `provisioning-tenant` testi yiqiladi) va `REDIS_URL=…/<N>` (N = 1…15, lane bo'yicha) — rate-limit va BullMQ kalitlari aralashmaydi.
+- ✅ **Lane URL'lari worktree'dagi `.env` nusxasiga yoziladi** (`DATABASE_URL`, `DATABASE_ADMIN_URL`, `REDIS_URL` almashtiriladi) — buyruq prefiksi emas. P bosqichi 1 darsi: prefiksni unutgan reviewer'lar `dental_test_…` topa olmadi yoki (yomonroq holda) dev bazasida `TRUNCATE` qilishi mumkin edi.
 - Shu bilan **verify ham parallel** bo'la oladi (avval bitta umumiy baza sabab serial edi).
 - Bosqich oxirida controller lane bazalarini o'chiradi.
 
@@ -109,11 +110,12 @@ pipeline(lanes,
 ## 6. Merge gate (bosqich oxirida, bir marta)
 
 Controller `main`ga merge qilishdan oldin, **birlashtirilgan** branch'da bir marta:
-1. `turbo typecheck`, `biome`, `check:rls`;
+1. `turbo typecheck`, `check:rls`; biome — faqat **tegilgan fayllar** (`bunx biome check <diff fayllari>`), chunki `supervisor-api`da avvaldan mavjud lint xatolari bor (`docs/KNOWN-TEST-FAILURES.md`);
 2. to'liq API test to'plami + web vitest;
 3. **Mezon:** yangi yiqilish yo'q. Ma'lum yiqilishlar ro'yxati (`mock.module` fayllararo oqishi va concurrent EXCLUDE poygasi — CLAUDE.md 2026-08-07 bloki, 9 ta) `docs/KNOWN-TEST-FAILURES.md`da nomma-nom saqlanadi va gate unga qarshi solishtiriladi. Ro'yxatdagi test **izolyatsiyada** yashil bo'lishi shart;
-4. whole-branch review (controller + advisor) — merge nuqtasida tug'ilgan nuqsonlar uchun (2026-08-06 darsi);
-5. merge (`--no-ff`) + push; worktree/branch/lane bazalari tozalanadi.
+4. **mutatsiya tekshiruvi** — implementer «failing-first» qadamini o'tkazib yuborgan har yangi test uchun controller kodni vaqtincha buzib testni yiqilishini ko'radi (keyin `git checkout <fayl>`, stash yo'q);
+5. whole-branch review (controller + advisor) — merge nuqtasida tug'ilgan nuqsonlar uchun (2026-08-06 darsi);
+6. merge (`--no-ff`) + push; worktree/branch/lane bazalari tozalanadi.
 
 Keyingi bosqich boshida to'liq to'plam **qayta yurmaydi** (👤) — oxirgi gate natijasi boshlang'ich holat.
 
