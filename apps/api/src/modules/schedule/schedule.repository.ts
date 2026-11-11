@@ -5,8 +5,11 @@ import {
   type DoctorTimeOffInsert,
   doctorSchedules,
   doctorTimeOff,
+  permissions,
+  rolePermissions,
+  userAssignments,
 } from '@dental/db-schema';
-import { and, asc, eq, gt, gte, isNull, lt, ne, or } from 'drizzle-orm';
+import { and, asc, eq, gt, gte, isNotNull, isNull, lt, ne, notExists, or } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 
@@ -196,6 +199,42 @@ export const createScheduleRepository = () => {
       );
   }
 
+  /**
+   * FU-17 (P10 fallback): filialga biriktirilgan (yoki tenant-wide) FAOL shifokorlar —
+   * `appointments.listDoctors` bilan bir xil ta'rif (`medical_record.edit`) — shu
+   * filialda UMUMAN aktiv jadval segmenti YO'Q bo'lganlari. Ular filial ish soatida
+   * ishlaydi deb hisoblanadi (`segmentsForDay` bilan izchil).
+   */
+  async function listBranchDoctorsWithoutSchedule(c: Context, branchId: string): Promise<string[]> {
+    const db = getDb(c);
+    const rows = await db
+      .selectDistinct({ doctorId: userAssignments.userId })
+      .from(userAssignments)
+      .innerJoin(rolePermissions, eq(rolePermissions.roleId, userAssignments.roleId))
+      .innerJoin(permissions, eq(permissions.id, rolePermissions.permissionId))
+      .where(
+        and(
+          eq(userAssignments.isActive, true),
+          isNotNull(userAssignments.acceptedAt),
+          or(isNull(userAssignments.branchId), eq(userAssignments.branchId, branchId)),
+          eq(permissions.code, 'medical_record.edit'),
+          notExists(
+            db
+              .select({ one: doctorSchedules.id })
+              .from(doctorSchedules)
+              .where(
+                and(
+                  eq(doctorSchedules.doctorId, userAssignments.userId),
+                  eq(doctorSchedules.branchId, branchId),
+                  eq(doctorSchedules.isActive, true),
+                ),
+              ),
+          ),
+        ),
+      );
+    return rows.map((r) => r.doctorId);
+  }
+
   /** Filialdagi [start,end) oraliq appointmentlari (cancelled tashqari), doctorId bilan. */
   async function listBranchAppointments(c: Context, branchId: string, start: Date, end: Date) {
     const db = getDb(c);
@@ -283,6 +322,7 @@ export const createScheduleRepository = () => {
     listActiveSegmentsForDay,
     hasAnyActiveSegments,
     listBranchActiveSegmentsForDay,
+    listBranchDoctorsWithoutSchedule,
     listBranchAppointments,
     listBranchOverlappingTimeOff,
     hasOverlappingTimeOff,

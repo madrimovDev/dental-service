@@ -18,7 +18,7 @@ import {
   setServicePriceSchema,
   updateServiceSchema,
 } from './services.schema.ts';
-import { createServicesService } from './services.service.ts';
+import { createServicesService, ServiceCodeTakenError } from './services.service.ts';
 
 /** Standart 404 response — get / patch / delete endpoint'lar uchun. */
 const notFoundResponse = {
@@ -80,13 +80,24 @@ export const serviceRoutes = (deps: { db: Database; audit: AuditLogger }) => {
         content: { 'application/json': { schema: errorResponseSchema } },
         description: 'Forbidden',
       },
+      409: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Service code already exists (service.code_taken)',
+      },
     },
   });
 
   app.openapi(createServiceRoute, async (c) => {
     const body = c.req.valid('json');
-    const row = await service.create(c, body);
-    return c.json(ok(toServiceDto(row)), 201);
+    try {
+      const row = await service.create(c, body);
+      return c.json(ok(toServiceDto(row)), 201);
+    } catch (err) {
+      if (err instanceof ServiceCodeTakenError) {
+        return c.json(fail('service.code_taken', 'Service code already exists'), 409);
+      }
+      throw err;
+    }
   });
 
   // ─── GET /{id} — get by id ────────────────────────────────────────────────
@@ -126,15 +137,29 @@ export const serviceRoutes = (deps: { db: Database; audit: AuditLogger }) => {
       params: serviceIdParamSchema,
       body: { content: { 'application/json': { schema: updateServiceSchema } } },
     },
-    responses: { ...okJson(serviceDtoSchema, 'Updated service'), ...notFoundResponse },
+    responses: {
+      ...okJson(serviceDtoSchema, 'Updated service'),
+      ...notFoundResponse,
+      409: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Service code already exists (service.code_taken)',
+      },
+    },
   });
 
   app.openapi(updateRoute, async (c) => {
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const row = await service.update(c, id, body);
-    if (!row) return c.json(fail('service.not_found', 'Service not found'), 404);
-    return c.json(ok(toServiceDto(row)), 200);
+    try {
+      const row = await service.update(c, id, body);
+      if (!row) return c.json(fail('service.not_found', 'Service not found'), 404);
+      return c.json(ok(toServiceDto(row)), 200);
+    } catch (err) {
+      if (err instanceof ServiceCodeTakenError) {
+        return c.json(fail('service.code_taken', 'Service code already exists'), 409);
+      }
+      throw err;
+    }
   });
 
   // ─── DELETE /{id} — soft delete ───────────────────────────────────────────
