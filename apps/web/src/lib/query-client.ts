@@ -12,6 +12,8 @@ import { i18n } from '@/lib/i18n.ts';
 const LICENSE_REDIRECTS: Record<string, string> = {
   LICENSE_EXPIRED: '/license-expired',
   LICENSE_NOT_FOUND: '/activate',
+  // P6: vaqtinchalik parol bilan kirilgan — faqat parol almashtirish ruxsat etiladi.
+  'auth.password_change_required': '/change-password-required',
 };
 
 export function handleLicenseBlock(error: unknown): boolean {

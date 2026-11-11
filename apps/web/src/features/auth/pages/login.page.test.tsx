@@ -21,8 +21,15 @@ const bootstrapStatus = vi.hoisted(() => ({
   },
 }));
 
+const loginOpts = vi.hoisted(() => ({
+  value: undefined as undefined | { onSuccess: (d: unknown) => void },
+}));
+
 vi.mock('../auth.api', () => ({
-  useLogin: () => ({ mutate: vi.fn(), isPending: false }),
+  useLogin: (o: { onSuccess: (d: unknown) => void }) => {
+    loginOpts.value = o;
+    return { mutate: vi.fn(), isPending: false };
+  },
   useRegistrationEnabled: () => registrationEnabled.value,
   useBootstrapStatus: () => bootstrapStatus.value,
 }));
@@ -146,5 +153,27 @@ describe("LoginPage — tenant yo'q holatida /activate ga yo'naltirish (audit C1
     expect(screen.getByText(i18n.t('auth.login.phone'))).toBeInTheDocument();
     // `useEffect` mikrotaskdan keyin ham ishlamasligi kerak
     await waitFor(() => expect(navigateMock).not.toHaveBeenCalled());
+  });
+});
+
+describe('LoginPage — majburiy parol almashtirish (P6)', () => {
+  const data = (mustChangePassword: boolean) => ({
+    accessToken: 'a',
+    refreshToken: 'r',
+    user: { id: 'u' },
+    mustChangePassword,
+  });
+
+  it('mustChangePassword:true → /change-password-required', () => {
+    renderApp(<LoginPage />);
+    loginOpts.value?.onSuccess(data(true));
+    expect(navigateMock).toHaveBeenCalledWith('/change-password-required', { replace: true });
+    expect(navigateMock).not.toHaveBeenCalledWith('/select-workspace');
+  });
+
+  it('mustChangePassword:false → /select-workspace', () => {
+    renderApp(<LoginPage />);
+    loginOpts.value?.onSuccess(data(false));
+    expect(navigateMock).toHaveBeenCalledWith('/select-workspace');
   });
 });

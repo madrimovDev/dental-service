@@ -71,6 +71,11 @@ export function LoginPage() {
     onSuccess: (data) => {
       setTokens(data.accessToken, data.refreshToken);
       setUser(data.user);
+      // Vaqtinchalik parol (owner tiklagan) — avval majburiy almashtirish
+      if (data.mustChangePassword) {
+        navigate('/change-password-required', { replace: true });
+        return;
+      }
       // After login, check memberships and route appropriately
       navigate('/select-workspace');
     },
