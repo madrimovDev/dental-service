@@ -29,7 +29,9 @@ export const dashboardRoutes = (deps: { db: Database }) => {
   app.openapi(route, async (c) => {
     const userId = (c.get('user') as { id: string } | undefined)?.id;
     if (!userId) return c.json(fail('auth.required', 'Authentication required'), 401);
-    return c.json(ok(await service.doctorPending(c, userId)), 200);
+    const perms = (c.get('accessClaims') as { perms?: string[] } | undefined)?.perms ?? [];
+    const canLab = perms.includes('lab_order.view') || perms.includes('@owner');
+    return c.json(ok(await service.doctorPending(c, userId, canLab)), 200);
   });
 
   return app;

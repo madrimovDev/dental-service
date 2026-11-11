@@ -1700,6 +1700,37 @@
     "pending_notes": "Неподписанные записи визита: {{count}}",
     "pending_images": "Непросмотренные снимки: {{count}}",
     "pending_plans": "Планы, ожидающие ответа пациента: {{count}}",
-    "pending_plans_oldest": "самый старый предложен {{count}} дн. назад"
+    "pending_plans_oldest": "самый старый предложен {{count}} дн. назад",
+    "subtitle": "{{total}} пациентов, осталось {{left}}",
+    "search_patient": "Поиск пациента",
+    "status_waiting": "Пришёл · ждёт {{count}} мин",
+    "status_planned": "Записан",
+    "age": "{{count}} лет",
+    "call_to_chair": "Пригласить в кресло",
+    "attention": "Внимание",
+    "allergy_hint": "Аллергия — проверьте перед лечением",
+    "lab": "Лаборатория",
+    "last_visit": "Прошлый визит",
+    "first_visit": "Первый визит",
+    "lab_title": "Лаборатория",
+    "lab_new": "Новый заказ",
+    "lab_empty": "Нет активных заказов",
+    "lab_status": {
+      "draft": "Черновик",
+      "sent": "Отправлен",
+      "in_progress": "В работе",
+      "ready": "Готов",
+      "delivered": "Выдан",
+      "cancelled": "Отменён"
+    },
+    "lab_type": {
+      "crown": "Коронка",
+      "bridge": "Мост",
+      "prosthetic": "Протез",
+      "aligners": "Элайнеры",
+      "denture": "Съёмный протез",
+      "inlay_onlay": "Вкладка",
+      "other": "Другое"
+    }
   }
 }

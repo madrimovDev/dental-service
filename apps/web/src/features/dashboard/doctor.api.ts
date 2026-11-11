@@ -8,7 +8,26 @@ export interface DoctorPendingItem {
   patientName: string;
   at: string;
 }
+export interface DoctorNextPatient {
+  appointmentId: string;
+  patientId: string;
+  patientName: string;
+  startTime: string;
+  dateOfBirth: string | null;
+  waitingMinutes: number | null;
+  queueTicketId: string | null;
+  allergies: { substance: string; severity: string }[];
+  lab: {
+    orderType: string;
+    labName: string;
+    status: string;
+    detail: string | null;
+    at: string;
+  } | null;
+  lastVisit: { date: string; summary: string | null } | null;
+}
 export interface DoctorPending {
+  nextPatient: DoctorNextPatient | null;
   unsignedVisitNotes: { count: number; items: DoctorPendingItem[] };
   unreviewedImages: { count: number; items: DoctorPendingItem[] };
   plansAwaitingResponse: { count: number; oldestDays: number | null; items: DoctorPendingItem[] };

@@ -10,6 +10,8 @@ import { ROLE_TEMPLATES } from '@dental/core';
 import {
   appointments,
   branches,
+  labOrders,
+  medicalRecords,
   patientImages,
   patients,
   tenants,
@@ -32,6 +34,7 @@ let tenantId: string;
 let doctorId: string;
 let otherDoctorId: string;
 let receptionistId: string;
+let nextApptId: string;
 
 const tokenFor = async (sub: string, perms: string[], roleKey: string) =>
   (await signAccess({ sub, atid: tenantId, abid: null, perms, roleKey, lang: 'uz' })).token;
@@ -118,6 +121,37 @@ beforeAll(async () => {
         sizeBytes: 1,
       },
     ]);
+    // Keyingi bemor konteksti: kelgusi yozilish (bugun 23:59 dan oldin bo'lishi shart emas — startTime bugun ichida).
+    const soon = new Date();
+    soon.setHours(23, 30, 0, 0);
+    if (soon.getTime() < Date.now()) soon.setTime(Date.now() + 60_000);
+    const [nx] = await tx
+      .insert(appointments)
+      .values({
+        tenantId,
+        branchId,
+        patientId,
+        doctorId,
+        startTime: soon,
+        endTime: new Date(soon.getTime() + 1_800_000),
+        status: 'scheduled',
+      })
+      .returning({ id: appointments.id });
+    nextApptId = nx!.id;
+    await tx.insert(medicalRecords).values({
+      tenantId,
+      patientId,
+      allergies: [{ type: 'medication', substance: 'Penitsillin', severity: 'severe' }],
+    });
+    await tx.insert(labOrders).values({
+      tenantId,
+      patientId,
+      doctorId,
+      labName: 'Oq Tish',
+      orderType: 'crown',
+      status: 'ready',
+      items: [{ description: 'Toj 26', material: 'sirkoniy', shade: 'A2' }],
+    });
     await tx.insert(treatmentPlans).values([
       { tenantId, patientId, doctorId, title: 'Reja 1', status: 'presented' },
       { tenantId, patientId, doctorId, title: 'Reja 2', status: 'draft' },
@@ -141,6 +175,24 @@ describe('GET /api/dashboard/doctor-pending', () => {
     expect(data.unreviewedImages.count).toBe(1);
     expect(data.plansAwaitingResponse.count).toBe(1);
     expect(data.plansAwaitingResponse.oldestDays).toBe(0);
+  });
+
+  test('nextPatient: allergiya, lab (lab_order.view bilan), oxirgi vizit', async () => {
+    const res = await get(await tokenFor(doctorId, permsFor('doctor'), 'doctor'));
+    const { data } = (await res.json()) as { data: Record<string, any> };
+    expect(data.nextPatient.appointmentId).toBe(nextApptId);
+    expect(data.nextPatient.allergies[0].substance).toBe('Penitsillin');
+    expect(data.nextPatient.lab.labName).toBe('Oq Tish');
+    expect(data.nextPatient.lab.detail).toBe('sirkoniy, A2');
+    expect(data.nextPatient.lastVisit).not.toBeNull();
+    // lab_order.view'siz → lab null, allergiya saqlanadi
+    const noLab = permsFor('doctor').filter((p) => p !== 'lab_order.view');
+    const r2 = await get(await tokenFor(doctorId, noLab, 'doctor'));
+    const d2 = ((await r2.json()) as { data: Record<string, any> }).data;
+    expect(d2.nextPatient.lab).toBeNull();
+    // Boshqa shifokorning keyingi bemori yo'q
+    const r3 = await get(await tokenFor(otherDoctorId, permsFor('doctor'), 'doctor'));
+    expect(((await r3.json()) as { data: Record<string, any> }).data.nextPatient).toBeNull();
   });
 
   test("Boshqa shifokorda faqat o'zinikilari (begona reja/yozilish aralashmaydi)", async () => {

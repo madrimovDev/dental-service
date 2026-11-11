@@ -9,6 +9,7 @@ const item = (n: string) => ({
   at: '2030-01-01T00:00:00Z',
 });
 const base: DoctorPending = {
+  nextPatient: null,
   unsignedVisitNotes: { count: 0, items: [] },
   unreviewedImages: { count: 0, items: [] },
   plansAwaitingResponse: { count: 0, oldestDays: null, items: [] },

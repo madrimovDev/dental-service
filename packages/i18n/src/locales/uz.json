@@ -1700,6 +1700,37 @@
     "pending_notes": "Imzolanmagan vizit yozuvi: {{count}}",
     "pending_images": "Ko'rib chiqilmagan rasm: {{count}}",
     "pending_plans": "Bemor javobini kutayotgan reja: {{count}}",
-    "pending_plans_oldest": "eng eskisi {{count}} kun oldin taklif qilingan"
+    "pending_plans_oldest": "eng eskisi {{count}} kun oldin taklif qilingan",
+    "subtitle": "{{total}} bemor, {{left}} tasi qoldi",
+    "search_patient": "Bemor qidirish",
+    "status_waiting": "Keldi · {{count}} daq kutmoqda",
+    "status_planned": "Yozilgan",
+    "age": "{{count}} yosh",
+    "call_to_chair": "Kresloga chaqirish",
+    "attention": "Diqqat",
+    "allergy_hint": "Allergiya — davolashdan oldin tekshiring",
+    "lab": "Lab",
+    "last_visit": "Oxirgi vizit",
+    "first_visit": "Birinchi vizit",
+    "lab_title": "Laboratoriya",
+    "lab_new": "Yangi buyurtma",
+    "lab_empty": "Faol buyurtma yo'q",
+    "lab_status": {
+      "draft": "Qoralama",
+      "sent": "Yuborilgan",
+      "in_progress": "Tayyorlanmoqda",
+      "ready": "Tayyor",
+      "delivered": "Topshirilgan",
+      "cancelled": "Bekor"
+    },
+    "lab_type": {
+      "crown": "Toj",
+      "bridge": "Ko'prik",
+      "prosthetic": "Protez",
+      "aligners": "Alaynerlar",
+      "denture": "To'liq protez",
+      "inlay_onlay": "Inley/onley",
+      "other": "Boshqa"
+    }
   }
 }
