@@ -65,12 +65,14 @@ services:
         condition: service_healthy
     networks: [hub_internal, supervisor_shared]
 
-  # W2 (apps/lab-hub-web) qurilgach yoqiladi — Caddyfile'dagi handle bilan birga.
-  # lab-hub-web:
-  #   image: ${LAB_HUB_WEB_IMAGE:-lab-hub-web:latest}
-  #   build: { context: ../.., dockerfile: apps/lab-hub-web/Dockerfile }
-  #   restart: unless-stopped
-  #   networks: [hub_internal]
+  # Laboratoriya portali (apps/lab-hub-web): statik SPA, ichki :80. Tashqi TLS/routing — caddy.
+  lab-hub-web:
+    image: ${LAB_HUB_WEB_IMAGE:-lab-hub-web:latest}
+    build:
+      context: ../..
+      dockerfile: apps/lab-hub-web/Dockerfile
+    restart: unless-stopped
+    networks: [hub_internal]
 
   caddy:
     image: caddy:2-alpine
@@ -83,7 +85,7 @@ services:
     environment:
       DOMAIN: ${DOMAIN:?set DOMAIN}
       ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL}
-    depends_on: [lab-hub-api]
+    depends_on: [lab-hub-api, lab-hub-web]
     networks: [hub_internal]
 
 networks:

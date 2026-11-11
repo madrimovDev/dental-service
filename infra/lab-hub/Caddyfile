@@ -2,7 +2,7 @@
 #
 # Env: DOMAIN (masalan lab.yoursite.uz), ACME_EMAIL.
 # Routing: /v1/* va /health → lab-hub-api; /internal/* — HECH QACHON tashqariga
-# (Supervisor ichki tarmoq orqali chaqiradi); qolgani → lab-hub-web (W2).
+# (Supervisor ichki tarmoq orqali chaqiradi); qolgani → lab-hub-web (statik SPA).
 
 {
 	email {$ACME_EMAIL}
@@ -32,8 +32,7 @@
 	}
 
 	handle {
-		# W2: reverse_proxy lab-hub-web:80
-		respond "Lab Hub" 200
+		reverse_proxy lab-hub-web:80
 	}
 
 	header {
