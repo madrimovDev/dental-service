@@ -30,29 +30,30 @@ Controller reja yozganda **har vazifaga daraja** qo'yadi (agent o'zi tanlamaydi)
 
 ## 2. Advisor taqiqi — qanday majburlanadi
 
-✅ **Spike natijasi:** standart `general-purpose` subagentda `advisor` **mavjud** — prompt'dagi taqiq yagona to'siq bo'lib qolardi.
+✅ **Spike natijalari (2026-11-11, restart'dan keyin):**
+- standart `general-purpose` **va** maxsus `.claude/agents/*` turlarida ham `advisor` **mavjud** — `tools:` allowlist ham, `disallowedTools: advisor` ham uni olib tashlamaydi;
+- sabab (Claude Code hujjati, tools-reference): advisor — API tomonida ishlaydigan **server tool**, «permission qoidalari yoki hook matcher'larida ishlatiladigan nomi yo'q»; subagentlar sozlangan advisor'ni meros qiladi;
+- yagona rasmiy o'chirgich `CLAUDE_CODE_DISABLE_ADVISOR_TOOL=1` — butun jarayon uchun, **asosiy sessiyada ham** o'chiradi (👤 talabiga zid, ishlatilmaydi);
+- per-call `model` override **ishlaydi** (frontmatter `sonnet` → chaqiruvda `haiku` = Haiku 5.5 tasdiqlandi).
 
-**Yechim:** loyihada maxsus agent turlari (`.claude/agents/*.md`), har birida **aniq `tools` allowlist** (advisor'siz). Workflow'da har `agent()` chaqiruvi `agentType` bilan shu turlardan birini oladi; Agent tool'da `subagent_type`.
+**Demak texnik blok hozircha yo'q.** Uch qatlamli nazorat:
+1. **Prompt:** har agent turi tanasida va har Workflow prompt'ida «`advisor` tool'ini chaqirma» (agentlar spike'da buni bajardi — chaqirmadi).
+2. **Audit (majburiy, har Workflow'dan keyin):** controller agent transkriptlarida advisor chaqiruvini qidiradi: `grep -l '"type":"server_tool_use","id":"[^"]*","name":"advisor"' <transcriptDir>/agent-*.jsonl` (✅ format asosiy sessiya transkriptida tasdiqlangan). ⚠️ Oddiy `'"name":"advisor"'` ishlatilmaydi — transkriptda tool ta'rifi (`advisor_20260301`) ham bor, har agentda soxta moslik beradi. Topilsa — o'sha agent natijasi qayta ko'rib chiqiladi va qo'llanmaga yoziladi.
+3. **Hisobot:** schema'da `advisorCalled: boolean` maydoni.
 
-✅ **Spike natijasi:** yangi `.claude/agents/` turi **sessiya qayta ishga tushmaguncha ko'rinmaydi** (`Agent type '…' not found`). Shuning uchun:
-1. agent turlari (`.claude/agents/{scout,implementer,test-runner,reviewer,verifier}.md`) **2026-11-11 da yozildi va commit qilindi**;
-2. foydalanuvchi sessiyani qayta ochadi;
-3. controller har turdan bittasini `haiku/low` bilan ishga tushirib, tool ro'yxatida `advisor` **yo'qligini** va `model`/`effort` per-call override ishlashini tekshiradi. Faqat shundan keyin Workflow ishga tushadi.
-4. Agar allowlist advisor'ni olib tashlamasa — prompt'dagi taqiq + agent hisobotida «advisor chaqirmadim» maydoni (schema) bilan nazorat; bu holat qo'llanmaga yoziladi.
-
-Har agent prompt'ida baribir: «`advisor` tool'ini chaqirma» (ikkinchi qatlam).
+Agar keyinchalik Claude Code per-agent opt-out qo'shsa — shu bo'lim yangilanadi (community so'rovi mavjud).
 
 ## 3. Agent turlari (`.claude/agents/`)
 
-| Tur | Vazifasi | Standart model/effort | Tools (advisor yo'q) | Yozadimi |
+| Tur | Vazifasi | Standart model/effort | Tools (allowlist; advisor baribir meros — §2) | Yozadimi |
 |---|---|---|---|---|
-| `scout` | kodni o'qib xarita/inventar | haiku · medium | Read, Grep, Glob, Bash (faqat o'qish) | yo'q |
-| `implementer` | reja vazifasini kodlaydi, o'z branch'iga commit | darajaga qarab (per-call override) | Read, Edit, Write, Bash, Grep, Glob | ha (o'z worktree'sida) |
+| `scout` | kodni o'qib xarita/inventar | haiku · medium | Read, Bash (faqat o'qish) | yo'q |
+| `implementer` | reja vazifasini kodlaydi, o'z branch'iga commit | darajaga qarab (per-call override) | Read, Edit, Write, Bash | ha (o'z worktree'sida) |
 | `test-runner` | **berilgan** test fayllari + typecheck, natijani qaytaradi | haiku · low | Bash, Read | yo'q |
-| `reviewer` | lane diff'ini spec/reja bo'yicha ko'radi | sonnet · medium | Read, Grep, Glob, Bash (git diff) | yo'q |
-| `verifier` | pul/xavfsizlik/RLS adversarial tekshiruv (rad etishga urinadi) | opus · high | Read, Grep, Glob, Bash | yo'q (faqat test skripti scratchpad'da) |
+| `reviewer` | lane diff'ini spec/reja bo'yicha ko'radi | sonnet · medium | Read, Bash (git diff) | yo'q |
+| `verifier` | pul/xavfsizlik/RLS adversarial tekshiruv (rad etishga urinadi) | opus · high | Read, Bash | yo'q (faqat test skripti scratchpad'da) |
 
-Agent turlari fayllari: `.claude/agents/*.md` (frontmatter `name`, `description`, `tools`, `model`; tana — §4 qoidalari). ⚠️ Tool nomlari: bu muhitda subagentlarda `Grep`/`Glob` yo'q — qidiruv `Bash` (grep/find) orqali. Restart'dan keyingi tekshiruvda Workflow `schema` uchun kerak bo'lgan StructuredOutput tool'i allowlist bilan bloklanmaganini ham tasdiqlash kerak.
+Agent turlari fayllari: `.claude/agents/*.md` (frontmatter `name`, `description`, `tools`, `model`; tana — §4 qoidalari). ⚠️ Tool nomlari: bu muhitda subagentlarda `Grep`/`Glob` yo'q — qidiruv `Bash` (grep/find) orqali. ✅ Workflow'da `agentType` + `schema` + `model`/`effort` birga ishlaydi: allowlist'li turda `StructuredOutput` avtomatik qo'shiladi (probe: `test-runner`, haiku/low → `claude-haiku-5-5`, tools `Bash, Read, StructuredOutput, advisor`).
 
 ## 4. Agent uchun majburiy qoidalar (prompt'ga kiradi)
 
@@ -64,7 +65,7 @@ Agent turlari fayllari: `.claude/agents/*.md` (frontmatter `name`, `description`
 6. **Ruxsat tekshiruvi** — real cheklangan rol bilan, `@owner` emas.
 7. Yangi permission kodi kerak bo'lsa — tor endpoint yoki backfill migratsiya (roadmap §5).
 8. `generate:contract` (OpenAPI → api-client) **faqat controller**/integratsiya vazifasi ishga tushiradi — parallel lane'lar emas.
-9. **Hisobot (schema bilan):** `status` (`done`/`blocked`/`failed`), `branch`, `commits`, `testsRun` (fayl + natija), `typecheck`, `notDone` (qilinmagan narsa — yashirilmaydi), `windowsOnly` (bool). «Done» faqat testlar yashil va commit mavjud bo'lsa.
+9. **Hisobot (schema bilan):** `advisorCalled` (bool), `status` (`done`/`blocked`/`failed`), `branch`, `commits`, `testsRun` (fayl + natija), `typecheck`, `notDone` (qilinmagan narsa — yashirilmaydi), `windowsOnly` (bool). «Done» faqat testlar yashil va commit mavjud bo'lsa.
 
 ## 5. Parallel ijro
 
