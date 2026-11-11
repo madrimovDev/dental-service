@@ -85,6 +85,31 @@ describe('ClinicsPage', () => {
     expect(labels).toContain('Nofaol');
   });
 
+  it('Rejim ustuni: SaaS klinika litsenziyasiz, obuna muddati bo‘yicha holat bilan ko‘rinadi', async () => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith('/v1/admin/clinics')) {
+        return jsonResponse([
+          { ...clinicOne, mode: 'desktop', subscriptionExpiresAt: null },
+          {
+            ...clinicTwo,
+            id: 's1',
+            name: 'SaaS Klinika',
+            mode: 'saas',
+            license: null,
+            subscriptionExpiresAt: '2099-01-01T00:00:00.000Z',
+          },
+        ]);
+      }
+      throw new Error('unhandled');
+    });
+    renderApp(<ClinicsPage />);
+    await screen.findByText('SaaS Klinika');
+    const modes = (await screen.findAllByTestId('clinic-mode')).map((b) => b.textContent);
+    expect(modes).toEqual(['Desktop', 'SaaS']);
+    const saasRow = screen.getByText('SaaS Klinika').closest('tr') as HTMLElement;
+    expect(within(saasRow).getByText('Faol')).toBeInTheDocument();
+  });
+
   it("N+1'siz — GET /v1/admin/clinics bitta marta chaqiriladi, per-klinika detail so'rovi yo'q", async () => {
     renderApp(<ClinicsPage />);
     await screen.findByText('Clinic One');

@@ -185,12 +185,26 @@ const EXPIRING_THRESHOLD_DAYS = 14;
  */
 export const computeLicenseState = (lic: LicenseData | null, nowMs: number): LicenseState => {
   if (!lic) return { state: 'none', expiresAt: null, graceEndsAt: null, daysLeft: null };
-  const expiryMs = Date.parse(lic.expiresAt);
+  return computeExpiryState(lic.expiresAt, effectiveGraceDays(lic.gracePeriodDays), nowMs);
+};
+
+/**
+ * Muddat + imtiyoz → holat (sof). Desktop `.lic` ham (`computeLicenseState`),
+ * SaaS obunasi ham (L8, `lib/subscription.ts` — P18 bilan BIR XIL chegaralar)
+ * shu yagona hisobdan foydalanadi. `graceDays` chaqiruvchi tomonidan 0..MAX_GRACE_DAYS
+ * ga keltirilgan bo'lishi shart.
+ */
+export const computeExpiryState = (
+  expiresAt: string,
+  graceDays: number,
+  nowMs: number,
+): LicenseState => {
+  const expiryMs = Date.parse(expiresAt);
   if (!Number.isFinite(expiryMs)) {
     // Buzuq sana — isLicenseValid ham rad etadi; bloklash tomoniga.
-    return { state: 'expired', expiresAt: lic.expiresAt, graceEndsAt: null, daysLeft: null };
+    return { state: 'expired', expiresAt, graceEndsAt: null, daysLeft: null };
   }
-  const graceEndMs = expiryMs + effectiveGraceDays(lic.gracePeriodDays) * DAY_MS;
+  const graceEndMs = expiryMs + graceDays * DAY_MS;
   const base = {
     expiresAt: new Date(expiryMs).toISOString(),
     graceEndsAt: new Date(graceEndMs).toISOString(),

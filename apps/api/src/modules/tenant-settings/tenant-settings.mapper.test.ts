@@ -37,6 +37,9 @@ describe('toTenantSettingsDto', () => {
       noShowStrikeThreshold: 3,
       notificationSettings: null,
       integrationSettings: null,
+      supervisorClinicId: null,
+      subscriptionExpiresAt: null,
+      subscriptionSyncedAt: null,
       createdAt: new Date('2026-06-12T10:00:00.000Z'),
       updatedAt: new Date('2026-06-12T11:00:00.000Z'),
     };
@@ -62,6 +65,9 @@ describe('toTenantSettingsDto', () => {
       noShowStrikeThreshold: 3,
       notificationSettings: null,
       integrationSettings: null,
+      supervisorClinicId: null,
+      subscriptionExpiresAt: null,
+      subscriptionSyncedAt: null,
       createdAt: new Date('2026-06-12T10:00:00.000Z'),
       updatedAt: new Date('2026-06-12T11:00:00.000Z'),
     };
@@ -84,6 +90,9 @@ describe('toTenantSettingsDto', () => {
       noShowStrikeThreshold: 3,
       notificationSettings: null,
       integrationSettings: null,
+      supervisorClinicId: null,
+      subscriptionExpiresAt: null,
+      subscriptionSyncedAt: null,
       createdAt: new Date('2026-06-12T10:00:00.000Z'),
       updatedAt: new Date('2026-06-12T11:00:00.000Z'),
     };
@@ -114,6 +123,9 @@ describe('toTenantSettingsDto', () => {
       noShowStrikeThreshold: 3,
       notificationSettings: null,
       integrationSettings: null,
+      supervisorClinicId: null,
+      subscriptionExpiresAt: null,
+      subscriptionSyncedAt: null,
       createdAt: new Date('2026-06-12T10:00:00.000Z'),
       updatedAt: new Date('2026-06-12T11:00:00.000Z'),
     };

@@ -12,6 +12,9 @@ export interface Clinic {
   contactPhone: string | null;
   ownerFullName: string;
   ownerPhone: string;
+  /** L8: `saas` klinikada litsenziya yo'q, obuna muddati `subscriptionExpiresAt`da. */
+  mode: 'desktop' | 'saas';
+  subscriptionExpiresAt: string | null;
   createdAt: string;
   license: ClinicLicenseSummary | null;
 }

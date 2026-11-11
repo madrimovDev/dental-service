@@ -1,6 +1,7 @@
 import { fail } from '@dental/core';
 import type { MiddlewareHandler } from 'hono';
 import { getActiveModules, getLicenseState } from './license.ts';
+import { getTenantSubscriptionState, tenantIdFromBearer } from './subscription.ts';
 
 /**
  * `/activate` va `/api/activate` — license faol bo'lmasa ham ochiq (public).
@@ -179,5 +180,49 @@ export const requireValidLicenseInDesktop = (): MiddlewareHandler => {
       return c.json(fail('LICENSE_NOT_FOUND', 'License not activated'), 403);
     }
     await next();
+  };
+};
+
+/**
+ * L8 — SaaS obuna bloki. Desktop'dagi P18 bilan bir xil natija: muddat + imtiyoz
+ * tugagach `403 LICENSE_EXPIRED` (web shu kod bo'yicha blok ekraniga yo'naltiradi),
+ * ochiq yo'llar ham bir xil (`GLOBAL_GATE_OPEN_PREFIXES` — login/refresh/status).
+ *
+ * Tenant `Authorization: Bearer` JWT'dan olinadi (bu middleware auth'dan OLDIN
+ * turadi). Token yo'q/yaroqsiz yoki muddat noma'lum (NULL) → o'tkazadi: 401'ni
+ * `authMiddleware` beradi, Supervisor o'chiq/ro'yxatga olinmagan tenant esa
+ * bloklanmaydi.
+ */
+export const requireValidSubscriptionInCloud = (): MiddlewareHandler => {
+  return async (c, next) => {
+    if (isGloballyOpen(c.req.path)) {
+      await next();
+      return;
+    }
+    const tenantId = await tenantIdFromBearer(c);
+    if (tenantId) {
+      const { state } = await getTenantSubscriptionState(tenantId);
+      if (state === 'expired') {
+        return c.json(
+          fail('LICENSE_EXPIRED', "Obuna muddati tugagan. To'lov qilishingiz kerak"),
+          403,
+        );
+      }
+    }
+    await next();
+  };
+};
+
+/**
+ * Rejimga bog'liq bo'lmagan yagona gate: Local Desktop → litsenziya (P18, xulq
+ * o'zgarmagan), bulut → tenant obunasi (L8). `app.ts` shuni `/api/*` va
+ * `/uploads/*` ga ulaydi.
+ */
+export const requireValidSubscription = (): MiddlewareHandler => {
+  const desktopGate = requireValidLicenseInDesktop();
+  const cloudGate = requireValidSubscriptionInCloud();
+  return async (c, next) => {
+    if (process.env.DENTAL_LOCAL_DESKTOP === 'true') return desktopGate(c, next);
+    return cloudGate(c, next);
   };
 };

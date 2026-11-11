@@ -1,10 +1,12 @@
 import { fail, normalizePhone, ok } from '@dental/core';
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
+import { onAfterCommit } from '../../db/after-commit.ts';
 import type { Database } from '../../db/client.ts';
 import { createAuditLogger } from '../../lib/audit-logger.ts';
 import { env } from '../../lib/env.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
 import { rateLimit } from '../../lib/rate-limit.ts';
+import { registerTenantAfterCommit } from '../../lib/supervisor-saas.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import {
   toLoginDto,
@@ -127,6 +129,18 @@ export const authRoutes = (deps: { db: Database }) => {
     const body = c.req.valid('json');
     try {
       const result = await service.registerTenant(body);
+      // L8: SaaS tenantni Supervisor'ga ro'yxatga olish — best-effort (commit'dan
+      // keyin, timeout bilan; xato 201 ni o'zgartirmaydi, qayta urinishni
+      // `supervisor-saas` sikli bajaradi). Desktop'da bu yo'lga umuman kirilmaydi (403).
+      await onAfterCommit(c, () =>
+        registerTenantAfterCommit({
+          tenantId: result.tenantId,
+          name: body.tenantName,
+          ownerFullName: body.ownerFullName,
+          ownerPhone: body.ownerPhone,
+          defaultLanguage: body.defaultLanguage,
+        }),
+      );
       return c.json(ok(toRegisterTenantDto(result)), 201);
     } catch (err: unknown) {
       // Drizzle DrizzleQueryError'da haqiqiy postgres xato cause ichida bo'ladi

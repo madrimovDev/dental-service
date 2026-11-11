@@ -3,6 +3,7 @@ import { authRoutes } from './modules/auth/auth.routes';
 import { clinicsRoutes } from './modules/clinics/clinics.routes';
 import { licensesRoutes } from './modules/licenses/licenses.routes';
 import { modulesRoutes } from './modules/modules/modules.routes';
+import { saasRoutes } from './modules/saas/saas.routes';
 
 // Hono ilova instansiyasini quradigan factory — Bun.serve'siz, testlar to'g'ridan
 // import qilib app.request(...) orqali chaqirishi mumkin.
@@ -18,6 +19,9 @@ export const createApp = () => {
   // it at '/v1/admin' (not '/v1/admin/modules') yields the brief's intended
   // path PATCH /v1/admin/licenses/:key/modules.
   app.route('/v1/admin', modulesRoutes());
+
+  // L8: SaaS apps/api xizmati uchun ichki API (SUPERVISOR_SAAS_TOKEN).
+  app.route('/internal/saas', saasRoutes());
 
   return app;
 };

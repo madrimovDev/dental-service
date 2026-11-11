@@ -34,8 +34,10 @@ export const ClinicsPage = () => {
           <Table.Thead>
             <Table.Tr>
               <Table.Th>Nomi</Table.Th>
+              <Table.Th>Rejim</Table.Th>
               <Table.Th>Litsenziya</Table.Th>
               <Table.Th>Tarif</Table.Th>
+              <Table.Th>Amal qilish</Table.Th>
               <Table.Th>Holat</Table.Th>
               <Table.Th />
             </Table.Tr>
@@ -43,20 +45,34 @@ export const ClinicsPage = () => {
           <Table.Tbody>
             {isLoading && (
               <Table.Tr>
-                <Table.Td colSpan={5}>Yuklanmoqda...</Table.Td>
+                <Table.Td colSpan={7}>Yuklanmoqda...</Table.Td>
               </Table.Tr>
             )}
             {clinics.map((clinic) => {
               const license = clinic.license;
+              const isSaas = clinic.mode === 'saas';
+              const expiresAt = isSaas ? clinic.subscriptionExpiresAt : license?.expiresAt;
+              const expired = expiresAt ? Date.parse(expiresAt) < Date.now() : false;
+              const active = isSaas ? !expired : license?.isActive;
               return (
                 <Table.Tr key={clinic.id}>
                   <Table.Td>{clinic.name}</Table.Td>
+                  <Table.Td>
+                    <Badge
+                      variant="light"
+                      color={isSaas ? 'blue' : 'gray'}
+                      data-testid="clinic-mode"
+                    >
+                      {isSaas ? 'SaaS' : 'Desktop'}
+                    </Badge>
+                  </Table.Td>
                   <Table.Td>{license?.licenseKey ?? '—'}</Table.Td>
                   <Table.Td>{license?.plan ?? '—'}</Table.Td>
                   <Table.Td>
-                    <Badge color={license?.isActive ? 'green' : 'red'}>
-                      {license?.isActive ? 'Faol' : 'Nofaol'}
-                    </Badge>
+                    {expiresAt ? new Date(expiresAt).toLocaleDateString('uz') : '—'}
+                  </Table.Td>
+                  <Table.Td>
+                    <Badge color={active ? 'green' : 'red'}>{active ? 'Faol' : 'Nofaol'}</Badge>
                   </Table.Td>
                   <Table.Td>
                     <Button
