@@ -82,7 +82,7 @@ Agent turlari fayllari: `.claude/agents/*.md` (frontmatter `name`, `description`
 
 Tartib:
 1. `git worktree add .claude/worktrees/<lane> -b wf/<stage>-<lane> main` (Workflow `isolation:'worktree'` o'rniga — eskirgan-commit muammosi bo'lgan; controller o'zi yaratadi va `git merge-base main wf/...` = `main` tip ekanini tekshiradi).
-2. `.env` nusxasi (+ `apps/supervisor-api/.env`) va **paketlarning o'z `node_modules` papkalariga symlink**: `for d in apps/*/node_modules; do ln -s "$PWD/$d" "$WT/$d"; done`. ✅ P bosqichi 2 darsi: `apps/supervisor-api` o'zining **zod 3** nusxasini ishlatadi; worktree'da u yo'q bo'lsa ildizdagi zod 4 olinadi va `zValidator` tip xatolari chiqadi (implementer kodni «zod v3 API»ga moslashtirishga urindi). Symlink `.gitignore`ga tushmaydi (`node_modules/` — papka naqshi) — commit'da `git add -A` emas, aniq yo'llar.
+2. `.env` nusxasi (+ `apps/supervisor-api/.env`) va **paketlarning o'z `node_modules` papkalariga symlink**: `for d in apps/*/node_modules; do ln -s "$PWD/$d" "$WT/$d"; done`. ✅ P bosqichi 2 darsi: `apps/supervisor-api` o'zining **zod 3** nusxasini ishlatadi; worktree'da u yo'q bo'lsa ildizdagi zod 4 olinadi va `zValidator` tip xatolari chiqadi (implementer kodni «zod v3 API»ga moslashtirishga urindi). ✅ `.gitignore` endi `node_modules` (slash'siz) — symlink ham e'tiborsiz qilinadi (P bosqichi 3 da agent `git add -A` bilan symlinklarni commit qilib yuborgan edi, reviewer ushladi).
 3. Lane bazasi va Redis indeksi (§5.3).
 4. Workflow `args` orqali har lane'ga: worktree yo'li, branch, `DATABASE_URL`, `DATABASE_ADMIN_URL`, `REDIS_URL`, vazifalar ro'yxati, test fayllari.
 
