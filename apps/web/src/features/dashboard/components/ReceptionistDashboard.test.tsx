@@ -24,12 +24,16 @@ vi.mock('@/features/appointments/appointments.api.ts', () => ({
     data: [
       {
         id: 'a1',
+        patientId: 'p1',
+        doctorId: 'd1',
         status: 'scheduled',
         startTime: '2026-06-22T09:00:00.000Z',
         endTime: '2026-06-22T09:30:00.000Z',
       },
       {
         id: 'a2',
+        patientId: 'p2',
+        doctorId: 'd2',
         status: 'no_show',
         startTime: '2026-06-22T10:00:00.000Z',
         endTime: '2026-06-22T10:30:00.000Z',
@@ -51,13 +55,40 @@ vi.mock('@/features/appointments/appointments.api.ts', () => ({
 vi.mock('@/features/queue/queue.api.ts', () => ({
   useQueueToday: () => ({
     data: [
-      { id: 'q1', queueNumber: 7, status: 'waiting' },
+      {
+        id: 'q1',
+        queueNumber: 7,
+        status: 'waiting',
+        patientId: 'p1',
+        createdAt: new Date(Date.now() - 22 * 60000).toISOString(),
+      },
       { id: 'q2', queueNumber: 8, status: 'in_progress' },
     ],
   }),
 }));
 
+// UI-R1: yangi hooklar (ismlar, diqqat manbalari, shifokorlar, qidiruv) — alohida modul.
+const attention = {
+  doctorsWithoutSchedule: [{ id: 'd2', name: 'Dr. Nazarov' }] as { id: string; name: string }[],
+  overdueLabs: 1,
+  recallOverdue: 7,
+};
+vi.mock('../reception.api.ts', () => ({
+  usePatientNames: () => new Map([['p1', 'Jasur Tursunov']]),
+  useDoctorOptions: () => ({
+    data: [
+      { id: 'd1', name: 'Dr. Karimov' },
+      { id: 'd2', name: 'Dr. Nazarov' },
+    ],
+  }),
+  useReceptionAttention: () => attention,
+  usePatientSearch: () => ({ data: { items: [] }, isFetching: false }),
+}));
+
 afterEach(() => {
+  attention.doctorsWithoutSchedule = [{ id: 'd2', name: 'Dr. Nazarov' }];
+  attention.overdueLabs = 1;
+  attention.recallOverdue = 7;
   mockHasPermission.mockClear();
   mockHasPermission.mockImplementation(() => true);
 });
@@ -119,5 +150,41 @@ describe('ReceptionistDashboard (DS1-T5 re-skin characterization)', () => {
     expect(screen.queryByText('Kassa')).not.toBeInTheDocument();
     // jadval qatori hali ham render bo'ladi (xulq saqlanadi)
     expect(screen.getByText('Rejalashtirilgan')).toBeInTheDocument();
+  });
+
+  it('UI-R1: bemor ismi, har qatorda bitta amal va Telegram bo‘sh holat', async () => {
+    const { ReceptionistDashboard } = await import('./ReceptionistDashboard.tsx');
+    renderApp(<ReceptionistDashboard />);
+
+    expect(screen.getAllByText('Jasur Tursunov').length).toBeGreaterThan(0);
+    // scheduled → «Navbatga» (/queue); no_show → «Qayta yozish»; completed → «Kassa»
+    expect(screen.getByRole('link', { name: 'Navbatga' })).toHaveAttribute('href', '/queue');
+    expect(screen.getByRole('link', { name: 'Qayta yozish' })).toHaveAttribute(
+      'href',
+      '/appointments',
+    );
+    expect(screen.getAllByText(/UI-4/).length).toBeGreaterThan(0);
+    // navbatdagi kutish matn bilan
+    expect(screen.getAllByText(/22/).length).toBeGreaterThan(0);
+  });
+
+  it('UI-R1: diqqat paneli ≤3 + «yana N ta» (jadvalsiz shifokor, lab, recall)', async () => {
+    attention.doctorsWithoutSchedule = [
+      { id: 'd2', name: 'Dr. Nazarov' },
+      { id: 'd3', name: 'Dr. Rasulova' },
+    ];
+    const { ReceptionistDashboard } = await import('./ReceptionistDashboard.tsx');
+    renderApp(<ReceptionistDashboard />);
+
+    expect(screen.getByText(/Dr\. Nazarov uchun ish jadvali yo/)).toBeInTheDocument();
+    expect(screen.getByText('Yana 1 ta')).toBeInTheDocument();
+  });
+
+  it("UI-R1: status filtri URL param'dan (?status=no_show)", async () => {
+    const { ReceptionistDashboard } = await import('./ReceptionistDashboard.tsx');
+    renderApp(<ReceptionistDashboard />, { route: '/?status=no_show' });
+
+    expect(screen.getByText('Kelmagan')).toBeInTheDocument();
+    expect(screen.queryByText('Rejalashtirilgan')).not.toBeInTheDocument();
   });
 });
