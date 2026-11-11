@@ -31,7 +31,7 @@ export function AnamnesisCard({
   const stale = confirmedAt == null || daysSince(confirmedAt) >= ANAMNESIS_STALE_DAYS;
 
   return (
-    <section aria-labelledby="pc-anamnesis-h" className={`${classes.block} ${classes.row}`}>
+    <section aria-labelledby="pc-anamnesis-h" className={`${classes.block} ${classes.blockRow}`}>
       <div className={classes.grow}>
         <h2 id="pc-anamnesis-h" className={classes.title}>
           {t('patientCard.anamnesis.title')}

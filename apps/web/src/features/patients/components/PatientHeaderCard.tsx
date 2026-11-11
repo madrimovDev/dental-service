@@ -75,9 +75,9 @@ export function PatientHeaderCard({
           aria-hidden
           style={{
             alignItems: 'center',
-            background: 'var(--teal-50)',
+            background: 'var(--primary-tint)',
             borderRadius: 99,
-            color: 'var(--teal-700)',
+            color: 'var(--primary-strong)',
             display: 'flex',
             flex: '0 0 auto',
             fontSize: 20,

@@ -132,7 +132,7 @@ export function PatientCard() {
       <>
         {t(s.labelKey)}
         {s.key === 'finance' && hasDebt && (
-          <span style={{ color: 'var(--red-700)', fontSize: 13, fontWeight: 700 }}>
+          <span style={{ color: 'var(--danger)', fontSize: 13, fontWeight: 700 }}>
             {' · '}
             {t('patients.balance_debt')}
           </span>

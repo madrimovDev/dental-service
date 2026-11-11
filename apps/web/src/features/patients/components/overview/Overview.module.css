@@ -31,6 +31,13 @@
   gap: 10px;
 }
 
+.blockRow {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+
 .row {
   display: flex;
   flex-wrap: wrap;
@@ -89,13 +96,13 @@
   padding: 12px 14px;
   border-radius: 10px;
   background: var(--primary-tint);
-  border: 1px solid var(--teal-200);
+  border: 1px solid var(--primary-tint-2);
 }
 
 .todayLabel {
   font-size: 13px;
   font-weight: 700;
-  color: var(--teal-700);
+  color: var(--primary-strong);
 }
 
 .visit {
@@ -127,7 +134,7 @@
 }
 
 .bigDebt {
-  color: var(--red-700);
+  color: var(--danger);
 }
 
 .dx {
