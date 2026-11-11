@@ -1,3 +1,4 @@
+import type { VisitNoteMetadata } from '@dental/db-schema';
 import type { Context } from 'hono';
 import type { AuditLogger } from '../../../lib/audit-logger.ts';
 import { createOwnershipValidator, type OwnershipValidator } from '../../../lib/ownership.ts';
@@ -28,6 +29,42 @@ export class VisitStageRepointError extends InvalidTransitionError {
       'linked stage is already completed. Change stage status via /treatment-stages.';
   }
 }
+
+/** UI-D4: imzolangan vizit yozuvi o'zgarmaydi (PATCH → 409 `visit_note.signed`). */
+export class VisitNoteSignedError extends Error {
+  constructor(readonly noteId: string) {
+    super('Visit note is signed and can no longer be edited');
+    this.name = 'VisitNoteSignedError';
+  }
+}
+
+/** UI-D4: allaqachon imzolangan yozuvni qayta imzolash (409 `visit_note.already_signed`). */
+export class VisitNoteAlreadySignedError extends Error {
+  constructor(readonly noteId: string) {
+    super('Visit note is already signed');
+    this.name = 'VisitNoteAlreadySignedError';
+  }
+}
+
+/**
+ * Mavjud metadata'ga kiruvchi qiymatlarni QO'SHADI (ezmaydi): `allergyOverrides`
+ * `drug` bo'yicha birlashadi (yangisi eskisini yangilaydi), `nextVisit` almashadi.
+ * Hech narsa berilmasa — `undefined` (metadata ustuniga tegilmaydi).
+ */
+export const mergeVisitNoteMetadata = (
+  existing: VisitNoteMetadata | null | undefined,
+  input: Pick<CreateVisitNoteInput, 'allergyOverrides' | 'nextVisit'>,
+): VisitNoteMetadata | undefined => {
+  if (input.allergyOverrides === undefined && input.nextVisit === undefined) return undefined;
+  const next: VisitNoteMetadata = { ...(existing ?? {}) };
+  if (input.allergyOverrides !== undefined) {
+    const byDrug = new Map((next.allergyOverrides ?? []).map((o) => [o.drug, o]));
+    for (const o of input.allergyOverrides) byDrug.set(o.drug, o);
+    next.allergyOverrides = [...byDrug.values()];
+  }
+  if (input.nextVisit !== undefined) next.nextVisit = input.nextVisit;
+  return next;
+};
 
 /**
  * C5 (CLI-222) — treatment-plans modulidan inject qilinadigan narrow dep.
@@ -122,6 +159,7 @@ export const createVisitNotesService = (deps: {
       plan: input.plan ?? null,
       performedServices: input.performedServices,
       freeNotes: input.freeNotes ?? null,
+      metadata: mergeVisitNoteMetadata(null, input) ?? null,
     });
 
     if (note) {
@@ -140,6 +178,8 @@ export const createVisitNotesService = (deps: {
   async function update(c: Context, id: string, input: UpdateVisitNoteInput) {
     const before = await repo.find(c, id);
     if (!before) return null;
+    // UI-D4: imzolangan yozuv — hech qanday yon ta'sirdan (stage, stock) OLDIN rad.
+    if (before.signedAt) throw new VisitNoteSignedError(id);
 
     // CLI-481: re-point blok — ownership/completeStage'dan OLDIN. Bu vizit allaqachon
     // bir bosqichni 'completed' qilgan bo'lsa (before.stageId non-null), yangi va
@@ -176,8 +216,12 @@ export const createVisitNotesService = (deps: {
     if (input.plan !== undefined) patch.plan = input.plan;
     if (input.performedServices) patch.performedServices = input.performedServices;
     if (input.freeNotes !== undefined) patch.freeNotes = input.freeNotes;
+    const mergedMeta = mergeVisitNoteMetadata(before.metadata, input);
+    if (mergedMeta !== undefined) patch.metadata = mergedMeta;
 
     const updated = await repo.update(c, id, patch);
+    // find→update orasida imzolangan bo'lsa (poyga) update 0 qator qaytaradi.
+    if (!updated) throw new VisitNoteSignedError(id);
     if (updated) {
       // CLI-414: `performedServices` YUBORILGAN bo'lsa (undefined EMAS) — stock reconcile
       // (multiset diff: delta>0 ayirish, delta<0 qaytarish). `undefined` (maydon yo'q) →
@@ -197,7 +241,26 @@ export const createVisitNotesService = (deps: {
     return updated;
   }
 
-  return { list, get, create, update };
+  /**
+   * UI-D4 «Imzolash»: qoralama → imzolangan (qaytarib bo'lmaydi). 404 — yozuv yo'q
+   * (RLS tufayli boshqa tenantniki ham); qayta imzolash → VisitNoteAlreadySignedError.
+   */
+  async function sign(c: Context, id: string) {
+    const before = await repo.find(c, id);
+    if (!before) return null;
+    if (before.signedAt) throw new VisitNoteAlreadySignedError(id);
+    const signed = await repo.sign(c, id, c.get('user')?.id ?? null);
+    if (!signed) throw new VisitNoteAlreadySignedError(id);
+    await deps.audit.record(c, {
+      action: 'signed',
+      resourceType: 'visit_note',
+      resourceId: id,
+      after: { signedAt: signed.signedAt?.toISOString() ?? null, signedBy: signed.signedBy },
+    });
+    return signed;
+  }
+
+  return { list, get, create, update, sign };
 };
 
 export type VisitNotesService = ReturnType<typeof createVisitNotesService>;

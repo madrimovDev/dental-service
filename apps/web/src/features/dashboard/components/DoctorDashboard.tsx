@@ -1,16 +1,22 @@
 import { StateView } from '@dental/ui';
 import { Box, Group, Stack, Text } from '@mantine/core';
-import { IconCalendarPlus, IconCash } from '@tabler/icons-react';
+import { IconCalendarPlus, IconCash, IconSearch } from '@tabler/icons-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAllLabOrders } from '@/features/clinical/clinical.api.ts';
+import { useCallOwnTicket } from '@/features/queue/queue.api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { useDoctorAppointments, useTodayRange } from '../dashboard.api.ts';
+import { useDoctorPending } from '../doctor.api.ts';
+import { usePatientNames } from '../reception.api.ts';
+import { buildPendingRows, DoctorPendingPanel } from './widgets/DoctorPendingPanel.tsx';
+import { LabPanel } from './widgets/LabPanel.tsx';
+import { NextPatientCard } from './widgets/NextPatientCard.tsx';
 import { ScheduleList } from './widgets/ScheduleList.tsx';
-import { StatCard } from './widgets/StatCard.tsx';
 
-// Off-scale literal (parity): KPI grid gap 14px (4px shkalada yo'q: 12/16).
-const KPI_GAP = 14;
+const fmtDay = (iso: string) =>
+  new Date(iso).toLocaleDateString('uz-UZ', { day: '2-digit', month: '2-digit' });
 
 const fmtTime = (iso: string) =>
   new Date(iso).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
@@ -58,13 +64,35 @@ export function DoctorDashboard() {
   const appts = appointments.data ?? [];
 
   const canAppointment = hasPermission('appointment.view');
+  const canPending = canAppointment && hasPermission('medical_record.view');
+  const pending = useDoctorPending(canPending);
+  const names = usePatientNames(appts.map((a) => a.patientId));
   const canCashier = hasPermission('cashier.view');
+  const callOwn = useCallOwnTicket();
+  const canLab = hasPermission('lab_order.view');
+  const labOrders = useAllLabOrders();
+  const labRows = canLab
+    ? (labOrders.data?.data ?? [])
+        .filter(
+          (l) => l.doctorId === user?.id && ['sent', 'in_progress', 'ready'].includes(l.status),
+        )
+        .slice(0, 4)
+    : [];
+  const left = appts.filter((a) => a.status === 'scheduled' || a.status === 'confirmed').length;
 
   return (
     <Stack gap="lg">
       {/* 1a. Header — greeting YO'Q (DS0 topbar sarlavhani olib boradi); amal tugmalari o'ngga surilgan. */}
-      {(canAppointment || canCashier) && (
-        <Group gap="xs" justify="flex-end">
+      <Group gap="xs" justify="space-between" wrap="wrap">
+        <Text size="sm" c="dimmed">
+          {t('doctorDay.subtitle', { total: appts.length, left })}
+        </Text>
+        <Group gap="xs">
+          <HeaderAction
+            to="/patients"
+            icon={<IconSearch size={17} />}
+            label={t('doctorDay.search_patient')}
+          />
           {canAppointment && (
             <HeaderAction
               to="/appointments"
@@ -80,7 +108,7 @@ export function DoctorDashboard() {
             />
           )}
         </Group>
-      )}
+      </Group>
 
       {appointments.isLoading ? (
         <StateView status="loading" skeleton="cards" />
@@ -93,29 +121,64 @@ export function DoctorDashboard() {
         />
       ) : (
         <>
-          {/* 1b. KPI qatori — repeat(4,1fr), gap 14px (off-scale literal, parity).
-              Doktorda 1 KPI bor → qolgan ustunlar bo'sh (grid bir xil shell). */}
-          <Box style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: KPI_GAP }}>
-            <StatCard label={t('dashboard.today_total')} value={appts.length} tone="primary" />
-          </Box>
+          <Box style={{ display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'flex-start' }}>
+            <Stack gap="md" style={{ flex: '999 1 600px', minWidth: 0 }}>
+              {pending.data?.nextPatient && (
+                <NextPatientCard
+                  next={pending.data.nextPatient}
+                  canCall={hasPermission('queue.view')}
+                  calling={callOwn.isPending}
+                  onCall={() => {
+                    const id = pending.data?.nextPatient?.queueTicketId;
+                    if (id) callOwn.mutate(id, { onSuccess: () => void pending.refetch() });
+                  }}
+                />
+              )}
+              <ScheduleList
+                title={t('dashboard.today_appointments')}
+                calendarLabel={t('dashboard.calendar_link', 'Kalendar')}
+                onCalendar={() => navigate('/appointments')}
+                rows={appts.map((a) => ({
+                  id: a.id,
+                  time: fmtTime(a.startTime),
+                  patient: names.get(a.patientId) ?? '—',
+                  duration: fmtDuration(a.startTime, a.endTime),
+                  status: a.status,
+                  statusLabel: t(`appointments.status.${a.status}`, a.status),
+                }))}
+                emptyText={t('dashboard.no_appointments')}
+                onRowClick={() => navigate('/appointments')}
+              />
+            </Stack>
 
-          {/* Doctor: rail yo'q (navbat/recall/faollik OMIT — data-gap, ds12) → bitta ustun jadval. */}
-          <ScheduleList
-            title={t('dashboard.today_appointments')}
-            calendarLabel={t('dashboard.calendar_link', 'Kalendar')}
-            onCalendar={() => navigate('/appointments')}
-            rows={appts.map((a) => ({
-              id: a.id,
-              time: fmtTime(a.startTime),
-              // Bemor ismi dashboard data'sida yo'q (faqat ID) — placeholder, hook qo'shilmaydi.
-              patient: '—',
-              duration: fmtDuration(a.startTime, a.endTime),
-              status: a.status,
-              statusLabel: t(`appointments.status.${a.status}`, a.status),
-            }))}
-            emptyText={t('dashboard.no_appointments')}
-            onRowClick={() => navigate('/appointments')}
-          />
+            <Stack gap="md" style={{ flex: '1 1 340px', minWidth: 300 }}>
+              {canPending && pending.data && (
+                <DoctorPendingPanel
+                  title={t('doctorDay.pending_title', 'Mendan kutilmoqda')}
+                  emptyText={t('doctorDay.pending_empty', 'Hammasi bajarilgan')}
+                  rows={buildPendingRows(
+                    pending.data,
+                    (key, n) => t(`doctorDay.pending_${key}`, { count: n }),
+                    (days) => t('doctorDay.pending_plans_oldest', { count: days ?? 0 }),
+                  )}
+                />
+              )}
+              {canLab && (
+                <LabPanel
+                  title={t('doctorDay.lab_title')}
+                  newLabel={t('doctorDay.lab_new')}
+                  emptyText={t('doctorDay.lab_empty')}
+                  rows={labRows.map((l) => ({
+                    id: l.id,
+                    what: `${t(`doctorDay.lab_type.${l.orderType}`, l.orderType)} · ${l.labName}`,
+                    meta: l.expectedDate ? fmtDay(l.expectedDate) : '',
+                    status: l.status,
+                    statusLabel: t(`doctorDay.lab_status.${l.status}`, l.status),
+                  }))}
+                />
+              )}
+            </Stack>
+          </Box>
         </>
       )}
     </Stack>

@@ -7,7 +7,9 @@
 import type {
   CreateLabOrder201,
   CreateLabOrderBody,
+  DeleteLabOrderFile200,
   GetLabOrder200,
+  ListLabOrderFiles200,
   ListLabOrders200,
   ListLabOrdersParams,
   ListOverdueLabOrders200,
@@ -65,8 +67,27 @@ import { customInstance } from '../../mutator';
     },
       );
     }
+  export const listLabOrderFiles = (
+    id: string,
+ ) => {
+      return customInstance<ListLabOrderFiles200>(
+      {url: `/api/lab-orders/${id}/files`, method: 'GET'
+    },
+      );
+    }
+  export const deleteLabOrderFile = (
+    id: string,
+    fileId: string,
+ ) => {
+      return customInstance<DeleteLabOrderFile200>(
+      {url: `/api/lab-orders/${id}/files/${fileId}`, method: 'DELETE'
+    },
+      );
+    }
   export type ListLabOrdersResult = NonNullable<Awaited<ReturnType<typeof listLabOrders>>>
 export type CreateLabOrderResult = NonNullable<Awaited<ReturnType<typeof createLabOrder>>>
 export type ListOverdueLabOrdersResult = NonNullable<Awaited<ReturnType<typeof listOverdueLabOrders>>>
 export type GetLabOrderResult = NonNullable<Awaited<ReturnType<typeof getLabOrder>>>
 export type UpdateLabOrderResult = NonNullable<Awaited<ReturnType<typeof updateLabOrder>>>
+export type ListLabOrderFilesResult = NonNullable<Awaited<ReturnType<typeof listLabOrderFiles>>>
+export type DeleteLabOrderFileResult = NonNullable<Awaited<ReturnType<typeof deleteLabOrderFile>>>

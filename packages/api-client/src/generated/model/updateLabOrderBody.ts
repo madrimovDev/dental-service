@@ -17,6 +17,12 @@ export type UpdateLabOrderBody = {
   orderType?: UpdateLabOrderBodyOrderType;
   status?: UpdateLabOrderBodyStatus;
   items?: UpdateLabOrderBodyItemsItem[];
+  /**
+   * @minLength 1
+   * @maxLength 20
+   */
+  shade?: string;
+  dueDate?: string;
   /** @nullable */
   sentDate?: string | null;
   /** @nullable */

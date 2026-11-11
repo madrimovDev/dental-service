@@ -548,6 +548,40 @@ export const createPatientsService = (deps: {
   }
 
   /**
+   * Anamnezni tasdiqlash (UI-D2): shifokor "o'zgarish yo'q — tasdiqlash" bosadi.
+   * Faqat `confirmedAt`/`confirmedBy` yoziladi (anamnez matni o'zgarmaydi) va audit
+   * `confirmed` (`updated` EMAS — tarix/diff ro'yxatini bo'sh yozuv bilan to'ldirmaydi).
+   */
+  async function confirmMedicalRecord(c: Context, patientId: string) {
+    const db = getDb(c);
+    const user = c.get('user');
+
+    const [before] = await db
+      .select()
+      .from(medicalRecords)
+      .where(eq(medicalRecords.patientId, patientId));
+    if (!before) return null;
+
+    const [updated] = await db
+      .update(medicalRecords)
+      .set({ confirmedAt: new Date(), confirmedBy: user?.id ?? null })
+      .where(eq(medicalRecords.id, before.id))
+      .returning();
+
+    if (updated) {
+      await deps.audit.record(c, {
+        action: 'confirmed',
+        resourceType: 'medical_record',
+        resourceId: updated.id,
+        before: { confirmedAt: before.confirmedAt, confirmedBy: before.confirmedBy },
+        after: { confirmedAt: updated.confirmedAt, confirmedBy: updated.confirmedBy },
+      });
+    }
+
+    return updated ?? null;
+  }
+
+  /**
    * Medical record o'zgarishlar tarixi (V2-7) — audit_log'dan o'qiladi
    * (updateMedicalRecord har o'zgarishda before/after yozadi). Yangi jadval shart emas.
    * RLS audit_log'ni tenant bo'yicha filtrlaydi.
@@ -845,6 +879,7 @@ export const createPatientsService = (deps: {
     archive,
     getMedicalRecord,
     updateMedicalRecord,
+    confirmMedicalRecord,
     medicalRecordHistory,
     listRelatives,
     addRelative,

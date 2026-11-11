@@ -362,11 +362,11 @@ To'liq: [`LAB-TECHNICIAN-ACCESS-2026-11-11.md`](./LAB-TECHNICIAN-ACCESS-2026-11-
 | UI-R4 ✅ | UI-1 | Navbat (`Queue.dc.html`) | SC-09, SC-10 (qaror) |
 | UI-R5 ✅ | UI-1 | Kassa (`Cashier.dc.html`) | P7, P13, MO-02, QR to‘lov usuli |
 | UI-R6 ✅ | UI-1 | Bemorlar (`Patients.dc.html`) | PT-01…04, dublikat tekshiruvi |
-| UI-D1 | UI-2 | Mening kunim (`DoctorDay.dc.html`) | — |
-| UI-D2 | UI-2 | Bemor kartasi (`Patient.dc.html`) | P11, anamnez `confirmedAt` |
-| UI-D3 | UI-2 | Tish xaritasi (`Odontogram.dc.html`) | CL-01, tashxis qidiruvi |
-| UI-D4 | UI-2 | Vizit yozuvi (`VisitNote.dc.html`) | **P12**, CL-12 |
-| UI-D5 | UI-2 | Lab buyurtma (`LabOrder.dc.html`) | lab_orders sxemasi (shade, due, files, remake) |
+| UI-D1 ✅ | UI-2 | Mening kunim (`DoctorDay.dc.html`) | — |
+| UI-D2 ✅ | UI-2 | Bemor kartasi (`Patient.dc.html`) | P11, anamnez `confirmedAt` |
+| UI-D3 ✅ | UI-2 | Tish xaritasi (`Odontogram.dc.html`) | CL-01, tashxis qidiruvi |
+| UI-D4 ✅ | UI-2 | Vizit yozuvi (`VisitNote.dc.html`) | **P12**, CL-12 |
+| UI-D5 ✅ | UI-2 | Lab buyurtma (`LabOrder.dc.html`) | lab_orders sxemasi (shade, due, files, remake) |
 | UI-M1 | UI-3 | Rahbar bosh sahifasi (`OwnerDashboard.dc.html`) | P13, zaxira nusxa holati |
 | UI-M2 | UI-3 | Hisobotlar (`Reports.dc.html`) | IR-06 |
 | UI-M3 | UI-3 | Sozlamalar (`Settings.dc.html`) | P10, P9, P16 (renew) |
@@ -443,4 +443,13 @@ Sinov 3 ta haqiqiy nuqson topdi (hammasi tuzatildi, testlar bilan): (1) jadvali 
 | FU-23 | L | `GET /patients/phone-check` `patient.create` bilan ism qaytaradi | `view_pii`siz faqat `count` qaytarish |
 | FU-24 | L | Kanvas elementlari qurilmagan: Qarzdorlar chip, Excel import, «Keyingi tashrif» ustuni, drag «ushlab turish», narx chip'lari | UI sayqal / P2 |
 | FU-25 | — | Telegram bron so'rovlari (`booking_requests`) | UI-4 (T2) |
+
+## 20. UI-2 dan keyingi follow-up'lar
+
+| ID | J | Qisqa | Qilinadigan ish |
+|---|---|---|---|
+| FU-26 | L | Allergiya banneri faqat `medical_record.view` egalariga | registrator/hamshira uchun xavfsizlik ogohlantirishi (faqat «allergiya bor» belgisi — R6 `flags.allergy` bilan) |
+| FU-27 | L | «Imzolanmagan vizit» / «ko'rilmagan rasm» ta'riflari taxminiy (D1) | D4 imzosi (`signed_at`) bilan qayta hisoblash |
+| FU-28 | L | Lab buyurtma «Laboratoriya nimani ko'radi» bloki — portalgacha klinika ichida | Lab portali bosqichida |
+| FU-29 | — | Presence («kim ishlayapti») qurilmagan | keyinga (qaror) |
 

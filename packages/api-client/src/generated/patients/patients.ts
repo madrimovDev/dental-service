@@ -12,6 +12,7 @@ import type {
   ArchivePatient200,
   CheckPatientPhone200,
   CheckPatientPhoneParams,
+  ConfirmMedicalRecord200,
   CreatePatient201,
   CreatePatientBody,
   GetMedicalRecord200,
@@ -116,6 +117,14 @@ import { customInstance } from '../../mutator';
     },
       );
     }
+  export const confirmMedicalRecord = (
+    id: string,
+ ) => {
+      return customInstance<ConfirmMedicalRecord200>(
+      {url: `/api/patients/${id}/medical-record/confirm`, method: 'POST'
+    },
+      );
+    }
   export const getMedicalRecordHistory = (
     id: string,
  ) => {
@@ -189,6 +198,7 @@ export type ArchivePatientResult = NonNullable<Awaited<ReturnType<typeof archive
 export type GetPatientBalanceResult = NonNullable<Awaited<ReturnType<typeof getPatientBalance>>>
 export type GetMedicalRecordResult = NonNullable<Awaited<ReturnType<typeof getMedicalRecord>>>
 export type UpdateMedicalRecordResult = NonNullable<Awaited<ReturnType<typeof updateMedicalRecord>>>
+export type ConfirmMedicalRecordResult = NonNullable<Awaited<ReturnType<typeof confirmMedicalRecord>>>
 export type GetMedicalRecordHistoryResult = NonNullable<Awaited<ReturnType<typeof getMedicalRecordHistory>>>
 export type ListPatientRelativesResult = NonNullable<Awaited<ReturnType<typeof listPatientRelatives>>>
 export type AddPatientRelativeResult = NonNullable<Awaited<ReturnType<typeof addPatientRelative>>>

@@ -6,6 +6,7 @@
  */
 import type { CreateLabOrderBodyOrderType } from './createLabOrderBodyOrderType';
 import type { CreateLabOrderBodyItemsItem } from './createLabOrderBodyItemsItem';
+import type { CreateLabOrderBodyRemakeReason } from './createLabOrderBodyRemakeReason';
 
 export type CreateLabOrderBody = {
   patientId: string;
@@ -18,7 +19,15 @@ export type CreateLabOrderBody = {
   orderType: CreateLabOrderBodyOrderType;
   /** @minItems 1 */
   items: CreateLabOrderBodyItemsItem[];
+  /**
+   * @minLength 1
+   * @maxLength 20
+   */
+  shade: string;
+  dueDate: string;
   expectedDate?: string;
+  remakeOfId?: string;
+  remakeReason?: CreateLabOrderBodyRemakeReason;
   /**
    * @minimum 0
    * @nullable

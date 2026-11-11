@@ -21,6 +21,7 @@ import { branchRoutes } from './modules/branches/index.ts';
 import { cashierRoutes } from './modules/cashier/index.ts';
 import { clinicalRoutes } from './modules/clinical/index.ts';
 import { consentRoutes } from './modules/consent/index.ts';
+import { dashboardRoutes } from './modules/dashboard/index.ts';
 import { expensesRoutes } from './modules/expenses/index.ts';
 import { healthRoutes } from './modules/health/index.ts';
 import { labOrdersRoutes } from './modules/lab-orders/index.ts';
@@ -187,6 +188,7 @@ export const createApp = () => {
     cashierRoutes({ db, audit, fiscal, priceLookup, payrollAdjustment: payrollAdjustmentHook }),
   );
   app.route('/api/reports', reportsRoutes({ db, audit }));
+  app.route('/api/dashboard', dashboardRoutes({ db }));
   app.route('/api/audit', auditRoutes({ db }));
   // Epic A: doktor jadvali + time-off + availability. Service'ni bir marta
   // yaratamiz va predikatlarini appointmentRoutes'ga inject qilamiz (A6).

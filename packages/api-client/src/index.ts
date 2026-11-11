@@ -1,6 +1,6 @@
 export type { ApiClient, ApiClientConfig } from './client.ts';
 export { ApiError, createApiClient } from './client.ts';
-export type { Endpoints } from './endpoints.ts';
+export type { Endpoints, LabOrderFileRecord } from './endpoints.ts';
 export { createEndpoints } from './endpoints.ts';
 // Generated (orval) — appointments
 export type {
@@ -462,6 +462,7 @@ export type {
   UserAssignment,
   UserAssignmentRow,
   VisitNote,
+  VisitNoteTemplate,
   WaiveNoShowStrikeBody,
   WorkingHoursSegment,
   WorkingHoursSegmentDto,
@@ -787,6 +788,9 @@ export {
   updateUserAssignment,
   upsertUserProfile,
 } from './generated/users/users.ts';
+// Generated (orval) — visit-note-templates (UI-D4: shablonlar tanlagichi)
+export type { ListVisitNoteTemplatesResult } from './generated/visit-note-templates/visit-note-templates.ts';
+export { listVisitNoteTemplates } from './generated/visit-note-templates/visit-note-templates.ts';
 // Generated (orval) — visit-notes
 export type {
   CreateVisitNoteResult,

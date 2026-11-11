@@ -7,7 +7,9 @@ import { createLocalStorageAdapter } from './storage.ts';
  * o'zgarmadi, shuning uchun chaqiruvchi modullar (masalan
  * `patient-images.service.ts`) o'zgarishsiz qoladi.
  */
-const storage = createLocalStorageAdapter();
+// Har chaqiruvda `UPLOADS_DIR`ni o'qiydi (`/uploads` route bilan bir xil) — modul darajasidagi
+// yagona adapter test to'plamida boshqa katalogga qarab qolardi. Production'da env o'zgarmaydi.
+const storage = () => createLocalStorageAdapter();
 
 /**
  * Storage key generator — multi-tenant uchun:
@@ -24,6 +26,21 @@ export function patientImageKey(args: {
 }
 
 /**
+ * Lab order fayli key (UI-D5):
+ *   tenants/{tenantId}/lab-orders/{labOrderId}/{fileId}.{ext}
+ * `/uploads` route shu prefiks (`lab-orders`) bo'yicha `lab_order.view` talab qiladi.
+ */
+export function labOrderFileKey(args: {
+  tenantId: string;
+  labOrderId: string;
+  fileId: string;
+  ext: string;
+}): string {
+  const ext = args.ext.replace(/^\./, '').toLowerCase();
+  return `tenants/${args.tenantId}/lab-orders/${args.labOrderId}/${args.fileId}.${ext}`;
+}
+
+/**
  * Fayl URL — avval MinIO presigned (short-lived) URL edi, endi local
  * filesystem'dagi `/uploads/:key` route'ga relative path
  * (`storage.serveUrl`). Frontend `<img src>` shu path'ni to'g'ridan ishlatadi.
@@ -31,7 +48,7 @@ export function patientImageKey(args: {
  * chaqiruvchi kodni o'zgartirmaslik uchun saqlanadi.
  */
 export async function presignedGetUrl(objectKey: string, _expiresInSec = 300): Promise<string> {
-  return storage.serveUrl(objectKey);
+  return storage().serveUrl(objectKey);
 }
 
 /**
@@ -46,9 +63,9 @@ export async function uploadObject(args: {
     args.body instanceof Uint8Array
       ? Buffer.from(args.body)
       : Buffer.from(new Uint8Array(args.body));
-  await storage.save(args.key, data);
+  await storage().save(args.key, data);
 }
 
 export async function deleteObject(key: string): Promise<void> {
-  await storage.remove(key);
+  await storage().remove(key);
 }

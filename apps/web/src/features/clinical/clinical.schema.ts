@@ -26,23 +26,6 @@ export const treatmentPlanFormSchema = z.object({
 export type TreatmentPlanFormValues = z.infer<typeof treatmentPlanFormSchema>;
 export type StageFormValues = z.infer<typeof stageSchema>;
 
-// ===== A: visit note =====
-export const visitNoteFormSchema = z.object({
-  subjective: z.string().optional(),
-  objective: z.string().optional(),
-  assessmentDiagnoses: z.array(z.string()),
-  plan: z.string().optional(),
-  freeNotes: z.string().optional(),
-  // Select clearable `null` qaytaradi — nullable (submit'da `?? undefined`).
-  appointmentId: z.string().nullable().optional(),
-  // CLI-414: bajarilgan xizmatlar (BOM auto-deduction, Qaror #15). Bo'sh → stock'ga tegilmaydi.
-  performedServices: z.array(z.string()).default([]),
-  // CLI-447: bosqichni yakunlash (visit → stage completion). Select clearable → null.
-  // `CreateVisitNoteInput.stageId` endi mavjud (types-clinical kengaytirildi).
-  stageId: z.string().nullable().optional(),
-});
-export type VisitNoteFormValues = z.infer<typeof visitNoteFormSchema>;
-
 // ===== B: prescription =====
 export const prescriptionItemSchema = z.object({
   medicationName: z.string().min(1),
@@ -58,25 +41,6 @@ export const prescriptionFormSchema = z.object({
   items: z.array(prescriptionItemSchema).min(1),
 });
 export type PrescriptionFormValues = z.infer<typeof prescriptionFormSchema>;
-
-// ===== B: lab order =====
-export const labOrderItemSchema = z.object({
-  description: z.string().min(1),
-  toothNumbersText: z.string(),
-  material: z.string().optional(),
-  shade: z.string().optional(),
-  quantity: z.number().optional(),
-});
-
-export const labOrderFormSchema = z.object({
-  labName: z.string().min(1),
-  orderType: z.string(),
-  expectedDate: z.string().optional(),
-  cost: z.number().optional(),
-  notes: z.string().optional(),
-  items: z.array(labOrderItemSchema).min(1),
-});
-export type LabOrderFormValues = z.infer<typeof labOrderFormSchema>;
 
 // ===== B: consent =====
 export const consentSignFormSchema = z.object({

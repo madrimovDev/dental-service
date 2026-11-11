@@ -1,4 +1,6 @@
-import type { Patient } from '@dental/api-client';
+import type { getMedicalRecord, Patient } from '@dental/api-client';
+
+type MedicalRecord = Awaited<ReturnType<typeof getMedicalRecord>>['data'];
 
 export type ListParams = { search?: string; archived?: boolean; page: number; pageSize?: number };
 
@@ -44,6 +46,15 @@ export type PatientDetail = {
   insurance: Patient['insurance'];
   insuranceStatus: Patient['insuranceStatus'];
   archived: boolean;
+};
+
+/**
+ * Tibbiy karta + anamnez tasdig'i (UI-D2). `confirmedAt`/`confirmedBy` backend'da bor;
+ * generated model kontrakt regeneratsiyasigacha ularni bilmaydi — shu paytgacha kengaytma.
+ */
+export type MedicalRecordView = MedicalRecord & {
+  confirmedAt?: string | null;
+  confirmedBy?: string | null;
 };
 
 export type { Patient };

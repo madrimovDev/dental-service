@@ -70,6 +70,10 @@ type Props = {
   size?: number;
   /** Faqat ko'rsatuv — bosish/tanlash o'chiriladi. */
   readOnly?: boolean;
+  /** Davolash rejasida bosqichi bor tish (UI-D3 «Reja»). */
+  planned?: boolean;
+  /** Kreslo yoni rejimi: bosish zonasi `--tap-chair` (≥60px). */
+  chair?: boolean;
 };
 
 export function ToothCell({
@@ -80,6 +84,8 @@ export function ToothCell({
   onClick,
   size = 36,
   readOnly = false,
+  planned = false,
+  chair = false,
 }: Props) {
   const { t } = useTranslation();
   const stateLabel = t(`tooth_chart.states.${state}`);
@@ -160,6 +166,8 @@ export function ToothCell({
       aria-label={`${number} — ${stateLabel}`}
       aria-pressed={selected}
       data-selected={selected || undefined}
+      data-planned={planned || undefined}
+      data-chair={chair || undefined}
     >
       {svg}
       <span className={classes.fdi} data-selected={selected || undefined}>

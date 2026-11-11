@@ -46,6 +46,7 @@ export const uploadsRoutes = (
   app.use('*', rlsMiddleware(deps.db));
 
   const requireImageView = requirePermission('patient_image.view');
+  const requireLabView = requirePermission('lab_order.view');
 
   app.get(
     '/:key{.+}',
@@ -54,9 +55,13 @@ export const uploadsRoutes = (
       // oshkor bo'lmaydi); faqat o'z tenant fayli uchun 403 beriladi.
       const resolved = storage.resolve(c.req.param('key'));
       if (resolved) {
-        const [prefix, keyTenantId] = resolved.relKey.split(sep);
+        const [prefix, keyTenantId, kind] = resolved.relKey.split(sep);
         if (prefix === 'tenants' && keyTenantId === c.get('activeTenantId')) {
-          return requireImageView(c, next);
+          // UI-D5: prefiks bo'yicha permission — `patients/` → patient_image.view,
+          // `lab-orders/` → lab_order.view; boshqa prefiks (o'z tenanti ichida ham) → 403.
+          if (kind === 'patients') return requireImageView(c, next);
+          if (kind === 'lab-orders') return requireLabView(c, next);
+          return c.json(fail('permission.denied', 'Forbidden'), 403);
         }
       }
       await next();
@@ -77,7 +82,7 @@ export const uploadsRoutes = (
       // mosligini KANONIK relKey'dan (o'qiladigan yo'l bilan bir xil string)
       // tekshiramiz. Mismatch bo'lsa 404 (403 emas) — "file not found" bilan bir
       // xil javob, fayl mavjudligini boshqa tenantga oshkor qilmaslik uchun.
-      const [prefix, keyTenantId] = resolved.relKey.split(sep);
+      const [prefix, keyTenantId, kind] = resolved.relKey.split(sep);
       if (prefix !== 'tenants' || !keyTenantId || keyTenantId !== activeTenantId) {
         return c.json(fail('NOT_FOUND', 'File not found'), 404);
       }
@@ -86,13 +91,13 @@ export const uploadsRoutes = (
         return c.json(fail('NOT_FOUND', 'File not found'), 404);
       }
 
-      // `audit_log.resource_id` — uuid; key formati `.../{imageId}.{ext}`
-      // (`patientImageKey()`), shuning uchun imageId olinadi, to'liq key `after`da.
-      const imageId = basename(resolved.relKey).split('.')[0] ?? '';
+      // `audit_log.resource_id` — uuid; key formati `.../{id}.{ext}`
+      // (`patientImageKey()` / `labOrderFileKey()`), shuning uchun id olinadi, to'liq key `after`da.
+      const objectId = basename(resolved.relKey).split('.')[0] ?? '';
       await deps.audit.record(c, {
         action: 'viewed',
-        resourceType: 'patient_image',
-        resourceId: UUID_RE.test(imageId) ? imageId : null,
+        resourceType: kind === 'lab-orders' ? 'lab_order_file' : 'patient_image',
+        resourceId: UUID_RE.test(objectId) ? objectId : null,
         after: { key: resolved.relKey },
       });
 

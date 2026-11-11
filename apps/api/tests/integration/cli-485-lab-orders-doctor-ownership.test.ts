@@ -49,6 +49,8 @@ const validInput = (doctorId: string) => ({
   labName: 'Test Lab',
   orderType: 'crown' as const,
   items: [{ description: 'Zirconia crown' }],
+  shade: 'A2',
+  dueDate: '2026-12-01',
 });
 
 beforeAll(async () => {

@@ -12,7 +12,7 @@ export type CreateTreatmentPlanBodyStagesItem = {
    * @maxLength 200
    */
   serviceName: string;
-  toothNumbers?: (number | null)[];
+  toothNumbers?: number[];
   /**
    * @minimum 0
    * @exclusiveMinimum

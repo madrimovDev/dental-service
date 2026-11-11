@@ -14,16 +14,19 @@ import type {
 import { describe, expect, it } from 'vitest';
 import { formatNumber } from '@/lib/format.ts';
 import {
+  addToothEntries,
   diagnosisSearchIndex,
-  draftMapToCreateInput,
-  draftMapToStateMap,
   draftStatesToCreateInput,
+  entriesToCreateInput,
   findActivePrice,
   formatBytes,
+  groupToothEntries,
   labOrderStatusToTone,
   normalizeSearch,
   parseToothNumbers,
+  plannedTeethFromPlans,
   planStatusToTone,
+  removeToothGroup,
   stageAcceptanceToTone,
   stageStatusToTone,
   templateBodyForLang,
@@ -32,12 +35,14 @@ import {
   toEstimateVM,
   toLabOrderListRowVM,
   toLabOrderVM,
+  toothHistoryRows,
   toPatientImageVM,
   toPlanCardVM,
   toPlanListRowVM,
   toPrescriptionVM,
   toStageRowVM,
-  toToothDraftMap,
+  toToothDisplayMap,
+  toToothEntries,
   toToothStateMap,
   toVisitNoteVM,
 } from './clinical.mappers';
@@ -66,51 +71,110 @@ describe('toToothStateMap / draftStatesToCreateInput', () => {
   });
 });
 
-// ---- CLI-189: per-surface + diagnosis draft round-trip ----
-describe('toToothDraftMap / draftMapToCreateInput (CLI-189)', () => {
-  it('non-whole surface va diagnosisId round-trip da yo‘qolmaydi', () => {
-    const chart = {
-      states: [
-        { toothNumber: 16, surface: 'O', state: 'filling', diagnosisId: 'dx-1' },
-        { toothNumber: 21, surface: 'M', state: 'caries', diagnosisId: null },
-      ],
-    } as unknown as ToothChartWithStates;
-    const draft = toToothDraftMap(chart);
-    expect(draft.get(16)).toEqual({ state: 'filling', surface: 'O', diagnosisId: 'dx-1' });
-    expect(draft.get(21)).toEqual({ state: 'caries', surface: 'M', diagnosisId: null });
+// ---- UI-D3: bitta tishga bir nechta tashxis ----
+describe('toothEntries (UI-D3)', () => {
+  const chart = {
+    states: [
+      { toothNumber: 36, surface: 'O', state: 'caries', diagnosisId: 'dx-1' },
+      { toothNumber: 36, surface: 'D', state: 'caries', diagnosisId: 'dx-1' },
+      { toothNumber: 36, surface: 'whole', state: 'root_canal', diagnosisId: 'dx-2' },
+      { toothNumber: 21, surface: 'M', state: 'filling', diagnosisId: null },
+    ],
+  } as unknown as ToothChartWithStates;
 
-    const input = draftMapToCreateInput(draft);
+  it('round-trip: yuza va tashxis yo‘qolmaydi, bir tishda bir nechta tashxis saqlanadi', () => {
+    const entries = toToothEntries(chart);
+    expect(entries).toHaveLength(4);
+    const input = entriesToCreateInput(entries);
     expect(input).toContainEqual({
-      toothNumber: 16,
-      state: 'filling',
+      toothNumber: 36,
+      state: 'caries',
       surface: 'O',
       diagnosisId: 'dx-1',
     });
-    // diagnosisId null → input'da undefined (optional)
+    expect(input).toContainEqual({
+      toothNumber: 36,
+      state: 'root_canal',
+      surface: 'whole',
+      diagnosisId: 'dx-2',
+    });
     expect(input).toContainEqual({
       toothNumber: 21,
-      state: 'caries',
+      state: 'filling',
       surface: 'M',
       diagnosisId: undefined,
     });
   });
 
-  it("'whole' yozuvi bir xil tish uchun afzal", () => {
-    const chart = {
-      states: [
-        { toothNumber: 16, surface: 'O', state: 'filling', diagnosisId: null },
-        { toothNumber: 16, surface: 'whole', state: 'crown', diagnosisId: 'dx-2' },
-      ],
-    } as unknown as ToothChartWithStates;
-    const draft = toToothDraftMap(chart);
-    expect(draft.get(16)).toEqual({ state: 'crown', surface: 'whole', diagnosisId: 'dx-2' });
+  it('groupToothEntries: (holat, tashxis) bo‘yicha yuzalar bilan guruhlaydi', () => {
+    const groups = groupToothEntries(toToothEntries(chart), 36);
+    expect(groups).toHaveLength(2);
+    expect(groups.find((g) => g.diagnosisId === 'dx-1')?.surfaces).toEqual(['O', 'D']);
   });
 
-  it('draftMapToStateMap odontogram uchun tish→holat', () => {
-    const draft = new Map([
-      [16, { state: 'filling' as const, surface: 'O' as const, diagnosisId: null }],
+  it('addToothEntries: boshqa tashxisni saqlaydi, shu tashxisni takrorlamaydi, bo‘sh yuza = whole', () => {
+    const base = toToothEntries(chart);
+    const added = addToothEntries(base, {
+      toothNumber: 36,
+      surfaces: [],
+      state: 'caries',
+      diagnosisId: 'dx-3',
+    });
+    expect(added).toHaveLength(5);
+    expect(added.at(-1)).toMatchObject({ surface: 'whole', diagnosisId: 'dx-3' });
+    const again = addToothEntries(added, {
+      toothNumber: 36,
+      surfaces: ['whole'],
+      state: 'missing',
+      diagnosisId: 'dx-3',
+    });
+    expect(again).toHaveLength(5);
+    expect(again.at(-1)?.state).toBe('missing');
+  });
+
+  it('removeToothGroup faqat shu tishdagi shu guruhni olib tashlaydi', () => {
+    const entries = toToothEntries(chart);
+    const g = groupToothEntries(entries, 36).find((x) => x.diagnosisId === 'dx-1');
+    const next = removeToothGroup(entries, 36, g?.key as string);
+    expect(next).toHaveLength(2);
+    expect(next.some((e) => e.diagnosisId === 'dx-1')).toBe(false);
+  });
+
+  it('toToothDisplayMap: whole holat ustun, aks holda birinchi sog‘lom bo‘lmagan yuza', () => {
+    const map = toToothDisplayMap(toToothEntries(chart));
+    expect(map.get(36)?.state).toBe('root_canal');
+    expect(map.get(36)?.surfaceStates.O).toBe('caries');
+    expect(map.get(21)?.state).toBe('filling');
+  });
+
+  it('plannedTeethFromPlans: faqat faol rejaning bajarilmagan bosqichlari', () => {
+    const plans = [
+      {
+        status: 'in_progress',
+        stages: [
+          { status: 'pending', toothNumbers: [16, 17] },
+          { status: 'completed', toothNumbers: [26] },
+        ],
+      },
+      { status: 'cancelled', stages: [{ status: 'pending', toothNumbers: [46] }] },
+    ] as never;
+    expect([...plannedTeethFromPlans(plans)].sort()).toEqual([16, 17]);
+  });
+
+  it('toothHistoryRows: snapshot bo‘yicha shu tish qatorlari', () => {
+    const rows = toothHistoryRows(
+      [{ id: 'c1', createdAt: '2026-01-01T00:00:00Z', states: chart.states }] as never,
+      21,
+    );
+    expect(rows).toEqual([
+      {
+        chartId: 'c1',
+        createdAt: '2026-01-01T00:00:00Z',
+        state: 'filling',
+        diagnosisId: null,
+        surfaces: ['M'],
+      },
     ]);
-    expect(draftMapToStateMap(draft).get(16)).toBe('filling');
   });
 });
 
@@ -409,6 +473,10 @@ function labOrder(over: Partial<LabOrder> = {}): LabOrder {
     notes: null,
     createdAt: '2026-06-10T00:00:00Z',
     updatedAt: '2026-06-10T00:00:00Z',
+    dueDate: null,
+    shade: null,
+    remakeOfId: null,
+    remakeReason: null,
     ...over,
   };
 }

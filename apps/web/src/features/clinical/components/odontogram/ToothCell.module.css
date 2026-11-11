@@ -23,6 +23,18 @@
   box-shadow: 0 0 0 2.5px var(--primary);
 }
 
+/* Rejadagi tish: matndan tashqari (label «rejada») punktir halqa. */
+.cell[data-planned] {
+  outline: 1.5px dashed var(--warning);
+  outline-offset: 1px;
+}
+
+/* Kreslo yoni rejimi (UI-D3): bosish zonasi --tap-chair (60px). */
+.cell[data-chair] {
+  min-width: var(--tap-chair);
+  min-height: var(--tap-chair);
+}
+
 .cell:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 1px;

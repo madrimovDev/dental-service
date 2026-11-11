@@ -9,6 +9,7 @@ import type {
   Prescription,
   ServicePrice,
   ToothChartWithStates,
+  ToothState,
   ToothSurface,
   TreatmentPlan,
   TreatmentPlanEstimate,
@@ -32,8 +33,10 @@ import type {
   PrescriptionVM,
   StageRowVM,
   Tone,
-  ToothDraft,
-  ToothDraftMap,
+  ToothDisplay,
+  ToothEntry,
+  ToothEntryGroup,
+  ToothHistoryRow,
   ToothStateMap,
   VisitNoteVM,
 } from './clinical.types';
@@ -84,50 +87,147 @@ export function draftStatesToCreateInput(map: ToothStateMap): CreateToothStateIn
   }));
 }
 
-// ===== CLI-189: per-surface + diagnosis draft model =====
-/**
- * Snapshot → tish bo'yicha draft xarita (har tishga bitta yozuv: state + surface + diagnosisId).
- * Bir nechta yuza yozuvi bo'lsa 'whole' afzal, aks holda birinchi topilgan.
- * (Avvalgi `toToothStateMap` 'whole'siz yuzalarni tashlardi → round-trip yo'qolardi.)
- */
-export function toToothDraftMap(chart: ToothChartWithStates | null): ToothDraftMap {
-  const map: ToothDraftMap = new Map();
-  if (!chart) return map;
-  for (const s of chart.states) {
-    const existing = map.get(s.toothNumber);
-    // 'whole' yozuvi har doim ustun; aks holda faqat bo'sh bo'lsa yozamiz.
-    if (!existing || s.surface === 'whole') {
-      map.set(s.toothNumber, {
-        state: s.state,
-        surface: (s.surface ?? 'whole') as ToothSurface,
-        diagnosisId: s.diagnosisId ?? null,
-      });
-    }
+// ===== UI-D3: odontogram draft (bitta tishga bir nechta tashxis) =====
+const entryKey = (e: ToothEntry) => `${e.toothNumber}:${e.surface}:${e.diagnosisId ?? '-'}`;
+
+/** Snapshot → draft qatorlar (hech narsa tashlanmaydi; bir xil tish+yuza+tashxis qisqaradi). */
+export function toToothEntries(
+  chart: Pick<ToothChartWithStates, 'states'> | null | undefined,
+): ToothEntry[] {
+  const byKey = new Map<string, ToothEntry>();
+  for (const s of chart?.states ?? []) {
+    const e: ToothEntry = {
+      toothNumber: s.toothNumber,
+      surface: (s.surface ?? 'whole') as ToothSurface,
+      state: s.state,
+      diagnosisId: s.diagnosisId ?? null,
+    };
+    byKey.set(entryKey(e), e);
   }
-  return map;
+  return [...byKey.values()];
 }
 
-export function draftMapToCreateInput(map: ToothDraftMap): CreateToothStateInput[] {
-  return Array.from(map.entries()).map(([toothNumber, d]) => ({
-    toothNumber,
-    state: d.state,
-    surface: d.surface,
-    diagnosisId: d.diagnosisId ?? undefined,
+export function entriesToCreateInput(entries: ToothEntry[]): CreateToothStateInput[] {
+  return entries.map((e) => ({
+    toothNumber: e.toothNumber,
+    state: e.state,
+    surface: e.surface,
+    diagnosisId: e.diagnosisId ?? undefined,
   }));
 }
 
-/** Odontogram cell rendering uchun: draft xaritani tish→holat xaritasiga keltiradi. */
-export function draftMapToStateMap(map: ToothDraftMap): ToothStateMap {
-  const out: ToothStateMap = new Map();
-  for (const [n, d] of map.entries()) out.set(n, d.state);
+/**
+ * Tishga holat/tashxis qo'shish: har yuza (bo'sh = 'whole') uchun qator. Shu tish+yuza+tashxis
+ * kombinatsiyasi bo'lsa almashtiriladi (takror yo'q); BOSHQA tashxis qatorlari saqlanadi.
+ */
+export function addToothEntries(
+  entries: ToothEntry[],
+  add: {
+    toothNumber: number;
+    surfaces: ToothSurface[];
+    state: ToothState;
+    diagnosisId: string | null;
+  },
+): ToothEntry[] {
+  const surfaces: ToothSurface[] = add.surfaces.length > 0 ? add.surfaces : ['whole'];
+  const incoming: ToothEntry[] = surfaces.map((surface) => ({
+    toothNumber: add.toothNumber,
+    surface,
+    state: add.state,
+    diagnosisId: add.diagnosisId,
+  }));
+  const keys = new Set(incoming.map(entryKey));
+  return [...entries.filter((e) => !keys.has(entryKey(e))), ...incoming];
+}
+
+export const toothGroupKey = (g: { state: ToothState; diagnosisId: string | null }) =>
+  `${g.state}:${g.diagnosisId ?? '-'}`;
+
+/** Tishdagi (holat, tashxis) bo'yicha guruhlar — «Shu tishdagi tashxislar» chiplari. */
+export function groupToothEntries(entries: ToothEntry[], toothNumber: number): ToothEntryGroup[] {
+  const groups = new Map<string, ToothEntryGroup>();
+  for (const e of entries) {
+    if (e.toothNumber !== toothNumber) continue;
+    const key = toothGroupKey(e);
+    const g = groups.get(key);
+    if (g) g.surfaces.push(e.surface);
+    else
+      groups.set(key, { key, state: e.state, diagnosisId: e.diagnosisId, surfaces: [e.surface] });
+  }
+  return [...groups.values()];
+}
+
+export function removeToothGroup(
+  entries: ToothEntry[],
+  toothNumber: number,
+  groupKey: string,
+): ToothEntry[] {
+  return entries.filter((e) => !(e.toothNumber === toothNumber && toothGroupKey(e) === groupKey));
+}
+
+/** Tish → katak ko'rinishi: 'whole' holat ustun, aks holda birinchi sog'lom bo'lmagan yuza. */
+export function toToothDisplayMap(entries: ToothEntry[]): Map<number, ToothDisplay> {
+  const out = new Map<number, ToothDisplay>();
+  for (const e of entries) {
+    const d = out.get(e.toothNumber) ?? { state: 'healthy' as ToothState, surfaceStates: {} };
+    d.surfaceStates[e.surface] = e.state;
+    out.set(e.toothNumber, d);
+  }
+  for (const d of out.values()) {
+    const whole = d.surfaceStates.whole;
+    d.state =
+      whole && whole !== 'healthy'
+        ? whole
+        : (Object.values(d.surfaceStates).find((s) => s && s !== 'healthy') ?? 'healthy');
+  }
   return out;
 }
 
-export const EMPTY_TOOTH_DRAFT = (): ToothDraft => ({
-  state: 'healthy',
-  surface: 'whole',
-  diagnosisId: null,
-});
+/** Davolash rejalaridagi faol (bajarilmagan) bosqichlarning tishlari — «Reja» ko'rinishi. */
+export function plannedTeethFromPlans(
+  plans: Array<Pick<TreatmentPlan, 'status'> & { stages?: TreatmentStage[] }> | undefined,
+): Set<number> {
+  const out = new Set<number>();
+  for (const plan of plans ?? []) {
+    if (plan.status === 'cancelled' || plan.status === 'completed') continue;
+    for (const st of plan.stages ?? []) {
+      if (st.status === 'completed' || st.status === 'skipped') continue;
+      for (const n of st.toothNumbers ?? []) out.add(n);
+    }
+  }
+  return out;
+}
+
+/** «Tish N tarixi»: snapshot'lar bo'yicha shu tish qatorlari (yangisi birinchi). */
+export function toothHistoryRows(
+  history: Array<Pick<ToothChartWithStates, 'id' | 'createdAt' | 'states'>> | undefined,
+  toothNumber: number,
+): ToothHistoryRow[] {
+  const rows: ToothHistoryRow[] = [];
+  for (const chart of history ?? []) {
+    for (const g of groupToothEntries(toToothEntries(chart), toothNumber)) {
+      rows.push({
+        chartId: chart.id,
+        createdAt: chart.createdAt,
+        state: g.state,
+        diagnosisId: g.diagnosisId,
+        surfaces: g.surfaces,
+      });
+    }
+  }
+  return rows;
+}
+
+/** ICD-10 kodidan tish holati taklifi (K02/K04 → kariyes, K08.1–K08.2 → yo'q); aks holda `null`. */
+export function suggestedStateForDiagnosis(d: Pick<Diagnosis, 'code'>): ToothState | null {
+  if (d.code.startsWith('K02') || d.code.startsWith('K04')) return 'caries';
+  if (d.code.startsWith('K08.1') || d.code.startsWith('K08.2')) return 'missing';
+  return null;
+}
+
+export function dxName(d: Diagnosis, lang: Lang): string {
+  return lang === 'ru' ? d.nameRu : d.nameUz;
+}
 
 // ===== A: treatment plan =====
 const PLAN_TONE: Record<TreatmentPlanStatus, Tone> = {

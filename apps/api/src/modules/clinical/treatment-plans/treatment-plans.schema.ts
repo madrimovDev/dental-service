@@ -1,4 +1,5 @@
 import { z } from '@hono/zod-openapi';
+import { isValidFdi } from '../tooth-charts/tooth-charts.schema.ts';
 
 /**
  * CLI-488: tooth_state enum qiymatlari (packages/db-schema `toothStateEnum` bilan bir xil).
@@ -31,7 +32,12 @@ export const createTreatmentPlanSchema = z.object({
       z.object({
         serviceId: z.uuid().optional(),
         serviceName: z.string().min(1).max(200),
-        toothNumbers: z.array(z.coerce.number().int()).optional(),
+        // UI-D3 (CL-01): FDI — doimiy 11–18/21–28/31–38/41–48, sut 51–55/61–65/71–75/81–85.
+        toothNumbers: z
+          .array(
+            z.coerce.number().int().refine(isValidFdi, { message: 'Invalid FDI tooth number' }),
+          )
+          .optional(),
         estimatedVisits: z.coerce.number().int().positive().default(1),
         estimatedDurationMinutes: z.coerce.number().int().positive().optional(),
         cost: z.coerce.number().nonnegative(),

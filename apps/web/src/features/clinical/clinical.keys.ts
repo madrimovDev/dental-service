@@ -18,13 +18,17 @@ export const clinicalKeys = {
   planEstimate: (planId: string) => ['clinical', 'plan-estimate', planId] as const,
   // A — visit notes
   visitNotes: (patientId: string) => ['clinical', 'visit-notes', patientId] as const,
-  diagnoses: () => ['clinical', 'diagnoses'] as const,
+  diagnoses: (search?: string) =>
+    search ? (['clinical', 'diagnoses', search] as const) : (['clinical', 'diagnoses'] as const),
+  visitNote: (id: string) => ['clinical', 'visit-note', id] as const,
+  visitNoteTemplates: () => ['clinical', 'visit-note-templates'] as const,
   appointmentsForPatient: (patientId: string) =>
     ['clinical', 'appointments-for-patient', patientId] as const,
   // B — prescriptions / lab orders / consent
   prescriptions: (patientId: string) => ['clinical', 'prescriptions', patientId] as const,
   labOrders: (patientId: string, status?: LabOrderStatus) =>
     ['clinical', 'lab-orders', patientId, status ?? null] as const,
+  labOrderFiles: (labOrderId: string) => ['clinical', 'lab-order-files', labOrderId] as const,
   consentForms: (patientId: string) => ['clinical', 'consent-forms', patientId] as const,
   consentTemplates: () => ['clinical', 'consent-templates'] as const,
   // C — images

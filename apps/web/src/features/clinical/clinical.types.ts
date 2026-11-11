@@ -18,13 +18,36 @@ export type Tone = NonNullable<StatusPillProps['status']>;
 // ===== A: Odontogram =====
 export type ToothStateMap = Map<number, ToothState>;
 
-// CLI-189: tish bo'yicha draft (state + yuza + diagnoz).
-export type ToothDraft = {
-  state: ToothState;
+// UI-D3: odontogram draft — tish+yuza+holat+tashxis qatorlari (bitta tishga BIR NECHTA tashxis).
+export type ToothEntry = {
+  toothNumber: number;
   surface: ToothSurface;
+  state: ToothState;
   diagnosisId: string | null;
 };
-export type ToothDraftMap = Map<number, ToothDraft>;
+
+/** Bir tishdagi bir xil (holat, tashxis) qatorlari yuzalari bilan guruhlangan (chip uchun). */
+export type ToothEntryGroup = {
+  key: string;
+  state: ToothState;
+  diagnosisId: string | null;
+  surfaces: ToothSurface[];
+};
+
+/** Odontogram katagi uchun yig'ma ko'rinish. */
+export type ToothDisplay = {
+  state: ToothState;
+  surfaceStates: Partial<Record<ToothSurface, ToothState>>;
+};
+
+/** «Tish N tarixi» qatori. */
+export type ToothHistoryRow = {
+  chartId: string;
+  createdAt: string;
+  state: ToothState;
+  diagnosisId: string | null;
+  surfaces: ToothSurface[];
+};
 
 // ===== A: Treatment plan =====
 export type PlanCardVM = {
@@ -195,3 +218,16 @@ export type PatientImageVM = {
 
 // Lokal re-export (mapper imzolari uchun)
 export type { Diagnosis, PrescriptionItem, ToothState, ToothSurface };
+
+// ===== UI-D4: vizit yozuvi sahifasi =====
+// Backend (UI-D4) `signedAt/signedBy/metadata` va `allergyOverrides/nextVisit` qo'shdi;
+// generated api-client keyingi `generate:contract`da yangilanadi — shu paytgacha tiplar
+// shu yerda kengaytiriladi (keyin ortiqcha bo'lib qoladi, lekin mos keladi).
+export type NextVisit = 'none' | '2w' | '6m';
+export type AllergyOverride = { drug: string; group: string; allergen: string; reason: string };
+export type VisitNoteMetadata = { allergyOverrides?: AllergyOverride[]; nextVisit?: NextVisit };
+export type VisitNoteView = import('@dental/api-client').VisitNote & {
+  signedAt?: string | null;
+  signedBy?: string | null;
+  metadata?: VisitNoteMetadata | null;
+};
