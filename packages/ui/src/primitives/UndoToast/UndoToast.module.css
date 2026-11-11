@@ -1,0 +1,42 @@
+.root {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  background: var(--text);
+  color: var(--surface);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  box-shadow: var(--shadow-lg);
+}
+.root[data-floating="true"] {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 1000;
+  max-width: calc(100vw - 32px);
+}
+.text {
+  margin-right: auto;
+}
+.undo {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--surface) 55%, transparent);
+  background: transparent;
+  color: var(--surface);
+  font: inherit;
+  font-weight: var(--fw-bold);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.undo:hover {
+  background: color-mix(in srgb, var(--surface) 15%, transparent);
+}
+.undo:focus-visible {
+  outline: 2px solid var(--surface);
+  outline-offset: 2px;
+}

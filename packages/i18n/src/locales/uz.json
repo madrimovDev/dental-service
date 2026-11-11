@@ -224,6 +224,34 @@
       "asosiy": "Asosiy",
       "klinika": "Klinika",
       "boshqaruv": "Boshqaruv"
+    },
+    "role_group": {
+      "today": "Bugungi ish",
+      "patients_money": "Bemorlar va pul",
+      "treatment": "Davolash",
+      "general": "Umumiy",
+      "laboratory": "Laboratoriya"
+    },
+    "role": {
+      "today": "Bugun",
+      "my_day": "Mening kunim",
+      "queue": "Navbat",
+      "patients": "Bemorlar",
+      "recalls": "Qayta chaqiruv",
+      "lab": "Laboratoriya",
+      "lab_orders": "Buyurtmalar",
+      "staff": "Xodimlar"
+    },
+    "role_name": {
+      "owner": "Klinika egasi",
+      "tenant_admin": "Administrator",
+      "branch_manager": "Filial mudiri",
+      "doctor": "Shifokor",
+      "doctor_assistant": "Shifokor + yordamchi",
+      "nurse": "Hamshira",
+      "receptionist": "Registrator",
+      "accountant": "Buxgalter",
+      "technician": "Texnik"
     }
   },
   "palette": {
@@ -251,6 +279,24 @@
     "lang_uz": "O'zbekcha",
     "lang_ru": "Ruscha",
     "toggle_sidebar": "Yon panelni yig'ish"
+  },
+  "connection": {
+    "lan": {
+      "title": "Server ulangan",
+      "description": "Lokal tarmoq · internetsiz ishlaydi"
+    },
+    "offline": {
+      "title": "Internet yo'q",
+      "description": "Ish davom etmoqda · SMS/Telegram navbatda"
+    },
+    "cloud": {
+      "title": "Bulut",
+      "description": "Oxirgi sinxron: hozir"
+    },
+    "noserver": {
+      "title": "Server topilmadi",
+      "description": "Qayta qidirilmoqda · 30 s"
+    }
   },
   "notifications": {
     "title": "Bildirishnomalar",

@@ -1,5 +1,5 @@
 import { logout as apiLogout } from '@dental/api-client';
-import { Avatar } from '@dental/ui';
+import { Avatar, ConnectionStatus, type ConnectionStatusKind } from '@dental/ui';
 import { Menu } from '@mantine/core';
 import { Building2, Check, ChevronDown, LogOut } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -9,8 +9,9 @@ import { RecallNavBadge } from '@/features/recalls/components/RecallNavBadge.tsx
 import { useVertical } from '@/features/settings/settings.api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { useUiStore } from '@/stores/ui-store.ts';
-import { type NavItem, visibleGroups } from './nav-config';
+import { type NavItem, sidebarModel } from './nav-config';
 import classes from './Sidebar.module.css';
+import { useConnectionKind } from './use-connection-status';
 
 function isActive(pathname: string, path: string, allPaths: string[]): boolean {
   if (path === '/') return pathname === '/';
@@ -137,10 +138,45 @@ function SidebarWorkspaceSwitcher({ rail }: { rail: boolean }) {
   );
 }
 
-function SidebarFooter({ rail }: { rail: boolean }) {
+const CONNECTION_KINDS: readonly ConnectionStatusKind[] = ['lan', 'offline', 'cloud', 'noserver'];
+
+function SidebarConnection({ rail }: { rail: boolean }) {
+  const { t } = useTranslation();
+  const kind = useConnectionKind();
+  if (!kind || !CONNECTION_KINDS.includes(kind)) return null;
+  const title = t(`connection.${kind}.title`);
+  if (rail) {
+    return (
+      <span
+        className={classes.connRail}
+        data-status={kind}
+        role="status"
+        aria-label={title}
+        title={title}
+      />
+    );
+  }
+  return (
+    <ConnectionStatus
+      status={kind}
+      title={title}
+      description={t(`connection.${kind}.description`)}
+    />
+  );
+}
+
+function SidebarFooter({
+  rail,
+  items,
+  isActive: isItemActive,
+}: {
+  rail: boolean;
+  items: NavItem[];
+  isActive: (path: string) => boolean;
+}) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { user, refreshToken, clear } = useAuthStore();
+  const { user, refreshToken, clear, roleKey, permissions } = useAuthStore();
 
   const logout = async () => {
     if (refreshToken) {
@@ -154,56 +190,86 @@ function SidebarFooter({ rail }: { rail: boolean }) {
     navigate('/login');
   };
 
-  if (rail) {
-    return (
-      <div className={classes.foot}>
-        <Link to="/profile" className={classes.footProfileRail} aria-label={t('layout.profile')}>
-          <Avatar name={user?.fullName ?? '?'} size="sm" />
-        </Link>
-        <button
-          type="button"
-          className={classes.footLogout}
-          onClick={logout}
-          aria-label={t('layout.logout')}
-          data-testid="sidebar-logout"
-        >
-          <LogOut size={17} />
-        </button>
-      </div>
-    );
-  }
+  const roleName = permissions.includes('@owner')
+    ? t('nav.role_name.owner')
+    : roleKey
+      ? t(`nav.role_name.${roleKey}`, { defaultValue: '' })
+      : '';
 
   return (
-    <div className={classes.foot}>
-      <Link to="/profile" className={classes.footProfile} aria-label={t('layout.profile')}>
-        <Avatar name={user?.fullName ?? '?'} size="sm" />
-        <span className={classes.footInfo}>
-          <b>{user?.fullName ?? user?.phone}</b>
-          <span>{user?.phone}</span>
-        </span>
-      </Link>
-      <button
-        type="button"
-        className={classes.footLogout}
-        onClick={logout}
-        aria-label={t('layout.logout')}
-        data-testid="sidebar-logout"
-      >
-        <LogOut size={17} />
-      </button>
+    <div className={classes.footWrap}>
+      <SidebarConnection rail={rail} />
+      {items.map((item) => {
+        const Icon = item.icon;
+        const label = t(item.labelKey);
+        return (
+          <Link
+            key={item.key}
+            to={item.path}
+            className={classes.item}
+            data-active={isItemActive(item.path)}
+            title={label}
+          >
+            <Icon />
+            <span className={classes.label}>{label}</span>
+          </Link>
+        );
+      })}
+      {rail ? (
+        <div className={classes.foot}>
+          <Link to="/profile" className={classes.footProfileRail} aria-label={t('layout.profile')}>
+            <Avatar name={user?.fullName ?? '?'} size="sm" />
+          </Link>
+          <button
+            type="button"
+            className={classes.footLogout}
+            onClick={logout}
+            aria-label={t('layout.logout')}
+            data-testid="sidebar-logout"
+          >
+            <LogOut size={17} />
+          </button>
+        </div>
+      ) : (
+        <div className={classes.foot}>
+          <Link to="/profile" className={classes.footProfile} aria-label={t('layout.profile')}>
+            <Avatar name={user?.fullName ?? '?'} size="sm" />
+            <span className={classes.footInfo}>
+              <b>{user?.fullName ?? user?.phone}</b>
+              <span data-testid="sidebar-role">{roleName || user?.phone}</span>
+            </span>
+          </Link>
+          <button
+            type="button"
+            className={classes.footLogout}
+            onClick={logout}
+            aria-label={t('layout.logout')}
+            data-testid="sidebar-logout"
+          >
+            <LogOut size={17} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
 export function Sidebar() {
   const { t } = useTranslation();
-  const { hasPermission, permissions } = useAuthStore();
+  const { hasPermission, permissions, roleKey } = useAuthStore();
   const { pathname } = useLocation();
   const vertical = useVertical();
   const rail = useUiStore((s) => s.sidebarRail);
   const isOwner = permissions.includes('@owner');
-  const groups = visibleGroups(hasPermission, vertical, isOwner);
-  const allPaths = groups.flatMap((g) => g.items.filter((i) => !i.disabled).map((i) => i.path));
+  const { groups, footer } = sidebarModel({
+    roleKey: roleKey ?? null,
+    has: hasPermission,
+    vertical,
+    isOwner,
+  });
+  const allPaths = [...groups.flatMap((g) => g.items), ...footer]
+    .filter((i) => !i.disabled)
+    .map((i) => i.path);
 
   const renderItem = (item: NavItem) => {
     const Icon = item.icon;
@@ -250,7 +316,11 @@ export function Sidebar() {
           </div>
         ))}
       </nav>
-      <SidebarFooter rail={rail} />
+      <SidebarFooter
+        rail={rail}
+        items={footer}
+        isActive={(path) => isActive(pathname, path, allPaths)}
+      />
     </div>
   );
 }

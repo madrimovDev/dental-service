@@ -224,6 +224,34 @@
       "asosiy": "Основное",
       "klinika": "Клиника",
       "boshqaruv": "Управление"
+    },
+    "role_group": {
+      "today": "Работа сегодня",
+      "patients_money": "Пациенты и оплата",
+      "treatment": "Лечение",
+      "general": "Общее",
+      "laboratory": "Лаборатория"
+    },
+    "role": {
+      "today": "Сегодня",
+      "my_day": "Мой день",
+      "queue": "Очередь",
+      "patients": "Пациенты",
+      "recalls": "Повторный вызов",
+      "lab": "Лаборатория",
+      "lab_orders": "Заказы",
+      "staff": "Сотрудники"
+    },
+    "role_name": {
+      "owner": "Владелец клиники",
+      "tenant_admin": "Администратор",
+      "branch_manager": "Управляющий филиалом",
+      "doctor": "Врач",
+      "doctor_assistant": "Врач + ассистент",
+      "nurse": "Медсестра",
+      "receptionist": "Регистратор",
+      "accountant": "Бухгалтер",
+      "technician": "Техник"
     }
   },
   "palette": {
@@ -251,6 +279,24 @@
     "lang_uz": "Узбекский",
     "lang_ru": "Русский",
     "toggle_sidebar": "Свернуть боковую панель"
+  },
+  "connection": {
+    "lan": {
+      "title": "Сервер подключён",
+      "description": "Локальная сеть · работает без интернета"
+    },
+    "offline": {
+      "title": "Нет интернета",
+      "description": "Работа продолжается · SMS/Telegram в очереди"
+    },
+    "cloud": {
+      "title": "Облако",
+      "description": "Последняя синхронизация: сейчас"
+    },
+    "noserver": {
+      "title": "Сервер не найден",
+      "description": "Идёт поиск · 30 с"
+    }
   },
   "notifications": {
     "title": "Уведомления",

@@ -105,6 +105,9 @@ describe('UsersSettingsScreen', () => {
     perms.value = ['@owner'];
     renderApp(<UsersSettingsScreen />);
     expect(screen.getByText('Kutilmoqda')).toBeInTheDocument();
+    expect(
+      screen.getByText('Kutilmoqda').closest('[data-meaning]')?.getAttribute('data-meaning'),
+    ).toBe('waiting'); // UI-0: StatusPill waiting
     // 2 ta qabul qilingan a'zo uchun reset, kutilayotgan uchun yo'q
     expect(screen.getAllByLabelText('Parolni qayta tiklash')).toHaveLength(2);
   });

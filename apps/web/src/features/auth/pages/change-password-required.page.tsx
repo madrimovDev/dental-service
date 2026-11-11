@@ -1,5 +1,6 @@
 import { ApiError } from '@dental/api-client';
-import { Alert, Button, Container, Paper, PasswordInput, Stack, Text, Title } from '@mantine/core';
+import { AlertBanner, Card } from '@dental/ui';
+import { Button, Container, PasswordInput, Stack, Title } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import type { TFunction } from 'i18next';
@@ -69,7 +70,7 @@ export function ChangePasswordRequiredPage() {
       <Title order={2} ta="center" mb="lg">
         {t('app.name')}
       </Title>
-      <Paper withBorder shadow="md" p="xl" radius="md">
+      <Card>
         <form
           onSubmit={form.onSubmit((v) =>
             changeMut.mutate({ currentPassword: v.currentPassword, newPassword: v.newPassword }),
@@ -77,9 +78,7 @@ export function ChangePasswordRequiredPage() {
         >
           <Stack gap="md">
             <Title order={3}>{t('auth.pwdChangeRequired.title')}</Title>
-            <Alert color="yellow" variant="light">
-              <Text size="sm">{t('auth.pwdChangeRequired.description')}</Text>
-            </Alert>
+            <AlertBanner tier={2}>{t('auth.pwdChangeRequired.description')}</AlertBanner>
             <PasswordInput
               label={t('auth.pwdChangeRequired.current')}
               autoComplete="current-password"
@@ -104,7 +103,7 @@ export function ChangePasswordRequiredPage() {
             </Button>
           </Stack>
         </form>
-      </Paper>
+      </Card>
     </Container>
   );
 }

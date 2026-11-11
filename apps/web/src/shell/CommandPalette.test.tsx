@@ -6,9 +6,11 @@ import { CommandPalette } from './CommandPalette';
 
 // Bemor qidiruvi har doim yoqilgan (patient.view), xodim — mockCanUser bilan boshqariladi.
 let mockCanUser = true;
+let mockExtraPerms: string[] = [];
 vi.mock('@/stores/auth-store.ts', () => ({
   useAuthStore: () => ({
-    hasPermission: (p: string) => p === 'patient.view' || (p === 'user.view' && mockCanUser),
+    hasPermission: (p: string) =>
+      p === 'patient.view' || (p === 'user.view' && mockCanUser) || mockExtraPerms.includes(p),
     permissions: [],
   }),
 }));
@@ -34,6 +36,7 @@ afterEach(() => {
   act(() => spotlight.close());
   useUsersSpy.mockClear();
   mockCanUser = true;
+  mockExtraPerms = [];
 });
 
 async function openAndType(text: string) {
@@ -59,5 +62,23 @@ describe('CommandPalette xodim qidiruvi RBAC gate (CLI-163)', () => {
     // bir necha render'dan keyin ham enabled:true bo'lmaydi
     await waitFor(() => expect(useUsersSpy).toHaveBeenCalledWith({ enabled: false }));
     expect(useUsersSpy).not.toHaveBeenCalledWith({ enabled: true });
+  });
+});
+
+// UI-0 1.5 — menyu rolga moslashgan, lekin ruxsatli har sahifa ⌘K orqali topiladi.
+describe('CommandPalette — ruxsatli sahifalar (1.5)', () => {
+  it("Receptionist shablon ruxsatlari: menyuda yo'q 'Sozlamalar' ⌘K'da bor", async () => {
+    mockExtraPerms = ['tenant.view', 'cashier.view'];
+    renderApp(<CommandPalette />);
+    act(() => spotlight.open());
+    expect(await screen.findByText('Sozlamalar')).toBeInTheDocument();
+    expect(screen.getByText('Kassa')).toBeInTheDocument();
+  });
+
+  it("ruxsatsiz sahifa ⌘K'da yo'q", async () => {
+    renderApp(<CommandPalette />);
+    act(() => spotlight.open());
+    await screen.findByPlaceholderText(/Bemor, yozuv/);
+    expect(screen.queryByText('Sozlamalar')).toBeNull();
   });
 });

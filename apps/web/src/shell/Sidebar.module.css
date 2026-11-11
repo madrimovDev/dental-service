@@ -13,10 +13,10 @@
 }
 .topLabel {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--text-2xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-3);
+  color: var(--text-2);
 }
 .pin {
   margin-left: auto;
@@ -34,23 +34,24 @@
   margin-bottom: 13px;
 }
 .groupLabel {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--text-3);
-  padding: 6px 10px 5px;
+  color: var(--text-2);
+  padding: 6px 10px 6px;
 }
 .item {
   display: flex;
   align-items: center;
   gap: 11px;
   width: 100%;
-  padding: 8px 11px;
+  min-height: 44px;
+  padding: 0 11px;
   border-radius: var(--radius-md);
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-2);
+  font-size: var(--text-base);
+  font-weight: var(--fw-medium);
+  color: var(--text);
   margin-bottom: 2px;
   position: relative;
   white-space: nowrap;
@@ -68,9 +69,9 @@
   outline-offset: 1px;
 }
 .item svg {
-  width: 17px;
-  height: 17px;
-  color: var(--text-3);
+  width: 18px;
+  height: 18px;
+  color: var(--text-2);
   flex: none;
 }
 .item[data-active="true"] {
@@ -177,8 +178,8 @@
   overflow: hidden;
 }
 .wsInfo b {
-  font-size: 12.5px;
-  font-weight: 600;
+  font-size: var(--text-base);
+  font-weight: var(--fw-bold);
   color: var(--text);
   white-space: nowrap;
   overflow: hidden;
@@ -188,8 +189,8 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
-  color: var(--text-3);
+  font-size: var(--text-xs);
+  color: var(--text-2);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -201,13 +202,37 @@
 }
 
 /* Sidebar footer */
+.footWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 10px 0;
+  border-top: 1px solid var(--border-subtle);
+}
+.connRail {
+  align-self: center;
+  width: 12px;
+  height: 12px;
+  margin: 6px 0;
+  border-radius: 50%;
+  background: var(--st-confirmed-fg);
+}
+.connRail[data-status="offline"] {
+  background: var(--st-waiting-fg);
+}
+.connRail[data-status="cloud"] {
+  background: var(--st-planned-fg);
+}
+.connRail[data-status="noserver"] {
+  background: var(--st-failed-fg);
+}
 .foot {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 14px;
+  padding: 8px 4px 10px;
   border-top: 1px solid var(--border-subtle);
-  min-height: 52px;
+  min-height: 56px;
 }
 .footInfo {
   display: flex;
@@ -218,16 +243,16 @@
   flex: 1;
 }
 .footInfo b {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
   color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .footInfo span {
-  font-size: 11px;
-  color: var(--text-3);
+  font-size: var(--text-xs);
+  color: var(--text-2);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -236,13 +261,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 44px;
+  height: 44px;
   border-radius: var(--radius-md);
   border: none;
   background: none;
   cursor: pointer;
-  color: var(--text-3);
+  color: var(--text-2);
   flex: none;
 }
 .footLogout:hover {
@@ -294,7 +319,7 @@
 [data-rail="true"] .item {
   justify-content: center;
   gap: 0;
-  padding: 8px 0;
+  padding: 0;
 }
 [data-rail="true"] .top {
   justify-content: center;
@@ -303,14 +328,13 @@
 [data-rail="true"] .pin {
   margin-left: 0;
 }
+[data-rail="true"] .footWrap {
+  padding: 10px 6px 0;
+}
 [data-rail="true"] .foot {
   justify-content: center;
-  padding: 10px 0;
+  padding: 8px 0 10px;
 }
 [data-rail="true"] .footInfo {
   display: none;
-}
-[data-rail="true"] .footLogout {
-  width: 36px;
-  height: 36px;
 }

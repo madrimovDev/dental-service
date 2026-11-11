@@ -1,0 +1,28 @@
+.root {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--st-done-border);
+  border-radius: var(--radius-sm);
+  padding: 3px 9px;
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+.root[data-level="critical"] {
+  background: var(--st-failed-bg);
+  color: var(--st-failed-fg);
+  border-color: var(--st-failed-fg);
+}
+.root[data-level="attention"] {
+  background: var(--st-waiting-bg);
+  color: var(--st-waiting-fg);
+  border-color: var(--st-waiting-fg);
+}
+.root[data-level="info"] {
+  background: var(--st-planned-bg);
+  color: var(--st-planned-fg);
+  border-color: var(--st-planned-fg);
+}

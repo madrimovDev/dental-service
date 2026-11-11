@@ -170,9 +170,9 @@ export function UsersSettingsScreen() {
                     <Table.Td>{a.branchName ?? t('users.all_branches')}</Table.Td>
                     <Table.Td>
                       {a.pending ? (
-                        <StatusPill status="warning">{t('settings.users.pending')}</StatusPill>
+                        <StatusPill status="waiting">{t('settings.users.pending')}</StatusPill>
                       ) : (
-                        <StatusPill status={a.isActive ? 'success' : 'neutral'}>
+                        <StatusPill status={a.isActive ? 'confirmed' : 'done'}>
                           {a.isActive ? t('users.active') : t('users.inactive')}
                         </StatusPill>
                       )}

@@ -1,0 +1,44 @@
+.root {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  background: var(--surface-2);
+  color: var(--text);
+}
+.root[data-tier="2"] {
+  background: var(--st-waiting-bg);
+  color: var(--st-waiting-fg);
+}
+.dot {
+  width: 9px;
+  height: 9px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.title {
+  font-weight: var(--fw-bold);
+}
+.action {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}

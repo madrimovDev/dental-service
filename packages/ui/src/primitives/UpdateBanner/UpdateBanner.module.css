@@ -1,0 +1,37 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--radius-lg);
+  background: var(--st-planned-bg);
+  color: var(--st-planned-fg);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+}
+.title {
+  font-weight: var(--fw-bold);
+}
+.text {
+  font-size: var(--text-sm);
+}
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.action {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: var(--radius);
+  border: 1px solid currentColor;
+  background: var(--surface);
+  color: var(--st-planned-fg);
+  font: inherit;
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.action:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
