@@ -3,7 +3,8 @@
 #
 #   scripts/wf-lane.sh prep <name> [redisIndex] [--db] [--sv]
 #     - .claude/worktrees/<name> worktree (branch wf/<name>) main tip'idan
-#     - .env (+ apps/supervisor-api/.env) nusxasi, apps/*/node_modules symlink
+#     - .env (+ apps/supervisor-api/.env) nusxasi, `bun install --frozen-lockfile` (ketma-ket;
+#       symlink EMAS — ildiz node_modules bo'lmasa @dental/* asosiy repo packages/'ga resolve bo'ladi)
 #     - --db: dental_test_<name> bazasi + migratsiya + seedPermissions; .env URL'lari shunga
 #     - --sv: supervisor_test_<name> bazasi + supervisor migratsiya; supervisor .env shunga
 #   scripts/wf-lane.sh clean <name>   — worktree, branch, lane bazalari, Redis indeksi
@@ -23,7 +24,8 @@ if [ "$cmd" = prep ]; then
   git worktree add -q "$WT" -b "$BR" main
   [ "$(git -C "$WT" rev-parse HEAD)" = "$(git rev-parse main)" ] || { echo "stale worktree base" >&2; exit 1; }
   cp .env "$WT/.env"; cp apps/supervisor-api/.env "$WT/apps/supervisor-api/.env"
-  for d in apps/*/node_modules; do [ -d "$d" ] && ln -s "$ROOT/$d" "$WT/$d"; done
+  (cd "$WT" && bun install --frozen-lockfile >/dev/null 2>&1) || { echo "bun install failed" >&2; exit 1; }
+  [ "$(readlink "$WT/node_modules/@dental/core")" = "../../packages/core" ] || { echo "@dental resolve check failed" >&2; exit 1; }
   if [ $want_db = 1 ]; then
     app=$(grep -E '^DATABASE_URL=' .env | cut -d= -f2-); adm=$(grep -E '^DATABASE_ADMIN_URL=' .env | cut -d= -f2-)
     rds=$(grep -E '^REDIS_URL=' .env | cut -d= -f2-)
