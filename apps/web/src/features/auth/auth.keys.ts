@@ -4,6 +4,7 @@ export const authKeys = {
   all: ['auth'] as const,
   me: () => ['auth', 'me'] as const,
   workspaceBranches: (tenantId: string | null) => ['auth', 'workspace-branches', tenantId] as const,
+  invitations: () => ['auth', 'invitations'] as const,
   registrationEnabled: () => ['auth', 'registration-enabled'] as const,
   bootstrapStatus: () => ['auth', 'bootstrap-status'] as const,
 };

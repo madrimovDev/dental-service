@@ -28,6 +28,7 @@ export type {
   ChangePasswordResult,
   GetMeResult,
   GetWorkspaceBranchesResult,
+  ListInvitationsResult,
   LoginResult,
   LogoutResult,
   RefreshResult,
@@ -36,10 +37,13 @@ export type {
   SwitchWorkspaceResult,
 } from './generated/auth/auth.ts';
 export {
+  acceptInvitation,
   bootstrapStatus,
   changePassword,
+  declineInvitation,
   getMe,
   getWorkspaceBranches,
+  listInvitations,
   login,
   logout,
   refresh,
