@@ -7,10 +7,6 @@ const PLACEHOLDER = 'change_me_in_production_min_32_chars_long_xxx';
 const baseRaw = {
   DATABASE_URL: 'postgres://u:p@localhost:5432/db',
   REDIS_URL: 'redis://localhost:6379',
-  MINIO_ENDPOINT: 'http://localhost:9000',
-  MINIO_BUCKET: 'dental-uploads',
-  MINIO_ROOT_USER: 'dental',
-  MINIO_ROOT_PASSWORD: 'dental_local_dev',
   WEB_ORIGIN: 'http://localhost:8000',
 };
 
@@ -134,10 +130,25 @@ describe('parseEnv MESSAGING_SECRET guard (CLI-379)', () => {
   });
 });
 
-describe('MINIO_* is optional (dead since storage.ts local-filesystem, CLI-340)', () => {
-  test('boots without any MINIO_* vars set', () => {
-    const { MINIO_ENDPOINT, MINIO_BUCKET, MINIO_ROOT_USER, MINIO_ROOT_PASSWORD, ...rest } = baseRaw;
-    const result = parseEnv({ ...rest, NODE_ENV: 'development', JWT_SECRET: STRONG_SECRET });
+describe('MINIO_* removed (P17: uploads live on a local volume)', () => {
+  test('boots without MINIO_* and the parsed env has no MINIO_ENDPOINT key', () => {
+    const result = parseEnv({ ...baseRaw, NODE_ENV: 'development', JWT_SECRET: STRONG_SECRET });
     expect(result.success).toBe(true);
+    if (result.success) {
+      expect('MINIO_ENDPOINT' in result.data).toBe(false);
+    }
+  });
+
+  test('stray MINIO_* vars are ignored, not surfaced', () => {
+    const result = parseEnv({
+      ...baseRaw,
+      MINIO_ENDPOINT: 'http://localhost:9000',
+      NODE_ENV: 'development',
+      JWT_SECRET: STRONG_SECRET,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect('MINIO_ENDPOINT' in result.data).toBe(false);
+    }
   });
 });

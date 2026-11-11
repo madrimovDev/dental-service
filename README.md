@@ -26,7 +26,7 @@ Status: **Phase 1, M0 — Pre-flight setup**
 # 2. O'rnatish
 bun install
 
-# 3. Local infra (Postgres, Redis, MinIO)
+# 3. Local infra (Postgres, Redis)
 cp .env.example .env
 docker compose -f infra/docker-compose.yml --env-file .env up -d
 

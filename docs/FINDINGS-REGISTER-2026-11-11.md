@@ -20,7 +20,7 @@
 |---|---|---|---|---|
 | P1 ✅ | C | RLS tx 500 da COMMIT (yopildi — P bosqichi 1) | `rlsMiddleware`: `await next()` dan keyin `c.error` bo'lsa throw (rollback); route'da yozib throw qiladigan HTTP regressiya testi | 1 |
 | P2 🟡 | C | desktop yangilanishda migratsiya yo'q | har startda idempotent `api.exe migrate` (API'dan oldin); 0043 to'qnashuvida tushunarli dialog | 3 |
-| P17 | C | bulutda uploads volume yo'q, backup MinIO'ga | `docker-compose.prod.yml`ga `uploads` volume + `UPLOADS_DIR`; `backup.sh`ni lokal uploads'ga qaratish; MinIO'ni compose'dan olib tashlash | 3 |
+| P17 ✅ | C | bulutda uploads volume yo'q, backup MinIO'ga (yopildi — P bosqichi 3) | `docker-compose.prod.yml`ga `uploads` volume + `UPLOADS_DIR`; `backup.sh`ni lokal uploads'ga qaratish; MinIO'ni compose'dan olib tashlash | 3 |
 | P3 ✅ | H | reminder jobId `:` (yopildi — `592ed7a`) | `queue.ts` fix'ini commit qilish + real `Queue.add` kontrakt testi | 2 |
 | P4 ✅ | H | Redis side-effect tx ichida (yopildi — P bosqichi 1; `onAfterCommit` + 2,5 s timeout) | enqueue/remove'ni commit'dan keyin best-effort (try/catch + log) yoki outbox; status-only qayta faollashganda re-enqueue | 2 |
 | P5 | H | rol eskalatsiyasi | invite/addAssignment/updateAssignment: berilayotgan rol permission'lari chaqiruvchinikining qism-to'plami bo'lishi shart (owner istisno); test | 4 |
@@ -34,7 +34,7 @@
 | P13 | H | Accountant kassa refund'ni qo'shadi | `type==='refund'` ayirilsin (DailySummaryCard bilan bir xil formula, umumiy helper) | 5 |
 | P14 🟡 | H | NSIS config'ni qayta yozadi | `${isUpdated}` bo'lsa dialog va yozish o'tkazib yuborilsin; mavjud config merge qilinsin | 3 |
 | P15 🟡 | H | supervision yo'q | child exit → backoff bilan restart + tray holati/xabar; Windows'da graceful stop (`pg_ctl stop`, API `/shutdown`); `before-quit` `preventDefault` + await | 6 |
-| P16 | H | Supervisor HTTP, backupsiz, renew yo'q | domen + TLS (prod Caddyfile); `pg_dump` cron + off-host; RSA private key zaxira tartibi; `PATCH /admin/licenses/:id` (expiresAt/grace) + UI | 6 |
+| P16 🟠 | H | Supervisor HTTP, backupsiz, renew yo'q (renew ✅ bosqich 2, backup ✅ bosqich 3; TLS/domen — bosqich 12) | domen + TLS (prod Caddyfile); `pg_dump` cron + off-host; RSA private key zaxira tartibi; `PATCH /admin/licenses/:id` (expiresAt/grace) + UI | 6 |
 | P18 ✅ | H | offline grace `expiresAt`dan (yopildi — P bosqichi 2: `expiresAt`+7, to'liq blok, banner/blok ekrani, renew; jonli tasdiqlangan; desktop UI Windows'da tekshirilmagan) | Q1/Q2 qaroridan keyin: grace = oxirgi muvaffaqiyatli heartbeat'dan yoki hujjatni kodga moslash; muddat tugaganda qoladigan modullar ro'yxati | 3 |
 
 ---

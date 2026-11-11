@@ -58,6 +58,10 @@ COPY packages/fiscal ./packages/fiscal
 
 WORKDIR /app/apps/api
 
+# Uploads volume mount point — must be writable by the non-root `bun` user.
+# A named volume mounted here inherits this ownership on first creation.
+RUN mkdir -p /data/uploads && chown bun:bun /data/uploads
+
 # The bun base image ships a non-root `bun` user — run as it.
 USER bun
 
