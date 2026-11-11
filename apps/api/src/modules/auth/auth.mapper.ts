@@ -28,6 +28,7 @@ export const toLoginDto = (r: LoginResult): LoginResponseDto => ({
     fullName: r.user.fullName ?? null,
     lang: r.user.lang ?? 'uz',
   },
+  mustChangePassword: r.mustChangePassword,
   accessToken: r.accessToken,
   refreshToken: r.refreshToken,
   accessExpiresAt: r.accessExpiresAt.toISOString(),

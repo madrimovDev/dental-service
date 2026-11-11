@@ -23,10 +23,10 @@
 | P17 ✅ | C | bulutda uploads volume yo'q, backup MinIO'ga (yopildi — P bosqichi 3) | `docker-compose.prod.yml`ga `uploads` volume + `UPLOADS_DIR`; `backup.sh`ni lokal uploads'ga qaratish; MinIO'ni compose'dan olib tashlash | 3 |
 | P3 ✅ | H | reminder jobId `:` (yopildi — `592ed7a`) | `queue.ts` fix'ini commit qilish + real `Queue.add` kontrakt testi | 2 |
 | P4 ✅ | H | Redis side-effect tx ichida (yopildi — P bosqichi 1; `onAfterCommit` + 2,5 s timeout) | enqueue/remove'ni commit'dan keyin best-effort (try/catch + log) yoki outbox; status-only qayta faollashganda re-enqueue | 2 |
-| P5 | H | rol eskalatsiyasi | invite/addAssignment/updateAssignment: berilayotgan rol permission'lari chaqiruvchinikining qism-to'plami bo'lishi shart (owner istisno); test | 4 |
-| P6 | H | tenantlararo parol tiklash | target boshqa tenantda owner yoki undan yuqori rolga ega bo'lsa rad etish (yoki faqat shu tenantga a'zo foydalanuvchiga ruxsat); test | 4 |
-| P7 | H | POS items + begona reja | `items` rejimida `treatmentPlanId`ni rad etish, `patientId`ni DB'dan tekshirish; test | 4 |
-| P8 | H | Telegram kontakt egaligi | `contact.user_id === ctx.from.id` talab qilish; mavjud `telegramChatId`ni jim ustiga yozmaslik | 4 |
+| P5 ✅ | H | rol eskalatsiyasi (yopildi — bosqich 4: invite/add/update/reactivate + roles create/setPermissions; `role.escalation` 403) | invite/addAssignment/updateAssignment: berilayotgan rol permission'lari chaqiruvchinikining qism-to'plami bo'lishi shart (owner istisno); test | 4 |
+| P6 🟠 | H | tenantlararo parol tiklash (bosqich 4: faqat owner, vaqtinchalik parol + `pwc` majburiy almashtirish, boshqa tenant owner'i himoyalangan; qoldiq: rozisiz invite → bosqich 4b) | target boshqa tenantda owner yoki undan yuqori rolga ega bo'lsa rad etish (yoki faqat shu tenantga a'zo foydalanuvchiga ruxsat); test | 4 |
+| P7 ✅ | H | POS items + begona reja (yopildi — bosqich 4) | `items` rejimida `treatmentPlanId`ni rad etish, `patientId`ni DB'dan tekshirish; test | 4 |
+| P8 ✅ | H | Telegram kontakt egaligi (yopildi — bosqich 4) | `contact.user_id === ctx.from.id` talab qilish; mavjud `telegramChatId`ni jim ustiga yozmaslik | 4 |
 | P9 | H | NoOp → recall `sent` | NoOp `{ok:false, reason:'not_configured'}` qaytarsin; recall `pending` qoladi, outcome `skipped_no_channel` | 5 |
 | P10 | H | yangi tenantda bron yo'q | provisioning/register filialga default `workHours` yozsin + Filial formasiga ish soati UI + doktor jadvali bo'sh bo'lsa wizard'da tushunarli xabar | 5 |
 | P11 | H❔ | rasmlar Bearer'siz | avval brauzerda tasdiqlash; keyin blob-fetch (`api-client` + `URL.createObjectURL`) yoki qisqa muddatli imzolangan URL; `/uploads`ga `patient_image.view` + audit | 5 |
@@ -397,4 +397,12 @@ To'liq: [`LAB-TECHNICIAN-ACCESS-2026-11-11.md`](./LAB-TECHNICIAN-ACCESS-2026-11-
 | FU-05 | L | `/api/license/recheck` ochiq | auth'siz (blok ekrani uchun), 6/daqiqa per-IP rate limit bilan. LAN ichida suiiste'mol = Supervisor'ga heartbeat oqimi; kerak bo'lsa global limit |
 | FU-06 | L | P2 restore oxirgi chora | DROP+CREATE+`pg_restore --single-transaction`: tiklash ham yiqilsa baza bo'sh qoladi (dump fayli saqlanadi, dialogda yo'li ko'rsatiladi) — qo'lda tiklash runbook'i kerak |
 | FU-07 | L | `mock.module` oqishi o'syapti | `license*.test.ts` va `cli-358` endi har biri o'z bun jarayonida yurgizilishi kerak (test skripti darajasida ajratish) |
+
+## 15. P bosqichi 4 dan keyingi follow-up'lar
+
+| ID | J | Qisqa | Qilinadigan ish |
+|---|---|---|---|
+| FU-08 | H | Rozisiz invite → hisobni egallash (P6 qoldig'i) | 👤 qaror: mavjud platforma foydalanuvchisini taklif qilish «kutilmoqda» holatida, foydalanuvchi qabul qilgach a'zo — **bosqich 4b** |
+| FU-09 | L | `user.manage` egasi yuqori huquqli xodimning tayinlovini o'chira/filialini o'zgartira oladi | eskalatsiya emas, lekin «yuqoridagini o'chirish»; kerak bo'lsa `assertCanGrant`ni remove/branch-change'ga ham |
+| FU-10 | L | Reset qilingan xodimning mavjud access token'i ≤15 daqiqa `pwc`siz | Redis denylist (JWT staleness qarori) |
 

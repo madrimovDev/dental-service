@@ -83,6 +83,8 @@ export const loginResponseSchema = z
       fullName: z.string().nullable(),
       lang: z.string(),
     }),
+    /** P6: vaqtinchalik parol bilan kirilgan — faqat parol almashtirish ekrani ochiladi. */
+    mustChangePassword: z.boolean(),
     accessToken: z.string(),
     refreshToken: z.string(),
     accessExpiresAt: z.iso.datetime(),

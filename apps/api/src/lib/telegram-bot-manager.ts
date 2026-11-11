@@ -26,6 +26,33 @@ async function readToken(adminDb: Database, tenantId: string): Promise<string | 
   return enc ? decryptSecret(enc) : null;
 }
 
+export type LinkOutcome = 'linked' | 'not_found' | 'not_own_contact' | 'already_linked';
+
+/**
+ * P8 — kontakt egaligi: faqat foydalanuvchining O'Z kontakti (`contact.user_id`
+ * === `from.id`) bemorni bog'laydi; mavjud boshqa chat'ga bog'lanish ustiga
+ * yozilmaydi.
+ */
+export async function linkPatientByContact(
+  tx: DbOrTx,
+  o: { contactUserId: number | undefined; fromId: number; phone: string; chatId: string },
+): Promise<LinkOutcome> {
+  if (o.contactUserId === undefined || o.contactUserId !== o.fromId) return 'not_own_contact';
+  // CLI-475 B7 — deterministik: eng eski bemor (createdAt asc).
+  const [p] = await tx
+    .select({ id: patients.id, chat: patients.telegramChatId })
+    .from(patients)
+    .where(inArray(patients.phone, [o.phone, o.phone.replace(/^\+/, '')]))
+    .orderBy(asc(patients.createdAt))
+    .limit(1);
+  if (!p) return 'not_found';
+  if (p.chat && p.chat !== o.chatId) return 'already_linked';
+  if (!p.chat) {
+    await tx.update(patients).set({ telegramChatId: o.chatId }).where(eq(patients.id, p.id));
+  }
+  return 'linked';
+}
+
 export function startTelegramBotManager(deps: ManagerDeps) {
   const bots = new Map<string, Telegraf>();
 
@@ -48,25 +75,22 @@ export function startTelegramBotManager(deps: ManagerDeps) {
       // `+901234567` qilib bemorni topa olmasdi.
       const phone = normalizePhone(ctx.message.contact.phone_number);
       const chatId = String(ctx.chat.id);
-      const outcome = await deps.withTenant(tenantId, async (tx) => {
-        // CLI-475 B7 — bir xil telefonli bir nechta bemor bo'lsa (tenant ichida
-        // dublikat telefon mumkin), tartibsiz `.limit(1)` DB-tartibiga bog'liq
-        // bo'lardi. Deterministik: eng eski bemor (createdAt asc) bog'lanadi.
-        const [p] = await tx
-          .select({ id: patients.id })
-          .from(patients)
-          .where(inArray(patients.phone, [phone, phone.replace(/^\+/, '')]))
-          .orderBy(asc(patients.createdAt))
-          .limit(1);
-        if (!p) return 'not_found';
-        await tx.update(patients).set({ telegramChatId: chatId }).where(eq(patients.id, p.id));
-        return 'linked';
-      });
-      await ctx.reply(
-        outcome === 'linked'
-          ? "✅ Bog'landingiz — endi eslatmalar shu yerga keladi."
-          : '⚠️ Raqamingiz topilmadi. Klinikaga murojaat qiling.',
+      const outcome = await deps.withTenant(tenantId, (tx) =>
+        linkPatientByContact(tx, {
+          contactUserId: ctx.message.contact.user_id,
+          fromId: ctx.from.id,
+          phone,
+          chatId,
+        }),
       );
+      const replies: Record<LinkOutcome, string> = {
+        linked: "✅ Bog'landingiz — endi eslatmalar shu yerga keladi.",
+        not_found: '⚠️ Raqamingiz topilmadi. Klinikaga murojaat qiling.',
+        not_own_contact: "⚠️ Faqat o'z raqamingizni ulashing.",
+        already_linked:
+          "⚠️ Bu raqam boshqa Telegram hisobiga bog'langan. Klinikaga murojaat qiling.",
+      };
+      await ctx.reply(replies[outcome]);
     });
     // NOTE: `bot.launch()`'s promise does NOT resolve on start — it resolves only
     // after `bot.stop()` (Telegraf's `Polling.loop()` is a `for await` that runs

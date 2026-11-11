@@ -23,6 +23,8 @@ export type AccessClaims = {
   perms: string[];
   roleKey: string | null; // aktiv kontekstdagi birlamchi rol templateKey'i (owner / no-context → null)
   lang: 'uz' | 'ru';
+  /** P6: vaqtinchalik parol bilan kirilgan — faqat parol almashtirish endpoint'lari ochiq. */
+  pwc?: boolean;
   iat: number;
   exp: number;
   jti: string;

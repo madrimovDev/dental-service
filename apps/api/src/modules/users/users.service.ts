@@ -9,19 +9,22 @@ import {
   userAssignments,
   users,
 } from '@dental/db-schema';
-import { and, eq, gt, isNull, or, sql } from 'drizzle-orm';
+import { and, eq, gt, isNull, ne, or, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { Database } from '../../db/client.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { logger } from '../../lib/logger.ts';
 import { hashPassword } from '../../lib/password.ts';
+import { assertCanGrant, loadRolePermissionCodes } from '../../lib/role-escalation.ts';
 import type {
   CreateAssignmentInput,
   InviteUserInput,
   UpdateAssignmentInput,
   UpsertProfileInput,
 } from './users.schema.ts';
+
+const callerPerms = (c: Context): string[] => c.get('accessClaims')?.perms ?? [];
 
 export const createUsersService = (deps: { db: Database; audit: AuditLogger }) => {
   /** Joriy tenant'dagi xodimlar (active assignmentlar bilan) */
@@ -67,6 +70,8 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
     // RoleId joriy tenant'da mavjudligini tekshirish — RLS qiladi
     const [role] = await dbContext.select().from(roles).where(eq(roles.id, input.roleId));
     if (!role) return { ok: false as const, code: 'role.not_found' };
+    // P5: tayinlanayotgan rol chaqiruvchining huquqlaridan yuqori bo'lmasin (yozishdan OLDIN).
+    assertCanGrant(callerPerms(c), (await loadRolePermissionCodes(dbContext, input.roleId)) ?? []);
 
     if (input.branchId) {
       const [branch] = await dbContext
@@ -211,6 +216,8 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
     // tekshirish — cross-tenant/ghost assignment oldini olish (invite bilan bir xil pattern).
     const [role] = await db.select().from(roles).where(eq(roles.id, input.roleId));
     if (!role) return { ok: false as const, code: 'role.not_found' as const };
+    // P5: tayinlanayotgan rol chaqiruvchining huquqlaridan yuqori bo'lmasin.
+    assertCanGrant(callerPerms(c), (await loadRolePermissionCodes(db, input.roleId)) ?? []);
 
     if (input.branchId) {
       const [branch] = await db.select().from(branches).where(eq(branches.id, input.branchId));
@@ -269,6 +276,23 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
       .where(eq(userAssignments.id, assignmentId));
     if (!before) return null;
 
+    // P5: eskalatsiya tekshiruvi (yozishdan OLDIN). Rol o'zgarsa yoki assignment qayta
+    // faollashtirilsa / muddati uzaytirilsa — EFFEKTIV rol (input.roleId ?? before.roleId)
+    // chaqiruvchi huquqlaridan yuqori bo'lmasligi shart. Aks holda eski Tenant Admin
+    // assignment'ni `{isActive:true}` / `{validTo:null}` bilan tiriltirib bo'ladi.
+    const roleChanged = input.roleId !== undefined && input.roleId !== before.roleId;
+    const reactivates = input.isActive === true && !before.isActive;
+    const extendsValidity =
+      input.validTo !== undefined &&
+      before.validTo !== null &&
+      (input.validTo === null || new Date(input.validTo).getTime() > before.validTo.getTime());
+    if (roleChanged || reactivates || extendsValidity) {
+      const effectiveRoleId = input.roleId ?? before.roleId;
+      const codes = await loadRolePermissionCodes(db, effectiveRoleId);
+      if (codes === null) return { ok: false as const, code: 'role.not_found' as const };
+      assertCanGrant(callerPerms(c), codes);
+    }
+
     const patch: Record<string, unknown> = { updatedAt: new Date() };
     if (input.roleId !== undefined) patch.roleId = input.roleId;
     if (input.branchId !== undefined) patch.branchId = input.branchId;
@@ -290,7 +314,7 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
         after: updated,
       });
     }
-    return updated;
+    return updated ? { ok: true as const, row: updated } : null;
   }
 
   async function removeAssignment(c: Context, assignmentId: string) {
@@ -313,18 +337,27 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
   }
 
   /**
-   * Admin tomonidan xodim parolini qayta tiklash.
-   *  - User joriy tenantda assignment yoki owner bo'lishi kerak (cross-tenant zarbasiz)
-   *  - Yangi 16-belgili vaqtinchalik parol generate qilinadi (login validator min 12)
-   *  - Foydalanuvchining hamma refresh tokenlari revoke qilinadi (logout boshqa qurilmalardan)
-   *  - Audit yoziladi
-   *  - Yangi parol qaytariladi (UI'da admin'ga ko'rsatiladi, u xodimga beradi)
+   * P6 — xodim parolini FAQAT klinika egasi (owner) tiklaydi.
+   *  - Chaqiruvchi owner bo'lishi shart (`@owner`), aks holda `user.reset_owner_only`
+   *  - Owner o'zini bu yo'l bilan tiklamaydi (`user.reset_self` — `/auth/change-password` bor)
+   *  - Maqsad shu tenant a'zosi bo'lishi kerak (cross-tenant zarbasiz)
+   *  - Yangi 16-belgili vaqtinchalik parol generate qilinadi va `must_change_password = true`
+   *    qo'yiladi: shu parol bilan kirilganda faqat parol almashtirish ochiladi
+   *  - Foydalanuvchining hamma refresh tokenlari revoke qilinadi
+   *  - Audit yoziladi; ochiq parol LOGGA YOZILMAYDI (faqat javobda qaytadi)
    */
   async function resetUserPassword(c: Context, targetUserId: string) {
     const dbContext = getDb(c);
     const tenantId = c.get('activeTenantId');
     const actor = c.get('user');
     if (!tenantId || !actor) throw new Error('No tenant context');
+
+    if (!c.get('accessClaims')?.perms.includes('@owner')) {
+      return { ok: false as const, code: 'user.reset_owner_only' };
+    }
+    if (actor.id === targetUserId) {
+      return { ok: false as const, code: 'user.reset_self' };
+    }
 
     // Target user shu tenantda ekanligini tekshirish (assignment yoki owner)
     return await dbContext.transaction(async (tx) => {
@@ -336,6 +369,20 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
         .from(tenants)
         .where(eq(tenants.id, tenantId));
       const isOwner = tenant?.ownerUserId === targetUserId;
+
+      // P6: maqsad BOSHQA klinikaning egasi bo'lsa — rad etiladi. Hujumchi o'z klinikasiga
+      // begona foydalanuvchini (invite orqali, rozilik so'ramasdan) a'zo qilib, keyin
+      // parolini tiklab, uning klinikasini to'liq egallashi mumkin edi.
+      // `tenants` platform jadvali (RLS yo'q) — shu sababli tenant kontekstidan qat'i nazar
+      // barcha klinikalar ko'rinadi.
+      const [otherOwned] = await tx
+        .select({ id: tenants.id })
+        .from(tenants)
+        .where(and(eq(tenants.ownerUserId, targetUserId), ne(tenants.id, tenantId)))
+        .limit(1);
+      if (otherOwned) {
+        return { ok: false as const, code: 'user.reset_other_tenant_owner' };
+      }
 
       let hasAssignment = false;
       if (!isOwner) {
@@ -356,12 +403,6 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
         return { ok: false as const, code: 'user.not_in_tenant' };
       }
 
-      // Tenant owner parolini faqat o'zi yoki tenant owner reset qila oladi
-      // (boshqa adminlar tenant owner'ning parolini o'zgartira olmaydi — xavfsizlik)
-      if (isOwner && actor.id !== tenant?.ownerUserId) {
-        return { ok: false as const, code: 'user.cannot_reset_owner' };
-      }
-
       const [target] = await tx.select().from(users).where(eq(users.id, targetUserId));
       if (!target) return { ok: false as const, code: 'user.not_found' };
 
@@ -371,7 +412,7 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
 
       await tx
         .update(users)
-        .set({ passwordHash: newHash, updatedAt: now })
+        .set({ passwordHash: newHash, mustChangePassword: true, updatedAt: now })
         .where(eq(users.id, targetUserId));
 
       // Barcha refresh tokenlarni revoke (boshqa qurilmalardan logout)
@@ -381,16 +422,14 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
         .where(and(eq(refreshTokens.userId, targetUserId), isNull(refreshTokens.revokedAt)));
 
       await deps.audit.record(c, {
-        action: 'password_reset_by_admin',
+        action: 'password_reset_by_owner',
         resourceType: 'user',
         resourceId: targetUserId,
         after: { phone: target.phone, by: actor.id },
       });
 
-      logger.warn(
-        { adminId: actor.id, userId: targetUserId, phone: target.phone, newPassword },
-        `🔐 Admin reset password — production'da SMS orqali yuboriladi`,
-      );
+      // ⚠️ Ochiq parol log'ga YOZILMAYDI — faqat javob orqali owner'ga qaytadi.
+      logger.info({ ownerId: actor.id, userId: targetUserId }, 'Owner reset staff password');
 
       return {
         ok: true as const,

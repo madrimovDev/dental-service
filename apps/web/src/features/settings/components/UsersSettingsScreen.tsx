@@ -38,7 +38,8 @@ import { StaffProfileModal } from './StaffProfileModal';
 
 export function UsersSettingsScreen() {
   const { t } = useTranslation();
-  const { hasPermission, user: currentUser } = useAuthStore();
+  const { hasPermission, permissions, user: currentUser } = useAuthStore();
+  const isOwner = permissions.includes('@owner');
   const assignments = useUsers();
   const roles = useRoles();
   const branches = useBranches();
@@ -183,7 +184,7 @@ export function UsersSettingsScreen() {
                             <IconUserCog size={16} />
                           </ActionIcon>
                         )}
-                        {hasPermission('user.manage') && a.userId !== currentUser?.id && (
+                        {isOwner && a.userId !== currentUser?.id && (
                           <ActionIcon
                             variant="subtle"
                             color="gray"
@@ -284,6 +285,7 @@ export function UsersSettingsScreen() {
                 {resetResult.phone}
               </Text>
               <Text size="sm">{t('users.temp_password_notice')}</Text>
+              <Text size="sm">{t('users.reset_must_change_notice')}</Text>
               <Text mt="sm" fw={700} ff="var(--font-mono)" size="lg">
                 {resetResult.tempPassword}
               </Text>

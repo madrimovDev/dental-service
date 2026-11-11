@@ -166,6 +166,19 @@
       "error_invalid_token": "Token yaroqsiz yoki muddati o'tgan",
       "error_generic": "Parolni tiklab bo'lmadi. Qaytadan urinib ko'ring.",
       "back_to_login": "Kirish sahifasiga qaytish"
+    },
+    "pwdChangeRequired": {
+      "title": "Parolni almashtiring",
+      "description": "Vaqtinchalik parol bilan kirdingiz. Davom etish uchun o'zingizning yangi parolingizni o'rnating.",
+      "current": "Vaqtinchalik parol",
+      "new_password": "Yangi parol",
+      "hint": "Kamida 12 belgi",
+      "confirm": "Yangi parolni tasdiqlash",
+      "mismatch": "Parollar mos kelmadi",
+      "same": "Yangi parol vaqtinchalik paroldan farq qilishi kerak",
+      "invalid_current": "Joriy parol noto'g'ri",
+      "submit": "Parolni o'rnatish",
+      "success": "Parol almashtirildi. Yangi parol bilan qayta kiring."
     }
   },
   "layout": {
@@ -425,6 +438,7 @@
     "confirm_remove": "Xodimni klinikadan chiqarishni tasdiqlaysizmi?",
     "invited_successfully": "Xodim muvaffaqiyatli qo'shildi! Parolni quyida ko'ring va xodimga bering.",
     "temp_password_notice": "⚠️ Bu parol faqat shu yerda ko'rsatiladi. Xodimga (Telegram, qo'lda yoki boshqa kanal orqali) yuboring va kopiyalab oling. Kelajakda SMS orqali avtomatik yuboriladi.",
+    "reset_must_change_notice": "Xodim birinchi kirishda parolni almashtiradi.",
     "invite_hint": "Bu yerda xodim akkaunti darhol yaratiladi. SMS hozircha yuborilmaydi — vaqtinchalik parol sizga ko'rsatiladi va xodimga qo'lda yuborasiz.",
     "already_exists_title": "Foydalanuvchi allaqachon mavjud",
     "already_exists_message": "Bu telefon raqami allaqachon ro'yxatdan o'tgan. Yangi parol yaratilmadi — mavjud foydalanuvchiga shu rol biriktirildi. U eski paroli bilan kiradi (yoki ro'yxatdan 🔑 orqali parolini qayta tiklang).",
