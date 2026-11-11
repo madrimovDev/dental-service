@@ -1,7 +1,7 @@
 import { ApiError } from '@dental/api-client';
 import { notifications } from '@mantine/notifications';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { queryClient } from './query-client';
+import { handleLicenseBlock, queryClient } from './query-client';
 
 vi.mock('@mantine/notifications', () => ({
   notifications: { show: vi.fn() },
@@ -46,5 +46,34 @@ describe('queryClient MutationCache.onError (global error toast)', () => {
     );
 
     expect(notifications.show).not.toHaveBeenCalled();
+  });
+});
+
+describe('handleLicenseBlock (P18)', () => {
+  const assign = vi.fn();
+  afterEach(() => {
+    assign.mockReset();
+    vi.unstubAllGlobals();
+  });
+  const stubLocation = (pathname: string) =>
+    vi.stubGlobal('window', { location: { pathname, assign } });
+
+  it('LICENSE_EXPIRED → /license-expired', () => {
+    stubLocation('/');
+    expect(handleLicenseBlock(new ApiError('LICENSE_EXPIRED', 'x', 403))).toBe(true);
+    expect(assign).toHaveBeenCalledWith('/license-expired');
+  });
+
+  it("LICENSE_NOT_FOUND → /activate (to'lov ekrani emas)", () => {
+    stubLocation('/patients');
+    expect(handleLicenseBlock(new ApiError('LICENSE_NOT_FOUND', 'x', 403))).toBe(true);
+    expect(assign).toHaveBeenCalledWith('/activate');
+  });
+
+  it("maqsad sahifada qayta yo'naltirmaydi; boshqa 403 e'tiborsiz", () => {
+    stubLocation('/license-expired');
+    expect(handleLicenseBlock(new ApiError('LICENSE_EXPIRED', 'x', 403))).toBe(true);
+    expect(handleLicenseBlock(new ApiError('forbidden', 'x', 403))).toBe(false);
+    expect(assign).not.toHaveBeenCalled();
   });
 });

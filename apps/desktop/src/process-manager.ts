@@ -444,7 +444,7 @@ export const startApiLayer = async (port: number): Promise<void> => {
   if (apiProcess && !exitedProcs.has(apiProcess)) status = 'running';
 };
 
-export const startServer = async (port = 80): Promise<void> => {
+export const startServer = async (port = 8080): Promise<void> => {
   await startDatabaseLayer();
   await startApiLayer(port);
 };
