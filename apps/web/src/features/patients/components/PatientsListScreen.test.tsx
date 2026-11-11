@@ -16,6 +16,9 @@ const dataResult = {
         genderLabel: 'Erkak',
         tags: ['VIP'],
         balance: 150000,
+        flagged: false,
+        noShowStrikes: 2,
+        flags: { allergy: true, debt: true, noShows: 2, telegram: true },
       },
     ],
     meta: { page: 1, pageSize: 20, total: 1 },
@@ -32,13 +35,15 @@ vi.mock('../patients.api', () => ({
   usePatients: (params: unknown) => usePatientsMock(params),
   useArchivePatient: () => ({ mutate: archiveMock, isPending: false }),
 }));
+let allowedPerms: ((code: string) => boolean) | undefined;
 vi.mock('@/stores/auth-store.ts', () => ({
-  useAuthStore: () => ({ hasPermission: () => true }),
+  useAuthStore: () => ({ hasPermission: (code: string) => allowedPerms?.(code) ?? true }),
 }));
 
 describe('PatientsListScreen', () => {
   beforeEach(() => {
     patientsResult = dataResult;
+    allowedPerms = undefined;
     usePatientsMock.mockClear();
     archiveMock.mockClear();
   });
@@ -106,6 +111,72 @@ describe('PatientsListScreen', () => {
     expect(emptyState).not.toBeNull();
     // CTA is scoped inside the StateView (avoids the duplicate header button trap).
     expect(within(emptyState).getByRole('button')).toBeInTheDocument();
+  });
+});
+
+describe('PatientsListScreen — UI-R6', () => {
+  beforeEach(() => {
+    patientsResult = dataResult;
+    allowedPerms = undefined;
+    usePatientsMock.mockClear();
+  });
+
+  it('belgilar MATN bilan ko‘rinadi: allergiya, qarz, kelmagan, Telegram', () => {
+    renderApp(<PatientsListScreen />);
+    expect(screen.getByText('Allergiya')).toBeInTheDocument();
+    expect(screen.getByText('Qarz')).toBeInTheDocument();
+    expect(screen.getByText('Kelmagan: 2')).toBeInTheDocument();
+    expect(screen.getByText('Telegram')).toBeInTheDocument();
+  });
+
+  it('belgisiz bemorda belgilar qatori chiqmaydi', () => {
+    patientsResult = {
+      ...dataResult,
+      data: {
+        ...dataResult.data,
+        items: [
+          {
+            ...dataResult.data.items[0],
+            balance: 0,
+            flags: { allergy: false, debt: false, noShows: 0, telegram: false },
+          },
+        ],
+      },
+    };
+    renderApp(<PatientsListScreen />);
+    expect(screen.queryByText('Allergiya')).not.toBeInTheDocument();
+    expect(screen.queryByText('Qarz')).not.toBeInTheDocument();
+  });
+
+  it('kirill qidiruvda lotin varianti izohi ko‘rinadi', () => {
+    renderApp(<PatientsListScreen />);
+    fireEvent.change(screen.getByPlaceholderText(/qidirish/i), { target: { value: 'турсун' } });
+    expect(screen.getByText('«tursun» ham topiladi')).toBeInTheDocument();
+  });
+
+  it('PT-03: view_pii yo‘q bo‘lsa qidiruv placeholder faqat ism haqida', () => {
+    allowedPerms = (code) => code !== 'patient.view_pii';
+    renderApp(<PatientsListScreen />);
+    expect(screen.getByPlaceholderText("Ism bo'yicha qidirish...")).toBeInTheDocument();
+  });
+
+  it('qidiruv URL search param ga yoziladi (navigatsiyadan keyin saqlanadi)', () => {
+    renderApp(<PatientsListScreen />, { route: '/patients?q=ali&archived=1' });
+    expect(usePatientsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ archived: true, page: 1 }),
+    );
+    expect((screen.getByPlaceholderText(/qidirish/i) as HTMLInputElement).value).toBe('ali');
+  });
+
+  it('«Yozish» tugmasi appointment.create ruxsati bilan ko‘rinadi', () => {
+    renderApp(<PatientsListScreen />);
+    expect(screen.getByRole('button', { name: 'Yozish' })).toBeInTheDocument();
+  });
+
+  it('appointment.create yo‘q bo‘lsa «Yozish» ko‘rinmaydi', () => {
+    allowedPerms = (code) => code !== 'appointment.create';
+    renderApp(<PatientsListScreen />);
+    expect(screen.queryByRole('button', { name: 'Yozish' })).not.toBeInTheDocument();
   });
 });
 

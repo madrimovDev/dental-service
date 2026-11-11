@@ -5,5 +5,6 @@ export * from './permissions.ts';
 export * from './phone.ts';
 export * from './role-templates.ts';
 export * from './supervisor-public-key.ts';
+export * from './translit.ts';
 export * from './types/api-response.ts';
 export * from './vertical-features.ts';

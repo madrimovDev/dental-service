@@ -4,6 +4,7 @@ import type {
   PatientEmergencyContact,
   PatientRelative,
 } from '@dental/db-schema';
+import { maskString } from './patients.mask.ts';
 import type {
   EmergencyContactDto,
   MedicalRecordDto,
@@ -94,14 +95,30 @@ export const toPatientDto = (row: Patient): PatientDto => ({
   updatedAt: row.updatedAt.toISOString(),
 });
 
-/** List item — Patient DTO + computed balance + no-show flag (masked upstream). */
+/**
+ * List item — Patient DTO + computed balance + no-show flag (PII masked upstream)
+ * + UI-R6 belgilar (`flags`): allergiya (faqat bor/yo'q, mazmuni EMAS), qarz,
+ * faol no-show soni, Telegram ulangan-ulanmagan. `telegramChatId` o'zi hech qachon
+ * DTO'ga chiqmaydi — faqat boolean.
+ */
 export const toPatientListItemDto = (
-  row: Patient & { balance: number; noShowStrikes: number; flagged: boolean },
+  row: Patient & {
+    balance: number;
+    noShowStrikes: number;
+    flagged: boolean;
+    hasAllergy: boolean;
+  },
 ): PatientListItemDto => ({
   ...toPatientDto(row),
   balance: row.balance,
   noShowStrikes: row.noShowStrikes,
   flagged: row.flagged,
+  flags: {
+    allergy: row.hasAllergy,
+    debt: row.balance > 0,
+    noShows: row.noShowStrikes,
+    telegram: row.telegramChatId != null && row.telegramChatId !== '',
+  },
 });
 
 /** Medical record DB row → wire DTO. Timestamps ISO; JSONB fields passthrough. */
@@ -131,13 +148,20 @@ export const toPatientRelativeDto = (row: PatientRelative): PatientRelativeDto =
   createdAt: row.createdAt.toISOString(),
 });
 
-/** Erkin emergency contact row → wire DTO. */
-export const toEmergencyContactDto = (row: PatientEmergencyContact): EmergencyContactDto => ({
+/**
+ * Erkin emergency contact row → wire DTO.
+ * PT-02: `canViewPii=false` bo'lsa telefon maskalanadi (bemor telefoni bilan bir xil qoida:
+ * oxirgi 4 raqam ochiq). Default `true` — chaqiruvchi ruxsatni aniq beradi/olib tashlaydi.
+ */
+export const toEmergencyContactDto = (
+  row: PatientEmergencyContact,
+  opts: { canViewPii: boolean } = { canViewPii: true },
+): EmergencyContactDto => ({
   id: row.id,
   tenantId: row.tenantId,
   patientId: row.patientId,
   name: row.name,
-  phone: row.phone,
+  phone: opts.canViewPii ? row.phone : maskString(row.phone, 4),
   relationship: row.relationship ?? null,
   isPrimary: row.isPrimary,
   createdAt: row.createdAt.toISOString(),

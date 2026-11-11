@@ -1,12 +1,12 @@
-import { Button, Card, Input, Select } from '@dental/ui';
+import { AlertBanner, Button, Card, Input, PhoneInput, Select } from '@dental/ui';
 import { Checkbox, TagsInput, Textarea } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { ChevronLeft, Phone, Users } from 'lucide-react';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { PhoneInput } from '@/components/PhoneInput.tsx';
-import { useCreatePatient } from '../patients.api';
+import { useCreatePatient, usePhoneCheck } from '../patients.api';
 import { type PatientFormValues, patientFormSchema } from '../patients.schema';
 import classes from './PatientNewScreen.module.css';
 
@@ -49,7 +49,21 @@ export function PatientNewScreen() {
     return typeof err === 'string' ? t(err) : err;
   };
 
+  // UI-R6: telefon dublikat tekshiruvi. Dublikat topilsa — «Uni ochish» yoki «Baribir yangi
+  // (oila a'zosi)» tanlanmaguncha saqlash to'xtatiladi (oila a'zolari bitta raqamni ulashadi,
+  // shuning uchun bloklash emas, ongli tanlov).
+  const phoneValue = form.values.phone ?? '';
+  const phoneCheck = usePhoneCheck(phoneValue);
+  const dupMatches = phoneCheck.data ?? [];
+  const [ackedPhone, setAckedPhone] = useState<string | null>(null);
+  const [dupBlocked, setDupBlocked] = useState(false);
+  const showDup = dupMatches.length > 0 && ackedPhone !== phoneValue;
+
   const submit = form.onSubmit((values) => {
+    if (showDup) {
+      setDupBlocked(true);
+      return;
+    }
     // Zod refine kafolatlaydi: provider bo'lmasa, coverageType/expiryDate/isActive ham bo'sh
     // bo'lishi shart (aks holda form submit bo'lmaydi) — shu sabab bu yerda xavfsiz tashlanadi.
     const insurance = values.insurance?.provider ? values.insurance : null;
@@ -159,7 +173,15 @@ export function PatientNewScreen() {
             <div className={classes.fields}>
               <div className={classes.grid2}>
                 <div className={`${classes.phoneWrap} ${classes.required}`}>
-                  <PhoneInput label={t('patients.form.phone')} {...form.getInputProps('phone')} />
+                  <PhoneInput
+                    label={t('patients.form.phone')}
+                    required
+                    {...form.getInputProps('phone')}
+                    onChange={(v) => {
+                      form.setFieldValue('phone', v);
+                      setDupBlocked(false);
+                    }}
+                  />
                 </div>
                 <div className={classes.phoneWrap}>
                   <PhoneInput
@@ -168,6 +190,31 @@ export function PatientNewScreen() {
                   />
                 </div>
               </div>
+              {showDup && (
+                <div className={classes.dupBox} data-testid="phone-dup">
+                  <AlertBanner tier={2} title={t('patientsList.dup_title')}>
+                    {t('patientsList.dup_desc', {
+                      names: dupMatches.map((m) => m.fullName).join(', '),
+                    })}
+                  </AlertBanner>
+                  <div className={classes.dupActions}>
+                    {dupMatches.map((m) => (
+                      <Button key={m.id} size="sm" onClick={() => navigate(`/patients/${m.id}`)}>
+                        {t('patientsList.dup_open')}
+                        {dupMatches.length > 1 ? `: ${m.fullName}` : ''}
+                      </Button>
+                    ))}
+                    <Button size="sm" variant="ghost" onClick={() => setAckedPhone(phoneValue)}>
+                      {t('patientsList.dup_anyway')}
+                    </Button>
+                  </div>
+                  {dupBlocked && (
+                    <div className={classes.dupBlocked} role="alert">
+                      {t('patientsList.dup_blocked')}
+                    </div>
+                  )}
+                </div>
+              )}
               <div className={classes.fieldWrap}>
                 <Input
                   label={t('patients.form.address')}

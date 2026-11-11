@@ -132,8 +132,13 @@ function GeneralReadOnly({ patient }: { patient: PatientDetail }) {
   );
 }
 
+/** PT-04: `patient.view_pii`siz serverdan maskalangan (`***`) qiymat keladi — tahrirlanmaydi, yuborilmaydi. */
+const PII_FORM_FIELDS = ['phone', 'phoneSecondary', 'passport', 'address'] as const;
+
 function GeneralEditForm({ patientId }: { patientId: string }) {
   const { t } = useTranslation();
+  const { hasPermission } = useAuthStore();
+  const canEditPii = hasPermission('patient.view_pii');
   const rawQuery = usePatientRaw(patientId);
   const updateMut = useUpdatePatient(patientId);
 
@@ -149,7 +154,13 @@ function GeneralEditForm({ patientId }: { patientId: string }) {
       notes: '',
       allowEmergencyRecall: false,
     },
-    validate: zod4Resolver(patientEditSchema),
+    // PT-04: maskalangan PII maydonlari formatga mos kelmaydi — ular tahrirlanmaydi,
+    // shuning uchun validatsiya xatosi ham bloklamasligi kerak.
+    validate: (values) => {
+      const errors = zod4Resolver(patientEditSchema)(values);
+      if (!canEditPii) for (const f of PII_FORM_FIELDS) delete errors[f];
+      return errors;
+    },
   });
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: form.setValues stable
@@ -189,30 +200,33 @@ function GeneralEditForm({ patientId }: { patientId: string }) {
     return null;
   }
 
-  // CLI-455 (frontend qismi): `values.field || undefined` bo'sh stringni har doim
-  // undefined'ga aylantirar edi — backend PATCH kalitni butunlay tashlab yuborardi,
-  // ya'ni foydalanuvchi maydonni ANIQ bo'shatsa ham eski qiymat serverda saqlanib qolardi.
-  // Endi original (serverdan yuklangan) qiymat bilan solishtiramiz:
-  //  - joriy '' va original ham bo'sh/yo'q edi → undefined (haqiqiy o'zgarish yo'q)
+  // CLI-455 (frontend qismi) + PT-04: faqat O'ZGARGAN maydonlar yuboriladi.
+  // Original (serverdan yuklangan) qiymat bilan solishtiramiz:
+  //  - joriy original bilan bir xil → undefined (o'zgarish yo'q, PATCH kalitni tashlaydi)
   //  - joriy '' lekin original qiymatga ega edi → null (foydalanuvchi ANIQ bo'shatdi)
-  //  - joriy bo'sh emas → o'sha qiymat
-  // Backend nullable qo'llovi alohida worktree'da (CLI-455 backend qismi) — generated
-  // `UpdatePatientBody` hali `null` qabul qilmaydi, shu sabab tor `as` kasting kerak;
-  // backend merge + api-client regenerate qilingach olib tashlash mumkin.
+  //  - aks holda joriy qiymat
+  // Maskalangan PII (`view_pii`siz) HECH QACHON yuborilmaydi — aks holda `***` haqiqiy
+  // qiymat ustiga yozilib qolardi.
+  // Generated `UpdatePatientBody` hali `null` qabul qilmaydi — tor `as` kasting
+  // (api-client regenerate qilingach olib tashlanadi).
   const original = rawQuery.data;
-  const clearedOrKept = (current: string, prev: string | null | undefined) =>
-    (current === '' ? (prev ? null : undefined) : current) as string | undefined;
+  const changed = (current: string, prev: string | null | undefined) => {
+    if (current === (prev ?? '')) return undefined;
+    return (current === '' ? null : current) as string | undefined;
+  };
+  const piiChanged = (current: string, prev: string | null | undefined) =>
+    canEditPii ? changed(current, prev) : undefined;
 
   const submit = form.onSubmit((values) =>
     updateMut.mutate({
       fullName: values.fullName,
       gender: values.gender ?? undefined,
-      dateOfBirth: clearedOrKept(values.dateOfBirth, original.dateOfBirth),
-      phone: clearedOrKept(values.phone, original.phone),
-      phoneSecondary: clearedOrKept(values.phoneSecondary, original.phoneSecondary),
-      passport: clearedOrKept(values.passport, original.passport),
-      address: clearedOrKept(values.address, original.address),
-      notes: clearedOrKept(values.notes, original.notes),
+      dateOfBirth: changed(values.dateOfBirth, original.dateOfBirth),
+      phone: piiChanged(values.phone, original.phone),
+      phoneSecondary: piiChanged(values.phoneSecondary, original.phoneSecondary),
+      passport: piiChanged(values.passport, original.passport),
+      address: piiChanged(values.address, original.address),
+      notes: changed(values.notes, original.notes),
       allowEmergencyRecall: values.allowEmergencyRecall,
     }),
   );
@@ -252,24 +266,44 @@ function GeneralEditForm({ patientId }: { patientId: string }) {
           <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
             {/* L13: patientEditSchema endi telefon formatini tekshiradi — error endi wire qilingan
                 (aks holda noto'g'ri format kiritilganda submit jim bloklanardi). */}
-            <PhoneInput label={t('patients.form.phone')} {...form.getInputProps('phone')} />
-            <PhoneInput
-              label={t('patients.form.phone_secondary')}
-              {...form.getInputProps('phoneSecondary')}
-            />
+            {canEditPii ? (
+              <>
+                <PhoneInput label={t('patients.form.phone')} {...form.getInputProps('phone')} />
+                <PhoneInput
+                  label={t('patients.form.phone_secondary')}
+                  {...form.getInputProps('phoneSecondary')}
+                />
+              </>
+            ) : (
+              <>
+                <Input label={t('patients.form.phone')} value={form.values.phone} disabled />
+                <Input
+                  label={t('patients.form.phone_secondary')}
+                  value={form.values.phoneSecondary}
+                  disabled
+                />
+              </>
+            )}
           </SimpleGrid>
           <Input
             label={t('patients.form.passport')}
             value={form.values.passport}
             error={form.errors.passport}
+            disabled={!canEditPii}
             onChange={(v) => form.setFieldValue('passport', v)}
           />
           <Input
             label={t('patients.form.address')}
             value={form.values.address}
             error={form.errors.address}
+            disabled={!canEditPii}
             onChange={(v) => form.setFieldValue('address', v)}
           />
+          {!canEditPii && (
+            <Text size="xs" c="dimmed" data-testid="pii-readonly-hint">
+              {t('patientsList.pii_readonly_hint')}
+            </Text>
+          )}
           <Textarea
             label={t('patients.form.notes')}
             rows={3}

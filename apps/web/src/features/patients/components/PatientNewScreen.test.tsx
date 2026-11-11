@@ -4,8 +4,11 @@ import { renderApp } from '../../../test-utils';
 import { PatientNewScreen } from './PatientNewScreen';
 
 const createMock = vi.fn();
+// biome-ignore lint/suspicious/noExplicitAny: test-only mutable mock result
+let phoneCheckData: any[] | undefined;
 vi.mock('../patients.api', () => ({
   useCreatePatient: () => ({ mutate: createMock, isPending: false }),
+  usePhoneCheck: () => ({ data: phoneCheckData }),
 }));
 
 const navigateMock = vi.fn();
@@ -18,6 +21,7 @@ describe('PatientNewScreen', () => {
   beforeEach(() => {
     createMock.mockClear();
     navigateMock.mockClear();
+    phoneCheckData = undefined;
   });
 
   it("form maydonlari + teg/manba/sug'urta ko'rsatadi", () => {
@@ -83,5 +87,52 @@ describe('PatientNewScreen', () => {
       ).toBeInTheDocument(),
     );
     expect(createMock).not.toHaveBeenCalled();
+  });
+
+  describe('telefon dublikati (UI-R6)', () => {
+    const fillNameAndPhone = () => {
+      fireEvent.change(screen.getByLabelText("To'liq ism"), { target: { value: 'Yangi Bemor' } });
+      fireEvent.change(screen.getByLabelText(/Telefon/, { selector: 'input' }), {
+        target: { value: '901234567' },
+      });
+    };
+
+    it('dublikat topilsa ogohlantirish + «Uni ochish» / «Baribir yangi» ko‘rinadi', () => {
+      phoneCheckData = [{ id: 'p9', fullName: 'Jasur Tursunov' }];
+      renderApp(<PatientNewScreen />);
+      fillNameAndPhone();
+      const box = screen.getByTestId('phone-dup');
+      expect(box).toHaveTextContent('Jasur Tursunov');
+      fireEvent.click(screen.getByText('Uni ochish'));
+      expect(navigateMock).toHaveBeenCalledWith('/patients/p9');
+    });
+
+    it('tanlovsiz saqlash to‘xtatiladi; «Baribir yangi» dan keyin saqlanadi', async () => {
+      phoneCheckData = [{ id: 'p9', fullName: 'Jasur Tursunov' }];
+      renderApp(<PatientNewScreen />);
+      fillNameAndPhone();
+
+      fireEvent.click(screen.getByText('Saqlash'));
+      await vi.waitFor(() => expect(screen.getByText(/Avval tanlang/)).toBeInTheDocument());
+      expect(createMock).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByText("Baribir yangi (oila a'zosi)"));
+      expect(screen.queryByTestId('phone-dup')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByText('Saqlash'));
+      await vi.waitFor(() => expect(createMock).toHaveBeenCalled());
+      expect(createMock).toHaveBeenCalledWith(
+        expect.objectContaining({ fullName: 'Yangi Bemor', phone: '+998901234567' }),
+        expect.anything(),
+      );
+    });
+
+    it('dublikat yo‘q bo‘lsa ogohlantirish chiqmaydi va saqlash to‘siqsiz', async () => {
+      phoneCheckData = [];
+      renderApp(<PatientNewScreen />);
+      fillNameAndPhone();
+      expect(screen.queryByTestId('phone-dup')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByText('Saqlash'));
+      await vi.waitFor(() => expect(createMock).toHaveBeenCalled());
+    });
   });
 });

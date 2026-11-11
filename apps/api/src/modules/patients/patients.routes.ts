@@ -16,6 +16,7 @@ import {
   toPatientListItemDto,
   toPatientRelativeDto,
 } from './patients.mapper.ts';
+import { userHasPiiAccess } from './patients.mask.ts';
 import {
   addEmergencyContactSchema,
   addRelativeSchema,
@@ -33,6 +34,8 @@ import {
   patientListResponseDtoSchema,
   patientRelativeDtoSchema,
   patientRelativeViewSchema,
+  phoneCheckQuerySchema,
+  phoneCheckResultSchema,
   relativeParamSchema,
   relativeRemoveResultSchema,
   updateMedicalRecordSchema,
@@ -146,6 +149,24 @@ export const patientRoutes = (deps: {
     const body = c.req.valid('json');
     const row = await service.create(c, body);
     return c.json(ok(toPatientDto(row)), 201);
+  });
+
+  // ─── GET /phone-check — telefon dublikat tekshiruvi (UI-R6) ───────────────
+  // ⚠️ `/{id}` dan OLDIN ro'yxatdan o'tadi (aks holda "phone-check" id sifatida tushadi).
+
+  const phoneCheckRoute = createRoute({
+    method: 'get',
+    path: '/phone-check',
+    tags: ['patients'],
+    operationId: 'checkPatientPhone',
+    middleware: [requirePermission('patient.create')] as const,
+    request: { query: phoneCheckQuerySchema },
+    responses: okJson(phoneCheckResultSchema, 'Patients already registered with this phone'),
+  });
+
+  app.openapi(phoneCheckRoute, async (c) => {
+    const { phone } = c.req.valid('query');
+    return c.json(ok(await service.phoneCheck(c, phone)), 200);
   });
 
   // ─── GET /{id} — get by id ───────────────────────────────────────────────
@@ -401,7 +422,8 @@ export const patientRoutes = (deps: {
   app.openapi(listEmergencyContactsRoute, async (c) => {
     const { id } = c.req.valid('param');
     const rows = await service.listEmergencyContacts(c, id);
-    return c.json(ok(rows.map(toEmergencyContactDto)), 200);
+    const canViewPii = userHasPiiAccess(c);
+    return c.json(ok(rows.map((r) => toEmergencyContactDto(r, { canViewPii }))), 200);
   });
 
   const addEmergencyContactRoute = createRoute({
@@ -440,7 +462,7 @@ export const patientRoutes = (deps: {
     try {
       const row = await service.addEmergencyContact(c, id, body);
       if (!row) throw new Error('Emergency contact creation failed');
-      return c.json(ok(toEmergencyContactDto(row)), 201);
+      return c.json(ok(toEmergencyContactDto(row, { canViewPii: userHasPiiAccess(c) })), 201);
     } catch (e) {
       // CLI-421: cross-entity ownership mismatch (URL patientId) → 400.
       if (e instanceof CrossEntityError) {

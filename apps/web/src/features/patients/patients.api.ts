@@ -3,6 +3,7 @@ import {
   addPatientRelative,
   archivePatient,
   createPatient,
+  customInstance,
   getMedicalRecord,
   getMedicalRecordHistory,
   getPatient,
@@ -22,7 +23,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { patientKeys } from './patients.keys';
 import { toPatientDetail, toPatientListItem } from './patients.mappers';
-import type { ListParams } from './patients.types';
+import type { ListParams, PhoneCheckMatch } from './patients.types';
 
 export function usePatients(params: ListParams, options?: { enabled?: boolean }) {
   const { t } = useTranslation();
@@ -37,6 +38,29 @@ export function usePatients(params: ListParams, options?: { enabled?: boolean })
         pageSize: params.pageSize ?? 20,
       }).then((r) => r.data);
       return { items: res.data.map((p) => toPatientListItem(p, t)), meta: res.meta };
+    },
+  });
+}
+
+/**
+ * UI-R6: telefon dublikat tekshiruvi (`GET /api/patients/phone-check`). To'liq raqam
+ * (+998XXXXXXXXX) bo'lgandagina so'raydi. Generated klient (`checkPatientPhone`) kontrakt
+ * regeneratsiyasidan keyin paydo bo'ladi — shu paytgacha envelope-mutator orqali to'g'ridan.
+ */
+export function usePhoneCheck(phone: string) {
+  const digits = phone.replace(/\D/g, '');
+  return useQuery({
+    queryKey: patientKeys.phoneCheck(phone),
+    // To'liq O'zbekiston raqami (+998 + 9 raqam = 12 xona) — qisman raqamda so'ramaymiz.
+    enabled: digits.length >= 12,
+    staleTime: 15_000,
+    queryFn: async () => {
+      const res = await customInstance<{ data: { matches: PhoneCheckMatch[] } }>({
+        url: '/api/patients/phone-check',
+        method: 'GET',
+        params: { phone },
+      });
+      return res.data.matches;
     },
   });
 }
