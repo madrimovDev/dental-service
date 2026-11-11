@@ -1,0 +1,1 @@
+ALTER TABLE "user_assignments" ALTER COLUMN "accepted_at" SET DEFAULT now();

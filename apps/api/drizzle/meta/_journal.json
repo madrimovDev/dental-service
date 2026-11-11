@@ -330,6 +330,13 @@
       "when": 1794397272589,
       "tag": "0046_assignment_accepted_at",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1794398659541,
+      "tag": "0047_user_assignments_accepted_default",
+      "breakpoints": true
     }
   ]
 }
