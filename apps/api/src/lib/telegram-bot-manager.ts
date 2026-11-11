@@ -94,6 +94,12 @@ export function startTelegramBotManager(deps: ManagerDeps) {
       // FU-15: `/start pv_<token>` — xodim telefonini tasdiqlash (bemor oqimidan alohida).
       // `ctx.payload` faqat shu prefiks bilan bo'lsa ushlanadi; aks holda bemor menyusi.
       if (ctx.payload?.startsWith(PV_START_PREFIX)) {
+        // Faqat shaxsiy chat: guruhda token guruh chat'iga bog'lanib, boshqa a'zo kontakti
+        // bilan tasdiqlanib qolmasin (verifier topdi).
+        if (ctx.chat.type !== 'private') {
+          await ctx.reply(phoneVerifyReplies.invalidLink);
+          return;
+        }
         const pvToken = parsePhoneVerifyPayload(ctx.payload);
         const outcome = pvToken
           ? await bindPhoneVerification(deps.adminDb, {
@@ -138,13 +144,16 @@ export function startTelegramBotManager(deps: ManagerDeps) {
       const chatId = String(ctx.chat.id);
       // FU-15: shu chat'da xodim telefoni tasdig'i kutilayotgan bo'lsa — kontakt shu
       // oqimga tegishli (bemor bog'lashga tushmaydi). Platform jadvallari → admin ulanish.
-      if (await hasPendingPhoneVerification(deps.adminDb, { tenantId, chatId })) {
+      if (
+        ctx.chat.type === 'private' &&
+        (await hasPendingPhoneVerification(deps.adminDb, { tenantId, chatId }))
+      ) {
         const pv = await verifyPhoneByContact(deps.adminDb, {
           tenantId,
           chatId,
           contactUserId: ctx.message.contact.user_id,
           fromId: ctx.from.id,
-          phone,
+          phone: ctx.message.contact.phone_number,
         });
         await ctx.reply(phoneVerifyReplyFor(pv), { reply_markup: { remove_keyboard: true } });
         return;

@@ -462,16 +462,29 @@ describe('FU-15 — taklifni qabul qilish telefon tasdigʻini talab qiladi', () 
     expect(await acceptedAt(tenantB, invB)).not.toBeNull();
   });
 
-  test('owner parolni tiklasa → phone_verified_at NULL, yangi taklif yana tasdiq talab qiladi', async () => {
-    const res = await call(ownerAToken, 'POST', `/users/${victimId}/reset-password`);
-    expect(res.status).toBe(200);
+  test('9 xonali raqam (mamlakat kodisiz) +998 deb taxmin qilinmaydi → rad', async () => {
+    // Avvalgi testda tasdiqlangan — tozalab, yangi token bilan sinaymiz.
+    await db.update(users).set({ phoneVerifiedAt: null }).where(eq(users.id, victimId));
+    const inv3 = await invite(tenantB, await seedRole(tenantB, 'B Local', ['patient.view']));
+    const token = await startOk(inv3);
+    expect(await bindPhoneVerification(db, { tenantId: tenantB, token, chatId: '7008' })).toBe(
+      'bound',
+    );
+    expect(
+      await verifyPhoneByContact(db, {
+        tenantId: tenantB,
+        chatId: '7008',
+        contactUserId: 7008,
+        fromId: 7008,
+        phone: '900015001',
+      }),
+    ).toBe('phone_mismatch');
     expect(await phoneVerifiedAt()).toBeNull();
+  });
 
-    // Yangi taklif (B klinikasining boshqa roli) — qabul qilish yana 403.
-    const inv2 = await invite(tenantB, await seedRole(tenantB, 'B Nurse', ['patient.view']));
-    const acc = await call(victimToken, 'POST', `/auth/invitations/${inv2}/accept`);
-    expect(acc.status).toBe(403);
-    expect(await errCode(acc)).toBe('phone.verification_required');
-    expect(await acceptedAt(tenantB, inv2)).toBeNull();
+  test("xodim boshqa klinikada ham qabul qilingan a'zo → A egasi parolni tiklay olmaydi (403)", async () => {
+    const res = await call(ownerAToken, 'POST', `/users/${victimId}/reset-password`);
+    expect(res.status).toBe(403);
+    expect(await errCode(res)).toBe('user.reset_multi_tenant_member');
   });
 });

@@ -20,6 +20,9 @@ import type { DbOrTx } from '../../db/client.ts';
 
 /** `/start` payload prefiksi — bemor bog'lash oqimidan (P8) ajratadi. */
 export const PV_START_PREFIX = 'pv_';
+
+/** Telegram `contact.phone_number` (`+998…` yoki `998…`) → `+<raqamlar>`, mamlakat kodi taxmin qilinmaydi. */
+export const strictTelegramPhone = (raw: string): string => `+${raw.replace(/\D/g, '')}`;
 export const PHONE_VERIFICATION_TTL_MS = 15 * 60_000;
 
 export const hashVerificationToken = async (token: string): Promise<string> => {
@@ -129,7 +132,9 @@ export async function verifyPhoneByContact(
       .returning({ id: phoneVerifications.id });
     if (!consumed || !user) return 'expired' as const;
 
-    if (normalizePhone(o.phone) !== normalizePhone(user.phone)) {
+    // Telegram kontaktida mamlakat kodi doim bor — 9 xonali xorijiy raqam `normalizePhone`
+    // orqali +998 deb o'qilmasligi uchun qat'iy solishtiriladi (verifier topdi).
+    if (strictTelegramPhone(o.phone) !== normalizePhone(user.phone)) {
       await tx.insert(auditLog).values({
         tenantId: null,
         userId: user.id,
@@ -167,7 +172,7 @@ export async function verifyPhoneByContact(
 /** Bot javoblari (uz — bot oqimining standart tili; foydalanuvchi hali bemor emas). */
 export const phoneVerifyReplies = {
   askContact:
-    "Telefon raqamingizni tasdiqlash uchun pastdagi «📱 Raqamni ulashish» tugmasini bosing. Faqat o'z raqamingizni ulashing.",
+    "Telefon raqamingizni tasdiqlash uchun pastdagi «📱 Raqamni ulashish» tugmasini bosing. Faqat o'z raqamingizni ulashing. Agar bu so'rovni siz boshlamagan bo'lsangiz — hech narsa ulashmang.",
   shareButton: '📱 Raqamni ulashish',
   invalidLink:
     "⚠️ Havola yaroqsiz yoki muddati o'tgan. Ilovada «Telegram orqali tasdiqlash»ni qayta bosing.",
