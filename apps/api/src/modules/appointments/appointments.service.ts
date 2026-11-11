@@ -5,7 +5,7 @@ import {
   userAssignments,
   users,
 } from '@dental/db-schema';
-import { and, asc, between, eq, gt, gte, lt, lte, ne } from 'drizzle-orm';
+import { and, asc, between, eq, gt, gte, isNotNull, lt, lte, ne } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { onAfterCommit } from '../../db/after-commit.ts';
 import { getDb } from '../../db/scoped.ts';
@@ -585,7 +585,13 @@ export const createAppointmentsService = (deps: {
       .innerJoin(users, eq(users.id, userAssignments.userId))
       .innerJoin(rolePermissions, eq(rolePermissions.roleId, userAssignments.roleId))
       .innerJoin(permissions, eq(permissions.id, rolePermissions.permissionId))
-      .where(and(eq(userAssignments.isActive, true), eq(permissions.code, 'medical_record.edit')))
+      .where(
+        and(
+          eq(userAssignments.isActive, true),
+          isNotNull(userAssignments.acceptedAt),
+          eq(permissions.code, 'medical_record.edit'),
+        ),
+      )
       .orderBy(users.fullName);
 
     return rows.map((r) => ({ id: r.id, name: r.fullName ?? r.phone }));

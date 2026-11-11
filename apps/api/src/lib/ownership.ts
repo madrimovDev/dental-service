@@ -7,7 +7,7 @@ import {
   userAssignments,
   visitNotes,
 } from '@dental/db-schema';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNotNull } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../db/scoped.ts';
 
@@ -66,7 +66,13 @@ export const createOwnershipValidator = () => {
     const [row] = await db
       .select({ id: userAssignments.id })
       .from(userAssignments)
-      .where(and(eq(userAssignments.userId, userId), eq(userAssignments.isActive, true)))
+      .where(
+        and(
+          eq(userAssignments.userId, userId),
+          eq(userAssignments.isActive, true),
+          isNotNull(userAssignments.acceptedAt),
+        ),
+      )
       .limit(1);
     if (!row) throw new CrossEntityError('user', 'not_found');
   }

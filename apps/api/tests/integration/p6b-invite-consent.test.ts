@@ -409,7 +409,7 @@ describe('P6b — rad etish va qayta taklif', () => {
 });
 
 describe('P6b — yangi foydalanuvchi va addAssignment', () => {
-  test('(5) yangi foydalanuvchi invite (tempPassword) darhol ishlaydi — rozilik so`ralmaydi', async () => {
+  test('(5) yangi foydalanuvchi invite — rozilik so`ralmaydi, birinchi kirishda parol almashtiriladi', async () => {
     const res = await call(ownerAToken, 'POST', '/users/invite', {
       phone: NEWBIE_PHONE,
       fullName: 'Newbie Staff',
@@ -420,7 +420,18 @@ describe('P6b — yangi foydalanuvchi va addAssignment', () => {
     expect(json.data.pending).toBe(false);
     expect(json.data.tempPassword.length).toBeGreaterThanOrEqual(12);
 
-    const { data } = await login(NEWBIE_PHONE, json.data.tempPassword);
+    // Vaqtinchalik parol bilan birinchi kirish — almashtirish majburiy (owner parolni biladi).
+    const first = await login(NEWBIE_PHONE, json.data.tempPassword);
+    expect((first.data as { mustChangePassword?: boolean } | undefined)?.mustChangePassword).toBe(
+      true,
+    );
+    const changed = await call(first.data?.accessToken ?? '', 'POST', '/auth/change-password', {
+      currentPassword: json.data.tempPassword,
+      newPassword: 'NewbieOwnPass123!',
+    });
+    expect(changed.status).toBe(200);
+
+    const { data } = await login(NEWBIE_PHONE, 'NewbieOwnPass123!');
     expect(data).toBeDefined();
     expect((await listInvitations(data?.accessToken ?? '')).length).toBe(0);
     const sw = await call(data?.accessToken ?? '', 'POST', '/auth/switch-workspace', {

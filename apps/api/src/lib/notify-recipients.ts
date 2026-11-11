@@ -1,5 +1,5 @@
 import { permissions, rolePermissions, tenants, userAssignments } from '@dental/db-schema';
-import { and, eq, isNull, or } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, or } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../db/scoped.ts';
 
@@ -38,6 +38,8 @@ export async function findRecipientsWithPermission(
       and(
         eq(userAssignments.tenantId, tenantId),
         eq(userAssignments.isActive, true),
+        // FU-08: kutilayotgan (qabul qilinmagan) taklif a'zolik emas.
+        isNotNull(userAssignments.acceptedAt),
         eq(permissions.code, code),
         branchPredicate,
       ),

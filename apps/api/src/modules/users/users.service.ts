@@ -111,6 +111,9 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
             phone,
             passwordHash,
             fullName: input.fullName,
+            // Vaqtinchalik parolni owner biladi — birinchi kirishda almashtirish majburiy
+            // (aks holda klinika ishlamaydigan hisobning ishlaydigan parolini saqlab qoladi).
+            mustChangePassword: true,
           })
           .returning();
 
@@ -118,11 +121,8 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
         user = created;
         createdNow = true;
 
-        // Mock OTP — console'ga password log qilinadi (M3 da SMS)
-        logger.warn(
-          { userId: user.id, phone: user.phone, tempPassword },
-          `🔐 Mock invite — production'da SMS orqali parol yuboriladi`,
-        );
+        // Vaqtinchalik parol FAQAT javobda (owner xodimga beradi) — log'ga yozilmaydi.
+        logger.info({ userId: user.id }, 'Invite: yangi foydalanuvchi yaratildi');
       }
 
       // Assignment yaratish (yoki agar mavjud bo'lsa — duplicate'ni oldini olish)

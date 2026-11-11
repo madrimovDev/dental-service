@@ -1,5 +1,5 @@
 import { tenants, userAssignments, users } from '@dental/db-schema';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNotNull } from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { Database } from '../../db/client.ts';
 import { getDb } from '../../db/scoped.ts';
@@ -86,6 +86,8 @@ export const createTenantsService = (deps: { db: Database; audit: AuditLogger })
           eq(userAssignments.tenantId, tenantId),
           eq(userAssignments.userId, input.newOwnerUserId),
           eq(userAssignments.isActive, true),
+          // FU-08: rozi bo'lmagan (kutilayotgan) foydalanuvchiga egalik o'tkazilmaydi.
+          isNotNull(userAssignments.acceptedAt),
         ),
       );
     if (!membership) return { ok: false as const, code: 'user.not_member' };
