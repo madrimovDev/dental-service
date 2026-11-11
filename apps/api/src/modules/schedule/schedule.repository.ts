@@ -159,6 +159,23 @@ export const createScheduleRepository = () => {
       );
   }
 
+  /** P10: doktorning shu filialda umuman (istalgan kun) aktiv jadval segmenti bormi. */
+  async function hasAnyActiveSegments(c: Context, doctorId: string, branchId: string) {
+    const db = getDb(c);
+    const [row] = await db
+      .select({ id: doctorSchedules.id })
+      .from(doctorSchedules)
+      .where(
+        and(
+          eq(doctorSchedules.doctorId, doctorId),
+          eq(doctorSchedules.branchId, branchId),
+          eq(doctorSchedules.isActive, true),
+        ),
+      )
+      .limit(1);
+    return Boolean(row);
+  }
+
   // ─── branch-wide availability inputs (DS4) ────────────────────────────────
   // Filialdagi BARCHA doktorlar uchun bir kunlik availability bir necha
   // so'rovda (per-doktor N+1 emas) — service xotirada doctorId bo'yicha guruh-
@@ -264,6 +281,7 @@ export const createScheduleRepository = () => {
     listDoctorAppointments,
     listOverlappingTimeOff,
     listActiveSegmentsForDay,
+    hasAnyActiveSegments,
     listBranchActiveSegmentsForDay,
     listBranchAppointments,
     listBranchOverlappingTimeOff,

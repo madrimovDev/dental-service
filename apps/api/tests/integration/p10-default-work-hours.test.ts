@@ -4,13 +4,21 @@
  * workHours=null filialda workHoursConfigured:false. Real DB.
  */
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { branches, doctorSchedules, patients } from '@dental/db-schema';
+import {
+  branches,
+  doctorSchedules,
+  patients,
+  roles,
+  userAssignments,
+  users,
+} from '@dental/db-schema';
 import { eq, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { DbOrTx } from '../../src/db/client.ts';
 import { db } from '../../src/db/client.ts';
 import { createAppointmentsService } from '../../src/modules/appointments/appointments.service.ts';
 import { provisionTenantInTx } from '../../src/modules/auth/auth.service.ts';
+import { DEFAULT_WORK_HOURS } from '../../src/modules/branches/branches.defaults.ts';
 import { createScheduleService } from '../../src/modules/schedule/schedule.service.ts';
 
 let tenantId: string;
@@ -45,6 +53,8 @@ const appts = createAppointmentsService({ audit: noopAudit, schedule });
 // 2026-12-07 — dushanba, 2026-12-13 — yakshanba.
 const MON = '2026-12-07';
 const SUN = '2026-12-13';
+const TUE = '2026-12-08';
+let freshDoctorId: string;
 
 beforeAll(async () => {
   await db.execute(sql`TRUNCATE users, tenants RESTART IDENTITY CASCADE`);
@@ -70,6 +80,19 @@ beforeAll(async () => {
       startMinute: 540,
       endMinute: 1080,
     });
+    // Jadvali UMUMAN yo'q yangi doktor (haqiqiy yangi klinika holati — P10 brauzer sinovi).
+    const [u] = await tx
+      .insert(users)
+      .values({ phone: '+998900001011', passwordHash: 'x', fullName: 'Yangi Doktor' })
+      .returning({ id: users.id });
+    freshDoctorId = u!.id;
+    const [docRole] = await tx
+      .select({ id: roles.id })
+      .from(roles)
+      .where(eq(roles.templateKey, 'doctor'));
+    await tx
+      .insert(userAssignments)
+      .values({ tenantId, branchId, userId: freshDoctorId, roleId: docRole!.id });
     const [p] = await tx
       .insert(patients)
       .values({ tenantId, fullName: 'Ali Valiyev', phone: '+998901112233' })
@@ -132,5 +155,53 @@ describe('P10 default work hours', () => {
       schedule.getAvailability(c, { doctorId: ownerId, branchId, date: MON, slotMinutes: 30 }),
     );
     expect(av.workHoursConfigured).toBe(false);
+    // Keyingi testlar uchun default'ni qaytaramiz.
+    await run((c) =>
+      (c.get('db') as DbOrTx)
+        .update(branches)
+        .set({ workHours: DEFAULT_WORK_HOURS })
+        .where(eq(branches.id, branchId)),
+    );
+  });
+
+  test("jadvali yo'q doktor filial ish soatida ishlaydi: slot bor va bron yaratiladi", async () => {
+    const av = await run((c) =>
+      schedule.getAvailability(c, {
+        doctorId: freshDoctorId,
+        branchId,
+        date: MON,
+        slotMinutes: 30,
+      }),
+    );
+    expect(av.slots.length).toBeGreaterThan(0);
+    const created = await run((c) =>
+      appts.create(c, {
+        branchId,
+        patientId,
+        doctorId: freshDoctorId,
+        startTime: '2026-12-07T05:00:00.000Z', // 10:00 Toshkent
+        endTime: '2026-12-07T05:30:00.000Z',
+        serviceIds: [],
+      }),
+    );
+    expect((created as { ok: boolean }).ok).toBe(true);
+  });
+
+  test("jadvali bor doktor jadvalsiz kunda (seshanba) band — fallback qo'llanmaydi", async () => {
+    const av = await run((c) =>
+      schedule.getAvailability(c, { doctorId: ownerId, branchId, date: TUE, slotMinutes: 30 }),
+    );
+    expect(av.slots.length).toBe(0);
+    const created = await run((c) =>
+      appts.create(c, {
+        branchId,
+        patientId,
+        doctorId: ownerId,
+        startTime: '2026-12-08T05:00:00.000Z',
+        endTime: '2026-12-08T05:30:00.000Z',
+        serviceIds: [],
+      }),
+    );
+    expect((created as { ok: boolean; code?: string }).code).toBe('schedule.outside_working_hours');
   });
 });

@@ -125,6 +125,26 @@ export const createScheduleService = (deps: { audit: AuditLogger }) => {
 
   // ─── Availability ───────────────────────────────────────────────────────
 
+  /**
+   * P10: shaxsiy jadvali UMUMAN yo'q doktor filial ish soatida ishlaydi deb hisoblanadi
+   * (yangi klinikada darhol bron qilish uchun). Jadvali bor, lekin shu kun segmenti
+   * yo'q doktor — dam olish kuni (avvalgidek).
+   */
+  async function segmentsForDay(c: Context, doctorId: string, branchId: string, weekday: number) {
+    const segs = await repo.listActiveSegmentsForDay(c, doctorId, branchId, weekday);
+    if (segs.length > 0) return segs;
+    if (await repo.hasAnyActiveSegments(c, doctorId, branchId)) return segs;
+    return [
+      {
+        weekday,
+        startMinute: 0,
+        endMinute: 1440,
+        effectiveFrom: null,
+        effectiveUntil: null,
+      },
+    ];
+  }
+
   async function getAvailability(c: Context, query: AvailabilityQuery) {
     // Kun [start,end) instant chegaralari — UTC+5 local 00:00 → +1 kun 00:00.
     // Bir kun avval/keyingacha kengaytirib o'qiymiz (chegaradagi event'lar uchun
@@ -140,7 +160,7 @@ export const createScheduleService = (deps: { audit: AuditLogger }) => {
 
     // Weekday'dagi segmentlar (effective oynasi pure funksiyada filtrlanadi).
     const weekday = weekdayOf(query.date);
-    const segRows = await repo.listActiveSegmentsForDay(c, query.doctorId, query.branchId, weekday);
+    const segRows = await segmentsForDay(c, query.doctorId, query.branchId, weekday);
 
     const slots = computeAvailability({
       date: query.date,
@@ -257,7 +277,7 @@ export const createScheduleService = (deps: { audit: AuditLogger }) => {
 
     const weekday = weekdayOf(dateStr);
     const [segs, workHours] = await Promise.all([
-      repo.listActiveSegmentsForDay(c, doctorId, branchId, weekday),
+      segmentsForDay(c, doctorId, branchId, weekday),
       repo.getBranchWorkHours(c, branchId),
     ]);
     if (segs.length === 0) return false;
