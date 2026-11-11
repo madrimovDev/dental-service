@@ -37,6 +37,7 @@ let noInviteId: string;
 let adminRoleId: string;
 let lowRoleId: string;
 let bmRoleId: string;
+const branchRoleIds: Record<string, string> = {};
 let bmToken: string;
 let ownerToken: string;
 let noInviteToken: string;
@@ -101,6 +102,17 @@ beforeAll(async () => {
   adminRoleId = await seedRole('Tenant Admin', adminPerms);
   lowRoleId = await seedRole('FrontDesk', ['patient.view', 'appointment.view']);
   bmRoleId = await seedRole('Branch Manager', bmPerms);
+  // FU-41: BM endi barcha filial shablonlarining superset'i — ularning har biri grantable bo'lishi kerak.
+  for (const key of [
+    'receptionist',
+    'doctor',
+    'doctor_assistant',
+    'nurse',
+    'accountant',
+    'technician',
+  ]) {
+    branchRoleIds[key] = await seedRole(`T-${key}`, templatePerms(key));
+  }
 
   bmToken = await tokenFor(bmId, bmPerms);
   ownerToken = await tokenFor(ownerId, ['@owner']);
@@ -140,6 +152,29 @@ describe('GET /api/users/grantable-roles (real Branch Manager permset)', () => {
       roleId: adminRoleId,
     });
     expect(bad.status).toBe(403);
+  });
+
+  test('FU-41: BM Receptionist/Doctor/Doctor+Assistant/Nurse/Accountant/Technician rollarini oladi (201), Tenant Admin — yo‘q (403 role.escalation)', async () => {
+    const res = await call(bmToken, 'GET', '/users/grantable-roles');
+    const ids = ((await res.json()) as { data: { id: string }[] }).data.map((r) => r.id);
+    expect(ids).not.toContain(adminRoleId);
+    let n = 0;
+    for (const [key, roleId] of Object.entries(branchRoleIds)) {
+      expect(ids).toContain(roleId);
+      const ok = await call(bmToken, 'POST', '/users/invite', {
+        phone: `+99890000620${n++}`,
+        fullName: `Invited ${key}`,
+        roleId,
+      });
+      expect(ok.status).toBe(201);
+    }
+    const bad = await call(bmToken, 'POST', '/users/invite', {
+      phone: '+998900006299',
+      fullName: 'Invited Admin2',
+      roleId: adminRoleId,
+    });
+    expect(bad.status).toBe(403);
+    expect(((await bad.json()) as { error: { code: string } }).error.code).toBe('role.escalation');
   });
 
   test('owner sees every role', async () => {

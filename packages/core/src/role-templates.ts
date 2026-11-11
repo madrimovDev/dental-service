@@ -16,6 +16,8 @@ export type RoleTemplate = {
   descriptionUz: string;
   descriptionRu: string;
   permissions: readonly Permission[];
+  /** FU-41: yozilish qabul qiladigan shifokor roli (`roles.is_practitioner`). */
+  isPractitioner?: boolean;
 };
 
 export const ROLE_TEMPLATES = [
@@ -95,8 +97,15 @@ export const ROLE_TEMPLATES = [
   {
     name: 'Branch Manager',
     templateKey: 'branch_manager',
-    descriptionUz: 'Filial mudiri — filial ichida hamma narsani boshqaradi',
-    descriptionRu: 'Менеджер филиала',
+    descriptionUz:
+      'Filial mudiri — filial ichida hamma narsani boshqaradi (resepsioner, shifokor, hamshira, buxgalter va texnik huquqlari)',
+    descriptionRu:
+      'Менеджер филиала — все права филиальных ролей (администратор, врач, медсестра, бухгалтер, техник)',
+    // FU-41: = Receptionist ∪ Doctor ∪ Doctor+Assistant ∪ Nurse ∪ Accountant ∪ Technician ∪ eski BM.
+    // Tenant-darajali huquqlar (tenant.edit, tenant_settings.*, role.*, user.manage/deactivate,
+    // branch.create/delete, notification.*, staff.invite/edit/delete, patient.delete,
+    // service.manage) QASDDAN YO'Q — shuning uchun P5 (assertCanGrant) bo'yicha BM
+    // Tenant Admin'ni bera olmaydi. Shifokor ro'yxatiga tushmaydi (`isPractitioner` yo'q).
     permissions: [
       'tenant.view',
       'branch.view',
@@ -108,6 +117,8 @@ export const ROLE_TEMPLATES = [
       'patient.create',
       'patient.edit',
       'patient.view_pii',
+      'medical_record.view',
+      'medical_record.edit',
       'staff.view',
       'appointment.view',
       'appointment.create',
@@ -118,7 +129,11 @@ export const ROLE_TEMPLATES = [
       'queue.manage',
       'service.view',
       'cashier.view',
+      'cashier.create_transaction',
+      'cashier.refund',
+      'cashier.void',
       'report.view',
+      'salary.view',
       'expense.view',
       'expense.manage',
       'stock.view',
@@ -129,16 +144,20 @@ export const ROLE_TEMPLATES = [
       'schedule.manage',
       'recall.view',
       'recall.manage',
-      // M5 shell permissions (CLI-412) — faqat *.view (manage/upload YO'Q)
       'prescription.view',
+      'prescription.manage',
       'consent.view',
+      'consent.manage',
       'lab_order.view',
+      'lab_order.manage',
       'patient_image.view',
+      'patient_image.upload',
     ],
   },
   {
     name: 'Doctor',
     templateKey: 'doctor',
+    isPractitioner: true,
     descriptionUz: 'Doktor — klinik ish',
     descriptionRu: 'Врач — клиническая работа',
     permissions: [
@@ -172,6 +191,7 @@ export const ROLE_TEMPLATES = [
   {
     name: 'Doctor + Assistant',
     templateKey: 'doctor_assistant',
+    isPractitioner: true,
     descriptionUz:
       'Doktor + asistent ishlari (kichik klinikalarda asistent alohida login bermaslik mumkin)',
     descriptionRu: 'Врач + ассистент (для малых клиник без отдельного логина ассистента)',

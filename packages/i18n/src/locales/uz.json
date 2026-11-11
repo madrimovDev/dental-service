@@ -566,6 +566,8 @@
   },
   "roles": {
     "create": "Yangi rol",
+    "practitioner": "Shifokor (yozilishni qabul qiladi)",
+    "practitioner_hint": "Belgilansa, bu rolli xodimlar yozilish va kalendarda shifokor sifatida ko'rinadi",
     "edit": "Rolni tahrirlash",
     "description": "Tavsif",
     "type": "Turi",

@@ -2,8 +2,7 @@ import {
   appointments,
   labOrders,
   patients,
-  permissions,
-  rolePermissions,
+  roles,
   treatmentPlans,
   treatmentStages,
   userAssignments,
@@ -571,12 +570,11 @@ export const createAppointmentsService = (deps: {
    * `appointment.view` bilan ochiq (yengil) — `user.view` (HR `/users/assignments`)
    * o'rniga, shunda Receptionist ham doktorlar ro'yxatini ko'radi.
    *
-   * A1 (CLI-438): deteksiya rol NOMI substring'iga ("doctor" so'zi) EMAS, balki
-   * `medical_record.edit` permission'iga tayanadi — barqaror signal (tenant rolni
-   * "Shifokor"/"Ortodont" deb qayta nomlasa ham ishlaydi). Role-template'larda
-   * (`packages/core/src/role-templates.ts`) faqat Doctor/Doctor+Assistant/Tenant
-   * Admin shu permission'ga ega; Nurse faqat `.view`, Receptionist/Technician
-   * umuman yo'q — "Doctor's Assistant" (klinik permission'siz) endi ko'rinmaydi.
+   * FU-41: deteksiya `roles.is_practitioner` bayrog'iga tayanadi (A1/CLI-438 da
+   * `medical_record.edit` permission'i edi — Branch Manager superset bo'lgach u endi
+   * shifokor belgisi emas). Bayroq Doctor/Doctor+Assistant shablonlarida va rol
+   * formasida «Shifokor» belgisi qo'yilgan rollarda yoqiladi (tenant rolni
+   * "Ortodont" deb qayta nomlasa ham ishlaydi).
    * ⚠️ Ma'lum chegara: yakka egа-doktor (tenant owner) role_permissions orqali EMAS,
    * implicit superuser sifatida ishlaydi — bu ro'yxatda ko'rinmaydi (eski substring
    * sxemasida ham ko'rinmasdi, pre-existing gap).
@@ -593,13 +591,12 @@ export const createAppointmentsService = (deps: {
       })
       .from(userAssignments)
       .innerJoin(users, eq(users.id, userAssignments.userId))
-      .innerJoin(rolePermissions, eq(rolePermissions.roleId, userAssignments.roleId))
-      .innerJoin(permissions, eq(permissions.id, rolePermissions.permissionId))
+      .innerJoin(roles, eq(roles.id, userAssignments.roleId))
       .where(
         and(
           eq(userAssignments.isActive, true),
           isNotNull(userAssignments.acceptedAt),
-          eq(permissions.code, 'medical_record.edit'),
+          eq(roles.isPractitioner, true),
         ),
       )
       .orderBy(users.fullName);

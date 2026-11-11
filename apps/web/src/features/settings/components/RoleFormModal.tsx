@@ -1,5 +1,5 @@
 import type { Role } from '@dental/api-client';
-import { Button, Group, Modal, Stack, TextInput } from '@mantine/core';
+import { Button, Checkbox, Group, Modal, Stack, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useEffect } from 'react';
@@ -27,7 +27,7 @@ export function RoleFormModal({
   const upsert = useUpsertRole();
 
   const form = useForm<RoleFormValues>({
-    initialValues: { name: '', description: '' },
+    initialValues: { name: '', description: '', isPractitioner: false },
     validate: zod4Resolver(roleSchema),
   });
 
@@ -35,7 +35,12 @@ export function RoleFormModal({
   useEffect(() => {
     if (!opened) return;
     if (editing) {
-      form.setValues({ name: editing.name, description: editing.description ?? '' });
+      form.setValues({
+        name: editing.name,
+        description: editing.description ?? '',
+        // TODO(generate): `Role.isPractitioner` generated modelda paydo bo'lgach cast kerak emas.
+        isPractitioner: (editing as Role & { isPractitioner?: boolean }).isPractitioner ?? false,
+      });
     } else {
       form.reset();
     }
@@ -47,6 +52,7 @@ export function RoleFormModal({
         id: editing?.id ?? null,
         name: values.name,
         description: values.description,
+        isPractitioner: values.isPractitioner ?? false,
         permissions: editing ? (detail.data?.permissions ?? []) : [],
       },
       {
@@ -68,6 +74,11 @@ export function RoleFormModal({
         <Stack gap="md">
           <TextInput label={t('common.name')} required {...form.getInputProps('name')} />
           <TextInput label={t('roles.description')} {...form.getInputProps('description')} />
+          <Checkbox
+            label={t('roles.practitioner')}
+            description={t('roles.practitioner_hint')}
+            {...form.getInputProps('isPractitioner', { type: 'checkbox' })}
+          />
           <Group justify="flex-end">
             <Button variant="default" onClick={onClose}>
               {t('common.cancel')}

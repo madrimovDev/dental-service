@@ -56,6 +56,7 @@ async function seedSystemRolesInTx(tx: DbTransaction, tenantId: string): Promise
         templateKey: template.templateKey,
         isTemplate: true,
         isSystem: true,
+        isPractitioner: 'isPractitioner' in template && template.isPractitioner === true,
       })
       .returning({ id: roles.id });
 
