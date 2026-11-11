@@ -249,6 +249,9 @@ export const medicalRecordDtoSchema = z
     bloodType: z.string().nullable(),
     pregnancyStatus: pregnancyStatusSchema.nullable(),
     testResults: testResultsSchema.nullable(),
+    /** Anamnez oxirgi tasdig'i (UI-D2) — hali tasdiqlanmagan bo'lsa null. */
+    confirmedAt: z.string().nullable(),
+    confirmedBy: z.uuid().nullable(),
     lastUpdatedBy: z.uuid().nullable(),
     createdAt: z.string(),
     updatedAt: z.string(),

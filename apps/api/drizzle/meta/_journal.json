@@ -351,6 +351,13 @@
       "when": 1794404203420,
       "tag": "0049_cashier_card_provider",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1794407169398,
+      "tag": "0050_anamnesis_confirmed",
+      "breakpoints": true
     }
   ]
 }

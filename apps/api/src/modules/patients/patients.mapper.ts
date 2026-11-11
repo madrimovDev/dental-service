@@ -133,6 +133,8 @@ export const toMedicalRecordDto = (row: MedicalRecord): MedicalRecordDto => ({
   bloodType: row.bloodType ?? null,
   pregnancyStatus: row.pregnancyStatus ?? null,
   testResults: row.testResults ?? null,
+  confirmedAt: row.confirmedAt?.toISOString() ?? null,
+  confirmedBy: row.confirmedBy ?? null,
   lastUpdatedBy: row.lastUpdatedBy ?? null,
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(),
