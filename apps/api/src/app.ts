@@ -7,7 +7,7 @@ import { secureHeaders } from 'hono/secure-headers';
 import { db } from './db/client.ts';
 import { createAuditLogger } from './lib/audit-logger.ts';
 import { env } from './lib/env.ts';
-import { requireModuleInDesktop } from './lib/license-middleware.ts';
+import { requireModuleInDesktop, requireValidLicenseInDesktop } from './lib/license-middleware.ts';
 import { METRICS_CONTENT_TYPE, renderMetrics } from './lib/metrics.ts';
 import { reminderQueue } from './lib/queue.ts';
 import { createReminderScheduler } from './lib/reminder-scheduler.ts';
@@ -47,6 +47,7 @@ import { tenantRoutes } from './modules/tenants/index.ts';
 import { userRoutes } from './modules/users/index.ts';
 import { activateRoutes } from './routes/activate.ts';
 import { bootstrapStatusRoutes } from './routes/bootstrap-status.ts';
+import { licenseStatusRoutes } from './routes/license-status.ts';
 import { resetOwnerPasswordRoutes } from './routes/reset-owner-password.ts';
 import { uploadsRoutes } from './routes/uploads.ts';
 
@@ -137,6 +138,12 @@ export const createApp = () => {
     }),
   );
 
+  // P18 — Local Desktop'da muddat + imtiyoz tugagach butun API (va /uploads)
+  // bloklanadi; ochiq yo'llar license-middleware.ts GLOBAL_GATE_OPEN_PREFIXES.
+  // SaaS rejimida (DENTAL_LOCAL_DESKTOP yo'q) no-op. Route'lardan OLDIN.
+  app.use('/api/*', requireValidLicenseInDesktop());
+  app.use('/uploads/*', requireValidLicenseInDesktop());
+
   // Public routes
   app.route('/api/health', healthRoutes({ db }));
   app.route('/api/auth', authRoutes({ db }));
@@ -146,6 +153,8 @@ export const createApp = () => {
   // Pre-auth diagnostika (audit C1): `.lic` bor, lekin lokal bazada tenant
   // yo'q holatini oshkor qiladi — web/desktop login gate'i shunga qaraydi.
   app.route('/api/bootstrap-status', bootstrapStatusRoutes({ db }));
+  // P18 — litsenziya holati + darhol heartbeat (blok ekrani uchun, auth'siz).
+  app.route('/api/license', licenseStatusRoutes());
   // Vendor-mediated owner password reset (CLI-226) — auth yo'q (owner login
   // qila olmaydi), license-middleware.ts WHITELIST'i bilan bir xil yo'l.
   app.route('/api/reset-owner-password', resetOwnerPasswordRoutes());

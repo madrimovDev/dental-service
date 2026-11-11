@@ -1,6 +1,6 @@
 import { fail } from '@dental/core';
 import type { MiddlewareHandler } from 'hono';
-import { getActiveModules } from './license.ts';
+import { getActiveModules, getLicenseState } from './license.ts';
 
 /**
  * `/activate` va `/api/activate` — license faol bo'lmasa ham ochiq (public).
@@ -133,5 +133,51 @@ export const requireModuleInDesktop = (module: string): MiddlewareHandler => {
       return;
     }
     return gate(c, next);
+  };
+};
+
+/**
+ * P18 — global litsenziya bloki (faqat Local Desktop). Muddat + imtiyoz
+ * (`MAX_GRACE_DAYS`) tugagach barcha `/api/*` (va `/uploads`) bloklanadi; faqat
+ * foydalanuvchi blok ekranini ko'rishi, kirishi, aktivatsiya/qayta-tekshirish
+ * qila olishi uchun zarur yo'llar ochiq qoladi.
+ *
+ * Ochiq yo'llar `requireModule` WHITELIST'idan ALOHIDA ro'yxat — u ro'yxatni
+ * kengaytirish modul gate'ining xulqini o'zgartirardi.
+ */
+const GLOBAL_GATE_OPEN_PREFIXES = [
+  '/api/health',
+  '/api/auth',
+  '/api/activate',
+  '/api/bootstrap-status',
+  '/api/reset-owner-password',
+  '/api/license',
+];
+
+/** `/api/auth` ni `/api/authx` dan ajratish uchun: aynan yo'l yoki `/` bilan davomi. */
+const isGloballyOpen = (path: string): boolean =>
+  GLOBAL_GATE_OPEN_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`));
+
+export const requireValidLicenseInDesktop = (): MiddlewareHandler => {
+  return async (c, next) => {
+    if (process.env.DENTAL_LOCAL_DESKTOP !== 'true') {
+      await next();
+      return;
+    }
+    if (isGloballyOpen(c.req.path)) {
+      await next();
+      return;
+    }
+    const { state } = await getLicenseState();
+    if (state === 'expired') {
+      return c.json(
+        fail('LICENSE_EXPIRED', "Litsenziya muddati tugagan. To'lov qilishingiz kerak"),
+        403,
+      );
+    }
+    if (state === 'none') {
+      return c.json(fail('LICENSE_NOT_FOUND', 'License not activated'), 403);
+    }
+    await next();
   };
 };

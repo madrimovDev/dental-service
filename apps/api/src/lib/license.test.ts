@@ -439,3 +439,123 @@ describe('getActiveModules — anchor advance (CLI-437)', () => {
     expect(await readAnchor()).toBeGreaterThanOrEqual(beforeMs);
   });
 });
+
+describe('grace cap + license state (P18)', () => {
+  const DAY = 86400000;
+  const mk = (over: Partial<import('./license').LicenseData> = {}) => ({
+    licenseKey: 'K',
+    clinicId: 'c',
+    modules: ['patients'],
+    expiresAt: new Date(Date.now() + 30 * DAY).toISOString(),
+    gracePeriodDays: 7,
+    issuedAt: new Date(Date.now() - 100 * DAY).toISOString(),
+    fingerprint: 'fp',
+    signature: 'sig',
+    ...over,
+  });
+
+  test('MAX_GRACE_DAYS is 7', async () => {
+    const { MAX_GRACE_DAYS } = await import('./license');
+    expect(MAX_GRACE_DAYS).toBe(7);
+  });
+
+  test('grace capped at 7 days even if signed 30', async () => {
+    const { isLicenseValid, getFingerprint } = await import('./license');
+    const localFp = await getFingerprint();
+    const base = {
+      licenseKey: 'K',
+      clinicId: 'c',
+      modules: ['patients'],
+      gracePeriodDays: 30,
+      issuedAt: new Date(Date.now() - 100 * DAY).toISOString(),
+      fingerprint: localFp,
+    };
+    // 10 kun oldin tugagan: imzolangan 30 kunlik imtiyoz bilan oldin yaroqli edi, endi 7 bilan yo'q.
+    const expired10 = { ...base, expiresAt: new Date(Date.now() - 10 * DAY).toISOString() };
+    expect(isLicenseValid({ ...expired10, signature: signForTest(expired10) }, localFp)).toBe(
+      false,
+    );
+    // 5 kun oldin tugagan: imtiyoz doirasida.
+    const expired5 = { ...base, expiresAt: new Date(Date.now() - 5 * DAY).toISOString() };
+    expect(isLicenseValid({ ...expired5, signature: signForTest(expired5) }, localFp)).toBe(true);
+  });
+
+  test('computeLicenseState table', async () => {
+    const { computeLicenseState } = await import('./license');
+    const now = Date.now();
+    expect(computeLicenseState(null, now)).toEqual({
+      state: 'none',
+      expiresAt: null,
+      graceEndsAt: null,
+      daysLeft: null,
+    });
+
+    const active = computeLicenseState(
+      mk({ expiresAt: new Date(now + 30 * DAY).toISOString() }),
+      now,
+    );
+    expect(active.state).toBe('active');
+    expect(active.daysLeft).toBe(30);
+
+    const expiring = computeLicenseState(
+      mk({ expiresAt: new Date(now + 10 * DAY).toISOString() }),
+      now,
+    );
+    expect(expiring.state).toBe('expiring');
+    expect(expiring.daysLeft).toBe(10);
+
+    const boundary = computeLicenseState(
+      mk({ expiresAt: new Date(now + 14 * DAY).toISOString() }),
+      now,
+    );
+    expect(boundary.state).toBe('expiring');
+
+    const grace = computeLicenseState(
+      mk({ expiresAt: new Date(now - 2 * DAY).toISOString(), gracePeriodDays: 30 }),
+      now,
+    );
+    expect(grace.state).toBe('grace');
+    expect(grace.daysLeft).toBe(5);
+    expect(grace.graceEndsAt).toBe(new Date(now + 5 * DAY).toISOString());
+
+    const expired = computeLicenseState(
+      mk({ expiresAt: new Date(now - 8 * DAY).toISOString(), gracePeriodDays: 30 }),
+      now,
+    );
+    expect(expired.state).toBe('expired');
+    expect(expired.daysLeft).toBeNull();
+
+    // Aynan imtiyoz oxirida — isLicenseValid kabi (now < end) — expired.
+    const exactEnd = computeLicenseState(
+      mk({ expiresAt: new Date(now - 7 * DAY).toISOString() }),
+      now,
+    );
+    expect(exactEnd.state).toBe('expired');
+  });
+
+  test('getLicenseState: real .lic file -> grace; tampered signature -> none', async () => {
+    const { writeLicense, getLicenseState, getFingerprint } = await import('./license');
+    process.env.LICENSE_ANCHOR_PATH = join(tmpDir, 'state-anchor.dat');
+    const localFp = await getFingerprint();
+    const payload = {
+      licenseKey: 'K',
+      clinicId: 'c',
+      modules: ['patients'],
+      expiresAt: new Date(Date.now() - 2 * DAY).toISOString(),
+      gracePeriodDays: 30,
+      issuedAt: new Date(Date.now() - 100 * DAY).toISOString(),
+      fingerprint: localFp,
+    };
+    await writeLicense({ ...payload, signature: signForTest(payload) });
+    const st = await getLicenseState();
+    expect(st.state).toBe('grace');
+    expect(st.daysLeft).toBe(5);
+
+    await writeLicense({
+      ...payload,
+      modules: ['patients', 'clinical'],
+      signature: signForTest(payload),
+    });
+    expect((await getLicenseState()).state).toBe('none');
+  });
+});
