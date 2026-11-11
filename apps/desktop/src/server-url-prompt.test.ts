@@ -18,6 +18,10 @@ describe('parsePromptTitle (CLI-404)', () => {
     expect(parsePromptTitle('cancel')).toEqual({ action: 'cancel' });
   });
 
+  test('rescan → {rescan}', () => {
+    expect(parsePromptTitle('rescan')).toEqual({ action: 'rescan' });
+  });
+
   test('boshqa title (masalan default) → null (signal emas)', () => {
     expect(parsePromptTitle('Server manzili')).toBeNull();
     expect(parsePromptTitle('')).toBeNull();
@@ -31,6 +35,9 @@ describe('buildServerUrlPromptHtml (CLI-404)', () => {
     expect(html).toContain("document.title = 'submit:'");
     expect(html).toContain("document.title = 'cancel'");
     expect(html).toContain('Content-Security-Policy');
+    // UI-T3: «Hozir qidirish» tugmasi + DT-18 izohi.
+    expect(html).toContain("document.title = 'rescan'");
+    expect(html).toContain("Manzil faqat ulanish muvaffaqiyatli bo'lsa saqlanadi");
     // Tashqi resurs (http/cdn) yo'q — o'zini ta'minlaydi.
     expect(html).not.toMatch(/src=["']https?:/);
   });
@@ -97,5 +104,21 @@ describe('promptServerUrl (CLI-404)', () => {
     win.emitTitle('submit:http://10.0.0.5:8000');
     win.emitTitle('cancel');
     expect(await p).toBe('http://10.0.0.5:8000');
+  });
+});
+
+describe('promptServerUrl rescan (UI-T3)', () => {
+  test('rescan signali onRescan ni chaqiradi, null qaytaradi va oynani yopadi', async () => {
+    const win = new FakeWindow();
+    let rescans = 0;
+    const p = promptServerUrl(() => win, {
+      onRescan: () => {
+        rescans += 1;
+      },
+    });
+    win.titleCb?.({}, 'rescan');
+    expect(await p).toBeNull();
+    expect(rescans).toBe(1);
+    expect(win.closed).toBe(true);
   });
 });

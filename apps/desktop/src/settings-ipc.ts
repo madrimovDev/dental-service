@@ -134,9 +134,11 @@ export const applyServerUrl = async (
     return { ok: false, code: validation.code ?? 'INVALID_URL' } satisfies SetServerUrlResult;
   }
   const url = validation.url;
-  writeConfig({ serverUrl: url });
+  // DT-18: manzil FAQAT muvaffaqiyatli ulanishdan keyin saqlanadi — noto'g'ri
+  // yozilgan manzil keyingi startup'da trustedUrl bo'lib qolmasin.
   const connected = await checkConnection(url);
   if (connected) {
+    writeConfig({ serverUrl: url });
     onConnected?.(url);
   }
   return { ok: true, connected, serverUrl: url } satisfies SetServerUrlResult;

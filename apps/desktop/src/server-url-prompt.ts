@@ -19,8 +19,9 @@ const SUBMIT_PREFIX = 'submit:';
 /** Prompt oynasi title-signalini o'qiydi (sof, testlanadi). */
 export const parsePromptTitle = (
   title: string,
-): { action: 'submit'; url: string } | { action: 'cancel' } | null => {
+): { action: 'submit'; url: string } | { action: 'cancel' } | { action: 'rescan' } | null => {
   if (title === 'cancel') return { action: 'cancel' };
+  if (title === 'rescan') return { action: 'rescan' };
   if (title.startsWith(SUBMIT_PREFIX)) {
     return { action: 'submit', url: title.slice(SUBMIT_PREFIX.length) };
   }
@@ -45,8 +46,10 @@ export const buildServerUrlPromptHtml = (): string => `<!doctype html>
 </style>
 </head>
 <body>
-  <h1>Server manzilini kiriting</h1>
-  <p>Masalan: http://192.168.1.5:8000</p>
+  <h1>Server topilmadi</h1>
+  <p>Lokal tarmoqda klinika serveri javob bermayapti. Server kompyuter yoqilganini va Wi-Fi bir xil ekanini tekshiring.</p>
+  <div class="row" style="justify-content:flex-start; margin: 0 0 14px"><button type="button" id="rescan">Hozir qidirish</button></div>
+  <p>Yoki manzilni qo'lda kiriting. Masalan: http://192.168.1.5:8000</p>
   <form id="f">
     <input id="url" type="text" placeholder="http://192.168.1.5:8000" autofocus autocomplete="off" />
     <div class="row">
@@ -54,7 +57,11 @@ export const buildServerUrlPromptHtml = (): string => `<!doctype html>
       <button type="submit" class="primary">Ulanish</button>
     </div>
   </form>
+  <p style="margin-top:10px">Manzil faqat ulanish muvaffaqiyatli bo'lsa saqlanadi.</p>
   <script>
+    document.getElementById('rescan').addEventListener('click', function () {
+      document.title = 'rescan';
+    });
     var input = document.getElementById('url');
     document.getElementById('f').addEventListener('submit', function (e) {
       e.preventDefault();
@@ -83,7 +90,10 @@ export interface PromptWindowLike {
  * real BrowserWindow beradi; test soxta oyna beradi). Validatsiya QILINMAYDI —
  * chaqiruvchi `applyServerUrl`ga uzatadi (CLI-434 yagona validatsiya manbasi).
  */
-export const promptServerUrl = (createWindow: () => PromptWindowLike): Promise<string | null> =>
+export const promptServerUrl = (
+  createWindow: () => PromptWindowLike,
+  opts: { onRescan?: () => void } = {},
+): Promise<string | null> =>
   new Promise((resolve) => {
     const win = createWindow();
     let settled = false;
@@ -96,6 +106,7 @@ export const promptServerUrl = (createWindow: () => PromptWindowLike): Promise<s
     win.webContents.on('page-title-updated', (_e, title) => {
       const parsed = parsePromptTitle(title);
       if (!parsed) return;
+      if (parsed.action === 'rescan') opts.onRescan?.();
       finish(parsed.action === 'submit' ? parsed.url : null);
     });
     win.on('closed', () => finish(null));
