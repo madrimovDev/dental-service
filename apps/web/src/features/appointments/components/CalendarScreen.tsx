@@ -87,7 +87,7 @@ export function CalendarScreen() {
     to: rangeEnd.toISOString(),
   });
   const { data: doctors } = useDoctors();
-  const { data: servicesData } = useServices();
+  const { data: servicesData } = useServices({ enabled: hasPermission('service.view') });
   const { data: branchesData } = useBranches();
   const cancelMut = useCancelAppointment();
   const statusMut = useUpdateAppointmentStatus();

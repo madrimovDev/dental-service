@@ -1,6 +1,7 @@
 export const settingsKeys = {
   all: ['settings'] as const,
   roles: () => ['settings', 'roles'] as const,
+  grantableRoles: () => ['settings', 'roles', 'grantable'] as const,
   role: (id: string) => ['settings', 'role', id] as const,
   permissions: () => ['settings', 'permissions'] as const,
   users: () => ['settings', 'users'] as const,

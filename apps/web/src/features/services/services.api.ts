@@ -12,8 +12,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { serviceKeys } from './services.keys';
 import type { ServiceFormValues } from './services.types';
 
-export function useServices() {
+export function useServices(options?: { enabled?: boolean }) {
   return useQuery({
+    enabled: options?.enabled,
     queryKey: serviceKeys.list(),
     queryFn: () => listServices().then((r) => r.data),
   });

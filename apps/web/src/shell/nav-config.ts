@@ -188,7 +188,7 @@ export const NAV_GROUPS: NavGroup[] = [
         labelKey: 'nav.tenant_settings',
         icon: Settings,
         path: '/settings/tenant',
-        permission: 'tenant.view',
+        permission: 'tenant_settings.view',
       },
       { key: 'kpi', labelKey: 'nav.kpi', icon: BarChart3, path: '/dashboard' },
       {

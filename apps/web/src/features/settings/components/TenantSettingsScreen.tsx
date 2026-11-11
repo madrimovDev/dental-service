@@ -62,10 +62,10 @@ export function TenantSettingsScreen() {
   const { hasPermission } = useAuthStore();
   const tenant = useTenant();
   const update = useUpdateTenant();
-  const settings = useTenantSettings();
+  const settings = useTenantSettings({ enabled: hasPermission('tenant_settings.view') });
   const updateSettings = useUpdateTenantSettings();
   const transfer = useTransferOwnership();
-  const users = useUsers();
+  const users = useUsers({ enabled: hasPermission('user.view') });
   const canEditTenant = hasPermission('tenant.edit');
   const canEditSettings = hasPermission('tenant_settings.edit');
   const [transferOpened, { open: openTransfer, close: closeTransfer }] = useDisclosure(false);

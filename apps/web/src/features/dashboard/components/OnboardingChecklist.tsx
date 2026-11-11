@@ -17,14 +17,16 @@ export function OnboardingChecklist() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { hasPermission } = useAuthStore();
-  const settingsQuery = useTenantSettings();
+  // Karta faqat `tenant_settings.edit`ga ko'rinadi — qolgan rollarda so'rovlar umuman ketmasin (403).
+  const canSee = hasPermission('tenant_settings.edit') && hasPermission('tenant_settings.view');
+  const settingsQuery = useTenantSettings({ enabled: canSee });
   const settings = settingsQuery.data;
   const update = useUpdateTenantSettings();
-  const branches = useBranches();
-  const services = useServices();
-  const users = useUsers();
+  const branches = useBranches({ enabled: canSee && hasPermission('branch.view') });
+  const services = useServices({ enabled: canSee && hasPermission('service.view') });
+  const users = useUsers({ enabled: canSee && hasPermission('user.view') });
 
-  if (!hasPermission('tenant_settings.edit')) return null;
+  if (!canSee) return null;
   // Settings yuklanmaguncha yashir — aks holda dismiss qilingan karta har yuklanishda miltillaydi.
   if (settingsQuery.isLoading) return null;
   if (settings?.onboardingDismissedAt) return null;

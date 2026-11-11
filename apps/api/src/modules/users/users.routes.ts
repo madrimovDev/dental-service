@@ -15,6 +15,7 @@ import {
   assignmentIdParamSchema,
   createAssignmentSchema,
   deleteAssignmentResultSchema,
+  grantableRoleDtoSchema,
   inviteUserResponseDtoSchema,
   inviteUserSchema,
   resetPasswordResponseDtoSchema,
@@ -65,6 +66,24 @@ export const userRoutes = (deps: { db: Database; audit: AuditLogger }) => {
   app.openapi(listAssignmentsRoute, async (c) => {
     const rows = await service.listAssignments(c);
     return c.json(ok(rows.map(toUserAssignmentDto)), 200);
+  });
+
+  // ─── GET /grantable-roles — chaqiruvchi tayinlay oladigan rollar ──────────
+  // `/{userId}/...` yo'llaridan oldin (statik yo'l). `role.view` SHART EMAS —
+  // «Xodim qo'shish» faqat `user.invite` bilan ishlashi kerak (Branch Manager).
+
+  const grantableRolesRoute = createRoute({
+    method: 'get',
+    path: '/grantable-roles',
+    tags: ['users'],
+    operationId: 'listGrantableRoles',
+    middleware: [requirePermission('user.invite')] as const,
+    responses: okJson(z.array(grantableRoleDtoSchema), 'Roles the caller may assign'),
+  });
+
+  app.openapi(grantableRolesRoute, async (c) => {
+    const rows = await service.listGrantableRoles(c);
+    return c.json(ok(rows), 200);
   });
 
   // ─── POST /invite — yangi xodimni taklif qilish ──────────────────────────

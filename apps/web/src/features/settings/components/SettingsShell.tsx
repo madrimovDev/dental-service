@@ -30,7 +30,7 @@ const TAB_CONFIG: { id: SettingsTab; labelKey: string; path: string; permission:
     id: 'tenant',
     labelKey: 'settings.nav_tenant',
     path: '/settings/tenant',
-    permission: 'tenant.view',
+    permission: 'tenant_settings.view',
   },
   {
     id: 'branches',

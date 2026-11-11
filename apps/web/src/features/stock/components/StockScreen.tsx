@@ -50,7 +50,7 @@ export function StockScreen() {
   const [batchOpened, { open: openBatch, close: closeBatch }] = useDisclosure(false);
 
   const branches = useBranches();
-  const services = useServices();
+  const services = useServices({ enabled: hasPermission('service.view') });
   const items = useStockItems(branchId ?? undefined);
   const movements = useStockMovements(selectedId);
   const expiring = useExpiringBatches(EXPIRING_WITHIN_DAYS, branchId ?? undefined);
