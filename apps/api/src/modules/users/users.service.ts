@@ -276,9 +276,19 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
       .where(eq(userAssignments.id, assignmentId));
     if (!before) return null;
 
-    // P5: rol o'zgarsa — mavjudligi (RLS) va eskalatsiya tekshiriladi (yozishdan OLDIN).
-    if (input.roleId !== undefined && input.roleId !== before.roleId) {
-      const codes = await loadRolePermissionCodes(db, input.roleId);
+    // P5: eskalatsiya tekshiruvi (yozishdan OLDIN). Rol o'zgarsa yoki assignment qayta
+    // faollashtirilsa / muddati uzaytirilsa — EFFEKTIV rol (input.roleId ?? before.roleId)
+    // chaqiruvchi huquqlaridan yuqori bo'lmasligi shart. Aks holda eski Tenant Admin
+    // assignment'ni `{isActive:true}` / `{validTo:null}` bilan tiriltirib bo'ladi.
+    const roleChanged = input.roleId !== undefined && input.roleId !== before.roleId;
+    const reactivates = input.isActive === true && !before.isActive;
+    const extendsValidity =
+      input.validTo !== undefined &&
+      before.validTo !== null &&
+      (input.validTo === null || new Date(input.validTo).getTime() > before.validTo.getTime());
+    if (roleChanged || reactivates || extendsValidity) {
+      const effectiveRoleId = input.roleId ?? before.roleId;
+      const codes = await loadRolePermissionCodes(db, effectiveRoleId);
       if (codes === null) return { ok: false as const, code: 'role.not_found' as const };
       assertCanGrant(callerPerms(c), codes);
     }

@@ -234,6 +234,64 @@ describe('P5 role escalation (real restricted permset)', () => {
     expect(res.status).toBe(201);
   });
 
+  test("(h) BM eski deaktiv Tenant Admin assignment'ni PATCH {isActive:true} bilan tiriltira olmaydi → 403", async () => {
+    const [a] = await withTx((tx) =>
+      tx
+        .insert(userAssignments)
+        .values({ userId: targetId, tenantId, roleId: adminRoleId, isActive: false })
+        .returning({ id: userAssignments.id }),
+    );
+    const id = a?.id as string;
+    const res = await call(bmToken, 'PATCH', `/users/assignments/${id}`, { isActive: true });
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe('role.escalation');
+    const [row] = await withTx((tx) =>
+      tx.select().from(userAssignments).where(eq(userAssignments.id, id)),
+    );
+    expect(row?.isActive).toBe(false);
+
+    // owner (superuser) baribir tiklay oladi; BM esa o'z permset ichidagi rolni tiklay oladi
+    const ok = await call(ownerToken, 'PATCH', `/users/assignments/${id}`, { isActive: true });
+    expect(ok.status).toBe(200);
+  });
+
+  test("(i) BM muddati o'tgan Tenant Admin assignment'ni PATCH {validTo:null} bilan uzaytira olmaydi → 403", async () => {
+    const [a] = await withTx((tx) =>
+      tx
+        .insert(userAssignments)
+        .values({
+          userId: bmId,
+          tenantId,
+          roleId: adminRoleId,
+          isActive: true,
+          validTo: new Date(Date.now() - 86_400_000),
+        })
+        .returning({ id: userAssignments.id }),
+    );
+    const id = a?.id as string;
+    const res = await call(bmToken, 'PATCH', `/users/assignments/${id}`, { validTo: null });
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe('role.escalation');
+    const [row] = await withTx((tx) =>
+      tx.select().from(userAssignments).where(eq(userAssignments.id, id)),
+    );
+    expect(row?.validTo).not.toBeNull();
+
+    // muddatni qisqartirish / o'z permset ichidagi rolni tiklash — ruxsat
+    const [low] = await withTx((tx) =>
+      tx
+        .insert(userAssignments)
+        .values({ userId: targetId, tenantId, roleId: lowRoleId, isActive: false })
+        .returning({ id: userAssignments.id }),
+    );
+    const okRe = await call(bmToken, 'PATCH', `/users/assignments/${low?.id}`, { isActive: true });
+    expect(okRe.status).toBe(200);
+    const shorten = await call(bmToken, 'PATCH', `/users/assignments/${id}`, {
+      validTo: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+    });
+    expect(shorten.status).toBe(200);
+  });
+
   test('(g) owner istalgan rolni bera oladi', async () => {
     const res = await call(ownerToken, 'POST', '/users/invite', {
       phone: '+998900005103',
