@@ -1,11 +1,27 @@
-import { serviceMaterials, stockBatches, stockItems, stockMovements } from '@dental/db-schema';
-import { and, asc, desc, eq, inArray, isNull, lte, or, sql } from 'drizzle-orm';
+import {
+  expenses,
+  serviceMaterials,
+  stockBatches,
+  stockItems,
+  stockMovements,
+  users,
+  visitNotes,
+} from '@dental/db-schema';
+import { and, asc, desc, eq, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { DbOrTx } from '../../db/client.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { findRecipientsWithPermission } from '../../lib/notify-recipients.ts';
-import { adjustmentDelta, applyMovement, isLowStock } from './stock.calc.ts';
+import {
+  adjustmentDelta,
+  allocateBatchRemaining,
+  applyMovement,
+  avgDailyUsage,
+  daysOfSupply,
+  isLowStock,
+  USAGE_WINDOW_DAYS,
+} from './stock.calc.ts';
 import type {
   CreateBatchInput,
   CreateBomInput,
@@ -18,6 +34,12 @@ import type {
 
 /** `listMovements` default sahifa hajmi (CLI-442 #3 — chegaralanmagan tarix oldini olish). */
 const DEFAULT_MOVEMENTS_PAGE_SIZE = 50;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** Asia/Tashkent UTC+5 (DST yo'q) — «bugun» chegarasi cashier/expenses bilan izchil. */
+const TASHKENT_OFFSET_MS = 5 * 60 * 60 * 1000;
+const tashkentDateStr = (now = Date.now()) =>
+  new Date(now + TASHKENT_OFFSET_MS).toISOString().slice(0, 10);
 
 /** Qo'lda 'out' harakat manfiy qoldiqqa olib kelganda (negative-stock guard). */
 export class InsufficientStockError extends Error {
@@ -76,6 +98,43 @@ export const createStockService = (deps: {
     }
   }
 
+  /**
+   * Item bo'yicha oxirgi 30 kun SOF sarfi: `out` yig'indisi − `visit_edit_return` (`in`).
+   * Qo'lda kirim (`in`) va inventarizatsiya (`adjustment`) sarf emas. RLS tenantni filtrlaydi.
+   */
+  async function netConsumption(c: Context, itemIds?: string[]) {
+    const db = getDb(c);
+    const since = new Date(Date.now() - USAGE_WINDOW_DAYS * DAY_MS);
+    const net = sql<string>`coalesce(sum(case
+      when ${stockMovements.type} = 'out' then ${stockMovements.quantity}
+      when ${stockMovements.type} = 'in' and ${stockMovements.reason} = 'visit_edit_return' then -${stockMovements.quantity}
+      else 0 end), 0)`;
+    const rows = await db
+      .select({ itemId: stockMovements.itemId, net })
+      .from(stockMovements)
+      .where(
+        and(
+          gte(stockMovements.createdAt, since),
+          itemIds ? inArray(stockMovements.itemId, itemIds) : undefined,
+        ),
+      )
+      .groupBy(stockMovements.itemId);
+    return new Map(rows.map((r) => [r.itemId, Number(r.net)]));
+  }
+
+  const withUsage = <T extends { id: string; quantity: string; minThreshold: string }>(
+    item: T,
+    consumed: Map<string, number>,
+  ) => {
+    const avg = avgDailyUsage(consumed.get(item.id) ?? 0);
+    return {
+      ...item,
+      lowStock: isLowStock(Number(item.quantity), Number(item.minThreshold)),
+      avgDailyUsage: avg,
+      daysLeft: daysOfSupply(Number(item.quantity), avg),
+    };
+  };
+
   // ===== Stock Items =====
   async function listItems(c: Context, query: ListItemsQuery) {
     const db = getDb(c);
@@ -93,17 +152,15 @@ export const createStockService = (deps: {
       .orderBy(asc(stockItems.name));
 
     // numeric(14,2) → string; Number() bilan solishtiramiz (leksik solishtiruvdan saqlanish).
-    return rows.map((item) => ({
-      ...item,
-      lowStock: isLowStock(Number(item.quantity), Number(item.minThreshold)),
-    }));
+    const consumed = await netConsumption(c);
+    return rows.map((item) => withUsage(item, consumed));
   }
 
   async function getItem(c: Context, id: string) {
     const db = getDb(c);
     const [item] = await db.select().from(stockItems).where(eq(stockItems.id, id));
     if (!item) return null;
-    return { ...item, lowStock: isLowStock(Number(item.quantity), Number(item.minThreshold)) };
+    return withUsage(item, await netConsumption(c, [item.id]));
   }
 
   async function createItem(c: Context, input: CreateItemInput) {
@@ -124,6 +181,19 @@ export const createStockService = (deps: {
         minThreshold: String(input.minThreshold),
       })
       .returning();
+
+    // IR-01: boshlang'ich qoldiq ledgerga yoziladi (avval faqat `quantity` ustuni edi —
+    // harakatlar tarixi nol bilan boshlanardi). qty 0 → qator yo'q.
+    if (item && input.quantity > 0) {
+      await db.insert(stockMovements).values({
+        tenantId,
+        itemId: item.id,
+        type: 'in',
+        quantity: String(input.quantity),
+        reason: 'initial_balance',
+        createdBy: c.get('user')?.id ?? null,
+      });
+    }
 
     if (item) {
       await deps.audit.record(c, {
@@ -528,15 +598,91 @@ export const createStockService = (deps: {
       .orderBy(desc(stockBatches.receivedAt));
   }
 
-  /** Muddati yaqinlashayotgan partiyalar (default 30 kun). */
-  async function expiringBatches(c: Context, withinDays = 30) {
+  /**
+   * Muddati yaqinlashayotgan (yoki o'tib ketgan) partiyalar (default 30 kun) — FAQAT qoldig'i
+   * borlar (IR-02): partiya qoldig'i item qoldig'ini FIFO bilan taqsimlash orqali topiladi
+   * (`allocateBatchRemaining`). Filial filtri: tanlangan filial + tenant-darajali (branchId=null).
+   */
+  async function expiringBatches(c: Context, withinDays = 30, branchId?: string) {
     const db = getDb(c);
-    const cutoff = new Date(Date.now() + withinDays * 24 * 60 * 60 * 1000);
-    return db
-      .select()
+    const cutoff = new Date(Date.now() + withinDays * DAY_MS);
+
+    const candidates = await db
+      .select({ batch: stockBatches, itemName: stockItems.name, unit: stockItems.unit })
       .from(stockBatches)
-      .where(lte(stockBatches.expiryDate, cutoff))
+      .innerJoin(stockItems, eq(stockItems.id, stockBatches.itemId))
+      .where(
+        and(
+          lte(stockBatches.expiryDate, cutoff),
+          branchId ? or(eq(stockItems.branchId, branchId), isNull(stockItems.branchId)) : undefined,
+        ),
+      )
       .orderBy(asc(stockBatches.expiryDate));
+    if (candidates.length === 0) return [];
+
+    // FIFO taqsimot uchun shu itemlarning BARCHA partiyalari kerak (muddati uzoqlari ham —
+    // ular eng yangi bo'lib qoldiqni oldin "oladi").
+    const itemIds = [...new Set(candidates.map((r) => r.batch.itemId))];
+    const [items, allBatches] = await Promise.all([
+      db
+        .select({ id: stockItems.id, quantity: stockItems.quantity })
+        .from(stockItems)
+        .where(inArray(stockItems.id, itemIds)),
+      db.select().from(stockBatches).where(inArray(stockBatches.itemId, itemIds)),
+    ]);
+    const qtyByItem = new Map(items.map((i) => [i.id, Number(i.quantity)]));
+    const remaining = new Map<string, number>();
+    for (const itemId of itemIds) {
+      const mine = allBatches
+        .filter((b) => b.itemId === itemId)
+        .map((b) => ({ id: b.id, receivedAt: b.receivedAt, qtyReceived: Number(b.qtyReceived) }));
+      for (const r of allocateBatchRemaining(qtyByItem.get(itemId) ?? 0, mine)) {
+        remaining.set(r.id, r.qtyRemaining);
+      }
+    }
+
+    return candidates
+      .map((r) => ({
+        ...r.batch,
+        itemName: r.itemName,
+        unit: r.unit,
+        qtyRemaining: remaining.get(r.batch.id) ?? 0,
+      }))
+      .filter((b) => b.qtyRemaining > 0);
+  }
+
+  /**
+   * Bugungi (Asia/Tashkent) avto-yechish jurnali: vizit yozuvidan kelgan chiqim (`visit_auto`)
+   * va qaytarish (`visit_edit_return`), yangisi birinchi. Shifokor nomi vizit yozuvidan.
+   */
+  async function autoDeductionsToday(c: Context, branchId?: string) {
+    const db = getDb(c);
+    const dayStart = new Date(`${tashkentDateStr()}T00:00:00+05:00`);
+    return db
+      .select({
+        id: stockMovements.id,
+        itemId: stockMovements.itemId,
+        itemName: stockItems.name,
+        unit: stockItems.unit,
+        type: stockMovements.type,
+        quantity: stockMovements.quantity,
+        reason: stockMovements.reason,
+        doctorName: users.fullName,
+        createdAt: stockMovements.createdAt,
+      })
+      .from(stockMovements)
+      .innerJoin(stockItems, eq(stockItems.id, stockMovements.itemId))
+      .leftJoin(visitNotes, eq(visitNotes.id, stockMovements.sourceVisitNoteId))
+      .leftJoin(users, eq(users.id, visitNotes.doctorId))
+      .where(
+        and(
+          gte(stockMovements.createdAt, dayStart),
+          inArray(stockMovements.reason, ['visit_auto', 'visit_edit_return']),
+          branchId ? or(eq(stockItems.branchId, branchId), isNull(stockItems.branchId)) : undefined,
+        ),
+      )
+      .orderBy(desc(stockMovements.createdAt))
+      .limit(100);
   }
 
   /**
@@ -590,6 +736,37 @@ export const createStockService = (deps: {
           after: batch,
         });
       }
+
+      // UI-M5: kirim → xarajat (ixtiyoriy). Marshrut `expense.manage`ni oldindan tekshiradi;
+      // schema `costPerUnit`ni majburlaydi. Bir tx: partiya + ledger + xarajat birga yoziladi.
+      if (batch && input.recordAsExpense && input.costPerUnit != null) {
+        const [item] = await tx
+          .select({ name: stockItems.name, branchId: stockItems.branchId })
+          .from(stockItems)
+          .where(eq(stockItems.id, input.itemId));
+        const amount = Math.round(input.qtyReceived * input.costPerUnit * 100) / 100;
+        const [expense] = await tx
+          .insert(expenses)
+          .values({
+            tenantId,
+            branchId: item?.branchId ?? null,
+            amount: String(amount),
+            date: tashkentDateStr(),
+            note: `Ombor kirimi: ${item?.name ?? ''} × ${input.qtyReceived}${
+              input.batchNumber ? ` (partiya ${input.batchNumber})` : ''
+            }`,
+            createdBy: user?.id ?? null,
+          })
+          .returning();
+        if (expense) {
+          await deps.audit.record(c, {
+            action: 'created',
+            resourceType: 'expense',
+            resourceId: expense.id,
+            after: { amount, source: 'stock_batch', batchId: batch.id },
+          });
+        }
+      }
       return batch ?? null;
     });
   }
@@ -608,6 +785,7 @@ export const createStockService = (deps: {
     reconcileForServices,
     listBatches,
     expiringBatches,
+    autoDeductionsToday,
     createBatch,
   };
 };

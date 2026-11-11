@@ -318,7 +318,14 @@ Uchta xulq testda ajablantirmasligi uchun:
 - [ ] Litsenziya umuman yo'q (`LICENSE_NOT_FOUND`) → `/activate` (to'lov ekrani emas).
 - [ ] Supervisor VM qayta deploy qilinganda `0003_grace_default_7` migratsiyasi qo'llangan (`licenses.grace_period_days` default 7).
 
-## 5. Caveats / troubleshooting
+## 4c. UI-3 (2026-11-11) — zaxira va tiklash
+
+- [ ] Sozlamalar → Zaxira: default papka (`D:\DentalBackup`, D: bo'lmasa `C:\DentalBackup`); boshqa papka tanlanadi va saqlanadi.
+- [ ] «Hozir zaxira olish» → papkada `.dump` + uploads arxivi; Rahbar sahifasida «Oxirgi zaxira» yangilanadi.
+- [ ] 20:00 da avtomatik zaxira (tizim soatini 19:59 ga qo'yib tekshirish); 15-zaxiradan keyin eng eskisi o'chadi.
+- [ ] Tiklash: faqat owner; klinika nomini noto'g'ri yozsa tugma ishlamaydi; to'g'ri yozilganda — oldin joriy holat zaxiralanadi, boshqa kompyuterlar «Texnik ish/server topilmadi» ko'radi, tiklashdan keyin ilova qayta ochiladi va ma'lumotlar tanlangan zaxira holatida.
+- [ ] Zaxira 2 kundan ortiq olinmasa Rahbar sahifasida ogohlantirish.
+
 
 | Muammo | Yechim |
 |---|---|

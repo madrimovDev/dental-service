@@ -367,12 +367,12 @@ To'liq: [`LAB-TECHNICIAN-ACCESS-2026-11-11.md`](./LAB-TECHNICIAN-ACCESS-2026-11-
 | UI-D3 ✅ | UI-2 | Tish xaritasi (`Odontogram.dc.html`) | CL-01, tashxis qidiruvi |
 | UI-D4 ✅ | UI-2 | Vizit yozuvi (`VisitNote.dc.html`) | **P12**, CL-12 |
 | UI-D5 ✅ | UI-2 | Lab buyurtma (`LabOrder.dc.html`) | lab_orders sxemasi (shade, due, files, remake) |
-| UI-M1 | UI-3 | Rahbar bosh sahifasi (`OwnerDashboard.dc.html`) | P13, zaxira nusxa holati |
-| UI-M2 | UI-3 | Hisobotlar (`Reports.dc.html`) | IR-06 |
-| UI-M3 | UI-3 | Sozlamalar (`Settings.dc.html`) | P10, P9, P16 (renew) |
-| UI-M4 | UI-3 | Xodimlar (`Staff.dc.html`) | **P5**, ID-04/05/06/28/29 |
-| UI-M5 | UI-3 | Ombor (`Stock.dc.html`) | IR-01, IR-02 |
-| UI-M6 | UI-3 | Xarajat va ish haqi (`Finance.dc.html`) | — |
+| UI-M1 ✅ | UI-3 | Rahbar bosh sahifasi (`OwnerDashboard.dc.html`) | P13, zaxira nusxa holati |
+| UI-M2 ✅ | UI-3 | Hisobotlar (`Reports.dc.html`) | IR-06 |
+| UI-M3 ✅ | UI-3 | Sozlamalar (`Settings.dc.html`) | P10, P9, P16 (renew) |
+| UI-M4 ✅ | UI-3 | Xodimlar (`Staff.dc.html`) | **P5**, ID-04/05/06/28/29 |
+| UI-M5 ✅ | UI-3 | Ombor (`Stock.dc.html`) | IR-01, IR-02 |
+| UI-M6 ✅ | UI-3 | Xarajat va ish haqi (`Finance.dc.html`) | — |
 | UI-T1 | UI-4 | Laboratoriya portali (`LabPortal.dc.html`) | lab portali spetsifikatsiyasi (C) |
 | UI-T2 | UI-4 | Telegram bot (`TelegramBot.dc.html`) | **P8** |
 | UI-T3 | UI-4 | Desktop holatlari (`Desktop.dc.html`) | **P2, P14, P15**, DT-01/02/03/18 |
@@ -452,4 +452,14 @@ Sinov 3 ta haqiqiy nuqson topdi (hammasi tuzatildi, testlar bilan): (1) jadvali 
 | FU-27 | L | «Imzolanmagan vizit» / «ko'rilmagan rasm» ta'riflari taxminiy (D1) | D4 imzosi (`signed_at`) bilan qayta hisoblash |
 | FU-28 | L | Lab buyurtma «Laboratoriya nimani ko'radi» bloki — portalgacha klinika ichida | Lab portali bosqichida |
 | FU-29 | — | Presence («kim ishlayapti») qurilmagan | keyinga (qaror) |
+
+## 21. UI-3 dan keyingi follow-up'lar
+
+| ID | J | Qisqa | Qilinadigan ish |
+|---|---|---|---|
+| FU-30 | L | Hisobotlarda «Xarajat va sof foyda» savoli «Tez orada» | `GET /api/reports/pnl` (C lane) mavjud — savolni ulash |
+| FU-31 | L | Hisobot filial dropdown'i `report.view`siz filialni ham taklif qiladi | server 403 qaytaradi; dropdown'ni ruxsatli filiallar bilan cheklash |
+| FU-32 | L | Filial «oflayn» holati yo'q (bitta server modeli) | — (kerak bo'lsa desktop klientlar heartbeat'i) |
+| FU-33 | L | 1C/CSV eksportda formula-injection himoyasi yo'q | `=`,`+`,`-`,`@` bilan boshlanuvchi qiymatlarni `'` bilan prefikslash |
+| FU-34 | 🟡 | Desktop zaxira/tiklash Windows'da tekshirilmagan | `DESKTOP-WINDOWS-BUILD-TEST.md` §4c |
 

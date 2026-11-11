@@ -118,7 +118,7 @@ pipeline(lanes,
 ## 6. Merge gate (bosqich oxirida, bir marta)
 
 Controller `main`ga merge qilishdan oldin, **birlashtirilgan** branch'da bir marta:
-1. `turbo typecheck`, `check:rls`; biome — faqat **tegilgan fayllar** (`bunx biome check <diff fayllari>`), chunki `supervisor-api`da avvaldan mavjud lint xatolari bor (`docs/KNOWN-TEST-FAILURES.md`);
+1. `turbo typecheck --force` (kesh soxta yashil berishi mumkin), **`cd apps/web && bun run build`**, `check:rls`; biome — faqat **tegilgan fayllar** (`bunx biome check <diff fayllari>`), chunki `supervisor-api`da avvaldan mavjud lint xatolari bor (`docs/KNOWN-TEST-FAILURES.md`);
 2. to'liq API test to'plami + web vitest;
 3. **Mezon:** yangi yiqilish yo'q. Ma'lum yiqilishlar ro'yxati (`mock.module` fayllararo oqishi va concurrent EXCLUDE poygasi — CLAUDE.md 2026-08-07 bloki, 9 ta) `docs/KNOWN-TEST-FAILURES.md`da nomma-nom saqlanadi va gate unga qarshi solishtiriladi. Ro'yxatdagi test **izolyatsiyada** yashil bo'lishi shart;
 4. **mutatsiya tekshiruvi** — implementer «failing-first» qadamini o'tkazib yuborgan har yangi test uchun controller kodni vaqtincha buzib testni yiqilishini ko'radi (keyin `git checkout <fayl>`, stash yo'q);

@@ -20,3 +20,20 @@ export type PayrollRunVM = {
   status: PayrollRunStatus;
   createdAt: string;
 };
+
+/** Run'ga singdirilgan refund-clawback tuzatishi (`GET /api/payroll/runs/:id/adjustments`). */
+export type PayrollAdjustmentDto = {
+  id: string;
+  userId: string;
+  amount: string;
+  sourceTransactionId: string;
+  sourceReceiptNumber: string | null;
+  sourceCreatedAt: string;
+  reason: 'refund_clawback';
+};
+
+/** Xodim bo'yicha tuzatish jamlanmasi (UI jadvalida «Tuzatish» ustuni). */
+export type PayrollAdjustmentSummary = {
+  total: number;
+  items: { receiptNumber: string | null; date: string; amount: number }[];
+};

@@ -7,10 +7,12 @@ import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
 import { createIntegrationsTester } from './integrations-tester.ts';
+import { createReadinessService } from './readiness.service.ts';
 import { toTenantSettingsDto } from './tenant-settings.mapper.ts';
 import {
   integrationsTestResultSchema,
   integrationsTestSchema,
+  readinessDtoSchema,
   tenantSettingsDtoSchema,
   tenantVerticalDtoSchema,
   updateSettingsSchema,
@@ -23,6 +25,7 @@ export const tenantSettingsRoutes = (deps: { db: Database; audit: AuditLogger })
   app.use('*', rlsMiddleware(deps.db));
 
   const service = createTenantSettingsService({ audit: deps.audit });
+  const readiness = createReadinessService();
 
   const getRoute = createRoute({
     method: 'get',
@@ -57,6 +60,19 @@ export const tenantSettingsRoutes = (deps: { db: Database; audit: AuditLogger })
     if (!tenantId) return c.json(ok({ vertical: 'dental' as const }), 200);
     const row = await service.getOrCreate(c);
     return c.json(ok({ vertical: row.vertical }), 200);
+  });
+
+  const readinessRoute = createRoute({
+    method: 'get',
+    path: '/readiness',
+    tags: ['tenant-settings'],
+    operationId: 'getTenantReadiness',
+    middleware: [requirePermission('tenant_settings.view')] as const,
+    responses: okJson(readinessDtoSchema, 'Clinic readiness checklist'),
+  });
+
+  app.openapi(readinessRoute, async (c) => {
+    return c.json(ok(await readiness.compute(c)), 200);
   });
 
   const patchRoute = createRoute({

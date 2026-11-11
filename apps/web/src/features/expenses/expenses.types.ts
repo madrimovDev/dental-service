@@ -27,3 +27,15 @@ export type DateRange = {
 };
 
 export type { Expense };
+
+/** P&L agregati (`GET /api/reports/pnl`). Ish haqi filial filtrida null. */
+export type PnlDto = {
+  revenue: number;
+  expenses: number;
+  payroll: number | null;
+  payrollFinalized: number | null;
+  payrollDraft: number | null;
+  payrollRunCount: number;
+  payrollIncluded: boolean;
+  netProfit: number;
+};

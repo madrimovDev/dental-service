@@ -12,4 +12,5 @@ export type ListExpiringStockBatchesParams = {
  * @exclusiveMinimum
  */
 withinDays?: number;
+branchId?: string;
 };

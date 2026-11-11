@@ -35,5 +35,6 @@ export const batchFormSchema = z.object({
   batchNumber: z.string().max(100).optional(),
   expiryDate: z.string().optional(),
   costPerUnit: z.union([z.coerce.number().nonnegative(), z.literal('')]).optional(),
+  recordAsExpense: z.boolean().optional(),
 });
 export type BatchFormSchema = z.infer<typeof batchFormSchema>;

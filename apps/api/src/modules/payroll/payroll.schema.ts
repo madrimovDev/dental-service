@@ -86,3 +86,20 @@ export const staffNameDtoSchema = z
   .openapi('StaffName');
 
 export type StaffNameDto = z.infer<typeof staffNameDtoSchema>;
+
+/**
+ * UI-M6: run'ga qo'llangan refund-clawback tuzatishlari (payroll tuzatish sababi).
+ * `amount` manfiy (komissiya-ekvivalenti). Sabab matni frontendda i18n qilinadi.
+ */
+export const payrollAdjustmentDtoSchema = z
+  .object({
+    id: z.uuid(),
+    userId: z.uuid(),
+    amount: z.string().openapi({ example: '-180000.00' }),
+    sourceTransactionId: z.uuid(),
+    sourceReceiptNumber: z.string().nullable(),
+    sourceCreatedAt: z.string(),
+    reason: z.literal('refund_clawback'),
+  })
+  .openapi('PayrollAdjustment');
+export type PayrollAdjustmentDto = z.infer<typeof payrollAdjustmentDtoSchema>;

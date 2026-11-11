@@ -2,6 +2,7 @@ import type { ExpenseSummary } from '@dental/api-client';
 import { screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { renderApp } from '../../../test-utils';
+import type { PnlDto } from '../expenses.types';
 import { ExpensesScreen } from './ExpensesScreen';
 
 // Owner/superuser — barcha permission bor (KPI + jadval ko'rinadi).
@@ -34,6 +35,17 @@ const expensesResponse = {
   meta: { page: 1, pageSize: 200, total: 1 },
 };
 
+let pnlData: PnlDto | undefined = {
+  revenue: 1300000,
+  expenses: 280000,
+  payroll: 180000,
+  payrollFinalized: 180000,
+  payrollDraft: 0,
+  payrollRunCount: 1,
+  payrollIncluded: true,
+  netProfit: 840000,
+};
+
 vi.mock('../expenses.api', () => ({
   useExpenseCategories: () => ({
     data: [
@@ -61,6 +73,7 @@ vi.mock('../expenses.api', () => ({
     refetch: vi.fn(),
   }),
   useExpenseSummary: () => ({ data: summary }),
+  usePnl: () => ({ data: pnlData }),
   useDeleteExpense: () => ({ mutate: vi.fn(), isPending: false }),
   useCreateExpense: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
   useUpdateExpense: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
@@ -85,5 +98,24 @@ describe('ExpensesScreen — 3 KPI', () => {
     const { container } = renderApp(<ExpensesScreen />);
     // StatCard delta span faqat delta prop berilganda chiqadi; biz bermaymiz.
     expect(container.querySelector('[data-delta]')).toBeNull();
+  });
+});
+
+describe('ExpensesScreen — P&L (UI-M6)', () => {
+  it('4 plitka: sof tushum, xarajat, ish haqi, sof foyda', () => {
+    renderApp(<ExpensesScreen />);
+    expect(screen.getByTestId('pnl-revenue')).toHaveTextContent('Sof tushum');
+    expect(screen.getByTestId('pnl-expenses')).toHaveTextContent('−');
+    expect(screen.getByTestId('pnl-payroll')).toHaveTextContent('yakunlangan');
+    expect(screen.getByTestId('pnl-net')).toHaveTextContent('Sof foyda');
+    expect(screen.getByTestId('pnl-net')).toHaveTextContent('tushum − xarajat − ish haqi');
+    expect(screen.queryByTestId('pnl-branch-note')).toBeNull();
+  });
+
+  it('ish haqi null (filial filtri) → «—» va izoh', () => {
+    pnlData = { ...(pnlData as PnlDto), payroll: null, payrollIncluded: false };
+    renderApp(<ExpensesScreen />);
+    expect(screen.getByTestId('pnl-payroll')).toHaveTextContent('—');
+    expect(screen.getByTestId('pnl-branch-note')).toBeInTheDocument();
   });
 });

@@ -1,6 +1,11 @@
 import type { PayrollLine, PayrollRun } from '@dental/api-client';
 import { describe, expect, it } from 'vitest';
-import { toLocalDate, toPayrollLineVM, toPayrollRunVM } from './payroll.mappers';
+import {
+  summarizeAdjustments,
+  toLocalDate,
+  toPayrollLineVM,
+  toPayrollRunVM,
+} from './payroll.mappers';
 
 function line(over: Partial<PayrollLine> = {}): PayrollLine {
   return {
@@ -76,5 +81,33 @@ describe('toLocalDate', () => {
     // 2026-06-11 mahalliy — toISOString UTC'ga o'tsa kun siljishi mumkin.
     const d = new Date(2026, 5, 11, 23, 30);
     expect(toLocalDate(d)).toBe('2026-06-11');
+  });
+});
+
+describe('summarizeAdjustments', () => {
+  it('xodim bo‘yicha jamlaydi, sabab elementlarini saqlaydi', () => {
+    const m = summarizeAdjustments([
+      {
+        id: '1',
+        userId: 'u1',
+        amount: '-100',
+        sourceTransactionId: 't1',
+        sourceReceiptNumber: 'R1',
+        sourceCreatedAt: '2026-06-12T05:00:00Z',
+        reason: 'refund_clawback',
+      },
+      {
+        id: '2',
+        userId: 'u1',
+        amount: '-50',
+        sourceTransactionId: 't2',
+        sourceReceiptNumber: null,
+        sourceCreatedAt: '2026-06-13T05:00:00Z',
+        reason: 'refund_clawback',
+      },
+    ]);
+    expect(m.get('u1')?.total).toBe(-150);
+    expect(m.get('u1')?.items).toHaveLength(2);
+    expect(m.get('u2')).toBeUndefined();
   });
 });

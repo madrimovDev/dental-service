@@ -1,5 +1,6 @@
 import type {
   AppointmentStatsReport,
+  DentalAnalyticsReport,
   DoctorWorkloadRow,
   OneCExportRow,
   PlanCompletionReport,
@@ -76,6 +77,42 @@ export function planCompletionToRows(r: PlanCompletionReport): string[][] {
   rows.push(['Status', 'Soni']);
   for (const s of r.byStatus) rows.push([s.status, String(s.count)]);
 
+  return rows;
+}
+
+export function debtToRows(
+  r: {
+    totalDebt: number;
+    patientCount: number;
+    buckets: { key: string; amount: number; patients: number }[];
+  },
+  label: (key: string) => string,
+): string[][] {
+  const rows: string[][] = [
+    ['Bemorlar qarzi'],
+    ['Jami qarz', String(r.totalDebt)],
+    ['Bemorlar', String(r.patientCount)],
+    [],
+  ];
+  rows.push(['Muddat', 'Bemorlar', 'Qarz']);
+  for (const b of r.buckets) rows.push([label(b.key), String(b.patients), String(b.amount)]);
+  return rows;
+}
+
+export function procedureMixToRows(r: DentalAnalyticsReport['procedureMix']): string[][] {
+  const rows: string[][] = [
+    ['Xizmatlar foydasi'],
+    ['Xizmat', 'Soni', 'Tushum', 'Material', 'Foyda'],
+  ];
+  for (const p of r) {
+    rows.push([
+      p.serviceName,
+      String(p.count),
+      String(p.revenue),
+      String(p.materialCost),
+      String(p.margin),
+    ]);
+  }
   return rows;
 }
 

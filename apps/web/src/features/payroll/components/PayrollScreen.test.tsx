@@ -28,6 +28,15 @@ let canManage = true;
 // CLI-470: run detail lines + staff-names ro'yxati — testlar bo'yicha override qilinadi.
 let runLines: (typeof payrollLine)[] = [];
 let staffNames: { userId: string; fullName: string }[] = [];
+let adjustmentList: Array<{
+  id: string;
+  userId: string;
+  amount: string;
+  sourceTransactionId: string;
+  sourceReceiptNumber: string | null;
+  sourceCreatedAt: string;
+  reason: 'refund_clawback';
+}> = [];
 
 vi.mock('../payroll.api', () => ({
   usePayrollRuns: () => ({ data: [draftRun], isLoading: false, isError: false }),
@@ -39,6 +48,7 @@ vi.mock('../payroll.api', () => ({
   useCreateRun: () => ({ mutate: vi.fn(), isPending: false }),
   useFinalizeRun: () => ({ mutate: vi.fn(), isPending: false }),
   useStaffNames: () => ({ data: staffNames }),
+  usePayrollAdjustments: () => ({ data: adjustmentList }),
 }));
 
 vi.mock('@/stores/auth-store.ts', () => ({
@@ -52,6 +62,7 @@ describe('PayrollScreen (re-skin smoke)', () => {
     canManage = true;
     runLines = [];
     staffNames = [];
+    adjustmentList = [];
   });
 
   it('renders PageHead title + status pill label', () => {
@@ -91,5 +102,36 @@ describe('PayrollScreen (re-skin smoke)', () => {
 
     fireEvent.click(screen.getByText('Batafsil'));
     expect(screen.getByText('Aliyev Shifokor')).toBeInTheDocument();
+  });
+
+  // UI-M6: tuzatish sababi (refund clawback) + yakunlashdan oldin ogohlantirish.
+  it('«Tuzatish» ustunida sabab: qaytarish sanasi va chek raqami', () => {
+    runLines = [payrollLine];
+    staffNames = [{ userId: 'u1', fullName: 'Aliyev Shifokor' }];
+    adjustmentList = [
+      {
+        id: 'a1',
+        userId: 'u1',
+        amount: '-180000',
+        sourceTransactionId: 'tx1',
+        sourceReceiptNumber: 'R-77',
+        sourceCreatedAt: '2026-06-12T05:00:00Z',
+        reason: 'refund_clawback',
+      },
+    ];
+    renderApp(<PayrollScreen />);
+    fireEvent.click(screen.getByText('Batafsil'));
+    const cell = screen.getByTestId('adj-u1');
+    expect(cell).toHaveTextContent('qaytarish 2026-06-12');
+    expect(cell).toHaveTextContent('R-77');
+  });
+
+  it('Yakunlash → tasdiq oynasi ogohlantirish bilan; darhol mutatsiya ketmaydi', async () => {
+    runLines = [payrollLine];
+    renderApp(<PayrollScreen />);
+    fireEvent.click(screen.getByText('Batafsil'));
+    fireEvent.click(screen.getByText('Yakunlash'));
+    expect(await screen.findByText('Ish haqini yakunlash')).toBeInTheDocument();
+    expect(screen.getByText(/bu davr o.zgarmaydi/)).toBeInTheDocument();
   });
 });

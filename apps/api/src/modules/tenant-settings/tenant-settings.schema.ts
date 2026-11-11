@@ -160,3 +160,21 @@ export const integrationsTestResultSchema = z
   .openapi('IntegrationsTestResult', { example: { ok: true, detail: '@clinicbot' } });
 
 export type IntegrationsTestResultDto = z.infer<typeof integrationsTestResultSchema>;
+
+/* UI-M3 — «Klinika ishga tayyorligi» (faqat o'qiladi, hech narsa saqlanmaydi). */
+export const READINESS_KEYS = [
+  'workHours',
+  'doctorSchedule',
+  'servicePrices',
+  'channel',
+  'staff',
+  'license',
+  'backup',
+] as const;
+export type ReadinessKey = (typeof READINESS_KEYS)[number];
+
+export const readinessDtoSchema = z
+  .object({
+    items: z.array(z.object({ key: z.enum(READINESS_KEYS), ok: z.boolean() })),
+  })
+  .openapi('TenantReadiness');

@@ -233,7 +233,9 @@ describe('Ombor chuqurligi — recipient + guard + alert + batch', () => {
     const batch = await withTx((tx) =>
       stock.createBatch(ctx(tx), {
         itemId,
-        qtyReceived: 50,
+        // Oldingi testlar qoldiqni manfiy qoldiradi (asimmetrik guard) — IR-02 (UI-M5) dan keyin
+        // expiring faqat qoldig'i bor partiyalarni qaytaradi, shuning uchun qoldiq musbat bo'lsin.
+        qtyReceived: 200,
         supplierName: 'MedSupply',
         batchNumber: 'B-001',
         expiryDate: '2020-01-01T00:00:00.000Z', // o'tgan → expiring
@@ -244,7 +246,7 @@ describe('Ombor chuqurligi — recipient + guard + alert + batch', () => {
     const after = await withTx((tx) =>
       tx.select({ q: stockItems.quantity }).from(stockItems).where(eq(stockItems.id, itemId)),
     );
-    expect(Number(after[0]?.q) - Number(before[0]?.q)).toBe(50);
+    expect(Number(after[0]?.q) - Number(before[0]?.q)).toBe(200);
 
     const expiring = await withTx((tx) => stock.expiringBatches(ctx(tx), 30));
     expect(expiring.some((b) => b.batchNumber === 'B-001')).toBe(true);

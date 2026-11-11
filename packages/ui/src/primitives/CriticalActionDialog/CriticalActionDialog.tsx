@@ -25,6 +25,8 @@ export interface CriticalActionDialogProps {
   onSafe: () => void;
   /** Xavfli davom etish — tanlangan sabab bilan. Sabab shu yerda saqlanishi kerak. */
   onConfirm: (reason: string | null) => void;
+  /** Qo'shimcha shart (masalan, klinika nomini qo'lda yozish) bajarilmaguncha xavfli tugma faol emas. */
+  confirmDisabled?: boolean;
 }
 
 /**
@@ -42,6 +44,7 @@ export function CriticalActionDialog({
   dangerLabel,
   onSafe,
   onConfirm,
+  confirmDisabled = false,
 }: CriticalActionDialogProps) {
   const [reason, setReason] = useState<string | null>(null);
 
@@ -51,7 +54,7 @@ export function CriticalActionDialog({
   }, [opened]);
 
   const needsReason = reasons.length > 0;
-  const canConfirm = !needsReason || reason !== null;
+  const canConfirm = (!needsReason || reason !== null) && !confirmDisabled;
 
   return (
     <Modal

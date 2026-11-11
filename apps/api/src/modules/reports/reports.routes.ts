@@ -5,6 +5,7 @@ import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { requireModuleInDesktop } from '../../lib/license-middleware.ts';
 import { okJson } from '../../lib/openapi.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
+import { reportBranchScope } from '../../middleware/report-scope.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
 import {
@@ -16,10 +17,14 @@ import {
 } from './reports.mapper.ts';
 import {
   appointmentStatsReportDtoSchema,
+  debtAgingReportDtoSchema,
   dentalAnalyticsReportDtoSchema,
   doctorWorkloadReportDtoSchema,
   oneCExportReportDtoSchema,
+  ownerTodayQuerySchema,
+  ownerTodayReportDtoSchema,
   planCompletionReportDtoSchema,
+  pnlReportDtoSchema,
   reportRangeSchema,
   revenueReportDtoSchema,
 } from './reports.schema.ts';
@@ -40,7 +45,7 @@ export const reportsRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     path: '/revenue',
     tags: ['reports'],
     operationId: 'getRevenueReport',
-    middleware: [requirePermission('report.view')] as const,
+    middleware: [requirePermission('report.view'), reportBranchScope()] as const,
     request: { query: reportRangeSchema },
     responses: okJson(revenueReportDtoSchema, 'Revenue report'),
   });
@@ -58,7 +63,7 @@ export const reportsRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     path: '/appointments',
     tags: ['reports'],
     operationId: 'getAppointmentStatsReport',
-    middleware: [requirePermission('report.view')] as const,
+    middleware: [requirePermission('report.view'), reportBranchScope()] as const,
     request: { query: reportRangeSchema },
     responses: okJson(appointmentStatsReportDtoSchema, 'Appointment statistics report'),
   });
@@ -76,7 +81,7 @@ export const reportsRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     path: '/doctors',
     tags: ['reports'],
     operationId: 'getDoctorWorkloadReport',
-    middleware: [requirePermission('report.view')] as const,
+    middleware: [requirePermission('report.view'), reportBranchScope()] as const,
     request: { query: reportRangeSchema },
     responses: okJson(doctorWorkloadReportDtoSchema, 'Doctor workload report'),
   });
@@ -94,7 +99,10 @@ export const reportsRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     path: '/treatment-plans',
     tags: ['reports'],
     operationId: 'getPlanCompletionReport',
-    middleware: [requirePermission('report.view')] as const,
+    middleware: [
+      requirePermission('report.view'),
+      reportBranchScope({ tenantWide: true }),
+    ] as const,
     request: { query: reportRangeSchema },
     responses: okJson(planCompletionReportDtoSchema, 'Treatment plan completion report'),
   });
@@ -105,6 +113,42 @@ export const reportsRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     return c.json(ok(toPlanCompletionReportDto(result)), 200);
   });
 
+  // ─── GET /debt-aging (UI-M1) ────────────────────────────────────────────────
+
+  const debtAgingRoute = createRoute({
+    method: 'get',
+    path: '/debt-aging',
+    tags: ['reports'],
+    operationId: 'getDebtAgingReport',
+    middleware: [
+      requirePermission('report.view'),
+      reportBranchScope({ tenantWide: true }),
+    ] as const,
+    responses: okJson(debtAgingReportDtoSchema, 'Patient debt aging'),
+  });
+
+  app.openapi(debtAgingRoute, async (c) => {
+    const result = await service.debtAging(c);
+    return c.json(ok(result), 200);
+  });
+
+  // ─── GET /owner-today (UI-M1) ────────────────────────────────────────────────
+
+  const ownerTodayRoute = createRoute({
+    method: 'get',
+    path: '/owner-today',
+    tags: ['reports'],
+    operationId: 'getOwnerTodayReport',
+    middleware: [requirePermission('report.view'), reportBranchScope()] as const,
+    request: { query: ownerTodayQuerySchema },
+    responses: okJson(ownerTodayReportDtoSchema, 'Owner today overview'),
+  });
+
+  app.openapi(ownerTodayRoute, async (c) => {
+    const result = await service.ownerToday(c, c.req.valid('query'));
+    return c.json(ok(result), 200);
+  });
+
   // ─── GET /dental-analytics (V2-3) ────────────────────────────────────────
 
   const dentalAnalyticsRoute = createRoute({
@@ -112,7 +156,10 @@ export const reportsRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     path: '/dental-analytics',
     tags: ['reports'],
     operationId: 'getDentalAnalyticsReport',
-    middleware: [requirePermission('report.view')] as const,
+    middleware: [
+      requirePermission('report.view'),
+      reportBranchScope({ tenantWide: true }),
+    ] as const,
     request: { query: reportRangeSchema },
     responses: okJson(dentalAnalyticsReportDtoSchema, 'Dental analytics report'),
   });
@@ -130,7 +177,7 @@ export const reportsRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     path: '/1c-export',
     tags: ['reports'],
     operationId: 'getOneCExport',
-    middleware: [requirePermission('report.view')] as const,
+    middleware: [requirePermission('report.view'), reportBranchScope()] as const,
     request: { query: reportRangeSchema },
     responses: okJson(oneCExportReportDtoSchema, '1C accounting export rows'),
   });
@@ -139,6 +186,23 @@ export const reportsRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     const range = c.req.valid('query');
     const rows = await service.oneCExport(c, range);
     return c.json(ok(rows), 200);
+  });
+
+  // ─── GET /pnl — foyda va zarar (UI-M6) ──────────────────────────────────────
+
+  const pnlRoute = createRoute({
+    method: 'get',
+    path: '/pnl',
+    tags: ['reports'],
+    operationId: 'getPnlReport',
+    middleware: [requirePermission('report.view')] as const,
+    request: { query: reportRangeSchema },
+    responses: okJson(pnlReportDtoSchema, 'Profit and loss'),
+  });
+
+  app.openapi(pnlRoute, async (c) => {
+    const range = c.req.valid('query');
+    return c.json(ok(await service.pnl(c, range)), 200);
   });
 
   return app;

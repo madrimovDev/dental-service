@@ -170,3 +170,73 @@ export const oneCExportReportDtoSchema = z
   .array(oneCExportRowDtoSchema)
   .openapi('OneCExportReport');
 export type OneCExportRow = z.infer<typeof oneCExportRowDtoSchema>;
+
+// ─── Debt aging (UI-M1) ──────────────────────────────────────────────────────
+export const debtAgingBucketKeys = ['d0_30', 'd31_60', 'd61_90', 'd90_plus'] as const;
+export const debtAgingReportDtoSchema = z
+  .object({
+    totalDebt: z.number(),
+    patientCount: z.number().int(),
+    over90Count: z.number().int(),
+    buckets: z.array(
+      z.object({
+        key: z.enum(debtAgingBucketKeys),
+        amount: z.number(),
+        patients: z.number().int(),
+      }),
+    ),
+  })
+  .openapi('DebtAgingReport');
+export type DebtAgingReport = z.infer<typeof debtAgingReportDtoSchema>;
+
+// ─── Owner today overview (UI-M1) ────────────────────────────────────────────
+export const ownerTodayQuerySchema = z.object({ branchId: z.string().uuid().optional() });
+export const ownerTodayReportDtoSchema = z
+  .object({
+    date: z.string(),
+    /** Sof tushum (P13): to'lovlar − refundlar. */
+    netTotal: z.number(),
+    refunded: z.number(),
+    byPaymentMethod: z.array(z.object({ paymentMethod: z.string(), total: z.number() })),
+    branches: z.array(
+      z.object({
+        branchId: z.string(),
+        name: z.string(),
+        netRevenue: z.number(),
+        patients: z.number().int(),
+        occupancy: z.number(),
+        status: z.enum(['active', 'idle']),
+      }),
+    ),
+    doctors: z.array(
+      z.object({
+        doctorId: z.string(),
+        done: z.number().int(),
+        planned: z.number().int(),
+        revenue: z.number(),
+      }),
+    ),
+  })
+  .openapi('OwnerTodayReport');
+export type OwnerTodayReport = z.infer<typeof ownerTodayReportDtoSchema>;
+
+// ─── P&L (UI-M6) ─────────────────────────────────────────────────────────────
+
+/**
+ * Foyda va zarar agregati: sof foyda = tushum (refund ayirilgan) − xarajat − ish haqi.
+ * Ish haqi (payroll run) filialga bog'lanmagan → `branchId` berilsa `payroll*` null va
+ * `netProfit` ish haqisiz (`payrollIncluded=false`).
+ */
+export const pnlReportDtoSchema = z
+  .object({
+    revenue: z.number(),
+    expenses: z.number(),
+    payroll: z.number().nullable(),
+    payrollFinalized: z.number().nullable(),
+    payrollDraft: z.number().nullable(),
+    payrollRunCount: z.number(),
+    payrollIncluded: z.boolean(),
+    netProfit: z.number(),
+  })
+  .openapi('PnlReport');
+export type PnlReport = z.infer<typeof pnlReportDtoSchema>;

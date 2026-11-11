@@ -1,5 +1,10 @@
 import type { PayrollLine, PayrollRun } from '@dental/api-client';
-import type { PayrollLineVM, PayrollRunVM } from './payroll.types';
+import type {
+  PayrollAdjustmentDto,
+  PayrollAdjustmentSummary,
+  PayrollLineVM,
+  PayrollRunVM,
+} from './payroll.types';
 
 /**
  * Payroll qator → VM (sof). String pul maydonlari → number;
@@ -39,4 +44,23 @@ export function toLocalDate(d: Date): string {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+}
+
+/** Tuzatishlarni xodim bo'yicha jamlaydi (manfiy summa; sabab — chek + sana). */
+export function summarizeAdjustments(
+  list: PayrollAdjustmentDto[],
+): Map<string, PayrollAdjustmentSummary> {
+  const map = new Map<string, PayrollAdjustmentSummary>();
+  for (const a of list) {
+    const cur = map.get(a.userId) ?? { total: 0, items: [] };
+    const amount = Number(a.amount);
+    cur.total += amount;
+    cur.items.push({
+      receiptNumber: a.sourceReceiptNumber,
+      date: a.sourceCreatedAt.slice(0, 10),
+      amount,
+    });
+    map.set(a.userId, cur);
+  }
+  return map;
 }

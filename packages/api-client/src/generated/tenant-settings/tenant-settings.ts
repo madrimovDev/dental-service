@@ -5,6 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type {
+  GetTenantReadiness200,
   GetTenantSettings200,
   GetTenantVertical200,
   IntegrationsTestInput,
@@ -43,6 +44,14 @@ import { customInstance } from '../../mutator';
     },
       );
     }
+  export const getTenantReadiness = (
+    
+ ) => {
+      return customInstance<GetTenantReadiness200>(
+      {url: `/api/tenant-settings/readiness`, method: 'GET'
+    },
+      );
+    }
   export const testTenantIntegration = (
     integrationsTestInput: IntegrationsTestInput,
  ) => {
@@ -56,4 +65,5 @@ import { customInstance } from '../../mutator';
   export type GetTenantSettingsResult = NonNullable<Awaited<ReturnType<typeof getTenantSettings>>>
 export type UpdateTenantSettingsResult = NonNullable<Awaited<ReturnType<typeof updateTenantSettings>>>
 export type GetTenantVerticalResult = NonNullable<Awaited<ReturnType<typeof getTenantVertical>>>
+export type GetTenantReadinessResult = NonNullable<Awaited<ReturnType<typeof getTenantReadiness>>>
 export type TestTenantIntegrationResult = NonNullable<Awaited<ReturnType<typeof testTenantIntegration>>>

@@ -12,6 +12,7 @@ import {
   useExpenseCategories,
   useExpenseSummary,
   useExpenses,
+  usePnl,
 } from '../expenses.api';
 import { buildCategoryNameMap, toExpenseVMs, toSummaryRows } from '../expenses.mappers';
 import type { ExpenseVM } from '../expenses.types';
@@ -19,6 +20,7 @@ import { CategoryManagerModal } from './CategoryManagerModal';
 import { ExpenseFormModal } from './ExpenseFormModal';
 import { ExpenseSummaryCard } from './ExpenseSummaryCard';
 import { ExpensesTable } from './ExpensesTable';
+import { PnlPanel } from './PnlPanel';
 
 /** Joriy oyning birinchi/oxirgi kuni (ISO yyyy-mm-dd, lokal). */
 function currentMonthRange(): { from: string; to: string } {
@@ -57,6 +59,7 @@ export function ExpensesScreen() {
     pageSize: 200,
   });
   const summary = useExpenseSummary({ from, to, branchId: branchId ?? undefined });
+  const pnl = usePnl({ from, to, branchId: branchId ?? undefined });
   const deleteExpense = useDeleteExpense();
 
   const catList = useMemo(() => categories.data ?? [], [categories.data]);
@@ -112,6 +115,8 @@ export function ExpensesScreen() {
           }
         />
 
+        {pnl.data && <PnlPanel pnl={pnl.data} />}
+
         <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="lg">
           <StatCard
             label={t('expenses.grand_total')}
@@ -165,6 +170,9 @@ export function ExpensesScreen() {
         </Group>
 
         <ExpenseSummaryCard rows={summaryRows} grandTotal={summary.data?.grandTotal ?? 0} />
+        <Text size="xs" c="dimmed">
+          {t('finance.stockNote')}
+        </Text>
 
         {expenses.isError ? (
           <StateView

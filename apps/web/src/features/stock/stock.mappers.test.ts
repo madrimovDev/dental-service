@@ -1,14 +1,19 @@
-import type { ServiceMaterial, StockItemWithLowStock, StockMovement } from '@dental/api-client';
+import type { ServiceMaterial, StockMovement } from '@dental/api-client';
 import { describe, expect, it } from 'vitest';
 import {
+  daysStateOf,
   formatQty,
+  servicesByItem,
+  sortCriticalFirst,
   stockStateOf,
+  toExpiringBatchVMs,
   toServiceMaterialVM,
   toStockItemVM,
   toStockMovementVM,
 } from './stock.mappers';
+import type { StockItemDto } from './stock.types';
 
-function item(over: Partial<StockItemWithLowStock> = {}): StockItemWithLowStock {
+function item(over: Partial<StockItemDto> = {}): StockItemDto {
   return {
     id: 'i1',
     tenantId: 't',
@@ -20,6 +25,8 @@ function item(over: Partial<StockItemWithLowStock> = {}): StockItemWithLowStock 
     quantity: '12.50',
     minThreshold: '5',
     lowStock: false,
+    avgDailyUsage: '0',
+    daysLeft: null,
     createdAt: '2026-06-11T00:00:00Z',
     updatedAt: '2026-06-11T00:00:00Z',
     ...over,
@@ -99,5 +106,71 @@ describe('stock.mappers', () => {
       };
       expect(toServiceMaterialVM(sm).qtyPerService).toBe(2.5);
     });
+  });
+});
+
+describe('UI-M5 «necha kunga yetadi»', () => {
+  it('daysStateOf: null → none (cheksiz), ≤5 kritik, ≤14 yaqin, qolgani ok', () => {
+    expect(daysStateOf(null)).toBe('none');
+    expect(daysStateOf(0)).toBe('critical');
+    expect(daysStateOf(5)).toBe('critical');
+    expect(daysStateOf(6)).toBe('soon');
+    expect(daysStateOf(14)).toBe('soon');
+    expect(daysStateOf(15)).toBe('ok');
+  });
+
+  it('toStockItemVM: daysLeft/avgDailyUsage API’dan; yo‘q bo‘lsa null/0', () => {
+    expect(toStockItemVM(item({ daysLeft: 3, avgDailyUsage: '1.50' }))).toMatchObject({
+      daysLeft: 3,
+      avgDailyUsage: 1.5,
+      daysState: 'critical',
+    });
+    expect(toStockItemVM(item())).toMatchObject({
+      daysLeft: null,
+      avgDailyUsage: 0,
+      daysState: 'none',
+    });
+  });
+
+  it('sortCriticalFirst: kam kun avval, null (sarf yo‘q) oxirida', () => {
+    const vm = (name: string, daysLeft: number | null) => toStockItemVM(item({ name, daysLeft }));
+    const sorted = sortCriticalFirst([vm('C', null), vm('B', 12), vm('A', 3)]);
+    expect(sorted.map((i) => i.name)).toEqual(['A', 'B', 'C']);
+  });
+
+  it('toExpiringBatchVMs: muddatsizni tashlaydi, o‘tganini belgilaydi, muddat bo‘yicha tartiblaydi', () => {
+    const now = new Date('2026-11-11T00:00:00Z');
+    const row = (id: string, expiryDate: string | null) => ({
+      id,
+      itemId: 'i',
+      itemName: 'Lidokain',
+      unit: 'karpula',
+      batchNumber: id,
+      supplierName: null,
+      expiryDate,
+      qtyRemaining: '14.00',
+    });
+    const out = toExpiringBatchVMs(
+      [row('late', '2026-12-01T00:00:00Z'), row('none', null), row('past', '2026-11-01T00:00:00Z')],
+      now,
+    );
+    expect(out.map((b) => b.id)).toEqual(['past', 'late']);
+    expect(out[0]?.expired).toBe(true);
+    expect(out[1]?.expired).toBe(false);
+    expect(out[1]?.qtyRemaining).toBe(14);
+  });
+
+  it('servicesByItem: takrorsiz, noma’lum xizmat tashlanadi', () => {
+    const names: Record<string, string> = { s1: 'Plomba', s2: 'Kanal' };
+    const map = servicesByItem(
+      [
+        { id: '1', serviceId: 's1', itemId: 'i1', qtyPerService: 1 },
+        { id: '2', serviceId: 's1', itemId: 'i1', qtyPerService: 2 },
+        { id: '3', serviceId: 's2', itemId: 'i1', qtyPerService: 1 },
+        { id: '4', serviceId: 'gone', itemId: 'i1', qtyPerService: 1 },
+      ],
+      (id) => names[id],
+    );
+    expect(map.get('i1')).toEqual(['Plomba', 'Kanal']);
   });
 });

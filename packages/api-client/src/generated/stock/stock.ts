@@ -16,6 +16,8 @@ import type {
   GetStockItem200,
   ListExpiringStockBatches200,
   ListExpiringStockBatchesParams,
+  ListStockAutoDeductionsToday200,
+  ListStockAutoDeductionsTodayParams,
   ListStockBatches200,
   ListStockBatchesParams,
   ListStockBom200,
@@ -145,6 +147,15 @@ import { customInstance } from '../../mutator';
     },
       );
     }
+  export const listStockAutoDeductionsToday = (
+    params?: ListStockAutoDeductionsTodayParams,
+ ) => {
+      return customInstance<ListStockAutoDeductionsToday200>(
+      {url: `/api/stock/auto-deductions/today`, method: 'GET',
+        params
+    },
+      );
+    }
   export type ListStockItemsResult = NonNullable<Awaited<ReturnType<typeof listStockItems>>>
 export type CreateStockItemResult = NonNullable<Awaited<ReturnType<typeof createStockItem>>>
 export type GetStockItemResult = NonNullable<Awaited<ReturnType<typeof getStockItem>>>
@@ -157,3 +168,4 @@ export type RemoveStockBomResult = NonNullable<Awaited<ReturnType<typeof removeS
 export type ListStockBatchesResult = NonNullable<Awaited<ReturnType<typeof listStockBatches>>>
 export type CreateStockBatchResult = NonNullable<Awaited<ReturnType<typeof createStockBatch>>>
 export type ListExpiringStockBatchesResult = NonNullable<Awaited<ReturnType<typeof listExpiringStockBatches>>>
+export type ListStockAutoDeductionsTodayResult = NonNullable<Awaited<ReturnType<typeof listStockAutoDeductionsToday>>>

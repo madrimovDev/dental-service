@@ -8,6 +8,8 @@ import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
 import type { NotificationsService } from '../notifications/notifications.service.ts';
 import {
+  toAutoDeductionDto,
+  toExpiringStockBatchDto,
   toServiceMaterialDto,
   toStockBatchDto,
   toStockItemDto,
@@ -15,6 +17,8 @@ import {
   toStockMovementDto,
 } from './stock.mapper.ts';
 import {
+  autoDeductionDtoSchema,
+  autoDeductionsQuerySchema,
   batchesQuerySchema,
   bomQuerySchema,
   createBatchSchema,
@@ -22,6 +26,7 @@ import {
   createItemSchema,
   createMovementSchema,
   expiringQuerySchema,
+  expiringStockBatchDtoSchema,
   listItemsQuerySchema,
   movementsQuerySchema,
   serviceMaterialDtoSchema,
@@ -286,13 +291,35 @@ export const stockRoutes = (deps: {
     operationId: 'listExpiringStockBatches',
     middleware: [requirePermission('stock.view')] as const,
     request: { query: expiringQuerySchema },
-    responses: okJson(z.array(stockBatchDtoSchema), 'Batches expiring within N days'),
+    responses: okJson(
+      z.array(expiringStockBatchDtoSchema),
+      'Batches with remaining stock, expiring (or expired) within N days',
+    ),
   });
 
   app.openapi(expiringBatchesRoute, async (c) => {
-    const { withinDays } = c.req.valid('query');
-    const rows = await service.expiringBatches(c, withinDays);
-    return c.json(ok(rows.map(toStockBatchDto)), 200);
+    const { withinDays, branchId } = c.req.valid('query');
+    const rows = await service.expiringBatches(c, withinDays, branchId);
+    return c.json(ok(rows.map(toExpiringStockBatchDto)), 200);
+  });
+
+  const autoDeductionsRoute = createRoute({
+    method: 'get',
+    path: '/auto-deductions/today',
+    tags: ['stock'],
+    operationId: 'listStockAutoDeductionsToday',
+    middleware: [requirePermission('stock.view')] as const,
+    request: { query: autoDeductionsQuerySchema },
+    responses: okJson(
+      z.array(autoDeductionDtoSchema),
+      "Today's automatic (visit-note) stock deductions",
+    ),
+  });
+
+  app.openapi(autoDeductionsRoute, async (c) => {
+    const { branchId } = c.req.valid('query');
+    const rows = await service.autoDeductionsToday(c, branchId);
+    return c.json(ok(rows.map(toAutoDeductionDto)), 200);
   });
 
   const createBatchRoute = createRoute({
@@ -309,6 +336,13 @@ export const stockRoutes = (deps: {
 
   app.openapi(createBatchRoute, async (c) => {
     const body = c.req.valid('json');
+    // Kirim → xarajat: ombor ruxsati (`stock.manage`) xarajat yozishga yetmaydi (Doctor/Nurse).
+    if (body.recordAsExpense) {
+      const perms = c.get('accessClaims')?.perms ?? [];
+      if (!perms.includes('@owner') && !perms.includes('expense.manage')) {
+        return c.json(fail('permission.denied', 'Permission required: expense.manage'), 403);
+      }
+    }
     const batch = await service.createBatch(c, body);
     if (!batch) throw new Error('Batch creation failed');
     return c.json(ok(toStockBatchDto(batch)), 201);
