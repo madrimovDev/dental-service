@@ -6,7 +6,6 @@ import {
   Chip,
   FileButton,
   Group,
-  Modal,
   NumberInput,
   Select,
   Stack,
@@ -15,14 +14,17 @@ import {
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
-import { IconX } from '@tabler/icons-react';
+import { IconChevronLeft, IconX } from '@tabler/icons-react';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { usePatient } from '@/features/patients/patients.api';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import {
   useCreateLabOrder,
+  useLabOrders,
+  useLabOrdersList,
   usePatientAppointments,
   useUpdateLabOrderStatus,
 } from '../../clinical.api';
@@ -40,6 +42,7 @@ import {
   type LabOrderWire,
   nextAppointmentStart,
 } from './lab-order.helpers';
+import { summarizeLabs } from './lab-order.labs';
 import { type LabOrderFormValues, labOrderFormSchema } from './lab-order.schema';
 
 const SHADE_COLORS: Record<string, string> = {
@@ -81,16 +84,16 @@ const initials = (name: string) =>
     .map((p) => `${p[0]?.toUpperCase()}.`)
     .join(' ');
 
-type Props = {
-  opened: boolean;
-  onClose: () => void;
-  patientId: string;
-  /** Shu bemorning mavjud buyurtmalari — remake uchun "asl buyurtma" tanlovi. */
-  existingOrders: LabOrderWire[];
-};
-
-export function LabOrderFormModal({ opened, onClose, patientId, existingOrders }: Props) {
+/**
+ * Yangi lab buyurtma — alohida sahifa `/patients/:id/lab-orders/new` (modal o'rniga).
+ * `?remakeOf=<buyurtma id>` — «qayta tayyorlash» oldindan belgilanadi.
+ */
+export function LabOrderNewPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const { id: patientId = '' } = useParams();
+  const [searchParams] = useSearchParams();
+  const remakeOf = searchParams.get('remakeOf');
   const user = useAuthStore((s) => s.user);
   const canViewAppointments = useAuthStore((s) => s.hasPermission('appointment.view'));
   const [files, setFiles] = useState<File[]>([]);
@@ -100,10 +103,22 @@ export function LabOrderFormModal({ opened, onClose, patientId, existingOrders }
     validate: zod4Resolver(labOrderFormSchema),
   });
 
+  const existingQuery = useLabOrders(patientId);
+  const existingOrders = useMemo(
+    () => (existingQuery.data ?? []) as LabOrderWire[],
+    [existingQuery.data],
+  );
+  const tenantOrdersQuery = useLabOrdersList({ pageSize: 100 });
+  const labs = useMemo(
+    () => summarizeLabs(tenantOrdersQuery.data?.data ?? []).slice(0, 4),
+    [tenantOrdersQuery.data],
+  );
   const createMut = useCreateLabOrder(patientId);
   const statusMut = useUpdateLabOrderStatus(patientId);
   const uploadMut = useUploadLabOrderFile();
-  const patientQuery = usePatient(patientId);
+  // Technician'da `patient.view` yo'q — keraksiz 403 so'rovi yuborilmaydi.
+  const canViewPatient = useAuthStore((s) => s.hasPermission('patient.view'));
+  const patientQuery = usePatient(canViewPatient ? patientId : '');
   const apptQuery = usePatientAppointments(patientId, canViewAppointments);
 
   const v = form.values;
@@ -132,14 +147,23 @@ export function LabOrderFormModal({ opened, onClose, patientId, existingOrders }
     return typeof m === 'string' && m ? t(m) : undefined;
   };
 
-  const reset = () => {
-    form.reset();
-    setFiles([]);
-  };
-  const close = () => {
-    reset();
-    onClose();
-  };
+  // Remake oqimi: asl buyurtma bu bemorniki bo'lsa, forma oldindan to'ldiriladi (bir marta).
+  const remakePrefilled = useRef(false);
+  useEffect(() => {
+    if (remakePrefilled.current || !remakeOf) return;
+    const original = existingOrders.find((o) => o.id === remakeOf);
+    if (!original) return;
+    remakePrefilled.current = true;
+    form.setValues({
+      isRemake: true,
+      remakeOfId: original.id,
+      labName: original.labName,
+      orderType: original.orderType as LabOrderFormValues['orderType'],
+    });
+  }, [existingOrders, remakeOf, form]);
+
+  const backTo = `/patients/${patientId}`;
+  const close = () => navigate(backTo);
 
   const submit = (send: boolean) =>
     form.onSubmit(async (values) => {
@@ -182,7 +206,7 @@ export function LabOrderFormModal({ opened, onClose, patientId, existingOrders }
         if (failed > 0) {
           notifications.show({ color: 'yellow', message: t('labOrder.files_failed') });
         }
-        close();
+        navigate(`/lab-orders/${order.id}`, { replace: true });
       } catch {
         // Global MutationCache.onError xato toast'ini ko'rsatadi; forma ochiq qoladi.
       }
@@ -191,17 +215,48 @@ export function LabOrderFormModal({ opened, onClose, patientId, existingOrders }
   const busy = createMut.isPending || statusMut.isPending || uploadMut.isPending;
 
   return (
-    <Modal
-      opened={opened}
-      onClose={close}
-      size="min(1100px, 96vw)"
-      title={patient ? t('labOrder.title_for', { name: patient.fullName }) : t('labOrder.title')}
-    >
+    <div className={classes.page}>
+      <header className={classes.pageHead}>
+        <Link to={backTo} className={classes.back} aria-label={t('labOrders.back')}>
+          <IconChevronLeft size={18} aria-hidden="true" />
+        </Link>
+        <div className={classes.titleBox}>
+          <h1 className={classes.title}>
+            {patient ? t('labOrder.title_for', { name: patient.fullName }) : t('labOrder.title')}
+          </h1>
+          <span className={classes.sub}>{user?.fullName ?? ''}</span>
+        </div>
+      </header>
       <form onSubmit={submit(true)}>
         <div className={classes.layout}>
           <Stack gap="md">
             <section className={classes.card}>
               <h3 className={classes.cardTitle}>{t('labOrder.lab_section')}</h3>
+              {labs.length > 0 && (
+                <div className={classes.labGrid}>
+                  {labs.map((l) => (
+                    <button
+                      key={l.name}
+                      type="button"
+                      className={classes.labCard}
+                      aria-pressed={v.labName.trim().toLowerCase() === l.name.toLowerCase()}
+                      onClick={() => form.setFieldValue('labName', l.name)}
+                    >
+                      <span className={classes.labName}>{l.name}</span>
+                      <span className={classes.labMeta}>
+                        {t(
+                          l.avgDays === null ? 'labOrders.lab_stats_nodays' : 'labOrders.lab_stats',
+                          {
+                            count: l.count,
+                            days: l.avgDays,
+                            remake: l.remakePct,
+                          },
+                        )}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
               <TextInput
                 label={t('lab_order.lab_name')}
                 description={t('labOrder.lab_name_hint')}
@@ -499,6 +554,6 @@ export function LabOrderFormModal({ opened, onClose, patientId, existingOrders }
           </Group>
         </div>
       </form>
-    </Modal>
+    </div>
   );
 }

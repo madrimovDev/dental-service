@@ -12,6 +12,7 @@ import {
   createTreatmentPlan,
   createVisitNote,
   deletePatientImage,
+  getLabOrder,
   getLatestToothChart,
   getPatient,
   getService,
@@ -421,12 +422,24 @@ export function useCreateLabOrder(patientId: string) {
   });
 }
 
+/** Bitta buyurtma (`/lab-orders/:id` sahifasi) — `lab_order.view`. */
+export function useLabOrder(id: string) {
+  return useQuery({
+    queryKey: clinicalKeys.labOrder(id),
+    queryFn: () => getLabOrder(id).then((r) => r.data),
+    enabled: !!id,
+  });
+}
+
 export function useUpdateLabOrderStatus(patientId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: LabOrderStatus }) =>
       updateLabOrder(id, { status }).then((r) => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: clinicalKeys.labOrders(patientId) }),
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: clinicalKeys.labOrders(patientId) });
+      qc.invalidateQueries({ queryKey: clinicalKeys.labOrder(v.id) });
+    },
   });
 }
 

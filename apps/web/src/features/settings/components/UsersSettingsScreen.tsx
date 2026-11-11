@@ -4,6 +4,7 @@ import {
   ActionIcon,
   Alert,
   Button,
+  Chip,
   Group,
   Modal,
   Select,
@@ -36,6 +37,7 @@ import { filterAssignments } from '../settings.mappers';
 import { type InviteFormValues, makeInviteSchema } from '../settings.schema';
 import type { UsersFilter } from '../settings.types';
 import { ConfirmModal } from './ConfirmModal';
+import { InviteRoleCards } from './InviteRoleCards';
 import { SettingsShell } from './SettingsShell';
 import { StaffProfileModal } from './StaffProfileModal';
 
@@ -122,199 +124,237 @@ export function UsersSettingsScreen() {
 
   return (
     <SettingsShell active="users" actions={actions}>
-      <Stack gap="lg">
-        <Group>
-          <TextInput
-            leftSection={<IconSearch size={16} />}
-            placeholder={t('settings.users_search')}
-            aria-label={t('settings.users_search')}
-            value={filter.search}
-            onChange={(e) => setFilter((f) => ({ ...f, search: e.currentTarget.value }))}
-            style={{ flex: 1 }}
-          />
-          <Select
-            placeholder={t('settings.users_filter_branch')}
-            aria-label={t('settings.users_filter_branch')}
-            clearable
-            data={branches.data?.map((b) => ({ value: b.id, label: b.name })) ?? []}
-            value={filter.branchId}
-            onChange={(v) => setFilter((f) => ({ ...f, branchId: v }))}
-          />
-          <Select
-            placeholder={t('settings.users_filter_role')}
-            aria-label={t('settings.users_filter_role')}
-            clearable
-            data={
-              filterRoles?.map((r) => ({
-                value: r.id,
-                label: roleLabel(r.name, t, 'isSystem' in r ? (r.isSystem as boolean) : undefined),
-              })) ?? []
-            }
-            value={filter.roleId}
-            onChange={(v) => setFilter((f) => ({ ...f, roleId: v }))}
-          />
-        </Group>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: opened ? 'minmax(0,1fr) minmax(300px,400px)' : 'minmax(0,1fr)',
+          gap: 20,
+          alignItems: 'start',
+        }}
+      >
+        <Stack gap="lg">
+          <Group wrap="wrap">
+            <TextInput
+              leftSection={<IconSearch size={16} />}
+              placeholder={t('settings.users_search')}
+              aria-label={t('settings.users_search')}
+              value={filter.search}
+              onChange={(e) => setFilter((f) => ({ ...f, search: e.currentTarget.value }))}
+              style={{ flex: '1 1 200px' }}
+            />
+            <Select
+              placeholder={t('settings.users_filter_branch')}
+              aria-label={t('settings.users_filter_branch')}
+              clearable
+              data={branches.data?.map((b) => ({ value: b.id, label: b.name })) ?? []}
+              value={filter.branchId}
+              onChange={(v) => setFilter((f) => ({ ...f, branchId: v }))}
+            />
+            <Select
+              placeholder={t('settings.users_filter_role')}
+              aria-label={t('settings.users_filter_role')}
+              clearable
+              data={
+                filterRoles?.map((r) => ({
+                  value: r.id,
+                  label: roleLabel(
+                    r.name,
+                    t,
+                    'isSystem' in r ? (r.isSystem as boolean) : undefined,
+                  ),
+                })) ?? []
+              }
+              value={filter.roleId}
+              onChange={(v) => setFilter((f) => ({ ...f, roleId: v }))}
+            />
+          </Group>
 
-        {assignments.data && assignments.data.length === 0 && (
-          <Text c="dimmed">{t('users.empty')}</Text>
-        )}
-        {filtered.length > 0 && (
-          <Table.ScrollContainer minWidth={750}>
-            <Table verticalSpacing="md">
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>{t('users.full_name')}</Table.Th>
-                  <Table.Th>{t('users.phone')}</Table.Th>
-                  <Table.Th>{t('users.role')}</Table.Th>
-                  <Table.Th>{t('users.branch')}</Table.Th>
-                  <Table.Th>{t('users.status')}</Table.Th>
-                  <Table.Th />
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {filtered.map((a) => (
-                  <Table.Tr key={a.assignmentId}>
-                    <Table.Td>
-                      <Group gap="xs" wrap="nowrap">
-                        <Text truncate maw={220}>
-                          {a.userFullName ?? '—'}
-                        </Text>
-                        {a.userId === ownerUserId && <Tag>{t('staffCards.owner')}</Tag>}
-                      </Group>
-                    </Table.Td>
-                    <Table.Td>{a.userPhone}</Table.Td>
-                    <Table.Td>{roleLabel(a.roleName, t)}</Table.Td>
-                    <Table.Td>{a.branchName ?? t('users.all_branches')}</Table.Td>
-                    <Table.Td>
-                      {a.pending ? (
-                        <StatusPill status="waiting">{t('settings.users.pending')}</StatusPill>
-                      ) : (
-                        <StatusPill status={a.isActive ? 'confirmed' : 'done'}>
-                          {a.isActive ? t('users.active') : t('users.inactive')}
-                        </StatusPill>
-                      )}
-                    </Table.Td>
-                    <Table.Td>
-                      <Group gap="xs" wrap="nowrap" justify="flex-end">
-                        {hasPermission('user.manage') && (
-                          <ActionIcon
-                            variant="subtle"
-                            color="gray"
-                            onClick={() =>
-                              setProfileEdit({
-                                userId: a.userId,
-                                name: a.userFullName ?? a.userPhone,
-                              })
-                            }
-                            title={t('staff.edit_profile')}
-                            aria-label={t('staff.edit_profile')}
-                          >
-                            <IconUserCog size={16} />
-                          </ActionIcon>
+          {assignments.data && assignments.data.length === 0 && (
+            <Text c="dimmed">{t('users.empty')}</Text>
+          )}
+          {filtered.length > 0 && (
+            <Table.ScrollContainer minWidth={750}>
+              <Table verticalSpacing="md">
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>{t('users.full_name')}</Table.Th>
+                    <Table.Th>{t('users.phone')}</Table.Th>
+                    <Table.Th>{t('users.role')}</Table.Th>
+                    <Table.Th>{t('users.branch')}</Table.Th>
+                    <Table.Th>{t('users.status')}</Table.Th>
+                    <Table.Th />
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {filtered.map((a) => (
+                    <Table.Tr key={a.assignmentId}>
+                      <Table.Td>
+                        <Group gap="xs" wrap="nowrap">
+                          <Text truncate maw={220}>
+                            {a.userFullName ?? '—'}
+                          </Text>
+                          {a.userId === ownerUserId && <Tag>{t('staffCards.owner')}</Tag>}
+                        </Group>
+                      </Table.Td>
+                      <Table.Td>{a.userPhone}</Table.Td>
+                      <Table.Td>{roleLabel(a.roleName, t)}</Table.Td>
+                      <Table.Td>{a.branchName ?? t('users.all_branches')}</Table.Td>
+                      <Table.Td>
+                        {a.pending ? (
+                          <StatusPill status="waiting">{t('settings.users.pending')}</StatusPill>
+                        ) : (
+                          <StatusPill status={a.isActive ? 'confirmed' : 'done'}>
+                            {a.isActive ? t('users.active') : t('users.inactive')}
+                          </StatusPill>
                         )}
-                        {isOwner &&
-                          !a.pending &&
-                          a.userId !== currentUser?.id &&
-                          a.userId !== ownerUserId && (
+                      </Table.Td>
+                      <Table.Td>
+                        <Group gap="xs" wrap="nowrap" justify="flex-end">
+                          {hasPermission('user.manage') && (
                             <ActionIcon
                               variant="subtle"
                               color="gray"
-                              style={{ color: 'var(--info)' }}
-                              onClick={() => setToReset(a.userId)}
-                              title={t('users.reset_password')}
-                              aria-label={t('users.reset_password')}
+                              onClick={() =>
+                                setProfileEdit({
+                                  userId: a.userId,
+                                  name: a.userFullName ?? a.userPhone,
+                                })
+                              }
+                              title={t('staff.edit_profile')}
+                              aria-label={t('staff.edit_profile')}
                             >
-                              <IconKey size={16} />
+                              <IconUserCog size={16} />
                             </ActionIcon>
                           )}
-                        {hasPermission('user.manage') && a.userId !== ownerUserId && (
-                          <ActionIcon
-                            variant="subtle"
-                            color="red"
-                            onClick={() => setToRemove(a.assignmentId)}
-                            title={t('staffCards.deactivate')}
-                            aria-label={t('staffCards.deactivate')}
-                          >
-                            <IconTrash size={16} />
-                          </ActionIcon>
-                        )}
-                      </Group>
-                    </Table.Td>
-                  </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
-          </Table.ScrollContainer>
-        )}
-      </Stack>
+                          {isOwner &&
+                            !a.pending &&
+                            a.userId !== currentUser?.id &&
+                            a.userId !== ownerUserId && (
+                              <ActionIcon
+                                variant="subtle"
+                                color="gray"
+                                style={{ color: 'var(--info)' }}
+                                onClick={() => setToReset(a.userId)}
+                                title={t('users.reset_password')}
+                                aria-label={t('users.reset_password')}
+                              >
+                                <IconKey size={16} />
+                              </ActionIcon>
+                            )}
+                          {hasPermission('user.manage') && a.userId !== ownerUserId && (
+                            <ActionIcon
+                              variant="subtle"
+                              color="red"
+                              onClick={() => setToRemove(a.assignmentId)}
+                              title={t('staffCards.deactivate')}
+                              aria-label={t('staffCards.deactivate')}
+                            >
+                              <IconTrash size={16} />
+                            </ActionIcon>
+                          )}
+                        </Group>
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </Table.ScrollContainer>
+          )}
+        </Stack>
 
-      {/* Invite modal */}
-      <Modal opened={opened} onClose={closeAll} title={t('users.invite')}>
-        {tempPassword ? (
-          <Stack gap="md">
-            <Alert color="teal" variant="light">
-              <Text fw={600}>{t('users.invited_successfully')}</Text>
-              <Text size="sm">{t('users.temp_password_notice')}</Text>
-              <Text size="sm" fw={600}>
-                {t('staffCards.shownOnce')}
-              </Text>
-              <Text mt="sm" fw={700} ff="var(--font-mono)" size="lg">
-                {tempPassword}
-              </Text>
-            </Alert>
-            <Button onClick={closeAll} fullWidth>
-              {t('common.cancel')}
-            </Button>
-          </Stack>
-        ) : (
-          <form onSubmit={form.onSubmit(submitInvite)}>
-            <Stack gap="md">
-              <Alert color="var(--info)" variant="light">
-                <Text size="sm">{t('users.invite_hint')}</Text>
-              </Alert>
-              <TextInput
-                label={t('users.full_name')}
-                required
-                {...form.getInputProps('fullName')}
-              />
-              <PhoneInput label={t('users.phone')} required {...form.getInputProps('phone')} />
-              <Select
-                label={t('users.role')}
-                description={t('staffCards.grantHint')}
-                data={
-                  grantable.data?.map((r) => ({
-                    value: r.id,
-                    label: roleLabel(
-                      r.name,
-                      t,
-                      'isSystem' in r ? (r.isSystem as boolean) : undefined,
-                    ),
-                  })) ?? []
-                }
-                required
-                {...form.getInputProps('roleId')}
-              />
-              <Select
-                label={t('users.branch')}
-                description={t('users.branch_hint')}
-                data={[
-                  { value: '', label: t('users.all_branches') },
-                  ...(branches.data?.map((b) => ({ value: b.id, label: b.name })) ?? []),
-                ]}
-                {...form.getInputProps('branchId')}
-              />
-              <Group justify="flex-end">
-                <Button variant="default" onClick={closeAll}>
+        {opened && (
+          <aside
+            aria-label={t('users.invite')}
+            style={{
+              borderRadius: 'var(--radius-card)',
+              border: '2px solid var(--primary)',
+              background: 'var(--surface)',
+              padding: 20,
+              position: 'sticky',
+              top: 0,
+              maxHeight: 'calc(100vh - 96px)',
+              overflowY: 'auto',
+            }}
+          >
+            <h2 style={{ margin: '0 0 12px', fontSize: 18 }}>{t('users.invite')}</h2>
+            {tempPassword ? (
+              <Stack gap="md">
+                <Alert color="teal" variant="light">
+                  <Text fw={600}>{t('users.invited_successfully')}</Text>
+                  <Text size="sm">{t('users.temp_password_notice')}</Text>
+                  <Text size="sm" fw={600}>
+                    {t('staffCards.shownOnce')}
+                  </Text>
+                  <Text mt="sm" fw={700} ff="var(--font-mono)" size="lg">
+                    {tempPassword}
+                  </Text>
+                </Alert>
+                <Button onClick={closeAll} fullWidth>
                   {t('common.cancel')}
                 </Button>
-                <Button type="submit" loading={invite.isPending}>
-                  {t('users.send_invite')}
-                </Button>
-              </Group>
-            </Stack>
-          </form>
+              </Stack>
+            ) : (
+              <form onSubmit={form.onSubmit(submitInvite)}>
+                <Stack gap="md">
+                  <Group grow align="flex-start">
+                    <TextInput
+                      label={t('users.full_name')}
+                      required
+                      {...form.getInputProps('fullName')}
+                    />
+                    <PhoneInput
+                      label={t('users.phone')}
+                      required
+                      {...form.getInputProps('phone')}
+                    />
+                  </Group>
+                  <InviteRoleCards
+                    roles={grantable.data ?? []}
+                    value={form.values.roleId}
+                    onChange={(id) => form.setFieldValue('roleId', id)}
+                    error={typeof form.errors.roleId === 'string' ? form.errors.roleId : undefined}
+                  />
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                      {t('users.branch')}
+                    </div>
+                    <Chip.Group
+                      multiple={false}
+                      value={form.values.branchId ?? ''}
+                      onChange={(v) => form.setFieldValue('branchId', v)}
+                    >
+                      <Group gap="xs">
+                        {(branches.data ?? []).map((b) => (
+                          <Chip key={b.id} value={b.id} variant="outline">
+                            {b.name}
+                          </Chip>
+                        ))}
+                        <Chip value="" variant="outline">
+                          {t('users.all_branches')}
+                        </Chip>
+                      </Group>
+                    </Chip.Group>
+                    <Text size="xs" c="dimmed" mt={4}>
+                      {t('users.branch_hint')}
+                    </Text>
+                  </div>
+                  <Alert color="var(--info)" variant="light">
+                    <Text size="sm">{t('users.invite_hint')}</Text>
+                  </Alert>
+                  <Group justify="flex-end">
+                    <Button variant="default" onClick={closeAll}>
+                      {t('common.cancel')}
+                    </Button>
+                    <Button type="submit" loading={invite.isPending}>
+                      {t('users.send_invite')}
+                    </Button>
+                  </Group>
+                </Stack>
+              </form>
+            )}
+          </aside>
         )}
-      </Modal>
+      </div>
 
       {/* Reset password result modal */}
       <Modal

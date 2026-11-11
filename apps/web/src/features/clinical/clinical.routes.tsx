@@ -9,6 +9,14 @@ const TreatmentPlansScreen = lazy(() =>
 const LabOrdersScreen = lazy(() =>
   import('./components/lab-orders/LabOrdersScreen').then((m) => ({ default: m.LabOrdersScreen })),
 );
+const LabOrderNewPage = lazy(() =>
+  import('./components/lab-orders/LabOrderNewPage').then((m) => ({ default: m.LabOrderNewPage })),
+);
+const LabOrderDetailPage = lazy(() =>
+  import('./components/lab-orders/LabOrderDetailPage').then((m) => ({
+    default: m.LabOrderDetailPage,
+  })),
+);
 const VisitNotePage = lazy(() =>
   import('./components/visit-notes/VisitNotePage').then((m) => ({ default: m.VisitNotePage })),
 );
@@ -22,6 +30,8 @@ export const clinicalRoutes: AppRoute[] = [
     element: <VisitNotePage />,
   },
   { path: '/plans', perm: 'medical_record.view', element: <TreatmentPlansScreen /> },
+  { path: '/patients/:id/lab-orders/new', perm: 'lab_order.manage', element: <LabOrderNewPage /> },
+  { path: '/lab-orders/:id', perm: 'lab_order.view', element: <LabOrderDetailPage /> },
   { path: '/lab', perm: 'lab_order.view', element: <LabOrdersScreen /> },
   { path: '/rx', perm: 'medical_record.view', element: <RxScreen /> },
 ];

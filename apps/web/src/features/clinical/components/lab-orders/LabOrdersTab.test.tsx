@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderApp } from '../../../../test-utils';
 import { LabOrdersTab } from './LabOrdersTab';
@@ -67,11 +67,6 @@ vi.mock('@/stores/auth-store.ts', () => ({
   }, {}),
 }));
 
-const openForm = async () => {
-  fireEvent.click(screen.getByRole('button', { name: 'Yangi buyurtma' }));
-  return screen.findByLabelText(/Laboratoriya nomi/);
-};
-
 describe('LabOrdersTab', () => {
   beforeEach(() => {
     createMutateAsync.mockReset();
@@ -101,65 +96,10 @@ describe('LabOrdersTab', () => {
     expect(screen.queryByText('Yetkazilgan')).not.toBeInTheDocument();
   });
 
-  it("forma: rang va muddatsiz yuborib bo'lmaydi (majburiy) — create chaqirilmaydi", async () => {
+  it('«Yangi buyurtma» alohida sahifaga o‘tadi (modal emas)', () => {
     renderApp(<LabOrdersTab patientId="p1" />);
-    fireEvent.change(await openForm(), { target: { value: 'Oq Tish' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Laboratoriyaga yuborish' }));
-    expect(await screen.findByText('Rangni tanlang')).toBeInTheDocument();
-    expect(screen.getByText('Kerakli sanani kiriting')).toBeInTheDocument();
-    expect(createMutateAsync).not.toHaveBeenCalled();
-  });
-
-  it('forma: «Laboratoriya nimani ko‘radi» bloki telefon/manzilni yashiradi, bemorni qisqartiradi', async () => {
-    renderApp(<LabOrdersTab patientId="p1" />);
-    await openForm();
-    const block = screen.getByTestId('lab-sees');
-    expect(block).toHaveTextContent('K. E.');
-    expect(block).toHaveTextContent("ko'rsatilmaydi");
-    expect(block).not.toHaveTextContent('Kamola Ergasheva');
-  });
-
-  it('forma: muddat keyingi yozilishdan kech bo‘lsa ogohlantirish', async () => {
-    renderApp(<LabOrdersTab patientId="p1" />);
-    await openForm();
-    const p2 = (n: number) => String(n).padStart(2, '0');
-    const late = new Date(future.getTime() + 3 * 86_400_000);
-    const ymd = `${late.getFullYear()}-${p2(late.getMonth() + 1)}-${p2(late.getDate())}`;
-    fireEvent.change(screen.getByLabelText(/Kerakli sana/), { target: { value: ymd } });
-    expect(await screen.findByText(/kun kech/)).toBeInTheDocument();
-  });
-
-  it("forma: to'liq to'ldirilsa create to'g'ri shape bilan va yuboriladi (status sent)", async () => {
-    renderApp(<LabOrdersTab patientId="p1" />);
-    fireEvent.change(await openForm(), { target: { value: 'Lab Z' } });
-    fireEvent.click(screen.getByText('A3'));
-    fireEvent.change(screen.getByLabelText(/Kerakli sana/), { target: { value: '2026-12-01' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Laboratoriyaga yuborish' }));
-    await waitFor(() => expect(createMutateAsync).toHaveBeenCalled());
-    expect(createMutateAsync).toHaveBeenCalledWith(
-      expect.objectContaining({
-        patientId: 'p1',
-        doctorId: 'u1',
-        labName: 'Lab Z',
-        orderType: 'crown',
-        shade: 'A3',
-        dueDate: '2026-12-01',
-      }),
-    );
-    await waitFor(() =>
-      expect(statusMutateAsync).toHaveBeenCalledWith({ id: 'new1', status: 'sent' }),
-    );
-  });
-
-  it('forma: remake belgilansa asl buyurtma va sabab majburiy', async () => {
-    renderApp(<LabOrdersTab patientId="p1" />);
-    fireEvent.change(await openForm(), { target: { value: 'Lab Z' } });
-    fireEvent.click(screen.getByText('A3'));
-    fireEvent.change(screen.getByLabelText(/Kerakli sana/), { target: { value: '2026-12-01' } });
-    fireEvent.click(screen.getByLabelText(/qayta tayyorlash/));
-    fireEvent.click(screen.getByRole('button', { name: 'Laboratoriyaga yuborish' }));
-    expect(await screen.findByText('Asl buyurtmani tanlang')).toBeInTheDocument();
-    expect(screen.getByText('Sababni tanlang')).toBeInTheDocument();
-    expect(createMutateAsync).not.toHaveBeenCalled();
+    const link = screen.getByRole('link', { name: 'Yangi buyurtma' });
+    expect(link).toHaveAttribute('href', '/patients/p1/lab-orders/new');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

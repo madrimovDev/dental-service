@@ -181,3 +181,115 @@
   font-size: var(--text-sm);
   font-weight: var(--fw-semibold);
 }
+
+/* ---- Alohida sahifa (modal o'rniga) ---- */
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.pageHead {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-4);
+  padding-bottom: var(--space-4);
+}
+
+.back {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  color: var(--ink);
+  display: inline-flex;
+  height: var(--tap-min);
+  justify-content: center;
+  width: var(--tap-min);
+}
+
+.back:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.titleBox {
+  display: flex;
+  flex-direction: column;
+  margin-right: auto;
+  min-width: 0;
+}
+
+.title {
+  color: var(--ink);
+  font-size: var(--text-xl, 22px);
+  font-weight: var(--fw-bold);
+  margin: 0;
+}
+
+.sub {
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+
+.labGrid {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin-bottom: var(--space-3);
+}
+
+.labCard {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-height: var(--tap-min);
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+}
+
+.labCard:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.labCard[aria-pressed="true"] {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  border-width: 2px;
+}
+
+.labName {
+  font-size: var(--text-md, 15px);
+  font-weight: var(--fw-bold);
+}
+
+.labMeta {
+  color: var(--ink-2);
+  font-size: var(--text-xs);
+}
+
+.kv {
+  display: grid;
+  gap: var(--space-2) var(--space-4);
+  grid-template-columns: max-content 1fr;
+  margin: 0;
+}
+
+.kv dt {
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+
+.kv dd {
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  margin: 0;
+}

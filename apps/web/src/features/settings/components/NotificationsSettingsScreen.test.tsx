@@ -14,6 +14,9 @@ const settingsData = {
   },
 };
 
+vi.mock('../settings.navData', () => ({
+  useSettingsNavData: () => ({ pills: {}, showLicense: false, showBackup: false }),
+}));
 vi.mock('../settings.api', () => ({
   useTenantSettings: () => ({ isLoading: false, data: settingsData }),
   useUpdateTenantSettings: () => ({ mutate: updateMutate, isPending: false }),

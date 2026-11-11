@@ -21,6 +21,12 @@ const IntegrationsSettingsScreen = lazy(() =>
     default: m.IntegrationsSettingsScreen,
   })),
 );
+const LicenseSettingsScreen = lazy(() =>
+  import('./components/LicenseSettingsScreen').then((m) => ({ default: m.LicenseSettingsScreen })),
+);
+const BackupSettingsScreen = lazy(() =>
+  import('./components/BackupSettingsScreen').then((m) => ({ default: m.BackupSettingsScreen })),
+);
 const NotificationsSettingsScreen = lazy(() =>
   import('./components/NotificationsSettingsScreen').then((m) => ({
     default: m.NotificationsSettingsScreen,
@@ -58,4 +64,6 @@ export const settingsRoutes: AppRoute[] = [
     perm: 'tenant_settings.view',
     element: <IntegrationsSettingsScreen />,
   },
+  { path: '/settings/license', perm: 'tenant_settings.view', element: <LicenseSettingsScreen /> },
+  { path: '/settings/backup', perm: 'tenant_settings.view', element: <BackupSettingsScreen /> },
 ];

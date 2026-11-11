@@ -14,6 +14,7 @@ import {
 import type { ToothEntry, ToothHistoryRow } from '../../clinical.types';
 import { DiagnosisPicker } from './DiagnosisPicker';
 import { STATUS, statusFill } from './ToothCell';
+import { type SuggestedService, TreatmentSuggestions } from './TreatmentSuggestions';
 
 const TOOTH_STATE_OPTIONS: ToothState[] = [
   'healthy',
@@ -63,7 +64,7 @@ type Props = {
   /** Joriy tahrirni snapshot sifatida saqlash. */
   onSaveOnly: (entries: ToothEntry[]) => void;
   /** Tashxisni rejaga qo'shish (saqlash + qoralama reja). */
-  onAddToPlan: (entries: ToothEntry[], label: string) => void;
+  onAddToPlan: (entries: ToothEntry[], label: string, service?: SuggestedService) => void;
 };
 
 export function ToothPanel({
@@ -84,12 +85,14 @@ export function ToothPanel({
   const [surfaces, setSurfaces] = useState<ToothSurface[]>([]);
   const [state, setState] = useState<ToothState>('healthy');
   const [diagnosis, setDiagnosis] = useState<Diagnosis | null>(null);
+  const [service, setService] = useState<SuggestedService | null>(null);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: tish almashganda tanlov tozalanadi
   useEffect(() => {
     setSurfaces([]);
     setState('healthy');
     setDiagnosis(null);
+    setService(null);
   }, [tooth]);
 
   const minH = chair ? 'var(--tap-chair)' : 'var(--tap-min)';
@@ -314,6 +317,19 @@ export function ToothPanel({
           )}
         </Box>
 
+        {canEdit && canAddToPlan && (
+          <TreatmentSuggestions
+            diagnosis={
+              diagnosis ??
+              (groups[0]?.diagnosisId ? (diagnosisById.get(groups[0].diagnosisId) ?? null) : null)
+            }
+            lang={lang}
+            chair={chair}
+            value={service}
+            onChange={setService}
+          />
+        )}
+
         {canEdit && (
           <Stack gap={8}>
             <Button variant="light" disabled={!canAdd} onClick={applyPending} styles={btnStyles}>
@@ -338,7 +354,7 @@ export function ToothPanel({
                     const first = groupLabel(
                       groupToothEntries(next, tooth)[0] ?? { state, diagnosisId: null },
                     );
-                    onAddToPlan(next, first);
+                    onAddToPlan(next, first, service ?? undefined);
                   }}
                   styles={btnStyles}
                 >
