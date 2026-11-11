@@ -15,6 +15,8 @@ import { createNotificationsService } from '../modules/notifications/index.ts';
 import { env } from './env.ts';
 import type { ReminderJob } from './queue.ts';
 import { renderReminderSms, type SmsLang } from './sms-templates.ts';
+import { botMessages } from './telegram/messages.ts';
+import { reminderCallbackData } from './telegram/reminder-actions.ts';
 import { type ResolvedTenantChannel, resolveTenantChannel } from './tenant-channel.ts';
 
 /**
@@ -24,6 +26,18 @@ import { type ResolvedTenantChannel, resolveTenantChannel } from './tenant-chann
  */
 export function shouldSkipReminder(status: string): boolean {
   return status === 'cancelled' || status === 'no_show';
+}
+
+/** 24 soatlik eslatma inline tugmalari (callback egasi tekshiruvi — reminder-actions.ts). */
+export function reminderButtons(lang: SmsLang, appointmentId: string) {
+  const m = botMessages(lang);
+  return [
+    [
+      { text: m.reminderYes, data: reminderCallbackData('ok', appointmentId) },
+      { text: m.reminderOther, data: reminderCallbackData('re', appointmentId) },
+      { text: m.reminderCancel, data: reminderCallbackData('no', appointmentId) },
+    ],
+  ];
 }
 
 /**
@@ -47,7 +61,13 @@ export async function processReminderJob(
       .select({ defaultLanguage: tenants.defaultLanguage })
       .from(tenants)
       .where(eq(tenants.id, tenantId));
-    const lang: SmsLang = tenant?.defaultLanguage === 'ru' ? 'ru' : 'uz';
+    // UI-T2: bemorning o'z tili (`preferred_language`) bo'lsa — shu, aks holda tenant default.
+    const lang: SmsLang =
+      patient?.preferredLanguage === 'ru' || patient?.preferredLanguage === 'uz'
+        ? patient.preferredLanguage
+        : tenant?.defaultLanguage === 'ru'
+          ? 'ru'
+          : 'uz';
 
     // CLI-379/400: per-tenant kanal tanlovi uchun (resolveTenantChannel).
     const [settingsRow] = await tx
@@ -141,6 +161,8 @@ export async function processReminderJob(
       // tushadi (test-only spy yoki NoOp; CLI-379/400 boshqa tenant'ning
       // umumiy akkauntiga fallback qilmaydi — recall-worker bilan bir xil qaror).
       channel: resolved.source === 'none' ? undefined : resolved.channel,
+      // UI-T2: FAQAT Telegram'da inline tugmalar — Kelaman / Boshqa vaqt / Bekor.
+      buttons: resolved.source === 'telegram' ? reminderButtons(lang, appt.id) : undefined,
     });
   });
 }

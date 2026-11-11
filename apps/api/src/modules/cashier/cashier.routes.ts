@@ -5,6 +5,7 @@ import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { requireModuleInDesktop } from '../../lib/license-middleware.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
+import { createPatientMessenger } from '../../lib/telegram/notify.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
@@ -64,6 +65,7 @@ export const cashierRoutes = (deps: {
     fiscal: deps.fiscal,
     priceLookup: deps.priceLookup,
     payrollAdjustment: deps.payrollAdjustment,
+    messenger: createPatientMessenger(),
   });
 
   // ─── GET /transactions — list (paginated) ────────────────────────────────

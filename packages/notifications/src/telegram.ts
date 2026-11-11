@@ -14,7 +14,19 @@ export const createTelegramChannel = (config: { botToken: string }): Notificatio
       const res = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: to, text: message.text }),
+        body: JSON.stringify({
+          chat_id: to,
+          text: message.text,
+          ...(message.buttons && message.buttons.length > 0
+            ? {
+                reply_markup: {
+                  inline_keyboard: message.buttons.map((row) =>
+                    row.map((b) => ({ text: b.text, callback_data: b.data })),
+                  ),
+                },
+              }
+            : {}),
+        }),
       });
       if (!res.ok) return { ok: false, error: `http_${res.status}` };
       const data = (await res.json()) as { result?: { message_id?: number } };

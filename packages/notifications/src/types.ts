@@ -1,6 +1,8 @@
 // @dental/notifications — kanal abstraksiya tiplari.
 
-export type NotificationMessage = { text: string };
+/** Inline tugma (faqat Telegram kanali ishlatadi; SMS e'tiborsiz qoldiradi). */
+export type MessageButton = { text: string; data: string };
+export type NotificationMessage = { text: string; buttons?: MessageButton[][] };
 export type SendResult = { ok: boolean; providerId?: string; error?: string };
 
 export interface NotificationChannel {

@@ -2235,5 +2235,17 @@
     "restoreCancel": "Bekor qilish",
     "restoreStarted": "Tiklash boshlandi",
     "restoreFailed": "Tiklashni boshlab bo'lmadi. Klinika nomini va nusxani tekshiring."
+  },
+  "telegramRequests": {
+    "empty": "So'rovlar hozircha yo'q",
+    "confirm": "Tasdiqlash",
+    "decline": "Rad etish",
+    "decline_submit": "Rad etishni yuborish",
+    "cancel": "Bekor qilish",
+    "reason_label": "Rad etish sababi",
+    "reason_required": "Sababni kiriting",
+    "reschedule": "Boshqa vaqtga ko'chirish",
+    "kpi_sub": "tasdiqlash kutmoqda",
+    "confirm_conflict": "Bu vaqt band bo'lib qoldi — so'rov kutishda qoldi"
   }
 }

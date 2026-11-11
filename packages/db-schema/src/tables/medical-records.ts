@@ -65,6 +65,11 @@ export const medicalRecords = pgTable(
     confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
     confirmedBy: uuid('confirmed_by').references(() => users.id, { onDelete: 'set null' }),
 
+    // UI-T2: Telegram bot anketasi javoblari — QORALAMA (allergiyalarga avtomatik
+    // yozilmaydi); shifokor «Anamnezni tasdiqlash» (UI-D2) bilan ko'rib chiqadi.
+    questionnaireAnswers: jsonb('questionnaire_answers').$type<Record<string, string> | null>(),
+    questionnaireAt: timestamp('questionnaire_at', { withTimezone: true }),
+
     lastUpdatedBy: uuid('last_updated_by').references(() => users.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

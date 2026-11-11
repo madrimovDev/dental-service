@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderApp } from '../../../test-utils';
 
@@ -68,6 +68,12 @@ vi.mock('@/features/queue/queue.api.ts', () => ({
 }));
 
 // UI-R1: yangi hooklar (ismlar, diqqat manbalari, shifokorlar, qidiruv) — alohida modul.
+const confirmMutate = vi.fn();
+const declineMutate = vi.fn();
+const bookingRequests: { items: Record<string, unknown>[]; pendingCount: number } = {
+  items: [],
+  pendingCount: 0,
+};
 const attention = {
   doctorsWithoutSchedule: [{ id: 'd2', name: 'Dr. Nazarov' }] as { id: string; name: string }[],
   overdueLabs: 1,
@@ -83,12 +89,19 @@ vi.mock('../reception.api.ts', () => ({
   }),
   useReceptionAttention: () => attention,
   usePatientSearch: () => ({ data: { items: [] }, isFetching: false }),
+  useBookingRequests: () => ({ data: bookingRequests, isLoading: false }),
+  useConfirmBookingRequest: () => ({ mutate: confirmMutate, isPending: false }),
+  useDeclineBookingRequest: () => ({ mutate: declineMutate, isPending: false }),
 }));
 
 afterEach(() => {
   attention.doctorsWithoutSchedule = [{ id: 'd2', name: 'Dr. Nazarov' }];
   attention.overdueLabs = 1;
   attention.recallOverdue = 7;
+  bookingRequests.items = [];
+  bookingRequests.pendingCount = 0;
+  confirmMutate.mockClear();
+  declineMutate.mockClear();
   mockHasPermission.mockClear();
   mockHasPermission.mockImplementation(() => true);
 });
@@ -163,7 +176,7 @@ describe('ReceptionistDashboard (DS1-T5 re-skin characterization)', () => {
       'href',
       '/appointments',
     );
-    expect(screen.getAllByText(/UI-4/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/So'rovlar hozircha yo'q/)).toBeInTheDocument();
     // navbatdagi kutish matn bilan
     expect(screen.getAllByText(/22/).length).toBeGreaterThan(0);
   });
@@ -186,5 +199,65 @@ describe('ReceptionistDashboard (DS1-T5 re-skin characterization)', () => {
 
     expect(screen.getByText('Kelmagan')).toBeInTheDocument();
     expect(screen.queryByText('Rejalashtirilgan')).not.toBeInTheDocument();
+  });
+
+  const req = (id: string, extra: Record<string, unknown> = {}) => ({
+    id,
+    status: 'pending',
+    requestedStart: '2026-06-22T14:00:00.000Z',
+    createdAt: '2026-06-22T08:00:00.000Z',
+    branchId: 'b1',
+    branchName: 'Markaz',
+    patientId: 'p1',
+    patientName: 'Dilnoza Karimova',
+    doctorId: null,
+    doctorName: null,
+    rescheduleOfAppointmentId: null,
+    appointmentId: null,
+    declineReason: null,
+    ...extra,
+  });
+
+  it('UI-T2: Telegram so‘rovlari ro‘yxati, KPI soni, Tasdiqlash chaqiruvi', async () => {
+    bookingRequests.items = [req('r1'), req('r2', { patientName: 'Aziza Yusupova' })];
+    bookingRequests.pendingCount = 2;
+    const { ReceptionistDashboard } = await import('./ReceptionistDashboard.tsx');
+    renderApp(<ReceptionistDashboard />);
+
+    expect(screen.getByText('Dilnoza Karimova')).toBeInTheDocument();
+    expect(screen.getByText('Aziza Yusupova')).toBeInTheDocument();
+    expect(screen.queryByText(/So'rovlar hozircha yo'q/)).not.toBeInTheDocument();
+    const confirms = screen.getAllByRole('button', { name: 'Tasdiqlash' });
+    expect(confirms).toHaveLength(2);
+    fireEvent.click(confirms[0] as HTMLElement);
+    expect(confirmMutate).toHaveBeenCalledWith({ id: 'r1' });
+  });
+
+  it('UI-T2: Rad etish sabab so‘raydi; sababsiz yuborilmaydi', async () => {
+    bookingRequests.items = [req('r1')];
+    bookingRequests.pendingCount = 1;
+    const { ReceptionistDashboard } = await import('./ReceptionistDashboard.tsx');
+    renderApp(<ReceptionistDashboard />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rad etish' }));
+    const submit = screen.getByRole('button', { name: 'Rad etishni yuborish' });
+    fireEvent.click(submit);
+    expect(declineMutate).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('Rad etish sababi'), {
+      target: { value: 'Shifokor yo‘q' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Rad etishni yuborish' }));
+    expect(declineMutate).toHaveBeenCalledWith({ id: 'r1', reason: 'Shifokor yo‘q' });
+  });
+
+  it('UI-T2: appointment.create yo‘q rolda tugmalar yashirin (ro‘yxat ko‘rinadi)', async () => {
+    bookingRequests.items = [req('r1')];
+    bookingRequests.pendingCount = 1;
+    mockHasPermission.mockImplementation((p) => p !== 'appointment.create');
+    const { ReceptionistDashboard } = await import('./ReceptionistDashboard.tsx');
+    renderApp(<ReceptionistDashboard />);
+
+    expect(screen.getByText('Dilnoza Karimova')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Tasdiqlash' })).not.toBeInTheDocument();
   });
 });

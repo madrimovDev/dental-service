@@ -10,6 +10,7 @@
 
 export * from './tables/appointments.ts';
 export * from './tables/audit-log.ts';
+export * from './tables/booking-requests.ts';
 export * from './tables/branches.ts';
 export * from './tables/cashier.ts';
 export * from './tables/consent.ts';
