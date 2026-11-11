@@ -114,7 +114,7 @@ Desktop serveri tashqaridan ochilmaydi va **ochilmasligi kerak**. Faqat chiquvch
 2. **Klinikalar asosan qaysi rejimda?** Ko'pchilik desktop bo'lsa, D1/D2 birinchi navbatda kerak.
 3. **Texnik bemorning nimasini ko'rishi kerak?** To'liq ism, faqat bosh harflar yoki faqat klinika bergan karta raqami? Yosh, jins, tish rangi fotosi, yuz rasmi (estetik ishlar uchun)?
 4. **Narx kimda?** Lab narx taklif qiladi va klinika tasdiqlaydimi, yoki klinika belgilaydimi? Lab xarajati klinika `expenses`ga avtomatik tushsinmi?
-5. **Relay/portal ma'lumot saqlashi** — PHI klinikadan tashqarida (bulutda) saqlanishiga klinikalar va qonun (O'zbekiston shaxsiy ma'lumotlar qonuni, mahalliylashtirish talabi) ruxsat beradimi?
+5. ✅ **QAROR (2026-11-12):** ma'lumot VPS'ga chiqadi (relay/portal bulutda), **qattiq shifrlangan**: TLS + saqlashda shifrlash (fayllar ham), joylashuv muhim emas. E2E (server o'qiy olmaydigan) shifrlash tanlanmadi — C variantining server tomonidagi lab UI'si bilan mos emas. ~~**Relay/portal ma'lumot saqlashi** — PHI klinikadan tashqarida (bulutda) saqlanishiga klinikalar va qonun (O'zbekiston shaxsiy ma'lumotlar qonuni, mahalliylashtirish talabi) ruxsat beradimi?~~
 
 ## 5. Bu tadqiqotda qo'shimcha aniqlangan nuqsonlar
 - Technician `lab_order.manage` bilan **buyurtma yaratadi** va istalgan `doctorId`ni tanlaydi (`lab-orders.service.ts:102` faqat user mavjudligini tekshiradi).
