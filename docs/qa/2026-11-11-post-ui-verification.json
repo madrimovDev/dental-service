@@ -1,0 +1,322 @@
+[
+  {
+    "status": "done",
+    "commits": ["88708f4"],
+    "testsRun": [
+      "cd apps/web && bun run typecheck (clean, also turbo typecheck 16/16 in pre-commit)",
+      "cd apps/web && bunx vitest run src/features (118 files, 637 tests passed)",
+      "cd apps/web && VITE_API_BASE_URL= bun run build (ok)",
+      "biome check on changed files (clean)"
+    ],
+    "bugs": [
+      "No wrong-URL shims found: all 22 shim URLs matched real generated routes (same path+method).",
+      "Process slip (self-caused, reverted): I briefly appended the barrel exports to the MAIN repo's packages/api-client/src/index.ts by using a non-worktree path; I restored it with git checkout (main status clean, 0 changes) and applied the change inside the worktree instead."
+    ],
+    "notDone": "Not run: the live app / visual (Playwright, app-shot) check; verification was typecheck, vitest and build only. No multipart upload shims were among the customInstance calls, so none were left in place. Only grep'd customInstance usages under apps/web/src/features: zero non-test remain. Other hand-written fetch paths outside this grep (e.g. patientImages.upload multipart, lib/api.ts refreshTokens) were not touched, as before.",
+    "advisorCalled": false,
+    "summary": "Replaced all non-test customInstance shims in apps/web/src/features with generated api-client functions: getBookingContext, list/confirm/declineBookingRequest, getBackupStatus/runBackup/updateBackupSettings/restoreBackup, getDebtAgingReport/getOwnerTodayReport/getPnlReport, getDoctorPending, getTenantReadiness, checkPatientPhone, confirmMedicalRecord, signVisitNote, listPayrollRunAdjustments, callOwnQueueTicket, listExpiringStockBatches, listStockAutoDeductionsToday. Local duplicate types (BookingContext, BookingRequest*, DebtAging, OwnerToday, BackupStatus/File, PnlDto, DoctorPending) were turned into aliases/re-exports of the generated models. The hand-maintained barrel packages/api-client/src/index.ts gained the new function and type exports. Behaviour is preserved (same params/bodies); the shared `Envelope`/`SyncAware` helper types remain only where still used. Committed 88708f4 on wf/v-shims."
+  },
+  {
+    "status": "done",
+    "commits": [],
+    "testsRun": [
+      "apps/desktop: P2_PG_TEST=1 bun test src/migrate-on-start.pg.test.ts src/backup-scheduler.pg.test.ts -> 4 pass / 0 fail (real Postgres 16 on :5433, pg16bin tools)",
+      "Manual Electron prod-flow on Linux (isolated netns, Xvfb): first run -> activate -> login -> create patient -> POST /api/backup/run -> POST /api/backup/restore",
+      "P17: docker compose build api, run with uploads_data volume, recreate, file survived"
+    ],
+    "bugs": [
+      "NOTE (not a product bug): the 'Linux Electron prod-flow recipe' in project_desktop_linux_run.md is stale. Since the btree_gist EXCLUDE migration (CLI-408), api `migrate` fails on a Linux box whose system postgres lacks contrib: `CREATE EXTENSION IF NOT EXISTS btree_gist` -> 'extension \"btree_gist\" is not available' (Nobara/Fedora: postgresql-contrib not installed). Windows bundle has btree_gist.dll/extension files, so the product is fine. Symptom in Electron: first-run main process hangs forever with no log, because migrateOnStart returns ok:false -> dialog.showErrorBox blocks (invisible under Xvfb); api.log is never created, postgres+valkey keep running. The dialog is shown, but nothing is written to LOGS_DIR for a migrate failure, so a headless/dev operator sees only an empty logs dir. Repro: first run with system postgres lacking contrib. Workaround used: dnf download postgresql-contrib, extract, and wrapper `postgres` on PATH adding -c extension_control_path='$system:<dir>/usr/share/pgsql' (PG18 appends /extension) -c dynamic_library_path='$libdir:<dir>/usr/lib64/pgsql'.",
+      "NOTE (environment): desktop Postgres/Valkey ports are hardcoded to 5433/6380 (process-manager.ts, first-run.ts, migrate-on-start.ts), which collides with the dev docker postgres published on host :5433, so the desktop cannot run next to the dev infra. I ran Electron in a private user+network namespace (unshare -U -n --map-user=1000 --keep-caps) with a unix-socket socat bridge to the supervisor on :3195. Not a Windows end-user issue.",
+      "NOTE (minor, observed): provisioned owner login with the temporary password returns mustChangePassword:false (login 200, no forced change). Not verified whether that is intended for the activation-provisioned owner (CLAUDE.md says provisioning gives a temp password); flagging only for confirmation."
+    ],
+    "notDone": "Not exercised: Windows-only paths; Electron BrowserWindow UI itself (I ran the app under Xvfb but verified the flow through the HTTP API, not through UI clicks or screenshots); restore of an uploads/ file created after the backup (the test instance had no uploaded files, uploads.tar was 10k empty-dir archive, so uploads rollback was not verified in this run; the real-PG test covers tar round trip); restricted-role (non-owner) restore attempt (owner-only enforcement not tested with a real non-owner role); P17 was verified with `docker compose run --no-deps` on the api service (volume + bun user + recreate), not by booting the full stack with a live DB, so the API process writing uploads through the volume was not exercised. I did not read supervisor-api RSA private key (auto-mode blocked reading it); activation succeeding shows the pair matches the key compiled into the api binary. A first attempt to run a downloaded npm embedded-postgres binary was blocked by the auto-mode classifier and abandoned; I used the Fedora postgresql-contrib RPM instead.",
+    "advisorCalled": false,
+    "summary": "(a) Both real-Postgres desktop test files pass (4/4). I used the default port 5433, since an initial P2_PG_PORT=5432 override was my mistake and connected to nothing. (b) The Electron prod flow works end to end once the postgres-contrib blocker below is worked around. First run (initdb, postgres :5433, valkey :6380, migrate, API :8080) was OK. Activation returned provisioned:true and owner login returned 200. Switch-workspace and patient creation worked (201). POST /api/backup/run returned 202 and about 1s later dental-<ts>/{db.dump 263k, uploads.tar} appeared. Wrong confirmName gave 400 backup.confirm_mismatch and a path-traversal file name gave 400 backup.file_invalid. After I created a second patient and called POST /api/backup/restore with the correct confirmName (202), the log showed a pre-restore backup and 'tiklash tugadi' about 3s after the request. restore-result.json said status ok, the API came back, the license heartbeat was OK, and login worked. The patient list then contained only 'Bemor BEFORE Backup' (total 1), so the patient created after the backup is gone. SIGTERM to the Electron main process also stopped postgres, valkey and api cleanly. Two unproven steps: the uploads rollback was not verified (no uploaded files existed), and I did not drive the UI. (c) P17 passes. The api image built from infra/docker-compose.prod.yml. uploads_data mounted at /data/uploads, owned by bun (uid 1000), and a file written as bun survived a container recreate. I removed the containers, volumes, network and image, and dropped the supervisor_v_desktop DB. The only bug-level finding is the stale Linux recipe: system postgres without contrib breaks api migrate on btree_gist, and Electron then silently hangs on an invisible error dialog (details under bugs).\""
+  },
+  {
+    "bugs": [
+      {
+        "severity": "medium",
+        "area": "Finance / Expenses",
+        "title": "Expenses list never loads: web asks pageSize=200, API max is 100 -> 400, table stays as grey skeleton",
+        "repro": "Login as owner (or any role with expense.view), open /expenses in any language/theme. Console: GET /api/expenses?from=2026-11-01&to=2026-11-30&pageSize=200 -> 400. Summary cards and the monthly summary render, but the expense table below shows only grey placeholder bars forever (screenshot /tmp/claude-1000/v-visual/own2-_expenses-dark-ru.png). API schema: listExpensesQuerySchema pageSize .max(100).",
+        "suspectedFile": "apps/web/src/features/expenses/components/ExpensesScreen.tsx:59 (pageSize: 200) vs apps/api/src/modules/expenses/expenses.schema.ts"
+      },
+      {
+        "severity": "medium",
+        "area": "i18n / Kalendar (RU)",
+        "title": "Uzbek text in Russian mode on calendar appointment blocks ('30daq'); keys appointments.minuteShort / serviceShort do not exist in uz.json or ru.json",
+        "repro": "Receptionist, switch to RU (button RU), open /appointments, go to next day (appointments created via API). Blocks read '10:00 · 30daq' / 'Aliyev Jasur'. t('appointments.minuteShort','daq') and t('appointments.serviceShort','xizmat') fall back to hardcoded Uzbek defaults. Static check of all t('a.b') keys in apps/web found these two missing.",
+        "suspectedFile": "apps/web/src/features/appointments/components/AppointmentSlot.tsx:47,54"
+      },
+      {
+        "severity": "low",
+        "area": "i18n raw key",
+        "title": "Missing i18n keys that render as raw key text: patients.collect_payment (patient header 'collect payment' button when balance debt and handler present) and states.forbidden_title (visit note page 403)",
+        "repro": "Static: t('patients.collect_payment') and t('states.forbidden_title') exist in neither uz.json nor ru.json (the only ones among ~1936 keys used by web). Patient card with a debt shows the button labelled 'patients.collect_payment'; VisitNotePage with a 403 shows title 'states.forbidden_title'. Not reproduced visually (needs a debt / a 403 on a visit note).",
+        "suspectedFile": "apps/web/src/features/patients/components/PatientHeaderCard.tsx:178; apps/web/src/features/clinical/components/visit-notes/VisitNotePage.tsx:350; packages/i18n/src/locales/{uz,ru}.json"
+      },
+      {
+        "severity": "low",
+        "area": "Kalendar (UZ)",
+        "title": "Calendar header date is garbled in UZ mode: 'M11 12 · Thu' instead of '12-noyabr · payshanba' (Intl uz locale fallback)",
+        "repro": "Receptionist, UZ mode, /appointments. Header shows 'M11 12 · Thu' (png rec2-_appointments-light-uz.png). Canvas shows 'Seshanba, 11-noyabr'. In headless Chromium the Intl uz locale has no month/weekday names; real Chrome/Electron may differ, so verify there. A lookup via i18n month/weekday names is safer than Intl for uz.",
+        "suspectedFile": "apps/web/src/features/appointments/components/CalendarScreen.tsx:124-129"
+      },
+      {
+        "severity": "low",
+        "area": "Kalendar",
+        "title": "Right panel title/stat labels say 'Bugun / Сегодня' ('Bugun jami', 'Всего сегодня') even when viewing another day (tomorrow)",
+        "repro": "Receptionist, /appointments, click next-day arrow. Header shows 12 Nov, but the side panel still reads 'Bugun' with 'Bugun jami 2'.",
+        "suspectedFile": "apps/web/src/features/appointments/components/CalendarScreen.tsx (side stats panel)"
+      },
+      {
+        "severity": "medium",
+        "area": "Services API",
+        "title": "POST /api/services with a duplicate code returns HTTP 500 internal_error instead of 409/validation error",
+        "repro": "Owner token: POST /api/services {code:'DUPX',nameUz:'Test',durationMinutes:30} twice. 1st 201, 2nd 500 {error:{code:'internal_error'}}; log: duplicate key value violates unique constraint services_tenant_code_unique. Also with P1 (tx commit on 500) this shows the UI a generic error. Should map 23505 to 409.",
+        "suspectedFile": "apps/api/src/modules/services/services.service.ts (create)"
+      },
+      {
+        "severity": "low",
+        "area": "Settings / Clinic (RU)",
+        "title": "Raw English/technical values in RU mode: subscription badge 'trial' and currency 'UZS' on /settings/tenant; role names 'Doctor'/'Accountant' etc. in Staff table while sidebar/profile shows localized 'Врач'/'Shifokor'",
+        "repro": "Owner, RU, /settings/tenant (badge 'trial' bottom left of form) and /settings/users (Role column shows system template names untranslated, whereas the user card shows 'Врач'). Inconsistent localization.",
+        "suspectedFile": "apps/web/src/features/settings/components (TenantSettingsScreen, UsersSettingsScreen)"
+      },
+      {
+        "severity": "low",
+        "area": "Stock",
+        "title": "Stock header says '0 ta tugayapti / 0 заканчиваются' while a row is flagged 'Kam qoldi / Мало' (quantity 3 < threshold 10)",
+        "repro": "Owner, /stock with item qty 3, minThreshold 10 and no consumption history. Row shows red 'Kam qoldi' but summary counts only items with daysLeft <= DAYS_CRITICAL, so low=0. Header and row disagree.",
+        "suspectedFile": "apps/web/src/features/stock/components/StockScreen.tsx:91-93"
+      },
+      {
+        "severity": "low",
+        "area": "Structure vs canvas",
+        "title": "Screens still diverge from canvas: LabOrder is a modal not the canvas dedicated page (no lab picker with portal status, no shade/remake sections as in canvas); Staff is a table with modal, not the canvas role-description card panel; Settings has no left nav with Litsenziya/Zaxira/Qurilmalar badges and no per-branch work hours or doctor schedule inline; Odontogram has no diagnosis search/treatment-suggestion panel on tooth select (only surfaces/state)",
+        "repro": "Compare canvas PNGs /tmp/claude-1000/v-visual/canvas-{LabOrder,Staff,Settings,Odontogram}.png with the app: own-PDavolash_Tish_xaritasi_*, lab-modal-*, own2-_settings_users-*, own3-_settings_tenant-*. Odontogram diagnosis panel may need an existing odontogram record to appear (not exercised).",
+        "suspectedFile": "apps/web/src/features/clinical/components, apps/web/src/features/settings/components"
+      }
+    ],
+    "checked": [
+      "Seeded tenant via scripts/ui/seed-roles.ts; added 3 patients, 2 appointments tomorrow, 2 stock items, 1 expense category + expense",
+      "Bugun (receptionist /): light/dark, UZ/RU, read PNG, compared to Main canvas; no raw keys, RU translated",
+      "Kalendar /appointments (receptionist) today and tomorrow, 4 variants, compared to Calendar canvas",
+      "Mening kunim (doctor /): 4 variants, DoctorDay canvas (empty-state only; no today appointments due to working hours/time)",
+      "Odontogram (owner, Davolash > Tish xaritasi) plus tooth selection panel, light UZ and dark RU, Odontogram canvas",
+      "Lab order tab and New order modal (owner) dark RU and light UZ, LabOrder canvas",
+      "Staff /settings/users, Stock /stock, Expenses /expenses, Payroll /payroll, Settings /settings/tenant and /settings/branches, 4 variants each with console/HTTP error capture",
+      "Static i18n cross-check: uz.json and ru.json both have 1936 keys; all literal t('..') keys used in web/ui src compared against locale files (5 missing)",
+      "Verified services duplicate-code 500 and expenses pageSize 400 via direct API calls",
+      "Dark-mode contrast looked fine on all viewed screens; no crashes (no pageerror) on any visited route"
+    ],
+    "screenshotsViewed": [
+      "/tmp/claude-1000/v-visual/rec-_-light-uz.png",
+      "/tmp/claude-1000/v-visual/rec-_-dark-uz.png",
+      "/tmp/claude-1000/v-visual/rec-_-light-ru.png",
+      "/tmp/claude-1000/v-visual/rec-_appointments-dark-ru.png",
+      "/tmp/claude-1000/v-visual/rec2-_appointments-dark-ru.png",
+      "/tmp/claude-1000/v-visual/rec2-_appointments-light-uz.png",
+      "/tmp/claude-1000/v-visual/doc-_-dark-ru.png",
+      "/tmp/claude-1000/v-visual/doc-_-light-uz.png",
+      "/tmp/claude-1000/v-visual/own-PDavolash_Tish_xaritasi_-light-uz.png",
+      "/tmp/claude-1000/v-visual/own-PDavolash_Tish_xaritasi_-dark-ru.png",
+      "/tmp/claude-1000/v-visual/own-PDavolash_Lab_buyurtmalar_-dark-ru.png",
+      "/tmp/claude-1000/v-visual/own-PDavolash_Lab_buyurtmalar_-light-uz.png",
+      "/tmp/claude-1000/v-visual/odo-tooth-light-uz.png",
+      "/tmp/claude-1000/v-visual/lab-modal-dark-ru.png",
+      "/tmp/claude-1000/v-visual/own2-_expenses-dark-ru.png",
+      "/tmp/claude-1000/v-visual/own2-_settings_users-dark-ru.png",
+      "/tmp/claude-1000/v-visual/own2-_stock-dark-ru.png",
+      "/tmp/claude-1000/v-visual/own2-_stock-light-uz.png",
+      "/tmp/claude-1000/v-visual/own2-_payroll-dark-ru.png",
+      "/tmp/claude-1000/v-visual/own3-_settings_tenant-dark-ru.png",
+      "/tmp/claude-1000/v-visual/own3-_settings_branches-light-uz.png",
+      "/tmp/claude-1000/v-visual/canvas-Calendar.png",
+      "/tmp/claude-1000/v-visual/canvas-DoctorDay.png",
+      "/tmp/claude-1000/v-visual/canvas-Odontogram.png",
+      "/tmp/claude-1000/v-visual/canvas-LabOrder.png",
+      "/tmp/claude-1000/v-visual/canvas-Staff.png",
+      "/tmp/claude-1000/v-visual/canvas-Settings.png"
+    ],
+    "notDone": "Settings backup section was NOT visually inspected: it renders only when DENTAL_LOCAL_DESKTOP=true, and with that env the API returned 403 on all tenant routes (license gate), so it could not be shown. Only a static look at where it mounts. Doctor Mening kunim was checked only in the empty state (no appointments today, branch closed at 21:22 local, so rich states like next-patient card, allergy chips, lab block were not exercised). Odontogram diagnosis/treatment-suggestion panel and the plan-add flow, and a debt scenario for patients.collect_payment, were not exercised (no odontogram or treatment plan created). Canvas screens Stock and Finance were generated but not read side by side; Staff/Stock/Finance comparison was mainly app-only. Receptionist/Doctor/Accountant restricted-role views of Staff/Stock/Finance were not checked, only owner. The Uzbek date format bug was observed in headless Chromium only and may not occur in real Chrome/Electron. Advisor tool was not called, per rules. Throwaway scripts were left in /tmp/claude-1000/v-visual/ (_vv.ts, _vv2.ts, data.ts); repo worktree is clean; API server killed on port 8133.",
+    "advisorCalled": false
+  },
+  {
+    "advisorCalled": false,
+    "bugs": [
+      {
+        "severity": "high",
+        "area": "appointments / concurrency (FU-01)",
+        "title": "Concurrent POST /api/appointments for the same doctor+slot: the loser gets HTTP 500, not 409",
+        "repro": "Role: receptionist (restricted JWT). Two patients, same doctorId+branchId, identical startTime/endTime (e.g. 2026-11-13T05:00Z-05:30Z), two parallel fetches with Promise.all against the running server. Result: one 201 and one 500 {\"error\":{\"code\":\"internal_error\"}}. Repeated on 5 different slots: every round was 201+500 (never 201+409). 6 concurrent requests on one slot gave 5x500 and 1x201. Overlapping but non-identical slots (11:00-11:30 vs 11:15-11:45) gave 201+500. The same patient posted twice concurrently gave 201+500. The API log shows DrizzleQueryError wrapping PostgresError 'conflicting key value violates exclusion constraint \"appointments_no_doctor_overlap\"'. The DB itself is correct: exactly 1 row per slot, no duplicates. Only the status code and the message to the user are wrong. In the UI the loser sees a generic common.error, not the conflict message. Root cause: exclusionConflictCode() reads err.code and err.constraint_name on the top-level error. With drizzle-orm 0.45.2 the PG error is in err.cause, so the 23P01 -> 409 mapping never matches.",
+        "suspectedFile": "apps/api/src/modules/appointments/appointments.service.ts (exclusionConflictCode, ~line 66-79; must unwrap .cause)"
+      },
+      {
+        "severity": "medium",
+        "area": "payroll / concurrency",
+        "title": "Same wrapped-23P01 bug in payroll: concurrent POST /api/payroll/runs for the same period returns 500 instead of 409 overlap",
+        "repro": "Role: owner. Three parallel POST /api/payroll/runs with {periodFrom:'2026-10-01',periodTo:'2026-10-31'}. Result: 201, 500, 500. isExclusionViolation() checks err.code === '23P01' on the DrizzleQueryError wrapper, not on .cause, so PayrollOverlapError is never thrown. Found while looking for the same failure pattern as FU-01.",
+        "suspectedFile": "apps/api/src/modules/payroll/payroll.service.ts (isExclusionViolation, ~line 30; catch at ~line 251)"
+      },
+      {
+        "severity": "medium",
+        "area": "visit note -> cashier handoff",
+        "title": "'Imzolash va kassaga yuborish' sends nothing to the cashier: the signed note's services never reach the receptionist's cashier",
+        "repro": "Doctor: patient card > Davolash > Vizitlar > Yangi vizit yozuvi, service Konsultatsiya (50 000), click 'Imzolash va kassaga yuborish'. Toast 'Imzolandi'. The doctor has no cashier.view, so the page falls back to the patient card. As receptionist: /cashier > pick the patient. The cart is empty, 'Eski balans 0', and no pending or unbilled item exists. Home 'Keyingi qadam: To'lovga' goes to bare /cashier with no patient or note context; the cashier reads no query params. The appointment stays in_progress and the queue ticket stays in 'Qabulda' (the 'Kassaga yuborildi' column stays empty) until the receptionist presses 'Tugatildi'. The cashier has no endpoint or UI that reads signed visit_notes (cashier_transactions had 0 rows). The receptionist must re-enter patient and services by hand, and the button label promises a handoff that does not exist.",
+        "suspectedFile": "apps/web/src/features/clinical/components/visit-notes/VisitNotePage.tsx (onSign, ~line 333-340) + apps/web/src/features/cashier/components/PosPanel.tsx; apps/api/src/modules/clinical/visit-notes/visit-notes.service.ts (sign)"
+      },
+      {
+        "severity": "medium",
+        "area": "cashier receipt",
+        "title": "Receipt modal prints 'Bemorsiz (walk-in)' for a payment made with a selected patient",
+        "repro": "Receptionist: /cashier, pick patient 'Иванов Пётр Сергеевич', add Konsultatsiya, Karta > Click, 'To'lovni qabul qilish'. DB cashier_transactions.patient_id is set correctly (c6abf2be-..., card_provider=click, paid 50000). The receipt modal shows 'Bemor: Bemorsiz (walk-in)'. PosPanel renders <ReceiptModal> without the patientName prop (ReceiptModal.tsx:182 falls back to t('cashier.no_patient')). The printed receipt therefore lacks the patient's name.",
+        "suspectedFile": "apps/web/src/features/cashier/components/PosPanel.tsx (~line 574-579, patientName not passed)"
+      },
+      {
+        "severity": "low",
+        "area": "calendar / schedule consistency (P10 fallback)",
+        "title": "Free-slots card and doctor warning say 'no slots / no schedule' while the booking screen offers 17 free slots",
+        "repro": "Receptionist: doctor without doctor_schedules rows, branch workHours set. /appointments/new (doctor + 30-minute service) lists 09:00-17:30 and booking succeeds (201, P10 fallback works). The calendar for the same day shows 'Doctor Seed - Jadval yo'q', a red banner 'Jadvalsiz bu shifokorga yozib bo'lmaydi' (on a day with no appointments) and a 'Bo'sh vaqtlar: Bu kun uchun bo'sh vaqt yo'q' card. GET /schedule/availability/branch?branchId=..&date=2026-11-12 returns doctors:[] while GET /schedule/availability?doctorId=..&slotMinutes=30 returns 17 slots. The branch endpoint lacks the P10 branch-hours fallback. The UI text contradicts what is actually possible.",
+        "suspectedFile": "apps/api/src/modules/schedule (availability/branch handler) + apps/web/src/features/appointments/components/FreeSlotsCard.tsx"
+      },
+      {
+        "severity": "low",
+        "area": "calendar i18n (environment-dependent)",
+        "title": "Calendar title/timeline render 'M11 12 · Thu' and 'Yozildi - M11 11 21:20' in uz",
+        "repro": "Receptionist, /appointments with the uz locale in Playwright's bundled Chromium: the title is 'M11 12 · Thu' (month as 'M11', weekday in English). Bun's Intl formats 'uz' correctly ('12-noyabr | payshanba'). This is most likely missing uz ICU data in that Chromium build, not an app logic bug; it may not reproduce in Electron or real Chrome. CalendarScreen uses Intl.DateTimeFormat(i18n.language) with no fallback. Not verified in a real Chrome.",
+        "suspectedFile": "apps/web/src/features/appointments/components/CalendarScreen.tsx (titleLabel, line ~123)"
+      }
+    ],
+    "checked": [
+      "Seed: scripts/ui/seed-roles.ts against the v-flows lane (api :8132, own test DB and Redis); owner created 2 services and widened branch workHours via API so a same-day booking was possible at 21:2x",
+      "Receptionist: created patient with Cyrillic name (UI, 201), Cyrillic search in the booking screen works, /appointments/new for 2026-11-12 10:00 (date picker, service, doctor, slot, 'Yozish') -> appointment stored 05:00Z = 10:00 Tashkent; calendar shows it on the next day; Tasdiqlash -> Qabulni boshlash flow",
+      "Receptionist: same-day booking (21:40), /queue 'Keldi' check-in created ticket A-01, 'Chaqirish' moved it to Qabulda and the appointment to in_progress",
+      "Doctor: patient card, visit note with Cyrillic complaint and service Konsultatsiya signed; visit_notes.appointment_id auto-linked to the today appointment; signed_at set",
+      "Receptionist: cashier pay by Karta + sub-type Click: cashier_transactions row card_provider=click, paid 50000; daily summary (UI): net 50 000, Karta 100%, Click 50 000, correct; accountant/receptionist daily-summary API needs branchId",
+      "Doctor: lab order with empty-form validation (native 'Please fill out this field' on lab name; shade/due-date errors in uz after lab name is filled), then shade A3.5 + due date + file upload: lab_orders row (status sent) + lab_order_files row; opened the file via the 'Fayllar' list: Bearer request 200 image/png, blob popup renders the image; no 401; unauthenticated GET /uploads/... returns 401",
+      "booking_requests: 2 pending rows inserted via psql; receptionist home shows them with Tasdiqlash/Rad etish; free slot confirmed (201-equivalent, appointment created, status confirmed); conflicting slot returned 409 and the UI toast 'Bu vaqt band bo'lib qoldi' (pre-check path works)",
+      "FU-01: concurrent POST /api/appointments (see bugs) incl. 6-way and overlapping variants; DB integrity verified (exactly 1 row per slot)",
+      "Console and HTTP error listener on every browser step: no unexpected 4xx/5xx besides the 409 above (the only 429 was the login rate limiter, expected and worked around with x-real-ip)"
+    ],
+    "notDone": "Not run: the Technician and Accountant UI flows, the 'Hujjatlar va rasmlar' tab for lab files, rejecting or declining a booking request, the Russian (ru) UI, dark mode, and desktop/Electron. The 'M11 ... Thu' date label was not checked in a real Chrome or Electron, so it is unconfirmed. A multi-process or multi-tenant race was not tested. The payroll 500 was reproduced once; I did not check how the UI shows it. Repo files were not changed (git status clean). Throwaway scripts and PNGs are in /tmp/claude-1000/v-flows/. The API on :8132 is stopped.",
+    "screenshotsViewed": [
+      "/tmp/claude-1000/v-flows/rec-patient-new.png",
+      "/tmp/claude-1000/v-flows/pat-saved.png",
+      "/tmp/claude-1000/v-flows/book-2.png",
+      "/tmp/claude-1000/v-flows/book-5.png",
+      "/tmp/claude-1000/v-flows/cal-0.png",
+      "/tmp/claude-1000/v-flows/appt-panel.png",
+      "/tmp/claude-1000/v-flows/queue-0.png",
+      "/tmp/claude-1000/v-flows/queue-2.png",
+      "/tmp/claude-1000/v-flows/queue-3.png",
+      "/tmp/claude-1000/v-flows/queue-4.png",
+      "/tmp/claude-1000/v-flows/doc-card.png",
+      "/tmp/claude-1000/v-flows/doc-home.png",
+      "/tmp/claude-1000/v-flows/doc-treat.png",
+      "/tmp/claude-1000/v-flows/doc-note-form.png",
+      "/tmp/claude-1000/v-flows/doc-note-signed.png",
+      "/tmp/claude-1000/v-flows/cashier-0.png",
+      "/tmp/claude-1000/v-flows/cashier-1.png",
+      "/tmp/claude-1000/v-flows/cashier-card.png",
+      "/tmp/claude-1000/v-flows/cashier-paid.png",
+      "/tmp/claude-1000/v-flows/cashier-summary.png",
+      "/tmp/claude-1000/v-flows/rec-home2.png",
+      "/tmp/claude-1000/v-flows/lab-form.png",
+      "/tmp/claude-1000/v-flows/lab-empty-submit.png",
+      "/tmp/claude-1000/v-flows/lab-name-only.png",
+      "/tmp/claude-1000/v-flows/lab-submitted.png",
+      "/tmp/claude-1000/v-flows/lab-list.png",
+      "/tmp/claude-1000/v-flows/lab-files.png",
+      "/tmp/claude-1000/v-flows/lab-popup.png",
+      "/tmp/claude-1000/v-flows/br-home.png",
+      "/tmp/claude-1000/v-flows/br-confirm-2.png"
+    ]
+  },
+  {
+    "bugs": [
+      {
+        "severity": "high",
+        "area": "Expenses (owner, tenant admin, branch manager, accountant)",
+        "title": "/expenses list always fails: client asks pageSize=200 but API max is 100 -> HTTP 400, page shows 'Yuklab bo'lmadi' + Qayta urinish",
+        "repro": "Log in as any role with expense.view (owner, Tenant Admin, Branch Manager, Accountant), open /expenses (sidebar 'Xarajatlar' or palette). Request GET /api/expenses?from=2026-11-01&to=2026-11-30&pageSize=200 returns 400 (console: 'Failed to load resource ... 400'). KPI cards render 0 so'm and the list area shows the error StateView with a retry button that can never succeed. The expenses list is unusable for every role. Cause: ExpensesScreen.tsx:59 pageSize: 200 vs apps/api expenses.schema.ts:36 .max(100).",
+        "suspectedFile": "apps/web/src/features/expenses/components/ExpensesScreen.tsx:59 (limit in apps/api/src/modules/expenses/expenses.schema.ts:36)"
+      },
+      {
+        "severity": "high",
+        "area": "Settings > Users (Branch Manager)",
+        "title": "Branch Manager has user.invite but cannot invite staff: role dropdown is empty because GET /api/roles returns 403",
+        "repro": "Log in as Branch Manager seed user, open /settings/users (sidebar 'Xodimlar'). Console: 403 GET /api/roles. Click 'Xodim qo'shish' -> 'Rol *' select opens with zero options (Tenant Admin sees Accountant...Tenant Admin; Branch Manager sees none), so the required field can never be filled. The 'Rol bo'yicha' filter is also empty. Needs a role-scoped lightweight endpoint (like CLI-154/155/157 pattern) or a role.view grant; this is the known RBAC screen<->endpoint gap pattern.",
+        "suspectedFile": "apps/web/src/features/settings/components/UsersSettingsScreen.tsx (useRoles) / apps/api/src/modules/roles/roles.routes.ts"
+      },
+      {
+        "severity": "medium",
+        "area": "Settings (all non-admin roles: Branch Manager, Doctor, Doctor+Assistant, Nurse, Receptionist, Accountant, Technician)",
+        "title": "'Sozlamalar' (/settings/tenant) is in the sidebar/palette for roles whose backing endpoints 403; page shows a read-only/forbidden banner",
+        "repro": "nav-config gates 'settings' on tenant.view, which EVERY role template has (packages/core/src/role-templates.ts), but GET /api/tenant-settings requires tenant_settings.view. Log in as Branch Manager (sidebar footer 'Sozlamalar'), Accountant (sidebar), or Doctor/Nurse/Receptionist/Technician (palette 'Sozlamalar' + 'Filiallar') and open /settings/tenant: 403 GET /api/tenant-settings and 403 GET /api/users/assignments; page shows banner 'Sizda klinika sozlamalarini o'zgartirish ruxsati yo'q (faqat ko'rish)' with a disabled form. A menu entry leading to a 403-backed page. Same 403 GET /api/users/assignments on /settings/branches for Doctor, Doctor+Assistant, Nurse, Receptionist, Accountant, Technician (BranchesSettingsScreen calls useUsers() unconditionally for the staff-count column). Technician has no sidebar link but the palette still offers Sozlamalar/Filiallar/Bemorlar.",
+        "suspectedFile": "apps/web/src/shell/nav-config.ts (settings item permission 'tenant.view'); apps/web/src/features/settings/components/BranchesSettingsScreen.tsx:24 (useUsers without enabled gate); TenantSettingsScreen.tsx"
+      },
+      {
+        "severity": "medium",
+        "area": "Dashboard / Home (Branch Manager)",
+        "title": "Branch Manager home dashboard fires 403 GET /api/tenant-settings (x2) and 403 GET /api/backup/status on every load",
+        "repro": "Log in as Branch Manager, land on '/' (also via palette 'Bosh ekran'/'Dashboard / KPI'). Network: 403 /api/tenant-settings (twice) and 403 /api/backup/status; 3 console errors. OnboardingChecklist calls useTenantSettings() before its hasPermission('tenant_settings.edit') early return, and OwnerAlertsPanel calls useBackupStatus() unconditionally in ManagerDashboard.",
+        "suspectedFile": "apps/web/src/features/dashboard/components/OnboardingChecklist.tsx:20-27; apps/web/src/features/dashboard/components/OwnerAlertsPanel.tsx:22"
+      },
+      {
+        "severity": "medium",
+        "area": "Queue (Doctor, Doctor+Assistant? no, Nurse)",
+        "title": "/queue (in Doctor and Nurse sidebar) fires 403 GET /api/queue/check-in-candidates; Nurse also 403 GET /api/services",
+        "repro": "Log in as Doctor or Nurse, open /queue ('Navbat'). QueueBoard calls useCheckInCandidates(branchFilter) unconditionally (API requires queue.create); 403 on every 10s refetchInterval poll, i.e. repeating 403s while the page is open. Nurse additionally gets 403 GET /api/services (QueueBoard useServices, no service.view); same /api/services 403 on Nurse /appointments (Kalendar), /stock (Ombor) and on patient card Davolash > 'Davolash rejasi' tab.",
+        "suspectedFile": "apps/web/src/features/queue/components/QueueBoard.tsx:45,49 and queue.api.ts:29 (useCheckInCandidates polling with no enabled: hasPermission('queue.create'))"
+      },
+      {
+        "severity": "medium",
+        "area": "Prescriptions (/rx) and Transactions (/transactions), all roles",
+        "title": "/rx and /transactions render a blank page (title only) for the empty state and for the error state",
+        "repro": "As owner (or any role with medical_record.view / cashier.view) open /rx (palette 'Reseptlar', Doctor/Nurse etc.) or /transactions (palette 'Tranzaksiyalar', Accountant sidebar). With no data the main area is empty below the title (innerText = 'Reseptlar' / 'Tranzaksiyalar'). Cause: both screens render <StateView status=\"empty\" /> and <StateView status=\"error\" /> with no title/description/retry; StateView renders nothing visible without them, so an API error is also indistinguishable from empty and offers no retry.",
+        "suspectedFile": "apps/web/src/features/clinical/components/RxScreen.tsx:18,24; apps/web/src/features/cashier/components/TransactionsScreen.tsx:19,27"
+      },
+      {
+        "severity": "low",
+        "area": "Command palette (Owner / Tenant Admin, 27+ entries)",
+        "title": "Palette list does not scroll: entries past ~16 are clipped below the viewport and unreachable by mouse; keyboard selection moves to off-screen items",
+        "repro": "Log in as owner at 1440x900, press Ctrl+K. Spotlight actions list height is 1310px (clientHeight=scrollHeight, overflow auto but its parent has no bounded height; Spotlight-inner overflow visible), so items from 'Xarajatlar' onward (Ish haqi, Filiallar, Rollar, Audit log, Sozlamalar, Tranzaksiyalar, Yangi bemor, Yangi yozilish, Kassani ochish) are below the 900px viewport. Mouse wheel does not scroll; Playwright click fails with 'element is outside of the viewport'; pressing ArrowDown x24 selects 'Yangi bemor' at y=1233 (off-screen) and the highlight is never scrolled into view. Only typing a filter reaches them.",
+        "suspectedFile": "apps/web/src/shell/CommandPalette.module.css (.actionsList lacks bounded max-height/scrollarea) / CommandPalette.tsx"
+      },
+      {
+        "severity": "low",
+        "area": "Patient card (Branch Manager, Technician)",
+        "title": "Silent 403s on patient card tabs: Branch Manager 'Hujjatlar va rasmlar' -> GET /api/visit-notes?patientId=..; Technician 'Davolash' -> GET /api/appointments?patientId=..",
+        "repro": "Branch Manager opens /patients/<id> and clicks 'Hujjatlar va rasmlar': 403 GET /api/visit-notes (patient-images tab loads visit notes without medical_record.view); tab still shows 'Rasmlar yo'q'. Technician opens /patients/<id> -> 'Davolash' (lab tab): 403 GET /api/appointments?patientId=.. (appointment.view missing); tab shows 'Buyurtmalar yo'q'. No crash, but console errors and possibly hidden data (visit-link selector) for roles that have the tab.",
+        "suspectedFile": "apps/web/src/features/patients/components (patient-images tab visit-notes query; lab-orders tab appointments query) - gate with hasPermission"
+      }
+    ],
+    "checked": [
+      "Seeded all 8 role templates + owner via an edited copy of scripts/ui/seed-roles.ts (kept in /tmp/claude-1000/v-crawl/seed-roles.ts, nothing committed in the worktree; git status clean)",
+      "Logged in with Playwright as owner + 8 roles, picked workspace, read sidebar links and every Ctrl+K palette entry (clicked each to resolve its path), visited all unique paths, recorded every >=400 response, console error and pageerror (no pageerror, no ErrorBoundary seen)",
+      "Per-role page results: owner and Tenant Admin only the expenses 400; Branch Manager 403s on /, /settings/users, /settings/tenant, plus expenses 400; Doctor/Nurse queue 403s; Receptionist/Accountant/Technician settings/branches+tenant 403s",
+      "Patient card /patients/:id for all 9 roles: every top-level tab and nested sub-tab (Ma'lumotlar, Tibbiy karta, Oila, Eslatmalar, Tish xaritasi, Davolash rejasi, Vizitlar, Reseptlar, Lab buyurtmalar, Rasmlar, Konsent) plus 403/state capture; Umumiy 'Klinik ma'lumotlar' forbidden card for roles lacking medical_record.view is an intentional explained StateView and was not counted as a bug",
+      "Confirmed expenses pageSize 200 vs API max(100) in source; confirmed StateView renders nothing without title; confirmed branch manager role select has zero options (tenant admin has 9); measured palette list overflow",
+      "Role menus verified: Technician sidebar = /lab only; Accountant sidebar includes /settings/*, /dashboard (redirects to /); /dashboard->/ fine"
+    ],
+    "screenshotsViewed": [
+      "/tmp/claude-1000/v-crawl/probe.png",
+      "/tmp/claude-1000/v-crawl/pal2.png",
+      "/tmp/claude-1000/v-crawl/pal3.png",
+      "/tmp/claude-1000/v-crawl/shots/owner/_rx.png",
+      "/tmp/claude-1000/v-crawl/shots/owner/_expenses.png",
+      "/tmp/claude-1000/v-crawl/shots/branch_manager/_settings_tenant.png",
+      "/tmp/claude-1000/v-crawl/shots/branch_manager/_settings_users.png",
+      "/tmp/claude-1000/v-crawl/inv-branch_manager.png",
+      "/tmp/claude-1000/v-crawl/shots/doctor/_queue.png",
+      "/tmp/claude-1000/v-crawl/shots/owner/patient-4.png",
+      "/tmp/claude-1000/v-crawl/shots/receptionist/patient-0.png",
+      "/tmp/claude-1000/v-crawl/shots/technician/patient-1.png",
+      "/tmp/claude-1000/v-crawl/shots/branch_manager/patient-3.png"
+    ],
+    "notDone": "Only the empty seeded dataset was crawled apart from one patient (no appointments, plans, services, stock, transactions), so data-dependent rendering and mutations (create/edit/delete, POS, refunds, payroll runs) were not exercised, and data-dependent 4xx on action buttons were not tested. Only uz locale, light theme, 1440x900 desktop viewport; RU/dark/narrow not covered. Role 'Doctor' Kalendar is only reachable via palette (not in its sidebar) - treated as by-design. Cosmetic items not reported (duplicate 'Yangi bemor' palette entry, 'Bosh ekran' and 'Dashboard / KPI' both pointing to '/'). Custom role and 'Tenant Admin' owner-only pages (audit/roles) were visited only as owner/tenant admin. Technician patient-card nested tabs after Davolash and the last receptionist 'Eslatmalar' data were checked only in the first pass. The advisor tool was not called. Bundled API on port 8131 was stopped by PID; nothing in the repo was changed or committed.",
+    "advisorCalled": false
+  }
+]
