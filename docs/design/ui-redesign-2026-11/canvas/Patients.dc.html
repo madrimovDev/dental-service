@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Bemorlar</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#f1f3ef}
+a{color:#0b7a6b}a:hover{color:#096154}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 100vh; font-family: 'Hanken Grotesk', system-ui, sans-serif; color: #192420; background: #f1f3ef; font-size: 15px; line-height: 1.45">
+  <div style="flex: 0 0 248px; display: flex">
+    <dc-import name="Sidebar" role="registrator" active="bemorlar" conn="lan" hint-size="248px,980px"></dc-import>
+  </div>
+
+  <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px 14px; padding: 16px 32px; background: #ffffff; border-bottom: 1px solid #e4e8e1">
+      <div style="display: flex; flex-direction: column; margin-right: auto">
+        <h1 style="margin: 0; font-size: 24px; font-weight: 700">Bemorlar</h1>
+        <span style="font-size: 14px; color: #4c5852">2 418 ta faol bemor · 37 ta arxivda</span>
+      </div>
+      <button type="button" style="height: 46px; padding: 0 16px; border-radius: 10px; border: 1px solid #d3d9d0; background: #fff; color: #192420; font: inherit; font-weight: 600; cursor: pointer">Excel'dan import</button>
+      <button type="button" style="height: 46px; padding: 0 18px; border-radius: 10px; border: 0; background: #0b7a6b; color: #fff; font: inherit; font-weight: 700; cursor: pointer">Yangi bemor</button>
+    </header>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 20px; padding: 20px 32px 40px; align-items: flex-start">
+      <section aria-label="Bemorlar ro'yxati" style="flex: 999 1 640px; min-width: 0; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+          <label for="ps" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Qidirish</label>
+          <div style="display: flex; align-items: center; gap: 8px; height: 46px; padding: 0 12px; border: 1px solid #d3d9d0; border-radius: 10px; background: #fff; flex: 1 1 320px">
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4c5852" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+            <input id="ps" value="турсун" style="border: 0; outline: 0; font: inherit; flex: 1; min-width: 0">
+            <span style="font-size: 13px; color: #4c5852">«Tursun» ham topiladi</span>
+          </div>
+          <button type="button" style="height: 40px; padding: 0 12px; border-radius: 99px; border: 1px solid #0b7a6b; background: #ddefea; color: #096154; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer">Qarzdorlar ✕</button>
+          <button type="button" style="height: 40px; padding: 0 12px; border-radius: 99px; border: 1px dashed #b9c2b6; background: #fff; color: #33403a; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer">+ Filtr</button>
+        </div>
+        <div style="background: #fff; border: 1px solid #e4e8e1; border-radius: 12px; overflow-x: auto">
+          <table style="width: 100%; border-collapse: collapse; min-width: 760px">
+            <thead>
+              <tr style="text-align: left; font-size: 13px; color: #4c5852">
+                <th scope="col" style="padding: 12px 18px; font-weight: 600">Bemor</th>
+                <th scope="col" style="padding: 12px 8px; font-weight: 600">Telefon</th>
+                <th scope="col" style="padding: 12px 8px; font-weight: 600">Keyingi tashrif</th>
+                <th scope="col" style="padding: 12px 8px; font-weight: 600; text-align: right">Balans</th>
+                <th scope="col" style="padding: 12px 8px; font-weight: 600">Belgilar</th>
+                <th scope="col" style="padding: 12px 18px; font-weight: 600; text-align: right">Amal</th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{rows}}" as="r" hint-placeholder-count="7">
+                <tr style="border-top: 1px solid #edf0ea">
+                  <td style="padding: 12px 18px"><a href="Patient.dc.html" style="color: #192420; font-weight: 700; text-decoration: none">{{r.name}}</a><div style="font-size: 13px; color: #4c5852">{{r.sub}}</div></td>
+                  <td style="padding: 12px 8px; font-family: 'JetBrains Mono', monospace; font-size: 14px">{{r.phone}}</td>
+                  <td style="padding: 12px 8px; font-size: 14px">{{r.next}}</td>
+                  <td style="padding: 12px 8px; text-align: right; font-family: 'JetBrains Mono', monospace; {{r.balStyle}}">{{r.bal}}</td>
+                  <td style="padding: 12px 8px"><div style="display: flex; flex-wrap: wrap; gap: 4px"><sc-for list="{{r.flags}}" as="f" hint-placeholder-count="1"><span style="{{f.style}}">{{f.t}}</span></sc-for></div></td>
+                  <td style="padding: 12px 18px; text-align: right"><a href="Booking.dc.html" style="display: inline-flex; align-items: center; height: 40px; padding: 0 12px; border-radius: 8px; border: 1px solid #d3d9d0; color: #192420; font-size: 14px; font-weight: 600; text-decoration: none">Yozish</a></td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+          <div style="display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-top: 1px solid #e4e8e1; font-size: 14px; color: #4c5852">
+            <span style="margin-right: auto">1–25 / 41 ta natija</span>
+            <button type="button" style="height: 40px; padding: 0 12px; border-radius: 8px; border: 1px solid #d3d9d0; background: #fff; color: #192420; font: inherit; font-weight: 600; cursor: pointer">Keyingi 25</button>
+          </div>
+        </div>
+      </section>
+
+      <aside aria-labelledby="new-h" style="flex: 1 1 340px; min-width: 300px; background: #fff; border: 1px solid #e4e8e1; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+        <h2 id="new-h" style="margin: 0; font-size: 18px; font-weight: 700">Yangi bemor</h2>
+        <span style="font-size: 14px; color: #4c5852">Ism va telefon yetarli. Qolganini birinchi tashrifda yoki Telegram anketasi orqali to'ldirish mumkin.</span>
+        <div style="display: flex; flex-direction: column; gap: 4px"><label for="nm" style="font-size: 14px; font-weight: 600">Ism va familiya</label><input id="nm" value="Jasur Tursunov" style="height: 44px; border: 1px solid #d3d9d0; border-radius: 10px; padding: 0 12px; font: inherit"></div>
+        <div style="display: flex; flex-direction: column; gap: 4px">
+          <label for="tp" style="font-size: 14px; font-weight: 600">Telefon</label>
+          <div style="display: flex; height: 44px; border: 2px solid #b57611; border-radius: 10px; overflow: hidden"><span style="display: flex; align-items: center; padding: 0 10px; background: #f6f8f4; border-right: 1px solid #d3d9d0; font-family: 'JetBrains Mono', monospace">+998</span><input id="tp" value="90 123 45 67" style="border: 0; outline: 0; padding: 0 10px; font: inherit; font-family: 'JetBrains Mono', monospace; flex: 1; min-width: 0"></div>
+        </div>
+        <div role="alert" style="display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 10px; background: #fbf1dd; color: #7a4f0a">
+          <b>Bu telefon bilan bemor bor</b>
+          <span style="font-size: 14px; color: #5c3d08">Jasur Tursunov, 41 yosh · oxirgi tashrif 14.10</span>
+          <div style="display: flex; gap: 8px"><a href="Patient.dc.html" style="height: 40px; padding: 0 12px; border-radius: 8px; background: #fff; border: 1px solid #e4ab44; color: #7a4f0a; font-weight: 700; display: flex; align-items: center; text-decoration: none">Uni ochish</a><button type="button" style="height: 40px; padding: 0 12px; border-radius: 8px; border: 0; background: transparent; color: #7a4f0a; font: inherit; font-weight: 600; cursor: pointer">Baribir yangi bemor (oila a'zosi)</button></div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+          <div style="display: flex; flex-direction: column; gap: 4px"><label for="bd" style="font-size: 14px; font-weight: 600">Tug'ilgan sana</label><input id="bd" placeholder="kk.oo.yyyy" style="height: 44px; border: 1px solid #d3d9d0; border-radius: 10px; padding: 0 12px; font: inherit; font-family: 'JetBrains Mono', monospace"></div>
+          <div style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 14px; font-weight: 600">Xabarlar tili</span><div role="radiogroup" aria-label="Xabarlar tili" style="display: flex; height: 44px; border: 1px solid #d3d9d0; border-radius: 10px; overflow: hidden"><button type="button" role="radio" aria-checked="true" style="flex: 1; border: 0; background: #ddefea; color: #096154; font: inherit; font-weight: 700; cursor: pointer">O'zbek</button><button type="button" role="radio" aria-checked="false" style="flex: 1; border: 0; border-left: 1px solid #d3d9d0; background: #fff; color: #192420; font: inherit; cursor: pointer">Русский</button></div></div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px"><label for="al" style="font-size: 14px; font-weight: 600">Allergiya yoki muhim kasallik</label><input id="al" placeholder="Masalan: penitsillin, diabet, qon suyultiruvchi dori" style="height: 44px; border: 1px solid #d3d9d0; border-radius: 10px; padding: 0 12px; font: inherit"></div>
+        <label style="display: flex; align-items: flex-start; gap: 8px; font-size: 14px"><input type="checkbox" checked style="width: 20px; height: 20px; accent-color: #0b7a6b; margin-top: 1px">Telegram'ga ulanish va anketa havolasini SMS bilan yuborish</label>
+        <button type="button" style="height: 48px; border-radius: 10px; border: 0; background: #0b7a6b; color: #fff; font: inherit; font-weight: 700; cursor: pointer">Saqlash va yozish</button>
+      </aside>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":980}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var F = {
+      c: 'font-size:12px;font-weight:700;color:#842523;background:#fbe7e5;border-radius:6px;padding:1px 6px',
+      w: 'font-size:12px;font-weight:600;color:#7a4f0a;background:#fbf1dd;border-radius:6px;padding:1px 6px',
+      n: 'font-size:12px;font-weight:600;color:#33403a;background:#edf0ea;border-radius:6px;padding:1px 6px',
+      b: 'font-size:12px;font-weight:600;color:#1f4f9e;background:#e8eefb;border-radius:6px;padding:1px 6px'
+    };
+    function f(t, k) { return { t: t, style: F[k] }; }
+    var debt = 'color:#a82f2d;font-weight:700', zero = 'color:#4c5852', credit = 'color:#096154;font-weight:600';
+    return {
+      rows: [
+        { name: 'Jasur Tursunov', sub: '41 yosh · № 0532', phone: '+998 90 123 45 67', next: 'Bugun 10:45 · Dr. Yusupova', bal: '−350 000', balStyle: debt, flags: [f('2 marta kelmagan', 'n'), f('Telegram', 'b')] },
+        { name: 'Dilshod Tursunboyev', sub: '28 yosh · № 1873', phone: '+998 93 401 22 18', next: '—', bal: '−120 000', balStyle: debt, flags: [f('Telegram', 'b')] },
+        { name: 'Mohira Tursunova', sub: '9 yosh · № 2011 · onasi: Nigora T.', phone: '+998 94 777 10 03', next: '19-noyabr · Dr. Rasulova', bal: '−80 000', balStyle: debt, flags: [f('Bola', 'n')] },
+        { name: 'Bahodir Tursunov', sub: '63 yosh · № 0144', phone: '+998 90 330 61 49', next: '—', bal: '−1 400 000', balStyle: debt, flags: [f('Antikoagulyant', 'c'), f('Diabet', 'w')] },
+        { name: 'Aziza Tursunaliyeva', sub: '35 yosh · № 1290', phone: '+998 99 812 00 57', next: '22-noyabr · Dr. Karimov', bal: '−50 000', balStyle: debt, flags: [f('Homilador', 'w')] }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

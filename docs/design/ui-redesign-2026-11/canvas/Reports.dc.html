@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Hisobotlar — savollar</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#f1f3ef}
+a{color:#0b7a6b}a:hover{color:#096154}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 100vh; font-family: 'Hanken Grotesk', system-ui, sans-serif; color: #192420; background: #f1f3ef; font-size: 15px; line-height: 1.45">
+  <div style="flex: 0 0 248px; display: flex">
+    <dc-import name="Sidebar" role="rahbar" active="hisobot" conn="lan" hint-size="248px,980px"></dc-import>
+  </div>
+
+  <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px 14px; padding: 16px 32px; background: #ffffff; border-bottom: 1px solid #e4e8e1">
+      <h1 style="margin: 0; font-size: 24px; font-weight: 700; margin-right: auto">Hisobotlar</h1>
+      <button type="button" style="height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid #0b7a6b; background: #ddefea; color: #096154; font: inherit; font-weight: 700; cursor: pointer">Noyabr 2026 ▾</button>
+      <button type="button" style="height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid #0b7a6b; background: #ddefea; color: #096154; font: inherit; font-weight: 700; cursor: pointer">Barcha filiallar ▾</button>
+      <span style="font-size: 13px; color: #4c5852">tanlov saqlanadi</span>
+    </header>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 20px; padding: 20px 32px 40px; align-items: flex-start">
+      <nav aria-label="Savollar" style="flex: 1 1 260px; max-width: 300px; min-width: 240px; display: flex; flex-direction: column; gap: 14px">
+        <sc-for list="{{groups}}" as="g" hint-placeholder-count="4">
+          <div style="display: flex; flex-direction: column; gap: 2px">
+            <span style="font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #5f6b65; padding: 0 10px 4px">{{g.title}}</span>
+            <sc-for list="{{g.items}}" as="i" hint-placeholder-count="3"><a href="#" style="{{i.style}}">{{i.q}}</a></sc-for>
+          </div>
+        </sc-for>
+      </nav>
+
+      <section aria-labelledby="q-h" style="flex: 999 1 600px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+        <div style="background: #fff; border: 1px solid #e4e8e1; border-radius: 14px; padding: 20px 22px; display: flex; flex-direction: column; gap: 14px">
+          <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px">
+            <h2 id="q-h" style="margin: 0; font-size: 22px; font-weight: 700; margin-right: auto">Kim qarzdor?</h2>
+            <button type="button" style="height: 40px; padding: 0 12px; border-radius: 8px; border: 1px solid #d3d9d0; background: #fff; color: #192420; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer">Excel</button>
+            <button type="button" style="height: 40px; padding: 0 12px; border-radius: 8px; border: 1px solid #d3d9d0; background: #fff; color: #192420; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer">1C eksport</button>
+          </div>
+          <p style="margin: 0; font-size: 18px; line-height: 1.5"><b style="font-family: 'JetBrains Mono', monospace; color: #a82f2d">64 bemor</b> jami <b style="font-family: 'JetBrains Mono', monospace; color: #a82f2d">18 400 000 so'm</b> qarz. Shundan <b>12 tasi 90 kundan oshgan</b> (6,1 mln) — ularga birinchi navbatda qo'ng'iroq qiling.</p>
+          <div role="img" aria-label="Qarz muddati bo'yicha: 0–30 kun 7,2 mln, 31–60 kun 3,4 mln, 61–90 kun 1,7 mln, 90 kundan ortiq 6,1 mln" style="display: flex; flex-direction: column; gap: 8px">
+            <sc-for list="{{aging}}" as="a" hint-placeholder-count="4">
+              <div style="display: flex; align-items: center; gap: 12px">
+                <span style="width: 110px; font-size: 14px; color: #33403a">{{a.label}}</span>
+                <div style="flex: 1; height: 26px; border-radius: 6px; background: #f1f3ef; overflow: hidden"><div style="{{a.bar}}"></div></div>
+                <b style="width: 120px; text-align: right; font-family: 'JetBrains Mono', monospace">{{a.value}}</b>
+              </div>
+            </sc-for>
+          </div>
+          <details style="font-size: 14px; color: #33403a"><summary style="cursor: pointer; font-weight: 700; color: #096154; min-height: 32px">Qanday hisoblandi?</summary><p style="margin: 6px 0 0">Qarz = bemor rozi bo'lgan reja bosqichlari narxi + rejasiz xizmatlar − to'langan + qaytarilgan. Bekor qilingan rejaga to'langan pul kredit sifatida qoladi. Kassa, bemor kartasi va shu hisobot bitta formulani ishlatadi.</p></details>
+        </div>
+
+        <div style="background: #fff; border: 1px solid #e4e8e1; border-radius: 14px; overflow-x: auto">
+          <table style="width: 100%; border-collapse: collapse; min-width: 700px">
+            <thead><tr style="text-align: left; font-size: 13px; color: #4c5852"><th scope="col" style="padding: 12px 20px; font-weight: 600">Bemor</th><th scope="col" style="padding: 12px 8px; font-weight: 600; text-align: right">Qarz</th><th scope="col" style="padding: 12px 8px; font-weight: 600">Necha kun</th><th scope="col" style="padding: 12px 8px; font-weight: 600">Oxirgi aloqa</th><th scope="col" style="padding: 12px 20px; font-weight: 600; text-align: right">Amal</th></tr></thead>
+            <tbody>
+              <sc-for list="{{debtors}}" as="d" hint-placeholder-count="5">
+                <tr style="border-top: 1px solid #edf0ea"><td style="padding: 12px 20px"><a href="Patient.dc.html" style="color: #192420; font-weight: 700; text-decoration: none">{{d.name}}</a><div style="font-size: 13px; color: #4c5852">{{d.why}}</div></td><td style="padding: 12px 8px; text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #a82f2d">{{d.debt}}</td><td style="padding: 12px 8px"><span style="{{d.agePill}}">{{d.age}}</span></td><td style="padding: 12px 8px; font-size: 14px; color: #33403a">{{d.last}}</td><td style="padding: 12px 20px; text-align: right"><button type="button" style="height: 40px; padding: 0 12px; border-radius: 8px; border: 1px solid #d3d9d0; background: #fff; color: #192420; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer">{{d.action}}</button></td></tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1080}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var it = 'display:flex;align-items:center;min-height:44px;padding:0 10px;border-radius:8px;text-decoration:none;font-size:15px;';
+    var on = it + 'background:#ddefea;color:#096154;font-weight:700;';
+    var off = it + 'color:#192420;';
+    function g(t, qs, active) { return { title: t, items: qs.map(function (q) { return { q: q, style: q === active ? on : off }; }) }; }
+    var A = 'Kim qarzdor?';
+    function bar(v, max, c) { return { bar: 'width:' + Math.round(v / max * 100) + '%;height:100%;background:' + c }; }
+    var pill = 'font-size:13px;font-weight:700;border-radius:99px;padding:3px 10px;';
+    return {
+      groups: [
+        g('Pul', ['Bugun qancha tushdi?', A, 'Qaysi xizmat ko‘p foyda beradi?', 'Xarajat va sof foyda'], A),
+        g('Shifokorlar', ['Kim qancha ishladi?', 'Kimning bemorlari kelmayapti?'], A),
+        g('Bemorlar', ['Qancha yangi bemor keldi?', 'Kim qaytib kelmadi?', 'Qayta chaqiruv natijasi'], A),
+        g('Ombor va lab', ['Qaysi material tugayapti?', 'Lab qancha kechikdi?'], A)
+      ],
+      aging: [
+        { label: '0–30 kun', value: '7,2 mln', bar: bar(7.2, 7.2, '#e4ab44').bar },
+        { label: '31–60 kun', value: '3,4 mln', bar: bar(3.4, 7.2, '#d38b1f').bar },
+        { label: '61–90 kun', value: '1,7 mln', bar: bar(1.7, 7.2, '#b5651d').bar },
+        { label: '90+ kun', value: '6,1 mln', bar: bar(6.1, 7.2, '#a82f2d').bar }
+      ],
+      debtors: [
+        { name: 'Bahodir Tursunov', why: 'Implant rejasi · 2/4 bosqich', debt: '1 400 000', age: '124 kun', agePill: pill + 'background:#fbe7e5;color:#842523', last: 'Telegram, 02.11 · o‘qidi', action: 'Qo‘ng‘iroq qildim' },
+        { name: 'Bekzod Aliyev', why: 'Protez rejasi · bugun yakunlanadi', debt: '1 200 000', age: '12 kun', agePill: pill + 'background:#fbf1dd;color:#7a4f0a', last: 'bugun kassada bo‘ladi', action: 'Kassaga belgilash' },
+        { name: 'Gulnora Xasanova', why: 'Qisman to‘lov · 11.11', debt: '300 000', age: 'bugun', agePill: pill + 'background:#f1f3ef;color:#4c5852', last: '—', action: 'Telegram eslatma' },
+        { name: 'Jasur Tursunov', why: 'Plomba · 14.10', debt: '350 000', age: '28 kun', agePill: pill + 'background:#fbf1dd;color:#7a4f0a', last: 'SMS, 25.10', action: 'Telegram eslatma' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Tish xaritasi va tashxis</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#f1f3ef}
+a{color:#0b7a6b}a:hover{color:#096154}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 100vh; font-family: 'Hanken Grotesk', system-ui, sans-serif; color: #192420; background: #f1f3ef; font-size: 15px; line-height: 1.45">
+  <div style="flex: 0 0 248px; display: flex">
+    <dc-import name="Sidebar" role="shifokor" active="rejalar" conn="lan" hint-size="248px,980px"></dc-import>
+  </div>
+
+  <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px 14px; padding: 14px 32px; background: #ffffff; border-bottom: 1px solid #e4e8e1">
+      <a href="Patient.dc.html" aria-label="Bemor kartasiga qaytish" style="width: 44px; height: 44px; border-radius: 10px; border: 1px solid #d3d9d0; display: flex; align-items: center; justify-content: center; color: #192420"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="m15 18-6-6 6-6"></path></svg></a>
+      <div style="display: flex; flex-direction: column; margin-right: auto">
+        <h1 style="margin: 0; font-size: 22px; font-weight: 700">Bekzod Aliyev · Tish xaritasi</h1>
+        <span style="font-size: 14px; color: #842523; font-weight: 600">Allergiya: penitsillin</span>
+      </div>
+      <div role="group" aria-label="Rejim" style="display: flex; border: 1px solid #d3d9d0; border-radius: 10px; overflow: hidden">
+        <button type="button" aria-pressed="true" style="height: 42px; padding: 0 14px; border: 0; background: #ddefea; color: #096154; font: inherit; font-weight: 700; cursor: pointer">Hozirgi holat</button>
+        <button type="button" aria-pressed="false" style="height: 42px; padding: 0 14px; border: 0; border-left: 1px solid #d3d9d0; background: #fff; color: #192420; font: inherit; font-weight: 600; cursor: pointer">Reja</button>
+        <button type="button" aria-pressed="false" style="height: 42px; padding: 0 14px; border: 0; border-left: 1px solid #d3d9d0; background: #fff; color: #192420; font: inherit; font-weight: 600; cursor: pointer">Tarix</button>
+      </div>
+      <label style="display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 12px; border: 1px solid #d3d9d0; border-radius: 10px; font-size: 14px; font-weight: 600"><input type="checkbox" style="width: 18px; height: 18px; accent-color: #0b7a6b">Kreslo yoni rejimi</label>
+    </header>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 20px; padding: 20px 32px 40px; align-items: flex-start">
+      <section aria-label="Odontogramma" style="flex: 999 1 640px; min-width: 0; background: #fff; border: 1px solid #e4e8e1; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px; overflow-x: auto">
+        <div style="display: flex; justify-content: space-between; font-size: 13px; color: #4c5852; min-width: 860px"><span>O'ng · yuqori jag'</span><span>Chap · yuqori jag'</span></div>
+        <div style="display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 6px; min-width: 860px">
+          <sc-for list="{{upper}}" as="t" hint-placeholder-count="16">
+            <button type="button" aria-label="{{t.aria}}" aria-pressed="{{t.sel}}" style="{{t.box}}">
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700">{{t.n}}</span>
+              <span style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; width: 40px; height: 40px">
+                <sc-for list="{{t.cells}}" as="c" hint-placeholder-count="9"><span style="{{c}}"></span></sc-for>
+              </span>
+              <span style="font-size: 11px; font-weight: 600; min-height: 15px">{{t.label}}</span>
+            </button>
+          </sc-for>
+        </div>
+        <div style="border-top: 2px dashed #d3d9d0; min-width: 860px"></div>
+        <div style="display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 6px; min-width: 860px">
+          <sc-for list="{{lower}}" as="t" hint-placeholder-count="16">
+            <button type="button" aria-label="{{t.aria}}" aria-pressed="{{t.sel}}" style="{{t.box}}">
+              <span style="font-size: 11px; font-weight: 600; min-height: 15px">{{t.label}}</span>
+              <span style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; width: 40px; height: 40px">
+                <sc-for list="{{t.cells}}" as="c" hint-placeholder-count="9"><span style="{{c}}"></span></sc-for>
+              </span>
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700">{{t.n}}</span>
+            </button>
+          </sc-for>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 13px; color: #4c5852; min-width: 860px"><span>O'ng · pastki jag'</span><span>Chap · pastki jag'</span></div>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 14px; color: #33403a; padding-top: 6px; border-top: 1px solid #edf0ea">
+          <sc-for list="{{legend}}" as="l" hint-placeholder-count="6"><span style="display: flex; align-items: center; gap: 6px"><span aria-hidden="true" style="{{l.sw}}"></span>{{l.name}}</span></sc-for>
+        </div>
+      </section>
+
+      <aside aria-labelledby="th-h" style="flex: 1 1 380px; min-width: 320px; display: flex; flex-direction: column; gap: 16px">
+        <section style="background: #fff; border: 2px solid #0b7a6b; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px">
+          <div style="display: flex; align-items: baseline; gap: 8px"><h2 id="th-h" style="margin: 0; font-size: 20px; font-weight: 700; margin-right: auto">Tish 36</h2><span style="font-size: 14px; color: #4c5852">pastki chap, birinchi oziq tish</span></div>
+
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <span style="font-size: 13px; font-weight: 700; color: #4c5852">Yuzalar</span>
+            <div role="group" aria-label="Yuzalar" style="display: flex; flex-wrap: wrap; gap: 6px">
+              <sc-for list="{{surfaces}}" as="s" hint-placeholder-count="5"><button type="button" aria-pressed="{{s.on}}" style="{{s.style}}"><b>{{s.k}}</b> {{s.name}}</button></sc-for>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <label for="dx" style="font-size: 13px; font-weight: 700; color: #4c5852">Tashxis qo'shish</label>
+            <input id="dx" value="chirish" style="height: 46px; border: 2px solid #0b7a6b; border-radius: 10px; padding: 0 12px; font: inherit">
+            <div role="listbox" aria-label="Tashxislar" style="display: flex; flex-direction: column; border: 1px solid #d3d9d0; border-radius: 10px; overflow: hidden">
+              <sc-for list="{{results}}" as="r" hint-placeholder-count="3">
+                <button type="button" role="option" style="{{r.style}}"><span style="display: flex; flex-direction: column; text-align: left; margin-right: auto"><b style="font-weight: 600">{{r.name}}</b><span style="font-size: 13px; color: #4c5852">{{r.hint}}</span></span><code style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #4c5852">{{r.code}}</code></button>
+              </sc-for>
+            </div>
+            <span style="font-size: 13px; color: #4c5852">«chirish», «karies», «кариес» — hammasi bir tashxisni topadi</span>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <span style="font-size: 13px; font-weight: 700; color: #4c5852">Shu tishdagi tashxislar</span>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px">
+              <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 4px 4px 10px; border-radius: 99px; background: #fbe7e5; color: #842523; font-size: 14px; font-weight: 600">Kariyes, dentin · O+D <button type="button" aria-label="Olib tashlash" style="width: 28px; height: 28px; border-radius: 99px; border: 0; background: #fff; color: #842523; cursor: pointer">✕</button></span>
+              <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 4px 4px 10px; border-radius: 99px; background: #fbf1dd; color: #7a4f0a; font-size: 14px; font-weight: 600">Surunkali pulpit <button type="button" aria-label="Olib tashlash" style="width: 28px; height: 28px; border-radius: 99px; border: 0; background: #fff; color: #7a4f0a; cursor: pointer">✕</button></span>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 10px; background: #f6f8f4">
+            <b>Davolash taklifi</b>
+            <label style="display: flex; align-items: center; gap: 10px"><input type="radio" name="tx" checked style="width: 18px; height: 18px; accent-color: #0b7a6b"><span style="margin-right: auto">Ildiz kanalini davolash (3 bosqich)</span><b style="font-family: 'JetBrains Mono', monospace">1 800 000</b></label>
+            <label style="display: flex; align-items: center; gap: 10px"><input type="radio" name="tx" style="width: 18px; height: 18px; accent-color: #0b7a6b"><span style="margin-right: auto">Plomba · O+D</span><b style="font-family: 'JetBrains Mono', monospace">450 000</b></label>
+          </div>
+          <div style="display: flex; gap: 8px">
+            <button type="button" style="flex: 1; height: 46px; border-radius: 10px; border: 1px solid #d3d9d0; background: #fff; color: #192420; font: inherit; font-weight: 600; cursor: pointer">Faqat tashxisni saqlash</button>
+            <button type="button" style="flex: 1; height: 46px; border-radius: 10px; border: 0; background: #0b7a6b; color: #fff; font: inherit; font-weight: 700; cursor: pointer">Rejaga qo'shish</button>
+          </div>
+        </section>
+
+        <section aria-labelledby="hi-h" style="background: #fff; border: 1px solid #e4e8e1; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 4px">
+          <h2 id="hi-h" style="margin: 0 0 6px; font-size: 16px; font-weight: 700">Tish 36 tarixi</h2>
+          <div style="display: flex; gap: 12px; padding: 8px 0; border-top: 1px solid #edf0ea"><span style="font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #4c5852; width: 74px">03.2024</span><span>Plomba O · Dr. Karimov</span></div>
+          <div style="display: flex; gap: 12px; padding: 8px 0; border-top: 1px solid #edf0ea"><span style="font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #4c5852; width: 74px">bugun</span><span>Rentgen: kariyes plomba ostida, pulpaga yaqin</span></div>
+        </section>
+      </aside>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1060}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var C = {
+      ok: { fill: '#ffffff', bd: '#d3d9d0', name: 'Sog‘lom' },
+      ca: { fill: '#f6b9b5', bd: '#cc3d3a', name: 'Kariyes' },
+      fi: { fill: '#9fd5cb', bd: '#0b7a6b', name: 'Plomba' },
+      cr: { fill: '#c9b8e8', bd: '#6a4fb3', name: 'Toj' },
+      pl: { fill: '#fbe2a8', bd: '#b57611', name: 'Rejada' },
+      mi: { fill: '#edf0ea', bd: '#7a857e', name: 'Yo‘q' }
+    };
+    function cells(state, surf) {
+      // 3x3: [ _, B, _ / M, O, D / _, L, _ ]
+      var map = [null, 'B', null, 'M', 'O', 'D', null, 'L', null];
+      return map.map(function (k) {
+        if (!k) return 'display:block';
+        var s = state === 'mi' ? 'mi' : (surf && surf[k]) ? surf[k] : (state === 'cr' ? 'cr' : 'ok');
+        var dashed = s === 'mi' ? 'dashed' : 'solid';
+        return 'display:block;border-radius:3px;background:' + C[s].fill + ';border:1px ' + dashed + ' ' + C[s].bd;
+      });
+    }
+    var boxBase = 'display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 2px;border-radius:10px;font:inherit;cursor:pointer;color:#192420;min-height:96px;';
+    function tooth(n, state, surf, label, sel) {
+      return { n: String(n), cells: cells(state, surf), label: label || '', sel: sel ? 'true' : 'false',
+        aria: 'Tish ' + n + (label ? ', ' + label : ''),
+        box: boxBase + (sel ? 'border:2px solid #0b7a6b;background:#ddefea;' : 'border:1px solid transparent;background:transparent;') };
+    }
+    var U = [18,17,16,15,14,13,12,11,21,22,23,24,25,26,27,28];
+    var L = [48,47,46,45,44,43,42,41,31,32,33,34,35,36,37,38];
+    var us = { 18: ['mi', null, 'yo‘q'], 16: ['ok', { O: 'fi' }, 'plomba'], 14: ['ok', { M: 'fi', O: 'fi' }, 'plomba'], 24: ['ok', { D: 'ca' }, 'kariyes'], 26: ['cr', null, 'toj'] };
+    var ls = { 46: ['ok', { O: 'fi' }, 'plomba'], 36: ['ok', { O: 'ca', D: 'ca' }, '2 tashxis'], 35: ['ok', { O: 'ca' }, 'kariyes'], 38: ['mi', null, 'yo‘q'], 45: ['ok', { O: 'pl' }, 'rejada'] };
+    function build(arr, st) { return arr.map(function (n) { var s = st[n] || ['ok']; return tooth(n, s[0], s[1], s[2], n === 36); }); }
+    var sOn = 'min-height:44px;padding:0 12px;border-radius:8px;border:2px solid #cc3d3a;background:#fbe7e5;color:#842523;font:inherit;font-size:14px;cursor:pointer;';
+    var sOff = 'min-height:44px;padding:0 12px;border-radius:8px;border:1px solid #d3d9d0;background:#fff;color:#192420;font:inherit;font-size:14px;cursor:pointer;';
+    var rBase = 'display:flex;align-items:center;gap:10px;min-height:52px;padding:8px 12px;border:0;border-top:1px solid #edf0ea;font:inherit;cursor:pointer;color:#192420;';
+    return {
+      upper: build(U, us),
+      lower: build(L, ls),
+      legend: ['ok', 'ca', 'fi', 'cr', 'pl', 'mi'].map(function (k) { return { name: C[k].name, sw: 'width:16px;height:16px;border-radius:4px;background:' + C[k].fill + ';border:1px ' + (k === 'mi' ? 'dashed' : 'solid') + ' ' + C[k].bd }; }),
+      surfaces: [
+        { k: 'M', name: 'medial', on: 'false', style: sOff },
+        { k: 'O', name: 'chaynov', on: 'true', style: sOn },
+        { k: 'D', name: 'distal', on: 'true', style: sOn },
+        { k: 'B', name: 'lunj', on: 'false', style: sOff },
+        { k: 'L', name: 'til', on: 'false', style: sOff }
+      ],
+      results: [
+        { name: 'Kariyes, dentin chegarasida', hint: 'eng ko‘p tanlangan · «chirish» sinonimi', code: 'K02.1', style: rBase + 'background:#f6fbf9;border-top:0;' },
+        { name: 'Kariyes, emal chegarasida', hint: 'boshlang‘ich bosqich', code: 'K02.0', style: rBase + 'background:#fff;' },
+        { name: 'Ikkilamchi kariyes (plomba ostida)', hint: 'eski plomba atrofida', code: 'K02.8', style: rBase + 'background:#fff;' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,294 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-11-11T09:30:00Z" },
+  "title": "Dental OS — UI yangilash",
+  "launch": { "view": "canvas", "page": "asos" },
+  "pages": [
+    { "id": "asos", "name": "1 · Asos" },
+    { "id": "registrator", "name": "2 · Registrator" },
+    { "id": "shifokor", "name": "3 · Shifokor" },
+    { "id": "rahbar", "name": "4 · Rahbar" },
+    { "id": "tashqi", "name": "5 · Lab, Telegram, Desktop" }
+  ],
+  "boards": {
+    "Tokens.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 1480,
+      "title": "Asos · Tokenlar, holat lug'ati, ogohlantirish darajalari",
+      "page": "asos"
+    },
+    "Components.dc.html": {
+      "x": 1520,
+      "y": 0,
+      "w": 1440,
+      "h": 1560,
+      "title": "Asos · Komponentlar va holatlar",
+      "page": "asos"
+    },
+    "Sidebar.dc.html": {
+      "x": 3040,
+      "y": 0,
+      "w": 248,
+      "h": 980,
+      "title": "Komponent · Menyu (rolga qarab)",
+      "page": "asos"
+    },
+    "Navigation.dc.html": {
+      "x": 3368,
+      "y": 0,
+      "w": 1240,
+      "h": 860,
+      "title": "Navigatsiya — hozir va taklif",
+      "page": "asos"
+    },
+    "Main.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 1060,
+      "title": "R1 · Bugun — registrator",
+      "expand": "fill",
+      "page": "registrator"
+    },
+    "Calendar.dc.html": {
+      "x": 1520,
+      "y": 0,
+      "w": 1440,
+      "h": 1060,
+      "title": "R2 · Kalendar — kun",
+      "expand": "fill",
+      "page": "registrator"
+    },
+    "Booking.dc.html": {
+      "x": 3040,
+      "y": 0,
+      "w": 1440,
+      "h": 1060,
+      "title": "R3 · Yangi yozilish",
+      "expand": "fill",
+      "page": "registrator"
+    },
+    "Queue.dc.html": {
+      "x": 0,
+      "y": 1180,
+      "w": 1440,
+      "h": 980,
+      "title": "R4 · Navbat",
+      "expand": "fill",
+      "page": "registrator"
+    },
+    "Cashier.dc.html": {
+      "x": 1520,
+      "y": 1180,
+      "w": 1440,
+      "h": 1060,
+      "title": "R5 · Kassa",
+      "expand": "fill",
+      "page": "registrator"
+    },
+    "Patients.dc.html": {
+      "x": 3040,
+      "y": 1180,
+      "w": 1440,
+      "h": 980,
+      "title": "R6 · Bemorlar ro'yxati",
+      "expand": "fill",
+      "page": "registrator"
+    },
+    "DoctorDay.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 1060,
+      "title": "D1 · Mening kunim — shifokor",
+      "expand": "fill",
+      "page": "shifokor"
+    },
+    "Patient.dc.html": {
+      "x": 1520,
+      "y": 0,
+      "w": 1440,
+      "h": 1160,
+      "title": "D2 · Bemor kartasi — Umumiy",
+      "expand": "fill",
+      "page": "shifokor"
+    },
+    "Odontogram.dc.html": {
+      "x": 3040,
+      "y": 0,
+      "w": 1440,
+      "h": 1060,
+      "title": "D3 · Tish xaritasi va tashxis",
+      "expand": "fill",
+      "page": "shifokor"
+    },
+    "VisitNote.dc.html": {
+      "x": 0,
+      "y": 1280,
+      "w": 1440,
+      "h": 1140,
+      "title": "D4 · Vizit yozuvi va retsept",
+      "expand": "fill",
+      "page": "shifokor"
+    },
+    "LabOrder.dc.html": {
+      "x": 1520,
+      "y": 1280,
+      "w": 1440,
+      "h": 1100,
+      "title": "D5 · Lab buyurtma",
+      "expand": "fill",
+      "page": "shifokor"
+    },
+    "OwnerDashboard.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 1080,
+      "title": "M1 · Rahbar — bugun",
+      "expand": "fill",
+      "page": "rahbar"
+    },
+    "Reports.dc.html": {
+      "x": 1520,
+      "y": 0,
+      "w": 1440,
+      "h": 1080,
+      "title": "M2 · Hisobotlar — savollar",
+      "expand": "fill",
+      "page": "rahbar"
+    },
+    "Settings.dc.html": {
+      "x": 3040,
+      "y": 0,
+      "w": 1440,
+      "h": 1100,
+      "title": "M3 · Sozlamalar — filial va ish soati",
+      "expand": "fill",
+      "page": "rahbar"
+    },
+    "Staff.dc.html": {
+      "x": 0,
+      "y": 1220,
+      "w": 1440,
+      "h": 1060,
+      "title": "M4 · Xodimlar va rollar",
+      "expand": "fill",
+      "page": "rahbar"
+    },
+    "Stock.dc.html": {
+      "x": 1520,
+      "y": 1220,
+      "w": 1440,
+      "h": 1020,
+      "title": "M5 · Ombor",
+      "expand": "fill",
+      "page": "rahbar"
+    },
+    "Finance.dc.html": {
+      "x": 3040,
+      "y": 1220,
+      "w": 1440,
+      "h": 1060,
+      "title": "M6 · Xarajat va ish haqi",
+      "expand": "fill",
+      "page": "rahbar"
+    },
+    "LabPortal.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 1060,
+      "title": "T1 · Laboratoriya portali — ko'p klinika",
+      "expand": "fill",
+      "page": "tashqi"
+    },
+    "TelegramBot.dc.html": {
+      "x": 1520,
+      "y": 0,
+      "w": 1760,
+      "h": 980,
+      "title": "T2 · Bemor uchun Telegram bot",
+      "page": "tashqi"
+    },
+    "Desktop.dc.html": {
+      "x": 0,
+      "y": 1180,
+      "w": 1600,
+      "h": 1100,
+      "title": "T3 · Desktop — o'rnatish, aktivatsiya, oflayn, yangilanish",
+      "page": "tashqi"
+    }
+  },
+  "order": [
+    "Tokens.dc.html",
+    "Components.dc.html",
+    "Sidebar.dc.html",
+    "Navigation.dc.html",
+    "Main.dc.html",
+    "Calendar.dc.html",
+    "Booking.dc.html",
+    "Queue.dc.html",
+    "Cashier.dc.html",
+    "Patients.dc.html",
+    "DoctorDay.dc.html",
+    "Patient.dc.html",
+    "Odontogram.dc.html",
+    "VisitNote.dc.html",
+    "LabOrder.dc.html",
+    "OwnerDashboard.dc.html",
+    "Reports.dc.html",
+    "Settings.dc.html",
+    "Staff.dc.html",
+    "Stock.dc.html",
+    "Finance.dc.html",
+    "LabPortal.dc.html",
+    "TelegramBot.dc.html",
+    "Desktop.dc.html"
+  ],
+  "notes": {
+    "title": {
+      "x": 0,
+      "y": -300,
+      "text": "Asos — bitta lug'at, bitta rang tizimi, uch darajali ogohlantirish",
+      "kind": "title1",
+      "maxW": 4600,
+      "page": "asos"
+    },
+    "reg": {
+      "x": 0,
+      "y": -300,
+      "text": "Registrator — har qatorda bitta keyingi qadam",
+      "kind": "title1",
+      "maxW": 4480,
+      "page": "registrator"
+    },
+    "doc": {
+      "x": 0,
+      "y": -300,
+      "text": "Shifokor — kritik ma'lumot doim ko'rinadi, tashxis nomi bilan",
+      "kind": "title1",
+      "maxW": 4480,
+      "page": "shifokor"
+    },
+    "own": {
+      "x": 0,
+      "y": -300,
+      "text": "Rahbar — raqamlar savolga javob beradi, sozlamalar bitta joyda",
+      "kind": "title1",
+      "maxW": 4480,
+      "page": "rahbar"
+    },
+    "ext": {
+      "x": 0,
+      "y": -300,
+      "text": "Tashqi — laboratoriya, bemor Telegram'da, klinika internetsiz ham ishlaydi",
+      "kind": "title1",
+      "maxW": 3280,
+      "page": "tashqi"
+    }
+  },
+  "designSystems": []
+}

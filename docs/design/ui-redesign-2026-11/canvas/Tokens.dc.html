@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Asos — tokenlar</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1480px; box-sizing: border-box; padding: 48px 56px; background: #f1f3ef; font-family: 'Hanken Grotesk', system-ui, sans-serif; color: #192420; display: flex; flex-direction: column; gap: 28px; font-size: 15px; line-height: 1.45">
+
+  <div style="display: flex; flex-direction: column; gap: 6px">
+    <span style="font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #096154">Dental OS · Asos</span>
+    <h1 style="margin: 0; font-size: 34px; font-weight: 700; letter-spacing: -.02em">Bitta lug'at, bitta rang tizimi</h1>
+    <span style="font-size: 16px; color: #4c5852; max-width: 900px">Har bir holat butun tizimda bir xil nom va bir xil rangda. Rang hech qachon yolg'iz kelmaydi — doim matn bilan. Mavjud teal tizimi saqlangan; matn kattaroq va kontrastliroq.</span>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px">
+    <section aria-labelledby="c-h" style="background: #fff; border: 1px solid #e4e8e1; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 12px">
+      <h2 id="c-h" style="margin: 0; font-size: 18px; font-weight: 700">Asosiy ranglar</h2>
+      <sc-for list="{{base}}" as="c" hint-placeholder-count="8">
+        <div style="display: flex; align-items: center; gap: 12px">
+          <span aria-hidden="true" style="{{c.sw}}"></span>
+          <span style="display: flex; flex-direction: column; margin-right: auto"><b style="font-weight: 600">{{c.name}}</b><span style="font-size: 13px; color: #4c5852">{{c.use}}</span></span>
+          <code style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #33403a">{{c.hex}}</code>
+        </div>
+      </sc-for>
+    </section>
+
+    <section aria-labelledby="t-h" style="background: #fff; border: 1px solid #e4e8e1; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 10px">
+      <h2 id="t-h" style="margin: 0; font-size: 18px; font-weight: 700">Tipografiya</h2>
+      <div style="display: flex; align-items: baseline; gap: 12px; border-bottom: 1px solid #edf0ea; padding-bottom: 8px"><code style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #4c5852; width: 70px">28 / 700</code><span style="font-size: 28px; font-weight: 700; letter-spacing: -.01em">Sahifa sarlavhasi</span></div>
+      <div style="display: flex; align-items: baseline; gap: 12px; border-bottom: 1px solid #edf0ea; padding-bottom: 8px"><code style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #4c5852; width: 70px">24 / 700</code><span style="font-size: 24px; font-weight: 700">Bemor ismi</span></div>
+      <div style="display: flex; align-items: baseline; gap: 12px; border-bottom: 1px solid #edf0ea; padding-bottom: 8px"><code style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #4c5852; width: 70px">18 / 700</code><span style="font-size: 18px; font-weight: 700">Bo'lim sarlavhasi</span></div>
+      <div style="display: flex; align-items: baseline; gap: 12px; border-bottom: 1px solid #edf0ea; padding-bottom: 8px"><code style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #4c5852; width: 70px">15 / 400</code><span style="font-size: 15px">Asosiy matn — eng kichik o'qiladigan o'lcham</span></div>
+      <div style="display: flex; align-items: baseline; gap: 12px; border-bottom: 1px solid #edf0ea; padding-bottom: 8px"><code style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #4c5852; width: 70px">13 / 500</code><span style="font-size: 13px; font-weight: 500; color: #4c5852">Izoh va yorliq (faqat #4c5852 yoki to'qroq)</span></div>
+      <div style="display: flex; align-items: baseline; gap: 12px"><code style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #4c5852; width: 70px">Mono</code><span style="font-family: 'JetBrains Mono', monospace; font-size: 15px">10:30 · 1 200 000 · 26 · +998 90 123 45 67</span></div>
+      <span style="font-size: 13px; color: #4c5852; margin-top: 4px">Hanken Grotesk — matn; JetBrains Mono — vaqt, pul, tish raqami, telefon (ustunlar tekis turadi).</span>
+    </section>
+
+    <section aria-labelledby="s-h" style="background: #fff; border: 1px solid #e4e8e1; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+      <h2 id="s-h" style="margin: 0; font-size: 18px; font-weight: 700">O'lcham va bosish zonasi</h2>
+      <div style="display: flex; align-items: flex-end; gap: 16px">
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 6px"><div style="width: 44px; height: 44px; border-radius: 8px; background: #ddefea; border: 2px dashed #0b7a6b"></div><span style="font-size: 13px; color: #33403a">44 px · stol</span></div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 6px"><div style="width: 60px; height: 60px; border-radius: 10px; background: #ddefea; border: 2px dashed #0b7a6b"></div><span style="font-size: 13px; color: #33403a">60 px · kreslo yoni</span></div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 6px"><div style="width: 40px; height: 40px; border-radius: 8px; background: #f1f3ef; border: 2px dashed #7a857e"></div><span style="font-size: 13px; color: #33403a">40 px · jadval qatori</span></div>
+      </div>
+      <span style="font-size: 14px; color: #33403a">Kreslo yoni rejimi: qo'lqop bilan ham xatosiz bosish uchun ≥15 mm zona, hover'siz boshqaruv.</span>
+      <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; font-size: 13px; color: #33403a">
+        <span>4 · 8 · 12</span><span>16 · 20 · 24</span><span>32 · 48</span><span>bo'shliq (px)</span>
+        <span>6 · 8</span><span>10 · 12</span><span>14 · 99</span><span>radius (px)</span>
+      </div>
+    </section>
+  </div>
+
+  <section aria-labelledby="v-h" style="background: #fff; border: 1px solid #e4e8e1; border-radius: 14px; padding: 22px 24px; display: flex; flex-direction: column; gap: 14px">
+    <div style="display: flex; flex-direction: column; gap: 2px">
+      <h2 id="v-h" style="margin: 0; font-size: 20px; font-weight: 700">Holat lug'ati — barcha modullar uchun bitta</h2>
+      <span style="font-size: 14px; color: #4c5852">Ma'no bo'yicha rang: ko'k — rejalashtirilgan, och teal — tasdiqlangan, sariq — e'tibor/kutish, to'q teal — hozir bajarilmoqda, kulrang — tugagan, qizil — muvaffaqiyatsiz.</span>
+    </div>
+    <div style="display: grid; grid-template-columns: 180px repeat(6, minmax(0, 1fr)); gap: 8px; align-items: center">
+      <span></span>
+      <sc-for list="{{meanings}}" as="m" hint-placeholder-count="6"><span style="font-size: 13px; font-weight: 700; color: #4c5852; text-transform: uppercase; letter-spacing: .04em">{{m}}</span></sc-for>
+    </div>
+    <sc-for list="{{vocab}}" as="row" hint-placeholder-count="5">
+      <div style="display: grid; grid-template-columns: 180px repeat(6, minmax(0, 1fr)); gap: 8px; align-items: center; border-top: 1px solid #edf0ea; padding-top: 10px">
+        <b style="font-weight: 700">{{row.domain}}</b>
+        <sc-for list="{{row.cells}}" as="c" hint-placeholder-count="6">
+          <span style="{{c.style}}">{{c.label}}</span>
+        </sc-for>
+      </div>
+    </sc-for>
+  </section>
+
+  <section aria-labelledby="a-h" style="display: flex; flex-direction: column; gap: 14px">
+    <div style="display: flex; flex-direction: column; gap: 2px">
+      <h2 id="a-h" style="margin: 0; font-size: 20px; font-weight: 700">Ogohlantirish darajalari</h2>
+      <span style="font-size: 14px; color: #4c5852">Faqat eng jiddiy holat ishni to'xtatadi. Hammasi to'xtatsa — hech biri o'qilmaydi (darajasiz tizimda jiddiy ogohlantirish 34%, darajali tizimda 100% qabul qilingan).</span>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px">
+      <sc-for list="{{tiers}}" as="t" hint-placeholder-count="3">
+        <div style="{{t.box}}">
+          <span style="{{t.tagStyle}}">{{t.tag}}</span>
+          <b style="font-size: 17px">{{t.title}}</b>
+          <span style="font-size: 14px; color: #33403a">{{t.rule}}</span>
+          <div style="{{t.sampleStyle}}">{{t.sample}}</div>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <section aria-labelledby="l-h" style="background: #fff; border: 1px solid #e4e8e1; border-radius: 14px; padding: 20px 24px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px">
+    <div style="display: flex; flex-direction: column; gap: 10px">
+      <h2 id="l-h" style="margin: 0; font-size: 18px; font-weight: 700">Matn qoidalari</h2>
+      <sc-for list="{{copy}}" as="c" hint-placeholder-count="4">
+        <div style="display: flex; gap: 10px; font-size: 14px"><span style="color: #842523; text-decoration: line-through; width: 160px; flex: none">{{c.bad}}</span><b style="color: #096154; font-weight: 700">{{c.good}}</b></div>
+      </sc-for>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px">
+      <h2 style="margin: 0; font-size: 18px; font-weight: 700">Ikki til — bitta lug'at manbasi</h2>
+      <sc-for list="{{terms}}" as="t" hint-placeholder-count="4">
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; font-size: 14px; border-top: 1px solid #edf0ea; padding-top: 6px"><span>{{t.uz}}</span><span style="color: #33403a">{{t.ru}}</span></div>
+      </sc-for>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1480}}'>
+class Component extends DCLogic {
+  renderVals() {
+    function sw(hex, border) { return 'width:40px;height:40px;border-radius:8px;flex:none;background:' + hex + ';border:1px solid ' + (border || 'rgba(25,36,32,.15)'); }
+    var M = {
+      plan: 'background:#e8eefb;color:#1f4f9e',
+      ok: 'background:#e7f6f1;color:#096154',
+      wait: 'background:#fbf1dd;color:#7a4f0a',
+      now: 'background:#0b7a6b;color:#ffffff',
+      done: 'background:#f1f3ef;color:#4c5852;border:1px solid #d3d9d0',
+      fail: 'background:#fbe7e5;color:#842523'
+    };
+    var pill = 'display:inline-block;justify-self:start;font-size:14px;font-weight:600;border-radius:99px;padding:4px 12px;';
+    var order = ['plan', 'ok', 'wait', 'now', 'done', 'fail'];
+    function row(domain, labels) {
+      return { domain: domain, cells: labels.map(function (l, i) { return { label: l || '—', style: l ? pill + M[order[i]] : 'font-size:14px;color:#7a857e' }; }) };
+    }
+    var tag = 'align-self:flex-start;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-radius:4px;padding:2px 8px;';
+    return {
+      base: [
+        { name: 'Fon', use: 'ilova foni', hex: '#F1F3EF', sw: sw('#f1f3ef') },
+        { name: 'Sirt', use: 'karta, panel', hex: '#FFFFFF', sw: sw('#ffffff') },
+        { name: 'Chegara', use: 'karta chegarasi', hex: '#E4E8E1', sw: sw('#e4e8e1') },
+        { name: 'Matn', use: 'asosiy matn', hex: '#192420', sw: sw('#192420') },
+        { name: 'Matn 2', use: 'izoh, yorliq · 7:1', hex: '#4C5852', sw: sw('#4c5852') },
+        { name: 'Asosiy (teal)', use: 'asosiy tugma, faol band', hex: '#0B7A6B', sw: sw('#0b7a6b') },
+        { name: 'Teal och', use: 'tanlangan fon', hex: '#DDEFEA', sw: sw('#ddefea') },
+        { name: 'Xavf', use: 'faqat kritik va o‘chirish', hex: '#A82F2D', sw: sw('#a82f2d') }
+      ],
+      meanings: ['Rejada', 'Tasdiqlangan', 'Kutish / e‘tibor', 'Hozir', 'Tugagan', 'Muvaffaqiyatsiz'],
+      vocab: [
+        row('Yozilish', ['Yozildi', 'Tasdiqlandi', 'Keldi', 'Kresloda', 'Yakunlandi', 'Kelmadi']),
+        row('Navbat', ['', '', 'Kutmoqda', 'Kresloda', 'Ketdi', 'Kelmadi']),
+        row('Reja bosqichi', ['Taklif', 'Rozi', 'Lab kutilmoqda', 'Jarayonda', 'Bajarildi', 'Rad etildi']),
+        row('Lab buyurtma', ['Yuborildi', 'Qabul qilindi', 'Tayyorlanmoqda', 'Jo‘natildi', 'Yetkazildi', 'Rad etildi']),
+        row('To‘lov', ['', 'To‘landi', 'Qisman', '', 'Qaytarildi', 'Qarz'])
+      ],
+      tiers: [
+        { tag: '1 · Kritik', title: 'Harakat paytida to‘xtatadi', rule: 'Faqat xavfli amalda modal chiqadi: penitsillinli bemorga penitsillin yozilganda. Sabab tanlanadi, qayta so‘ralmaydi.', sample: 'Allergiya: penitsillin — amoksitsillin yozilmoqda. Davom etish sababi?', box: 'background:#fff;border:2px solid #cc3d3a;border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:8px', tagStyle: tag + 'background:#cc3d3a;color:#fff', sampleStyle: 'margin-top:4px;padding:10px 12px;border-radius:8px;background:#fbe7e5;color:#842523;font-size:14px;font-weight:600' },
+        { tag: '2 · Diqqat', title: 'Doim ko‘rinadi, to‘xtatmaydi', rule: 'Bemor kartasi sarlavhasidagi banner, kun ro‘yxatidagi belgi. Har ochilishda modal chiqarmaydi.', sample: 'Allergiya: penitsillin. Antikoagulyant qabul qiladi.', box: 'background:#fff;border:2px solid #b57611;border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:8px', tagStyle: tag + 'background:#b57611;color:#fff', sampleStyle: 'margin-top:4px;padding:10px 12px;border-radius:8px;background:#fbf1dd;color:#7a4f0a;font-size:14px;font-weight:600' },
+        { tag: '3 · Ma‘lumot', title: 'So‘ralganda ko‘rinadi', rule: '«Diqqat» panelida 3–5 tadan oshmaydi, qolgani «yana N ta» ostida. Har biri amalga olib boradi.', sample: '7 bemorni qayta chaqirish vaqti keldi →', box: 'background:#fff;border:1px solid #d3d9d0;border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:8px', tagStyle: tag + 'background:#4c5852;color:#fff', sampleStyle: 'margin-top:4px;padding:10px 12px;border-radius:8px;background:#f6f8f4;color:#33403a;font-size:14px;font-weight:600' }
+      ],
+      copy: [
+        { bad: 'OK / Update', good: 'Tashxis qo‘shish' },
+        { bad: 'Xatolik yuz berdi', good: 'Dr. Nazarov uchun jadval yo‘q — jadvalni kiriting' },
+        { bad: 'K00.1, K02.1', good: 'Kariyes (dentin) · K02.1' },
+        { bad: 'Status: in_progress', good: 'Kresloda' }
+      ],
+      terms: [
+        { uz: 'Yozilish', ru: 'Запись' },
+        { uz: 'Kresloda', ru: 'В кресле' },
+        { uz: 'Davolash rejasi', ru: 'План лечения' },
+        { uz: 'Qayta chaqiruv', ru: 'Повторный вызов' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

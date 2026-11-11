@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Sozlamalar — filial va ish soati</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#f1f3ef}
+a{color:#0b7a6b}a:hover{color:#096154}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 100vh; font-family: 'Hanken Grotesk', system-ui, sans-serif; color: #192420; background: #f1f3ef; font-size: 15px; line-height: 1.45">
+  <div style="flex: 0 0 248px; display: flex">
+    <dc-import name="Sidebar" role="rahbar" active="sozlamalar" conn="lan" hint-size="248px,980px"></dc-import>
+  </div>
+
+  <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 32px; background: #ffffff; border-bottom: 1px solid #e4e8e1">
+      <h1 style="margin: 0; font-size: 24px; font-weight: 700; margin-right: auto">Sozlamalar</h1>
+    </header>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 20px; padding: 20px 32px 40px; align-items: flex-start">
+      <nav aria-label="Sozlamalar bo'limlari" style="flex: 1 1 260px; max-width: 300px; min-width: 240px; background: #fff; border: 1px solid #e4e8e1; border-radius: 12px; padding: 8px; display: flex; flex-direction: column; gap: 2px">
+        <sc-for list="{{sections}}" as="s" hint-placeholder-count="8">
+          <a href="{{s.href}}" style="{{s.style}}"><span style="margin-right: auto">{{s.name}}</span><span style="{{s.badgeStyle}}">{{s.badge}}</span></a>
+        </sc-for>
+      </nav>
+
+      <div style="flex: 999 1 600px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+        <section aria-labelledby="rd-h" style="background: #fff; border: 1px solid #e4e8e1; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; align-items: baseline; gap: 10px"><h2 id="rd-h" style="margin: 0; font-size: 18px; font-weight: 700; margin-right: auto">Klinika ishga tayyorligi</h2><b style="font-family: 'JetBrains Mono', monospace">5 / 7</b></div>
+          <div style="height: 8px; border-radius: 99px; background: #edf0ea; overflow: hidden" role="img" aria-label="7 tadan 5 tasi bajarilgan"><div style="width: 71%; height: 100%; background: #0b7a6b"></div></div>
+          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 16px">
+            <sc-for list="{{ready}}" as="r" hint-placeholder-count="7"><div style="{{r.style}}"><b aria-hidden="true">{{r.mark}}</b><span>{{r.text}}</span></div></sc-for>
+          </div>
+        </section>
+
+        <section aria-labelledby="wh-h" style="background: #fff; border: 1px solid #e4e8e1; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px">
+            <h2 id="wh-h" style="margin: 0; font-size: 18px; font-weight: 700; margin-right: auto">Yunusobod filiali · ish soati</h2>
+            <button type="button" style="height: 40px; padding: 0 12px; border-radius: 8px; border: 1px solid #d3d9d0; background: #fff; color: #192420; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer">Chilonzordan nusxa olish</button>
+          </div>
+          <span style="font-size: 14px; color: #4c5852">Ish soati kiritilmaguncha bu filialda yozilish qilib bo'lmaydi. Shifokor jadvali shu oraliqdan chiqa olmaydi.</span>
+          <div style="display: flex; flex-direction: column">
+            <sc-for list="{{week}}" as="d" hint-placeholder-count="7">
+              <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; min-height: 56px; border-top: 1px solid #edf0ea">
+                <label style="display: flex; align-items: center; gap: 10px; width: 150px"><input type="checkbox" checked="{{d.open}}" style="width: 20px; height: 20px; accent-color: #0b7a6b"><b style="font-weight: 600">{{d.day}}</b></label>
+                <sc-if value="{{d.open}}" hint-placeholder-val="{{ true }}">
+                  <span style="display: flex; align-items: center; gap: 8px"><input aria-label="{{d.day}} ochilish" value="{{d.from}}" style="width: 84px; height: 42px; border: 1px solid #d3d9d0; border-radius: 8px; text-align: center; font: inherit; font-family: 'JetBrains Mono', monospace"><span aria-hidden="true">—</span><input aria-label="{{d.day}} yopilish" value="{{d.to}}" style="width: 84px; height: 42px; border: 1px solid #d3d9d0; border-radius: 8px; text-align: center; font: inherit; font-family: 'JetBrains Mono', monospace"></span>
+                  <span style="font-size: 14px; color: #4c5852">{{d.note}}</span>
+                </sc-if>
+                <sc-if value="{{d.closed}}" hint-placeholder-val="{{ false }}"><span style="font-size: 14px; color: #4c5852">Dam olish kuni</span></sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </section>
+
+        <section aria-labelledby="ds-h" style="background: #fff; border: 1px solid #e4e8e1; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 6px">
+          <h2 id="ds-h" style="margin: 0 0 6px; font-size: 18px; font-weight: 700">Shifokorlar jadvali</h2>
+          <sc-for list="{{docs}}" as="d" hint-placeholder-count="3">
+            <div style="display: flex; align-items: center; gap: 12px; min-height: 52px; border-top: 1px solid #edf0ea">
+              <span style="display: flex; flex-direction: column; margin-right: auto"><b style="font-weight: 600">{{d.name}}</b><span style="font-size: 13px; color: #4c5852">{{d.meta}}</span></span>
+              <span style="{{d.pill}}">{{d.status}}</span>
+              <button type="button" style="{{d.btn}}">{{d.action}}</button>
+            </div>
+          </sc-for>
+        </section>
+      </div>
+
+      <aside style="flex: 1 1 300px; min-width: 280px; display: flex; flex-direction: column; gap: 16px">
+        <section aria-labelledby="ls-h" style="background: #fff; border: 2px solid #b57611; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 6px">
+          <h2 id="ls-h" style="margin: 0; font-size: 17px; font-weight: 700">Litsenziya</h2>
+          <b style="font-size: 18px">5-dekabrgacha · 24 kun qoldi</b>
+          <span style="font-size: 14px; color: #33403a">Tarif: Standart · 11 modul. Internet bo'lmasa ham muddat tugaguncha ishlaydi.</span>
+          <button type="button" style="margin-top: 4px; height: 44px; border-radius: 10px; border: 0; background: #0b7a6b; color: #fff; font: inherit; font-weight: 700; cursor: pointer">Uzaytirish so'rovini yuborish</button>
+        </section>
+        <section aria-labelledby="bk-h" style="background: #fff; border: 2px solid #cc3d3a; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 6px">
+          <h2 id="bk-h" style="margin: 0; font-size: 17px; font-weight: 700">Zaxira nusxa</h2>
+          <b style="font-size: 18px; color: #a82f2d">Oxirgisi 3 kun oldin</b>
+          <span style="font-size: 14px; color: #33403a">Har kuni 20:00 da USB diskka va (tarifda bo'lsa) bulutga. Yunusobod serverida disk ulanmagan.</span>
+          <div style="display: flex; gap: 8px; margin-top: 4px"><button type="button" style="flex: 1; height: 44px; border-radius: 10px; border: 0; background: #0b7a6b; color: #fff; font: inherit; font-weight: 700; cursor: pointer">Hozir nusxa olish</button><button type="button" style="height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid #d3d9d0; background: #fff; color: #192420; font: inherit; font-weight: 600; cursor: pointer">Tiklash</button></div>
+        </section>
+        <section aria-labelledby="ig-h" style="background: #fff; border: 1px solid #e4e8e1; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 6px">
+          <h2 id="ig-h" style="margin: 0 0 4px; font-size: 17px; font-weight: 700">Integratsiyalar</h2>
+          <sc-for list="{{integr}}" as="i" hint-placeholder-count="3"><div style="display: flex; align-items: center; gap: 10px; min-height: 44px; border-top: 1px solid #edf0ea"><b style="font-weight: 600; margin-right: auto">{{i.name}}</b><span style="{{i.pill}}">{{i.status}}</span></div></sc-for>
+          <span style="font-size: 13px; color: #4c5852">Kanal ulanmagan bo'lsa, eslatma «yuborildi» deb belgilanmaydi — ro'yxatda qoladi.</span>
+        </section>
+      </aside>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var it = 'display:flex;align-items:center;gap:8px;min-height:44px;padding:0 10px;border-radius:8px;text-decoration:none;font-size:15px;';
+    var badge = 'font-size:12px;font-weight:700;border-radius:99px;padding:1px 8px;';
+    var B = { ok: badge + 'background:#e7f6f1;color:#096154', w: badge + 'background:#fbf1dd;color:#7a4f0a', c: badge + 'background:#fbe7e5;color:#842523', n: badge + 'background:#edf0ea;color:#33403a' };
+    function s(name, b, k, active) { return { name: name, badge: b, badgeStyle: B[k], href: '#', style: it + (active ? 'background:#ddefea;color:#096154;font-weight:700;' : 'color:#192420;') }; }
+    var pill = 'font-size:13px;font-weight:700;border-radius:99px;padding:3px 10px;';
+    var P = 'height:40px;padding:0 12px;border-radius:8px;border:0;background:#0b7a6b;color:#fff;font:inherit;font-size:14px;font-weight:700;cursor:pointer';
+    var S = 'height:40px;padding:0 12px;border-radius:8px;border:1px solid #d3d9d0;background:#fff;color:#192420;font:inherit;font-size:14px;font-weight:600;cursor:pointer';
+    var ok = 'display:flex;gap:8px;font-size:14px;color:#096154';
+    var no = 'display:flex;gap:8px;font-size:14px;color:#842523;font-weight:600';
+    function day(d, open, from, to, note) { return { day: d, open: open, closed: !open, from: from || '', to: to || '', note: note || '' }; }
+    return {
+      sections: [
+        s('Klinika', '✓', 'ok'), s('Filiallar va ish soati', '1 muammo', 'c', true), s('Xodimlar va rollar', '9', 'n'), s('Xizmatlar va narxlar', '64', 'n'),
+        s('Integratsiyalar', 'SMS yo‘q', 'w'), s('Litsenziya', '24 kun', 'w'), s('Zaxira nusxa', '3 kun', 'c'), s('Qurilmalar va server', '5', 'n')
+      ],
+      ready: [
+        { mark: '✓', text: 'Klinika nomi va logotip', style: ok },
+        { mark: '✓', text: 'Xizmatlar va narxlar (64)', style: ok },
+        { mark: '✓', text: 'Xodimlar taklif qilindi (9)', style: ok },
+        { mark: '✓', text: 'Telegram bot ulandi', style: ok },
+        { mark: '✓', text: 'Chilonzor ish soati', style: ok },
+        { mark: '✕', text: 'Yunusobod ish soati', style: no },
+        { mark: '✕', text: 'Dr. Nazarov jadvali', style: no }
+      ],
+      week: [
+        day('Dushanba', true, '09:00', '18:00'), day('Seshanba', true, '09:00', '18:00'), day('Chorshanba', true, '09:00', '18:00'),
+        day('Payshanba', true, '09:00', '18:00'), day('Juma', true, '09:00', '17:00', 'juma namozi 12:30–13:30 — tanaffus'), day('Shanba', true, '10:00', '15:00'), day('Yakshanba', false)
+      ],
+      docs: [
+        { name: 'Dr. Karimov', meta: 'Chilonzor · Du–Ju 09:00–18:00', status: 'Kiritilgan', pill: pill + 'background:#e7f6f1;color:#096154', action: 'O‘zgartirish', btn: S },
+        { name: 'Dr. Rasulova', meta: 'Yunusobod · filial soati yo‘q', status: 'Filialni kutmoqda', pill: pill + 'background:#fbf1dd;color:#7a4f0a', action: 'O‘zgartirish', btn: S },
+        { name: 'Dr. Nazarov', meta: 'Chilonzor', status: 'Kiritilmagan', pill: pill + 'background:#fbe7e5;color:#842523', action: 'Jadval kiritish', btn: P }
+      ],
+      integr: [
+        { name: 'Telegram bot', status: 'Ulangan', pill: pill + 'background:#e7f6f1;color:#096154' },
+        { name: 'SMS (Eskiz)', status: 'Ulanmagan', pill: pill + 'background:#fbf1dd;color:#7a4f0a' },
+        { name: 'Fiskal kassa', status: 'Ulangan', pill: pill + 'background:#e7f6f1;color:#096154' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

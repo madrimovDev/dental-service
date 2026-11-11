@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Laboratoriya portali</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#f1f3ef}
+a{color:#0b7a6b}a:hover{color:#096154}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 100vh; font-family: 'Hanken Grotesk', system-ui, sans-serif; color: #192420; background: #f1f3ef; font-size: 15px; line-height: 1.45">
+  <div style="flex: 0 0 248px; display: flex">
+    <dc-import name="Sidebar" role="texnik" active="lab" conn="cloud" hint-size="248px,980px"></dc-import>
+  </div>
+
+  <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px 14px; padding: 16px 32px; background: #ffffff; border-bottom: 1px solid #e4e8e1">
+      <div style="display: flex; flex-direction: column; margin-right: auto">
+        <h1 style="margin: 0; font-size: 24px; font-weight: 700">Buyurtmalar · Oq Tish laboratoriyasi</h1>
+        <span style="font-size: 14px; color: #4c5852">6 klinikadan 23 ta ochiq ish · 2 tasi bugun topshirilishi kerak</span>
+      </div>
+      <button type="button" style="height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid #0b7a6b; background: #ddefea; color: #096154; font: inherit; font-weight: 700; cursor: pointer">Muddat bo'yicha ▾</button>
+      <button type="button" style="height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid #d3d9d0; background: #fff; color: #192420; font: inherit; font-weight: 600; cursor: pointer">Texnik: hammasi ▾</button>
+    </header>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 20px; padding: 20px 32px 40px; align-items: flex-start">
+      <section aria-label="Ishlar" style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 10px">
+        <div role="tablist" aria-label="Holat" style="display: flex; flex-wrap: wrap; gap: 6px">
+          <sc-for list="{{tabs}}" as="t" hint-placeholder-count="5"><button type="button" role="tab" aria-selected="{{t.sel}}" style="{{t.style}}">{{t.name}} <b style="font-family: 'JetBrains Mono', monospace">{{t.n}}</b></button></sc-for>
+        </div>
+        <sc-for list="{{cases}}" as="c" hint-placeholder-count="5">
+          <button type="button" style="{{c.box}}">
+            <span style="display: flex; flex-direction: column; align-items: flex-start; text-align: left; margin-right: auto; min-width: 0">
+              <span style="display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline"><b style="font-size: 16px">{{c.work}}</b><span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #4c5852">{{c.no}}</span></span>
+              <span style="font-size: 14px; color: #33403a">{{c.clinic}}</span>
+              <span style="font-size: 13px; color: #4c5852">{{c.meta}}</span>
+            </span>
+            <span style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px">
+              <span style="{{c.duePill}}">{{c.due}}</span>
+              <span style="{{c.pill}}">{{c.status}}</span>
+            </span>
+          </button>
+        </sc-for>
+      </section>
+
+      <aside aria-labelledby="cs-h" style="flex: 1 1 420px; min-width: 320px; background: #fff; border: 2px solid #0b7a6b; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; flex-direction: column; gap: 2px">
+          <span style="font-size: 13px; color: #4c5852">Smile Dent (Chilonzor) · Dr. Yusupova · <span style="font-family: 'JetBrains Mono', monospace">L-231</span></span>
+          <h2 id="cs-h" style="margin: 0; font-size: 21px; font-weight: 700">Ko'prik 34–36 · sirkoniy</h2>
+          <span style="font-size: 14px; color: #33403a">Bemor: K. E. · ayol · 47 yosh · klinika kodi SD-1187</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+          <div style="padding: 10px 12px; border-radius: 10px; background: #f6f8f4; display: flex; flex-direction: column"><span style="font-size: 13px; color: #4c5852">Rang</span><b style="font-family: 'JetBrains Mono', monospace; font-size: 18px">A3 · surat bor</b></div>
+          <div style="padding: 10px 12px; border-radius: 10px; background: #fbf1dd; display: flex; flex-direction: column; color: #7a4f0a"><span style="font-size: 13px">Kerak</span><b style="font-size: 18px">18-noyabr · 7 kun</b></div>
+          <div style="padding: 10px 12px; border-radius: 10px; background: #f6f8f4; display: flex; flex-direction: column"><span style="font-size: 13px; color: #4c5852">Tishlar</span><b style="font-family: 'JetBrains Mono', monospace">34 · 35 oraliq · 36</b></div>
+          <div style="padding: 10px 12px; border-radius: 10px; background: #f6f8f4; display: flex; flex-direction: column"><span style="font-size: 13px; color: #4c5852">Fayllar</span><b>2 STL · 1 surat</b></div>
+        </div>
+        <div style="padding: 10px 12px; border-radius: 10px; border: 1px solid #e4e8e1; font-size: 14px"><b>Shifokor izohi:</b> oraliq milkka tegmasin, yuvish oson bo'lsin</div>
+
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <span style="font-size: 13px; font-weight: 700; color: #4c5852">Klinika bilan yozishma</span>
+          <div style="display: flex; flex-direction: column; gap: 6px; max-height: 170px; overflow: auto">
+            <div style="align-self: flex-start; max-width: 85%; padding: 8px 12px; border-radius: 12px 12px 12px 4px; background: #f1f3ef; font-size: 14px"><b style="font-size: 12px; color: #4c5852">Dr. Yusupova · 10:12</b><br>Antagonist skani ham qo'shdim, tishlash zich.</div>
+            <div style="align-self: flex-end; max-width: 85%; padding: 8px 12px; border-radius: 12px 12px 4px 12px; background: #ddefea; font-size: 14px"><b style="font-size: 12px; color: #096154">Shoxrux · 10:30</b><br>Qabul qildim. Dizaynni 14-noyabrda tasdiqlashga yuboraman.</div>
+          </div>
+          <div style="display: flex; gap: 6px"><label for="msg" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Xabar</label><input id="msg" placeholder="Xabar yozing…" style="flex: 1; height: 44px; border: 1px solid #d3d9d0; border-radius: 10px; padding: 0 12px; font: inherit"><button type="button" style="height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid #d3d9d0; background: #fff; color: #192420; font: inherit; font-weight: 600; cursor: pointer">Yuborish</button></div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 4px"><label for="tech" style="font-size: 14px; font-weight: 600">Texnik</label><select id="tech" style="height: 44px; border: 1px solid #d3d9d0; border-radius: 10px; padding: 0 10px; font: inherit; background: #fff"><option>Shoxrux Olimov · 6 ta ishda</option><option>Akmal Yusupov · 3 ta ishda</option></select></div>
+        <div style="display: flex; gap: 8px">
+          <button type="button" style="height: 46px; padding: 0 14px; border-radius: 10px; border: 1px solid #f0aea9; background: #fff; color: #a82f2d; font: inherit; font-weight: 600; cursor: pointer">Rad etish…</button>
+          <button type="button" style="flex: 1; height: 46px; border-radius: 10px; border: 0; background: #0b7a6b; color: #fff; font: inherit; font-weight: 700; cursor: pointer">Tayyor — jo'natishga</button>
+        </div>
+        <span style="font-size: 13px; color: #4c5852">Klinika «Yetkazildi» ni tasdiqlaydi. Bemorning telefoni, manzili va kartasi laboratoriyaga hech qachon ko'rinmaydi.</span>
+      </aside>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1060}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var tb = 'min-height:42px;padding:0 14px;border-radius:99px;font:inherit;font-size:14px;cursor:pointer;';
+    function tab(n, c, sel) { return { name: n, n: c, sel: sel ? 'true' : 'false', style: tb + (sel ? 'border:1px solid #0b7a6b;background:#ddefea;color:#096154;font-weight:700;' : 'border:1px solid #d3d9d0;background:#fff;color:#192420;') }; }
+    var pill = 'font-size:13px;font-weight:700;border-radius:99px;padding:3px 10px;white-space:nowrap;';
+    var P = { yangi: pill + 'background:#e8eefb;color:#1f4f9e', qabul: pill + 'background:#e7f6f1;color:#096154', ish: pill + 'background:#fbf1dd;color:#7a4f0a', remake: pill + 'background:#fbe7e5;color:#842523' };
+    var dueBad = 'font-size:14px;font-weight:700;color:#842523;background:#fbe7e5;border-radius:6px;padding:2px 8px;white-space:nowrap';
+    var dueWarn = 'font-size:14px;font-weight:700;color:#7a4f0a;white-space:nowrap';
+    var dueOk = 'font-size:14px;color:#33403a;white-space:nowrap';
+    var box = 'display:flex;align-items:center;gap:14px;width:100%;padding:12px 16px;border-radius:12px;font:inherit;color:#192420;cursor:pointer;';
+    function c(work, no, clinic, meta, due, ds, status, k, sel) { return { work: work, no: no, clinic: clinic, meta: meta, due: due, duePill: ds, status: status, pill: P[k], box: box + (sel ? 'border:2px solid #0b7a6b;background:#f6fbf9;' : 'border:1px solid #e4e8e1;background:#fff;') }; }
+    return {
+      tabs: [tab('Yangi', '4', false), tab('Ishda', '13', true), tab('Tayyor', '3'), tab('Jo‘natilgan', '3'), tab('Qayta tayyorlash', '1')],
+      cases: [
+        c('Toj · 26 · sirkoniy', 'L-208', 'Smile Dent (Chilonzor) · Dr. Yusupova', 'A2 · texnik Shoxrux', 'Bugun', dueBad, 'Ishda', 'ish'),
+        c('Ko‘prik 34–36 · sirkoniy', 'L-231', 'Smile Dent (Chilonzor) · Dr. Yusupova', 'A3 · texnik Shoxrux · yangi xabar', '18-noyabr', dueOk, 'Qabul qilindi', 'qabul', true),
+        c('Kappa · ikki jag‘', 'L-229', 'Dentaplus · Dr. Ergashev', 'texnik Akmal', 'Ertaga', dueWarn, 'Ishda', 'ish'),
+        c('Vkladka · 46 · E.max', 'L-233', 'Oydin Tabassum · Dr. Sobirova', 'B1 · desktop klinika · relay orqali keldi', '20-noyabr', dueOk, 'Yangi', 'yangi'),
+        c('Toj · 11 · qayta', 'L-219R', 'Dentaplus · Dr. Ergashev', 'sabab: rang · asl L-219', '15-noyabr', dueWarn, 'Qayta tayyorlash', 'remake')
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Asos — komponentlar</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0b7a6b}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1560px; box-sizing: border-box; padding: 48px 56px; background: #f1f3ef; font-family: 'Hanken Grotesk', system-ui, sans-serif; color: #192420; display: flex; flex-direction: column; gap: 24px; font-size: 15px; line-height: 1.45">
+  <div style="display: flex; flex-direction: column; gap: 6px">
+    <span style="font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #096154">Dental OS · Komponentlar</span>
+    <h1 style="margin: 0; font-size: 34px; font-weight: 700; letter-spacing: -.02em">Har holat chizilgan: bo'sh, xato, ruxsat yo'q, oflayn</h1>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px">
+    <section aria-labelledby="b-h" style="background: #fff; border: 1px solid #e4e8e1; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 12px">
+      <h2 id="b-h" style="margin: 0; font-size: 18px; font-weight: 700">Tugmalar — doim fe'l bilan</h2>
+      <div style="display: flex; flex-wrap: wrap; gap: 10px">
+        <button type="button" style="height: 44px; padding: 0 18px; border-radius: 10px; border: 0; background: #0b7a6b; color: #fff; font: inherit; font-weight: 700; cursor: pointer">To'lov qabul qilish</button>
+        <button type="button" style="height: 44px; padding: 0 18px; border-radius: 10px; border: 1px solid #d3d9d0; background: #fff; color: #192420; font: inherit; font-weight: 600; cursor: pointer">Ko'chirish</button>
+        <button type="button" style="height: 44px; padding: 0 18px; border-radius: 10px; border: 1px solid #f0aea9; background: #fff; color: #a82f2d; font: inherit; font-weight: 600; cursor: pointer">Bekor qilish</button>
+        <button type="button" style="height: 44px; padding: 0 14px; border-radius: 10px; border: 0; background: transparent; color: #096154; font: inherit; font-weight: 600; cursor: pointer">Batafsil</button>
+        <button type="button" disabled style="height: 44px; padding: 0 18px; border-radius: 10px; border: 0; background: #e4e8e1; color: #5f6b65; font: inherit; font-weight: 600">Saqlanmoqda…</button>
+      </div>
+      <span style="font-size: 13px; color: #4c5852">Har ekranda bitta asosiy (teal) tugma. Xavfli amal — qizil chegara, to'liq qizil emas.</span>
+    </section>
+
+    <section aria-labelledby="i-h" style="background: #fff; border: 1px solid #e4e8e1; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 12px">
+      <h2 id="i-h" style="margin: 0; font-size: 18px; font-weight: 700">Maydonlar</h2>
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <label for="ph" style="font-size: 14px; font-weight: 600">Telefon raqami</label>
+        <div style="display: flex; height: 44px; border: 1px solid #d3d9d0; border-radius: 10px; overflow: hidden">
+          <span style="display: flex; align-items: center; padding: 0 10px; background: #f6f8f4; border-right: 1px solid #d3d9d0; font-family: 'JetBrains Mono', monospace">+998</span>
+          <input id="ph" value="90 123 45 67" style="border: 0; outline: 0; padding: 0 10px; font: inherit; font-family: 'JetBrains Mono', monospace; flex: 1; min-width: 0">
+        </div>
+        <span style="font-size: 13px; color: #4c5852">Istalgan shaklda yozing — avtomatik to'g'rilanadi</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <label for="dob" style="font-size: 14px; font-weight: 600">Tug'ilgan sana</label>
+        <input id="dob" value="31.02.1990" aria-invalid="true" aria-describedby="dob-e" style="height: 44px; border: 2px solid #cc3d3a; border-radius: 10px; padding: 0 12px; font: inherit; font-family: 'JetBrains Mono', monospace">
+        <span id="dob-e" style="font-size: 13px; font-weight: 600; color: #a82f2d">Bunday sana yo'q — kun va oyni tekshiring</span>
+      </div>
+    </section>
+
+    <section aria-labelledby="p-h" style="background: #fff; border: 1px solid #e4e8e1; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 12px">
+      <h2 id="p-h" style="margin: 0; font-size: 18px; font-weight: 700">Belgilar</h2>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px">
+        <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; border-radius: 99px; padding: 4px 12px; background: #fbf1dd; color: #7a4f0a"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 99px; background: #b57611"></span>Keldi</span>
+        <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; border-radius: 99px; padding: 4px 12px; background: #0b7a6b; color: #fff"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 99px; background: #fff"></span>Kresloda</span>
+        <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; border-radius: 99px; padding: 4px 12px; background: #fbe7e5; color: #842523"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 99px; background: #cc3d3a"></span>Kelmadi</span>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px">
+        <span style="font-size: 13px; font-weight: 700; color: #842523; background: #fbe7e5; border-radius: 6px; padding: 2px 8px">Allergiya: penitsillin</span>
+        <span style="font-size: 13px; font-weight: 600; color: #7a4f0a; background: #fbf1dd; border-radius: 6px; padding: 2px 8px">Qarz 350 000 so'm</span>
+        <span style="font-size: 13px; font-weight: 600; color: #33403a; background: #edf0ea; border-radius: 6px; padding: 2px 8px">2 marta kelmagan</span>
+        <span style="font-size: 13px; font-weight: 600; color: #1f4f9e; background: #e8eefb; border-radius: 6px; padding: 2px 8px">Telegram ulangan</span>
+      </div>
+      <span style="font-size: 13px; color: #4c5852">Holat — doira + matn. Bemor belgisi — to'rtburchak yorliq. Rang ma'noni takrorlaydi, o'rnini bosmaydi.</span>
+    </section>
+  </div>
+
+  <section aria-labelledby="al-h" style="display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 20px">
+    <div style="background: #fff; border: 1px solid #e4e8e1; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 12px">
+      <h2 id="al-h" style="margin: 0; font-size: 18px; font-weight: 700">Kritik ogohlantirish — faqat xavfli harakatda</h2>
+      <div role="alertdialog" aria-labelledby="dlg-h" style="border: 2px solid #cc3d3a; border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 12px 32px rgba(25,36,32,.16)">
+        <div style="display: flex; align-items: center; gap: 10px; color: #842523"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3 2 21h20zM12 10v5M12 18h.01"></path></svg><b id="dlg-h" style="font-size: 18px">Bemorda penitsillinga allergiya bor</b></div>
+        <span>Siz <b>amoksitsillin 500 mg</b> yozmoqdasiz — bu penitsillin guruhi. Davom etish uchun sababni tanlang.</span>
+        <div role="radiogroup" aria-label="Sabab" style="display: flex; flex-wrap: wrap; gap: 8px">
+          <button type="button" role="radio" aria-checked="false" style="height: 40px; padding: 0 12px; border-radius: 99px; border: 1px solid #d3d9d0; background: #fff; font: inherit; font-size: 14px; cursor: pointer; color: #192420">Avval muammosiz qabul qilgan</button>
+          <button type="button" role="radio" aria-checked="false" style="height: 40px; padding: 0 12px; border-radius: 99px; border: 1px solid #d3d9d0; background: #fff; font: inherit; font-size: 14px; cursor: pointer; color: #192420">Allergiya noto'g'ri kiritilgan</button>
+        </div>
+        <div style="display: flex; gap: 10px; justify-content: flex-end">
+          <button type="button" style="height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid #d3d9d0; background: #fff; font: inherit; font-weight: 600; cursor: pointer; color: #192420">Davom etish</button>
+          <button type="button" style="height: 44px; padding: 0 16px; border-radius: 10px; border: 0; background: #0b7a6b; color: #fff; font: inherit; font-weight: 700; cursor: pointer">Boshqa dori tanlash</button>
+        </div>
+      </div>
+      <span style="font-size: 13px; color: #4c5852">Xavfsiz variant — asosiy tugma. Tanlangan sabab saqlanadi va shu bemorda yana so'ralmaydi.</span>
+    </div>
+    <div style="background: #fff; border: 1px solid #e4e8e1; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; font-size: 18px; font-weight: 700">Qaytarib bo'ladigan amal</h2>
+      <div role="status" style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; background: #192420; color: #fff">
+        <span style="margin-right: auto">Jasur Tursunov — <b>Kelmadi</b> deb belgilandi</span>
+        <button type="button" style="height: 40px; padding: 0 12px; border-radius: 8px; border: 1px solid #5f6b65; background: transparent; color: #9ce2d3; font: inherit; font-weight: 700; cursor: pointer">Qaytarish · 8 s</button>
+      </div>
+      <span style="font-size: 13px; color: #4c5852">«Kelmadi», «Bekor qilish», «Arxivlash» — tasdiq oynasi o'rniga 10 soniya qaytarish imkoni. Pul bilan bog'liq amal (qaytarish, chegirma) — doim tasdiq oynasi.</span>
+      <div style="display: flex; flex-direction: column; gap: 8px; padding: 14px; border: 1px solid #e4e8e1; border-radius: 12px">
+        <b>To'lovni qaytarish</b>
+        <span style="font-size: 14px; color: #33403a">600 000 so'm · naqd · Bekzod Aliyev. Fiskal chek bekor qilinadi.</span>
+        <div style="display: flex; gap: 8px; justify-content: flex-end"><button type="button" style="height: 40px; padding: 0 14px; border-radius: 8px; border: 1px solid #d3d9d0; background: #fff; font: inherit; font-weight: 600; cursor: pointer; color: #192420">Yo'q</button><button type="button" style="height: 40px; padding: 0 14px; border-radius: 8px; border: 1px solid #cc3d3a; background: #fff; color: #a82f2d; font: inherit; font-weight: 700; cursor: pointer">600 000 so'mni qaytarish</button></div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="st-h" style="display: flex; flex-direction: column; gap: 12px">
+    <h2 id="st-h" style="margin: 0; font-size: 20px; font-weight: 700">Ekran holatlari — hech qachon «standart qiymat»ni haqiqiydek ko'rsatmaydi</h2>
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px">
+      <sc-for list="{{states}}" as="s" hint-placeholder-count="4">
+        <div style="background: #fff; border: 1px solid #e4e8e1; border-radius: 14px; padding: 22px 18px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-height: 210px">
+          <span style="{{s.iconBox}}"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{s.d}}"></path></svg></span>
+          <b style="font-size: 16px">{{s.title}}</b>
+          <span style="font-size: 14px; color: #33403a">{{s.text}}</span>
+          <sc-if value="{{s.hasCta}}" hint-placeholder-val="{{ true }}"><button type="button" style="margin-top: auto; height: 40px; padding: 0 14px; border-radius: 8px; border: 1px solid #d3d9d0; background: #fff; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; color: #192420">{{s.cta}}</button></sc-if>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <section aria-labelledby="cn-h" style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px">
+    <div style="background: #fff; border: 1px solid #e4e8e1; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 12px">
+      <h2 id="cn-h" style="margin: 0; font-size: 18px; font-weight: 700">Ulanish holati — menyu pastida, doim</h2>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+        <sc-for list="{{conn}}" as="c" hint-placeholder-count="4">
+          <div style="{{c.box}}"><span aria-hidden="true" style="{{c.dot}}"></span><span style="display: flex; flex-direction: column"><b style="font-size: 14px">{{c.title}}</b><span style="font-size: 13px">{{c.text}}</span></span></div>
+        </sc-for>
+      </div>
+      <span style="font-size: 13px; color: #4c5852">Internet yo'qligi ishni to'xtatmaydi — faqat Telegram/SMS navbatga qo'yiladi. Litsenziya serveri bilan aloqa uzilishi ish vaqtida hech narsani bloklamaydi.</span>
+    </div>
+    <div style="background: #fff; border: 1px solid #e4e8e1; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; font-size: 18px; font-weight: 700">Yangilanish — ish vaqtida emas</h2>
+      <div style="display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 12px; background: #e8eefb; color: #1f4f9e">
+        <b>Yangi versiya 0.2.0 tayyor</b>
+        <span style="font-size: 14px; color: #1f3a6e">Klinika yopilgandan keyin, bugun 19:00 da o'rnatiladi. Ma'lumotlar zaxiralanadi va baza avtomatik yangilanadi.</span>
+        <div style="display: flex; gap: 8px"><button type="button" style="height: 40px; padding: 0 14px; border-radius: 8px; border: 1px solid #9db8ee; background: #fff; color: #1f4f9e; font: inherit; font-weight: 600; cursor: pointer">Vaqtni o'zgartirish</button><button type="button" style="height: 40px; padding: 0 14px; border-radius: 8px; border: 0; background: transparent; color: #1f4f9e; font: inherit; font-weight: 600; cursor: pointer">Nima yangi?</button></div>
+      </div>
+      <span style="font-size: 13px; color: #4c5852">Majburiy qayta ishga tushirish qabul o'rtasida hech qachon bo'lmaydi.</span>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1560}}'>
+class Component extends DCLogic {
+  renderVals() {
+    function ib(bg, fg) { return 'width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:' + bg + ';color:' + fg; }
+    function cb(bg, fg, dot) { return { box: 'display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:10px;background:' + bg + ';color:' + fg, dot: 'width:9px;height:9px;border-radius:99px;margin-top:5px;flex:none;background:' + dot }; }
+    var c1 = cb('#e7f6f1', '#0a4e45', '#0b7a6b'), c2 = cb('#fbf1dd', '#7a4f0a', '#b57611'), c3 = cb('#e8eefb', '#1f4f9e', '#2a66cc'), c4 = cb('#fbe7e5', '#842523', '#cc3d3a');
+    return {
+      states: [
+        { title: 'Hali bemor yo‘q', text: 'Birinchi bemorni qo‘shing yoki Excel‘dan import qiling.', cta: 'Bemor qo‘shish', hasCta: true, d: 'M12 5v14M5 12h14', iconBox: ib('#ddefea', '#096154') },
+        { title: 'Ma‘lumot yuklanmadi', text: 'Server javob bermadi. Ulanishni tekshirib, qayta urinib ko‘ring.', cta: 'Qayta urinish', hasCta: true, d: 'M21 12a9 9 0 1 1-3-6.7M21 3v6h-6', iconBox: ib('#fbf1dd', '#7a4f0a') },
+        { title: 'Bu bo‘lim sizga yopiq', text: 'Klinika sozlamalarini faqat egasi va administrator ko‘radi. Kerak bo‘lsa, Anvar Karimovga murojaat qiling.', cta: '', hasCta: false, d: 'M6 11h12v10H6zM8 11V7a4 4 0 0 1 8 0v4', iconBox: ib('#edf0ea', '#33403a') },
+        { title: 'Yuklanmoqda', text: 'Kun jadvali olinmoqda… Odatda 1 soniyadan kam.', cta: '', hasCta: false, d: 'M12 3v3M12 18v3M3 12h3M18 12h3', iconBox: ib('#e8eefb', '#1f4f9e') }
+      ],
+      conn: [
+        { title: 'Server ulangan', text: 'Lokal tarmoq', box: c1.box, dot: c1.dot },
+        { title: 'Internet yo‘q', text: 'Ish davom etmoqda', box: c2.box, dot: c2.dot },
+        { title: 'Bulut', text: 'Sinxron: hozir', box: c3.box, dot: c3.dot },
+        { title: 'Server topilmadi', text: 'Qayta qidirilmoqda', box: c4.box, dot: c4.dot }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

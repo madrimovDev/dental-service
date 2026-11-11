@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Navigatsiya — hozir va taklif</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0b7a6b}a:hover{color:#096154}
+</style>
+</helmet>
+<div style="width: 1240px; height: 860px; box-sizing: border-box; padding: 40px 48px; background: #f1f3ef; font-family: 'Hanken Grotesk', system-ui, sans-serif; color: #192420; display: flex; flex-direction: column; gap: 24px">
+  <div style="display: flex; flex-direction: column; gap: 4px">
+    <h1 style="margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -.01em">Menyu: har kim faqat o'z ishini ko'radi</h1>
+    <span style="font-size: 16px; color: #4c5852">Chapda — hozirgi menyu (rolga qarab faqat ruxsat yo'q bandlar yashiriladi). O'ngda — ish bo'yicha guruhlangan menyu, ikki rol misolida.</span>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; flex: 1; min-height: 0">
+
+    <section aria-labelledby="now-h" style="background: #ffffff; border: 1px solid #e4e8e1; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+      <div style="display: flex; align-items: baseline; gap: 8px"><h2 id="now-h" style="margin: 0; font-size: 19px; font-weight: 700; margin-right: auto">Hozir</h2><span style="font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #a82f2d; font-weight: 600">17 band + sozlamalar</span></div>
+      <sc-for list="{{now}}" as="g" hint-placeholder-count="3">
+        <div style="display: flex; flex-direction: column; gap: 4px">
+          <span style="font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #5f6b65">{{g.title}}</span>
+          <sc-for list="{{g.items}}" as="i" hint-placeholder-count="5">
+            <div style="font-size: 15px; padding: 3px 0; color: #33403a">{{i}}</div>
+          </sc-for>
+        </div>
+      </sc-for>
+      <div style="margin-top: auto; padding: 12px 14px; border-radius: 10px; background: #fbe7e5; color: #842523; font-size: 14px; line-height: 1.4">«Boshqaruv» guruhida ish (ombor, xarajat) va sozlama (xizmatlar, kategoriyalar, xodimlar) aralash. «Sozlamalar» ekrani barcha rollarga ochiq, lekin ko'pchilik rol uning ma'lumotini ko'ra olmaydi.</div>
+    </section>
+
+    <sc-for list="{{roles}}" as="r" hint-placeholder-count="2">
+      <section style="background: #ffffff; border: 1px solid #e4e8e1; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; align-items: baseline; gap: 8px"><h2 style="margin: 0; font-size: 19px; font-weight: 700; margin-right: auto">{{r.title}}</h2><span style="font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #096154; font-weight: 600">{{r.count}}</span></div>
+        <sc-for list="{{r.groups}}" as="g" hint-placeholder-count="3">
+          <div style="display: flex; flex-direction: column; gap: 4px">
+            <span style="font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #5f6b65">{{g.title}}</span>
+            <sc-for list="{{g.items}}" as="i" hint-placeholder-count="3">
+              <div style="{{i.style}}">{{i.label}}</div>
+            </sc-for>
+          </div>
+        </sc-for>
+        <div style="margin-top: auto; padding: 12px 14px; border-radius: 10px; background: #e7f6f1; color: #0a4e45; font-size: 14px; line-height: 1.4">{{r.note}}</div>
+      </section>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1240,"height":860}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var item = 'font-size:15px;padding:8px 10px;border-radius:8px;color:#192420;';
+    var active = item + 'background:#ddefea;color:#096154;font-weight:700;';
+    function it(label, isActive) { return { label: label, style: isActive ? active : item }; }
+    return {
+      now: [
+        { title: 'Asosiy', items: ['Bosh sahifa', 'Yozilishlar', 'Navbat', 'Bemorlar', 'Kassa'] },
+        { title: 'Klinika', items: ['Davolash rejalari', 'Laboratoriya', 'Retseptlar', 'Jadval', 'Qayta chaqiruv'] },
+        { title: 'Boshqaruv', items: ['Hisobotlar', 'Xizmatlar', 'Xizmat kategoriyalari', 'Xodimlar', 'Ombor', 'Xarajatlar', 'Ish haqi'] }
+      ],
+      roles: [
+        {
+          title: 'Taklif · Registrator', count: '6 band',
+          groups: [
+            { title: 'Bugungi ish', items: [it('Bugun', true), it('Yozilishlar'), it('Navbat')] },
+            { title: 'Bemorlar va pul', items: [it('Bemorlar'), it('Kassa'), it('Qayta chaqiruv')] }
+          ],
+          note: 'Bosh sahifa — «kimni hozir qabul qilaman». Jadval, xizmatlar va xodimlar sozlamalar ichida, kundalik menyuda emas.'
+        },
+        {
+          title: 'Taklif · Shifokor', count: '5 band',
+          groups: [
+            { title: 'Bugungi ish', items: [it('Mening kunim', true), it('Navbat')] },
+            { title: 'Davolash', items: [it('Bemorlar'), it('Davolash rejalari'), it('Laboratoriya')] }
+          ],
+          note: 'Retseptlar, rasmlar va konsent — bemor kartasi ichida, alohida menyu bandi emas. Shifokor navbatdan bemorni o‘zi chaqiradi.'
+        }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -341,3 +341,38 @@ To'liq: [`LAB-TECHNICIAN-ACCESS-2026-11-11.md`](./LAB-TECHNICIAN-ACCESS-2026-11-
 | **6. Ishonchlilik/operatsiya** | supervision, Supervisor TLS/backup/renew/audit | P15, P16, SV-01…SV-07, DT-04…DT-18 |
 | **7. Sifat va qarz** | PII maskalash, pagination/100 chegaralari, UTC sanalar, i18n, testlar | PT-*, SC-01/02/22, MO-06, IR-11, MO-23, PL-04, PL-07, *-T |
 | **8. Mahsulot (rejalashtirish)** | Lab portali (C + D1) | LB-* |
+| **9. UI qayta dizayni** | Kanvasdagi 24 ta ekranni kodda qurish (UI-0 → UI-4) | UI-* (§12) |
+
+---
+
+## 12. UI qayta dizayni — ishlar (kanvas → kod)
+
+> **Manba:** kanvas https://claude.ai/artifact/71dFMTtcyyMFE5yZhGSDZ3 · repo nusxasi [`docs/design/ui-redesign-2026-11/canvas/`](./design/ui-redesign-2026-11/canvas/).
+> **To'liq spetsifikatsiya:** [`docs/superpowers/specs/2026-11-11-ui-redesign-design.md`](./superpowers/specs/2026-11-11-ui-redesign-design.md) — har ekran uchun kod fayllari, backend ishi va qabul mezonlari.
+> **Holat:** dizayn tayyor, kod yozilmagan. Har bosqichdan oldin `superpowers:writing-plans`.
+
+| ID | Bosqich | Ekran (artboard) | Oldin bajarilishi shart |
+|---|---|---|---|
+| UI-00 | UI-0 | Tokenlar (`Tokens.dc.html`): 15px matn, kontrast, 44/60px | — |
+| UI-01 | UI-0 | Komponentlar (`Components.dc.html`): StatusPill 6 ma‘no, AlertTier, CriticalActionDialog, UndoToast, StateView.forbidden, ConnectionStatus, UpdateBanner | — |
+| UI-02 | UI-0 | Rolga moslashuvchi menyu (`Sidebar.dc.html`) | — |
+| UI-R1 | UI-1 | Bugun — registrator (`Main.dc.html`) | P10; T2 bilan `booking_requests` |
+| UI-R2 | UI-1 | Kalendar (`Calendar.dc.html`) | SC-01/02/03; kreslo modeli (qaror) |
+| UI-R3 | UI-1 | Yangi yozilish (`Booking.dc.html`) | SC-07, P10 |
+| UI-R4 | UI-1 | Navbat (`Queue.dc.html`) | SC-09, SC-10 (qaror) |
+| UI-R5 | UI-1 | Kassa (`Cashier.dc.html`) | P7, P13, MO-02, QR to‘lov usuli |
+| UI-R6 | UI-1 | Bemorlar (`Patients.dc.html`) | PT-01…04, dublikat tekshiruvi |
+| UI-D1 | UI-2 | Mening kunim (`DoctorDay.dc.html`) | — |
+| UI-D2 | UI-2 | Bemor kartasi (`Patient.dc.html`) | P11, anamnez `confirmedAt` |
+| UI-D3 | UI-2 | Tish xaritasi (`Odontogram.dc.html`) | CL-01, tashxis qidiruvi |
+| UI-D4 | UI-2 | Vizit yozuvi (`VisitNote.dc.html`) | **P12**, CL-12 |
+| UI-D5 | UI-2 | Lab buyurtma (`LabOrder.dc.html`) | lab_orders sxemasi (shade, due, files, remake) |
+| UI-M1 | UI-3 | Rahbar bosh sahifasi (`OwnerDashboard.dc.html`) | P13, zaxira nusxa holati |
+| UI-M2 | UI-3 | Hisobotlar (`Reports.dc.html`) | IR-06 |
+| UI-M3 | UI-3 | Sozlamalar (`Settings.dc.html`) | P10, P9, P16 (renew) |
+| UI-M4 | UI-3 | Xodimlar (`Staff.dc.html`) | **P5**, ID-04/05/06/28/29 |
+| UI-M5 | UI-3 | Ombor (`Stock.dc.html`) | IR-01, IR-02 |
+| UI-M6 | UI-3 | Xarajat va ish haqi (`Finance.dc.html`) | — |
+| UI-T1 | UI-4 | Laboratoriya portali (`LabPortal.dc.html`) | lab portali spetsifikatsiyasi (C) |
+| UI-T2 | UI-4 | Telegram bot (`TelegramBot.dc.html`) | **P8** |
+| UI-T3 | UI-4 | Desktop holatlari (`Desktop.dc.html`) | **P2, P14, P15**, DT-01/02/03/18 |

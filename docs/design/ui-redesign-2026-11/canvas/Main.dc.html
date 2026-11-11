@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Bugun — Registrator</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#f1f3ef}
+a{color:#0b7a6b}a:hover{color:#096154}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 100vh; font-family: 'Hanken Grotesk', system-ui, sans-serif; color: #192420; background: #f1f3ef; font-size: 15px; line-height: 1.45">
+  <div style="flex: 0 0 248px; display: flex">
+    <dc-import name="Sidebar" role="registrator" active="bugun" conn="lan" hint-size="248px,980px"></dc-import>
+  </div>
+
+  <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px 14px; padding: 16px 32px; background: #ffffff; border-bottom: 1px solid #e4e8e1">
+      <div style="display: flex; flex-direction: column; margin-right: auto">
+        <h1 style="margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -.01em">Bugun</h1>
+        <span style="font-size: 14px; color: #4c5852">Seshanba, 11-noyabr · klinika 09:00–18:00</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 4px; flex: 0 1 400px; min-width: 260px">
+        <label for="q" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Bemor qidirish</label>
+        <div style="display: flex; align-items: center; gap: 8px; height: 46px; padding: 0 12px; border: 2px solid #0b7a6b; border-radius: 10px; background: #ffffff">
+          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4c5852" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+          <input id="q" type="search" value="90 123" style="border: 0; outline: 0; background: transparent; font: inherit; color: #192420; flex: 1; min-width: 0; font-family: 'JetBrains Mono', monospace">
+          <kbd style="font-family: 'JetBrains Mono', monospace; font-size: 12px; border: 1px solid #d3d9d0; border-radius: 5px; padding: 1px 6px; color: #4c5852">Ctrl K</kbd>
+        </div>
+        <div role="listbox" aria-label="Qidiruv natijalari" style="background: #ffffff; border: 1px solid #d3d9d0; border-radius: 10px; box-shadow: 0 8px 24px rgba(25,36,32,.12); padding: 6px; display: flex; flex-direction: column">
+          <sc-for list="{{found}}" as="f" hint-placeholder-count="2">
+            <a href="Patient.dc.html" role="option" style="display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 10px; border-radius: 8px; color: #192420; text-decoration: none">
+              <span style="display: flex; flex-direction: column; margin-right: auto"><b style="font-weight: 600">{{f.name}}</b><span style="font-size: 13px; color: #4c5852">{{f.meta}}</span></span>
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 14px">{{f.phone}}</span>
+            </a>
+          </sc-for>
+          <span style="font-size: 12px; color: #4c5852; padding: 4px 10px">Telefon (istalgan shaklda), ism yoki familiya · lotin va kirill</span>
+        </div>
+      </div>
+      <button type="button" style="height: 46px; padding: 0 16px; border-radius: 10px; border: 1px solid #d3d9d0; background: #ffffff; color: #192420; font: inherit; font-weight: 600; cursor: pointer">Navbatga qo'shish</button>
+      <a href="Booking.dc.html" style="height: 46px; padding: 0 18px; border-radius: 10px; background: #0b7a6b; color: #ffffff; font-weight: 700; text-decoration: none; display: flex; align-items: center; gap: 8px">
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>Yangi yozilish</a>
+    </header>
+
+    <div style="padding: 20px 32px 40px; display: flex; flex-direction: column; gap: 20px">
+
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+        <span style="font-size: 14px; color: #4c5852">Ko'rinish:</span>
+        <button type="button" style="height: 36px; padding: 0 12px; border-radius: 99px; border: 1px solid #0b7a6b; background: #ddefea; color: #096154; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer">Shifokor: hammasi ▾</button>
+        <button type="button" style="height: 36px; padding: 0 12px; border-radius: 99px; border: 1px solid #0b7a6b; background: #ddefea; color: #096154; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer">Holat: kelmaganlar ▾</button>
+        <span style="font-size: 13px; color: #4c5852">· filtrlar sahifadan chiqib qaytganda saqlanadi</span>
+      </div>
+
+      <section aria-label="Bugungi holat" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px">
+        <sc-for list="{{summary}}" as="s" hint-placeholder-count="4">
+          <a href="{{s.href}}" style="background: #ffffff; border: 1px solid #e4e8e1; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; color: #192420; text-decoration: none">
+            <span style="font-size: 14px; color: #4c5852">{{s.label}}</span>
+            <span style="font-size: 28px; font-weight: 700; font-family: 'JetBrains Mono', monospace; letter-spacing: -.02em">{{s.value}}</span>
+            <span style="font-size: 13px; color: #4c5852">{{s.hint}}</span>
+          </a>
+        </sc-for>
+      </section>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+        <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 20px">
+
+          <section aria-labelledby="tg-h" style="background: #ffffff; border: 1px solid #e4e8e1; border-radius: 12px">
+            <div style="display: flex; align-items: center; gap: 10px; padding: 14px 20px; border-bottom: 1px solid #e4e8e1">
+              <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2a66cc" stroke-width="2" stroke-linejoin="round"><path d="m22 3-20 8 7 2 2 7 4-5 5 4z"></path></svg>
+              <h2 id="tg-h" style="margin: 0; font-size: 18px; font-weight: 700; margin-right: auto">Telegram'dan yozilish so'rovlari</h2>
+              <span style="font-size: 14px; color: #4c5852">3 ta javob kutmoqda</span>
+            </div>
+            <sc-for list="{{requests}}" as="r" hint-placeholder-count="3">
+              <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 12px 20px; border-top: 1px solid #edf0ea">
+                <div style="display: flex; flex-direction: column; flex: 1 1 260px"><b style="font-weight: 600">{{r.name}}</b><span style="font-size: 14px; color: #4c5852">{{r.text}}</span></div>
+                <span style="font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 600">{{r.slot}}</span>
+                <button type="button" style="height: 40px; padding: 0 14px; border-radius: 8px; border: 1px solid #d3d9d0; background: #fff; color: #192420; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer">Boshqa vaqt</button>
+                <button type="button" style="height: 40px; padding: 0 14px; border-radius: 8px; border: 0; background: #0b7a6b; color: #fff; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer">Tasdiqlash</button>
+              </div>
+            </sc-for>
+          </section>
+
+          <section aria-labelledby="next-h" style="background: #ffffff; border: 1px solid #e4e8e1; border-radius: 12px">
+            <div style="display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid #e4e8e1">
+              <h2 id="next-h" style="margin: 0; font-size: 18px; font-weight: 700; margin-right: auto">Keyingi bemorlar</h2>
+              <a href="Calendar.dc.html" style="font-size: 14px; font-weight: 600">Kalendarda ochish</a>
+            </div>
+            <div style="overflow-x: auto">
+              <table style="width: 100%; border-collapse: collapse; min-width: 680px">
+                <thead>
+                  <tr style="text-align: left; font-size: 13px; color: #4c5852">
+                    <th scope="col" style="padding: 10px 20px; font-weight: 600">Vaqt</th>
+                    <th scope="col" style="padding: 10px 8px; font-weight: 600">Bemor</th>
+                    <th scope="col" style="padding: 10px 8px; font-weight: 600">Shifokor · xizmat</th>
+                    <th scope="col" style="padding: 10px 8px; font-weight: 600">Holat</th>
+                    <th scope="col" style="padding: 10px 20px; font-weight: 600; text-align: right">Keyingi qadam</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <sc-for list="{{rows}}" as="r" hint-placeholder-count="6">
+                    <tr style="border-top: 1px solid #edf0ea">
+                      <td style="padding: 12px 20px; font-family: 'JetBrains Mono', monospace; font-weight: 500">{{r.time}}</td>
+                      <td style="padding: 12px 8px"><a href="Patient.dc.html" style="color: #192420; font-weight: 600; text-decoration: none">{{r.patient}}</a><sc-if value="{{r.hasFlag}}" hint-placeholder-val="{{ false }}"><div style="{{r.flagStyle}}">{{r.flag}}</div></sc-if></td>
+                      <td style="padding: 12px 8px">{{r.doctor}}<div style="font-size: 13px; color: #4c5852">{{r.service}}</div></td>
+                      <td style="padding: 12px 8px"><span style="{{r.pill}}"><span aria-hidden="true" style="{{r.dot}}"></span>{{r.status}}</span><sc-if value="{{r.hasLate}}" hint-placeholder-val="{{ false }}"><div style="font-size: 13px; font-weight: 600; color: #7a4f0a; margin-top: 2px">{{r.late}}</div></sc-if></td>
+                      <td style="padding: 12px 20px; text-align: right"><button type="button" style="{{r.btn}}">{{r.action}}</button></td>
+                    </tr>
+                  </sc-for>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+
+        <aside style="flex: 1 1 320px; min-width: 280px; display: flex; flex-direction: column; gap: 16px">
+          <section aria-labelledby="att-h" style="background: #ffffff; border: 1px solid #e4e8e1; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px">
+            <div style="display: flex; align-items: baseline"><h2 id="att-h" style="margin: 0; font-size: 18px; font-weight: 700; margin-right: auto">Diqqat talab qiladi</h2><span style="font-size: 13px; color: #4c5852">muhimligi bo'yicha</span></div>
+            <sc-for list="{{alerts}}" as="a" hint-placeholder-count="3">
+              <div style="{{a.box}}">
+                <span style="{{a.tagStyle}}">{{a.tag}}</span>
+                <b style="font-size: 15px">{{a.title}}</b>
+                <span style="font-size: 14px; color: #33403a">{{a.text}}</span>
+                <a href="{{a.href}}" style="font-size: 14px; font-weight: 700; min-height: 32px; display: inline-flex; align-items: center">{{a.cta}} →</a>
+              </div>
+            </sc-for>
+            <button type="button" style="height: 40px; border-radius: 8px; border: 1px dashed #d3d9d0; background: #fafbf8; color: #33403a; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer">Yana 2 ta ma'lumot</button>
+          </section>
+          <section aria-labelledby="q-h" style="background: #ffffff; border: 1px solid #e4e8e1; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 6px">
+            <div style="display: flex; align-items: baseline"><h2 id="q-h" style="margin: 0; font-size: 18px; font-weight: 700; margin-right: auto">Navbatda kutmoqda</h2><a href="Queue.dc.html" style="font-size: 14px; font-weight: 600">Navbat</a></div>
+            <sc-for list="{{queue}}" as="q" hint-placeholder-count="3">
+              <div style="display: flex; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid #edf0ea">
+                <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 17px; width: 48px">{{q.no}}</span>
+                <span style="display: flex; flex-direction: column; margin-right: auto"><b style="font-size: 15px; font-weight: 600">{{q.name}}</b><span style="font-size: 13px; color: #4c5852">{{q.doctor}}</span></span>
+                <span style="{{q.waitStyle}}">{{q.wait}}</span>
+              </div>
+            </sc-for>
+          </section>
+        </aside>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1060}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var pb = 'display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:600;border-radius:99px;padding:3px 10px;';
+    var db = 'width:8px;height:8px;border-radius:99px;display:inline-block;';
+    var st = {
+      keldi: { pill: pb + 'background:#fbf1dd;color:#7a4f0a', dot: db + 'background:#b57611', label: 'Keldi' },
+      kresloda: { pill: pb + 'background:#0b7a6b;color:#ffffff', dot: db + 'background:#ffffff', label: 'Kresloda' },
+      tasdiq: { pill: pb + 'background:#e7f6f1;color:#096154', dot: db + 'background:#0b7a6b', label: 'Tasdiqlandi' },
+      yozildi: { pill: pb + 'background:#e8eefb;color:#1f4f9e', dot: db + 'background:#2a66cc', label: 'Yozildi' }
+    };
+    var P = 'height:40px;padding:0 14px;border-radius:8px;border:0;background:#0b7a6b;color:#fff;font:inherit;font-size:14px;font-weight:700;cursor:pointer';
+    var S = 'height:40px;padding:0 14px;border-radius:8px;border:1px solid #d3d9d0;background:#fff;color:#192420;font:inherit;font-size:14px;font-weight:600;cursor:pointer';
+    var flagCrit = 'display:inline-block;margin-top:2px;font-size:13px;font-weight:700;color:#842523;background:#fbe7e5;border-radius:6px;padding:1px 6px';
+    var flagWarn = 'display:inline-block;margin-top:2px;font-size:13px;font-weight:600;color:#7a4f0a';
+    function row(t, p, d, sv, s, act, primary, flag, fs, late) {
+      return { time: t, patient: p, doctor: d, service: sv, status: st[s].label, pill: st[s].pill, dot: st[s].dot,
+        action: act, btn: primary ? P : S, hasFlag: !!flag, flag: flag || '', flagStyle: fs === 'c' ? flagCrit : flagWarn,
+        hasLate: !!late, late: late || '' };
+    }
+    var aBox = {
+      c: 'display:flex;flex-direction:column;gap:3px;padding:12px 14px;border-radius:10px;background:#fbe7e5;border:1px solid #f0aea9',
+      w: 'display:flex;flex-direction:column;gap:3px;padding:12px 14px;border-radius:10px;background:#fbf1dd;border:1px solid #f0d49a',
+      i: 'display:flex;flex-direction:column;gap:3px;padding:12px 14px;border-radius:10px;background:#f6f8f4;border:1px solid #e4e8e1'
+    };
+    var tag = 'align-self:flex-start;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border-radius:4px;padding:1px 6px;';
+    var aTag = { c: tag + 'background:#cc3d3a;color:#fff', w: tag + 'background:#b57611;color:#fff', i: tag + 'background:#4c5852;color:#fff' };
+    var waitBad = 'font-size:14px;font-weight:700;color:#842523;background:#fbe7e5;border-radius:6px;padding:2px 8px';
+    var waitOk = 'font-size:14px;color:#33403a';
+    return {
+      found: [
+        { name: 'Jasur Tursunov', meta: 'Bugun 10:45 · qarz 350 000 so‘m', phone: '+998 90 123 45 67' },
+        { name: 'Ulug‘bek Hamidov', meta: 'Oxirgi tashrif 14.10', phone: '+998 90 123 98 01' }
+      ],
+      summary: [
+        { label: 'Bugungi yozilishlar', value: '18', hint: '12 tasi hali kelmagan', href: 'Calendar.dc.html' },
+        { label: 'Navbatda', value: '4', hint: 'eng uzoq kutish 22 daqiqa', href: 'Queue.dc.html' },
+        { label: 'Kreslolar', value: '2 / 5', hint: '3 ta kreslo bo‘sh', href: 'Calendar.dc.html' },
+        { label: 'Telegram so‘rovlari', value: '3', hint: 'javob kutmoqda', href: '#tg-h' }
+      ],
+      requests: [
+        { name: 'Shahnoza Abdullayeva', text: 'Yangi bemor · tish og‘rig‘i, tezroq', slot: 'Bugun 15:30 · Dr. Karimov' },
+        { name: 'Ravshan Qosimov', text: 'Mavjud bemor · tozalash', slot: 'Ertaga 10:00 · Dr. Rasulova' },
+        { name: 'Madina Tolipova', text: 'Mavjud bemor · ko‘rikni ko‘chirish', slot: '13-noyabr 11:00' }
+      ],
+      rows: [
+        row('10:30', 'Dilnoza Rahimova', 'Dr. Karimov', 'Konsultatsiya', 'keldi', 'Kresloga yuborish', true, 'Birinchi tashrif', 'w', 'kutmoqda · 22 daq'),
+        row('10:45', 'Jasur Tursunov', 'Dr. Yusupova', 'Plomba · 36', 'tasdiq', 'Keldi', false, 'Qarz 350 000 so‘m', 'w', '+7 daq kechikmoqda'),
+        row('11:00', 'Nodira Saidova', 'Dr. Karimov', 'Tozalash', 'tasdiq', 'Keldi', false),
+        row('11:15', 'Bekzod Aliyev', 'Dr. Yusupova', 'Toj o‘rnatish · 26', 'yozildi', 'Keldi', false, 'Allergiya: penitsillin', 'c'),
+        row('11:30', 'Kamola Ergasheva', 'Dr. Nazarov', 'Implant · ko‘rik', 'yozildi', 'Keldi', false),
+        row('11:30', 'Sardor Qodirov', 'Dr. Karimov', 'Plomba · 14', 'kresloda', 'Kassaga', false)
+      ],
+      alerts: [
+        { tag: 'Kritik', title: 'Dr. Nazarov uchun ish jadvali yo‘q', text: '11:30 dagi bemor kiritilgan, lekin shifokor jadvalsiz — yangi yozilish qilib bo‘lmaydi.', cta: 'Jadvalni kiritish', href: '#', box: aBox.c, tagStyle: aTag.c },
+        { tag: 'Diqqat', title: 'Lab ishi bugun kerak, tasdiq yo‘q', text: 'Toj (B. Aliyev, 26) — 11:15 ga yozilgan. Oq Tish laboratoriyasi hali jo‘natmagan.', cta: 'Buyurtmani ochish', href: '#', box: aBox.w, tagStyle: aTag.w },
+        { tag: 'Ma‘lumot', title: '7 bemorni qayta chaqirish vaqti', text: 'Profilaktik ko‘rik muddati o‘tgan. Telegram ulangan — eslatma bir bosishda.', cta: 'Ro‘yxatni ochish', href: '#', box: aBox.i, tagStyle: aTag.i }
+      ],
+      queue: [
+        { no: 'A-12', name: 'Dilnoza Rahimova', doctor: 'Dr. Karimov', wait: '22 daq', waitStyle: waitBad },
+        { no: 'A-13', name: 'Ulug‘bek Hamidov', doctor: 'Dr. Yusupova', wait: '9 daq', waitStyle: waitOk },
+        { no: 'A-14', name: 'Zarina Po‘latova', doctor: 'Dr. Karimov', wait: '3 daq', waitStyle: waitOk }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

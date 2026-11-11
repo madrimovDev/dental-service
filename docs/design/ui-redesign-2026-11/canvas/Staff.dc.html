@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Xodimlar va rollar</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#f1f3ef}
+a{color:#0b7a6b}a:hover{color:#096154}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 100vh; font-family: 'Hanken Grotesk', system-ui, sans-serif; color: #192420; background: #f1f3ef; font-size: 15px; line-height: 1.45">
+  <div style="flex: 0 0 248px; display: flex">
+    <dc-import name="Sidebar" role="rahbar" active="xodimlar" conn="lan" hint-size="248px,980px"></dc-import>
+  </div>
+
+  <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 32px; background: #ffffff; border-bottom: 1px solid #e4e8e1">
+      <div style="display: flex; flex-direction: column; margin-right: auto"><h1 style="margin: 0; font-size: 24px; font-weight: 700">Xodimlar</h1><span style="font-size: 14px; color: #4c5852">9 faol · 1 faolsiz · 2 filial</span></div>
+      <button type="button" style="height: 46px; padding: 0 16px; border-radius: 10px; border: 1px solid #d3d9d0; background: #fff; color: #192420; font: inherit; font-weight: 600; cursor: pointer">Rollarni sozlash</button>
+      <button type="button" style="height: 46px; padding: 0 18px; border-radius: 10px; border: 0; background: #0b7a6b; color: #fff; font: inherit; font-weight: 700; cursor: pointer">Xodim taklif qilish</button>
+    </header>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 20px; padding: 20px 32px 40px; align-items: flex-start">
+      <section aria-label="Xodimlar ro'yxati" style="flex: 999 1 560px; min-width: 0; background: #fff; border: 1px solid #e4e8e1; border-radius: 12px; overflow-x: auto">
+        <table style="width: 100%; border-collapse: collapse; min-width: 640px">
+          <thead><tr style="text-align: left; font-size: 13px; color: #4c5852"><th scope="col" style="padding: 12px 18px; font-weight: 600">Xodim</th><th scope="col" style="padding: 12px 8px; font-weight: 600">Rol</th><th scope="col" style="padding: 12px 8px; font-weight: 600">Filial</th><th scope="col" style="padding: 12px 8px; font-weight: 600">Oxirgi kirish</th><th scope="col" style="padding: 12px 18px; font-weight: 600; text-align: right">Amal</th></tr></thead>
+          <tbody>
+            <sc-for list="{{staff}}" as="s" hint-placeholder-count="7">
+              <tr style="{{s.row}}"><td style="padding: 12px 18px"><b style="font-weight: 700">{{s.name}}</b><div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #4c5852">{{s.phone}}</div></td><td style="padding: 12px 8px"><span style="{{s.rolePill}}">{{s.role}}</span></td><td style="padding: 12px 8px; font-size: 14px">{{s.branch}}</td><td style="padding: 12px 8px; font-size: 14px; color: #33403a">{{s.last}}</td><td style="padding: 12px 18px; text-align: right"><sc-if value="{{s.canEdit}}" hint-placeholder-val="{{ true }}"><button type="button" style="height: 40px; padding: 0 12px; border-radius: 8px; border: 1px solid #d3d9d0; background: #fff; color: #192420; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer">{{s.action}}</button></sc-if></td></tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </section>
+
+      <aside aria-labelledby="inv-h" style="flex: 1 1 400px; min-width: 320px; background: #fff; border: 2px solid #0b7a6b; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+        <h2 id="inv-h" style="margin: 0; font-size: 18px; font-weight: 700">Xodim taklif qilish</h2>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+          <div style="display: flex; flex-direction: column; gap: 4px"><label for="sn" style="font-size: 14px; font-weight: 600">Ism</label><input id="sn" value="Nilufar Ahmedova" style="height: 44px; border: 1px solid #d3d9d0; border-radius: 10px; padding: 0 12px; font: inherit"></div>
+          <div style="display: flex; flex-direction: column; gap: 4px"><label for="sp" style="font-size: 14px; font-weight: 600">Telefon</label><input id="sp" value="+998 91 244 05 18" style="height: 44px; border: 1px solid #d3d9d0; border-radius: 10px; padding: 0 12px; font: inherit; font-family: 'JetBrains Mono', monospace"></div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <span style="font-size: 14px; font-weight: 600">Rol</span>
+          <div role="radiogroup" aria-label="Rol" style="display: flex; flex-direction: column; gap: 6px">
+            <sc-for list="{{roles}}" as="r" hint-placeholder-count="5">
+              <button type="button" role="radio" aria-checked="{{r.on}}" aria-disabled="{{r.dis}}" style="{{r.style}}">
+                <span style="display: flex; align-items: baseline; gap: 8px; width: 100%"><b>{{r.name}}</b><span style="margin-left: auto; font-size: 13px; color: #4c5852">{{r.who}}</span></span>
+                <span style="font-size: 13px; color: #096154">✓ {{r.can}}</span>
+                <span style="font-size: 13px; color: #842523">✕ {{r.cannot}}</span>
+              </button>
+            </sc-for>
+          </div>
+          <span style="font-size: 13px; color: #4c5852">Hech kim o'zidan yuqori huquqli rol bera olmaydi. Filial menejeri «Administrator» va «Egasi» rollarini ko'rmaydi.</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 14px; font-weight: 600">Filial</span><div role="radiogroup" aria-label="Filial" style="display: flex; gap: 6px"><button type="button" role="radio" aria-checked="true" style="flex: 1; height: 44px; border-radius: 10px; border: 2px solid #0b7a6b; background: #ddefea; color: #096154; font: inherit; font-weight: 700; cursor: pointer">Chilonzor</button><button type="button" role="radio" aria-checked="false" style="flex: 1; height: 44px; border-radius: 10px; border: 1px solid #d3d9d0; background: #fff; color: #192420; font: inherit; cursor: pointer">Yunusobod</button><button type="button" role="radio" aria-checked="false" style="flex: 1; height: 44px; border-radius: 10px; border: 1px solid #d3d9d0; background: #fff; color: #192420; font: inherit; cursor: pointer">Ikkalasi</button></div></div>
+        <div style="padding: 12px 14px; border-radius: 10px; background: #f6f8f4; font-size: 14px; color: #33403a">Vaqtinchalik parol bir marta ko'rsatiladi va SMS/Telegram orqali yuboriladi. Birinchi kirishda xodim o'z parolini qo'yadi.</div>
+        <button type="button" style="height: 48px; border-radius: 10px; border: 0; background: #0b7a6b; color: #fff; font: inherit; font-weight: 700; cursor: pointer">Taklif yuborish</button>
+      </aside>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1060}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var pill = 'font-size:13px;font-weight:700;border-radius:99px;padding:3px 10px;';
+    var R = { owner: pill + 'background:#192420;color:#fff', admin: pill + 'background:#e8eefb;color:#1f4f9e', doc: pill + 'background:#ddefea;color:#096154', reg: pill + 'background:#fbf1dd;color:#7a4f0a', other: pill + 'background:#edf0ea;color:#33403a' };
+    var row = 'border-top:1px solid #edf0ea';
+    function s(name, phone, role, k, branch, last, action, canEdit, inactive) { return { name: name, phone: phone, role: role, rolePill: R[k], branch: branch, last: last, action: action || 'O‘zgartirish', canEdit: canEdit !== false, row: row + (inactive ? ';opacity:.6' : '') }; }
+    var rb = 'display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:10px 12px;border-radius:10px;font:inherit;text-align:left;color:#192420;cursor:pointer;';
+    function role(name, who, can, cannot, sel, dis) { return { name: name, who: who, can: can, cannot: cannot, on: sel ? 'true' : 'false', dis: dis ? 'true' : 'false', style: rb + (sel ? 'border:2px solid #0b7a6b;background:#f6fbf9;' : dis ? 'border:1px dashed #d3d9d0;background:#f6f8f4;opacity:.7;cursor:not-allowed;' : 'border:1px solid #d3d9d0;background:#fff;') }; }
+    return {
+      staff: [
+        s('Anvar Karimov', '+998 90 100 20 30', 'Klinika egasi', 'owner', 'Hammasi', 'hozir', '', false),
+        s('Dilfuza Rahimova', '+998 93 220 11 05', 'Administrator', 'admin', 'Hammasi', 'bugun 08:40'),
+        s('Dr. Laylo Yusupova', '+998 90 555 01 22', 'Shifokor', 'doc', 'Chilonzor', 'bugun 08:55'),
+        s('Dr. Sardor Karimov', '+998 97 410 77 19', 'Shifokor', 'doc', 'Chilonzor', 'bugun 08:52'),
+        s('Malika Azimova', '+998 99 300 44 81', 'Registrator', 'reg', 'Chilonzor', 'bugun 08:31'),
+        s('Shoxrux Olimov', '+998 94 812 63 00', 'Texnik (tashqi)', 'other', 'Oq Tish lab.', 'kecha'),
+        s('Jamshid To‘rayev', '+998 90 712 30 44', 'Registrator', 'reg', 'Yunusobod', '2 oy oldin', 'Faollashtirish', true, true)
+      ],
+      roles: [
+        role('Assistent', 'shifokor yonida', 'rasm yuklash, vizit yozuvini to‘ldirish, navbat', 'to‘lov, retsept imzolash', true),
+        role('Registrator', 'qabulxona', 'yozilish, navbat, kassa, bemor qo‘shish', 'tibbiy yozuv, qaytarish'),
+        role('Shifokor', 'davolash', 'tibbiy karta, reja, retsept, lab buyurtma', 'kassa, xodimlar'),
+        role('Hisobchi', 'moliya', 'hisobot, qaytarish, xarajat, ish haqi', 'tibbiy ma‘lumot'),
+        role('Administrator', 'faqat egasi beradi', 'deyarli hammasi', 'egalikni o‘tkazish', false, false)
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

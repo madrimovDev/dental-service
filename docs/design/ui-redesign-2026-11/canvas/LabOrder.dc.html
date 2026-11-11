@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Lab buyurtma</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#f1f3ef}
+a{color:#0b7a6b}a:hover{color:#096154}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 100vh; font-family: 'Hanken Grotesk', system-ui, sans-serif; color: #192420; background: #f1f3ef; font-size: 15px; line-height: 1.45">
+  <div style="flex: 0 0 248px; display: flex">
+    <dc-import name="Sidebar" role="shifokor" active="lab" conn="lan" hint-size="248px,980px"></dc-import>
+  </div>
+
+  <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px 14px; padding: 14px 32px; background: #ffffff; border-bottom: 1px solid #e4e8e1">
+      <div style="display: flex; flex-direction: column; margin-right: auto">
+        <h1 style="margin: 0; font-size: 22px; font-weight: 700">Yangi lab buyurtma · Kamola Ergasheva</h1>
+        <span style="font-size: 14px; color: #4c5852">Reja «Ko'prik 34–36» · 3-bosqich · Dr. Yusupova</span>
+      </div>
+    </header>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 20px; padding: 20px 32px 120px; align-items: flex-start">
+      <div style="flex: 999 1 600px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+
+        <section aria-labelledby="lb-h" style="background: #fff; border: 1px solid #e4e8e1; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 10px">
+          <h2 id="lb-h" style="margin: 0; font-size: 17px; font-weight: 700">Laboratoriya</h2>
+          <div role="radiogroup" aria-label="Laboratoriya" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+            <button type="button" role="radio" aria-checked="true" style="display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 12px 14px; border-radius: 10px; border: 2px solid #0b7a6b; background: #ddefea; color: #192420; font: inherit; cursor: pointer; text-align: left"><b>Oq Tish</b><span style="font-size: 13px; color: #096154; font-weight: 600">Portalda · holat jonli ko'rinadi</span><span style="font-size: 13px; color: #33403a">o'rtacha 5 kun · remake 4%</span></button>
+            <button type="button" role="radio" aria-checked="false" style="display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 12px 14px; border-radius: 10px; border: 1px solid #d3d9d0; background: #fff; color: #192420; font: inherit; cursor: pointer; text-align: left"><b>Dental Lab Pro</b><span style="font-size: 13px; color: #4c5852; font-weight: 600">Portalda yo'q · PDF Telegram'ga yuboriladi</span><span style="font-size: 13px; color: #33403a">holatni qo'lda yangilaysiz</span></button>
+          </div>
+        </section>
+
+        <section aria-labelledby="wk-h" style="background: #fff; border: 1px solid #e4e8e1; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px">
+          <h2 id="wk-h" style="margin: 0; font-size: 17px; font-weight: 700">Ish</h2>
+          <div style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 14px; font-weight: 600">Turi</span>
+            <div role="radiogroup" aria-label="Ish turi" style="display: flex; flex-wrap: wrap; gap: 6px"><sc-for list="{{types}}" as="t" hint-placeholder-count="6"><button type="button" role="radio" aria-checked="{{t.on}}" style="{{t.style}}">{{t.name}}</button></sc-for></div>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px">
+            <div style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 14px; font-weight: 600">Tishlar</span><div style="display: flex; flex-wrap: wrap; gap: 6px"><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; padding: 8px 12px; border-radius: 8px; background: #ddefea; color: #096154">34</span><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; padding: 8px 12px; border-radius: 8px; background: #fbf1dd; color: #7a4f0a" title="oraliq">35 · oraliq</span><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; padding: 8px 12px; border-radius: 8px; background: #ddefea; color: #096154">36</span></div></div>
+            <div style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 14px; font-weight: 600">Material</span><div role="radiogroup" aria-label="Material" style="display: flex; flex-wrap: wrap; gap: 6px"><sc-for list="{{materials}}" as="m" hint-placeholder-count="3"><button type="button" role="radio" aria-checked="{{m.on}}" style="{{m.style}}">{{m.name}}</button></sc-for></div></div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <span style="font-size: 14px; font-weight: 600">Rang <span style="color: #a82f2d">· majburiy</span></span>
+            <div role="radiogroup" aria-label="Rang" style="display: flex; flex-wrap: wrap; gap: 6px"><sc-for list="{{shades}}" as="s" hint-placeholder-count="8"><button type="button" role="radio" aria-checked="{{s.on}}" style="{{s.style}}"><span aria-hidden="true" style="{{s.sw}}"></span>{{s.name}}</button></sc-for></div>
+            <span style="font-size: 13px; color: #4c5852">Rang mos kelmasligi — qayta tayyorlashning har oltidan bir sababi. Shkala bilan surat biriktiring.</span>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px">
+            <div style="display: flex; flex-direction: column; gap: 4px"><label for="due" style="font-size: 14px; font-weight: 600">Kerakli sana <span style="color: #a82f2d">· majburiy</span></label><input id="due" value="18.11.2026" style="height: 44px; border: 1px solid #d3d9d0; border-radius: 10px; padding: 0 12px; font: inherit; font-family: 'JetBrains Mono', monospace"><span style="font-size: 13px; color: #096154; font-weight: 600">Bemor 20-noyabr 10:00 ga yozilgan — 2 kun zaxira</span></div>
+            <div style="display: flex; flex-direction: column; gap: 4px"><label for="nt" style="font-size: 14px; font-weight: 600">Izoh texnikka</label><textarea id="nt" rows="2" style="border: 1px solid #d3d9d0; border-radius: 10px; padding: 10px 12px; font: inherit; resize: vertical">Oraliq milkka tegmasin, yuvish oson bo'lsin</textarea></div>
+          </div>
+        </section>
+
+        <section aria-labelledby="fl-h" style="background: #fff; border: 1px solid #e4e8e1; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 10px">
+          <h2 id="fl-h" style="margin: 0; font-size: 17px; font-weight: 700">Fayllar</h2>
+          <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px">
+            <div style="display: flex; flex-direction: column; gap: 2px; padding: 12px; border-radius: 10px; background: #f6f8f4"><b style="font-size: 14px">Skan · yuqori/pastki</b><span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #4c5852">2 × STL · 38 MB</span></div>
+            <div style="display: flex; flex-direction: column; gap: 2px; padding: 12px; border-radius: 10px; background: #f6f8f4"><b style="font-size: 14px">Rang shkalasi bilan surat</b><span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #4c5852">1 × JPG · A2</span></div>
+            <button type="button" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 12px; border-radius: 10px; border: 2px dashed #b9c2b6; background: #fff; color: #33403a; font: inherit; cursor: pointer"><b style="font-size: 14px">+ Fayl qo'shish</b><span style="font-size: 13px">yoki shu yerga tashlang</span></button>
+          </div>
+        </section>
+
+        <section aria-labelledby="rm-h" style="background: #fff; border: 1px solid #e4e8e1; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 10px">
+          <label style="display: flex; align-items: center; gap: 10px"><input type="checkbox" style="width: 20px; height: 20px; accent-color: #0b7a6b"><b id="rm-h" style="font-size: 16px">Bu qayta tayyorlash (remake)</b></label>
+          <span style="font-size: 14px; color: #4c5852">Belgilansa, asl buyurtma tanlanadi va sabab ko'rsatiladi — laboratoriya bilan tahlil uchun:</span>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px"><sc-for list="{{reasons}}" as="r" hint-placeholder-count="6"><span style="font-size: 14px; padding: 6px 12px; border-radius: 99px; border: 1px solid #d3d9d0; color: #5f6b65">{{r}}</span></sc-for></div>
+        </section>
+      </div>
+
+      <aside style="flex: 1 1 340px; min-width: 300px; display: flex; flex-direction: column; gap: 16px">
+        <section aria-labelledby="lv-h" style="background: #fff; border: 1px solid #e4e8e1; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px">
+          <h2 id="lv-h" style="margin: 0; font-size: 17px; font-weight: 700">Laboratoriya nimani ko'radi</h2>
+          <div style="display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 10px; background: #f6f8f4; font-size: 14px">
+            <div style="display: flex"><span style="color: #4c5852; width: 110px">Bemor</span><b>K. E. · ayol · 47 yosh</b></div>
+            <div style="display: flex"><span style="color: #4c5852; width: 110px">Klinika kodi</span><b style="font-family: 'JetBrains Mono', monospace">SD-1187</b></div>
+            <div style="display: flex"><span style="color: #4c5852; width: 110px">Shifokor</span><b>Dr. Yusupova</b></div>
+            <div style="display: flex"><span style="color: #4c5852; width: 110px">Telefon, manzil</span><b style="color: #842523">ko'rsatilmaydi</b></div>
+          </div>
+          <span style="font-size: 13px; color: #4c5852">Bemorning to'liq kartasi klinikadan chiqmaydi. Laboratoriya faqat ish uchun kerakli ma'lumotni oladi.</span>
+        </section>
+        <section aria-labelledby="sg-h" style="background: #fff; border: 1px solid #e4e8e1; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px">
+          <h2 id="sg-h" style="margin: 0; font-size: 17px; font-weight: 700">Buyurtma yo'li</h2>
+          <ol style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px">
+            <sc-for list="{{steps}}" as="s" hint-placeholder-count="5"><li style="display: flex; gap: 10px; align-items: flex-start"><span aria-hidden="true" style="{{s.dot}}"></span><span style="display: flex; flex-direction: column"><b style="font-weight: 600">{{s.name}}</b><span style="font-size: 13px; color: #4c5852">{{s.who}}</span></span></li></sc-for>
+          </ol>
+        </section>
+      </aside>
+    </div>
+
+    <div style="position: sticky; bottom: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding: 14px 32px; background: #ffffff; border-top: 1px solid #d3d9d0; box-shadow: 0 -6px 18px rgba(25,36,32,.08)">
+      <span style="margin-right: auto; font-size: 14px; color: #33403a"><b>Ko'prik 34–36</b> · sirkoniy · A3 · 18-noyabrgacha · Oq Tish</span>
+      <button type="button" style="height: 46px; padding: 0 16px; border-radius: 10px; border: 1px solid #d3d9d0; background: #fff; color: #192420; font: inherit; font-weight: 600; cursor: pointer">Qoralama</button>
+      <button type="button" style="height: 46px; padding: 0 20px; border-radius: 10px; border: 0; background: #0b7a6b; color: #fff; font: inherit; font-weight: 700; cursor: pointer">Laboratoriyaga yuborish</button>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var b = 'min-height:44px;padding:0 14px;border-radius:10px;font:inherit;cursor:pointer;';
+    var on = b + 'border:2px solid #0b7a6b;background:#ddefea;color:#096154;font-weight:700;';
+    var off = b + 'border:1px solid #d3d9d0;background:#fff;color:#192420;';
+    function opt(name, sel) { return { name: name, on: sel ? 'true' : 'false', style: sel ? on : off }; }
+    var shadeHex = { A1: '#f3ead8', A2: '#ecdcc0', A3: '#e5d0ac', 'A3.5': '#dcc198', B1: '#f4eedd', B2: '#ede2c6', C1: '#e3dccb', D2: '#e2d6c4' };
+    var shades = Object.keys(shadeHex).map(function (k) {
+      var sel = k === 'A3';
+      return { name: k, on: sel ? 'true' : 'false', style: (sel ? on : off) + 'display:flex;align-items:center;gap:8px;font-family:JetBrains Mono,monospace;', sw: 'width:18px;height:18px;border-radius:5px;border:1px solid #b9c2b6;background:' + shadeHex[k] };
+    });
+    function dot(k) {
+      var m = { done: 'background:#0b7a6b;border-color:#0b7a6b', now: 'background:#fff;border-color:#0b7a6b;border-width:3px', next: 'background:#fff;border-color:#b9c2b6' };
+      return 'width:16px;height:16px;border-radius:99px;border:2px solid;flex:none;margin-top:3px;' + m[k];
+    }
+    return {
+      types: [opt('Toj'), opt('Ko‘prik', true), opt('Protez'), opt('Kappa'), opt('Vkladka'), opt('Boshqa')],
+      materials: [opt('Sirkoniy', true), opt('Metallokeramika'), opt('E.max')],
+      shades: shades,
+      reasons: ['Chekka mos emas', 'Kontakt nuqtasi', 'Tishlash', 'Rang', 'Estetika', 'Boshqa'],
+      steps: [
+        { name: 'Yuborildi', who: 'klinika · lab qabul qilguncha bekor qilish mumkin', dot: dot('now') },
+        { name: 'Qabul qilindi yoki rad etildi', who: 'laboratoriya · rad etsa sababini yozadi', dot: dot('next') },
+        { name: 'Tayyorlanmoqda', who: 'laboratoriya · texnik biriktiriladi', dot: dot('next') },
+        { name: 'Jo‘natildi', who: 'laboratoriya · kuryer yoki o‘zi olib ketadi', dot: dot('next') },
+        { name: 'Yetkazildi', who: 'klinika tasdiqlaydi → reja bosqichi ochiladi', dot: dot('next') }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

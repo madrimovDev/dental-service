@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Bemor uchun Telegram bot</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1760px; height: 980px; box-sizing: border-box; padding: 32px 40px; background: #e9ece6; font-family: 'Hanken Grotesk', system-ui, sans-serif; color: #192420; display: flex; flex-direction: column; gap: 20px">
+  <div style="display: flex; align-items: baseline; gap: 16px">
+    <h1 style="margin: 0; font-size: 28px; font-weight: 700">Bemor uchun asosiy kanal — klinika boti</h1>
+    <span style="font-size: 16px; color: #4c5852">Ilova kerak emas. Har klinikaning o'z boti, bemor tanlagan tilda (o'zbek yoki rus).</span>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(4, 390px); gap: 40px">
+    <sc-for list="{{phones}}" as="p" hint-placeholder-count="4">
+      <div style="display: flex; flex-direction: column; gap: 10px">
+        <div style="width: 390px; height: 780px; box-sizing: border-box; border-radius: 36px; border: 10px solid #192420; background: #dfe7e3; overflow: hidden; display: flex; flex-direction: column">
+          <div style="display: flex; align-items: center; gap: 10px; padding: 14px 16px; background: #0b7a6b; color: #fff">
+            <span aria-hidden="true" style="width: 36px; height: 36px; border-radius: 99px; background: #fff; color: #0b7a6b; display: flex; align-items: center; justify-content: center; font-weight: 700">S</span>
+            <span style="display: flex; flex-direction: column"><b style="font-size: 16px">Smile Dent</b><span style="font-size: 12px; opacity: .85">klinika boti</span></span>
+          </div>
+          <div style="flex: 1; padding: 14px 12px; display: flex; flex-direction: column; gap: 10px; overflow: hidden">
+            <sc-for list="{{p.msgs}}" as="m" hint-placeholder-count="4">
+              <div style="{{m.wrap}}">
+                <div style="{{m.bubble}}">{{m.text}}</div>
+                <sc-if value="{{m.hasBtns}}" hint-placeholder-val="{{ false }}">
+                  <div style="{{m.btnGrid}}">
+                    <sc-for list="{{m.btns}}" as="b" hint-placeholder-count="2"><button type="button" style="{{b.style}}">{{b.t}}</button></sc-for>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+          <sc-if value="{{p.hasKb}}" hint-placeholder-val="{{ false }}">
+            <div style="padding: 10px 12px 16px; background: #f6f8f4; border-top: 1px solid #d3d9d0"><button type="button" style="width: 100%; height: 48px; border-radius: 12px; border: 0; background: #0b7a6b; color: #fff; font: inherit; font-weight: 700; font-size: 15px; cursor: pointer">{{p.kb}}</button></div>
+          </sc-if>
+        </div>
+        <b style="font-size: 17px">{{p.title}}</b>
+        <span style="font-size: 14px; color: #33403a; max-width: 390px">{{p.note}}</span>
+      </div>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1760,"height":980}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var bot = { wrap: 'display:flex;flex-direction:column;align-items:flex-start;gap:6px;max-width:88%', bubble: 'padding:9px 12px;border-radius:14px 14px 14px 4px;background:#ffffff;font-size:15px;line-height:1.4;white-space:pre-line;box-shadow:0 1px 1px rgba(0,0,0,.06)' };
+    var me = { wrap: 'display:flex;flex-direction:column;align-items:flex-end;gap:6px;align-self:flex-end;max-width:88%', bubble: 'padding:9px 12px;border-radius:14px 14px 4px 14px;background:#c8ead9;font-size:15px;line-height:1.4;white-space:pre-line' };
+    var btn = 'min-height:40px;padding:6px 10px;border-radius:10px;border:0;background:rgba(255,255,255,.92);color:#096154;font:inherit;font-size:14px;font-weight:700;cursor:pointer;';
+    var btnOn = 'min-height:40px;padding:6px 10px;border-radius:10px;border:2px solid #0b7a6b;background:#ddefea;color:#096154;font:inherit;font-size:14px;font-weight:700;cursor:pointer;';
+    var btnDis = 'min-height:40px;padding:6px 10px;border-radius:10px;border:0;background:rgba(255,255,255,.5);color:#7a857e;font:inherit;font-size:14px;cursor:not-allowed;text-decoration:line-through;';
+    function m(who, text, btns, cols) {
+      var base = who === 'bot' ? bot : me;
+      return { wrap: base.wrap, bubble: base.bubble, text: text, hasBtns: !!btns, btns: (btns || []).map(function (b) { return typeof b === 'string' ? { t: b, style: btn } : { t: b[0], style: b[1] === 'on' ? btnOn : btnDis }; }),
+        btnGrid: 'display:grid;grid-template-columns:repeat(' + (cols || 2) + ',minmax(0,1fr));gap:6px;width:100%' };
+    }
+    return {
+      phones: [
+        { title: '1 · Ulanish', note: 'Bemor faqat o‘z raqamini ulaydi — boshqa odamning kontakti rad etiladi. Shundan keyin eslatma va cheklar shu yerga keladi.', hasKb: true, kb: 'Raqamimni ulashish',
+          msgs: [
+            m('bot', 'Assalomu alaykum! Bu Smile Dent klinikasi boti.\nYozilish, eslatma va cheklar uchun telefon raqamingizni ulashing.'),
+            m('me', 'Kontakt: Jasur T.\n+998 90 *** 45 67'),
+            m('bot', 'Rahmat, Jasur! Siz bizning bemorimizsiz.\nKeyingi tashrif: 13-noyabr, 11:15 · Dr. Yusupova'),
+            m('bot', 'Til tanlang:', ['O‘zbekcha', 'Русский'])
+          ] },
+        { title: '2 · Yozilish', note: 'Faqat haqiqiy bo‘sh vaqtlar ko‘rsatiladi. So‘rov registrator «Bugun» ekranida bir bosishda tasdiqlanadi.', hasKb: false,
+          msgs: [
+            m('bot', 'Qaysi xizmat kerak?', ['Ko‘rik', 'Tozalash', 'Og‘riq bor', 'Boshqa']),
+            m('me', 'Ko‘rik'),
+            m('bot', 'Pa, 13-noyabr — bo‘sh vaqtlar:', [['09:00', 'dis'], '10:00', ['11:15', 'on'], '14:00', '16:30', 'Boshqa kun'], 3),
+            m('bot', 'So‘rov yuborildi: 13-noyabr, 11:15, ko‘rik.\nKlinika odatda 15 daqiqada tasdiqlaydi.')
+          ] },
+        { title: '3 · Eslatma (24 soat oldin)', note: 'Bitta eslatma — eng samarali vaqt. Bemor javobi kalendarda holatni o‘zi yangilaydi: «Kelaman» → Tasdiqlandi.', hasKb: false,
+          msgs: [
+            m('bot', 'Eslatma: ertaga, 13-noyabr, 11:15\nDr. Yusupova · Smile Dent, Chilonzor\nBilan: pasport shart emas.', ['Kelaman', 'Boshqa vaqt', 'Bekor qilish'], 1),
+            m('me', 'Kelaman'),
+            m('bot', 'Rahmat! Kutib qolamiz.\nManzil: Chilonzor 9-kvartal, 14-uy', ['Xaritada ochish'], 1)
+          ] },
+        { title: '4 · Anketa, chek, retsept', note: 'Anamnez anketasi tashrifdan oldin. To‘lovdan keyin fiskal chek va retsept shu chatga keladi.', hasKb: false,
+          msgs: [
+            m('bot', 'Tashrifdan oldin sog‘liq anketasini to‘ldiring (2 daqiqa). Shifokor oldindan ko‘radi.', ['Anketani ochish'], 1),
+            m('bot', 'To‘lov qabul qilindi: 650 000 so‘m\nNaqd · 13.11 · 11:58', ['Fiskal chekni ochish'], 1),
+            m('bot', 'Retsept (Dr. Yusupova):\nIbuprofen 400 mg — 1 tab × 2, 3 kun\nKeyingi tashrif: 27-noyabr tavsiya etiladi', ['Yozilish'], 1)
+          ] }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

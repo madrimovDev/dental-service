@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Yangi yozilish</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#f1f3ef}
+a{color:#0b7a6b}a:hover{color:#096154}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 100vh; font-family: 'Hanken Grotesk', system-ui, sans-serif; color: #192420; background: #f1f3ef; font-size: 15px; line-height: 1.45">
+  <div style="flex: 0 0 248px; display: flex">
+    <dc-import name="Sidebar" role="registrator" active="kalendar" conn="lan" hint-size="248px,980px"></dc-import>
+  </div>
+
+  <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 32px; background: #ffffff; border-bottom: 1px solid #e4e8e1">
+      <a href="Calendar.dc.html" aria-label="Kalendarga qaytish" style="width: 44px; height: 44px; border-radius: 10px; border: 1px solid #d3d9d0; display: flex; align-items: center; justify-content: center; color: #192420"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="m15 18-6-6 6-6"></path></svg></a>
+      <div style="display: flex; flex-direction: column; margin-right: auto">
+        <h1 style="margin: 0; font-size: 24px; font-weight: 700">Yangi yozilish</h1>
+        <span style="font-size: 14px; color: #4c5852">Bitta ekranda: bemor → xizmat → shifokor → vaqt. Qadamlar orasida yurish shart emas.</span>
+      </div>
+    </header>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 20px; padding: 20px 32px 120px; align-items: flex-start">
+      <div style="flex: 1 1 420px; min-width: 300px; display: flex; flex-direction: column; gap: 16px">
+
+        <section aria-labelledby="p-h" style="background: #fff; border: 1px solid #e4e8e1; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+          <h2 id="p-h" style="margin: 0; font-size: 17px; font-weight: 700"><span style="color: #096154">1</span> · Bemor</h2>
+          <label for="ps" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Bemor qidirish</label>
+          <input id="ps" value="+998 90 555 18 22" style="height: 46px; border: 1px solid #d3d9d0; border-radius: 10px; padding: 0 12px; font: inherit; font-family: 'JetBrains Mono', monospace">
+          <div style="display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 10px; border: 2px solid #0b7a6b; background: #f6fbf9">
+            <div style="display: flex; align-items: center; gap: 10px"><b style="font-size: 16px; margin-right: auto">Bekzod Aliyev</b><span style="font-size: 13px; color: #4c5852">34 yosh · karta № 1042</span></div>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px">
+              <span style="font-size: 13px; font-weight: 700; color: #842523; background: #fbe7e5; border-radius: 6px; padding: 2px 8px">Allergiya: penitsillin</span>
+              <span style="font-size: 13px; font-weight: 600; color: #7a4f0a; background: #fbf1dd; border-radius: 6px; padding: 2px 8px">Qarz 1 200 000 so'm</span>
+              <span style="font-size: 13px; font-weight: 600; color: #1f4f9e; background: #e8eefb; border-radius: 6px; padding: 2px 8px">Telegram ulangan</span>
+            </div>
+            <span style="font-size: 14px; color: #33403a">Faol reja: Protez · 5-bosqich «Toj o'rnatish» hali yozilmagan</span>
+          </div>
+          <button type="button" style="align-self: flex-start; height: 40px; padding: 0 12px; border-radius: 8px; border: 0; background: transparent; color: #096154; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer">+ Yangi bemor (ism va telefon yetarli)</button>
+        </section>
+
+        <section aria-labelledby="s-h" style="background: #fff; border: 1px solid #e4e8e1; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+          <h2 id="s-h" style="margin: 0; font-size: 17px; font-weight: 700"><span style="color: #096154">2</span> · Xizmat</h2>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px">
+            <sc-for list="{{services}}" as="s" hint-placeholder-count="5">
+              <button type="button" aria-pressed="{{s.pressed}}" style="{{s.style}}"><b style="font-weight: 600">{{s.name}}</b><span style="font-size: 13px">{{s.meta}}</span></button>
+            </sc-for>
+          </div>
+          <span style="font-size: 14px; color: #33403a">Jami: <b>60 daqiqa</b> · <b style="font-family: 'JetBrains Mono', monospace">800 000 so'm</b> (reja narxi)</span>
+        </section>
+
+        <section aria-labelledby="d-h" style="background: #fff; border: 1px solid #e4e8e1; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 10px">
+          <h2 id="d-h" style="margin: 0; font-size: 17px; font-weight: 700"><span style="color: #096154">3</span> · Shifokor</h2>
+          <sc-for list="{{doctors}}" as="d" hint-placeholder-count="3">
+            <button type="button" aria-pressed="{{d.pressed}}" style="{{d.style}}">
+              <span style="display: flex; flex-direction: column; text-align: left; margin-right: auto"><b style="font-weight: 600">{{d.name}}</b><span style="font-size: 13px; color: #4c5852">{{d.meta}}</span></span>
+              <span style="{{d.nextStyle}}">{{d.next}}</span>
+            </button>
+          </sc-for>
+        </section>
+      </div>
+
+      <section aria-labelledby="t-h" style="flex: 999 1 520px; min-width: 0; background: #fff; border: 1px solid #e4e8e1; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px">
+        <h2 id="t-h" style="margin: 0; font-size: 17px; font-weight: 700"><span style="color: #096154">4</span> · Vaqt — Dr. Yusupova, 60 daqiqa</h2>
+        <div role="tablist" aria-label="Kun" style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px">
+          <sc-for list="{{days}}" as="d" hint-placeholder-count="7">
+            <button type="button" role="tab" aria-selected="{{d.sel}}" style="{{d.style}}"><span style="font-size: 13px">{{d.wd}}</span><b style="font-size: 17px; font-family: 'JetBrains Mono', monospace">{{d.n}}</b><span style="font-size: 12px">{{d.free}}</span></button>
+          </sc-for>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <span style="font-size: 13px; font-weight: 700; color: #4c5852">Ertalab</span>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px">
+            <sc-for list="{{morning}}" as="s" hint-placeholder-count="6"><button type="button" aria-disabled="{{s.dis}}" title="{{s.why}}" style="{{s.style}}">{{s.t}}<sc-if value="{{s.hasWhy}}" hint-placeholder-val="{{ false }}"><span style="display: block; font-size: 11px; font-family: 'Hanken Grotesk', sans-serif; font-weight: 600">{{s.why}}</span></sc-if></button></sc-for>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <span style="font-size: 13px; font-weight: 700; color: #4c5852">Tushdan keyin</span>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px">
+            <sc-for list="{{afternoon}}" as="s" hint-placeholder-count="4"><button type="button" aria-disabled="{{s.dis}}" title="{{s.why}}" style="{{s.style}}">{{s.t}}<sc-if value="{{s.hasWhy}}" hint-placeholder-val="{{ false }}"><span style="display: block; font-size: 11px; font-family: 'Hanken Grotesk', sans-serif; font-weight: 600">{{s.why}}</span></sc-if></button></sc-for>
+          </div>
+        </div>
+        <div role="note" style="display: flex; gap: 10px; padding: 12px 14px; border-radius: 10px; background: #fbf1dd; color: #7a4f0a">
+          <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg>
+          <span><b>Lab ishi:</b> toj laboratoriyadan 11-noyabrda keladi deb kutilmoqda. 13-noyabr yoki undan keyingi kun xavfsizroq.</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 10px; background: #f6f8f4">
+          <b style="font-size: 14px">Bemorga Telegram'da ketadigan eslatma (24 soat oldin)</b>
+          <span style="font-size: 14px; color: #33403a; white-space: pre-line">«Assalomu alaykum, Bekzod! 13-noyabr, 11:15 da Dr. Yusupova sizni kutadi (Smile Dent, Chilonzor).
+[Kelaman]  [Boshqa vaqt]»</span>
+        </div>
+      </section>
+    </div>
+
+    <div style="position: sticky; bottom: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding: 14px 32px; background: #ffffff; border-top: 1px solid #d3d9d0; box-shadow: 0 -6px 18px rgba(25,36,32,.08)">
+      <span style="margin-right: auto; font-size: 15px"><b>Bekzod Aliyev</b> · Toj o'rnatish (26) · Dr. Yusupova · <b style="font-family: 'JetBrains Mono', monospace">13-noyabr 11:15–12:15</b></span>
+      <a href="Calendar.dc.html" style="height: 46px; padding: 0 16px; border-radius: 10px; border: 1px solid #d3d9d0; color: #192420; font-weight: 600; text-decoration: none; display: flex; align-items: center">Bekor qilish</a>
+      <button type="button" style="height: 46px; padding: 0 22px; border-radius: 10px; border: 0; background: #0b7a6b; color: #fff; font: inherit; font-weight: 700; cursor: pointer">Yozish</button>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1060}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var chip = 'display:flex;flex-direction:column;align-items:flex-start;gap:0;min-height:52px;padding:6px 12px;border-radius:10px;font:inherit;cursor:pointer;';
+    var on = chip + 'border:2px solid #0b7a6b;background:#ddefea;color:#096154;';
+    var off = chip + 'border:1px solid #d3d9d0;background:#fff;color:#192420;';
+    var dbase = 'display:flex;align-items:center;gap:10px;min-height:56px;padding:8px 12px;border-radius:10px;font:inherit;cursor:pointer;width:100%;';
+    var slotBase = 'min-width:84px;min-height:44px;padding:6px 10px;border-radius:8px;font:inherit;font-family:JetBrains Mono,monospace;font-size:15px;cursor:pointer;';
+    var sFree = slotBase + 'border:1px solid #9ce2d3;background:#fff;color:#096154;font-weight:600;';
+    var sSel = slotBase + 'border:2px solid #0b7a6b;background:#0b7a6b;color:#fff;font-weight:700;';
+    var sDis = slotBase + 'border:1px dashed #d3d9d0;background:#f6f8f4;color:#5f6b65;cursor:not-allowed;';
+    function sl(t, kind, why) { return { t: t, dis: kind === 'dis' ? 'true' : 'false', why: why || '', hasWhy: !!why, style: kind === 'sel' ? sSel : kind === 'dis' ? sDis : sFree }; }
+    var dayBase = 'display:flex;flex-direction:column;align-items:center;gap:0;min-height:68px;padding:6px 4px;border-radius:10px;font:inherit;cursor:pointer;';
+    function day(wd, n, free, sel) { return { wd: wd, n: n, free: free, sel: sel ? 'true' : 'false', style: dayBase + (sel ? 'border:2px solid #0b7a6b;background:#ddefea;color:#096154;' : free === 'band' ? 'border:1px dashed #d3d9d0;background:#f6f8f4;color:#5f6b65;' : 'border:1px solid #d3d9d0;background:#fff;color:#192420;') }; }
+    return {
+      services: [
+        { name: 'Toj o‘rnatish · 26', meta: '60 daq · rejadan', pressed: 'true', style: on },
+        { name: 'Ko‘rik', meta: '30 daq', pressed: 'false', style: off },
+        { name: 'Plomba', meta: '45 daq', pressed: 'false', style: off },
+        { name: 'Tozalash', meta: '40 daq', pressed: 'false', style: off },
+        { name: 'Rentgen', meta: '10 daq', pressed: 'false', style: off }
+      ],
+      doctors: [
+        { name: 'Dr. Yusupova', meta: 'Ortoped · rejani olib boradi', next: 'Eng yaqin: 13-noyabr 11:15', pressed: 'true', style: dbase + 'border:2px solid #0b7a6b;background:#ddefea;color:#192420;', nextStyle: 'font-size:13px;font-weight:700;color:#096154' },
+        { name: 'Dr. Karimov', meta: 'Terapevt', next: 'Bu xizmatni bajarmaydi', pressed: 'false', style: dbase + 'border:1px dashed #d3d9d0;background:#f6f8f4;color:#4c5852;cursor:not-allowed;', nextStyle: 'font-size:13px;color:#4c5852' },
+        { name: 'Dr. Nazarov', meta: 'Jarroh', next: 'Jadval kiritilmagan', pressed: 'false', style: dbase + 'border:1px dashed #f0aea9;background:#fdf3f2;color:#4c5852;cursor:not-allowed;', nextStyle: 'font-size:13px;font-weight:700;color:#842523' }
+      ],
+      days: [
+        day('Se', '11', 'o‘tgan', false), day('Ch', '12', 'band'), day('Pa', '13', '4 bo‘sh', true), day('Ju', '14', '6 bo‘sh'), day('Sh', '15', '2 bo‘sh'), day('Ya', '16', 'dam olish'), day('Du', '17', '7 bo‘sh')
+      ],
+      morning: [sl('09:00', 'dis', 'band'), sl('10:00', 'free'), sl('11:15', 'sel'), sl('12:00', 'dis', 'tushlik')],
+      afternoon: [sl('14:00', 'free'), sl('15:00', 'dis', 'bemor band'), sl('16:30', 'free'), sl('17:00', 'dis', '60 daq sig‘maydi')]
+    };
+  }
+}
+</script>
+</body>
+</html>

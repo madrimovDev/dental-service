@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Vizit yozuvi va retsept</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#f1f3ef}
+a{color:#0b7a6b}a:hover{color:#096154}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 100vh; font-family: 'Hanken Grotesk', system-ui, sans-serif; color: #192420; background: #f1f3ef; font-size: 15px; line-height: 1.45">
+  <div style="flex: 0 0 248px; display: flex">
+    <dc-import name="Sidebar" role="shifokor" active="bemorlar" conn="lan" hint-size="248px,980px"></dc-import>
+  </div>
+
+  <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px 14px; padding: 14px 32px; background: #ffffff; border-bottom: 1px solid #e4e8e1">
+      <a href="Patient.dc.html" aria-label="Bemor kartasiga qaytish" style="width: 44px; height: 44px; border-radius: 10px; border: 1px solid #d3d9d0; display: flex; align-items: center; justify-content: center; color: #192420"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="m15 18-6-6 6-6"></path></svg></a>
+      <div style="display: flex; flex-direction: column; margin-right: auto">
+        <h1 style="margin: 0; font-size: 22px; font-weight: 700">Vizit yozuvi · Jasur Tursunov</h1>
+        <span style="font-size: 14px; color: #4c5852">11-noyabr, 10:45 · Dr. Yusupova · kresloda 18 daqiqa</span>
+      </div>
+      <label for="tpl" style="font-size: 14px; font-weight: 600">Shablon</label>
+      <select id="tpl" style="height: 44px; border: 1px solid #d3d9d0; border-radius: 10px; padding: 0 12px; font: inherit; background: #fff"><option>Plomba (kompozit)</option><option>Ko'rik</option><option>Ildiz kanali</option></select>
+    </header>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 20px; padding: 20px 32px 120px; align-items: flex-start">
+      <div style="flex: 999 1 600px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+
+        <section aria-labelledby="so-h" style="background: #fff; border: 1px solid #e4e8e1; border-radius: 12px; padding: 18px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px">
+          <h2 id="so-h" style="margin: 0; font-size: 17px; font-weight: 700; grid-column: 1 / -1">Shikoyat va ko'rik</h2>
+          <div style="display: flex; flex-direction: column; gap: 4px"><label for="c1" style="font-size: 14px; font-weight: 600">Shikoyat</label><textarea id="c1" rows="3" style="border: 1px solid #d3d9d0; border-radius: 10px; padding: 10px 12px; font: inherit; resize: vertical">Pastki chapda shirinlikdan og'riq, 2 haftadan beri</textarea></div>
+          <div style="display: flex; flex-direction: column; gap: 4px"><label for="c2" style="font-size: 14px; font-weight: 600">Ko'rik</label><textarea id="c2" rows="3" style="border: 1px solid #d3d9d0; border-radius: 10px; padding: 10px 12px; font: inherit; resize: vertical">36 — O+D yuzada kariyes, perkussiya manfiy, rentgenda pulpagacha 1 mm</textarea></div>
+        </section>
+
+        <section aria-labelledby="dx-h" style="background: #fff; border: 1px solid #e4e8e1; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; align-items: baseline"><h2 id="dx-h" style="margin: 0; font-size: 17px; font-weight: 700; margin-right: auto">Tashxis</h2><a href="Odontogram.dc.html" style="font-size: 14px; font-weight: 600">Tish xaritasida ochish</a></div>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px">
+            <span style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 99px; background: #fbe7e5; color: #842523; font-weight: 600"><b style="font-family: 'JetBrains Mono', monospace">36</b>Kariyes, dentin · O+D <code style="font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 400">K02.1</code></span>
+            <button type="button" style="height: 36px; padding: 0 12px; border-radius: 99px; border: 1px dashed #b9c2b6; background: #fff; color: #33403a; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer">+ Tashxis qo'shish</button>
+          </div>
+        </section>
+
+        <section aria-labelledby="pr-h" style="background: #fff; border: 1px solid #e4e8e1; border-radius: 12px">
+          <div style="display: flex; align-items: center; padding: 14px 18px; border-bottom: 1px solid #e4e8e1"><h2 id="pr-h" style="margin: 0; font-size: 17px; font-weight: 700; margin-right: auto">Bajarilgan ishlar</h2><button type="button" style="height: 40px; padding: 0 12px; border-radius: 8px; border: 0; background: transparent; color: #096154; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer">+ Xizmat</button></div>
+          <sc-for list="{{done}}" as="d" hint-placeholder-count="3">
+            <div style="display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-top: 1px solid #edf0ea">
+              <b style="font-family: 'JetBrains Mono', monospace; width: 28px">{{d.tooth}}</b>
+              <span style="display: flex; flex-direction: column; margin-right: auto"><b style="font-weight: 600">{{d.name}}</b><span style="font-size: 13px; color: #4c5852">{{d.meta}}</span></span>
+              <b style="font-family: 'JetBrains Mono', monospace">{{d.price}}</b>
+            </div>
+          </sc-for>
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 18px; border-top: 1px solid #e4e8e1; background: #f6f8f4; border-radius: 0 0 12px 12px; font-size: 14px">
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4c5852" stroke-width="2" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"></path></svg>
+            <span style="margin-right: auto; color: #33403a">Ombordan avtomatik yechiladi: kompozit A2 — 1 shpris, artikain — 1 karpula, matritsa — 1 dona</span>
+            <b style="font-family: 'JetBrains Mono', monospace; font-size: 17px">Jami 520 000 so'm</b>
+          </div>
+        </section>
+
+        <section aria-labelledby="rx-h" style="background: #fff; border: 1px solid #e4e8e1; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 10px">
+          <h2 id="rx-h" style="margin: 0; font-size: 17px; font-weight: 700">Retsept</h2>
+          <div style="display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) 44px; gap: 8px; align-items: end">
+            <div style="display: flex; flex-direction: column; gap: 4px"><label for="r1" style="font-size: 13px; font-weight: 600">Dori</label><input id="r1" value="Ibuprofen 400 mg" style="height: 44px; border: 1px solid #d3d9d0; border-radius: 10px; padding: 0 12px; font: inherit"></div>
+            <div style="display: flex; flex-direction: column; gap: 4px"><label for="r2" style="font-size: 13px; font-weight: 600">Qanday</label><input id="r2" value="1 tab × 2" style="height: 44px; border: 1px solid #d3d9d0; border-radius: 10px; padding: 0 12px; font: inherit"></div>
+            <div style="display: flex; flex-direction: column; gap: 4px"><label for="r3" style="font-size: 13px; font-weight: 600">Necha kun</label><input id="r3" value="3" style="height: 44px; border: 1px solid #d3d9d0; border-radius: 10px; padding: 0 12px; font: inherit; font-family: 'JetBrains Mono', monospace"></div>
+            <button type="button" aria-label="Dorini olib tashlash" style="height: 44px; border-radius: 10px; border: 1px solid #d3d9d0; background: #fff; color: #4c5852; cursor: pointer">✕</button>
+          </div>
+          <span style="display: flex; align-items: center; gap: 6px; font-size: 14px; color: #096154; font-weight: 600"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"></path></svg>Allergiya va anamnez bilan tekshirildi — muammo yo'q</span>
+          <span style="font-size: 13px; color: #4c5852">Muammo bo'lsa, faqat shu paytda kritik oyna chiqadi (masalan, penitsillinga allergiyasi bor bemorga amoksitsillin).</span>
+          <div style="display: flex; gap: 8px"><button type="button" style="height: 40px; padding: 0 12px; border-radius: 8px; border: 1px solid #d3d9d0; background: #fff; color: #192420; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer">+ Dori</button><label style="display: flex; align-items: center; gap: 8px; font-size: 14px"><input type="checkbox" checked style="width: 18px; height: 18px; accent-color: #0b7a6b">Bemorga Telegram'da yuborish</label></div>
+        </section>
+      </div>
+
+      <aside style="flex: 1 1 320px; min-width: 280px; display: flex; flex-direction: column; gap: 16px">
+        <section aria-labelledby="st-h" style="background: #fff; border: 1px solid #e4e8e1; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px">
+          <h2 id="st-h" style="margin: 0; font-size: 17px; font-weight: 700">Reja bilan bog'lash</h2>
+          <label style="display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: 10px; border: 2px solid #0b7a6b; background: #f6fbf9"><input type="radio" name="st" checked style="width: 18px; height: 18px; accent-color: #0b7a6b; margin-top: 2px"><span style="display: flex; flex-direction: column"><b>Reja «Plomba 36» · 1/1 bosqich</b><span style="font-size: 13px; color: #33403a">Bajarildi deb belgilanadi, tish xaritasi «plomba» bo'ladi</span></span></label>
+          <label style="display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: 10px; border: 1px solid #d3d9d0"><input type="radio" name="st" style="width: 18px; height: 18px; accent-color: #0b7a6b; margin-top: 2px"><span>Rejasiz vizit</span></label>
+        </section>
+        <section aria-labelledby="nx-h" style="background: #fff; border: 1px solid #e4e8e1; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px">
+          <h2 id="nx-h" style="margin: 0; font-size: 17px; font-weight: 700">Keyingi tashrif</h2>
+          <div role="group" aria-label="Qachon" style="display: flex; flex-wrap: wrap; gap: 6px">
+            <button type="button" aria-pressed="false" style="height: 40px; padding: 0 12px; border-radius: 99px; border: 1px solid #d3d9d0; background: #fff; color: #192420; font: inherit; font-size: 14px; cursor: pointer">Kerak emas</button>
+            <button type="button" aria-pressed="true" style="height: 40px; padding: 0 12px; border-radius: 99px; border: 2px solid #0b7a6b; background: #ddefea; color: #096154; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer">2 haftadan keyin</button>
+            <button type="button" aria-pressed="false" style="height: 40px; padding: 0 12px; border-radius: 99px; border: 1px solid #d3d9d0; background: #fff; color: #192420; font: inherit; font-size: 14px; cursor: pointer">6 oyda ko'rik</button>
+          </div>
+          <span style="font-size: 13px; color: #4c5852">Registrator «Bugun» ekranida yozish taklifini ko'radi</span>
+        </section>
+      </aside>
+    </div>
+
+    <div style="position: sticky; bottom: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding: 14px 32px; background: #ffffff; border-top: 1px solid #d3d9d0; box-shadow: 0 -6px 18px rgba(25,36,32,.08)">
+      <span style="margin-right: auto; font-size: 14px; color: #4c5852">Qoralama saqlandi · 10:58 · internet uzilsa ham yo'qolmaydi</span>
+      <button type="button" style="height: 46px; padding: 0 16px; border-radius: 10px; border: 1px solid #d3d9d0; background: #fff; color: #192420; font: inherit; font-weight: 600; cursor: pointer">Saqlash</button>
+      <button type="button" style="height: 46px; padding: 0 20px; border-radius: 10px; border: 0; background: #0b7a6b; color: #fff; font: inherit; font-weight: 700; cursor: pointer">Imzolash va kassaga yuborish</button>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1140}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      done: [
+        { tooth: '36', name: 'Plomba, kompozit · O+D', meta: 'shablondan · reja narxi', price: '450 000' },
+        { tooth: '36', name: 'Anesteziya (artikain)', meta: 'penitsillin emas', price: '50 000' },
+        { tooth: '—', name: 'Ko‘rish rentgeni', meta: 'assistent yukladi 10:47', price: '20 000' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
