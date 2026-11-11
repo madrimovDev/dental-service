@@ -88,6 +88,9 @@ services:
       SENTRY_DSN: ${SENTRY_DSN:-}
       # API does NOT run the in-process reminder worker — the `worker` service does.
       RUN_REMINDER_WORKER: 'false'
+      # L8: SaaS tenantlarni Supervisor'da ro'yxatga olish + obuna holati (bo'sh = o'chiq).
+      SUPERVISOR_URL: ${SUPERVISOR_URL:-}
+      SUPERVISOR_SAAS_TOKEN: ${SUPERVISOR_SAAS_TOKEN:-}
     volumes:
       - uploads_data:/data/uploads
     depends_on:
@@ -108,11 +111,15 @@ services:
     environment:
       NODE_ENV: production
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
+      # L8: Supervisor sinxron job'i cross-tenant (RLS bypass) o'qiydi.
+      DATABASE_ADMIN_URL: ${DATABASE_ADMIN_URL:-}
       REDIS_URL: ${REDIS_URL:?set REDIS_URL}
       JWT_SECRET: ${JWT_SECRET}
       WEB_ORIGIN: ${WEB_ORIGIN}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       SENTRY_DSN: ${SENTRY_DSN:-}
+      SUPERVISOR_URL: ${SUPERVISOR_URL:-}
+      SUPERVISOR_SAAS_TOKEN: ${SUPERVISOR_SAAS_TOKEN:-}
     depends_on:
       postgres:
         condition: service_healthy

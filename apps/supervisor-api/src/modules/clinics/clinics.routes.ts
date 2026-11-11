@@ -9,6 +9,7 @@ import { normalizePhone } from '../../lib/phone';
 import { generateTempPassword } from '../../lib/temp-password';
 import { adminJwtMiddleware } from '../auth/jwt.middleware';
 import { createLicenseService } from '../licenses/licenses.service';
+import { renewSaasClinic } from '../saas/saas.routes';
 
 const uuidSchema = z.string().uuid();
 
@@ -28,6 +29,8 @@ const pickClinicPublic = (clinic: typeof clinics.$inferSelect) => ({
   contactPhone: clinic.contactPhone,
   ownerFullName: clinic.ownerFullName,
   ownerPhone: clinic.ownerPhone,
+  mode: clinic.mode,
+  subscriptionExpiresAt: clinic.subscriptionExpiresAt,
   createdAt: clinic.createdAt,
 });
 
@@ -307,6 +310,15 @@ export const clinicsRoutes = () => {
     const expiresAt = new Date(raw.length === 10 ? `${raw}T23:59:59.000Z` : raw);
 
     try {
+      // L8: SaaS klinikada litsenziya yo'q — obuna muddati uzaytiriladi.
+      const target = await db.query.clinics.findFirst({ where: eq(clinics.id, idResult.data) });
+      if (target?.mode === 'saas') {
+        const updated = await renewSaasClinic(idResult.data, expiresAt);
+        return c.json({
+          clinic: pickClinicPublic(updated),
+          subscriptionExpiresAt: updated.subscriptionExpiresAt,
+        });
+      }
       const license = await service.renew(idResult.data, expiresAt, c.get('adminUserId'));
       return c.json({ license });
     } catch (err) {

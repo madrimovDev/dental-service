@@ -7,7 +7,7 @@ import { secureHeaders } from 'hono/secure-headers';
 import { db } from './db/client.ts';
 import { createAuditLogger } from './lib/audit-logger.ts';
 import { env } from './lib/env.ts';
-import { requireModuleInDesktop, requireValidLicenseInDesktop } from './lib/license-middleware.ts';
+import { requireModuleInDesktop, requireValidSubscription } from './lib/license-middleware.ts';
 import { METRICS_CONTENT_TYPE, renderMetrics } from './lib/metrics.ts';
 import { reminderQueue } from './lib/queue.ts';
 import { createReminderScheduler } from './lib/reminder-scheduler.ts';
@@ -143,11 +143,12 @@ export const createApp = () => {
     }),
   );
 
-  // P18 — Local Desktop'da muddat + imtiyoz tugagach butun API (va /uploads)
-  // bloklanadi; ochiq yo'llar license-middleware.ts GLOBAL_GATE_OPEN_PREFIXES.
-  // SaaS rejimida (DENTAL_LOCAL_DESKTOP yo'q) no-op. Route'lardan OLDIN.
-  app.use('/api/*', requireValidLicenseInDesktop());
-  app.use('/uploads/*', requireValidLicenseInDesktop());
+  // P18 + L8 — Local Desktop'da litsenziya, SaaS'da tenant obunasi: muddat +
+  // imtiyoz tugagach butun API (va /uploads) bloklanadi; ochiq yo'llar
+  // license-middleware.ts GLOBAL_GATE_OPEN_PREFIXES. SaaS'da muddat noma'lum
+  // (Supervisor o'chiq / ro'yxatga olinmagan) bo'lsa — bloklanmaydi. Route'lardan OLDIN.
+  app.use('/api/*', requireValidSubscription());
+  app.use('/uploads/*', requireValidSubscription());
 
   // Public routes
   app.route('/api/health', healthRoutes({ db }));

@@ -11,6 +11,13 @@ export const clinics = pgTable('clinics', {
   ownerPhone: text('owner_phone').notNull(),
   ownerTempPassword: text('owner_temp_password'),
   defaultLanguage: text('default_language').notNull().default('uz'),
+  // L8 (Lab Hub, 2026-11-12) — SaaS tenantlar ham Supervisor'da klinika sifatida.
+  // `desktop` (default; litsenziya + filial bor) | `saas` (litsenziyasiz; obuna
+  // muddati `subscriptionExpiresAt`da). `saasTenantId` — SaaS `apps/api` dagi
+  // tenant UUID'si (bir tenant — bitta klinika, shu sabab UNIQUE).
+  mode: text('mode').notNull().default('desktop'), // 'desktop'|'saas'
+  saasTenantId: uuid('saas_tenant_id').unique(),
+  subscriptionExpiresAt: timestamp('subscription_expires_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 

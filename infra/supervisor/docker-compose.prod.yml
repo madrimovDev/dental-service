@@ -61,6 +61,8 @@ services:
       # Lab Hub (infra/lab-hub): bo'sh = «Laboratoriyalar» va /internal verify 503.
       LAB_HUB_URL: ${LAB_HUB_URL:-}
       SUPERVISOR_HUB_TOKEN: ${SUPERVISOR_HUB_TOKEN:-}
+      # L8: SaaS apps/api xizmat kaliti (>=32 bayt; bo'sh = /internal/saas yopiq, 503)
+      SUPERVISOR_SAAS_TOKEN: ${SUPERVISOR_SAAS_TOKEN:-}
       API_PORT: 3101
     depends_on:
       postgres:

@@ -3,12 +3,14 @@ import { Lock } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { useRecheckLicense } from '../license.api';
+import { useLicenseStatus, useRecheckLicense } from '../license.api';
 
 export function LicenseBlockedScreen() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const recheck = useRecheckLicense();
+  const { data: status } = useLicenseStatus();
+  const isCloud = status?.mode === 'cloud';
   const [stillExpired, setStillExpired] = useState(false);
 
   const onRecheck = () => {
@@ -31,8 +33,12 @@ export function LicenseBlockedScreen() {
         <StateView
           status="error"
           icon={<Lock size={22} aria-hidden="true" />}
-          title={t('license.blocked.title')}
-          description={`${t('license.blocked.body')} ${t('license.blocked.internet')}`}
+          title={isCloud ? t('license.blocked.subscriptionTitle') : t('license.blocked.title')}
+          description={
+            isCloud
+              ? t('license.blocked.subscriptionBody')
+              : `${t('license.blocked.body')} ${t('license.blocked.internet')}`
+          }
           action={
             <div
               style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}

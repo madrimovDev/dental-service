@@ -42,6 +42,14 @@ export const tenantSettings = pgTable(
     // DS12 (DS10 Sozlamalar): integratsiya konfiguratsiyasi (provider bo'yicha blob,
     // masalan { telegram: { enabled }, sms: { provider } }). Nullable, backward-compatible.
     integrationSettings: jsonb('integration_settings').$type<Record<string, unknown> | null>(),
+    // L8 (Lab Hub): SaaS tenant Supervisor'da klinika sifatida ro'yxatga olinadi.
+    // `supervisorClinicId` NULL = hali ro'yxatda emas (retry worker qayta urinadi).
+    // `subscriptionExpiresAt` — Supervisor'dan sinxronlangan obuna muddati; NULL =
+    // muddat noma'lum → bloklanmaydi. Faqat server yozadi (admin conn / withTenant),
+    // tenant-settings PATCH sxemasida YO'Q.
+    supervisorClinicId: uuid('supervisor_clinic_id'),
+    subscriptionExpiresAt: timestamp('subscription_expires_at', { withTimezone: true }),
+    subscriptionSyncedAt: timestamp('subscription_synced_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

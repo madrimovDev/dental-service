@@ -534,4 +534,44 @@ describe('ClinicDetailPage', () => {
 
     expect(await screen.findByText("Parol-tiklash tokenini yaratib bo'lmadi")).toBeInTheDocument();
   });
+  // L8 — SaaS klinikada litsenziya yo'q: litsenziya/modul bloklari ko'rinmaydi,
+  // obuna muddati va uzaytirish tugmasi bor (renew endpoint o'sha).
+  it('SaaS klinika: litsenziya/modullar yashirin, obuna kartasi + uzaytirish renew POST qiladi', async () => {
+    const saasClinic = {
+      ...clinic,
+      mode: 'saas',
+      ownerFullName: 'Sardor Aliyev',
+      subscriptionExpiresAt: '2026-12-01T00:00:00.000Z',
+    };
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === 'POST' && url.endsWith('/v1/admin/clinics/c1/renew')) {
+        return jsonResponse({
+          clinic: saasClinic,
+          subscriptionExpiresAt: '2028-06-30T23:59:59.000Z',
+        });
+      }
+      if (url.endsWith('/v1/admin/clinics/c1')) {
+        return jsonResponse({ clinic: saasClinic, license: null });
+      }
+      throw new Error(`unhandled fetch: ${url} ${init?.method ?? 'GET'}`);
+    });
+
+    renderDetail();
+    expect(await screen.findByTestId('saas-card')).toHaveTextContent('SaaS');
+    expect(screen.queryByText(/Litsenziya:/)).not.toBeInTheDocument();
+    expect(screen.queryByText('patients')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Muddatni uzaytirish' }));
+    fireEvent.change(await screen.findByLabelText('Yangi amal qilish muddati'), {
+      target: { value: '2028-06-30' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Tasdiqlash' }));
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/v1/admin/clinics/c1/renew'),
+        expect.objectContaining({ method: 'POST' }),
+      ),
+    );
+  });
 });
