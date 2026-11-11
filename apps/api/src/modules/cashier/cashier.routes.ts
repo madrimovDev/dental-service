@@ -30,7 +30,9 @@ import {
   createCashierService,
   DiscountExceedsMaxError,
   DiscountExceedsTotalError,
+  ItemsPlanNotAllowedError,
   NoActivePriceError,
+  PatientNotFoundError,
   type PayrollAdjustmentHook,
   type PriceLookup,
 } from './cashier.service.ts';
@@ -141,6 +143,18 @@ export const cashierRoutes = (deps: {
           fail('cashier.no_active_price', 'No active price for this service at this branch'),
           400,
         );
+      }
+      if (e instanceof ItemsPlanNotAllowedError) {
+        return c.json(
+          fail(
+            'cashier.items_plan_not_allowed',
+            'treatmentPlanId is not allowed for free POS sale',
+          ),
+          400,
+        );
+      }
+      if (e instanceof PatientNotFoundError) {
+        return c.json(fail('patient.not_found', 'Patient not found'), 400);
       }
       if (e instanceof DiscountExceedsTotalError) {
         return c.json(
