@@ -6,6 +6,7 @@ import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppointments } from '@/features/appointments/appointments.api.ts';
+import { usePendingVisits } from '@/features/cashier/cashier.api.ts';
 import { useQueueToday } from '@/features/queue/queue.api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { useTodayRange } from '../dashboard.api.ts';
@@ -284,6 +285,9 @@ export function ReceptionistDashboard() {
   const queue = useQueueToday(activeBranchId);
   const doctors = useDoctorOptions();
   const attention = useReceptionAttention(activeBranchId);
+  // FX-handoff: shifokor imzolagan, kassada to'lov kutayotgan vizitlar soni (cashier.view bilan).
+  const pendingVisits = usePendingVisits(activeBranchId);
+  const pendingVisitCount = pendingVisits.data?.length ?? 0;
   const bookingRequests = useBookingRequests();
   const tgItems = bookingRequests.data?.items ?? [];
   const tgCount = bookingRequests.data?.pendingCount ?? tgItems.length;
@@ -353,6 +357,18 @@ export function ReceptionistDashboard() {
     }));
 
   const attentionItems: AttentionItem[] = [
+    ...(pendingVisitCount > 0
+      ? [
+          {
+            key: 'pending-visits',
+            tier: 2 as const,
+            title: t('cashierHandoff.reception_title', { n: pendingVisitCount }),
+            text: t('cashierHandoff.reception_text'),
+            actionLabel: t('cashierHandoff.reception_open'),
+            to: '/cashier',
+          },
+        ]
+      : []),
     ...attention.doctorsWithoutSchedule.map(
       (d): AttentionItem => ({
         key: `sched-${d.id}`,
@@ -408,7 +424,15 @@ export function ReceptionistDashboard() {
             />
           )}
           {canCashier && (
-            <HeaderAction to="/cashier" icon={null} label={t('dashboard.open_cashier', 'Kassa')} />
+            <HeaderAction
+              to="/cashier"
+              icon={null}
+              label={
+                pendingVisitCount > 0
+                  ? `${t('dashboard.open_cashier', 'Kassa')} · ${pendingVisitCount}`
+                  : t('dashboard.open_cashier', 'Kassa')
+              }
+            />
           )}
         </Group>
       </Group>

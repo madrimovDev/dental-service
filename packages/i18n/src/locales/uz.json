@@ -2264,5 +2264,21 @@
     "now": "Hozir o'rnatish",
     "tonight": "Kechqurun",
     "installing": "Yangilanmoqda — kompyuterni o'chirmang"
+  },
+  "cashierHandoff": {
+    "title": "Kutilayotgan vizitlar",
+    "hint": "Shifokor imzolagan, hali to'lanmagan bugungi vizitlar",
+    "empty": "Imzolangan, to'lanmagan vizit yo'q",
+    "take": "Kassaga olish",
+    "doctor": "Dr. {{name}}",
+    "unpriced": "Narxi belgilanmagan xizmat bor — avval filial narxini kiriting",
+    "from_visit": "Vizit: {{patient}}",
+    "clear": "Vizitni bekor qilish",
+    "replace_cart_confirm": "Joriy savat vizit xizmatlari bilan almashtiriladi. Davom etasizmi?",
+    "already_billed": "Bu vizit allaqachon to'langan — ro'yxat yangilandi",
+    "reception_title": "{{n}} ta vizit kassada to'lov kutmoqda",
+    "reception_text": "Shifokor imzolagan, hali to'lanmagan bugungi vizitlar.",
+    "reception_open": "Kassani ochish",
+    "kpi": "Kassada kutmoqda"
   }
 }

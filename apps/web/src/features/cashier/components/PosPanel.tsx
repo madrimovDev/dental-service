@@ -1,7 +1,13 @@
-import type { CashierTransaction, PaymentMethod, Service } from '@dental/api-client';
+import {
+  ApiError,
+  type CashierTransaction,
+  type PaymentMethod,
+  type Service,
+} from '@dental/api-client';
 import { StatusPill } from '@dental/ui';
 import {
   Box,
+  Button,
   Card,
   Group,
   Loader,
@@ -12,6 +18,7 @@ import {
   TextInput,
   UnstyledButton,
 } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import {
   IconBuildingBank,
   IconCash,
@@ -26,6 +33,7 @@ import { BalanceBadge } from '@/components/BalanceBadge';
 import { usePatientBalance } from '@/features/patients/patients.api';
 import { formatCurrency } from '@/lib/format';
 import { fetchServicePrices, useCreateTransaction, useServices } from '../cashier.api';
+import { cashierKeys } from '../cashier.keys';
 import {
   buildCreatePayload,
   computeNetTotal,
@@ -37,6 +45,7 @@ import {
   CARD_PROVIDERS,
   type CardProvider,
   type CartItem,
+  type PendingVisit,
   type TransactionVM,
 } from '../cashier.types';
 import { CartTable } from './CartTable';
@@ -47,6 +56,13 @@ export interface PosPanelProps {
   patientId: string | null;
   /** Savat bo'sh emasligini ota-komponentga bildiradi (rejim almashganda ogohlantirish uchun). */
   onDirtyChange?: (dirty: boolean) => void;
+  /**
+   * FX-handoff: kassaga olingan vizit. O'zgarganda savat vizit xizmatlari (server narxi)
+   * bilan to'ldiriladi va to'lovda `visitNoteId` yuboriladi.
+   */
+  visit?: PendingVisit | null;
+  /** To'lov muvaffaqiyatli yoki vizit bekor qilinganda (ota vizit holatini tozalaydi). */
+  onVisitDone?: () => void;
 }
 
 /** Quick-add xizmat pill (hover → primary token chrome; addService() semantikasi saqlanadi). */
@@ -125,7 +141,13 @@ type ReceiptSnapshot = {
   cart: CartItem[];
 };
 
-export function PosPanel({ branchId, patientId, onDirtyChange }: PosPanelProps) {
+export function PosPanel({
+  branchId,
+  patientId,
+  onDirtyChange,
+  visit = null,
+  onVisitDone,
+}: PosPanelProps) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const servicesQuery = useServices();
@@ -140,6 +162,7 @@ export function PosPanel({ branchId, patientId, onDirtyChange }: PosPanelProps) 
   const [cardProvider, setCardProvider] = useState<CardProvider>('terminal');
   const [notes, setNotes] = useState('');
   const [receipt, setReceipt] = useState<ReceiptSnapshot | null>(null);
+  const [visitNoteId, setVisitNoteId] = useState<string | null>(null);
 
   // Foiz → so'm chegirma. gross = savat jami (chegirmasiz) = computeNetTotal(cart, 0).
   const gross = computeNetTotal(cart, 0);
@@ -156,6 +179,41 @@ export function PosPanel({ branchId, patientId, onDirtyChange }: PosPanelProps) 
   useEffect(() => {
     onDirtyChange?.(cart.length > 0);
   }, [cart.length, onDirtyChange]);
+
+  // FX-handoff: vizit tanlanganda savatni vizit xizmatlari bilan almashtirish (narx serverdan).
+  // `servicesQuery.data` ataylab deps'da yo'q — faqat vizit o'zgarganda ishlaydi.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: vizit almashganda bir marta
+  useEffect(() => {
+    if (!visit) {
+      setVisitNoteId(null);
+      return;
+    }
+    const known = servicesQuery.data ?? [];
+    setCart(
+      visit.services.map((s) => ({
+        service:
+          known.find((k) => k.id === s.serviceId) ??
+          ({
+            id: s.serviceId,
+            nameUz: s.serviceName,
+            code: '',
+            category: null,
+            isActive: true,
+          } as unknown as Service),
+        quantity: s.quantity,
+        unitPrice: Number(s.unitPrice ?? 0),
+      })),
+    );
+    setVisitNoteId(visit.visitNoteId);
+    setDiscountPct(0);
+    setPaidAmount('');
+  }, [visit]);
+
+  const clearVisit = () => {
+    setCart([]);
+    setVisitNoteId(null);
+    onVisitDone?.();
+  };
 
   const activeServices = useMemo(
     () => servicesQuery.data?.filter((s) => s.isActive) ?? [],
@@ -218,8 +276,21 @@ export function PosPanel({ branchId, patientId, onDirtyChange }: PosPanelProps) 
     });
     // Savat snapshot'i (charge'dan oldin — onSuccess reset'idan keyin ham mavjud bo'lsin).
     const cartSnapshot = [...cart];
-    createMut.mutate(payload, {
+    createMut.mutate(visitNoteId ? { ...payload, visitNoteId } : payload, {
+      onError: (e) => {
+        // 409: vizit boshqa kassada allaqachon to'langan — ro'yxatni yangilab savatni bo'shatamiz.
+        if (e instanceof ApiError && e.code === 'cashier.visit_already_billed') {
+          notifications.show({ color: 'red', message: t('cashierHandoff.already_billed') });
+          void qc.invalidateQueries({ queryKey: cashierKeys.all });
+          clearVisit();
+          return;
+        }
+        // Per-mutation onError global toast'ni o'chiradi — umumiy xatoni o'zimiz ko'rsatamiz.
+        notifications.show({ color: 'red', message: t('common.error') });
+      },
       onSuccess: (data: CashierTransaction) => {
+        setVisitNoteId(null);
+        onVisitDone?.();
         // Server tranzaksiyasi → VM (chek manbasi). data yo'q bo'lsa modal ochilmaydi.
         if (data) {
           setReceipt({ transaction: toTransactionVM(data), cart: cartSnapshot });
@@ -270,6 +341,27 @@ export function PosPanel({ branchId, patientId, onDirtyChange }: PosPanelProps) 
             </Group>
           )}
         </Group>
+
+        {/* FX-handoff: vizitdan to'ldirilgan savat — qaysi vizit ekani + bekor qilish. */}
+        {visitNoteId && visit && (
+          <Group
+            justify="space-between"
+            wrap="nowrap"
+            data-testid="visit-banner"
+            style={{
+              padding: '10px 18px',
+              background: 'var(--primary-soft)',
+              borderBottom: '1px solid var(--border)',
+            }}
+          >
+            <Text size="sm" fw={600} style={{ color: 'var(--primary)' }}>
+              {t('cashierHandoff.from_visit', { patient: visit.patientName })}
+            </Text>
+            <Button size="xs" variant="subtle" onClick={clearVisit}>
+              {t('cashierHandoff.clear')}
+            </Button>
+          </Group>
+        )}
 
         {/* Qidiruv + quick-add xizmat pillari */}
         <Box style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)' }}>
