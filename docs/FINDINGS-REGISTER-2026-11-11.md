@@ -20,7 +20,7 @@
 |---|---|---|---|---|
 | P1 ✅ | C | RLS tx 500 da COMMIT (yopildi — P bosqichi 1) | `rlsMiddleware`: `await next()` dan keyin `c.error` bo'lsa throw (rollback); route'da yozib throw qiladigan HTTP regressiya testi | 1 |
 | P2 🟡 | C | desktop yangilanishda migratsiya yo'q | har startda idempotent `api.exe migrate` (API'dan oldin); 0043 to'qnashuvida tushunarli dialog | 3 |
-| P17 ✅ | C | bulutda uploads volume yo'q, backup MinIO'ga (yopildi — P bosqichi 3) | `docker-compose.prod.yml`ga `uploads` volume + `UPLOADS_DIR`; `backup.sh`ni lokal uploads'ga qaratish; MinIO'ni compose'dan olib tashlash | 3 |
+| P17 ✅ | C | bulutda uploads volume yo'q, backup MinIO'ga (yopildi — P bosqichi 3; ⚠️ Docker image build va volume saqlanishi amalda yurgizilmagan — infra bosqichida tekshiriladi) | `docker-compose.prod.yml`ga `uploads` volume + `UPLOADS_DIR`; `backup.sh`ni lokal uploads'ga qaratish; MinIO'ni compose'dan olib tashlash | 3 |
 | P3 ✅ | H | reminder jobId `:` (yopildi — `592ed7a`) | `queue.ts` fix'ini commit qilish + real `Queue.add` kontrakt testi | 2 |
 | P4 ✅ | H | Redis side-effect tx ichida (yopildi — P bosqichi 1; `onAfterCommit` + 2,5 s timeout) | enqueue/remove'ni commit'dan keyin best-effort (try/catch + log) yoki outbox; status-only qayta faollashganda re-enqueue | 2 |
 | P5 ✅ | H | rol eskalatsiyasi (yopildi — bosqich 4: invite/add/update/reactivate + roles create/setPermissions; `role.escalation` 403) | invite/addAssignment/updateAssignment: berilayotgan rol permission'lari chaqiruvchinikining qism-to'plami bo'lishi shart (owner istisno); test | 4 |
@@ -414,4 +414,15 @@ To'liq: [`LAB-TECHNICIAN-ACCESS-2026-11-11.md`](./LAB-TECHNICIAN-ACCESS-2026-11-
 | FU-12 | L | Eskiz bor, bemor telefoni yo'q → `skipped_no_channel` (avval `no_phone`) | outcome tartibini aniqlashtirish (diagnostika) |
 | FU-13 | L | Filial formasida ochilish < yopilish validatsiyasi yo'q; `doctor_on_time_off` matni hardcoded | UI-3 (Sozlamalar) bilan |
 | FU-14 | M | P11 haqiqiy brauzer/Electron'da tekshirilmagan (jsdom + API) | UI-2 (Bemor kartasi) Playwright sinovida |
+
+## 17. Brauzer sinovi (2026-11-11, haqiqiy Chromium, API web'ni o'zi serve qiladi — real CSP)
+
+✅ Tasdiqlandi: majburiy parol almashtirish; B klinika takliflar kartasi; bemor kartasida rasm (`blob:`, real CSP) — **P11 ✅**; `/uploads` Accountant 403 / Doktor 200 / auth'siz 401; Branch Manager → Tenant Admin 403; yangi klinikada bo'sh slot + bron 201 (**P10**); Accountant kunlik kassa 150 000 − 50 000 = 100 000 (**P13**).
+Sinov 3 ta haqiqiy nuqson topdi (hammasi tuzatildi, testlar bilan): (1) jadvali yo'q doktorga bron qilib bo'lmasdi — P10 testi doktor jadvalini qo'lda qo'shib yashirgan edi; (2) bitta workspace'li foydalanuvchi taklif kartasini ko'rmasdi (avto-redirect); (3) tenant-wide xodim/owner `abid=null` → kunlik kassa bo'sh (switch-workspace endi standart filial tanlaydi).
+
+| ID | J | Qisqa | Qilinadigan ish |
+|---|---|---|---|
+| FU-15 | M | Telefonni oldindan ro'yxatdan o'tkazish (P6 qoldiq xavfi) | klinika platformada hali yo'q telefon uchun hisob yaratib, vaqtinchalik parolni bilib qoladi; keyin o'sha odam boshqa klinika taklifini olsa, birinchi klinika uning nomidan kirib qabul qilishi mumkin. Yopish = telefon egaligini tasdiqlash (SMS/Telegram OTP) — 👤 qaror kerak |
+| FU-16 | L | Kassa xulosasi «cash · payment» tarjimasiz | UI-1 Kassa ekrani bilan |
+| FU-17 | L | Filial bo'yicha availability (FreeSlotsCard) jadvalsiz doktorni ko'rsatmaydi | single-doctor availability'dagi fallback filial-darajasiga ham |
 

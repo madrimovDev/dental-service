@@ -618,6 +618,10 @@ export const createAuthService = (deps: AuthServiceDeps) => {
     // 3-4. Assignment va branch validation — bitta transaction'da RLS context bilan.
     // current_tenant_id = input.tenantId o'rnatib, user_assignments va branches'ga
     // standart tenant_isolation policy orqali kira olamiz.
+    // Filial berilmasa — standart filial (brauzer sinovi: tenant-wide xodim/owner'da
+    // `abid=null` bo'lib kunlik kassa va boshqa filialga bog'liq ekranlar ishlamasdi).
+    let assignedBranchId: string | null = null;
+    let resolvedBranchId: string | null = input.branchId ?? null;
     const validationResult = await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${input.tenantId}, true)`);
       await tx.execute(sql`SELECT set_config('app.current_user_id', ${userId}, true)`);
@@ -643,6 +647,7 @@ export const createAuthService = (deps: AuthServiceDeps) => {
           );
 
         if (!assignment) return { code: 'auth.no_workspace_access' as const };
+        assignedBranchId = assignment.branchId ?? null;
       }
 
       // branchId tenant ichida VA o'chirilmagan ekanligini tekshirish (defense in depth).
@@ -658,6 +663,20 @@ export const createAuthService = (deps: AuthServiceDeps) => {
         }
       }
 
+      if (!resolvedBranchId) {
+        if (assignedBranchId) {
+          resolvedBranchId = assignedBranchId;
+        } else {
+          const [first] = await tx
+            .select({ id: branches.id })
+            .from(branches)
+            .where(and(eq(branches.tenantId, input.tenantId), isNull(branches.deletedAt)))
+            .orderBy(asc(branches.createdAt))
+            .limit(1);
+          resolvedBranchId = first?.id ?? null;
+        }
+      }
+
       return { code: null };
     });
 
@@ -670,7 +689,7 @@ export const createAuthService = (deps: AuthServiceDeps) => {
       db,
       userId,
       input.tenantId,
-      input.branchId ?? null,
+      resolvedBranchId,
     );
 
     // 5. User lang
@@ -683,7 +702,7 @@ export const createAuthService = (deps: AuthServiceDeps) => {
       const newAccess = await signAccess({
         sub: userId,
         atid: input.tenantId,
-        abid: input.branchId ?? null,
+        abid: resolvedBranchId,
         perms: perms as Permission[],
         roleKey,
         lang: (user.preferredLanguage as 'uz' | 'ru') ?? 'uz',
@@ -697,7 +716,7 @@ export const createAuthService = (deps: AuthServiceDeps) => {
           tokenHash: await hashToken(newRefresh.token),
           expiresAt: newRefresh.expiresAt,
           activeTenantId: input.tenantId,
-          activeBranchId: input.branchId ?? null,
+          activeBranchId: resolvedBranchId,
         })
         .returning({ id: refreshTokens.id });
 

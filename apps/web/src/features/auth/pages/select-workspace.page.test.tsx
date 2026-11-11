@@ -11,10 +11,12 @@ const inv = vi.hoisted(() => ({
   list: [] as unknown[],
   accept: vi.fn(),
   decline: vi.fn(),
+  active: 't1' as string | null,
+  switchMutate: vi.fn(),
 }));
 
 vi.mock('../auth.api', () => ({
-  useInvitations: () => ({ data: inv.list }),
+  useInvitations: () => ({ data: inv.list, isLoading: false }),
   useAcceptInvitation: () => ({ mutate: inv.accept, isPending: false }),
   useDeclineInvitation: () => ({ mutate: inv.decline, isPending: false }),
   useMe: () => ({
@@ -34,7 +36,7 @@ vi.mock('../auth.api', () => ({
       ownerTenants: [],
     },
   }),
-  useSwitchWorkspace: () => ({ mutate: vi.fn(), isPending: false }),
+  useSwitchWorkspace: () => ({ mutate: inv.switchMutate, isPending: false }),
 }));
 
 vi.mock('@/stores/auth-store.ts', () => ({
@@ -42,7 +44,7 @@ vi.mock('@/stores/auth-store.ts', () => ({
   // bo'lsa switchMut.mutate() avtomatik chaqiradi) shart bo'yicha skip qilinadi
   // (bu ticket faqat static render/i18n'ni tekshiradi, auto-select oqimini emas).
   useAuthStore: () => ({
-    activeTenantId: 't1',
+    activeTenantId: inv.active,
     clear: vi.fn(),
     setTokens: vi.fn(),
     setContext: vi.fn(),
@@ -85,5 +87,37 @@ describe('SelectWorkspacePage — takliflar (P6 FU-08)', () => {
     expect(inv.accept.mock.calls[0]?.[0]).toBe('inv1');
     fireEvent.click(screen.getByText(i18n.t('auth.invitations.decline')));
     expect(inv.decline.mock.calls[0]?.[0]).toBe('inv1');
+  });
+});
+
+describe('SelectWorkspacePage — avto-tanlash va takliflar (FU-08)', () => {
+  it("bitta workspace + kutilayotgan taklif: avto-tanlamaydi, taklif ko'rinadi", () => {
+    inv.active = null;
+    inv.switchMutate.mockReset();
+    inv.list = [
+      {
+        id: 'inv1',
+        tenantId: 't2',
+        tenantName: 'Ikkinchi Klinika',
+        branchId: null,
+        branchName: null,
+        roleName: 'Doctor',
+        invitedAt: new Date().toISOString(),
+      },
+    ];
+    renderApp(<SelectWorkspacePage />);
+    expect(inv.switchMutate).not.toHaveBeenCalled();
+    expect(screen.getByText('Ikkinchi Klinika')).toBeTruthy();
+    inv.active = 't1';
+    inv.list = [];
+  });
+
+  it("bitta workspace, taklif yo'q: avto-tanlaydi (avvalgi xulq)", () => {
+    inv.active = null;
+    inv.switchMutate.mockReset();
+    inv.list = [];
+    renderApp(<SelectWorkspacePage />);
+    expect(inv.switchMutate).toHaveBeenCalledTimes(1);
+    inv.active = 't1';
   });
 });

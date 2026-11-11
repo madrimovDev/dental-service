@@ -107,6 +107,10 @@ export function SelectWorkspacePage() {
     if (activeTenantId) return; // allaqachon workspace tanlangan — qasddan kelgan, ko'rsatamiz
     if (switchMut.isPending) return; // qo'l bilan tanlash davom etmoqda — auto qo'shilmasin
     if (!meQuery.data) return;
+    // FU-08: kutilayotgan taklif bo'lsa avto-redirect QILMAYMIZ — aks holda bitta
+    // workspace'li foydalanuvchi taklifni hech qachon ko'rmaydi (brauzer sinovi topilmasi).
+    if (invitations.isLoading) return;
+    if ((invitations.data ?? []).length > 0) return;
     const options = collectOptions(meQuery.data);
     if (options.length === 1 && options[0]) {
       autoSelectedRef.current = true;
@@ -115,7 +119,7 @@ export function SelectWorkspacePage() {
         branchId: options[0].branchId ?? undefined,
       });
     }
-  }, [meQuery.data]);
+  }, [meQuery.data, invitations.data, invitations.isLoading]);
 
   if (meQuery.isLoading) {
     return (
