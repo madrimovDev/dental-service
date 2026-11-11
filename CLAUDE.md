@@ -4,7 +4,29 @@ Bu fayl Claude Code uchun loyiha konteksti. Har yangi sessiyada birinchi o'qilad
 
 > ⚠️ **REDESIGN FAOL (2026-06-09).** Loyiha "Dental SaaS" → **kengaytiriladigan klinika platformasi + rolga moslashuvchi UX** ga qayta yo'naltirildi. M1–M5 yadro qurilgan va saqlanadi (gibrid: ko'chiriladi, qayta qurilmaydi).
 >
-> 🪟 **ENG SO'NGGI (2026-08-07) — Windows E2E tayyorgarligi: Supervisor qayta deploy + aktivatsiya zanjiri JONLI tasdiqlandi.**
+> 🔬 **ENG SO'NGGI (2026-11-11) — 9 domenli feature tadqiqoti: [`docs/FEATURE-RESEARCH-2026-11-11.md`](./docs/FEATURE-RESEARCH-2026-11-11.md).** ~90 feature, 18 ustuvor topilma (P1–P18), offline/online rejim jadvali va keyingi tekshiruv rejasi. Kod hali TEGILMAGAN.
+> **Git:** `main` = `origin/main` + 1 (`117b587 wip` — Windows sinovida topilgan fingerprint keshi, ~6 s/so'rov edi) + commit qilinmagan `lib/queue.ts` (reminder jobId `:`→`-`).
+> **⚠️ P1 [Critical, probe bilan tasdiqlangan]:** `middleware/rls.ts` rollback hech qachon ishlamaydi — `app.onError` xatoni Hono compose ichida yutadi, `await next()` throw qilmaydi → **500 bo'lgan tenant so'rovi tranzaksiyani COMMIT qiladi** (yarim yozuv qoladi). «500 = rollback» deb faraz QILINMASIN. Shu sabab BullMQ jobId bugi (P3, `be7b7fd` 2026-06-21 dan beri) yozilishni rollback qilmaydi — yozilish saqlanadi + 500.
+> **Boshqa Critical/High:**
+> - P2 — desktop yangilanishda migratsiya yo'q (faqat first-run).
+> - P17 — bulutda uploads volume yo'q va `backup.sh` MinIO'ga qaratilgan.
+> - P18 — offline grace `expiresAt`dan hisoblanadi, heartbeat'dan emas (spec'dan farq); Supervisor'da renew yo'q.
+> - P5 — rol eskalatsiyasi (invite).
+> - P6 — tenantlararo parol tiklash.
+> - P7 — POS `items` + begona `treatmentPlanId`.
+> - P8 — Telegram kontakt egaligi tekshirilmaydi.
+> - P9 — NoOp `ok:true` → recall jim `contacted`.
+> - P10 — yangi tenantda `workHours=null` → bron yo'q.
+> - P11 — rasmlar Bearer'siz `<img>` (❔ brauzerda).
+> - P12 — Zod 4 `.partial()` default'larni qo'llaydi (probe bilan tasdiqlangan).
+> - P13 — Accountant dashboard refund'ni qo'shadi.
+> - P14 — NSIS `config.json`ni qayta yozadi.
+>
+> **To'liq reyestr (har topilma + ish):** [`docs/FINDINGS-REGISTER-2026-11-11.md`](./docs/FINDINGS-REGISTER-2026-11-11.md).
+> **Tashqi texnik (lab):** SaaS'da faqat har klinikaga *Technician* qilib taklif qilish mumkin (boshqa lablar buyurtmalari va butun bemor ro'yxati ko'rinadi, `labName` erkin matn, `labs` obyekti yo'q). Desktop'da umuman kira olmaydi. Variantlar: [`docs/LAB-TECHNICIAN-ACCESS-2026-11-11.md`](./docs/LAB-TECHNICIAN-ACCESS-2026-11-11.md).
+> **Naqsh:** tashqi side-effect'lar tx ichida timeout'siz; spy-dep testlar real cheklovlarni yashiradi; RBAC ekran↔endpoint bo'shlig'i 8 joyda takrorlangan.
+>
+> 🪟 **2026-08-07 — Windows E2E tayyorgarligi: Supervisor qayta deploy + aktivatsiya zanjiri JONLI tasdiqlandi.**
 > **Tuzatildi:** lokal `apps/supervisor-api/.env` `RSA_PRIVATE_KEY` `~/supervisor-private.pem` bilan almashtirildi (juftlik SHA `9c147ae6…`, `packages/core` bilan mos — yangi keypair generatsiya QILINMADI); yiqilgan testlar (`458864b`): Sidebar/nav-config CLI-161 testlari `4ce4b07` FUTURE→LIVE o'zgarishidan keyin eskirgan edi (FUTURE qoidasi endi `isVisible` ustida sintetik element bilan qulflanadi), PlanFormModal label matcher + yetishmayotgan `act()`, cli-226/cli-477 rate-limit bucket to'qnashuvi (barcha test so'rovlari `unknown` IP'da, limit 5/1 SOAT — endi unikal `x-real-ip`), `@dental/api` test skripti `--env-file` + `--timeout 30000` (5s hook timeout 179 fayl + bitta Postgres'da yetmasdi). API to'plami **24 → 9 yiqilgan**; qolgan 9 tasi ikki ma'lum sinf va **izolyatsiyada yashil** (`mock.module` bitta bun jarayonida fayllararo oqadi; 2 ta concurrent EXCLUDE testi to'liq yuk ostida poyga yutqazadi) — qayta ochilmasin. `4388ff9`: `ensureAppRole()` rol klasterda mavjud bo'lsa darhol qaytib, grant'larni ham o'tkazib yuborardi (rol=klaster, grant=baza) → shu klasterdagi **ikkinchi bazada** API boot'da `permission denied for table permissions`; grant'lar endi mustaqil va idempotent qo'llanadi.
 > **VM (103, `192.168.3.242`):** baza volume'i **to'liq o'chirildi**, joriy `main` rsync qilinib qayta qurildi — provisioning (2026-08-03) va tiklanish (2026-08-06) epiklari **birinchi marta VM'ga yetdi**. ⚠️ VM'dagi `~/dental-service` **git klon EMAS**, nusxa daraxt — transport = `rsync` (`bins/`, `.env.production` exclude qilinadi), keyin `~/deploy-supervisor.sh` (build → migrate+seed → up). Eski `CB628-…` litsenziya kaliti **endi yo'q**; yangisi `4F25F-4085C-13F1F-2E3E5`.
 > **Jonli tasdiqlangan (Linux, VM'ga qarshi, toza bazada) — bu zanjir ilgari HECH QACHON ishlamagan edi:** `bootstrap-status {false,false}` → `/api/activate` → imzolangan provisioning bloki → tenant + owner + filial + **8 rol shabloni** → owner telefoni+vaqtinchalik paroli bilan login **200** → `{true,true}` → Supervisor'da vaqtinchalik parol o'chdi, fingerprint bog'landi. **Muhimi:** `prepare-reinstall`dan keyin **IKKINCHI** aktivatsiya ham `provisioned: true` qaytardi (`provisionedAt` tegilmasa ham) — Windows aynan shu «tiklangan» holatga tushadi, shuning uchun alohida tekshirildi. Qaror #43 ham shu bilan jonli tasdiqlandi.
