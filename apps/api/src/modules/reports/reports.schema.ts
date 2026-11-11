@@ -240,3 +240,15 @@ export const pnlReportDtoSchema = z
   })
   .openapi('PnlReport');
 export type PnlReport = z.infer<typeof pnlReportDtoSchema>;
+
+/**
+ * FU-31 — hisobot filial tanlagichi: FAQAT chaqiruvchida `report.view` bor tayinlovlardan
+ * kelgan filiallar (server `reportBranchScope` bilan bir xil doira).
+ */
+export const reportBranchesDtoSchema = z
+  .object({
+    branches: z.array(z.object({ id: z.uuid(), name: z.string() })),
+    allowAllBranches: z.boolean(),
+  })
+  .openapi('ReportBranches');
+export type ReportBranchesDto = z.infer<typeof reportBranchesDtoSchema>;

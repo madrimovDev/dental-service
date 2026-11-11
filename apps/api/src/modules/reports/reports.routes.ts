@@ -25,6 +25,7 @@ import {
   ownerTodayReportDtoSchema,
   planCompletionReportDtoSchema,
   pnlReportDtoSchema,
+  reportBranchesDtoSchema,
   reportRangeSchema,
   revenueReportDtoSchema,
 } from './reports.schema.ts';
@@ -37,6 +38,22 @@ export const reportsRoutes = (deps: { db: Database; audit: AuditLogger }) => {
   app.use('*', rlsMiddleware(deps.db));
 
   const service = createReportsService({ audit: deps.audit });
+
+  // ─── GET /branches — hisobot filial tanlagichi (FU-31) ─────────────────────
+  // Statik yo'l; filial doirasi `reportBranchScope` bilan bir xil (report.view tayinlovlari).
+
+  const reportBranchesRoute = createRoute({
+    method: 'get',
+    path: '/branches',
+    tags: ['reports'],
+    operationId: 'getReportBranches',
+    middleware: [requirePermission('report.view'), reportBranchScope()] as const,
+    responses: okJson(reportBranchesDtoSchema, 'Branches the caller may report on'),
+  });
+
+  app.openapi(reportBranchesRoute, async (c) => {
+    return c.json(ok(await service.reportBranches(c)), 200);
+  });
 
   // ─── GET /revenue ──────────────────────────────────────────────────────────
 

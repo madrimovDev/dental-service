@@ -1147,6 +1147,16 @@
     "notes": "Eslatma",
     "conflict": "Doktor bu vaqtda band",
     "patient_conflict": "Bemor shu vaqtda boshqa yozilishga ega",
+    "price_unset": "Narx belgilanmagan",
+    "price_branch": "filial narxi",
+    "price_partial": "ba'zi xizmatlarga narx belgilanmagan",
+    "moved": "{{name}} — {{doctor}}, {{time}} ga ko'chirildi",
+    "move_failed": "Ko'chirib bo'lmadi — yozilish joyiga qaytarildi",
+    "move_action": "Ko'chirish",
+    "move_time": "Yangi vaqt (shu kun)",
+    "move_doctor": "Shifokor",
+    "move_apply": "Ko'chirish",
+    "slot_busy": "Bu vaqt hozirgina band qilindi — boshqa vaqtni tanlang",
     "patient_flagged": "Diqqat: bu bemor {{count}} marta kelmagan",
     "empty": "Yozuvlar yo'q",
     "empty_week": "Bu hafta yozilishlar yo'q",
@@ -2125,7 +2135,8 @@
       "appointments": "Jami {{total}} qabul. Kelmaganlar {{noShow}}, slot bandligi {{util}}.",
       "newPatients": "{{new}} yangi va {{returning}} qaytgan bemor. Qaytish ulushi {{rate}}.",
       "recall": "{{total}} ta qayta chaqiruvdan {{converted}} tasi qabulga yozildi ({{rate}}).",
-      "plans": "{{total}} bosqichdan {{done}} tasi bajarildi ({{rate}})."
+      "plans": "{{total}} bosqichdan {{done}} tasi bajarildi ({{rate}}).",
+      "pnl": "Sof foyda {{net}}: tushum {{revenue}} dan xarajat {{expenses}} va ish haqi ayirildi."
     },
     "chart": {
       "payment": "To'lov usuli bo'yicha",
@@ -2141,7 +2152,8 @@
       "appointments": "Kelmaganlar ulushi = «kelmadi» holatidagi qabullar / jami. Bandlik = band daqiqalar / filial ish soati × shifokorlar.",
       "newPatients": "Yangi — davrda birinchi marta kelgan; qaytgan — avval ham kelgan va davrda qayta kelgan bemorlar.",
       "recall": "Qayta chaqiruvdan keyin qabulga yozilgan yoki yakunlanganlar ulushi.",
-      "plans": "Davrda yaratilgan qabul qilingan rejalarning bosqichlari: bajarilgan / jami."
+      "plans": "Davrda yaratilgan qabul qilingan rejalarning bosqichlari: bajarilgan / jami.",
+      "pnl": "Sof foyda = sof tushum (qaytarishlar ayirilgan) − xarajatlar − yakunlangan ish haqi. Filial tanlansa ish haqi hisobga olinmaydi (ish haqi filialga bog'lanmagan)."
     }
   },
   "settingsShell": {

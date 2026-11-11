@@ -161,6 +161,11 @@
   color: var(--ink);
 }
 
+/* sudrab ko'chirish mumkin */
+.slot[data-draggable="true"] {
+  cursor: grab;
+}
+
 /* tanlangan yozilish — qalin ink halqa (kanvas: box-shadow 3px ink) */
 .slot[data-selected="true"] {
   box-shadow: 0 0 0 3px var(--ink);

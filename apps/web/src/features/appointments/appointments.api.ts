@@ -4,14 +4,17 @@ import {
   createAppointment,
   getBookingContext,
   getBranchAvailability,
+  getService,
   listAppointments,
   listBranches,
   listDoctors,
   listServices,
   updateAppointment,
 } from '@dental/api-client';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { findActivePrice } from '@/features/cashier/cashier.mappers';
 import { scheduleKeys } from '@/features/schedule/schedule.keys';
+import { serviceKeys } from '@/features/services/services.keys';
 import { lookupKeys } from '@/lib/lookup-keys';
 import { appointmentKeys } from './appointments.keys';
 import type { Appointment, AppointmentStatus } from './appointments.types';
@@ -142,6 +145,23 @@ export function useUpdateAppointmentStatus() {
   });
 }
 
+/** Yozilishni boshqa vaqt/shifokorga ko'chirish (`PATCH /appointments/:id`, `appointment.edit`). */
+export function useMoveAppointment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...body
+    }: {
+      id: string;
+      startTime: string;
+      endTime: string;
+      doctorId?: string;
+    }) => updateAppointment(id, body).then((r) => r.data),
+    onSuccess: () => invalidateAppointmentAndAvailability(qc),
+  });
+}
+
 /**
  * UI-R3: bemorning ochiq lab buyurtmalari (muddat ogohlantirishi) + faol reja bosqichi
  * (taklif). `appointment.create` — registratorda `lab_order.view` yo'q, shuning uchun tor endpoint.
@@ -152,4 +172,32 @@ export function useBookingContext(patientId: string | null) {
     enabled: !!patientId,
     queryFn: () => getBookingContext({ patientId: patientId ?? '' }).then((r) => r.data),
   });
+}
+
+/**
+ * Narx chip'lari: har xizmatning tanlangan FILIAL bo'yicha amaldagi narxi
+ * (`id → narx | null` (narx belgilanmagan); hali yuklanmaganlar xaritada YO'Q).
+ * TODO(batch): ro'yxat endpoint'i narxni qaytarsa (generate:contract) — N ta `GET /services/{id}`
+ * o'rniga bitta so'rov. Detail cache'i kassa bilan umumiy (`serviceKeys.detail`).
+ */
+export function useServicePrices(
+  serviceIds: string[],
+  branchId: string | null,
+  enabled = true,
+): Map<string, number | null> {
+  const results = useQueries({
+    queries: serviceIds.map((id) => ({
+      queryKey: serviceKeys.detail(id),
+      queryFn: () => getService(id).then((r) => r.data),
+      enabled: enabled && !!branchId,
+      staleTime: 5 * 60_000,
+    })),
+  });
+  const out = new Map<string, number | null>();
+  if (!branchId) return out;
+  results.forEach((r, i) => {
+    const id = serviceIds[i];
+    if (id && r.data) out.set(id, findActivePrice(r.data.prices, branchId));
+  });
+  return out;
 }

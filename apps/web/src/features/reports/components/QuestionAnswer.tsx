@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import { useDoctors } from '@/features/appointments/appointments.api';
 import { Donut } from '@/features/dashboard/components/widgets/Donut';
 import { Heatmap } from '@/features/dashboard/components/widgets/Heatmap';
+import { PnlPanel } from '@/features/expenses/components/PnlPanel';
 import { formatCurrency, formatNumber } from '@/lib/format';
 import {
   useAppointmentStats,
@@ -15,6 +16,7 @@ import {
   useOneCExport,
   useOwnerTodayReport,
   usePlanCompletion,
+  usePnlReport,
   useRevenueReport,
 } from '../reports.api';
 import {
@@ -85,6 +87,8 @@ export function QuestionAnswer({ question, range, ready }: Props) {
       return <DebtAnswer ready={ready} />;
     case 'services':
       return <ServicesAnswer range={range} ready={ready} />;
+    case 'pnl':
+      return <PnlAnswer range={range} ready={ready} />;
     case 'doctors':
       return <DoctorsAnswer range={range} ready={ready} />;
     case 'appointments':
@@ -340,6 +344,29 @@ function ServicesAnswer({ range, ready }: SubProps) {
           ))}
         </DataTable>
       }
+    />
+  );
+}
+
+function PnlAnswer({ range, ready }: SubProps) {
+  const { t } = useTranslation();
+  const q = usePnlReport(range, { enabled: ready });
+  const d = q.data;
+  return (
+    <AnswerShell
+      title={t('reportsQ.q.pnl')}
+      query={q}
+      hasData={!!d}
+      sentence={
+        d &&
+        t('reportsQ.answer.pnl', {
+          net: formatCurrency(d.netProfit, t),
+          revenue: formatCurrency(d.revenue, t),
+          expenses: formatCurrency(d.expenses, t),
+        })
+      }
+      chart={d && <PnlPanel pnl={d} />}
+      howText={t('reportsQ.howText.pnl')}
     />
   );
 }

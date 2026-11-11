@@ -1,5 +1,7 @@
+import { ApiError } from '@dental/api-client';
 import { Button, IconButton, StateView, StatusPill, Tabs, UndoToast } from '@dental/ui';
 import { Group, Select } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import { ChevronRight } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,10 +15,17 @@ import {
   useBranches,
   useCancelAppointment,
   useDoctors,
+  useMoveAppointment,
   useServices,
   useUpdateAppointmentStatus,
 } from '../appointments.api';
-import { addDaysToDateKey, localDateKey, mondayOfWeek } from '../appointments.mappers';
+import {
+  addDaysToDateKey,
+  instantFromDayMinute,
+  localDateKey,
+  localMinutes,
+  mondayOfWeek,
+} from '../appointments.mappers';
 import type { Appointment, AppointmentStatus, CalendarEvent } from '../appointments.types';
 import { AppointmentPanel } from './AppointmentPanel';
 import { CalendarGrid } from './CalendarGrid';
@@ -58,6 +67,10 @@ export function CalendarScreen() {
   const pendingRef = useRef<PendingAction | null>(null);
   /** Kutilayotgan (UndoToast) yoki yuborilgan, hali refetch bo'lmagan holatlar — optimistik ko'rinish. */
   const [overrides, setOverrides] = useState<Record<string, AppointmentStatus>>({});
+  /** Sudrab ko'chirish: UndoToast tugaguncha ko'rinish yangi joyda, PATCH hali yuborilmagan. */
+  const [moves, setMoves] = useState<
+    Record<string, { startTime: string; endTime: string; doctorId: string }>
+  >({});
 
   // A11 (CLI-438): pivot kun — `date` (brauzer-local Date, faqat navigatsiya/display
   // uchun) qaysi Tashkent kalendar kuniga tegishli ekanini aniqlaydi. Fetch range
@@ -92,6 +105,7 @@ export function CalendarScreen() {
   const { data: branchesData } = useBranches();
   const cancelMut = useCancelAppointment();
   const statusMut = useUpdateAppointmentStatus();
+  const moveMut = useMoveAppointment();
   const canViewSchedule = hasPermission('schedule.view');
   const { data: availability } = useBranchAvailability({
     branchId,
@@ -132,9 +146,11 @@ export function CalendarScreen() {
     () =>
       (appts ?? []).map((a) => {
         const status = overrides[a.id];
-        return status ? { ...a, status } : a;
+        const mv = moves[a.id];
+        const base = mv ? { ...a, ...mv } : a;
+        return status ? { ...base, status } : base;
       }),
-    [appts, overrides],
+    [appts, overrides, moves],
   );
 
   // Server holati override'ga yetib kelgach (refetch) override tushiriladi.
@@ -146,6 +162,24 @@ export function CalendarScreen() {
       let changed = false;
       for (const a of appts ?? []) {
         if (next[a.id] === a.status) {
+          delete next[a.id];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [appts]);
+
+  // Ko'chirish serverga yetib kelgach (refetch) vaqtinchalik joy tushiriladi.
+  useEffect(() => {
+    setMoves((prev) => {
+      const keys = Object.keys(prev);
+      if (keys.length === 0) return prev;
+      const next = { ...prev };
+      let changed = false;
+      for (const a of appts ?? []) {
+        const mv = next[a.id];
+        if (mv && new Date(a.startTime).getTime() === new Date(mv.startTime).getTime()) {
           delete next[a.id];
           changed = true;
         }
@@ -187,6 +221,12 @@ export function CalendarScreen() {
 
   /** Optimistik holatni olib tashlash (xato yoki qaytarish). */
   const clearOverride = useCallback((id: string) => {
+    setMoves((prev) => {
+      if (!(id in prev)) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
     setOverrides((prev) => {
       if (!(id in prev)) return prev;
       const next = { ...prev };
@@ -239,6 +279,63 @@ export function CalendarScreen() {
     startUndoable(appt, 'cancelled', () =>
       cancelMut.mutate({ id: appt.id }, { onError: () => clearOverride(appt.id) }),
     );
+
+  /** 409 va boshqa xatolar → aniq xabar (joyiga qaytadi). */
+  const moveErrorMessage = (err: unknown): string => {
+    if (err instanceof ApiError) {
+      if (err.code === 'conflict.doctor_busy') return t('appointments.conflict');
+      if (err.code === 'conflict.patient_busy') return t('appointments.patient_conflict');
+      if (err.code === 'conflict.slot_busy') return t('appointments.slot_busy');
+      if (err.code === 'schedule.outside_working_hours')
+        return t('appointments.outside_working_hours');
+    }
+    return t('appointments.move_failed');
+  };
+
+  /**
+   * Sudrab (yoki panel orqali) ko'chirish: joy darhol yangilanadi, `UndoToast` tugagach
+   * PATCH ketadi. Server 409 qaytarsa yozilish joyiga qaytadi va xabar chiqadi.
+   */
+  const moveAppointment = (appt: Appointment, doctorId: string, startMinute: number) => {
+    const durationMs = new Date(appt.endTime).getTime() - new Date(appt.startTime).getTime();
+    const startTime = instantFromDayMinute(pivotKey, startMinute);
+    const endTime = new Date(new Date(startTime).getTime() + durationMs).toISOString();
+    const sameSpot =
+      doctorId === appt.doctorId &&
+      localMinutes(appt.startTime) === startMinute &&
+      localDateKey(appt.startTime) === pivotKey;
+    if (sameSpot) return;
+    flushPending();
+    setMoves((prev) => ({ ...prev, [appt.id]: { startTime, endTime, doctorId } }));
+    const hh = `${String(Math.floor(startMinute / 60)).padStart(2, '0')}:${String(startMinute % 60).padStart(2, '0')}`;
+    const action: PendingAction = {
+      key: `${appt.id}:move:${startTime}:${doctorId}`,
+      id: appt.id,
+      status: appt.status,
+      label: t('appointments.moved', {
+        name: patientName(appt.patientId),
+        doctor: doctorNameMap.get(doctorId) ?? '',
+        time: hh,
+      }),
+      commit: () =>
+        moveMut.mutate(
+          {
+            id: appt.id,
+            startTime,
+            endTime,
+            ...(doctorId !== appt.doctorId ? { doctorId } : {}),
+          },
+          {
+            onError: (err) => {
+              clearOverride(appt.id);
+              notifications.show({ color: 'red', message: moveErrorMessage(err) });
+            },
+          },
+        ),
+    };
+    pendingRef.current = action;
+    setPending(action);
+  };
 
   const undoPending = () => {
     const p = pendingRef.current;
@@ -363,6 +460,8 @@ export function CalendarScreen() {
               onSlotClick={openDetail}
               selectedId={selectedId}
               unscheduledDoctorIds={unscheduledDoctorIds}
+              canMove={hasPermission('appointment.edit')}
+              onMove={moveAppointment}
             />
           ) : (
             <WeekGrid
@@ -389,6 +488,11 @@ export function CalendarScreen() {
               onNoShow={() => markNoShow(selected)}
               onCancel={() => markCancelled(selected)}
               onClose={closeDetail}
+              doctors={doctors ?? []}
+              onMove={(doctorId, hhmm) => {
+                const [h, m] = hhmm.split(':').map(Number);
+                moveAppointment(selected, doctorId, (h ?? 0) * 60 + (m ?? 0));
+              }}
             />
           )}
           <DayStatsCard

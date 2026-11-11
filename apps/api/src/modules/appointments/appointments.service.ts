@@ -61,15 +61,18 @@ export type SchedulePredicates = {
  * map qilib bo'lmaydi — patient-overlap DB backstop'iga tushsa `patient_busy`
  * qaytarilishi shart, aks holda xato noto'g'ri xabar bilan ko'rinadi.
  */
-function exclusionConflictCode(
+export function exclusionConflictCode(
   err: unknown,
-): 'conflict.doctor_busy' | 'conflict.patient_busy' | null {
+): 'conflict.doctor_busy' | 'conflict.patient_busy' | 'conflict.slot_busy' | null {
   // FU-01: drizzle PG xatosini `.cause`ga o'raydi — pgErrorInfo ochadi.
   const pg = pgErrorInfo(err);
   // 40P01 (deadlock_detected): bir slotga ko'p parallel insert EXCLUDE gist
   // kutish zanjirida deadlock'ga tushishi mumkin — yutqazuvchi ham to'qnashuv
   // (boshqa so'rov slotni ushlagan), shuning uchun 409.
   if (!pg || (pg.code !== '23P01' && pg.code !== '40P01')) return null;
+  // FU-43: deadlock yutqazuvchisi qaysi constraint buzilganini bilmaydi — umumiy
+  // «slot band» (doktor/bemor deb taxmin qilinmaydi).
+  if (pg.code === '40P01') return 'conflict.slot_busy';
   if (pg.constraint === 'appointments_no_patient_overlap') return 'conflict.patient_busy';
   // `appointments_no_doctor_overlap` yoki noma'lum → doctor (mavjud xulq).
   return 'conflict.doctor_busy';

@@ -261,6 +261,34 @@ describe('IR-06: doira faqat report.view beradigan tayinlovlardan', () => {
   });
 });
 
+describe('FU-31: /reports/branches faqat report.view filiallari', () => {
+  const list = async (who: string) => {
+    const res = await createApp().request('/api/reports/branches', {
+      headers: { authorization: `Bearer ${tokens[who]}` },
+    });
+    return { status: res.status, d: res.status === 200 ? await data(res) : null };
+  };
+  test("A'da BM + B'da report.view'siz rol → faqat A, allowAll=false", async () => {
+    const r = await list('mixed');
+    expect(r.status).toBe(200);
+    expect(r.d.branches.map((b: any) => b.id)).toEqual([brA]);
+    expect(r.d.allowAllBranches).toBe(false);
+  });
+  test('ikki filialli BM → A va B; tenant-wide admin/owner → hammasi + allowAll', async () => {
+    const ab = await list('bmAB');
+    expect(ab.d.branches.map((b: any) => b.id).sort()).toEqual([brA, brB].sort());
+    expect(ab.d.allowAllBranches).toBe(false);
+    for (const who of ['admin', 'owner']) {
+      const r = await list(who);
+      expect(r.d.allowAllBranches).toBe(true);
+      expect(r.d.branches.length).toBe(3);
+    }
+  });
+  test('tayinlovsiz → 403 (fail-closed)', async () => {
+    expect((await list('ghost')).status).toBe(403);
+  });
+});
+
 describe('Cheklovsiz rollar', () => {
   test.each([
     'owner',

@@ -11,11 +11,22 @@ const hooks = vi.hoisted(() => ({
   debtCalls: [] as unknown[],
 }));
 
-vi.mock('@/features/auth', () => ({ useWorkspaceBranches: () => hooks.ws.current }));
 vi.mock('@/features/appointments/appointments.api', () => ({
   useDoctors: () => ({ data: [{ id: 'd1', name: 'Dr. Ali' }] }),
 }));
 vi.mock('../reports.api', () => ({
+  useReportBranches: () => hooks.ws.current,
+  usePnlReport: () =>
+    ok({
+      revenue: 1_300_000,
+      expenses: 280_000,
+      payroll: 180_000,
+      payrollFinalized: 180_000,
+      payrollDraft: 0,
+      payrollRunCount: 1,
+      payrollIncluded: true,
+      netProfit: 840_000,
+    }),
   useOwnerTodayReport: () =>
     ok({
       date: '2026-11-11',
@@ -130,6 +141,16 @@ describe('ReportsScreen (UI-M2)', () => {
     expect(
       screen.getByRole('heading', { level: 2, name: 'Kim qancha ishladi?' }),
     ).toBeInTheDocument();
+  });
+
+  it("FU-30: «Xarajat va sof foyda» ochiladi va /pnl ma'lumotini ko'rsatadi (soon emas)", () => {
+    hooks.ws.current = owner;
+    renderApp(<ReportsScreen />, { route: '/reports?q=pnl' });
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Xarajat va sof foyda' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Sof foyda 840\s*000/)).toBeInTheDocument();
+    expect(screen.getByTestId('pnl-net')).toBeInTheDocument();
   });
 
   it('filial ma‘lumoti kelmaguncha hech qanday hisobot so‘rovi yoqilmaydi', () => {

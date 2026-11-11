@@ -120,6 +120,7 @@ export const appointmentRoutes = (deps: {
       if (
         result.code === 'conflict.doctor_busy' ||
         result.code === 'conflict.patient_busy' ||
+        result.code === 'conflict.slot_busy' ||
         result.code === 'schedule.outside_working_hours' ||
         result.code === 'schedule.doctor_on_time_off'
       )
@@ -221,6 +222,7 @@ export const appointmentRoutes = (deps: {
       if (
         result.code === 'conflict.doctor_busy' ||
         result.code === 'conflict.patient_busy' ||
+        result.code === 'conflict.slot_busy' ||
         result.code === 'schedule.outside_working_hours' ||
         result.code === 'schedule.doctor_on_time_off'
       )

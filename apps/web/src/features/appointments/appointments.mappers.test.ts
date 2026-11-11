@@ -1,6 +1,13 @@
 import type { Appointment } from '@dental/api-client';
 import { describe, expect, it } from 'vitest';
-import { assignLanes, groupByDay, localMinutes, toSlotPosition } from './appointments.mappers';
+import {
+  assignLanes,
+  dropStartMinute,
+  groupByDay,
+  instantFromDayMinute,
+  localMinutes,
+  toSlotPosition,
+} from './appointments.mappers';
 import { GRID } from './appointments.types';
 
 function appt(start: string, end: string, id = 'a'): Appointment {
@@ -54,5 +61,23 @@ describe('appointments.mappers — timezone + grid', () => {
     expect(cols[0]?.dateKey).toBe('2026-06-10');
     expect(cols[0]?.events).toHaveLength(1);
     expect(cols[1]?.events).toHaveLength(1);
+  });
+});
+
+describe('sudrab ko‘chirish matematikasi', () => {
+  it('Y → 15 daqiqalik qadam, grab offset hisobga olinadi, kun chegarasiga qisiladi', () => {
+    // 88 px/soat; 2 soat = 176 px → 10:00
+    expect(dropStartMinute(176, 0, 0, 30)).toBe(10 * 60);
+    // slotni o'rtasidan (44px) ushlagan: 176+44 → hali 10:00
+    expect(dropStartMinute(220, 0, 44, 30)).toBe(10 * 60);
+    // 15-daqiqaga yaxlitlash (10:10 → 10:15)
+    expect(dropStartMinute(176 + (10 * 88) / 60, 0, 0, 30)).toBe(10 * 60 + 15);
+    // kun boshidan oldin / oxiridan keyin qisiladi (oxiri — davomiylik hisobga olingan)
+    expect(dropStartMinute(-500, 0, 0, 30)).toBe(8 * 60);
+    expect(dropStartMinute(99999, 0, 0, 60)).toBe(19 * 60);
+  });
+
+  it('Tashkent kun+daqiqa → UTC instant (UTC+5)', () => {
+    expect(instantFromDayMinute('2026-06-10', 10 * 60 + 30)).toBe('2026-06-10T05:30:00.000Z');
   });
 });
