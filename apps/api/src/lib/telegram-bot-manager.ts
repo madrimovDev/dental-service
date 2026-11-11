@@ -5,14 +5,23 @@ import IORedis from 'ioredis';
 import { Telegraf } from 'telegraf';
 import { message } from 'telegraf/filters';
 import type { Database, DbOrTx } from '../db/client.ts';
+import { expireStaleBookingRequests } from '../modules/booking-requests/booking-requests.repository.ts';
 import { decryptSecret } from './crypto.ts';
 import { env } from './env.ts';
 import { logger } from './logger.ts';
+import { createBotFlows } from './telegram/deps.ts';
+import type { TelegramFlows } from './telegram/flows.ts';
+import { type BotReply, toTelegrafExtra } from './telegram/reply.ts';
 
 type ManagerDeps = {
   adminDb: Database;
   withTenant: <T>(tenantId: string, fn: (tx: DbOrTx) => Promise<T>) => Promise<T>;
+  /** Test/DI — default `createBotFlows(adminDb)` (UI-T2 suhbat oqimlari). */
+  flows?: TelegramFlows;
 };
+
+/** 24 soatdan eski `pending` bron so'rovlarini yopish davri (cross-tenant, admin conn). */
+const BOOKING_EXPIRY_INTERVAL_MS = 60 * 60_000;
 
 /** Bir tenantning telegram token'ini o'qib bot ishga tushiradi (null → yo'q). */
 async function readToken(adminDb: Database, tenantId: string): Promise<string | null> {
@@ -55,18 +64,37 @@ export async function linkPatientByContact(
 
 export function startTelegramBotManager(deps: ManagerDeps) {
   const bots = new Map<string, Telegraf>();
+  const flows = deps.flows ?? createBotFlows(deps.adminDb);
 
   const launch = async (tenantId: string, token: string) => {
     const bot = new Telegraf(token);
-    bot.start((ctx) =>
+    const run = <T>(fn: (tx: DbOrTx) => Promise<T>) => deps.withTenant(tenantId, fn);
+    const send = (ctx: { reply: (t: string, e?: object) => Promise<unknown> }, r: BotReply) =>
+      ctx.reply(r.text, toTelegrafExtra(r));
+    const askContact = (ctx: { reply: (t: string, e?: object) => Promise<unknown> }) =>
       ctx.reply('Telefon raqamingizni ulashing:', {
         reply_markup: {
           keyboard: [[{ text: '📱 Telefonni ulashish', request_contact: true }]],
           resize_keyboard: true,
           one_time_keyboard: true,
         },
-      }),
-    );
+      });
+    bot.catch((err) => logger.error({ err, tenantId }, 'bot handler failed'));
+
+    bot.start(async (ctx) => {
+      const menu = await run((tx) => flows.menuFor(tx, tenantId, String(ctx.chat.id)));
+      // Bog'langan bemor — menyu; aks holda kontakt so'raladi (P8).
+      if (menu.keyboard) await send(ctx, menu);
+      else await askContact(ctx);
+    });
+    for (const command of ['book', 'anketa', 'lang', 'menu'] as const) {
+      bot.command(command, async (ctx) => {
+        const r = await run((tx) =>
+          flows.onCommand(tx, { tenantId, chatId: String(ctx.chat.id), command }),
+        );
+        await send(ctx, r);
+      });
+    }
     // CLI-475 B7 — `message('contact')` filter (Telegraf'ning eskirgan
     // `bot.on('contact', …)` overload'i o'rniga); `ctx.message.contact` tip-xavfsiz.
     bot.on(message('contact'), async (ctx) => {
@@ -91,6 +119,30 @@ export function startTelegramBotManager(deps: ManagerDeps) {
           "⚠️ Bu raqam boshqa Telegram hisobiga bog'langan. Klinikaga murojaat qiling.",
       };
       await ctx.reply(replies[outcome]);
+      if (outcome === 'linked') {
+        await send(ctx, await run((tx) => flows.menuFor(tx, tenantId, chatId)));
+      }
+    });
+    // Menyu tugmalari va anketa javoblari (matn). Kontakt/komandalar yuqorida ushlanadi.
+    bot.on(message('text'), async (ctx) => {
+      const r = await run((tx) =>
+        flows.onText(tx, { tenantId, chatId: String(ctx.chat.id), text: ctx.message.text }),
+      );
+      await send(ctx, r);
+    });
+    // Inline tugmalar: eslatma (rm:), bron (bk:), anketa (qs:), til (lg:).
+    bot.on('callback_query', async (ctx) => {
+      const data = 'data' in ctx.callbackQuery ? ctx.callbackQuery.data : undefined;
+      const chatId = ctx.chat?.id;
+      if (!data || chatId === undefined) {
+        await ctx.answerCbQuery();
+        return;
+      }
+      const res = await run((tx) =>
+        flows.onCallback(tx, { tenantId, chatId: String(chatId), data }),
+      );
+      await ctx.answerCbQuery(res.toast);
+      if (res.reply) await send(ctx, res.reply);
     });
     // NOTE: `bot.launch()`'s promise does NOT resolve on start — it resolves only
     // after `bot.stop()` (Telegraf's `Polling.loop()` is a `for await` that runs
@@ -143,7 +195,17 @@ export function startTelegramBotManager(deps: ManagerDeps) {
 
   void bootAll().catch((err) => logger.error({ err }, 'bot bootAll failed'));
 
+  // UI-T2: 24 soatdan eski `pending` bron so'rovlari → `expired` (admin conn, barcha tenantlar).
+  const expire = () =>
+    expireStaleBookingRequests(deps.adminDb).catch((err) =>
+      logger.error({ err }, 'booking request expiry failed'),
+    );
+  void expire();
+  const expiryTimer = setInterval(() => void expire(), BOOKING_EXPIRY_INTERVAL_MS);
+  expiryTimer.unref();
+
   const stopAll = async () => {
+    clearInterval(expiryTimer);
     for (const [, bot] of bots) bot.stop('shutdown');
     bots.clear();
     await sub.quit();

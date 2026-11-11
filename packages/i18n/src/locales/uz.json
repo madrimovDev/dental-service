@@ -153,11 +153,21 @@
       "login_hint": "Kirish uchun telefon: {{phone}}. Parolni yetkazib beruvchidan oling.",
       "login_hint_existing": "Kirish uchun telefon: {{phone}}. Avvalgi parolingiz o'zgarmadi.",
       "error_invalid_key": "Litsenziya kaliti noto'g'ri",
-      "error_fingerprint_mismatch": "Bu litsenziya boshqa qurilmada faol. Supervisor bilan bog'laning.",
-      "error_fingerprint_unavailable": "Bu qurilmani aniqlab bo'lmadi (virtual muhit qo'llab-quvvatlanmaydi)",
-      "error_generic": "Litsenziyani faollashtirib bo'lmadi. Qaytadan urinib ko'ring.",
+      "error_fingerprint_mismatch": "Bu litsenziya boshqa kompyuterda faollashtirilgan",
+      "error_fingerprint_unavailable": "Bu kompyuterni aniqlab bo'lmadi (virtual muhit qo'llab-quvvatlanmaydi)",
+      "error_generic": "Litsenziyani faollashtirib bo'lmadi",
       "needs_vendor_title": "Klinika ma'lumotlari topilmadi",
-      "needs_vendor_body": "Litsenziya faollashtirilgan, lekin klinika ma'lumotlari bu kompyuterda topilmadi. Ta'minotchiga murojaat qiling — u \"qayta o'rnatishga tayyorlash\"ni bajarib, sizga yangi login va vaqtinchalik parol beradi."
+      "needs_vendor_body": "Litsenziya faollashtirilgan, lekin klinika ma'lumotlari bu kompyuterda topilmadi. Ta'minotchiga murojaat qiling — u \"qayta o'rnatishga tayyorlash\"ni bajarib, sizga yangi login va vaqtinchalik parol beradi.",
+      "next_invalid_key": "Kalitni ta'minotchi bergan xabardan qayta nusxalang (tire va harflarga e'tibor bering) va yana urinib ko'ring.",
+      "next_fingerprint_mismatch": "Kompyuter almashtirilgan bo'lsa, ta'minotchiga «qayta o'rnatishga tayyorlash»ni bosishni ayting — keyin shu yerda qayta urining.",
+      "next_fingerprint_unavailable": "Dasturni oddiy (virtual bo'lmagan) Windows kompyuterda ishga tushiring.",
+      "error_not_activated": "Bu kompyuter hali faollashtirilmagan",
+      "next_not_activated": "Litsenziya kalitini kiriting. Aktivatsiya faqat bir marta, internet bilan bajariladi.",
+      "error_supervisor": "Litsenziya serveri so'rovni qabul qilmadi yoki javob bermadi",
+      "next_supervisor": "Birozdan keyin qayta urining. Muammo davom etsa, ta'minotchiga murojaat qiling.",
+      "error_network": "Internetga ulanib bo'lmadi",
+      "next_network": "Internet ulanishini tekshiring va qayta urining. Aktivatsiya uchun internet faqat bir marta kerak.",
+      "next_generic": "Qaytadan urinib ko'ring. Takrorlansa, ta'minotchiga murojaat qiling."
     },
     "reset_owner": {
       "title": "Klinika egasi parolini tiklash",
@@ -1632,7 +1642,7 @@
     "attention_title": "Diqqat talab qiladi",
     "attention_empty": "Hammasi joyida",
     "attention_no_schedule_title": "{{name}} uchun ish jadvali yo'q",
-    "attention_no_schedule_text": "Jadvalsiz shifokorga bemor yozib bo'lmaydi.",
+    "attention_no_schedule_text": "Shaxsiy jadval kiritilmagan — bemorlar filial ish soati bo'yicha yoziladi.",
     "attention_open_schedule": "Jadvalni kiritish",
     "attention_lab_title": "Lab ishi muddati o'tgan",
     "attention_lab_text": "{{n}} ta buyurtma muddati o'tgan.",
@@ -2235,5 +2245,24 @@
     "restoreCancel": "Bekor qilish",
     "restoreStarted": "Tiklash boshlandi",
     "restoreFailed": "Tiklashni boshlab bo'lmadi. Klinika nomini va nusxani tekshiring."
+  },
+  "telegramRequests": {
+    "empty": "So'rovlar hozircha yo'q",
+    "confirm": "Tasdiqlash",
+    "decline": "Rad etish",
+    "decline_submit": "Rad etishni yuborish",
+    "cancel": "Bekor qilish",
+    "reason_label": "Rad etish sababi",
+    "reason_required": "Sababni kiriting",
+    "reschedule": "Boshqa vaqtga ko'chirish",
+    "kpi_sub": "tasdiqlash kutmoqda",
+    "confirm_conflict": "Bu vaqt band bo'lib qoldi — so'rov kutishda qoldi"
+  },
+  "desktopUpdate": {
+    "title": "Yangi versiya tayyor",
+    "at": "Klinika yopilgandan keyin, bugun {{time}} da o'rnatiladi.",
+    "now": "Hozir o'rnatish",
+    "tonight": "Kechqurun",
+    "installing": "Yangilanmoqda — kompyuterni o'chirmang"
   }
 }

@@ -1,14 +1,18 @@
 import { prescriptions } from '@dental/db-schema';
 import { and, desc, eq } from 'drizzle-orm';
 import type { Context } from 'hono';
+import { onAfterCommit } from '../../db/after-commit.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { createOwnershipValidator, type OwnershipValidator } from '../../lib/ownership.ts';
+import type { PatientMessenger } from '../../lib/telegram/notify.ts';
 import type { CreatePrescriptionInput, UpdatePrescriptionInput } from './prescriptions.schema.ts';
 
 export const createPrescriptionsService = (deps: {
   audit: AuditLogger;
   ownership?: OwnershipValidator;
+  /** UI-T2: retsept berilganda bemorga Telegram xabari (commit'dan keyin, best-effort). */
+  messenger?: PatientMessenger;
 }) => {
   const ownership = deps.ownership ?? createOwnershipValidator();
   async function list(c: Context, patientId?: string) {
@@ -76,6 +80,17 @@ export const createPrescriptionsService = (deps: {
         resourceId: row.id,
         after: { patientId: input.patientId, itemCount: input.items.length },
       });
+      const messenger = deps.messenger;
+      if (messenger) {
+        await onAfterCommit(c, () =>
+          messenger.sendPrescription({
+            tenantId,
+            patientId: row.patientId,
+            issuedAt: row.issuedDate,
+            items: row.items,
+          }),
+        );
+      }
     }
     return row;
   }

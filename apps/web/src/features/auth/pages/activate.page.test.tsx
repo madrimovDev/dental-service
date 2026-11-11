@@ -197,3 +197,47 @@ describe("ActivatePage — tenant yo'q holati (audit C1)", () => {
     expect(await screen.findByRole('textbox')).toBeInTheDocument();
   });
 });
+
+// UI-T3 — xato kodi emas: nima bo'ldi + keyingi qadam.
+describe('ActivatePage — xato kodlari oddiy tilda va keyingi qadam bilan', () => {
+  const codes: Array<[string, string]> = [
+    ['INVALID_KEY', 'invalid_key'],
+    ['FINGERPRINT_MISMATCH', 'fingerprint_mismatch'],
+    ['NOT_ACTIVATED', 'not_activated'],
+    ['SUPERVISOR_ERROR', 'supervisor'],
+  ];
+  for (const [code, key] of codes) {
+    it(`${code} — sabab va keyingi qadam ko'rinadi, xom kod emas`, async () => {
+      mockActivate({ success: false, error: { code, message: 'x' } });
+      renderApp(<ActivatePage />);
+      submit();
+
+      expect(await screen.findByText(i18n.t(`auth.activate.error_${key}`))).toBeInTheDocument();
+      expect(screen.getByText(i18n.t(`auth.activate.next_${key}`))).toBeInTheDocument();
+      expect(screen.queryByText(code)).not.toBeInTheDocument();
+    });
+  }
+
+  it('tarmoq xatosi (fetch reject) — tarmoq matni va keyingi qadam', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('Failed to fetch');
+      }),
+    );
+    renderApp(<ActivatePage />);
+    submit();
+
+    expect(await screen.findByText(i18n.t('auth.activate.error_network'))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('auth.activate.next_network'))).toBeInTheDocument();
+  });
+
+  it("noma'lum kod — umumiy matn va keyingi qadam", async () => {
+    mockActivate({ success: false, error: { code: 'WHATEVER', message: 'x' } });
+    renderApp(<ActivatePage />);
+    submit();
+
+    expect(await screen.findByText(i18n.t('auth.activate.error_generic'))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('auth.activate.next_generic'))).toBeInTheDocument();
+  });
+});

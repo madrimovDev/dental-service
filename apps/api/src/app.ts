@@ -12,12 +12,14 @@ import { METRICS_CONTENT_TYPE, renderMetrics } from './lib/metrics.ts';
 import { reminderQueue } from './lib/queue.ts';
 import { createReminderScheduler } from './lib/reminder-scheduler.ts';
 import { createLocalStorageAdapter } from './lib/storage.ts';
+import { createPatientMessenger } from './lib/telegram/notify.ts';
 import { errorHandler } from './middleware/error-handler.ts';
 import { requestId } from './middleware/request-id.ts';
 import { appointmentRoutes, createAppointmentsService } from './modules/appointments/index.ts';
 import { auditRoutes } from './modules/audit/index.ts';
 import { authRoutes } from './modules/auth/index.ts';
 import { backupRoutes } from './modules/backup/index.ts';
+import { bookingRequestRoutes } from './modules/booking-requests/index.ts';
 import { branchRoutes } from './modules/branches/index.ts';
 import { cashierRoutes } from './modules/cashier/index.ts';
 import { clinicalRoutes } from './modules/clinical/index.ts';
@@ -238,6 +240,19 @@ export const createApp = () => {
     removeReminder: reminderScheduler.removeReminder,
   });
   app.route('/api/appointments', appointmentRoutes({ db, audit, service: appointmentsService }));
+  // UI-T2: Telegram bot bron so'rovlari (registrator tasdiqlaydi → appointment).
+  // Desktop'da `appointments` moduli bo'lmasa bron so'rovlari ham yopiq.
+  app.use('/api/booking-requests', requireModuleInDesktop('appointments'));
+  app.use('/api/booking-requests/*', requireModuleInDesktop('appointments'));
+  app.route(
+    '/api/booking-requests',
+    bookingRequestRoutes({
+      db,
+      audit,
+      appointments: appointmentsService,
+      messenger: createPatientMessenger(),
+    }),
+  );
   app.route('/api/schedule', scheduleRoutes({ db, audit }));
   // CLI-482: queueService'ni shu yerda quramiz (deferred ref'ni to'ldiradi) va
   // queueRoutes'ga uzatamiz — forward-sync (queue→appt) VA teskari sync

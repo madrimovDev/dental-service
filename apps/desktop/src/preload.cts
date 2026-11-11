@@ -19,7 +19,23 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 const SET_SERVER_URL_CHANNEL = 'dental:set-server-url';
+// UI-T3 — yangilanish holati (kanal nomlari main.ts bilan literal bir xil, yuqoridagi izohga qarang).
+const UPDATE_STATE_CHANNEL = 'dental:update-state';
+const UPDATE_INSTALL_NOW_CHANNEL = 'dental:update-install-now';
+const UPDATE_INSTALL_TONIGHT_CHANNEL = 'dental:update-install-tonight';
+const UPDATE_GET_STATE_CHANNEL = 'dental:update-get-state';
 
 contextBridge.exposeInMainWorld('dentalDesktop', {
   setServerUrl: (serverUrl: string) => ipcRenderer.invoke(SET_SERVER_URL_CHANNEL, serverUrl),
+  onUpdateState: (cb: (state: unknown) => void) => {
+    const listener = (_e: unknown, state: unknown) => cb(state);
+    ipcRenderer.on(UPDATE_STATE_CHANNEL, listener);
+    // Banner mount bo'lguncha kelgan holatni ham olish.
+    void ipcRenderer.invoke(UPDATE_GET_STATE_CHANNEL).then((s: unknown) => {
+      if (s) cb(s);
+    });
+    return () => ipcRenderer.removeListener(UPDATE_STATE_CHANNEL, listener);
+  },
+  installUpdateNow: () => ipcRenderer.invoke(UPDATE_INSTALL_NOW_CHANNEL),
+  installUpdateTonight: () => ipcRenderer.invoke(UPDATE_INSTALL_TONIGHT_CHANNEL),
 });

@@ -12,8 +12,10 @@ import {
 import { createNoOpFiscalProvider, type FiscalProvider } from '@dental/fiscal';
 import { and, between, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
+import { onAfterCommit } from '../../db/after-commit.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import type { PatientMessenger } from '../../lib/telegram/notify.ts';
 import {
   computePlanBalance,
   distributeRefundNegations,
@@ -166,6 +168,8 @@ export const createCashierService = (deps: {
   priceLookup?: PriceLookup;
   /** CLI-446 G3: refund finalized payroll davriga tushsa carry-forward tuzatish yozish uchun. */
   payrollAdjustment?: PayrollAdjustmentHook;
+  /** UI-T2: to'lovdan keyin bemorga Telegram chek xabari (commit'dan keyin, best-effort). */
+  messenger?: PatientMessenger;
 }) => {
   // DI: env'da SOLIQ_* bo'lsa real Soliq provider, aks holda NoOp (V3-1).
   const fiscal: FiscalProvider = deps.fiscal ?? createNoOpFiscalProvider();
@@ -483,6 +487,21 @@ export const createCashierService = (deps: {
         resourceId: transaction.id,
         after: { receiptNumber, totalAmount: netTotal, items: input.items.length },
       });
+
+      // UI-T2: bog'langan (Telegram) bemorga chek xulosasi — commit'dan KEYIN.
+      const messenger = deps.messenger;
+      if (messenger && transaction.patientId && Number(transaction.paidAmount) > 0) {
+        const patientId = transaction.patientId;
+        await onAfterCommit(c, () =>
+          messenger.sendReceipt({
+            tenantId,
+            patientId,
+            amount: transaction.paidAmount,
+            at: transaction.createdAt,
+            receiptNumber: transaction.receiptNumber,
+          }),
+        );
+      }
 
       return { ...transaction, items };
     });
