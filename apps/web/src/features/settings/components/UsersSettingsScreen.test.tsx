@@ -42,8 +42,13 @@ vi.mock('../settings.api', () => ({
   useRemoveAssignment: () => ({ mutate: vi.fn(), isPending: false }),
   useResetPassword: () => ({ mutate: vi.fn(), isPending: false }),
 }));
+const perms = vi.hoisted(() => ({ value: ['@owner'] as string[] }));
 vi.mock('@/stores/auth-store.ts', () => ({
-  useAuthStore: () => ({ hasPermission: () => true, user: { id: 'me' } }),
+  useAuthStore: () => ({
+    permissions: perms.value,
+    hasPermission: (c: string) => perms.value.includes('@owner') || perms.value.includes(c),
+    user: { id: 'me' },
+  }),
 }));
 
 describe('UsersSettingsScreen', () => {
@@ -64,5 +69,18 @@ describe('UsersSettingsScreen', () => {
     renderApp(<UsersSettingsScreen />);
     // Badge -> StatusPill migratsiyasidan keyin ham label matni (users.active) DOM'da
     expect(screen.getAllByText('Faol').length).toBeGreaterThan(0);
+  });
+
+  it("reset ikonkasi owner'ga ko'rinadi", () => {
+    perms.value = ['@owner'];
+    renderApp(<UsersSettingsScreen />);
+    expect(screen.getAllByLabelText('Parolni qayta tiklash').length).toBeGreaterThan(0);
+  });
+
+  it("user.manage bor, lekin owner bo'lmagan foydalanuvchida reset ikonkasi yo'q (P6)", () => {
+    perms.value = ['user.manage'];
+    renderApp(<UsersSettingsScreen />);
+    expect(screen.queryByLabelText('Parolni qayta tiklash')).not.toBeInTheDocument();
+    perms.value = ['@owner'];
   });
 });

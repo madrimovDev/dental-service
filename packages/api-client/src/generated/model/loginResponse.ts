@@ -8,6 +8,7 @@ import type { LoginResponseUser } from './loginResponseUser';
 
 export interface LoginResponse {
   user: LoginResponseUser;
+  mustChangePassword: boolean;
   accessToken: string;
   refreshToken: string;
   accessExpiresAt: string;

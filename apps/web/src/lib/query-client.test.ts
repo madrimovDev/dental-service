@@ -77,3 +77,23 @@ describe('handleLicenseBlock (P18)', () => {
     expect(assign).not.toHaveBeenCalled();
   });
 });
+
+describe('handleLicenseBlock — auth.password_change_required (P6)', () => {
+  const assign = vi.fn();
+  afterEach(() => {
+    assign.mockReset();
+    vi.unstubAllGlobals();
+  });
+
+  it('403 auth.password_change_required → /change-password-required', () => {
+    vi.stubGlobal('window', { location: { pathname: '/patients', assign } });
+    expect(handleLicenseBlock(new ApiError('auth.password_change_required', 'x', 403))).toBe(true);
+    expect(assign).toHaveBeenCalledWith('/change-password-required');
+  });
+
+  it("maqsad sahifada qayta yo'naltirmaydi", () => {
+    vi.stubGlobal('window', { location: { pathname: '/change-password-required', assign } });
+    expect(handleLicenseBlock(new ApiError('auth.password_change_required', 'x', 403))).toBe(true);
+    expect(assign).not.toHaveBeenCalled();
+  });
+});

@@ -4,6 +4,11 @@ import type { AppRoute } from '@/shell';
 const ActivatePage = lazy(() =>
   import('./pages/activate.page').then((m) => ({ default: m.ActivatePage })),
 );
+const ChangePasswordRequiredPage = lazy(() =>
+  import('./pages/change-password-required.page').then((m) => ({
+    default: m.ChangePasswordRequiredPage,
+  })),
+);
 const LoginPage = lazy(() => import('./pages/login.page').then((m) => ({ default: m.LoginPage })));
 const RegisterTenantPage = lazy(() =>
   import('./pages/register-tenant.page').then((m) => ({ default: m.RegisterTenantPage })),
@@ -18,6 +23,7 @@ const SelectWorkspacePage = lazy(() =>
 // Public route'lar — shell tashqarisida, perm darvozasiz (app/routes.tsx publicRoutes ga qo'yadi)
 export const authRoutes: AppRoute[] = [
   { path: '/login', element: <LoginPage /> },
+  { path: '/change-password-required', element: <ChangePasswordRequiredPage /> },
   { path: '/activate', element: <ActivatePage /> },
   { path: '/register-tenant', element: <RegisterTenantPage /> },
   { path: '/reset-owner-password', element: <ResetOwnerPasswordPage /> },

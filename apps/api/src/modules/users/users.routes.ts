@@ -182,16 +182,24 @@ export const userRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     },
     responses: {
       ...okJson(userAssignmentRowDtoSchema, 'Updated assignment'),
-      ...assignmentNotFoundResponse,
+      403: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Forbidden (role.escalation: role exceeds caller permissions)',
+      },
+      404: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Assignment or role not found',
+      },
     },
   });
 
   app.openapi(updateAssignmentRoute, async (c) => {
     const { assignmentId } = c.req.valid('param');
     const body = c.req.valid('json');
-    const row = await service.updateAssignment(c, assignmentId, body);
-    if (!row) return c.json(fail('assignment.not_found', 'Assignment not found'), 404);
-    return c.json(ok(toUserAssignmentRowDto(row)), 200);
+    const result = await service.updateAssignment(c, assignmentId, body);
+    if (!result) return c.json(fail('assignment.not_found', 'Assignment not found'), 404);
+    if (!result.ok) return c.json(fail('role.not_found', 'Role not found'), 404);
+    return c.json(ok(toUserAssignmentRowDto(result.row)), 200);
   });
 
   // ─── DELETE /assignments/{assignmentId} ──────────────────────────────────
@@ -225,7 +233,7 @@ export const userRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     path: '/{userId}/reset-password',
     tags: ['users'],
     operationId: 'resetUserPassword',
-    middleware: [requirePermission('user.manage')] as const,
+    // P6: faqat owner — `requirePermission` o'rniga servisda `@owner` tekshiriladi.
     request: {
       params: userIdParamSchema,
     },
@@ -234,7 +242,11 @@ export const userRoutes = (deps: { db: Database; audit: AuditLogger }) => {
       ...userNotFoundResponse,
       403: {
         content: { 'application/json': { schema: errorResponseSchema } },
-        description: 'Forbidden (user not in tenant or cannot reset owner)',
+        description: 'Forbidden (owner only, or user not in tenant)',
+      },
+      400: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Owner cannot reset own password via this route',
       },
     },
   });
@@ -245,7 +257,12 @@ export const userRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     if (!result.ok) {
       const msgs: Record<string, [string, number]> = {
         'user.not_in_tenant': ['Foydalanuvchi bu klinikaga tegishli emas', 403],
-        'user.cannot_reset_owner': ["Klinika egasi parolini boshqa admin o'zgartira olmaydi", 403],
+        'user.reset_owner_only': ['Parolni faqat klinika egasi tiklaydi', 403],
+        'user.reset_other_tenant_owner': [
+          "Boshqa klinika egasining parolini tiklab bo'lmaydi",
+          403,
+        ],
+        'user.reset_self': ["O'z parolingizni 'Parolni almashtirish' orqali o'zgartiring", 400],
         'user.not_found': ['Foydalanuvchi topilmadi', 404],
       };
       const [msg, status] = msgs[result.code] ?? ['Reset failed', 400];

@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { index, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { boolean, index, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 /**
  * Platform-level user identity.
@@ -16,6 +16,8 @@ export const users = pgTable(
     email: text('email').unique(),
     passwordHash: text('password_hash').notNull(),
     fullName: text('full_name'),
+    // P6: owner vaqtinchalik parol bergan — birinchi kirishda majburiy almashtiriladi.
+    mustChangePassword: boolean('must_change_password').notNull().default(false),
     preferredLanguage: text('preferred_language').notNull().default('uz'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

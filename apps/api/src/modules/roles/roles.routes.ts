@@ -155,6 +155,10 @@ export const roleRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     responses: {
       ...okJson(rolePermissionsResultSchema, 'Role permissions updated'),
       ...notFoundResponse,
+      403: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Forbidden (role.escalation: permissions exceed caller permissions)',
+      },
     },
   });
 
