@@ -3544,6 +3544,9 @@
             "items": {
               "$ref": "#/components/schemas/AvailabilitySlot"
             }
+          },
+          "workHoursConfigured": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -3551,7 +3554,8 @@
           "branchId",
           "date",
           "slotMinutes",
-          "slots"
+          "slots",
+          "workHoursConfigured"
         ]
       },
       "AvailabilitySlot": {
@@ -11916,8 +11920,7 @@
                   "durationMinutes": {
                     "type": "integer",
                     "minimum": 0,
-                    "exclusiveMinimum": true,
-                    "default": 30
+                    "exclusiveMinimum": true
                   },
                   "requiredRole": {
                     "type": "string",
@@ -11932,8 +11935,7 @@
                     "maxLength": 1000
                   },
                   "isActive": {
-                    "type": "boolean",
-                    "default": true
+                    "type": "boolean"
                   }
                 }
               }
@@ -17163,8 +17165,7 @@
                     "type": "string"
                   },
                   "isActive": {
-                    "type": "boolean",
-                    "default": true
+                    "type": "boolean"
                   }
                 }
               }
@@ -18394,8 +18395,7 @@
                   "minThreshold": {
                     "type": "number",
                     "nullable": true,
-                    "minimum": 0,
-                    "default": 0
+                    "minimum": 0
                   }
                 }
               }
@@ -22118,8 +22118,7 @@
                     "items": {
                       "type": "string",
                       "format": "uuid"
-                    },
-                    "default": []
+                    }
                   },
                   "plan": {
                     "type": "string",
@@ -22130,8 +22129,7 @@
                     "items": {
                       "type": "string",
                       "format": "uuid"
-                    },
-                    "default": []
+                    }
                   },
                   "freeNotes": {
                     "type": "string",
@@ -22446,12 +22444,10 @@
                         "type": "string",
                         "maxLength": 5000
                       }
-                    },
-                    "default": {}
+                    }
                   },
                   "isShared": {
-                    "type": "boolean",
-                    "default": false
+                    "type": "boolean"
                   }
                 }
               }
