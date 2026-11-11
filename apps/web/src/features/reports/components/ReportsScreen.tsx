@@ -4,7 +4,7 @@ import { DatePickerInput } from '@mantine/dates';
 import { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
-import { useWorkspaceBranches } from '@/features/auth';
+import { useReportBranches } from '../reports.api';
 import {
   fromLocalDate,
   parseReportParams,
@@ -26,7 +26,7 @@ import { QuestionNav } from './QuestionNav';
 export function ReportsScreen() {
   const { t } = useTranslation();
   const [sp, setSp] = useSearchParams();
-  const wsBranches = useWorkspaceBranches();
+  const wsBranches = useReportBranches();
 
   // Filial ma'lumoti kelmaguncha so'rov yubormaymiz (fail-closed UI).
   const ready = !!wsBranches.data;

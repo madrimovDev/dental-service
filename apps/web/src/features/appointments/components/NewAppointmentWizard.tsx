@@ -12,13 +12,14 @@ import { useNavigate } from 'react-router-dom';
 import { usePatients } from '@/features/patients';
 import { useAvailability } from '@/features/schedule/schedule.api';
 import { localDateParam, slotTimeLabel } from '@/features/schedule/schedule.mappers';
-import { formatDayMonth } from '@/lib/format';
+import { formatCurrency, formatDayMonth } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import {
   useBookingContext,
   useBranches,
   useCreateAppointment,
   useDoctors,
+  useServicePrices,
   useServices,
 } from '../appointments.api';
 import { type WizardValues, wizardSchema } from '../appointments.schema';
@@ -44,6 +45,8 @@ function conflictMessage(err: unknown, t: (key: string) => string, lang: string)
     case 'conflict.patient_busy':
       // CLI-471: bemor shu vaqtda boshqa yozilishga ega.
       return t('appointments.patient_conflict');
+    case 'conflict.slot_busy':
+      return t('appointments.slot_busy');
     case 'schedule.outside_working_hours':
       return t('appointments.outside_working_hours');
     case 'schedule.doctor_on_time_off':
@@ -121,6 +124,21 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
   const slotMinutes = form.values.serviceIds.reduce(
     (sum, id) => sum + (durationByService.get(id) ?? 0),
     0,
+  );
+
+  // Narx chip'lari (filial narxi): faqat faol xizmatlar uchun; filial tanlanmaguncha ko'rsatilmaydi.
+  const priceBranchId = form.values.branchId || null;
+  const priceByService = useServicePrices(
+    (servicesData ?? []).map((s) => s.id),
+    priceBranchId,
+    hasPermission('service.view'),
+  );
+  const totalPrice = form.values.serviceIds.reduce(
+    (sum, id) => sum + (priceByService.get(id) ?? 0),
+    0,
+  );
+  const hasUnpriced = form.values.serviceIds.some(
+    (id) => priceByService.has(id) && priceByService.get(id) === null,
   );
 
   const dateParam = localDateParam(form.values.date);
@@ -318,6 +336,12 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
                   <b>{s.nameUz}</b>
                   <span className={styles.choiceMeta}>
                     {s.durationMinutes} {t('booking.minutes_short')}
+                    {priceByService.has(s.id) &&
+                      ` · ${
+                        priceByService.get(s.id) === null
+                          ? t('appointments.price_unset')
+                          : formatCurrency(priceByService.get(s.id) as number, t)
+                      }`}
                   </span>
                 </button>
               ))}
@@ -325,6 +349,9 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
             {slotMinutes > 0 && (
               <span className={styles.subtitle}>
                 {t('booking.total', { minutes: slotMinutes })}
+                {totalPrice > 0 &&
+                  ` · ${formatCurrency(totalPrice, t)} (${t('appointments.price_branch')})`}
+                {hasUnpriced && ` · ${t('appointments.price_partial')}`}
               </span>
             )}
           </section>

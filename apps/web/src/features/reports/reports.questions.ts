@@ -32,7 +32,7 @@ export const QUESTIONS: Question[] = [
   { key: 'revenue', group: 'money' },
   { key: 'debt', group: 'money', tenantWide: true },
   { key: 'services', group: 'money', tenantWide: true },
-  { key: 'pnl', group: 'money', soon: true },
+  { key: 'pnl', group: 'money', tenantWide: true },
   { key: 'doctors', group: 'doctors' },
   { key: 'appointments', group: 'doctors' },
   { key: 'noshowDoctors', group: 'doctors', soon: true },

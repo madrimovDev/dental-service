@@ -1,6 +1,7 @@
+import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { groupByDoctor } from '../appointments.mappers';
+import { dropStartMinute, groupByDoctor } from '../appointments.mappers';
 import type { Appointment } from '../appointments.types';
 import {
   type CalendarEvent,
@@ -12,6 +13,9 @@ import {
 import { AppointmentSlot } from './AppointmentSlot';
 import classes from './CalendarGrid.module.css';
 import { CurrentTimeLine } from './CurrentTimeLine';
+
+/** Faqat hali boshlanmagan yozilishni ko'chirish mumkin. */
+export const MOVABLE: ReadonlySet<string> = new Set(['scheduled', 'confirmed']);
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -42,6 +46,8 @@ export function CalendarGrid({
   onSlotClick,
   selectedId,
   unscheduledDoctorIds,
+  canMove = false,
+  onMove,
 }: {
   appointments: Appointment[];
   doctors: Doctor[];
@@ -54,7 +60,12 @@ export function CalendarGrid({
    * Ularning ustunida sabab bloki chiqadi: jadvalsiz yozib bo'lmaydi (P10).
    */
   unscheduledDoctorIds?: ReadonlySet<string> | null;
+  /** `appointment.edit` — faol yozilishlarni sudrab ko'chirish mumkin. */
+  canMove?: boolean;
+  /** Yozilish `doctorId` ustuniga, kun boshidan `startMinute` ga tushirildi. */
+  onMove?: (appointment: Appointment, doctorId: string, startMinute: number) => void;
 }) {
+  const dragRef = useRef<{ event: CalendarEvent; grab: number } | null>(null);
   const { t } = useTranslation();
   const cols = groupByDoctor(appointments, doctors);
   const noSchedule = (doctorId: string) => unscheduledDoctorIds?.has(doctorId) ?? false;
@@ -97,7 +108,36 @@ export function CalendarGrid({
                 </span>
                 <span className={classes.colCount}>{col.events.length}</span>
               </div>
+              {/* biome-ignore lint/a11y/noStaticElementInteractions: drop zone; klaviatura alternativasi — AppointmentPanel «Ko'chirish» */}
               <div
+                onDragOver={
+                  canMove
+                    ? (e) => {
+                        if (dragRef.current) e.preventDefault();
+                      }
+                    : undefined
+                }
+                onDrop={
+                  canMove
+                    ? (e) => {
+                        const d = dragRef.current;
+                        dragRef.current = null;
+                        if (!d) return;
+                        e.preventDefault();
+                        const dur = d.event.endMin - d.event.startMin;
+                        onMove?.(
+                          d.event.appointment,
+                          col.doctor.id,
+                          dropStartMinute(
+                            e.clientY,
+                            e.currentTarget.getBoundingClientRect().top,
+                            d.grab,
+                            dur,
+                          ),
+                        );
+                      }
+                    : undefined
+                }
                 className={`${classes.colBody} ${noSchedule(col.doctor.id) ? classes.colNoSchedule : ''}`}
               >
                 <GridLines />
@@ -121,6 +161,10 @@ export function CalendarGrid({
                     tone={tone}
                     onClick={onSlotClick}
                     selected={selectedId === e.appointment.id}
+                    draggable={canMove && MOVABLE.has(e.appointment.status)}
+                    onDragStartSlot={(ev, grab) => {
+                      dragRef.current = { event: ev, grab };
+                    }}
                   />
                 ))}
               </div>

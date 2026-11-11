@@ -1,10 +1,11 @@
 import { Button, IconButton, StatusPill } from '@dental/ui';
 import { X } from 'lucide-react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { formatDayMonth } from '@/lib/format';
 import { localTimeLabel } from '../appointments.mappers';
-import type { Appointment, AppointmentStatus } from '../appointments.types';
+import type { Appointment, AppointmentStatus, Doctor } from '../appointments.types';
 import classes from './AppointmentPanel.module.css';
 
 /** Yozilish holati → yagona holat lug'ati (UI-0). */
@@ -43,6 +44,9 @@ export const CAN_ABORT: ReadonlySet<AppointmentStatus> = new Set([
   'in_progress',
 ]);
 
+/** Ko'chirish (vaqt/shifokor) faqat hali boshlanmagan yozilish uchun. */
+const CAN_MOVE: ReadonlySet<AppointmentStatus> = new Set(['scheduled', 'confirmed']);
+
 export function AppointmentPanel({
   appointment,
   patientName,
@@ -55,6 +59,8 @@ export function AppointmentPanel({
   onNoShow,
   onCancel,
   onClose,
+  doctors = [],
+  onMove,
 }: {
   appointment: Appointment;
   patientName: string;
@@ -69,8 +75,16 @@ export function AppointmentPanel({
   onNoShow: () => void;
   onCancel: () => void;
   onClose: () => void;
+  /** Klaviatura alternativasi (sudrab ko'chirishga): shifokorlar ro'yxati. */
+  doctors?: Doctor[];
+  /** `hhmm` — Tashkent vaqti, kun yozilish kuni. */
+  onMove?: (doctorId: string, hhmm: string) => void;
 }) {
   const { t, i18n } = useTranslation();
+  const [moveOpen, setMoveOpen] = useState(false);
+  const [moveTime, setMoveTime] = useState(() => localTimeLabel(appointment.startTime));
+  const [moveDoctor, setMoveDoctor] = useState(appointment.doctorId);
+  const canMove = onMove != null && canEdit && CAN_MOVE.has(appointment.status);
   const status = appointment.status;
   const next = NEXT[status];
   const abortable = CAN_ABORT.has(status);
@@ -158,6 +172,49 @@ export function AppointmentPanel({
               </Button>
             )}
           </div>
+        </div>
+      )}
+
+      {canMove && (
+        <div className={classes.actions}>
+          {!moveOpen ? (
+            <Button variant="default" onClick={() => setMoveOpen(true)}>
+              {t('appointments.move_action')}
+            </Button>
+          ) : (
+            <form
+              className={classes.moveForm}
+              onSubmit={(e) => {
+                e.preventDefault();
+                onMove?.(moveDoctor, moveTime);
+                setMoveOpen(false);
+              }}
+            >
+              <label className={classes.moveField}>
+                <span>{t('appointments.move_time')}</span>
+                <input
+                  type="time"
+                  step={900}
+                  required
+                  value={moveTime}
+                  onChange={(e) => setMoveTime(e.currentTarget.value)}
+                />
+              </label>
+              <label className={classes.moveField}>
+                <span>{t('appointments.move_doctor')}</span>
+                <select value={moveDoctor} onChange={(e) => setMoveDoctor(e.currentTarget.value)}>
+                  {doctors.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <Button variant="primary" type="submit">
+                {t('appointments.move_apply')}
+              </Button>
+            </form>
+          )}
         </div>
       )}
 
