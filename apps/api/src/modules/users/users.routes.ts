@@ -258,6 +258,10 @@ export const userRoutes = (deps: { db: Database; audit: AuditLogger }) => {
       const msgs: Record<string, [string, number]> = {
         'user.not_in_tenant': ['Foydalanuvchi bu klinikaga tegishli emas', 403],
         'user.reset_owner_only': ['Parolni faqat klinika egasi tiklaydi', 403],
+        'user.reset_other_tenant_owner': [
+          "Boshqa klinika egasining parolini tiklab bo'lmaydi",
+          403,
+        ],
         'user.reset_self': ["O'z parolingizni 'Parolni almashtirish' orqali o'zgartiring", 400],
         'user.not_found': ['Foydalanuvchi topilmadi', 404],
       };

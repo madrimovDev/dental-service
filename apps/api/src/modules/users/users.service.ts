@@ -9,7 +9,7 @@ import {
   userAssignments,
   users,
 } from '@dental/db-schema';
-import { and, eq, gt, isNull, or, sql } from 'drizzle-orm';
+import { and, eq, gt, isNull, ne, or, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { Database } from '../../db/client.ts';
 import { getDb } from '../../db/scoped.ts';
@@ -369,6 +369,20 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
         .from(tenants)
         .where(eq(tenants.id, tenantId));
       const isOwner = tenant?.ownerUserId === targetUserId;
+
+      // P6: maqsad BOSHQA klinikaning egasi bo'lsa — rad etiladi. Hujumchi o'z klinikasiga
+      // begona foydalanuvchini (invite orqali, rozilik so'ramasdan) a'zo qilib, keyin
+      // parolini tiklab, uning klinikasini to'liq egallashi mumkin edi.
+      // `tenants` platform jadvali (RLS yo'q) — shu sababli tenant kontekstidan qat'i nazar
+      // barcha klinikalar ko'rinadi.
+      const [otherOwned] = await tx
+        .select({ id: tenants.id })
+        .from(tenants)
+        .where(and(eq(tenants.ownerUserId, targetUserId), ne(tenants.id, tenantId)))
+        .limit(1);
+      if (otherOwned) {
+        return { ok: false as const, code: 'user.reset_other_tenant_owner' };
+      }
 
       let hasAssignment = false;
       if (!isOwner) {
