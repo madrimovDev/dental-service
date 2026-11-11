@@ -1,5 +1,5 @@
 import type { ExpenseSummary } from '@dental/api-client';
-import { screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { renderApp } from '../../../test-utils';
 import type { PnlDto } from '../expenses.types';
@@ -35,6 +35,9 @@ const expensesResponse = {
   meta: { page: 1, pageSize: 100, total: 1 },
 };
 
+const useExpensesSpy = vi.fn();
+let expensesMeta = { page: 1, pageSize: 20, total: 1 };
+
 let pnlData: PnlDto | undefined = {
   revenue: 1300000,
   expenses: 280000,
@@ -66,12 +69,15 @@ vi.mock('../expenses.api', () => ({
     ],
   }),
   useBranches: () => ({ data: [{ id: 'b1', name: 'Markaz' }] }),
-  useExpenses: () => ({
-    data: expensesResponse,
-    isLoading: false,
-    isError: false,
-    refetch: vi.fn(),
-  }),
+  useExpenses: (params: unknown) => {
+    useExpensesSpy(params);
+    return {
+      data: { ...expensesResponse, meta: expensesMeta },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    };
+  },
   useExpenseSummary: () => ({ data: summary }),
   usePnl: () => ({ data: pnlData }),
   useDeleteExpense: () => ({ mutate: vi.fn(), isPending: false }),
@@ -117,5 +123,25 @@ describe('ExpensesScreen — P&L (UI-M6)', () => {
     renderApp(<ExpensesScreen />);
     expect(screen.getByTestId('pnl-payroll')).toHaveTextContent('—');
     expect(screen.getByTestId('pnl-branch-note')).toBeInTheDocument();
+  });
+});
+
+describe('ExpensesScreen — pagination (FU-42)', () => {
+  it("total > pageSize → sahifalash chiqadi va 2-sahifa so'raladi", () => {
+    expensesMeta = { page: 1, pageSize: 20, total: 45 };
+    renderApp(<ExpensesScreen />);
+    expect(useExpensesSpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 1, pageSize: 20 }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '2' }));
+    expect(useExpensesSpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 2, pageSize: 20 }),
+    );
+  });
+
+  it("bitta sahifa → sahifalash yo'q", () => {
+    expensesMeta = { page: 1, pageSize: 20, total: 3 };
+    renderApp(<ExpensesScreen />);
+    expect(screen.queryByRole('button', { name: '2' })).toBeNull();
   });
 });

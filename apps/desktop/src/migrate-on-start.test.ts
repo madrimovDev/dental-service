@@ -2,7 +2,7 @@ import { describe, expect, mock, test } from 'bun:test';
 
 await import('./test-electron-mock.js');
 
-const { migrateOnStart } = await import('./migrate-on-start.js');
+const { migrateOnStart, logMigrateFailure } = await import('./migrate-on-start.js');
 
 type Calls = string[];
 
@@ -213,6 +213,34 @@ console.log('RESULT:' + JSON.stringify({ r, calls }));
       if (prev === undefined) delete process.env.DENTAL_DATA_DIR;
       else process.env.DENTAL_DATA_DIR = prev;
       await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('logMigrateFailure (FU-44, real fs)', () => {
+  test("xato LOGS_DIR/migrate.log ga yoziladi (katalog yo'q bo'lsa yaratiladi)", async () => {
+    const { mkdtemp, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { readFileSync } = await import('node:fs');
+    const root = await mkdtemp(join(tmpdir(), 'mlog-'));
+    try {
+      const dir = join(root, 'nested', 'logs');
+      const ok = logMigrateFailure(dir, {
+        ok: false,
+        reason: 'failed',
+        restored: true,
+        message: 'boom\nline2',
+        backupFile: '/x/pre.dump',
+      });
+      expect(ok).toBe(true);
+      const txt = readFileSync(join(dir, 'migrate.log'), 'utf8');
+      expect(txt).toContain('reason=failed restored=true');
+      expect(txt).toContain('backup: /x/pre.dump');
+      expect(txt).toContain('boom');
+      expect(txt).toContain('line2');
+    } finally {
+      await rm(root, { recursive: true, force: true });
     }
   });
 });

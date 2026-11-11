@@ -19,6 +19,9 @@ export const users = pgTable(
     // P6: owner vaqtinchalik parol bergan — birinchi kirishda majburiy almashtiriladi.
     mustChangePassword: boolean('must_change_password').notNull().default(false),
     preferredLanguage: text('preferred_language').notNull().default('uz'),
+    // FU-15: telefon egaligi Telegram (o'z kontakti) orqali tasdiqlangan vaqt. NULL —
+    // tasdiqlanmagan: boshqa klinika taklifini qabul qilib bo'lmaydi. Parol tiklanganda NULL.
+    phoneVerifiedAt: timestamp('phone_verified_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),

@@ -5,8 +5,7 @@ import {
   type DoctorTimeOffInsert,
   doctorSchedules,
   doctorTimeOff,
-  permissions,
-  rolePermissions,
+  roles,
   userAssignments,
 } from '@dental/db-schema';
 import { and, asc, eq, gt, gte, isNotNull, isNull, lt, ne, notExists, or } from 'drizzle-orm';
@@ -201,7 +200,7 @@ export const createScheduleRepository = () => {
 
   /**
    * FU-17 (P10 fallback): filialga biriktirilgan (yoki tenant-wide) FAOL shifokorlar —
-   * `appointments.listDoctors` bilan bir xil ta'rif (`medical_record.edit`) — shu
+   * `appointments.listDoctors` bilan bir xil ta'rif (`roles.is_practitioner`, FU-41) — shu
    * filialda UMUMAN aktiv jadval segmenti YO'Q bo'lganlari. Ular filial ish soatida
    * ishlaydi deb hisoblanadi (`segmentsForDay` bilan izchil).
    */
@@ -210,14 +209,13 @@ export const createScheduleRepository = () => {
     const rows = await db
       .selectDistinct({ doctorId: userAssignments.userId })
       .from(userAssignments)
-      .innerJoin(rolePermissions, eq(rolePermissions.roleId, userAssignments.roleId))
-      .innerJoin(permissions, eq(permissions.id, rolePermissions.permissionId))
+      .innerJoin(roles, eq(roles.id, userAssignments.roleId))
       .where(
         and(
           eq(userAssignments.isActive, true),
           isNotNull(userAssignments.acceptedAt),
           or(isNull(userAssignments.branchId), eq(userAssignments.branchId, branchId)),
-          eq(permissions.code, 'medical_record.edit'),
+          eq(roles.isPractitioner, true),
           notExists(
             db
               .select({ one: doctorSchedules.id })

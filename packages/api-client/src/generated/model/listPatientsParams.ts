@@ -8,6 +8,7 @@
 export type ListPatientsParams = {
 search?: string;
 archived?: boolean | 'true' | 'false';
+debt?: boolean | 'true' | 'false';
 /**
  * @minimum 0
  * @exclusiveMinimum

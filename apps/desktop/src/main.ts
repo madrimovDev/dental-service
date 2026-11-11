@@ -57,7 +57,12 @@ import {
 } from './discovery.js';
 import { isFirstRun, runFirstSetup, runMigrations } from './first-run.js';
 import { fetchBootstrapStatus, licenseGatedUrl, resolveStartupUrl } from './license-status.js';
-import { createPgTools, createStateStore, migrateOnStart } from './migrate-on-start.js';
+import {
+  createPgTools,
+  createStateStore,
+  logMigrateFailure,
+  migrateOnStart,
+} from './migrate-on-start.js';
 import { getDataDir } from './paths.js';
 import {
   getApiCommand,
@@ -311,6 +316,7 @@ app.whenReady().then(async () => {
         now: () => new Date(),
       });
       if (!migration.ok) {
+        logMigrateFailure(LOGS_DIR, migration);
         const message =
           migration.reason === 'phone_conflict'
             ? "Yangilash to'xtatildi: bazada takroriy telefon raqamlari bor. Ta'minotchiga murojaat qiling."

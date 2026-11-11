@@ -7,5 +7,6 @@
 import type { PatientPhoneCheckMatchesItem } from './patientPhoneCheckMatchesItem';
 
 export interface PatientPhoneCheck {
+  count: number;
   matches: PatientPhoneCheckMatchesItem[];
 }

@@ -172,6 +172,12 @@ export const PERMISSIONS = [
     descriptionRu: 'Архивирование пациента',
   },
   {
+    code: 'patient.import',
+    category: 'patient',
+    descriptionUz: 'Bemorlarni Excel/CSV fayldan import qilish',
+    descriptionRu: 'Импорт пациентов из Excel/CSV',
+  },
+  {
     code: 'patient.view_pii',
     category: 'patient',
     descriptionUz: "Bemor PII (pasport, telefon) ko'rish",

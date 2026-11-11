@@ -510,6 +510,21 @@
       "tenant": "Klinika",
       "report": "Hisobotlar",
       "audit": "Audit"
+    },
+    "nav_services": "Xizmatlar va narxlar",
+    "nav_license": "Litsenziya",
+    "nav_backup": "Zaxira nusxa",
+    "license": {
+      "title": "Litsenziya",
+      "state": "Holat",
+      "expires": "Tugash sanasi",
+      "days_left": "Qolgan kun",
+      "state_active": "Faol",
+      "state_expiring": "Tez orada tugaydi",
+      "state_grace": "Imtiyoz muddati",
+      "state_expired": "Muddati tugagan",
+      "state_none": "Yo'q",
+      "renew_hint": "Uzaytirish ta'minotchi orqali; internet bo'lganda «Qayta tekshirish» yangilangan muddatni oladi."
     }
   },
   "users": {
@@ -566,6 +581,8 @@
   },
   "roles": {
     "create": "Yangi rol",
+    "practitioner": "Shifokor (yozilishni qabul qiladi)",
+    "practitioner_hint": "Belgilansa, bu rolli xodimlar yozilish va kalendarda shifokor sifatida ko'rinadi",
     "edit": "Rolni tahrirlash",
     "description": "Tavsif",
     "type": "Turi",
@@ -582,13 +599,15 @@
     "count": "{{count}} ta bemor",
     "filter": {
       "all": "Barchasi",
-      "archived": "Arxiv"
+      "archived": "Arxiv",
+      "debt": "Qarzdorlar"
     },
     "col": {
       "patient": "Bemor",
       "phone": "Telefon",
       "age_gender": "Yosh · jins",
-      "balance": "Balans"
+      "balance": "Balans",
+      "next_visit": "Keyingi tashrif"
     },
     "empty_title": "Bu bo'limda bemor yo'q",
     "empty_desc": "Boshqa filtrni tanlang yoki yangi bemor qo'shing",
@@ -731,7 +750,9 @@
     "allergy_confirm_pill": "Anesteziyadan oldin tasdiqlang",
     "payment_history": "To'lov tarixi",
     "no_medical_permission": "Sizda tibbiy kartani ko'rish ruxsati yo'q",
-    "collect_payment": "To'lov qabul qilish"
+    "collect_payment": "To'lov qabul qilish",
+    "import_button": "Excel'dan import",
+    "dup_desc_count": "Shu raqam bilan ro'yxatdan o'tgan bemorlar: {{count}} ta (ism faqat bemor ma'lumotlarini ko'ra oladiganlarga ko'rinadi)."
   },
   "medical": {
     "history_title": "O'zgarishlar tarixi",
@@ -1141,6 +1162,16 @@
     "notes": "Eslatma",
     "conflict": "Doktor bu vaqtda band",
     "patient_conflict": "Bemor shu vaqtda boshqa yozilishga ega",
+    "price_unset": "Narx belgilanmagan",
+    "price_branch": "filial narxi",
+    "price_partial": "ba'zi xizmatlarga narx belgilanmagan",
+    "moved": "{{name}} — {{doctor}}, {{time}} ga ko'chirildi",
+    "move_failed": "Ko'chirib bo'lmadi — yozilish joyiga qaytarildi",
+    "move_action": "Ko'chirish",
+    "move_time": "Yangi vaqt (shu kun)",
+    "move_doctor": "Shifokor",
+    "move_apply": "Ko'chirish",
+    "slot_busy": "Bu vaqt hozirgina band qilindi — boshqa vaqtni tanlang",
     "patient_flagged": "Diqqat: bu bemor {{count}} marta kelmagan",
     "empty": "Yozuvlar yo'q",
     "empty_week": "Bu hafta yozilishlar yo'q",
@@ -1921,7 +1952,11 @@
     "plan_teeth": "Rejalashtirilgan tishlar",
     "plan_empty": "Rejalashtirilgan bosqich yo'q",
     "tooth_history": "Tish {{n}} tarixi",
-    "history_empty": "Bu tish bo'yicha tarix yo'q"
+    "history_empty": "Bu tish bo'yicha tarix yo'q",
+    "suggest_title": "Davolash taklifi",
+    "suggest_none": "Mos xizmat topilmadi — katalogdan tanlang",
+    "suggest_other": "Boshqa xizmat tanlash",
+    "suggest_no_price": "narx yo'q"
   },
   "visitNote": {
     "title": "Vizit yozuvi",
@@ -2119,7 +2154,8 @@
       "appointments": "Jami {{total}} qabul. Kelmaganlar {{noShow}}, slot bandligi {{util}}.",
       "newPatients": "{{new}} yangi va {{returning}} qaytgan bemor. Qaytish ulushi {{rate}}.",
       "recall": "{{total}} ta qayta chaqiruvdan {{converted}} tasi qabulga yozildi ({{rate}}).",
-      "plans": "{{total}} bosqichdan {{done}} tasi bajarildi ({{rate}})."
+      "plans": "{{total}} bosqichdan {{done}} tasi bajarildi ({{rate}}).",
+      "pnl": "Sof foyda {{net}}: tushum {{revenue}} dan xarajat {{expenses}} va ish haqi ayirildi."
     },
     "chart": {
       "payment": "To'lov usuli bo'yicha",
@@ -2135,7 +2171,8 @@
       "appointments": "Kelmaganlar ulushi = «kelmadi» holatidagi qabullar / jami. Bandlik = band daqiqalar / filial ish soati × shifokorlar.",
       "newPatients": "Yangi — davrda birinchi marta kelgan; qaytgan — avval ham kelgan va davrda qayta kelgan bemorlar.",
       "recall": "Qayta chaqiruvdan keyin qabulga yozilgan yoki yakunlanganlar ulushi.",
-      "plans": "Davrda yaratilgan qabul qilingan rejalarning bosqichlari: bajarilgan / jami."
+      "plans": "Davrda yaratilgan qabul qilingan rejalarning bosqichlari: bajarilgan / jami.",
+      "pnl": "Sof foyda = sof tushum (qaytarishlar ayirilgan) − xarajatlar − yakunlangan ish haqi. Filial tanlansa ish haqi hisobga olinmaydi (ish haqi filialga bog'lanmagan)."
     }
   },
   "settingsShell": {
@@ -2152,7 +2189,12 @@
     "item_license": "Litsenziya / obuna",
     "item_backup": "Zaxira nusxa",
     "backupSection": "Zaxira nusxa",
-    "backupPlaceholder": "Zaxira bo'limi tez orada."
+    "backupPlaceholder": "Zaxira bo'limi tez orada.",
+    "pill_issues": "{{count}} muammo",
+    "pill_days": "{{count}} kun",
+    "pill_no_prices": "Narx yo'q",
+    "pill_no_channel": "Kanal yo'q",
+    "pill_never": "Hech qachon"
   },
   "staffCards": {
     "can": "Qila oladi",
@@ -2294,5 +2336,105 @@
     "reception_text": "Shifokor imzolagan, hali to'lanmagan bugungi vizitlar.",
     "reception_open": "Kassani ochish",
     "kpi": "Kassada kutmoqda"
+  },
+  "phoneVerify": {
+    "hint": "Taklifni qabul qilishdan oldin telefon raqamingiz sizniki ekanini Telegram orqali tasdiqlang.",
+    "start": "Telegram orqali tasdiqlash",
+    "waiting": "Telegram'da botga raqamingizni ulashing — tasdiq kutilmoqda…",
+    "open_link": "Telegram ochilmadimi? Havolani bosing",
+    "verified": "Telefon raqami tasdiqlandi",
+    "unavailable": "Bu klinikada Telegram bot sozlanmagan — klinika administratoriga murojaat qiling.",
+    "required": "Avval telefon raqamingizni Telegram orqali tasdiqlang.",
+    "start_failed": "Tasdiqlashni boshlab bo'lmadi. Birozdan keyin qayta urinib ko'ring."
+  },
+  "patientImport": {
+    "title": "Bemorlarni Excel/CSV'dan import qilish",
+    "choose_file": "Faylni tanlang",
+    "file_hint": "Birinchi qator — ustun sarlavhalari. .xlsx, .xls yoki .csv, 5 MB gacha. Fayl faqat shu brauzerda o'qiladi; serverga tekshirilgan qatorlar yuboriladi.",
+    "reading": "Fayl o'qilmoqda…",
+    "map_hint": "{{file}} — {{count}} ta qator. Har bir maydon uchun ustunni tanlang (ism majburiy).",
+    "no_column": "— ustun yo'q —",
+    "empty_header": "(sarlavhasiz)",
+    "field": {
+      "fullName": "Ism va familiya",
+      "phone": "Telefon",
+      "phoneSecondary": "Qo'shimcha telefon",
+      "dateOfBirth": "Tug'ilgan sana",
+      "gender": "Jins",
+      "address": "Manzil",
+      "passport": "Pasport",
+      "notes": "Izoh",
+      "source": "Manba"
+    },
+    "back": "Orqaga",
+    "preview": "Oldindan ko'rish",
+    "preview_hint": "Hali hech narsa saqlanmadi. Yangi bemorlar qo'shiladi, mavjud telefonlilar o'tkazib yuboriladi, xatoli qatorlar tashlanadi.",
+    "count_new": "Yangi",
+    "count_duplicate": "Dublikat (telefon mavjud)",
+    "count_error": "Xato",
+    "duplicates_note": "Dublikat qatorlar bemorni qayta yaratmaydi va mavjud ma'lumotni o'zgartirmaydi.",
+    "run": "Import qilish ({{count}} ta)",
+    "close": "Yopish",
+    "done_title": "Import tugadi",
+    "done_desc": "{{count}} ta yangi bemor qo'shildi.",
+    "errors_title": "Xato qatorlar",
+    "error_row": "Qator {{row}}: {{reason}}",
+    "errors_more": "…va yana {{count}} ta xato qator",
+    "error_title": "Import bajarilmadi",
+    "request_error": "Serverga yuborib bo'lmadi. Qayta urinib ko'ring.",
+    "no_rows": "Faylda import qilinadigan qator yo'q.",
+    "file_error": {
+      "too_big": "Fayl 5 MB dan katta.",
+      "empty": "Faylda sarlavha va kamida bitta ma'lumot qatori bo'lishi kerak.",
+      "unreadable": "Faylni o'qib bo'lmadi. .xlsx yoki .csv ekanini tekshiring.",
+      "too_many_rows": "Faylda 20 000 dan ortiq qator bor — bo'laklarga bo'ling."
+    },
+    "error": {
+      "invalid_name": "Ism juda qisqa yoki yo'q",
+      "invalid_phone": "Telefon noto'g'ri",
+      "invalid_date": "Tug'ilgan sana noto'g'ri",
+      "invalid_gender": "Jins tanilmadi (erkak/ayol)",
+      "too_long": "Qiymat juda uzun",
+      "unsafe_value": "Matn =, +, - yoki @ bilan boshlanmasligi kerak",
+      "unknown": "Noma'lum xato"
+    }
+  },
+  "labOrders": {
+    "back": "Orqaga",
+    "previous_labs": "Oldingi laboratoriyalar",
+    "lab_stats": "{{count}} ta buyurtma · o'rtacha {{days}} kun · remake {{remake}}%",
+    "detail_title": "Lab buyurtma №{{number}}",
+    "make_remake": "Qayta tayyorlash",
+    "sees_portal_note": "Laboratoriya portali ulangach, laboratoriya faqat shu ma'lumotni ko'radi.",
+    "lab_stats_nodays": "{{count}} ta buyurtma · remake {{remake}}%",
+    "detail_title_plain": "Lab buyurtma"
+  },
+  "staffPanel": {
+    "grant_note": "Hech kim o'zidan yuqori huquqli rol bera olmaydi. Filial menejeri «Administrator» va «Egasi» rollarini ko'rmaydi.",
+    "scope_custom": "maxsus rol",
+    "scope_tenant_admin": "faqat egasi beradi",
+    "can_tenant_admin": "deyarli hammasi",
+    "cannot_tenant_admin": "egalikni o'tkazish",
+    "scope_branch_manager": "filial boshqaruvi",
+    "can_branch_manager": "filial ishi, xodim taklifi, hisobotlar",
+    "cannot_branch_manager": "administrator rolini berish, klinika sozlamalari",
+    "scope_doctor": "davolash",
+    "can_doctor": "tibbiy karta, reja, retsept, lab buyurtma",
+    "cannot_doctor": "kassa, xodimlar",
+    "scope_doctor_assistant": "shifokor yonida",
+    "can_doctor_assistant": "tibbiy yozuv, rasm yuklash, navbat",
+    "cannot_doctor_assistant": "to'lov, xodimlar",
+    "scope_nurse": "hamshira",
+    "can_nurse": "rasm yuklash, vizit yozuvini to'ldirish, navbat",
+    "cannot_nurse": "to'lov, retsept imzolash",
+    "scope_receptionist": "qabulxona",
+    "can_receptionist": "yozilish, navbat, kassa, bemor qo'shish",
+    "cannot_receptionist": "tibbiy yozuv, qaytarish",
+    "scope_accountant": "moliya",
+    "can_accountant": "hisobot, qaytarish, xarajat, ish haqi",
+    "cannot_accountant": "tibbiy ma'lumot",
+    "scope_technician": "laboratoriya",
+    "can_technician": "lab buyurtmalari",
+    "cannot_technician": "kassa, tibbiy karta, xodimlar"
   }
 }

@@ -13,6 +13,7 @@ export interface RoleWithPermissions {
   description: string | null;
   isTemplate: boolean;
   isSystem: boolean;
+  isPractitioner: boolean;
   createdAt: string;
   updatedAt: string;
   permissions: string[];

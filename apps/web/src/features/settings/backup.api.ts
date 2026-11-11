@@ -14,8 +14,9 @@ export type { BackupFile, BackupStatus };
 
 const backupKeys = { status: () => ['settings', 'backup', 'status'] as const };
 
-export function useBackupStatus() {
+export function useBackupStatus(options?: { enabled?: boolean }) {
   return useQuery({
+    enabled: options?.enabled,
     queryKey: backupKeys.status(),
     queryFn: () => getBackupStatus().then((r) => r.data),
     // Bulut (404/cloud) yoki ruxsat yo'q (403) — bo'lim ko'rinmaydi; qayta urinish kerak emas.

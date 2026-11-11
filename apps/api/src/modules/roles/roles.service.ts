@@ -49,6 +49,7 @@ export const createRolesService = (deps: { audit: AuditLogger }) => {
         description: input.description ?? null,
         isTemplate: false,
         isSystem: false,
+        isPractitioner: input.isPractitioner ?? false,
       })
       .returning();
 

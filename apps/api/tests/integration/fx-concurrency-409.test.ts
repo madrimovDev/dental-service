@@ -23,6 +23,7 @@ import { sql } from 'drizzle-orm';
 import { createApp } from '../../src/app.ts';
 import { db } from '../../src/db/client.ts';
 import { signAccess } from '../../src/lib/jwt.ts';
+import { exclusionConflictCode } from '../../src/modules/appointments/appointments.service.ts';
 
 let tenantId: string;
 let doctorId: string;
@@ -114,13 +115,27 @@ describe('FU-01 parallel → 409', () => {
     expect(statuses(rs)).toEqual([201, 409]);
     const loser = rs.find((r) => r.status === 409)!;
     const body = (await loser.json()) as { error: { code: string } };
-    expect(body.error.code).toBe('conflict.doctor_busy');
+    expect(['conflict.doctor_busy', 'conflict.slot_busy']).toContain(body.error.code);
     // Aynan 1 qator saqlangan.
     const n = await db.transaction(async (tx) => {
       await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
       return (await tx.select({ id: appointments.id }).from(appointments)).length;
     });
     expect(n).toBe(1);
+  });
+
+  test("FU-43: 40P01 deadlock → umumiy conflict.slot_busy; 23P01 → constraint bo'yicha", () => {
+    const wrap = (code: string, constraint?: string) => ({
+      cause: { code, constraint_name: constraint },
+    });
+    expect(exclusionConflictCode(wrap('40P01'))).toBe('conflict.slot_busy');
+    expect(exclusionConflictCode(wrap('23P01', 'appointments_no_patient_overlap'))).toBe(
+      'conflict.patient_busy',
+    );
+    expect(exclusionConflictCode(wrap('23P01', 'appointments_no_doctor_overlap'))).toBe(
+      'conflict.doctor_busy',
+    );
+    expect(exclusionConflictCode(new Error('x'))).toBeNull();
   });
 
   test('6 parallel bir slotda: 1 × 201, 5 × 409', async () => {

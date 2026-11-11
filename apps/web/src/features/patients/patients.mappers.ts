@@ -31,7 +31,11 @@ function genderLabel(g: Patient['gender'], t: TFn): string {
  * tipda yo'q — shuning uchun tor kengaytirma. Eski javobda yo'q bo'lsa, `balance`/strike'dan
  * kelib chiqadigan xavfsiz default.
  */
-type WithFlags = PatientListItemDto & { flags?: PatientFlags };
+type WithFlags = PatientListItemDto & {
+  flags?: PatientFlags;
+  /** FU-24: generate:contract'dan keyin generated tipga o'tadi. */
+  nextAppointmentAt?: string | null;
+};
 
 export function toPatientListItem(p: WithFlags, t: TFn): PatientListItem {
   return {
@@ -42,6 +46,7 @@ export function toPatientListItem(p: WithFlags, t: TFn): PatientListItem {
     genderLabel: genderLabel(p.gender, t),
     tags: p.tags ?? [],
     balance: p.balance,
+    nextAppointmentAt: p.nextAppointmentAt ?? null,
     noShowStrikes: p.noShowStrikes,
     flagged: p.flagged,
     flags: p.flags ?? {

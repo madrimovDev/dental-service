@@ -10,6 +10,7 @@ import {
   getPatient,
   getPatientBalance,
   getPatientNoShowStrikes,
+  importPatients,
   listCashierTransactions,
   listPatientEmergencyContacts,
   listPatientRelatives,
@@ -22,6 +23,13 @@ import {
 } from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import {
+  chunk,
+  IMPORT_CHUNK_SIZE,
+  type ImportResult,
+  type ImportRowInput,
+  mergeImportResults,
+} from './patient-import';
 import { patientKeys } from './patients.keys';
 import { toPatientDetail, toPatientListItem } from './patients.mappers';
 import type { ListParams, MedicalRecordView } from './patients.types';
@@ -35,9 +43,11 @@ export function usePatients(params: ListParams, options?: { enabled?: boolean })
       const res = await listPatients({
         search: params.search || undefined,
         archived: params.archived,
+        // TODO(generate): `debt` generate:contract'dan keyin generated params tipida bo'ladi.
+        ...(params.debt ? { debt: true } : {}),
         page: params.page,
         pageSize: params.pageSize ?? 20,
-      }).then((r) => r.data);
+      } as Parameters<typeof listPatients>[0]).then((r) => r.data);
       return { items: res.data.map((p) => toPatientListItem(p, t)), meta: res.meta };
     },
   });
@@ -56,7 +66,10 @@ export function usePhoneCheck(phone: string) {
     staleTime: 15_000,
     queryFn: async () => {
       const res = await checkPatientPhone({ phone });
-      return res.data.matches;
+      // FU-23: `patient.view_pii`siz `matches` bo'sh, faqat `count` keladi.
+      // TODO(generate): `count` generated tipda generate:contract'dan keyin.
+      const data = res.data as typeof res.data & { count?: number };
+      return { count: data.count ?? data.matches.length, matches: data.matches };
     },
   });
 }
@@ -241,6 +254,35 @@ export function useWaiveNoShowStrike(patientId: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: patientKeys.noShowStrikes(patientId) });
       qc.invalidateQueries({ queryKey: patientKeys.all });
+    },
+  });
+}
+
+/**
+ * FU-24: Excel/CSV import (`POST /api/patients/import`, `patient.import`). Server bitta so'rovda
+ * ko'pi bilan 1000 qator oladi — kattaroq fayl bo'laklab ketma-ket yuboriladi, natija birlashtiriladi.
+ * `dryRun` — hech narsa yozmaydi (oldindan ko'rish: yangi / dublikat / xato).
+ */
+// TODO(generate): generated `importPatients` paydo bo'lgach customInstance o'rniga ishlatiladi.
+export async function runPatientImport(
+  rows: ImportRowInput[],
+  dryRun: boolean,
+): Promise<ImportResult> {
+  const parts: ImportResult[] = [];
+  for (const part of chunk(rows, IMPORT_CHUNK_SIZE)) {
+    const res = await importPatients({ rows: part, dryRun } as never);
+    parts.push(res.data as unknown as ImportResult);
+  }
+  return mergeImportResults(parts);
+}
+
+export function useImportPatients() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { rows: ImportRowInput[]; dryRun: boolean }) =>
+      runPatientImport(args.rows, args.dryRun),
+    onSuccess: (result) => {
+      if (!result.dryRun && result.created > 0) qc.invalidateQueries({ queryKey: patientKeys.all });
     },
   });
 }

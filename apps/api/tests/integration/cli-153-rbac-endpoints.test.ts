@@ -121,8 +121,8 @@ beforeAll(async () => {
     const [doctorRole, doctorAssistRole, receptionRole] = await tx
       .insert(roles)
       .values([
-        { tenantId: tenantAId, name: 'Doctor' },
-        { tenantId: tenantAId, name: 'Doctor + Assistant' },
+        { tenantId: tenantAId, name: 'Doctor', isPractitioner: true },
+        { tenantId: tenantAId, name: 'Doctor + Assistant', isPractitioner: true },
         { tenantId: tenantAId, name: 'Receptionist' },
       ])
       .returning({ id: roles.id });
@@ -167,7 +167,7 @@ beforeAll(async () => {
   await withTenant(tenantBId, async (tx) => {
     const [doctorRoleB] = await tx
       .insert(roles)
-      .values({ tenantId: tenantBId, name: 'Doctor' })
+      .values({ tenantId: tenantBId, name: 'Doctor', isPractitioner: true })
       .returning({ id: roles.id });
     if (!doctorRoleB) throw new Error('roleB insert failed');
     await tx

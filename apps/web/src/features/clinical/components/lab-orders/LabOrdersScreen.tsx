@@ -126,7 +126,9 @@ export function LabOrdersScreen() {
                   return (
                     <Table.Tr key={r.id}>
                       <Table.Td>
-                        <Mono>{r.orderNumber ?? '—'}</Mono>
+                        <Link to={`/lab-orders/${r.id}`}>
+                          <Mono>{r.orderNumber ?? '—'}</Mono>
+                        </Link>
                       </Table.Td>
                       <Table.Td>
                         {name ? (

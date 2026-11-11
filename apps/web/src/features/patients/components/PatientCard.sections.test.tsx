@@ -117,8 +117,8 @@ describe('PatientCard — 4 bo’lim, rol bo’yicha (real rol shablonlari)', ()
     expect(screen.getByRole('tab', { name: /Moliya/ })).toBeInTheDocument();
   });
 
-  it('Branch Manager: medical_record.view yo’q, lekin Davolash bo’limi bor — Retseptlar va Laboratoriya tab’lari ochiladi', async () => {
-    h.perms = permsFor('branch_manager');
+  it('medical_record.view yo’q (FU-41: Branch Manager endi unga ega, shuning uchun shablondan olib tashlandi), lekin Davolash bo’limi bor — Retseptlar va Laboratoriya tab’lari ochiladi', async () => {
+    h.perms = permsFor('branch_manager').filter((p) => !p.startsWith('medical_record.'));
     h.medical = undefined;
     mount();
     fireEvent.click(screen.getByRole('tab', { name: 'Davolash' }));

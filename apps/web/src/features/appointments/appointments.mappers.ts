@@ -156,3 +156,32 @@ export function groupByDay(appts: Appointment[], dayKeys: string[], grid = GRID)
     ),
   }));
 }
+
+/** Sudrab ko'chirish qadami (daqiqa). */
+export const DRAG_SNAP_MIN = 15;
+
+/**
+ * Sudralgan yozilish tushirilgan Y koordinatasidan yangi boshlanish daqiqasi (kun boshidan,
+ * Tashkent). `grabOffsetPx` — slot ustida ushlangan nuqta slot tepasidan qancha pastda.
+ * Qadam `DRAG_SNAP_MIN`; kun chegarasiga (GRID) qisiladi — yozilish chegaradan chiqmaydi.
+ */
+export function dropStartMinute(
+  clientY: number,
+  bodyTop: number,
+  grabOffsetPx: number,
+  durationMin: number,
+  grid = GRID,
+): number {
+  const raw = (clientY - bodyTop - grabOffsetPx) / grid.pxPerMin + grid.dayStartHour * 60;
+  const snapped = Math.round(raw / DRAG_SNAP_MIN) * DRAG_SNAP_MIN;
+  const min = grid.dayStartHour * 60;
+  const max = grid.dayEndHour * 60 - Math.max(durationMin, DRAG_SNAP_MIN);
+  return Math.min(Math.max(snapped, min), Math.max(max, min));
+}
+
+/** Tashkent kun kaliti + kun boshidan daqiqa → UTC ISO instant (Tashkent = UTC+5, DST yo'q). */
+export function instantFromDayMinute(dateKey: string, minute: number): string {
+  const hh = String(Math.floor(minute / 60)).padStart(2, '0');
+  const mm = String(minute % 60).padStart(2, '0');
+  return new Date(`${dateKey}T${hh}:${mm}:00+05:00`).toISOString();
+}

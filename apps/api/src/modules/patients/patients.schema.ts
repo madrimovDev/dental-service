@@ -106,6 +106,11 @@ export const listQuerySchema = z.object({
     .union([z.boolean(), z.enum(['true', 'false'])])
     .optional()
     .transform((v) => v === true || v === 'true'),
+  // FU-24: «Qarzdorlar» filtri — faqat balansi > 0 (qarz) bemorlar. `archived` bilan bir xil parse.
+  debt: z
+    .union([z.boolean(), z.enum(['true', 'false'])])
+    .optional()
+    .transform((v) => v === true || v === 'true'),
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(100).default(20),
 });
@@ -188,6 +193,8 @@ export type PatientDto = z.infer<typeof patientDtoSchema>;
 export const patientListItemDtoSchema = patientDtoSchema
   .extend({
     balance: z.number(),
+    // FU-24: eng yaqin kelajakdagi faol yozilish (ISO) — `appointment.view` bo'lmasa har doim null.
+    nextAppointmentAt: z.string().nullable(),
     // CLI-474 (L7): faol (waivedmas, hali no_show) strike soni + chegara belgisi.
     noShowStrikes: z.number().int(),
     flagged: z.boolean(),
@@ -209,6 +216,8 @@ export const phoneCheckQuerySchema = z.object({
 
 export const phoneCheckResultSchema = z
   .object({
+    // FU-23: `patient.view_pii`siz faqat `count` — `matches` bo'sh (ism sizib chiqmaydi).
+    count: z.number().int(),
     matches: z.array(z.object({ id: z.uuid(), fullName: z.string() })),
   })
   .openapi('PatientPhoneCheck');
@@ -329,3 +338,52 @@ export type EmergencyContactDto = z.infer<typeof emergencyContactDtoSchema>;
 export const emergencyContactRemoveResultSchema = z
   .object({ removed: z.literal(true), id: z.uuid() })
   .openapi('PatientEmergencyContactRemoveResult');
+
+// ─── Excel/CSV import (FU-24) ─────────────────────────────────────────────────
+
+/** Import qatorlari bitta so'rovda ko'pi bilan shuncha. */
+export const PATIENT_IMPORT_MAX_ROWS = 1000;
+
+/**
+ * Import qatori — brauzer faylni o'qib, ustunlarni moslab yuboradi. Maydonlar ataylab
+ * bo'sh qoldirilgan/xom matn: har qator ALOHIDA tekshiriladi (bitta noto'g'ri qator
+ * butun importni 400 qilmasin), shuning uchun bu yerda faqat tip/uzunlik darvozasi.
+ */
+export const importPatientRowSchema = z.object({
+  fullName: z.string().max(500),
+  phone: z.string().max(60).nullish(),
+  phoneSecondary: z.string().max(60).nullish(),
+  dateOfBirth: z.string().max(40).nullish(),
+  gender: z.string().max(20).nullish(),
+  passport: z.string().max(200).nullish(),
+  address: z.string().max(1000).nullish(),
+  notes: z.string().max(4000).nullish(),
+  source: z.string().max(200).nullish(),
+});
+export type ImportPatientRow = z.infer<typeof importPatientRowSchema>;
+
+export const importPatientsSchema = z.object({
+  rows: z.array(importPatientRowSchema).min(1).max(PATIENT_IMPORT_MAX_ROWS),
+  /** true — hisoblaydi (yangi/dublikat/xato), lekin hech narsa yozmaydi (oldindan ko'rish). */
+  dryRun: z.boolean().optional(),
+});
+export type ImportPatientsInput = z.infer<typeof importPatientsSchema>;
+
+export const importPatientsResultSchema = z
+  .object({
+    dryRun: z.boolean(),
+    created: z.number().int(),
+    skippedDuplicate: z.number().int(),
+    errorCount: z.number().int(),
+    /** 1-asosli qator raqami (faylning birinchi ma'lumot qatori = 1). */
+    results: z.array(
+      z.object({
+        row: z.number().int(),
+        status: z.enum(['created', 'skipped_duplicate', 'error']),
+        /** `status='error'` bo'lsa sabab kodi (`invalid_name`, `invalid_phone`, ...). */
+        code: z.string().optional(),
+      }),
+    ),
+  })
+  .openapi('PatientImportResult');
+export type ImportPatientsResult = z.infer<typeof importPatientsResultSchema>;

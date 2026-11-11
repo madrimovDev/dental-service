@@ -6,6 +6,8 @@ import {
   getOneCExport,
   getOwnerTodayReport,
   getPlanCompletionReport,
+  getPnlReport,
+  getReportBranches,
   getRevenueReport,
 } from '@dental/api-client';
 import { useQuery } from '@tanstack/react-query';
@@ -85,6 +87,32 @@ export function useDebtAgingReport(opts: ReportQueryOpts = {}) {
     queryKey: reportKeys.debtAging(),
     queryFn: () => getDebtAgingReport().then((r) => r.data),
     enabled: opts.enabled ?? true,
+    retry: false,
+  });
+}
+
+/** Foyda va zarar (FU-30) — mavjud `GET /api/reports/pnl`. */
+export function usePnlReport(range: ReportRange, opts: ReportQueryOpts = {}) {
+  return useQuery({
+    queryKey: reportKeys.pnl(range),
+    queryFn: () => getPnlReport(toQuery(range)).then((r) => r.data),
+    enabled: opts.enabled ?? true,
+  });
+}
+
+export type ReportBranches = {
+  branches: { id: string; name: string }[];
+  allowAllBranches: boolean;
+};
+
+/**
+ * FU-31: hisobot filial tanlagichi — faqat `report.view` beradigan tayinlovlar filiallari.
+ * TODO(generate): `generate:contract`dan keyin generated `getReportBranches`ga almashtiring.
+ */
+export function useReportBranches() {
+  return useQuery({
+    queryKey: reportKeys.branches(),
+    queryFn: () => getReportBranches().then((r) => r.data as unknown as ReportBranches),
     retry: false,
   });
 }

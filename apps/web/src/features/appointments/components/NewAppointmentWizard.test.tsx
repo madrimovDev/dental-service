@@ -54,6 +54,11 @@ vi.mock('../appointments.api', () => ({
       { id: 's2', nameUz: 'Tozalash', durationMinutes: 30 },
     ],
   }),
+  useServicePrices: () =>
+    new Map<string, number | null>([
+      ['s1', 150000],
+      ['s2', null],
+    ]),
   useBookingContext: () => ({ data: bookingCtx.data }),
   useBranches: () => ({ data: [{ id: 'b1', name: 'Markaziy filial' }] }),
 }));
@@ -109,6 +114,17 @@ describe('NewAppointmentWizard', () => {
         expect.objectContaining({ search: 'Vali', page: 1, pageSize: 100 }),
       ),
     );
+  });
+
+  it("narx chip'lari: filial narxi va «narx belgilanmagan»; jami narx tanlangan xizmatlardan", () => {
+    renderApp(<NewAppointmentWizard onClose={vi.fn()} />);
+    const priced = screen.getByRole('button', { name: /Tekshiruv/ });
+    expect(priced).toHaveTextContent(/150\s*000/);
+    expect(screen.getByRole('button', { name: /Tozalash/ })).toHaveTextContent(
+      'Narx belgilanmagan',
+    );
+    fireEvent.click(priced);
+    expect(screen.getByText(/Jami: 30 daqiqa · 150\s*000.*filial narxi/)).toBeInTheDocument();
   });
 
   it("4 bo'lim bitta ekranda ko'rinadi", () => {

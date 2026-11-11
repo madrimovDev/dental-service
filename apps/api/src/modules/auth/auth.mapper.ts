@@ -67,4 +67,5 @@ export const toMembershipsDto = (userId: string, r: MembershipsResult): Membersh
     tenantName: t.tenantName,
     tenantSlug: t.tenantSlug,
   })),
+  phoneVerified: r.phoneVerified,
 });

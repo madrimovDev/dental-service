@@ -4,6 +4,7 @@ import { z } from 'zod';
 export const roleSchema = z.object({
   name: z.string().min(2).max(120),
   description: z.string().max(500).optional(),
+  isPractitioner: z.boolean().optional(),
 });
 export type RoleFormValues = z.infer<typeof roleSchema>;
 

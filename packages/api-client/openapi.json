@@ -236,12 +236,16 @@
                 "tenantSlug"
               ]
             }
+          },
+          "phoneVerified": {
+            "type": "boolean"
           }
         },
         "required": [
           "userId",
           "assignments",
-          "ownerTenants"
+          "ownerTenants",
+          "phoneVerified"
         ]
       },
       "WorkspaceBranches": {
@@ -328,6 +332,40 @@
         },
         "required": [
           "accepted"
+        ]
+      },
+      "StartPhoneVerificationResponse": {
+        "type": "object",
+        "properties": {
+          "alreadyVerified": {
+            "type": "boolean"
+          },
+          "deepLink": {
+            "type": "string",
+            "nullable": true
+          },
+          "expiresAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "alreadyVerified",
+          "deepLink",
+          "expiresAt"
+        ]
+      },
+      "StartPhoneVerificationRequest": {
+        "type": "object",
+        "properties": {
+          "invitationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "invitationId"
         ]
       },
       "DeclineInvitationResponse": {
@@ -969,6 +1007,10 @@
             "type": "boolean",
             "example": false
           },
+          "isPractitioner": {
+            "type": "boolean",
+            "example": false
+          },
           "createdAt": {
             "type": "string",
             "example": "2026-06-12T10:00:00.000Z"
@@ -985,6 +1027,7 @@
           "description",
           "isTemplate",
           "isSystem",
+          "isPractitioner",
           "createdAt",
           "updatedAt"
         ]
@@ -1017,6 +1060,10 @@
             "type": "boolean",
             "example": false
           },
+          "isPractitioner": {
+            "type": "boolean",
+            "example": false
+          },
           "createdAt": {
             "type": "string",
             "example": "2026-06-12T10:00:00.000Z"
@@ -1043,6 +1090,7 @@
           "description",
           "isTemplate",
           "isSystem",
+          "isPractitioner",
           "createdAt",
           "updatedAt",
           "permissions"
@@ -1441,6 +1489,10 @@
               "balance": {
                 "type": "number"
               },
+              "nextAppointmentAt": {
+                "type": "string",
+                "nullable": true
+              },
               "noShowStrikes": {
                 "type": "integer"
               },
@@ -1473,6 +1525,7 @@
             },
             "required": [
               "balance",
+              "nextAppointmentAt",
               "noShowStrikes",
               "flagged",
               "flags"
@@ -1624,9 +1677,62 @@
           "updatedAt"
         ]
       },
+      "PatientImportResult": {
+        "type": "object",
+        "properties": {
+          "dryRun": {
+            "type": "boolean"
+          },
+          "created": {
+            "type": "integer"
+          },
+          "skippedDuplicate": {
+            "type": "integer"
+          },
+          "errorCount": {
+            "type": "integer"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "row": {
+                  "type": "integer"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "created",
+                    "skipped_duplicate",
+                    "error"
+                  ]
+                },
+                "code": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "row",
+                "status"
+              ]
+            }
+          }
+        },
+        "required": [
+          "dryRun",
+          "created",
+          "skippedDuplicate",
+          "errorCount",
+          "results"
+        ]
+      },
       "PatientPhoneCheck": {
         "type": "object",
         "properties": {
+          "count": {
+            "type": "integer"
+          },
           "matches": {
             "type": "array",
             "items": {
@@ -1648,6 +1754,7 @@
           }
         },
         "required": [
+          "count",
           "matches"
         ]
       },
@@ -2895,6 +3002,37 @@
           "services",
           "total",
           "hasUnpriced"
+        ]
+      },
+      "ReportBranches": {
+        "type": "object",
+        "properties": {
+          "branches": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name"
+              ]
+            }
+          },
+          "allowAllBranches": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "branches",
+          "allowAllBranches"
         ]
       },
       "RevenueReport": {
@@ -8113,6 +8251,90 @@
             }
           },
           "403": {
+            "description": "Phone not verified (FU-15) — verify via Telegram first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Invitation not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/phone-verification/start": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "startPhoneVerification",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartPhoneVerificationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Telegram deep-link issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/StartPhoneVerificationResponse"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
             "description": "Forbidden",
             "content": {
               "application/json": {
@@ -8124,6 +8346,26 @@
           },
           "404": {
             "description": "Invitation not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Inviting clinic has no working Telegram bot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
             "content": {
               "application/json": {
                 "schema": {
@@ -10207,6 +10449,9 @@
                       "type": "string"
                     },
                     "default": []
+                  },
+                  "isPractitioner": {
+                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -10390,6 +10635,9 @@
                   "description": {
                     "type": "string",
                     "maxLength": 500
+                  },
+                  "isPractitioner": {
+                    "type": "boolean"
                   }
                 }
               }
@@ -11545,6 +11793,25 @@
           },
           {
             "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                }
+              ]
+            },
+            "required": false,
+            "name": "debt",
+            "in": "query"
+          },
+          {
+            "schema": {
               "type": "integer",
               "minimum": 0,
               "exclusiveMinimum": true,
@@ -11756,6 +12023,145 @@
                     },
                     "data": {
                       "$ref": "#/components/schemas/Patient"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/patients/import": {
+      "post": {
+        "tags": [
+          "patients"
+        ],
+        "operationId": "importPatients",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "rows": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "fullName": {
+                          "type": "string",
+                          "maxLength": 500
+                        },
+                        "phone": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 60
+                        },
+                        "phoneSecondary": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 60
+                        },
+                        "dateOfBirth": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 40
+                        },
+                        "gender": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 20
+                        },
+                        "passport": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 200
+                        },
+                        "address": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 1000
+                        },
+                        "notes": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 4000
+                        },
+                        "source": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 200
+                        }
+                      },
+                      "required": [
+                        "fullName"
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 1000
+                  },
+                  "dryRun": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "rows"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Import result (per-row)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/PatientImportResult"
                     }
                   },
                   "required": [
@@ -15291,6 +15697,71 @@
                       "items": {
                         "$ref": "#/components/schemas/PendingVisit"
                       }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/branches": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "operationId": "getReportBranches",
+        "responses": {
+          "200": {
+            "description": "Branches the caller may report on",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ReportBranches"
                     }
                   },
                   "required": [

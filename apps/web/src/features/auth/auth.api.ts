@@ -9,6 +9,7 @@ import {
   login,
   registerTenant,
   registrationEnabled,
+  startPhoneVerification,
   switchWorkspace,
 } from '@dental/api-client';
 import { notifications } from '@mantine/notifications';
@@ -84,12 +85,36 @@ export function useBootstrapStatus() {
 }
 
 // Login'dan keyin a'zoliklarni o'qish (active workspace HALI yo'q — accessToken bilan gated)
-export function useMe() {
+// FU-15: `refetchInterval` — Telegram tasdig'ini kutayotganda `phoneVerified`ni so'rab turish.
+export function useMe(opts?: { refetchInterval?: number | false }) {
   const accessToken = useAuthStore((s) => s.accessToken);
   return useQuery({
     queryKey: authKeys.me(),
     queryFn: () => getMe().then((r) => r.data),
     enabled: !!accessToken,
+    refetchInterval: opts?.refetchInterval ?? false,
+  });
+}
+
+export type StartPhoneVerificationResult = {
+  alreadyVerified: boolean;
+  deepLink: string | null;
+  expiresAt: string | null;
+};
+
+/**
+ * FU-15: taklif qilgan klinika boti orqali telefonni tasdiqlash havolasi.
+ * Global toast o'chiq (o'z `onError`i bor) — 409 `phone.verification_unavailable`
+ * sahifada aniq matn bilan ko'rsatiladi.
+ * TODO(generate): generated `startPhoneVerification` ga o'tkazilsin.
+ */
+export function useStartPhoneVerification() {
+  return useMutation<StartPhoneVerificationResult, ApiError, string>({
+    mutationFn: (invitationId: string) =>
+      startPhoneVerification({ invitationId }).then(
+        (r) => r.data as unknown as StartPhoneVerificationResult,
+      ),
+    onError: () => {},
   });
 }
 

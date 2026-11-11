@@ -28,6 +28,8 @@ import {
   registerTenantResponseSchema,
   registerTenantSchema,
   registrationEnabledResponseSchema,
+  startPhoneVerificationResponseSchema,
+  startPhoneVerificationSchema,
   switchWorkspaceSchema,
   tokenPairResponseSchema,
   workspaceBranchesResponseSchema,
@@ -349,6 +351,7 @@ export const authRoutes = (deps: { db: Database }) => {
     request: { params: invitationIdParamSchema },
     responses: {
       ...okJson(acceptInvitationResponseSchema, 'Invitation accepted'),
+      403: errResp('Phone not verified (FU-15) — verify via Telegram first'),
       404: errResp('Invitation not found'),
     },
   });
@@ -358,8 +361,78 @@ export const authRoutes = (deps: { db: Database }) => {
     if (!user) return c.json(fail('auth.required', 'Authentication required'), 401);
     const { id } = c.req.valid('param');
     const result = await service.acceptInvitation(user.id, id, invitationMeta(c));
-    if (!result) return c.json(fail('invitation.not_found', 'Taklif topilmadi'), 404);
+    if (result.status === 'not_found') {
+      return c.json(fail('invitation.not_found', 'Taklif topilmadi'), 404);
+    }
+    if (result.status === 'phone_unverified') {
+      return c.json(
+        fail(
+          'phone.verification_required',
+          'Taklifni qabul qilishdan oldin telefon raqamingizni Telegram orqali tasdiqlang',
+        ),
+        403,
+      );
+    }
     return c.json(ok({ accepted: true as const }), 200);
+  });
+
+  // ─── FU-15: telefonni Telegram orqali tasdiqlash ─────────────────────────
+  // Taklif qilgan klinikaning boti orqali bir martalik deep-link. Rate-limit: IP +
+  // taklif bo'yicha (har bosish yangi token yaratadi — cheksiz token yaratilmasin).
+  const phoneVerifyRateLimit = rateLimit({
+    name: 'phone-verify-start',
+    limit: 10,
+    windowSeconds: 15 * 60,
+    keyFromBody: (b) =>
+      typeof b === 'object' &&
+      b !== null &&
+      typeof (b as { invitationId?: unknown }).invitationId === 'string'
+        ? (b as { invitationId: string }).invitationId
+        : undefined,
+  });
+
+  const startPhoneVerificationRoute = createRoute({
+    method: 'post',
+    path: '/phone-verification/start',
+    tags: ['auth'],
+    operationId: 'startPhoneVerification',
+    middleware: [authMiddleware(), phoneVerifyRateLimit] as const,
+    request: {
+      body: { content: { 'application/json': { schema: startPhoneVerificationSchema } } },
+    },
+    responses: {
+      ...okJson(startPhoneVerificationResponseSchema, 'Telegram deep-link issued'),
+      404: errResp('Invitation not found'),
+      409: errResp('Inviting clinic has no working Telegram bot'),
+      429: errResp('Too many requests'),
+    },
+  });
+
+  app.openapi(startPhoneVerificationRoute, async (c) => {
+    const user = c.get('user');
+    if (!user) return c.json(fail('auth.required', 'Authentication required'), 401);
+    const { invitationId } = c.req.valid('json');
+    const result = await service.startPhoneVerification(user.id, invitationId);
+    if (!result.ok) {
+      if (result.code === 'invitation.not_found') {
+        return c.json(fail('invitation.not_found', 'Taklif topilmadi'), 404);
+      }
+      return c.json(
+        fail(
+          'phone.verification_unavailable',
+          'Bu klinikada Telegram bot sozlanmagan — klinika administratoriga murojaat qiling',
+        ),
+        409,
+      );
+    }
+    return c.json(
+      ok({
+        alreadyVerified: result.alreadyVerified,
+        deepLink: result.deepLink,
+        expiresAt: result.expiresAt ? result.expiresAt.toISOString() : null,
+      }),
+      200,
+    );
   });
 
   const declineInvitationRoute = createRoute({
@@ -380,7 +453,9 @@ export const authRoutes = (deps: { db: Database }) => {
     if (!user) return c.json(fail('auth.required', 'Authentication required'), 401);
     const { id } = c.req.valid('param');
     const result = await service.declineInvitation(user.id, id, invitationMeta(c));
-    if (!result) return c.json(fail('invitation.not_found', 'Taklif topilmadi'), 404);
+    if (result.status !== 'ok') {
+      return c.json(fail('invitation.not_found', 'Taklif topilmadi'), 404);
+    }
     return c.json(ok({ declined: true as const }), 200);
   });
 

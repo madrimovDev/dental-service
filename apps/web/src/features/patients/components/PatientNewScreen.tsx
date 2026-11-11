@@ -54,10 +54,12 @@ export function PatientNewScreen() {
   // shuning uchun bloklash emas, ongli tanlov).
   const phoneValue = form.values.phone ?? '';
   const phoneCheck = usePhoneCheck(phoneValue);
-  const dupMatches = phoneCheck.data ?? [];
+  const dupMatches = phoneCheck.data?.matches ?? [];
+  // FU-23: `patient.view_pii`siz server ism qaytarmaydi — faqat son (`matches` bo'sh).
+  const dupCount = phoneCheck.data?.count ?? dupMatches.length;
   const [ackedPhone, setAckedPhone] = useState<string | null>(null);
   const [dupBlocked, setDupBlocked] = useState(false);
-  const showDup = dupMatches.length > 0 && ackedPhone !== phoneValue;
+  const showDup = dupCount > 0 && ackedPhone !== phoneValue;
 
   const submit = form.onSubmit((values) => {
     if (showDup) {
@@ -193,9 +195,11 @@ export function PatientNewScreen() {
               {showDup && (
                 <div className={classes.dupBox} data-testid="phone-dup">
                   <AlertBanner tier={2} title={t('patientsList.dup_title')}>
-                    {t('patientsList.dup_desc', {
-                      names: dupMatches.map((m) => m.fullName).join(', '),
-                    })}
+                    {dupMatches.length > 0
+                      ? t('patientsList.dup_desc', {
+                          names: dupMatches.map((m) => m.fullName).join(', '),
+                        })
+                      : t('patients.dup_desc_count', { count: dupCount })}
                   </AlertBanner>
                   <div className={classes.dupActions}>
                     {dupMatches.map((m) => (

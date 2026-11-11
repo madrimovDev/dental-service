@@ -9,6 +9,7 @@ export const toRoleDto = (row: Role): RoleDto => ({
   description: row.description ?? null,
   isTemplate: row.isTemplate,
   isSystem: row.isSystem,
+  isPractitioner: row.isPractitioner,
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(),
 });
@@ -26,6 +27,7 @@ export const toRoleWithPermissionsDto = (
   description: row.description ?? null,
   isTemplate: row.isTemplate,
   isSystem: row.isSystem,
+  isPractitioner: row.isPractitioner,
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(),
   permissions: row.permissions,

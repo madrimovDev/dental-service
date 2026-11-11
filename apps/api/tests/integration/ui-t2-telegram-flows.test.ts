@@ -218,10 +218,10 @@ beforeAll(async () => {
       .returning({ id: branches.id });
     branchA = b!.id;
 
-    // Doktor: `medical_record.edit` ruxsatli rol (listDoctors shu signalga tayanadi).
+    // Doktor: `is_practitioner` rol (FU-41: listDoctors shu belgiga tayanadi).
     const [role] = await tx
       .insert(roles)
-      .values({ tenantId: tA, name: 'Doctor' })
+      .values({ tenantId: tA, name: 'Doctor', isPractitioner: true })
       .returning({ id: roles.id });
     const [perm] = await db
       .select({ id: permissions.id })

@@ -1,4 +1,5 @@
-import { act, fireEvent, screen } from '@testing-library/react';
+import { ApiError } from '@dental/api-client';
+import { act, createEvent, fireEvent, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderApp } from '../../../test-utils';
 import { CalendarScreen } from './CalendarScreen';
@@ -6,6 +7,7 @@ import { CalendarScreen } from './CalendarScreen';
 const hoisted = vi.hoisted(() => ({
   perms: new Set<string>(),
   statusMutate: vi.fn(),
+  moveMutate: vi.fn(),
   cancelMutate: vi.fn(),
   appts: [] as unknown[],
   availability: undefined as unknown,
@@ -35,6 +37,7 @@ vi.mock('../appointments.api', () => ({
   useBranches: () => ({ data: [] }),
   useCancelAppointment: () => ({ mutate: hoisted.cancelMutate }),
   useUpdateAppointmentStatus: () => ({ mutate: hoisted.statusMutate }),
+  useMoveAppointment: () => ({ mutate: hoisted.moveMutate }),
 }));
 vi.mock('@/stores/auth-store.ts', () => ({
   useAuthStore: () => ({
@@ -72,6 +75,7 @@ beforeEach(() => {
   hoisted.perms = new Set(['appointment.view', 'appointment.edit', 'appointment.cancel']);
   hoisted.statusMutate.mockReset();
   hoisted.cancelMutate.mockReset();
+  hoisted.moveMutate.mockReset();
   hoisted.appts = [appt()];
   hoisted.availability = undefined;
 });
@@ -182,5 +186,94 @@ describe('CalendarScreen', () => {
     // d2 jadvalsiz → bitta blok
     expect(screen.getAllByRole('note')).toHaveLength(1);
     expect(screen.getByText("Jadvalni ko'rish →")).toBeInTheDocument();
+  });
+
+  describe('ko‘chirish (drag + klaviatura)', () => {
+    const dt = () => ({ setData: vi.fn(), effectAllowed: '' });
+    // jsdom'da DragEvent yo'q — clientY/dataTransfer'ni qo'lda biriktiramiz.
+    const drag = (
+      type: 'dragStart' | 'drop',
+      el: Element,
+      clientY: number,
+      dataTransfer = dt(),
+    ) => {
+      const ev = createEvent[type](el);
+      Object.defineProperty(ev, 'clientY', { value: clientY });
+      Object.defineProperty(ev, 'dataTransfer', { value: dataTransfer });
+      fireEvent(el, ev);
+    };
+    const colBodies = (c: HTMLElement) =>
+      Array.from(c.querySelectorAll<HTMLElement>('[class*="colBody"]'));
+
+    it('sudrab boshqa shifokor ustuniga tushirilsa: darhol ko‘chadi, 10 s dan keyin PATCH (vaqt+shifokor)', () => {
+      vi.useFakeTimers();
+      const { container } = renderApp(<CalendarScreen />);
+      const slot = screen.getByText('Dilnoza Rahimova').closest('button') as HTMLElement;
+      expect(slot).toHaveAttribute('draggable', 'true');
+      drag('dragStart', slot, 0);
+      // 12:00 = (12-8) soat × 88 px
+      drag('drop', colBodies(container)[1] as HTMLElement, 4 * 88);
+      expect(screen.getByText(/Dilnoza Rahimova — Dr\. Vali, 12:00/)).toBeInTheDocument();
+      expect(hoisted.moveMutate).not.toHaveBeenCalled();
+      act(() => {
+        vi.advanceTimersByTime(10_500);
+      });
+      expect(hoisted.moveMutate).toHaveBeenCalledTimes(1);
+      const body = hoisted.moveMutate.mock.calls[0]?.[0];
+      expect(body).toMatchObject({ id: 'a1', doctorId: 'd2' });
+      expect(new Date(body.startTime).getUTCHours()).toBe(7); // 12:00 Tashkent
+      expect(new Date(body.endTime).getUTCHours()).toBe(8);
+    });
+
+    it('«Qaytarish» — PATCH yuborilmaydi; server 409 qaytarsa yozilish joyiga qaytadi', () => {
+      vi.useFakeTimers();
+      const { container } = renderApp(<CalendarScreen />);
+      const slot = screen.getByText('Dilnoza Rahimova').closest('button') as HTMLElement;
+      drag('dragStart', slot, 0);
+      drag('drop', colBodies(container)[0] as HTMLElement, 4 * 88);
+      fireEvent.click(screen.getByRole('button', { name: /Qaytarish/ }));
+      act(() => {
+        vi.advanceTimersByTime(20_000);
+      });
+      expect(hoisted.moveMutate).not.toHaveBeenCalled();
+
+      // Ikkinchi urinish → 409 → joyiga qaytadi
+      hoisted.moveMutate.mockImplementation((_b, opts) =>
+        opts.onError(new ApiError('conflict.doctor_busy', 'x', 409)),
+      );
+      drag('dragStart', slot, 0);
+      drag('drop', colBodies(container)[0] as HTMLElement, 4 * 88);
+      act(() => {
+        vi.advanceTimersByTime(10_500);
+      });
+      expect(hoisted.moveMutate).toHaveBeenCalledTimes(1);
+      expect(screen.queryByText(/12:00 ga/)).not.toBeInTheDocument();
+    });
+
+    it('appointment.edit yo‘q → sudrab bo‘lmaydi; faol bo‘lmagan holat → draggable emas', () => {
+      hoisted.perms = new Set(['appointment.view']);
+      renderApp(<CalendarScreen />);
+      expect(screen.getByText('Dilnoza Rahimova').closest('button')).not.toHaveAttribute(
+        'draggable',
+      );
+    });
+
+    it('klaviatura alternativasi: panelda «Ko‘chirish» → vaqt + shifokor', () => {
+      vi.useFakeTimers();
+      renderApp(<CalendarScreen />);
+      fireEvent.click(screen.getByText('Dilnoza Rahimova'));
+      fireEvent.click(screen.getByRole('button', { name: "Ko'chirish" }));
+      fireEvent.change(screen.getByLabelText('Yangi vaqt (shu kun)'), {
+        target: { value: '15:30' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: "Ko'chirish" }));
+      act(() => {
+        vi.advanceTimersByTime(10_500);
+      });
+      const body = hoisted.moveMutate.mock.calls[0]?.[0];
+      expect(new Date(body.startTime).getUTCHours()).toBe(10);
+      expect(new Date(body.startTime).getUTCMinutes()).toBe(30);
+      expect(body.doctorId).toBeUndefined();
+    });
   });
 });

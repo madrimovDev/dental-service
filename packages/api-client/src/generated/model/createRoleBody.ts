@@ -14,4 +14,5 @@ export type CreateRoleBody = {
   /** @maxLength 500 */
   description?: string;
   permissions?: string[];
+  isPractitioner?: boolean;
 };

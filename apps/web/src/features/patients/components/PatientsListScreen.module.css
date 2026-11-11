@@ -80,6 +80,23 @@
   padding: 0 16px;
 }
 
+/* FU-24: «Keyingi tashrif» ustuni bor bo'lganda (appointment.view). */
+.tableHead[data-next-visit="true"],
+.row[data-next-visit="true"] {
+  grid-template-columns: minmax(0, 1.6fr) 170px 120px 130px 260px;
+}
+
+.nextVisit {
+  font-size: 12.5px;
+  color: var(--text-2);
+  font-family: var(--font-sans);
+  white-space: nowrap;
+}
+
+.pillClose {
+  margin-left: 6px;
+}
+
 .tableHead {
   height: 40px;
   background: var(--surface-2);

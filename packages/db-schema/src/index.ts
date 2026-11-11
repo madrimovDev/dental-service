@@ -4,7 +4,7 @@
 //   branches, roles, role_permissions, user_assignments, audit_log
 //
 // Platform-level jadvallar (RLS YO'Q):
-//   users, tenants, permissions, refresh_tokens
+//   users, tenants, permissions, refresh_tokens, phone_verifications
 //
 // audit_log alohida: tenant_id NULLABLE (platform event'lar uchun)
 
@@ -31,6 +31,7 @@ export * from './tables/payroll-adjustments.ts';
 export * from './tables/payroll-lines.ts';
 export * from './tables/payroll-runs.ts';
 export * from './tables/permissions.ts';
+export * from './tables/phone-verifications.ts';
 export * from './tables/prescriptions.ts';
 export * from './tables/queue-tickets.ts';
 export * from './tables/recall-logs.ts';

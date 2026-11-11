@@ -65,6 +65,8 @@ export function CashierScreen() {
       if (posCartDirty.current && !window.confirm(t('cashierHandoff.replace_cart_confirm'))) return;
       setMode('payment');
       setPatientId(v.patientId);
+      // Chekda bemor ismi (QA: «Bemorsiz (walk-in)» chiqardi).
+      setPatientName(v.patientName);
       // Yangi obyekt: xuddi shu vizit qayta olinsa ham savat qayta to'ldiriladi.
       setVisit({ ...v });
     },

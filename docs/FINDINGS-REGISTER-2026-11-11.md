@@ -422,7 +422,7 @@ Sinov 3 ta haqiqiy nuqson topdi (hammasi tuzatildi, testlar bilan): (1) jadvali 
 
 | ID | J | Qisqa | Qilinadigan ish |
 |---|---|---|---|
-| FU-15 | M | Telefonni oldindan ro'yxatdan o'tkazish (P6 qoldiq xavfi) | klinika platformada hali yo'q telefon uchun hisob yaratib, vaqtinchalik parolni bilib qoladi; keyin o'sha odam boshqa klinika taklifini olsa, birinchi klinika uning nomidan kirib qabul qilishi mumkin. Yopish = telefon egaligini tasdiqlash (SMS/Telegram OTP) — 👤 qaror kerak |
+| FU-15 ✅ | M | Telefonni oldindan ro'yxatdan o'tkazish (P6 qoldiq xavfi) | klinika platformada hali yo'q telefon uchun hisob yaratib, vaqtinchalik parolni bilib qoladi; keyin o'sha odam boshqa klinika taklifini olsa, birinchi klinika uning nomidan kirib qabul qilishi mumkin. Yopish = telefon egaligini tasdiqlash (SMS/Telegram OTP) — 👤 qaror kerak |
 | FU-16 ✅ | L | Kassa xulosasi «cash · payment» tarjimasiz (UI-1 da yopildi) | UI-1 Kassa ekrani bilan |
 | FU-17 ✅ | L | Filial bo'yicha availability (FreeSlotsCard) jadvalsiz doktorni ko'rsatmaydi | single-doctor availability'dagi fallback filial-darajasiga ham |
 
@@ -438,10 +438,10 @@ Sinov 3 ta haqiqiy nuqson topdi (hammasi tuzatildi, testlar bilan): (1) jadvali 
 
 | ID | J | Qisqa | Qilinadigan ish |
 |---|---|---|---|
-| FU-21 | M | PT-04 backend'da: `view_pii`siz foydalanuvchi PATCH orqali PII maydonlarini o'zgartira oladi | faqat web cheklangan — `patients.update`da `view_pii`siz PII maydonlari 403 |
+| FU-21 ✅ | M | PT-04 backend'da: `view_pii`siz foydalanuvchi PATCH orqali PII maydonlarini o'zgartira oladi | faqat web cheklangan — `patients.update`da `view_pii`siz PII maydonlari 403 |
 | FU-22 ✅ | L | Bugun ekrani bemor ismini har bemor uchun alohida so'raydi | B.1 qo'shgan `appointment.patientName` (JOIN) dan foydalanish |
-| FU-23 | L | `GET /patients/phone-check` `patient.create` bilan ism qaytaradi | `view_pii`siz faqat `count` qaytarish |
-| FU-24 | L | Kanvas elementlari qurilmagan: Qarzdorlar chip, Excel import, «Keyingi tashrif» ustuni, drag «ushlab turish», narx chip'lari | UI sayqal / P2 |
+| FU-23 ✅ | L | `GET /patients/phone-check` `patient.create` bilan ism qaytaradi | `view_pii`siz faqat `count` qaytarish |
+| FU-24 ✅ | L | Kanvas elementlari qurilmagan: Qarzdorlar chip, Excel import, «Keyingi tashrif» ustuni, drag «ushlab turish», narx chip'lari | UI sayqal / P2 |
 | FU-25 ✅ | — | Telegram bron so'rovlari (`booking_requests`) | UI-4 (T2) da yopildi |
 
 ## 20. UI-2 dan keyingi follow-up'lar
@@ -457,10 +457,10 @@ Sinov 3 ta haqiqiy nuqson topdi (hammasi tuzatildi, testlar bilan): (1) jadvali 
 
 | ID | J | Qisqa | Qilinadigan ish |
 |---|---|---|---|
-| FU-30 | L | Hisobotlarda «Xarajat va sof foyda» savoli «Tez orada» | `GET /api/reports/pnl` (C lane) mavjud — savolni ulash |
-| FU-31 | L | Hisobot filial dropdown'i `report.view`siz filialni ham taklif qiladi | server 403 qaytaradi; dropdown'ni ruxsatli filiallar bilan cheklash |
-| FU-32 | L | Filial «oflayn» holati yo'q (bitta server modeli) | — (kerak bo'lsa desktop klientlar heartbeat'i) |
-| FU-33 | L | 1C/CSV eksportda formula-injection himoyasi yo'q | `=`,`+`,`-`,`@` bilan boshlanuvchi qiymatlarni `'` bilan prefikslash |
+| FU-30 ✅ | L | Hisobotlarda «Xarajat va sof foyda» savoli «Tez orada» | `GET /api/reports/pnl` (C lane) mavjud — savolni ulash |
+| FU-31 ✅ | L | Hisobot filial dropdown'i `report.view`siz filialni ham taklif qiladi | server 403 qaytaradi; dropdown'ni ruxsatli filiallar bilan cheklash |
+| FU-32 ➖ | L | Filial «oflayn» holati yo'q (bitta server modeli) | — (kerak bo'lsa desktop klientlar heartbeat'i) |
+| FU-33 ✅ | L | 1C/CSV eksportda formula-injection himoyasi yo'q | `=`,`+`,`-`,`@` bilan boshlanuvchi qiymatlarni `'` bilan prefikslash |
 | FU-34 | 🟡 | Desktop zaxira/tiklash Windows'da tekshirilmagan | `DESKTOP-WINDOWS-BUILD-TEST.md` §4c |
 
 ## 22. UI-4 dan keyingi follow-up'lar
@@ -480,8 +480,23 @@ Sinov 3 ta haqiqiy nuqson topdi (hammasi tuzatildi, testlar bilan): (1) jadvali 
 
 | ID | J | Qisqa | Qilinadigan ish |
 |---|---|---|---|
-| FU-41 | 👤 | Branch Manager shablonida registrator/shifokor huquqlari yo'q → P5 bo'yicha ularni yollay olmaydi | qaror: BM shabloniga huquq qo'shish yoki P5 qoidasini «filial xodimlari uchun» yumshatish |
-| FU-42 | L | `/expenses` 100 tadan ortiq yozuvda faqat birinchi 100 | server pagination UI |
-| FU-43 | L | 40P01 deadlock xabari doim `doctor_busy` | constraint nomi yo'q holatda umumiy matn |
-| FU-44 | L | Linux dev Electron retsepti: tizim postgres'da `btree_gist` (contrib) kerak; migratsiya yiqilsa main dialog'da osiladi, LOGS_DIR'ga yozilmaydi | `migrate-on-start` xatosini logga yozish |
+| FU-41 ✅ | — | Branch Manager shablonida registrator/shifokor huquqlari yo'q → P5 bo'yicha ularni yollay olmaydi | qaror: BM shabloniga huquq qo'shish yoki P5 qoidasini «filial xodimlari uchun» yumshatish |
+| FU-42 ✅ | L | `/expenses` 100 tadan ortiq yozuvda faqat birinchi 100 | server pagination UI |
+| FU-43 ✅ | L | 40P01 deadlock xabari doim `doctor_busy` | constraint nomi yo'q holatda umumiy matn |
+| FU-44 ✅ | L | Linux dev Electron retsepti: tizim postgres'da `btree_gist` (contrib) kerak; migratsiya yiqilsa main dialog'da osiladi, LOGS_DIR'ga yozilmaydi | `migrate-on-start` xatosini logga yozish |
+
+## 24. Yakunlash qoldiqlari (2026-11-12) — natija
+
+Reja: `docs/superpowers/plans/2026-11-12-completion-leftovers.md`. 5 lane + controller integratsiyasi + real-brauzer qabul sinovi (7 oqim).
+- **FU-41:** Branch Manager = filial shablonlari birlashmasi (Tenant Admin'siz — 403 qoladi); shifokor endi `roles.is_practitioner` (0055) bo'yicha aniqlanadi, BM shifokorlar ro'yxatiga tushmaydi (brauzerda tasdiqlandi).
+- **FU-15:** boshqa klinika taklifini qabul qilish Telegram orqali telefon tasdig'ini talab qiladi (0056, `/start pv_<token>`, `contact.user_id === from.id`, qat'iy raqam solishtirish, faqat shaxsiy chat); bot yo'q → 409 aniq xabar. Qo'shimcha: **ko'p klinikada qabul qilingan xodimning parolini bitta klinika egasi tiklay olmaydi** (403 `user.reset_multi_tenant_member`) — reset orqali boshqa klinikaga kirish yo'li yopildi.
+- **FU-24:** Qarzdorlar chip, «Keyingi tashrif» ustuni, Excel/CSV import (`patient.import`, 0057; dublikat/xato qator), kalendarda sudrab ko'chirish (UndoToast), narx chip'lari; lab buyurtma alohida sahifa; Sozlamalar chap navigatsiyasi; Xodimlar rol-kartalari; tish xaritasi tashxis paneli.
+- FU-21/23 (PII), FU-30/31 (hisobot), FU-33 (formula-injection), FU-42/43/44.
+- **FU-32 ➖:** qurilmaydi — kanvasda faqat `ConnectionStatus` (UI-0), bitta server modelida filial signali yo'q.
+
+| ID | J | Qisqa | Qilinadigan ish |
+|---|---|---|---|
+| FU-45 | L | Invite modali muvaffaqiyatdan keyin «Bekor qilish» o'rniga «Yopish» bo'lishi kerak | matn |
+| FU-46 | L | Price chip'lari har xizmat uchun alohida `GET /services/{id}` | batch endpoint |
+| FU-47 | L | `/select-workspace`ga SPA orqali o'tilganda bir marta «klinika yo'q» flesh | yuklanish holati |
 

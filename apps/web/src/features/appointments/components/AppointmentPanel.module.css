@@ -119,3 +119,28 @@
   flex: none;
   text-align: center;
 }
+
+.moveForm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.moveField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+}
+
+.moveField input,
+.moveField select {
+  min-height: var(--tap-min);
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}

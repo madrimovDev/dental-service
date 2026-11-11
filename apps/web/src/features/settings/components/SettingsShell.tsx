@@ -1,31 +1,37 @@
-import type { ComponentType, CSSProperties, ReactNode } from 'react';
-import { lazy, Suspense, useState } from 'react';
+import { VisuallyHidden } from '@mantine/core';
+import type { CSSProperties, ReactNode } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth-store.ts';
+import { useSettingsNavData } from '../settings.navData';
+import type { NavPill } from '../settings.navPills';
 import { type ReadinessKey, useTenantReadiness } from '../settings.readiness.api';
 
-export type SettingsTab = 'tenant' | 'roles' | 'branches' | 'users' | 'notify' | 'integrations';
+export type SettingsTab =
+  | 'tenant'
+  | 'roles'
+  | 'branches'
+  | 'users'
+  | 'services'
+  | 'notify'
+  | 'integrations'
+  | 'license'
+  | 'backup';
 
-// Bo'lim yonidagi holat badge'i qaysi readiness elementiga bog'liq.
-const TAB_READINESS: Partial<Record<SettingsTab, ReadinessKey[]>> = {
-  tenant: ['license'],
-  branches: ['workHours', 'doctorSchedule'],
-  users: ['staff'],
-  integrations: ['channel'],
+// Klinika bo'limi: litsenziya tayyorligi (✓ yoki «sozlanmagan»).
+const TENANT_READINESS: ReadinessKey[] = ['license'];
+
+type TabConfig = {
+  id: SettingsTab;
+  labelKey: string;
+  path: string;
+  permission: string;
+  /** Faqat desktopda ko'rinadigan bo'lim (bulutda yo'q). */
+  desktopOnly?: 'license' | 'backup';
 };
 
-// Lane D yaratadigan zaxira bo'limi — fayl bo'lmasa placeholder (import.meta.glob bo'sh qaytadi).
-const backupModules = import.meta.glob('./BackupSettingsSection.tsx') as Record<
-  string,
-  () => Promise<{ BackupSettingsSection: ComponentType }>
->;
-const backupLoader = backupModules['./BackupSettingsSection.tsx'];
-const BackupSection: ComponentType | null = backupLoader
-  ? lazy(() => backupLoader().then((m) => ({ default: m.BackupSettingsSection })))
-  : null;
-
-const TAB_CONFIG: { id: SettingsTab; labelKey: string; path: string; permission: string }[] = [
+const TAB_CONFIG: TabConfig[] = [
   {
     id: 'tenant',
     labelKey: 'settings.nav_tenant',
@@ -41,6 +47,12 @@ const TAB_CONFIG: { id: SettingsTab; labelKey: string; path: string; permission:
   { id: 'roles', labelKey: 'settings.nav_roles', path: '/settings/roles', permission: 'role.view' },
   { id: 'users', labelKey: 'settings.nav_users', path: '/settings/users', permission: 'user.view' },
   {
+    id: 'services',
+    labelKey: 'settings.nav_services',
+    path: '/settings/services',
+    permission: 'service.view',
+  },
+  {
     id: 'notify',
     labelKey: 'settings.nav_notify',
     path: '/settings/notify',
@@ -51,6 +63,20 @@ const TAB_CONFIG: { id: SettingsTab; labelKey: string; path: string; permission:
     labelKey: 'settings.nav_integrations',
     path: '/settings/integrations',
     permission: 'tenant_settings.view',
+  },
+  {
+    id: 'license',
+    labelKey: 'settings.nav_license',
+    path: '/settings/license',
+    permission: 'tenant_settings.view',
+    desktopOnly: 'license',
+  },
+  {
+    id: 'backup',
+    labelKey: 'settings.nav_backup',
+    path: '/settings/backup',
+    permission: 'tenant_settings.view',
+    desktopOnly: 'backup',
   },
 ];
 
@@ -78,6 +104,64 @@ function StatusBadge({ ok, label }: { ok: boolean; label: string }) {
         background: ok ? 'var(--success)' : 'var(--warning)',
       }}
     />
+  );
+}
+
+const PILL_COLORS: Record<NavPill['tone'], { bg: string; fg: string }> = {
+  ok: { bg: 'var(--success-soft, var(--primary-soft))', fg: 'var(--success)' },
+  neutral: { bg: 'var(--surface-2)', fg: 'var(--ink-2)' },
+  warn: { bg: 'var(--warning-soft, var(--surface-2))', fg: 'var(--warning)' },
+  danger: { bg: 'var(--danger-soft, var(--surface-2))', fg: 'var(--danger)' },
+};
+
+/** Bo'lim yonidagi matnli belgi: ✓ / son / «1 muammo» / «3 kun» — rang yolg'iz emas. */
+function NavPillBadge({ pill }: { pill: NavPill }) {
+  const { t } = useTranslation();
+  const label =
+    pill.kind === 'ok'
+      ? '✓'
+      : pill.kind === 'count'
+        ? String(pill.count)
+        : pill.kind === 'issues'
+          ? t('settingsShell.pill_issues', { count: pill.count })
+          : pill.kind === 'days'
+            ? t('settingsShell.pill_days', { count: pill.count })
+            : pill.kind === 'no_prices'
+              ? t('settingsShell.pill_no_prices')
+              : pill.kind === 'no_channel'
+                ? t('settingsShell.pill_no_channel')
+                : pill.kind === 'todo'
+                  ? t('settingsShell.todo')
+                  : t('settingsShell.pill_never');
+  const c = PILL_COLORS[pill.tone];
+  return (
+    <span
+      data-testid={
+        pill.kind === 'ok'
+          ? 'tab-badge-ok'
+          : pill.tone === 'neutral'
+            ? 'tab-badge-count'
+            : 'tab-badge-todo'
+      }
+      style={{
+        flexShrink: 0,
+        padding: '1px 8px',
+        borderRadius: 99,
+        fontSize: 11.5,
+        fontWeight: 700,
+        background: c.bg,
+        color: c.fg,
+      }}
+    >
+      {pill.kind === 'ok' ? (
+        <>
+          <span aria-hidden="true">{label}</span>
+          <VisuallyHidden>{t('settingsShell.ready')}</VisuallyHidden>
+        </>
+      ) : (
+        label
+      )}
+    </span>
   );
 }
 
@@ -202,19 +286,28 @@ export function SettingsShell({
   const navigate = useNavigate();
   const { hasPermission } = useAuthStore();
 
-  const visible = TAB_CONFIG.filter((tab) => hasPermission(tab.permission));
   const canSeeReadiness = hasPermission('tenant_settings.view');
   const readiness = useTenantReadiness(canSeeReadiness);
   const items = readiness.data?.items ?? [];
   const okCount = items.filter((i) => i.ok).length;
-  const hasBackup = items.some((i) => i.key === 'backup');
+  const nav = useSettingsNavData(items, hasPermission);
+  const visible = TAB_CONFIG.filter((tab) => {
+    if (!hasPermission(tab.permission)) return false;
+    if (tab.desktopOnly === 'license') return nav.showLicense;
+    if (tab.desktopOnly === 'backup') return nav.showBackup;
+    return true;
+  });
   const tabBadge = (tab: SettingsTab): ReactNode => {
-    const keys = TAB_READINESS[tab];
-    if (!keys) return undefined;
-    const rel = items.filter((i) => keys.includes(i.key));
-    if (rel.length === 0) return undefined;
-    const ok = rel.every((i) => i.ok);
-    return <StatusBadge ok={ok} label={t(ok ? 'settingsShell.ready' : 'settingsShell.todo')} />;
+    if (tab === 'tenant') {
+      const rel = items.filter((i) => TENANT_READINESS.includes(i.key));
+      if (rel.length === 0) return undefined;
+      const ok = rel.every((i) => i.ok);
+      return (
+        <NavPillBadge pill={ok ? { tone: 'ok', kind: 'ok' } : { tone: 'warn', kind: 'todo' }} />
+      );
+    }
+    const pill = nav.pills[tab];
+    return pill ? <NavPillBadge pill={pill} /> : undefined;
   };
 
   return (
@@ -253,19 +346,6 @@ export function SettingsShell({
           </div>
         )}
         {children}
-        {hasBackup && active === 'tenant' && (
-          <section aria-label={t('settingsShell.backupSection')} style={{ marginTop: 20 }}>
-            {BackupSection ? (
-              <Suspense fallback={null}>
-                <BackupSection />
-              </Suspense>
-            ) : (
-              <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>
-                {t('settingsShell.backupPlaceholder')}
-              </div>
-            )}
-          </section>
-        )}
       </div>
     </div>
   );

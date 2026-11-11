@@ -1,5 +1,15 @@
 import { PageHead, StatCard, StateView } from '@dental/ui';
-import { Button, Group, Modal, Select, SimpleGrid, Stack, Text, TextInput } from '@mantine/core';
+import {
+  Button,
+  Group,
+  Modal,
+  Pagination,
+  Select,
+  SimpleGrid,
+  Stack,
+  Text,
+  TextInput,
+} from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconCategory, IconListNumbers, IconPlus, IconWallet } from '@tabler/icons-react';
 import { useMemo, useState } from 'react';
@@ -21,6 +31,8 @@ import { ExpenseFormModal } from './ExpenseFormModal';
 import { ExpenseSummaryCard } from './ExpenseSummaryCard';
 import { ExpensesTable } from './ExpensesTable';
 import { PnlPanel } from './PnlPanel';
+
+const PAGE_SIZE = 20;
 
 /** Joriy oyning birinchi/oxirgi kuni (ISO yyyy-mm-dd, lokal). */
 function currentMonthRange(): { from: string; to: string } {
@@ -45,6 +57,15 @@ export function ExpensesScreen() {
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [branchId, setBranchId] = useState<string | null>(null);
 
+  const [page, setPage] = useState(1);
+  // FU-42: filtr o'zgarsa 1-sahifaga qaytamiz (aks holda bo'sh sahifa chiqishi mumkin).
+  const changeFilter =
+    <T,>(set: (v: T) => void) =>
+    (v: T) => {
+      set(v);
+      setPage(1);
+    };
+
   const [pendingDelete, setPendingDelete] = useState<ExpenseVM | null>(null);
   const [formOpened, { open: openForm, close: closeForm }] = useDisclosure(false);
   const [catOpened, { open: openCat, close: closeCat }] = useDisclosure(false);
@@ -56,7 +77,8 @@ export function ExpensesScreen() {
     to,
     categoryId: categoryId ?? undefined,
     branchId: branchId ?? undefined,
-    pageSize: 100,
+    page,
+    pageSize: PAGE_SIZE,
   });
   const summary = useExpenseSummary({ from, to, branchId: branchId ?? undefined });
   const pnl = usePnl({ from, to, branchId: branchId ?? undefined });
@@ -70,6 +92,11 @@ export function ExpensesScreen() {
   const expenseVMs = useMemo(
     () => toExpenseVMs(expenses.data?.data ?? [], nameMap, uncategorized),
     [expenses.data, nameMap, uncategorized],
+  );
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil((expenses.data?.meta.total ?? 0) / (expenses.data?.meta.pageSize ?? PAGE_SIZE)),
   );
 
   const summaryRows = useMemo(
@@ -141,20 +168,20 @@ export function ExpensesScreen() {
             type="date"
             label={t('expenses.from')}
             value={from}
-            onChange={(e) => setFrom(e.currentTarget.value)}
+            onChange={(e) => changeFilter(setFrom)(e.currentTarget.value)}
           />
           <TextInput
             type="date"
             label={t('expenses.to')}
             value={to}
-            onChange={(e) => setTo(e.currentTarget.value)}
+            onChange={(e) => changeFilter(setTo)(e.currentTarget.value)}
           />
           <Select
             label={t('expenses.category')}
             placeholder={t('expenses.all_categories')}
             data={categoryOptions}
             value={categoryId}
-            onChange={setCategoryId}
+            onChange={changeFilter(setCategoryId)}
             clearable
             w={200}
           />
@@ -163,7 +190,7 @@ export function ExpensesScreen() {
             placeholder={t('expenses.all_branches')}
             data={branchOptions}
             value={branchId}
-            onChange={setBranchId}
+            onChange={changeFilter(setBranchId)}
             clearable
             w={200}
           />
@@ -184,7 +211,18 @@ export function ExpensesScreen() {
         ) : expenses.isLoading ? (
           <StateView status="loading" skeleton="table" />
         ) : (
-          <ExpensesTable expenses={expenseVMs} canManage={canManage} onDelete={setPendingDelete} />
+          <>
+            <ExpensesTable
+              expenses={expenseVMs}
+              canManage={canManage}
+              onDelete={setPendingDelete}
+            />
+            {totalPages > 1 && (
+              <Group justify="flex-end">
+                <Pagination value={page} onChange={setPage} total={totalPages} />
+              </Group>
+            )}
+          </>
         )}
       </Stack>
 

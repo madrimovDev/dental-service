@@ -1025,7 +1025,22 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
     };
   }
 
+  /** FU-31: `reportBranchScope` doirasidagi filiallar (null = butun klinika). */
+  async function reportBranches(c: Context) {
+    const ids = scopeIds(c);
+    const rows = await getDb(c)
+      .select({ id: branches.id, name: branches.name })
+      .from(branches)
+      .where(
+        ids
+          ? and(isNull(branches.deletedAt), branchIn(branches.id, ids))
+          : isNull(branches.deletedAt),
+      );
+    return { branches: rows, allowAllBranches: ids === null };
+  }
+
   return {
+    reportBranches,
     pnl,
     debtAging,
     ownerToday,

@@ -30,14 +30,14 @@ describe('reports.questions', () => {
     const locked = QUESTIONS.filter((q) => questionLock(q, false) === 'clinicWide').map(
       (q) => q.key,
     );
-    expect(locked).toEqual(['debt', 'services', 'newPatients', 'recall', 'plans']);
+    expect(locked).toEqual(['debt', 'services', 'pnl', 'newPatients', 'recall', 'plans']);
     expect(QUESTIONS.filter((q) => questionLock(q, true) === 'clinicWide')).toHaveLength(0);
   });
 
   it('yopiq/noma’lum `q` → birinchi ochiq savol', () => {
     expect(resolveQuestion('debt', false).key).toBe('today');
     expect(resolveQuestion('debt', true).key).toBe('debt');
-    expect(resolveQuestion('pnl', true).key).toBe('today');
+    expect(resolveQuestion('stock', true).key).toBe('today');
     expect(resolveQuestion(null, true).key).toBe('today');
   });
 });

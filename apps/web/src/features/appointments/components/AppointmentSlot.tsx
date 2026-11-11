@@ -11,12 +11,17 @@ export function AppointmentSlot({
   tone = 'muted',
   onClick,
   selected = false,
+  draggable = false,
+  onDragStartSlot,
 }: {
   event: CalendarEvent;
   patientName: (patientId: string) => string;
   tone?: Tone;
   onClick?: (event: CalendarEvent) => void;
   selected?: boolean;
+  /** Sudrab ko'chirish mumkin (appointment.edit + faol yozilish). */
+  draggable?: boolean;
+  onDragStartSlot?: (event: CalendarEvent, grabOffsetPx: number) => void;
 }) {
   const { t } = useTranslation();
   const { pos, appointment, startMin, endMin } = event;
@@ -31,6 +36,18 @@ export function AppointmentSlot({
       data-status={appointment.status}
       data-selected={selected}
       aria-pressed={selected}
+      draggable={draggable || undefined}
+      data-draggable={draggable || undefined}
+      onDragStart={
+        draggable
+          ? (e) => {
+              const top = e.currentTarget.getBoundingClientRect().top;
+              e.dataTransfer.effectAllowed = 'move';
+              e.dataTransfer.setData('text/plain', appointment.id);
+              onDragStartSlot?.(event, e.clientY - top);
+            }
+          : undefined
+      }
       style={{
         // model (a): slot ham, grid line ham .colBody origin'idan → addend YO'Q
         top: pos.top,

@@ -9,7 +9,7 @@
  * Birinchi o'rnatishda (`state === null`) baza bo'sh — dump shart emas.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { getOrCreateSuperuserPassword } from './first-run.js';
 import { getBackupsDir, getDataDir, getResourcesDir } from './paths.js';
@@ -94,6 +94,31 @@ export const migrateOnStart = (deps: MigrateDeps): MigrateResult => {
 
   deps.writeState({ lastMigratedVersion: deps.appVersion });
   return { ok: true, backedUp: backupFile };
+};
+
+/**
+ * FU-44: migratsiya xatosini `<logsDir>/migrate.log`ga yozadi (dialog ko'rsatilishidan
+ * OLDIN) — dialog «Loglarni ko'ring» desa, u yerda haqiqatan nimadir bo'lishi shart.
+ * Log yozilmasa ham asosiy oqim yiqilmaydi (false qaytadi).
+ */
+export const logMigrateFailure = (
+  logsDir: string,
+  result: Extract<MigrateResult, { ok: false }>,
+  now: Date = new Date(),
+): boolean => {
+  try {
+    mkdirSync(logsDir, { recursive: true });
+    const lines = [
+      `${now.toISOString()} migrate FAILED reason=${result.reason} restored=${result.restored}`,
+      ...(result.backupFile ? [`  backup: ${result.backupFile}`] : []),
+      `  ${result.message.replace(/\n/g, '\n  ')}`,
+      '',
+    ];
+    appendFileSync(join(logsDir, 'migrate.log'), lines.join('\n'));
+    return true;
+  } catch {
+    return false;
+  }
 };
 
 // --- Real adapterlar ---------------------------------------------------

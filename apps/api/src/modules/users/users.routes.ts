@@ -281,6 +281,10 @@ export const userRoutes = (deps: { db: Database; audit: AuditLogger }) => {
           "Boshqa klinika egasining parolini tiklab bo'lmaydi",
           403,
         ],
+        'user.reset_multi_tenant_member': [
+          "Xodim boshqa klinikada ham ishlaydi — parolni u o'zi tiklashi kerak (ta'minotchiga murojaat)",
+          403,
+        ],
         'user.reset_self': ["O'z parolingizni 'Parolni almashtirish' orqali o'zgartiring", 400],
         'user.not_found': ['Foydalanuvchi topilmadi', 404],
       };

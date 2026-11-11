@@ -11,4 +11,5 @@ export interface MembershipsResponse {
   userId: string;
   assignments: MembershipsResponseAssignmentsItem[];
   ownerTenants: MembershipsResponseOwnerTenantsItem[];
+  phoneVerified: boolean;
 }

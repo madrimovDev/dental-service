@@ -2,8 +2,7 @@ import {
   appointments,
   labOrders,
   patients,
-  permissions,
-  rolePermissions,
+  roles,
   treatmentPlans,
   treatmentStages,
   userAssignments,
@@ -62,15 +61,18 @@ export type SchedulePredicates = {
  * map qilib bo'lmaydi — patient-overlap DB backstop'iga tushsa `patient_busy`
  * qaytarilishi shart, aks holda xato noto'g'ri xabar bilan ko'rinadi.
  */
-function exclusionConflictCode(
+export function exclusionConflictCode(
   err: unknown,
-): 'conflict.doctor_busy' | 'conflict.patient_busy' | null {
+): 'conflict.doctor_busy' | 'conflict.patient_busy' | 'conflict.slot_busy' | null {
   // FU-01: drizzle PG xatosini `.cause`ga o'raydi — pgErrorInfo ochadi.
   const pg = pgErrorInfo(err);
   // 40P01 (deadlock_detected): bir slotga ko'p parallel insert EXCLUDE gist
   // kutish zanjirida deadlock'ga tushishi mumkin — yutqazuvchi ham to'qnashuv
   // (boshqa so'rov slotni ushlagan), shuning uchun 409.
   if (!pg || (pg.code !== '23P01' && pg.code !== '40P01')) return null;
+  // FU-43: deadlock yutqazuvchisi qaysi constraint buzilganini bilmaydi — umumiy
+  // «slot band» (doktor/bemor deb taxmin qilinmaydi).
+  if (pg.code === '40P01') return 'conflict.slot_busy';
   if (pg.constraint === 'appointments_no_patient_overlap') return 'conflict.patient_busy';
   // `appointments_no_doctor_overlap` yoki noma'lum → doctor (mavjud xulq).
   return 'conflict.doctor_busy';
@@ -571,12 +573,11 @@ export const createAppointmentsService = (deps: {
    * `appointment.view` bilan ochiq (yengil) — `user.view` (HR `/users/assignments`)
    * o'rniga, shunda Receptionist ham doktorlar ro'yxatini ko'radi.
    *
-   * A1 (CLI-438): deteksiya rol NOMI substring'iga ("doctor" so'zi) EMAS, balki
-   * `medical_record.edit` permission'iga tayanadi — barqaror signal (tenant rolni
-   * "Shifokor"/"Ortodont" deb qayta nomlasa ham ishlaydi). Role-template'larda
-   * (`packages/core/src/role-templates.ts`) faqat Doctor/Doctor+Assistant/Tenant
-   * Admin shu permission'ga ega; Nurse faqat `.view`, Receptionist/Technician
-   * umuman yo'q — "Doctor's Assistant" (klinik permission'siz) endi ko'rinmaydi.
+   * FU-41: deteksiya `roles.is_practitioner` bayrog'iga tayanadi (A1/CLI-438 da
+   * `medical_record.edit` permission'i edi — Branch Manager superset bo'lgach u endi
+   * shifokor belgisi emas). Bayroq Doctor/Doctor+Assistant shablonlarida va rol
+   * formasida «Shifokor» belgisi qo'yilgan rollarda yoqiladi (tenant rolni
+   * "Ortodont" deb qayta nomlasa ham ishlaydi).
    * ⚠️ Ma'lum chegara: yakka egа-doktor (tenant owner) role_permissions orqali EMAS,
    * implicit superuser sifatida ishlaydi — bu ro'yxatda ko'rinmaydi (eski substring
    * sxemasida ham ko'rinmasdi, pre-existing gap).
@@ -593,13 +594,12 @@ export const createAppointmentsService = (deps: {
       })
       .from(userAssignments)
       .innerJoin(users, eq(users.id, userAssignments.userId))
-      .innerJoin(rolePermissions, eq(rolePermissions.roleId, userAssignments.roleId))
-      .innerJoin(permissions, eq(permissions.id, rolePermissions.permissionId))
+      .innerJoin(roles, eq(roles.id, userAssignments.roleId))
       .where(
         and(
           eq(userAssignments.isActive, true),
           isNotNull(userAssignments.acceptedAt),
-          eq(permissions.code, 'medical_record.edit'),
+          eq(roles.isPractitioner, true),
         ),
       )
       .orderBy(users.fullName);

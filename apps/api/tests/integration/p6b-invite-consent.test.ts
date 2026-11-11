@@ -102,7 +102,14 @@ const assignmentRow = async (userId: string, tenantId: string) => {
 const mkUser = async (phone: string, fullName: string, password = PW) => {
   const [u] = await db
     .insert(users)
-    .values({ phone, passwordHash: await hashPassword(password), fullName })
+    // FU-15: bu to'plam rozilik (accepted_at) mantig'ini tekshiradi — telefon tasdig'i
+    // talabi `fu15-phone-verification.test.ts`da. Shu yerda telefon tasdiqlangan deb olinadi.
+    .values({
+      phone,
+      passwordHash: await hashPassword(password),
+      fullName,
+      phoneVerifiedAt: new Date(),
+    })
     .returning({ id: users.id });
   if (!u) throw new Error('user insert failed');
   return u.id;
@@ -341,8 +348,13 @@ describe('P6b — hujum zanjiri (Review Focus 1, 2)', () => {
     expect(claims.atid).toBe(tenantA);
     expect(claims.perms).toEqual(expect.arrayContaining(STAFF_CODES));
 
-    // Endi a'zo — owner reset qila oladi
-    expect((await call(ownerAToken, 'POST', `/users/${doctorId}/reset-password`)).status).toBe(200);
+    // Endi a'zo, lekin B klinikasida ham ishlaydi — FU-15 qoldig'i: A egasi parolni tiklasa
+    // shu hisob bilan B'ga kirardi, shuning uchun ko'p klinikali xodimni tiklash rad etiladi.
+    const rs = await call(ownerAToken, 'POST', `/users/${doctorId}/reset-password`);
+    expect(rs.status).toBe(403);
+    expect(((await rs.json()) as { error: { code: string } }).error.code).toBe(
+      'user.reset_multi_tenant_member',
+    );
   });
 });
 

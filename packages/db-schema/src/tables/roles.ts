@@ -22,6 +22,8 @@ export const roles = pgTable(
     templateKey: text('template_key'), // system template barqaror key (custom rol → null)
     isTemplate: boolean('is_template').notNull().default(false),
     isSystem: boolean('is_system').notNull().default(false),
+    // FU-41: yozilish qabul qiladigan shifokor roli (permission emas — BM superset shifokor bo'lib qolmasligi uchun)
+    isPractitioner: boolean('is_practitioner').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
