@@ -35,10 +35,7 @@ function conflictMessage(err: unknown, t: (key: string) => string, lang: string)
       // CLI-471: bemor shu vaqtda boshqa yozilishga ega.
       return t('appointments.patient_conflict');
     case 'schedule.outside_working_hours':
-      // TODO i18n key: appointments.outside_working_hours (uz.json/ru.json)
-      return lang === 'ru'
-        ? 'Это время вне рабочего графика доктора'
-        : 'Bu vaqt doktor ish jadvalidan tashqarida';
+      return t('appointments.outside_working_hours');
     case 'schedule.doctor_on_time_off':
       // TODO i18n key: appointments.doctor_on_time_off (uz.json/ru.json)
       return lang === 'ru' ? 'Доктор в этот день в отпуске' : "Doktor shu kuni ta'tilda";
@@ -248,7 +245,9 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
               </Text>
             ) : slots.length === 0 ? (
               <Text size="sm" c="dimmed">
-                {t('appointments.no_slots')}
+                {availability?.workHoursConfigured === false
+                  ? t('appointments.work_hours_not_configured')
+                  : t('appointments.no_slots')}
               </Text>
             ) : (
               <Chip.Group

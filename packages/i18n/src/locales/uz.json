@@ -324,6 +324,20 @@
     "activityFeed": "So'nggi faoliyat"
   },
   "branches": {
+    "work_hours": "Ish soati",
+    "work_hours_open": "Ochiq",
+    "work_hours_closed": "Yopiq",
+    "work_hours_open_time": "Ochilish",
+    "work_hours_close_time": "Yopilish",
+    "days": {
+      "mon": "Dushanba",
+      "tue": "Seshanba",
+      "wed": "Chorshanba",
+      "thu": "Payshanba",
+      "fri": "Juma",
+      "sat": "Shanba",
+      "sun": "Yakshanba"
+    },
     "title": "Filiallar",
     "create": "Yangi filial",
     "edit": "Filialni tahrirlash",
@@ -987,6 +1001,8 @@
     "free_slots": "Bo'sh vaqtlar",
     "pick_service_first": "Avval xizmatni tanlang",
     "no_slots": "Bu kun uchun bo'sh vaqt yo'q",
+    "work_hours_not_configured": "Filial ish soati sozlanmagan — Sozlamalar → Filiallar",
+    "outside_working_hours": "Bu vaqt doktor ish jadvalidan tashqarida",
     "services": "Xizmatlar",
     "notes": "Eslatma",
     "conflict": "Doktor bu vaqtda band",

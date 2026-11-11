@@ -141,6 +141,35 @@ describe('NewAppointmentWizard', () => {
     expect(screen.getByText('09:30')).toBeInTheDocument();
   });
 
+  it("workHoursConfigured=false bo'lsa «ish soati sozlanmagan» xabari (P10)", async () => {
+    const prev = availabilityMock.data;
+    availabilityMock.data = { ...prev, slots: [], workHoursConfigured: false } as typeof prev;
+    try {
+      renderApp(<NewAppointmentWizard onClose={vi.fn()} />);
+      await selectService();
+      fireEvent.click(screen.getByText('Vaqt'));
+      expect(
+        await screen.findByText('Filial ish soati sozlanmagan — Sozlamalar → Filiallar'),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("Bu kun uchun bo'sh vaqt yo'q")).not.toBeInTheDocument();
+    } finally {
+      availabilityMock.data = prev;
+    }
+  });
+
+  it("workHoursConfigured=true va slot yo'q — oddiy no_slots (P10)", async () => {
+    const prev = availabilityMock.data;
+    availabilityMock.data = { ...prev, slots: [], workHoursConfigured: true } as typeof prev;
+    try {
+      renderApp(<NewAppointmentWizard onClose={vi.fn()} />);
+      await selectService();
+      fireEvent.click(screen.getByText('Vaqt'));
+      expect(await screen.findByText("Bu kun uchun bo'sh vaqt yo'q")).toBeInTheDocument();
+    } finally {
+      availabilityMock.data = prev;
+    }
+  });
+
   it("slot tanlanmaguncha Keyingi tugmasi o'chiq, tanlangach yoqiladi", async () => {
     renderApp(<NewAppointmentWizard onClose={vi.fn()} />);
     await selectService();
