@@ -16,12 +16,15 @@ import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { logger } from '../../lib/logger.ts';
 import { hashPassword } from '../../lib/password.ts';
+import { assertCanGrant, loadRolePermissionCodes } from '../../lib/role-escalation.ts';
 import type {
   CreateAssignmentInput,
   InviteUserInput,
   UpdateAssignmentInput,
   UpsertProfileInput,
 } from './users.schema.ts';
+
+const callerPerms = (c: Context): string[] => c.get('accessClaims')?.perms ?? [];
 
 export const createUsersService = (deps: { db: Database; audit: AuditLogger }) => {
   /** Joriy tenant'dagi xodimlar (active assignmentlar bilan) */
@@ -67,6 +70,8 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
     // RoleId joriy tenant'da mavjudligini tekshirish — RLS qiladi
     const [role] = await dbContext.select().from(roles).where(eq(roles.id, input.roleId));
     if (!role) return { ok: false as const, code: 'role.not_found' };
+    // P5: tayinlanayotgan rol chaqiruvchining huquqlaridan yuqori bo'lmasin (yozishdan OLDIN).
+    assertCanGrant(callerPerms(c), (await loadRolePermissionCodes(dbContext, input.roleId)) ?? []);
 
     if (input.branchId) {
       const [branch] = await dbContext
@@ -211,6 +216,8 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
     // tekshirish — cross-tenant/ghost assignment oldini olish (invite bilan bir xil pattern).
     const [role] = await db.select().from(roles).where(eq(roles.id, input.roleId));
     if (!role) return { ok: false as const, code: 'role.not_found' as const };
+    // P5: tayinlanayotgan rol chaqiruvchining huquqlaridan yuqori bo'lmasin.
+    assertCanGrant(callerPerms(c), (await loadRolePermissionCodes(db, input.roleId)) ?? []);
 
     if (input.branchId) {
       const [branch] = await db.select().from(branches).where(eq(branches.id, input.branchId));
@@ -269,6 +276,13 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
       .where(eq(userAssignments.id, assignmentId));
     if (!before) return null;
 
+    // P5: rol o'zgarsa — mavjudligi (RLS) va eskalatsiya tekshiriladi (yozishdan OLDIN).
+    if (input.roleId !== undefined && input.roleId !== before.roleId) {
+      const codes = await loadRolePermissionCodes(db, input.roleId);
+      if (codes === null) return { ok: false as const, code: 'role.not_found' as const };
+      assertCanGrant(callerPerms(c), codes);
+    }
+
     const patch: Record<string, unknown> = { updatedAt: new Date() };
     if (input.roleId !== undefined) patch.roleId = input.roleId;
     if (input.branchId !== undefined) patch.branchId = input.branchId;
@@ -290,7 +304,7 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
         after: updated,
       });
     }
-    return updated;
+    return updated ? { ok: true as const, row: updated } : null;
   }
 
   async function removeAssignment(c: Context, assignmentId: string) {

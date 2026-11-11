@@ -8601,7 +8601,7 @@
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Forbidden (role.escalation: permissions exceed caller permissions)",
             "content": {
               "application/json": {
                 "schema": {
@@ -9017,7 +9017,7 @@
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Forbidden (role.escalation: role exceeds caller permissions)",
             "content": {
               "application/json": {
                 "schema": {
@@ -9027,7 +9027,7 @@
             }
           },
           "404": {
-            "description": "Assignment not found",
+            "description": "Assignment or role not found",
             "content": {
               "application/json": {
                 "schema": {

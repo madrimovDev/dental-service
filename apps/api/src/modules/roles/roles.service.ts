@@ -4,10 +4,13 @@ import { and, eq, inArray } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { assertCanGrant } from '../../lib/role-escalation.ts';
 import type { CreateRoleInput, UpdateRoleInput } from './roles.schema.ts';
 
 const filterOwnerOnly = (codes: string[]): string[] =>
   codes.filter((c) => !(OWNER_ONLY_PERMISSIONS as readonly string[]).includes(c));
+
+const callerPerms = (c: Context): string[] => c.get('accessClaims')?.perms ?? [];
 
 export const createRolesService = (deps: { audit: AuditLogger }) => {
   async function list(c: Context) {
@@ -35,6 +38,8 @@ export const createRolesService = (deps: { audit: AuditLogger }) => {
     if (!tenantId) throw new Error('No tenant context');
 
     const allowedCodes = filterOwnerOnly(input.permissions);
+    // P5: yangi rolga chaqiruvchida yo'q huquq berib bo'lmaydi (yozishdan OLDIN).
+    assertCanGrant(callerPerms(c), allowedCodes);
 
     const [role] = await db
       .insert(roles)
@@ -108,6 +113,11 @@ export const createRolesService = (deps: { audit: AuditLogger }) => {
 
     const allowedCodes = filterOwnerOnly(codes);
     const beforePerms = role.permissions;
+    // P5: faqat YANGI qo'shilayotgan kodlar chaqiruvchida bo'lishi shart (olib tashlash eskalatsiya emas).
+    assertCanGrant(
+      callerPerms(c),
+      allowedCodes.filter((code) => !beforePerms.includes(code)),
+    );
 
     return db.transaction(async (tx) => {
       // Replace strategy: delete all + insert

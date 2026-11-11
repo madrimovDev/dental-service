@@ -182,16 +182,24 @@ export const userRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     },
     responses: {
       ...okJson(userAssignmentRowDtoSchema, 'Updated assignment'),
-      ...assignmentNotFoundResponse,
+      403: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Forbidden (role.escalation: role exceeds caller permissions)',
+      },
+      404: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Assignment or role not found',
+      },
     },
   });
 
   app.openapi(updateAssignmentRoute, async (c) => {
     const { assignmentId } = c.req.valid('param');
     const body = c.req.valid('json');
-    const row = await service.updateAssignment(c, assignmentId, body);
-    if (!row) return c.json(fail('assignment.not_found', 'Assignment not found'), 404);
-    return c.json(ok(toUserAssignmentRowDto(row)), 200);
+    const result = await service.updateAssignment(c, assignmentId, body);
+    if (!result) return c.json(fail('assignment.not_found', 'Assignment not found'), 404);
+    if (!result.ok) return c.json(fail('role.not_found', 'Role not found'), 404);
+    return c.json(ok(toUserAssignmentRowDto(result.row)), 200);
   });
 
   // ─── DELETE /assignments/{assignmentId} ──────────────────────────────────
