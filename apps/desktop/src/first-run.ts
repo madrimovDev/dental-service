@@ -33,12 +33,22 @@ const getConfFileNames = (): { postgres: string; valkey: string } =>
 
 export const isFirstRun = (): boolean => !existsSync(join(getPgDataDir(), 'PG_VERSION'));
 
+// `api.exe migrate` xatoni pino bilan STDOUT'ga yozadi (stderr bo'sh qoladi) —
+// faqat stderr'ni olsak xato matni (masalan «Telefon normalizatsiyasi
+// to'xtatildi») yo'qoladi. Ikkalasini ham olamiz.
+const describeOutput = (result: SpawnSyncReturns<Buffer>): string => {
+  const parts = [result.stderr?.toString().trim(), result.stdout?.toString().trim()].filter(
+    (p): p is string => Boolean(p),
+  );
+  return parts.length > 0 ? parts.join('\n') : 'unknown error';
+};
+
 const assertSuccess = (result: SpawnSyncReturns<Buffer>, label: string): void => {
   if (result.error) {
     throw new Error(`${label} failed: ${result.error.message}`);
   }
   if (result.status !== 0) {
-    throw new Error(`${label} failed: ${result.stderr?.toString() ?? 'unknown error'}`);
+    throw new Error(`${label} failed: ${describeOutput(result)}`);
   }
 };
 

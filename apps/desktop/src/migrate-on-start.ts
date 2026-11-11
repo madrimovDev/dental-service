@@ -109,8 +109,13 @@ export const createStateStore = (
   firstRun: boolean,
 ): Pick<MigrateDeps, 'readState' | 'writeState'> => ({
   readState: () => {
+    // Haqiqiy first-run (`postgres\data` yo'q) — baza bo'sh, dump shart emas.
+    // `state.json` `postgres\data`dan TASHQARIDA yashaydi va klaster
+    // yo'qolganda omon qolishi mumkin: eskirgan fayl o'qilsa mavjud bo'lmagan
+    // bazadan pg_dump urinardi va ilova abadiy qulflanib qolardi.
+    if (firstRun) return { lastMigratedVersion: null };
     const path = getStatePath();
-    if (!existsSync(path)) return { lastMigratedVersion: firstRun ? null : 'unknown' };
+    if (!existsSync(path)) return { lastMigratedVersion: 'unknown' };
     try {
       const parsed = JSON.parse(readFileSync(path, 'utf8')) as { lastMigratedVersion?: unknown };
       return {
@@ -127,7 +132,7 @@ export const createStateStore = (
   },
 });
 
-const getPgBin = (name: 'pg_dump' | 'pg_restore'): string =>
+const getPgBin = (name: 'pg_dump' | 'pg_restore' | 'psql'): string =>
   process.platform === 'win32' ? join(getResourcesDir(), 'postgres', 'bin', `${name}.exe`) : name;
 
 export const createPgTools = (): Pick<MigrateDeps, 'dump' | 'restore'> => {
@@ -138,35 +143,43 @@ export const createPgTools = (): Pick<MigrateDeps, 'dump' | 'restore'> => {
     });
     if (result.error) throw new Error(`${label} failed: ${result.error.message}`);
     if (result.status !== 0) {
-      throw new Error(`${label} failed: ${result.stderr?.toString() ?? 'unknown error'}`);
+      throw new Error(`${label} failed: ${result.stderr?.toString() || 'unknown error'}`);
     }
   };
+  const conn = ['-h', 'localhost', '-p', '5433', '-U', 'dental'];
   return {
     dump: (file) => {
       mkdirSync(getBackupsDir(), { recursive: true });
-      run(
-        getPgBin('pg_dump'),
-        ['-h', 'localhost', '-p', '5433', '-U', 'dental', '-Fc', '-f', file, 'dental'],
-        'pg_dump',
-      );
+      run(getPgBin('pg_dump'), [...conn, '-Fc', '-f', file, 'dental'], 'pg_dump');
     },
-    restore: (file) =>
+    // `pg_restore --clean` FAQAT dump'dagi obyektlarni o'chiradi: migratsiya
+    // dump'dan keyin yaratgan yangi jadval/ustunlar (drizzle migrator bitta
+    // tranzaksiyada COMMIT qiladi, keyin ensureAppRole/RLS yiqilishi mumkin)
+    // qolib ketardi va tuzatilgan versiya `relation already exists` bilan
+    // abadiy yiqilardi. Shu sabab bazani butunlay qayta yaratamiz:
+    // DROP (ulanishlarni uzib) → CREATE → bitta tranzaksiyada tiklash.
+    // Rollar klaster-darajali — saqlanadi; dump egalik/grant'larni tiklaydi.
+    restore: (file) => {
+      run(
+        getPgBin('psql'),
+        [
+          ...conn,
+          '-d',
+          'postgres',
+          '-v',
+          'ON_ERROR_STOP=1',
+          '-c',
+          'DROP DATABASE IF EXISTS dental WITH (FORCE)',
+          '-c',
+          'CREATE DATABASE dental',
+        ],
+        'recreate database',
+      );
       run(
         getPgBin('pg_restore'),
-        [
-          '--clean',
-          '--if-exists',
-          '-h',
-          'localhost',
-          '-p',
-          '5433',
-          '-U',
-          'dental',
-          '-d',
-          'dental',
-          file,
-        ],
+        [...conn, '--exit-on-error', '--single-transaction', '-d', 'dental', file],
         'pg_restore',
-      ),
+      );
+    },
   };
 };

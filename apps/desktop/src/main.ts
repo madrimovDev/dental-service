@@ -302,7 +302,7 @@ app.whenReady().then(async () => {
               : `Yangilash muvaffaqiyatsiz. Ma'lumotlarni qaytarib bo'lmadi${migration.backupFile ? `, zaxira: ${migration.backupFile}` : ''}. Ta'minotchiga murojaat qiling.`;
         dialog.showErrorBox(
           "Dental Service — yangilash to'xtatildi",
-          `${message}\n\nTafsilot: ${migration.message}\nLoglarni ko'ring: ${LOGS_DIR}`,
+          `${message}\n\nTafsilot: ${migration.message.slice(-800)}\nLoglarni ko'ring: ${LOGS_DIR}`,
         );
         await stopServer();
         app.quit();
