@@ -451,28 +451,6 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
         return { ok: false as const, code: 'user.reset_other_tenant_owner' };
       }
 
-      // FU-15 qoldig'i: maqsad BOSHQA klinikada ham qabul qilingan a'zo bo'lsa — rad.
-      // Aks holda klinika A egasi parolni tiklab, shu hisob bilan klinika B'ga kirardi.
-      // `app.current_user_id` user_assignments RLS'ida foydalanuvchining o'z qatorlarini
-      // ochadi (workspaces naqshi); tx oxirida bekor bo'ladi.
-      await tx.execute(sql`SELECT set_config('app.current_user_id', ${targetUserId}, true)`);
-      const [otherMember] = await tx
-        .select({ id: userAssignments.id })
-        .from(userAssignments)
-        .where(
-          and(
-            eq(userAssignments.userId, targetUserId),
-            ne(userAssignments.tenantId, tenantId),
-            eq(userAssignments.isActive, true),
-            isNotNull(userAssignments.acceptedAt),
-          ),
-        )
-        .limit(1);
-      await tx.execute(sql`SELECT set_config('app.current_user_id', '', true)`);
-      if (otherMember) {
-        return { ok: false as const, code: 'user.reset_multi_tenant_member' };
-      }
-
       let hasAssignment = false;
       if (!isOwner) {
         const [a] = await tx
@@ -493,6 +471,28 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
 
       if (!isOwner && !hasAssignment) {
         return { ok: false as const, code: 'user.not_in_tenant' };
+      }
+
+      // FU-15 qoldig'i: maqsad BOSHQA klinikada ham qabul qilingan a'zo bo'lsa — rad.
+      // Aks holda klinika A egasi parolni tiklab, shu hisob bilan klinika B'ga kirardi.
+      // `app.current_user_id` user_assignments RLS'ida foydalanuvchining o'z qatorlarini
+      // ochadi (workspaces naqshi); tx oxirida bekor bo'ladi.
+      await tx.execute(sql`SELECT set_config('app.current_user_id', ${targetUserId}, true)`);
+      const [otherMember] = await tx
+        .select({ id: userAssignments.id })
+        .from(userAssignments)
+        .where(
+          and(
+            eq(userAssignments.userId, targetUserId),
+            ne(userAssignments.tenantId, tenantId),
+            eq(userAssignments.isActive, true),
+            isNotNull(userAssignments.acceptedAt),
+          ),
+        )
+        .limit(1);
+      await tx.execute(sql`SELECT set_config('app.current_user_id', '', true)`);
+      if (otherMember) {
+        return { ok: false as const, code: 'user.reset_multi_tenant_member' };
       }
 
       const [target] = await tx.select().from(users).where(eq(users.id, targetUserId));
