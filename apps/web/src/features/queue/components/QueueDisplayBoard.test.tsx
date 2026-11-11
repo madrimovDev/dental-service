@@ -83,8 +83,9 @@ describe('QueueDisplayBoard', () => {
     expect(cabinetNumbers).toHaveLength(2);
     expect(cabinetNumbers[0]?.textContent).toBe('A-06');
     expect(cabinetNumbers[1]?.textContent).toBe('A-07');
-    expect(screen.getByText('Ali Valiyev')).toBeInTheDocument();
-    expect(screen.getByText('Vali Aliyev')).toBeInTheDocument();
+    // PII: TV ekranida bemor ismi YO'Q (faqat raqam).
+    expect(screen.queryByText('Ali Valiyev')).toBeNull();
+    expect(screen.queryByText('Vali Aliyev')).toBeNull();
   });
 
   it("kabinet bo'sh bo'lsa placeholder ko'rsatadi", () => {

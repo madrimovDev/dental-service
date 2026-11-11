@@ -1,6 +1,7 @@
 import {
   type CreateQueueTicketBody,
   createQueueTicket,
+  customInstance,
   getCheckInCandidates,
   getQueueToday,
   listBranches,
@@ -9,8 +10,10 @@ import {
   type QueueStatus,
   updateQueueTicketStatus,
 } from '@dental/api-client';
+import { notifications } from '@mantine/notifications';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { appointmentKeys } from '@/features/appointments/appointments.keys';
+import { i18n } from '@/lib/i18n.ts';
 import { lookupKeys } from '@/lib/lookup-keys';
 import { queueKeys } from './queue.keys';
 
@@ -40,15 +43,48 @@ export function useCreateTicket() {
   });
 }
 
+/** SC-09: backend javobidagi `appointmentSyncError` (yozilish sync'i bajarilmadi) — jim yutilmaydi. */
+type SyncAware = { appointmentSyncError?: string | null };
+
+export function warnIfAppointmentSyncFailed(ticket: unknown) {
+  const code = (ticket as SyncAware | undefined)?.appointmentSyncError;
+  if (!code) return;
+  notifications.show({
+    color: 'yellow',
+    message: i18n.t('queueBoard.sync_failed', { code }),
+  });
+}
+
 export function useUpdateQueueStatus() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: QueueStatus }) =>
       updateQueueTicketStatus(id, { status }).then((r) => r.data),
-    onSuccess: () => {
+    onSuccess: (ticket) => {
+      warnIfAppointmentSyncFailed(ticket);
       void qc.invalidateQueries({ queryKey: queueKeys.all });
       // Backend done→completed / missed→no_show appointment'ni sync qiladi —
       // kalendar cache'ni ham yangilash kerak.
+      void qc.invalidateQueries({ queryKey: appointmentKeys.all });
+    },
+  });
+}
+
+/**
+ * Shifokor o'z bemorini chaqiradi (`POST /queue/{id}/call-own`, queue.manage SHART EMAS).
+ * TODO(generate:contract): generated `callOwnQueueTicket` paydo bo'lgach shu yerni almashtiring.
+ */
+export function useCallOwnTicket() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      customInstance<{ data: SyncAware }>({
+        url: `/api/queue/${id}/call-own`,
+        method: 'POST',
+      }).then((r) => r.data),
+    onSuccess: (ticket) => {
+      warnIfAppointmentSyncFailed(ticket);
+      void qc.invalidateQueries({ queryKey: queueKeys.all });
       void qc.invalidateQueries({ queryKey: appointmentKeys.all });
     },
   });
