@@ -17,7 +17,16 @@ export interface TrayInfo {
   // Klient rolida `false` — LAN discovery serverni topa olmadi (fon retry
   // davom etmoqda, CLI-348 qaror 4). `undefined`/`true` — ulangan holat.
   serverFound?: boolean;
+  // Server rolida child process holati (P15): ishlamoqda / qayta ishga
+  // tushmoqda / to'xtadi (restart urinishlari tugagan).
+  serverState?: 'ok' | 'restarting' | 'down';
 }
+
+const SERVER_STATE_LABELS = {
+  ok: 'ishlamoqda',
+  restarting: 'qayta ishga tushmoqda',
+  down: "to'xtadi",
+} as const;
 
 export interface TrayCallbacks {
   onOpen: () => void;
@@ -58,7 +67,7 @@ export const setTrayToolTip = (text: string): void => {
 export const updateTray = (role: AppRole, info: TrayInfo, callbacks: TrayCallbacks): void => {
   const label =
     role === 'server'
-      ? `Dental Service — Server\n📡 ${info.serverUrl}\n👥 ${info.connectedClients ?? 0} ta qurilma${info.licenseInfo ? `\n🔐 ${info.licenseInfo}` : ''}`
+      ? `Dental Service — Server\n📡 ${info.serverUrl}\n👥 ${info.connectedClients ?? 0} ta qurilma${info.licenseInfo ? `\n🔐 ${info.licenseInfo}` : ''}${info.serverState ? `\n🖥 Server: ${SERVER_STATE_LABELS[info.serverState]}` : ''}`
       : info.serverFound === false
         ? 'Dental Service — Klient\n🔍 Server topilmadi (30s da qayta urinilmoqda)'
         : `Dental Service — Klient\n✅ Ulangan: ${info.serverUrl}`;

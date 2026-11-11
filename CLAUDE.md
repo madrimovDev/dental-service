@@ -7,11 +7,10 @@ Bu fayl Claude Code uchun loyiha konteksti. Har yangi sessiyada birinchi o'qilad
 > 🗺️ **YAKUNLASH YO'L XARITASI (2026-11-11) — ishni shu yerdan boshlang: [`docs/superpowers/specs/2026-11-11-completion-roadmap-design.md`](./docs/superpowers/specs/2026-11-11-completion-roadmap-design.md).** «Tugadi» = P1–P18 + UI-0…UI-4 + lab portali (alohida brainstorm) + VPS/domen/TLS (eng oxiri). Tartib: P (1–5) → UI → lab → infra. Real klinika YO'Q, VM o'chirilgan — hammasi lokalda. Asosiy qarorlar: P18 = `expiresAt` + 7 kun imtiyoz, keyin to'liq blok (to'lov ekrani); P6 = faqat owner tiklaydi, vaqtinchalik parol + majburiy almashtirish; karta sub-turi (Terminal/Click/Payme/Boshqa), integratsiyasiz; kreslo modeli yo'q; desktop zaxira papkaga + UI orqali tiklash (owner). Uzaytirish faqat heartbeat orqali (internet shart, offline kod yo'q). **Ijro qoidalari:** [`docs/ORCHESTRATION-GUIDE.md`](./docs/ORCHESTRATION-GUIDE.md) — Haiku/Sonnet/Opus + dinamik effort, subagentlarda advisor YO'Q (`.claude/agents/*` allowlist), faqat nomlangan testlar, to'liq to'plam faqat merge oldidan bir marta, lane'ga alohida test bazasi, merge/push — controller.
 >
 > 🔬 **ENG SO'NGGI (2026-11-11) — 9 domenli feature tadqiqoti: [`docs/FEATURE-RESEARCH-2026-11-11.md`](./docs/FEATURE-RESEARCH-2026-11-11.md).** ~90 feature, 18 ustuvor topilma (P1–P18), offline/online rejim jadvali va keyingi tekshiruv rejasi. Kod hali TEGILMAGAN.
+> ✅ **P bosqichi 2 (2026-11-11): P18 ✅, P2/P14/P15/DT-01…03 🟡 (kod tayyor, Windows'da tekshirilmagan — `docs/DESKTOP-WINDOWS-BUILD-TEST.md` §4b).** Litsenziya: `expiresAt` + 7 kun (`MAX_GRACE_DAYS`), keyin desktop'da `/api/*` + `/uploads` to'liq blok (`requireValidLicenseInDesktop`, ochiq: health/auth/activate/bootstrap-status/reset-owner-password/license), web banner + `/license-expired` + «Qayta tekshirish» (`POST /api/license/recheck`), Supervisor `POST /v1/admin/clinics/:id/renew` + admin tugma — **jonli tasdiqlangan** (active→grace→expired 403→renew→active). Desktop: har startda migratsiya, versiya o'zgarsa oldin `pg_dump`, yiqilsa DROP+CREATE+restore (real-PG testi), child supervision (5 urinish backoff), graceful `pg_ctl stop`, installer config'ni saqlaydi, port **8080**, firewall. ⚠️ Worktree'da `apps/supervisor-api/node_modules` (zod 3) va `apps/web/node_modules` symlink qilinmasa typecheck soxta xato beradi (orkestratsiya qo'llanmasi §5.2).
 > ✅ **P bosqichi 1 (2026-11-11) yopildi: P1 + P3 + P4.** `rlsMiddleware` endi `c.error` yoki status ≥ 500 da rollback qiladi (`fail()` bilan qaytarilgan 4xx — commit). Redis/BullMQ eslatmalari `onAfterCommit(c, fn)` (`apps/api/src/db/after-commit.ts`) orqali faqat commit'dan keyin, best-effort, 2,5 s timeout bilan (o'lik Redis javobni osib qo'ymaydi — verifier topdi). **Qoida:** 4xx'da yozuv saqlanishi kerak bo'lsa — `fail()` qaytar, throw qilma. Follow-up'lar: FINDINGS-REGISTER §13 (FU-01…04). Ma'lum test yiqilishlari: `docs/KNOWN-TEST-FAILURES.md`.
 > **Boshqa Critical/High:**
-> - P2 — desktop yangilanishda migratsiya yo'q (faqat first-run).
 > - P17 — bulutda uploads volume yo'q va `backup.sh` MinIO'ga qaratilgan.
-> - P18 — offline grace `expiresAt`dan hisoblanadi, heartbeat'dan emas (spec'dan farq); Supervisor'da renew yo'q.
 > - P5 — rol eskalatsiyasi (invite).
 > - P6 — tenantlararo parol tiklash.
 > - P7 — POS `items` + begona `treatmentPlanId`.
@@ -21,7 +20,6 @@ Bu fayl Claude Code uchun loyiha konteksti. Har yangi sessiyada birinchi o'qilad
 > - P11 — rasmlar Bearer'siz `<img>` (❔ brauzerda).
 > - P12 — Zod 4 `.partial()` default'larni qo'llaydi (probe bilan tasdiqlangan).
 > - P13 — Accountant dashboard refund'ni qo'shadi.
-> - P14 — NSIS `config.json`ni qayta yozadi.
 >
 > **To'liq reyestr (har topilma + ish):** [`docs/FINDINGS-REGISTER-2026-11-11.md`](./docs/FINDINGS-REGISTER-2026-11-11.md).
 > **Tashqi texnik (lab):** SaaS'da faqat har klinikaga *Technician* qilib taklif qilish mumkin (boshqa lablar buyurtmalari va butun bemor ro'yxati ko'rinadi, `labName` erkin matn, `labs` obyekti yo'q). Desktop'da umuman kira olmaydi. Variantlar: [`docs/LAB-TECHNICIAN-ACCESS-2026-11-11.md`](./docs/LAB-TECHNICIAN-ACCESS-2026-11-11.md).

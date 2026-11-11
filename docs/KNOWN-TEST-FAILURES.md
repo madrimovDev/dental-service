@@ -25,6 +25,18 @@
 | `tests/integration/cli-387-license-heartbeat.test.ts` | CLI-387 — deactivated clinic gets blocked on next heartbeat > active license passes (200) -> Supervisor heartbeat says INVALID_KEY -> next request 403 LICENSE_NOT_FOUND |
 | `tests/integration/cli-387-license-heartbeat.test.ts` | CLI-387 — deactivated clinic gets blocked on next heartbeat > transient network error during heartbeat does NOT invalidate the cached license (offline resilience) |
 
+## P bosqichi 2 (2026-11-11) qo'shilganlari — `mock.module` oqishi sinfi, izolyatsiyada yashil
+
+| Fayl | Test |
+|---|---|
+| `src/lib/license.test.ts` | grace cap + license state (P18) > getLicenseState: real .lic file -> grace; tampered signature -> none |
+| `tests/integration/cli-358-module-gating.test.ts` | GET /api/branches (non-module route, Local Desktop mode, no license) → 403 LICENSE_NOT_FOUND (P18 global gate) |
+| `tests/integration/cli-358-module-gating.test.ts` | GET /api/branches (…) → 403 (P18 global gate) while /api/auth stays open |
+| `tests/integration/cli-358-module-gating.test.ts` | GET /api/treatment-plans (Local Desktop, no auth header, no license) → 403 LICENSE_NOT_FOUND (P18 global gate runs BEFORE auth) |
+
+Sabab: `license-middleware.test.ts`/`license.test.ts` `./license.ts`ni `mock.module` bilan almashtiradi; bitta bun jarayonida `getLicenseState` mock'i boshqa fayllarga oqadi. Oxirgi gate: `1001 pass / 18 fail` (17 ta shu ro'yxat sinflari + 1 muhit).
+
 ## Muhit bilan bog'liq (ro'yxatga kirmaydi)
+- `clinical.test.ts` `(unnamed)` hook — `diagnoses_code_unique (K02.1)`: lane bazasiga `seedDiagnoses` qo'llangan bo'lsa yiqiladi. Lane'ga **faqat `seedPermissions`**.
 - `provisioning-tenant.test.ts` «har rol shabloni o'z permission to'plamini to'liq oladi» — lane bazasida `seedPermissions` ishlatilmagan bo'lsa yiqiladi (permission katalogi migratsiyada emas, API boot'da seed qilinadi). Lane tayyorlashda seed majburiy (qo'llanma §5.3).
 - `bun run lint` (`biome check .`) — `apps/supervisor-api` dagi avvaldan mavjud `noNonNullAssertion`/`noExplicitAny` xatolari bilan exit 1. Gate'da faqat **tegilgan fayllar** biome'dan toza bo'lishi tekshiriladi (pre-commit hook shuni qiladi).

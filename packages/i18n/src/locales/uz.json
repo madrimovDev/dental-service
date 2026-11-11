@@ -1412,5 +1412,18 @@
     "empty": "Hali kategoriya yo'q",
     "confirm_delete": "Kategoriyani o'chirish?",
     "in_use_error": "Bu kategoriyaga xizmatlar biriktirilgan — avval ularni ko'chiring"
+  },
+  "license": {
+    "banner": {
+      "expiring": "Litsenziya {{count}} kundan keyin tugaydi",
+      "grace": "To'lov kechikdi, {{count}} kundan keyin dastur to'xtaydi"
+    },
+    "blocked": {
+      "title": "Litsenziya muddati tugadi",
+      "body": "To'lov qilishingiz kerak, ta'minotchiga murojaat qiling",
+      "internet": "Internetga ulaning",
+      "recheck": "Qayta tekshirish",
+      "stillExpired": "Litsenziya hali ham faol emas"
+    }
   }
 }

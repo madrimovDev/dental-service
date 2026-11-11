@@ -5,6 +5,7 @@ import { cashierRoutes } from '@/features/cashier';
 import { clinicalRoutes } from '@/features/clinical';
 import { dashboardRoutes } from '@/features/dashboard';
 import { expensesRoutes } from '@/features/expenses';
+import { licenseRoutes } from '@/features/license';
 import { patientRoutes } from '@/features/patients';
 import { payrollRoutes } from '@/features/payroll';
 import { profileRoutes } from '@/features/profile';
@@ -25,6 +26,7 @@ import { type AppRoute, DesignSystemPage, ForbiddenPage } from '@/shell';
 
 export const publicRoutes: AppRoute[] = [
   ...authRoutes,
+  ...licenseRoutes,
   ...(import.meta.env.DEV ? [{ path: '/dev/ds', element: <DesignSystemPage /> }] : []),
 ];
 

@@ -66,6 +66,21 @@ describe('tray', () => {
     expect(template[0]?.label).toContain('http://10.0.0.5:80');
   });
 
+  test('server tray shows crash state label', () => {
+    const cbs = { onOpen: mock(() => {}), onSettings: mock(() => {}), onStop: mock(() => {}) };
+    createTray('server', { serverUrl: 'http://localhost:80', serverState: 'ok' }, cbs);
+    expect(trayMockState.lastMenuTemplate?.[0]?.label).toContain('Server: ishlamoqda');
+
+    updateTray('server', { serverUrl: 'http://localhost:80', serverState: 'restarting' }, cbs);
+    expect(trayMockState.lastMenuTemplate?.[0]?.label).toContain('Server: qayta ishga tushmoqda');
+
+    updateTray('server', { serverUrl: 'http://localhost:80', serverState: 'down' }, cbs);
+    expect(trayMockState.lastMenuTemplate?.[0]?.label).toContain("Server: to'xtadi");
+
+    updateTray('server', { serverUrl: 'http://localhost:80' }, cbs);
+    expect(trayMockState.lastMenuTemplate?.[0]?.label).not.toContain('Server: ');
+  });
+
   test('"Ochish" tugmasi bosilganda onOpen chaqiriladi', () => {
     const onOpen = mock(() => {});
     const onSettings = mock(() => {});

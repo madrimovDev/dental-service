@@ -140,6 +140,9 @@ export {
   listOverdueLabOrders,
   updateLabOrder,
 } from './generated/lab-orders/lab-orders.ts';
+// Generated (orval) — license
+export type { GetLicenseStatusResult, RecheckLicenseResult } from './generated/license/license.ts';
+export { getLicenseStatus, recheckLicense } from './generated/license/license.ts';
 export type {
   WorkspaceBranches,
   WorkspaceBranchesBranchesItem,
@@ -467,6 +470,7 @@ export {
   RecallDtoStatus,
   UpdateRecallStatus,
 } from './generated/model/index.ts';
+export type { LicenseStatus } from './generated/model/licenseStatus.ts';
 // Generated (orval) — no-show-strikes (CLI-474 L7)
 export {
   getPatientNoShowStrikes,

@@ -300,6 +300,47 @@
           "hasTenant"
         ]
       },
+      "LicenseStatus": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "none",
+              "active",
+              "expiring",
+              "grace",
+              "expired"
+            ]
+          },
+          "expiresAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "graceEndsAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "daysLeft": {
+            "type": "integer",
+            "nullable": true
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "desktop",
+              "cloud"
+            ]
+          }
+        },
+        "required": [
+          "state",
+          "expiresAt",
+          "graceEndsAt",
+          "daysLeft",
+          "mode"
+        ]
+      },
       "PermissionDef": {
         "type": "object",
         "properties": {
@@ -6776,6 +6817,86 @@
                     "success",
                     "data"
                   ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/license/status": {
+      "get": {
+        "tags": [
+          "license"
+        ],
+        "operationId": "getLicenseStatus",
+        "responses": {
+          "200": {
+            "description": "Local license state (desktop) or none (cloud)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/LicenseStatus"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/license/recheck": {
+      "post": {
+        "tags": [
+          "license"
+        ],
+        "operationId": "recheckLicense",
+        "responses": {
+          "200": {
+            "description": "Heartbeat run immediately; refreshed license state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/LicenseStatus"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not available outside Local Desktop",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }

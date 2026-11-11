@@ -3,6 +3,7 @@ import { useDisclosure } from '@mantine/hooks';
 import { Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Outlet } from 'react-router-dom';
+import { LicenseBanner } from '@/features/license';
 import { useUiStore } from '@/stores/ui-store.ts';
 import { CommandPalette } from './CommandPalette';
 import { PageLoader } from './PageLoader';
@@ -24,6 +25,7 @@ export function AppShell() {
       </a>
       <CommandPalette />
       <MantineAppShell.Header>
+        <LicenseBanner />
         <Topbar onBurger={toggle} burgerOpened={opened} />
       </MantineAppShell.Header>
       <MantineAppShell.Navbar>

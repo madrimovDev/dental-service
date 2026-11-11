@@ -37,7 +37,7 @@ export const licenses = pgTable('licenses', {
   fingerprint: text('fingerprint'), // machine fingerprint (SHA-256)
   plan: text('plan').notNull(), // 'starter'|'standard'|'premium'|'enterprise'
   modules: jsonb('modules').notNull().$type<string[]>(),
-  gracePeriodDays: integer('grace_period_days').notNull().default(30),
+  gracePeriodDays: integer('grace_period_days').notNull().default(7),
   expiresAt: timestamp('expires_at').notNull(),
   isActive: boolean('is_active').notNull().default(true),
   lastHeartbeatAt: timestamp('last_heartbeat_at'),

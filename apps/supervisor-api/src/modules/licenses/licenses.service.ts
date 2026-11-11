@@ -312,6 +312,38 @@ export const createLicenseService = () => ({
     return { loginPhone: clinic.ownerPhone, tempPassword };
   },
 
+  /**
+   * Muddatni uzaytirish (P18). Heartbeat o'zgarmaydi — u `expiresAt`ni DB'dan
+   * o'qib `.lic`ni qayta imzolaydi.
+   */
+  async renew(clinicId: string, expiresAt: Date, adminId?: string) {
+    if (expiresAt.getTime() <= Date.now()) {
+      throw Object.assign(new Error('EXPIRES_IN_PAST'), { status: 400 });
+    }
+    const clinic = await db.query.clinics.findFirst({ where: eq(clinics.id, clinicId) });
+    if (!clinic) throw Object.assign(new Error('CLINIC_NOT_FOUND'), { status: 404 });
+    const lic = await db.query.licenses.findFirst({ where: eq(licenses.clinicId, clinicId) });
+    if (!lic) throw Object.assign(new Error('LICENSE_NOT_FOUND'), { status: 404 });
+
+    return db.transaction(async (tx) => {
+      const [updated] = await tx
+        .update(licenses)
+        .set({ expiresAt })
+        .where(eq(licenses.id, lic.id))
+        .returning();
+      await tx.insert(licenseEvents).values({
+        licenseId: lic.id,
+        event: 'renewed',
+        metadata: {
+          from: lic.expiresAt.toISOString(),
+          to: expiresAt.toISOString(),
+          createdBy: adminId ?? null,
+        },
+      });
+      return updated!;
+    });
+  },
+
   async reactivate(licenseKey: string, newFingerprint: string) {
     const lic = await db.query.licenses.findFirst({
       where: eq(licenses.licenseKey, licenseKey),

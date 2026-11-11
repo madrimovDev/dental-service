@@ -82,14 +82,14 @@ Agent turlari fayllari: `.claude/agents/*.md` (frontmatter `name`, `description`
 
 Tartib:
 1. `git worktree add .claude/worktrees/<lane> -b wf/<stage>-<lane> main` (Workflow `isolation:'worktree'` o'rniga — eskirgan-commit muammosi bo'lgan; controller o'zi yaratadi va `git merge-base main wf/...` = `main` tip ekanini tekshiradi).
-2. `.env` nusxasi.
+2. `.env` nusxasi (+ `apps/supervisor-api/.env`) va **paketlarning o'z `node_modules` papkalariga symlink**: `for d in apps/*/node_modules; do ln -s "$PWD/$d" "$WT/$d"; done`. ✅ P bosqichi 2 darsi: `apps/supervisor-api` o'zining **zod 3** nusxasini ishlatadi; worktree'da u yo'q bo'lsa ildizdagi zod 4 olinadi va `zValidator` tip xatolari chiqadi (implementer kodni «zod v3 API»ga moslashtirishga urindi). Symlink `.gitignore`ga tushmaydi (`node_modules/` — papka naqshi) — commit'da `git add -A` emas, aniq yo'llar.
 3. Lane bazasi va Redis indeksi (§5.3).
 4. Workflow `args` orqali har lane'ga: worktree yo'li, branch, `DATABASE_URL`, `DATABASE_ADMIN_URL`, `REDIS_URL`, vazifalar ro'yxati, test fayllari.
 
 ### 5.3 Lane'ga alohida test bazasi va Redis
 ✅ Spike natijasi: shell'dagi `DATABASE_URL` `--env-file`dagi qiymatdan **ustun**; `dental_test_lane1` yaratilib `migrate.ts` bilan to'liq migratsiya qilindi va integration test unga qarshi o'tdi.
 
-- Har lane: `dental_test_<stage>_<lane>` (controller yaratadi + `migrate.ts` + **`seedPermissions`/`seedDiagnoses`** — permission katalogi migratsiyada emas, API boot'da seed qilinadi; seed'siz `provisioning-tenant` testi yiqiladi) va `REDIS_URL=…/<N>` (N = 1…15, lane bo'yicha) — rate-limit va BullMQ kalitlari aralashmaydi.
+- Har lane: `dental_test_<stage>_<lane>` (controller yaratadi + `migrate.ts` + **faqat `seedPermissions`** (`seedDiagnoses` EMAS — `clinical.test.ts` o'z diagnozlarini qo'shadi va `diagnoses_code_unique` bilan yiqiladi) — permission katalogi migratsiyada emas, API boot'da seed qilinadi; seed'siz `provisioning-tenant` testi yiqiladi) va `REDIS_URL=…/<N>` (N = 1…15, lane bo'yicha) — rate-limit va BullMQ kalitlari aralashmaydi.
 - ✅ **Lane URL'lari worktree'dagi `.env` nusxasiga yoziladi** (`DATABASE_URL`, `DATABASE_ADMIN_URL`, `REDIS_URL` almashtiriladi) — buyruq prefiksi emas. P bosqichi 1 darsi: prefiksni unutgan reviewer'lar `dental_test_…` topa olmadi yoki (yomonroq holda) dev bazasida `TRUNCATE` qilishi mumkin edi.
 - ⚠️ **Shell env `--env-file`dan USTUN.** Controller lane'ni tayyorlayotganda `set -a; . ./.env` qilsa, keyingi `bun --env-file=… migrate` **asosiy `dental` bazasiga** ketadi (P bosqichi 2 da shunday bo'ldi — idempotent bo'lgani uchun zarar yo'q). Lane migratsiya/seed buyruqlari `env -u DATABASE_URL -u DATABASE_ADMIN_URL -u REDIS_URL bun --env-file=…` bilan yuriladi va natija `select count(*) from permissions` (64 kutiladi) bilan tekshiriladi.
 - Supervisor lane'i: worktree'dagi `apps/supervisor-api/.env`da `DATABASE_URL` → `supervisor_test_<stage>_<lane>`, `db:migrate` (seed admin yaratadi). `bun run test` skripti `-u DATABASE_URL` qiladi, shuning uchun `.env` yagona manba.

@@ -14,7 +14,7 @@ const DEFAULTS: AppConfig = {
   role: 'server',
   serverUrl: null,
   licenseKey: null,
-  serverPort: 80,
+  serverPort: 8080,
 };
 
 // Runtime da har chaqiruvda hisoblanadi (env-override testable bo'lishi uchun) —

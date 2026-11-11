@@ -47,7 +47,7 @@ export const CreateClinicModal = ({ opened, onClose }: Props) => {
       contactPhone: '',
       plan: 'starter',
       expiresAt: '',
-      gracePeriodDays: 30,
+      gracePeriodDays: 7,
       ownerFullName: '',
       ownerPhone: '',
       defaultLanguage: 'uz',

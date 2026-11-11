@@ -13,7 +13,7 @@ const updateModulesSchema = z.object({
   // `isLicenseValid`: `hozir < expiresAt + gracePeriodDays`), shuning uchun
   // chegarasiz qiymat litsenziyani amalda cheksiz uzaytirardi va yaratishdagi
   // cheklov shu bitta endpoint orqali chetlab o'tilardi.
-  gracePeriodDays: z.number().int().min(1).max(365).optional(),
+  gracePeriodDays: z.number().int().min(1).max(7).optional(),
 });
 
 export const modulesRoutes = () => {

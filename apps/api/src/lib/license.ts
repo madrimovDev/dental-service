@@ -137,6 +137,76 @@ export const readLicense = async (): Promise<LicenseData | null> => {
   }
 };
 
+const DAY_MS = 86400000;
+
+/**
+ * P18 — imtiyozli muddat yuqori chegarasi. Imzolangan `gracePeriodDays` (eski
+ * `.lic`larda 30 bo'lishi mumkin) baribir `MAX_GRACE_DAYS` dan oshmaydi.
+ */
+export const MAX_GRACE_DAYS = 7;
+
+/** Imzolangan qiymat → amaldagi imtiyoz kunlari (0..MAX_GRACE_DAYS; NaN/manfiy → 0). */
+const effectiveGraceDays = (signedDays: number): number =>
+  Number.isFinite(signedDays) ? Math.min(Math.max(signedDays, 0), MAX_GRACE_DAYS) : 0;
+
+/** Imzo + mashina bog'lanishi (muddatdan mustaqil). */
+const isLicenseAuthentic = (data: LicenseData, localFingerprint: string): boolean => {
+  const { signature, ...payload } = data;
+  if (!verifyLicenseSignature(payload, signature, SUPERVISOR_PUBLIC_KEY_PEM)) {
+    return false;
+  }
+  // Eski (fingerprint'siz) payload yoki mashina mos kelmasligi → rad.
+  return Boolean(payload.fingerprint) && payload.fingerprint === localFingerprint;
+};
+
+/** CLI-437 — `max(Date.now(), anchor, issuedAt)`: soat orqaga surilsa ham muddat tiklanmaydi. */
+const effectiveNowMs = (data: LicenseData, anchorMs: number): number => {
+  const issuedAtMs = Date.parse(data.issuedAt);
+  return Math.max(Date.now(), anchorMs, Number.isFinite(issuedAtMs) ? issuedAtMs : 0);
+};
+
+export type LicenseStateName = 'none' | 'active' | 'expiring' | 'grace' | 'expired';
+
+export interface LicenseState {
+  state: LicenseStateName;
+  expiresAt: string | null;
+  graceEndsAt: string | null;
+  daysLeft: number | null;
+}
+
+/** Muddat tugashiga shuncha kun qolganda `expiring` (banner sariq). */
+const EXPIRING_THRESHOLD_DAYS = 14;
+
+/**
+ * Sof holat funksiyasi (imzo/fingerprint TEKSHIRMAYDI — chaqiruvchi tekshiradi).
+ * `daysLeft`: active/expiring'da `expiresAt`gacha, grace'da `graceEndsAt`gacha,
+ * butun kunlar (yuqoriga yaxlitlangan). Chegara `isLicenseValid` bilan mos:
+ * `now < expiresAt + grace` — amal qiladi.
+ */
+export const computeLicenseState = (lic: LicenseData | null, nowMs: number): LicenseState => {
+  if (!lic) return { state: 'none', expiresAt: null, graceEndsAt: null, daysLeft: null };
+  const expiryMs = Date.parse(lic.expiresAt);
+  if (!Number.isFinite(expiryMs)) {
+    // Buzuq sana — isLicenseValid ham rad etadi; bloklash tomoniga.
+    return { state: 'expired', expiresAt: lic.expiresAt, graceEndsAt: null, daysLeft: null };
+  }
+  const graceEndMs = expiryMs + effectiveGraceDays(lic.gracePeriodDays) * DAY_MS;
+  const base = {
+    expiresAt: new Date(expiryMs).toISOString(),
+    graceEndsAt: new Date(graceEndMs).toISOString(),
+  };
+  if (nowMs >= graceEndMs) return { state: 'expired', ...base, daysLeft: null };
+  if (nowMs >= expiryMs) {
+    return { state: 'grace', ...base, daysLeft: Math.ceil((graceEndMs - nowMs) / DAY_MS) };
+  }
+  const daysToExpiry = Math.ceil((expiryMs - nowMs) / DAY_MS);
+  return {
+    state: daysToExpiry <= EXPIRING_THRESHOLD_DAYS ? 'expiring' : 'active',
+    ...base,
+    daysLeft: daysToExpiry,
+  };
+};
+
 /**
  * Litsenziya haqiqiyligini tekshiradi (sof funksiya — fingerprint chaqiruvchida
  * bir marta hisoblanadi, `getFingerprint` async bo'lgani uchun; testda mock oson).
@@ -160,19 +230,10 @@ export const isLicenseValid = (
   localFingerprint: string,
   anchorMs = 0,
 ): boolean => {
-  const { signature, ...payload } = data;
-  if (!verifyLicenseSignature(payload, signature, SUPERVISOR_PUBLIC_KEY_PEM)) {
-    return false;
-  }
-  // Eski (fingerprint'siz) payload yoki mashina mos kelmasligi → rad.
-  if (!payload.fingerprint || payload.fingerprint !== localFingerprint) {
-    return false;
-  }
+  if (!isLicenseAuthentic(data, localFingerprint)) return false;
   const expiry = new Date(data.expiresAt).getTime();
-  const grace = data.gracePeriodDays * 86400000;
-  const issuedAtMs = Date.parse(data.issuedAt);
-  const effectiveNow = Math.max(Date.now(), anchorMs, Number.isFinite(issuedAtMs) ? issuedAtMs : 0);
-  return effectiveNow < expiry + grace;
+  const grace = effectiveGraceDays(data.gracePeriodDays) * DAY_MS;
+  return effectiveNowMs(data, anchorMs) < expiry + grace;
 };
 
 /**
@@ -231,6 +292,25 @@ export const getActiveModules = async (): Promise<string[]> => {
     // no-op — anchor faylga yozilmasa ham modul ro'yxati qaytariladi
   }
   return lic.modules;
+};
+
+/**
+ * Joriy litsenziya holati (UI banner / global blok uchun). `.lic` yo'q, o'qib
+ * bo'lmaydi, fingerprint hisoblanmaydi yoki imzo/fingerprint mos emas → `none`.
+ * Langarni ilgari SURMAYDI (faqat o'qiydi) — `getActiveModules` suradi.
+ */
+export const getLicenseState = async (): Promise<LicenseState> => {
+  const lic = await readLicense();
+  if (!lic) return computeLicenseState(null, 0);
+  let localFingerprint: string;
+  try {
+    localFingerprint = await getFingerprint();
+  } catch {
+    return computeLicenseState(null, 0);
+  }
+  if (!isLicenseAuthentic(lic, localFingerprint)) return computeLicenseState(null, 0);
+  const anchorMs = await readAnchor();
+  return computeLicenseState(lic, effectiveNowMs(lic, anchorMs));
 };
 
 /**
