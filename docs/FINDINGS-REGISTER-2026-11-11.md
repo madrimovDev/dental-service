@@ -10,7 +10,7 @@
 >   - 📄 — agent koddan tasdiqlagan;
 >   - ❔ — ehtimoliy, runtime'da tekshirish kerak.
 >
-> **Holat:** hech biri tuzatilmagan (2026-11-11). Faqat `queue.ts` (P3) uchun commit qilinmagan fix bor.
+> **Holat:** hech biri tuzatilmagan (2026-11-11), P3 dan tashqari — ✅ `592ed7a` da yopilgan (real `Job.validateOptions` testi bilan). Yakunlash tartibi va qarorlar: [`superpowers/specs/2026-11-11-completion-roadmap-design.md`](./superpowers/specs/2026-11-11-completion-roadmap-design.md).
 
 ---
 
