@@ -20,9 +20,5 @@ export const RECALL_QUEUE_NAME = 'recall-scan';
 /** Deterministik repeatable jobId — qayta boot'da takror registratsiya drift qilmaydi. */
 export const RECALL_SCAN_JOB_ID = 'recall-daily-scan';
 
-/**
- * Deterministik job ID — yozilish bo'yicha. Bitta yozilishga bitta eslatma:
- * reschedule'da eski job `remove(jobId)` qilinadi, keyin yangi delay bilan
- * qayta `add` qilinadi. add/remove drift qilmasligi uchun bitta joyda.
- */
-export const reminderJobId = (appointmentId: string) => `appointment:${appointmentId}`;
+// Reminder job ID — sof modulda (Redis'siz test qilinadi), shu yerdan qayta eksport.
+export { reminderJobId } from './reminder-job-id.ts';
