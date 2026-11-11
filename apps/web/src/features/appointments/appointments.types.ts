@@ -1,5 +1,11 @@
-import type { Appointment, AppointmentStatus } from '@dental/api-client';
+import type { Appointment as ApiAppointment, AppointmentStatus } from '@dental/api-client';
 import type React from 'react';
+
+/**
+ * Yozilish + bemor ismi (SC-01: `GET /appointments` JOIN bilan to'ldiradi).
+ * Generated modelga `patientName` regen'dan keyin ham keladi — kesishma zararsiz.
+ */
+export type Appointment = ApiAppointment & { patientName?: string | null };
 
 export type Doctor = { id: string; name: string };
 
@@ -50,4 +56,4 @@ export function toneVars(tone: Tone): React.CSSProperties {
   } as React.CSSProperties;
 }
 
-export type { Appointment, AppointmentStatus };
+export type { AppointmentStatus };

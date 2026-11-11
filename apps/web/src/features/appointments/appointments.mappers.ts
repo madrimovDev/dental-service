@@ -1,5 +1,10 @@
-import type { Appointment } from '@dental/api-client';
-import type { CalendarEvent, DayColumn, Doctor, DoctorColumn } from './appointments.types';
+import type {
+  Appointment,
+  CalendarEvent,
+  DayColumn,
+  Doctor,
+  DoctorColumn,
+} from './appointments.types';
 import { GRID } from './appointments.types';
 
 const TZ = 'Asia/Tashkent';

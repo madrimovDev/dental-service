@@ -106,6 +106,12 @@
   text-overflow: ellipsis;
 }
 
+.colSubDanger {
+  display: block;
+  color: var(--danger);
+  font-weight: var(--fw-bold);
+}
+
 .colCount {
   flex: none;
   font-family: var(--font-mono);
@@ -153,6 +159,46 @@
   border: 1px solid var(--border);
   border-left: 3px solid var(--tone, var(--primary));
   color: var(--ink);
+}
+
+/* tanlangan yozilish — qalin ink halqa (kanvas: box-shadow 3px ink) */
+.slot[data-selected="true"] {
+  box-shadow: 0 0 0 3px var(--ink);
+  z-index: 1;
+}
+
+/* jadvalsiz doktor ustuni (UI-R2): ustun fon + sabab bloki */
+.colNoSchedule {
+  background-color: var(--surface-2);
+}
+
+.noScheduleNote {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 12px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--danger-bg);
+  border: 1px solid var(--danger);
+  color: var(--danger); /* --danger on --danger-bg: contrast-check validated */
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+}
+
+.noScheduleTitle {
+  font-weight: var(--fw-bold);
+  font-size: var(--text-sm);
+}
+
+.noScheduleLink {
+  font-weight: var(--fw-bold);
+  color: inherit;
+  text-decoration: underline;
 }
 
 /* status modifikatorlar (spec §4) — rang doktor-tonida, status dim/override */

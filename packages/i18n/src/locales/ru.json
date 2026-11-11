@@ -1513,5 +1513,32 @@
       "recheck": "Проверить снова",
       "stillExpired": "Лицензия по-прежнему не активна"
     }
+  },
+  "calendar": {
+    "panel_title": "Выбранная запись",
+    "panel_close": "Закрыть",
+    "next_step": "Следующий шаг",
+    "action_confirm": "Подтвердить",
+    "action_start": "Начать приём",
+    "action_complete": "Завершить",
+    "action_reopen": "Вернуть в работу",
+    "action_no_show": "Не пришёл",
+    "action_cancel": "Отменить",
+    "action_patient_card": "Карточка пациента",
+    "undo": "Вернуть",
+    "seconds": "с",
+    "marked_no_show": "{{name}} — не пришёл",
+    "marked_cancelled": "{{name}} — запись отменена",
+    "history": "История статусов",
+    "history_booked": "Записан — {{date}}",
+    "history_confirmed": "Подтверждена",
+    "history_in_progress": "На приёме",
+    "history_completed": "Завершена",
+    "history_no_show": "Не пришёл",
+    "history_cancelled": "Отменена",
+    "no_schedule_title": "На этот день графика нет",
+    "no_schedule_text": "Без графика записать к этому врачу нельзя.",
+    "no_schedule_link": "Открыть график →",
+    "no_schedule_badge": "Нет графика"
   }
 }

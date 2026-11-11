@@ -1,26 +1,23 @@
-import { Button, IconButton, Mono, StateView, StatusPill, Tabs } from '@dental/ui';
-import { Group, Modal, Select, Stack, Text, Textarea } from '@mantine/core';
+import { Button, IconButton, StateView, StatusPill, Tabs, UndoToast } from '@dental/ui';
+import { Group, Modal, Select } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { ChevronRight } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { usePatients } from '@/features/patients';
 import { fullDayRangeToInstants } from '@/features/schedule/schedule.mappers';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import {
   useAppointments,
+  useBranchAvailability,
   useBranches,
   useCancelAppointment,
   useDoctors,
   useServices,
+  useUpdateAppointmentStatus,
 } from '../appointments.api';
-import {
-  addDaysToDateKey,
-  localDateKey,
-  localTimeLabel,
-  mondayOfWeek,
-} from '../appointments.mappers';
-import type { AppointmentStatus, CalendarEvent } from '../appointments.types';
+import { addDaysToDateKey, localDateKey, mondayOfWeek } from '../appointments.mappers';
+import type { Appointment, AppointmentStatus, CalendarEvent } from '../appointments.types';
+import { AppointmentPanel } from './AppointmentPanel';
 import { CalendarGrid } from './CalendarGrid';
 import { DayStatsCard } from './DayStatsCard';
 import { FreeSlotsCard } from './FreeSlotsCard';
@@ -38,17 +35,15 @@ function isToday(dateKey: string): boolean {
   return dateKey === localDateKey(new Date().toISOString());
 }
 
-/** AppointmentStatus → R0 StatusPill semantik variant. */
-const statusVariant: Record<AppointmentStatus, StatusPillVariant> = {
-  scheduled: 'accent',
-  confirmed: 'info',
-  in_progress: 'warning',
-  completed: 'success',
-  no_show: 'danger',
-  cancelled: 'neutral',
+/** Qaytariladigan amal — `UndoToast` tugaguncha PATCH/POST YUBORILMAYDI (strike ham yozilmaydi). */
+type PendingAction = {
+  /** `${id}:${kind}` — UndoToast remount kaliti. */
+  key: string;
+  id: string;
+  status: AppointmentStatus;
+  label: string;
+  commit: () => void;
 };
-
-type StatusPillVariant = 'neutral' | 'success' | 'warning' | 'danger' | 'info' | 'accent';
 
 export function CalendarScreen() {
   const { t, i18n } = useTranslation();
@@ -57,8 +52,11 @@ export function CalendarScreen() {
   const [branchId, setBranchId] = useState<string | null>(activeBranchId);
   const [date, setDate] = useState(() => new Date());
   const [opened, { open, close }] = useDisclosure(false);
-  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
-  const [cancelReason, setCancelReason] = useState('');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [pending, setPending] = useState<PendingAction | null>(null);
+  const pendingRef = useRef<PendingAction | null>(null);
+  /** Kutilayotgan (UndoToast) yoki yuborilgan, hali refetch bo'lmagan holatlar — optimistik ko'rinish. */
+  const [overrides, setOverrides] = useState<Record<string, AppointmentStatus>>({});
 
   // A11 (CLI-438): pivot kun — `date` (brauzer-local Date, faqat navigatsiya/display
   // uchun) qaysi Tashkent kalendar kuniga tegishli ekanini aniqlaydi. Fetch range
@@ -89,20 +87,28 @@ export function CalendarScreen() {
     to: rangeEnd.toISOString(),
   });
   const { data: doctors } = useDoctors();
-  const { data: patientsData } = usePatients({ page: 1, pageSize: 100 });
   const { data: servicesData } = useServices();
   const { data: branchesData } = useBranches();
   const cancelMut = useCancelAppointment();
+  const statusMut = useUpdateAppointmentStatus();
+  const canViewSchedule = hasPermission('schedule.view');
+  const { data: availability } = useBranchAvailability({
+    branchId,
+    date: pivotKey,
+    enabled: canViewSchedule && view === 'day',
+  });
 
   const branchOptions = useMemo(
     () => (branchesData ?? []).map((b) => ({ value: b.id, label: b.name })),
     [branchesData],
   );
 
-  const patientNameMap = useMemo(() => {
-    return new Map((patientsData?.items ?? []).map((p) => [p.id, p.fullName]));
-  }, [patientsData]);
-  const patientName = (patientId: string) => patientNameMap.get(patientId) ?? '—';
+  // SC-01: bemor ismi yozilish DTO'sidan (backend JOIN) — avval faqat birinchi 100 bemordan olinardi.
+  const patientNameMap = useMemo(
+    () => new Map((appts ?? []).map((a) => [a.patientId, a.patientName ?? ''])),
+    [appts],
+  );
+  const patientName = (patientId: string) => patientNameMap.get(patientId) || '—';
 
   const doctorNameMap = useMemo(
     () => new Map((doctors ?? []).map((d) => [d.id, d.name])),
@@ -125,10 +131,41 @@ export function CalendarScreen() {
 
   // Rail kartalari `Appointment[]` kutadi (DS4-2 DayStatsCard/WaitlistCard) —
   // `useAppointments` allaqachon `Appointment[]` qaytaradi.
-  const apptList = useMemo(() => appts ?? [], [appts]);
+  const apptList = useMemo<Appointment[]>(
+    () =>
+      (appts ?? []).map((a) => {
+        const status = overrides[a.id];
+        return status ? { ...a, status } : a;
+      }),
+    [appts, overrides],
+  );
+
+  // Server holati override'ga yetib kelgach (refetch) override tushiriladi.
+  useEffect(() => {
+    setOverrides((prev) => {
+      const keys = Object.keys(prev);
+      if (keys.length === 0) return prev;
+      const next = { ...prev };
+      let changed = false;
+      for (const a of appts ?? []) {
+        if (next[a.id] === a.status) {
+          delete next[a.id];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [appts]);
+
+  // Jadvalsiz ustun (P10): `schedule.view` bor va ma'lumot kelgan bo'lsagina bilinadi.
+  const unscheduledDoctorIds = useMemo(() => {
+    if (view !== 'day' || availability == null) return null;
+    const scheduled = new Set(availability.doctors.map((d) => d.doctorId));
+    return new Set((doctors ?? []).filter((d) => !scheduled.has(d.id)).map((d) => d.id));
+  }, [view, availability, doctors]);
 
   // Sub-sarlavha hisoblari (client-side, appts/doctors/branch'dan).
-  const apptCount = appts?.length ?? 0;
+  const apptCount = apptList.length;
   const activeDoctorCount = useMemo(
     () => new Set(apptList.map((a) => a.doctorId)).size,
     [apptList],
@@ -146,26 +183,76 @@ export function CalendarScreen() {
     });
   };
 
-  const openDetail = (event: CalendarEvent) => {
-    setCancelReason('');
-    setSelectedEvent(event);
+  const openDetail = (event: CalendarEvent) => setSelectedId(event.appointment.id);
+  const closeDetail = () => setSelectedId(null);
+
+  const selected = selectedId == null ? null : (apptList.find((a) => a.id === selectedId) ?? null);
+
+  /** Optimistik holatni olib tashlash (xato yoki qaytarish). */
+  const clearOverride = useCallback((id: string) => {
+    setOverrides((prev) => {
+      if (!(id in prev)) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  }, []);
+
+  /** Kutilayotgan amalni darhol bajaradi (muddat tugadi / yangi amal boshlandi / ekrandan chiqildi). */
+  const flushPending = useCallback(() => {
+    const p = pendingRef.current;
+    if (p == null) return;
+    pendingRef.current = null;
+    setPending(null);
+    p.commit();
+  }, []);
+
+  // Sahifadan chiqilsa kutilayotgan amal yo'qolmaydi — bajariladi (UndoToast unmount'da commit qilmaydi).
+  useEffect(() => () => flushPending(), [flushPending]);
+
+  const startUndoable = (
+    appt: Appointment,
+    status: 'no_show' | 'cancelled',
+    commit: () => void,
+  ) => {
+    flushPending(); // oldingi kutilayotgan amal bo'lsa — avval uni yakunla
+    setOverrides((prev) => ({ ...prev, [appt.id]: status }));
+    const action: PendingAction = {
+      key: `${appt.id}:${status}`,
+      id: appt.id,
+      status,
+      label: t(status === 'no_show' ? 'calendar.marked_no_show' : 'calendar.marked_cancelled', {
+        name: patientName(appt.patientId),
+      }),
+      commit,
+    };
+    pendingRef.current = action;
+    setPending(action);
   };
-  const closeDetail = () => setSelectedEvent(null);
 
-  const appt = selectedEvent?.appointment;
-  const canCancel =
-    appt != null &&
-    hasPermission('appointment.cancel') &&
-    appt.status !== 'cancelled' &&
-    appt.status !== 'completed';
-
-  const confirmCancel = () => {
-    if (appt == null) return;
-    cancelMut.mutate(
-      { id: appt.id, reason: cancelReason.trim() || undefined },
-      { onSuccess: closeDetail },
+  const markNoShow = (appt: Appointment) =>
+    startUndoable(appt, 'no_show', () =>
+      statusMut.mutate(
+        { id: appt.id, status: 'no_show' },
+        { onError: () => clearOverride(appt.id) },
+      ),
     );
+
+  const markCancelled = (appt: Appointment) =>
+    startUndoable(appt, 'cancelled', () =>
+      cancelMut.mutate({ id: appt.id }, { onError: () => clearOverride(appt.id) }),
+    );
+
+  const undoPending = () => {
+    const p = pendingRef.current;
+    pendingRef.current = null;
+    setPending(null);
+    // Hech narsa yuborilmagan — faqat optimistik ko'rinish qaytariladi.
+    if (p) clearOverride(p.id);
   };
+
+  const changeStatus = (appt: Appointment, to: AppointmentStatus) =>
+    statusMut.mutate({ id: appt.id, status: to });
 
   return (
     <div>
@@ -273,22 +360,40 @@ export function CalendarScreen() {
             />
           ) : view === 'day' ? (
             <CalendarGrid
-              appointments={appts ?? []}
+              appointments={apptList}
               doctors={doctors ?? []}
               patientName={patientName}
               onSlotClick={openDetail}
+              selectedId={selectedId}
+              unscheduledDoctorIds={unscheduledDoctorIds}
             />
           ) : (
             <WeekGrid
-              appointments={appts ?? []}
+              appointments={apptList}
               dayKeys={dayKeys}
               patientName={patientName}
               onSlotClick={openDetail}
+              selectedId={selectedId}
             />
           )}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {selected != null && (
+            <AppointmentPanel
+              appointment={selected}
+              patientName={patientName(selected.patientId)}
+              doctorName={doctorNameMap.get(selected.doctorId) ?? '—'}
+              serviceNames={(selected.serviceIds ?? []).map((id) => serviceNameMap.get(id) ?? id)}
+              canEdit={hasPermission('appointment.edit')}
+              canCancel={hasPermission('appointment.cancel')}
+              canOpenPatient={hasPermission('patient.view')}
+              onStatus={(to) => changeStatus(selected, to)}
+              onNoShow={() => markNoShow(selected)}
+              onCancel={() => markCancelled(selected)}
+              onClose={closeDetail}
+            />
+          )}
           <DayStatsCard appts={apptList} />
           {/* DS12: jonli "Bo'sh slot" kartasi — faqat `schedule.view` ruxsati
               bo'lganda render (cheklangan rollarda 403 oldini olish, CLI-153). */}
@@ -302,43 +407,18 @@ export function CalendarScreen() {
       <Modal opened={opened} onClose={close} title={t('appointments.create')} size="lg">
         <NewAppointmentWizard onClose={close} />
       </Modal>
-      <Modal opened={appt != null} onClose={closeDetail} title={t('appointments.title')} size="md">
-        {appt != null && (
-          <Stack gap="sm">
-            <Mono>
-              {localTimeLabel(appt.startTime)} — {localTimeLabel(appt.endTime)}
-            </Mono>
-            <Text size="sm">
-              {t('appointments.patient')}: {patientName(appt.patientId)}
-            </Text>
-            <Text size="sm">
-              {t('appointments.doctor')}: {doctorNameMap.get(appt.doctorId) ?? '—'}
-            </Text>
-            <Text size="sm">
-              {t('appointments.services')}:{' '}
-              {(appt.serviceIds ?? []).map((id) => serviceNameMap.get(id) ?? id).join(', ') || '—'}
-            </Text>
-            <div>
-              <StatusPill status={statusVariant[appt.status]}>
-                {t(`appointments.status.${appt.status}`)}
-              </StatusPill>
-            </div>
-            {canCancel && (
-              <Stack gap="xs" mt="sm">
-                <Textarea
-                  label={t('appointments.cancel_reason')}
-                  rows={2}
-                  value={cancelReason}
-                  onChange={(e) => setCancelReason(e.currentTarget.value)}
-                />
-                <Button variant="danger" disabled={cancelMut.isPending} onClick={confirmCancel}>
-                  {t('common.cancel')}
-                </Button>
-              </Stack>
-            )}
-          </Stack>
-        )}
-      </Modal>
+      {pending != null && (
+        <UndoToast
+          key={pending.key}
+          floating
+          undoLabel={t('calendar.undo')}
+          secondsSuffix={t('calendar.seconds')}
+          onUndo={undoPending}
+          onCommit={flushPending}
+        >
+          {pending.label}
+        </UndoToast>
+      )}
     </div>
   );
 }

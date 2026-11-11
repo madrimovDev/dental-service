@@ -1513,5 +1513,32 @@
       "recheck": "Qayta tekshirish",
       "stillExpired": "Litsenziya hali ham faol emas"
     }
+  },
+  "calendar": {
+    "panel_title": "Tanlangan yozilish",
+    "panel_close": "Yopish",
+    "next_step": "Keyingi qadam",
+    "action_confirm": "Tasdiqlash",
+    "action_start": "Qabulni boshlash",
+    "action_complete": "Yakunlash",
+    "action_reopen": "Qayta faollashtirish",
+    "action_no_show": "Kelmadi",
+    "action_cancel": "Bekor qilish",
+    "action_patient_card": "Bemor kartasi",
+    "undo": "Qaytarish",
+    "seconds": "s",
+    "marked_no_show": "{{name}} — Kelmadi",
+    "marked_cancelled": "{{name}} — Bekor qilindi",
+    "history": "Holat tarixi",
+    "history_booked": "Yozildi — {{date}}",
+    "history_confirmed": "Tasdiqlandi",
+    "history_in_progress": "Qabulda",
+    "history_completed": "Yakunlandi",
+    "history_no_show": "Kelmadi",
+    "history_cancelled": "Bekor qilindi",
+    "no_schedule_title": "Bu kunga ish jadvali yo'q",
+    "no_schedule_text": "Jadvalsiz bu shifokorga yozib bo'lmaydi.",
+    "no_schedule_link": "Jadvalni ko'rish →",
+    "no_schedule_badge": "Jadval yo'q"
   }
 }

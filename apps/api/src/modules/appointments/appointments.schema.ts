@@ -65,6 +65,8 @@ export const appointmentDtoSchema = z
     tenantId: z.uuid(),
     branchId: z.uuid(),
     patientId: z.uuid(),
+    // SC-01: faqat ro'yxat (`GET /`) JOIN bilan to'ldiriladi; boshqa javoblarda null.
+    patientName: z.string().nullable().optional().openapi({ example: 'Ali Valiyev' }),
     doctorId: z.uuid(),
     assistantId: z.uuid().nullable().openapi({ example: null }),
     startTime: z.string().openapi({ example: '2026-06-12T10:00:00.000Z' }),

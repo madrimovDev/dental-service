@@ -1,5 +1,6 @@
 import {
   appointments,
+  patients,
   permissions,
   rolePermissions,
   userAssignments,
@@ -244,13 +245,17 @@ export const createAppointmentsService = (deps: {
 
     // CLI-435: majburiy chegara + barqaror tartib (startTime asc, id tie-break).
     const offset = (query.page - 1) * query.pageSize;
-    return db
-      .select()
+    // SC-01: bemor ismi JOIN bilan (kalendar avval faqat birinchi 100 bemordan olardi).
+    // patients RLS — xuddi shu tenant tranzaksiyasida; LEFT JOIN: bemor yo'q bo'lsa ham qator qoladi.
+    const rows = await db
+      .select({ appointment: appointments, patientName: patients.fullName })
       .from(appointments)
+      .leftJoin(patients, eq(patients.id, appointments.patientId))
       .where(filters.length > 0 ? and(...filters) : undefined)
       .orderBy(asc(appointments.startTime), asc(appointments.id))
       .limit(query.pageSize)
       .offset(offset);
+    return rows.map((r) => ({ ...r.appointment, patientName: r.patientName ?? null }));
   }
 
   async function getById(c: Context, id: string) {

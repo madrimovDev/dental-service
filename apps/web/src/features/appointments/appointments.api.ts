@@ -7,19 +7,42 @@ import {
   listBranches,
   listDoctors,
   listServices,
+  updateAppointment,
 } from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { scheduleKeys } from '@/features/schedule/schedule.keys';
 import { lookupKeys } from '@/lib/lookup-keys';
 import { appointmentKeys } from './appointments.keys';
+import type { Appointment, AppointmentStatus } from './appointments.types';
 
+/** Server sahifa hajmi (API `.max(100)`); kun/hafta oralig'i sahifalab TO'LIQ olinadi (SC-02). */
+const PAGE_SIZE = 100;
+/** Xavfsizlik chegarasi (30 × 100 = 3000 yozilish) — cheksiz sikldan himoya. */
+const MAX_PAGES = 30;
+
+/**
+ * Berilgan oraliqdagi BARCHA yozilishlar. Avval faqat birinchi sahifa (100 ta)
+ * olinardi va ortig'i jim kesilardi (SC-02). Server tartibi barqaror
+ * (startTime, id) — sahifalar takrorlanmaydi.
+ */
 export function useAppointments(range: { branchId?: string; from: string; to: string }) {
   return useQuery({
     queryKey: appointmentKeys.list(range),
-    queryFn: () =>
-      listAppointments({ branchId: range.branchId, from: range.from, to: range.to }).then(
-        (r) => r.data,
-      ),
+    queryFn: async (): Promise<Appointment[]> => {
+      const all: Appointment[] = [];
+      for (let page = 1; page <= MAX_PAGES; page++) {
+        const rows = (await listAppointments({
+          branchId: range.branchId,
+          from: range.from,
+          to: range.to,
+          page,
+          pageSize: PAGE_SIZE,
+        }).then((r) => r.data)) as Appointment[];
+        all.push(...rows);
+        if (rows.length < PAGE_SIZE) break;
+      }
+      return all;
+    },
   });
 }
 
@@ -103,6 +126,16 @@ export function useCancelAppointment() {
   return useMutation({
     mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
       cancelAppointment(id, reason !== undefined ? { reason } : undefined).then((r) => r.data),
+    onSuccess: () => invalidateAppointmentAndAvailability(qc),
+  });
+}
+
+/** Faqat holat o'tishi (`PATCH /appointments/:id`, `appointment.edit`; state-machine serverda). */
+export function useUpdateAppointmentStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: AppointmentStatus }) =>
+      updateAppointment(id, { status }).then((r) => r.data),
     onSuccess: () => invalidateAppointmentAndAvailability(qc),
   });
 }
