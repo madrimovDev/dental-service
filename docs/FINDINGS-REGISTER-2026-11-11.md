@@ -18,11 +18,11 @@
 
 | ID | J | Qisqa | Qilinadigan ish | Tartib |
 |---|---|---|---|---|
-| P1 | C | RLS tx 500 da COMMIT | `rlsMiddleware`: `await next()` dan keyin `c.error` bo'lsa throw (rollback); route'da yozib throw qiladigan HTTP regressiya testi | 1 |
+| P1 ✅ | C | RLS tx 500 da COMMIT (yopildi — P bosqichi 1) | `rlsMiddleware`: `await next()` dan keyin `c.error` bo'lsa throw (rollback); route'da yozib throw qiladigan HTTP regressiya testi | 1 |
 | P2 | C | desktop yangilanishda migratsiya yo'q | har startda idempotent `api.exe migrate` (API'dan oldin); 0043 to'qnashuvida tushunarli dialog | 3 |
 | P17 | C | bulutda uploads volume yo'q, backup MinIO'ga | `docker-compose.prod.yml`ga `uploads` volume + `UPLOADS_DIR`; `backup.sh`ni lokal uploads'ga qaratish; MinIO'ni compose'dan olib tashlash | 3 |
-| P3 | H | reminder jobId `:` | `queue.ts` fix'ini commit qilish + real `Queue.add` kontrakt testi | 2 |
-| P4 | H | Redis side-effect tx ichida | enqueue/remove'ni commit'dan keyin best-effort (try/catch + log) yoki outbox; status-only qayta faollashganda re-enqueue | 2 |
+| P3 ✅ | H | reminder jobId `:` (yopildi — `592ed7a`) | `queue.ts` fix'ini commit qilish + real `Queue.add` kontrakt testi | 2 |
+| P4 ✅ | H | Redis side-effect tx ichida (yopildi — P bosqichi 1; `onAfterCommit` + 2,5 s timeout) | enqueue/remove'ni commit'dan keyin best-effort (try/catch + log) yoki outbox; status-only qayta faollashganda re-enqueue | 2 |
 | P5 | H | rol eskalatsiyasi | invite/addAssignment/updateAssignment: berilayotgan rol permission'lari chaqiruvchinikining qism-to'plami bo'lishi shart (owner istisno); test | 4 |
 | P6 | H | tenantlararo parol tiklash | target boshqa tenantda owner yoki undan yuqori rolga ega bo'lsa rad etish (yoki faqat shu tenantga a'zo foydalanuvchiga ruxsat); test | 4 |
 | P7 | H | POS items + begona reja | `items` rejimida `treatmentPlanId`ni rad etish, `patientId`ni DB'dan tekshirish; test | 4 |
@@ -376,3 +376,15 @@ To'liq: [`LAB-TECHNICIAN-ACCESS-2026-11-11.md`](./LAB-TECHNICIAN-ACCESS-2026-11-
 | UI-T1 | UI-4 | Laboratoriya portali (`LabPortal.dc.html`) | lab portali spetsifikatsiyasi (C) |
 | UI-T2 | UI-4 | Telegram bot (`TelegramBot.dc.html`) | **P8** |
 | UI-T3 | UI-4 | Desktop holatlari (`Desktop.dc.html`) | **P2, P14, P15**, DT-01/02/03/18 |
+
+---
+
+## 13. P bosqichi 1 (2026-11-11) dan keyingi follow-up'lar
+
+| ID | J | Qisqa | Qilinadigan ish |
+|---|---|---|---|
+| FU-01 | M❔ | 23P01 → 409 amalda 500 bo'lishi mumkin | verifier: tx ichida savepoint'siz ushlangan DB xatosidan keyin COMMIT yiqilib klientga 500 boradi (eski xulq, regressiya emas). `appointments-patient-overlap` testi `patient_busy` kutadi va o'tadi — **real route orqali tasdiqlash kerak**; tasdiqlansa insert'ni savepoint (`tx.transaction`) ichiga olish |
+| FU-02 | M | Ichma-ich `rlsMiddleware` (`/api` prefiksi) | `expenses`/`clinical`/`patient-images` bare `/api`ga `app.use('*', auth, rls)` bilan ulangan → har so'rov 2–3 tranzaksiya (pool bosimi) va ichki `afterCommit` ro'yxati tashqi commit'dan oldin ishlaydi. Hozir u modullarda afterCommit yo'q. Yechim: rls'ni idempotent qilish (allaqachon `db` tx bo'lsa qayta ochmaslik) |
+| FU-03 | L | tx ichidagi boshqa side-effect'lar | `notifications.notifyInTx` SMS'ni tx ichida yuboradi (`stock.service.ts:70` low-stock) — 500 bo'lsa SMS ketadi, yozuv rollback. `onAfterCommit`ga ko'chirish |
+| FU-04 | L | Yangi qoida | throw (shu jumladan `HTTPException`/`ZodError` 4xx) endi yozuvlarni rollback qiladi. 4xx'da audit/strike qatori saqlanishi kerak bo'lgan kod `fail()` **qaytarishi** shart, throw emas |
+
