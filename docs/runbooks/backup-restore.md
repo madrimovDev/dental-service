@@ -1,6 +1,6 @@
 # Backup & disaster-recovery runbook — dental-service
 
-> **Medical data.** Patient records (Postgres) and clinical images (MinIO) are
+> **Medical data.** Patient records (Postgres) and clinical images (uploads volume) are
 > sensitive PII under retention obligations. Backups MUST be encrypted, stored
 > off-host, access-controlled, and periodically test-restored. Losing this data
 > is unrecoverable for the clinic.
@@ -10,7 +10,7 @@
 | Store    | Contents                                   | Method                          |
 |----------|--------------------------------------------|---------------------------------|
 | Postgres | all tenant + platform data (past RLS)      | `pg_dump --format=custom`       |
-| MinIO    | patient images / uploads (PII)             | `mc mirror` of the bucket       |
+| Uploads  | patient images / files (PII), `uploads_data` volume | `tar -czf` of `UPLOADS_DIR` |
 
 Redis is a cache/queue — NOT backed up (rebuildable). Reminder jobs re-enqueue
 on appointment changes; a Redis loss does not lose source-of-truth data.
@@ -18,22 +18,25 @@ on appointment changes; a Redis loss does not lose source-of-truth data.
 ## Backup schedule
 
 Run `infra/backup.sh` from cron on the host (or a dedicated backup container
-with `postgresql-client` + `mc`). Recommended:
+with `postgresql-client`; mount `uploads_data` read-only at `UPLOADS_DIR`). Recommended:
 
 ```cron
 # Daily full backup at 02:30 Asia/Tashkent. Logs to syslog; alert on non-zero.
-30 2 * * *  DATABASE_ADMIN_URL=... MINIO_ENDPOINT=... MINIO_ROOT_USER=... \
-            MINIO_ROOT_PASSWORD=... MINIO_BUCKET=dental-uploads \
+# UPLOADS_DIR = host path of the `uploads_data` volume
+# (docker volume inspect <project>_uploads_data -f '{{.Mountpoint}}'), or /data/uploads
+# when run inside a sidecar that mounts it.
+30 2 * * *  DATABASE_ADMIN_URL=... UPLOADS_DIR=/data/uploads \
             BACKUP_DIR=/var/backups/dental RETENTION_DAYS=14 \
-            BACKUP_S3_TARGET=offsite/dental-backups \
+            BACKUP_RSYNC_TARGET=backup@offsite:/srv/dental-backups/ \
             /opt/dental/infra/backup.sh >> /var/log/dental-backup.log 2>&1
 ```
 
 - **RETENTION_DAYS** (default 14) prunes local copies. Keep a longer-retained,
-  immutable copy off-host (`BACKUP_S3_TARGET` -> versioned/object-locked bucket).
+  immutable copy off-host (`BACKUP_RSYNC_TARGET` -> versioned/snapshotted storage).
 - **Off-host is mandatory for DR** — a backup on the same host does not survive
-  host loss. Set `BACKUP_S3_TARGET` to a different provider/region with
-  encryption at rest + object lock.
+  host loss. Set `BACKUP_RSYNC_TARGET` to a different host/provider with
+  encryption at rest. Note `rsync --delete` mirrors local pruning; snapshot
+  the target for an immutable history. The newest backup is never pruned.
 - **Targets:** RPO ~24h with daily dumps. For tighter RPO, enable Postgres WAL
   archiving / PITR (e.g. managed Postgres PITR or `wal-g`) in addition.
 
@@ -41,8 +44,8 @@ with `postgresql-client` + `mc`). Recommended:
 ```
 <BACKUP_DIR>/<UTC-timestamp>/
   db.dump        # pg_dump custom format
-  objects/       # mirror of the MinIO bucket
-  MANIFEST       # timestamp + contents
+  uploads.tar.gz # archive of UPLOADS_DIR (relative paths)
+  MANIFEST       # timestamp + contents (db_dump=, uploads=)
 ```
 
 ## Restore (full recovery)
@@ -72,29 +75,29 @@ After restore, confirm the runtime non-superuser role exists (`dental_app`,
 NOBYPASSRLS) — it is created by `infra/postgres-init.sh` on first init; if
 restoring onto a brand-new cluster, run that init first.
 
-### 2. Restore MinIO objects
+### 2. Restore uploads
+Extract into the `uploads_data` volume (owned by the `bun` user, uid 1000 in
+the image). With the stack stopped or the api idle:
 ```sh
-mc alias set tgt "$MINIO_ENDPOINT" "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"
-mc mb --ignore-existing "tgt/$MINIO_BUCKET"
-mc mirror --overwrite "$B/objects" "tgt/$MINIO_BUCKET"
+docker run --rm -v <project>_uploads_data:/data/uploads -v "$B":/b:ro \
+  alpine sh -c 'tar -C /data/uploads -xzf /b/uploads.tar.gz && chown -R 1000:1000 /data/uploads'
 ```
-Keep the bucket PRIVATE (no anonymous policy) — images are served via presigned
-URLs only.
+Uploads are served only through the authenticated `/uploads/*` API route —
+there is no public bucket.
 
 ### 3. Bring the app up + verify
 ```sh
 docker compose -f infra/docker-compose.prod.yml --env-file <envfile> up -d
 curl -fsS https://<DOMAIN>/api/health     # expect {"data":{"ok":true,"db":...}}
 ```
-Spot-check: log in, open a patient with images, confirm an image loads (presigned
-URL works), confirm recent appointments/payments are present.
+Spot-check: log in, open a patient with images, confirm an image loads, confirm recent appointments/payments are present.
 
 ## Verification cadence
 
 - **Monthly:** restore the latest backup to a staging host + run the §3 checks.
   An untested backup is not a backup.
 - **Quarterly:** full DR drill — provision a clean host, restore Postgres +
-  MinIO, measure RTO. Document the actual recovery time.
+  uploads, measure RTO. Document the actual recovery time.
 
 ## RTO / RPO summary
 

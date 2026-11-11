@@ -9,7 +9,7 @@ import postgres from 'postgres';
 // Standalone logger reading directly from process.env — deliberately does NOT
 // import lib/logger.ts (which pulls in the FULL env schema via env.ts). The
 // migration is a release step that runs with an env-LIGHT set (only DATABASE_*),
-// so it must not require JWT_SECRET / REDIS_URL / MINIO_* to boot. (D4 / D6.)
+// so it must not require JWT_SECRET / REDIS_URL to boot. (D4 / D6.)
 const logger = pino({ level: process.env.LOG_LEVEL ?? 'info' });
 
 // Migrate task DATABASE_ADMIN_URL ishlatadi (superuser).

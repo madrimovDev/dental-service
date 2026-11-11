@@ -38,10 +38,6 @@ jobs:
     env:
       DATABASE_URL: postgres://dental:dental@localhost:5432/dental
       REDIS_URL: redis://localhost:6379
-      MINIO_ENDPOINT: http://localhost:9000
-      MINIO_BUCKET: dental-test
-      MINIO_ROOT_USER: dental
-      MINIO_ROOT_PASSWORD: dental_local_dev
       JWT_SECRET: ci_test_secret_min_32_chars_long_xxx_yyy
       WEB_ORIGIN: http://localhost:8000
       API_PORT: 8001
