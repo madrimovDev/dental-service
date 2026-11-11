@@ -19,6 +19,7 @@ directories:
   buildResources: build
 files:
   - dist/**/*
+  - assets/**/*
   - package.json
 extraResources:
   - from: resources/postgres
