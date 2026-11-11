@@ -28,6 +28,7 @@ export const clinicalKeys = {
   prescriptions: (patientId: string) => ['clinical', 'prescriptions', patientId] as const,
   labOrders: (patientId: string, status?: LabOrderStatus) =>
     ['clinical', 'lab-orders', patientId, status ?? null] as const,
+  labOrderFiles: (labOrderId: string) => ['clinical', 'lab-order-files', labOrderId] as const,
   consentForms: (patientId: string) => ['clinical', 'consent-forms', patientId] as const,
   consentTemplates: () => ['clinical', 'consent-templates'] as const,
   // C — images

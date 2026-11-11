@@ -62,6 +62,7 @@ import { api } from '@/lib/api.ts';
 import { lookupKeys } from '@/lib/lookup-keys.ts';
 import { clinicalKeys } from './clinical.keys';
 import type { VisitNoteView } from './clinical.types';
+import type { LabOrderCreateExtras } from './components/lab-orders/lab-order.helpers';
 
 const HOUR = 1000 * 60 * 60;
 
@@ -411,10 +412,15 @@ export function useLabOrdersList(params: ListLabOrdersParams) {
   });
 }
 
+/**
+ * UI-D5: yangi buyurtmada `shade` + `dueDate` majburiy (kontrakt regeneratsiyasigacha tip
+ * kengaytma — `LabOrderCreateExtras`), remake — `remakeOfId` + `remakeReason` juftligi.
+ */
 export function useCreateLabOrder(patientId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: CreateLabOrderInput) => createLabOrder(body).then((r) => r.data),
+    mutationFn: (body: CreateLabOrderInput & LabOrderCreateExtras) =>
+      createLabOrder(body).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: clinicalKeys.labOrders(patientId) }),
   });
 }
