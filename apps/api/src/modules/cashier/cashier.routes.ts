@@ -19,6 +19,8 @@ import {
   dailySummaryQuery,
   listTransactionsQuery,
   patientPlansQuery,
+  pendingVisitDtoSchema,
+  pendingVisitsQuery,
   planBalanceDtoSchema,
   planIdParamSchema,
   refundRequestSchema,
@@ -36,6 +38,11 @@ import {
   PatientNotFoundError,
   type PayrollAdjustmentHook,
   type PriceLookup,
+  VisitAlreadyBilledError,
+  VisitItemsMismatchError,
+  VisitNoteNotFoundError,
+  VisitNotSignedError,
+  VisitPatientMismatchError,
 } from './cashier.service.ts';
 
 /** Standart 404 — get by id uchun. */
@@ -116,6 +123,10 @@ export const cashierRoutes = (deps: {
         content: { 'application/json': { schema: errorResponseSchema } },
         description: 'Forbidden',
       },
+      409: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Visit note already billed',
+      },
     },
   });
 
@@ -157,6 +168,31 @@ export const cashierRoutes = (deps: {
       }
       if (e instanceof PatientNotFoundError) {
         return c.json(fail('patient.not_found', 'Patient not found'), 400);
+      }
+      // FX-handoff: vizit → kassa
+      if (e instanceof VisitNoteNotFoundError) {
+        return c.json(fail('visit_note.not_found', 'Visit note not found'), 400);
+      }
+      if (e instanceof VisitNotSignedError) {
+        return c.json(fail('cashier.visit_not_signed', 'Visit note is not signed'), 400);
+      }
+      if (e instanceof VisitPatientMismatchError) {
+        return c.json(
+          fail('cashier.visit_patient_mismatch', 'patientId does not match the visit note'),
+          400,
+        );
+      }
+      if (e instanceof VisitItemsMismatchError) {
+        return c.json(
+          fail(
+            'cashier.visit_items_mismatch',
+            'Items must be services performed in the visit note',
+          ),
+          400,
+        );
+      }
+      if (e instanceof VisitAlreadyBilledError) {
+        return c.json(fail('cashier.visit_already_billed', 'Visit note is already billed'), 409);
       }
       if (e instanceof DiscountExceedsTotalError) {
         return c.json(
@@ -289,6 +325,24 @@ export const cashierRoutes = (deps: {
   app.openapi(patientPlansRoute, async (c) => {
     const { patientId } = c.req.valid('query');
     const rows = await service.listPatientPlans(c, patientId);
+    return c.json(ok(rows), 200);
+  });
+
+  // ─── GET /pending-visits — imzolangan, to'lanmagan bugungi vizitlar (FX-handoff) ─
+
+  const pendingVisitsRoute = createRoute({
+    method: 'get',
+    path: '/pending-visits',
+    tags: ['cashier'],
+    operationId: 'listCashierPendingVisits',
+    middleware: [requirePermission('cashier.view')] as const,
+    request: { query: pendingVisitsQuery },
+    responses: okJson(z.array(pendingVisitDtoSchema), 'Signed, unbilled visits of today'),
+  });
+
+  app.openapi(pendingVisitsRoute, async (c) => {
+    const { branchId } = c.req.valid('query');
+    const rows = await service.listPendingVisits(c, branchId);
     return c.json(ok(rows), 200);
   });
 

@@ -19,6 +19,7 @@ import { services } from './services.ts';
 import { tenants } from './tenants.ts';
 import { treatmentPlans } from './treatment-plans.ts';
 import { users } from './users.ts';
+import { visitNotes } from './visit-notes.ts';
 
 export const paymentMethodEnum = pgEnum('payment_method', ['cash', 'card', 'transfer', 'other']);
 /**
@@ -71,6 +72,13 @@ export const cashierTransactions = pgTable(
     status: transactionStatusEnum('status').notNull().default('completed'),
     notes: text('notes'),
 
+    /**
+     * FX-handoff: imzolangan vizit → kassa. Bitta vizit FAQAT BIR MARTA to'lanadi
+     * (quyidagi partial unique indeks). Refund/void qatorlari bu ustunni to'ldirmaydi,
+     * shuning uchun qaytarilgan vizit ham «to'langan» hisoblanadi (qayta hisob-kitob yo'q).
+     */
+    visitNoteId: uuid('visit_note_id').references(() => visitNotes.id, { onDelete: 'set null' }),
+
     fiscalProvider: text('fiscal_provider').notNull().default('noop'),
     fiscalReceiptId: text('fiscal_receipt_id'),
     fiscalResponse: jsonb('fiscal_response'),
@@ -89,6 +97,10 @@ export const cashierTransactions = pgTable(
     // Parent bo'yicha qidiruv. V2-4 (CLI-244): qisman refund uchun bitta parentga
     // BIR NECHTA refund ruxsat — unique EMAS (cumulative guard service'da).
     index('cashier_tx_parent_idx').on(t.parentTransactionId),
+    // FX-handoff: bitta vizit bir marta to'lanadi (poyga → 23505 → 409).
+    uniqueIndex('cashier_tx_visit_note_unique')
+      .on(t.visitNoteId)
+      .where(sql`${t.visitNoteId} IS NOT NULL`),
     // UI-R5: sub-tur faqat karta uchun va faqat ma'lum qiymatlar (service+schema ham tekshiradi).
     check(
       'cashier_tx_card_provider_chk',

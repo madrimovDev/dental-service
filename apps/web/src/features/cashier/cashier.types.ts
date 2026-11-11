@@ -68,3 +68,24 @@ export type StageSelection = {
   stageId: string;
   amount: number;
 };
+
+/**
+ * FX-handoff: kutilayotgan vizit (imzolangan, to'lanmagan). Generated api-client
+ * `generate:contract`dan keyin shu tip generated modeldan keladi (hozir qo'lda).
+ */
+export type PendingVisit = {
+  visitNoteId: string;
+  patientId: string;
+  patientName: string;
+  doctorId: string;
+  doctorName: string | null;
+  signedAt: string;
+  services: Array<{
+    serviceId: string;
+    serviceName: string;
+    quantity: number;
+    unitPrice: string | null;
+  }>;
+  total: string;
+  hasUnpriced: boolean;
+};

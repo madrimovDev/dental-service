@@ -379,6 +379,13 @@
       "when": 1794412091645,
       "tag": "0053_ui_t2_telegram",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1794415895722,
+      "tag": "0054_visit_cashier_handoff",
+      "breakpoints": true
     }
   ]
 }
