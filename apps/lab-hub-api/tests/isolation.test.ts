@@ -94,7 +94,7 @@ describe('RLS izolyatsiya (real DB)', () => {
     expect((await clinicReq(clinicB, `/v1/clinic/cases/${a.ref}`)).status).toBe(404);
     const rows = await withClinic(db, clinicB.clinicId, (tx) => tx.select().from(cases));
     expect(rows.length).toBe(0);
-    const changes = (await (await clinicReq(clinicB, '/v1/clinic/changes?since=0')).json()) as {
+    const changes = (await (await clinicReq(clinicB, '/v1/clinic/changes')).json()) as {
       events: unknown[];
     };
     expect(changes.events.length).toBe(0);

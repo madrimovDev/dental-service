@@ -1,10 +1,10 @@
 import crypto from 'node:crypto';
 import { zValidator } from '@hono/zod-validator';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { Hono, type MiddlewareHandler } from 'hono';
 import { z } from 'zod';
 import { db } from '../../db/client';
-import { clinics } from '../../db/schema';
+import { clinicEvents, clinics } from '../../db/schema';
 import { normalizePhone } from '../../lib/phone';
 
 /**
@@ -108,17 +108,35 @@ export const saasRoutes = () => {
 
 /**
  * Vendor admin SaaS klinika obunasini uzaytiradi (desktop `renew` naqshi —
- * `licenses.service.renew`). `GET /status` keyingi sinxronda yangi muddatni beradi.
+ * `licenses.service.renew`: muddat + audit bitta tranzaksiyada). `GET /status`
+ * keyingi sinxronda yangi muddatni beradi. Audit — `clinic_events`
+ * (`saas_renewed`, `{from, to, createdBy}`), chunki SaaS klinikada litsenziya yo'q.
  */
-export const renewSaasClinic = async (clinicId: string, expiresAt: Date) => {
+export const renewSaasClinic = async (clinicId: string, expiresAt: Date, adminId?: string) => {
   if (expiresAt.getTime() <= Date.now()) {
     throw Object.assign(new Error('EXPIRES_IN_PAST'), { status: 400 });
   }
-  const [updated] = await db
-    .update(clinics)
-    .set({ subscriptionExpiresAt: expiresAt })
-    .where(eq(clinics.id, clinicId))
-    .returning();
-  if (!updated) throw Object.assign(new Error('CLINIC_NOT_FOUND'), { status: 404 });
-  return updated;
+  return db.transaction(async (tx) => {
+    const [before] = await tx
+      .select({ subscriptionExpiresAt: clinics.subscriptionExpiresAt })
+      .from(clinics)
+      .where(and(eq(clinics.id, clinicId), eq(clinics.mode, 'saas')))
+      .for('update');
+    if (!before) throw Object.assign(new Error('CLINIC_NOT_FOUND'), { status: 404 });
+    const [updated] = await tx
+      .update(clinics)
+      .set({ subscriptionExpiresAt: expiresAt })
+      .where(eq(clinics.id, clinicId))
+      .returning();
+    await tx.insert(clinicEvents).values({
+      clinicId,
+      event: 'saas_renewed',
+      metadata: {
+        from: before.subscriptionExpiresAt?.toISOString() ?? null,
+        to: expiresAt.toISOString(),
+        createdBy: adminId ?? null,
+      },
+    });
+    return updated!;
+  });
 };

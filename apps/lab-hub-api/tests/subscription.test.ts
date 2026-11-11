@@ -166,6 +166,31 @@ describe('obuna (L10): expiresAt + 7 kun, keyin 403', () => {
     ).toBe(401);
   });
 
+  it('Supervisor revoke push’i (expiresAt=null) klinikani darhol bloklaydi, renew push’i ochadi, hub kaliti saqlanadi', async () => {
+    const clinic = await connectClinic();
+    const push = (expiresAt: string | null) =>
+      app.request('/internal/clinics', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${config.supervisorHubToken}`,
+        },
+        // supervisor-api `pushClinicToHub` yuboradigan aniq shakl.
+        body: JSON.stringify({
+          supervisorClinicId: clinic.supervisorClinicId,
+          mode: 'desktop',
+          name: 'Klinika',
+          expiresAt,
+        }),
+      });
+    expect((await push(null)).status).toBe(200);
+    const blocked = await clinicReq(clinic, '/v1/clinic/links');
+    expect(blocked.status).toBe(403);
+    expect(await code(blocked)).toBe('clinic.subscription_expired');
+    expect((await push(inDays(60).toISOString())).status).toBe(200);
+    expect((await clinicReq(clinic, '/v1/clinic/links')).status).toBe(200);
+  });
+
   it('Supervisor bilan qayta tekshiruv: uzaytirilgan klinika ochiladi, bekor qilingani yopiladi', async () => {
     const clinic = await connectClinic();
     const reg = supervisorRegistry.get(clinic.supervisorClinicId)!;

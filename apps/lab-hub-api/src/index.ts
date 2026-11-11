@@ -1,6 +1,7 @@
 import { createApp } from './app';
 import { loadConfig } from './config';
 import { createDb } from './db/client';
+import { verifyKek } from './lib/kek-check';
 import { createKeyring } from './lib/keyring';
 import { createStorage } from './lib/storage';
 import { createSupervisorClient } from './lib/supervisor-client';
@@ -17,6 +18,15 @@ try {
 }
 
 const { db } = createDb(config.databaseUrl);
+
+// KEK kanareykasi: to'g'ri formatdagi, lekin BOSHQA KEK bilan boot qilish
+// yangi lab DEK'larini qaytarib bo'lmas holga keltirardi — darhol yiqilamiz.
+try {
+  await verifyKek(db, config.kek);
+} catch (err) {
+  console.error(`[lab-hub] ${(err as Error).message}`);
+  process.exit(1);
+}
 const deps = {
   db,
   config,

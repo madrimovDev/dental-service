@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  bigint,
   bigserial,
   boolean,
   date,
@@ -221,14 +222,21 @@ export type CaseEventType =
   | 'purged';
 
 /**
- * Audit + klinika sinxron kursori. `seq` — global monoton; klinika
- * `GET /v1/clinic/changes?since=<seq>` bilan o'qiydi (RLS klinika doirasida).
- * `payload` PHI'siz (holat, narx, id'lar).
+ * Audit + klinika sinxron kursori. `seq` — global monoton (lekin COMMIT tartibida
+ * emas: kichik seq'li tranzaksiya kattasidan keyin commit bo'lishi mumkin).
+ * Shuning uchun klinika kursori `(tx_id, seq)` juftligi: `tx_id` — yozgan
+ * tranzaksiyaning xid'i; `GET /v1/clinic/changes` faqat `tx_id < snapshot xmin`
+ * (ya'ni yakunlangan tranzaksiyalar) hodisalarini beradi — kursor hech qachon
+ * hali commit bo'lmagan hodisadan oshib ketmaydi. `payload` PHI'siz.
  */
 export const caseEvents = pgTable(
   'case_events',
   {
     seq: bigserial('seq', { mode: 'number' }).primaryKey(),
+    // Yozgan tranzaksiya xid'i (pg_current_xact_id) — commit-xavfsiz kursor uchun.
+    txId: bigint('tx_id', { mode: 'number' })
+      .notNull()
+      .default(sql`(pg_current_xact_id()::text)::bigint`),
     labId: uuid('lab_id')
       .notNull()
       .references(() => labs.id, { onDelete: 'cascade' }),
@@ -244,8 +252,23 @@ export const caseEvents = pgTable(
     payload: jsonb('payload').$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index('case_events_clinic_seq_idx').on(t.clinicId, t.seq)],
+  (t) => [
+    index('case_events_clinic_seq_idx').on(t.clinicId, t.seq),
+    index('case_events_clinic_tx_seq_idx').on(t.clinicId, t.txId, t.seq),
+  ],
 );
+
+/**
+ * KEK kanareykasi (bitta qator, id=1): birinchi boot'da KEK bilan shifrlangan
+ * tasodifiy qiymat yoziladi; keyingi har boot uni ochib KEK to'g'riligini
+ * tekshiradi (`lib/kek-check.ts`). Noto'g'ri KEK bilan boot yiqiladi — aks holda
+ * yangi lablar DEK'i noto'g'ri kalit bilan o'ralib, qaytarib bo'lmas holga tushardi.
+ */
+export const kekCheck = pgTable('kek_check', {
+  id: integer('id').primaryKey().default(1),
+  canary: text('canary').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
 
 /** Klinika bo'yicha oylik akt-sverka: to'langanini lab qo'lda belgilaydi. */
 export const settlements = pgTable(

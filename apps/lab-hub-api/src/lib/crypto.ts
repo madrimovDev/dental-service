@@ -102,3 +102,14 @@ export const decryptBuffer = (dek: Key, blob: Buffer): Buffer => {
   o += TAG_LEN;
   return open(dek, iv, tag, blob.subarray(o));
 };
+
+const CANARY_AAD = 'kek-check:v1';
+
+/** KEK kanareykasi: tasodifiy 32 bayt KEK bilan o'raladi (`lib/kek-check.ts`). */
+export const sealKekCanary = (kek: Key): string => pack(seal(kek, randomBytes(32), CANARY_AAD));
+
+/** Noto'g'ri KEK → GCM autentifikatsiya xatosi (throw). */
+export const openKekCanary = (kek: Key, value: string): void => {
+  const { iv, tag, ct } = unpack(value);
+  open(kek, iv, tag, ct, CANARY_AAD);
+};

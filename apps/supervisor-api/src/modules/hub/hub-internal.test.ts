@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { createSupervisorClient } from '../../../../lab-hub-api/src/lib/supervisor-client';
 import { createApp } from '../../app';
 import { db } from '../../db/client';
 import { branches, clinics, licenses } from '../../db/schema';
@@ -40,6 +41,21 @@ const seedClinic = async (lic: { isActive: boolean; expiresAt: Date }) => {
     isActive: lic.isActive,
   });
   return { clinicId: clinic!.id, key, name: clinic!.name };
+};
+
+const seedSaasClinic = async (subscriptionExpiresAt: Date | null) => {
+  const [clinic] = await db
+    .insert(clinics)
+    .values({
+      name: `Hub SaaS ${crypto.randomUUID().slice(0, 6)}`,
+      ownerFullName: 'O',
+      ownerPhone: '+998900000001',
+      mode: 'saas',
+      saasTenantId: crypto.randomUUID(),
+      subscriptionExpiresAt,
+    })
+    .returning();
+  return { clinicId: clinic!.id, name: clinic!.name };
 };
 
 const verify = (id: string, query = '', token = TOKEN) =>
@@ -90,6 +106,47 @@ describe('GET /internal/clinics/:id/verify', () => {
     >;
     expect(body.active).toBe(false);
     expect(body.licenseMatches).toBe(false);
+  });
+
+  it('SaaS klinika: mode=saas, muddat = subscription_expires_at, litsenziya kaliti hech qachon mos emas', async () => {
+    const exp = new Date(Date.now() + 14 * 86_400_000);
+    const c = await seedSaasClinic(exp);
+    const body = (await (await verify(c.clinicId, '?licenseKey=ANY')).json()) as Record<
+      string,
+      unknown
+    >;
+    expect(body).toEqual({
+      clinicId: c.clinicId,
+      name: c.name,
+      mode: 'saas',
+      active: true,
+      expiresAt: exp.toISOString(),
+      licenseMatches: false,
+    });
+    const noSub = await seedSaasClinic(null);
+    const inactive = (await (await verify(noSub.clinicId)).json()) as Record<string, unknown>;
+    expect(inactive.mode).toBe('saas');
+    expect(inactive.active).toBe(false);
+    expect(inactive.expiresAt).toBeNull();
+  });
+
+  it('seam: Hub’ning haqiqiy Supervisor klienti bu endpoint bilan ikkala rejimda ishlaydi', async () => {
+    // Hub (apps/lab-hub-api) klienti — fetch shu Supervisor ilovasiga yo'naltiriladi.
+    const client = createSupervisorClient({
+      baseUrl: 'http://supervisor.internal',
+      token: TOKEN,
+      fetch: ((url: URL | string, init?: RequestInit) =>
+        app.request(url.toString(), init)) as typeof fetch,
+    });
+    const exp = new Date(Date.now() + 30 * 86_400_000);
+    const saas = await seedSaasClinic(exp);
+    const sv = await client.verifyClinic(saas.clinicId, {});
+    expect(sv).toMatchObject({ mode: 'saas', active: true, expiresAt: exp.toISOString() });
+
+    const desk = await seedClinic({ isActive: true, expiresAt: exp });
+    const dv = await client.verifyClinic(desk.clinicId, { licenseKey: desk.key });
+    expect(dv).toMatchObject({ mode: 'desktop', active: true, licenseMatches: true });
+    expect(await client.verifyClinic(crypto.randomUUID(), {})).toBeNull();
   });
 
   it('noma‘lum / yaroqsiz id 404', async () => {

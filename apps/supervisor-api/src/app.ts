@@ -16,7 +16,7 @@ export const createApp = (opts: { hubFetch?: typeof fetch } = {}) => {
 
   app.route('/v1', licensesRoutes());
   app.route('/v1/admin/auth', authRoutes());
-  app.route('/v1/admin/clinics', clinicsRoutes());
+  app.route('/v1/admin/clinics', clinicsRoutes({ hubFetch: opts.hubFetch }));
   // modulesRoutes defines '/licenses/:key/modules' internally, so mounting
   // it at '/v1/admin' (not '/v1/admin/modules') yields the brief's intended
   // path PATCH /v1/admin/licenses/:key/modules.

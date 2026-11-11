@@ -67,6 +67,18 @@ export const licenseEvents = pgTable('license_events', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+// Klinika darajasidagi vendor amallari auditi (litsenziyasi yo'q SaaS klinikalar
+// uchun — `license_events` `license_id` talab qiladi). Masalan: 'saas_renewed'.
+export const clinicEvents = pgTable('clinic_events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  clinicId: uuid('clinic_id')
+    .notNull()
+    .references(() => clinics.id, { onDelete: 'cascade' }),
+  event: text('event').notNull(),
+  metadata: jsonb('metadata'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 // Admin foydalanuvchilar (Supervisor panel uchun)
 export const adminUsers = pgTable('admin_users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -95,5 +107,6 @@ export type Clinics = typeof clinics.$inferSelect;
 export type Branches = typeof branches.$inferSelect;
 export type Licenses = typeof licenses.$inferSelect;
 export type LicenseEvents = typeof licenseEvents.$inferSelect;
+export type ClinicEvents = typeof clinicEvents.$inferSelect;
 export type AdminUsers = typeof adminUsers.$inferSelect;
 export type LicenseResetTokens = typeof licenseResetTokens.$inferSelect;

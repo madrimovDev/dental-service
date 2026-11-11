@@ -8,6 +8,7 @@ import { branches, clinics, licenseEvents, licenses } from '../../db/schema';
 import { normalizePhone } from '../../lib/phone';
 import { generateTempPassword } from '../../lib/temp-password';
 import { adminJwtMiddleware } from '../auth/jwt.middleware';
+import { pushClinicToHub } from '../hub/clinic-state';
 import { createLicenseService } from '../licenses/licenses.service';
 import { renewSaasClinic } from '../saas/saas.routes';
 
@@ -114,8 +115,10 @@ const renewSchema = z.object({
 
 type AdminEnv = { Variables: { adminUserId?: string } };
 
-export const clinicsRoutes = () => {
+export const clinicsRoutes = (deps: { hubFetch?: typeof fetch } = {}) => {
   const app = new Hono<AdminEnv>();
+  // Renew/deactivate'dan keyin Lab Hub'ga best-effort push (hech qachon throw qilmaydi).
+  const pushToHub = (clinicId: string) => pushClinicToHub(clinicId, { fetch: deps.hubFetch });
   const service = createLicenseService();
   app.use('*', adminJwtMiddleware);
 
@@ -269,7 +272,9 @@ export const clinicsRoutes = () => {
     await db.insert(licenseEvents).values({
       licenseId: license.id,
       event: 'deactivated',
+      metadata: { createdBy: c.get('adminUserId') ?? null },
     });
+    await pushToHub(clinic.id);
 
     const updatedLicense = await db.query.licenses.findFirst({
       where: eq(licenses.id, license.id),
@@ -313,13 +318,15 @@ export const clinicsRoutes = () => {
       // L8: SaaS klinikada litsenziya yo'q — obuna muddati uzaytiriladi.
       const target = await db.query.clinics.findFirst({ where: eq(clinics.id, idResult.data) });
       if (target?.mode === 'saas') {
-        const updated = await renewSaasClinic(idResult.data, expiresAt);
+        const updated = await renewSaasClinic(idResult.data, expiresAt, c.get('adminUserId'));
+        await pushToHub(updated.id);
         return c.json({
           clinic: pickClinicPublic(updated),
           subscriptionExpiresAt: updated.subscriptionExpiresAt,
         });
       }
       const license = await service.renew(idResult.data, expiresAt, c.get('adminUserId'));
+      await pushToHub(idResult.data);
       return c.json({ license });
     } catch (err) {
       const code = err instanceof Error ? err.message : 'UNKNOWN';

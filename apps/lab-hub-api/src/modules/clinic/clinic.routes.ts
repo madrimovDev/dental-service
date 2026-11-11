@@ -1,5 +1,5 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import { and, asc, eq, gt, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { Context, MiddlewareHandler } from 'hono';
 import type { Tx } from '../../db/client';
 import {
@@ -327,10 +327,18 @@ export const clinicRoutes = (deps: Deps) => {
         const l = await t.query.labs.findFirst({ where: eq(labs.id, b.labId) });
         if (!l) throw new ApiError(404, 'lab.not_found');
         if (isBlocked(l.expiresAt, deps.now())) throw new ApiError(403, 'lab.subscription_expired');
-        const link = await t.query.labClinicLinks.findFirst({
-          where: and(eq(labClinicLinks.labId, l.id), eq(labClinicLinks.clinicId, clinic.id)),
+        // Qaror: bekor qilingan (revoked) ulanish faqat YANGI ishlarni bloklaydi —
+        // mavjud ish (shu ref bilan) yakunigacha davom etadi (README «Ulanish bekor qilinsa»).
+        const known = await t.query.cases.findFirst({
+          where: and(eq(cases.clinicId, clinic.id), eq(cases.clinicCaseRef, ref)),
+          columns: { id: true },
         });
-        if (link?.status !== 'active') throw new ApiError(403, 'link.not_active');
+        if (!known) {
+          const link = await t.query.labClinicLinks.findFirst({
+            where: and(eq(labClinicLinks.labId, l.id), eq(labClinicLinks.clinicId, clinic.id)),
+          });
+          if (link?.status !== 'active') throw new ApiError(403, 'link.not_active');
+        }
         const dek = dekOf(l);
         const fields = {
           patientNameEnc: encryptOptional(dek, b.patient.fullName),
@@ -607,15 +615,28 @@ export const clinicRoutes = (deps: Deps) => {
   );
 
   // --- o'zgarishlar (poll) ----------------------------------------------------
+  /**
+   * Commit-xavfsiz kursor: `<tx_id>.<seq>`. `seq` (bigserial) commit tartibida
+   * EMAS — kichik seq'li tranzaksiya kattasidan keyin commit bo'lishi mumkin va
+   * oddiy `seq > since` kursori uni butunlay o'tkazib yuborardi. Shuning uchun
+   * faqat `tx_id < pg_snapshot_xmin(...)` (barcha yozuvchisi yakunlangan)
+   * hodisalar `(tx_id, seq)` tartibida qaytariladi: bu chegaradan pastda yangi
+   * hodisa hech qachon paydo bo'lmaydi, kursor xavfsiz oldinga suriladi.
+   * Narxi: uzoq davom etayotgan yozuvchi tranzaksiya tugagunicha yangi hodisalar
+   * biroz kechikadi (yo'qolmaydi).
+   */
   app.openapi(
     createRoute({
       method: 'get',
       path: '/changes',
       tags,
-      summary: 'Kursordan keyingi hodisalar (case_events.seq)',
+      summary: 'Kursordan keyingi hodisalar (kursor `<tx_id>.<seq>`, commit-xavfsiz)',
       request: {
         query: z.object({
-          since: z.coerce.number().int().min(0).default(0),
+          since: z
+            .string()
+            .regex(/^\d{1,19}\.\d{1,19}$/)
+            .default('0.0'),
           limit: z.coerce.number().int().min(1).max(500).default(200),
         }),
       },
@@ -624,12 +645,19 @@ export const clinicRoutes = (deps: Deps) => {
     async (c) =>
       tx(c, async (t, clinic) => {
         const { since, limit } = c.req.valid('query');
+        const [sinceTx, sinceSeq] = since.split('.') as [string, string];
         const rows = await t
           .select({ ev: caseEvents, ref: cases.clinicCaseRef })
           .from(caseEvents)
           .innerJoin(cases, eq(cases.id, caseEvents.caseId))
-          .where(and(eq(caseEvents.clinicId, clinic.id), gt(caseEvents.seq, since)))
-          .orderBy(asc(caseEvents.seq))
+          .where(
+            and(
+              eq(caseEvents.clinicId, clinic.id),
+              sql`${caseEvents.txId} < (pg_snapshot_xmin(pg_current_snapshot())::text)::bigint`,
+              sql`(${caseEvents.txId}, ${caseEvents.seq}) > (${sinceTx}::bigint, ${sinceSeq}::bigint)`,
+            ),
+          )
+          .orderBy(asc(caseEvents.txId), asc(caseEvents.seq))
           .limit(limit);
         const msgIds = rows
           .filter((r) => r.ev.type === 'message')
@@ -681,7 +709,8 @@ export const clinicRoutes = (deps: Deps) => {
                 : null,
           };
         });
-        return c.json({ events, nextCursor: rows.at(-1)?.ev.seq ?? since });
+        const last = rows.at(-1)?.ev;
+        return c.json({ events, nextCursor: last ? `${last.txId}.${last.seq}` : since });
       }),
   );
 
