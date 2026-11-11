@@ -677,6 +677,30 @@ describe('UI-T2 — eslatma tugmalari (egalik tekshiruvi)', () => {
     expect(a.cancellationReason).toBe('patient_telegram');
   });
 
+  test('Boshlanish vaqti O‘TGAN yozilishda eski/takroriy tugma hech narsani o‘zgartirmaydi (ok/no/re)', async () => {
+    const past = new Date(Date.now() - 5 * 3600_000);
+    const id = await seedAppointment(patient1, past);
+    await run((tx) => tx.delete(bookingRequests).where(eq(bookingRequests.patientId, patient1)));
+    await run(async (tx) => {
+      for (const action of ['no', 'ok', 're'] as const) {
+        const r = await flows.onCallback(tx, {
+          tenantId: tA,
+          chatId: CHAT_A,
+          data: reminderCallbackData(action, id),
+        });
+        expect(r.reply).toBeNull();
+        expect(r.toast).toContain('Allaqachon');
+      }
+    });
+    const a = await apptStatus(id);
+    expect(a.status).toBe('scheduled'); // no-show strike yo'li ochiq qoladi
+    expect(a.cancellationReason).toBeNull();
+    const reqs = await run((tx) =>
+      tx.select().from(bookingRequests).where(eq(bookingRequests.rescheduleOfAppointmentId, id)),
+    );
+    expect(reqs).toHaveLength(0);
+  });
+
   test('Boshqa vaqt: egasi → bron oqimi boshlanadi; so‘rov eski yozilishga bog‘lanadi', async () => {
     const id = await seedAppointment(patient1, tomorrowAt(13, 6));
     // Oldingi testlardan qolgan ochiq so'rovlar oqimni bloklamasin.

@@ -35,7 +35,7 @@ export type ReminderActionResult = {
 
 /**
  * Eslatma tugmasi bosilganda: FAQAT yozilish egasi (patients.telegram_chat_id
- * === callback chat_id) o'zgartira oladi. Begona chat → `not_owner`, hech narsa
+ * === callback chat_id) o'zgartira oladi. Boshlanish vaqti o'tgan yozilish → `already`. Begona chat → `not_owner`, hech narsa
  * o'zgarmaydi. Ikkinchi bosish (allaqachon shu holatda) → `already`.
  */
 export async function handleReminderAction(
@@ -47,6 +47,7 @@ export async function handleReminderAction(
     .select({
       id: appointments.id,
       status: appointments.status,
+      startTime: appointments.startTime,
       patientId: appointments.patientId,
       chat: patients.telegramChatId,
     })
@@ -60,6 +61,11 @@ export async function handleReminderAction(
   const base = { patientId: row.patientId, appointmentId: row.id };
   const active = row.status === 'scheduled' || row.status === 'confirmed';
   if (!active) return { outcome: 'already', ...base };
+  // Boshlanish vaqti o'tgan yozilishga eski/takroriy tugma ta'sir qilmaydi: aks holda
+  // no-show strike chetlab o'tiladi (cancelled→no_show yo'q) va bot service'ida
+  // `queue.closeLinkedOpenTicket` yo'qligi sabab ochiq navbat chiptasi qolib ketadi.
+  // 'ok' | 'no' | 're' — hammasiga.
+  if (row.startTime.getTime() <= Date.now()) return { outcome: 'already', ...base };
 
   const c = createBotContext(tx, o.tenantId);
   try {
