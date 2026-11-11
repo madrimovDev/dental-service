@@ -1,6 +1,7 @@
 import { ApiError } from '@dental/api-client';
 import { AlertBanner, Card, StatusPill } from '@dental/ui';
 import {
+  Anchor,
   Button,
   Container,
   Group,
@@ -12,7 +13,7 @@ import {
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { roleLabel } from '@/lib/role-label';
@@ -22,8 +23,16 @@ import {
   useDeclineInvitation,
   useInvitations,
   useMe,
+  useStartPhoneVerification,
   useSwitchWorkspace,
 } from '../auth.api';
+import { isPhoneVerified } from '../auth.mappers';
+
+/** FU-15: taklif bo'yicha Telegram tasdig'i holati (kutish havolasi yoki bot yo'q). */
+type PhoneVerifyState = { kind: 'waiting'; link: string } | { kind: 'unavailable' };
+
+/** Telegram tasdig'ini kutayotganda `me` so'rash davri. */
+const PHONE_VERIFY_POLL_MS = 3000;
 
 type WorkspaceOption = {
   tenantId: string;
@@ -44,11 +53,44 @@ export function SelectWorkspacePage() {
   // Auto-select faqat bir marta ishlasin (loop oldini olish).
   const autoSelectedRef = useRef(false);
 
-  const meQuery = useMe();
+  // FU-15: taklif bo'yicha tasdiq holati; kutish bo'lsa `me` 3 s'da so'raladi.
+  const [pv, setPv] = useState<Record<string, PhoneVerifyState>>({});
+  const waiting = Object.values(pv).some((s) => s.kind === 'waiting');
+  const meQuery = useMe({ refetchInterval: waiting ? PHONE_VERIFY_POLL_MS : false });
+  const phoneVerified = isPhoneVerified(meQuery.data);
+  // Tasdiqlangach polling to'xtaydi.
+  useEffect(() => {
+    if (phoneVerified && waiting) setPv({});
+  }, [phoneVerified, waiting]);
   const invitations = useInvitations();
   const acceptMut = useAcceptInvitation();
   const declineMut = useDeclineInvitation();
+  const startPv = useStartPhoneVerification();
   const invites = invitations.data ?? [];
+
+  const startVerification = (invitationId: string) =>
+    startPv.mutate(invitationId, {
+      onSuccess: (res) => {
+        if (res.alreadyVerified || !res.deepLink) {
+          void meQuery.refetch();
+          return;
+        }
+        // Desktop'da `setWindowOpenHandler` tashqi brauzer/Telegram'ga yo'naltiradi.
+        window.open(res.deepLink, '_blank', 'noopener,noreferrer');
+        setPv((p) => ({ ...p, [invitationId]: { kind: 'waiting', link: res.deepLink ?? '' } }));
+      },
+      onError: (err) => {
+        if (err instanceof ApiError && err.code === 'phone.verification_unavailable') {
+          setPv((p) => ({ ...p, [invitationId]: { kind: 'unavailable' } }));
+          return;
+        }
+        notifications.show({
+          title: t('common.error'),
+          message: t('phoneVerify.start_failed'),
+          color: 'red',
+        });
+      },
+    });
 
   const switchMut = useSwitchWorkspace({
     onSuccess: (data) => {
@@ -148,43 +190,62 @@ export function SelectWorkspacePage() {
           <Title order={4}>{t('auth.invitations.title')}</Title>
           {invites.map((inv) => (
             <Card key={inv.id}>
-              <Group justify="space-between" wrap="nowrap">
-                <Stack gap={4}>
-                  <Group gap="xs">
-                    <Text fw={600}>{inv.tenantName}</Text>
-                    <StatusPill status="waiting">{t('settings.users.pending')}</StatusPill>
+              <Stack gap="sm">
+                <Group justify="space-between" wrap="nowrap">
+                  <Stack gap={4}>
+                    <Group gap="xs">
+                      <Text fw={600}>{inv.tenantName}</Text>
+                      <StatusPill status="waiting">{t('settings.users.pending')}</StatusPill>
+                    </Group>
+                    <Text size="sm" c="var(--text-2)">
+                      {inv.branchName ?? t('auth.select_workspace.all_branches')} ·{' '}
+                      {roleLabel(inv.roleName, t)}
+                    </Text>
+                  </Stack>
+                  <Group gap="xs" wrap="nowrap">
+                    <Button
+                      size="xs"
+                      loading={acceptMut.isPending}
+                      disabled={!phoneVerified}
+                      onClick={() =>
+                        acceptMut.mutate(inv.id, {
+                          onSuccess: () =>
+                            notifications.show({
+                              message: t('auth.invitations.accepted'),
+                              color: 'teal',
+                            }),
+                          onError: (err) => {
+                            // FU-15: server tasdiq talab qildi (masalan parol tiklangan) — holatni yangilaymiz.
+                            if (
+                              err instanceof ApiError &&
+                              err.code === 'phone.verification_required'
+                            ) {
+                              void meQuery.refetch();
+                            }
+                          },
+                        })
+                      }
+                    >
+                      {t('auth.invitations.accept')}
+                    </Button>
+                    <Button
+                      size="xs"
+                      variant="default"
+                      loading={declineMut.isPending}
+                      onClick={() => declineMut.mutate(inv.id)}
+                    >
+                      {t('auth.invitations.decline')}
+                    </Button>
                   </Group>
-                  <Text size="sm" c="var(--text-2)">
-                    {inv.branchName ?? t('auth.select_workspace.all_branches')} ·{' '}
-                    {roleLabel(inv.roleName, t)}
-                  </Text>
-                </Stack>
-                <Group gap="xs" wrap="nowrap">
-                  <Button
-                    size="xs"
-                    loading={acceptMut.isPending}
-                    onClick={() =>
-                      acceptMut.mutate(inv.id, {
-                        onSuccess: () =>
-                          notifications.show({
-                            message: t('auth.invitations.accepted'),
-                            color: 'teal',
-                          }),
-                      })
-                    }
-                  >
-                    {t('auth.invitations.accept')}
-                  </Button>
-                  <Button
-                    size="xs"
-                    variant="default"
-                    loading={declineMut.isPending}
-                    onClick={() => declineMut.mutate(inv.id)}
-                  >
-                    {t('auth.invitations.decline')}
-                  </Button>
                 </Group>
-              </Group>
+                {!phoneVerified && (
+                  <PhoneVerifyBlock
+                    state={pv[inv.id]}
+                    loading={startPv.isPending && startPv.variables === inv.id}
+                    onStart={() => startVerification(inv.id)}
+                  />
+                )}
+              </Stack>
             </Card>
           ))}
         </Stack>
@@ -223,6 +284,50 @@ export function SelectWorkspacePage() {
         ))}
       </Stack>
     </Container>
+  );
+}
+
+/**
+ * FU-15: boshqa klinika taklifini qabul qilishdan oldin telefonni taklif qilgan
+ * klinika boti orqali tasdiqlash. Bot yo'q bo'lsa — aniq xabar (yopiq holat).
+ */
+function PhoneVerifyBlock({
+  state,
+  loading,
+  onStart,
+}: {
+  state: PhoneVerifyState | undefined;
+  loading: boolean;
+  onStart: () => void;
+}) {
+  const { t } = useTranslation();
+  if (state?.kind === 'unavailable') {
+    return <AlertBanner tier={2}>{t('phoneVerify.unavailable')}</AlertBanner>;
+  }
+  if (state?.kind === 'waiting') {
+    return (
+      <Stack gap={4}>
+        <Group gap="xs" wrap="nowrap">
+          <Loader size="xs" />
+          <Text size="sm">{t('phoneVerify.waiting')}</Text>
+        </Group>
+        <Anchor href={state.link} target="_blank" rel="noopener noreferrer" size="sm">
+          {t('phoneVerify.open_link')}
+        </Anchor>
+      </Stack>
+    );
+  }
+  return (
+    <Stack gap="xs">
+      <Text size="sm" c="var(--text-2)">
+        {t('phoneVerify.hint')}
+      </Text>
+      <Group>
+        <Button size="xs" variant="light" loading={loading} onClick={onStart}>
+          {t('phoneVerify.start')}
+        </Button>
+      </Group>
+    </Stack>
   );
 }
 

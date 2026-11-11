@@ -83,7 +83,8 @@ export const resetOwnerPasswordRoutes = (
       await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenant.id}, true)`);
       await tx
         .update(users)
-        .set({ passwordHash, updatedAt: now })
+        // FU-15: vendor-vositachiligidagi tiklash ham telefon tasdig'ini bekor qiladi.
+        .set({ passwordHash, phoneVerifiedAt: null, updatedAt: now })
         .where(eq(users.id, tenant.ownerUserId));
       await tx.insert(auditLog).values({
         tenantId: tenant.id,

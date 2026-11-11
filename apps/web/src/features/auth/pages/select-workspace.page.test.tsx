@@ -1,3 +1,4 @@
+import { ApiError } from '@dental/api-client';
 import { fireEvent, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/lib/i18n.ts';
@@ -13,12 +14,15 @@ const inv = vi.hoisted(() => ({
   decline: vi.fn(),
   active: 't1' as string | null,
   switchMutate: vi.fn(),
+  phoneVerified: true,
+  start: vi.fn(),
 }));
 
 vi.mock('../auth.api', () => ({
   useInvitations: () => ({ data: inv.list, isLoading: false }),
   useAcceptInvitation: () => ({ mutate: inv.accept, isPending: false }),
   useDeclineInvitation: () => ({ mutate: inv.decline, isPending: false }),
+  useStartPhoneVerification: () => ({ mutate: inv.start, isPending: false }),
   useMe: () => ({
     isLoading: false,
     data: {
@@ -34,6 +38,7 @@ vi.mock('../auth.api', () => ({
         },
       ],
       ownerTenants: [],
+      phoneVerified: inv.phoneVerified,
     },
   }),
   useSwitchWorkspace: () => ({ mutate: inv.switchMutate, isPending: false }),
@@ -119,5 +124,74 @@ describe('SelectWorkspacePage — avto-tanlash va takliflar (FU-08)', () => {
     renderApp(<SelectWorkspacePage />);
     expect(inv.switchMutate).toHaveBeenCalledTimes(1);
     inv.active = 't1';
+  });
+});
+
+describe('SelectWorkspacePage — FU-15 telefonni Telegram orqali tasdiqlash', () => {
+  const invite = {
+    id: 'inv1',
+    tenantId: 't2',
+    tenantName: 'Begona Klinika',
+    branchId: null,
+    branchName: null,
+    roleName: 'Doctor',
+    invitedAt: '2026-01-01T00:00:00Z',
+  };
+  const acceptButton = () =>
+    screen.getByText(i18n.t('auth.invitations.accept')).closest('button') as HTMLButtonElement;
+
+  it('tasdiqlanmagan: izoh ko‘rinadi, Qabul qilish o‘chirilgan, tasdiqlash tugmasi taklif id bilan', () => {
+    inv.phoneVerified = false;
+    inv.list = [invite];
+    inv.accept.mockReset();
+    inv.start.mockReset();
+    renderApp(<SelectWorkspacePage />);
+    expect(screen.getByText(i18n.t('phoneVerify.hint'))).toBeInTheDocument();
+    expect(acceptButton()).toBeDisabled();
+    fireEvent.click(acceptButton());
+    expect(inv.accept).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText(i18n.t('phoneVerify.start')));
+    expect(inv.start.mock.calls[0]?.[0]).toBe('inv1');
+  });
+
+  it('start muvaffaqiyatli: deepLink ochiladi va kutish holati ko‘rinadi', () => {
+    inv.phoneVerified = false;
+    inv.list = [invite];
+    const link = 'https://t.me/clinic_bot?start=pv_abcdefghijklmnopqrstuvwxyz012345';
+    inv.start.mockReset();
+    inv.start.mockImplementation((_id: string, o: { onSuccess: (d: unknown) => void }) =>
+      o.onSuccess({ alreadyVerified: false, deepLink: link, expiresAt: null }),
+    );
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+    renderApp(<SelectWorkspacePage />);
+    fireEvent.click(screen.getByText(i18n.t('phoneVerify.start')));
+    expect(open).toHaveBeenCalledWith(link, '_blank', 'noopener,noreferrer');
+    expect(screen.getByText(i18n.t('phoneVerify.waiting'))).toBeInTheDocument();
+    const fallback = screen.getByText(i18n.t('phoneVerify.open_link')).closest('a');
+    expect(fallback?.getAttribute('href')).toBe(link);
+    expect(acceptButton()).toBeDisabled();
+    open.mockRestore();
+  });
+
+  it('bot sozlanmagan (409): aniq xabar, jim o‘tkazib yuborilmaydi', () => {
+    inv.phoneVerified = false;
+    inv.list = [invite];
+    inv.start.mockReset();
+    inv.start.mockImplementation((_id: string, o: { onError: (e: unknown) => void }) =>
+      o.onError(new ApiError('phone.verification_unavailable', 'no bot', 409)),
+    );
+    renderApp(<SelectWorkspacePage />);
+    fireEvent.click(screen.getByText(i18n.t('phoneVerify.start')));
+    expect(screen.getByText(i18n.t('phoneVerify.unavailable'))).toBeInTheDocument();
+    expect(acceptButton()).toBeDisabled();
+  });
+
+  it('tasdiqlangan: tasdiqlash tugmasi yo‘q, Qabul qilish faol', () => {
+    inv.phoneVerified = true;
+    inv.list = [invite];
+    renderApp(<SelectWorkspacePage />);
+    expect(screen.queryByText(i18n.t('phoneVerify.start'))).not.toBeInTheDocument();
+    expect(acceptButton()).not.toBeDisabled();
+    inv.list = [];
   });
 });

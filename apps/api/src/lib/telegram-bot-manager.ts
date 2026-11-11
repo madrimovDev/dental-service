@@ -11,6 +11,15 @@ import { env } from './env.ts';
 import { logger } from './logger.ts';
 import { createBotFlows } from './telegram/deps.ts';
 import type { TelegramFlows } from './telegram/flows.ts';
+import {
+  bindPhoneVerification,
+  hasPendingPhoneVerification,
+  PV_START_PREFIX,
+  parsePhoneVerifyPayload,
+  phoneVerifyReplies,
+  phoneVerifyReplyFor,
+  verifyPhoneByContact,
+} from './telegram/phone-verify.ts';
 import { type BotReply, toTelegrafExtra } from './telegram/reply.ts';
 
 type ManagerDeps = {
@@ -82,6 +91,30 @@ export function startTelegramBotManager(deps: ManagerDeps) {
     bot.catch((err) => logger.error({ err, tenantId }, 'bot handler failed'));
 
     bot.start(async (ctx) => {
+      // FU-15: `/start pv_<token>` — xodim telefonini tasdiqlash (bemor oqimidan alohida).
+      // `ctx.payload` faqat shu prefiks bilan bo'lsa ushlanadi; aks holda bemor menyusi.
+      if (ctx.payload?.startsWith(PV_START_PREFIX)) {
+        const pvToken = parsePhoneVerifyPayload(ctx.payload);
+        const outcome = pvToken
+          ? await bindPhoneVerification(deps.adminDb, {
+              tenantId,
+              token: pvToken,
+              chatId: String(ctx.chat.id),
+            })
+          : 'invalid';
+        if (outcome !== 'bound') {
+          await ctx.reply(phoneVerifyReplies.invalidLink);
+          return;
+        }
+        await ctx.reply(phoneVerifyReplies.askContact, {
+          reply_markup: {
+            keyboard: [[{ text: phoneVerifyReplies.shareButton, request_contact: true }]],
+            resize_keyboard: true,
+            one_time_keyboard: true,
+          },
+        });
+        return;
+      }
       const menu = await run((tx) => flows.menuFor(tx, tenantId, String(ctx.chat.id)));
       // Bog'langan bemor — menyu; aks holda kontakt so'raladi (P8).
       if (menu.keyboard) await send(ctx, menu);
@@ -103,6 +136,19 @@ export function startTelegramBotManager(deps: ManagerDeps) {
       // `+901234567` qilib bemorni topa olmasdi.
       const phone = normalizePhone(ctx.message.contact.phone_number);
       const chatId = String(ctx.chat.id);
+      // FU-15: shu chat'da xodim telefoni tasdig'i kutilayotgan bo'lsa — kontakt shu
+      // oqimga tegishli (bemor bog'lashga tushmaydi). Platform jadvallari → admin ulanish.
+      if (await hasPendingPhoneVerification(deps.adminDb, { tenantId, chatId })) {
+        const pv = await verifyPhoneByContact(deps.adminDb, {
+          tenantId,
+          chatId,
+          contactUserId: ctx.message.contact.user_id,
+          fromId: ctx.from.id,
+          phone,
+        });
+        await ctx.reply(phoneVerifyReplyFor(pv), { reply_markup: { remove_keyboard: true } });
+        return;
+      }
       const outcome = await deps.withTenant(tenantId, (tx) =>
         linkPatientByContact(tx, {
           contactUserId: ctx.message.contact.user_id,
