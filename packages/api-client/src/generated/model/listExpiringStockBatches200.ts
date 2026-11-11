@@ -4,9 +4,9 @@
  * Dental Service API
  * OpenAPI spec version: 0.1.0
  */
-import type { StockBatch } from './stockBatch';
+import type { ExpiringStockBatch } from './expiringStockBatch';
 
 export type ListExpiringStockBatches200 = {
   success: boolean;
-  data: StockBatch[];
+  data: ExpiringStockBatch[];
 };

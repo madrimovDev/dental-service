@@ -22,4 +22,5 @@ export type CreateStockBatchBody = {
    * @nullable
    */
   costPerUnit?: number | null;
+  recordAsExpense?: boolean;
 };

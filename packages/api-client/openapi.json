@@ -652,6 +652,41 @@
           "vertical"
         ]
       },
+      "TenantReadiness": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "enum": [
+                    "workHours",
+                    "doctorSchedule",
+                    "servicePrices",
+                    "channel",
+                    "staff",
+                    "license",
+                    "backup"
+                  ]
+                },
+                "ok": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "key",
+                "ok"
+              ]
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
       "IntegrationsTestResult": {
         "type": "object",
         "properties": {
@@ -724,6 +759,90 @@
             "botToken": "123456:ABC-DEF..."
           }
         }
+      },
+      "BackupStatus": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "desktop",
+              "cloud"
+            ]
+          },
+          "folder": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastSuccessAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastError": {
+            "type": "string",
+            "nullable": true
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BackupFile"
+            }
+          }
+        },
+        "required": [
+          "mode",
+          "folder",
+          "lastSuccessAt",
+          "lastError",
+          "files"
+        ]
+      },
+      "BackupFile": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "dental-20261111-200000"
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-11-11T20:00:00.000Z"
+          }
+        },
+        "required": [
+          "name",
+          "sizeBytes",
+          "createdAt"
+        ]
+      },
+      "BackupRequested": {
+        "type": "object",
+        "properties": {
+          "requested": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "requested"
+        ]
+      },
+      "BackupSettings": {
+        "type": "object",
+        "properties": {
+          "folder": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "folder"
+        ]
       },
       "Branch": {
         "type": "object",
@@ -2977,6 +3096,158 @@
           "byStatus"
         ]
       },
+      "DebtAgingReport": {
+        "type": "object",
+        "properties": {
+          "totalDebt": {
+            "type": "number"
+          },
+          "patientCount": {
+            "type": "integer"
+          },
+          "over90Count": {
+            "type": "integer"
+          },
+          "buckets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "enum": [
+                    "d0_30",
+                    "d31_60",
+                    "d61_90",
+                    "d90_plus"
+                  ]
+                },
+                "amount": {
+                  "type": "number"
+                },
+                "patients": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "key",
+                "amount",
+                "patients"
+              ]
+            }
+          }
+        },
+        "required": [
+          "totalDebt",
+          "patientCount",
+          "over90Count",
+          "buckets"
+        ]
+      },
+      "OwnerTodayReport": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string"
+          },
+          "netTotal": {
+            "type": "number"
+          },
+          "refunded": {
+            "type": "number"
+          },
+          "byPaymentMethod": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "paymentMethod": {
+                  "type": "string"
+                },
+                "total": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "paymentMethod",
+                "total"
+              ]
+            }
+          },
+          "branches": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "branchId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "netRevenue": {
+                  "type": "number"
+                },
+                "patients": {
+                  "type": "integer"
+                },
+                "occupancy": {
+                  "type": "number"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "active",
+                    "idle"
+                  ]
+                }
+              },
+              "required": [
+                "branchId",
+                "name",
+                "netRevenue",
+                "patients",
+                "occupancy",
+                "status"
+              ]
+            }
+          },
+          "doctors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "doctorId": {
+                  "type": "string"
+                },
+                "done": {
+                  "type": "integer"
+                },
+                "planned": {
+                  "type": "integer"
+                },
+                "revenue": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "doctorId",
+                "done",
+                "planned",
+                "revenue"
+              ]
+            }
+          }
+        },
+        "required": [
+          "date",
+          "netTotal",
+          "refunded",
+          "byPaymentMethod",
+          "branches",
+          "doctors"
+        ]
+      },
       "DentalAnalyticsReport": {
         "type": "object",
         "properties": {
@@ -3143,6 +3414,48 @@
           "paymentMethod",
           "amount",
           "patientName"
+        ]
+      },
+      "PnlReport": {
+        "type": "object",
+        "properties": {
+          "revenue": {
+            "type": "number"
+          },
+          "expenses": {
+            "type": "number"
+          },
+          "payroll": {
+            "type": "number",
+            "nullable": true
+          },
+          "payrollFinalized": {
+            "type": "number",
+            "nullable": true
+          },
+          "payrollDraft": {
+            "type": "number",
+            "nullable": true
+          },
+          "payrollRunCount": {
+            "type": "number"
+          },
+          "payrollIncluded": {
+            "type": "boolean"
+          },
+          "netProfit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "revenue",
+          "expenses",
+          "payroll",
+          "payrollFinalized",
+          "payrollDraft",
+          "payrollRunCount",
+          "payrollIncluded",
+          "netProfit"
         ]
       },
       "DoctorPending": {
@@ -5164,6 +5477,15 @@
           },
           "lowStock": {
             "type": "boolean"
+          },
+          "avgDailyUsage": {
+            "type": "string",
+            "example": "1.50"
+          },
+          "daysLeft": {
+            "type": "integer",
+            "nullable": true,
+            "example": 12
           }
         },
         "required": [
@@ -5178,7 +5500,9 @@
           "minThreshold",
           "createdAt",
           "updatedAt",
-          "lowStock"
+          "lowStock",
+          "avgDailyUsage",
+          "daysLeft"
         ]
       },
       "StockItem": {
@@ -5412,6 +5736,91 @@
           "createdAt"
         ]
       },
+      "ExpiringStockBatch": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StockBatch"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "itemName": {
+                "type": "string",
+                "example": "Lidokain 2%"
+              },
+              "unit": {
+                "type": "string",
+                "example": "karpula"
+              },
+              "qtyRemaining": {
+                "type": "string",
+                "example": "14.00"
+              }
+            },
+            "required": [
+              "itemName",
+              "unit",
+              "qtyRemaining"
+            ]
+          }
+        ]
+      },
+      "StockAutoDeduction": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "itemName": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "in",
+              "out",
+              "adjustment"
+            ]
+          },
+          "quantity": {
+            "type": "string",
+            "example": "1.00"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true,
+            "example": "visit_auto"
+          },
+          "doctorName": {
+            "type": "string",
+            "nullable": true,
+            "example": "Karimov"
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-06-12T10:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "itemId",
+          "itemName",
+          "unit",
+          "type",
+          "quantity",
+          "reason",
+          "doctorName",
+          "createdAt"
+        ]
+      },
       "PayrollRun": {
         "type": "object",
         "properties": {
@@ -5552,6 +5961,49 @@
           "commissionAmount",
           "total",
           "createdAt"
+        ]
+      },
+      "PayrollAdjustment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "string",
+            "example": "-180000.00"
+          },
+          "sourceTransactionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceReceiptNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceCreatedAt": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "refund_clawback"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "amount",
+          "sourceTransactionId",
+          "sourceReceiptNumber",
+          "sourceCreatedAt",
+          "reason"
         ]
       },
       "NotificationsFeed": {
@@ -8469,6 +8921,71 @@
         }
       }
     },
+    "/api/tenant-settings/readiness": {
+      "get": {
+        "tags": [
+          "tenant-settings"
+        ],
+        "operationId": "getTenantReadiness",
+        "responses": {
+          "200": {
+            "description": "Clinic readiness checklist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/TenantReadiness"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/tenant-settings/integrations/test": {
       "post": {
         "tags": [
@@ -8532,6 +9049,340 @@
           },
           "403": {
             "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/backup/status": {
+      "get": {
+        "tags": [
+          "backup"
+        ],
+        "operationId": "getBackupStatus",
+        "responses": {
+          "200": {
+            "description": "Backup status (desktop) or cloud marker",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/BackupStatus"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/backup/run": {
+      "post": {
+        "tags": [
+          "backup"
+        ],
+        "operationId": "runBackup",
+        "responses": {
+          "202": {
+            "description": "Backup requested (Electron main picks it up)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/BackupRequested"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not available outside Local Desktop",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A restore is already pending",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/backup/settings": {
+      "put": {
+        "tags": [
+          "backup"
+        ],
+        "operationId": "updateBackupSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "folder": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "folder"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Backup folder saved (owner only)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/BackupSettings"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not available outside Local Desktop",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A restore is already pending",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/backup/restore": {
+      "post": {
+        "tags": [
+          "backup"
+        ],
+        "operationId": "restoreBackup",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "confirmName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "file",
+                  "confirmName"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Restore requested (owner only; Electron main performs it)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/BackupRequested"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not available outside Local Desktop",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A restore is already pending",
             "content": {
               "application/json": {
                 "schema": {
@@ -14454,6 +15305,147 @@
         }
       }
     },
+    "/api/reports/debt-aging": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "operationId": "getDebtAgingReport",
+        "responses": {
+          "200": {
+            "description": "Patient debt aging",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/DebtAgingReport"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/owner-today": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "operationId": "getOwnerTodayReport",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Owner today overview",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/OwnerTodayReport"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/reports/dental-analytics": {
       "get": {
         "tags": [
@@ -14599,6 +15591,100 @@
                     },
                     "data": {
                       "$ref": "#/components/schemas/OneCExportReport"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/pnl": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "operationId": "getPnlReport",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "required": true,
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "required": true,
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Profit and loss",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/PnlReport"
                     }
                   },
                   "required": [
@@ -20299,6 +21385,9 @@
                     "type": "number",
                     "nullable": true,
                     "minimum": 0
+                  },
+                  "recordAsExpense": {
+                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -20385,11 +21474,20 @@
             "required": false,
             "name": "withinDays",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
           }
         ],
         "responses": {
           "200": {
-            "description": "Batches expiring within N days",
+            "description": "Batches with remaining stock, expiring (or expired) within N days",
             "content": {
               "application/json": {
                 "schema": {
@@ -20404,7 +21502,86 @@
                     "data": {
                       "type": "array",
                       "items": {
-                        "$ref": "#/components/schemas/StockBatch"
+                        "$ref": "#/components/schemas/ExpiringStockBatch"
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/stock/auto-deductions/today": {
+      "get": {
+        "tags": [
+          "stock"
+        ],
+        "operationId": "listStockAutoDeductionsToday",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Today's automatic (visit-note) stock deductions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/StockAutoDeduction"
                       }
                     }
                   },
@@ -20861,6 +22038,85 @@
           },
           "409": {
             "description": "Only draft runs can be deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/payroll/runs/{id}/adjustments": {
+      "get": {
+        "tags": [
+          "payroll"
+        ],
+        "operationId": "listPayrollRunAdjustments",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Applied refund adjustments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PayrollAdjustment"
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
             "content": {
               "application/json": {
                 "schema": {

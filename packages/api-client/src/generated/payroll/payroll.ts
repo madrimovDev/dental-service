@@ -10,6 +10,7 @@ import type {
   DeletePayrollRun200,
   FinalizePayrollRun200,
   GetPayrollRun200,
+  ListPayrollRunAdjustments200,
   ListPayrollRuns200,
   ListPayrollStaffNames200
 } from '.././model';
@@ -60,6 +61,14 @@ import { customInstance } from '../../mutator';
     },
       );
     }
+  export const listPayrollRunAdjustments = (
+    id: string,
+ ) => {
+      return customInstance<ListPayrollRunAdjustments200>(
+      {url: `/api/payroll/runs/${id}/adjustments`, method: 'GET'
+    },
+      );
+    }
   export const finalizePayrollRun = (
     id: string,
  ) => {
@@ -73,4 +82,5 @@ export type CreatePayrollRunResult = NonNullable<Awaited<ReturnType<typeof creat
 export type ListPayrollStaffNamesResult = NonNullable<Awaited<ReturnType<typeof listPayrollStaffNames>>>
 export type GetPayrollRunResult = NonNullable<Awaited<ReturnType<typeof getPayrollRun>>>
 export type DeletePayrollRunResult = NonNullable<Awaited<ReturnType<typeof deletePayrollRun>>>
+export type ListPayrollRunAdjustmentsResult = NonNullable<Awaited<ReturnType<typeof listPayrollRunAdjustments>>>
 export type FinalizePayrollRunResult = NonNullable<Awaited<ReturnType<typeof finalizePayrollRun>>>

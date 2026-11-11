@@ -7,14 +7,19 @@
 import type {
   GetAppointmentStatsReport200,
   GetAppointmentStatsReportParams,
+  GetDebtAgingReport200,
   GetDentalAnalyticsReport200,
   GetDentalAnalyticsReportParams,
   GetDoctorWorkloadReport200,
   GetDoctorWorkloadReportParams,
   GetOneCExport200,
   GetOneCExportParams,
+  GetOwnerTodayReport200,
+  GetOwnerTodayReportParams,
   GetPlanCompletionReport200,
   GetPlanCompletionReportParams,
+  GetPnlReport200,
+  GetPnlReportParams,
   GetRevenueReport200,
   GetRevenueReportParams
 } from '.././model';
@@ -59,6 +64,23 @@ import { customInstance } from '../../mutator';
     },
       );
     }
+  export const getDebtAgingReport = (
+    
+ ) => {
+      return customInstance<GetDebtAgingReport200>(
+      {url: `/api/reports/debt-aging`, method: 'GET'
+    },
+      );
+    }
+  export const getOwnerTodayReport = (
+    params?: GetOwnerTodayReportParams,
+ ) => {
+      return customInstance<GetOwnerTodayReport200>(
+      {url: `/api/reports/owner-today`, method: 'GET',
+        params
+    },
+      );
+    }
   export const getDentalAnalyticsReport = (
     params: GetDentalAnalyticsReportParams,
  ) => {
@@ -77,9 +99,21 @@ import { customInstance } from '../../mutator';
     },
       );
     }
+  export const getPnlReport = (
+    params: GetPnlReportParams,
+ ) => {
+      return customInstance<GetPnlReport200>(
+      {url: `/api/reports/pnl`, method: 'GET',
+        params
+    },
+      );
+    }
   export type GetRevenueReportResult = NonNullable<Awaited<ReturnType<typeof getRevenueReport>>>
 export type GetAppointmentStatsReportResult = NonNullable<Awaited<ReturnType<typeof getAppointmentStatsReport>>>
 export type GetDoctorWorkloadReportResult = NonNullable<Awaited<ReturnType<typeof getDoctorWorkloadReport>>>
 export type GetPlanCompletionReportResult = NonNullable<Awaited<ReturnType<typeof getPlanCompletionReport>>>
+export type GetDebtAgingReportResult = NonNullable<Awaited<ReturnType<typeof getDebtAgingReport>>>
+export type GetOwnerTodayReportResult = NonNullable<Awaited<ReturnType<typeof getOwnerTodayReport>>>
 export type GetDentalAnalyticsReportResult = NonNullable<Awaited<ReturnType<typeof getDentalAnalyticsReport>>>
 export type GetOneCExportResult = NonNullable<Awaited<ReturnType<typeof getOneCExport>>>
+export type GetPnlReportResult = NonNullable<Awaited<ReturnType<typeof getPnlReport>>>

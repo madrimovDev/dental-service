@@ -21,4 +21,7 @@ export interface StockItemWithLowStock {
   createdAt: string;
   updatedAt: string;
   lowStock: boolean;
+  avgDailyUsage: string;
+  /** @nullable */
+  daysLeft: number | null;
 }
