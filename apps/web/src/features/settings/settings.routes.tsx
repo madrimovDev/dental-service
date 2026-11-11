@@ -1,5 +1,6 @@
 import { lazy } from 'react';
 import type { AppRoute } from '@/shell';
+import { SettingsShell } from './components/SettingsShell';
 
 const ServicesScreen = lazy(() =>
   import('@/features/services/components/ServicesScreen').then((m) => ({
@@ -44,7 +45,16 @@ const UsersSettingsScreen = lazy(() =>
 
 export const settingsRoutes: AppRoute[] = [
   // Xizmatlar katalogi /settings/* ostida; ekran `features/services` da
-  { path: '/settings/services', perm: 'service.view', element: <ServicesScreen /> },
+  {
+    path: '/settings/services',
+    perm: 'service.view',
+    // Sozlamalar chap navigatsiyasi xizmatlar sahifasida ham (QA: boshi berk ko'cha edi).
+    element: (
+      <SettingsShell active="services">
+        <ServicesScreen />
+      </SettingsShell>
+    ),
+  },
   {
     path: '/settings/service-categories',
     perm: 'service.view',
