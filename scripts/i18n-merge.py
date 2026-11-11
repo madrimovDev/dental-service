@@ -48,6 +48,14 @@ def merge(base, ours, theirs, where, conflicts):
 def main() -> int:
     bad = 0
     for path in sys.argv[1:]:
+        # Konflikt bo'lmagan (git o'zi birlashtirgan) faylga TEGMAYMIZ — aks holda
+        # index bosqichlari yo'q va natija bo'sh `{}` bo'lardi (UI-2 da shunday bo'ldi).
+        unmerged = subprocess.run(
+            ["git", "ls-files", "-u", "--", path], capture_output=True, text=True
+        ).stdout.strip()
+        if not unmerged:
+            print(f"{path}: konflikt yo'q — o'tkazildi")
+            continue
         conflicts: list[str] = []
         res = merge(stage(path, 1), stage(path, 2), stage(path, 3), "", conflicts)
         if conflicts:

@@ -473,6 +473,10 @@ function labOrder(over: Partial<LabOrder> = {}): LabOrder {
     notes: null,
     createdAt: '2026-06-10T00:00:00Z',
     updatedAt: '2026-06-10T00:00:00Z',
+    dueDate: null,
+    shade: null,
+    remakeOfId: null,
+    remakeReason: null,
     ...over,
   };
 }
