@@ -210,13 +210,16 @@ export const createBackupScheduler = (deps: BackupSchedulerDeps) => {
     const uploadsFile = join(dir, BACKUP_UPLOADS_FILE);
     if (!existsSync(dbFile)) return { ok: false, error: 'backup not found' };
 
-    await deps.maintenance.start();
     let apiStopped = false;
     let preRestore: string | null = null;
     let stage = 'api_stop';
     try {
+      // Tartib muhim: texnik-ish serveri API bilan BIR XIL portni tinglaydi, shuning uchun
+      // avval API to'xtaydi (port bo'shaydi), keyin maintenance ko'tariladi (EADDRINUSE bo'lmasin).
       await deps.stopApi();
       apiStopped = true;
+      stage = 'maintenance_start';
+      await deps.maintenance.start();
       stage = 'pre_restore_backup';
       const pre = runBackupUnlocked('pre-restore');
       if (!pre.ok) throw new Error(`tiklashdan oldingi zaxira olinmadi: ${pre.error}`);

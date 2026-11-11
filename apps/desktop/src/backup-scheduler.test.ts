@@ -14,6 +14,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
+import { createServer, type Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -24,6 +25,7 @@ import {
   nextBackupTime,
   resolveDefaultBackupFolder,
 } from './backup-scheduler.js';
+import { createMaintenanceServer } from './backup-tools.js';
 
 let dataDir: string;
 let folder: string;
@@ -184,7 +186,7 @@ describe('so‘rov fayllari (poll)', () => {
     expect(s.listBackups(folder).length).toBe(1);
   });
 
-  test('restore-request.json: texnik-ish -> API stop -> pre-restore zaxira -> restoreDb -> uploads -> migratsiya -> API start', async () => {
+  test('restore-request.json: API stop -> texnik-ish -> pre-restore zaxira -> restoreDb -> uploads -> migratsiya -> API start', async () => {
     seedBackup('dental-20261001-200000', 'TARGET');
     writeFileSync(
       join(dataDir, 'restore-request.json'),
@@ -194,8 +196,8 @@ describe('so‘rov fayllari (poll)', () => {
     await s.poll();
 
     expect(calls).toEqual([
-      'maint:start',
       'stopApi',
+      'maint:start',
       'dump', // tiklashdan oldin avtomatik zaxira
       'archive',
       'restoreDb:TARGET',
@@ -280,5 +282,95 @@ describe('start/stop taymerlari', () => {
     expect(delays).toEqual([2 * 60 * 60 * 1000, 2000]);
     s.stop();
     expect(cleared).toEqual(['T', 'I']);
+  });
+});
+
+describe('tiklash: API va texnik-ish serveri BIR XIL portda (real http)', () => {
+  const listen = (port: number): Promise<Server> =>
+    new Promise((resolve, reject) => {
+      const srv = createServer((_req, res) => res.end('api'));
+      srv.once('error', reject);
+      srv.listen(port, () => resolve(srv));
+    });
+  const close = (srv: Server): Promise<void> =>
+    new Promise((resolve) => {
+      srv.closeAllConnections();
+      srv.close(() => resolve());
+    });
+  const requestFile = () =>
+    writeFileSync(
+      join(dataDir, 'restore-request.json'),
+      JSON.stringify({ file: 'dental-20261001-200000' }),
+    );
+
+  test('API ishlab turgan portda tiklash: avval API to‘xtaydi, so‘ng maintenance 503 beradi, oxirida API qaytadi', async () => {
+    seedBackup('dental-20261001-200000', 'TARGET');
+    requestFile();
+    const port = 19000 + Math.floor(Math.random() * 1000);
+    let api: Server | null = await listen(port);
+    const maint = createMaintenanceServer(() => port);
+    let statusDuring = 0;
+    const s = createBackupScheduler(
+      makeDeps({
+        stopApi: async () => {
+          calls.push('stopApi');
+          if (api) await close(api);
+          api = null;
+        },
+        startApi: async () => {
+          calls.push('startApi');
+          api = await listen(port);
+        },
+        maintenance: {
+          start: async () => {
+            await maint.start();
+            calls.push('maint:start');
+            statusDuring = (await fetch(`http://127.0.0.1:${port}/`)).status;
+          },
+          stop: async () => {
+            calls.push('maint:stop');
+            await maint.stop();
+          },
+        },
+      }),
+    );
+    try {
+      await s.poll();
+      const result = JSON.parse(readFileSync(join(dataDir, 'restore-result.json'), 'utf8'));
+      expect(result.status).toBe('ok');
+      expect(statusDuring).toBe(503);
+      expect(calls[0]).toBe('stopApi');
+      expect(calls.indexOf('maint:start')).toBeGreaterThan(calls.indexOf('stopApi'));
+      expect(calls.slice(-2)).toEqual(['maint:stop', 'startApi']);
+      // API qaytdi, texnik-ish serveri portni bo‘shatgan.
+      expect(await (await fetch(`http://127.0.0.1:${port}/`)).text()).toBe('api');
+    } finally {
+      if (api) await close(api);
+      await maint.stop();
+    }
+  });
+
+  test('maintenance.start yiqilsa: yakuniy natija "failed" yoziladi, baza tegilmaydi, API qaytadi (running qolib ketmaydi)', async () => {
+    seedBackup('dental-20261001-200000', 'TARGET');
+    requestFile();
+    const s = createBackupScheduler(
+      makeDeps({
+        maintenance: {
+          start: async () => {
+            calls.push('maint:start');
+            throw new Error('EADDRINUSE');
+          },
+          stop: async () => {
+            calls.push('maint:stop');
+          },
+        },
+      }),
+    );
+    await s.poll();
+    const result = JSON.parse(readFileSync(join(dataDir, 'restore-result.json'), 'utf8'));
+    expect(result.status).toBe('failed');
+    expect(result.error).toContain('maintenance_start');
+    expect(calls.some((c) => c.startsWith('restoreDb'))).toBe(false);
+    expect(calls.slice(-2)).toEqual(['maint:stop', 'startApi']);
   });
 });

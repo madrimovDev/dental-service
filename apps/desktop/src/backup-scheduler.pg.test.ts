@@ -126,7 +126,7 @@ describe.skipIf(!enabled)('zaxira + tiklash — real Postgres + tar', () => {
     expect(readFileSync(join(uploads, 'rasm.txt'), 'utf8')).toBe('asl-rasm');
     expect(existsSync(join(uploads, 'yangi.txt'))).toBe(false);
     expect(existsSync(`${uploads}.old`)).toBe(false);
-    expect(calls).toEqual(['maint:start', 'stopApi', 'migrate', 'maint:stop', 'startApi']);
+    expect(calls).toEqual(['stopApi', 'maint:start', 'migrate', 'maint:stop', 'startApi']);
 
     const result = JSON.parse(readFileSync(join(dataDir, 'restore-result.json'), 'utf8'));
     expect(result.status).toBe('ok');
@@ -144,7 +144,7 @@ describe.skipIf(!enabled)('zaxira + tiklash — real Postgres + tar', () => {
     await scheduler.poll();
 
     expect(psql(DB, 'select name from patients where id = 1')).toBe('Ali');
-    expect(calls).toEqual(['maint:start', 'stopApi', 'maint:stop', 'startApi']);
+    expect(calls).toEqual(['stopApi', 'maint:start', 'maint:stop', 'startApi']);
     const result = JSON.parse(readFileSync(join(dataDir, 'restore-result.json'), 'utf8'));
     expect(result.status).toBe('failed');
     expect(result.error).toContain('restore_db');
