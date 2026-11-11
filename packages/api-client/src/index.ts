@@ -15,6 +15,7 @@ export {
   cancelAppointment,
   createAppointment,
   getAppointment,
+  getBookingContext,
   listAppointments,
   listDoctors,
   updateAppointment,
@@ -51,6 +52,18 @@ export {
   registrationEnabled,
   switchWorkspace,
 } from './generated/auth/auth.ts';
+// Generated (orval) — shim'lardan almashtirilgan funksiyalar (v-shims)
+export {
+  getBackupStatus,
+  restoreBackup,
+  runBackup,
+  updateBackupSettings,
+} from './generated/backup/backup.ts';
+export {
+  confirmBookingRequest,
+  declineBookingRequest,
+  listBookingRequests,
+} from './generated/booking-requests/booking-requests.ts';
 export type {
   CreateBranchResult,
   DeleteBranchResult,
@@ -101,6 +114,7 @@ export {
   signConsentForm,
   updateConsentTemplate,
 } from './generated/consent/consent.ts';
+export { getDoctorPending } from './generated/dashboard/dashboard.ts';
 // Generated (orval) — diagnoses
 export type { ListDiagnosesResult } from './generated/diagnoses/diagnoses.ts';
 export { listDiagnoses } from './generated/diagnoses/diagnoses.ts';
@@ -148,6 +162,21 @@ export {
 export type { GetLicenseStatusResult, RecheckLicenseResult } from './generated/license/license.ts';
 export { getLicenseStatus, recheckLicense } from './generated/license/license.ts';
 export type {
+  BackupFile,
+  BackupStatus,
+  BookingContext,
+  BookingRequest,
+  BookingRequestList,
+  DebtAgingReport,
+  DoctorPending,
+  ExpiringStockBatch,
+  MedicalRecord,
+  OwnerTodayReport,
+  PatientPhoneCheck,
+  PayrollAdjustment,
+  PnlReport,
+  StockAutoDeduction,
+  TenantReadiness,
   WorkspaceBranches,
   WorkspaceBranchesBranchesItem,
 } from './generated/model';
@@ -527,6 +556,8 @@ export {
   addPatientEmergencyContact,
   addPatientRelative,
   archivePatient,
+  checkPatientPhone,
+  confirmMedicalRecord,
   createPatient,
   getMedicalRecord,
   getMedicalRecordHistory,
@@ -552,6 +583,7 @@ export {
   createPayrollRun,
   finalizePayrollRun,
   getPayrollRun,
+  listPayrollRunAdjustments,
   listPayrollRuns,
   listPayrollStaffNames,
 } from './generated/payroll/payroll.ts';
@@ -581,6 +613,7 @@ export type {
   UpdateQueueTicketStatusResult,
 } from './generated/queue/queue.ts';
 export {
+  callOwnQueueTicket,
   createQueueTicket,
   getCheckInCandidates,
   getQueueToday,
@@ -614,10 +647,13 @@ export type {
 } from './generated/reports/reports.ts';
 export {
   getAppointmentStatsReport,
+  getDebtAgingReport,
   getDentalAnalyticsReport,
   getDoctorWorkloadReport,
   getOneCExport,
+  getOwnerTodayReport,
   getPlanCompletionReport,
+  getPnlReport,
   getRevenueReport,
 } from './generated/reports/reports.ts';
 // Generated (orval) — roles
@@ -708,6 +744,7 @@ export {
   createStockMovement,
   getStockItem,
   listExpiringStockBatches,
+  listStockAutoDeductionsToday,
   listStockBatches,
   listStockBom,
   listStockItems,
@@ -732,6 +769,7 @@ export type {
   UpdateTenantSettingsResult,
 } from './generated/tenant-settings/tenant-settings.ts';
 export {
+  getTenantReadiness,
   getTenantSettings,
   getTenantVertical,
   testTenantIntegration,
@@ -802,6 +840,7 @@ export {
   createVisitNote,
   getVisitNote,
   listVisitNotes,
+  signVisitNote,
   updateVisitNote,
 } from './generated/visit-notes/visit-notes.ts';
 export type { CustomInstanceConfig } from './mutator.ts';

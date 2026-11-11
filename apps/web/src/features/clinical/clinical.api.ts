@@ -11,7 +11,6 @@ import {
   createToothChart,
   createTreatmentPlan,
   createVisitNote,
-  customInstance,
   deletePatientImage,
   getLatestToothChart,
   getPatient,
@@ -38,6 +37,7 @@ import {
   type SignTreatmentPlanConsentBody,
   signConsentForm,
   signTreatmentPlanConsent,
+  signVisitNote,
   type TreatmentStageAcceptance,
   type TreatmentStageStatus,
   type UpdateTreatmentPlanBodyStatus,
@@ -319,18 +319,11 @@ export function useVisitNoteTemplates() {
   });
 }
 
-/**
- * «Imzolash» — `POST /visit-notes/{id}/sign`. Generated klient hali bu endpointni bilmaydi
- * (keyingi `generate:contract`) — shu paytgacha mutator orqali to'g'ridan chaqiriladi.
- */
+/** «Imzolash» — `POST /visit-notes/{id}/sign`. */
 export function useSignVisitNote(patientId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) =>
-      customInstance<{ success: boolean; data: VisitNoteView }>({
-        url: `/api/visit-notes/${id}/sign`,
-        method: 'POST',
-      }).then((r) => r.data),
+    mutationFn: (id: string) => signVisitNote(id).then((r) => r.data as VisitNoteView),
     onSuccess: (_d, id) => {
       qc.invalidateQueries({ queryKey: clinicalKeys.visitNotes(patientId) });
       qc.invalidateQueries({ queryKey: clinicalKeys.visitNote(id) });

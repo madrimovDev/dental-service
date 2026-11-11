@@ -1,14 +1,13 @@
 import {
   createPayrollRun,
-  customInstance,
   finalizePayrollRun,
   getPayrollRun,
+  listPayrollRunAdjustments,
   listPayrollRuns,
   listPayrollStaffNames,
 } from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { payrollKeys } from './payroll.keys';
-import type { PayrollAdjustmentDto } from './payroll.types';
 
 /**
  * UserId → ism xaritasi uchun (payroll line faqat userId tashiydi).
@@ -73,17 +72,12 @@ export function useFinalizeRun() {
 }
 
 /**
- * Run'ga qo'llangan refund-clawback tuzatishlari (tuzatish sababi). ⚠️ Vaqtinchalik qo'lda —
- * `generate:contract`dan keyin generated `listPayrollRunAdjustments`.
+ * Run'ga qo'llangan refund-clawback tuzatishlari (tuzatish sababi).
  */
 export function usePayrollAdjustments(id: string | null) {
   return useQuery({
     queryKey: payrollKeys.adjustments(id ?? ''),
-    queryFn: () =>
-      customInstance<{ data: PayrollAdjustmentDto[] }>({
-        url: `/api/payroll/runs/${id}/adjustments`,
-        method: 'GET',
-      }).then((r) => r.data),
+    queryFn: () => listPayrollRunAdjustments(id as string).then((r) => r.data),
     enabled: !!id,
   });
 }

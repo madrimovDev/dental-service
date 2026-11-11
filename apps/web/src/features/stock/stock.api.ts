@@ -3,9 +3,10 @@ import {
   createStockBom,
   createStockItem,
   createStockMovement,
-  customInstance,
   listBranches,
+  listExpiringStockBatches,
   listServices,
+  listStockAutoDeductionsToday,
   listStockBatches,
   listStockBom,
   listStockItems,
@@ -15,7 +16,6 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { lookupKeys } from '@/lib/lookup-keys';
 import { stockKeys } from './stock.keys';
-import type { AutoDeductionDto, ExpiringBatchDto } from './stock.types';
 
 /** Ombor itemlari (qoldiq + lowStock). branchId ixtiyoriy filtr. */
 export function useStockItems(branchId?: string) {
@@ -53,34 +53,26 @@ export function useStockBatches(itemId: string | null) {
 
 /**
  * Muddati yaqinlashayotgan (yoki o'tgan) partiyalar — faqat qoldig'i borlari (IR-02), filial
- * filtri bilan. ⚠️ Vaqtinchalik qo'lda (`customInstance`): javob endi `itemName/unit/qtyRemaining`
- * ham beradi — `generate:contract`dan keyin generated `listExpiringStockBatches` ishlatiladi.
+ * filtri bilan.
  */
 export function useExpiringBatches(withinDays = 30, branchId?: string) {
   return useQuery({
     queryKey: stockKeys.expiring(withinDays, branchId ?? ''),
     queryFn: () =>
-      customInstance<{ data: ExpiringBatchDto[] }>({
-        url: '/api/stock/batches/expiring',
-        method: 'GET',
-        params: { withinDays, ...(branchId ? { branchId } : {}) },
-      }).then((r) => r.data),
+      listExpiringStockBatches({ withinDays, ...(branchId ? { branchId } : {}) }).then(
+        (r) => r.data,
+      ),
   });
 }
 
 /**
- * Bugungi avto-yechish jurnali (vizit yozuvidan). ⚠️ Vaqtinchalik qo'lda — `generate:contract`dan
- * keyin generated `listStockAutoDeductionsToday`.
+ * Bugungi avto-yechish jurnali (vizit yozuvidan).
  */
 export function useAutoDeductionsToday(branchId?: string) {
   return useQuery({
     queryKey: stockKeys.autoToday(branchId ?? ''),
     queryFn: () =>
-      customInstance<{ data: AutoDeductionDto[] }>({
-        url: '/api/stock/auto-deductions/today',
-        method: 'GET',
-        params: branchId ? { branchId } : undefined,
-      }).then((r) => r.data),
+      listStockAutoDeductionsToday(branchId ? { branchId } : undefined).then((r) => r.data),
   });
 }
 

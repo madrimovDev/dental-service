@@ -1,4 +1,14 @@
-import { ApiError, customInstance, getRecallSummary } from '@dental/api-client';
+import type {
+  BookingRequest,
+  BookingRequestList as GeneratedBookingRequestList,
+} from '@dental/api-client';
+import {
+  ApiError,
+  confirmBookingRequest,
+  declineBookingRequest,
+  getRecallSummary,
+  listBookingRequests,
+} from '@dental/api-client';
 import { notifications } from '@mantine/notifications';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import i18n from 'i18next';
@@ -66,45 +76,17 @@ export function useReceptionAttention(branchId: string | null) {
 }
 
 // ─── Telegram bron so'rovlari (UI-T2) ───────────────────────────────────────────
-// TODO(integratsiya): generate:contract'dan keyin generated client'ga (listBookingRequests,
-// confirmBookingRequest, declineBookingRequest) o'tkazish — hozircha customInstance + qo'lda tip.
-
-export interface BookingRequestRow {
-  id: string;
-  status: 'pending' | 'confirmed' | 'declined' | 'expired';
-  requestedStart: string;
-  createdAt: string;
-  branchId: string;
-  branchName: string | null;
-  patientId: string;
-  patientName: string | null;
-  doctorId: string | null;
-  doctorName: string | null;
-  rescheduleOfAppointmentId: string | null;
-  appointmentId: string | null;
-  declineReason: string | null;
-}
-
-export interface BookingRequestList {
-  items: BookingRequestRow[];
-  pendingCount: number;
-}
+export type BookingRequestRow = BookingRequest;
+export type BookingRequestList = GeneratedBookingRequestList;
 
 const BOOKING_KEY = ['reception', 'booking-requests'] as const;
-
-type Envelope<T> = { success: boolean; data: T };
 
 /** `appointment.view` bilan GET; ruxsatsiz rolda so'rov yuborilmaydi (403 portlamasin). */
 export function useBookingRequests() {
   const { hasPermission } = useAuthStore();
   return useQuery({
     queryKey: BOOKING_KEY,
-    queryFn: () =>
-      customInstance<Envelope<BookingRequestList>>({
-        url: '/api/booking-requests',
-        method: 'GET',
-        params: { status: 'pending' },
-      }).then((r) => r.data),
+    queryFn: () => listBookingRequests({ status: 'pending' }).then((r) => r.data),
     enabled: hasPermission('appointment.view'),
   });
 }
@@ -113,12 +95,7 @@ export function useBookingRequests() {
 export function useConfirmBookingRequest() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id }: { id: string }) =>
-      customInstance<Envelope<unknown>>({
-        url: `/api/booking-requests/${id}/confirm`,
-        method: 'POST',
-        data: {},
-      }),
+    mutationFn: ({ id }: { id: string }) => confirmBookingRequest(id, {}),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: BOOKING_KEY });
       void qc.invalidateQueries({ queryKey: ['appointments'] });
@@ -138,11 +115,7 @@ export function useDeclineBookingRequest() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, reason }: { id: string; reason: string }) =>
-      customInstance<Envelope<unknown>>({
-        url: `/api/booking-requests/${id}/decline`,
-        method: 'POST',
-        data: { reason },
-      }),
+      declineBookingRequest(id, { reason }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: BOOKING_KEY });
     },

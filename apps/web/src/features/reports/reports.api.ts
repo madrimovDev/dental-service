@@ -1,14 +1,14 @@
 import {
-  customInstance,
   getAppointmentStatsReport,
+  getDebtAgingReport,
   getDentalAnalyticsReport,
   getDoctorWorkloadReport,
   getOneCExport,
+  getOwnerTodayReport,
   getPlanCompletionReport,
   getRevenueReport,
 } from '@dental/api-client';
 import { useQuery } from '@tanstack/react-query';
-import type { DebtAging, OwnerToday } from '@/features/dashboard/dashboard.api';
 import { reportKeys } from './reports.keys';
 import type { ReportRange } from './reports.types';
 
@@ -73,12 +73,7 @@ export function useOneCExport(range: ReportRange) {
 export function useOwnerTodayReport(branchId: string | undefined, opts: ReportQueryOpts = {}) {
   return useQuery({
     queryKey: reportKeys.ownerToday(branchId),
-    queryFn: () =>
-      customInstance<{ data: OwnerToday }>({
-        url: '/api/reports/owner-today',
-        method: 'GET',
-        params: branchId ? { branchId } : undefined,
-      }).then((r) => r.data),
+    queryFn: () => getOwnerTodayReport(branchId ? { branchId } : undefined).then((r) => r.data),
     enabled: opts.enabled ?? true,
     retry: false,
   });
@@ -88,10 +83,7 @@ export function useOwnerTodayReport(branchId: string | undefined, opts: ReportQu
 export function useDebtAgingReport(opts: ReportQueryOpts = {}) {
   return useQuery({
     queryKey: reportKeys.debtAging(),
-    queryFn: () =>
-      customInstance<{ data: DebtAging }>({ url: '/api/reports/debt-aging', method: 'GET' }).then(
-        (r) => r.data,
-      ),
+    queryFn: () => getDebtAgingReport().then((r) => r.data),
     enabled: opts.enabled ?? true,
     retry: false,
   });

@@ -1,4 +1,4 @@
-import type { Expense } from '@dental/api-client';
+import type { Expense, PnlReport } from '@dental/api-client';
 
 /** Xarajat ro'yxat satri view-model'i (string pul → number, kategoriya nomi join'langan). */
 export type ExpenseVM = {
@@ -29,13 +29,4 @@ export type DateRange = {
 export type { Expense };
 
 /** P&L agregati (`GET /api/reports/pnl`). Ish haqi filial filtrida null. */
-export type PnlDto = {
-  revenue: number;
-  expenses: number;
-  payroll: number | null;
-  payrollFinalized: number | null;
-  payrollDraft: number | null;
-  payrollRunCount: number;
-  payrollIncluded: boolean;
-  netProfit: number;
-};
+export type PnlDto = PnlReport;
