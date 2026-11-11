@@ -372,6 +372,13 @@
       "when": 1794406515367,
       "tag": "0052_visit_note_sign",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1794412091645,
+      "tag": "0053_ui_t2_telegram",
+      "breakpoints": true
     }
   ]
 }

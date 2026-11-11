@@ -5,6 +5,7 @@ import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { requireModuleInDesktop } from '../../lib/license-middleware.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
 import { CrossEntityError } from '../../lib/ownership.ts';
+import { createPatientMessenger } from '../../lib/telegram/notify.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
@@ -33,7 +34,7 @@ export const prescriptionsRoutes = (deps: { db: Database; audit: AuditLogger }) 
   app.use('*', authMiddleware());
   app.use('*', rlsMiddleware(deps.db));
 
-  const service = createPrescriptionsService(deps);
+  const service = createPrescriptionsService({ ...deps, messenger: createPatientMessenger() });
 
   // ─── GET / — list ────────────────────────────────────────────────────────
 
