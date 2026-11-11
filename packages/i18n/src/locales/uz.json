@@ -2525,6 +2525,7 @@
     "err_clinic_subscription_expired": "Klinika obunasi tugagan — portal ishlamaydi.",
     "err_lab_subscription_expired": "Laboratoriya obunasi tugagan.",
     "err_clinic_unknown": "Klinika ta'minotchida topilmadi.",
-    "err_clinic_unauthorized": "Portal kaliti yaroqsiz — qayta ulaning."
+    "err_clinic_unauthorized": "Portal kaliti yaroqsiz — qayta ulaning.",
+    "lab_name_hint_portal": "Portaldagi laboratoriyani tanlang yoki boshqa lab nomini yozing (portalsiz — holat qo'lda)"
   }
 }

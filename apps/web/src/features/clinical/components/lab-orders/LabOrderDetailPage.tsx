@@ -124,6 +124,8 @@ export function LabOrderDetailPage() {
             </dl>
           </section>
 
+          <LabOrderHubPanel order={order} canManage={canManage} />
+
           <section className={classes.card}>
             <h3 className={classes.cardTitle}>{t('labOrder.files_section')}</h3>
             <LabOrderFiles labOrderId={order.id} canManage={canManage} />
@@ -154,8 +156,6 @@ export function LabOrderDetailPage() {
               />
             )}
           </section>
-
-          <LabOrderHubPanel order={order} canManage={canManage} />
 
           <section className={classes.card}>
             <h3 className={classes.cardTitle}>{t('labOrder.sees_title')}</h3>

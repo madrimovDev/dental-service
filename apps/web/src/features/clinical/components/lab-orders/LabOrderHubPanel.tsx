@@ -1,4 +1,4 @@
-import { AlertBanner, Mono, StatusPill } from '@dental/ui';
+import { AlertBanner, StatusPill } from '@dental/ui';
 import { Button, Group, Select, Stack, Textarea } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useState } from 'react';
@@ -152,14 +152,13 @@ export function LabOrderHubPanel({
           <div className={classes.label}>{t('labHubClinic.price_title')}</div>
           {approved ? (
             <div>
-              <Mono>{formatCurrency(Number(approved), t)}</Mono>{' '}
+              <b>{formatCurrency(Number(approved), t)}</b>{' '}
               <span className={classes.okNote}>{t('labHubClinic.price_approved_note')}</span>
             </div>
           ) : proposed ? (
             <Group gap="sm">
               <span>
-                {t('labHubClinic.price_proposed')}:{' '}
-                <Mono>{formatCurrency(Number(proposed), t)}</Mono>
+                {t('labHubClinic.price_proposed')}: <b>{formatCurrency(Number(proposed), t)}</b>
               </span>
               {canManage && (
                 <Button

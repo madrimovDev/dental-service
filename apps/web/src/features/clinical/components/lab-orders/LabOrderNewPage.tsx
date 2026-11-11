@@ -294,7 +294,11 @@ export function LabOrderNewPage() {
               )}
               <TextInput
                 label={t('lab_order.lab_name')}
-                description={t('labOrder.lab_name_hint')}
+                description={t(
+                  hubLabs.length > 0
+                    ? 'labHubClinic.lab_name_hint_portal'
+                    : 'labOrder.lab_name_hint',
+                )}
                 required
                 {...form.getInputProps('labName')}
                 onChange={(e) => {
