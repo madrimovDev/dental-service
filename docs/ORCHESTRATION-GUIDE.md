@@ -109,6 +109,12 @@ pipeline(lanes,
 - `blocked`/`failed` → §1 eskalatsiya (yangi chaqiruv, bir daraja yuqori).
 - Lane natijalari qaytgach — controller: integratsiya lane → merge tayyorlash.
 
+## 5.5 Integratsiya: migratsiya va i18n konfliktlari (UI-1/UI-2 darslari)
+
+- **i18n:** `python3 scripts/i18n-merge.py packages/i18n/src/locales/{uz,ru}.json` — faqat haqiqatan konfliktli faylga tegadi (UI-2 da konfliktsiz faylga ishlatilib uz/ru bo'sh `{}` bo'lib qolgan edi; endi `git ls-files -u` tekshiriladi). Merge'dan keyin kalitlar soni `main`dan kam emasligini tekshiring.
+- **Drizzle (bir nechta lane migratsiya yaratsa):** `_journal.json` — ikki tomon `entries` birlashmasi, `tag` bo'yicha tartib, `idx` qayta raqamlanadi. Snapshot'lar hammasi bir xil ota-snapshot'ga (`prevId`) ishora qiladi → `drizzle-kit generate` «collision» beradi. Tuzatish: `prevId` zanjirini ketma-ket qiling, keyin `drizzle-kit generate --name probe` (u boshqa lane'larning DDL'ini qayta chiqaradi), probe snapshot'ini oxirgi snapshot o'rniga qo'ying (`id`/`prevId` oxirgisiniki), probe SQL + snapshot + jurnal yozuvini o'chiring; qayta `generate` → «No schema changes».
+- **Lane'lar rejadan tashqari migratsiya yaratishi mumkin** (UI-2 C lane 0052) — integratsiyada `ls apps/api/drizzle/*.sql` bilan raqamlarni tekshiring.
+
 ## 6. Merge gate (bosqich oxirida, bir marta)
 
 Controller `main`ga merge qilishdan oldin, **birlashtirilgan** branch'da bir marta:
