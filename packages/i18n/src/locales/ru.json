@@ -1794,5 +1794,40 @@
       "title": "Открытые диагнозы",
       "empty": "Открытых диагнозов нет"
     }
+  },
+  "odontogram": {
+    "views_label": "Вид",
+    "view_current": "Текущее состояние",
+    "view_plan": "План",
+    "view_history": "История",
+    "chair_mode": "Режим у кресла",
+    "planned": "в плане",
+    "tooth_title": "Зуб {{n}}",
+    "surfaces": "Поверхности",
+    "state": "Состояние",
+    "face": {
+      "M": "медиальная",
+      "O": "жевательная",
+      "D": "дистальная",
+      "B": "щёчная",
+      "L": "язычная"
+    },
+    "diagnosis_search": "Добавить диагноз",
+    "diagnosis_search_placeholder": "Название или код диагноза",
+    "diagnosis_results": "Результаты поиска диагнозов",
+    "diagnosis_none": "Диагноз не найден",
+    "diagnosis_hint": "«chirish», «karies», «кариес» — всё найдёт один диагноз",
+    "tooth_diagnoses": "Диагнозы этого зуба",
+    "tooth_diagnoses_empty": "У этого зуба нет диагнозов",
+    "remove_diagnosis": "{{name}} — убрать",
+    "add_diagnosis": "Добавить диагноз",
+    "add_to_plan": "Добавить в план",
+    "save_only": "Сохранить только диагноз",
+    "plan_title": "Лечение: зуб {{n}}",
+    "added_to_plan": "Добавлено в план",
+    "plan_teeth": "Запланированные зубы",
+    "plan_empty": "Нет запланированных этапов",
+    "tooth_history": "История зуба {{n}}",
+    "history_empty": "По этому зубу истории нет"
   }
 }

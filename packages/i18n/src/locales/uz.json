@@ -1794,5 +1794,40 @@
       "title": "Ochiq tashxislar",
       "empty": "Ochiq tashxis yo'q"
     }
+  },
+  "odontogram": {
+    "views_label": "Ko'rinish",
+    "view_current": "Hozirgi holat",
+    "view_plan": "Reja",
+    "view_history": "Tarix",
+    "chair_mode": "Kreslo yoni rejimi",
+    "planned": "rejada",
+    "tooth_title": "Tish {{n}}",
+    "surfaces": "Yuzalar",
+    "state": "Holat",
+    "face": {
+      "M": "medial",
+      "O": "chaynov",
+      "D": "distal",
+      "B": "lunj",
+      "L": "til"
+    },
+    "diagnosis_search": "Tashxis qo'shish",
+    "diagnosis_search_placeholder": "Tashxis nomi yoki kodi",
+    "diagnosis_results": "Tashxis natijalari",
+    "diagnosis_none": "Tashxis topilmadi",
+    "diagnosis_hint": "«chirish», «karies», «кариес» — hammasi bir tashxisni topadi",
+    "tooth_diagnoses": "Shu tishdagi tashxislar",
+    "tooth_diagnoses_empty": "Bu tishda tashxis yo'q",
+    "remove_diagnosis": "{{name}} — olib tashlash",
+    "add_diagnosis": "Tashxis qo'shish",
+    "add_to_plan": "Rejaga qo'shish",
+    "save_only": "Faqat tashxisni saqlash",
+    "plan_title": "Davolash: tish {{n}}",
+    "added_to_plan": "Rejaga qo'shildi",
+    "plan_teeth": "Rejalashtirilgan tishlar",
+    "plan_empty": "Rejalashtirilgan bosqich yo'q",
+    "tooth_history": "Tish {{n}} tarixi",
+    "history_empty": "Bu tish bo'yicha tarix yo'q"
   }
 }
