@@ -30,7 +30,8 @@
   ; Avval o'chirib qo'shamiz — yangilashda qoida dublikat bo'lmasin.
   nsExec::Exec 'netsh advfirewall firewall delete rule name="Dental Service TCP"'
   nsExec::Exec 'netsh advfirewall firewall delete rule name="Dental Service UDP"'
-  nsExec::Exec 'netsh advfirewall firewall add rule name="Dental Service TCP" dir=in action=allow protocol=TCP localport=8080'
+  ; TCP — dastur bo'yicha (port emas): foydalanuvchi Sozlamalarda portni o'zgartirsa ham qoida ishlaydi.
+  nsExec::Exec 'netsh advfirewall firewall add rule name="Dental Service TCP" dir=in action=allow protocol=TCP program="$INSTDIR\resources\api.exe"'
   nsExec::Exec 'netsh advfirewall firewall add rule name="Dental Service UDP" dir=in action=allow protocol=UDP localport=47890'
 !macroend
 

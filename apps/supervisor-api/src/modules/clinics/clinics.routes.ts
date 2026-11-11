@@ -37,7 +37,7 @@ const createClinicSchema = z.object({
   contactPhone: z.string().optional(),
   plan: z.enum(['starter', 'standard', 'premium', 'enterprise']),
   expiresAt: z.string(), // ISO date
-  gracePeriodDays: z.number().int().min(1).max(365).default(7),
+  gracePeriodDays: z.number().int().min(1).max(7).default(7),
   // Provisioning — klinika lokal bazasida yaratiladigan birlamchi ma'lumot
   // (spec §5.2). Telefon `normalizePhone` bilan kanonik shaklga keltiriladi.
   ownerFullName: z.string().min(2).max(120),

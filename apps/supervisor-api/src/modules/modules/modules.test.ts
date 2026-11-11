@@ -20,7 +20,7 @@ const createClinicWithLicense = async (plan = 'standard') => {
       name: `Modules Test Clinic ${crypto.randomUUID()}`,
       plan,
       expiresAt: new Date(Date.now() + 86400000 * 365).toISOString(),
-      gracePeriodDays: 30,
+      gracePeriodDays: 7,
       // Owner (provisioning) maydonlari `createClinicSchema`da majburiy —
       // ularsiz POST 400 qaytaradi va `license` undefined bo'lib qoladi.
       // `defaultLanguage`/`branchName` — Zod default'lari bor.
@@ -64,14 +64,14 @@ describe('PATCH /v1/admin/licenses/:key/modules', () => {
     const res = await app.request(`/v1/admin/licenses/${license.licenseKey}/modules`, {
       method: 'PATCH',
       headers: await authHeaders(),
-      body: JSON.stringify({ modules: ['patients'], gracePeriodDays: 15 }),
+      body: JSON.stringify({ modules: ['patients'], gracePeriodDays: 5 }),
     });
     expect(res.status).toBe(200);
 
     const updated = await db.query.licenses.findFirst({
       where: eq(licenses.licenseKey, license.licenseKey),
     });
-    expect(updated?.gracePeriodDays).toBe(15);
+    expect(updated?.gracePeriodDays).toBe(5);
   });
 
   it('returns 404 for an unknown license key', async () => {
@@ -88,13 +88,13 @@ describe('PATCH /v1/admin/licenses/:key/modules', () => {
   // Grace period muddat tekshiruviga TO'G'RIDAN-TO'G'RI qo'shiladi (apps/api
   // `isLicenseValid`: `hozir < expiresAt + gracePeriodDays`), ya'ni chegarasiz
   // qiymat litsenziyani amalda cheksiz uzaytiradi. Klinika yaratishda
-  // `createClinicSchema` 1..365 ni majburlaydi — bu yangilash yo'li ham xuddi
+  // `createClinicSchema` 1..7 ni majburlaydi (P18: imtiyoz ≤ 7 kun) — bu yangilash yo'li ham xuddi
   // shu chegarada bo'lishi shart, aks holda cheklov bitta endpoint orqali
   // chetlab o'tiladi.
   const OUT_OF_RANGE: [string, number][] = [
     ['0 (juda kichik)', 0],
     ['-5 (manfiy)', -5],
-    ['366 (365 dan katta)', 366],
+    ['8 (7 dan katta)', 8],
     ['100000 (amalda cheksiz)', 100000],
   ];
   for (const [label, gracePeriodDays] of OUT_OF_RANGE) {
@@ -111,7 +111,7 @@ describe('PATCH /v1/admin/licenses/:key/modules', () => {
       const untouched = await db.query.licenses.findFirst({
         where: eq(licenses.licenseKey, license.licenseKey),
       });
-      expect(untouched?.gracePeriodDays).toBe(30);
+      expect(untouched?.gracePeriodDays).toBe(7);
       expect(untouched?.modules).not.toEqual(['patients']);
     });
   }

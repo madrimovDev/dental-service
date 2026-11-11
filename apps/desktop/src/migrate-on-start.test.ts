@@ -108,7 +108,7 @@ describe('migrateOnStart', () => {
     });
     const r = migrateOnStart(deps);
     expect(deps.runMigrations).not.toHaveBeenCalled();
-    expect(r).toMatchObject({ ok: false, reason: 'failed' });
+    expect(r).toMatchObject({ ok: false, reason: 'backup_failed' });
   });
 });
 

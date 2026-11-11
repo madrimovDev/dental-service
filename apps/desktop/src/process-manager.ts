@@ -88,7 +88,7 @@ let pgProcess: ChildProcess | null = null;
 let valkeyProcess: ChildProcess | null = null;
 let apiProcess: ChildProcess | null = null;
 let status: ServerStatus = 'stopped';
-let currentApiPort = 80;
+let currentApiPort = 8080;
 
 // stopServer() (yoki supervisor o'zi) qasddan o'ldirgan jarayonlar — ularning
 // `exit` eventi crash emas (restart ham, soxta status o'zgarishi ham yo'q).

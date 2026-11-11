@@ -13,7 +13,7 @@ export const createClinicFormSchema = z.object({
     message: 'Tarifni tanlang',
   }),
   expiresAt: z.string().min(1, 'Amal qilish muddatini tanlang'),
-  gracePeriodDays: z.number().int().min(1).max(365),
+  gracePeriodDays: z.number().int().min(1).max(7),
   // Provisioning — klinika lokal bazasida yaratiladigan birlamchi ma'lumot.
   // Telefon normalizatsiyasi (+998XXXXXXXXX) serverda bajariladi.
   ownerFullName: z.string().min(2, 'Owner F.I.Sh. kiritilishi shart'),

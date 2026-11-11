@@ -28,7 +28,8 @@ export type MigrateResult =
   | { ok: true; backedUp: string | null }
   | {
       ok: false;
-      reason: 'phone_conflict' | 'failed';
+      /** `backup_failed` — zaxira olinmadi, migratsiya boshlanmadi, baza tegilmagan. */
+      reason: 'phone_conflict' | 'failed' | 'backup_failed';
       /** Baza yangilashdan oldingi holatda (tiklandi yoki umuman o'zgarmagan). */
       restored: boolean;
       message: string;
@@ -58,7 +59,7 @@ export const migrateOnStart = (deps: MigrateDeps): MigrateResult => {
       // Dump yiqildi — baza hali tegilmagan, migratsiya boshlanmaydi.
       return {
         ok: false,
-        reason: 'failed',
+        reason: 'backup_failed',
         restored: true,
         message: `Zaxira olinmadi: ${errMessage(err)}`,
       };
@@ -135,10 +136,26 @@ export const createStateStore = (
 const getPgBin = (name: 'pg_dump' | 'pg_restore' | 'psql'): string =>
   process.platform === 'win32' ? join(getResourcesDir(), 'postgres', 'bin', `${name}.exe`) : name;
 
-export const createPgTools = (): Pick<MigrateDeps, 'dump' | 'restore'> => {
-  const run = (bin: string, args: string[], label: string): void => {
-    const result = spawnSync(bin, args, {
-      env: { ...process.env, PGPASSWORD: getOrCreateSuperuserPassword() },
+/** Ulanish parametrlari — default ilova bazasi; testlar scratch bazani beradi. */
+export type PgToolsOptions = {
+  host?: string;
+  port?: string;
+  user?: string;
+  database?: string;
+  password?: () => string;
+  bin?: (name: 'pg_dump' | 'pg_restore' | 'psql') => string;
+};
+
+export const createPgTools = (opts: PgToolsOptions = {}): Pick<MigrateDeps, 'dump' | 'restore'> => {
+  const host = opts.host ?? 'localhost';
+  const port = opts.port ?? '5433';
+  const user = opts.user ?? 'dental';
+  const database = opts.database ?? 'dental';
+  const password = opts.password ?? getOrCreateSuperuserPassword;
+  const bin = opts.bin ?? getPgBin;
+  const run = (binary: string, args: string[], label: string): void => {
+    const result = spawnSync(binary, args, {
+      env: { ...process.env, PGPASSWORD: password() },
       stdio: 'pipe',
     });
     if (result.error) throw new Error(`${label} failed: ${result.error.message}`);
@@ -146,11 +163,11 @@ export const createPgTools = (): Pick<MigrateDeps, 'dump' | 'restore'> => {
       throw new Error(`${label} failed: ${result.stderr?.toString() || 'unknown error'}`);
     }
   };
-  const conn = ['-h', 'localhost', '-p', '5433', '-U', 'dental'];
+  const conn = ['-h', host, '-p', port, '-U', user];
   return {
     dump: (file) => {
       mkdirSync(getBackupsDir(), { recursive: true });
-      run(getPgBin('pg_dump'), [...conn, '-Fc', '-f', file, 'dental'], 'pg_dump');
+      run(bin('pg_dump'), [...conn, '-Fc', '-f', file, database], 'pg_dump');
     },
     // `pg_restore --clean` FAQAT dump'dagi obyektlarni o'chiradi: migratsiya
     // dump'dan keyin yaratgan yangi jadval/ustunlar (drizzle migrator bitta
@@ -160,8 +177,11 @@ export const createPgTools = (): Pick<MigrateDeps, 'dump' | 'restore'> => {
     // DROP (ulanishlarni uzib) → CREATE → bitta tranzaksiyada tiklash.
     // Rollar klaster-darajali — saqlanadi; dump egalik/grant'larni tiklaydi.
     restore: (file) => {
+      // Bazani o'chirishdan OLDIN dump o'qilishini tekshiramiz — buzilgan/
+      // yarim fayl bilan bazani yo'qotib qo'ymaslik uchun.
+      run(bin('pg_restore'), ['--list', file], 'pg_restore --list');
       run(
-        getPgBin('psql'),
+        bin('psql'),
         [
           ...conn,
           '-d',
@@ -169,15 +189,15 @@ export const createPgTools = (): Pick<MigrateDeps, 'dump' | 'restore'> => {
           '-v',
           'ON_ERROR_STOP=1',
           '-c',
-          'DROP DATABASE IF EXISTS dental WITH (FORCE)',
+          `DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`,
           '-c',
-          'CREATE DATABASE dental',
+          `CREATE DATABASE "${database}"`,
         ],
         'recreate database',
       );
       run(
-        getPgBin('pg_restore'),
-        [...conn, '--exit-on-error', '--single-transaction', '-d', 'dental', file],
+        bin('pg_restore'),
+        [...conn, '--exit-on-error', '--single-transaction', '-d', database, file],
         'pg_restore',
       );
     },

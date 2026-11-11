@@ -307,9 +307,11 @@ app.whenReady().then(async () => {
         const message =
           migration.reason === 'phone_conflict'
             ? "Yangilash to'xtatildi: bazada takroriy telefon raqamlari bor. Ta'minotchiga murojaat qiling."
-            : migration.restored
-              ? "Yangilash muvaffaqiyatsiz. Ma'lumotlar avvalgi holatga qaytarildi. Ta'minotchiga murojaat qiling."
-              : `Yangilash muvaffaqiyatsiz. Ma'lumotlarni qaytarib bo'lmadi${migration.backupFile ? `, zaxira: ${migration.backupFile}` : ''}. Ta'minotchiga murojaat qiling.`;
+            : migration.reason === 'backup_failed'
+              ? "Yangilashdan oldin zaxira olinmadi, shuning uchun yangilash bajarilmadi. Ma'lumotlaringiz o'zgarmagan. Ta'minotchiga murojaat qiling."
+              : migration.restored
+                ? "Yangilash muvaffaqiyatsiz. Ma'lumotlar avvalgi holatga qaytarildi. Ta'minotchiga murojaat qiling."
+                : `Yangilash muvaffaqiyatsiz. Ma'lumotlarni qaytarib bo'lmadi${migration.backupFile ? `, zaxira: ${migration.backupFile}` : ''}. Ta'minotchiga murojaat qiling.`;
         dialog.showErrorBox(
           "Dental Service — yangilash to'xtatildi",
           `${message}\n\nTafsilot: ${migration.message.slice(-800)}\nLoglarni ko'ring: ${LOGS_DIR}`,

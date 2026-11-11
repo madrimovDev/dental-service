@@ -26,7 +26,7 @@ const createClinic = async (overrides: Partial<Record<string, unknown>> = {}) =>
       contactEmail: 'clinic@test.com',
       plan: 'standard',
       expiresAt: new Date(Date.now() + 86400000 * 365).toISOString(),
-      gracePeriodDays: 30,
+      gracePeriodDays: 7,
       // Provisioning maydonlari majburiy (createClinicSchema) — ularsiz POST
       // 400 qaytaradi.
       ownerFullName: 'Ali Valiyev',

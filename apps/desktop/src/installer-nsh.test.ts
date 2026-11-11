@@ -15,9 +15,9 @@ describe('installer.nsh (P14, DT-03)', () => {
     expect(exists).toBeLessThan(box);
   });
 
-  test('firewall rules added for TCP 8080 and UDP 47890', () => {
+  test('firewall: TCP by api.exe program (port-independent), UDP 47890', () => {
     expect(nsh).toMatch(
-      /netsh advfirewall firewall add rule[^\n]*protocol=TCP[^\n]*localport=8080/,
+      /netsh advfirewall firewall add rule[^\n]*protocol=TCP[^\n]*program="\$INSTDIR\\resources\\api\.exe"/,
     );
     expect(nsh).toMatch(
       /netsh advfirewall firewall add rule[^\n]*protocol=UDP[^\n]*localport=47890/,
