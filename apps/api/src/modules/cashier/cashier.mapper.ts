@@ -23,6 +23,7 @@ export const toCashierTransactionDto = (row: CashierTransaction): CashierTransac
   discount: row.discount,
   currency: row.currency,
   paymentMethod: row.paymentMethod,
+  cardProvider: row.cardProvider ?? null,
   type: row.type,
   parentTransactionId: row.parentTransactionId ?? null,
   status: row.status,

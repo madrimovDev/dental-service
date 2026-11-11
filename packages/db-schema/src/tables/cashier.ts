@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
   type AnyPgColumn,
+  check,
   index,
   integer,
   jsonb,
@@ -20,6 +21,13 @@ import { treatmentPlans } from './treatment-plans.ts';
 import { users } from './users.ts';
 
 export const paymentMethodEnum = pgEnum('payment_method', ['cash', 'card', 'transfer', 'other']);
+/**
+ * UI-R5: karta sub-turi (`payment_method='card'` bo'lganda). Tashqi integratsiya YO'Q —
+ * faqat hisobot/xulosa uchun yorliq. `text` (enum emas) — yangi sub-tur migratsiyasiz qo'shiladi.
+ */
+export const CARD_PROVIDERS = ['terminal', 'click', 'payme', 'other'] as const;
+export type CardProvider = (typeof CARD_PROVIDERS)[number];
+
 export const transactionTypeEnum = pgEnum('transaction_type', ['payment', 'refund', 'void']);
 export const transactionStatusEnum = pgEnum('transaction_status', [
   'pending',
@@ -53,6 +61,7 @@ export const cashierTransactions = pgTable(
     currency: text('currency').notNull().default('UZS'),
 
     paymentMethod: paymentMethodEnum('payment_method').notNull(),
+    cardProvider: text('card_provider').$type<CardProvider>(),
     type: transactionTypeEnum('type').notNull().default('payment'),
     parentTransactionId: uuid('parent_transaction_id').references(
       (): AnyPgColumn => cashierTransactions.id,
@@ -80,6 +89,11 @@ export const cashierTransactions = pgTable(
     // Parent bo'yicha qidiruv. V2-4 (CLI-244): qisman refund uchun bitta parentga
     // BIR NECHTA refund ruxsat — unique EMAS (cumulative guard service'da).
     index('cashier_tx_parent_idx').on(t.parentTransactionId),
+    // UI-R5: sub-tur faqat karta uchun va faqat ma'lum qiymatlar (service+schema ham tekshiradi).
+    check(
+      'cashier_tx_card_provider_chk',
+      sql`${t.cardProvider} IS NULL OR (${t.paymentMethod} = 'card' AND ${t.cardProvider} IN ('terminal', 'click', 'payme', 'other'))`,
+    ),
   ],
 );
 

@@ -1,5 +1,8 @@
 import { z } from '@hono/zod-openapi';
 
+/** UI-R5: karta sub-turi. `payment_method='card'` bilan birga (integratsiyasiz yorliq). */
+export const cardProviderSchema = z.enum(['terminal', 'click', 'payme', 'other']);
+
 // ─── Request schemas (SAQLANADI — hand client REQUEST tiplari) ───────────────
 
 export const createTransactionSchema = z
@@ -19,6 +22,8 @@ export const createTransactionSchema = z
     discount: z.coerce.number().nonnegative().default(0),
     paidAmount: z.coerce.number().nonnegative(),
     paymentMethod: z.enum(['cash', 'card', 'transfer', 'other']),
+    // UI-R5: faqat `card` uchun (aks holda 400 — quyidagi refine). Berilmasa null.
+    cardProvider: cardProviderSchema.optional(),
     notes: z.string().max(1000).optional(),
     treatmentPlanId: z.uuid().optional(),
     allocations: z
@@ -29,6 +34,10 @@ export const createTransactionSchema = z
         }),
       )
       .optional(),
+  })
+  .refine((v) => v.cardProvider === undefined || v.paymentMethod === 'card', {
+    message: 'cardProvider faqat paymentMethod=card uchun',
+    path: ['cardProvider'],
   })
   // Erkin POS (items) yoki plan-billing (allocations) — kamida bittasi bo'lishi shart.
   .refine((v) => v.items.length > 0 || (v.allocations?.length ?? 0) > 0, {
@@ -102,6 +111,7 @@ export const cashierTransactionDtoSchema = z
     discount: z.string(),
     currency: z.string(),
     paymentMethod: paymentMethodSchema,
+    cardProvider: cardProviderSchema.nullable(),
     type: transactionTypeSchema,
     parentTransactionId: z.uuid().nullable(),
     status: transactionStatusSchema,
@@ -161,6 +171,8 @@ export const dailySummaryDtoSchema = z
     breakdown: z.array(
       z.object({
         paymentMethod: paymentMethodSchema,
+        /** UI-R5: karta sub-turi (faqat `card` qatorlarida; boshqalarda null). */
+        cardProvider: cardProviderSchema.nullable(),
         type: transactionTypeSchema,
         total: z.string(),
         count: z.number().int(),

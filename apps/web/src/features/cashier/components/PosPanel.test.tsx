@@ -111,4 +111,56 @@ describe('PosPanel', () => {
       expect.anything(),
     );
   });
+
+  // ─── UI-R5 ───
+  it('naqd: bemor 70 000 bersa qaytim 20 000, serverga paidAmount = 50 000 (net)', async () => {
+    renderApp(<PosPanel branchId="b1" patientId="pat1" />);
+    fireEvent.click(await screen.findByText('Plomba'));
+    await screen.findByDisplayValue("50 000 so'm");
+
+    fireEvent.change(screen.getByLabelText('Bemor berdi'), { target: { value: '70 000' } });
+    expect(screen.getByTestId('tender-change').textContent).toMatch(/20\s000\sso'm/);
+    expect(screen.getByTestId('tender-debt').textContent).toMatch(/0\sso'm/);
+
+    fireEvent.click(screen.getByText("To'lovni qabul qilish"));
+    expect(mutate).toHaveBeenCalledWith(
+      expect.objectContaining({ paymentMethod: 'cash', paidAmount: 50000 }),
+      expect.anything(),
+    );
+    const payload = mutate.mock.calls[0]?.[0] as { cardProvider?: string };
+    expect(payload.cardProvider).toBeUndefined();
+  });
+
+  it('naqd: kam bersa qarz qoladi', async () => {
+    renderApp(<PosPanel branchId="b1" patientId="pat1" />);
+    fireEvent.click(await screen.findByText('Plomba'));
+    await screen.findByDisplayValue("50 000 so'm");
+
+    fireEvent.change(screen.getByLabelText('Bemor berdi'), { target: { value: '30 000' } });
+    expect(screen.getByTestId('tender-debt').textContent).toMatch(/20\s000\sso'm/);
+  });
+
+  it('karta → sub-tur chiplar; Click tanlansa payload cardProvider:click', async () => {
+    renderApp(<PosPanel branchId="b1" patientId="pat1" />);
+    fireEvent.click(await screen.findByText('Plomba'));
+    await screen.findByDisplayValue("50 000 so'm");
+
+    // Naqdda sub-tur yo'q.
+    expect(screen.queryByRole('radio', { name: 'Click' })).toBeNull();
+    fireEvent.click(screen.getByText('Karta'));
+    fireEvent.click(screen.getByRole('radio', { name: 'Click' }));
+    // Kartada qaytim yo'q.
+    expect(screen.queryByTestId('tender-change')).toBeNull();
+
+    fireEvent.click(screen.getByText("To'lovni qabul qilish"));
+    expect(mutate).toHaveBeenCalledWith(
+      expect.objectContaining({ paymentMethod: 'card', cardProvider: 'click' }),
+      expect.anything(),
+    );
+  });
+
+  it('fiskal chek holati ko‘rinadi: NoOp → «Yuborilmagan»', () => {
+    renderApp(<PosPanel branchId="b1" patientId={null} />);
+    expect(screen.getByTestId('fiscal-state').textContent).toContain('Yuborilmagan');
+  });
 });

@@ -344,6 +344,13 @@
       "when": 1794399999000,
       "tag": "0048_recall_log_skipped_no_channel",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1794404203420,
+      "tag": "0049_cashier_card_provider",
+      "breakpoints": true
     }
   ]
 }

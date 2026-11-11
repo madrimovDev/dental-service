@@ -38,7 +38,7 @@ describe('CartTable', () => {
     expect(screen.queryByText('Terapiya')).toBeNull();
   });
 
-  it('soni va narx NumberInput tahrirlanadi (onUpdate chaqiriladi)', () => {
+  it('soni tahrirlanadi (onUpdate), narx QULFLANGAN (MO-02) — o‘zgartirib bo‘lmaydi', () => {
     const onUpdate = vi.fn();
     renderApp(<CartTable cart={[makeItem()]} onUpdate={onUpdate} onRemove={vi.fn()} />);
     const qty = screen.getByLabelText('Soni') as HTMLInputElement;
@@ -46,9 +46,12 @@ describe('CartTable', () => {
     fireEvent.change(qty, { target: { value: '3' } });
     expect(onUpdate).toHaveBeenCalledWith('s1', { quantity: 3 });
 
+    onUpdate.mockClear();
     const price = screen.getByLabelText('Narx') as HTMLInputElement;
+    expect(price.readOnly).toBe(true);
+    expect(price.value).toBe("50 000 so'm");
     fireEvent.change(price, { target: { value: '60 000' } });
-    expect(onUpdate).toHaveBeenCalledWith('s1', { unitPrice: 60000 });
+    expect(onUpdate).not.toHaveBeenCalled();
   });
 
   it('× remove tugma onRemove ni chaqiradi', () => {

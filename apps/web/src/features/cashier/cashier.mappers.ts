@@ -5,6 +5,7 @@ import type {
   ServicePrice,
 } from '@dental/api-client';
 import type {
+  CardProvider,
   CartItem,
   PlanBalanceVM,
   StageSelection,
@@ -34,6 +35,67 @@ export function netCashTotal(breakdown: Array<{ type: string; total: string | nu
   );
 }
 
+export type Tender = { paid: number; change: number; debt: number };
+
+/**
+ * Naqd qaytimi (sof). `received` — bemor bergan summa (null = to'liq to'lov).
+ * paid ≤ net (server `paidAmount` ni net'dan oshirmaymiz); qaytim FAQAT naqdda.
+ * Karta/o'tkazmada ortiqcha kiritilgan summa net'ga qirqiladi.
+ */
+export function computeTender(method: PaymentMethod, net: number, received: number | null): Tender {
+  if (received === null) return { paid: net, change: 0, debt: 0 };
+  const paid = Math.min(received, net);
+  const change = method === 'cash' ? Math.max(0, received - net) : 0;
+  return { paid, change, debt: Math.max(0, net - received) };
+}
+
+export type BreakdownRowLike = {
+  paymentMethod: string;
+  /** UI-R5: backend `cardProvider` (generated tip regeneratsiyagacha ixtiyoriy). */
+  cardProvider?: string | null;
+  type: string;
+  total: string | number;
+};
+
+export type DaySummary = {
+  cash: number;
+  card: number;
+  transfer: number;
+  other: number;
+  /** Karta sub-turlari bo'yicha SOF (payment − refund). `unspecified` = sub-tursiz karta. */
+  cardByProvider: Partial<Record<CardProvider | 'unspecified', number>>;
+  /** Jami qaytarilgan (musbat son). */
+  refunded: number;
+  /** Σ payment − Σ refund (`netCashTotal` bilan bir xil). */
+  net: number;
+};
+
+/** Kunlik breakdown → usullar bo'yicha SOF jamlar (refund har satrda ayiriladi). */
+export function summarizeBreakdown(rows: BreakdownRowLike[]): DaySummary {
+  const out: DaySummary = {
+    cash: 0,
+    card: 0,
+    transfer: 0,
+    other: 0,
+    cardByProvider: {},
+    refunded: 0,
+    net: netCashTotal(rows),
+  };
+  for (const r of rows) {
+    if (r.type !== 'payment' && r.type !== 'refund') continue;
+    const signed = r.type === 'refund' ? -Number(r.total) : Number(r.total);
+    if (r.type === 'refund') out.refunded += Number(r.total);
+    if (r.paymentMethod === 'cash') out.cash += signed;
+    else if (r.paymentMethod === 'transfer') out.transfer += signed;
+    else if (r.paymentMethod === 'card') {
+      out.card += signed;
+      const key = (r.cardProvider ?? 'unspecified') as CardProvider | 'unspecified';
+      out.cardByProvider[key] = (out.cardByProvider[key] ?? 0) + signed;
+    } else out.other += signed;
+  }
+  return out;
+}
+
 /** Savat jami − chegirma (manfiy bo'lmaydi). */
 export function computeNetTotal(cart: CartItem[], discount: number): number {
   const gross = cart.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
@@ -47,6 +109,8 @@ export type CreatePayload = {
   discount: number;
   paidAmount: number;
   paymentMethod: PaymentMethod;
+  /** Faqat `card` uchun (backend boshqa usulda 400 qaytaradi). */
+  cardProvider?: CardProvider;
   notes?: string;
 };
 
@@ -58,6 +122,7 @@ export function buildCreatePayload(input: {
   discount: number;
   paidAmount: number | null;
   paymentMethod: PaymentMethod;
+  cardProvider?: CardProvider | null;
   notes: string;
 }): CreatePayload {
   const netTotal = computeNetTotal(input.cart, input.discount);
@@ -73,6 +138,7 @@ export function buildCreatePayload(input: {
     discount: input.discount,
     paidAmount: input.paidAmount ?? netTotal,
     paymentMethod: input.paymentMethod,
+    cardProvider: input.paymentMethod === 'card' ? (input.cardProvider ?? undefined) : undefined,
     notes: input.notes || undefined,
   };
 }
@@ -111,6 +177,8 @@ export function buildAllocationPayload(input: {
 
 /** Tranzaksiya → VM (string pul → number). */
 export function toTransactionVM(tx: CashierTransaction): TransactionVM {
+  // `cardProvider` generated tipda regeneratsiyagacha yo'q — kengaytirilgan o'qish.
+  const ext = tx as CashierTransaction & { cardProvider?: CardProvider | null };
   return {
     id: tx.id,
     receiptNumber: tx.receiptNumber,
@@ -118,9 +186,11 @@ export function toTransactionVM(tx: CashierTransaction): TransactionVM {
     paidAmount: Number(tx.paidAmount),
     discount: Number(tx.discount),
     paymentMethod: tx.paymentMethod,
+    cardProvider: ext.cardProvider ?? null,
     type: tx.type,
     status: tx.status,
     createdAt: tx.createdAt,
+    fiscalSent: tx.fiscalReceiptId != null,
     refundable: tx.status === 'completed' && tx.type === 'payment',
     planLinked: tx.treatmentPlanId != null,
   };

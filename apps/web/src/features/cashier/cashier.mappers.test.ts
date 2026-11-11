@@ -254,3 +254,76 @@ describe('netCashTotal (P13)', () => {
     ).toBe(200000);
   });
 });
+
+describe('computeTender (UI-R5 qaytim)', () => {
+  it('naqd: bemor ortiq bersa qaytim, paid = net', async () => {
+    const { computeTender } = await import('./cashier.mappers');
+    expect(computeTender('cash', 650000, 700000)).toEqual({ paid: 650000, change: 50000, debt: 0 });
+  });
+
+  it('naqd: kam bersa qarz qoladi, qaytim 0', async () => {
+    const { computeTender } = await import('./cashier.mappers');
+    expect(computeTender('cash', 650000, 400000)).toEqual({
+      paid: 400000,
+      change: 0,
+      debt: 250000,
+    });
+  });
+
+  it('kiritilmagan summa = to‘liq to‘lov; karta/o‘tkazmada qaytim hech qachon yo‘q', async () => {
+    const { computeTender } = await import('./cashier.mappers');
+    expect(computeTender('cash', 650000, null)).toEqual({ paid: 650000, change: 0, debt: 0 });
+    expect(computeTender('card', 650000, 700000)).toEqual({ paid: 650000, change: 0, debt: 0 });
+    expect(computeTender('transfer', 650000, 100000)).toEqual({
+      paid: 100000,
+      change: 0,
+      debt: 550000,
+    });
+  });
+});
+
+describe('summarizeBreakdown (UI-R5 xulosa)', () => {
+  it('karta sub-turlar bo‘yicha bo‘linadi, refund har satrda ayiriladi, sof = P13 formulasi', async () => {
+    const { summarizeBreakdown, netCashTotal } = await import('./cashier.mappers');
+    const rows = [
+      { paymentMethod: 'cash', cardProvider: null, type: 'payment', total: '2450000' },
+      { paymentMethod: 'card', cardProvider: 'terminal', type: 'payment', total: '1600000' },
+      { paymentMethod: 'card', cardProvider: 'click', type: 'payment', total: '1400000' },
+      { paymentMethod: 'card', cardProvider: 'click', type: 'refund', total: '600000' },
+      { paymentMethod: 'card', cardProvider: null, type: 'payment', total: '100000' },
+    ];
+    const s = summarizeBreakdown(rows);
+    expect(s.cash).toBe(2450000);
+    expect(s.card).toBe(2500000); // 1600000 + 1400000 - 600000 + 100000
+    expect(s.cardByProvider).toEqual({
+      terminal: 1600000,
+      click: 800000,
+      unspecified: 100000,
+    });
+    expect(s.refunded).toBe(600000);
+    expect(s.net).toBe(netCashTotal(rows));
+    expect(s.net).toBe(4950000);
+  });
+});
+
+describe('toTransactionVM (UI-R5)', () => {
+  it('cardProvider va fiskal holat VMga o‘tadi', async () => {
+    const { toTransactionVM } = await import('./cashier.mappers');
+    const vm = toTransactionVM({
+      id: 't1',
+      receiptNumber: 'R-1',
+      totalAmount: '100',
+      paidAmount: '100',
+      discount: '0',
+      paymentMethod: 'card',
+      cardProvider: 'payme',
+      type: 'payment',
+      status: 'completed',
+      createdAt: '2026-01-01T00:00:00Z',
+      treatmentPlanId: null,
+      fiscalReceiptId: null,
+    } as never);
+    expect(vm.cardProvider).toBe('payme');
+    expect(vm.fiscalSent).toBe(false);
+  });
+});

@@ -57,7 +57,7 @@ describe('AccountantDashboard (DS1-T4 re-skin characterization)', () => {
     // by-service BarMini (haftalik tushum kartasi) saqlanadi
     expect(screen.getByText('Tozalash')).toBeInTheDocument();
     // kunlik kassa breakdown qatori (paymentMethod · type) saqlanadi
-    expect(screen.getByText('cash · income')).toBeInTheDocument();
+    expect(screen.getByText('Naqd pul · income')).toBeInTheDocument();
   });
 
   it('ruxsat bo‘lganda «Yangi yozilish» + «Kassa» tugmalarini ko‘rsatadi', async () => {
@@ -79,6 +79,6 @@ describe('AccountantDashboard (DS1-T4 re-skin characterization)', () => {
     expect(screen.queryByText('Yangi yozilish')).not.toBeInTheDocument();
     expect(screen.queryByText('Kassa')).not.toBeInTheDocument();
     // breakdown qatori hali ham render bo'ladi (xulq saqlanadi)
-    expect(screen.getByText('cash · income')).toBeInTheDocument();
+    expect(screen.getByText('Naqd pul · income')).toBeInTheDocument();
   });
 });
