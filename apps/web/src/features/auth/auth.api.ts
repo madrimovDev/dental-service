@@ -2,7 +2,6 @@ import {
   ApiError,
   acceptInvitation,
   bootstrapStatus,
-  customInstance,
   declineInvitation,
   getMe,
   getWorkspaceBranches,
@@ -10,6 +9,7 @@ import {
   login,
   registerTenant,
   registrationEnabled,
+  startPhoneVerification,
   switchWorkspace,
 } from '@dental/api-client';
 import { notifications } from '@mantine/notifications';
@@ -111,11 +111,9 @@ export type StartPhoneVerificationResult = {
 export function useStartPhoneVerification() {
   return useMutation<StartPhoneVerificationResult, ApiError, string>({
     mutationFn: (invitationId: string) =>
-      customInstance<{ data: StartPhoneVerificationResult }>({
-        url: '/api/auth/phone-verification/start',
-        method: 'POST',
-        data: { invitationId },
-      }).then((r) => r.data),
+      startPhoneVerification({ invitationId }).then(
+        (r) => r.data as unknown as StartPhoneVerificationResult,
+      ),
     onError: () => {},
   });
 }

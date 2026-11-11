@@ -38,6 +38,7 @@ describe('patients.mappers', () => {
       {
         ...base,
         balance: 150000,
+        nextAppointmentAt: null,
         noShowStrikes: 0,
         flagged: false,
         flags: { allergy: false, debt: false, noShows: 0, telegram: false },

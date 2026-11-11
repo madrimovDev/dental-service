@@ -23,6 +23,7 @@ export {
 export type { GetRecentActivityResult, ListAuditLogResult } from './generated/audit/audit.ts';
 // Generated (orval) — explicit re-export (coexistence: kolliziya nazorati)
 export { getRecentActivity, listAuditLog } from './generated/audit/audit.ts';
+export { startPhoneVerification } from './generated/auth/auth';
 // Generated (orval) — auth
 export type {
   BootstrapStatusResult,
@@ -535,6 +536,7 @@ export {
   listPatientImages,
   updatePatientImage,
 } from './generated/patient-images/patient-images.ts';
+export { importPatients } from './generated/patients/patients';
 // Generated (orval) — patients
 export type {
   AddPatientEmergencyContactResult,
@@ -637,6 +639,7 @@ export {
   markRecallContacted,
   updateRecall,
 } from './generated/recalls/recalls.ts';
+export { getReportBranches } from './generated/reports/reports';
 // Generated (orval) — reports
 export type {
   GetAppointmentStatsReportResult,

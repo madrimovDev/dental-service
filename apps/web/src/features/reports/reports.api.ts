@@ -1,5 +1,4 @@
 import {
-  customInstance,
   getAppointmentStatsReport,
   getDebtAgingReport,
   getDentalAnalyticsReport,
@@ -8,6 +7,7 @@ import {
   getOwnerTodayReport,
   getPlanCompletionReport,
   getPnlReport,
+  getReportBranches,
   getRevenueReport,
 } from '@dental/api-client';
 import { useQuery } from '@tanstack/react-query';
@@ -112,11 +112,7 @@ export type ReportBranches = {
 export function useReportBranches() {
   return useQuery({
     queryKey: reportKeys.branches(),
-    queryFn: () =>
-      customInstance<{ success: true; data: ReportBranches }>({
-        url: '/api/reports/branches',
-        method: 'GET',
-      }).then((r) => r.data),
+    queryFn: () => getReportBranches().then((r) => r.data as unknown as ReportBranches),
     retry: false,
   });
 }

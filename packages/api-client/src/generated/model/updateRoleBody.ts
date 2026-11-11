@@ -13,4 +13,5 @@ export type UpdateRoleBody = {
   name?: string;
   /** @maxLength 500 */
   description?: string;
+  isPractitioner?: boolean;
 };

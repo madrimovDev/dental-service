@@ -5,12 +5,12 @@ import {
   checkPatientPhone,
   confirmMedicalRecord,
   createPatient,
-  customInstance,
   getMedicalRecord,
   getMedicalRecordHistory,
   getPatient,
   getPatientBalance,
   getPatientNoShowStrikes,
+  importPatients,
   listCashierTransactions,
   listPatientEmergencyContacts,
   listPatientRelatives,
@@ -270,12 +270,8 @@ export async function runPatientImport(
 ): Promise<ImportResult> {
   const parts: ImportResult[] = [];
   for (const part of chunk(rows, IMPORT_CHUNK_SIZE)) {
-    const res = await customInstance<{ success: true; data: ImportResult }>({
-      url: '/api/patients/import',
-      method: 'POST',
-      data: { rows: part, dryRun },
-    });
-    parts.push(res.data);
+    const res = await importPatients({ rows: part, dryRun } as never);
+    parts.push(res.data as unknown as ImportResult);
   }
   return mergeImportResults(parts);
 }

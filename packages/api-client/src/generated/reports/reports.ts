@@ -20,6 +20,7 @@ import type {
   GetPlanCompletionReportParams,
   GetPnlReport200,
   GetPnlReportParams,
+  GetReportBranches200,
   GetRevenueReport200,
   GetRevenueReportParams
 } from '.././model';
@@ -28,6 +29,14 @@ import { customInstance } from '../../mutator';
 
 
 
+  export const getReportBranches = (
+    
+ ) => {
+      return customInstance<GetReportBranches200>(
+      {url: `/api/reports/branches`, method: 'GET'
+    },
+      );
+    }
   export const getRevenueReport = (
     params: GetRevenueReportParams,
  ) => {
@@ -108,7 +117,8 @@ import { customInstance } from '../../mutator';
     },
       );
     }
-  export type GetRevenueReportResult = NonNullable<Awaited<ReturnType<typeof getRevenueReport>>>
+  export type GetReportBranchesResult = NonNullable<Awaited<ReturnType<typeof getReportBranches>>>
+export type GetRevenueReportResult = NonNullable<Awaited<ReturnType<typeof getRevenueReport>>>
 export type GetAppointmentStatsReportResult = NonNullable<Awaited<ReturnType<typeof getAppointmentStatsReport>>>
 export type GetDoctorWorkloadReportResult = NonNullable<Awaited<ReturnType<typeof getDoctorWorkloadReport>>>
 export type GetPlanCompletionReportResult = NonNullable<Awaited<ReturnType<typeof getPlanCompletionReport>>>

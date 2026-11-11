@@ -8,6 +8,8 @@ import type { PatientListItemAllOfFlags } from './patientListItemAllOfFlags';
 
 export type PatientListItemAllOf = {
   balance: number;
+  /** @nullable */
+  nextAppointmentAt: string | null;
   noShowStrikes: number;
   flagged: boolean;
   flags: PatientListItemAllOfFlags;

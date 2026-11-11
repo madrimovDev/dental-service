@@ -22,6 +22,8 @@ import type {
   RegisterTenant201,
   RegisterTenantBody,
   RegistrationEnabled200,
+  StartPhoneVerification200,
+  StartPhoneVerificationRequest,
   SwitchWorkspace200,
   SwitchWorkspaceBody
 } from '.././model';
@@ -110,6 +112,16 @@ import { customInstance } from '../../mutator';
     },
       );
     }
+  export const startPhoneVerification = (
+    startPhoneVerificationRequest: StartPhoneVerificationRequest,
+ ) => {
+      return customInstance<StartPhoneVerification200>(
+      {url: `/api/auth/phone-verification/start`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: startPhoneVerificationRequest
+    },
+      );
+    }
   export const declineInvitation = (
     id: string,
  ) => {
@@ -155,6 +167,7 @@ export type GetMeResult = NonNullable<Awaited<ReturnType<typeof getMe>>>
 export type GetWorkspaceBranchesResult = NonNullable<Awaited<ReturnType<typeof getWorkspaceBranches>>>
 export type ListInvitationsResult = NonNullable<Awaited<ReturnType<typeof listInvitations>>>
 export type AcceptInvitationResult = NonNullable<Awaited<ReturnType<typeof acceptInvitation>>>
+export type StartPhoneVerificationResult = NonNullable<Awaited<ReturnType<typeof startPhoneVerification>>>
 export type DeclineInvitationResult = NonNullable<Awaited<ReturnType<typeof declineInvitation>>>
 export type SwitchWorkspaceResult = NonNullable<Awaited<ReturnType<typeof switchWorkspace>>>
 export type ChangePasswordResult = NonNullable<Awaited<ReturnType<typeof changePassword>>>
