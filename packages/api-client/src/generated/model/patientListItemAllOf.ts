@@ -4,9 +4,11 @@
  * Dental Service API
  * OpenAPI spec version: 0.1.0
  */
+import type { PatientListItemAllOfFlags } from './patientListItemAllOfFlags';
 
 export type PatientListItemAllOf = {
   balance: number;
   noShowStrikes: number;
   flagged: boolean;
+  flags: PatientListItemAllOfFlags;
 };

@@ -45,7 +45,11 @@ export function PatientsListScreen() {
   // PT-03: telefon/passport bo'yicha qidiruv faqat view_pii bilan ishlaydi — placeholder buni aytadi.
   const canSearchPii = hasPermission('patient.view_pii');
   // Kirill↔lotin: qidiruv o'zgartirilgan variantni ham topishini ko'rsatamiz.
-  const alsoVariant = searchVariants(searchInput)[1];
+  // Izoh — boshqa yozuvdagi (lotin↔kirill) birinchi variant; katta-kichik harf variantlari emas.
+  const inputIsCyr = /[\u0400-\u04FF]/.test(searchInput);
+  const alsoVariant = searchVariants(searchInput).find(
+    (v) => /[\u0400-\u04FF]/.test(v) !== inputIsCyr,
+  );
 
   const updateParams = (patch: Record<string, string | null>) => {
     const next = new URLSearchParams(searchParams);

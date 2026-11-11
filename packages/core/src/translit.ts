@@ -170,5 +170,23 @@ export const searchVariants = (search: string): string[] => {
   } else if (HAS_LATIN.test(term) && !HAS_CYRILLIC.test(term)) {
     variants.push(latinToCyrillic(term), latinToCyrillic(term, { hAs: 'ҳ' }));
   }
-  return [...new Set(variants)];
+  // Desktop Postgres `--locale=C` da ILIKE faqat ASCII harflarni katta-kichik
+  // farqlamay solishtiradi — kirill variantlarining katta harfli shakllarini ham
+  // qo'shamiz («турсун» → «Турсун», «ТУРСУН»), aks holda «Турсунбой» topilmaydi.
+  const withCase: string[] = [];
+  for (const v of variants) {
+    withCase.push(v);
+    if (HAS_CYRILLIC.test(v)) {
+      const lower = v.toLocaleLowerCase('ru');
+      withCase.push(
+        lower,
+        lower.replace(
+          /(^|\s)(\S)/g,
+          (_m, sp: string, ch: string) => sp + ch.toLocaleUpperCase('ru'),
+        ),
+        v.toLocaleUpperCase('ru'),
+      );
+    }
+  }
+  return [...new Set(withCase)];
 };

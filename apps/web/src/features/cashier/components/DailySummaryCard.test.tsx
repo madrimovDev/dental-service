@@ -14,9 +14,9 @@ const summary: DailySummary = {
   date: '2026-06-22',
   branchId: 'b1',
   breakdown: [
-    { paymentMethod: 'cash', type: 'payment', total: '300000', count: 3 },
-    { paymentMethod: 'card', type: 'payment', total: '100000', count: 1 },
-    { paymentMethod: 'cash', type: 'refund', total: '50000', count: 1 },
+    { paymentMethod: 'cash', type: 'payment', cardProvider: null, total: '300000', count: 3 },
+    { paymentMethod: 'card', type: 'payment', cardProvider: null, total: '100000', count: 1 },
+    { paymentMethod: 'cash', type: 'refund', cardProvider: null, total: '50000', count: 1 },
   ],
 };
 
@@ -58,8 +58,8 @@ describe('DailySummaryCard', () => {
       date: '2026-06-22',
       branchId: 'b1',
       breakdown: [
-        { paymentMethod: 'cash', type: 'payment', total: '300000', count: 3 },
-        { paymentMethod: 'card', type: 'payment', total: '100000', count: 1 },
+        { paymentMethod: 'cash', type: 'payment', cardProvider: null, total: '300000', count: 3 },
+        { paymentMethod: 'card', type: 'payment', cardProvider: null, total: '100000', count: 1 },
       ],
     };
     renderApp(<DailySummaryCard summary={noRefundSummary} />);

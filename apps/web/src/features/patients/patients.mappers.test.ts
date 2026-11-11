@@ -35,7 +35,13 @@ describe('patients.mappers', () => {
   });
   it('toPatientListItem gender label + tags + balance', () => {
     const vm = toPatientListItem(
-      { ...base, balance: 150000, noShowStrikes: 0, flagged: false },
+      {
+        ...base,
+        balance: 150000,
+        noShowStrikes: 0,
+        flagged: false,
+        flags: { allergy: false, debt: false, noShows: 0, telegram: false },
+      },
       (k) => k,
     );
     expect(vm.genderLabel).toBe('patients.gender.male');

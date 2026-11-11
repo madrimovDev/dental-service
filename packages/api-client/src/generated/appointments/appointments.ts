@@ -10,6 +10,8 @@ import type {
   CreateAppointment201,
   CreateAppointmentBody,
   GetAppointment200,
+  GetBookingContext200,
+  GetBookingContextParams,
   ListAppointments200,
   ListAppointmentsParams,
   ListDoctors200,
@@ -48,6 +50,15 @@ import { customInstance } from '../../mutator';
     },
       );
     }
+  export const getBookingContext = (
+    params: GetBookingContextParams,
+ ) => {
+      return customInstance<GetBookingContext200>(
+      {url: `/api/appointments/booking-context`, method: 'GET',
+        params
+    },
+      );
+    }
   export const getAppointment = (
     id: string,
  ) => {
@@ -81,6 +92,7 @@ import { customInstance } from '../../mutator';
   export type ListAppointmentsResult = NonNullable<Awaited<ReturnType<typeof listAppointments>>>
 export type CreateAppointmentResult = NonNullable<Awaited<ReturnType<typeof createAppointment>>>
 export type ListDoctorsResult = NonNullable<Awaited<ReturnType<typeof listDoctors>>>
+export type GetBookingContextResult = NonNullable<Awaited<ReturnType<typeof getBookingContext>>>
 export type GetAppointmentResult = NonNullable<Awaited<ReturnType<typeof getAppointment>>>
 export type UpdateAppointmentResult = NonNullable<Awaited<ReturnType<typeof updateAppointment>>>
 export type CancelAppointmentResult = NonNullable<Awaited<ReturnType<typeof cancelAppointment>>>

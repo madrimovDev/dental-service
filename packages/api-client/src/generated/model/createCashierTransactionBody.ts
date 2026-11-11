@@ -6,6 +6,7 @@
  */
 import type { CreateCashierTransactionBodyItemsItem } from './createCashierTransactionBodyItemsItem';
 import type { CreateCashierTransactionBodyPaymentMethod } from './createCashierTransactionBodyPaymentMethod';
+import type { CreateCashierTransactionBodyCardProvider } from './createCashierTransactionBodyCardProvider';
 import type { CreateCashierTransactionBodyAllocationsItem } from './createCashierTransactionBodyAllocationsItem';
 
 export type CreateCashierTransactionBody = {
@@ -23,6 +24,7 @@ export type CreateCashierTransactionBody = {
    */
   paidAmount: number | null;
   paymentMethod: CreateCashierTransactionBodyPaymentMethod;
+  cardProvider?: CreateCashierTransactionBodyCardProvider;
   /** @maxLength 1000 */
   notes?: string;
   treatmentPlanId?: string;

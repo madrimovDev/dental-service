@@ -5,6 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type {
+  CallOwnQueueTicket200,
   CreateQueueTicket201,
   CreateQueueTicketBody,
   GetCheckInCandidates200,
@@ -60,6 +61,14 @@ import { customInstance } from '../../mutator';
     },
       );
     }
+  export const callOwnQueueTicket = (
+    id: string,
+ ) => {
+      return customInstance<CallOwnQueueTicket200>(
+      {url: `/api/queue/${id}/call-own`, method: 'POST'
+    },
+      );
+    }
   export const sweepQueueNoShows = (
     sweepQueueNoShowsBody?: SweepQueueNoShowsBody,
  ) => {
@@ -74,4 +83,5 @@ import { customInstance } from '../../mutator';
 export type CreateQueueTicketResult = NonNullable<Awaited<ReturnType<typeof createQueueTicket>>>
 export type GetCheckInCandidatesResult = NonNullable<Awaited<ReturnType<typeof getCheckInCandidates>>>
 export type UpdateQueueTicketStatusResult = NonNullable<Awaited<ReturnType<typeof updateQueueTicketStatus>>>
+export type CallOwnQueueTicketResult = NonNullable<Awaited<ReturnType<typeof callOwnQueueTicket>>>
 export type SweepQueueNoShowsResult = NonNullable<Awaited<ReturnType<typeof sweepQueueNoShows>>>

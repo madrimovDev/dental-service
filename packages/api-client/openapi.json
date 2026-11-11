@@ -1305,12 +1305,36 @@
               },
               "flagged": {
                 "type": "boolean"
+              },
+              "flags": {
+                "type": "object",
+                "properties": {
+                  "allergy": {
+                    "type": "boolean"
+                  },
+                  "debt": {
+                    "type": "boolean"
+                  },
+                  "noShows": {
+                    "type": "integer"
+                  },
+                  "telegram": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "allergy",
+                  "debt",
+                  "noShows",
+                  "telegram"
+                ]
               }
             },
             "required": [
               "balance",
               "noShowStrikes",
-              "flagged"
+              "flagged",
+              "flags"
             ]
           }
         ]
@@ -1457,6 +1481,33 @@
           "archivedAt",
           "createdAt",
           "updatedAt"
+        ]
+      },
+      "PatientPhoneCheck": {
+        "type": "object",
+        "properties": {
+          "matches": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "fullName": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "fullName"
+              ]
+            }
+          }
+        },
+        "required": [
+          "matches"
         ]
       },
       "PatientBalance": {
@@ -2323,6 +2374,17 @@
               "other"
             ]
           },
+          "cardProvider": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "terminal",
+              "click",
+              "payme",
+              "other",
+              null
+            ]
+          },
           "type": {
             "type": "string",
             "enum": [
@@ -2374,6 +2436,7 @@
           "discount",
           "currency",
           "paymentMethod",
+          "cardProvider",
           "type",
           "parentTransactionId",
           "status",
@@ -2468,6 +2531,17 @@
                     "other"
                   ]
                 },
+                "cardProvider": {
+                  "type": "string",
+                  "nullable": true,
+                  "enum": [
+                    "terminal",
+                    "click",
+                    "payme",
+                    "other",
+                    null
+                  ]
+                },
                 "type": {
                   "type": "string",
                   "enum": [
@@ -2485,6 +2559,7 @@
               },
               "required": [
                 "paymentMethod",
+                "cardProvider",
                 "type",
                 "total",
                 "count"
@@ -3208,6 +3283,11 @@
             "type": "string",
             "format": "uuid"
           },
+          "patientName": {
+            "type": "string",
+            "nullable": true,
+            "example": "Ali Valiyev"
+          },
           "doctorId": {
             "type": "string",
             "format": "uuid"
@@ -3298,6 +3378,96 @@
         "required": [
           "id",
           "name"
+        ]
+      },
+      "BookingContext": {
+        "type": "object",
+        "properties": {
+          "openLabOrders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "labName": {
+                  "type": "string"
+                },
+                "orderType": {
+                  "type": "string",
+                  "example": "crown"
+                },
+                "status": {
+                  "type": "string",
+                  "example": "sent"
+                },
+                "expectedDate": {
+                  "type": "string",
+                  "nullable": true,
+                  "example": "2026-11-11T00:00:00.000Z"
+                }
+              },
+              "required": [
+                "id",
+                "labName",
+                "orderType",
+                "status",
+                "expectedDate"
+              ]
+            }
+          },
+          "nextPlanStage": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "planId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "planTitle": {
+                "type": "string"
+              },
+              "doctorId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "stageId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "sequence": {
+                "type": "integer"
+              },
+              "serviceId": {
+                "type": "string",
+                "nullable": true,
+                "format": "uuid"
+              },
+              "serviceName": {
+                "type": "string"
+              },
+              "estimatedDurationMinutes": {
+                "type": "integer",
+                "nullable": true
+              }
+            },
+            "required": [
+              "planId",
+              "planTitle",
+              "doctorId",
+              "stageId",
+              "sequence",
+              "serviceId",
+              "serviceName",
+              "estimatedDurationMinutes"
+            ]
+          }
+        },
+        "required": [
+          "openLabOrders",
+          "nextPlanStage"
         ]
       },
       "WorkingHoursSegmentDto": {
@@ -3545,6 +3715,12 @@
               "$ref": "#/components/schemas/AvailabilitySlot"
             }
           },
+          "unavailable": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UnavailableSlot"
+            }
+          },
           "workHoursConfigured": {
             "type": "boolean"
           }
@@ -3555,6 +3731,7 @@
           "date",
           "slotMinutes",
           "slots",
+          "unavailable",
           "workHoursConfigured"
         ]
       },
@@ -3583,6 +3760,32 @@
           "end",
           "startMinute",
           "endMinute"
+        ]
+      },
+      "UnavailableSlot": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AvailabilitySlot"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "reason": {
+                "type": "string",
+                "enum": [
+                  "past",
+                  "busy",
+                  "lunch",
+                  "time_off",
+                  "too_short"
+                ],
+                "example": "busy"
+              }
+            },
+            "required": [
+              "reason"
+            ]
+          }
         ]
       },
       "BranchAvailability": {
@@ -3805,6 +4008,26 @@
           "cancellationReason",
           "createdAt",
           "updatedAt"
+        ]
+      },
+      "QueueTicketUpdateResult": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/QueueTicket"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "appointmentSyncError": {
+                "type": "string",
+                "nullable": true,
+                "example": null
+              }
+            },
+            "required": [
+              "appointmentSyncError"
+            ]
+          }
         ]
       },
       "RecallDto": {
@@ -10026,6 +10249,82 @@
         }
       }
     },
+    "/api/patients/phone-check": {
+      "get": {
+        "tags": [
+          "patients"
+        ],
+        "operationId": "checkPatientPhone",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 40
+            },
+            "required": true,
+            "name": "phone",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Patients already registered with this phone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/PatientPhoneCheck"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/patients/{id}": {
       "get": {
         "tags": [
@@ -12761,6 +13060,15 @@
                       "other"
                     ]
                   },
+                  "cardProvider": {
+                    "type": "string",
+                    "enum": [
+                      "terminal",
+                      "click",
+                      "payme",
+                      "other"
+                    ]
+                  },
                   "notes": {
                     "type": "string",
                     "maxLength": 1000
@@ -14375,6 +14683,82 @@
         }
       }
     },
+    "/api/appointments/booking-context": {
+      "get": {
+        "tags": [
+          "appointments"
+        ],
+        "operationId": "getBookingContext",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "patientId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Booking context for a patient",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/BookingContext"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/appointments/{id}": {
       "get": {
         "tags": [
@@ -15650,7 +16034,7 @@
                       ]
                     },
                     "data": {
-                      "$ref": "#/components/schemas/QueueTicket"
+                      "$ref": "#/components/schemas/QueueTicketUpdateResult"
                     }
                   },
                   "required": [
@@ -15683,6 +16067,92 @@
           },
           "403": {
             "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Queue ticket not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/queue/{id}/call-own": {
+      "post": {
+        "tags": [
+          "queue"
+        ],
+        "operationId": "callOwnQueueTicket",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Called queue ticket",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/QueueTicketUpdateResult"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid status transition",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not the doctor of this ticket",
             "content": {
               "application/json": {
                 "schema": {

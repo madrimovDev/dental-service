@@ -5,10 +5,13 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { DailySummaryBreakdownItemPaymentMethod } from './dailySummaryBreakdownItemPaymentMethod';
+import type { DailySummaryBreakdownItemCardProvider } from './dailySummaryBreakdownItemCardProvider';
 import type { DailySummaryBreakdownItemType } from './dailySummaryBreakdownItemType';
 
 export type DailySummaryBreakdownItem = {
   paymentMethod: DailySummaryBreakdownItemPaymentMethod;
+  /** @nullable */
+  cardProvider: DailySummaryBreakdownItemCardProvider;
   type: DailySummaryBreakdownItemType;
   total: string;
   count: number;

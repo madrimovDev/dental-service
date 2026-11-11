@@ -48,11 +48,11 @@ describe('latinToCyrillic', () => {
 
 describe('searchVariants', () => {
   it('kirill → asl + lotin', () => {
-    expect(searchVariants('турсун')).toEqual(['турсун', 'tursun']);
+    expect(searchVariants('турсун')).toEqual(expect.arrayContaining(['турсун', 'tursun']));
   });
 
   it('lotin → asl + kirill', () => {
-    expect(searchVariants('Tursun')).toEqual(['Tursun', 'Турсун']);
+    expect(searchVariants('Tursun')).toEqual(expect.arrayContaining(['Tursun', 'Турсун']));
   });
 
   it('raqam/belgi — bitta variant', () => {
@@ -61,5 +61,17 @@ describe('searchVariants', () => {
 
   it('bo‘sh → bo‘sh', () => {
     expect(searchVariants('  ')).toEqual([]);
+  });
+});
+
+describe('searchVariants — C-locale kirill katta-kichik harf (desktop)', () => {
+  it("lotin 'tursun' kirillning bosh harfli va katta shakllarini ham beradi", () => {
+    const v = searchVariants('tursun');
+    expect(v).toContain('турсун');
+    expect(v).toContain('Турсун');
+    expect(v).toContain('ТУРСУН');
+  });
+  it("kirill 'турсун' o'zining bosh harfli shaklini beradi", () => {
+    expect(searchVariants('турсун')).toContain('Турсун');
   });
 });
