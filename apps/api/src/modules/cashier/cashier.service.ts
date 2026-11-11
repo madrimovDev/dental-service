@@ -3,6 +3,7 @@ import {
   cashierTransactionItems,
   cashierTransactions,
   expenses,
+  patients,
   tenantSettings,
   treatmentPlans,
   treatmentStagePayments,
@@ -81,6 +82,22 @@ export class NoActivePriceError extends Error {
  * CLI-444: `discount` erkin POS itemsGross'dan katta bo'lganda routes 400 ga
  * aylantiradi — avvalgi jim `Math.max(0, ...)` clamp o'rniga.
  */
+/** P7: erkin POS (items) rejimida `treatmentPlanId` berilsa — routes 400. */
+export class ItemsPlanNotAllowedError extends Error {
+  constructor() {
+    super('treatmentPlanId is not allowed for free POS sale (items)');
+    this.name = 'ItemsPlanNotAllowedError';
+  }
+}
+
+/** P7: berilgan `patientId` joriy tenantda (RLS) mavjud emas — routes 400. */
+export class PatientNotFoundError extends Error {
+  constructor() {
+    super('Patient not found');
+    this.name = 'PatientNotFoundError';
+  }
+}
+
 export class DiscountExceedsTotalError extends Error {
   constructor() {
     super('Discount exceeds items gross total');
@@ -226,6 +243,20 @@ export const createCashierService = (deps: {
     const tenantId = c.get('activeTenantId');
     const user = c.get('user');
     if (!tenantId) throw new Error('No tenant context');
+
+    // P7: erkin POS (items, allocations yo'q) rejimida reja bog'lanmaydi va
+    // patientId DB'dan (RLS) tekshiriladi.
+    if (input.items.length > 0 && !(input.allocations && input.allocations.length > 0)) {
+      if (input.treatmentPlanId) throw new ItemsPlanNotAllowedError();
+      if (input.patientId) {
+        const [p] = await db
+          .select({ id: patients.id })
+          .from(patients)
+          .where(eq(patients.id, input.patientId))
+          .limit(1);
+        if (!p) throw new PatientNotFoundError();
+      }
+    }
 
     // CLI-443: POS item narxi client'dan ISHONCH bilan qabul qilinmaydi — har
     // item uchun SERVERDA `getActivePrice(serviceId, branchId)` orqali hisoblanadi.
