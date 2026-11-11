@@ -14,13 +14,14 @@ import {
   useUpsertRole,
   useUsers,
 } from '../settings.api';
+import { summarizeRole } from '../settings.roleCapabilities';
 import { ConfirmModal } from './ConfirmModal';
 import { PermissionBuilder } from './PermissionBuilder';
 import { RoleFormModal } from './RoleFormModal';
 import { SettingsShell } from './SettingsShell';
 
 export function RolesSettingsScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { hasPermission } = useAuthStore();
   const roles = useRoles();
   const permissions = usePermissions();
@@ -59,6 +60,11 @@ export function RolesSettingsScreen() {
     }
     return map;
   }, [users.data]);
+
+  const capabilities = useMemo(
+    () => summarizeRole(selectedPerms, permissions.data ?? [], i18n.language),
+    [selectedPerms, permissions.data, i18n.language],
+  );
 
   const openCreate = () => {
     setEditing(null);
@@ -244,6 +250,27 @@ export function RolesSettingsScreen() {
                   </div>
                 )}
               </div>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: 12,
+                  padding: '14px 18px 0',
+                }}
+              >
+                <CapabilityCard
+                  testId="role-can"
+                  title={t('staffCards.can')}
+                  items={capabilities.can}
+                  tone="ok"
+                />
+                <CapabilityCard
+                  testId="role-cannot"
+                  title={t('staffCards.cannot')}
+                  items={capabilities.cannot}
+                  tone="muted"
+                />
+              </div>
               <div style={{ padding: '6px 18px 18px' }}>
                 <PermissionBuilder
                   permissions={permissions.data ?? []}
@@ -275,5 +302,47 @@ export function RolesSettingsScreen() {
         loading={deleteRole.isPending}
       />
     </SettingsShell>
+  );
+}
+
+function CapabilityCard({
+  title,
+  items,
+  tone,
+  testId,
+}: {
+  title: string;
+  items: string[];
+  tone: 'ok' | 'muted';
+  testId: string;
+}) {
+  return (
+    <div
+      data-testid={testId}
+      style={{
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius-card)',
+        padding: '12px 14px',
+        background: tone === 'ok' ? 'var(--primary-soft)' : 'var(--surface)',
+      }}
+    >
+      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>
+        {title} ({items.length})
+      </div>
+      <ul
+        style={{
+          margin: 0,
+          paddingLeft: 16,
+          fontSize: 12,
+          color: tone === 'ok' ? 'var(--ink)' : 'var(--ink-3)',
+          maxHeight: 140,
+          overflowY: 'auto',
+        }}
+      >
+        {items.map((i) => (
+          <li key={i}>{i}</li>
+        ))}
+      </ul>
+    </div>
   );
 }

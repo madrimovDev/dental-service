@@ -1,5 +1,5 @@
 import { ApiError } from '@dental/api-client';
-import { StatusPill } from '@dental/ui';
+import { StatusPill, Tag } from '@dental/ui';
 import {
   ActionIcon,
   Alert,
@@ -26,10 +26,13 @@ import {
   useInviteUser,
   useRemoveAssignment,
   useResetPassword,
+  useRolePermissionMap,
   useRoles,
+  useTenant,
   useUsers,
 } from '../settings.api';
 import { filterAssignments } from '../settings.mappers';
+import { canGrantRole } from '../settings.roleCapabilities';
 import { type InviteFormValues, makeInviteSchema } from '../settings.schema';
 import type { UsersFilter } from '../settings.types';
 import { ConfirmModal } from './ConfirmModal';
@@ -43,6 +46,12 @@ export function UsersSettingsScreen() {
   const assignments = useUsers();
   const roles = useRoles();
   const branches = useBranches();
+  const tenant = useTenant();
+  const rolePerms = useRolePermissionMap(
+    (roles.data ?? []).map((r) => r.id),
+    hasPermission('user.invite'),
+  );
+  const ownerUserId = tenant.data?.ownerUserId;
   const invite = useInviteUser();
   const removeAssignment = useRemoveAssignment();
   const resetPassword = useResetPassword();
@@ -161,9 +170,12 @@ export function UsersSettingsScreen() {
                 {filtered.map((a) => (
                   <Table.Tr key={a.assignmentId}>
                     <Table.Td>
-                      <Text truncate maw={220}>
-                        {a.userFullName ?? '—'}
-                      </Text>
+                      <Group gap="xs" wrap="nowrap">
+                        <Text truncate maw={220}>
+                          {a.userFullName ?? '—'}
+                        </Text>
+                        {a.userId === ownerUserId && <Tag>{t('staffCards.owner')}</Tag>}
+                      </Group>
                     </Table.Td>
                     <Table.Td>{a.userPhone}</Table.Td>
                     <Table.Td>{a.roleName}</Table.Td>
@@ -195,24 +207,28 @@ export function UsersSettingsScreen() {
                             <IconUserCog size={16} />
                           </ActionIcon>
                         )}
-                        {isOwner && !a.pending && a.userId !== currentUser?.id && (
-                          <ActionIcon
-                            variant="subtle"
-                            color="gray"
-                            style={{ color: 'var(--info)' }}
-                            onClick={() => setToReset(a.userId)}
-                            title={t('users.reset_password')}
-                            aria-label={t('users.reset_password')}
-                          >
-                            <IconKey size={16} />
-                          </ActionIcon>
-                        )}
-                        {hasPermission('user.manage') && (
+                        {isOwner &&
+                          !a.pending &&
+                          a.userId !== currentUser?.id &&
+                          a.userId !== ownerUserId && (
+                            <ActionIcon
+                              variant="subtle"
+                              color="gray"
+                              style={{ color: 'var(--info)' }}
+                              onClick={() => setToReset(a.userId)}
+                              title={t('users.reset_password')}
+                              aria-label={t('users.reset_password')}
+                            >
+                              <IconKey size={16} />
+                            </ActionIcon>
+                          )}
+                        {hasPermission('user.manage') && a.userId !== ownerUserId && (
                           <ActionIcon
                             variant="subtle"
                             color="red"
                             onClick={() => setToRemove(a.assignmentId)}
-                            aria-label={t('common.delete')}
+                            title={t('staffCards.deactivate')}
+                            aria-label={t('staffCards.deactivate')}
                           >
                             <IconTrash size={16} />
                           </ActionIcon>
@@ -234,6 +250,9 @@ export function UsersSettingsScreen() {
             <Alert color="teal" variant="light">
               <Text fw={600}>{t('users.invited_successfully')}</Text>
               <Text size="sm">{t('users.temp_password_notice')}</Text>
+              <Text size="sm" fw={600}>
+                {t('staffCards.shownOnce')}
+              </Text>
               <Text mt="sm" fw={700} ff="var(--font-mono)" size="lg">
                 {tempPassword}
               </Text>
@@ -256,7 +275,24 @@ export function UsersSettingsScreen() {
               <PhoneInput label={t('users.phone')} required {...form.getInputProps('phone')} />
               <Select
                 label={t('users.role')}
-                data={roles.data?.map((r) => ({ value: r.id, label: r.name })) ?? []}
+                description={t('staffCards.grantHint')}
+                data={
+                  roles.data?.map((r) => {
+                    const perms = rolePerms.get(r.id);
+                    // Ruxsatlar yuklanmaguncha cheklanmaydi; haqiqiy to'siq — server (P5).
+                    const allowed = !perms || canGrantRole(permissions, perms);
+                    return {
+                      value: r.id,
+                      label: allowed ? r.name : `${r.name} — ${t('staffCards.cannotGrant')}`,
+                      disabled: !allowed,
+                    };
+                  }) ?? []
+                }
+                renderOption={({ option }) => (
+                  <span aria-disabled={'disabled' in option && option.disabled ? true : undefined}>
+                    {option.label}
+                  </span>
+                )}
                 required
                 {...form.getInputProps('roleId')}
               />
@@ -315,7 +351,7 @@ export function UsersSettingsScreen() {
         onConfirm={() => {
           if (toRemove) removeAssignment.mutate(toRemove, { onSuccess: () => setToRemove(null) });
         }}
-        message={t('users.confirm_remove')}
+        message={t('staffCards.confirmDeactivate')}
         loading={removeAssignment.isPending}
       />
 

@@ -8,5 +8,6 @@ export const settingsKeys = {
   branches: () => ['settings', 'branches'] as const,
   tenant: () => ['settings', 'tenant'] as const,
   tenantSettings: () => ['tenant-settings'] as const,
+  readiness: () => ['tenant-settings', 'readiness'] as const,
   tenantVertical: () => ['tenant-vertical'] as const,
 };

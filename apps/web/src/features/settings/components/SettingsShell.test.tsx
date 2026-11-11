@@ -1,7 +1,10 @@
-import { fireEvent, screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderApp } from '../../../test-utils';
 import { SettingsShell } from './SettingsShell';
+
+const readinessMock = vi.fn();
+vi.mock('../settings.readiness.api', () => ({ useTenantReadiness: () => readinessMock() }));
 
 const navigateMock = vi.fn();
 vi.mock('react-router-dom', async () => {
@@ -15,6 +18,8 @@ vi.mock('@/stores/auth-store.ts', () => ({
 }));
 
 describe('SettingsShell', () => {
+  beforeEach(() => readinessMock.mockReturnValue({ data: undefined }));
+
   it('left-nav: eyebrow + 6 nav buttonni ko’rsatadi', () => {
     hasPermissionMock.mockReturnValue(true);
     renderApp(
@@ -60,5 +65,34 @@ describe('SettingsShell', () => {
     expect(within(nav).queryByText('Xodimlar')).not.toBeInTheDocument();
     // tenant (1) + notify/integrations gated on tenant_settings.view (0) = 1 visible button.
     expect(within(nav).getAllByRole('button')).toHaveLength(1);
+  });
+
+  it('readiness: N/total, bo’lim badge’i va desktopda zaxira placeholder', async () => {
+    hasPermissionMock.mockReturnValue(true);
+    readinessMock.mockReturnValue({
+      data: {
+        items: [
+          { key: 'workHours', ok: false },
+          { key: 'doctorSchedule', ok: true },
+          { key: 'channel', ok: true },
+          { key: 'staff', ok: true },
+          { key: 'license', ok: true },
+          { key: 'backup', ok: false },
+        ],
+      },
+    });
+    renderApp(
+      <SettingsShell active="tenant">
+        <div>content</div>
+      </SettingsShell>,
+    );
+    expect(screen.getByTestId('readiness-count')).toHaveTextContent('4/6');
+    // Filiallar: workHours ok emas -> todo badge; Klinika (license): ok
+    const nav = screen.getByRole('navigation');
+    const branchesBtn = within(nav).getByText('Filiallar').closest('button') as HTMLElement;
+    expect(within(branchesBtn).getByTestId('tab-badge-todo')).toBeInTheDocument();
+    const tenantBtn = within(nav).getByText('Klinika').closest('button') as HTMLElement;
+    expect(within(tenantBtn).getByTestId('tab-badge-ok')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByLabelText('Zaxira nusxa')).toBeInTheDocument());
   });
 });

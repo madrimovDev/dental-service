@@ -53,12 +53,24 @@ vi.mock('../settings.api', () => ({
       },
     ],
   }),
-  useRoles: () => ({ data: [] }),
+  useRoles: () => ({
+    data: [
+      { id: 'r-low', name: 'Receptionist' },
+      { id: 'r-high', name: 'Accountant' },
+    ],
+  }),
+  useTenant: () => ({ data: { ownerUserId: ownerId.value } }),
+  useRolePermissionMap: () =>
+    new Map([
+      ['r-low', ['patient.view']],
+      ['r-high', ['patient.view', 'cashier.refund']],
+    ]),
   useBranches: () => ({ data: [] }),
   useInviteUser: () => ({ mutate: inviteMutate, isPending: false }),
   useRemoveAssignment: () => ({ mutate: vi.fn(), isPending: false }),
   useResetPassword: () => ({ mutate: vi.fn(), isPending: false }),
 }));
+const ownerId = vi.hoisted(() => ({ value: 'u-none' }));
 const perms = vi.hoisted(() => ({ value: ['@owner'] as string[] }));
 vi.mock('@/stores/auth-store.ts', () => ({
   useAuthStore: () => ({
@@ -110,5 +122,35 @@ describe('UsersSettingsScreen', () => {
     ).toBe('waiting'); // UI-0: StatusPill waiting
     // 2 ta qabul qilingan a'zo uchun reset, kutilayotgan uchun yo'q
     expect(screen.getAllByLabelText('Parolni qayta tiklash')).toHaveLength(2);
+  });
+
+  it("egasi ro'yxatda «Egasi» belgisi bilan, unda faolsizlantirish/reset yo'q (ID-28)", () => {
+    perms.value = ['@owner'];
+    ownerId.value = 'u1';
+    renderApp(<UsersSettingsScreen />);
+    expect(screen.getByText('Egasi')).toBeInTheDocument();
+    // u1 (egasi) uchun reset yo'q: 3 xodimdan faqat u2 (u3 kutilmoqda)
+    expect(screen.getAllByLabelText('Parolni qayta tiklash')).toHaveLength(1);
+    expect(screen.getAllByLabelText('Faolsizlantirish')).toHaveLength(2);
+    ownerId.value = 'u-none';
+  });
+
+  it("ruxsat etilmagan rol aria-disabled (assertCanGrant ko'zgusi, owner emas)", async () => {
+    perms.value = ['user.invite', 'patient.view'];
+    renderApp(<UsersSettingsScreen />);
+    fireEvent.click(screen.getByText("Xodim qo'shish"));
+    const roleInput = (await screen.findAllByLabelText(/^Rol\s*\*?$/))[0] as HTMLElement;
+    fireEvent.click(roleInput);
+    await screen.findAllByText(/Accountant/);
+    const opts = screen.getAllByRole('option', { hidden: true });
+    const high = opts.find(
+      (o) => o.textContent?.includes('Accountant') && o.textContent.includes('berib'),
+    );
+    const low = opts.find((o) => o.textContent === 'Receptionist');
+    expect(high?.querySelector('[aria-disabled="true"]')).not.toBeNull();
+    expect(high?.getAttribute('data-combobox-disabled')).toBe('true');
+    expect(low).toBeDefined();
+    expect(low?.querySelector('[aria-disabled="true"]')).toBeNull();
+    perms.value = ['@owner'];
   });
 });

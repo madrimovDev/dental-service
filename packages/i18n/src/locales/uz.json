@@ -2113,5 +2113,31 @@
       "recall": "Qayta chaqiruvdan keyin qabulga yozilgan yoki yakunlanganlar ulushi.",
       "plans": "Davrda yaratilgan qabul qilingan rejalarning bosqichlari: bajarilgan / jami."
     }
+  },
+  "settingsShell": {
+    "readinessTitle": "Klinika ishga tayyorligi",
+    "readinessCount": "{{ok}}/{{total}}",
+    "readinessAllDone": "Klinika to'liq sozlangan",
+    "ready": "Tayyor",
+    "todo": "Sozlanmagan",
+    "item_workHours": "Filial ish soati",
+    "item_doctorSchedule": "Shifokor jadvali",
+    "item_servicePrices": "Xizmat narxlari",
+    "item_channel": "Xabar kanali (Telegram/SMS)",
+    "item_staff": "Xodimlar",
+    "item_license": "Litsenziya / obuna",
+    "item_backup": "Zaxira nusxa",
+    "backupSection": "Zaxira nusxa",
+    "backupPlaceholder": "Zaxira bo'limi tez orada."
+  },
+  "staffCards": {
+    "can": "Qila oladi",
+    "cannot": "Qila olmaydi",
+    "owner": "Egasi",
+    "deactivate": "Faolsizlantirish",
+    "confirmDeactivate": "Xodim shu filialda faolsizlantirilsinmi? U tizimga kira olmaydi.",
+    "shownOnce": "Parol faqat bir marta ko'rsatiladi — yopilgach qayta ko'rib bo'lmaydi.",
+    "grantHint": "O'zingizda yo'q ruxsatli rolni bera olmaysiz.",
+    "cannotGrant": "berib bo'lmaydi"
   }
 }
