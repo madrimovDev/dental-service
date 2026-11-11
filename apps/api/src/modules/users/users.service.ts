@@ -482,7 +482,14 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
 
       await tx
         .update(users)
-        .set({ passwordHash: newHash, mustChangePassword: true, updatedAt: now })
+        // FU-15: parolni boshqa odam (owner) bildi — telefon tasdig'i bekor: keyingi
+        // begona klinika taklifini qabul qilish uchun egasi yana Telegram orqali tasdiqlaydi.
+        .set({
+          passwordHash: newHash,
+          mustChangePassword: true,
+          phoneVerifiedAt: null,
+          updatedAt: now,
+        })
         .where(eq(users.id, targetUserId));
 
       // Barcha refresh tokenlarni revoke (boshqa qurilmalardan logout)

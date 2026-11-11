@@ -145,6 +145,8 @@ export const membershipsResponseSchema = z
         tenantSlug: z.string(),
       }),
     ),
+    /** FU-15: telefon Telegram orqali tasdiqlanganmi (taklifni qabul qilish sharti). */
+    phoneVerified: z.boolean(),
   })
   .openapi('MembershipsResponse');
 export type MembershipsResponseDto = z.infer<typeof membershipsResponseSchema>;
@@ -186,3 +188,18 @@ export const acceptInvitationResponseSchema = z
 export const declineInvitationResponseSchema = z
   .object({ declined: z.literal(true) })
   .openapi('DeclineInvitationResponse');
+
+/** FU-15 — `POST /phone-verification/start` so'rovi: qaysi taklif uchun (qaysi klinika boti). */
+export const startPhoneVerificationSchema = z
+  .object({ invitationId: z.uuid() })
+  .openapi('StartPhoneVerificationRequest');
+
+export const startPhoneVerificationResponseSchema = z
+  .object({
+    /** Telefon allaqachon tasdiqlangan — yangi token yaratilmadi. */
+    alreadyVerified: z.boolean(),
+    /** `https://t.me/<bot>?start=pv_<token>` (bir martalik, 15 daqiqa). */
+    deepLink: z.string().nullable(),
+    expiresAt: z.iso.datetime().nullable(),
+  })
+  .openapi('StartPhoneVerificationResponse');

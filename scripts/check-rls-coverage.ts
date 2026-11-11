@@ -23,7 +23,15 @@ const RLS_DIR = join(import.meta.dir, '..', 'apps', 'api', 'migrations', 'rls');
  * Bu list'ga yangi jadval qo'shilsa, ehtiyot bo'ling: tenant izolyatsiyasi
  * shu jadval orqali sizib chiqishi mumkin.
  */
-const PLATFORM_TABLES = new Set(['users', 'tenants', 'permissions', 'refresh_tokens']);
+// FU-15: `phone_verifications` — foydalanuvchi darajasidagi tasdiq tokenlari; `tenant_id`
+// faqat qaysi klinika boti ekanini bildiradi (tenant ma'lumoti emas).
+const PLATFORM_TABLES = new Set([
+  'users',
+  'tenants',
+  'permissions',
+  'refresh_tokens',
+  'phone_verifications',
+]);
 
 async function findTablesWithTenantId(): Promise<{ name: string; file: string }[]> {
   const files = (await readdir(SCHEMA_DIR)).filter((f) => f.endsWith('.ts'));

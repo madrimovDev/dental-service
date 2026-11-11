@@ -9,18 +9,27 @@ import {
   auditLog,
   branches,
   permissions as permissionsTable,
+  phoneVerifications,
   refreshTokens,
   rolePermissions,
   roles,
+  tenantSettings,
   tenants,
   userAssignments,
   users,
 } from '@dental/db-schema';
 import { and, asc, eq, gt, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import type { Database, DbTransaction } from '../../db/client.ts';
+import { decryptSecret } from '../../lib/crypto.ts';
 import { signAccess, signRefresh, verifyRefresh } from '../../lib/jwt.ts';
 import { logger } from '../../lib/logger.ts';
 import { hashPassword, verifyPassword } from '../../lib/password.ts';
+import { fetchBotUsername } from '../../lib/telegram/bot-info.ts';
+import {
+  hashVerificationToken,
+  PHONE_VERIFICATION_TTL_MS,
+  PV_START_PREFIX,
+} from '../../lib/telegram/phone-verify.ts';
 import { DEFAULT_WORK_HOURS } from '../branches/branches.defaults.ts';
 import type {
   ChangePasswordInput,
@@ -268,10 +277,13 @@ async function buildPermissionsForContext(
 
 export type AuthServiceDeps = {
   db: Database;
+  /** FU-15 DI: bot username (Telegram `getMe`). Default — real Telegram API. */
+  resolveBotUsername?: (token: string) => Promise<string | null>;
 };
 
 export const createAuthService = (deps: AuthServiceDeps) => {
   const { db } = deps;
+  const resolveBotUsername = deps.resolveBotUsername ?? fetchBotUsername;
 
   async function registerTenant(input: RegisterTenantInput) {
     // Atomic transaction: user + tenant + branch + 8 role templates + (no owner assignment row).
@@ -423,7 +435,13 @@ export const createAuthService = (deps: AuthServiceDeps) => {
         .from(tenants)
         .where(eq(tenants.ownerUserId, userId));
 
-      return { assignments: result, ownerTenants };
+      // FU-15: telefon Telegram orqali tasdiqlanganmi (taklifni qabul qilish sharti).
+      const [me] = await tx
+        .select({ phoneVerifiedAt: users.phoneVerifiedAt })
+        .from(users)
+        .where(eq(users.id, userId));
+
+      return { assignments: result, ownerTenants, phoneVerified: !!me?.phoneVerifiedAt };
     });
   }
 
@@ -529,23 +547,27 @@ export const createAuthService = (deps: AuthServiceDeps) => {
     assignmentId: string,
     decision: 'accept' | 'decline',
     meta: InvitationMeta,
-  ): Promise<{ id: string; tenantId: string } | null> {
+  ): Promise<
+    { status: 'ok'; id: string; tenantId: string } | { status: 'not_found' | 'phone_unverified' }
+  > {
     return await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT set_config('app.current_user_id', ${userId}, true)`);
 
-      const [pending] = await tx
-        .select()
-        .from(userAssignments)
-        .where(
-          and(
-            eq(userAssignments.id, assignmentId),
-            eq(userAssignments.userId, userId),
-            eq(userAssignments.isActive, true),
-            isNull(userAssignments.acceptedAt),
-            or(isNull(userAssignments.validTo), gt(userAssignments.validTo, new Date())),
-          ),
-        );
-      if (!pending) return null;
+      const pending = await findPendingInvitation(tx, userId, assignmentId);
+      if (!pending) return { status: 'not_found' as const };
+
+      // FU-15: boshqa klinika taklifini qabul qilish — telefon egaligi isbotlangan bo'lishi
+      // shart. Aks holda hisobni yaratgan klinika (vaqtinchalik parolni biladi) shu hisob
+      // bilan kirib, begona klinika taklifini qabul qilib, uning ma'lumotiga kira olardi.
+      // Tekshiruv taklif topilgandan KEYIN — begona id'da 404 (mavjudligi oshkor emas).
+      // Rad etish hech narsa bermaydi — tasdiqsiz ruxsat.
+      if (decision === 'accept') {
+        const [u] = await tx
+          .select({ v: users.phoneVerifiedAt })
+          .from(users)
+          .where(eq(users.id, userId));
+        if (!u?.v) return { status: 'phone_unverified' as const };
+      }
 
       await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${pending.tenantId}, true)`);
 
@@ -565,7 +587,7 @@ export const createAuthService = (deps: AuthServiceDeps) => {
           ),
         )
         .returning({ id: userAssignments.id, tenantId: userAssignments.tenantId });
-      if (!updated) return null;
+      if (!updated) return { status: 'not_found' as const };
 
       await tx.insert(auditLog).values({
         tenantId: pending.tenantId,
@@ -584,8 +606,88 @@ export const createAuthService = (deps: AuthServiceDeps) => {
         userAgent: meta.userAgent,
       });
 
-      return updated;
+      return { status: 'ok' as const, ...updated };
     });
+  }
+
+  /** Foydalanuvchining shu id'li kutilayotgan (qabul qilinmagan, aktiv) taklifi. */
+  async function findPendingInvitation(tx: DbTransaction, userId: string, assignmentId: string) {
+    const [pending] = await tx
+      .select()
+      .from(userAssignments)
+      .where(
+        and(
+          eq(userAssignments.id, assignmentId),
+          eq(userAssignments.userId, userId),
+          eq(userAssignments.isActive, true),
+          isNull(userAssignments.acceptedAt),
+          or(isNull(userAssignments.validTo), gt(userAssignments.validTo, new Date())),
+        ),
+      );
+    return pending ?? null;
+  }
+
+  /**
+   * FU-15: telefonni Telegram orqali tasdiqlashni boshlash. Taklif qilgan klinikaning
+   * boti orqali bir martalik token (bazada faqat SHA-256) va deep-link qaytaradi.
+   * Bot sozlanmagan yoki ishlamasa — `phone.verification_unavailable` (YOPIQ: tasdiqsiz
+   * qabul qilish yo'li ochilmaydi). Tashqi `getMe` chaqiruvi DB tranzaksiyasidan tashqarida.
+   */
+  async function startPhoneVerification(userId: string, invitationId: string) {
+    const ctx = await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT set_config('app.current_user_id', ${userId}, true)`);
+      const pending = await findPendingInvitation(tx, userId, invitationId);
+      if (!pending) return { kind: 'not_found' as const };
+
+      const [u] = await tx
+        .select({ v: users.phoneVerifiedAt })
+        .from(users)
+        .where(eq(users.id, userId));
+      if (u?.v) return { kind: 'verified' as const };
+
+      // Taklif qilgan klinika sozlamalari — shu tenant RLS kontekstida.
+      await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${pending.tenantId}, true)`);
+      const [settings] = await tx
+        .select({ s: tenantSettings.integrationSettings })
+        .from(tenantSettings)
+        .limit(1);
+      const enc = (settings?.s as { telegram?: { botTokenEnc?: string } } | null)?.telegram
+        ?.botTokenEnc;
+      return { kind: 'pending' as const, tenantId: pending.tenantId, enc: enc ?? null };
+    });
+
+    if (ctx.kind === 'not_found') return { ok: false as const, code: 'invitation.not_found' };
+    if (ctx.kind === 'verified') {
+      return { ok: true as const, alreadyVerified: true, deepLink: null, expiresAt: null };
+    }
+
+    const unavailable = { ok: false as const, code: 'phone.verification_unavailable' };
+    if (!ctx.enc) return unavailable;
+    let botToken: string;
+    try {
+      botToken = decryptSecret(ctx.enc);
+    } catch (err) {
+      logger.warn({ err, tenantId: ctx.tenantId }, 'phone-verify: bot token decrypt failed');
+      return unavailable;
+    }
+    const username = await resolveBotUsername(botToken);
+    if (!username) return unavailable;
+
+    const token = randomBytes(24).toString('base64url'); // 32 belgi, [A-Za-z0-9_-]
+    const expiresAt = new Date(Date.now() + PHONE_VERIFICATION_TTL_MS);
+    await db.insert(phoneVerifications).values({
+      userId,
+      tenantId: ctx.tenantId,
+      tokenHash: await hashVerificationToken(token),
+      expiresAt,
+    });
+
+    return {
+      ok: true as const,
+      alreadyVerified: false,
+      deepLink: `https://t.me/${username}?start=${PV_START_PREFIX}${token}`,
+      expiresAt,
+    };
   }
 
   const acceptInvitation = (userId: string, id: string, meta: InvitationMeta) =>
@@ -881,6 +983,7 @@ export const createAuthService = (deps: AuthServiceDeps) => {
     listInvitations,
     acceptInvitation,
     declineInvitation,
+    startPhoneVerification,
     switchWorkspace,
     refresh,
     changePassword,

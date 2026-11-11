@@ -2296,5 +2296,15 @@
     "reception_text": "Shifokor imzolagan, hali to'lanmagan bugungi vizitlar.",
     "reception_open": "Kassani ochish",
     "kpi": "Kassada kutmoqda"
+  },
+  "phoneVerify": {
+    "hint": "Taklifni qabul qilishdan oldin telefon raqamingiz sizniki ekanini Telegram orqali tasdiqlang.",
+    "start": "Telegram orqali tasdiqlash",
+    "waiting": "Telegram'da botga raqamingizni ulashing — tasdiq kutilmoqda…",
+    "open_link": "Telegram ochilmadimi? Havolani bosing",
+    "verified": "Telefon raqami tasdiqlandi",
+    "unavailable": "Bu klinikada Telegram bot sozlanmagan — klinika administratoriga murojaat qiling.",
+    "required": "Avval telefon raqamingizni Telegram orqali tasdiqlang.",
+    "start_failed": "Tasdiqlashni boshlab bo'lmadi. Birozdan keyin qayta urinib ko'ring."
   }
 }
