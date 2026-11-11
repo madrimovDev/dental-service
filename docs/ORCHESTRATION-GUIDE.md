@@ -91,6 +91,8 @@ Tartib:
 
 - Har lane: `dental_test_<stage>_<lane>` (controller yaratadi + `migrate.ts` + **`seedPermissions`/`seedDiagnoses`** — permission katalogi migratsiyada emas, API boot'da seed qilinadi; seed'siz `provisioning-tenant` testi yiqiladi) va `REDIS_URL=…/<N>` (N = 1…15, lane bo'yicha) — rate-limit va BullMQ kalitlari aralashmaydi.
 - ✅ **Lane URL'lari worktree'dagi `.env` nusxasiga yoziladi** (`DATABASE_URL`, `DATABASE_ADMIN_URL`, `REDIS_URL` almashtiriladi) — buyruq prefiksi emas. P bosqichi 1 darsi: prefiksni unutgan reviewer'lar `dental_test_…` topa olmadi yoki (yomonroq holda) dev bazasida `TRUNCATE` qilishi mumkin edi.
+- ⚠️ **Shell env `--env-file`dan USTUN.** Controller lane'ni tayyorlayotganda `set -a; . ./.env` qilsa, keyingi `bun --env-file=… migrate` **asosiy `dental` bazasiga** ketadi (P bosqichi 2 da shunday bo'ldi — idempotent bo'lgani uchun zarar yo'q). Lane migratsiya/seed buyruqlari `env -u DATABASE_URL -u DATABASE_ADMIN_URL -u REDIS_URL bun --env-file=…` bilan yuriladi va natija `select count(*) from permissions` (64 kutiladi) bilan tekshiriladi.
+- Supervisor lane'i: worktree'dagi `apps/supervisor-api/.env`da `DATABASE_URL` → `supervisor_test_<stage>_<lane>`, `db:migrate` (seed admin yaratadi). `bun run test` skripti `-u DATABASE_URL` qiladi, shuning uchun `.env` yagona manba.
 - Shu bilan **verify ham parallel** bo'la oladi (avval bitta umumiy baza sabab serial edi).
 - Bosqich oxirida controller lane bazalarini o'chiradi.
 
