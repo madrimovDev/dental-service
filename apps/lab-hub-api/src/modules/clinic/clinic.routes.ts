@@ -170,6 +170,32 @@ export const clinicRoutes = (deps: Deps) => {
   );
 
   // --- hub key auth -----------------------------------------------------------
+  /**
+   * Klinika obunasini Supervisor bilan davriy qayta tekshirish: bloklangan
+   * bo'lsa har 10 daqiqada (uzaytirilgan bo'lishi mumkin), faol bo'lsa har
+   * 24 soatda (bekor qilingan bo'lishi mumkin). Supervisor javob bermasa —
+   * keshdagi holat bilan davom etadi. Faol emas / topilmadi → `expiresAt = 0`.
+   */
+  const refreshClinic = async (clinic: Clinic): Promise<Clinic> => {
+    const now = deps.now();
+    const age = now.getTime() - (clinic.lastVerifiedAt?.getTime() ?? 0);
+    const due = isBlocked(clinic.expiresAt, now) ? age > 10 * 60_000 : age > 24 * 3_600_000;
+    if (!due) return clinic;
+    let v: Awaited<ReturnType<typeof deps.supervisor.verifyClinic>>;
+    try {
+      v = await deps.supervisor.verifyClinic(clinic.supervisorClinicId, {});
+    } catch {
+      return clinic;
+    }
+    const expiresAt = v?.active && v.expiresAt ? new Date(v.expiresAt) : new Date(0);
+    const [row] = await deps.db
+      .update(clinics)
+      .set({ expiresAt, lastVerifiedAt: now, ...(v ? { name: v.name } : {}) })
+      .where(eq(clinics.id, clinic.id))
+      .returning();
+    return row ?? clinic;
+  };
+
   const auth: MiddlewareHandler<ClinicEnv> = async (c, next) => {
     const key = bearer(c.req.header('Authorization'));
     if (!key) return c.json({ error: { code: 'clinic.unauthorized' } }, 401);
@@ -177,10 +203,11 @@ export const clinicRoutes = (deps: Deps) => {
       where: eq(clinics.hubKeyHash, sha256Hex(key)),
     });
     if (!clinic) return c.json({ error: { code: 'clinic.unauthorized' } }, 401);
-    if (isBlocked(clinic.expiresAt, deps.now())) {
+    const fresh = await refreshClinic(clinic);
+    if (isBlocked(fresh.expiresAt, deps.now())) {
       return c.json({ error: { code: 'clinic.subscription_expired' } }, 403);
     }
-    c.set('clinic', clinic);
+    c.set('clinic', fresh);
     await next();
   };
   for (const p of ['/labs', '/links', '/links/*', '/cases/*', '/changes']) app.use(p, auth);

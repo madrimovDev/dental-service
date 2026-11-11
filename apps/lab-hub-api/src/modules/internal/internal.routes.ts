@@ -175,10 +175,16 @@ export const internalRoutes = (deps: Deps) => {
       const expiresAt = b.expiresAt ? new Date(b.expiresAt) : null;
       const [row] = await deps.db
         .insert(clinics)
-        .values({ supervisorClinicId: b.supervisorClinicId, mode: b.mode, name: b.name, expiresAt })
+        .values({
+          supervisorClinicId: b.supervisorClinicId,
+          mode: b.mode,
+          name: b.name,
+          expiresAt,
+          lastVerifiedAt: deps.now(),
+        })
         .onConflictDoUpdate({
           target: clinics.supervisorClinicId,
-          set: { mode: b.mode, name: b.name, expiresAt },
+          set: { mode: b.mode, name: b.name, expiresAt, lastVerifiedAt: deps.now() },
         })
         .returning({ id: clinics.id });
       return c.json({ clinicId: row!.id });

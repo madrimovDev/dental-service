@@ -1,0 +1,51 @@
+# Lab Hub public edge (L2: faqat HTTPS, TLS 1.2+, HSTS).
+#
+# Env: DOMAIN (masalan lab.yoursite.uz), ACME_EMAIL.
+# Routing: /v1/* va /health → lab-hub-api; /internal/* — HECH QACHON tashqariga
+# (Supervisor ichki tarmoq orqali chaqiradi); qolgani → lab-hub-web (W2).
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode gzip zstd
+
+	tls {
+		protocols tls1.2 tls1.3
+	}
+
+	@internal path /internal /internal/*
+	handle @internal {
+		respond 404
+	}
+
+	handle /v1/* {
+		request_body {
+			max_size 60MB
+		}
+		reverse_proxy lab-hub-api:8171
+	}
+
+	handle /health {
+		reverse_proxy lab-hub-api:8171
+	}
+
+	handle {
+		# W2: reverse_proxy lab-hub-web:80
+		respond "Lab Hub" 200
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

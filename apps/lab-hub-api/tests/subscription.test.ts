@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
-import { labs } from '../src/db/schema';
+import { clinics, labs } from '../src/db/schema';
 import { subscriptionState } from '../src/lib/subscription';
 import {
   app,
@@ -10,6 +10,7 @@ import {
   connectClinic,
   createLab,
   db,
+  deps,
   inDays,
   labReq,
   linkActive,
@@ -163,5 +164,44 @@ describe('obuna (L10): expiresAt + 7 kun, keyin 403', () => {
         })
       ).status,
     ).toBe(401);
+  });
+
+  it('Supervisor bilan qayta tekshiruv: uzaytirilgan klinika ochiladi, bekor qilingani yopiladi', async () => {
+    const clinic = await connectClinic();
+    const reg = supervisorRegistry.get(clinic.supervisorClinicId)!;
+    const old = new Date(Date.now() - 2 * 86_400_000);
+
+    // Hub'dagi muddat o'tgan, lekin Supervisor'da uzaytirilgan → qayta tekshiruvdan keyin 200.
+    await db
+      .update(clinics)
+      .set({ expiresAt: inDays(-10), lastVerifiedAt: old })
+      .where(eq(clinics.id, clinic.clinicId));
+    expect((await clinicReq(clinic, '/v1/clinic/links')).status).toBe(200);
+    const row = await db.query.clinics.findFirst({ where: eq(clinics.id, clinic.clinicId) });
+    expect(row!.expiresAt!.toISOString()).toBe(reg.expiresAt!);
+
+    // Supervisor litsenziyani bekor qildi; Hub muddati hali kelajakda, oxirgi tekshiruv >24 soat.
+    supervisorRegistry.set(clinic.supervisorClinicId, { ...reg, active: false });
+    await db.update(clinics).set({ lastVerifiedAt: old }).where(eq(clinics.id, clinic.clinicId));
+    const res = await clinicReq(clinic, '/v1/clinic/links');
+    expect(res.status).toBe(403);
+    expect(await code(res)).toBe('clinic.subscription_expired');
+  });
+
+  it('Supervisor javob bermasa — faol klinika kesh bilan ishlashda davom etadi', async () => {
+    const clinic = await connectClinic();
+    await db
+      .update(clinics)
+      .set({ lastVerifiedAt: new Date(Date.now() - 2 * 86_400_000) })
+      .where(eq(clinics.id, clinic.clinicId));
+    const orig = deps.supervisor.verifyClinic;
+    deps.supervisor.verifyClinic = async () => {
+      throw new Error('down');
+    };
+    try {
+      expect((await clinicReq(clinic, '/v1/clinic/links')).status).toBe(200);
+    } finally {
+      deps.supervisor.verifyClinic = orig;
+    }
   });
 });
