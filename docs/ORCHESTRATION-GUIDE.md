@@ -121,6 +121,13 @@ Controller `main`ga merge qilishdan oldin, **birlashtirilgan** branch'da bir mar
 
 Keyingi bosqich boshida to'liq to'plam **qayta yurmaydi** (👤) — oxirgi gate natijasi boshlang'ich holat.
 
+## 6b. UI bosqichlari uchun vizual qabul (UI-0 darsi)
+
+Reviewer'lar ko'pincha skrinshot OLMAYDI («server ishga tushirilmadi»). Shuning uchun:
+- reviewer schema'siga `screenshotsViewed: string[]` (Read qilingan PNG yo'llari) maydoni majburiy; bo'sh bo'lsa controller vazifani vizual tasdiqlanmagan deb hisoblaydi;
+- **merge oldidan controller o'zi** `scripts/ui/seed-roles.ts` + `app-shot.ts` bilan har rol uchun asosiy sahifalarni light+dark oladi va Read qiladi (UI-0 da shu yo'l bilan tasdiqlandi);
+- app-shot argumentlari shell'da emas, Python/JSON orqali uzatiladi (tenant nomida bo'shliq bor — `shift` xatosi login sahifasini «muvaffaqiyatli» skrinshot qildi).
+
 ## 7. Holat va hujjatlash
 
 - **Windows-only** vazifa: `windowsOnly: true` → holat «kod tayyor, Windows'da tekshirilmagan», Done emas; `DESKTOP-WINDOWS-BUILD-TEST.md`ga tekshiruv bandi qo'shiladi.
