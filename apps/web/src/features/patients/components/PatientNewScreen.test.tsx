@@ -8,7 +8,9 @@ const createMock = vi.fn();
 let phoneCheckData: any[] | undefined;
 vi.mock('../patients.api', () => ({
   useCreatePatient: () => ({ mutate: createMock, isPending: false }),
-  usePhoneCheck: () => ({ data: phoneCheckData }),
+  usePhoneCheck: () => ({
+    data: phoneCheckData ? { count: phoneCheckData.length, matches: phoneCheckData } : undefined,
+  }),
 }));
 
 const navigateMock = vi.fn();

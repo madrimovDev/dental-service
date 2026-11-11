@@ -2,15 +2,25 @@ import { searchVariants } from '@dental/core';
 import { Button, Card, IconButton, Input, PatientFlag, StateView } from '@dental/ui';
 import { Pagination } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
-import { Archive, Eye, Plus, Search } from 'lucide-react';
+import { Archive, Eye, FileSpreadsheet, Plus, Search, X } from 'lucide-react';
 import type { MouseEvent } from 'react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { formatDayMonth } from '@/lib/format.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { useArchivePatient, usePatients } from '../patients.api';
 import { BalanceChip } from './BalanceChip';
+import { PatientImportModal } from './PatientImportModal';
 import classes from './PatientsListScreen.module.css';
+
+/** «Keyingi tashrif» katagi: «14-noy · 09:30». */
+function formatNextVisit(iso: string, lang: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  return `${formatDayMonth(d, lang, { month: 'short' })} · ${time}`;
+}
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -22,13 +32,16 @@ function initials(name: string): string {
 }
 
 export function PatientsListScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const [importOpen, setImportOpen] = useState(false);
   const { hasPermission } = useAuthStore();
   // Filtrlar URL'da — bemor kartasidan qaytganda qidiruv/sahifa saqlanadi (UI-1 qoidasi).
   const [searchParams, setSearchParams] = useSearchParams();
   const urlSearch = searchParams.get('q') ?? '';
   const archived = searchParams.get('archived') === '1';
+  // FU-24: «Qarzdorlar» filtri URL'da (kartadan qaytganda saqlanadi).
+  const debtOnly = searchParams.get('debt') === '1' && !archived;
   const page = Math.max(1, Number(searchParams.get('page')) || 1);
   const [searchInput, setSearchInput] = useState(urlSearch);
   const [search] = useDebouncedValue(searchInput.trim(), 300);
@@ -37,11 +50,19 @@ export function PatientsListScreen() {
   useEffect(() => {
     if (urlSearch !== searchInput.trim()) setSearchInput(urlSearch);
   }, [urlSearch]);
-  const { data, isLoading, isError, refetch } = usePatients({ search, archived, page });
+  const { data, isLoading, isError, refetch } = usePatients({
+    search,
+    archived,
+    debt: debtOnly,
+    page,
+  });
   const archiveMut = useArchivePatient();
   const items = data?.items ?? [];
   const canCreate = hasPermission('patient.create');
   const canBook = hasPermission('appointment.create');
+  const canImport = hasPermission('patient.import');
+  // «Keyingi tashrif» ustuni faqat yozilishlarni ko'ra oladigan rolga (server ham null qaytaradi).
+  const showNextVisit = hasPermission('appointment.view');
   // PT-03: telefon/passport bo'yicha qidiruv faqat view_pii bilan ishlaydi — placeholder buni aytadi.
   const canSearchPii = hasPermission('patient.view_pii');
   // Kirill↔lotin: qidiruv o'zgartirilgan variantni ham topishini ko'rsatamiz.
@@ -64,7 +85,10 @@ export function PatientsListScreen() {
     setSearchInput(v);
     updateParams({ q: v.trim() || null, page: null });
   };
-  const setFilter = (next: boolean) => updateParams({ archived: next ? '1' : null, page: null });
+  const setFilter = (next: boolean) =>
+    updateParams({ archived: next ? '1' : null, debt: null, page: null });
+  const setDebt = (next: boolean) =>
+    updateParams({ debt: next ? '1' : null, archived: null, page: null });
 
   return (
     <div>
@@ -92,6 +116,15 @@ export function PatientsListScreen() {
               </div>
             )}
           </div>
+          {canImport && (
+            <Button
+              variant="default"
+              iconLeft={<FileSpreadsheet size={16} />}
+              onClick={() => setImportOpen(true)}
+            >
+              {t('patients.import_button')}
+            </Button>
+          )}
           {canCreate && (
             <Button
               variant="primary"
@@ -108,10 +141,20 @@ export function PatientsListScreen() {
         <button
           type="button"
           className={classes.pill}
-          data-active={!archived}
+          data-active={!archived && !debtOnly}
           onClick={() => setFilter(false)}
         >
           {t('patients.filter.all')}
+        </button>
+        <button
+          type="button"
+          className={classes.pill}
+          data-active={debtOnly}
+          aria-pressed={debtOnly}
+          onClick={() => setDebt(!debtOnly)}
+        >
+          {t('patients.filter.debt')}
+          {debtOnly && <X size={13} aria-hidden className={classes.pillClose} />}
         </button>
         <button
           type="button"
@@ -152,10 +195,11 @@ export function PatientsListScreen() {
         />
       ) : (
         <Card bodyless>
-          <div className={classes.tableHead}>
+          <div className={classes.tableHead} data-next-visit={showNextVisit}>
             <span>{t('patients.col.patient')}</span>
             <span>{t('patients.col.phone')}</span>
             <span>{t('patients.col.age_gender')}</span>
+            {showNextVisit && <span>{t('patients.col.next_visit')}</span>}
             <span className={classes.colBalance}>{t('patients.col.balance')}</span>
           </div>
           {items.map((p) => (
@@ -163,6 +207,7 @@ export function PatientsListScreen() {
             <div
               key={p.id}
               className={classes.row}
+              data-next-visit={showNextVisit}
               role="button"
               tabIndex={0}
               onClick={() => navigate(`/patients/${p.id}`)}
@@ -211,6 +256,15 @@ export function PatientsListScreen() {
               <span className={classes.ageGender}>
                 {p.age != null ? `${p.age} · ${p.genderLabel}` : p.genderLabel || '—'}
               </span>
+
+              {showNextVisit &&
+                (p.nextAppointmentAt ? (
+                  <span className={classes.nextVisit}>
+                    {formatNextVisit(p.nextAppointmentAt, i18n.language)}
+                  </span>
+                ) : (
+                  <span className={classes.empty}>—</span>
+                ))}
 
               <div className={classes.balanceCell}>
                 <BalanceChip balance={p.balance} />
@@ -265,6 +319,7 @@ export function PatientsListScreen() {
           onChange={setPage}
         />
       )}
+      <PatientImportModal opened={importOpen} onClose={() => setImportOpen(false)} />
     </div>
   );
 }

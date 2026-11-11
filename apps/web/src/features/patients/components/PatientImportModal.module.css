@@ -1,0 +1,95 @@
+/* FU-24 — bemorlarni Excel/CSV'dan import (modal). Mavjud tokenlar. */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-2);
+  font-family: var(--font-sans);
+}
+
+.fileInput {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--text);
+  padding: 10px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.mapGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.counts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.count {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-family: var(--font-sans);
+}
+
+.count strong {
+  font-size: 22px;
+  color: var(--text);
+}
+
+.count span {
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.count[data-kind="new"] {
+  border-color: var(--primary);
+}
+
+.count[data-kind="error"] strong {
+  color: var(--danger);
+}
+
+.errors {
+  margin: 0;
+  padding: 10px 14px 10px 28px;
+  max-height: 180px;
+  overflow: auto;
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-size: 12.5px;
+  color: var(--text-2);
+  font-family: var(--font-sans);
+}
+
+@media (max-width: 640px) {
+  .mapGrid {
+    grid-template-columns: 1fr;
+  }
+}

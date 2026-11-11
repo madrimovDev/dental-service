@@ -582,13 +582,15 @@
     "count": "{{count}} ta bemor",
     "filter": {
       "all": "Barchasi",
-      "archived": "Arxiv"
+      "archived": "Arxiv",
+      "debt": "Qarzdorlar"
     },
     "col": {
       "patient": "Bemor",
       "phone": "Telefon",
       "age_gender": "Yosh · jins",
-      "balance": "Balans"
+      "balance": "Balans",
+      "next_visit": "Keyingi tashrif"
     },
     "empty_title": "Bu bo'limda bemor yo'q",
     "empty_desc": "Boshqa filtrni tanlang yoki yangi bemor qo'shing",
@@ -731,7 +733,9 @@
     "allergy_confirm_pill": "Anesteziyadan oldin tasdiqlang",
     "payment_history": "To'lov tarixi",
     "no_medical_permission": "Sizda tibbiy kartani ko'rish ruxsati yo'q",
-    "collect_payment": "To'lov qabul qilish"
+    "collect_payment": "To'lov qabul qilish",
+    "import_button": "Excel'dan import",
+    "dup_desc_count": "Shu raqam bilan ro'yxatdan o'tgan bemorlar: {{count}} ta (ism faqat bemor ma'lumotlarini ko'ra oladiganlarga ko'rinadi)."
   },
   "medical": {
     "history_title": "O'zgarishlar tarixi",
@@ -2294,5 +2298,57 @@
     "reception_text": "Shifokor imzolagan, hali to'lanmagan bugungi vizitlar.",
     "reception_open": "Kassani ochish",
     "kpi": "Kassada kutmoqda"
+  },
+  "patientImport": {
+    "title": "Bemorlarni Excel/CSV'dan import qilish",
+    "choose_file": "Faylni tanlang",
+    "file_hint": "Birinchi qator — ustun sarlavhalari. .xlsx, .xls yoki .csv, 5 MB gacha. Fayl faqat shu brauzerda o'qiladi; serverga tekshirilgan qatorlar yuboriladi.",
+    "reading": "Fayl o'qilmoqda…",
+    "map_hint": "{{file}} — {{count}} ta qator. Har bir maydon uchun ustunni tanlang (ism majburiy).",
+    "no_column": "— ustun yo'q —",
+    "empty_header": "(sarlavhasiz)",
+    "field": {
+      "fullName": "Ism va familiya",
+      "phone": "Telefon",
+      "phoneSecondary": "Qo'shimcha telefon",
+      "dateOfBirth": "Tug'ilgan sana",
+      "gender": "Jins",
+      "address": "Manzil",
+      "passport": "Pasport",
+      "notes": "Izoh",
+      "source": "Manba"
+    },
+    "back": "Orqaga",
+    "preview": "Oldindan ko'rish",
+    "preview_hint": "Hali hech narsa saqlanmadi. Yangi bemorlar qo'shiladi, mavjud telefonlilar o'tkazib yuboriladi, xatoli qatorlar tashlanadi.",
+    "count_new": "Yangi",
+    "count_duplicate": "Dublikat (telefon mavjud)",
+    "count_error": "Xato",
+    "duplicates_note": "Dublikat qatorlar bemorni qayta yaratmaydi va mavjud ma'lumotni o'zgartirmaydi.",
+    "run": "Import qilish ({{count}} ta)",
+    "close": "Yopish",
+    "done_title": "Import tugadi",
+    "done_desc": "{{count}} ta yangi bemor qo'shildi.",
+    "errors_title": "Xato qatorlar",
+    "error_row": "Qator {{row}}: {{reason}}",
+    "errors_more": "…va yana {{count}} ta xato qator",
+    "error_title": "Import bajarilmadi",
+    "request_error": "Serverga yuborib bo'lmadi. Qayta urinib ko'ring.",
+    "no_rows": "Faylda import qilinadigan qator yo'q.",
+    "file_error": {
+      "too_big": "Fayl 5 MB dan katta.",
+      "empty": "Faylda sarlavha va kamida bitta ma'lumot qatori bo'lishi kerak.",
+      "unreadable": "Faylni o'qib bo'lmadi. .xlsx yoki .csv ekanini tekshiring.",
+      "too_many_rows": "Faylda 20 000 dan ortiq qator bor — bo'laklarga bo'ling."
+    },
+    "error": {
+      "invalid_name": "Ism juda qisqa yoki yo'q",
+      "invalid_phone": "Telefon noto'g'ri",
+      "invalid_date": "Tug'ilgan sana noto'g'ri",
+      "invalid_gender": "Jins tanilmadi (erkak/ayol)",
+      "too_long": "Qiymat juda uzun",
+      "unsafe_value": "Matn =, +, - yoki @ bilan boshlanmasligi kerak",
+      "unknown": "Noma'lum xato"
+    }
   }
 }
