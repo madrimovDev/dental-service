@@ -37,7 +37,7 @@ const createClinicSchema = z.object({
   contactPhone: z.string().optional(),
   plan: z.enum(['starter', 'standard', 'premium', 'enterprise']),
   expiresAt: z.string(), // ISO date
-  gracePeriodDays: z.number().int().min(1).max(365).default(30),
+  gracePeriodDays: z.number().int().min(1).max(365).default(7),
   // Provisioning — klinika lokal bazasida yaratiladigan birlamchi ma'lumot
   // (spec §5.2). Telefon `normalizePhone` bilan kanonik shaklga keltiriladi.
   ownerFullName: z.string().min(2).max(120),
@@ -104,6 +104,8 @@ const MODULE_MAP: Record<z.infer<typeof createClinicSchema>['plan'], string[]> =
 // `adminJwtMiddleware` (jwt.middleware.ts:17) tokenning `sub`'ini
 // `adminUserId` deb yozadi. Hono instansiyasi tiplanmasa `c.get(...)`
 // `never` beradi — audit `createdBy` uchun uni aniq e'lon qilamiz.
+const renewSchema = z.object({ expiresAt: z.union([z.iso.datetime(), z.iso.date()]) });
+
 type AdminEnv = { Variables: { adminUserId?: string } };
 
 export const clinicsRoutes = () => {
@@ -280,6 +282,30 @@ export const clinicsRoutes = () => {
     try {
       const credentials = await service.prepareReinstall(idResult.data, adminId);
       return c.json({ credentials });
+    } catch (err) {
+      const code = err instanceof Error ? err.message : 'UNKNOWN';
+      const status = (err as { status?: number }).status ?? 500;
+      return c.json({ error: { code } }, status as 400 | 404 | 500);
+    }
+  });
+
+  // Litsenziya muddatini uzaytirish (P18). Faqat `expiresAt` yangilanadi —
+  // klinika keyingi heartbeat orqali yangi muddatni oladi (offline kod yo'q).
+  app.post('/:id/renew', async (c) => {
+    const idResult = uuidSchema.safeParse(c.req.param('id'));
+    if (!idResult.success) return c.json({ error: { code: 'NOT_FOUND' } }, 404);
+
+    const body = await c.req.json().catch(() => null);
+    const parsed = renewSchema.safeParse(body);
+    if (!parsed.success) return c.json({ error: { code: 'VALIDATION_ERROR' } }, 400);
+
+    const raw = parsed.data.expiresAt;
+    // Faqat sana bo'lsa — o'sha kunning oxiri (UTC).
+    const expiresAt = new Date(raw.length === 10 ? `${raw}T23:59:59.000Z` : raw);
+
+    try {
+      const license = await service.renew(idResult.data, expiresAt, c.get('adminUserId'));
+      return c.json({ license });
     } catch (err) {
       const code = err instanceof Error ? err.message : 'UNKNOWN';
       const status = (err as { status?: number }).status ?? 500;
