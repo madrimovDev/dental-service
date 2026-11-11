@@ -1732,5 +1732,67 @@
       "inlay_onlay": "Inley/onley",
       "other": "Boshqa"
     }
+  },
+  "patientCard": {
+    "section": {
+      "overview": "Umumiy",
+      "treatment": "Davolash",
+      "finance": "Moliya",
+      "docs": "Hujjatlar va rasmlar"
+    },
+    "sub": {
+      "details": "Ma'lumotlar",
+      "medical": "Tibbiy karta",
+      "family": "Oila",
+      "recall": "Eslatmalar",
+      "odontogram": "Tish xaritasi",
+      "plan": "Davolash rejasi",
+      "visits": "Vizitlar",
+      "rx": "Reseptlar",
+      "lab": "Lab buyurtmalar",
+      "payments": "To'lovlar",
+      "images": "Rasmlar",
+      "consent": "Konsent"
+    },
+    "details": "Batafsil",
+    "allergy_title": "Allergiya:",
+    "allergy_hint": "davolashdan oldin tekshiring",
+    "clinical_title": "Klinik ma'lumotlar",
+    "forbidden_title": "Bu ma'lumot sizning rolingizga yopiq",
+    "forbidden_desc": "Tibbiy karta, davolash rejasi va vizitlarni ko'rish uchun ruxsat kerak.",
+    "anamnesis": {
+      "title": "Anamnez",
+      "never": "Hali tasdiqlanmagan — bugun bemordan so'rang",
+      "stale": "Oxirgi tasdiq {{date}} — bugun so'rang",
+      "confirmed_on": "Oxirgi tasdiq: {{date}}",
+      "update": "Yangilash",
+      "confirm": "O'zgarish yo'q — tasdiqlash",
+      "confirmed_toast": "Anamnez tasdiqlandi"
+    },
+    "plan": {
+      "title": "Faol reja · {{title}}",
+      "title_empty": "Faol reja",
+      "none": "Faol davolash rejasi yo'q",
+      "open": "Rejani ochish",
+      "progress": "{{total}} bosqichdan {{done}} tasi bajarilgan",
+      "today_stage": "Bugungi bosqich · {{n}}/{{total}}",
+      "teeth": "Tishlar",
+      "effects": "Bosqich bajarilganda, natijaviy holat tanlangan bo'lsa, tish xaritasi shu holatga o'tadi.",
+      "all_done": "Barcha bosqichlar bajarilgan"
+    },
+    "visits": {
+      "title": "So'nggi vizitlar",
+      "empty": "Vizitlar hali yo'q",
+      "visit": "Vizit",
+      "services": "Bajarilgan ishlar: {{count}}"
+    },
+    "next_visit": {
+      "title": "Keyingi tashrif",
+      "none": "Keyingi yozilish yo'q"
+    },
+    "diagnoses": {
+      "title": "Ochiq tashxislar",
+      "empty": "Ochiq tashxis yo'q"
+    }
   }
 }

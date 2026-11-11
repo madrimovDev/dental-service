@@ -23,7 +23,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { patientKeys } from './patients.keys';
 import { toPatientDetail, toPatientListItem } from './patients.mappers';
-import type { ListParams, PhoneCheckMatch } from './patients.types';
+import type { ListParams, MedicalRecordView, PhoneCheckMatch } from './patients.types';
 
 export function usePatients(params: ListParams, options?: { enabled?: boolean }) {
   const { t } = useTranslation();
@@ -115,7 +115,7 @@ export function useArchivePatient() {
 export function useMedicalRecord(id: string) {
   return useQuery({
     queryKey: patientKeys.medical(id),
-    queryFn: () => getMedicalRecord(id).then((r) => r.data),
+    queryFn: () => getMedicalRecord(id).then((r) => r.data as MedicalRecordView),
     enabled: !!id,
   });
 }
@@ -128,6 +128,26 @@ export function useUpdateMedicalRecord(id: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: patientKeys.medical(id) });
       qc.invalidateQueries({ queryKey: patientKeys.medicalHistory(id) });
+    },
+  });
+}
+
+/**
+ * UI-D2: anamnezni tasdiqlash (`POST /api/patients/{id}/medical-record/confirm`, `medical_record.edit`).
+ * Generated klient kontrakt regeneratsiyasidan keyin paydo bo'ladi — shu paytgacha envelope-mutator.
+ */
+export function useConfirmMedicalRecord(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const res = await customInstance<{ data: MedicalRecordView }>({
+        url: `/api/patients/${id}/medical-record/confirm`,
+        method: 'POST',
+      });
+      return res.data;
+    },
+    onSuccess: (record) => {
+      qc.setQueryData(patientKeys.medical(id), record);
     },
   });
 }

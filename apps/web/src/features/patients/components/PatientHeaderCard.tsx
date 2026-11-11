@@ -1,5 +1,5 @@
 import type { AllergyEntry } from '@dental/api-client';
-import { Button, Mono } from '@dental/ui';
+import { AlertBanner, Button, Mono } from '@dental/ui';
 import { useTranslation } from 'react-i18next';
 import { formatCurrency } from '@/lib/format';
 import type { PatientDetail } from '../patients.types';
@@ -22,8 +22,8 @@ export interface PatientHeaderCardProps {
   patient: HeaderPatient;
   /** Bemor balansi (qarz > 0). undefined bo'lsa balans bloki ko'rsatilmaydi. */
   balance?: number;
-  /** Faqat anestetik severe allergiya — render sharti PatientCard'da hisoblanadi. */
-  severeAllergy?: Pick<AllergyEntry, 'substance' | 'severity'> | undefined;
+  /** Barcha allergiyalar (UI-D2: sarlavhada doimiy, 2-daraja banner). Bo'sh/undefined bo'lsa banner yo'q. */
+  allergies?: Pick<AllergyEntry, 'substance' | 'severity'>[] | undefined;
   /** "To'lov qabul qilish" tugmasi — mavjud xulq (faqat ko'rinish + ixtiyoriy navigatsiya). */
   onCollectPayment?: () => void;
 }
@@ -31,7 +31,7 @@ export interface PatientHeaderCardProps {
 export function PatientHeaderCard({
   patient,
   balance,
-  severeAllergy,
+  allergies,
   onCollectPayment,
 }: PatientHeaderCardProps) {
   const { t } = useTranslation();
@@ -71,21 +71,20 @@ export function PatientHeaderCard({
           padding: '20px 22px',
         }}
       >
-        {/* Bespoke gradient avatar — Avatar primitivi gradient bermaydi (spec §4.1). */}
         <div
           aria-hidden
           style={{
             alignItems: 'center',
-            background: 'linear-gradient(135deg, var(--primary), var(--violet))',
-            borderRadius: 16,
-            color: 'var(--on-primary)',
+            background: 'var(--teal-50)',
+            borderRadius: 99,
+            color: 'var(--teal-700)',
             display: 'flex',
             flex: '0 0 auto',
-            fontSize: 21,
+            fontSize: 20,
             fontWeight: 700,
-            height: 60,
+            height: 56,
             justifyContent: 'center',
-            width: 60,
+            width: 56,
           }}
         >
           {initials(patient.fullName)}
@@ -96,7 +95,7 @@ export function PatientHeaderCard({
             <h1
               style={{
                 color: 'var(--ink)',
-                fontSize: 22,
+                fontSize: 26,
                 fontWeight: 700,
                 letterSpacing: '-.02em',
                 margin: 0,
@@ -124,10 +123,10 @@ export function PatientHeaderCard({
             <div
               style={{
                 alignItems: 'center',
-                color: 'var(--ink-3)',
+                color: 'var(--text-2)',
                 display: 'flex',
                 flexWrap: 'wrap',
-                fontSize: 12.5,
+                fontSize: 'var(--text-base)',
                 gap: 8,
                 marginTop: 7,
               }}
@@ -156,8 +155,8 @@ export function PatientHeaderCard({
             <div>
               <div
                 style={{
-                  color: 'var(--ink-3)',
-                  fontSize: 11,
+                  color: 'var(--text-2)',
+                  fontSize: 13,
                   letterSpacing: '.04em',
                   textTransform: 'uppercase',
                 }}
@@ -183,55 +182,17 @@ export function PatientHeaderCard({
         )}
       </div>
 
-      {severeAllergy && (
-        <div
-          style={{
-            alignItems: 'center',
-            background: 'var(--danger-soft)',
-            borderTop: '1px solid color-mix(in srgb, var(--danger) 22%, transparent)',
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 12,
-            padding: '12px 22px',
-          }}
-        >
-          <span
-            aria-hidden
-            style={{
-              alignItems: 'center',
-              background: 'var(--danger)',
-              borderRadius: 8,
-              color: 'var(--text-on-danger)',
-              display: 'flex',
-              flex: '0 0 auto',
-              fontSize: 18,
-              fontWeight: 700,
-              height: 30,
-              justifyContent: 'center',
-              width: 30,
-            }}
-          >
-            !
-          </span>
-          <span style={{ color: 'var(--ink)', fontSize: 13 }}>
-            <strong style={{ color: 'var(--danger)' }}>
-              {t('patients.severe_allergy_warning')}
-            </strong>{' '}
-            {severeAllergy.substance}
-          </span>
-          <span
-            style={{
-              background: 'var(--danger)',
-              borderRadius: 99,
-              color: 'var(--text-on-danger)',
-              fontSize: 12,
-              fontWeight: 600,
-              marginLeft: 'auto',
-              padding: '3px 10px',
-            }}
-          >
-            {t('patients.allergy_confirm_pill')}
-          </span>
+      {allergies && allergies.length > 0 && (
+        <div style={{ padding: '0 22px 16px' }}>
+          <AlertBanner tier={2} title={t('patientCard.allergy_title')}>
+            {allergies.map((a, i) => (
+              <span key={a.substance}>
+                {i > 0 && <span aria-hidden> · </span>}
+                {a.severity === 'severe' ? <strong>{a.substance}</strong> : a.substance}
+              </span>
+            ))}
+            <span> — {t('patientCard.allergy_hint')}</span>
+          </AlertBanner>
         </div>
       )}
     </div>

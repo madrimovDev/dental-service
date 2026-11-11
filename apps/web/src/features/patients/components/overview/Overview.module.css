@@ -1,0 +1,162 @@
+.layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.main {
+  flex: 999 1 560px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.aside {
+  flex: 1 1 320px;
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.block {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+
+.grow {
+  margin-right: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.muted {
+  font-size: 14px;
+  color: var(--text-2);
+}
+
+.warn {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--st-waiting-fg);
+}
+
+.note {
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.progress {
+  height: 8px;
+  border-radius: 99px;
+  background: var(--border-subtle);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--primary);
+}
+
+.today {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--primary-tint);
+  border: 1px solid var(--teal-200);
+}
+
+.todayLabel {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--teal-700);
+}
+
+.visit {
+  display: flex;
+  gap: 14px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.visitDate {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--text-2);
+  width: 54px;
+  flex: none;
+}
+
+.visitBody {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.big {
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.bigDebt {
+  color: var(--red-700);
+}
+
+.dx {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.dxTooth {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  width: 28px;
+}
+
+.dxName {
+  margin-right: auto;
+}
+
+.dxCode {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.detailsHead {
+  margin: 24px 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
