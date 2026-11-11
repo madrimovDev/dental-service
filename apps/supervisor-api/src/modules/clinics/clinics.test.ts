@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import { createApp } from '../../app';
 import { db } from '../../db/client';
@@ -518,5 +518,203 @@ describe('POST /v1/admin/clinics/:id/prepare-reinstall', () => {
     expect(res.status).toBe(404);
     const body = (await res.json()) as any;
     expect(body.error.code).toBe('CLINIC_NOT_FOUND');
+  });
+});
+
+// ─── L8 (Lab Hub): SaaS tenantlar Supervisor'da ──────────────────────────────
+
+const SAAS_TOKEN = 'saas-test-token-0123456789-abcdefghijklmnop';
+const saasHeaders = (token: string = SAAS_TOKEN) => ({
+  'Content-Type': 'application/json',
+  Authorization: `Bearer ${token}`,
+});
+const registerSaas = (tenantId: string, overrides: Record<string, unknown> = {}) =>
+  app.request('/internal/saas/clinics', {
+    method: 'POST',
+    headers: saasHeaders(),
+    body: JSON.stringify({
+      tenantId,
+      name: 'SaaS Klinika',
+      ownerFullName: 'Sardor Aliyev',
+      ownerPhone: '901112233',
+      ...overrides,
+    }),
+  });
+
+describe('L8 — /internal/saas/clinics', () => {
+  it("SUPERVISOR_SAAS_TOKEN sozlanmagan bo'lsa yo'l yopiq (503), kalit bo'sh qiymat bilan ochilmaydi", async () => {
+    const prev = process.env.SUPERVISOR_SAAS_TOKEN;
+    delete process.env.SUPERVISOR_SAAS_TOKEN;
+    try {
+      const res = await registerSaas(crypto.randomUUID());
+      expect(res.status).toBe(503);
+      process.env.SUPERVISOR_SAAS_TOKEN = 'short';
+      expect((await registerSaas(crypto.randomUUID())).status).toBe(503);
+    } finally {
+      if (prev === undefined) delete process.env.SUPERVISOR_SAAS_TOKEN;
+      else process.env.SUPERVISOR_SAAS_TOKEN = prev;
+    }
+  });
+
+  describe('token sozlangan', () => {
+    const prev = process.env.SUPERVISOR_SAAS_TOKEN;
+    beforeAll(() => {
+      process.env.SUPERVISOR_SAAS_TOKEN = SAAS_TOKEN;
+    });
+    afterAll(() => {
+      if (prev === undefined) delete process.env.SUPERVISOR_SAAS_TOKEN;
+      else process.env.SUPERVISOR_SAAS_TOKEN = prev;
+    });
+
+    it("noto'g'ri/yo'q token → 401; admin JWT bu yo'lga kira olmaydi", async () => {
+      const tenantId = crypto.randomUUID();
+      const bad = await app.request('/internal/saas/clinics', {
+        method: 'POST',
+        headers: saasHeaders('x'.repeat(40)),
+        body: JSON.stringify({ tenantId, name: 'X', ownerFullName: 'Y', ownerPhone: '901112233' }),
+      });
+      expect(bad.status).toBe(401);
+      const none = await app.request('/internal/saas/clinics', { method: 'POST' });
+      expect(none.status).toBe(401);
+      const adminJwt = await app.request(`/internal/saas/clinics/${tenantId}/status`, {
+        headers: { Authorization: `Bearer ${await signAdminTestToken()}` },
+      });
+      expect(adminJwt.status).toBe(401);
+    });
+
+    it("yangi tenant: mode=saas, 14 kunlik sinov, litsenziya/filial YO'Q, telefon kanonik", async () => {
+      const tenantId = crypto.randomUUID();
+      const res = await registerSaas(tenantId);
+      expect(res.status).toBe(201);
+      const body = (await res.json()) as any;
+      expect(body.mode).toBe('saas');
+      const days = (Date.parse(body.subscriptionExpiresAt) - Date.now()) / 86_400_000;
+      expect(days).toBeGreaterThan(13.9);
+      expect(days).toBeLessThan(14.1);
+
+      const [row] = await db.select().from(clinicsTable).where(eq(clinicsTable.id, body.clinicId));
+      expect(row?.mode).toBe('saas');
+      expect(row?.saasTenantId).toBe(tenantId);
+      expect(row?.ownerPhone).toBe('+998901112233');
+      expect(row?.ownerTempPassword).toBeNull();
+      const lics = await db
+        .select()
+        .from(licensesTable)
+        .where(eq(licensesTable.clinicId, body.clinicId));
+      expect(lics).toHaveLength(0);
+    });
+
+    it('idempotent: qayta chaqiruv 200 va SINOV MUDDATI QAYTA BOSHLANMAYDI, bitta qator', async () => {
+      const tenantId = crypto.randomUUID();
+      const first = (await (await registerSaas(tenantId)).json()) as any;
+      // Muddatni qo'lda o'tgan paytga suramiz — qayta ro'yxat uni tiklamasligi kerak.
+      const past = new Date(Date.now() - 86_400_000);
+      await db
+        .update(clinicsTable)
+        .set({ subscriptionExpiresAt: past })
+        .where(eq(clinicsTable.id, first.clinicId));
+      const res = await registerSaas(tenantId, { name: 'Boshqa nom' });
+      expect(res.status).toBe(200);
+      const second = (await res.json()) as any;
+      expect(second.clinicId).toBe(first.clinicId);
+      expect(Date.parse(second.subscriptionExpiresAt)).toBe(past.getTime());
+      const rows = await db
+        .select()
+        .from(clinicsTable)
+        .where(eq(clinicsTable.saasTenantId, tenantId));
+      expect(rows).toHaveLength(1);
+    });
+
+    it('parallel ikki ro‘yxat — bitta klinika (UNIQUE saas_tenant_id)', async () => {
+      const tenantId = crypto.randomUUID();
+      const [a, b] = await Promise.all([registerSaas(tenantId), registerSaas(tenantId)]);
+      expect([a.status, b.status].sort()).toEqual([200, 201]);
+      const rows = await db
+        .select()
+        .from(clinicsTable)
+        .where(eq(clinicsTable.saasTenantId, tenantId));
+      expect(rows).toHaveLength(1);
+    });
+
+    it('status: muddat qaytadi; noma’lum tenant va noto‘g‘ri uuid → 404; desktop klinika ko‘rinmaydi', async () => {
+      const tenantId = crypto.randomUUID();
+      await registerSaas(tenantId);
+      const res = await app.request(`/internal/saas/clinics/${tenantId}/status`, {
+        headers: saasHeaders(),
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as any;
+      expect(body.tenantId).toBe(tenantId);
+      expect(typeof body.subscriptionExpiresAt).toBe('string');
+
+      const unknown = await app.request(`/internal/saas/clinics/${crypto.randomUUID()}/status`, {
+        headers: saasHeaders(),
+      });
+      expect(unknown.status).toBe(404);
+      const badId = await app.request('/internal/saas/clinics/nope/status', {
+        headers: saasHeaders(),
+      });
+      expect(badId.status).toBe(404);
+    });
+  });
+});
+
+describe('L8 — admin: rejim + SaaS obunasini uzaytirish', () => {
+  const prev = process.env.SUPERVISOR_SAAS_TOKEN;
+  beforeAll(() => {
+    process.env.SUPERVISOR_SAAS_TOKEN = SAAS_TOKEN;
+  });
+  afterAll(() => {
+    if (prev === undefined) delete process.env.SUPERVISOR_SAAS_TOKEN;
+    else process.env.SUPERVISOR_SAAS_TOKEN = prev;
+  });
+
+  it("ro'yxat har klinikaga mode beradi: desktop — litsenziya bilan, saas — litsenziyasiz", async () => {
+    const desktop = (await (await createClinic()).json()) as any;
+    const saas = (await (await registerSaas(crypto.randomUUID())).json()) as any;
+    const res = await app.request('/v1/admin/clinics', { headers: await authHeaders() });
+    const list = (await res.json()) as any[];
+    const d = list.find((c) => c.id === desktop.clinic.id);
+    const s = list.find((c) => c.id === saas.clinicId);
+    expect(d.mode).toBe('desktop');
+    expect(d.license).not.toBeNull();
+    expect(s.mode).toBe('saas');
+    expect(s.license).toBeNull();
+    expect(s.subscriptionExpiresAt).toBeTruthy();
+  });
+
+  it('renew SaaS klinikada subscription_expires_at ni yangilaydi (status endpoint ko‘radi)', async () => {
+    const tenantId = crypto.randomUUID();
+    const saas = (await (await registerSaas(tenantId)).json()) as any;
+    const res = await app.request(`/v1/admin/clinics/${saas.clinicId}/renew`, {
+      method: 'POST',
+      headers: await authHeaders(),
+      body: JSON.stringify({ expiresAt: '2099-01-31' }),
+    });
+    expect(res.status).toBe(200);
+    const status = (await (
+      await app.request(`/internal/saas/clinics/${tenantId}/status`, { headers: saasHeaders() })
+    ).json()) as any;
+    expect(status.subscriptionExpiresAt).toBe('2099-01-31T23:59:59.000Z');
+  });
+
+  it("renew o'tmishdagi sanani rad etadi (400), desktop renew xulqi o'zgarmagan", async () => {
+    const saas = (await (await registerSaas(crypto.randomUUID())).json()) as any;
+    const past = await app.request(`/v1/admin/clinics/${saas.clinicId}/renew`, {
+      method: 'POST',
+      headers: await authHeaders(),
+      body: JSON.stringify({ expiresAt: '2001-01-01' }),
+    });
+    expect(past.status).toBe(400);
+
+    const desktop = (await (await createClinic()).json()) as any;
+    const ok = await app.request(`/v1/admin/clinics/${desktop.clinic.id}/renew`, {
+      method: 'POST',
+      headers: await authHeaders(),
+      body: JSON.stringify({ expiresAt: '2099-02-01' }),
+    });
+    expect(ok.status).toBe(200);
+    const body = (await ok.json()) as any;
+    expect(body.license.expiresAt).toBeTruthy();
   });
 });

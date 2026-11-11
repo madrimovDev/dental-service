@@ -29,6 +29,20 @@
       "when": 1794388685888,
       "tag": "0003_grace_default_7",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794426995975,
+      "tag": "0004_saas_clinics",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794429701082,
+      "tag": "0005_clinic_events",
+      "breakpoints": true
     }
   ]
 }

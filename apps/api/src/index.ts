@@ -23,6 +23,7 @@ if (process.argv[2] === 'migrate') {
   const { registerRecallScheduler } = await import('./lib/recall-scheduler.ts');
   const { startRecallWorker } = await import('./lib/recall-worker.ts');
   const { startReminderWorker } = await import('./lib/reminder-worker.ts');
+  const { startSupervisorSyncScheduler } = await import('./lib/supervisor-saas.ts');
   const { startTelegramBotManager } = await import('./lib/telegram-bot-manager.ts');
   const { closeRedisPub } = await import('./modules/tenant-settings/tenant-settings.service.ts');
   const { initSentry } = await import('./lib/sentry.ts');
@@ -68,6 +69,13 @@ if (process.argv[2] === 'migrate') {
     ? startTelegramBotManager({ adminDb: messagingAdmin.db, withTenant })
     : null;
 
+  // L8: SaaS tenantlarni Supervisor'ga ro'yxatga olish retry + kunlik obuna sinxroni.
+  // Bot-manager bilan bir xil gating (admin conn); `SUPERVISOR_SAAS_TOKEN` yo'q yoki
+  // desktop bo'lsa no-op.
+  const stopSupervisorSync = messagingAdmin
+    ? startSupervisorSyncScheduler({ adminDb: messagingAdmin.db })
+    : null;
+
   // CLI-387 — License heartbeat: only relevant for Local Desktop (WEB_DIST_DIR
   // signal, same one requireModuleInDesktop uses — apps/api/src/lib/license-middleware.ts).
   // Cloud/dev/CI never write a .lic file, so this is a no-op there (readLicense()
@@ -95,6 +103,7 @@ if (process.argv[2] === 'migrate') {
       if (inProcessBotManager) await inProcessBotManager.stopAll();
       if (messagingAdmin) await messagingAdmin.client.end({ timeout: 5 });
       stopLicenseHeartbeat?.();
+      stopSupervisorSync?.();
       await reminderQueue.close();
       await recallQueue.close();
       await closeRedisPub(); // CLI-475 B5 — telegram:reload publish ulanishini yopadi

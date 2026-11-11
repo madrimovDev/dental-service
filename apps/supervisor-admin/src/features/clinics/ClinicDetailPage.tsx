@@ -199,6 +199,7 @@ export const ClinicDetailPage = () => {
   if (!data) return null;
 
   const activeModules: string[] = data.license?.modules ?? [];
+  const isSaas = data.clinic.mode === 'saas';
 
   const toggle = (mod: string) => {
     const updated = activeModules.includes(mod)
@@ -217,163 +218,210 @@ export const ClinicDetailPage = () => {
           {mutationError}
         </Text>
       )}
-      <Paper p="md" withBorder mb="md">
-        <Text fw={500}>Litsenziya: {data.license?.licenseKey}</Text>
-        <Text c="dimmed">Tarif: {data.license?.plan}</Text>
-        <Text c="dimmed">
-          Amal qilish:{' '}
-          {data.license?.expiresAt
-            ? new Date(data.license.expiresAt).toLocaleDateString('uz')
-            : '—'}
-        </Text>
-        <Text c="dimmed">Grace period: {data.license?.gracePeriodDays} kun</Text>
-        <Text c="dimmed">
-          Fingerprint: {data.license?.fingerprint ?? '— (hali faollashtirilmagan)'}
-        </Text>
-        <Text c={data.license?.isActive ? 'teal' : 'red'} mt="xs">
-          Holat: {data.license?.isActive ? 'Faol' : 'Bekor qilingan'}
-        </Text>
-        {/* Vaqtinchalik owner paroli aktivatsiyadan keyin Supervisor bazasidan
-            o'chiriladi — mavjudligi provisioning hali ko'chirilmaganini bildiradi. */}
-        <Alert
-          color={data.clinic.ownerTempPassword ? 'yellow' : 'green'}
-          variant="light"
-          mt="sm"
-          data-testid="provisioning-status"
-        >
-          {data.clinic.ownerTempPassword ? (
-            <>
-              Aktivatsiya kutilmoqda. Login: <b>{data.clinic.ownerPhone}</b>, vaqtinchalik parol:{' '}
-              <Code>{data.clinic.ownerTempPassword}</Code>
-            </>
-          ) : (
-            <>
-              Aktivatsiya qilingan — vaqtinchalik parol o'chirilgan. Parol unutilsa "Parol-tiklash
-              tokeni yaratish" tugmasidan foydalaning.
-            </>
-          )}
-        </Alert>
-        <Group mt="sm">
-          <Button
-            size="xs"
-            variant="outline"
-            onClick={() => reactivate.mutate()}
-            disabled={!data.license?.fingerprint}
-          >
-            Reactivate
-          </Button>
-          <Button size="xs" variant="outline" color="red" onClick={() => deactivate.mutate()}>
-            Bekor qilish
-          </Button>
-          <Button
-            size="xs"
-            variant="outline"
-            onClick={() => generateResetToken.mutate()}
-            loading={generateResetToken.isPending}
-          >
-            Parol-tiklash tokeni yaratish
-          </Button>
-          <Button size="xs" variant="outline" onClick={() => setReinstallConfirm(true)}>
-            Qayta o'rnatishga tayyorlash
-          </Button>
-          <Button size="xs" variant="outline" onClick={() => setRenewOpen(true)}>
-            Muddatni uzaytirish
-          </Button>
-        </Group>
-        <Modal opened={renewOpen} onClose={() => setRenewOpen(false)} title="Muddatni uzaytirish">
-          <TextInput
-            type="date"
-            label="Yangi amal qilish muddati"
-            value={renewDate}
-            onChange={(e) => setRenewDate(e.currentTarget.value)}
-            mb="md"
-          />
-          <Text size="sm" c="dimmed" mb="md">
-            Klinika yangi muddatni keyingi heartbeat'da oladi (internet talab qilinadi).
+      {isSaas && (
+        <Paper p="md" withBorder mb="md" data-testid="saas-card">
+          <Text fw={500}>Rejim: SaaS (litsenziyasiz)</Text>
+          <Text c="dimmed">Egasi: {data.clinic.ownerFullName}</Text>
+          <Text c="dimmed">
+            Obuna amal qilish:{' '}
+            {data.clinic.subscriptionExpiresAt
+              ? new Date(data.clinic.subscriptionExpiresAt).toLocaleDateString('uz')
+              : '—'}
           </Text>
-          <Button
-            onClick={() => renew.mutate(renewDate)}
-            disabled={!renewDate}
-            loading={renew.isPending}
-          >
-            Tasdiqlash
-          </Button>
-        </Modal>
-        <Modal
-          opened={reinstallConfirm}
-          onClose={() => setReinstallConfirm(false)}
-          title="Qayta o'rnatishga tayyorlash"
-        >
-          <Text size="sm" mb="md">
-            Yangi vaqtinchalik parol yaratiladi va qurilma bog'lanishi (fingerprint) bekor qilinadi.
-            Mijoz istalgan kompyuterda litsenziya kalitini kiritib klinikani qaytadan o'rnata oladi.
-            Eski parol ishlamay qoladi.
-          </Text>
-          <Text size="sm" c="dimmed" mb="md">
-            Eslatma: eski o'rnatma darhol to'xtamaydi — u keshlangan litsenziya bilan muddat
-            tugagunicha ishlashda davom etadi. Darhol to'xtatish kerak bo'lsa litsenziyani alohida
-            deaktivatsiya qiling.
-          </Text>
-          <Button onClick={() => prepareReinstall.mutate()} loading={prepareReinstall.isPending}>
-            Tasdiqlash
-          </Button>
-        </Modal>
-        {reinstallCreds && (
-          <Paper withBorder p="md" mt="md">
-            <Text fw={600} mb="xs">
-              Mijozga yetkazing (bir marta ko'rsatiladi)
+          <Group mt="sm">
+            <Button size="xs" variant="outline" onClick={() => setRenewOpen(true)}>
+              Muddatni uzaytirish
+            </Button>
+          </Group>
+          <Modal opened={renewOpen} onClose={() => setRenewOpen(false)} title="Muddatni uzaytirish">
+            <TextInput
+              type="date"
+              label="Yangi amal qilish muddati"
+              value={renewDate}
+              onChange={(e) => setRenewDate(e.currentTarget.value)}
+              mb="md"
+            />
+            <Text size="sm" c="dimmed" mb="md">
+              Klinika yangi muddatni kunlik sinxronda yoki «Qayta tekshirish»da oladi.
             </Text>
-            {/* Qiymatlar ATAYIN alohida elementda (`<b>` / `<Code>`) —
+            <Button
+              onClick={() => renew.mutate(renewDate)}
+              disabled={!renewDate}
+              loading={renew.isPending}
+            >
+              Tasdiqlash
+            </Button>
+          </Modal>
+        </Paper>
+      )}
+      {!isSaas && (
+        <>
+          <Paper p="md" withBorder mb="md">
+            <Text fw={500}>Litsenziya: {data.license?.licenseKey}</Text>
+            <Text c="dimmed">Tarif: {data.license?.plan}</Text>
+            <Text c="dimmed">
+              Amal qilish:{' '}
+              {data.license?.expiresAt
+                ? new Date(data.license.expiresAt).toLocaleDateString('uz')
+                : '—'}
+            </Text>
+            <Text c="dimmed">Grace period: {data.license?.gracePeriodDays} kun</Text>
+            <Text c="dimmed">
+              Fingerprint: {data.license?.fingerprint ?? '— (hali faollashtirilmagan)'}
+            </Text>
+            <Text c={data.license?.isActive ? 'teal' : 'red'} mt="xs">
+              Holat: {data.license?.isActive ? 'Faol' : 'Bekor qilingan'}
+            </Text>
+            {/* Vaqtinchalik owner paroli aktivatsiyadan keyin Supervisor bazasidan
+            o'chiriladi — mavjudligi provisioning hali ko'chirilmaganini bildiradi. */}
+            <Alert
+              color={data.clinic.ownerTempPassword ? 'yellow' : 'green'}
+              variant="light"
+              mt="sm"
+              data-testid="provisioning-status"
+            >
+              {data.clinic.ownerTempPassword ? (
+                <>
+                  Aktivatsiya kutilmoqda. Login: <b>{data.clinic.ownerPhone}</b>, vaqtinchalik
+                  parol: <Code>{data.clinic.ownerTempPassword}</Code>
+                </>
+              ) : (
+                <>
+                  Aktivatsiya qilingan — vaqtinchalik parol o'chirilgan. Parol unutilsa
+                  "Parol-tiklash tokeni yaratish" tugmasidan foydalaning.
+                </>
+              )}
+            </Alert>
+            <Group mt="sm">
+              <Button
+                size="xs"
+                variant="outline"
+                onClick={() => reactivate.mutate()}
+                disabled={!data.license?.fingerprint}
+              >
+                Reactivate
+              </Button>
+              <Button size="xs" variant="outline" color="red" onClick={() => deactivate.mutate()}>
+                Bekor qilish
+              </Button>
+              <Button
+                size="xs"
+                variant="outline"
+                onClick={() => generateResetToken.mutate()}
+                loading={generateResetToken.isPending}
+              >
+                Parol-tiklash tokeni yaratish
+              </Button>
+              <Button size="xs" variant="outline" onClick={() => setReinstallConfirm(true)}>
+                Qayta o'rnatishga tayyorlash
+              </Button>
+              <Button size="xs" variant="outline" onClick={() => setRenewOpen(true)}>
+                Muddatni uzaytirish
+              </Button>
+            </Group>
+            <Modal
+              opened={renewOpen}
+              onClose={() => setRenewOpen(false)}
+              title="Muddatni uzaytirish"
+            >
+              <TextInput
+                type="date"
+                label="Yangi amal qilish muddati"
+                value={renewDate}
+                onChange={(e) => setRenewDate(e.currentTarget.value)}
+                mb="md"
+              />
+              <Text size="sm" c="dimmed" mb="md">
+                Klinika yangi muddatni keyingi heartbeat'da oladi (internet talab qilinadi).
+              </Text>
+              <Button
+                onClick={() => renew.mutate(renewDate)}
+                disabled={!renewDate}
+                loading={renew.isPending}
+              >
+                Tasdiqlash
+              </Button>
+            </Modal>
+            <Modal
+              opened={reinstallConfirm}
+              onClose={() => setReinstallConfirm(false)}
+              title="Qayta o'rnatishga tayyorlash"
+            >
+              <Text size="sm" mb="md">
+                Yangi vaqtinchalik parol yaratiladi va qurilma bog'lanishi (fingerprint) bekor
+                qilinadi. Mijoz istalgan kompyuterda litsenziya kalitini kiritib klinikani qaytadan
+                o'rnata oladi. Eski parol ishlamay qoladi.
+              </Text>
+              <Text size="sm" c="dimmed" mb="md">
+                Eslatma: eski o'rnatma darhol to'xtamaydi — u keshlangan litsenziya bilan muddat
+                tugagunicha ishlashda davom etadi. Darhol to'xtatish kerak bo'lsa litsenziyani
+                alohida deaktivatsiya qiling.
+              </Text>
+              <Button
+                onClick={() => prepareReinstall.mutate()}
+                loading={prepareReinstall.isPending}
+              >
+                Tasdiqlash
+              </Button>
+            </Modal>
+            {reinstallCreds && (
+              <Paper withBorder p="md" mt="md">
+                <Text fw={600} mb="xs">
+                  Mijozga yetkazing (bir marta ko'rsatiladi)
+                </Text>
+                {/* Qiymatlar ATAYIN alohida elementda (`<b>` / `<Code>`) —
                 yuqoridagi provisioning Alert'i bilan bir xil idiom, matn
                 bo'yicha aniq qidirish shuni talab qiladi. */}
-            <Text size="sm">
-              Login (telefon): <b>{reinstallCreds.loginPhone}</b>
-            </Text>
-            <Text size="sm">
-              Vaqtinchalik parol: <Code>{reinstallCreds.tempPassword}</Code>
-            </Text>
-            <CopyButton value={reinstallCreds.tempPassword}>
-              {({ copied, copy }) => (
-                <Button size="xs" variant="subtle" onClick={copy}>
-                  {copied ? 'Nusxalandi' : 'Parolni nusxalash'}
-                </Button>
-              )}
-            </CopyButton>
-          </Paper>
-        )}
-        {resetToken && (
-          <Stack gap={4} mt="sm">
-            <TextInput
-              label="Parol-tiklash tokeni"
-              value={resetToken}
-              readOnly
-              rightSection={
-                <CopyButton value={resetToken}>
+                <Text size="sm">
+                  Login (telefon): <b>{reinstallCreds.loginPhone}</b>
+                </Text>
+                <Text size="sm">
+                  Vaqtinchalik parol: <Code>{reinstallCreds.tempPassword}</Code>
+                </Text>
+                <CopyButton value={reinstallCreds.tempPassword}>
                   {({ copied, copy }) => (
                     <Button size="xs" variant="subtle" onClick={copy}>
-                      {copied ? 'Nusxalandi' : 'Nusxalash'}
+                      {copied ? 'Nusxalandi' : 'Parolni nusxalash'}
                     </Button>
                   )}
                 </CopyButton>
-              }
-            />
-            <Text size="sm" c="dimmed">
-              Bir marta ko'rsatiladi — mijozga bering. 24 soat amal qiladi.
-            </Text>
+              </Paper>
+            )}
+            {resetToken && (
+              <Stack gap={4} mt="sm">
+                <TextInput
+                  label="Parol-tiklash tokeni"
+                  value={resetToken}
+                  readOnly
+                  rightSection={
+                    <CopyButton value={resetToken}>
+                      {({ copied, copy }) => (
+                        <Button size="xs" variant="subtle" onClick={copy}>
+                          {copied ? 'Nusxalandi' : 'Nusxalash'}
+                        </Button>
+                      )}
+                    </CopyButton>
+                  }
+                />
+                <Text size="sm" c="dimmed">
+                  Bir marta ko'rsatiladi — mijozga bering. 24 soat amal qiladi.
+                </Text>
+              </Stack>
+            )}
+          </Paper>
+          <Title order={4} mb="sm">
+            Modullar
+          </Title>
+          <Stack gap="xs">
+            {ALL_MODULES.map((mod) => (
+              <Group key={mod} justify="space-between">
+                <Text>{mod}</Text>
+                <Switch checked={activeModules.includes(mod)} onChange={() => toggle(mod)} />
+              </Group>
+            ))}
           </Stack>
-        )}
-      </Paper>
-      <Title order={4} mb="sm">
-        Modullar
-      </Title>
-      <Stack gap="xs">
-        {ALL_MODULES.map((mod) => (
-          <Group key={mod} justify="space-between">
-            <Text>{mod}</Text>
-            <Switch checked={activeModules.includes(mod)} onChange={() => toggle(mod)} />
-          </Group>
-        ))}
-      </Stack>
+        </>
+      )}
     </>
   );
 };

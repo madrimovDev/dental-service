@@ -26,14 +26,25 @@ export function AppShell() {
       </a>
       <CommandPalette />
       <MantineAppShell.Header>
-        <LicenseBanner />
-        <DesktopUpdateBanner />
         <Topbar onBurger={toggle} burgerOpened={opened} />
       </MantineAppShell.Header>
       <MantineAppShell.Navbar>
         <Sidebar />
       </MantineAppShell.Navbar>
       <MantineAppShell.Main id="main-content">
+        {/* Banner'lar header ICHIDA emas (u 62px qat'iy balandlikda — banner Topbar'ni
+            qoplab qo'yardi): sarlavha ostida yopishib turadi, kontentni siljitadi. */}
+        <div
+          style={{
+            position: 'sticky',
+            top: 'var(--app-shell-header-offset, 0px)',
+            zIndex: 10,
+            margin: 'calc(-1 * var(--mantine-spacing-md)) calc(-1 * var(--mantine-spacing-md)) 0',
+          }}
+        >
+          <LicenseBanner />
+          <DesktopUpdateBanner />
+        </div>
         <Suspense fallback={<PageLoader />}>
           <Outlet />
         </Suspense>

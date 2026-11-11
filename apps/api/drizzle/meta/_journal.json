@@ -407,6 +407,13 @@
       "when": 1794426236908,
       "tag": "0057_patient_import_perm",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1794427155126,
+      "tag": "0058_saas_subscription",
+      "breakpoints": true
     }
   ]
 }

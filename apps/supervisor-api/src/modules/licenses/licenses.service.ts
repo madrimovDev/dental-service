@@ -4,6 +4,7 @@ import { db } from '../../db/client';
 import { branches, clinics, licenseEvents, licenseResetTokens, licenses } from '../../db/schema';
 import { signLicense } from '../../lib/rsa';
 import { generateTempPassword } from '../../lib/temp-password';
+import { pushClinicToHub } from '../hub/clinic-state';
 
 // CLI-226 — vendor-vositachiligidagi owner parol-tiklash tokeni. Format
 // clinics.routes.ts'dagi license-key generator bilan bir xil uslub: 3ta
@@ -359,6 +360,8 @@ export const createLicenseService = () => ({
       fingerprint: newFingerprint,
       metadata: { previousFingerprint: lic.fingerprint },
     });
+    // Deaktivatsiyadan keyin qayta yoqish ham Hub holatini o'zgartiradi (best-effort).
+    await pushClinicToHub(lic.clinicId);
     return buildResponse({ ...lic, fingerprint: newFingerprint }, new Date().toISOString());
   },
 

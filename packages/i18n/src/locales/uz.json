@@ -1628,14 +1628,18 @@
   "license": {
     "banner": {
       "expiring": "Litsenziya {{count}} kundan keyin tugaydi",
-      "grace": "To'lov kechikdi, {{count}} kundan keyin dastur to'xtaydi"
+      "grace": "To'lov kechikdi, {{count}} kundan keyin dastur to'xtaydi",
+      "subscriptionExpiring": "Obuna {{count}} kundan keyin tugaydi",
+      "subscriptionGrace": "To'lov kechikdi, {{count}} kundan keyin xizmat to'xtaydi"
     },
     "blocked": {
       "title": "Litsenziya muddati tugadi",
       "body": "To'lov qilishingiz kerak, ta'minotchiga murojaat qiling",
       "internet": "Internetga ulaning",
       "recheck": "Qayta tekshirish",
-      "stillExpired": "Litsenziya hali ham faol emas"
+      "stillExpired": "Litsenziya hali ham faol emas",
+      "subscriptionTitle": "Obuna muddati tugadi",
+      "subscriptionBody": "To'lov qilishingiz kerak, ta'minotchiga murojaat qiling"
     }
   },
   "patientsList": {

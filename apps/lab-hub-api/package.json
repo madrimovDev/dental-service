@@ -1,0 +1,28 @@
+{
+  "name": "@lab-hub/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --env-file=.env --hot run src/index.ts",
+    "start:prod": "bun run src/index.ts",
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "env -u DATABASE_URL -u DATABASE_ADMIN_URL -u JWT_SECRET -u LAB_HUB_KEK -u UPLOADS_DIR bun --env-file=.env test --timeout 30000",
+    "db:generate": "bun --env-file=.env x drizzle-kit generate",
+    "db:migrate": "env -u DATABASE_URL -u DATABASE_ADMIN_URL bun --env-file=.env run src/db/migrate.ts",
+    "db:migrate:prod": "bun run src/db/migrate.ts"
+  },
+  "dependencies": {
+    "@hono/zod-openapi": "^1.2.0",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.12.18",
+    "jose": "^6.2.3",
+    "postgres": "^3.4.5",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "bun-types": "latest",
+    "drizzle-kit": "^0.31.10"
+  }
+}
