@@ -10,12 +10,14 @@ import {
   branches,
   cashierTransactions,
   patients,
+  permissions,
+  rolePermissions,
   roles,
   tenants,
   userAssignments,
   users,
 } from '@dental/db-schema';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { createApp } from '../../src/app.ts';
 import { db } from '../../src/db/client.ts';
 import { signAccess } from '../../src/lib/jwt.ts';
@@ -58,6 +60,17 @@ beforeAll(async () => {
   const ghost = await mk('+998900002206'); // Branch Manager — tayinlov yo'q
   const expired = await mk('+998900002207'); // Branch Manager — faolsiz tayinlov
   const doc = await mk('+998900002208');
+  const mixed = await mk('+998900002209'); // A'da Branch Manager, B'da Doctor (report.view yo'q)
+  const mixedWide = await mk('+998900002210'); // tenant-wide Doctor + A'da Branch Manager
+  // report.view — platform katalogi (test bazasida bo'lmasa qo'shamiz)
+  await db
+    .insert(permissions)
+    .values({ code: 'report.view', category: 'report' })
+    .onConflictDoNothing();
+  const [reportView] = await db
+    .select({ id: permissions.id })
+    .from(permissions)
+    .where(eq(permissions.code, 'report.view'));
   tenantId = (
     await db
       .insert(tenants)
@@ -82,6 +95,12 @@ beforeAll(async () => {
       .insert(roles)
       .values({ tenantId, name: 'R' })
       .returning({ id: roles.id });
+    // 'R' — report.view beradi; 'NR' — hech qanday hisobot huquqisiz (Doctor shabloniga o'xshash)
+    await tx.insert(rolePermissions).values({ roleId: role!.id, permissionId: reportView!.id });
+    const [noReportRole] = await tx
+      .insert(roles)
+      .values({ tenantId, name: 'NR' })
+      .returning({ id: roles.id });
     const asg = (userId: string, branchId: string | null, extra: object = {}) => ({
       tenantId,
       userId,
@@ -98,6 +117,10 @@ beforeAll(async () => {
         asg(admin, null),
         asg(acc, null),
         asg(expired, brA, { isActive: false }),
+        asg(mixed, brA),
+        { ...asg(mixed, brB), roleId: noReportRole!.id },
+        { ...asg(mixedWide, null), roleId: noReportRole!.id },
+        asg(mixedWide, brA),
       ]);
     const [pt] = await tx
       .insert(patients)
@@ -149,6 +172,9 @@ beforeAll(async () => {
   tokens.admin = await tokenFor(admin, permsFor('tenant_admin'), 'tenant_admin');
   tokens.acc = await tokenFor(acc, permsFor('accountant'), 'accountant');
   tokens.ghost = await tokenFor(ghost, permsFor('branch_manager'), 'branch_manager');
+  // JWT: A workspace'ga o'tilgan (Branch Manager permset — report.view bor)
+  tokens.mixed = await tokenFor(mixed, permsFor('branch_manager'), 'branch_manager');
+  tokens.mixedWide = await tokenFor(mixedWide, permsFor('branch_manager'), 'branch_manager');
   tokens.expired = await tokenFor(expired, permsFor('branch_manager'), 'branch_manager');
 });
 
@@ -211,6 +237,27 @@ describe('Ikki filialli Branch Manager', () => {
     expect((await data(await q('appointments', 'bmAB'))).total).toBe(3);
     expect((await data(await q('revenue', 'bmAB', `&branchId=${brB}`))).total).toBe(20_000);
     expect((await q('revenue', 'bmAB', `&branchId=${brC}`)).status).toBe(403);
+  });
+});
+
+describe('IR-06: doira faqat report.view beradigan tayinlovlardan', () => {
+  test("A'da Branch Manager, B'da Doctor: B tushumi ko'rinmaydi (403), yig'indi faqat A", async () => {
+    const res = await q('revenue', 'mixed', `&branchId=${brB}`);
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as any).error.code).toBe('report.branch_forbidden');
+    expect((await data(await q('revenue', 'mixed'))).total).toBe(100_000);
+    expect((await data(await q('revenue', 'mixed', `&branchId=${brA}`))).total).toBe(100_000);
+    expect((await q('1c-export', 'mixed', `&branchId=${brB}`)).status).toBe(403);
+  });
+
+  test("tenant-wide Doctor + A'da Branch Manager: cheklovsiz EMAS — faqat A; tenant-darajali 403", async () => {
+    expect((await data(await q('revenue', 'mixedWide'))).total).toBe(100_000);
+    expect((await q('revenue', 'mixedWide', `&branchId=${brC}`)).status).toBe(403);
+    for (const path of ['debt-aging', 'treatment-plans', 'dental-analytics']) {
+      const res = await q(path, 'mixedWide');
+      expect(res.status).toBe(403);
+      expect(((await res.json()) as any).error.code).toBe('report.tenant_scope_required');
+    }
   });
 });
 

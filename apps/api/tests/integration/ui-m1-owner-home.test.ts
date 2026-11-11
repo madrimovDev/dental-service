@@ -9,6 +9,8 @@ import {
   branches,
   cashierTransactions,
   patients,
+  permissions,
+  rolePermissions,
   roles,
   tenants,
   treatmentPlans,
@@ -17,7 +19,7 @@ import {
   userAssignments,
   users,
 } from '@dental/db-schema';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { createApp } from '../../src/app.ts';
 import { db } from '../../src/db/client.ts';
 import { signAccess } from '../../src/lib/jwt.ts';
@@ -70,6 +72,16 @@ beforeAll(async () => {
       .insert(roles)
       .values({ tenantId, name: 'R' })
       .returning({ id: roles.id });
+    // IR-06: doiraga faqat roli report.view beradigan tayinlov kiradi.
+    await db
+      .insert(permissions)
+      .values({ code: 'report.view', category: 'report' })
+      .onConflictDoNothing();
+    const [reportView] = await db
+      .select({ id: permissions.id })
+      .from(permissions)
+      .where(eq(permissions.code, 'report.view'));
+    await tx.insert(rolePermissions).values({ roleId: role!.id, permissionId: reportView!.id });
     await tx
       .insert(userAssignments)
       .values({ tenantId, userId: accId, branchId: null, roleId: role!.id });

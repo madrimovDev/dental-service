@@ -1,5 +1,5 @@
 import { fail } from '@dental/core';
-import { userAssignments } from '@dental/db-schema';
+import { permissions, rolePermissions, userAssignments } from '@dental/db-schema';
 import { and, eq, gt, isNotNull, isNull, or } from 'drizzle-orm';
 import type { MiddlewareHandler } from 'hono';
 import { getDb } from '../db/scoped.ts';
@@ -17,7 +17,7 @@ export type BranchScope =
   | { kind: 'none' };
 
 /**
- * Sof qaror: faol va qabul qilingan tayinlovlardan filial doirasi.
+ * Sof qaror: faol, qabul qilingan va `report.view` beruvchi tayinlovlardan filial doirasi.
  * Bitta tenant-wide (`branchId = null`) tayinlov → butun klinika; aks holda tayinlangan
  * filiallar; tayinlov yo'q → hech narsa (fail-closed).
  */
@@ -48,6 +48,16 @@ export const reportBranchScope =
       const rows = await getDb(c)
         .select({ branchId: userAssignments.branchId })
         .from(userAssignments)
+        // IR-06: doiraga FAQAT roli `report.view` beradigan tayinlovlar kiradi. Aks holda boshqa
+        // filialdagi report.view'siz rol (masalan Doctor) hisobot doirasini kengaytirib yuboradi.
+        .innerJoin(rolePermissions, eq(rolePermissions.roleId, userAssignments.roleId))
+        .innerJoin(
+          permissions,
+          and(
+            eq(permissions.id, rolePermissions.permissionId),
+            eq(permissions.code, 'report.view'),
+          ),
+        )
         .where(
           and(
             eq(userAssignments.userId, claims.sub),
@@ -57,7 +67,7 @@ export const reportBranchScope =
             or(isNull(userAssignments.validTo), gt(userAssignments.validTo, now)),
           ),
         );
-      scope = decideBranchScope(rows.map((r) => r.branchId));
+      scope = decideBranchScope([...new Set(rows.map((r) => r.branchId))]);
     }
 
     if (scope.kind === 'none') {
