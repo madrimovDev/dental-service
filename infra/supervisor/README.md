@@ -87,6 +87,9 @@ Env (ixtiyoriy, `export` yoki cron qatorida):
 
 - `COMPOSE_FILE` — default `docker-compose.ip.yml` (skript papkasidan).
   Domen rejimida `docker-compose.prod.yml` ko'rsating.
+- `ENV_FILE` — default `infra/supervisor/.env.production`. Compose interpolatsiyasi
+  (`${POSTGRES_USER:?}`, `${RSA_PRIVATE_KEY:?}` …) uchun skript `docker compose --env-file`
+  bilan shu faylni beradi. Cron'da majburiy: compose `.env.production`ni o'zi yuklamaydi.
 - `POSTGRES_USER` — default `supervisor`; `.env.production`dagidan farq qilsa, shu yerda bering.
 - `BACKUP_DIR` — default `/var/backups/supervisor` (papka `700`, fayllar `600`).
 - `RETENTION_DAYS` — default `30`. Eng yangi zaxira hech qachon o'chirilmaydi.

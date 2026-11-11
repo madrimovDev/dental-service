@@ -20,6 +20,10 @@
 #   POSTGRES_USER         default: supervisor (konteyner ichidagi pg rol nomi)
 #   BACKUP_RSYNC_TARGET   agar berilsa, BACKUP_DIR shu manzilga rsync qilinadi
 #                         (masalan user@host:/srv/supervisor-backups/)
+#   ENV_FILE              compose interpolatsiya uchun env fayl (docker-compose.ip.yml
+#                         `${POSTGRES_USER:?}` va boshqalarni talab qiladi). Default:
+#                         ${SCRIPT_DIR}/.env.production. Cron'da bu MAJBURIY — compose
+#                         `.env.production`ni o'zi avtomatik yuklamaydi.
 #   PG_DUMP_CMD           TEST UCHUN: compose o'rniga shu buyruq (sh -c) stdout'iga
 #                         dump yozadi (masalan lokal smoke uchun docker exec ...)
 #
@@ -33,6 +37,7 @@ COMPOSE_FILE="${COMPOSE_FILE:-${SCRIPT_DIR}/docker-compose.ip.yml}"
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/supervisor}"
 RETENTION_DAYS="${RETENTION_DAYS:-30}"
 POSTGRES_USER="${POSTGRES_USER:-supervisor}"
+ENV_FILE="${ENV_FILE:-${SCRIPT_DIR}/.env.production}"
 TS="$(date -u +%Y%m%dT%H%M%SZ)"
 DEST="${BACKUP_DIR}/${TS}"
 
@@ -60,7 +65,7 @@ if [ -n "${PG_DUMP_CMD:-}" ]; then
   sh -c "${PG_DUMP_CMD}" > "${DEST}/supervisor.dump.partial"
 else
   [ -f "${COMPOSE_FILE}" ] || { echo "COMPOSE_FILE topilmadi: ${COMPOSE_FILE}" >&2; exit 1; }
-  docker compose -f "${COMPOSE_FILE}" exec -T postgres \
+  docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" exec -T postgres \
     pg_dump -U "${POSTGRES_USER}" -Fc supervisor > "${DEST}/supervisor.dump.partial"
 fi
 [ -s "${DEST}/supervisor.dump.partial" ] || { echo "dump bo'sh" >&2; exit 1; }
@@ -73,6 +78,12 @@ mv "${DEST}/supervisor.dump.partial" "${DEST}/supervisor.dump"
   echo "restore=pg_restore --clean --if-exists -d supervisor supervisor.dump"
 } > "${DEST}/MANIFEST"
 log "wrote ${DEST}"
+
+# Zaxira to'liq yozildi. Bundan keyin xatolik (retention, rsync) mahalliy
+# zaxirani o'chirmasligi kerak — ok=1 shu yerda, rsync'dan OLDIN o'rnatiladi.
+# rsync xatosi `set -e` bilan non-zero exit beradi, lekin cleanup papkani
+# qoldiradi.
+ok=1
 
 # --- 3. Retention: RETENTION_DAYS dan eski papkalar, eng yangisi saqlanadi ----
 newest="$(find "${BACKUP_DIR}" -mindepth 1 -maxdepth 1 -type d -name '[0-9]*T*Z' \
@@ -93,5 +104,4 @@ if [ -n "${BACKUP_RSYNC_TARGET:-}" ]; then
   rsync -a "${BACKUP_DIR}/" "${BACKUP_RSYNC_TARGET}"
 fi
 
-ok=1
 log "done"
