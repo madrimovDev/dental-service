@@ -15,16 +15,7 @@ import { type SpawnSyncReturns, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { app } from 'electron';
-
-const getResourcesDir = (): string =>
-  app.isPackaged ? process.resourcesPath : join(import.meta.dirname, '..', 'resources');
-
-const getDataDir = (): string =>
-  process.env.DENTAL_DATA_DIR ||
-  (process.platform === 'win32' ? 'C:\\ProgramData\\DentalService' : '/var/lib/dental-service');
-
-const getPgDataDir = (): string => join(getDataDir(), 'postgres', 'data');
+import { getDataDir, getPgDataDir, getResourcesDir } from './paths.js';
 
 // Windows: portable binary resources/postgres/bin/initdb.exe. Boshqa
 // platformalar (dev/test): tizim PATH'idan `initdb` (bundled binary yo'q).

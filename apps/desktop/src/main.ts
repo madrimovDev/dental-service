@@ -54,13 +54,8 @@ import {
 } from './discovery.js';
 import { isFirstRun, runFirstSetup, runMigrations } from './first-run.js';
 import { fetchBootstrapStatus, licenseGatedUrl, resolveStartupUrl } from './license-status.js';
-import {
-  getApiCommand,
-  startApiLayer,
-  startDatabaseLayer,
-  startServer,
-  stopServer,
-} from './process-manager.js';
+import { createPgTools, createStateStore, migrateOnStart } from './migrate-on-start.js';
+import { getApiCommand, startApiLayer, startDatabaseLayer, stopServer } from './process-manager.js';
 import { type PromptWindowLike, promptServerUrl } from './server-url-prompt.js';
 import { applyServerUrl, registerSettingsIpc, validateServerUrl } from './settings-ipc.js';
 import { setupSingleInstance } from './single-instance.js';
@@ -286,12 +281,34 @@ app.whenReady().then(async () => {
       const firstRun = isFirstRun();
       if (firstRun) {
         runFirstSetup();
-        await startDatabaseLayer();
-        runMigrations(API_EXE);
-        await startApiLayer(config.serverPort);
-      } else {
-        await startServer(config.serverPort);
       }
+      await startDatabaseLayer();
+      // P2 — har startda migratsiya (yangilanishda ham sxema yangilanadi):
+      // versiya o'zgargan bo'lsa oldin pg_dump, yiqilsa dump'dan tiklanadi
+      // va API ISHGA TUSHIRILMAYDI.
+      const migration = migrateOnStart({
+        ...createStateStore(firstRun),
+        ...createPgTools(),
+        runMigrations: () => runMigrations(API_EXE),
+        appVersion: app.getVersion(),
+        now: () => new Date(),
+      });
+      if (!migration.ok) {
+        const message =
+          migration.reason === 'phone_conflict'
+            ? "Yangilash to'xtatildi: bazada takroriy telefon raqamlari bor. Ta'minotchiga murojaat qiling."
+            : migration.restored
+              ? "Yangilash muvaffaqiyatsiz. Ma'lumotlar avvalgi holatga qaytarildi. Ta'minotchiga murojaat qiling."
+              : `Yangilash muvaffaqiyatsiz. Ma'lumotlarni qaytarib bo'lmadi${migration.backupFile ? `, zaxira: ${migration.backupFile}` : ''}. Ta'minotchiga murojaat qiling.`;
+        dialog.showErrorBox(
+          "Dental Service — yangilash to'xtatildi",
+          `${message}\n\nTafsilot: ${migration.message}\nLoglarni ko'ring: ${LOGS_DIR}`,
+        );
+        await stopServer();
+        app.quit();
+        return;
+      }
+      await startApiLayer(config.serverPort);
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
       dialog.showErrorBox(

@@ -16,24 +16,12 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { app } from 'electron';
 import {
   getOrCreateDbPassword,
   getOrCreateJwtSecret,
   getOrCreateSuperuserPassword,
 } from './first-run.js';
-
-const getResourcesDir = (): string =>
-  app.isPackaged ? process.resourcesPath : join(import.meta.dirname, '..', 'resources');
-
-// Postgres/Valkey/uploads/logs bir xil ma'lumot papkasi ostida yashaydi
-// (`config.ts`dagi CONFIG_DIR bilan bir xil default — DENTAL_DATA_DIR alohida
-// override qilinishi mumkin, masalan testlarda).
-const getDataDir = (): string =>
-  process.env.DENTAL_DATA_DIR ||
-  (process.platform === 'win32' ? 'C:\\ProgramData\\DentalService' : '/var/lib/dental-service');
-
-const getPgDataDir = (): string => join(getDataDir(), 'postgres', 'data');
+import { getDataDir, getPgDataDir, getResourcesDir } from './paths.js';
 
 // Platform param default `process.platform` — testlarda ikkala tarmoqni ham
 // (win32 va boshqa) haqiqiy joriy platformadan mustaqil sinash uchun.
