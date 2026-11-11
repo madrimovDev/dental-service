@@ -17,6 +17,7 @@ import { requestId } from './middleware/request-id.ts';
 import { appointmentRoutes, createAppointmentsService } from './modules/appointments/index.ts';
 import { auditRoutes } from './modules/audit/index.ts';
 import { authRoutes } from './modules/auth/index.ts';
+import { backupRoutes } from './modules/backup/index.ts';
 import { branchRoutes } from './modules/branches/index.ts';
 import { cashierRoutes } from './modules/cashier/index.ts';
 import { clinicalRoutes } from './modules/clinical/index.ts';
@@ -176,6 +177,8 @@ export const createApp = () => {
   app.route('/api/permissions', permissionRoutes({ db }));
   app.route('/api/tenant', tenantRoutes({ db, audit }));
   app.route('/api/tenant-settings', tenantSettingsRoutes({ db, audit }));
+  // UI-3 D.1: desktop zaxira nusxa (cloud'da status `mode:'cloud'`, qolganlari 404).
+  app.route('/api/backup', backupRoutes({ db, audit }));
   app.route('/api/branches', branchRoutes({ db, audit }));
   app.route('/api/roles', roleRoutes({ db, audit }));
   app.route('/api/users', userRoutes({ db, audit }));
