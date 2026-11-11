@@ -20,7 +20,7 @@ describe('readConfig / writeConfig', () => {
   test('returns default config if file missing', () => {
     const cfg = readConfig();
     expect(cfg.role).toBe('server');
-    expect(cfg.serverPort).toBe(80);
+    expect(cfg.serverPort).toBe(8080);
     expect(cfg.serverUrl).toBeNull();
     expect(cfg.licenseKey).toBeNull();
   });
@@ -38,5 +38,12 @@ describe('readConfig / writeConfig', () => {
     const cfg = readConfig();
     expect(cfg.licenseKey).toBe('KEY-1');
     expect(cfg.role).toBe('client');
+  });
+
+  test('preserves existing serverPort and licenseKey', () => {
+    writeConfig({ serverPort: 9090, licenseKey: 'KEY-9' });
+    const cfg = readConfig();
+    expect(cfg.serverPort).toBe(9090);
+    expect(cfg.licenseKey).toBe('KEY-9');
   });
 });
