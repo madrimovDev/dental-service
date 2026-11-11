@@ -20,6 +20,8 @@ import {
   dentalAnalyticsReportDtoSchema,
   doctorWorkloadReportDtoSchema,
   oneCExportReportDtoSchema,
+  ownerTodayQuerySchema,
+  ownerTodayReportDtoSchema,
   planCompletionReportDtoSchema,
   reportRangeSchema,
   revenueReportDtoSchema,
@@ -119,6 +121,23 @@ export const reportsRoutes = (deps: { db: Database; audit: AuditLogger }) => {
 
   app.openapi(debtAgingRoute, async (c) => {
     const result = await service.debtAging(c);
+    return c.json(ok(result), 200);
+  });
+
+  // ─── GET /owner-today (UI-M1) ────────────────────────────────────────────────
+
+  const ownerTodayRoute = createRoute({
+    method: 'get',
+    path: '/owner-today',
+    tags: ['reports'],
+    operationId: 'getOwnerTodayReport',
+    middleware: [requirePermission('report.view')] as const,
+    request: { query: ownerTodayQuerySchema },
+    responses: okJson(ownerTodayReportDtoSchema, 'Owner today overview'),
+  });
+
+  app.openapi(ownerTodayRoute, async (c) => {
+    const result = await service.ownerToday(c, c.req.valid('query'));
     return c.json(ok(result), 200);
   });
 

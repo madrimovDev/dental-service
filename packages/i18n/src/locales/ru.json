@@ -1994,6 +1994,23 @@
     "branches": "Филиалы",
     "branchRevenue": "Выручка",
     "backupTile": "Резервная копия",
-    "backupOk": "Последняя: {{date}}"
+    "backupOk": "Последняя: {{date}}",
+    "kpiRevenueToday": "Чистая выручка за сегодня",
+    "kpiRevenueHint": "возвраты −{{refunded}}",
+    "methodCash": "наличные",
+    "methodCard": "карта",
+    "methodTransfer": "перевод",
+    "methodOther": "другое",
+    "branchesToday": "Филиалы сегодня",
+    "colBranch": "Филиал",
+    "colNetRevenue": "Чистая выручка",
+    "colPatients": "Пациенты",
+    "colOccupancy": "Загрузка кресел",
+    "colStatus": "Статус",
+    "branchActive": "Работает",
+    "branchIdle": "Сегодня нет активности",
+    "doctorsToday": "Врачи сегодня",
+    "doctorProgress": "Принято {{done}} из {{planned}}",
+    "doctorProgressAria": "{{done}} из {{planned}} пациентов"
   }
 }

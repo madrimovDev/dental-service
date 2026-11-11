@@ -52,6 +52,7 @@ import type {
   DentalAnalyticsReport,
   DoctorWorkloadRow,
   OneCExportRow,
+  OwnerTodayReport,
   PlanCompletionReport,
   ReportRange,
   RevenueReport,
@@ -805,8 +806,132 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
     };
   }
 
+  /**
+   * UI-M1 — rahbar «bugun» ko'rinishi (Tashkent kuni). Sof tushum = to'lovlar − refundlar
+   * (P13: refund ayriladi, `signedPaidAmount`). Filial va shifokor bo'yicha bugun.
+   */
+  async function ownerToday(
+    c: Context,
+    { branchId }: { branchId?: string },
+  ): Promise<OwnerTodayReport> {
+    const db = getDb(c);
+    const date = new Date(Date.now() + 5 * 3_600_000).toISOString().slice(0, 10);
+    const { start, end } = tashkentRange(date, date);
+    const weekday = WEEKDAYS[new Date(`${date}T12:00:00+05:00`).getUTCDay()] as string;
+
+    const txBase = [
+      eq(cashierTransactions.status, 'completed'),
+      inRange(cashierTransactions.createdAt, start, end),
+    ];
+    if (branchId) txBase.push(eq(cashierTransactions.branchId, branchId));
+
+    const refundSum = sql<string>`COALESCE(SUM(CASE WHEN ${cashierTransactions.type} = 'refund' THEN ${cashierTransactions.paidAmount} ELSE 0 END), 0)`;
+    const [totals] = await db
+      .select({ net: signedPaidAmount, refunded: refundSum })
+      .from(cashierTransactions)
+      .where(and(...txBase));
+    const methods = await db
+      .select({ paymentMethod: cashierTransactions.paymentMethod, total: signedPaidAmount })
+      .from(cashierTransactions)
+      .where(and(...txBase))
+      .groupBy(cashierTransactions.paymentMethod);
+    const branchRev = await db
+      .select({ branchId: cashierTransactions.branchId, total: signedPaidAmount })
+      .from(cashierTransactions)
+      .where(and(...txBase))
+      .groupBy(cashierTransactions.branchId);
+    const doctorRev = await db
+      .select({ doctorId: treatmentPlans.doctorId, total: signedPaidAmount })
+      .from(cashierTransactions)
+      .innerJoin(treatmentPlans, eq(cashierTransactions.treatmentPlanId, treatmentPlans.id))
+      .where(and(...txBase))
+      .groupBy(treatmentPlans.doctorId);
+
+    const apBase = [
+      inRange(appointments.startTime, start, end),
+      ne(appointments.status, 'cancelled'),
+    ];
+    if (branchId) apBase.push(eq(appointments.branchId, branchId));
+    const apByBranch = await db
+      .select({
+        branchId: appointments.branchId,
+        patients: countDistinct(appointments.patientId),
+        minutes: sql<string>`COALESCE(SUM(EXTRACT(EPOCH FROM (${appointments.endTime} - ${appointments.startTime})) / 60), 0)`,
+        docs: countDistinct(appointments.doctorId),
+      })
+      .from(appointments)
+      .where(and(...apBase))
+      .groupBy(appointments.branchId);
+    const apByDoctor = await db
+      .select({
+        doctorId: appointments.doctorId,
+        planned: count(),
+        done: sql<number>`COUNT(*) FILTER (WHERE ${appointments.status} = 'completed')`,
+      })
+      .from(appointments)
+      .where(and(...apBase))
+      .groupBy(appointments.doctorId);
+
+    const branchRows = await db
+      .select({ id: branches.id, name: branches.name, workHours: branches.workHours })
+      .from(branches)
+      .where(branchId ? eq(branches.id, branchId) : undefined);
+
+    const revByBranch = new Map(branchRev.map((r) => [r.branchId, Number(r.total)]));
+    const apByBr = new Map(apByBranch.map((r) => [r.branchId, r]));
+
+    const branchOut = branchRows.map((b) => {
+      const ap = apByBr.get(b.id);
+      const netRevenue = revByBranch.get(b.id) ?? 0;
+      const capacity =
+        branchOpenMinutes(b.workHours, weekday, DEFAULT_WORK_MINUTES) * Number(ap?.docs ?? 0);
+      return {
+        branchId: b.id,
+        name: b.name,
+        netRevenue,
+        patients: Number(ap?.patients ?? 0),
+        occupancy: utilizationPct(Number(ap?.minutes ?? 0), capacity),
+        status: (ap || revByBranch.has(b.id) ? 'active' : 'idle') as 'active' | 'idle',
+      };
+    });
+
+    const revByDoctor = new Map(doctorRev.map((r) => [r.doctorId, Number(r.total)]));
+    const doctorIds = new Set<string>([
+      ...apByDoctor.map((r) => r.doctorId),
+      ...revByDoctor.keys(),
+    ]);
+    const apByDoc = new Map(apByDoctor.map((r) => [r.doctorId, r]));
+    const doctorOut = [...doctorIds].map((doctorId) => ({
+      doctorId,
+      planned: Number(apByDoc.get(doctorId)?.planned ?? 0),
+      done: Number(apByDoc.get(doctorId)?.done ?? 0),
+      revenue: revByDoctor.get(doctorId) ?? 0,
+    }));
+    doctorOut.sort((a, b) => b.revenue - a.revenue || b.planned - a.planned);
+
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'report',
+      resourceId: null,
+      after: { report: 'owner_today', date, branchId: branchId ?? null },
+    });
+
+    return {
+      date,
+      netTotal: Number(totals?.net ?? 0),
+      refunded: Number(totals?.refunded ?? 0),
+      byPaymentMethod: methods.map((r) => ({
+        paymentMethod: r.paymentMethod as string,
+        total: Number(r.total),
+      })),
+      branches: branchOut,
+      doctors: doctorOut,
+    };
+  }
+
   return {
     debtAging,
+    ownerToday,
     revenue,
     appointmentStats,
     doctorWorkload,

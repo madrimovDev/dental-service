@@ -185,3 +185,33 @@ export function useBackupStatus() {
     refetchInterval: 5 * 60_000,
   });
 }
+
+export interface OwnerToday {
+  date: string;
+  netTotal: number;
+  refunded: number;
+  byPaymentMethod: { paymentMethod: string; total: number }[];
+  branches: {
+    branchId: string;
+    name: string;
+    netRevenue: number;
+    patients: number;
+    occupancy: number;
+    status: 'active' | 'idle';
+  }[];
+  doctors: { doctorId: string; done: number; planned: number; revenue: number }[];
+}
+
+/** Bugungi sof tushum (P13: refund ayirilgan), filial va shifokor bo'yicha — `report.view`. */
+export function useOwnerToday() {
+  const { hasPermission } = useAuthStore();
+  return useQuery({
+    queryKey: dashboardKeys.ownerToday(),
+    queryFn: () =>
+      customInstance<{ data: OwnerToday }>({ url: '/api/reports/owner-today', method: 'GET' }).then(
+        (r) => r.data,
+      ),
+    enabled: hasPermission('report.view'),
+    retry: false,
+  });
+}

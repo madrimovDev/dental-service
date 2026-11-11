@@ -1994,6 +1994,23 @@
     "branches": "Filiallar",
     "branchRevenue": "Tushum",
     "backupTile": "Zaxira nusxa",
-    "backupOk": "Oxirgi: {{date}}"
+    "backupOk": "Oxirgi: {{date}}",
+    "kpiRevenueToday": "Bugungi sof tushum",
+    "kpiRevenueHint": "qaytarildi −{{refunded}}",
+    "methodCash": "naqd",
+    "methodCard": "karta",
+    "methodTransfer": "o‘tkazma",
+    "methodOther": "boshqa",
+    "branchesToday": "Filiallar bugun",
+    "colBranch": "Filial",
+    "colNetRevenue": "Sof tushum",
+    "colPatients": "Bemorlar",
+    "colOccupancy": "Kreslo bandligi",
+    "colStatus": "Holat",
+    "branchActive": "Ish davom etmoqda",
+    "branchIdle": "Bugun faollik yo‘q",
+    "doctorsToday": "Shifokorlar bugun",
+    "doctorProgress": "{{done}} / {{planned}} bemor qabul qilindi",
+    "doctorProgressAria": "{{done}} / {{planned}} bemor"
   }
 }

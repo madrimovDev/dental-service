@@ -10,18 +10,16 @@ import { useRecallSummary } from '@/features/recalls/recalls.api.ts';
 import { formatCurrency } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import {
-  useBranchNames,
   useDebtAging,
   useDefaultPeriod,
   useDoctorNames,
   useManagerKpi,
+  useOwnerToday,
 } from '../dashboard.api.ts';
-import { toStatDelta } from '../dashboard.mappers';
 import { OnboardingChecklist } from './OnboardingChecklist.tsx';
 import { OwnerAlertsPanel } from './OwnerAlertsPanel.tsx';
-import { BarMini } from './widgets/BarMini.tsx';
+import { BranchesToday, DoctorsToday } from './OwnerTodaySections.tsx';
 import { MiniList } from './widgets/MiniList.tsx';
-import { Sparkline } from './widgets/Sparkline.tsx';
 import { StatCard } from './widgets/StatCard.tsx';
 
 const fmtPct = (n: number) => `${Math.round(n * 100)}%`;
@@ -141,12 +139,22 @@ export function ManagerDashboard() {
   const { t } = useTranslation();
   const { hasPermission } = useAuthStore();
   const period = useDefaultPeriod();
-  const { revenue, appointments, doctors } = useManagerKpi(period);
-  const branchNames = useBranchNames();
+  const { revenue, appointments } = useManagerKpi(period);
   const doctorNames = useDoctorNames();
   const debt = useDebtAging().data;
+  const today = useOwnerToday().data;
+  const methodsHint = today
+    ? [
+        ...today.byPaymentMethod
+          .filter((m) => m.total !== 0)
+          .map(
+            (m) =>
+              `${t(`ownerHome.method${m.paymentMethod.charAt(0).toUpperCase()}${m.paymentMethod.slice(1)}`)} ${formatCurrency(m.total, t)}`,
+          ),
+        t('ownerHome.kpiRevenueHint', { refunded: formatCurrency(today.refunded, t) }),
+      ].join(' · ')
+    : undefined;
 
-  const rev = revenue.data;
   const appt = appointments.data;
 
   const canAppointment = hasPermission('appointment.view');
@@ -197,13 +205,12 @@ export function ManagerDashboard() {
               gap: KPI_GAP,
             }}
           >
-            <KpiLink to="/reports">
+            <KpiLink to="/cashier">
               <StatCard
-                label={t('dashboard.revenue_total')}
-                value={rev ? formatCurrency(rev.total, t) : '—'}
+                label={t('ownerHome.kpiRevenueToday')}
+                value={today ? formatCurrency(today.netTotal, t) : '—'}
                 color="teal"
-                delta={toStatDelta(rev?.comparison?.previous, t)}
-                spark={<Sparkline points={(rev?.byPeriod ?? []).map((p) => p.total)} />}
+                hint={methodsHint}
               />
             </KpiLink>
             {hasPermission('report.view') && (
@@ -246,48 +253,16 @@ export function ManagerDashboard() {
               alignItems: 'start',
             }}
           >
-            {/* Chap ustun — haftalik tushum kartasi (line chart deferred → BarMini by-service). */}
+            {/* Chap ustun — kanvas: «Filiallar bugun» jadvali + «Shifokorlar bugun». */}
             <Stack gap="md" style={{ minWidth: 0 }}>
-              <CardShell>
-                <Stack gap="sm">
-                  <Title order={4} fw={700} c="var(--ink)">
-                    {t('dashboard.weekly_revenue', 'Haftalik tushum')}
-                  </Title>
-                  {/* Line chart (7-kunlik seriya) DEFERRED — data-gap (ds12);
-                      mavjud by-service BarMini re-skin sifatida saqlanadi. */}
-                  <BarMini
-                    data={(rev?.byService ?? []).slice(0, 8).map((s) => ({
-                      label: s.serviceName,
-                      value: s.total,
-                      display: formatCurrency(s.total, t),
-                    }))}
-                  />
-                </Stack>
-              </CardShell>
+              <BranchesToday data={today} />
+              <DoctorsToday data={today} names={doctorNames.data} />
             </Stack>
 
-            {/* O'ng rail (360px) — revenue-by-branch + top-doctors ro'yxatlari saqlanadi.
+            {/* O'ng rail (360px) — masalalar paneli + recall/faollik kartalari.
                 Navbat/recall/faollik kartalari OMIT (data-gap, ds12 — manager'da hook yo'q). */}
             <Stack gap={16}>
               <OwnerAlertsPanel />
-              <MiniList
-                title={t('dashboard.revenue_by_branch')}
-                items={(rev?.byBranch ?? []).map((b) => ({
-                  id: b.branchId,
-                  label: branchNames.data?.get(b.branchId) ?? b.branchId,
-                  right: formatCurrency(b.total, t),
-                }))}
-                emptyText={t('dashboard.empty')}
-              />
-              <MiniList
-                title={t('dashboard.top_doctors')}
-                items={(doctors.data ?? []).map((d) => ({
-                  id: d.doctorId,
-                  label: doctorNames.data?.get(d.doctorId) ?? d.doctorId,
-                  right: `${d.completed}/${d.total}`,
-                }))}
-                emptyText={t('dashboard.empty')}
-              />
               {/* Recall rail — faqat recall.view ruxsati bor bo'lsa render qilinadi.
                   RecallRailCard ichida hook bor → mount bo'lmasa 403 so'rov yuborilmaydi. */}
               {canRecall && <RecallRailCard />}

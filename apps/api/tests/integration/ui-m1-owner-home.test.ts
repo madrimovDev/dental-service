@@ -5,6 +5,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { ROLE_TEMPLATES } from '@dental/core';
 import {
+  appointments,
   branches,
   cashierTransactions,
   patients,
@@ -162,5 +163,83 @@ describe('GET /api/reports/debt-aging', () => {
       headers: { authorization: `Bearer ${tokens.receptionist}` },
     });
     expect(res.status).toBe(403);
+  });
+});
+
+describe('GET /api/reports/owner-today (P13: sof tushum, refund ayriladi)', () => {
+  test('bugungi sof tushum = to‘lovlar − refund; filial va shifokor bo‘yicha; Receptionist 403', async () => {
+    const today = new Date(Date.now() + 5 * 3_600_000).toISOString().slice(0, 10);
+    // beforeAll seed'i ham bugun yaratilgan — delta bilan tekshiramiz.
+    const get = async () =>
+      (
+        (await (
+          await createApp().request('/api/reports/owner-today', {
+            headers: { authorization: `Bearer ${tokens.accountant}` },
+          })
+        ).json()) as { data: any }
+      ).data;
+    const before = await get();
+    await db.transaction(async (tx) => {
+      await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
+      const [br] = await tx.select({ id: branches.id }).from(branches);
+      const [pt] = await tx.select({ id: patients.id }).from(patients).limit(1);
+      const [tn] = await tx.select({ o: tenants.ownerUserId }).from(tenants);
+      const [plan] = await tx
+        .insert(treatmentPlans)
+        .values({
+          tenantId,
+          patientId: pt!.id,
+          doctorId: tn!.o,
+          title: 'Today',
+          status: 'in_progress',
+          totalCost: '1000000',
+        })
+        .returning({ id: treatmentPlans.id });
+      const mk = (type: string, method: string, amount: number) =>
+        ({
+          tenantId,
+          branchId: br!.id,
+          patientId: pt!.id,
+          treatmentPlanId: plan!.id,
+          totalAmount: String(amount),
+          paidAmount: String(amount),
+          paymentMethod: method,
+          type,
+          status: 'completed',
+        }) as never;
+      await tx
+        .insert(cashierTransactions)
+        .values([
+          mk('payment', 'cash', 500_000),
+          mk('payment', 'card', 300_000),
+          mk('refund', 'cash', 100_000),
+        ]);
+      await tx.insert(appointments).values({
+        tenantId,
+        branchId: br!.id,
+        patientId: pt!.id,
+        doctorId: tn!.o,
+        startTime: new Date(`${today}T10:00:00+05:00`),
+        endTime: new Date(`${today}T11:00:00+05:00`),
+        status: 'completed',
+      });
+    });
+    const data = await get();
+    const m = (d: any, k: string) =>
+      d.byPaymentMethod.find((x: any) => x.paymentMethod === k)?.total ?? 0;
+    expect(data.netTotal - before.netTotal).toBe(700_000);
+    expect(data.refunded - before.refunded).toBe(100_000);
+    expect(m(data, 'cash') - m(before, 'cash')).toBe(400_000);
+    expect(m(data, 'card') - m(before, 'card')).toBe(300_000);
+    expect(data.branches[0].netRevenue - before.branches[0].netRevenue).toBe(700_000);
+    expect(data.branches[0].patients).toBe(1);
+    expect(data.branches[0].status).toBe('active');
+    expect(data.doctors[0]).toMatchObject({ planned: 1, done: 1 });
+    expect(data.doctors[0].revenue - (before.doctors[0]?.revenue ?? 0)).toBe(700_000);
+
+    const forbidden = await createApp().request('/api/reports/owner-today', {
+      headers: { authorization: `Bearer ${tokens.receptionist}` },
+    });
+    expect(forbidden.status).toBe(403);
   });
 });

@@ -188,3 +188,34 @@ export const debtAgingReportDtoSchema = z
   })
   .openapi('DebtAgingReport');
 export type DebtAgingReport = z.infer<typeof debtAgingReportDtoSchema>;
+
+// ─── Owner today overview (UI-M1) ────────────────────────────────────────────
+export const ownerTodayQuerySchema = z.object({ branchId: z.string().uuid().optional() });
+export const ownerTodayReportDtoSchema = z
+  .object({
+    date: z.string(),
+    /** Sof tushum (P13): to'lovlar − refundlar. */
+    netTotal: z.number(),
+    refunded: z.number(),
+    byPaymentMethod: z.array(z.object({ paymentMethod: z.string(), total: z.number() })),
+    branches: z.array(
+      z.object({
+        branchId: z.string(),
+        name: z.string(),
+        netRevenue: z.number(),
+        patients: z.number().int(),
+        occupancy: z.number(),
+        status: z.enum(['active', 'idle']),
+      }),
+    ),
+    doctors: z.array(
+      z.object({
+        doctorId: z.string(),
+        done: z.number().int(),
+        planned: z.number().int(),
+        revenue: z.number(),
+      }),
+    ),
+  })
+  .openapi('OwnerTodayReport');
+export type OwnerTodayReport = z.infer<typeof ownerTodayReportDtoSchema>;
