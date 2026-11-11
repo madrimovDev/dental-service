@@ -1,4 +1,5 @@
 import {
+  AlertBanner,
   Avatar,
   Button,
   Card,
@@ -6,6 +7,7 @@ import {
   Input,
   Mono,
   PageHead,
+  PatientFlag,
   Select,
   StatCard,
   StatusPill,
@@ -70,13 +72,34 @@ export function DesignSystemPage() {
 
       <Card title="Status / Tags">
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-          <StatusPill status="success">Tugadi</StatusPill>
-          <StatusPill status="warning">Kutilmoqda</StatusPill>
-          <StatusPill status="danger">No-show</StatusPill>
-          <StatusPill status="info">Qabulda</StatusPill>
-          <StatusPill status="accent">Yangi</StatusPill>
+          <StatusPill status="planned">Yozildi</StatusPill>
+          <StatusPill status="confirmed">Tasdiqlandi</StatusPill>
+          <StatusPill status="waiting">Kutmoqda</StatusPill>
+          <StatusPill status="active">Kresloda</StatusPill>
+          <StatusPill status="done">Yakunlandi</StatusPill>
+          <StatusPill status="failed">Kelmadi</StatusPill>
           <Tag>Sug'urta</Tag>
           <Avatar name="Ali Valiyev" size="md" />
+        </div>
+      </Card>
+
+      <Card title="PatientFlag">
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <PatientFlag level="critical">Allergiya: penitsillin</PatientFlag>
+          <PatientFlag level="attention">2 marta kelmagan</PatientFlag>
+          <PatientFlag level="neutral">Telegram ulangan</PatientFlag>
+          <PatientFlag level="info">Qarz 350 000</PatientFlag>
+        </div>
+      </Card>
+
+      <Card title="AlertBanner">
+        <div style={{ display: 'grid', gap: 10 }}>
+          <AlertBanner tier={2} title="Allergiya">
+            Penitsillin. Antikoagulyant qabul qiladi.
+          </AlertBanner>
+          <AlertBanner tier={3} action={{ label: "Ko'rish", onClick: () => {} }}>
+            7 bemorni qayta chaqirish vaqti keldi
+          </AlertBanner>
         </div>
       </Card>
 

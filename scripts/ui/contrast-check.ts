@@ -70,6 +70,12 @@ export const PAIRS: Array<[string, string, number]> = [
   ['--text', '--danger-bg', 4.5],
   ['--text', '--warning-bg', 4.5],
   ['--text-on-primary', '--primary-hover', 4.5],
+  ['--st-planned-fg', '--st-planned-bg', 4.5],
+  ['--st-confirmed-fg', '--st-confirmed-bg', 4.5],
+  ['--st-waiting-fg', '--st-waiting-bg', 4.5],
+  ['--st-active-fg', '--st-active-bg', 4.5],
+  ['--st-done-fg', '--st-done-bg', 4.5],
+  ['--st-failed-fg', '--st-failed-bg', 4.5],
 ];
 
 let failed = 0;

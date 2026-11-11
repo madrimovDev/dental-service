@@ -1,5 +1,11 @@
 # Status / label indikatorlari — qachon qaysi (CLI-181)
 
+## UI-0 yangilanishi — 6 ma'noli holat lug'ati
+
+`StatusPill` varianti endi **ma'no** bo'yicha: `planned | confirmed | waiting | active | done | failed` (tokenlar `--st-<ma'no>-bg/fg`, light+dark kontrast `scripts/ui/contrast-check.ts` da). Eski nomlar map qilinadi: `info→planned`, `success→confirmed`, `warning→waiting`, `accent→active`, `neutral→done`, `danger→failed` (`data-status` — berilgan nom, `data-meaning` — yangi ma'no). Yangi kod faqat yangi nomlarni ishlatadi. Rang doim yorliq bilan.
+
+Yangi: `PatientFlag` (to'rtburchak bemor belgisi: critical/attention/neutral/info) va `AlertBanner` (2 = diqqat `role=alert`, 3 = ma'lumot `role=status`; 1-daraja modal — `CriticalActionDialog`).
+
 `@dental/ui` da pill-shaklidagi indikatorlar uchun **uchta** vosita bor. Audit (CLI-177) "uch xil pill" ni nomuvofiqlik deb belgiladi — aslida ular **uch xil maqsad**. Bu hujjat tanlovni aniqlashtiradi (recurrence guard).
 
 ## Qoida

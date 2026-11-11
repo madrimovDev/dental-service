@@ -8,8 +8,9 @@
   font-size: var(--text-xs);
   font-weight: var(--fw-semibold);
   white-space: nowrap;
-  background: var(--surface-2);
-  color: var(--text-2);
+  border: 1px solid transparent;
+  background: var(--st-done-bg);
+  color: var(--st-done-fg);
 }
 .dot {
   width: 6px;
@@ -18,26 +19,28 @@
   background: currentColor;
   flex: none;
 }
-.root[data-status="success"] {
-  background: var(--success-bg);
-  color: var(--success);
+.root[data-meaning="planned"] {
+  background: var(--st-planned-bg);
+  color: var(--st-planned-fg);
 }
-.root[data-status="warning"] {
-  background: var(--warning-bg);
-  color: var(--warning);
+.root[data-meaning="confirmed"] {
+  background: var(--st-confirmed-bg);
+  color: var(--st-confirmed-fg);
 }
-.root[data-status="danger"] {
-  background: var(--danger-bg);
-  color: var(--danger);
+.root[data-meaning="waiting"] {
+  background: var(--st-waiting-bg);
+  color: var(--st-waiting-fg);
 }
-.root[data-status="info"] {
-  background: var(--info-bg);
-  color: var(--info);
+.root[data-meaning="active"] {
+  background: var(--st-active-bg);
+  color: var(--st-active-fg);
 }
-.root[data-status="accent"] {
-  background: var(--primary-tint);
-  color: var(--primary-hover);
+.root[data-meaning="done"] {
+  background: var(--st-done-bg);
+  color: var(--st-done-fg);
+  border-color: var(--st-done-border);
 }
-:global([data-mantine-color-scheme="dark"]) .root[data-status="accent"] {
-  color: var(--primary);
+.root[data-meaning="failed"] {
+  background: var(--st-failed-bg);
+  color: var(--st-failed-fg);
 }

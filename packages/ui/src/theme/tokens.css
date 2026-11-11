@@ -82,6 +82,21 @@
   --violet: #7143cc;
   --violet-soft: #ece4fb;
 
+  /* --- holat lug'ati (UI-0 1.2): 6 ma'no, fon/matn --- */
+  --st-planned-bg: #e8eefb;
+  --st-planned-fg: #1f4f9e;
+  --st-confirmed-bg: #e7f6f1;
+  --st-confirmed-fg: #096154;
+  --st-waiting-bg: #fbf1dd;
+  --st-waiting-fg: #7a4f0a;
+  --st-active-bg: #0b7a6b;
+  --st-active-fg: #ffffff;
+  --st-done-bg: #f1f3ef;
+  --st-done-fg: #4c5852;
+  --st-done-border: #d3d9d0;
+  --st-failed-bg: #fbe7e5;
+  --st-failed-fg: #842523;
+
   /* --- elevation (light, Dental OS) --- */
   --shadow-sm: 0 1px 2px rgba(25, 40, 35, 0.04), 0 1px 1px rgba(25, 40, 35, 0.02);
   --shadow: 0 2px 6px rgba(25, 40, 35, 0.05), 0 12px 30px -10px rgba(25, 40, 35, 0.09);
@@ -179,6 +194,19 @@
   --info-bg: #172642;
   --violet: #b093ee;
   --violet-soft: #241b39;
+  --st-planned-bg: #172642;
+  --st-planned-fg: #8fb4f7;
+  --st-confirmed-bg: #16332c;
+  --st-confirmed-fg: #4fd0b9;
+  --st-waiting-bg: #332814;
+  --st-waiting-fg: #e4ab44;
+  --st-active-bg: #2cb9a2;
+  --st-active-fg: #04130f;
+  --st-done-bg: #1d2824;
+  --st-done-fg: #aab6b0;
+  --st-done-border: #3b4a43;
+  --st-failed-bg: #341917;
+  --st-failed-fg: #f58a84;
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.28), 0 1px 1px rgba(0, 0, 0, 0.2);
   --shadow: 0 2px 6px rgba(0, 0, 0, 0.3), 0 14px 34px -10px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 28px 68px -14px rgba(0, 0, 0, 0.62), 0 10px 24px -10px rgba(0, 0, 0, 0.45);
