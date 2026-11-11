@@ -18,13 +18,36 @@ export type Tone = NonNullable<StatusPillProps['status']>;
 // ===== A: Odontogram =====
 export type ToothStateMap = Map<number, ToothState>;
 
-// CLI-189: tish bo'yicha draft (state + yuza + diagnoz).
-export type ToothDraft = {
-  state: ToothState;
+// UI-D3: odontogram draft — tish+yuza+holat+tashxis qatorlari (bitta tishga BIR NECHTA tashxis).
+export type ToothEntry = {
+  toothNumber: number;
   surface: ToothSurface;
+  state: ToothState;
   diagnosisId: string | null;
 };
-export type ToothDraftMap = Map<number, ToothDraft>;
+
+/** Bir tishdagi bir xil (holat, tashxis) qatorlari yuzalari bilan guruhlangan (chip uchun). */
+export type ToothEntryGroup = {
+  key: string;
+  state: ToothState;
+  diagnosisId: string | null;
+  surfaces: ToothSurface[];
+};
+
+/** Odontogram katagi uchun yig'ma ko'rinish. */
+export type ToothDisplay = {
+  state: ToothState;
+  surfaceStates: Partial<Record<ToothSurface, ToothState>>;
+};
+
+/** «Tish N tarixi» qatori. */
+export type ToothHistoryRow = {
+  chartId: string;
+  createdAt: string;
+  state: ToothState;
+  diagnosisId: string | null;
+  surfaces: ToothSurface[];
+};
 
 // ===== A: Treatment plan =====
 export type PlanCardVM = {

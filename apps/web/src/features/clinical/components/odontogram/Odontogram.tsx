@@ -1,6 +1,7 @@
-import type { ToothState, ToothStateEntry } from '@dental/api-client';
+import type { ToothState } from '@dental/api-client';
 import { Box, Group, Stack, Text } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
+import type { ToothDisplay } from '../../clinical.types';
 import { STATUS, statusFill, ToothCell } from './ToothCell';
 
 const PERMANENT_QUADRANTS = {
@@ -43,26 +44,27 @@ const rowLabelStyle = {
 };
 
 type Props = {
-  states: ToothStateEntry[];
+  /** Tish → katak ko'rinishi (holat + yuzalar); yo'q tish = sog'lom. */
+  displays: Map<number, ToothDisplay>;
+  /** Davolash rejasida bosqichi bor tishlar. */
+  plannedTeeth?: Set<number>;
+  /** Kreslo yoni rejimi: kattaroq katak + bosish zonasi ≥ --tap-chair. */
+  chairMode?: boolean;
   isPrimaryDentition?: boolean;
   selectedTooth: number | null;
   onSelectTooth: (n: number) => void;
 };
 
 export function Odontogram({
-  states,
+  displays,
+  plannedTeeth,
+  chairMode = false,
   isPrimaryDentition = false,
   selectedTooth,
   onSelectTooth,
 }: Props) {
   const { t } = useTranslation();
   const quadrants = isPrimaryDentition ? PRIMARY_QUADRANTS : PERMANENT_QUADRANTS;
-
-  const toothStateMap = new Map<number, ToothState>();
-  for (const s of states) {
-    if (s.surface === 'whole') toothStateMap.set(s.toothNumber, s.state);
-    else if (!toothStateMap.has(s.toothNumber)) toothStateMap.set(s.toothNumber, s.state);
-  }
 
   // Bir yoy: [o'ng-yarim ...11, 21... chap-yarim]. Markaz = right/left chegarasi.
   // Vertikal offset = amp*t*t (parabola): markaz tishlari tekis, uchlar siljiydi.
@@ -79,6 +81,16 @@ export function Odontogram({
           const offset = ARCH_AMP * tNorm * tNorm;
           const ty = arch === 'upper' ? -offset : offset;
           const isMidlineGap = i === half; // 11→21 (yoki sut) orasi
+          const display = displays.get(n);
+          const state = display?.state ?? 'healthy';
+          const planned = plannedTeeth?.has(n) ?? false;
+          // Holat faqat rang bilan emas — katak ostida MATN (WCAG 1.4.1): holat nomi yoki «rejada».
+          const caption =
+            state !== 'healthy'
+              ? t(`tooth_chart.states.${state}`)
+              : planned
+                ? t('odontogram.planned')
+                : '';
           return (
             <Box
               key={n}
@@ -89,10 +101,32 @@ export function Odontogram({
             >
               <ToothCell
                 number={n}
-                state={toothStateMap.get(n) ?? 'healthy'}
+                state={state}
+                surfaceStates={display?.surfaceStates}
                 selected={selectedTooth === n}
                 onClick={() => onSelectTooth(n)}
+                planned={planned}
+                chair={chairMode}
+                size={chairMode ? 44 : 36}
               />
+              <Text
+                title={caption || undefined}
+                style={{
+                  fontSize: 10,
+                  lineHeight: '12px',
+                  minHeight: 12,
+                  marginTop: 4,
+                  maxWidth: chairMode ? 60 : 46,
+                  textAlign: 'center',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  color: state !== 'healthy' ? 'var(--ink-2)' : 'var(--warning)',
+                  fontWeight: 600,
+                }}
+              >
+                {caption}
+              </Text>
             </Box>
           );
         })}
@@ -119,6 +153,19 @@ export function Odontogram({
       </Stack>
 
       <Group gap="md" mt="xs" wrap="wrap" justify="center">
+        <Group gap={6} wrap="nowrap">
+          <Box
+            style={{
+              width: 11,
+              height: 11,
+              borderRadius: 3,
+              flexShrink: 0,
+              border: '1.5px dashed var(--warning)',
+              background: 'var(--surface)',
+            }}
+          />
+          <Text style={{ fontSize: 11.5, color: 'var(--ink-2)' }}>{t('odontogram.planned')}</Text>
+        </Group>
         {LEGEND_ORDER.map((s) => (
           <Group key={s} gap={6} wrap="nowrap">
             <Box

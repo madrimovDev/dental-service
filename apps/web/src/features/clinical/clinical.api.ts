@@ -45,6 +45,7 @@ import {
   updateVisitNote,
 } from '@dental/api-client';
 import {
+  keepPreviousData,
   type QueryClient,
   useMutation,
   useQueries,
@@ -294,11 +295,14 @@ export function useUpdateVisitNote(patientId: string) {
   });
 }
 
-export function useDiagnoses() {
+/** `search` — server tomonida nom (uz/ru) + sinonim + kod, harf xatosiga chidamli qidiruv (UI-D3). */
+export function useDiagnoses(search?: string) {
+  const term = search?.trim() || undefined;
   return useQuery({
-    queryKey: clinicalKeys.diagnoses(),
-    queryFn: () => listDiagnoses().then((r) => r.data),
+    queryKey: clinicalKeys.diagnoses(term),
+    queryFn: () => listDiagnoses(term ? { search: term } : undefined).then((r) => r.data),
     staleTime: HOUR,
+    placeholderData: keepPreviousData,
   });
 }
 
