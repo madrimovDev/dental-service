@@ -285,12 +285,45 @@ Uchta xulq testda ajablantirmasligi uchun:
 
 ---
 
+## 4b. P bosqichi 2 (2026-11-11) — Windows'da qo'lda tekshiriladiganlar
+
+> Holat: **kod tayyor, Windows'da tekshirilmagan** (P2, P14, P15, P18 desktop UI, DT-01…03). Linux'da: unit + real-PG tiklash testi (`apps/desktop/src/migrate-on-start.pg.test.ts`) + P18 zanjiri jonli (lokal Supervisor ↔ API: active → grace → expired 403 → renew → active).
+
+**Installer / paketlash (P14, DT-01, DT-03)**
+- [ ] Toza o'rnatish: rol dialogi bir marta chiqadi, `config.json` = `{"role":…}`.
+- [ ] Yangilash o'rnatish: rol dialogi **chiqmaydi**, `config.json`dagi `serverPort`/`licenseKey`/`serverUrl` saqlanadi.
+- [ ] Tray ikonka ko'rinadi (`assets/**/*` paketda).
+- [ ] Boshqa PC'dan `http://<server>:8080` ochiladi; firewall'da «Dental Service TCP» (`api.exe` dasturi) va «Dental Service UDP» (47890) bor, yangilashdan keyin dublikat yo'q; o'chirishdan keyin ikkalasi yo'q.
+- [ ] `resources\postgres\bin\` ichida `pg_dump.exe`, `pg_restore.exe`, `psql.exe`, `pg_ctl.exe` bor; `DROP DATABASE … WITH (FORCE)` paketdagi PG16'da ishlaydi.
+
+**Yangilashda migratsiya (P2)**
+- [ ] Eski versiya → yangi versiya: `<dataDir>\backups\pre-migrate-<ver>-<ts>.dump` paydo bo'ladi, ilova ochiladi; ikkinchi start (versiya o'zgarmagan) — yangi dump yo'q, tez ochiladi.
+- [ ] P2'dan oldingi o'rnatma (`state.json` yo'q, baza bor): birinchi yangilashda dump olinadi.
+- [ ] Ataylab buzilgan migratsiya (masalan drizzle jadvallaridan keyin yiqiladigan RLS fayli) → dialog, baza tiklanadi (yangi jadvallar yo'q), API ishga tushmaydi; keyingi tuzatilgan versiya muammosiz migratsiya qiladi.
+- [ ] Telefon to'qnashuvi (0043/0044) → «bazada takroriy telefon raqamlari bor» dialogi (umumiy emas), «Tafsilot» bo'sh emas.
+- [ ] Eskirgan `state.json`: `postgres\data`ni o'chirib, `state.json`ni qoldirib yangi versiya o'rnatish → first-run o'tadi, `database "dental" does not exist` sikli yo'q.
+- [ ] Tiklash ham yiqilsa → dialogda zaxira fayl yo'li ko'rsatiladi.
+
+**Child process supervision (P15, DT-02)**
+- [ ] Task Manager'da `api.exe`ni o'ldirish → 1–2 s da qayta turadi, tray «Server: qayta ishga tushmoqda» → «ishlamoqda».
+- [ ] 10 daqiqa ichida 6 marta o'ldirish → restart to'xtaydi, tray «Server: to'xtadi».
+- [ ] `postgres.exe`ni o'ldirish → postgres ham, api ham qayta turadi.
+- [ ] Ilovani yopish → postgres toza to'xtaydi (`pg_ctl stop -m fast`), keyingi startda postgres logida «recovery» yo'q.
+- [ ] **Avto-yangilash** yangi `before-quit` (`preventDefault` + `await stopServer()` + `app.exit`) bilan ham o'rnatishni tugatadi (ilova osilib qolmaydi).
+- [ ] Portni boshqa dastur bilan band qilib ishga tushirish → «Port band» dialogi; `api.log`da Bun xabari `EADDRINUSE`/`address already in use` ni o'z ichiga oladi.
+
+**Litsenziya (P18)**
+- [ ] Muddatga ≤ 14 kun → sariq banner; imtiyozda (1–7 kun) → qizil, yopilmaydigan banner.
+- [ ] Imtiyozdan keyin istalgan sahifa → `/license-expired`; login ishlaydi; «Qayta tekshirish» (internet bilan, Supervisor'da uzaytirilgan) → bosh sahifaga qaytadi.
+- [ ] Litsenziya umuman yo'q (`LICENSE_NOT_FOUND`) → `/activate` (to'lov ekrani emas).
+- [ ] Supervisor VM qayta deploy qilinganda `0003_grace_default_7` migratsiyasi qo'llangan (`licenses.grace_period_days` default 7).
+
 ## 5. Caveats / troubleshooting
 
 | Muammo | Yechim |
 |---|---|
 | SmartScreen ogohlantirishi | Imzosiz installer (CLI-376) — «Run anyway» |
-| **API port 80** band yoki admin kerak | `config.serverPort` default 80. Band bo'lsa/admin bo'lmasa API ko'tarilmaydi. Ilovani **administrator** sifatida oching yoki portni o'zgartiring |
+| **API porti band** | 2026-11-11 dan `config.serverPort` default **8080** (avval 80 — Windows'da IIS/admin bilan band bo'lardi). Band bo'lsa «Port band» dialogi chiqadi → Sozlamalar → Server porti. Firewall TCP qoidasi `api.exe` dasturi bo'yicha, port o'zgarsa ham ishlaydi |
 | `C:\ProgramData\DentalService` yozib bo'lmaydi | Administrator huquqi bilan oching |
 | Binariy yuklanmadi (prebuild) | Windows `http://192.168.3.242/bins/...` ga yeta olishini tekshiring (LAN); yoki qo'lda joylashtiring (§2) |
 | Aktivatsiya "invalid signature" | Desktop `main`dagi YANGI public key bilan build qilinganini tekshiring (`packages/core/src/supervisor-public-key.ts`); VM'dagi private kalitga mos |

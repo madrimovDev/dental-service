@@ -19,7 +19,7 @@
 | ID | J | Qisqa | Qilinadigan ish | Tartib |
 |---|---|---|---|---|
 | P1 ✅ | C | RLS tx 500 da COMMIT (yopildi — P bosqichi 1) | `rlsMiddleware`: `await next()` dan keyin `c.error` bo'lsa throw (rollback); route'da yozib throw qiladigan HTTP regressiya testi | 1 |
-| P2 | C | desktop yangilanishda migratsiya yo'q | har startda idempotent `api.exe migrate` (API'dan oldin); 0043 to'qnashuvida tushunarli dialog | 3 |
+| P2 🟡 | C | desktop yangilanishda migratsiya yo'q | har startda idempotent `api.exe migrate` (API'dan oldin); 0043 to'qnashuvida tushunarli dialog | 3 |
 | P17 | C | bulutda uploads volume yo'q, backup MinIO'ga | `docker-compose.prod.yml`ga `uploads` volume + `UPLOADS_DIR`; `backup.sh`ni lokal uploads'ga qaratish; MinIO'ni compose'dan olib tashlash | 3 |
 | P3 ✅ | H | reminder jobId `:` (yopildi — `592ed7a`) | `queue.ts` fix'ini commit qilish + real `Queue.add` kontrakt testi | 2 |
 | P4 ✅ | H | Redis side-effect tx ichida (yopildi — P bosqichi 1; `onAfterCommit` + 2,5 s timeout) | enqueue/remove'ni commit'dan keyin best-effort (try/catch + log) yoki outbox; status-only qayta faollashganda re-enqueue | 2 |
@@ -32,10 +32,10 @@
 | P11 | H❔ | rasmlar Bearer'siz | avval brauzerda tasdiqlash; keyin blob-fetch (`api-client` + `URL.createObjectURL`) yoki qisqa muddatli imzolangan URL; `/uploads`ga `patient_image.view` + audit | 5 |
 | P12 | H | Zod `.partial()` default | update schema'larni default'siz qurish (visit-notes, consent template va boshqa `.partial()` joylarini grep qilish); HTTP test | 5 |
 | P13 | H | Accountant kassa refund'ni qo'shadi | `type==='refund'` ayirilsin (DailySummaryCard bilan bir xil formula, umumiy helper) | 5 |
-| P14 | H | NSIS config'ni qayta yozadi | `${isUpdated}` bo'lsa dialog va yozish o'tkazib yuborilsin; mavjud config merge qilinsin | 3 |
-| P15 | H | supervision yo'q | child exit → backoff bilan restart + tray holati/xabar; Windows'da graceful stop (`pg_ctl stop`, API `/shutdown`); `before-quit` `preventDefault` + await | 6 |
+| P14 🟡 | H | NSIS config'ni qayta yozadi | `${isUpdated}` bo'lsa dialog va yozish o'tkazib yuborilsin; mavjud config merge qilinsin | 3 |
+| P15 🟡 | H | supervision yo'q | child exit → backoff bilan restart + tray holati/xabar; Windows'da graceful stop (`pg_ctl stop`, API `/shutdown`); `before-quit` `preventDefault` + await | 6 |
 | P16 | H | Supervisor HTTP, backupsiz, renew yo'q | domen + TLS (prod Caddyfile); `pg_dump` cron + off-host; RSA private key zaxira tartibi; `PATCH /admin/licenses/:id` (expiresAt/grace) + UI | 6 |
-| P18 | H | offline grace `expiresAt`dan | Q1/Q2 qaroridan keyin: grace = oxirgi muvaffaqiyatli heartbeat'dan yoki hujjatni kodga moslash; muddat tugaganda qoladigan modullar ro'yxati | 3 |
+| P18 ✅ | H | offline grace `expiresAt`dan (yopildi — P bosqichi 2: `expiresAt`+7, to'liq blok, banner/blok ekrani, renew; jonli tasdiqlangan; desktop UI Windows'da tekshirilmagan) | Q1/Q2 qaroridan keyin: grace = oxirgi muvaffaqiyatli heartbeat'dan yoki hujjatni kodga moslash; muddat tugaganda qoladigan modullar ro'yxati | 3 |
 
 ---
 
@@ -239,9 +239,9 @@
 
 | ID | J | Topilma | Joy | D | Ish |
 |---|---|---|---|---|---|
-| DT-01 | M-H | Tray ikonka paketga kirmaydi (`assets/` `files`da yo'q) | `electron-builder.yml:20` | ✅ | `files`ga `assets/**` |
-| DT-02 | H | Port 80 default (Windows'da band/admin), sabab foydalanuvchiga ko'rinmaydi | `config.ts:17` | 📄 | yuqori port + port-band diagnostika |
-| DT-03 | M | Firewall qoidasi yo'q (TCP 80, UDP 47890) | `installer.nsh` | 📄 | `netsh advfirewall` |
+| DT-01 🟡 | M-H | Tray ikonka paketga kirmaydi (`assets/` `files`da yo'q) | `electron-builder.yml:20` | ✅ | `files`ga `assets/**` |
+| DT-02 🟡 | H | Port 80 default (Windows'da band/admin), sabab foydalanuvchiga ko'rinmaydi | `config.ts:17` | 📄 | yuqori port + port-band diagnostika |
+| DT-03 🟡 | M | Firewall qoidasi yo'q (TCP 80, UDP 47890) | `installer.nsh` | 📄 | `netsh advfirewall` |
 | DT-04 | M | Postgres tayyorligi 3 s fallback; yarim initdb keyin first-run deb hisoblanmaydi | `process-manager.ts:152` | 📄 | `pg_isready` |
 | DT-05 | M | Port 5433/6380 to'qnashuvi faqat log'da | — | 📄 | oldindan tekshirish |
 | DT-06 | M | `getLocalIp` birinchi IPv4 (Hyper-V/WSL/VPN) | `discovery.ts:28` | 📄 | default route interfeysi |
@@ -387,4 +387,14 @@ To'liq: [`LAB-TECHNICIAN-ACCESS-2026-11-11.md`](./LAB-TECHNICIAN-ACCESS-2026-11-
 | FU-02 | M | Ichma-ich `rlsMiddleware` (`/api` prefiksi) | `expenses`/`clinical`/`patient-images` bare `/api`ga `app.use('*', auth, rls)` bilan ulangan → har so'rov 2–3 tranzaksiya (pool bosimi) va ichki `afterCommit` ro'yxati tashqi commit'dan oldin ishlaydi. Hozir u modullarda afterCommit yo'q. Yechim: rls'ni idempotent qilish (allaqachon `db` tx bo'lsa qayta ochmaslik) |
 | FU-03 | L | tx ichidagi boshqa side-effect'lar | `notifications.notifyInTx` SMS'ni tx ichida yuboradi (`stock.service.ts:70` low-stock) — 500 bo'lsa SMS ketadi, yozuv rollback. `onAfterCommit`ga ko'chirish |
 | FU-04 | L | Yangi qoida | throw (shu jumladan `HTTPException`/`ZodError` 4xx) endi yozuvlarni rollback qiladi. 4xx'da audit/strike qatori saqlanishi kerak bo'lgan kod `fail()` **qaytarishi** shart, throw emas |
+
+> 🟡 = kod tayyor, Windows'da tekshirilmagan (P bosqichi 2, 2026-11-11). Tekshiruv ro'yxati: `docs/DESKTOP-WINDOWS-BUILD-TEST.md` §4b.
+
+## 14. P bosqichi 2 dan keyingi follow-up'lar
+
+| ID | J | Qisqa | Qilinadigan ish |
+|---|---|---|---|
+| FU-05 | L | `/api/license/recheck` ochiq | auth'siz (blok ekrani uchun), 6/daqiqa per-IP rate limit bilan. LAN ichida suiiste'mol = Supervisor'ga heartbeat oqimi; kerak bo'lsa global limit |
+| FU-06 | L | P2 restore oxirgi chora | DROP+CREATE+`pg_restore --single-transaction`: tiklash ham yiqilsa baza bo'sh qoladi (dump fayli saqlanadi, dialogda yo'li ko'rsatiladi) — qo'lda tiklash runbook'i kerak |
+| FU-07 | L | `mock.module` oqishi o'syapti | `license*.test.ts` va `cli-358` endi har biri o'z bun jarayonida yurgizilishi kerak (test skripti darajasida ajratish) |
 

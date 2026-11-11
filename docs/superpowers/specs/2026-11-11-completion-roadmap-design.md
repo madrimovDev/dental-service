@@ -96,6 +96,15 @@ P bosqichlari 1→5 tartibda; ichida bir-biriga tegmaydigan ishlar parallel (ork
 - **P12**: update schema'lar default'siz quriladi (barcha `.partial()` joylari grep qilinadi); HTTP test (PATCH default bilan ustiga yozmaydi).
 - **P13**: Accountant dashboard'da `type==='refund'` ayiriladi — `DailySummaryCard` bilan umumiy helper.
 
+### 3.7 P bosqichi 2 da qabul qilingan builder qarorlari (🛠, 2026-11-11)
+- Desktop server porti default **8080** (80 emas); firewall TCP qoidasi `api.exe` dasturi bo'yicha.
+- P2 tiklash: dump o'qilishi `pg_restore --list` bilan tekshiriladi → baza **DROP + CREATE** → `pg_restore --single-transaction` (`--clean` yetmaydi — yarim migratsiya qoldiqlari qolardi). Dump olinmasa `backup_failed` — migratsiya boshlanmaydi.
+- Zaxira faqat ilova versiyasi o'zgarganda (`<dataDir>/state.json` `lastMigratedVersion`), har startda emas.
+- `LICENSE_NOT_FOUND` → `/activate`; `LICENSE_EXPIRED` → `/license-expired` (to'lov ekrani).
+- `/api/license/status` va `/api/license/recheck` auth'siz (blok holatida login'dan keyingi so'rovlar ham bloklangani uchun), recheck 6/daqiqa per-IP.
+- Supervisor `gracePeriodDays` chegarasi **1..7** (yaratish, modules PATCH, admin UI); API qo'shimcha `min(signed, 7)` bilan cheklaydi.
+- Renew: `expiresAt` sana bo'lsa UTC `23:59:59` deb olinadi.
+
 ## 4. UI qayta dizayni — qarorlar
 
 UI spec ([`2026-11-11-ui-redesign-design.md`](./2026-11-11-ui-redesign-design.md)) asosiy manba bo'lib qoladi; §4 dagi ochiq savollarga javoblar:
