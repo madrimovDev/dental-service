@@ -24,6 +24,21 @@ export function patientImageKey(args: {
 }
 
 /**
+ * Lab order fayli key (UI-D5):
+ *   tenants/{tenantId}/lab-orders/{labOrderId}/{fileId}.{ext}
+ * `/uploads` route shu prefiks (`lab-orders`) bo'yicha `lab_order.view` talab qiladi.
+ */
+export function labOrderFileKey(args: {
+  tenantId: string;
+  labOrderId: string;
+  fileId: string;
+  ext: string;
+}): string {
+  const ext = args.ext.replace(/^\./, '').toLowerCase();
+  return `tenants/${args.tenantId}/lab-orders/${args.labOrderId}/${args.fileId}.${ext}`;
+}
+
+/**
  * Fayl URL — avval MinIO presigned (short-lived) URL edi, endi local
  * filesystem'dagi `/uploads/:key` route'ga relative path
  * (`storage.serveUrl`). Frontend `<img src>` shu path'ni to'g'ridan ishlatadi.

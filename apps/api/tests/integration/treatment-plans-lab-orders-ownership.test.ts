@@ -96,6 +96,8 @@ describe('L12 — treatment-plans/lab-orders create() ownership validation', () 
         labName: 'L12 Lab',
         orderType: 'crown',
         items: [{ description: 'Crown 26' }],
+        shade: 'A2',
+        dueDate: '2026-12-01',
       }),
     });
     expect(res.status).toBe(400);

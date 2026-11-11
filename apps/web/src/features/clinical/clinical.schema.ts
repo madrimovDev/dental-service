@@ -59,25 +59,6 @@ export const prescriptionFormSchema = z.object({
 });
 export type PrescriptionFormValues = z.infer<typeof prescriptionFormSchema>;
 
-// ===== B: lab order =====
-export const labOrderItemSchema = z.object({
-  description: z.string().min(1),
-  toothNumbersText: z.string(),
-  material: z.string().optional(),
-  shade: z.string().optional(),
-  quantity: z.number().optional(),
-});
-
-export const labOrderFormSchema = z.object({
-  labName: z.string().min(1),
-  orderType: z.string(),
-  expectedDate: z.string().optional(),
-  cost: z.number().optional(),
-  notes: z.string().optional(),
-  items: z.array(labOrderItemSchema).min(1),
-});
-export type LabOrderFormValues = z.infer<typeof labOrderFormSchema>;
-
 // ===== B: consent =====
 export const consentSignFormSchema = z.object({
   // Select clearable `null` qaytaradi — nullable (submit'da `?? undefined`).

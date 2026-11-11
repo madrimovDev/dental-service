@@ -1,15 +1,34 @@
-import { labOrders } from '@dental/db-schema';
-import { and, count, desc, eq, lt, notInArray } from 'drizzle-orm';
+import { labOrderFiles, labOrders } from '@dental/db-schema';
+import { and, asc, count, desc, eq, lt, notInArray } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
-import { createOwnershipValidator, type OwnershipValidator } from '../../lib/ownership.ts';
+import {
+  CrossEntityError,
+  createOwnershipValidator,
+  type OwnershipValidator,
+} from '../../lib/ownership.ts';
+import { deleteObject, labOrderFileKey, presignedGetUrl, uploadObject } from '../../lib/s3.ts';
 import type {
   CreateLabOrderInput,
   ListLabOrdersQuery,
   UpdateLabOrderInput,
 } from './lab-orders.schema.ts';
 import { assertLabOrderTransition, type LabOrderStatus } from './lab-orders.transitions.ts';
+
+/**
+ * `dueDate` (kalendar kun) → `expectedDate` (timestamptz): O'zbekiston (UTC+5) kun oxiri.
+ * Eski `overdue()` va ro'yxat `expectedDate`ga tayanadi — kun oxirigacha "muddati o'tmagan".
+ */
+const dueDateToExpected = (dueDate: string): Date => new Date(`${dueDate}T23:59:59+05:00`);
+
+export type UploadLabFileInput = {
+  label?: string;
+  originalFilename: string;
+  contentType: string;
+  ext: string;
+  body: ArrayBuffer;
+};
 
 export const createLabOrdersService = (deps: {
   audit: AuditLogger;
@@ -101,6 +120,16 @@ export const createLabOrdersService = (deps: {
     // cross-tenant/mavjud bo'lmagan doctorId xom 500 emas, toza 400).
     await ownership.assertUserExists(c, input.doctorId);
 
+    // UI-D5: remake — asl buyurtma shu tenantda (RLS) VA shu bemorniki bo'lishi shart.
+    if (input.remakeOfId) {
+      const [orig] = await db
+        .select({ patientId: labOrders.patientId })
+        .from(labOrders)
+        .where(eq(labOrders.id, input.remakeOfId));
+      if (!orig) throw new CrossEntityError('lab_order', 'not_found');
+      if (orig.patientId !== input.patientId) throw new CrossEntityError('lab_order', 'mismatch');
+    }
+
     const [row] = await db
       .insert(labOrders)
       .values({
@@ -110,7 +139,14 @@ export const createLabOrdersService = (deps: {
         labName: input.labName,
         orderType: input.orderType,
         items: input.items,
-        expectedDate: input.expectedDate ? new Date(input.expectedDate) : null,
+        shade: input.shade,
+        dueDate: input.dueDate,
+        // dueDate — haqiqat manbai; expectedDate unga mos (aniq vaqt berilsa o'sha saqlanadi).
+        expectedDate: input.expectedDate
+          ? new Date(input.expectedDate)
+          : dueDateToExpected(input.dueDate),
+        remakeOfId: input.remakeOfId ?? null,
+        remakeReason: input.remakeReason ?? null,
         cost: input.cost !== undefined ? String(input.cost) : null,
         notes: input.notes ?? null,
       })
@@ -121,7 +157,15 @@ export const createLabOrdersService = (deps: {
         action: 'created',
         resourceType: 'lab_order',
         resourceId: row.id,
-        after: { patientId: input.patientId, orderType: input.orderType, lab: input.labName },
+        after: {
+          patientId: input.patientId,
+          orderType: input.orderType,
+          lab: input.labName,
+          shade: input.shade,
+          dueDate: input.dueDate,
+          remakeOfId: input.remakeOfId ?? null,
+          remakeReason: input.remakeReason ?? null,
+        },
       });
     }
     return row;
@@ -151,6 +195,12 @@ export const createLabOrdersService = (deps: {
       if (input.status === 'delivered' && !before.deliveredDate) patch.deliveredDate = new Date();
     }
     if (input.items) patch.items = input.items;
+    if (input.shade) patch.shade = input.shade;
+    if (input.dueDate) {
+      patch.dueDate = input.dueDate;
+      // dueDate o'zgarsa expectedDate ham mos (aniq expectedDate berilsa pastda ustun turadi).
+      patch.expectedDate = dueDateToExpected(input.dueDate);
+    }
     if (input.sentDate !== undefined)
       patch.sentDate = input.sentDate ? new Date(input.sentDate) : null;
     if (input.expectedDate !== undefined)
@@ -173,7 +223,111 @@ export const createLabOrdersService = (deps: {
     return row;
   }
 
-  return { list, get, create, update, overdue };
+  // ─── Fayllar (UI-D5) ─────────────────────────────────────────────────────────
+
+  async function listFiles(c: Context, labOrderId: string) {
+    const db = getDb(c);
+    const [order] = await db
+      .select({ id: labOrders.id })
+      .from(labOrders)
+      .where(eq(labOrders.id, labOrderId));
+    if (!order) return null;
+
+    const rows = await db
+      .select()
+      .from(labOrderFiles)
+      .where(eq(labOrderFiles.labOrderId, labOrderId))
+      .orderBy(asc(labOrderFiles.createdAt));
+
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'lab_order',
+      resourceId: labOrderId,
+      after: { files: rows.length },
+    });
+    return Promise.all(
+      rows.map(async (row) => ({ row, url: await presignedGetUrl(row.objectKey) })),
+    );
+  }
+
+  async function uploadFile(c: Context, labOrderId: string, input: UploadLabFileInput) {
+    const db = getDb(c);
+    const tenantId = c.get('activeTenantId');
+    const user = c.get('user');
+    if (!tenantId) throw new Error('No tenant context');
+
+    // Buyurtma shu tenantda bo'lishi shart (RLS) — storage yozishdan OLDIN.
+    const [order] = await db
+      .select({ id: labOrders.id })
+      .from(labOrders)
+      .where(eq(labOrders.id, labOrderId));
+    if (!order) return null;
+
+    const fileId = crypto.randomUUID();
+    const objectKey = labOrderFileKey({ tenantId, labOrderId, fileId, ext: input.ext });
+    await uploadObject({ key: objectKey, body: input.body, contentType: input.contentType });
+
+    let row: typeof labOrderFiles.$inferSelect | undefined;
+    try {
+      [row] = await db
+        .insert(labOrderFiles)
+        .values({
+          id: fileId,
+          tenantId,
+          labOrderId,
+          uploadedByUserId: user?.id ?? null,
+          label: input.label ?? null,
+          objectKey,
+          originalFilename: input.originalFilename,
+          contentType: input.contentType,
+          sizeBytes: input.body.byteLength,
+        })
+        .returning();
+    } catch (e) {
+      await deleteObject(objectKey).catch(() => {});
+      throw e;
+    }
+    if (!row) {
+      await deleteObject(objectKey).catch(() => {});
+      throw new Error('Insert failed after upload');
+    }
+
+    await deps.audit.record(c, {
+      action: 'uploaded',
+      resourceType: 'lab_order_file',
+      resourceId: row.id,
+      after: {
+        labOrderId,
+        contentType: input.contentType,
+        size: row.sizeBytes,
+      },
+    });
+    return { row, url: await presignedGetUrl(row.objectKey) };
+  }
+
+  async function removeFile(c: Context, labOrderId: string, fileId: string) {
+    const db = getDb(c);
+    const [before] = await db
+      .select()
+      .from(labOrderFiles)
+      .where(and(eq(labOrderFiles.id, fileId), eq(labOrderFiles.labOrderId, labOrderId)));
+    if (!before) return null;
+
+    await db.delete(labOrderFiles).where(eq(labOrderFiles.id, fileId));
+    await deleteObject(before.objectKey).catch((err) =>
+      console.error('[lab-orders] storage delete failed:', err),
+    );
+
+    await deps.audit.record(c, {
+      action: 'deleted',
+      resourceType: 'lab_order_file',
+      resourceId: fileId,
+      before,
+    });
+    return before;
+  }
+
+  return { list, get, create, update, overdue, listFiles, uploadFile, removeFile };
 };
 
 export type LabOrdersService = ReturnType<typeof createLabOrdersService>;
