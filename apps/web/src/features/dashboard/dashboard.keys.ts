@@ -9,6 +9,7 @@ export const dashboardKeys = {
     branchId: string | null,
     range: { from: string; to: string },
   ) => ['dashboard', 'doctor-appointments', doctorId, branchId, range] as const,
+  doctorPending: () => ['dashboard', 'doctor-pending'] as const,
   labOrders: () => ['dashboard', 'lab-orders'] as const,
   branchNames: () => ['dashboard', 'branch-names'] as const,
   doctorNames: () => ['dashboard', 'doctor-names'] as const,

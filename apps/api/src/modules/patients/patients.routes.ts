@@ -291,6 +291,28 @@ export const patientRoutes = (deps: {
     return c.json(ok(toMedicalRecordDto(row)), 200);
   });
 
+  // ─── POST /{id}/medical-record/confirm — anamnezni tasdiqlash (UI-D2) ────
+
+  const confirmMedicalRoute = createRoute({
+    method: 'post',
+    path: '/{id}/medical-record/confirm',
+    tags: ['patients'],
+    operationId: 'confirmMedicalRecord',
+    middleware: [requirePermission('medical_record.edit')] as const,
+    request: { params: patientIdParamSchema },
+    responses: {
+      ...okJson(medicalRecordDtoSchema, 'Anamnez tasdiqlandi'),
+      ...medicalNotFound,
+    },
+  });
+
+  app.openapi(confirmMedicalRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const row = await service.confirmMedicalRecord(c, id);
+    if (!row) return c.json(fail('medical_record.not_found', 'Medical record not found'), 404);
+    return c.json(ok(toMedicalRecordDto(row)), 200);
+  });
+
   // ─── GET /{id}/medical/history — o'zgarishlar tarixi (V2-7) ──────────────
 
   const medicalHistoryRoute = createRoute({

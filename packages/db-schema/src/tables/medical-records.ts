@@ -61,6 +61,10 @@ export const medicalRecords = pgTable(
     // Test natijalari (HIV, gepatit, COVID)
     testResults: jsonb('test_results').$type<TestResults>(),
 
+    // Anamnez oxirgi tasdig'i (UI-D2): shifokor "o'zgarish yo'q — tasdiqlash" bosganda.
+    confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
+    confirmedBy: uuid('confirmed_by').references(() => users.id, { onDelete: 'set null' }),
+
     lastUpdatedBy: uuid('last_updated_by').references(() => users.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

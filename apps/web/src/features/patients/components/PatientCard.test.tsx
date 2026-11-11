@@ -74,7 +74,7 @@ describe('PatientCard', () => {
     expect(screen.getByText('Lidokain')).toBeInTheDocument();
   });
 
-  it("cashier.view ruxsati bo'lmasa 'To'lovlar' tab ko'rinmaydi (CLI-456)", () => {
+  it("cashier.view ruxsati bo'lmasa 'Moliya' bo'limi ko'rinmaydi (CLI-456)", () => {
     permsHolder.current = [];
     renderApp(
       <Routes>
@@ -82,10 +82,10 @@ describe('PatientCard', () => {
       </Routes>,
       { route: '/patients/p1' },
     );
-    expect(screen.queryByText("To'lovlar")).not.toBeInTheDocument();
+    expect(screen.queryByText('Moliya')).not.toBeInTheDocument();
   });
 
-  it("cashier.view ruxsati bilan 'To'lovlar' tab ko'rinadi (CLI-456)", () => {
+  it("cashier.view ruxsati bilan 'Moliya' bo'limi ko'rinadi (CLI-456)", () => {
     permsHolder.current = ['cashier.view'];
     renderApp(
       <Routes>
@@ -93,6 +93,6 @@ describe('PatientCard', () => {
       </Routes>,
       { route: '/patients/p1' },
     );
-    expect(screen.getByText("To'lovlar")).toBeInTheDocument();
+    expect(screen.getByText('Moliya')).toBeInTheDocument();
   });
 });

@@ -4,6 +4,8 @@ export type PatientTabDef = {
   key: string;
   labelKey: string;
   permission?: string;
+  /** Bo'lim ko'rinishi uchun shu ruxsatlardan KAMIDA BITTASI yetarli (permission bilan birga emas). */
+  anyPermission?: string[];
   feature?: VerticalFeature;
 };
 
@@ -15,6 +17,8 @@ export function filterPatientTabs(
 ): PatientTabDef[] {
   return tabs.filter(
     (tb) =>
-      (!tb.permission || has(tb.permission)) && (!tb.feature || hasFeature(vertical, tb.feature)),
+      (!tb.permission || has(tb.permission)) &&
+      (!tb.anyPermission || tb.anyPermission.some((p) => has(p))) &&
+      (!tb.feature || hasFeature(vertical, tb.feature)),
   );
 }

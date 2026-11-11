@@ -21,4 +21,11 @@ describe('filterPatientTabs', () => {
     const keys = filterPatientTabs(TABS, () => false, 'dental').map((t) => t.key);
     expect(keys).toEqual(['gen']);
   });
+  it("anyPermission → kamida bittasi bo'lsa ko'rinadi", () => {
+    const tabs: PatientTabDef[] = [
+      { key: 'docs', labelKey: 'd', anyPermission: ['a.view', 'b.view'] },
+    ];
+    expect(filterPatientTabs(tabs, (p) => p === 'b.view', 'dental')).toHaveLength(1);
+    expect(filterPatientTabs(tabs, () => false, 'dental')).toHaveLength(0);
+  });
 });
