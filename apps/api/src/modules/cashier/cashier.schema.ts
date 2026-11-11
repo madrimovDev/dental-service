@@ -26,6 +26,11 @@ export const createTransactionSchema = z
     cardProvider: cardProviderSchema.optional(),
     notes: z.string().max(1000).optional(),
     treatmentPlanId: z.uuid().optional(),
+    /**
+     * FX-handoff: imzolangan vizit yozuvi to'lovi. Bemor va xizmat tarkibi vizitdan
+     * tekshiriladi, narx serverda hisoblanadi; bitta vizit bir marta to'lanadi (409).
+     */
+    visitNoteId: z.uuid().optional(),
     allocations: z
       .array(
         z.object({
@@ -43,6 +48,11 @@ export const createTransactionSchema = z
   .refine((v) => v.items.length > 0 || (v.allocations?.length ?? 0) > 0, {
     message: 'items yoki allocations talab qilinadi',
     path: ['items'],
+  })
+  // FX-handoff: vizit to'lovi faqat erkin POS (items) rejimida.
+  .refine((v) => v.visitNoteId === undefined || (v.allocations?.length ?? 0) === 0, {
+    message: 'visitNoteId allocations bilan birga ishlatilmaydi',
+    path: ['visitNoteId'],
   })
   // CLI-453 #3: ikkalasi BIRGA to'ldirilishi taqiqlanadi — bitta tranzaksiya yo erkin
   // POS (items) YOKI plan-billing (allocations), aralash-rejim semantik jihatdan
@@ -114,6 +124,7 @@ export const cashierTransactionDtoSchema = z
     cardProvider: cardProviderSchema.nullable(),
     type: transactionTypeSchema,
     parentTransactionId: z.uuid().nullable(),
+    visitNoteId: z.uuid().nullable(),
     status: transactionStatusSchema,
     notes: z.string().nullable(),
     fiscalProvider: z.string(),
@@ -224,3 +235,35 @@ export const cashierPatientPlanDtoSchema = z
   })
   .openapi('CashierPatientPlan');
 export type CashierPatientPlanDto = z.infer<typeof cashierPatientPlanDtoSchema>;
+
+/** FX-handoff: `GET /pending-visits` — branchId majburiy; «bugun» = Asia/Tashkent kuni. */
+export const pendingVisitsQuery = z.object({
+  branchId: z.uuid(),
+});
+export type PendingVisitsQuery = z.infer<typeof pendingVisitsQuery>;
+
+/**
+ * Kutilayotgan vizit (imzolangan, to'lanmagan) — kassa savatini to'ldirish uchun.
+ * `unitPrice` filialdagi FAOL narx (yo'q bo'lsa null → `hasUnpriced`). Pul = string.
+ */
+export const pendingVisitDtoSchema = z
+  .object({
+    visitNoteId: z.uuid(),
+    patientId: z.uuid(),
+    patientName: z.string(),
+    doctorId: z.uuid(),
+    doctorName: z.string().nullable(),
+    signedAt: z.string(),
+    services: z.array(
+      z.object({
+        serviceId: z.uuid(),
+        serviceName: z.string(),
+        quantity: z.number().int(),
+        unitPrice: z.string().nullable(),
+      }),
+    ),
+    total: z.string(),
+    hasUnpriced: z.boolean(),
+  })
+  .openapi('PendingVisit');
+export type PendingVisitDto = z.infer<typeof pendingVisitDtoSchema>;

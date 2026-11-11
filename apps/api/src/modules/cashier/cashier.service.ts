@@ -1,16 +1,32 @@
 import { randomBytes } from 'node:crypto';
 import {
+  appointments,
   cashierTransactionItems,
   cashierTransactions,
   expenses,
   patients,
+  services,
   tenantSettings,
   treatmentPlans,
   treatmentStagePayments,
   treatmentStages,
+  users,
+  visitNotes,
 } from '@dental/db-schema';
 import { createNoOpFiscalProvider, type FiscalProvider } from '@dental/fiscal';
-import { and, between, count, desc, eq, inArray, sql } from 'drizzle-orm';
+import {
+  and,
+  between,
+  count,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  or,
+  sql,
+} from 'drizzle-orm';
 import type { Context } from 'hono';
 import { onAfterCommit } from '../../db/after-commit.ts';
 import { getDb } from '../../db/scoped.ts';
@@ -22,7 +38,11 @@ import {
   fromCents,
   toCents,
 } from './cashier.billing.ts';
-import type { CreateTransactionInput, ListTransactionsQuery } from './cashier.schema.ts';
+import type {
+  CreateTransactionInput,
+  ListTransactionsQuery,
+  PendingVisitDto,
+} from './cashier.schema.ts';
 
 const generateReceiptNumber = (): string => {
   const date = new Date();
@@ -99,6 +119,65 @@ export class PatientNotFoundError extends Error {
     this.name = 'PatientNotFoundError';
   }
 }
+
+/** FX-handoff: `visitNoteId` joriy tenantda (RLS) topilmadi — routes 400 `visit_note.not_found`. */
+export class VisitNoteNotFoundError extends Error {
+  constructor() {
+    super('Visit note not found');
+    this.name = 'VisitNoteNotFoundError';
+  }
+}
+
+/** FX-handoff: vizit imzolanmagan (qoralama) — to'lov qabul qilinmaydi. */
+export class VisitNotSignedError extends Error {
+  constructor() {
+    super('Visit note is not signed');
+    this.name = 'VisitNotSignedError';
+  }
+}
+
+/** FX-handoff: client yuborgan `patientId` vizit bemoriga mos emas. */
+export class VisitPatientMismatchError extends Error {
+  constructor() {
+    super('patientId does not match the visit note patient');
+    this.name = 'VisitPatientMismatchError';
+  }
+}
+
+/** FX-handoff: savat xizmatlari vizitda bajarilgan xizmatlardan tashqarida/ortiq. */
+export class VisitItemsMismatchError extends Error {
+  constructor() {
+    super('Items do not match the services performed in the visit note');
+    this.name = 'VisitItemsMismatchError';
+  }
+}
+
+/** FX-handoff: bitta vizit bir marta to'lanadi (pre-check YOKI unique indeks poygasi) — 409. */
+export class VisitAlreadyBilledError extends Error {
+  constructor() {
+    super('Visit note is already billed');
+    this.name = 'VisitAlreadyBilledError';
+  }
+}
+
+/** `cashier_tx_visit_note_unique` (23505) — pre-check o'tib ketgan poyga. */
+const isVisitUniqueViolation = (err: unknown): boolean => {
+  const e = err as {
+    code?: string;
+    constraint_name?: string;
+    cause?: { code?: string; constraint_name?: string };
+  } | null;
+  if (!e) return false;
+  const code = e.code ?? e.cause?.code;
+  const name = e.constraint_name ?? e.cause?.constraint_name;
+  return code === '23505' && name === 'cashier_tx_visit_note_unique';
+};
+
+/** Asia/Tashkent kalendar kunining boshi (UTC+5, DST yo'q) — `list` bilan izchil. */
+const tashkentDayStart = (now = new Date()): Date => {
+  const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tashkent' }).format(now);
+  return new Date(`${day}T00:00:00+05:00`);
+};
 
 export class DiscountExceedsTotalError extends Error {
   constructor() {
@@ -262,6 +341,45 @@ export const createCashierService = (deps: {
       }
     }
 
+    // FX-handoff: vizit to'lovi. Vizit RLS orqali o'qiladi (boshqa tenant → topilmadi),
+    // imzolangan bo'lishi, bemor mos kelishi, savat tarkibi vizitda bajarilgan xizmatlar
+    // ichida qolishi va hali to'lanmagan bo'lishi shart. Narxni baribir server hisoblaydi.
+    let visitPatientId: string | null = null;
+    if (input.visitNoteId) {
+      const [visit] = await db
+        .select({
+          patientId: visitNotes.patientId,
+          signedAt: visitNotes.signedAt,
+          performedServices: visitNotes.performedServices,
+        })
+        .from(visitNotes)
+        .where(eq(visitNotes.id, input.visitNoteId))
+        .limit(1);
+      if (!visit) throw new VisitNoteNotFoundError();
+      if (!visit.signedAt) throw new VisitNotSignedError();
+      if (input.patientId && input.patientId !== visit.patientId) {
+        throw new VisitPatientMismatchError();
+      }
+      const allowed = new Map<string, number>();
+      for (const sid of visit.performedServices ?? []) {
+        allowed.set(sid, (allowed.get(sid) ?? 0) + 1);
+      }
+      const requested = new Map<string, number>();
+      for (const i of input.items) {
+        requested.set(i.serviceId, (requested.get(i.serviceId) ?? 0) + i.quantity);
+      }
+      for (const [sid, qty] of requested) {
+        if (qty > (allowed.get(sid) ?? 0)) throw new VisitItemsMismatchError();
+      }
+      const [billed] = await db
+        .select({ id: cashierTransactions.id })
+        .from(cashierTransactions)
+        .where(eq(cashierTransactions.visitNoteId, input.visitNoteId))
+        .limit(1);
+      if (billed) throw new VisitAlreadyBilledError();
+      visitPatientId = visit.patientId;
+    }
+
     // CLI-443: POS item narxi client'dan ISHONCH bilan qabul qilinmaydi — har
     // item uchun SERVERDA `getActivePrice(serviceId, branchId)` orqali hisoblanadi.
     // Yozuv tranzaksiyasi ochilishidan OLDIN (getDb(c) — request-level RLS tx,
@@ -336,7 +454,7 @@ export const createCashierService = (deps: {
     // `input.treatmentPlanId`/`patientId` berilsa — mos kelishi SHART (aks holda
     // AllocationPlanMismatchError); berilmasa — aniqlangan qiymat DERIVE qilinadi.
     let resolvedTreatmentPlanId: string | null = input.treatmentPlanId ?? null;
-    let resolvedPatientId: string | null = input.patientId ?? null;
+    let resolvedPatientId: string | null = visitPatientId ?? input.patientId ?? null;
 
     if (input.allocations && input.allocations.length > 0) {
       const stageIds = [...new Set(input.allocations.map((a) => a.stageId))];
@@ -380,131 +498,237 @@ export const createCashierService = (deps: {
 
     const receiptNumber = generateReceiptNumber();
 
-    return await db.transaction(async (tx) => {
-      await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);
+    const runInsert = () =>
+      db.transaction(async (tx) => {
+        await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);
 
-      const [transaction] = await tx
-        .insert(cashierTransactions)
-        .values({
-          tenantId,
-          branchId: input.branchId,
-          patientId: resolvedPatientId,
-          treatmentPlanId: resolvedTreatmentPlanId,
-          receiptNumber,
-          totalAmount: String(netTotal),
-          paidAmount: String(input.paidAmount),
-          discount: String(input.discount),
-          paymentMethod: input.paymentMethod,
-          cardProvider: input.paymentMethod === 'card' ? (input.cardProvider ?? null) : null,
-          notes: input.notes ?? null,
-          createdBy: user?.id ?? null,
-        })
-        .returning();
-
-      if (!transaction) throw new Error('Transaction insert failed');
-
-      // Items — bo'sh massivni insert qilmaymiz (Drizzle throw qiladi). Plan-billing'da items bo'sh.
-      // unitPrice/subtotal — server tomonidan resolvedItems'dan (CLI-443, client qiymati emas).
-      const items =
-        resolvedItems.length > 0
-          ? await tx
-              .insert(cashierTransactionItems)
-              .values(
-                resolvedItems.map((i) => ({
-                  transactionId: transaction.id,
-                  serviceId: i.serviceId,
-                  serviceName: i.serviceName,
-                  quantity: i.quantity,
-                  unitPrice: String(i.unitPrice),
-                  subtotal: String(i.unitPrice * i.quantity),
-                })),
-              )
-              .returning()
-          : [];
-
-      // Per-bosqich allocation rowlar (ijobiy = to'lov). Bir tx ichida (RLS tx-bound).
-      if (input.allocations && input.allocations.length > 0) {
-        // CLI-413: overpay guard'ni bir REQUEST ichida stage bo'yicha AGREGAT
-        // qilamiz — aks holda [{X,100k},{X,100k}] har biri mustaqil o'tib, 100k
-        // cost'ga 200k tushardi. Stage row'ni `.for('update')` bilan qulflaymiz
-        // (parallel to'lov poygasi — TOCTOU). Deterministik tartib (stageId sort)
-        // deadlock'ni oldini oladi.
-        const requestedByStage = new Map<string, number>();
-        for (const a of input.allocations) {
-          requestedByStage.set(a.stageId, (requestedByStage.get(a.stageId) ?? 0) + a.amount);
-        }
-        for (const stageId of [...requestedByStage.keys()].sort()) {
-          const requested = requestedByStage.get(stageId) as number;
-          const [stage] = await tx
-            .select({ cost: treatmentStages.cost })
-            .from(treatmentStages)
-            .where(eq(treatmentStages.id, stageId))
-            .for('update');
-          if (!stage) throw new AllocationExceedError();
-          const [paidRow] = await tx
-            .select({
-              paid: sql<string>`COALESCE(SUM(${treatmentStagePayments.amount}), 0)`,
-            })
-            .from(treatmentStagePayments)
-            .where(eq(treatmentStagePayments.stageId, stageId));
-          const existingPaid = Number(paidRow?.paid ?? 0);
-          if (existingPaid + requested > Number(stage.cost)) {
-            throw new AllocationExceedError();
-          }
-        }
-        await tx.insert(treatmentStagePayments).values(
-          input.allocations.map((a) => ({
+        const [transaction] = await tx
+          .insert(cashierTransactions)
+          .values({
             tenantId,
-            transactionId: transaction.id,
-            stageId: a.stageId,
-            amount: String(a.amount),
-          })),
-        );
-      }
-
-      // Fiscal (NoOp — M3 da). CLI-449: paidAmount (haqiqatda olingan naqd) —
-      // totalAmount (nominal/hisob-faktura) EMAS, qisman to'langan savdoda fiskal
-      // chek haqiqiy qabul qilingan summaga mos bo'lishi uchun.
-      const fiscalResult = await fiscal.createReceipt({
-        id: transaction.id,
-        amount: Number(transaction.paidAmount),
-        items: items,
-      });
-
-      if (fiscalResult.fiscalId || fiscalResult.response) {
-        await tx
-          .update(cashierTransactions)
-          .set({
-            fiscalReceiptId: fiscalResult.fiscalId,
-            fiscalResponse: fiscalResult.response as object,
+            branchId: input.branchId,
+            patientId: resolvedPatientId,
+            treatmentPlanId: resolvedTreatmentPlanId,
+            receiptNumber,
+            totalAmount: String(netTotal),
+            paidAmount: String(input.paidAmount),
+            discount: String(input.discount),
+            paymentMethod: input.paymentMethod,
+            cardProvider: input.paymentMethod === 'card' ? (input.cardProvider ?? null) : null,
+            notes: input.notes ?? null,
+            visitNoteId: input.visitNoteId ?? null,
+            createdBy: user?.id ?? null,
           })
-          .where(eq(cashierTransactions.id, transaction.id));
-      }
+          .returning();
 
-      await deps.audit.record(c, {
-        action: 'created',
-        resourceType: 'cashier_transaction',
-        resourceId: transaction.id,
-        after: { receiptNumber, totalAmount: netTotal, items: input.items.length },
+        if (!transaction) throw new Error('Transaction insert failed');
+
+        // Items — bo'sh massivni insert qilmaymiz (Drizzle throw qiladi). Plan-billing'da items bo'sh.
+        // unitPrice/subtotal — server tomonidan resolvedItems'dan (CLI-443, client qiymati emas).
+        const items =
+          resolvedItems.length > 0
+            ? await tx
+                .insert(cashierTransactionItems)
+                .values(
+                  resolvedItems.map((i) => ({
+                    transactionId: transaction.id,
+                    serviceId: i.serviceId,
+                    serviceName: i.serviceName,
+                    quantity: i.quantity,
+                    unitPrice: String(i.unitPrice),
+                    subtotal: String(i.unitPrice * i.quantity),
+                  })),
+                )
+                .returning()
+            : [];
+
+        // Per-bosqich allocation rowlar (ijobiy = to'lov). Bir tx ichida (RLS tx-bound).
+        if (input.allocations && input.allocations.length > 0) {
+          // CLI-413: overpay guard'ni bir REQUEST ichida stage bo'yicha AGREGAT
+          // qilamiz — aks holda [{X,100k},{X,100k}] har biri mustaqil o'tib, 100k
+          // cost'ga 200k tushardi. Stage row'ni `.for('update')` bilan qulflaymiz
+          // (parallel to'lov poygasi — TOCTOU). Deterministik tartib (stageId sort)
+          // deadlock'ni oldini oladi.
+          const requestedByStage = new Map<string, number>();
+          for (const a of input.allocations) {
+            requestedByStage.set(a.stageId, (requestedByStage.get(a.stageId) ?? 0) + a.amount);
+          }
+          for (const stageId of [...requestedByStage.keys()].sort()) {
+            const requested = requestedByStage.get(stageId) as number;
+            const [stage] = await tx
+              .select({ cost: treatmentStages.cost })
+              .from(treatmentStages)
+              .where(eq(treatmentStages.id, stageId))
+              .for('update');
+            if (!stage) throw new AllocationExceedError();
+            const [paidRow] = await tx
+              .select({
+                paid: sql<string>`COALESCE(SUM(${treatmentStagePayments.amount}), 0)`,
+              })
+              .from(treatmentStagePayments)
+              .where(eq(treatmentStagePayments.stageId, stageId));
+            const existingPaid = Number(paidRow?.paid ?? 0);
+            if (existingPaid + requested > Number(stage.cost)) {
+              throw new AllocationExceedError();
+            }
+          }
+          await tx.insert(treatmentStagePayments).values(
+            input.allocations.map((a) => ({
+              tenantId,
+              transactionId: transaction.id,
+              stageId: a.stageId,
+              amount: String(a.amount),
+            })),
+          );
+        }
+
+        // Fiscal (NoOp — M3 da). CLI-449: paidAmount (haqiqatda olingan naqd) —
+        // totalAmount (nominal/hisob-faktura) EMAS, qisman to'langan savdoda fiskal
+        // chek haqiqiy qabul qilingan summaga mos bo'lishi uchun.
+        const fiscalResult = await fiscal.createReceipt({
+          id: transaction.id,
+          amount: Number(transaction.paidAmount),
+          items: items,
+        });
+
+        if (fiscalResult.fiscalId || fiscalResult.response) {
+          await tx
+            .update(cashierTransactions)
+            .set({
+              fiscalReceiptId: fiscalResult.fiscalId,
+              fiscalResponse: fiscalResult.response as object,
+            })
+            .where(eq(cashierTransactions.id, transaction.id));
+        }
+
+        await deps.audit.record(c, {
+          action: 'created',
+          resourceType: 'cashier_transaction',
+          resourceId: transaction.id,
+          after: { receiptNumber, totalAmount: netTotal, items: input.items.length },
+        });
+
+        // UI-T2: bog'langan (Telegram) bemorga chek xulosasi — commit'dan KEYIN.
+        const messenger = deps.messenger;
+        if (messenger && transaction.patientId && Number(transaction.paidAmount) > 0) {
+          const patientId = transaction.patientId;
+          await onAfterCommit(c, () =>
+            messenger.sendReceipt({
+              tenantId,
+              patientId,
+              amount: transaction.paidAmount,
+              at: transaction.createdAt,
+              receiptNumber: transaction.receiptNumber,
+            }),
+          );
+        }
+
+        return { ...transaction, items };
       });
 
-      // UI-T2: bog'langan (Telegram) bemorga chek xulosasi — commit'dan KEYIN.
-      const messenger = deps.messenger;
-      if (messenger && transaction.patientId && Number(transaction.paidAmount) > 0) {
-        const patientId = transaction.patientId;
-        await onAfterCommit(c, () =>
-          messenger.sendReceipt({
-            tenantId,
-            patientId,
-            amount: transaction.paidAmount,
-            at: transaction.createdAt,
-            receiptNumber: transaction.receiptNumber,
-          }),
-        );
-      }
+    // FX-handoff: parallel ikki to'lov — unique indeks yutqazgani 500 emas, 409.
+    // `db.transaction` so'rov-tx ichida SAVEPOINT: yutqazgan insert rollback bo'ladi,
+    // tashqi tx aborted bo'lib qolmaydi.
+    try {
+      return await runInsert();
+    } catch (e) {
+      if (isVisitUniqueViolation(e)) throw new VisitAlreadyBilledError();
+      throw e;
+    }
+  }
 
-      return { ...transaction, items };
+  /**
+   * FX-handoff: kassa uchun «kutilayotgan vizitlar» — BUGUN (Asia/Tashkent) imzolangan,
+   * hali to'lanmagan, kamida bitta xizmat bajarilgan vizitlar. Filial: yozilishi shu
+   * filialda bo'lgan YOKI yozilishga bog'lanmagan (filiali noma'lum) vizitlar. Narx
+   * filialning FAOL narxidan (POS bilan bir manba); narxsiz xizmat → `unitPrice: null`.
+   */
+  async function listPendingVisits(c: Context, branchId: string): Promise<PendingVisitDto[]> {
+    const db = getDb(c);
+    const dayStart = tashkentDayStart();
+
+    const rows = await db
+      .select({
+        visitNoteId: visitNotes.id,
+        patientId: visitNotes.patientId,
+        patientName: patients.fullName,
+        doctorId: visitNotes.doctorId,
+        doctorName: users.fullName,
+        signedAt: visitNotes.signedAt,
+        performed: visitNotes.performedServices,
+      })
+      .from(visitNotes)
+      .innerJoin(patients, eq(patients.id, visitNotes.patientId))
+      .leftJoin(users, eq(users.id, visitNotes.doctorId))
+      .leftJoin(appointments, eq(appointments.id, visitNotes.appointmentId))
+      .where(
+        and(
+          isNotNull(visitNotes.signedAt),
+          gte(visitNotes.signedAt, dayStart),
+          sql`COALESCE(array_length(${visitNotes.performedServices}, 1), 0) > 0`,
+          or(isNull(appointments.id), eq(appointments.branchId, branchId)),
+          sql`NOT EXISTS (SELECT 1 FROM cashier_transactions ct WHERE ct.visit_note_id = ${visitNotes.id})`,
+        ),
+      )
+      .orderBy(desc(visitNotes.signedAt))
+      .limit(100);
+
+    const serviceIds = [...new Set(rows.flatMap((r) => r.performed ?? []))];
+    const names = new Map<string, string>();
+    const prices = new Map<string, string | null>();
+    if (serviceIds.length > 0) {
+      const svcRows = await db
+        .select({ id: services.id, nameUz: services.nameUz })
+        .from(services)
+        .where(inArray(services.id, serviceIds));
+      for (const r of svcRows) names.set(r.id, r.nameUz);
+      await Promise.all(
+        serviceIds.map(async (sid) => {
+          const p = deps.priceLookup
+            ? await deps.priceLookup.getActivePrice(c, sid, branchId)
+            : null;
+          prices.set(sid, p?.price ?? null);
+        }),
+      );
+    }
+
+    const result: PendingVisitDto[] = rows.map((r) => {
+      const qty = new Map<string, number>();
+      for (const sid of r.performed ?? []) qty.set(sid, (qty.get(sid) ?? 0) + 1);
+      let totalCents = 0;
+      let hasUnpriced = false;
+      const lines = [...qty].map(([serviceId, quantity]) => {
+        const unitPrice = prices.get(serviceId) ?? null;
+        if (unitPrice === null) hasUnpriced = true;
+        else totalCents += toCents(Number(unitPrice)) * quantity;
+        return {
+          serviceId,
+          serviceName: names.get(serviceId) ?? '—',
+          quantity,
+          unitPrice,
+        };
+      });
+      return {
+        visitNoteId: r.visitNoteId,
+        patientId: r.patientId,
+        patientName: r.patientName,
+        doctorId: r.doctorId,
+        doctorName: r.doctorName ?? null,
+        signedAt: (r.signedAt as Date).toISOString(),
+        services: lines,
+        total: String(fromCents(totalCents)),
+        hasUnpriced,
+      };
     });
+
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'cashier_pending_visits',
+      resourceId: null,
+      after: { branchId, count: result.length },
+    });
+
+    return result;
   }
 
   /**
@@ -820,7 +1044,16 @@ export const createCashierService = (deps: {
     return rows;
   }
 
-  return { list, getById, create, refund, dailySummary, planBalance, listPatientPlans };
+  return {
+    list,
+    getById,
+    create,
+    refund,
+    dailySummary,
+    planBalance,
+    listPatientPlans,
+    listPendingVisits,
+  };
 };
 
 export type CashierService = ReturnType<typeof createCashierService>;

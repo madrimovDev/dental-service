@@ -1,0 +1,3 @@
+ALTER TABLE "cashier_transactions" ADD COLUMN "visit_note_id" uuid;--> statement-breakpoint
+ALTER TABLE "cashier_transactions" ADD CONSTRAINT "cashier_transactions_visit_note_id_visit_notes_id_fk" FOREIGN KEY ("visit_note_id") REFERENCES "public"."visit_notes"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+CREATE UNIQUE INDEX "cashier_tx_visit_note_unique" ON "cashier_transactions" USING btree ("visit_note_id") WHERE "cashier_transactions"."visit_note_id" IS NOT NULL;
