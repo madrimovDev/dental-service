@@ -105,6 +105,13 @@ P bosqichlari 1→5 tartibda; ichida bir-biriga tegmaydigan ishlar parallel (ork
 - Supervisor `gracePeriodDays` chegarasi **1..7** (yaratish, modules PATCH, admin UI); API qo'shimcha `min(signed, 7)` bilan cheklaydi.
 - Renew: `expiresAt` sana bo'lsa UTC `23:59:59` deb olinadi.
 
+### 3.8 P bosqichlari 4b–5 va brauzer sinovidagi qarorlar (2026-11-11)
+- 👤 **Taklifga rozilik:** mavjud platforma foydalanuvchisini taklif qilish «kutilmoqda» (`accepted_at`), foydalanuvchi qabul qilgunicha a'zolik emas.
+- 🛠 Yangi taklif qilingan foydalanuvchi ham birinchi kirishda parolni almashtiradi.
+- 🛠 Shaxsiy jadvali umuman yo'q doktor filial ish soatida ishlaydi (jadvali bor doktorning bo'sh kuni — dam).
+- 🛠 `switch-workspace` filial berilmasa: filial xodimi → o'z filiali, tenant-wide/owner → eng eski filial.
+- ⚠️ Qoldiq xavf FU-15 (telefonni oldindan ro'yxatdan o'tkazish) — telefon egaligini tasdiqlash 👤 qaroriga qoldirildi.
+
 ## 4. UI qayta dizayni — qarorlar
 
 UI spec ([`2026-11-11-ui-redesign-design.md`](./2026-11-11-ui-redesign-design.md)) asosiy manba bo'lib qoladi; §4 dagi ochiq savollarga javoblar:
