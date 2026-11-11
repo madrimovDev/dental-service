@@ -2,7 +2,9 @@ import { randomBytes } from 'node:crypto';
 import { normalizePhone } from '@dental/core';
 import {
   branches,
+  permissions as permissionsTable,
   refreshTokens,
+  rolePermissions,
   roles,
   staffProfiles,
   tenants,
@@ -16,7 +18,11 @@ import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { logger } from '../../lib/logger.ts';
 import { hashPassword } from '../../lib/password.ts';
-import { assertCanGrant, loadRolePermissionCodes } from '../../lib/role-escalation.ts';
+import {
+  assertCanGrant,
+  loadRolePermissionCodes,
+  RoleEscalationError,
+} from '../../lib/role-escalation.ts';
 import type {
   CreateAssignmentInput,
   InviteUserInput,
@@ -56,6 +62,39 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
         .where(isNull(users.deletedAt))
         .orderBy(users.fullName)
     );
+  }
+
+  /**
+   * Chaqiruvchi tayinlay oladigan rollar. Qoida `assertCanGrant` bilan AYNAN bir xil
+   * (rol permission'lari chaqiruvchida bo'lishi shart; owner — hammasi), shuning uchun
+   * ro'yxatdagi har rol `invite`/`addAssignment` da 403 `role.escalation` bermaydi.
+   */
+  async function listGrantableRoles(c: Context) {
+    const db = getDb(c);
+    const roleRows = await db
+      .select({ id: roles.id, name: roles.name, isSystem: roles.isSystem })
+      .from(roles)
+      .orderBy(roles.name);
+    const permRows = await db
+      .select({ roleId: rolePermissions.roleId, code: permissionsTable.code })
+      .from(rolePermissions)
+      .innerJoin(permissionsTable, eq(rolePermissions.permissionId, permissionsTable.id));
+    const byRole = new Map<string, string[]>();
+    for (const r of permRows) {
+      const list = byRole.get(r.roleId);
+      if (list) list.push(r.code);
+      else byRole.set(r.roleId, [r.code]);
+    }
+    const caller = callerPerms(c);
+    return roleRows.filter((r) => {
+      try {
+        assertCanGrant(caller, byRole.get(r.id) ?? []);
+        return true;
+      } catch (e) {
+        if (e instanceof RoleEscalationError) return false;
+        throw e;
+      }
+    });
   }
 
   /**
@@ -563,6 +602,7 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
 
   return {
     listAssignments,
+    listGrantableRoles,
     invite,
     addAssignment,
     updateAssignment,

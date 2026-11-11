@@ -148,8 +148,9 @@ export function useCreatePlan(patientId: string) {
 }
 
 // CLI-188: davolash reja bosqichi uchun xizmat katalogi (lookup — cache bo'lishiladi).
-export function useServiceCatalog() {
+export function useServiceCatalog(enabled = true) {
   return useQuery({
+    enabled,
     queryKey: lookupKeys.services(),
     queryFn: () => listServices().then((r) => r.data),
     staleTime: HOUR,
@@ -270,8 +271,9 @@ function invalidatePlanFinancials(qc: QueryClient, patientId: string) {
 }
 
 // ===== A: visit notes =====
-export function useVisitNotes(patientId: string) {
+export function useVisitNotes(patientId: string, enabled = true) {
   return useQuery({
+    enabled,
     queryKey: clinicalKeys.visitNotes(patientId),
     queryFn: () => listVisitNotes({ patientId }).then((r) => r.data),
   });
@@ -362,8 +364,9 @@ export function useDiagnoses(search?: string) {
   });
 }
 
-export function usePatientAppointments(patientId: string) {
+export function usePatientAppointments(patientId: string, enabled = true) {
   return useQuery({
+    enabled,
     queryKey: clinicalKeys.appointmentsForPatient(patientId),
     queryFn: () => listAppointments({ patientId }).then((r) => r.data),
   });

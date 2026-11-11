@@ -1,6 +1,7 @@
 import {
   createBranch,
   createRole,
+  customInstance,
   deleteBranch,
   deleteRole,
   deleteUserAssignment,
@@ -34,10 +35,30 @@ import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/rea
 import { settingsKeys } from './settings.keys';
 
 // --- Roles ---
-export function useRoles() {
+export function useRoles(options?: { enabled?: boolean }) {
   return useQuery({
+    enabled: options?.enabled,
     queryKey: settingsKeys.roles(),
     queryFn: () => listRoles().then((r) => r.data),
+  });
+}
+
+export type GrantableRole = { id: string; name: string; isSystem: boolean };
+
+/**
+ * Chaqiruvchi tayinlay oladigan rollar (`GET /api/users/grantable-roles`, `user.invite`).
+ * `role.view` talab qilmaydi — Branch Manager ham «Xodim qo'shish» rolini tanlay oladi.
+ * TODO(controller): `generate:contract` dan keyin generated `listGrantableRoles` bilan almashtirilsin.
+ */
+export function useGrantableRoles(options?: { enabled?: boolean }) {
+  return useQuery({
+    enabled: options?.enabled,
+    queryKey: settingsKeys.grantableRoles(),
+    queryFn: () =>
+      customInstance<{ success: true; data: GrantableRole[] }>({
+        url: '/api/users/grantable-roles',
+        method: 'GET',
+      }).then((r) => r.data),
   });
 }
 
@@ -164,8 +185,9 @@ export function useUpsertProfile(userId: string) {
 }
 
 // --- Branches ---
-export function useBranches() {
+export function useBranches(options?: { enabled?: boolean }) {
   return useQuery({
+    enabled: options?.enabled,
     queryKey: settingsKeys.branches(),
     queryFn: () => listBranches().then((r) => r.data),
   });
@@ -225,8 +247,9 @@ export function useUpdateTenant() {
 }
 
 // --- Tenant settings (klinika sozlamalari) ---
-export function useTenantSettings() {
+export function useTenantSettings(options?: { enabled?: boolean }) {
   return useQuery({
+    enabled: options?.enabled,
     queryKey: settingsKeys.tenantSettings(),
     queryFn: () => getTenantSettings().then((res) => res.data),
   });

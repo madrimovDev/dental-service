@@ -83,7 +83,10 @@ vi.mock('@mantine/hooks', async (orig) => {
   return { ...actual, useDebouncedValue: (v: unknown) => [v] };
 });
 
-const mockAuth = vi.hoisted(() => ({ activeBranchId: 'b1' as string | null }));
+const mockAuth = vi.hoisted(() => ({
+  activeBranchId: 'b1' as string | null,
+  hasPermission: (_c: string) => true,
+}));
 vi.mock('@/stores/auth-store.ts', () => ({ useAuthStore: () => mockAuth }));
 
 describe('NewAppointmentWizard', () => {

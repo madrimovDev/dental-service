@@ -51,8 +51,10 @@ describe('SettingsShell', () => {
   });
 
   it('permission yo’q tablarni filtrlaydi', () => {
-    // Faqat tenant.view ruxsatli bo’lsa: tenant + notify + integrations ko’rinadi.
-    hasPermissionMock.mockImplementation((code: string): boolean => code === 'tenant.view');
+    // Faqat tenant_settings.view ruxsatli bo’lsa: tenant + notify + integrations ko’rinadi.
+    hasPermissionMock.mockImplementation(
+      (code: string): boolean => code === 'tenant_settings.view',
+    );
     renderApp(
       <SettingsShell active="tenant">
         <div>content</div>
@@ -63,8 +65,8 @@ describe('SettingsShell', () => {
     expect(within(nav).queryByText('Rollar')).not.toBeInTheDocument();
     expect(within(nav).queryByText('Filiallar')).not.toBeInTheDocument();
     expect(within(nav).queryByText('Xodimlar')).not.toBeInTheDocument();
-    // tenant (1) + notify/integrations gated on tenant_settings.view (0) = 1 visible button.
-    expect(within(nav).getAllByRole('button')).toHaveLength(1);
+    // tenant + notify + integrations — uchalasi tenant_settings.view ostida.
+    expect(within(nav).getAllByRole('button')).toHaveLength(3);
   });
 
   it('readiness: N/total, bo’lim badge’i va desktopda zaxira placeholder', async () => {

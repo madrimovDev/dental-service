@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useLicenseStatus } from '@/features/license/license.api.ts';
 import { formatCurrency } from '@/lib/format';
+import { useAuthStore } from '@/stores/auth-store.ts';
 import { useBackupStatus, useDebtAging } from '../dashboard.api.ts';
 import { buildOwnerAlerts, type OwnerAlertLevel } from '../owner-alerts.ts';
 
@@ -19,7 +20,9 @@ const LEVEL_STYLE: Record<OwnerAlertLevel, { bg: string; border: string; tag: st
  */
 export function OwnerAlertsPanel() {
   const { t } = useTranslation();
-  const { data: backup } = useBackupStatus();
+  const { hasPermission } = useAuthStore();
+  // `/backup/status` — tenant_settings.view; ruxsatsiz rolda 403 shovqini bo'lmasin.
+  const { data: backup } = useBackupStatus({ enabled: hasPermission('tenant_settings.view') });
   const { data: license } = useLicenseStatus();
   const { data: debt } = useDebtAging();
 

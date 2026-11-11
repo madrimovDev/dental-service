@@ -92,6 +92,7 @@ type Props = {
 export function LabOrderFormModal({ opened, onClose, patientId, existingOrders }: Props) {
   const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
+  const canViewAppointments = useAuthStore((s) => s.hasPermission('appointment.view'));
   const [files, setFiles] = useState<File[]>([]);
 
   const form = useForm<LabOrderFormValues>({
@@ -103,7 +104,7 @@ export function LabOrderFormModal({ opened, onClose, patientId, existingOrders }
   const statusMut = useUpdateLabOrderStatus(patientId);
   const uploadMut = useUploadLabOrderFile();
   const patientQuery = usePatient(patientId);
-  const apptQuery = usePatientAppointments(patientId);
+  const apptQuery = usePatientAppointments(patientId, canViewAppointments);
 
   const v = form.values;
   const patient = patientQuery.data;

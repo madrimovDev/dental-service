@@ -72,7 +72,7 @@ type SlotCell = { start: string; end: string; reason: UnavailableSlot['reason'] 
 export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const { activeBranchId } = useAuthStore();
+  const { activeBranchId, hasPermission } = useAuthStore();
   const [error, setError] = useState<string | null>(null);
   const { data: doctors } = useDoctors();
   // CLI-454: bemor qidiruvi serverga debounced uzatiladi (100 ta chegarasiz ro'yxat emas).
@@ -83,7 +83,7 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
     page: 1,
     pageSize: 100,
   });
-  const { data: servicesData } = useServices();
+  const { data: servicesData } = useServices({ enabled: hasPermission('service.view') });
   const { data: branchesData } = useBranches();
   const createMut = useCreateAppointment();
 

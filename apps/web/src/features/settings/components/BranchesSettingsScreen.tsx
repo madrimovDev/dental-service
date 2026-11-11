@@ -21,7 +21,8 @@ export function BranchesSettingsScreen() {
   const { t } = useTranslation();
   const { hasPermission } = useAuthStore();
   const branches = useBranches();
-  const assignments = useUsers();
+  // Xodim soni ustuni `user.view` talab qiladi — ruxsatsiz rolda 403 shovqini bo'lmasin.
+  const assignments = useUsers({ enabled: hasPermission('user.view') });
   const upsert = useUpsertBranch();
   const remove = useDeleteBranch();
 

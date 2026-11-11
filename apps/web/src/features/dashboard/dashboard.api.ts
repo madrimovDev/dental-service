@@ -157,8 +157,9 @@ export type BackupStatus = GeneratedBackupStatus;
  * Zaxira holati (lane D kontrakti). 404 yoki 403 (endpoint yo'q / ruxsat yo'q) → `null`:
  * plitka umuman ko'rinmaydi.
  */
-export function useBackupStatus() {
+export function useBackupStatus(options?: { enabled?: boolean }) {
   return useQuery({
+    enabled: options?.enabled,
     queryKey: dashboardKeys.backupStatus(),
     queryFn: async (): Promise<BackupStatus | null> => {
       try {
