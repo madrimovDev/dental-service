@@ -11,7 +11,7 @@ import { patients, tenants, users } from '@dental/db-schema';
 import { Queue } from 'bullmq';
 import { eq, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
-import { onAfterCommit } from '../../src/db/after-commit.ts';
+import { AFTER_COMMIT_TIMEOUT_MS, onAfterCommit } from '../../src/db/after-commit.ts';
 import { db } from '../../src/db/client.ts';
 import { getDb } from '../../src/db/scoped.ts';
 import { reminderJobId } from '../../src/lib/reminder-job-id.ts';
@@ -23,6 +23,10 @@ let tenantId: string;
 let ownerId: string;
 const queue = new Queue('reminders-p4-test', { connection: { url: process.env.REDIS_URL } });
 const scheduler = createReminderScheduler(queue);
+// Haqiqiy o'lik Redis: hech narsa tinglamaydigan port. BullMQ bunda reject qilmaydi, osilib qoladi.
+const deadQueue = new Queue('reminders-p4-dead', { connection: { url: 'redis://localhost:6399' } });
+deadQueue.on('error', () => {});
+const deadScheduler = createReminderScheduler(deadQueue);
 
 const insertRow = async (c: Parameters<typeof getDb>[0], name: string) => {
   await getDb(c).insert(patients).values({ tenantId, fullName: name, phone: '+998901234567' });
@@ -70,6 +74,11 @@ const buildApp = () => {
     });
     return c.json({ ok: true });
   });
+  app.get('/redis-down', async (c) => {
+    await insertRow(c, 'p4-redis-down');
+    await onAfterCommit(c, () => deadScheduler.enqueueReminder(tenantId, randomUUID(), 60_000));
+    return c.json({ ok: true });
+  });
   app.get('/remove', async (c) => {
     await insertRow(c, 'p4-remove');
     await onAfterCommit(c, () => scheduler.removeReminder(apptId.remove));
@@ -96,6 +105,7 @@ afterAll(async () => {
   await db.execute(sql`TRUNCATE users, tenants RESTART IDENTITY CASCADE`);
   await queue.obliterate({ force: true });
   await queue.close();
+  await deadQueue.close().catch(() => {});
 });
 
 describe('P4 afterCommit', () => {
@@ -119,6 +129,15 @@ describe('P4 afterCommit', () => {
     const res = await app.request('/throws');
     expect(res.status).toBe(200);
     expect(await rowCount('p4-throws')).toBe(1);
+  });
+
+  test('real dead Redis -> bounded response time, 200 and row committed', async () => {
+    const t0 = Date.now();
+    const res = await app.request('/redis-down');
+    const elapsed = Date.now() - t0;
+    expect(res.status).toBe(200);
+    expect(elapsed).toBeLessThan(AFTER_COMMIT_TIMEOUT_MS + 3000);
+    expect(await rowCount('p4-redis-down')).toBe(1);
   });
 
   test('removeReminder after commit', async () => {

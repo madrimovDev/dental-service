@@ -11,11 +11,36 @@ declare module 'hono' {
   }
 }
 
-const runOne = async (fn: AfterCommitFn, requestId?: string): Promise<void> => {
+/**
+ * Side-effect javobni bloklay oladigan yuqori chegara. Redis/Valkey'ga ulanib
+ * bo'lmasa BullMQ `getJob()`/`add()` reject qilmaydi, cheksiz osilib qoladi —
+ * commit bo'lgan so'rov klientga 200 o'rniga timeout bo'lib qaytmasligi kerak.
+ */
+export const AFTER_COMMIT_TIMEOUT_MS = 2500;
+
+const runOne = async (
+  fn: AfterCommitFn,
+  requestId?: string,
+  timeoutMs: number = AFTER_COMMIT_TIMEOUT_MS,
+): Promise<void> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    await fn();
+    const work = fn();
+    // Timeout g'olib bo'lsa `work` fonda davom etadi — keyingi rejection'ni yutamiz.
+    work.catch(() => {});
+    await Promise.race([
+      work,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`afterCommit side-effect timed out after ${timeoutMs}ms`)),
+          timeoutMs,
+        );
+      }),
+    ]);
   } catch (err) {
     logger.warn({ err, requestId }, 'afterCommit side-effect failed');
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 };
 
