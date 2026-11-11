@@ -15,7 +15,10 @@ export const createVisitNoteTemplateSchema = z.object({
 });
 export type CreateVisitNoteTemplateInput = z.infer<typeof createVisitNoteTemplateSchema>;
 
-export const updateVisitNoteTemplateSchema = createVisitNoteTemplateSchema.partial();
+export const updateVisitNoteTemplateSchema = createVisitNoteTemplateSchema
+  .partial()
+  // P12: default'siz
+  .extend({ template: templateBodySchema.optional(), isShared: z.boolean().optional() });
 export type UpdateVisitNoteTemplateInput = z.infer<typeof updateVisitNoteTemplateSchema>;
 
 /** Response DTO — wire shape. */

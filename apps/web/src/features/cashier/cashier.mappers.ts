@@ -26,6 +26,14 @@ export function findActivePrice(prices: ServicePrice[], branchId: string): numbe
   return top ? Number(top.price) : null;
 }
 
+/** Kunlik kassa SOF jami: Σ payment − Σ refund (DailySummaryCard va AccountantDashboard umumiy). */
+export function netCashTotal(breakdown: Array<{ type: string; total: string | number }>): number {
+  return breakdown.reduce(
+    (s, b) => (b.type === 'refund' ? s - Number(b.total) : s + Number(b.total)),
+    0,
+  );
+}
+
 /** Savat jami − chegirma (manfiy bo'lmaydi). */
 export function computeNetTotal(cart: CartItem[], discount: number): number {
   const gross = cart.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);

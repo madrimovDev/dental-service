@@ -157,17 +157,27 @@ export function useBranches() {
 export function useUpsertBranch() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { id: string | null; name: string; address?: string; phone?: string }) => {
+    mutationFn: (input: {
+      id: string | null;
+      name: string;
+      address?: string;
+      phone?: string;
+      workHours?: UpdateBranchBody['workHours'];
+    }) => {
       const body: UpdateBranchBody = {
         name: input.name,
         address: input.address,
         phone: input.phone,
+        workHours: input.workHours,
       };
       return input.id
         ? updateBranch(input.id, body).then((r) => r.data)
-        : createBranch({ name: input.name, address: input.address, phone: input.phone }).then(
-            (r) => r.data,
-          );
+        : createBranch({
+            name: input.name,
+            address: input.address,
+            phone: input.phone,
+            workHours: input.workHours,
+          }).then((r) => r.data);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: settingsKeys.branches() }),
   });

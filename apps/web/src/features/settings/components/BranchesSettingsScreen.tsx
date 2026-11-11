@@ -13,6 +13,7 @@ import { useBranches, useDeleteBranch, useUpsertBranch, useUsers } from '../sett
 import { type BranchFormValues, branchSchema } from '../settings.schema';
 import { ConfirmModal } from './ConfirmModal';
 import { SettingsShell } from './SettingsShell';
+import { DEFAULT_WORK_HOURS, WorkHoursEditor, type WorkHoursValue } from './WorkHoursEditor';
 
 const GRID_COLS = 'minmax(0,1fr) minmax(0,1.3fr) 150px 110px auto';
 
@@ -39,6 +40,7 @@ export function BranchesSettingsScreen() {
   const [opened, { open, close }] = useDisclosure(false);
   const [editing, setEditing] = useState<Branch | null>(null);
   const [toDelete, setToDelete] = useState<Branch | null>(null);
+  const [workHours, setWorkHours] = useState<WorkHoursValue>(DEFAULT_WORK_HOURS);
 
   const form = useForm<BranchFormValues>({
     initialValues: { name: '', address: '', phone: '' },
@@ -48,11 +50,14 @@ export function BranchesSettingsScreen() {
   const openCreate = () => {
     setEditing(null);
     form.reset();
+    setWorkHours(DEFAULT_WORK_HOURS);
     open();
   };
   const openEdit = (b: Branch) => {
     setEditing(b);
     form.setValues({ name: b.name, address: b.address ?? '', phone: b.phone ?? '' });
+    // workHours=null (sozlanmagan) → default ko'rsatiladi; saqlansa filial sozlanadi.
+    setWorkHours((b.workHours as WorkHoursValue | null) ?? DEFAULT_WORK_HOURS);
     open();
   };
 
@@ -63,6 +68,7 @@ export function BranchesSettingsScreen() {
         name: values.name,
         address: values.address || undefined,
         phone: values.phone || undefined,
+        workHours,
       },
       {
         onSuccess: () => {
@@ -211,6 +217,10 @@ export function BranchesSettingsScreen() {
             <TextInput label={t('branches.name')} required {...form.getInputProps('name')} />
             <TextInput label={t('branches.address')} {...form.getInputProps('address')} />
             <PhoneInput label={t('branches.phone')} {...form.getInputProps('phone')} />
+            <Text size="sm" fw={600}>
+              {t('branches.work_hours')}
+            </Text>
+            <WorkHoursEditor value={workHours} onChange={setWorkHours} />
             <Group justify="flex-end">
               <Button variant="default" onClick={close}>
                 {t('common.cancel')}

@@ -801,6 +801,6 @@ export {
   updateVisitNote,
 } from './generated/visit-notes/visit-notes.ts';
 export type { CustomInstanceConfig } from './mutator.ts';
-export { configureClient, customInstance, isClientConfigured } from './mutator.ts';
+export { configureClient, customInstance, fetchBlob, isClientConfigured } from './mutator.ts';
 export * from './types-clinical.ts';
 export * from './types-m5.ts';

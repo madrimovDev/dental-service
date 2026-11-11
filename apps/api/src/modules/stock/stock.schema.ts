@@ -16,7 +16,11 @@ export type CreateItemInput = z.infer<typeof createItemSchema>;
 // CLI-424: `quantity` PATCH-item'dan CHIQARILDI — qoldiq faqat movement (`createMovement`)
 // yoki batch (`createBatch`) orqali o'zgaradi (Qaror #31, ledger yagona manba). `updateItem`
 // faqat metadata: name/unit/category/price/branchId/minThreshold.
-export const updateItemSchema = createItemSchema.omit({ quantity: true }).partial();
+export const updateItemSchema = createItemSchema
+  .omit({ quantity: true })
+  .partial()
+  // P12: default'siz (PATCH minThreshold'ni 0 ga tashlamasin)
+  .extend({ minThreshold: z.coerce.number().nonnegative().optional() });
 export type UpdateItemInput = z.infer<typeof updateItemSchema>;
 
 export const listItemsQuerySchema = z.object({

@@ -337,6 +337,13 @@
       "when": 1794398659541,
       "tag": "0047_user_assignments_accepted_default",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1794399999000,
+      "tag": "0048_recall_log_skipped_no_channel",
+      "breakpoints": true
     }
   ]
 }

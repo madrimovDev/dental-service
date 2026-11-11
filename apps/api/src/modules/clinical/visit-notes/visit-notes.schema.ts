@@ -17,7 +17,14 @@ export const createVisitNoteSchema = z.object({
 });
 export type CreateVisitNoteInput = z.infer<typeof createVisitNoteSchema>;
 
-export const updateVisitNoteSchema = createVisitNoteSchema.partial().omit({ patientId: true });
+export const updateVisitNoteSchema = createVisitNoteSchema
+  .partial()
+  // P12: default'siz (PATCH bo'sh massiv bilan ustiga yozmasin)
+  .extend({
+    assessmentDiagnoses: z.array(z.uuid()).optional(),
+    performedServices: z.array(z.uuid()).optional(),
+  })
+  .omit({ patientId: true });
 export type UpdateVisitNoteInput = z.infer<typeof updateVisitNoteSchema>;
 
 /** Response DTO — wire shape (api-client VisitNote invariant). */

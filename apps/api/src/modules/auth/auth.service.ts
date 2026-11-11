@@ -21,6 +21,7 @@ import type { Database, DbTransaction } from '../../db/client.ts';
 import { signAccess, signRefresh, verifyRefresh } from '../../lib/jwt.ts';
 import { logger } from '../../lib/logger.ts';
 import { hashPassword, verifyPassword } from '../../lib/password.ts';
+import { DEFAULT_WORK_HOURS } from '../branches/branches.defaults.ts';
 import type {
   ChangePasswordInput,
   LoginInput,
@@ -164,6 +165,7 @@ export async function provisionTenantInTx(
       name: input.branchName?.trim() || 'Bosh filial',
       address: input.branchAddress ?? null,
       phone: input.branchPhone ? normalizePhone(input.branchPhone) : null,
+      workHours: DEFAULT_WORK_HOURS,
     })
     .returning({ id: branches.id });
 

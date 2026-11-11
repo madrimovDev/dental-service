@@ -15,7 +15,10 @@ export const createTemplateSchema = z.object({
 });
 export type CreateTemplateInput = z.infer<typeof createTemplateSchema>;
 
-export const updateTemplateSchema = createTemplateSchema.partial();
+export const updateTemplateSchema = createTemplateSchema
+  .partial()
+  // P12: default'siz (PATCH isActive'ni ustiga yozmasin)
+  .extend({ isActive: z.boolean().optional() });
 export type UpdateTemplateInput = z.infer<typeof updateTemplateSchema>;
 
 export const signFormSchema = z.object({

@@ -12,4 +12,5 @@ export interface Availability {
   date: string;
   slotMinutes: number;
   slots: AvailabilitySlot[];
+  workHoursConfigured: boolean;
 }

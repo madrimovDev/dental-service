@@ -242,3 +242,15 @@ describe('toPlanBalanceVM', () => {
     expect(vm.balance).toBe(70000);
   });
 });
+
+describe('netCashTotal (P13)', () => {
+  it('refund ayiriladi, payment qo‘shiladi', async () => {
+    const { netCashTotal } = await import('./cashier.mappers');
+    expect(
+      netCashTotal([
+        { type: 'payment', total: '500000' },
+        { type: 'refund', total: '300000' },
+      ]),
+    ).toBe(200000);
+  });
+});

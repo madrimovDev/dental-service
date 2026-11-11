@@ -1,8 +1,9 @@
-import { screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { renderApp } from '../../../test-utils';
 import { BranchesSettingsScreen } from './BranchesSettingsScreen';
 
+const mutateMock = vi.hoisted(() => vi.fn());
 vi.mock('../settings.api', () => ({
   useBranches: () => ({
     isLoading: false,
@@ -17,7 +18,7 @@ vi.mock('../settings.api', () => ({
       { assignmentId: 'a2', branchId: 'b1', isActive: true },
     ],
   }),
-  useUpsertBranch: () => ({ mutate: vi.fn(), isPending: false }),
+  useUpsertBranch: () => ({ mutate: mutateMock, isPending: false }),
   useDeleteBranch: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 vi.mock('@/stores/auth-store.ts', () => ({
@@ -49,5 +50,21 @@ describe('BranchesSettingsScreen', () => {
     // Edit/delete actions present
     expect(screen.getAllByLabelText('Tahrirlash').length).toBeGreaterThan(0);
     expect(screen.getAllByLabelText("O'chirish").length).toBeGreaterThan(0);
+  });
+
+  it('yangi filial formasida ish soati muharriri default bilan, saqlashda workHours yuboriladi (P10)', async () => {
+    mutateMock.mockReset();
+    renderApp(<BranchesSettingsScreen />);
+    fireEvent.click(screen.getByRole('button', { name: 'Yangi filial' }));
+    expect(await screen.findByLabelText('Dushanba — Ochilish')).toHaveValue('09:00');
+    fireEvent.change(screen.getByLabelText('Filial nomi', { exact: false }), {
+      target: { value: 'Yangi' },
+    });
+    fireEvent.click(screen.getByLabelText('Shanba — Ochiq'));
+    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    await waitFor(() => expect(mutateMock).toHaveBeenCalled());
+    const body = mutateMock.mock.calls[0]?.[0];
+    expect(body?.workHours.sat).toBeNull();
+    expect(body?.workHours.mon).toEqual({ open: '09:00', close: '18:00' });
   });
 });

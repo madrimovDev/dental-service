@@ -130,6 +130,8 @@ export const availabilityDtoSchema = z
     date: z.string().openapi({ example: '2026-06-22' }),
     slotMinutes: z.number().int().openapi({ example: 30 }),
     slots: z.array(availabilitySlotDtoSchema),
+    /** false → filialda ish soati (branches.workHours) sozlanmagan (null). */
+    workHoursConfigured: z.boolean(),
   })
   .openapi('Availability');
 export type AvailabilityDto = z.infer<typeof availabilityDtoSchema>;
