@@ -6,7 +6,10 @@ import { requireModuleInDesktop } from '../../lib/license-middleware.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
 import { CrossEntityError } from '../../lib/ownership.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
-import { requirePermission } from '../../middleware/require-permission.ts';
+import {
+  requirePermission,
+  requirePermissionIfFieldsPresent,
+} from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
 import {
   toEmergencyContactDto,
@@ -24,6 +27,8 @@ import {
   emergencyContactDtoSchema,
   emergencyContactParamSchema,
   emergencyContactRemoveResultSchema,
+  importPatientsResultSchema,
+  importPatientsSchema,
   listQuerySchema,
   medicalRecordDtoSchema,
   medicalRecordHistoryEntrySchema,
@@ -151,6 +156,26 @@ export const patientRoutes = (deps: {
     return c.json(ok(toPatientDto(row)), 201);
   });
 
+  // ─── POST /import — Excel/CSV'dan ommaviy import (FU-24) ──────────────────
+  // ⚠️ `/{id}` dan OLDIN (POST `/{id}` yo'q, lekin tartib saqlanadi).
+
+  const importRoute = createRoute({
+    method: 'post',
+    path: '/import',
+    tags: ['patients'],
+    operationId: 'importPatients',
+    middleware: [requirePermission('patient.import')] as const,
+    request: {
+      body: { content: { 'application/json': { schema: importPatientsSchema } } },
+    },
+    responses: okJson(importPatientsResultSchema, 'Import result (per-row)'),
+  });
+
+  app.openapi(importRoute, async (c) => {
+    const body = c.req.valid('json');
+    return c.json(ok(await service.importPatients(c, body)), 200);
+  });
+
   // ─── GET /phone-check — telefon dublikat tekshiruvi (UI-R6) ───────────────
   // ⚠️ `/{id}` dan OLDIN ro'yxatdan o'tadi (aks holda "phone-check" id sifatida tushadi).
 
@@ -213,7 +238,15 @@ export const patientRoutes = (deps: {
     path: '/{id}',
     tags: ['patients'],
     operationId: 'updatePatient',
-    middleware: [requirePermission('patient.edit')] as const,
+    // FU-21: PII maydonlari (telefon/passport/manzil) body'da bo'lsa — `patient.view_pii` ham shart
+    // (avval faqat web yashirardi; endi backend majburlaydi). Boshqa maydonlar uchun `patient.edit`.
+    middleware: [
+      requirePermission('patient.edit'),
+      requirePermissionIfFieldsPresent(
+        ['phone', 'phoneSecondary', 'passport', 'address'],
+        'patient.view_pii',
+      ),
+    ] as const,
     request: {
       params: patientIdParamSchema,
       body: { content: { 'application/json': { schema: updatePatientSchema } } },

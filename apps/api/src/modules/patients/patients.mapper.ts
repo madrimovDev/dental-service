@@ -104,6 +104,7 @@ export const toPatientDto = (row: Patient): PatientDto => ({
 export const toPatientListItemDto = (
   row: Patient & {
     balance: number;
+    nextAppointmentAt: Date | null;
     noShowStrikes: number;
     flagged: boolean;
     hasAllergy: boolean;
@@ -111,6 +112,7 @@ export const toPatientListItemDto = (
 ): PatientListItemDto => ({
   ...toPatientDto(row),
   balance: row.balance,
+  nextAppointmentAt: row.nextAppointmentAt ? row.nextAppointmentAt.toISOString() : null,
   noShowStrikes: row.noShowStrikes,
   flagged: row.flagged,
   flags: {
