@@ -98,9 +98,15 @@ export function useUpsertRole() {
       name: string;
       description?: string;
       permissions: string[];
+      /** FU-41. TODO(generate): generate:contract dan keyin generated body'da paydo bo'ladi. */
+      isPractitioner?: boolean;
     }) => {
       if (input.id) {
-        await updateRole(input.id, { name: input.name, description: input.description });
+        await updateRole(input.id, {
+          name: input.name,
+          description: input.description,
+          ...(input.isPractitioner === undefined ? {} : { isPractitioner: input.isPractitioner }),
+        });
         await setRolePermissions(input.id, { permissions: input.permissions });
         return;
       }
@@ -108,6 +114,7 @@ export function useUpsertRole() {
         name: input.name,
         description: input.description,
         permissions: input.permissions,
+        ...(input.isPractitioner === undefined ? {} : { isPractitioner: input.isPractitioner }),
       });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: settingsKeys.roles() }),

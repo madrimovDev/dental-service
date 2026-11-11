@@ -54,16 +54,9 @@ describe('CLI-412 — M5 klinik permissionlar rol shablonlarida', () => {
     for (const p of M5_PERMISSIONS) expect(perms).toContain(p);
   });
 
-  test('Branch Manager — faqat *.view (manage/upload YO‘Q)', () => {
+  test('Branch Manager — FU-41: barcha M5 permission (filial shablonlari birlashmasi)', () => {
     const perms = permsFor('branch_manager');
-    expect(perms).toContain('prescription.view');
-    expect(perms).toContain('consent.view');
-    expect(perms).toContain('lab_order.view');
-    expect(perms).toContain('patient_image.view');
-    expect(perms).not.toContain('prescription.manage');
-    expect(perms).not.toContain('consent.manage');
-    expect(perms).not.toContain('lab_order.manage');
-    expect(perms).not.toContain('patient_image.upload');
+    for (const p of M5_PERMISSIONS) expect(perms).toContain(p);
   });
 
   test('Nurse — *.view + patient_image.upload (manage YO‘Q)', () => {
@@ -98,5 +91,50 @@ describe('CLI-412 — M5 klinik permissionlar rol shablonlarida', () => {
   test('Accountant — M5 permission qo‘shilmagan', () => {
     const perms = permsFor('accountant');
     for (const p of M5_PERMISSIONS) expect(perms).not.toContain(p);
+  });
+});
+
+/**
+ * FU-41 — Branch Manager = barcha filial-darajali shablonlar birlashmasi (+ hozirgi BM).
+ * P5 (assertCanGrant) qoidasi yumshatilmaydi: BM Tenant Admin'ning tenant-darajali
+ * huquqlarini OLMAYDI, shuning uchun Tenant Admin'ni bera olmaydi.
+ */
+describe('FU-41 — Branch Manager superset', () => {
+  const BRANCH_TEMPLATES = [
+    'receptionist',
+    'doctor',
+    'doctor_assistant',
+    'nurse',
+    'accountant',
+    'technician',
+  ] as const;
+
+  for (const key of BRANCH_TEMPLATES) {
+    test(`BM ⊇ ${key}`, () => {
+      const bm = new Set(permsFor('branch_manager'));
+      for (const p of permsFor(key)) expect(bm.has(p)).toBe(true);
+    });
+  }
+
+  test('BM ⊉ Tenant Admin (tenant-darajali huquqlar yo‘q)', () => {
+    const bm = new Set(permsFor('branch_manager'));
+    const missing = permsFor('tenant_admin').filter((p) => !bm.has(p));
+    expect(missing.length).toBeGreaterThan(0);
+    for (const p of [
+      'role.manage',
+      'role.view',
+      'user.manage',
+      'tenant.edit',
+      'tenant_settings.edit',
+    ]) {
+      expect(bm.has(p)).toBe(false);
+    }
+  });
+
+  test('is_practitioner faqat Doctor va Doctor + Assistant shablonlarida', () => {
+    const flagged = ROLE_TEMPLATES.filter(
+      (t) => 'isPractitioner' in t && (t as { isPractitioner?: boolean }).isPractitioner,
+    ).map((t) => t.templateKey);
+    expect([...flagged].sort()).toEqual(['doctor', 'doctor_assistant']);
   });
 });

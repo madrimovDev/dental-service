@@ -36,4 +36,15 @@ describe('RoleFormModal', () => {
     // Ruxsatlar endi inline o'ng panelda tanlanadi — yangi rol bo'sh massiv bilan yaratiladi
     expect(payload.permissions).toEqual([]);
   });
+
+  it('«Shifokor» belgisi payload’ga isPractitioner sifatida tushadi (FU-41)', async () => {
+    renderApp(<RoleFormModal opened onClose={vi.fn()} editing={null} />);
+    fireEvent.change(screen.getByLabelText(/Nom/), { target: { value: 'Ortodont' } });
+    fireEvent.click(screen.getByLabelText(/Shifokor/));
+    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+
+    await waitFor(() => expect(upsertMutate).toHaveBeenCalledTimes(1));
+    const payload = upsertMutate.mock.calls[0]?.[0] as { isPractitioner: boolean };
+    expect(payload.isPractitioner).toBe(true);
+  });
 });

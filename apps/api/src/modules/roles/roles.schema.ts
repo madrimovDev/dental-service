@@ -6,12 +6,15 @@ export const createRoleSchema = z.object({
   name: z.string().min(2).max(120),
   description: z.string().max(500).optional(),
   permissions: z.array(z.string()).default([]),
+  /** FU-41: yozilish qabul qiladigan shifokor roli. */
+  isPractitioner: z.boolean().optional(),
 });
 export type CreateRoleInput = z.infer<typeof createRoleSchema>;
 
 export const updateRoleSchema = z.object({
   name: z.string().min(2).max(120).optional(),
   description: z.string().max(500).optional(),
+  isPractitioner: z.boolean().optional(),
 });
 export type UpdateRoleInput = z.infer<typeof updateRoleSchema>;
 
@@ -41,6 +44,7 @@ export const roleDtoSchema = z
     description: z.string().nullable().openapi({ example: 'Medical staff role' }),
     isTemplate: z.boolean().openapi({ example: false }),
     isSystem: z.boolean().openapi({ example: false }),
+    isPractitioner: z.boolean().openapi({ example: false }),
     createdAt: z.string().openapi({ example: '2026-06-12T10:00:00.000Z' }),
     updatedAt: z.string().openapi({ example: '2026-06-12T10:00:00.000Z' }),
   })
@@ -60,6 +64,7 @@ export const roleWithPermissionsDtoSchema = z
     description: z.string().nullable().openapi({ example: 'Medical staff role' }),
     isTemplate: z.boolean().openapi({ example: false }),
     isSystem: z.boolean().openapi({ example: false }),
+    isPractitioner: z.boolean().openapi({ example: false }),
     createdAt: z.string().openapi({ example: '2026-06-12T10:00:00.000Z' }),
     updatedAt: z.string().openapi({ example: '2026-06-12T10:00:00.000Z' }),
     permissions: z.array(z.string()).openapi({ example: ['patient.view', 'appointment.view'] }),
