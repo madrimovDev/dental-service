@@ -1,0 +1,42 @@
+.root {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  background: var(--st-confirmed-bg);
+  color: var(--st-confirmed-fg);
+}
+.root[data-status="offline"] {
+  background: var(--st-waiting-bg);
+  color: var(--st-waiting-fg);
+}
+.root[data-status="cloud"] {
+  background: var(--st-planned-bg);
+  color: var(--st-planned-fg);
+}
+.root[data-status="noserver"] {
+  background: var(--st-failed-bg);
+  color: var(--st-failed-fg);
+}
+.dot {
+  width: 9px;
+  height: 9px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+.text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.title {
+  font-size: var(--text-sm);
+  font-weight: var(--fw-bold);
+}
+.description {
+  font-size: var(--text-xs);
+}

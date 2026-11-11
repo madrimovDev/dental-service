@@ -1,0 +1,83 @@
+.content {
+  border: 2px solid var(--danger);
+  background: var(--surface);
+  color: var(--text);
+}
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+}
+.head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--danger);
+  font-size: var(--text-lg);
+}
+.message {
+  color: var(--text);
+}
+.reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.reason {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.reason[aria-checked="true"] {
+  border-color: var(--primary);
+  background: var(--primary-tint);
+  font-weight: var(--fw-semibold);
+}
+.reason:focus-visible,
+.danger:focus-visible,
+.safe:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+.actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.danger,
+.safe {
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.danger {
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+}
+.safe {
+  border: 0;
+  background: var(--primary);
+  color: var(--text-on-primary);
+  font-weight: var(--fw-bold);
+}
+.safe:hover {
+  background: var(--primary-hover);
+}
+.danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

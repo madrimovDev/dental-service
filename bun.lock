@@ -186,6 +186,7 @@
       "name": "@dental/ui",
       "version": "0.1.0",
       "dependencies": {
+        "@dental/core": "workspace:*",
         "@fontsource-variable/hanken-grotesk": "^5.0.0",
         "@fontsource/jetbrains-mono": "^5.0.0",
       },

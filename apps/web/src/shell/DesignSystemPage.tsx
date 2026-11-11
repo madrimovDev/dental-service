@@ -3,16 +3,22 @@ import {
   Avatar,
   Button,
   Card,
+  ConnectionStatus,
+  CriticalActionDialog,
   IconButton,
   Input,
   Mono,
   PageHead,
   PatientFlag,
+  PhoneInput,
   Select,
   StatCard,
+  StateView,
   StatusPill,
   Tabs,
   Tag,
+  UndoToast,
+  UpdateBanner,
 } from '@dental/ui';
 import { Button as MButton, Menu, Modal, useMantineColorScheme } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
@@ -23,6 +29,9 @@ export function DesignSystemPage() {
   const { t } = useTranslation();
   const { toggleColorScheme } = useMantineColorScheme();
   const [tab, setTab] = useState('info');
+  const [phone, setPhone] = useState('');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [undoKey, setUndoKey] = useState<number | null>(null);
   return (
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 24 }}>
       <PageHead
@@ -100,6 +109,110 @@ export function DesignSystemPage() {
           <AlertBanner tier={3} action={{ label: "Ko'rish", onClick: () => {} }}>
             7 bemorni qayta chaqirish vaqti keldi
           </AlertBanner>
+        </div>
+      </Card>
+
+      <Card title="Critical dialog / UndoToast">
+        <div style={{ display: 'grid', gap: 12, maxWidth: 520 }}>
+          <div>
+            <Button variant="default" onClick={() => setDialogOpen(true)}>
+              Kritik ogohlantirishni ochish
+            </Button>
+          </div>
+          <CriticalActionDialog
+            opened={dialogOpen}
+            title="Allergiya ogohlantirishi"
+            reasonsLabel="Sabab"
+            reasons={[
+              { value: 'tolerated', label: 'Avval muammosiz qabul qilgan' },
+              { value: 'wrong', label: "Allergiya noto'g'ri kiritilgan" },
+            ]}
+            safeLabel="Boshqa dori tanlash"
+            dangerLabel="Davom etish"
+            onSafe={() => setDialogOpen(false)}
+            onConfirm={() => setDialogOpen(false)}
+          >
+            Siz <b>amoksitsillin 500 mg</b> yozmoqdasiz — bu penitsillin guruhi. Davom etish uchun
+            sababni tanlang.
+          </CriticalActionDialog>
+          {undoKey === null ? (
+            <div>
+              <Button variant="default" onClick={() => setUndoKey(Date.now())}>
+                Kelmadi deb belgilash
+              </Button>
+            </div>
+          ) : (
+            <UndoToast
+              key={undoKey}
+              undoLabel="Qaytarish"
+              secondsSuffix="s"
+              onUndo={() => setUndoKey(null)}
+              onCommit={() => setUndoKey(null)}
+            >
+              Jasur Tursunov — <b>Kelmadi</b> deb belgilandi
+            </UndoToast>
+          )}
+        </div>
+      </Card>
+
+      <Card title="Ekran holatlari (StateView)">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
+          <StateView
+            status="empty"
+            title="Hali bemor yo'q"
+            description="Birinchi bemorni qo'shing yoki Excel'dan import qiling."
+          />
+          <StateView
+            status="error"
+            title="Ma'lumot yuklanmadi"
+            description="Server javob bermadi."
+            onRetry={() => {}}
+            retryLabel="Qayta urinish"
+          />
+          <StateView
+            status="forbidden"
+            title="Bu bo'lim sizga yopiq"
+            description="Klinika sozlamalarini faqat egasi va administrator ko'radi."
+            contact="Kerak bo'lsa, Anvar Karimovga murojaat qiling."
+          />
+          <StateView status="loading" skeleton="cards" />
+        </div>
+      </Card>
+
+      <Card title="ConnectionStatus / UpdateBanner / PhoneInput">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+          <ConnectionStatus status="lan" title="Server ulangan" description="Lokal tarmoq" />
+          <ConnectionStatus
+            status="offline"
+            title="Internet yo'q"
+            description="Ish davom etmoqda"
+          />
+          <ConnectionStatus status="cloud" title="Bulut" description="Sinxron: hozir" />
+          <ConnectionStatus
+            status="noserver"
+            title="Server topilmadi"
+            description="Qayta qidirilmoqda"
+          />
+        </div>
+        <div style={{ height: 12 }} />
+        <UpdateBanner
+          title="Yangi versiya 0.2.0 tayyor"
+          actions={[
+            { label: "Vaqtni o'zgartirish", onClick: () => {} },
+            { label: 'Hozir emas', onClick: () => {} },
+          ]}
+        >
+          Klinika yopilgandan keyin, bugun 19:00 da o'rnatiladi.
+        </UpdateBanner>
+        <div style={{ height: 12 }} />
+        <div style={{ maxWidth: 320 }}>
+          <PhoneInput
+            label="Telefon raqami"
+            hint="Istalgan shaklda yozing — avtomatik to'g'rilanadi"
+            value={phone}
+            onChange={setPhone}
+          />
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, marginTop: 6 }}>{phone}</div>
         </div>
       </Card>
 

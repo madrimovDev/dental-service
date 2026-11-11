@@ -2,7 +2,7 @@ import { Skeleton } from '@mantine/core';
 import type { ReactNode } from 'react';
 import classes from './StateView.module.css';
 
-export type StateViewStatus = 'loading' | 'error' | 'empty';
+export type StateViewStatus = 'loading' | 'error' | 'empty' | 'forbidden';
 export type StateViewSkeleton = 'table' | 'cards' | 'detail';
 
 export interface StateViewProps {
@@ -14,7 +14,28 @@ export interface StateViewProps {
   action?: ReactNode;
   onRetry?: () => void;
   retryLabel?: string;
+  /**
+   * Faqat `forbidden` uchun: kimga murojaat qilish matni ("Kerak bo'lsa, Anvar
+   * Karimovga murojaat qiling."). Chaqiruvchi tarjima qilib beradi.
+   */
+  contact?: string;
 }
+
+const LockIcon = (
+  <svg
+    aria-hidden="true"
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M6 11h12v10H6zM8 11V7a4 4 0 0 1 8 0v4" />
+  </svg>
+);
 
 function SkeletonBlock({ shape }: { shape: StateViewSkeleton }) {
   if (shape === 'detail') {
@@ -54,7 +75,22 @@ export function StateView(props: StateViewProps) {
     action,
     onRetry,
     retryLabel,
+    contact,
   } = props;
+
+  // 403: hech qachon standart/oldingi qiymat ko'rsatilmaydi (ID-11) — faqat tushuntirish.
+  if (status === 'forbidden') {
+    return (
+      <div className={classes.root} data-state="forbidden">
+        <div className={classes.center}>
+          <div className={classes.icon}>{icon ?? LockIcon}</div>
+          {title && <div className={classes.title}>{title}</div>}
+          {description && <div className={classes.description}>{description}</div>}
+          {contact && <div className={classes.description}>{contact}</div>}
+        </div>
+      </div>
+    );
+  }
 
   if (status === 'loading') {
     return (
