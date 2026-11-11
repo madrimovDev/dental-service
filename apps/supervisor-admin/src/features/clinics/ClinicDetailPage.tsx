@@ -46,6 +46,8 @@ export const ClinicDetailPage = () => {
     tempPassword: string;
   } | null>(null);
   const [reinstallConfirm, setReinstallConfirm] = useState(false);
+  const [renewOpen, setRenewOpen] = useState(false);
+  const [renewDate, setRenewDate] = useState('');
 
   const { data, isError } = useQuery({
     queryKey: ['clinic', id],
@@ -144,6 +146,31 @@ export const ClinicDetailPage = () => {
     onError: (err) => {
       setReinstallConfirm(false);
       setMutationError(err instanceof Error ? err.message : "Qayta o'rnatishga tayyorlab bo'lmadi");
+    },
+  });
+
+  // Muddatni uzaytirish (P18) — faqat `expiresAt` yangilanadi; klinika
+  // keyingi heartbeat'da yangi muddatni oladi (offline kod yo'q).
+  const renew = useMutation({
+    mutationFn: async (expiresAt: string) => {
+      const res = await authFetch(`/v1/admin/clinics/${id}/renew`, {
+        method: 'POST',
+        body: JSON.stringify({ expiresAt }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: { code?: string } } | null;
+        throw new Error(body?.error?.code ?? "Muddatni uzaytirib bo'lmadi");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      setMutationError(null);
+      setRenewOpen(false);
+      setRenewDate('');
+      qc.invalidateQueries({ queryKey: ['clinic', id] });
+    },
+    onError: (err) => {
+      setMutationError(err instanceof Error ? err.message : "Muddatni uzaytirib bo'lmadi");
     },
   });
 
@@ -249,7 +276,29 @@ export const ClinicDetailPage = () => {
           <Button size="xs" variant="outline" onClick={() => setReinstallConfirm(true)}>
             Qayta o'rnatishga tayyorlash
           </Button>
+          <Button size="xs" variant="outline" onClick={() => setRenewOpen(true)}>
+            Muddatni uzaytirish
+          </Button>
         </Group>
+        <Modal opened={renewOpen} onClose={() => setRenewOpen(false)} title="Muddatni uzaytirish">
+          <TextInput
+            type="date"
+            label="Yangi amal qilish muddati"
+            value={renewDate}
+            onChange={(e) => setRenewDate(e.currentTarget.value)}
+            mb="md"
+          />
+          <Text size="sm" c="dimmed" mb="md">
+            Klinika yangi muddatni keyingi heartbeat'da oladi (internet talab qilinadi).
+          </Text>
+          <Button
+            onClick={() => renew.mutate(renewDate)}
+            disabled={!renewDate}
+            loading={renew.isPending}
+          >
+            Tasdiqlash
+          </Button>
+        </Modal>
         <Modal
           opened={reinstallConfirm}
           onClose={() => setReinstallConfirm(false)}
