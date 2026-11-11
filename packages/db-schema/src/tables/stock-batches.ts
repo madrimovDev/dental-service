@@ -7,8 +7,9 @@ import { tenants } from './tenants.ts';
  * Stock batch — ombor partiyasini qabul qilish yozuvi (V2-2): supplier/batch#/expiry/cost.
  * ⚠️ LIGHTWEIGHT model (Qaror #31): `stock_items.quantity` yagona on-hand manbai bo'lib
  * qoladi; batch = QABUL yozuvi (FIFO batch-level deduction YO'Q). Demak expiry — qabul
- * yozuvi ogohlantirishi (muddati o'tgan partiya qabul qilingani), aniq "javonda 5 dona
- * muddati o'tgan" emas. Stomatologiya uchun yetarli. Qabul qilinganda `qtyReceived`
+ * yozuvi ogohlantirishi. UI-M5/IR-02: `expiring` ro'yxati item qoldig'ini FIFO bilan partiyalarga
+ * taqsimlaydi (eng yangi partiya qoldiqni oladi) — qoldig'i 0 partiya ro'yxatga kirmaydi.
+ * Stomatologiya uchun yetarli. Qabul qilinganda `qtyReceived`
  * miqdor uchun 'in' stock movement yaratiladi (quantity bittada manba bo'lib qoladi).
  */
 export const stockBatches = pgTable(

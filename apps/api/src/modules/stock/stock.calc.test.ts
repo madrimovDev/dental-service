@@ -1,5 +1,12 @@
 import { describe, expect, test } from 'bun:test';
-import { adjustmentDelta, applyMovement, isLowStock } from './stock.calc.ts';
+import {
+  adjustmentDelta,
+  allocateBatchRemaining,
+  applyMovement,
+  avgDailyUsage,
+  daysOfSupply,
+  isLowStock,
+} from './stock.calc.ts';
 
 describe('isLowStock', () => {
   test('qoldiq chegaradan past → true', () => {
@@ -49,5 +56,44 @@ describe('adjustmentDelta', () => {
   });
   test("o'zgarishsiz → 0 (100→100)", () => {
     expect(adjustmentDelta(100, 100)).toBe(0);
+  });
+});
+
+describe('daysOfSupply / avgDailyUsage', () => {
+  test('sarf 0 → null (cheksiz, bo‘linish xatosi yo‘q)', () => {
+    expect(daysOfSupply(50, 0)).toBeNull();
+    expect(daysOfSupply(0, 0)).toBeNull();
+    expect(avgDailyUsage(0)).toBe(0);
+    expect(avgDailyUsage(-5)).toBe(0);
+  });
+  test('qoldiq ÷ kunlik sarf, pastga yaxlitlanadi', () => {
+    expect(daysOfSupply(10, avgDailyUsage(30))).toBe(10);
+    expect(daysOfSupply(10, 3)).toBe(3);
+  });
+  test('qoldiq ≤ 0 va sarf bor → 0', () => {
+    expect(daysOfSupply(0, 1)).toBe(0);
+    expect(daysOfSupply(-2, 1)).toBe(0);
+  });
+});
+
+describe('allocateBatchRemaining (FIFO)', () => {
+  const d = (n: number) => new Date(2030, 0, n);
+  test('qoldiq eng yangi partiyaga taqsimlanadi', () => {
+    const r = allocateBatchRemaining(14, [
+      { id: 'old', receivedAt: d(1), qtyReceived: 10 },
+      { id: 'new', receivedAt: d(20), qtyReceived: 20 },
+    ]);
+    expect(r.find((b) => b.id === 'new')?.qtyRemaining).toBe(14);
+    expect(r.find((b) => b.id === 'old')?.qtyRemaining).toBe(0);
+  });
+  test('qoldiq oshsa eski partiyaga o‘tadi; manfiy/0 qoldiq → hammasi 0', () => {
+    const r = allocateBatchRemaining(25, [
+      { id: 'old', receivedAt: d(1), qtyReceived: 10 },
+      { id: 'new', receivedAt: d(20), qtyReceived: 20 },
+    ]);
+    expect(r.map((b) => b.qtyRemaining)).toEqual([5, 20]);
+    expect(
+      allocateBatchRemaining(-3, [{ receivedAt: d(1), qtyReceived: 5 }])[0]?.qtyRemaining,
+    ).toBe(0);
   });
 });

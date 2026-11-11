@@ -3,8 +3,8 @@ import {
   createStockBom,
   createStockItem,
   createStockMovement,
+  customInstance,
   listBranches,
-  listExpiringStockBatches,
   listServices,
   listStockBatches,
   listStockBom,
@@ -15,6 +15,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { lookupKeys } from '@/lib/lookup-keys';
 import { stockKeys } from './stock.keys';
+import type { AutoDeductionDto, ExpiringBatchDto } from './stock.types';
 
 /** Ombor itemlari (qoldiq + lowStock). branchId ixtiyoriy filtr. */
 export function useStockItems(branchId?: string) {
@@ -50,19 +51,48 @@ export function useStockBatches(itemId: string | null) {
   });
 }
 
-/** Muddati yaqinlashayotgan partiyalar (ogohlantirish). */
-export function useExpiringBatches(withinDays = 30) {
+/**
+ * Muddati yaqinlashayotgan (yoki o'tgan) partiyalar — faqat qoldig'i borlari (IR-02), filial
+ * filtri bilan. ⚠️ Vaqtinchalik qo'lda (`customInstance`): javob endi `itemName/unit/qtyRemaining`
+ * ham beradi — `generate:contract`dan keyin generated `listExpiringStockBatches` ishlatiladi.
+ */
+export function useExpiringBatches(withinDays = 30, branchId?: string) {
   return useQuery({
-    queryKey: stockKeys.expiring(withinDays),
-    queryFn: () => listExpiringStockBatches({ withinDays }).then((r) => r.data),
+    queryKey: stockKeys.expiring(withinDays, branchId ?? ''),
+    queryFn: () =>
+      customInstance<{ data: ExpiringBatchDto[] }>({
+        url: '/api/stock/batches/expiring',
+        method: 'GET',
+        params: { withinDays, ...(branchId ? { branchId } : {}) },
+      }).then((r) => r.data),
   });
 }
+
+/**
+ * Bugungi avto-yechish jurnali (vizit yozuvidan). ⚠️ Vaqtinchalik qo'lda — `generate:contract`dan
+ * keyin generated `listStockAutoDeductionsToday`.
+ */
+export function useAutoDeductionsToday(branchId?: string) {
+  return useQuery({
+    queryKey: stockKeys.autoToday(branchId ?? ''),
+    queryFn: () =>
+      customInstance<{ data: AutoDeductionDto[] }>({
+        url: '/api/stock/auto-deductions/today',
+        method: 'GET',
+        params: branchId ? { branchId } : undefined,
+      }).then((r) => r.data),
+  });
+}
+
+/** Kirim body'si: `recordAsExpense` — kirimni xarajatlarga ham yozish (generated tipda hali yo'q). */
+export type CreateBatchPayload = Parameters<typeof createStockBatch>[0] & {
+  recordAsExpense?: boolean;
+};
 
 export function useCreateBatch() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: Parameters<typeof createStockBatch>[0]) =>
-      createStockBatch(body).then((r) => r.data),
+    mutationFn: (body: CreateBatchPayload) => createStockBatch(body).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: stockKeys.all }),
   });
 }

@@ -1,5 +1,7 @@
 import type { ServiceMaterial, StockBatch, StockItem, StockMovement } from '@dental/db-schema';
 import type {
+  AutoDeductionDto,
+  ExpiringStockBatchDto,
   ServiceMaterialDto,
   StockBatchDto,
   StockItemDto,
@@ -27,11 +29,34 @@ export const toStockItemDto = (row: StockItem): StockItemDto => ({
 });
 
 export const toStockItemWithLowStockDto = (
-  row: StockItem & { lowStock: boolean },
+  row: StockItem & { lowStock: boolean; avgDailyUsage: number; daysLeft: number | null },
 ): StockItemWithLowStockDto => ({
   ...toStockItemDto(row),
   lowStock: row.lowStock,
+  avgDailyUsage: row.avgDailyUsage.toFixed(2),
+  daysLeft: row.daysLeft,
 });
+
+export const toExpiringStockBatchDto = (
+  row: StockBatch & { itemName: string; unit: string; qtyRemaining: number },
+): ExpiringStockBatchDto => ({
+  ...toStockBatchDto(row),
+  itemName: row.itemName,
+  unit: row.unit,
+  qtyRemaining: row.qtyRemaining.toFixed(2),
+});
+
+export const toAutoDeductionDto = (row: {
+  id: string;
+  itemId: string;
+  itemName: string;
+  unit: string;
+  type: 'in' | 'out' | 'adjustment';
+  quantity: string;
+  reason: string | null;
+  doctorName: string | null;
+  createdAt: Date;
+}): AutoDeductionDto => ({ ...row, createdAt: row.createdAt.toISOString() });
 
 export const toStockMovementDto = (row: StockMovement): StockMovementDto => ({
   id: row.id,

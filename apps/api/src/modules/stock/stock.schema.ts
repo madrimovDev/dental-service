@@ -56,14 +56,26 @@ export const createBomSchema = z.object({
 export type CreateBomInput = z.infer<typeof createBomSchema>;
 
 /** Partiya qabul qilish (V2-2) — supplier/batch#/expiry/cost ixtiyoriy. */
-export const createBatchSchema = z.object({
-  itemId: z.uuid(),
-  qtyReceived: z.coerce.number().positive(),
-  supplierName: z.string().max(200).optional(),
-  batchNumber: z.string().max(100).optional(),
-  expiryDate: z.iso.datetime().optional(),
-  costPerUnit: z.coerce.number().nonnegative().optional(),
-});
+export const createBatchSchema = z
+  .object({
+    itemId: z.uuid(),
+    qtyReceived: z.coerce.number().positive(),
+    supplierName: z.string().max(200).optional(),
+    batchNumber: z.string().max(100).optional(),
+    expiryDate: z.iso.datetime().optional(),
+    costPerUnit: z.coerce.number().nonnegative().optional(),
+    // UI-M5: kirimni xarajatlarga ham yozish (ixtiyoriy). `expense.manage` + narx talab qilinadi.
+    recordAsExpense: z.boolean().optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.recordAsExpense && val.costPerUnit == null) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['costPerUnit'],
+        message: 'costPerUnit is required when recordAsExpense is true',
+      });
+    }
+  });
 export type CreateBatchInput = z.infer<typeof createBatchSchema>;
 
 // ===== Query schemas (route-level) =====
@@ -80,12 +92,18 @@ export const bomQuerySchema = z.object({
   serviceId: z.uuid().optional(),
 });
 
+export const autoDeductionsQuerySchema = z.object({
+  branchId: z.uuid().optional(),
+});
+
 export const batchesQuerySchema = z.object({
   itemId: z.uuid(),
 });
 
 export const expiringQuerySchema = z.object({
   withinDays: z.coerce.number().int().positive().max(365).optional(),
+  // IR-02: filial filtri (tenant-darajali itemlar — branchId=null — har doim kiradi).
+  branchId: z.uuid().optional(),
 });
 
 /** Path param — /items/{id} va /bom/{id} ikkalasi ham faqat `id`. */
@@ -113,7 +131,14 @@ export const stockItemDtoSchema = z.object(stockItemShape).openapi('StockItem');
 export type StockItemDto = z.infer<typeof stockItemDtoSchema>;
 
 export const stockItemWithLowStockDtoSchema = z
-  .object({ ...stockItemShape, lowStock: z.boolean() })
+  .object({
+    ...stockItemShape,
+    lowStock: z.boolean(),
+    // UI-M5: oxirgi 30 kun o'rtacha kunlik sarf (numeric → string) va «necha kunga yetadi»
+    // (sarf 0 → null = cheksiz).
+    avgDailyUsage: z.string().openapi({ example: '1.50' }),
+    daysLeft: z.number().int().nullable().openapi({ example: 12 }),
+  })
   .openapi('StockItemWithLowStock');
 export type StockItemWithLowStockDto = z.infer<typeof stockItemWithLowStockDtoSchema>;
 
@@ -163,3 +188,29 @@ export const stockBatchDtoSchema = z
   })
   .openapi('StockBatch');
 export type StockBatchDto = z.infer<typeof stockBatchDtoSchema>;
+
+/** `batches/expiring` — partiya + item nomi/birligi + FIFO bo'yicha qoldiq (IR-02). */
+export const expiringStockBatchDtoSchema = stockBatchDtoSchema
+  .extend({
+    itemName: z.string().openapi({ example: 'Lidokain 2%' }),
+    unit: z.string().openapi({ example: 'karpula' }),
+    qtyRemaining: z.string().openapi({ example: '14.00' }),
+  })
+  .openapi('ExpiringStockBatch');
+export type ExpiringStockBatchDto = z.infer<typeof expiringStockBatchDtoSchema>;
+
+/** Bugungi avto-yechish jurnali qatori (vizit yozuvidan kelgan chiqim / qaytarish). */
+export const autoDeductionDtoSchema = z
+  .object({
+    id: z.uuid(),
+    itemId: z.uuid(),
+    itemName: z.string(),
+    unit: z.string(),
+    type: z.enum(['in', 'out', 'adjustment']),
+    quantity: z.string().openapi({ example: '1.00' }),
+    reason: z.string().nullable().openapi({ example: 'visit_auto' }),
+    doctorName: z.string().nullable().openapi({ example: 'Karimov' }),
+    createdAt: z.string().openapi({ example: '2026-06-12T10:00:00.000Z' }),
+  })
+  .openapi('StockAutoDeduction');
+export type AutoDeductionDto = z.infer<typeof autoDeductionDtoSchema>;
