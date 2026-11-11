@@ -10,10 +10,7 @@ import type {
  * `generate:contract`dan keyin ularni o'zi beradi (intersection shunda ham to'g'ri); shu paytgacha
  * ixtiyoriy deb olinadi.
  */
-export type StockItemDto = StockItemWithLowStock & {
-  avgDailyUsage?: string;
-  daysLeft?: number | null;
-};
+export type StockItemDto = StockItemWithLowStock;
 
 /** «Necha kunga yetadi» holati: ≤5 kun — kritik, ≤14 — yaqin, null — sarf yo'q (cheksiz). */
 export type DaysState = 'critical' | 'soon' | 'ok' | 'none';

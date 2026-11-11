@@ -25,6 +25,8 @@ function item(over: Partial<StockItemDto> = {}): StockItemDto {
     quantity: '12.50',
     minThreshold: '5',
     lowStock: false,
+    avgDailyUsage: '0',
+    daysLeft: null,
     createdAt: '2026-06-11T00:00:00Z',
     updatedAt: '2026-06-11T00:00:00Z',
     ...over,
