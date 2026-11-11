@@ -72,7 +72,7 @@ P bosqichlari 1→5 tartibda; ichida bir-biriga tegmaydigan ishlar parallel (ork
   - 🛠 Blok paytida ochiq qoladiganlar: login, `bootstrap-status`, litsenziya holati, aktivatsiya, heartbeat (uzaytirish yetib kelishi uchun), to'lov ekrani.
 - **Ogohlantirish bannerlari** (🛠): muddat tugashiga 14 kun qolganda «Litsenziya N kundan keyin tugaydi»; imtiyozli 7 kun davomida «To'lov kechikdi, N kundan keyin dastur to'xtaydi» (qizil, yopilmaydi).
 - **Uzaytirish (renew):** Supervisor'da `PATCH /v1/admin/licenses/:id` (`expiresAt`) + admin panelda tugma + audit. Klinika internetga ulanganda yangi muddat heartbeat orqali o'zi yetib keladi (imzolangan, monotonik soat langari saqlanadi).
-- ⚠️ **Ochiq (foydalanuvchiga savol):** hech qachon internetga chiqmaydigan klinikaga uzaytirish qanday yetadi — §8.
+- 👤 **Uzaytirish faqat internet orqali** (heartbeat). Offline kod yo'q. 🛠 Blok ekranida «Qayta tekshirish» tugmasi heartbeat'ni darhol chaqiradi — to'lovdan keyin kutish shart emas.
 
 > **Qamrov:** P18 bloki — **desktop** litsenziya mexanizmi. SaaS tenantlariga tegishli emas (SaaS obuna/blok — bu loyiha doirasidan tashqarida).
 
@@ -140,7 +140,7 @@ Yangi qarorlar (P18 grace/blok, P6 owner+vaqtinchalik parol, karta sub-turi, kre
 
 ## 8. Ochiq savollar
 
-1. **P18 — internetsiz klinikaga uzaytirish** (javob kutilmoqda; P18 rejasidan oldin hal qilinadi). Variantlar: (a) faqat heartbeat — internet shart; (b) + Supervisor chiqaradigan bir martalik imzolangan (tekis, Qaror #40) uzaytirish kodi, blok ekrani/Sozlamalar'da qo'lda kiritiladi. (b) tanlansa, kod kiritish yo'li blok paytida ochiq qoladiganlar ro'yxatiga qo'shiladi.
+1. ~~**P18 — internetsiz klinikaga uzaytirish**~~ → 👤 **(a) faqat heartbeat**: uzaytirish olish uchun internet shart; offline uzaytirish kodi qurilmaydi. Blok ekranida «Internetga ulaning va ta'minotchiga murojaat qiling» + «Qayta tekshirish» tugmasi (heartbeat'ni darhol chaqiradi).
 
 Builder check (2026-11-11) savollari: #1 shu yerda; #2 (real klinikalar) — §1 «Joriy muhit»; #3 P2 rollback, #4 Telegram desktop'da, #5 lab modeli, #6 P1 4xx — 🛠 qarorlar §3.1, §3.2, §4.
 
