@@ -2,6 +2,7 @@ import { Button, Group, Modal, Select, Stack, Tabs, Text } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useAuthStore } from '@/stores/auth-store.ts';
 import { useCheckInCandidates, useCreateTicket, usePatientsAll, useServices } from '../queue.api';
 
 export function CheckInDialog({
@@ -14,11 +15,13 @@ export function CheckInDialog({
   branchId: string;
 }) {
   const { t } = useTranslation();
-  const candidates = useCheckInCandidates(branchId);
+  const { hasPermission } = useAuthStore();
+  // Dialog doim mount qilinadi — ruxsatsiz rolda (queue.create / service.view yo'q) 403 so'rovlari ketmasin.
+  const candidates = useCheckInCandidates(branchId, hasPermission('queue.create'));
   // Yozuvdan check-in tab'idagi bemor-nomi qidiruvi ("Bemor" ustuni) qidiruvdan
   // mustaqil — cheklanmagan (search='') chaqiruv shu uchun saqlanadi.
   const patients = usePatientsAll();
-  const services = useServices();
+  const services = useServices({ enabled: hasPermission('service.view') });
   const createTicket = useCreateTicket();
 
   const [walkInPatient, setWalkInPatient] = useState<string | null>(null);

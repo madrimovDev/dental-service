@@ -4,6 +4,7 @@ import { useForm } from '@mantine/form';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useAuthStore } from '@/stores/auth-store.ts';
 import { useUploadPatientImage, useVisitNotes } from '../../clinical.api';
 import { type UploadImageFormValues, uploadImageFormSchema } from '../../clinical.schema';
 
@@ -31,7 +32,9 @@ export function ImageUploadModal({
   const [file, setFile] = useState<File | null>(null);
   const [visitNoteId, setVisitNoteId] = useState<string | null>(null);
   const uploadMut = useUploadPatientImage(patientId);
-  const visitsQuery = useVisitNotes(patientId);
+  const { hasPermission } = useAuthStore();
+  // Vizitga bog'lash ixtiyoriy; `medical_record.view` yo'q rolda so'rov (403) yuborilmaydi.
+  const visitsQuery = useVisitNotes(patientId, hasPermission('medical_record.view'));
   const visitOptions = (visitsQuery.data ?? []).map((v) => ({
     value: v.id,
     label: new Date(v.visitDate).toLocaleDateString(i18n.language === 'ru' ? 'ru-RU' : 'uz-UZ'),

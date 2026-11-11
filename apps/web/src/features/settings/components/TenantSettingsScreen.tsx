@@ -62,10 +62,10 @@ export function TenantSettingsScreen() {
   const { hasPermission } = useAuthStore();
   const tenant = useTenant();
   const update = useUpdateTenant();
-  const settings = useTenantSettings();
+  const settings = useTenantSettings({ enabled: hasPermission('tenant_settings.view') });
   const updateSettings = useUpdateTenantSettings();
   const transfer = useTransferOwnership();
-  const users = useUsers();
+  const users = useUsers({ enabled: hasPermission('user.view') });
   const canEditTenant = hasPermission('tenant.edit');
   const canEditSettings = hasPermission('tenant_settings.edit');
   const [transferOpened, { open: openTransfer, close: closeTransfer }] = useDisclosure(false);
@@ -257,11 +257,23 @@ export function TenantSettingsScreen() {
                   </Text>
                 </div>
 
-                <TextInput
+                <Select
                   label={t('tenant_settings.currency')}
                   required
+                  allowDeselect={false}
                   disabled={!canEditSettings}
                   styles={INPUT_STYLES}
+                  data={[
+                    { value: 'UZS', label: `${t('common.currency')} (UZS)` },
+                    ...(settingsForm.values.currency && settingsForm.values.currency !== 'UZS'
+                      ? [
+                          {
+                            value: settingsForm.values.currency,
+                            label: settingsForm.values.currency,
+                          },
+                        ]
+                      : []),
+                  ]}
                   {...settingsForm.getInputProps('currency')}
                 />
 
@@ -295,7 +307,11 @@ export function TenantSettingsScreen() {
               style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}
             >
               <StatusPill status={subscriptionActive ? 'success' : 'warning'}>
-                {data?.subscriptionStatus ?? '—'}
+                {data?.subscriptionStatus
+                  ? t(`tenant_settings.subscription.${data.subscriptionStatus}`, {
+                      defaultValue: data.subscriptionStatus,
+                    })
+                  : '—'}
               </StatusPill>
               {(canEditTenant || canEditSettings) && (
                 <Button onClick={handleSave} loading={isSaving}>

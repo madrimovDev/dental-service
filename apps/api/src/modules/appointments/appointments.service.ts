@@ -14,6 +14,7 @@ import type { Context } from 'hono';
 import { onAfterCommit } from '../../db/after-commit.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { pgErrorInfo } from '../../lib/pg-error.ts';
 import { reminderDelayMs } from '../../lib/reminder-delay.ts';
 import type {
   CreateAppointmentInput,
@@ -64,16 +65,13 @@ export type SchedulePredicates = {
 function exclusionConflictCode(
   err: unknown,
 ): 'conflict.doctor_busy' | 'conflict.patient_busy' | null {
-  if (
-    typeof err !== 'object' ||
-    err === null ||
-    !('code' in err) ||
-    (err as { code?: string }).code !== '23P01'
-  ) {
-    return null;
-  }
-  const constraint = (err as { constraint_name?: string }).constraint_name;
-  if (constraint === 'appointments_no_patient_overlap') return 'conflict.patient_busy';
+  // FU-01: drizzle PG xatosini `.cause`ga o'raydi — pgErrorInfo ochadi.
+  const pg = pgErrorInfo(err);
+  // 40P01 (deadlock_detected): bir slotga ko'p parallel insert EXCLUDE gist
+  // kutish zanjirida deadlock'ga tushishi mumkin — yutqazuvchi ham to'qnashuv
+  // (boshqa so'rov slotni ushlagan), shuning uchun 409.
+  if (!pg || (pg.code !== '23P01' && pg.code !== '40P01')) return null;
+  if (pg.constraint === 'appointments_no_patient_overlap') return 'conflict.patient_busy';
   // `appointments_no_doctor_overlap` yoki noma'lum → doctor (mavjud xulq).
   return 'conflict.doctor_busy';
 }
@@ -304,21 +302,26 @@ export const createAppointmentsService = (deps: {
 
     let appt: typeof appointments.$inferSelect | undefined;
     try {
-      [appt] = await db
-        .insert(appointments)
-        .values({
-          tenantId,
-          branchId: input.branchId,
-          patientId: input.patientId,
-          doctorId: input.doctorId,
-          assistantId: input.assistantId ?? null,
-          startTime: start,
-          endTime: end,
-          serviceIds: input.serviceIds,
-          notes: input.notes ?? null,
-          createdBy: user?.id ?? null,
-        })
-        .returning();
+      // FU-01: SAVEPOINT — EXCLUDE (23P01) so'rov tranzaksiyasini aborted qilmasin
+      // (aks holda keyingi audit/COMMIT yiqiladi → 500). Savepoint rollback bo'ladi,
+      // tashqi tx sog'lom qoladi va 409 javobi qaytadi.
+      [appt] = await db.transaction(async (sp) =>
+        sp
+          .insert(appointments)
+          .values({
+            tenantId,
+            branchId: input.branchId,
+            patientId: input.patientId,
+            doctorId: input.doctorId,
+            assistantId: input.assistantId ?? null,
+            startTime: start,
+            endTime: end,
+            serviceIds: input.serviceIds,
+            notes: input.notes ?? null,
+            createdBy: user?.id ?? null,
+          })
+          .returning(),
+      );
     } catch (err) {
       // CLI-408/471: pre-check o'tdi-yu EXCLUDE constraint otdi (concurrent race)
       // → constraint nomiga qarab 409 doctor_busy / patient_busy.
@@ -419,11 +422,10 @@ export const createAppointmentsService = (deps: {
 
     let updated: typeof appointments.$inferSelect | undefined;
     try {
-      [updated] = await db
-        .update(appointments)
-        .set(patch)
-        .where(eq(appointments.id, id))
-        .returning();
+      // FU-01: savepoint — 23P01 tashqi tranzaksiyani aborted qilmasin.
+      [updated] = await db.transaction(async (sp) =>
+        sp.update(appointments).set(patch).where(eq(appointments.id, id)).returning(),
+      );
     } catch (err) {
       // CLI-408/471: reschedule/reactivation band slotga ustma-ust tushdi →
       // constraint nomiga qarab 409 doctor_busy / patient_busy.

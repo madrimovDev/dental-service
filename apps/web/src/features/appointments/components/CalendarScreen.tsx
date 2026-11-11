@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { fullDayRangeToInstants } from '@/features/schedule/schedule.mappers';
+import { formatDayMonth, formatWeekday } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import {
   useAppointments,
@@ -87,7 +88,7 @@ export function CalendarScreen() {
     to: rangeEnd.toISOString(),
   });
   const { data: doctors } = useDoctors();
-  const { data: servicesData } = useServices();
+  const { data: servicesData } = useServices({ enabled: hasPermission('service.view') });
   const { data: branchesData } = useBranches();
   const cancelMut = useCancelAppointment();
   const statusMut = useUpdateAppointmentStatus();
@@ -119,15 +120,11 @@ export function CalendarScreen() {
     [servicesData],
   );
 
-  // Sana sarlavhasi: "DD-oy · hafta-kuni" — Intl orqali (yangi i18n kalit yo'q).
-  const titleLabel = useMemo(() => {
-    const dayMonth = new Intl.DateTimeFormat(i18n.language, {
-      day: 'numeric',
-      month: 'long',
-    }).format(date);
-    const weekday = new Intl.DateTimeFormat(i18n.language, { weekday: 'long' }).format(date);
-    return `${dayMonth} · ${weekday}`;
-  }, [date, i18n.language]);
+  // Sana sarlavhasi: "12-noyabr · payshanba" — uz'da lug'at (Intl `uz` ma'lumoti yo'q bo'lishi mumkin).
+  const titleLabel = useMemo(
+    () => `${formatDayMonth(date, i18n.language)} · ${formatWeekday(date, i18n.language)}`,
+    [date, i18n.language],
+  );
 
   // Rail kartalari `Appointment[]` kutadi (DS4-2 DayStatsCard/WaitlistCard) —
   // `useAppointments` allaqachon `Appointment[]` qaytaradi.
@@ -394,7 +391,11 @@ export function CalendarScreen() {
               onClose={closeDetail}
             />
           )}
-          <DayStatsCard appts={apptList} />
+          <DayStatsCard
+            appts={apptList}
+            isToday={isToday(pivotKey)}
+            dayLabel={formatDayMonth(date, i18n.language)}
+          />
           {/* DS12: jonli "Bo'sh slot" kartasi — faqat `schedule.view` ruxsati
               bo'lganda render (cheklangan rollarda 403 oldini olish, CLI-153). */}
           {hasPermission('schedule.view') && (

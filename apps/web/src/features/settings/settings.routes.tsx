@@ -44,7 +44,7 @@ export const settingsRoutes: AppRoute[] = [
     perm: 'service.view',
     element: <ServiceCategoriesScreen />,
   },
-  { path: '/settings/tenant', perm: 'tenant.view', element: <TenantSettingsScreen /> },
+  { path: '/settings/tenant', perm: 'tenant_settings.view', element: <TenantSettingsScreen /> },
   { path: '/settings/branches', perm: 'branch.view', element: <BranchesSettingsScreen /> },
   { path: '/settings/roles', perm: 'role.view', element: <RolesSettingsScreen /> },
   { path: '/settings/users', perm: 'user.view', element: <UsersSettingsScreen /> },

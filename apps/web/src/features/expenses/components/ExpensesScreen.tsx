@@ -56,7 +56,7 @@ export function ExpensesScreen() {
     to,
     categoryId: categoryId ?? undefined,
     branchId: branchId ?? undefined,
-    pageSize: 200,
+    pageSize: 100,
   });
   const summary = useExpenseSummary({ from, to, branchId: branchId ?? undefined });
   const pnl = usePnl({ from, to, branchId: branchId ?? undefined });

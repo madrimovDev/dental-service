@@ -3,12 +3,29 @@ import { and, desc, eq, getTableColumns, isNull, lte, or, sql } from 'drizzle-or
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { pgErrorInfo } from '../../lib/pg-error.ts';
 import type { ServiceCategoriesService } from '../service-categories/service-categories.service.ts';
 import type {
   CreateServiceInput,
   SetServicePriceInput,
   UpdateServiceInput,
 } from './services.schema.ts';
+
+/**
+ * FU-01: (tenant_id, code) UNIQUE (`services_tenant_code_unique`, 23505) —
+ * dublikat kod 500 emas, route'da 409 `service.code_taken`.
+ */
+export class ServiceCodeTakenError extends Error {
+  constructor() {
+    super('service.code_taken');
+    this.name = 'ServiceCodeTakenError';
+  }
+}
+
+const isCodeTaken = (err: unknown): boolean => {
+  const pg = pgErrorInfo(err);
+  return pg?.code === '23505' && pg.constraint === 'services_tenant_code_unique';
+};
 
 export const createServicesService = (deps: {
   audit: AuditLogger;
@@ -67,6 +84,22 @@ export const createServicesService = (deps: {
       ? await deps.categories.findOrCreateByName(c, input.category)
       : null;
 
+    try {
+      return await insertService(c, db, tenantId, categoryId, input);
+    } catch (err) {
+      // db.transaction = SAVEPOINT (so'rov tx ichida) → u rollback bo'lgan, tashqi tx sog'lom.
+      if (isCodeTaken(err)) throw new ServiceCodeTakenError();
+      throw err;
+    }
+  }
+
+  async function insertService(
+    c: Context,
+    db: ReturnType<typeof getDb>,
+    tenantId: string,
+    categoryId: string | null,
+    input: CreateServiceInput,
+  ) {
     return await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);
 
@@ -129,11 +162,24 @@ export const createServicesService = (deps: {
     }
     const { category: _category, ...rest } = input;
 
-    const [updated] = await db
-      .update(services)
-      .set({ ...rest, ...(categoryId !== undefined ? { categoryId } : {}), updatedAt: new Date() })
-      .where(and(eq(services.id, id), isNull(services.deletedAt)))
-      .returning();
+    let updated: typeof services.$inferSelect | undefined;
+    try {
+      // FU-01: savepoint — code UNIQUE (23505) tashqi tx'ni aborted qilmasin.
+      [updated] = await db.transaction(async (sp) =>
+        sp
+          .update(services)
+          .set({
+            ...rest,
+            ...(categoryId !== undefined ? { categoryId } : {}),
+            updatedAt: new Date(),
+          })
+          .where(and(eq(services.id, id), isNull(services.deletedAt)))
+          .returning(),
+      );
+    } catch (err) {
+      if (isCodeTaken(err)) throw new ServiceCodeTakenError();
+      throw err;
+    }
 
     if (updated) {
       await deps.audit.record(c, {

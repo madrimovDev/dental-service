@@ -6,6 +6,7 @@ import {
   getService,
   listBranches,
   listCashierPatientPlans,
+  listCashierPendingVisits,
   listCashierTransactions,
   listPatients,
   listServices,
@@ -16,7 +17,9 @@ import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tansta
 import { patientKeys } from '@/features/patients/patients.keys';
 import { serviceKeys } from '@/features/services/services.keys';
 import { lookupKeys } from '@/lib/lookup-keys';
+import { useAuthStore } from '@/stores/auth-store.ts';
 import { cashierKeys } from './cashier.keys';
+import type { PendingVisit } from './cashier.types';
 
 /**
  * CLI-440 #2: Asia/Tashkent kalendar kuni (UTC EMAS — `new Date().toISOString().slice(0,10)`
@@ -104,7 +107,8 @@ export function usePlanBalance(planId: string | null) {
 export function useCreateTransaction() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: Parameters<typeof createCashierTransaction>[0]) =>
+    // `visitNoteId` (FX-handoff) generated body'da regeneratsiyagacha yo'q.
+    mutationFn: (body: Parameters<typeof createCashierTransaction>[0] & { visitNoteId?: string }) =>
       createCashierTransaction(body).then((r) => r.data),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: cashierKeys.all });
@@ -161,5 +165,23 @@ export function useAllTransactions() {
   return useQuery({
     queryKey: cashierKeys.allTransactions(),
     queryFn: () => listCashierTransactions().then((r) => r.data),
+  });
+}
+
+/**
+ * Bugun imzolangan, hali to'lanmagan vizitlar (`GET /cashier/pending-visits`, `cashier.view`).
+ * TODO(integratsiya): `generate:contract`dan keyin generated `listCashierPendingVisits`ga
+ * almashtiring (bu lane generate qilmaydi). Kassa/«Bugun» ochiq turganda 30 s da yangilanadi.
+ */
+export function usePendingVisits(branchId: string | null) {
+  const { hasPermission } = useAuthStore();
+  return useQuery({
+    queryKey: cashierKeys.pendingVisits(branchId ?? ''),
+    queryFn: () =>
+      listCashierPendingVisits({ branchId: branchId as string }).then(
+        (r) => r.data as unknown as PendingVisit[],
+      ),
+    enabled: !!branchId && hasPermission('cashier.view'),
+    refetchInterval: 30_000,
   });
 }

@@ -26,6 +26,7 @@ export const toCashierTransactionDto = (row: CashierTransaction): CashierTransac
   cardProvider: row.cardProvider ?? null,
   type: row.type,
   parentTransactionId: row.parentTransactionId ?? null,
+  visitNoteId: row.visitNoteId ?? null,
   status: row.status,
   notes: row.notes ?? null,
   fiscalProvider: row.fiscalProvider,

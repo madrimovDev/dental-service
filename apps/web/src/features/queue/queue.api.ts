@@ -26,11 +26,12 @@ export function useQueueToday(branchId: string | null) {
   });
 }
 
-export function useCheckInCandidates(branchId: string | null) {
+export function useCheckInCandidates(branchId: string | null, allowed = true) {
   return useQuery({
     queryKey: queueKeys.candidates(branchId ?? ''),
     queryFn: () => getCheckInCandidates({ branchId: branchId ?? '' }).then((r) => r.data),
-    enabled: !!branchId,
+    // `allowed` — `queue.create` (server talabi); ruxsatsiz rolda 10 s'lik 403 poll bo'lmasin.
+    enabled: !!branchId && allowed,
     refetchInterval: 10_000,
   });
 }
@@ -97,8 +98,9 @@ export function usePatientsAll(search = '') {
   });
 }
 
-export function useServices() {
+export function useServices(options?: { enabled?: boolean }) {
   return useQuery({
+    enabled: options?.enabled,
     queryKey: lookupKeys.services(),
     queryFn: () => listServices().then((r) => r.data),
   });

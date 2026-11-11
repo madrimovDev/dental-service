@@ -10,7 +10,7 @@ vi.mock('../../clinical.api', () => ({
 vi.mock('@/stores/auth-store.ts', () => ({
   // biome-ignore lint/suspicious/noExplicitAny: test mock selector
   useAuthStore: (sel?: (s: any) => unknown) => {
-    const store = { activeBranchId: 'b1' };
+    const store = { activeBranchId: 'b1', hasPermission: () => true };
     return sel ? sel(store) : store;
   },
 }));

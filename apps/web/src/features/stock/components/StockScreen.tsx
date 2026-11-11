@@ -14,7 +14,6 @@ import {
   useStockMovements,
 } from '../stock.api';
 import {
-  DAYS_CRITICAL,
   formatQty,
   servicesByItem,
   sortCriticalFirst,
@@ -50,7 +49,7 @@ export function StockScreen() {
   const [batchOpened, { open: openBatch, close: closeBatch }] = useDisclosure(false);
 
   const branches = useBranches();
-  const services = useServices();
+  const services = useServices({ enabled: hasPermission('service.view') });
   const items = useStockItems(branchId ?? undefined);
   const movements = useStockMovements(selectedId);
   const expiring = useExpiringBatches(EXPIRING_WITHIN_DAYS, branchId ?? undefined);
@@ -88,9 +87,8 @@ export function StockScreen() {
 
   const expiringBatches = useMemo(() => toExpiringBatchVMs(expiring.data ?? []), [expiring.data]);
   const topBatch = expiringBatches[0];
-  const endingCount = itemVMs.filter(
-    (i) => i.daysLeft != null && i.daysLeft <= DAYS_CRITICAL,
-  ).length;
+  // Sarlavha va qator belgisi bir manbadan — API `lowStock` (qoldiq <= minThreshold).
+  const endingCount = itemVMs.filter((i) => i.lowStock).length;
 
   const branchOptions = (branches.data ?? []).map((b) => ({ value: b.id, label: b.name }));
   const branchName = branchOptions.find((b) => b.value === branchId)?.label;

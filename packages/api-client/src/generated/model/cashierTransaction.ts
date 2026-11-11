@@ -29,6 +29,8 @@ export interface CashierTransaction {
   type: CashierTransactionType;
   /** @nullable */
   parentTransactionId: string | null;
+  /** @nullable */
+  visitNoteId: string | null;
   status: CashierTransactionStatus;
   /** @nullable */
   notes: string | null;

@@ -157,3 +157,14 @@ export type StaffProfileDto = z.infer<typeof staffProfileDtoSchema>;
 export const deleteAssignmentResultSchema = z
   .object({ deleted: z.literal(true) })
   .openapi('DeleteAssignmentResult');
+
+/** GET /grantable-roles — chaqiruvchi tayinlay oladigan rollar (faqat id + nom). */
+export const grantableRoleDtoSchema = z
+  .object({
+    id: z.uuid(),
+    name: z.string().openapi({ example: 'Doctor' }),
+    isSystem: z.boolean().openapi({ example: true }),
+  })
+  .openapi('GrantableRole');
+
+export type GrantableRoleDto = z.infer<typeof grantableRoleDtoSchema>;

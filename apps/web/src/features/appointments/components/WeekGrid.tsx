@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { formatDayMonth, formatWeekday } from '@/lib/format';
 import { groupByDay } from '../appointments.mappers';
 import type { Appointment } from '../appointments.types';
 import { type CalendarEvent, GRID, toneForIndex, toneVars } from '../appointments.types';
@@ -33,16 +34,6 @@ export function WeekGrid({
   selectedId?: string | null;
 }) {
   const { i18n } = useTranslation();
-  const locale = i18n.language === 'ru' ? 'ru-RU' : 'uz-UZ';
-  const weekdayFmt = new Intl.DateTimeFormat(locale, {
-    weekday: 'short',
-    timeZone: 'Asia/Tashkent',
-  });
-  const dayFmt = new Intl.DateTimeFormat(locale, {
-    day: '2-digit',
-    month: 'short',
-    timeZone: 'Asia/Tashkent',
-  });
   const cols = groupByDay(appointments, dayKeys);
   const hours = Array.from(
     { length: GRID.dayEndHour - GRID.dayStartHour },
@@ -67,8 +58,16 @@ export function WeekGrid({
             <div key={col.dateKey} className={classes.col}>
               <div className={classes.colHead} style={toneVars(tone)}>
                 <span className={classes.colHeadText}>
-                  <span className={classes.colName}>{weekdayFmt.format(day)}</span>
-                  <span className={classes.colSub}>{dayFmt.format(day)}</span>
+                  <span className={classes.colName}>
+                    {formatWeekday(day, i18n.language, 'short', 'Asia/Tashkent')}
+                  </span>
+                  <span className={classes.colSub}>
+                    {formatDayMonth(day, i18n.language, {
+                      month: 'short',
+                      padDay: true,
+                      timeZone: 'Asia/Tashkent',
+                    })}
+                  </span>
                 </span>
                 <span className={classes.colCount}>{col.events.length}</span>
               </div>

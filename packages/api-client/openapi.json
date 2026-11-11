@@ -1162,6 +1162,28 @@
           "pending"
         ]
       },
+      "GrantableRole": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "example": "Doctor"
+          },
+          "isSystem": {
+            "type": "boolean",
+            "example": true
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "isSystem"
+        ]
+      },
       "InviteUserResponse": {
         "type": "object",
         "properties": {
@@ -2528,6 +2550,11 @@
             "nullable": true,
             "format": "uuid"
           },
+          "visitNoteId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -2569,6 +2596,7 @@
           "cardProvider",
           "type",
           "parentTransactionId",
+          "visitNoteId",
           "status",
           "notes",
           "fiscalProvider",
@@ -2795,6 +2823,78 @@
           "id",
           "title",
           "status"
+        ]
+      },
+      "PendingVisit": {
+        "type": "object",
+        "properties": {
+          "visitNoteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patientName": {
+            "type": "string"
+          },
+          "doctorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "doctorName": {
+            "type": "string",
+            "nullable": true
+          },
+          "signedAt": {
+            "type": "string"
+          },
+          "services": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "serviceId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "serviceName": {
+                  "type": "string"
+                },
+                "quantity": {
+                  "type": "integer"
+                },
+                "unitPrice": {
+                  "type": "string",
+                  "nullable": true
+                }
+              },
+              "required": [
+                "serviceId",
+                "serviceName",
+                "quantity",
+                "unitPrice"
+              ]
+            }
+          },
+          "total": {
+            "type": "string"
+          },
+          "hasUnpriced": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "visitNoteId",
+          "patientId",
+          "patientName",
+          "doctorId",
+          "doctorName",
+          "signedAt",
+          "services",
+          "total",
+          "hasUnpriced"
         ]
       },
       "RevenueReport": {
@@ -10623,6 +10723,74 @@
         }
       }
     },
+    "/api/users/grantable-roles": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "operationId": "listGrantableRoles",
+        "responses": {
+          "200": {
+            "description": "Roles the caller may assign",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/GrantableRole"
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/users/invite": {
       "post": {
         "tags": [
@@ -13555,6 +13723,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Service code already exists (service.code_taken)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -13767,6 +13945,16 @@
           },
           "404": {
             "description": "Service not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Service code already exists (service.code_taken)",
             "content": {
               "application/json": {
                 "schema": {
@@ -14545,6 +14733,10 @@
                     "type": "string",
                     "format": "uuid"
                   },
+                  "visitNoteId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
                   "allocations": {
                     "type": "array",
                     "items": {
@@ -14624,6 +14816,16 @@
           },
           "403": {
             "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Visit note already billed",
             "content": {
               "application/json": {
                 "schema": {
@@ -15009,6 +15211,85 @@
                       "type": "array",
                       "items": {
                         "$ref": "#/components/schemas/CashierPatientPlan"
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cashier/pending-visits": {
+      "get": {
+        "tags": [
+          "cashier"
+        ],
+        "operationId": "listCashierPendingVisits",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Signed, unbilled visits of today",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PendingVisit"
                       }
                     }
                   },

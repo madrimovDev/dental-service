@@ -59,6 +59,7 @@ function tx(over: Partial<CashierTransaction> = {}): CashierTransaction {
     treatmentPlanId: null,
     receiptNumber: 'R-001',
     cardProvider: null,
+    visitNoteId: null,
     totalAmount: '120000',
     paidAmount: '120000',
     discount: '0',

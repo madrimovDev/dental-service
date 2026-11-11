@@ -5,6 +5,7 @@ import { useDisclosure } from '@mantine/hooks';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { roleLabel } from '@/lib/role-label';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import {
   useDeleteRole,
@@ -161,7 +162,7 @@ export function RolesSettingsScreen() {
                         color: active ? 'var(--primary)' : 'var(--ink)',
                       }}
                     >
-                      {r.name}
+                      {roleLabel(r.name, t, r.isSystem)}
                     </span>
                     <Tag>{r.isSystem ? t('roles.system') : t('roles.custom')}</Tag>
                   </span>
@@ -211,7 +212,7 @@ export function RolesSettingsScreen() {
                       color: 'var(--ink)',
                     }}
                   >
-                    {selectedRole.name}
+                    {roleLabel(selectedRole.name, t, selectedRole.isSystem)}
                     {selectedRole.isSystem && (
                       <StatusPill status="neutral" dot={false}>
                         {t('roles.system_template')}

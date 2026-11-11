@@ -383,7 +383,7 @@ To'liq: [`LAB-TECHNICIAN-ACCESS-2026-11-11.md`](./LAB-TECHNICIAN-ACCESS-2026-11-
 
 | ID | J | Qisqa | Qilinadigan ish |
 |---|---|---|---|
-| FU-01 | M❔ | 23P01 → 409 amalda 500 bo'lishi mumkin | verifier: tx ichida savepoint'siz ushlangan DB xatosidan keyin COMMIT yiqilib klientga 500 boradi (eski xulq, regressiya emas). `appointments-patient-overlap` testi `patient_busy` kutadi va o'tadi — **real route orqali tasdiqlash kerak**; tasdiqlansa insert'ni savepoint (`tx.transaction`) ichiga olish |
+| FU-01 ✅ | M | 23P01 → 409 amalda 500 bo'lishi mumkin | verifier: tx ichida savepoint'siz ushlangan DB xatosidan keyin COMMIT yiqilib klientga 500 boradi (eski xulq, regressiya emas). `appointments-patient-overlap` testi `patient_busy` kutadi va o'tadi — **real route orqali tasdiqlash kerak**; tasdiqlansa insert'ni savepoint (`tx.transaction`) ichiga olish |
 | FU-02 | M | Ichma-ich `rlsMiddleware` (`/api` prefiksi) | `expenses`/`clinical`/`patient-images` bare `/api`ga `app.use('*', auth, rls)` bilan ulangan → har so'rov 2–3 tranzaksiya (pool bosimi) va ichki `afterCommit` ro'yxati tashqi commit'dan oldin ishlaydi. Hozir u modullarda afterCommit yo'q. Yechim: rls'ni idempotent qilish (allaqachon `db` tx bo'lsa qayta ochmaslik) |
 | FU-03 | L | tx ichidagi boshqa side-effect'lar | `notifications.notifyInTx` SMS'ni tx ichida yuboradi (`stock.service.ts:70` low-stock) — 500 bo'lsa SMS ketadi, yozuv rollback. `onAfterCommit`ga ko'chirish |
 | FU-04 | L | Yangi qoida | throw (shu jumladan `HTTPException`/`ZodError` 4xx) endi yozuvlarni rollback qiladi. 4xx'da audit/strike qatori saqlanishi kerak bo'lgan kod `fail()` **qaytarishi** shart, throw emas |
@@ -424,7 +424,7 @@ Sinov 3 ta haqiqiy nuqson topdi (hammasi tuzatildi, testlar bilan): (1) jadvali 
 |---|---|---|---|
 | FU-15 | M | Telefonni oldindan ro'yxatdan o'tkazish (P6 qoldiq xavfi) | klinika platformada hali yo'q telefon uchun hisob yaratib, vaqtinchalik parolni bilib qoladi; keyin o'sha odam boshqa klinika taklifini olsa, birinchi klinika uning nomidan kirib qabul qilishi mumkin. Yopish = telefon egaligini tasdiqlash (SMS/Telegram OTP) — 👤 qaror kerak |
 | FU-16 ✅ | L | Kassa xulosasi «cash · payment» tarjimasiz (UI-1 da yopildi) | UI-1 Kassa ekrani bilan |
-| FU-17 | L | Filial bo'yicha availability (FreeSlotsCard) jadvalsiz doktorni ko'rsatmaydi | single-doctor availability'dagi fallback filial-darajasiga ham |
+| FU-17 ✅ | L | Filial bo'yicha availability (FreeSlotsCard) jadvalsiz doktorni ko'rsatmaydi | single-doctor availability'dagi fallback filial-darajasiga ham |
 
 ## 18. UI-0 dan keyingi follow-up'lar
 
@@ -439,7 +439,7 @@ Sinov 3 ta haqiqiy nuqson topdi (hammasi tuzatildi, testlar bilan): (1) jadvali 
 | ID | J | Qisqa | Qilinadigan ish |
 |---|---|---|---|
 | FU-21 | M | PT-04 backend'da: `view_pii`siz foydalanuvchi PATCH orqali PII maydonlarini o'zgartira oladi | faqat web cheklangan — `patients.update`da `view_pii`siz PII maydonlari 403 |
-| FU-22 | L | Bugun ekrani bemor ismini har bemor uchun alohida so'raydi | B.1 qo'shgan `appointment.patientName` (JOIN) dan foydalanish |
+| FU-22 ✅ | L | Bugun ekrani bemor ismini har bemor uchun alohida so'raydi | B.1 qo'shgan `appointment.patientName` (JOIN) dan foydalanish |
 | FU-23 | L | `GET /patients/phone-check` `patient.create` bilan ism qaytaradi | `view_pii`siz faqat `count` qaytarish |
 | FU-24 | L | Kanvas elementlari qurilmagan: Qarzdorlar chip, Excel import, «Keyingi tashrif» ustuni, drag «ushlab turish», narx chip'lari | UI sayqal / P2 |
 | FU-25 ✅ | — | Telegram bron so'rovlari (`booking_requests`) | UI-4 (T2) da yopildi |
@@ -473,4 +473,15 @@ Sinov 3 ta haqiqiy nuqson topdi (hammasi tuzatildi, testlar bilan): (1) jadvali 
 | FU-38 | L | Bot sessiyalari xotirada (restart → «Suhbat eskirdi») | kerak bo'lsa Redis |
 | FU-39 | L | Desktop yangilanish vaqti `config.workCloseTime`/19:00 — filial `workHours.close`ga ulanmagan | API'dan yopilish vaqtini olish |
 | FU-40 | 🟡 | UI-T3 desktop holatlari Windows'da tekshirilmagan | `DESKTOP-WINDOWS-BUILD-TEST.md` |
+
+## 23. UI dan keyingi tekshiruv (2026-11-11) — natija
+
+5 agentli real-brauzer tekshiruvi (`docs/qa/2026-11-11-post-ui-verification.json`): barcha 8 rol bo'yicha crawl, asosiy oqimlar, dark/RU vizual, API shim'lar, desktop (Linux Electron prod-flow: aktivatsiya → zaxira → tiklash **ishladi**; real-PG testlari 4/4) va P17 (Docker volume — fayl konteyner qayta yaratilganda saqlanadi ✅). Topilgan ~20 nuqson tuzatildi (`docs/superpowers/plans/2026-11-11-verify-fixes.md`): FU-01 parallel bron 500→409 (+ payroll, services dublikat), provisioning owner majburiy parol almashtirish, filial availability jadvalsiz doktor, Branch Manager `GET /api/users/grantable-roles`, nav/403 shovqinlari, `/expenses` pageSize, bo'sh holatlar, ⌘K scroll, kalendar sanasi/RU matnlari, rol nomlari tarjimasi, ombor sarlavhasi, chek bemor nomi, **vizit → kassa uzatish** (migratsiya 0054 `visit_note_id`, `GET /api/cashier/pending-visits`).
+
+| ID | J | Qisqa | Qilinadigan ish |
+|---|---|---|---|
+| FU-41 | 👤 | Branch Manager shablonida registrator/shifokor huquqlari yo'q → P5 bo'yicha ularni yollay olmaydi | qaror: BM shabloniga huquq qo'shish yoki P5 qoidasini «filial xodimlari uchun» yumshatish |
+| FU-42 | L | `/expenses` 100 tadan ortiq yozuvda faqat birinchi 100 | server pagination UI |
+| FU-43 | L | 40P01 deadlock xabari doim `doctor_busy` | constraint nomi yo'q holatda umumiy matn |
+| FU-44 | L | Linux dev Electron retsepti: tizim postgres'da `btree_gist` (contrib) kerak; migratsiya yiqilsa main dialog'da osiladi, LOGS_DIR'ga yozilmaydi | `migrate-on-start` xatosini logga yozish |
 

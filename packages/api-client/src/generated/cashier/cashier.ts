@@ -13,6 +13,8 @@ import type {
   GetCashierTransaction200,
   ListCashierPatientPlans200,
   ListCashierPatientPlansParams,
+  ListCashierPendingVisits200,
+  ListCashierPendingVisitsParams,
   ListCashierTransactions200,
   ListCashierTransactionsParams,
   RefundCashierTransaction200,
@@ -87,6 +89,15 @@ import { customInstance } from '../../mutator';
     },
       );
     }
+  export const listCashierPendingVisits = (
+    params: ListCashierPendingVisitsParams,
+ ) => {
+      return customInstance<ListCashierPendingVisits200>(
+      {url: `/api/cashier/pending-visits`, method: 'GET',
+        params
+    },
+      );
+    }
   export type ListCashierTransactionsResult = NonNullable<Awaited<ReturnType<typeof listCashierTransactions>>>
 export type CreateCashierTransactionResult = NonNullable<Awaited<ReturnType<typeof createCashierTransaction>>>
 export type GetCashierTransactionResult = NonNullable<Awaited<ReturnType<typeof getCashierTransaction>>>
@@ -94,3 +105,4 @@ export type RefundCashierTransactionResult = NonNullable<Awaited<ReturnType<type
 export type GetCashierDailySummaryResult = NonNullable<Awaited<ReturnType<typeof getCashierDailySummary>>>
 export type GetCashierPlanBalanceResult = NonNullable<Awaited<ReturnType<typeof getCashierPlanBalance>>>
 export type ListCashierPatientPlansResult = NonNullable<Awaited<ReturnType<typeof listCashierPatientPlans>>>
+export type ListCashierPendingVisitsResult = NonNullable<Awaited<ReturnType<typeof listCashierPendingVisits>>>

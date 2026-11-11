@@ -11,6 +11,7 @@ import type {
   GetUserProfile200,
   InviteUser201,
   InviteUserBody,
+  ListGrantableRoles200,
   ListUserAssignments200,
   ResetUserPassword200,
   UpdateUserAssignment200,
@@ -28,6 +29,14 @@ import { customInstance } from '../../mutator';
  ) => {
       return customInstance<ListUserAssignments200>(
       {url: `/api/users/assignments`, method: 'GET'
+    },
+      );
+    }
+  export const listGrantableRoles = (
+    
+ ) => {
+      return customInstance<ListGrantableRoles200>(
+      {url: `/api/users/grantable-roles`, method: 'GET'
     },
       );
     }
@@ -99,6 +108,7 @@ import { customInstance } from '../../mutator';
       );
     }
   export type ListUserAssignmentsResult = NonNullable<Awaited<ReturnType<typeof listUserAssignments>>>
+export type ListGrantableRolesResult = NonNullable<Awaited<ReturnType<typeof listGrantableRoles>>>
 export type InviteUserResult = NonNullable<Awaited<ReturnType<typeof inviteUser>>>
 export type AddUserAssignmentResult = NonNullable<Awaited<ReturnType<typeof addUserAssignment>>>
 export type UpdateUserAssignmentResult = NonNullable<Awaited<ReturnType<typeof updateUserAssignment>>>

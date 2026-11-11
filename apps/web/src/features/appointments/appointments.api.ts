@@ -61,8 +61,9 @@ export function useDoctors() {
 }
 
 /** Branch xizmatlari ro'yxati (MultiSelect opsiyalari uchun). */
-export function useServices() {
+export function useServices(options?: { enabled?: boolean }) {
   return useQuery({
+    enabled: options?.enabled,
     queryKey: lookupKeys.services(),
     queryFn: () => listServices().then((r) => r.data),
   });

@@ -68,7 +68,7 @@ describe('CommandPalette xodim qidiruvi RBAC gate (CLI-163)', () => {
 // UI-0 1.5 — menyu rolga moslashgan, lekin ruxsatli har sahifa ⌘K orqali topiladi.
 describe('CommandPalette — ruxsatli sahifalar (1.5)', () => {
   it("Receptionist shablon ruxsatlari: menyuda yo'q 'Sozlamalar' ⌘K'da bor", async () => {
-    mockExtraPerms = ['tenant.view', 'cashier.view'];
+    mockExtraPerms = ['tenant_settings.view', 'cashier.view'];
     renderApp(<CommandPalette />);
     act(() => spotlight.open());
     expect(await screen.findByText('Sozlamalar')).toBeInTheDocument();

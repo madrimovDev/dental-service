@@ -20,19 +20,19 @@ import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PhoneInput } from '@/components/PhoneInput.tsx';
+import { roleLabel } from '@/lib/role-label';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import {
   useBranches,
+  useGrantableRoles,
   useInviteUser,
   useRemoveAssignment,
   useResetPassword,
-  useRolePermissionMap,
   useRoles,
   useTenant,
   useUsers,
 } from '../settings.api';
 import { filterAssignments } from '../settings.mappers';
-import { canGrantRole } from '../settings.roleCapabilities';
 import { type InviteFormValues, makeInviteSchema } from '../settings.schema';
 import type { UsersFilter } from '../settings.types';
 import { ConfirmModal } from './ConfirmModal';
@@ -44,13 +44,13 @@ export function UsersSettingsScreen() {
   const { hasPermission, permissions, user: currentUser } = useAuthStore();
   const isOwner = permissions.includes('@owner');
   const assignments = useUsers();
-  const roles = useRoles();
+  // Rol ro'yxati `role.view` talab qiladi (Branch Manager'da yo'q) — filtr uchun faqat shunda;
+  // «Xodim qo'shish» roli esa `user.invite` bilan ishlaydigan tor endpoint'dan (server-side P5 qoidasi).
+  const roles = useRoles({ enabled: hasPermission('role.view') });
+  const grantable = useGrantableRoles({ enabled: hasPermission('user.invite') });
+  const filterRoles = roles.data ?? grantable.data;
   const branches = useBranches();
   const tenant = useTenant();
-  const rolePerms = useRolePermissionMap(
-    (roles.data ?? []).map((r) => r.id),
-    hasPermission('user.invite'),
-  );
   const ownerUserId = tenant.data?.ownerUserId;
   const invite = useInviteUser();
   const removeAssignment = useRemoveAssignment();
@@ -144,7 +144,12 @@ export function UsersSettingsScreen() {
             placeholder={t('settings.users_filter_role')}
             aria-label={t('settings.users_filter_role')}
             clearable
-            data={roles.data?.map((r) => ({ value: r.id, label: r.name })) ?? []}
+            data={
+              filterRoles?.map((r) => ({
+                value: r.id,
+                label: roleLabel(r.name, t, 'isSystem' in r ? (r.isSystem as boolean) : undefined),
+              })) ?? []
+            }
             value={filter.roleId}
             onChange={(v) => setFilter((f) => ({ ...f, roleId: v }))}
           />
@@ -178,7 +183,7 @@ export function UsersSettingsScreen() {
                       </Group>
                     </Table.Td>
                     <Table.Td>{a.userPhone}</Table.Td>
-                    <Table.Td>{a.roleName}</Table.Td>
+                    <Table.Td>{roleLabel(a.roleName, t)}</Table.Td>
                     <Table.Td>{a.branchName ?? t('users.all_branches')}</Table.Td>
                     <Table.Td>
                       {a.pending ? (
@@ -277,22 +282,15 @@ export function UsersSettingsScreen() {
                 label={t('users.role')}
                 description={t('staffCards.grantHint')}
                 data={
-                  roles.data?.map((r) => {
-                    const perms = rolePerms.get(r.id);
-                    // Ruxsatlar yuklanmaguncha cheklanmaydi; haqiqiy to'siq — server (P5).
-                    const allowed = !perms || canGrantRole(permissions, perms);
-                    return {
-                      value: r.id,
-                      label: allowed ? r.name : `${r.name} — ${t('staffCards.cannotGrant')}`,
-                      disabled: !allowed,
-                    };
-                  }) ?? []
+                  grantable.data?.map((r) => ({
+                    value: r.id,
+                    label: roleLabel(
+                      r.name,
+                      t,
+                      'isSystem' in r ? (r.isSystem as boolean) : undefined,
+                    ),
+                  })) ?? []
                 }
-                renderOption={({ option }) => (
-                  <span aria-disabled={'disabled' in option && option.disabled ? true : undefined}>
-                    {option.label}
-                  </span>
-                )}
                 required
                 {...form.getInputProps('roleId')}
               />

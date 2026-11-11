@@ -28,5 +28,6 @@ export type CreateCashierTransactionBody = {
   /** @maxLength 1000 */
   notes?: string;
   treatmentPlanId?: string;
+  visitNoteId?: string;
   allocations?: CreateCashierTransactionBodyAllocationsItem[];
 };

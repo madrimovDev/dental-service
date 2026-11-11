@@ -42,11 +42,11 @@ export function QueueBoard() {
 
   const branches = useBranches();
   const patients = usePatientsAll();
-  const services = useServices();
+  const services = useServices({ enabled: hasPermission('service.view') });
   const queue = useQueueToday(branchFilter);
   const updateStatus = useUpdateQueueStatus();
   const callOwn = useCallOwnTicket();
-  const candidates = useCheckInCandidates(branchFilter);
+  const candidates = useCheckInCandidates(branchFilter, hasPermission('queue.create'));
   const checkInTicket = useCreateTicket();
 
   const lookups: QueueLookups = useMemo(

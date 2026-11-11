@@ -106,8 +106,12 @@ describe('CLI-408 EXCLUDE gist constraint', () => {
       r.status === 'fulfilled' ? r.value : { ok: false, code: 'rejected' },
     );
     const oks = results.filter((r) => r.ok).length;
+    // Ikkala so'rov BIR xil doktor VA bemor → DB'da ikki EXCLUDE constraint ham
+    // to'qnashadi; qaysi biri birinchi tekshirilishi poyga (FU-01: ikkalasi 409).
     const conflicts = results.filter(
-      (r) => !r.ok && (r as { code: string }).code === 'conflict.doctor_busy',
+      (r) =>
+        !r.ok &&
+        ['conflict.doctor_busy', 'conflict.patient_busy'].includes((r as { code: string }).code),
     ).length;
     expect(oks).toBe(1);
     expect(conflicts).toBe(1);

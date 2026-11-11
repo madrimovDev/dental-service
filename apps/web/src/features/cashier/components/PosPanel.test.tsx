@@ -163,4 +163,33 @@ describe('PosPanel', () => {
     renderApp(<PosPanel branchId="b1" patientId={null} />);
     expect(screen.getByTestId('fiscal-state').textContent).toContain('Yuborilmagan');
   });
+  // ─── FX-handoff ───
+  it('vizit tanlanganda savat vizit xizmatlari bilan to‘ladi, to‘lovda visitNoteId ketadi', async () => {
+    const visit = {
+      visitNoteId: 'v1',
+      patientId: 'pat1',
+      patientName: 'Bemor Bir',
+      doctorId: 'd1',
+      doctorName: 'Karimov',
+      signedAt: '2026-11-11T08:00:00Z',
+      services: [{ serviceId: 's1', serviceName: 'Plomba', quantity: 2, unitPrice: '50000.00' }],
+      total: '100000',
+      hasUnpriced: false,
+    };
+    renderApp(<PosPanel branchId="b1" patientId="pat1" visit={visit} />);
+
+    // Savat vizitdan to'ldirildi (2 × 50 000, narx qulflangan), banner ko'rinadi.
+    expect(await screen.findByTestId('visit-banner')).toBeTruthy();
+    expect(screen.getByDisplayValue("50 000 so'm")).toBeTruthy();
+
+    fireEvent.click(screen.getByText("To'lovni qabul qilish"));
+    expect(mutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        patientId: 'pat1',
+        visitNoteId: 'v1',
+        items: [expect.objectContaining({ serviceId: 's1', quantity: 2, unitPrice: 50000 })],
+      }),
+      expect.anything(),
+    );
+  });
 });

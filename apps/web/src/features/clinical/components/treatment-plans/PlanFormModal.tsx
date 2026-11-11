@@ -46,7 +46,8 @@ export function PlanFormModal({
   const { t } = useTranslation();
   const qc = useQueryClient();
   const activeBranchId = useAuthStore((s) => s.activeBranchId);
-  const servicesQuery = useServiceCatalog();
+  const canViewServices = useAuthStore((s) => s.hasPermission('service.view'));
+  const servicesQuery = useServiceCatalog(canViewServices);
   const form = useForm<TreatmentPlanFormValues>({
     initialValues: { title: '', notes: '', stages: [] },
     validate: zod4Resolver(treatmentPlanFormSchema),

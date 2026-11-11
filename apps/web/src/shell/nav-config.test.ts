@@ -187,14 +187,25 @@ describe('rolga moslashuvchi sidebar (1.5)', () => {
     expect(m.footer).toEqual([]);
   });
 
-  it("Receptionist: ruxsat (tenant.view) bor -> Sozlamalar menyuda yo'q, lekin ⌘K'da bor", () => {
+  it("Receptionist: tenant.view bor, lekin tenant_settings.view yo'q -> Sozlamalar menyuda ham, ⌘K'da ham yo'q (sahifa so'rovlari 403)", () => {
     const perms = permsOf('receptionist');
-    expect(perms.has('tenant.view')).toBe(true); // fixture haqiqatan ruxsatli
+    expect(perms.has('tenant.view')).toBe(true);
+    expect(perms.has('tenant_settings.view')).toBe(false);
     const m = sidebarModel({ roleKey: 'receptionist', has: hasOf(perms) });
     expect([...m.groups.flatMap((g) => g.items), ...m.footer].map((i) => i.key)).not.toContain(
       'settings',
     );
-    expect(paletteNavItems(hasOf(perms)).map((i) => i.key)).toContain('settings');
+    expect(paletteNavItems(hasOf(perms)).map((i) => i.key)).not.toContain('settings');
+  });
+
+  it("Branch Manager: Sozlamalar yo'q (tenant_settings.view yo'q), Tenant Admin'da bor", () => {
+    const bm = permsOf('branch_manager');
+    expect(bm.has('tenant_settings.view')).toBe(false);
+    const mBm = sidebarModel({ roleKey: 'branch_manager', has: hasOf(bm) });
+    expect(mBm.footer.map((i) => i.key)).not.toContain('settings');
+    const admin = permsOf('tenant_admin');
+    const mAdmin = sidebarModel({ roleKey: 'tenant_admin', has: hasOf(admin) });
+    expect(mAdmin.footer.map((i) => i.key)).toContain('settings');
   });
 
   it('Doctor: Mening kunim + Navbat; Davolash — Bemorlar, rejalar, laboratoriya', () => {

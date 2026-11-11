@@ -53,22 +53,32 @@ vi.mock('../settings.api', () => ({
       },
     ],
   }),
-  useRoles: () => ({
-    data: [
-      { id: 'r-low', name: 'Receptionist' },
-      { id: 'r-high', name: 'Accountant' },
-    ],
-  }),
+  useRoles: (opts?: { enabled?: boolean }) => {
+    rolesEnabled.value = opts?.enabled !== false;
+    return {
+      data:
+        opts?.enabled === false
+          ? undefined
+          : [
+              { id: 'r-low', name: 'Receptionist' },
+              { id: 'r-high', name: 'Accountant' },
+            ],
+    };
+  },
   useTenant: () => ({ data: { ownerUserId: ownerId.value } }),
-  useRolePermissionMap: () =>
-    new Map([
-      ['r-low', ['patient.view']],
-      ['r-high', ['patient.view', 'cashier.refund']],
-    ]),
+  // `GET /users/grantable-roles` — server allaqachon chaqiruvchi bera olmaydigan rollarni olib tashlagan.
+  useGrantableRoles: () => ({ data: grantable.value }),
   useBranches: () => ({ data: [] }),
   useInviteUser: () => ({ mutate: inviteMutate, isPending: false }),
   useRemoveAssignment: () => ({ mutate: vi.fn(), isPending: false }),
   useResetPassword: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+const rolesEnabled = vi.hoisted(() => ({ value: true }));
+const grantable = vi.hoisted(() => ({
+  value: [
+    { id: 'r-low', name: 'Receptionist', isSystem: true },
+    { id: 'r-high', name: 'Accountant', isSystem: true },
+  ] as { id: string; name: string; isSystem: boolean }[],
 }));
 const ownerId = vi.hoisted(() => ({ value: 'u-none' }));
 const perms = vi.hoisted(() => ({ value: ['@owner'] as string[] }));
@@ -135,22 +145,24 @@ describe('UsersSettingsScreen', () => {
     ownerId.value = 'u-none';
   });
 
-  it("ruxsat etilmagan rol aria-disabled (assertCanGrant ko'zgusi, owner emas)", async () => {
-    perms.value = ['user.invite', 'patient.view'];
+  it("Xodim qo'shish rol ro'yxati grantable-roles'dan (role.view yo'q Branch Manager ham to'ldiradi)", async () => {
+    // role.view YO'Q, user.invite bor — `useRoles` enabled:false (data yo'q), lekin rollar ko'rinadi.
+    perms.value = ['user.invite', 'user.view'];
+    grantable.value = [{ id: 'r-low', name: 'Receptionist', isSystem: true }];
     renderApp(<UsersSettingsScreen />);
     fireEvent.click(screen.getByText("Xodim qo'shish"));
     const roleInput = (await screen.findAllByLabelText(/^Rol\s*\*?$/))[0] as HTMLElement;
     fireEvent.click(roleInput);
-    await screen.findAllByText(/Accountant/);
+    await screen.findAllByText(/Registrator/);
     const opts = screen.getAllByRole('option', { hidden: true });
-    const high = opts.find(
-      (o) => o.textContent?.includes('Accountant') && o.textContent.includes('berib'),
-    );
-    const low = opts.find((o) => o.textContent === 'Receptionist');
-    expect(high?.querySelector('[aria-disabled="true"]')).not.toBeNull();
-    expect(high?.getAttribute('data-combobox-disabled')).toBe('true');
-    expect(low).toBeDefined();
-    expect(low?.querySelector('[aria-disabled="true"]')).toBeNull();
+    const labels = opts.map((o) => o.textContent);
+    expect(labels).toContain('Registrator');
+    expect(labels).not.toContain('Buxgalter');
+    expect(rolesEnabled.value).toBe(false);
     perms.value = ['@owner'];
+    grantable.value = [
+      { id: 'r-low', name: 'Receptionist', isSystem: true },
+      { id: 'r-high', name: 'Accountant', isSystem: true },
+    ];
   });
 });
