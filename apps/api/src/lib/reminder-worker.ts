@@ -129,16 +129,10 @@ export async function processReminderJob(
       // favqulodda telefonga ketganda ko'rsatiladi. Telegram (chat_id) tanlansa,
       // `emergencyFallback` (telefon-fallback) true bo'lsa ham favqulodda TELEFON
       // ishlatilmaydi (xabar bemor chat_id'ga ketadi) — matn noto'g'ri bo'lardi.
-      // `source !== 'telegram'` (sms YOKI none — ikkalasida ham `resolved.to`
-      // telefonga yuboriladi) bilan gate qilamiz.
-      // CLI-475 B7 — "Favqulodda aloqaga yuborildi" matni FAQAT xabar haqiqatan
-      // favqulodda telefonga ketganda ko'rsatiladi. Telegram (chat_id) tanlansa,
-      // `emergencyFallback` (telefon-fallback) true bo'lsa ham favqulodda TELEFON
-      // ishlatilmaydi (xabar bemor chat_id'ga ketadi) — matn noto'g'ri bo'lardi.
-      // `source !== 'telegram'` (sms YOKI none — ikkalasida ham `resolved.to`
-      // telefonga yuboriladi) bilan gate qilamiz.
+      // P9 — `source === 'none'` (kanal sozlanmagan, NoOp ok:false) da ham hech
+      // narsa yuborilmaydi — shuning uchun faqat haqiqiy SMS kanalida ('sms').
       body:
-        emergencyFallback && resolved.source !== 'telegram'
+        emergencyFallback && resolved.source === 'sms'
           ? `${body} — Favqulodda aloqaga yuborildi`
           : body,
       smsTo: resolved.to,
