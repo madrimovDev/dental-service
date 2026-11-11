@@ -9,10 +9,12 @@ import {
   branches,
   cashierTransactions,
   patients,
+  roles,
   tenants,
   treatmentPlans,
   treatmentStagePayments,
   treatmentStages,
+  userAssignments,
   users,
 } from '@dental/db-schema';
 import { sql } from 'drizzle-orm';
@@ -63,6 +65,14 @@ beforeAll(async () => {
     const branchId = (
       await tx.insert(branches).values({ tenantId, name: 'B' }).returning({ id: branches.id })
     )[0]!.id;
+    // IR-06: hisobot filial doirasi tayinlovdan olinadi — Accountant tenant-wide (branchId=null).
+    const [role] = await tx
+      .insert(roles)
+      .values({ tenantId, name: 'R' })
+      .returning({ id: roles.id });
+    await tx
+      .insert(userAssignments)
+      .values({ tenantId, userId: accId, branchId: null, roleId: role!.id });
     const [p1, p2, p3] = await tx
       .insert(patients)
       .values([

@@ -2012,5 +2012,106 @@
     "doctorsToday": "Shifokorlar bugun",
     "doctorProgress": "{{done}} / {{planned}} bemor qabul qilindi",
     "doctorProgressAria": "{{done}} / {{planned}} bemor"
+  },
+  "reportsQ": {
+    "nav": "Savollar",
+    "period": "Davr",
+    "branch": "Filial",
+    "allBranches": "Barcha filiallar",
+    "myBranches": "Mening filiallarim",
+    "saved": "tanlov saqlanadi",
+    "scopeNote": "Siz faqat o'z filiallaringiz ma'lumotini ko'rasiz.",
+    "group": {
+      "money": "Pul",
+      "doctors": "Shifokorlar",
+      "patients": "Bemorlar",
+      "stockLab": "Ombor va lab"
+    },
+    "q": {
+      "today": "Bugun qancha tushdi?",
+      "revenue": "Davr bo'yicha qancha tushdi?",
+      "debt": "Kim qarzdor?",
+      "services": "Qaysi xizmat ko'p foyda beradi?",
+      "pnl": "Xarajat va sof foyda",
+      "doctors": "Kim qancha ishladi?",
+      "appointments": "Qabullar qanday o'tdi?",
+      "noshowDoctors": "Kimning bemorlari kelmayapti?",
+      "newPatients": "Qancha yangi bemor keldi?",
+      "notReturned": "Kim qaytib kelmadi?",
+      "recall": "Qayta chaqiruv natijasi",
+      "plans": "Davolash rejalari bajarilishi",
+      "stock": "Qaysi material tugayapti?",
+      "lab": "Lab qancha kechikdi?"
+    },
+    "lock": {
+      "soon": "Tez orada",
+      "clinicWide": "Butun klinika"
+    },
+    "lockHint": {
+      "clinicWide": "Bu savol filialga bo'linmaydi — faqat butun klinika rahbarlari ko'radi."
+    },
+    "how": "Qanday hisoblandi?",
+    "excel": "Excel",
+    "oneC": "1C eksport",
+    "empty": "Bu davr uchun ma'lumot yo'q",
+    "forbidden": "Bu hisobot sizning huquqlaringizda mavjud emas.",
+    "col": {
+      "branch": "Filial",
+      "doctor": "Shifokor",
+      "service": "Xizmat",
+      "count": "Soni",
+      "total": "Jami",
+      "completed": "Yakunlangan",
+      "rate": "Bajarilish",
+      "revenue": "Tushum",
+      "material": "Material",
+      "margin": "Foyda",
+      "marginPct": "Foyda, %",
+      "age": "Muddat",
+      "patients": "Bemorlar",
+      "amount": "Qarz",
+      "status": "Holat",
+      "method": "To'lov usuli",
+      "action": "Amal",
+      "plannedDone": "Rejada / bajarildi"
+    },
+    "action": {
+      "patients": "Bemorlar",
+      "schedule": "Jadval"
+    },
+    "aging": {
+      "d0_30": "0–30 kun",
+      "d31_60": "31–60 kun",
+      "d61_90": "61–90 kun",
+      "d90_plus": "90+ kun"
+    },
+    "answer": {
+      "today": "Bugun sof tushum {{net}}. Qaytarilgan: {{refunded}}.",
+      "revenue": "{{from}} – {{to}} oralig'ida sof tushum {{total}}.",
+      "debt": "{{count}} bemor jami {{amount}} qarz. Shundan {{over90}} tasi 90 kundan oshgan — ularga birinchi navbatda qo'ng'iroq qiling.",
+      "debtNone": "Qarzdor bemor yo'q.",
+      "services": "Eng ko'p foyda beradigan xizmat — {{name}} ({{margin}}).",
+      "doctors": "{{count}} shifokor jami {{total}} qabul qildi, {{completed}} tasi yakunlandi.",
+      "appointments": "Jami {{total}} qabul. Kelmaganlar {{noShow}}, slot bandligi {{util}}.",
+      "newPatients": "{{new}} yangi va {{returning}} qaytgan bemor. Qaytish ulushi {{rate}}.",
+      "recall": "{{total}} ta qayta chaqiruvdan {{converted}} tasi qabulga yozildi ({{rate}}).",
+      "plans": "{{total}} bosqichdan {{done}} tasi bajarildi ({{rate}})."
+    },
+    "chart": {
+      "payment": "To'lov usuli bo'yicha",
+      "trend": "Kunlar bo'yicha",
+      "occupancy": "Qabullar bandligi"
+    },
+    "howText": {
+      "today": "Bugungi (Toshkent vaqti) to'lovlar yig'indisidan qaytarilgan pullar ayiriladi. Qaytarish tushumni ikki marta kamaytirmaydi.",
+      "revenue": "Tanlangan davrdagi to'lovlar yig'indisi minus qaytarilganlar. Filial filtri tanlangan filialga yoki sizning filiallaringizga tegishli.",
+      "debt": "Qarz = bemor rozi bo'lgan reja bosqichlari narxi + rejasiz xizmatlar − to'langan + qaytarilgan. Muddat — qarz paydo bo'lgan kundan hozirgacha. Kassa, bemor kartasi va shu hisobot bitta formulani ishlatadi.",
+      "services": "Foyda = xizmat tushumi (qaytarish va chegirma ayirilgan) − xizmat uchun sarflangan material narxi. Material narxi xizmat retsepti bo'yicha taxminiy.",
+      "doctors": "Tanlangan davrdagi qabullar shifokor bo'yicha; yakunlangan — holati «yakunlangan» bo'lganlari.",
+      "appointments": "Kelmaganlar ulushi = «kelmadi» holatidagi qabullar / jami. Bandlik = band daqiqalar / filial ish soati × shifokorlar.",
+      "newPatients": "Yangi — davrda birinchi marta kelgan; qaytgan — avval ham kelgan va davrda qayta kelgan bemorlar.",
+      "recall": "Qayta chaqiruvdan keyin qabulga yozilgan yoki yakunlanganlar ulushi.",
+      "plans": "Davrda yaratilgan qabul qilingan rejalarning bosqichlari: bajarilgan / jami."
+    }
   }
 }

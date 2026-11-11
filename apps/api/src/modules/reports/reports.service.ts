@@ -112,9 +112,14 @@ async function netServiceAggregates(
   db: DbOrTx,
   start: Date,
   end: Date,
-  branchId?: string | null,
+  branchIds?: string[] | null,
 ): Promise<NetServiceRow[]> {
-  const branchFilter = branchId ? sql`AND t.branch_id = ${branchId}` : sql``;
+  const branchFilter = branchIds
+    ? sql`AND t.branch_id IN (${sql.join(
+        branchIds.map((b) => sql`${b}`),
+        sql`, `,
+      )})`
+    : sql``;
   // Date obyekti to'g'ridan raw sql'ga interpolatsiya qilinsa postgres-js
   // parametrni string-tip sifatida yozishga urinib RangeError beradi — ISO
   // string sifatida uzatib, Postgres implicit timestamptz cast'iga tayanamiz.
@@ -183,15 +188,30 @@ function* eachWeekday(from: string, to: string): Generator<string> {
   }
 }
 
+/**
+ * IR-06 — filial doirasi. `reportBranchScope` middleware (HTTP qatlami) chaqiruvchining
+ * ruxsat etilgan filiallarini `c.var.reportBranchIds`ga qo'yadi (owner / tenant-wide → null).
+ * Middleware'siz kontekstda (service-darajali testlar, worker) — so'ralgan `branchId` yoki cheklovsiz.
+ */
+const scopeIds = (c: Context, branchId?: string | null): string[] | null => {
+  const scoped = c.get('reportBranchIds');
+  if (scoped) return scoped;
+  return branchId ? [branchId] : null;
+};
+
+const branchIn = (col: Column, ids: string[]) =>
+  ids.length === 1 ? eq(col, ids[0] as string) : inArray(col, ids);
+
 export const createReportsService = (deps: { audit: AuditLogger }) => {
   async function revenueTotal(c: Context, { from, to, branchId }: ReportRange): Promise<number> {
     const db = getDb(c);
+    const ids = scopeIds(c, branchId);
     const { start, end } = tashkentRange(from, to);
     const base = [
       eq(cashierTransactions.status, 'completed'),
       inRange(cashierTransactions.createdAt, start, end),
     ];
-    if (branchId) base.push(eq(cashierTransactions.branchId, branchId));
+    if (ids) base.push(branchIn(cashierTransactions.branchId, ids));
     const [row] = await db
       .select({ total: signedPaidAmount })
       .from(cashierTransactions)
@@ -204,9 +224,10 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
     { from, to, branchId }: ReportRange,
   ): Promise<number> {
     const db = getDb(c);
+    const ids = scopeIds(c, branchId);
     const { start, end } = tashkentRange(from, to);
     const base = [inRange(appointments.startTime, start, end)];
-    if (branchId) base.push(eq(appointments.branchId, branchId));
+    if (ids) base.push(branchIn(appointments.branchId, ids));
     const [row] = await db
       .select({ c: count() })
       .from(appointments)
@@ -236,13 +257,14 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
 
   async function revenue(c: Context, { from, to, branchId }: ReportRange): Promise<RevenueReport> {
     const db = getDb(c);
+    const ids = scopeIds(c, branchId);
     const { start, end } = tashkentRange(from, to);
 
     const base = [
       eq(cashierTransactions.status, 'completed'),
       inRange(cashierTransactions.createdAt, start, end),
     ];
-    if (branchId) base.push(eq(cashierTransactions.branchId, branchId));
+    if (ids) base.push(branchIn(cashierTransactions.branchId, ids));
 
     const dayExpr = sql<string>`(${cashierTransactions.createdAt} AT TIME ZONE 'Asia/Tashkent')::date`;
 
@@ -265,7 +287,7 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
       .orderBy(dayExpr);
 
     // byService — itemli POS (payment, completed), net-of-refund-and-discount (CLI-430).
-    const byServiceNet = await netServiceAggregates(db, start, end, branchId);
+    const byServiceNet = await netServiceAggregates(db, start, end, ids);
     const byService = byServiceNet.map((r) => ({ serviceName: r.serviceName, total: r.revenue }));
 
     const byPaymentMethod = await db
@@ -323,9 +345,10 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
     { from, to, branchId }: ReportRange,
   ): Promise<AppointmentStatsReport> {
     const db = getDb(c);
+    const ids = scopeIds(c, branchId);
     const { start, end } = tashkentRange(from, to);
     const base = [inRange(appointments.startTime, start, end)];
-    if (branchId) base.push(eq(appointments.branchId, branchId));
+    if (ids) base.push(branchIn(appointments.branchId, ids));
 
     const statusRows = await db
       .select({ status: appointments.status, c: count() })
@@ -357,7 +380,7 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
     const branchRows = await db
       .select({ id: branches.id, workHours: branches.workHours })
       .from(branches)
-      .where(branchId ? eq(branches.id, branchId) : undefined);
+      .where(ids ? branchIn(branches.id, ids) : undefined);
     const whById = new Map(branchRows.map((b) => [b.id, b.workHours]));
 
     let capacityMinutes = 0;
@@ -415,9 +438,10 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
     { from, to, branchId }: ReportRange,
   ): Promise<DoctorWorkloadRow[]> {
     const db = getDb(c);
+    const ids = scopeIds(c, branchId);
     const { start, end } = tashkentRange(from, to);
     const base = [inRange(appointments.startTime, start, end)];
-    if (branchId) base.push(eq(appointments.branchId, branchId));
+    if (ids) base.push(branchIn(appointments.branchId, ids));
 
     const rows = await db
       .select({
@@ -494,12 +518,13 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
     { from, to, branchId }: ReportRange,
   ): Promise<DentalAnalyticsReport> {
     const db = getDb(c);
+    const ids = scopeIds(c, branchId);
     const { start, end } = tashkentRange(from, to);
 
     // 1. Procedure-mix — kassa item'lari (completed payment, oraliq, filial).
     //    `count` = XOM SUM(quantity) (bajarilgan protsedura soni); `revenue` = net-of-
     //    refund-and-discount (CLI-430) — `netServiceAggregates` bilan bir xil hisoblash.
-    const mixRows = await netServiceAggregates(db, start, end, branchId);
+    const mixRows = await netServiceAggregates(db, start, end, ids);
 
     // CLI-450: xizmat margin (BOM + item bo'yicha o'rtacha-narx approksimatsiya, v1 —
     // dokumentlashtirilgan cheklov: FIFO/batch-consumption tracking yo'q). `serviceId`
@@ -591,7 +616,7 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
 
     // 4. No-show trend — hafta-kuni bo'yicha (Asia/Tashkent). EXTRACT(DOW) 0=Yak..6=Shan.
     const nsFilter = [inRange(appointments.startTime, start, end)];
-    if (branchId) nsFilter.push(eq(appointments.branchId, branchId));
+    if (ids) nsFilter.push(branchIn(appointments.branchId, ids));
     const nsRows = await db
       .select({
         weekday: sql<number>`EXTRACT(DOW FROM ${appointments.startTime} AT TIME ZONE 'Asia/Tashkent')::int`,
@@ -639,12 +664,13 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
     { from, to, branchId }: ReportRange,
   ): Promise<OneCExportRow[]> {
     const db = getDb(c);
+    const ids = scopeIds(c, branchId);
     const { start, end } = tashkentRange(from, to);
     const filter = [
       eq(cashierTransactions.status, 'completed'),
       inRange(cashierTransactions.createdAt, start, end),
     ];
-    if (branchId) filter.push(eq(cashierTransactions.branchId, branchId));
+    if (ids) filter.push(branchIn(cashierTransactions.branchId, ids));
 
     const rows = await db
       .select({
@@ -815,6 +841,7 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
     { branchId }: { branchId?: string },
   ): Promise<OwnerTodayReport> {
     const db = getDb(c);
+    const ids = scopeIds(c, branchId);
     const date = new Date(Date.now() + 5 * 3_600_000).toISOString().slice(0, 10);
     const { start, end } = tashkentRange(date, date);
     const weekday = WEEKDAYS[new Date(`${date}T12:00:00+05:00`).getUTCDay()] as string;
@@ -823,7 +850,7 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
       eq(cashierTransactions.status, 'completed'),
       inRange(cashierTransactions.createdAt, start, end),
     ];
-    if (branchId) txBase.push(eq(cashierTransactions.branchId, branchId));
+    if (ids) txBase.push(branchIn(cashierTransactions.branchId, ids));
 
     const refundSum = sql<string>`COALESCE(SUM(CASE WHEN ${cashierTransactions.type} = 'refund' THEN ${cashierTransactions.paidAmount} ELSE 0 END), 0)`;
     const [totals] = await db
@@ -851,7 +878,7 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
       inRange(appointments.startTime, start, end),
       ne(appointments.status, 'cancelled'),
     ];
-    if (branchId) apBase.push(eq(appointments.branchId, branchId));
+    if (ids) apBase.push(branchIn(appointments.branchId, ids));
     const apByBranch = await db
       .select({
         branchId: appointments.branchId,
@@ -875,7 +902,7 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
     const branchRows = await db
       .select({ id: branches.id, name: branches.name, workHours: branches.workHours })
       .from(branches)
-      .where(branchId ? eq(branches.id, branchId) : undefined);
+      .where(ids ? branchIn(branches.id, ids) : undefined);
 
     const revByBranch = new Map(branchRev.map((r) => [r.branchId, Number(r.total)]));
     const apByBr = new Map(apByBranch.map((r) => [r.branchId, r]));

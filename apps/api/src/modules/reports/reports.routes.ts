@@ -5,6 +5,7 @@ import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { requireModuleInDesktop } from '../../lib/license-middleware.ts';
 import { okJson } from '../../lib/openapi.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
+import { reportBranchScope } from '../../middleware/report-scope.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
 import {
@@ -43,7 +44,7 @@ export const reportsRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     path: '/revenue',
     tags: ['reports'],
     operationId: 'getRevenueReport',
-    middleware: [requirePermission('report.view')] as const,
+    middleware: [requirePermission('report.view'), reportBranchScope()] as const,
     request: { query: reportRangeSchema },
     responses: okJson(revenueReportDtoSchema, 'Revenue report'),
   });
@@ -61,7 +62,7 @@ export const reportsRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     path: '/appointments',
     tags: ['reports'],
     operationId: 'getAppointmentStatsReport',
-    middleware: [requirePermission('report.view')] as const,
+    middleware: [requirePermission('report.view'), reportBranchScope()] as const,
     request: { query: reportRangeSchema },
     responses: okJson(appointmentStatsReportDtoSchema, 'Appointment statistics report'),
   });
@@ -79,7 +80,7 @@ export const reportsRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     path: '/doctors',
     tags: ['reports'],
     operationId: 'getDoctorWorkloadReport',
-    middleware: [requirePermission('report.view')] as const,
+    middleware: [requirePermission('report.view'), reportBranchScope()] as const,
     request: { query: reportRangeSchema },
     responses: okJson(doctorWorkloadReportDtoSchema, 'Doctor workload report'),
   });
@@ -97,7 +98,10 @@ export const reportsRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     path: '/treatment-plans',
     tags: ['reports'],
     operationId: 'getPlanCompletionReport',
-    middleware: [requirePermission('report.view')] as const,
+    middleware: [
+      requirePermission('report.view'),
+      reportBranchScope({ tenantWide: true }),
+    ] as const,
     request: { query: reportRangeSchema },
     responses: okJson(planCompletionReportDtoSchema, 'Treatment plan completion report'),
   });
@@ -115,7 +119,10 @@ export const reportsRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     path: '/debt-aging',
     tags: ['reports'],
     operationId: 'getDebtAgingReport',
-    middleware: [requirePermission('report.view')] as const,
+    middleware: [
+      requirePermission('report.view'),
+      reportBranchScope({ tenantWide: true }),
+    ] as const,
     responses: okJson(debtAgingReportDtoSchema, 'Patient debt aging'),
   });
 
@@ -131,7 +138,7 @@ export const reportsRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     path: '/owner-today',
     tags: ['reports'],
     operationId: 'getOwnerTodayReport',
-    middleware: [requirePermission('report.view')] as const,
+    middleware: [requirePermission('report.view'), reportBranchScope()] as const,
     request: { query: ownerTodayQuerySchema },
     responses: okJson(ownerTodayReportDtoSchema, 'Owner today overview'),
   });
@@ -148,7 +155,10 @@ export const reportsRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     path: '/dental-analytics',
     tags: ['reports'],
     operationId: 'getDentalAnalyticsReport',
-    middleware: [requirePermission('report.view')] as const,
+    middleware: [
+      requirePermission('report.view'),
+      reportBranchScope({ tenantWide: true }),
+    ] as const,
     request: { query: reportRangeSchema },
     responses: okJson(dentalAnalyticsReportDtoSchema, 'Dental analytics report'),
   });
@@ -166,7 +176,7 @@ export const reportsRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     path: '/1c-export',
     tags: ['reports'],
     operationId: 'getOneCExport',
-    middleware: [requirePermission('report.view')] as const,
+    middleware: [requirePermission('report.view'), reportBranchScope()] as const,
     request: { query: reportRangeSchema },
     responses: okJson(oneCExportReportDtoSchema, '1C accounting export rows'),
   });

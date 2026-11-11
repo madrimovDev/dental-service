@@ -7,5 +7,7 @@ export const reportKeys = {
   doctors: (range: ReportRange) => ['reports', 'doctors', range] as const,
   planCompletion: (range: ReportRange) => ['reports', 'planCompletion', range] as const,
   dentalAnalytics: (range: ReportRange) => ['reports', 'dentalAnalytics', range] as const,
+  ownerToday: (branchId?: string) => ['reports', 'ownerToday', branchId ?? null] as const,
+  debtAging: () => ['reports', 'debtAging'] as const,
   oneCExport: (range: ReportRange) => ['reports', 'oneCExport', range] as const,
 };
