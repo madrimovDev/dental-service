@@ -11,13 +11,22 @@ import * as realLicense from './license';
 // import qilganda qolgan eksportlar (`writeLicense` va h.k.) `undefined`
 // bo'lib qoladi (fayllar tartibiga bog'liq, racy).
 let activeModules: string[] = ['patients', 'appointments'];
+let licenseState: string = 'active';
 
 mock.module('./license', () => ({
   ...realLicense,
   getActiveModules: async () => activeModules,
+  getLicenseState: async () => ({
+    state: licenseState,
+    expiresAt: null,
+    graceEndsAt: null,
+    daysLeft: null,
+  }),
 }));
 
-const { requireModule, requireModuleInDesktop } = await import('./license-middleware');
+const { requireModule, requireModuleInDesktop, requireValidLicenseInDesktop } = await import(
+  './license-middleware'
+);
 
 describe('requireModule', () => {
   test('allows request if module is active', async () => {
@@ -191,5 +200,77 @@ describe('MODULE_MAP — supervisor/api dictionary lockstep (CLI-433)', () => {
   test("apps/api's MODULE_MAP matches the agreed dictionary (mirror this in supervisor's clinics.test.ts too)", async () => {
     const { MODULE_MAP } = await import('./license-middleware');
     expect(MODULE_MAP).toEqual(AGREED_MODULE_MAP);
+  });
+});
+
+describe('requireValidLicenseInDesktop (P18 global blok)', () => {
+  const prevEnv = process.env.DENTAL_LOCAL_DESKTOP;
+  afterEach(() => {
+    if (prevEnv === undefined) delete process.env.DENTAL_LOCAL_DESKTOP;
+    else process.env.DENTAL_LOCAL_DESKTOP = prevEnv;
+  });
+
+  const buildApp = () => {
+    const app = new Hono();
+    app.use('/api/*', requireValidLicenseInDesktop());
+    app.use('/uploads/*', requireValidLicenseInDesktop());
+    app.all('*', (c) => c.json({ ok: true }));
+    return app;
+  };
+
+  test('blocks /api/stock and /api/reports when expired', async () => {
+    process.env.DENTAL_LOCAL_DESKTOP = 'true';
+    licenseState = 'expired';
+    const app = buildApp();
+    for (const path of ['/api/stock', '/api/reports/x', '/api/authx', '/uploads/a.png']) {
+      const res = await app.request(path);
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { error: { code: string } };
+      expect(body.error.code).toBe('LICENSE_EXPIRED');
+    }
+  });
+
+  test('blocks with LICENSE_NOT_FOUND when no license', async () => {
+    process.env.DENTAL_LOCAL_DESKTOP = 'true';
+    licenseState = 'none';
+    const res = await buildApp().request('/api/stock');
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe('LICENSE_NOT_FOUND');
+  });
+
+  test('whitelisted paths pass when expired', async () => {
+    process.env.DENTAL_LOCAL_DESKTOP = 'true';
+    licenseState = 'expired';
+    const app = buildApp();
+    for (const path of [
+      '/api/auth/login',
+      '/api/license/status',
+      '/api/license/recheck',
+      '/api/bootstrap-status',
+      '/api/activate',
+      '/api/reset-owner-password',
+      '/api/health',
+    ]) {
+      const res = await app.request(path);
+      expect(res.status).toBe(200);
+    }
+  });
+
+  test('no-op outside desktop', async () => {
+    delete process.env.DENTAL_LOCAL_DESKTOP;
+    licenseState = 'expired';
+    const res = await buildApp().request('/api/stock');
+    expect(res.status).toBe(200);
+  });
+
+  test('grace, expiring and active pass', async () => {
+    process.env.DENTAL_LOCAL_DESKTOP = 'true';
+    const app = buildApp();
+    for (const st of ['grace', 'expiring', 'active']) {
+      licenseState = st;
+      const res = await app.request('/api/stock');
+      expect(res.status).toBe(200);
+    }
   });
 });
