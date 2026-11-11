@@ -241,6 +241,9 @@ export const createApp = () => {
   });
   app.route('/api/appointments', appointmentRoutes({ db, audit, service: appointmentsService }));
   // UI-T2: Telegram bot bron so'rovlari (registrator tasdiqlaydi → appointment).
+  // Desktop'da `appointments` moduli bo'lmasa bron so'rovlari ham yopiq.
+  app.use('/api/booking-requests', requireModuleInDesktop('appointments'));
+  app.use('/api/booking-requests/*', requireModuleInDesktop('appointments'));
   app.route(
     '/api/booking-requests',
     bookingRequestRoutes({

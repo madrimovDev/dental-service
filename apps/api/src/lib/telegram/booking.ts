@@ -227,6 +227,8 @@ export function createBookingFlow(deps: BookingDeps) {
       const b = s.branches[Number(arg)];
       if (!b) return { text: m.sessionExpired };
       s.branchId = b.id;
+      // Eski xabardagi slot tugmasi yangi filialga noto'g'ri vaqtni yozmasin.
+      s.slots = [];
       return afterBranch(ctx, s);
     }
     if (op === 'd') {
@@ -236,6 +238,7 @@ export function createBookingFlow(deps: BookingDeps) {
         if (!d) return { text: m.sessionExpired };
         s.doctorId = d.id;
       }
+      s.slots = [];
       return renderDays(ctx, s);
     }
     if (op === 't') {
