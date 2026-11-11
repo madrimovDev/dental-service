@@ -59,6 +59,13 @@ vi.mock('@/features/clinical/clinical.api', () => ({
   usePatientAppointments: () => ({ data: [], isLoading: false }),
 }));
 
+vi.mock('@/features/clinical/components/prescriptions/PrescriptionsTab', () => ({
+  PrescriptionsTab: () => <div data-testid="rx-content" />,
+}));
+vi.mock('@/features/clinical/components/lab-orders/LabOrdersTab', () => ({
+  LabOrdersTab: () => <div data-testid="lab-content" />,
+}));
+
 vi.mock('@/stores/auth-store.ts', () => ({
   useAuthStore: () => ({ hasPermission: (code: string) => h.perms.includes(code) }),
 }));
@@ -108,6 +115,27 @@ describe('PatientCard — 4 bo’lim, rol bo’yicha (real rol shablonlari)', ()
     expect(document.querySelector('[data-state="forbidden"]')).not.toBeNull();
     // Moliya (cashier.view) bor
     expect(screen.getByRole('tab', { name: /Moliya/ })).toBeInTheDocument();
+  });
+
+  it('Branch Manager: medical_record.view yo’q, lekin Davolash bo’limi bor — Retseptlar va Laboratoriya tab’lari ochiladi', async () => {
+    h.perms = permsFor('branch_manager');
+    h.medical = undefined;
+    mount();
+    fireEvent.click(screen.getByRole('tab', { name: 'Davolash' }));
+    expect(await screen.findByTestId('rx-content')).toBeInTheDocument();
+    // klinik (medical_record) tab'lar ko'rinmaydi
+    expect(screen.queryByRole('tab', { name: 'Tish xaritasi' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: 'Lab buyurtmalar' }));
+    expect(await screen.findByTestId('lab-content')).toBeInTheDocument();
+  });
+
+  it('Technician: lab_order.view bilan Davolash bo’limi va laboratoriya mazmuni ko’rinadi', async () => {
+    h.perms = permsFor('technician');
+    h.medical = undefined;
+    mount();
+    fireEvent.click(screen.getByRole('tab', { name: 'Davolash' }));
+    expect(await screen.findByTestId('lab-content')).toBeInTheDocument();
+    expect(screen.queryByTestId('rx-content')).not.toBeInTheDocument();
   });
 
   it('Nurse: medical_record.view bor, edit yo’q — anamnez ko’rinadi, tasdiqlash tugmasi YO’Q', () => {

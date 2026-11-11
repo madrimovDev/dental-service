@@ -64,7 +64,9 @@ const SECTIONS: PatientTabDef[] = [
   {
     key: 'treatment',
     labelKey: 'patientCard.section.treatment',
-    permission: 'medical_record.view',
+    // Ichki tab'lar (rx/lab) boshqa ruxsatlar bilan ochiladi — bo'lim ularning birortasida ko'rinadi
+    // (Branch Manager: prescription.view + lab_order.view, medical_record.view YO'Q; Technician: lab_order.view).
+    anyPermission: ['medical_record.view', 'prescription.view', 'lab_order.view'],
   },
   { key: 'finance', labelKey: 'patientCard.section.finance', permission: 'cashier.view' },
   {
