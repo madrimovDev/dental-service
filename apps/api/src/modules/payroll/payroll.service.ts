@@ -12,6 +12,7 @@ import { and, desc, eq, gte, inArray, isNull, lt, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { pgErrorInfo } from '../../lib/pg-error.ts';
 import { computePayrollLine } from './payroll.calc.ts';
 import type { CreateRunInput } from './payroll.schema.ts';
 
@@ -27,8 +28,11 @@ export class PayrollOverlapError extends Error {
 }
 
 /** Postgres exclusion_violation (EXCLUDE constraint) — SQLSTATE 23P01. */
-const isExclusionViolation = (err: unknown): boolean =>
-  typeof err === 'object' && err !== null && (err as { code?: string }).code === '23P01';
+const isExclusionViolation = (err: unknown): boolean => {
+  const code = pgErrorInfo(err)?.code;
+  // 40P01: parallel EXCLUDE insert'lar deadlock'ga tushsa yutqazuvchi ham overlap.
+  return code === '23P01' || code === '40P01';
+};
 
 /**
  * Payroll moduli — gibrid baza + komissiya, snapshot run.

@@ -206,11 +206,12 @@ export const createScheduleService = (deps: { audit: AuditLogger }) => {
     const weekday = weekdayOf(query.date);
 
     // Filial uchun barcha kirishlarni bir necha so'rovda (per-doktor N+1 emas).
-    const [workHours, segRows, apptRows, timeOffRows] = await Promise.all([
+    const [workHours, segRows, apptRows, timeOffRows, scheduleless] = await Promise.all([
       repo.getBranchWorkHours(c, query.branchId),
       repo.listBranchActiveSegmentsForDay(c, query.branchId, weekday),
       repo.listBranchAppointments(c, query.branchId, dayStart, dayEnd),
       repo.listBranchOverlappingTimeOff(c, query.branchId, dayStart, dayEnd),
+      repo.listBranchDoctorsWithoutSchedule(c, query.branchId),
     ]);
 
     // doctorId bo'yicha guruhlash.
@@ -219,6 +220,22 @@ export const createScheduleService = (deps: { audit: AuditLogger }) => {
       const arr = segsByDoctor.get(s.doctorId);
       if (arr) arr.push(s);
       else segsByDoctor.set(s.doctorId, [s]);
+    }
+    // FU-17 (P10): jadvali umuman yo'q shifokor `segmentsForDay` bilan bir xil —
+    // butun kun segmenti (filial ish soati bilan kesishadi). Aks holda filial
+    // availability (FreeSlotsCard) bron ekrani taklif qilgan slotlarni ko'rmasdi.
+    for (const doctorId of scheduleless) {
+      if (!segsByDoctor.has(doctorId)) {
+        segsByDoctor.set(doctorId, [
+          {
+            weekday,
+            startMinute: 0,
+            endMinute: 1440,
+            effectiveFrom: null,
+            effectiveUntil: null,
+          } as (typeof segRows)[number],
+        ]);
+      }
     }
     const apptsByDoctor = new Map<string, typeof apptRows>();
     for (const a of apptRows) {

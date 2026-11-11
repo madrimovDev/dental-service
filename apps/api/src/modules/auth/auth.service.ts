@@ -108,6 +108,13 @@ export type ProvisionTenantInput = {
   branchPhone?: string | null;
   /** Audit `action` kodi; default `tenant.registered`. */
   auditAction?: string;
+  /**
+   * Owner birinchi kirishda parolni almashtirishga majburmi. Default `false`
+   * (self-service register — owner parolni o'zi tanlagan). Aktivatsiya
+   * provisioning'ida `true`: parol Supervisor/vendor tomonida generatsiya
+   * qilingan va vendor biladi (FU: `mustChangePassword:false` bo'lib qolgan edi).
+   */
+  mustChangePassword?: boolean;
 };
 
 export type ProvisionTenantResult = {
@@ -132,6 +139,7 @@ export async function provisionTenantInTx(
       passwordHash,
       fullName: input.ownerFullName,
       preferredLanguage: input.defaultLanguage,
+      mustChangePassword: input.mustChangePassword ?? false,
     })
     .returning({ id: users.id, phone: users.phone });
 

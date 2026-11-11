@@ -35,7 +35,7 @@ import { Hono } from 'hono';
 import { db } from '../../src/db/client.ts';
 import { verifyPassword } from '../../src/lib/password.ts';
 import { closeRateLimitRedis } from '../../src/lib/rate-limit.ts';
-import { provisionTenantInTx } from '../../src/modules/auth/auth.service.ts';
+import { createAuthService, provisionTenantInTx } from '../../src/modules/auth/auth.service.ts';
 import { activateRoutes } from '../../src/routes/activate.ts';
 
 // ⚠️ Bu fayl ATAYIN NA `mock.module`, NA `globalThis.fetch` almashtirishini
@@ -237,6 +237,8 @@ describe('aktivatsiya provisioning — muvaffaqiyatli yo‘l', () => {
     const [user] = await db.select().from(users).where(eq(users.phone, '+998901234567'));
     expect(user).toBeDefined();
     expect(user?.fullName).toBe('Ali Valiyev');
+    // Vaqtinchalik parol vendorga ma'lum → majburiy almashtirish.
+    expect(user?.mustChangePassword).toBe(true);
     expect(await verifyPassword(OWNER_PASSWORD, user?.passwordHash ?? '')).toBe(true);
 
     const tenantRows = await db.select().from(tenants);
@@ -263,6 +265,27 @@ describe('aktivatsiya provisioning — muvaffaqiyatli yo‘l', () => {
     );
     expect(auditRows.some((r) => r.action === 'tenant.provisioned')).toBe(true);
     expect(JSON.stringify(auditRows)).not.toContain(OWNER_PASSWORD);
+  });
+
+  test('provisioning owner vaqtinchalik parol bilan kirganda mustChangePassword:true (+ JWT pwc)', async () => {
+    await activate();
+    const auth = createAuthService({ db });
+    const r = await auth.login({ phone: '+998901234567', password: OWNER_PASSWORD });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.mustChangePassword).toBe(true);
+  });
+
+  test('self-service registerTenant owner’i majburan almashtirmaydi (default false)', async () => {
+    const auth = createAuthService({ db });
+    await auth.registerTenant({
+      tenantName: 'Self klinika',
+      ownerPhone: '+998907770001',
+      ownerFullName: 'Self Owner',
+      ownerPassword: 'Passw0rd!self',
+      defaultLanguage: 'uz',
+    });
+    const [u] = await db.select().from(users).where(eq(users.phone, '+998907770001'));
+    expect(u?.mustChangePassword).toBe(false);
   });
 
   test('Supervisor’ga provisioning tasdig‘i yuboriladi (markProvisioned)', async () => {

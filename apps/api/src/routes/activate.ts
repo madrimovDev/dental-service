@@ -86,6 +86,8 @@ const applyProvisioning = async (
       branchAddress: p.branchAddress || null,
       branchPhone: p.branchPhone || null,
       auditAction: 'tenant.provisioned',
+      // Vaqtinchalik parolni vendor ham biladi → birinchi kirishda almashtirish shart.
+      mustChangePassword: true,
     }),
   );
   return { applied: true, ownerPhone: normalizePhone(p.ownerPhone) };

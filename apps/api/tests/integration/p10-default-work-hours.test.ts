@@ -209,6 +209,82 @@ describe('P10 default work hours', () => {
   });
 });
 
+describe('FU-17 filial availability P10 fallback', () => {
+  const key = (sl: { start: string }[]) => sl.map((x) => x.start).join(',');
+
+  test("jadvalsiz doktor filial availability'da: slotlari yakka availability bilan bir xil", async () => {
+    const one = await run((c) =>
+      schedule.getAvailability(c, {
+        doctorId: freshDoctorId,
+        branchId,
+        date: MON,
+        slotMinutes: 30,
+      }),
+    );
+    const br = await run((c) =>
+      schedule.getBranchAvailability(c, { branchId, date: MON, slotMinutes: 30 }),
+    );
+    const fresh = br.doctors.find((d) => d.doctorId === freshDoctorId);
+    expect(fresh).toBeDefined();
+    expect(fresh?.slots.length).toBeGreaterThan(0);
+    expect(key(fresh?.slots ?? [])).toBe(key(one.slots));
+    // Jadvali bor doktor (owner, dushanba segmenti) ham avvalgidek bor.
+    expect(br.doctors.some((d) => d.doctorId === ownerId)).toBe(true);
+  });
+
+  test("seshanba: jadvali bor, lekin shu kunda segmenti yo'q doktor yo'q; jadvalsiz doktor bor", async () => {
+    const br = await run((c) =>
+      schedule.getBranchAvailability(c, { branchId, date: TUE, slotMinutes: 30 }),
+    );
+    expect(br.doctors.some((d) => d.doctorId === ownerId)).toBe(false);
+    expect(br.doctors.some((d) => d.doctorId === freshDoctorId)).toBe(true);
+  });
+
+  test("yakshanba (filial yopiq): jadvalsiz doktorda slot yo'q", async () => {
+    const br = await run((c) =>
+      schedule.getBranchAvailability(c, { branchId, date: SUN, slotMinutes: 30 }),
+    );
+    const fresh = br.doctors.find((d) => d.doctorId === freshDoctorId);
+    expect(fresh?.slots ?? []).toHaveLength(0);
+  });
+
+  test("boshqa filialga biriktirilgan jadvalsiz doktor bu filialda ko'rinmaydi", async () => {
+    let otherDoctorId = '';
+    let otherBranchId = '';
+    await run(async (c) => {
+      const tx = c.get('db') as DbOrTx;
+      const [b2] = await tx
+        .insert(branches)
+        .values({ tenantId, name: 'Boshqa filial', workHours: DEFAULT_WORK_HOURS })
+        .returning({ id: branches.id });
+      otherBranchId = b2!.id;
+      const [u] = await tx
+        .insert(users)
+        .values({ phone: '+998900001012', passwordHash: 'x', fullName: 'Boshqa Doktor' })
+        .returning({ id: users.id });
+      otherDoctorId = u!.id;
+      const [docRole] = await tx
+        .select({ id: roles.id })
+        .from(roles)
+        .where(eq(roles.templateKey, 'doctor'));
+      await tx.insert(userAssignments).values({
+        tenantId,
+        branchId: otherBranchId,
+        userId: otherDoctorId,
+        roleId: docRole!.id,
+      });
+    });
+    const here = await run((c) =>
+      schedule.getBranchAvailability(c, { branchId, date: MON, slotMinutes: 30 }),
+    );
+    expect(here.doctors.some((d) => d.doctorId === otherDoctorId)).toBe(false);
+    const there = await run((c) =>
+      schedule.getBranchAvailability(c, { branchId: otherBranchId, date: MON, slotMinutes: 30 }),
+    );
+    expect(there.doctors.some((d) => d.doctorId === otherDoctorId)).toBe(true);
+  });
+});
+
 // ─── UI-R3 (SC-07): slot sabablari + `now` + booking-context ──────────────────
 describe('UI-R3 availability sabablari', () => {
   const WED = '2026-12-09';
