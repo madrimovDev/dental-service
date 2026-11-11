@@ -1636,5 +1636,17 @@
     "cancel": "Bekor qilish",
     "minutes_short": "daq",
     "flagged": "Ko'p marta kelmagan: {{count}} ta"
+  },
+  "queueBoard": {
+    "col_waiting": "Kutmoqda",
+    "col_in_progress": "Qabulda",
+    "col_cashier": "Kassaga yuborildi",
+    "open_tv": "TV ekranini ochish",
+    "waited_short": "+{{count}} daq",
+    "not_arrived": "Yozilgan, hali kelmagan",
+    "not_arrived_empty": "Hamma yozilgan bemor keldi",
+    "arrived": "Keldi",
+    "tv_numbers_only": "Faqat raqam ko'rsatiladi — bemor ismi ekranga chiqmaydi",
+    "sync_failed": "Navbat yangilandi, lekin yozilish holati o'zgarmadi ({{code}})"
   }
 }

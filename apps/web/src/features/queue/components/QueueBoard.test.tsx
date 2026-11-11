@@ -4,8 +4,9 @@ import { renderApp } from '../../../test-utils';
 import { QueueBoard } from './QueueBoard';
 
 // Hoisted spies so assertions observe the same instance across renders.
-const { updateMutate, navigateSpy } = vi.hoisted(() => ({
+const { updateMutate, callOwnMutate, navigateSpy } = vi.hoisted(() => ({
   updateMutate: vi.fn(),
+  callOwnMutate: vi.fn(),
   navigateSpy: vi.fn(),
 }));
 
@@ -31,10 +32,15 @@ vi.mock('../queue.api', () => ({
   useQueueToday: () => ({ data: queueData, isLoading: false, isError: false }),
   useCheckInCandidates: () => ({ data: [] }),
   useCreateTicket: () => ({ mutate: vi.fn(), isPending: false }),
+  useCallOwnTicket: () => ({ mutate: callOwnMutate, isPending: false, variables: undefined }),
   useUpdateQueueStatus: () => ({ mutate: updateMutate, isPending: false, variables: undefined }),
 }));
+let perms: string[] | 'all' = 'all';
 vi.mock('@/stores/auth-store.ts', () => ({
-  useAuthStore: () => ({ hasPermission: () => true, activeBranchId: 'b1' }),
+  useAuthStore: () => ({
+    hasPermission: (p: string) => perms === 'all' || perms.includes(p),
+    activeBranchId: 'b1',
+  }),
 }));
 
 function ticket(over: Record<string, unknown>) {
@@ -59,20 +65,22 @@ function ticket(over: Record<string, unknown>) {
 describe('QueueBoard', () => {
   beforeEach(() => {
     queueData = [];
+    perms = 'all';
     updateMutate.mockClear();
+    callOwnMutate.mockClear();
     navigateSpy.mockClear();
   });
 
   it("3 ustun sarlavhasini ko'rsatadi", () => {
     renderApp(<QueueBoard />);
     expect(screen.getByText(/Kutmoqda/)).toBeInTheDocument();
-    expect(screen.getByText(/Davom etmoqda/)).toBeInTheDocument();
-    expect(screen.getByText(/Bajarilgan/)).toBeInTheDocument();
+    expect(screen.getByText(/Qabulda/)).toBeInTheDocument();
+    expect(screen.getByText(/Kassaga yuborildi/)).toBeInTheDocument();
   });
 
-  it("'Display board' tugmasi /queue/board ga navigatsiya qiladi", () => {
+  it("'TV ekranini ochish' tugmasi /queue/board ga navigatsiya qiladi", () => {
     renderApp(<QueueBoard />);
-    const btn = screen.getByRole('button', { name: /Display board/ });
+    const btn = screen.getByRole('button', { name: /TV ekranini ochish/ });
     fireEvent.click(btn);
     expect(navigateSpy).toHaveBeenCalledWith('/queue/board');
   });
@@ -96,5 +104,14 @@ describe('QueueBoard', () => {
     const callBtn = screen.getByRole('button', { name: /Chaqirish →/ });
     fireEvent.click(callBtn);
     expect(updateMutate).toHaveBeenCalledWith({ id: 'tw', status: 'in_progress' });
+  });
+
+  it("queue.manage'siz shifokor chaqirsa call-own ishlatiladi (PATCH status emas)", () => {
+    perms = ['queue.view'];
+    queueData = [ticket({ id: 'tw', status: 'waiting', queueNumber: 3, patientId: 'p2' })];
+    renderApp(<QueueBoard />);
+    fireEvent.click(screen.getByRole('button', { name: /Chaqirish →/ }));
+    expect(callOwnMutate).toHaveBeenCalledWith('tw');
+    expect(updateMutate).not.toHaveBeenCalled();
   });
 });

@@ -5,9 +5,9 @@ import { QueueCard } from './QueueCard';
 import classes from './QueueColumn.module.css';
 
 const titleKey: Record<QueueColumnKey, string> = {
-  waiting: 'queue.waiting',
-  in_progress: 'queue.in_progress',
-  completed: 'queue.completed',
+  waiting: 'queueBoard.col_waiting',
+  in_progress: 'queueBoard.col_in_progress',
+  completed: 'queueBoard.col_cashier',
 };
 
 /** Count chip toni — ustun kalitidan deriva qilinadi. */
@@ -22,6 +22,7 @@ export function QueueColumn({
   title,
   lookups,
   canManage,
+  canCall,
   busyId,
   onStatus,
 }: {
@@ -29,6 +30,7 @@ export function QueueColumn({
   title: string;
   lookups: QueueLookups;
   canManage: boolean;
+  canCall?: boolean;
   busyId?: string;
   onStatus: (id: string, status: QueueStatus) => void;
 }) {
@@ -47,6 +49,7 @@ export function QueueColumn({
             key={ticket.id}
             vm={toQueueCardVM(ticket, lookups)}
             canManage={canManage}
+            canCall={canCall}
             busy={busyId === ticket.id}
             onStatus={(status) => onStatus(ticket.id, status)}
           />
