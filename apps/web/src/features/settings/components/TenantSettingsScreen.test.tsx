@@ -65,6 +65,6 @@ describe('TenantSettingsScreen', () => {
 
   it("subscription holati StatusPill orqali ko'rinadi", () => {
     renderApp(<TenantSettingsScreen />);
-    expect(screen.getByText('active')).toBeInTheDocument();
+    expect(screen.getByText('Faol')).toBeInTheDocument();
   });
 });

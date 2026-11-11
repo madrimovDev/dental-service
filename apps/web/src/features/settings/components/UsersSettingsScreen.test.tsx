@@ -141,12 +141,12 @@ describe('UsersSettingsScreen', () => {
     fireEvent.click(screen.getByText("Xodim qo'shish"));
     const roleInput = (await screen.findAllByLabelText(/^Rol\s*\*?$/))[0] as HTMLElement;
     fireEvent.click(roleInput);
-    await screen.findAllByText(/Accountant/);
+    await screen.findAllByText(/Buxgalter/);
     const opts = screen.getAllByRole('option', { hidden: true });
     const high = opts.find(
-      (o) => o.textContent?.includes('Accountant') && o.textContent.includes('berib'),
+      (o) => o.textContent?.includes('Buxgalter') && o.textContent.includes('berib'),
     );
-    const low = opts.find((o) => o.textContent === 'Receptionist');
+    const low = opts.find((o) => o.textContent === 'Registrator');
     expect(high?.querySelector('[aria-disabled="true"]')).not.toBeNull();
     expect(high?.getAttribute('data-combobox-disabled')).toBe('true');
     expect(low).toBeDefined();

@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router-dom';
 import { usePatients } from '@/features/patients';
 import { useAvailability } from '@/features/schedule/schedule.api';
 import { localDateParam, slotTimeLabel } from '@/features/schedule/schedule.mappers';
+import { formatDayMonth } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import {
   useBookingContext,
@@ -199,11 +200,7 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
     branchOptions.find((b) => b.value === form.values.branchId)?.label ?? t('appointments.branch');
   const slotPicked = form.values.startTime != null;
 
-  const lang = i18n.language === 'ru' ? 'ru-RU' : 'uz-UZ';
-  const dateLabel = (iso: string) =>
-    new Intl.DateTimeFormat(lang, { timeZone: TZ, day: 'numeric', month: 'long' }).format(
-      new Date(iso),
-    );
+  const dateLabel = (iso: string) => formatDayMonth(new Date(iso), i18n.language, { timeZone: TZ });
   const slotDateLabel = form.values.startTime ? dateLabel(form.values.startTime) : null;
 
   // Lab muddati: tanlangan slot (yo'q bo'lsa — tanlangan sana) lab kelish sanasidan oldin bo'lsa ogohlantirish.

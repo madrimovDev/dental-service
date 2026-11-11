@@ -45,6 +45,8 @@ import { ReceiptModal } from './ReceiptModal';
 export interface PosPanelProps {
   branchId: string;
   patientId: string | null;
+  /** Tanlangan bemor ismi (chekda ko'rsatiladi). */
+  patientName?: string;
   /** Savat bo'sh emasligini ota-komponentga bildiradi (rejim almashganda ogohlantirish uchun). */
   onDirtyChange?: (dirty: boolean) => void;
 }
@@ -123,9 +125,10 @@ const PAYMENT_OPTIONS: ReadonlyArray<{
 type ReceiptSnapshot = {
   transaction: TransactionVM;
   cart: CartItem[];
+  patientName?: string;
 };
 
-export function PosPanel({ branchId, patientId, onDirtyChange }: PosPanelProps) {
+export function PosPanel({ branchId, patientId, patientName, onDirtyChange }: PosPanelProps) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const servicesQuery = useServices();
@@ -222,7 +225,11 @@ export function PosPanel({ branchId, patientId, onDirtyChange }: PosPanelProps) 
       onSuccess: (data: CashierTransaction) => {
         // Server tranzaksiyasi → VM (chek manbasi). data yo'q bo'lsa modal ochilmaydi.
         if (data) {
-          setReceipt({ transaction: toTransactionVM(data), cart: cartSnapshot });
+          setReceipt({
+            transaction: toTransactionVM(data),
+            cart: cartSnapshot,
+            patientName: patientId ? patientName : undefined,
+          });
         }
         setCart([]);
         setSearch('');
@@ -576,6 +583,7 @@ export function PosPanel({ branchId, patientId, onDirtyChange }: PosPanelProps) 
           onClose={() => setReceipt(null)}
           transaction={receipt.transaction}
           cart={receipt.cart}
+          patientName={receipt.patientName}
         />
       )}
     </>

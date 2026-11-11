@@ -32,7 +32,7 @@ const expensesResponse = {
       createdAt: '2026-06-10T05:00:00Z',
     },
   ],
-  meta: { page: 1, pageSize: 200, total: 1 },
+  meta: { page: 1, pageSize: 100, total: 1 },
 };
 
 let pnlData: PnlDto | undefined = {

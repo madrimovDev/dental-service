@@ -44,14 +44,14 @@ export function AppointmentSlot({
       <span className={classes.slotHead}>
         <span className={classes.slotTime}>
           {localTimeLabel(appointment.startTime)} · {durationMin}
-          {t('appointments.minuteShort', 'daq')}
+          {t('appointments.minuteShort')}
         </span>
         <StatusIndicator status={appointment.status} size={9} />
       </span>
       <span className={classes.slotPatient}>{patientName(appointment.patientId)}</span>
       {pos.height > 44 && serviceCount > 0 ? (
         <span className={classes.slotService}>
-          {serviceCount} {t('appointments.serviceShort', 'xizmat')}
+          {serviceCount} {t('appointments.serviceShort')}
         </span>
       ) : null}
     </button>

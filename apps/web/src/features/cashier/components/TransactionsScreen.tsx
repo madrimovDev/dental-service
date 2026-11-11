@@ -13,10 +13,18 @@ const fmtDate = (iso: string) => {
 
 export function TransactionsScreen() {
   const { t } = useTranslation();
-  const { data, isLoading, isError } = useAllTransactions();
+  const { data, isLoading, isError, refetch } = useAllTransactions();
 
   if (isLoading) return <StateView status="loading" skeleton="table" />;
-  if (isError) return <StateView status="error" />;
+  if (isError)
+    return (
+      <StateView
+        status="error"
+        title={t('states.error_title')}
+        retryLabel={t('states.retry')}
+        onRetry={() => refetch()}
+      />
+    );
 
   const transactions = data?.data ?? [];
 
@@ -24,7 +32,11 @@ export function TransactionsScreen() {
     <Stack>
       <PageHead title={t('nav.transactions')} />
       {!transactions.length ? (
-        <StateView status="empty" />
+        <StateView
+          status="empty"
+          title={t('states.empty_title')}
+          description={t('cashier.transactions_empty_description')}
+        />
       ) : (
         <Table striped highlightOnHover>
           <Table.Thead>

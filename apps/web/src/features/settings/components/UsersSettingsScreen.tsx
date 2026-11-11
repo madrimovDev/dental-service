@@ -20,6 +20,7 @@ import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PhoneInput } from '@/components/PhoneInput.tsx';
+import { roleLabel } from '@/lib/role-label';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import {
   useBranches,
@@ -144,7 +145,10 @@ export function UsersSettingsScreen() {
             placeholder={t('settings.users_filter_role')}
             aria-label={t('settings.users_filter_role')}
             clearable
-            data={roles.data?.map((r) => ({ value: r.id, label: r.name })) ?? []}
+            data={
+              roles.data?.map((r) => ({ value: r.id, label: roleLabel(r.name, t, r.isSystem) })) ??
+              []
+            }
             value={filter.roleId}
             onChange={(v) => setFilter((f) => ({ ...f, roleId: v }))}
           />
@@ -178,7 +182,7 @@ export function UsersSettingsScreen() {
                       </Group>
                     </Table.Td>
                     <Table.Td>{a.userPhone}</Table.Td>
-                    <Table.Td>{a.roleName}</Table.Td>
+                    <Table.Td>{roleLabel(a.roleName, t)}</Table.Td>
                     <Table.Td>{a.branchName ?? t('users.all_branches')}</Table.Td>
                     <Table.Td>
                       {a.pending ? (
@@ -283,7 +287,9 @@ export function UsersSettingsScreen() {
                     const allowed = !perms || canGrantRole(permissions, perms);
                     return {
                       value: r.id,
-                      label: allowed ? r.name : `${r.name} — ${t('staffCards.cannotGrant')}`,
+                      label: allowed
+                        ? roleLabel(r.name, t, r.isSystem)
+                        : `${roleLabel(r.name, t, r.isSystem)} — ${t('staffCards.cannotGrant')}`,
                       disabled: !allowed,
                     };
                   }) ?? []

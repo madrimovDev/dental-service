@@ -2,7 +2,8 @@
   "states": {
     "error_title": "Yuklab bo'lmadi",
     "retry": "Qayta urinish",
-    "empty_title": "Hozircha bo'sh"
+    "empty_title": "Hozircha bo'sh",
+    "forbidden_title": "Ruxsat yo'q"
   },
   "app": {
     "name": "Dental Service",
@@ -377,7 +378,8 @@
     "new_appointment": "Yangi yozilish",
     "open_cashier": "Kassa",
     "vsPrevPeriod": "o'tgan davrga nisbatan",
-    "activityFeed": "So'nggi faoliyat"
+    "activityFeed": "So'nggi faoliyat",
+    "today_schedule": "Bugungi jadval"
   },
   "branches": {
     "work_hours": "Ish soati",
@@ -418,7 +420,13 @@
     "currency": "Valyuta",
     "reminder_lead_hours": "Eslatma oldindan (soat)",
     "max_discount_percent": "Maksimal chegirma foizi",
-    "max_discount_percent_hint": "Kassada bitta xizmatga beriladigan eng yuqori chegirma. 100% = cheklovsiz. Faqat klinika administratori o'zgartira oladi."
+    "max_discount_percent_hint": "Kassada bitta xizmatga beriladigan eng yuqori chegirma. 100% = cheklovsiz. Faqat klinika administratori o'zgartira oladi.",
+    "subscription": {
+      "trial": "Sinov",
+      "active": "Faol",
+      "suspended": "To'xtatilgan",
+      "cancelled": "Bekor qilingan"
+    }
   },
   "settings": {
     "users": {
@@ -722,7 +730,8 @@
     "severe_allergy_warning": "DIQQAT — anestetik allergiyasi!",
     "allergy_confirm_pill": "Anesteziyadan oldin tasdiqlang",
     "payment_history": "To'lov tarixi",
-    "no_medical_permission": "Sizda tibbiy kartani ko'rish ruxsati yo'q"
+    "no_medical_permission": "Sizda tibbiy kartani ko'rish ruxsati yo'q",
+    "collect_payment": "To'lov qabul qilish"
   },
   "medical": {
     "history_title": "O'zgarishlar tarixi",
@@ -1149,7 +1158,10 @@
       "completed": "Bajarilgan",
       "no_show": "Kelmagan",
       "cancelled": "Bekor qilingan"
-    }
+    },
+    "minuteShort": "daq",
+    "serviceShort": "xizmat",
+    "day_total": "Kun jami"
   },
   "schedule": {
     "title": "Ish jadvali",
@@ -1355,7 +1367,8 @@
       "voided": "Bekor qilingan",
       "pending": "Kutilmoqda"
     },
-    "switch_mode_confirm": "Savatda saqlanmagan satrlar bor. Rejimni almashtirsangiz ular yo'qoladi. Davom etasizmi?"
+    "switch_mode_confirm": "Savatda saqlanmagan satrlar bor. Rejimni almashtirsangiz ular yo'qoladi. Davom etasizmi?",
+    "transactions_empty_description": "Hali birorta tranzaksiya qayd etilmagan."
   },
   "reports": {
     "title": "Hisobotlar",
@@ -1568,7 +1581,8 @@
   },
   "rx": {
     "itemsCount": "Dorilar",
-    "diagnosis": "Tashxis"
+    "diagnosis": "Tashxis",
+    "empty_description": "Hali birorta retsept yozilmagan."
   },
   "serviceCategories": {
     "title": "Xizmat kategoriyalari",
