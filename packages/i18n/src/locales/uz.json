@@ -2013,5 +2013,26 @@
     "expenseNeedsCost": "Xarajatga yozish uchun dona narxini kiriting",
     "receiveButton": "{{qty}} {{unit}} kirim qilish",
     "historyHint": "Tanlangan material harakatlari"
+  },
+  "finance": {
+    "netRevenue": "Sof tushum",
+    "netRevenueHint": "qaytarishlar ayirilgan",
+    "expenses": "Xarajatlar",
+    "expensesHint": "materiallar, ijara, kommunal",
+    "payroll": "Ish haqi",
+    "payrollDraftHint": "qoralama · {{count}} ta run",
+    "payrollFinalHint": "yakunlangan · {{count}} ta run",
+    "payrollBranchHint": "filial bo'yicha hisoblanmaydi",
+    "netProfit": "Sof foyda",
+    "netProfitHint": "tushum − xarajat − ish haqi",
+    "branchNote": "Ish haqi butun klinika bo'yicha hisoblanadi, shuning uchun filial tanlanganda sof foyda ish haqisiz ko'rsatiladi.",
+    "stockNote": "Ombor kirimi «Materiallar»ga avtomatik tushadi (kirimda belgilansa).",
+    "adjustment": "Tuzatish",
+    "adjReason": "qaytarish {{date}} · chek {{receipt}}",
+    "finalizeNote": "Yakunlangandan keyin oy o'zgarmaydi. Keyin qaytarilgan to'lovlar keyingi oyga tuzatish bo'lib tushadi.",
+    "finalizeTitle": "Ish haqini yakunlash",
+    "finalizeWarn": "Yakunlangandan keyin bu davr o'zgarmaydi. Keyin qaytarilgan to'lovlar keyingi davrga tuzatish bo'lib tushadi.",
+    "finalizeTotal": "Jami to'lanadi: {{total}}",
+    "finalizeConfirm": "Yakunlash"
   }
 }

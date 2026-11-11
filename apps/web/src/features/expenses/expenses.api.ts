@@ -1,6 +1,7 @@
 import {
   createExpense,
   createExpenseCategory,
+  customInstance,
   deleteExpense,
   deleteExpenseCategory,
   expenseSummary,
@@ -13,7 +14,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { lookupKeys } from '@/lib/lookup-keys';
 import { expensesKeys } from './expenses.keys';
-import type { DateRange } from './expenses.types';
+import type { DateRange, PnlDto } from './expenses.types';
 
 export type ListExpensesParams = {
   from?: string;
@@ -114,5 +115,26 @@ export function useDeleteCategory() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: expensesKeys.all });
     },
+  });
+}
+
+/**
+ * Foyda va zarar (tushum − xarajat − ish haqi). ⚠️ Vaqtinchalik qo'lda (`customInstance`) —
+ * `generate:contract`dan keyin generated `getPnlReport` ishlatiladi.
+ */
+export function usePnl(range: DateRange & { branchId?: string }) {
+  return useQuery({
+    queryKey: expensesKeys.pnl(range),
+    queryFn: () =>
+      customInstance<{ data: PnlDto }>({
+        url: '/api/reports/pnl',
+        method: 'GET',
+        params: {
+          from: range.from,
+          to: range.to,
+          ...(range.branchId ? { branchId: range.branchId } : {}),
+        },
+      }).then((r) => r.data),
+    enabled: !!range.from && !!range.to,
   });
 }

@@ -1,5 +1,5 @@
 import { PageHead, StateView, StatusPill } from '@dental/ui';
-import { Button, Card, Group, Stack, Table, Title } from '@mantine/core';
+import { Alert, Button, Card, Group, Modal, Stack, Table, Text, Title } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { useForm } from '@mantine/form';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
@@ -10,11 +10,17 @@ import { useAuthStore } from '@/stores/auth-store.ts';
 import {
   useCreateRun,
   useFinalizeRun,
+  usePayrollAdjustments,
   usePayrollRun,
   usePayrollRuns,
   useStaffNames,
 } from '../payroll.api';
-import { toLocalDate, toPayrollLineVM, toPayrollRunVM } from '../payroll.mappers';
+import {
+  summarizeAdjustments,
+  toLocalDate,
+  toPayrollLineVM,
+  toPayrollRunVM,
+} from '../payroll.mappers';
 import { periodFormSchema } from '../payroll.schema';
 
 export function PayrollScreen() {
@@ -23,9 +29,12 @@ export function PayrollScreen() {
   const canManage = hasPermission('payroll.manage');
 
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const runs = usePayrollRuns();
   const runDetail = usePayrollRun(selectedRunId);
+  const adjustments = usePayrollAdjustments(selectedRunId);
+  const adjByUser = useMemo(() => summarizeAdjustments(adjustments.data ?? []), [adjustments.data]);
   const createRun = useCreateRun();
   const finalizeRun = useFinalizeRun();
 
@@ -62,6 +71,7 @@ export function PayrollScreen() {
   const runRows = (runs.data ?? []).map(toPayrollRunVM);
   const lineVMs = (runDetail.data?.lines ?? []).map((l) => toPayrollLineVM(l, nameByUserId));
   const detailStatus = runDetail.data?.status;
+  const grandTotal = lineVMs.reduce((sum, l) => sum + l.total, 0);
 
   const statusBadge = (status: 'draft' | 'finalized') => (
     <StatusPill status={status === 'finalized' ? 'success' : 'neutral'}>
@@ -155,7 +165,7 @@ export function PayrollScreen() {
                 <Button
                   color="teal"
                   loading={finalizeRun.isPending}
-                  onClick={() => finalizeRun.mutate(selectedRunId)}
+                  onClick={() => setConfirmOpen(true)}
                 >
                   {t('payroll.finalize')}
                 </Button>
@@ -183,6 +193,7 @@ export function PayrollScreen() {
                       <Table.Th ta="right">{t('payroll.attributed_revenue')}</Table.Th>
                       <Table.Th ta="right">{t('payroll.commission_percent')}</Table.Th>
                       <Table.Th ta="right">{t('payroll.commission_amount')}</Table.Th>
+                      <Table.Th ta="right">{t('finance.adjustment')}</Table.Th>
                       <Table.Th ta="right">{t('payroll.total')}</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
@@ -194,6 +205,27 @@ export function PayrollScreen() {
                         <Table.Td ta="right">{formatCurrency(l.attributedRevenue, t)}</Table.Td>
                         <Table.Td ta="right">{l.commissionPercent}%</Table.Td>
                         <Table.Td ta="right">{formatCurrency(l.commissionAmount, t)}</Table.Td>
+                        <Table.Td ta="right" data-testid={`adj-${l.userId}`}>
+                          {l.userId && adjByUser.get(l.userId) ? (
+                            <Stack gap={0} align="flex-end">
+                              <Text size="sm" fw={700} c="var(--danger)">
+                                {formatCurrency(adjByUser.get(l.userId)?.total ?? 0, t)}
+                              </Text>
+                              {adjByUser.get(l.userId)?.items.map((it) => (
+                                <Text key={`${it.receiptNumber}-${it.date}`} size="xs" c="dimmed">
+                                  {t('finance.adjReason', {
+                                    date: it.date,
+                                    receipt: it.receiptNumber ?? '—',
+                                  })}
+                                </Text>
+                              ))}
+                            </Stack>
+                          ) : (
+                            <Text size="sm" c="dimmed">
+                              —
+                            </Text>
+                          )}
+                        </Table.Td>
                         <Table.Td ta="right" fw={600}>
                           {formatCurrency(l.total, t)}
                         </Table.Td>
@@ -203,9 +235,50 @@ export function PayrollScreen() {
                 </Table>
               </Table.ScrollContainer>
             )}
+            {lineVMs.length > 0 && (
+              <Group justify="space-between">
+                <Text size="xs" c="dimmed">
+                  {t('finance.finalizeNote')}
+                </Text>
+                <Text fw={700} data-testid="payroll-grand-total">
+                  {formatCurrency(grandTotal, t)}
+                </Text>
+              </Group>
+            )}
           </Stack>
         </Card>
       )}
+
+      <Modal
+        opened={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title={t('finance.finalizeTitle')}
+        size="md"
+      >
+        <Stack gap="md">
+          <Alert color="yellow" variant="light">
+            {t('finance.finalizeWarn')}
+          </Alert>
+          <Text size="sm">
+            {t('finance.finalizeTotal', { total: formatCurrency(grandTotal, t) })}
+          </Text>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setConfirmOpen(false)}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              color="teal"
+              loading={finalizeRun.isPending}
+              onClick={() => {
+                if (selectedRunId) finalizeRun.mutate(selectedRunId);
+                setConfirmOpen(false);
+              }}
+            >
+              {t('finance.finalizeConfirm')}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </Stack>
   );
 }

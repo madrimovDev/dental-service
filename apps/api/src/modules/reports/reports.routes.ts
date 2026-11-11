@@ -20,6 +20,7 @@ import {
   doctorWorkloadReportDtoSchema,
   oneCExportReportDtoSchema,
   planCompletionReportDtoSchema,
+  pnlReportDtoSchema,
   reportRangeSchema,
   revenueReportDtoSchema,
 } from './reports.schema.ts';
@@ -139,6 +140,23 @@ export const reportsRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     const range = c.req.valid('query');
     const rows = await service.oneCExport(c, range);
     return c.json(ok(rows), 200);
+  });
+
+  // ─── GET /pnl — foyda va zarar (UI-M6) ──────────────────────────────────────
+
+  const pnlRoute = createRoute({
+    method: 'get',
+    path: '/pnl',
+    tags: ['reports'],
+    operationId: 'getPnlReport',
+    middleware: [requirePermission('report.view')] as const,
+    request: { query: reportRangeSchema },
+    responses: okJson(pnlReportDtoSchema, 'Profit and loss'),
+  });
+
+  app.openapi(pnlRoute, async (c) => {
+    const range = c.req.valid('query');
+    return c.json(ok(await service.pnl(c, range)), 200);
   });
 
   return app;

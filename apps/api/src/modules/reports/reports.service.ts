@@ -2,7 +2,10 @@ import {
   appointments,
   branches,
   cashierTransactions,
+  expenses,
   patients,
+  payrollLines,
+  payrollRuns,
   recalls,
   serviceMaterials,
   stockBatches,
@@ -12,6 +15,7 @@ import {
 import type { Column } from 'drizzle-orm';
 import {
   and,
+  between,
   count,
   countDistinct,
   desc,
@@ -49,6 +53,7 @@ import type {
   DoctorWorkloadRow,
   OneCExportRow,
   PlanCompletionReport,
+  PnlReport,
   ReportRange,
   RevenueReport,
 } from './reports.schema.ts';
@@ -672,7 +677,72 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
     }));
   }
 
+  /**
+   * P&L (UI-M6): sof foyda = tushum − xarajat − ish haqi.
+   *  - tushum: `revenueTotal` (refund manfiy — `signedPaidAmount`), Tashkent yarim-ochiq oraliq.
+   *  - xarajat: `expenses.date` kalendar kuni bo'yicha [from, to]; branchId bo'lsa shu filial.
+   *  - ish haqi: davri (`periodTo`) [from, to]ga tushgan payroll run'lar (finalized + draft) jami.
+   *    Payroll filialga bog'lanmagan → branchId berilsa hisobga olinmaydi (`payrollIncluded=false`).
+   */
+  async function pnl(c: Context, range: ReportRange): Promise<PnlReport> {
+    const db = getDb(c);
+    const { from, to, branchId } = range;
+    const revenueAmount = await revenueTotal(c, range);
+
+    const expFilters = [between(expenses.date, from, to)];
+    if (branchId) expFilters.push(eq(expenses.branchId, branchId));
+    const [expRow] = await db
+      .select({ total: sql<string>`COALESCE(SUM(${expenses.amount}), 0)` })
+      .from(expenses)
+      .where(and(...expFilters));
+    const expenseAmount = Number(expRow?.total ?? 0);
+
+    let payrollFinalized: number | null = null;
+    let payrollDraft: number | null = null;
+    let payrollRunCount = 0;
+    if (!branchId) {
+      const rows = await db
+        .select({
+          status: payrollRuns.status,
+          runs: sql<number>`COUNT(DISTINCT ${payrollRuns.id})::int`,
+          total: sql<string>`COALESCE(SUM(${payrollLines.total}), 0)`,
+        })
+        .from(payrollRuns)
+        .leftJoin(payrollLines, eq(payrollLines.runId, payrollRuns.id))
+        .where(between(payrollRuns.periodTo, from, to))
+        .groupBy(payrollRuns.status);
+      payrollFinalized = 0;
+      payrollDraft = 0;
+      for (const r of rows) {
+        payrollRunCount += Number(r.runs);
+        if (r.status === 'finalized') payrollFinalized = Number(r.total);
+        else payrollDraft = Number(r.total);
+      }
+    }
+    const payroll = payrollFinalized === null ? null : payrollFinalized + (payrollDraft ?? 0);
+    const netProfit = revenueAmount - expenseAmount - (payroll ?? 0);
+
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'report',
+      resourceId: null,
+      after: { report: 'pnl', from, to, branchId: branchId ?? null },
+    });
+
+    return {
+      revenue: revenueAmount,
+      expenses: expenseAmount,
+      payroll,
+      payrollFinalized,
+      payrollDraft,
+      payrollRunCount,
+      payrollIncluded: payroll !== null,
+      netProfit,
+    };
+  }
+
   return {
+    pnl,
     revenue,
     appointmentStats,
     doctorWorkload,

@@ -313,6 +313,36 @@ export const createPayrollService = (deps: { audit: AuditLogger }) => {
     return { ...run, lines };
   }
 
+  /** UI-M6: shu run'ga singdirilgan refund-clawback tuzatishlari (sabab ko'rsatish uchun). */
+  async function listRunAdjustments(c: Context, runId: string) {
+    const db = getDb(c);
+    const rows = await db
+      .select({
+        id: payrollAdjustments.id,
+        doctorId: payrollAdjustments.doctorId,
+        amount: payrollAdjustments.amount,
+        sourceTransactionId: payrollAdjustments.sourceTransactionId,
+        receiptNumber: cashierTransactions.receiptNumber,
+        sourceCreatedAt: cashierTransactions.createdAt,
+      })
+      .from(payrollAdjustments)
+      .innerJoin(
+        cashierTransactions,
+        eq(cashierTransactions.id, payrollAdjustments.sourceTransactionId),
+      )
+      .where(eq(payrollAdjustments.appliedToRunId, runId))
+      .orderBy(payrollAdjustments.createdAt);
+    return rows.map((r) => ({
+      id: r.id,
+      userId: r.doctorId,
+      amount: r.amount,
+      sourceTransactionId: r.sourceTransactionId,
+      sourceReceiptNumber: r.receiptNumber ?? null,
+      sourceCreatedAt: r.sourceCreatedAt.toISOString(),
+      reason: 'refund_clawback' as const,
+    }));
+  }
+
   async function finalizeRun(c: Context, runId: string) {
     const db = getDb(c);
     const tenantId = c.get('activeTenantId');
@@ -456,6 +486,7 @@ export const createPayrollService = (deps: { audit: AuditLogger }) => {
     listRuns,
     listStaffNames,
     getRun,
+    listRunAdjustments,
     finalizeRun,
     deleteRun,
     recordRefundAdjustment,
