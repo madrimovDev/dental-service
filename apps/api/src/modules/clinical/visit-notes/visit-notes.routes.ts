@@ -17,6 +17,8 @@ import {
   createVisitNotesService,
   type ReconcileStockHook,
   type StageCompleteHook,
+  VisitNoteAlreadySignedError,
+  VisitNoteSignedError,
 } from './visit-notes.service.ts';
 
 /** Standart 404 response — get / patch endpoint'lar uchun. */
@@ -159,6 +161,10 @@ export const visitNotesRoutes = (deps: {
         content: { 'application/json': { schema: errorResponseSchema } },
         description: 'Invalid stage transition',
       },
+      409: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Visit note is signed',
+      },
       ...notFoundResponse,
     },
   });
@@ -171,11 +177,50 @@ export const visitNotesRoutes = (deps: {
       if (!note) return c.json(fail('note.not_found', 'Note not found'), 404);
       return c.json(ok(toVisitNoteDto(note)), 200);
     } catch (e) {
+      if (e instanceof VisitNoteSignedError) {
+        return c.json(fail('visit_note.signed', e.message), 409);
+      }
       if (e instanceof CrossEntityError) {
         return c.json(fail(`ownership.${e.reason}`, e.message), 400);
       }
       if (e instanceof InvalidTransitionError) {
         return c.json(fail('stage.invalid_transition', e.message), 400);
+      }
+      throw e;
+    }
+  });
+
+  // ─── POST /visit-notes/{id}/sign — imzolash (UI-D4) ──────────────────────
+
+  const signRoute = createRoute({
+    method: 'post',
+    path: '/visit-notes/{id}/sign',
+    tags: ['visit-notes'],
+    operationId: 'signVisitNote',
+    middleware: [
+      requireModuleInDesktop('clinical'),
+      requirePermission('medical_record.edit'),
+    ] as const,
+    request: { params: z.object({ id: z.uuid() }) },
+    responses: {
+      ...okJson(visitNoteDtoSchema, 'Signed visit note'),
+      409: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Visit note is already signed',
+      },
+      ...notFoundResponse,
+    },
+  });
+
+  app.openapi(signRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    try {
+      const note = await service.sign(c, id);
+      if (!note) return c.json(fail('note.not_found', 'Note not found'), 404);
+      return c.json(ok(toVisitNoteDto(note)), 200);
+    } catch (e) {
+      if (e instanceof VisitNoteAlreadySignedError) {
+        return c.json(fail('visit_note.already_signed', e.message), 409);
       }
       throw e;
     }

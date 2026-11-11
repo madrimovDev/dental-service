@@ -358,6 +358,13 @@
       "when": 1794407169398,
       "tag": "0050_anamnesis_confirmed",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1794406515367,
+      "tag": "0052_visit_note_sign",
+      "breakpoints": true
     }
   ]
 }

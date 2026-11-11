@@ -218,3 +218,16 @@ export type PatientImageVM = {
 
 // Lokal re-export (mapper imzolari uchun)
 export type { Diagnosis, PrescriptionItem, ToothState, ToothSurface };
+
+// ===== UI-D4: vizit yozuvi sahifasi =====
+// Backend (UI-D4) `signedAt/signedBy/metadata` va `allergyOverrides/nextVisit` qo'shdi;
+// generated api-client keyingi `generate:contract`da yangilanadi — shu paytgacha tiplar
+// shu yerda kengaytiriladi (keyin ortiqcha bo'lib qoladi, lekin mos keladi).
+export type NextVisit = 'none' | '2w' | '6m';
+export type AllergyOverride = { drug: string; group: string; allergen: string; reason: string };
+export type VisitNoteMetadata = { allergyOverrides?: AllergyOverride[]; nextVisit?: NextVisit };
+export type VisitNoteView = import('@dental/api-client').VisitNote & {
+  signedAt?: string | null;
+  signedBy?: string | null;
+  metadata?: VisitNoteMetadata | null;
+};

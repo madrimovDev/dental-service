@@ -20,6 +20,8 @@ export const clinicalKeys = {
   visitNotes: (patientId: string) => ['clinical', 'visit-notes', patientId] as const,
   diagnoses: (search?: string) =>
     search ? (['clinical', 'diagnoses', search] as const) : (['clinical', 'diagnoses'] as const),
+  visitNote: (id: string) => ['clinical', 'visit-note', id] as const,
+  visitNoteTemplates: () => ['clinical', 'visit-note-templates'] as const,
   appointmentsForPatient: (patientId: string) =>
     ['clinical', 'appointments-for-patient', patientId] as const,
   // B — prescriptions / lab orders / consent
