@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useDailySummary } from '@/features/cashier/cashier.api.ts';
+import { netCashTotal } from '@/features/cashier/cashier.mappers.ts';
 import { formatCurrency } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { useDefaultPeriod, useRevenueReport } from '../dashboard.api.ts';
@@ -125,14 +126,7 @@ export function AccountantDashboard() {
             />
             <StatCard
               label={t('dashboard.daily_cash')}
-              value={
-                summary.data
-                  ? formatCurrency(
-                      summary.data.breakdown.reduce((s, b) => s + Number(b.total), 0),
-                      t,
-                    )
-                  : '—'
-              }
+              value={summary.data ? formatCurrency(netCashTotal(summary.data.breakdown), t) : '—'}
             />
           </Box>
 

@@ -20,6 +20,11 @@ export type CreateServiceInput = z.infer<typeof createServiceSchema>;
 
 export const updateServiceSchema = createServiceSchema
   .partial()
+  // P12: .partial() ZodDefault'ni saqlaydi → PATCH default'ni ustiga yozardi; default'siz qayta e'lon.
+  .extend({
+    durationMinutes: z.coerce.number().int().positive().optional(),
+    isActive: z.boolean().optional(),
+  })
   .omit({ initialPrice: true, initialBranchId: true });
 export type UpdateServiceInput = z.infer<typeof updateServiceSchema>;
 
