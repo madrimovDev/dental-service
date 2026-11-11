@@ -27,11 +27,11 @@
 | P6 ✅ | H | tenantlararo parol tiklash (yopildi — bosqich 4 + 4b: faqat owner, vaqtinchalik parol + `pwc`, mavjud foydalanuvchini taklif qilish rozilik bilan (`accepted_at`), kutilayotgan taklif hech qayerda a'zolik emas) | target boshqa tenantda owner yoki undan yuqori rolga ega bo'lsa rad etish (yoki faqat shu tenantga a'zo foydalanuvchiga ruxsat); test | 4 |
 | P7 ✅ | H | POS items + begona reja (yopildi — bosqich 4) | `items` rejimida `treatmentPlanId`ni rad etish, `patientId`ni DB'dan tekshirish; test | 4 |
 | P8 ✅ | H | Telegram kontakt egaligi (yopildi — bosqich 4) | `contact.user_id === ctx.from.id` talab qilish; mavjud `telegramChatId`ni jim ustiga yozmaslik | 4 |
-| P9 | H | NoOp → recall `sent` | NoOp `{ok:false, reason:'not_configured'}` qaytarsin; recall `pending` qoladi, outcome `skipped_no_channel` | 5 |
-| P10 | H | yangi tenantda bron yo'q | provisioning/register filialga default `workHours` yozsin + Filial formasiga ish soati UI + doktor jadvali bo'sh bo'lsa wizard'da tushunarli xabar | 5 |
-| P11 | H❔ | rasmlar Bearer'siz | avval brauzerda tasdiqlash; keyin blob-fetch (`api-client` + `URL.createObjectURL`) yoki qisqa muddatli imzolangan URL; `/uploads`ga `patient_image.view` + audit | 5 |
-| P12 | H | Zod `.partial()` default | update schema'larni default'siz qurish (visit-notes, consent template va boshqa `.partial()` joylarini grep qilish); HTTP test | 5 |
-| P13 | H | Accountant kassa refund'ni qo'shadi | `type==='refund'` ayirilsin (DailySummaryCard bilan bir xil formula, umumiy helper) | 5 |
+| P9 ✅ | H | NoOp → recall `sent` | NoOp `{ok:false, reason:'not_configured'}` qaytarsin; recall `pending` qoladi, outcome `skipped_no_channel` | 5 |
+| P10 ✅ | H | yangi tenantda bron yo'q | provisioning/register filialga default `workHours` yozsin + Filial formasiga ish soati UI + doktor jadvali bo'sh bo'lsa wizard'da tushunarli xabar | 5 |
+| P11 ✅ | H❔ | rasmlar Bearer'siz | avval brauzerda tasdiqlash; keyin blob-fetch (`api-client` + `URL.createObjectURL`) yoki qisqa muddatli imzolangan URL; `/uploads`ga `patient_image.view` + audit | 5 |
+| P12 ✅ | H | Zod `.partial()` default | update schema'larni default'siz qurish (visit-notes, consent template va boshqa `.partial()` joylarini grep qilish); HTTP test | 5 |
+| P13 ✅ | H | Accountant kassa refund'ni qo'shadi | `type==='refund'` ayirilsin (DailySummaryCard bilan bir xil formula, umumiy helper) | 5 |
 | P14 🟡 | H | NSIS config'ni qayta yozadi | `${isUpdated}` bo'lsa dialog va yozish o'tkazib yuborilsin; mavjud config merge qilinsin | 3 |
 | P15 🟡 | H | supervision yo'q | child exit → backoff bilan restart + tray holati/xabar; Windows'da graceful stop (`pg_ctl stop`, API `/shutdown`); `before-quit` `preventDefault` + await | 6 |
 | P16 🟠 | H | Supervisor HTTP, backupsiz, renew yo'q (renew ✅ bosqich 2, backup ✅ bosqich 3; TLS/domen — bosqich 12) | domen + TLS (prod Caddyfile); `pg_dump` cron + off-host; RSA private key zaxira tartibi; `PATCH /admin/licenses/:id` (expiresAt/grace) + UI | 6 |
@@ -405,4 +405,13 @@ To'liq: [`LAB-TECHNICIAN-ACCESS-2026-11-11.md`](./LAB-TECHNICIAN-ACCESS-2026-11-
 | FU-08 ✅ | H | Rozisiz invite → hisobni egallash (P6 qoldig'i) — bosqich 4b da yopildi | 👤 qaror: mavjud platforma foydalanuvchisini taklif qilish «kutilmoqda» holatida, foydalanuvchi qabul qilgach a'zo — **bosqich 4b** |
 | FU-09 | L | `user.manage` egasi yuqori huquqli xodimning tayinlovini o'chira/filialini o'zgartira oladi | eskalatsiya emas, lekin «yuqoridagini o'chirish»; kerak bo'lsa `assertCanGrant`ni remove/branch-change'ga ham |
 | FU-10 | L | Reset qilingan xodimning mavjud access token'i ≤15 daqiqa `pwc`siz | Redis denylist (JWT staleness qarori) |
+
+## 16. P bosqichi 5 dan keyingi follow-up'lar
+
+| ID | J | Qisqa | Qilinadigan ish |
+|---|---|---|---|
+| FU-11 | L | NoOp tenant'da har recall scan'da `skipped_no_channel` log qatori | dedupe yoki faqat holat o'zgarganda yozish |
+| FU-12 | L | Eskiz bor, bemor telefoni yo'q → `skipped_no_channel` (avval `no_phone`) | outcome tartibini aniqlashtirish (diagnostika) |
+| FU-13 | L | Filial formasida ochilish < yopilish validatsiyasi yo'q; `doctor_on_time_off` matni hardcoded | UI-3 (Sozlamalar) bilan |
+| FU-14 | M | P11 haqiqiy brauzer/Electron'da tekshirilmagan (jsdom + API) | UI-2 (Bemor kartasi) Playwright sinovida |
 
