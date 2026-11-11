@@ -1,7 +1,6 @@
 import {
   createBranch,
   createRole,
-  customInstance,
   deleteBranch,
   deleteRole,
   deleteUserAssignment,
@@ -13,6 +12,7 @@ import {
   type IntegrationsTestInput,
   inviteUser,
   listBranches,
+  listGrantableRoles,
   listPermissions,
   listRoles,
   listUserAssignments,
@@ -54,11 +54,7 @@ export function useGrantableRoles(options?: { enabled?: boolean }) {
   return useQuery({
     enabled: options?.enabled,
     queryKey: settingsKeys.grantableRoles(),
-    queryFn: () =>
-      customInstance<{ success: true; data: GrantableRole[] }>({
-        url: '/api/users/grantable-roles',
-        method: 'GET',
-      }).then((r) => r.data),
+    queryFn: () => listGrantableRoles().then((r) => r.data as unknown as GrantableRole[]),
   });
 }
 

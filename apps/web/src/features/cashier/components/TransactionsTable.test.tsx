@@ -14,6 +14,7 @@ vi.mock('../cashier.api', () => ({
       id: 'tx1',
       fiscalReceiptId: null,
       cardProvider: null,
+      visitNoteId: null,
       items: [
         { id: 'i1', serviceName: 'Plomba', quantity: 1, unitPrice: '120000', subtotal: '120000' },
       ],
@@ -35,6 +36,7 @@ function tx(over: Partial<CashierTransaction> = {}): CashierTransaction {
     treatmentPlanId: null,
     receiptNumber: 'R-001',
     cardProvider: null,
+    visitNoteId: null,
     totalAmount: '120000',
     paidAmount: '120000',
     discount: '0',

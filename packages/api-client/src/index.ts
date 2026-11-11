@@ -78,6 +78,7 @@ export {
   listBranches,
   updateBranch,
 } from './generated/branches/branches.ts';
+export { listCashierPendingVisits } from './generated/cashier/cashier';
 // Generated (orval) — cashier
 export type {
   CreateCashierTransactionResult,
@@ -805,6 +806,7 @@ export {
   updateTreatmentPlan,
   updateTreatmentStage,
 } from './generated/treatment-plans/treatment-plans.ts';
+export { listGrantableRoles } from './generated/users/users';
 // Generated (orval) — users
 export type {
   AddUserAssignmentResult,

@@ -1,12 +1,12 @@
 import {
   createCashierTransaction,
-  customInstance,
   getCashierDailySummary,
   getCashierPlanBalance,
   getCashierTransaction,
   getService,
   listBranches,
   listCashierPatientPlans,
+  listCashierPendingVisits,
   listCashierTransactions,
   listPatients,
   listServices,
@@ -178,11 +178,9 @@ export function usePendingVisits(branchId: string | null) {
   return useQuery({
     queryKey: cashierKeys.pendingVisits(branchId ?? ''),
     queryFn: () =>
-      customInstance<{ data: PendingVisit[] }>({
-        url: '/api/cashier/pending-visits',
-        method: 'GET',
-        params: { branchId },
-      }).then((r) => r.data),
+      listCashierPendingVisits({ branchId: branchId as string }).then(
+        (r) => r.data as unknown as PendingVisit[],
+      ),
     enabled: !!branchId && hasPermission('cashier.view'),
     refetchInterval: 30_000,
   });
