@@ -1513,5 +1513,20 @@
       "recheck": "Qayta tekshirish",
       "stillExpired": "Litsenziya hali ham faol emas"
     }
+  },
+  "patientsList": {
+    "flag_allergy": "Allergiya",
+    "flag_debt": "Qarz",
+    "flag_no_shows": "Kelmagan: {{count}}",
+    "flag_telegram": "Telegram",
+    "also_found": "«{{variant}}» ham topiladi",
+    "book": "Yozish",
+    "search_placeholder_name": "Ism bo'yicha qidirish...",
+    "pii_readonly_hint": "Telefon, pasport va manzilni faqat maxfiy ma'lumotlarni ko'rish huquqi bor xodim tahrirlay oladi.",
+    "dup_title": "Bu telefon bilan bemor bor",
+    "dup_desc": "Shu raqam bilan ro'yxatdan o'tgan: {{names}}",
+    "dup_open": "Uni ochish",
+    "dup_anyway": "Baribir yangi (oila a'zosi)",
+    "dup_blocked": "Avval tanlang: mavjud bemorni oching yoki «Baribir yangi» ni bosing."
   }
 }
