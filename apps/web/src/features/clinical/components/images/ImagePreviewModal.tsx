@@ -1,6 +1,8 @@
 import { Mono } from '@dental/ui';
-import { Badge, Group, Image, Modal, Stack, Text } from '@mantine/core';
+import { Anchor, Badge, Group, Image, Modal, Stack, Text } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import { useTranslation } from 'react-i18next';
+import { downloadAuthedFile, useAuthedObjectUrl } from '@/hooks/useAuthedObjectUrl';
 import type { PatientImageVM } from '../../clinical.types';
 
 export function ImagePreviewModal({
@@ -11,17 +13,27 @@ export function ImagePreviewModal({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
+  // P11: Bearer'li blob (faqat rasm turi uchun).
+  const { src } = useAuthedObjectUrl(image?.isImage ? image.url : null);
   return (
     <Modal opened={!!image} onClose={onClose} title={image?.displayTitle} size="xl">
       {image && (
         <Stack>
           {image.isImage ? (
-            <Image src={image.url} alt={image.displayTitle} fit="contain" />
+            <Image src={src ?? undefined} alt={image.displayTitle} fit="contain" />
           ) : (
             <Text>
-              <a href={image.url} target="_blank" rel="noopener noreferrer">
+              <Anchor
+                component="button"
+                type="button"
+                onClick={() => {
+                  downloadAuthedFile(image.url, image.originalFilename, {
+                    openInNewTab: true,
+                  }).catch(() => notifications.show({ color: 'red', message: t('common.error') }));
+                }}
+              >
                 {image.originalFilename}
-              </a>
+              </Anchor>
             </Text>
           )}
           {image.description && <Text>{image.description}</Text>}

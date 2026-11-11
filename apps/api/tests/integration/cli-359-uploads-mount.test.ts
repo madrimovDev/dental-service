@@ -23,10 +23,34 @@ process.env.UPLOADS_DIR = testUploadsDir;
 const { createApp } = await import('../../src/app.ts');
 const { createLocalStorageAdapter } = await import('../../src/lib/storage.ts');
 const { signAccess } = await import('../../src/lib/jwt.ts');
+const { db } = await import('../../src/db/client.ts');
+const { tenants, users } = await import('@dental/db-schema');
 
 afterAll(async () => {
   await rm(testUploadsDir, { recursive: true, force: true });
 });
+
+/** P11: /uploads endi audit yozadi — real tenant + user qatori kerak (FK). */
+async function seedTenantUser(): Promise<{ tenantId: string; userId: string }> {
+  const suffix = randomUUID().slice(0, 8);
+  const [u] = await db
+    .insert(users)
+    .values({
+      phone: `+9989${Math.floor(Math.random() * 1e8)
+        .toString()
+        .padStart(8, '0')}`,
+      passwordHash: 'x',
+      fullName: 'Uploads Test',
+    })
+    .returning({ id: users.id });
+  if (!u) throw new Error('user insert failed');
+  const [t] = await db
+    .insert(tenants)
+    .values({ name: `Uploads ${suffix}`, slug: `uploads-${suffix}`, ownerUserId: u.id })
+    .returning({ id: tenants.id });
+  if (!t) throw new Error('tenant insert failed');
+  return { tenantId: t.id, userId: u.id };
+}
 
 describe('CLI-359 — /uploads mount', () => {
   test('GET /uploads/:key without Authorization -> 401 (proves route is mounted)', async () => {
@@ -40,7 +64,7 @@ describe('CLI-359 — /uploads mount', () => {
 
   test('own-tenant JWT -> 200, file bytes match', async () => {
     const storage = createLocalStorageAdapter(testUploadsDir);
-    const tenantAId = randomUUID();
+    const { tenantId: tenantAId, userId } = await seedTenantUser();
     const patientId = randomUUID();
     const imageId = randomUUID();
     const key = `tenants/${tenantAId}/patients/${patientId}/${imageId}.jpg`;
@@ -48,10 +72,10 @@ describe('CLI-359 — /uploads mount', () => {
     await storage.save(key, fileBytes);
 
     const { token } = await signAccess({
-      sub: randomUUID(),
+      sub: userId,
       atid: tenantAId,
       abid: null,
-      perms: [],
+      perms: ['patient_image.view'],
       roleKey: null,
       lang: 'uz',
     });
@@ -79,7 +103,7 @@ describe('CLI-359 — /uploads mount', () => {
       sub: randomUUID(),
       atid: tenantBId, // boshqa tenant — key tenantAId'ga tegishli
       abid: null,
-      perms: [],
+      perms: ['patient_image.view'],
       roleKey: null,
       lang: 'uz',
     });
@@ -104,7 +128,7 @@ describe('CLI-359 — /uploads mount', () => {
       sub: randomUUID(),
       atid: tenantAId,
       abid: null,
-      perms: [],
+      perms: ['patient_image.view'],
       roleKey: null,
       lang: 'uz',
     });
@@ -122,7 +146,7 @@ describe('CLI-359 — /uploads mount', () => {
       sub: randomUUID(),
       atid: randomUUID(),
       abid: null,
-      perms: [],
+      perms: ['patient_image.view'],
       roleKey: null,
       lang: 'uz',
     });

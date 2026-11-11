@@ -108,7 +108,8 @@ export const createApp = () => {
             defaultSrc: ["'self'"],
             scriptSrc: ["'self'"],
             styleSrc: ["'self'", "'unsafe-inline'"],
-            imgSrc: ["'self'", 'data:'],
+            // P11: rasmlar Bearer bilan fetch → blob: object URL (useAuthedObjectUrl); CSP3'da 'self' blob:'ga mos kelmaydi.
+            imgSrc: ["'self'", 'data:', 'blob:'],
             // CLI-402: Vite ba'zi shriftlarni `data:font/woff2;base64,...` sifatida
             // inline qiladi — `data:` bo'lmasa BrowserWindow har sahifada shriftni
             // rad etadi (console'da 8-10 xato, fallback shriftga tushadi).
@@ -306,7 +307,7 @@ export const createApp = () => {
   // `uploads.ts` ichida (key'dagi tenantId JWT `activeTenantId` bilan
   // solishtiriladi — bu route filesystem-based, RLS qamrovidan tashqarida).
   const uploadsStorage = createLocalStorageAdapter();
-  app.route('/uploads', uploadsRoutes(uploadsStorage));
+  app.route('/uploads', uploadsRoutes(uploadsStorage, { db, audit }));
 
   // Local Desktop bitta-EXE arxitekturasi — Windows'da alohida nginx/Caddy
   // yo'q, api.exe o'zi `apps/web` build outputni ham serve qiladi

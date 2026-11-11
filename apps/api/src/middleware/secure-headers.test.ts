@@ -16,7 +16,7 @@ function buildApp(nodeEnv: 'development' | 'production', webDistDir?: string) {
             defaultSrc: ["'self'"],
             scriptSrc: ["'self'"],
             styleSrc: ["'self'", "'unsafe-inline'"],
-            imgSrc: ["'self'", 'data:'],
+            imgSrc: ["'self'", 'data:', 'blob:'],
             fontSrc: ["'self'"],
             connectSrc: ["'self'"],
             frameAncestors: ["'none'"],
@@ -71,7 +71,7 @@ describe('security headers middleware', () => {
       expect(csp).toContain("default-src 'self'");
       expect(csp).toContain("script-src 'self'");
       expect(csp).toContain("style-src 'self' 'unsafe-inline'");
-      expect(csp).toContain("img-src 'self' data:");
+      expect(csp).toContain("img-src 'self' data: blob:");
       expect(csp).toContain("frame-ancestors 'none'");
       expect(csp).not.toContain("default-src 'none'");
     });

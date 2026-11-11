@@ -1,5 +1,6 @@
 import { Mono } from '@dental/ui';
 import { ActionIcon, Badge, Box, Button, Card, Group, Image, Stack, Text } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import {
   IconDental,
   IconDownload,
@@ -9,6 +10,7 @@ import {
   IconZoomIn,
 } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
+import { downloadAuthedFile, useAuthedObjectUrl } from '@/hooks/useAuthedObjectUrl';
 import type { PatientImageVM } from '../../clinical.types';
 
 export function ImageCard({
@@ -23,6 +25,8 @@ export function ImageCard({
   onRequestDelete: () => void;
 }) {
   const { t } = useTranslation();
+  // P11: <img> Bearer yubormaydi — blob orqali (faqat rasm turi uchun).
+  const { src } = useAuthedObjectUrl(vm.isImage ? vm.url : null);
   return (
     <Card
       withBorder
@@ -51,7 +55,7 @@ export function ImageCard({
           }}
         >
           {vm.isImage ? (
-            <Image src={vm.url} alt={vm.displayTitle} height="100%" fit="cover" />
+            <Image src={src ?? undefined} alt={vm.displayTitle} height="100%" fit="cover" />
           ) : (
             <Stack align="center" justify="center" h="100%" gap={6}>
               <IconFile size={32} style={{ color: 'var(--ink-3)' }} />
@@ -107,11 +111,11 @@ export function ImageCard({
           <Button
             size="xs"
             variant="subtle"
-            component="a"
-            href={vm.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            download={vm.originalFilename}
+            onClick={() => {
+              downloadAuthedFile(vm.url, vm.originalFilename).catch(() =>
+                notifications.show({ color: 'red', message: t('common.error') }),
+              );
+            }}
             leftSection={<IconDownload size={12} />}
           >
             {t('image.download')}
