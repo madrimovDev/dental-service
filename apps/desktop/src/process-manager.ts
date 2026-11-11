@@ -376,6 +376,8 @@ const spawnApi = (port: number): Promise<void> =>
         DATABASE_ADMIN_URL: `postgresql://dental:${getOrCreateSuperuserPassword()}@localhost:5433/dental`,
         REDIS_URL: 'redis://localhost:6380',
         UPLOADS_DIR: join(dataDir, 'uploads'),
+        // API `<dataDir>/backup-*.json` so'rov fayllarini shu papkaga yozadi (zaxira kontrakti, UI-3 D.1).
+        DENTAL_DATA_DIR: dataDir,
         // JWT_SECRET/WEB_ORIGIN — env-schema.ts talab qiladi, lekin
         // foydalanuvchi shell'ida hech qachon bo'lmaydi (real Windows PC'da
         // dev env yo'q) — desktop o'zi ta'minlashi shart (CLI-346/CLI-348
@@ -442,6 +444,25 @@ export const startApiLayer = async (port: number): Promise<void> => {
   // Tayyor bo'lish oynasida api yiqilgan bo'lsa (supervisor restart'ni o'zi
   // boshqaradi) soxta 'running' qo'yilmaydi.
   if (apiProcess && !exitedProcs.has(apiProcess)) status = 'running';
+};
+
+/**
+ * Faqat API jarayonini to'xtatadi (postgres/valkey ishlashda qoladi) — zaxira tiklash paytida baza
+ * bandligi uchun (UI-3 / D.1). Kutilayotgan API restart'lari bekor qilinadi, jarayon `intentional` —
+ * crash-supervision qayta ishga tushirmaydi. `startApiLayer(port)` bilan qaytariladi.
+ */
+export const stopApiLayer = async (): Promise<void> => {
+  pendingRestarts.delete('api');
+  const api = apiProcess;
+  if (!api) return;
+  killIntentionally(api, 'SIGTERM');
+  if (!(await waitForExit(api, getStopWaitMs()))) {
+    api.kill('SIGKILL');
+    await waitForExit(api, getStopWaitMs());
+  }
+  apiProcess = null;
+  status = 'starting';
+  emitStatus({ child: 'api' });
 };
 
 export const startServer = async (port = 8080): Promise<void> => {

@@ -40,10 +40,13 @@
  *   blank screen in real BrowserWindow (CSP + preload ESM)"). `preload.ts`ni
  *   ESM'ga o'tkazish shu bug'ni qaytaradi.
  */
+import { appendFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { app, BrowserWindow, dialog, ipcMain, Notification, shell } from 'electron';
 import electronUpdater from 'electron-updater';
 import { setupAutoUpdater } from './auto-updater.js';
+import { createBackupScheduler, resolveDefaultBackupFolder } from './backup-scheduler.js';
+import { createMaintenanceServer, createUploadsTools } from './backup-tools.js';
 import { startClientReconnectLoop } from './client-reconnect.js';
 import { readConfig, writeConfig } from './config.js';
 import {
@@ -55,12 +58,14 @@ import {
 import { isFirstRun, runFirstSetup, runMigrations } from './first-run.js';
 import { fetchBootstrapStatus, licenseGatedUrl, resolveStartupUrl } from './license-status.js';
 import { createPgTools, createStateStore, migrateOnStart } from './migrate-on-start.js';
+import { getDataDir } from './paths.js';
 import {
   getApiCommand,
   onServerStatusChange,
   PortInUseError,
   startApiLayer,
   startDatabaseLayer,
+  stopApiLayer,
   stopServer,
 } from './process-manager.js';
 import { type PromptWindowLike, promptServerUrl } from './server-url-prompt.js';
@@ -91,6 +96,8 @@ const LOGS_DIR = join(
 );
 
 let mainWindow: BrowserWindow | null = null;
+// UI-3 / D.1 — server rolida kunlik zaxira + so'rov fayllari kuzatuvchisi.
+let stopBackupScheduler: (() => void) | null = null;
 // Klient rejimida server topilmaganda ishga tushirilgan fon retry sikli
 // to'xtatuvchisi — server topilganda yoki ilova yopilganda tozalanadi
 // (CLI-348 qaror 4).
@@ -372,6 +379,44 @@ app.whenReady().then(async () => {
         }
       }
     });
+    // UI-3 / D.1 — zaxira nusxa: har kuni 20:00 + API topshirgan so'rovlar (`backup-request.json`,
+    // `restore-request.json`). Tiklash API'ni to'xtatadi, shuning uchun u `config.serverPort`ni biladi.
+    const pgTools = createPgTools();
+    const uploadsTools = createUploadsTools(() => join(getDataDir(), 'uploads'));
+    const backupScheduler = createBackupScheduler({
+      now: () => new Date(),
+      timers: {
+        setTimeout: (fn, ms) => setTimeout(fn, ms),
+        clearTimeout: (h) => clearTimeout(h as NodeJS.Timeout),
+        setInterval: (fn, ms) => setInterval(fn, ms),
+        clearInterval: (h) => clearInterval(h as NodeJS.Timeout),
+      },
+      getDataDir,
+      defaultFolder: () =>
+        resolveDefaultBackupFolder({
+          platform: process.platform,
+          dataDir: getDataDir(),
+          driveExists: existsSync,
+        }),
+      dump: pgTools.dump,
+      restoreDb: pgTools.restore,
+      archiveUploads: uploadsTools.archiveUploads,
+      extractUploads: uploadsTools.extractUploads,
+      migrate: () => runMigrations(API_EXE),
+      stopApi: stopApiLayer,
+      startApi: () => startApiLayer(config.serverPort),
+      maintenance: createMaintenanceServer(() => config.serverPort),
+      log: (message) => {
+        try {
+          mkdirSync(LOGS_DIR, { recursive: true });
+          appendFileSync(join(LOGS_DIR, 'backup.log'), `${new Date().toISOString()} ${message}\n`);
+        } catch {
+          // log yozib bo'lmasa ham zaxira oqimi to'xtamasin
+        }
+      },
+    });
+    backupScheduler.start();
+    stopBackupScheduler = backupScheduler.stop;
     // Litsenziya faollashtirilmagan bo'lsa (`.lic` fayl yo'q) — asosiy UI
     // o'rniga aktivatsiya sahifasi ochiladi (CLI-348 qaror 1). Web app
     // `/activate` sahifasi qurilgan va ro'yxatdan o'tgan
@@ -531,6 +576,7 @@ app.on('before-quit', (event) => {
     if (serverStopHandled) return;
     serverStopHandled = true;
     event.preventDefault();
+    stopBackupScheduler?.();
     stopServerDiscovery();
     stopServer()
       .catch(() => {})
