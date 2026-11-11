@@ -51,6 +51,7 @@ elif [ "$cmd" = clean ]; then
   git worktree remove --force "$WT" 2>/dev/null || true
   git branch -D -q "$BR" 2>/dev/null || true
   psqlc "DROP DATABASE IF EXISTS $DBN WITH (FORCE)"; psqlc "DROP DATABASE IF EXISTS $SVN WITH (FORCE)"
+  psqlc "DROP DATABASE IF EXISTS lab_hub_test_${name//-/_} WITH (FORCE)"   # Lab Hub lane bazasi (apps/lab-hub-api/.env)
   echo "cleaned $name"
 else
   echo "unknown command $cmd" >&2; exit 2

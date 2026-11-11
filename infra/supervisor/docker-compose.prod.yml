@@ -58,6 +58,9 @@ services:
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
       RSA_PRIVATE_KEY: ${RSA_PRIVATE_KEY:?set RSA_PRIVATE_KEY}
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
+      # Lab Hub (infra/lab-hub): bo'sh = «Laboratoriyalar» va /internal verify 503.
+      LAB_HUB_URL: ${LAB_HUB_URL:-}
+      SUPERVISOR_HUB_TOKEN: ${SUPERVISOR_HUB_TOKEN:-}
       API_PORT: 3101
     depends_on:
       postgres:

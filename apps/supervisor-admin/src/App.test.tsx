@@ -34,7 +34,7 @@ describe('App routing guard (CLI-392)', () => {
 
     renderApp();
 
-    expect(await screen.findByText('Klinikalar')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Klinikalar' })).toBeInTheDocument();
     expect(screen.queryByText('Kirish')).not.toBeInTheDocument();
   });
 });

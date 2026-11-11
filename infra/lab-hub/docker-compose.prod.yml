@@ -1,0 +1,103 @@
+# Lab Hub — markaziy xizmat (spec 2026-11-12-lab-portal-design §2, L2).
+#
+# Supervisor bilan bitta VPS'da bo'lishi mumkin, lekin ALOHIDA stack: alohida
+# baza, alohida sirlar. Ikki stack faqat umumiy docker tarmog'i orqali gaplashadi
+# (`supervisor_shared`, README «Tarmoq»): Hub → Supervisor verify va
+# Supervisor → Hub ichki admin API. `/internal/*` Caddy orqali TASHQARIGA OCHILMAYDI.
+#
+#   docker compose -f docker-compose.prod.yml --env-file .env.production run --rm migrate
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+#
+# Build context — repo ROOT (apps/lab-hub-api/Dockerfile).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: lab_hub
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [hub_internal]
+
+  # Release qadami: drizzle migratsiyalari + RLS + non-superuser `lab_hub_app` roli.
+  migrate:
+    image: ${LAB_HUB_API_IMAGE:-lab-hub-api:latest}
+    build:
+      context: ../..
+      dockerfile: apps/lab-hub-api/Dockerfile
+    command: ['bun', 'run', 'src/db/migrate.ts']
+    restart: 'no'
+    environment:
+      DATABASE_ADMIN_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/lab_hub
+      LAB_HUB_APP_DB_PASSWORD: ${LAB_HUB_APP_DB_PASSWORD:?set LAB_HUB_APP_DB_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [hub_internal]
+
+  lab-hub-api:
+    image: ${LAB_HUB_API_IMAGE:-lab-hub-api:latest}
+    build:
+      context: ../..
+      dockerfile: apps/lab-hub-api/Dockerfile
+    restart: unless-stopped
+    environment:
+      # Runtime — FAQAT non-superuser rol (superuser RLS'ni chetlab o'tadi).
+      DATABASE_URL: postgres://lab_hub_app:${LAB_HUB_APP_DB_PASSWORD}@postgres:5432/lab_hub
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
+      # KEK — yo'q/noto'g'ri bo'lsa konteyner ishga tushmaydi (fail-fast).
+      LAB_HUB_KEK: ${LAB_HUB_KEK:?set LAB_HUB_KEK}
+      SUPERVISOR_HUB_TOKEN: ${SUPERVISOR_HUB_TOKEN:?set SUPERVISOR_HUB_TOKEN}
+      SAAS_HUB_TOKEN: ${SAAS_HUB_TOKEN:-}
+      SUPERVISOR_URL: ${SUPERVISOR_URL:-http://api:3101}
+      UPLOADS_DIR: /data/uploads
+      API_PORT: 8171
+    volumes: [uploads_data:/data/uploads]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [hub_internal, supervisor_shared]
+
+  # W2 (apps/lab-hub-web) qurilgach yoqiladi — Caddyfile'dagi handle bilan birga.
+  # lab-hub-web:
+  #   image: ${LAB_HUB_WEB_IMAGE:-lab-hub-web:latest}
+  #   build: { context: ../.., dockerfile: apps/lab-hub-web/Dockerfile }
+  #   restart: unless-stopped
+  #   networks: [hub_internal]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ['80:80', '443:443']
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL}
+    depends_on: [lab-hub-api]
+    networks: [hub_internal]
+
+networks:
+  hub_internal:
+    driver: bridge
+  # Supervisor stack'ining tarmog'i (infra/supervisor, compose loyiha nomi
+  # `supervisor` bo'lsa `supervisor_internal`). Avval Supervisor ishga tushishi kerak.
+  supervisor_shared:
+    external: true
+    name: ${SUPERVISOR_NETWORK:-supervisor_internal}
+
+volumes:
+  postgres_data:
+  # Faqat shifrlangan bloblar (`<labId>/<uuid>.bin`); kalitsiz o'qib bo'lmaydi.
+  uploads_data:
+  caddy_data:
+  caddy_config:

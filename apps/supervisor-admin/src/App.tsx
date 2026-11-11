@@ -5,6 +5,7 @@ import { RequireAuth } from './components/auth/RequireAuth';
 import { LoginPage } from './features/auth/LoginPage';
 import { ClinicDetailPage } from './features/clinics/ClinicDetailPage';
 import { ClinicsPage } from './features/clinics/ClinicsPage';
+import { LabsPage } from './features/labs/LabsPage';
 
 const queryClient = new QueryClient();
 
@@ -22,6 +23,7 @@ export const App = () => (
         >
           <Route path="/" element={<ClinicsPage />} />
           <Route path="/clinics/:id" element={<ClinicDetailPage />} />
+          <Route path="/labs" element={<LabsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
