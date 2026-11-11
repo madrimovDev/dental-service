@@ -24,11 +24,13 @@ export function WeekGrid({
   dayKeys,
   patientName,
   onSlotClick,
+  selectedId,
 }: {
   appointments: Appointment[];
   dayKeys: string[];
   patientName: (patientId: string) => string;
   onSlotClick?: (event: CalendarEvent) => void;
+  selectedId?: string | null;
 }) {
   const { i18n } = useTranslation();
   const locale = i18n.language === 'ru' ? 'ru-RU' : 'uz-UZ';
@@ -79,6 +81,7 @@ export function WeekGrid({
                     patientName={patientName}
                     tone={tone}
                     onClick={onSlotClick}
+                    selected={selectedId === e.appointment.id}
                   />
                 ))}
               </div>

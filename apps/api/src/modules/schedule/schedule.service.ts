@@ -1,6 +1,11 @@
 import type { Context } from 'hono';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
-import { computeAvailability, WEEKDAY_KEYS, weekdayOf } from './schedule.availability.ts';
+import {
+  computeAvailability,
+  computeAvailabilityDetailed,
+  WEEKDAY_KEYS,
+  weekdayOf,
+} from './schedule.availability.ts';
 import {
   toAvailabilitySlotDto,
   toTimeOffDto,
@@ -145,7 +150,7 @@ export const createScheduleService = (deps: { audit: AuditLogger }) => {
     ];
   }
 
-  async function getAvailability(c: Context, query: AvailabilityQuery) {
+  async function getAvailability(c: Context, query: AvailabilityQuery, now: Date = new Date()) {
     // Kun [start,end) instant chegaralari — UTC+5 local 00:00 → +1 kun 00:00.
     // Bir kun avval/keyingacha kengaytirib o'qiymiz (chegaradagi event'lar uchun
     // clip pure funksiyada to'g'ri amalga oshiriladi).
@@ -162,7 +167,7 @@ export const createScheduleService = (deps: { audit: AuditLogger }) => {
     const weekday = weekdayOf(query.date);
     const segRows = await segmentsForDay(c, query.doctorId, query.branchId, weekday);
 
-    const slots = computeAvailability({
+    const { slots, unavailable } = computeAvailabilityDetailed({
       date: query.date,
       doctorSegments: segRows.map((s) => ({
         weekday: s.weekday,
@@ -175,6 +180,7 @@ export const createScheduleService = (deps: { audit: AuditLogger }) => {
       appointments: appts,
       timeOffs,
       slotMinutes: query.slotMinutes,
+      now,
     });
 
     return {
@@ -183,6 +189,7 @@ export const createScheduleService = (deps: { audit: AuditLogger }) => {
       date: query.date,
       slotMinutes: query.slotMinutes,
       slots: slots.map(toAvailabilitySlotDto),
+      unavailable: unavailable.map((u) => ({ ...toAvailabilitySlotDto(u), reason: u.reason })),
       workHoursConfigured: workHours !== null,
     };
   }

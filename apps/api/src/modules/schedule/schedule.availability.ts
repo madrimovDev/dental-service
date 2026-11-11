@@ -130,7 +130,20 @@ export type ComputeAvailabilityInput = {
   appointments: BusyAppointment[];
   timeOffs: BusyTimeOff[];
   slotMinutes: number;
+  /**
+   * SC-07: berilsa, boshlanishi `now`dan oldin bo'lgan slotlar bo'sh ro'yxatdan
+   * chiqariladi va `unavailable` ro'yxatida `past` sababi bilan qaytadi.
+   */
+  now?: Date;
 };
+
+/** Slot nega band: o'tgan / band / tushlik (doktor jadvalidagi tanaffus) / ta'til / sig'maydi. */
+export type UnavailableReason = 'past' | 'busy' | 'lunch' | 'time_off' | 'too_short';
+
+export type UnavailableSlot = AvailabilitySlot & { reason: UnavailableReason };
+
+/** `unavailable` panjarasi qadami (daqiqa) — slot davomiyligidan kichik bo'lsa shu. */
+const GRID_STEP = 30;
 
 /**
  * Berilgan kun uchun doktor bo'sh slot'lari.
@@ -142,27 +155,40 @@ export type ComputeAvailabilityInput = {
  *   kalit null → yopiq. {open,close} → o'sha oraliq.
  */
 export function computeAvailability(input: ComputeAvailabilityInput): AvailabilitySlot[] {
-  const { date, doctorSegments, branchWorkHours, appointments, timeOffs, slotMinutes } = input;
-  if (slotMinutes <= 0) return [];
+  return computeAvailabilityDetailed(input).slots;
+}
+
+/**
+ * `computeAvailability` + band slotlar sababi bilan (SC-07, Booking ekrani).
+ * `unavailable` — 30 daq (yoki slotMinutes<30 bo'lsa slotMinutes) qadamli panjara
+ * bo'yicha bo'sh bo'lmagan slotlar; boshlanishi bo'sh slot ichiga tushganlari kiritilmaydi.
+ */
+export function computeAvailabilityDetailed(input: ComputeAvailabilityInput): {
+  slots: AvailabilitySlot[];
+  unavailable: UnavailableSlot[];
+} {
+  const { date, doctorSegments, branchWorkHours, appointments, timeOffs, slotMinutes, now } = input;
+  const empty = { slots: [], unavailable: [] };
+  if (slotMinutes <= 0) return empty;
 
   const weekday = weekdayOf(date);
   const key = WEEKDAY_KEYS[weekday];
 
   // 1. Branch ochiq oralig'i shu kunda.
   const branchEntry = branchWorkHours && key ? branchWorkHours[key] : undefined;
-  if (!branchEntry) return []; // yopiq yoki sozlanmagan → slot yo'q
+  if (!branchEntry) return empty; // yopiq yoki sozlanmagan → slot yo'q
   const branchOpen: Interval = {
     start: hhmmToMinutes(branchEntry.open),
     end: hhmmToMinutes(branchEntry.close),
   };
-  if (branchOpen.end <= branchOpen.start) return [];
+  if (branchOpen.end <= branchOpen.start) return empty;
 
   // 2. Doktor segmentlari shu kunda (weekday + effective oynasi + aktivlik).
   const segs = doctorSegments
     .filter((s) => s.weekday === weekday && inEffectiveWindow(s, date))
     .map((s) => ({ start: s.startMinute, end: s.endMinute }))
     .filter((s) => s.end > s.start);
-  if (segs.length === 0) return [];
+  if (segs.length === 0) return empty;
 
   // 3. base = intersect(branchOpen, har doktor segmenti).
   const base: Interval[] = [];
@@ -170,26 +196,68 @@ export function computeAvailability(input: ComputeAvailabilityInput): Availabili
     const x = intersectOne(branchOpen, seg);
     if (x) base.push(x);
   }
-  if (base.length === 0) return [];
+  if (base.length === 0) return empty;
 
   // 4. busy = appointmentlar ∪ time-off'lar — local daqiqaga, [0,1440)'ga clip.
   const busy: Interval[] = [];
-  const pushClipped = (startAt: Date, endAt: Date) => {
-    const s = Math.max(0, instantToLocalMinute(startAt, date));
+  const apptBusy: Interval[] = [];
+  const offBusy: Interval[] = [];
+  const clip = (startAt: Date, endAt: Date): Interval | null => {
+    const st = Math.max(0, instantToLocalMinute(startAt, date));
     const e = Math.min(1440, instantToLocalMinute(endAt, date));
-    if (e > s) busy.push({ start: s, end: e });
+    return e > st ? { start: st, end: e } : null;
   };
-  for (const a of appointments) pushClipped(a.startAt, a.endAt);
-  for (const t of timeOffs) pushClipped(t.startAt, t.endAt);
+  for (const a of appointments) {
+    const x = clip(a.startAt, a.endAt);
+    if (x) {
+      busy.push(x);
+      apptBusy.push(x);
+    }
+  }
+  for (const t of timeOffs) {
+    const x = clip(t.startAt, t.endAt);
+    if (x) {
+      busy.push(x);
+      offBusy.push(x);
+    }
+  }
 
   // 5. free = subtract(base, busy); 6. slots = tile.
   const free = subtract(base, busy);
   const tiled = tile(free, slotMinutes);
 
-  return tiled.map((slot) => ({
+  const nowMinute = now ? instantToLocalMinute(now, date) : null;
+  const isPast = (startMinute: number) => nowMinute !== null && startMinute < nowMinute;
+  const kept = tiled.filter((slot) => !isPast(slot.start));
+
+  const toSlot = (slot: Interval): AvailabilitySlot => ({
     startMinute: slot.start,
     endMinute: slot.end,
     start: localMinuteToInstant(date, slot.start).toISOString(),
     end: localMinuteToInstant(date, slot.end).toISOString(),
-  }));
+  });
+
+  // 7. unavailable — qadamli panjara; sabab ustuvorligi: past > ta'til > band > tushlik > sig'maydi.
+  const overlaps = (a: Interval, list: Interval[]) => list.some((b) => intersectOne(a, b) !== null);
+  const spanStart = Math.min(...base.map((b) => b.start));
+  const spanEnd = Math.max(...base.map((b) => b.end));
+  const step = Math.min(GRID_STEP, slotMinutes);
+  const unavailable: UnavailableSlot[] = [];
+  for (let st = spanStart; st < spanEnd; st += step) {
+    if (kept.some((k) => st >= k.start && st < k.end)) continue;
+    const cell: Interval = { start: st, end: st + slotMinutes };
+    let reason: UnavailableReason;
+    if (isPast(st)) reason = 'past';
+    else if (overlaps(cell, offBusy)) reason = 'time_off';
+    else if (overlaps(cell, apptBusy)) reason = 'busy';
+    else if (
+      // tanaffus: [spanStart, spanEnd) ichida, lekin doktor segmentlari qoplamagan joy
+      !base.some((b) => st >= b.start && st < b.end)
+    )
+      reason = 'lunch';
+    else reason = 'too_short';
+    unavailable.push({ ...toSlot(cell), reason });
+  }
+
+  return { slots: kept.map(toSlot), unavailable };
 }

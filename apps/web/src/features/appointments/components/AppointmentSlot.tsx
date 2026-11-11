@@ -10,11 +10,13 @@ export function AppointmentSlot({
   patientName,
   tone = 'muted',
   onClick,
+  selected = false,
 }: {
   event: CalendarEvent;
   patientName: (patientId: string) => string;
   tone?: Tone;
   onClick?: (event: CalendarEvent) => void;
+  selected?: boolean;
 }) {
   const { t } = useTranslation();
   const { pos, appointment, startMin, endMin } = event;
@@ -27,6 +29,8 @@ export function AppointmentSlot({
       type="button"
       className={classes.slot}
       data-status={appointment.status}
+      data-selected={selected}
+      aria-pressed={selected}
       style={{
         // model (a): slot ham, grid line ham .colBody origin'idan → addend YO'Q
         top: pos.top,

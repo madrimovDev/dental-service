@@ -1,11 +1,15 @@
 import {
   appointments,
+  labOrders,
+  patients,
   permissions,
   rolePermissions,
+  treatmentPlans,
+  treatmentStages,
   userAssignments,
   users,
 } from '@dental/db-schema';
-import { and, asc, between, eq, gt, gte, isNotNull, lt, lte, ne } from 'drizzle-orm';
+import { and, asc, between, eq, gt, gte, inArray, isNotNull, lt, lte, ne } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { onAfterCommit } from '../../db/after-commit.ts';
 import { getDb } from '../../db/scoped.ts';
@@ -244,13 +248,17 @@ export const createAppointmentsService = (deps: {
 
     // CLI-435: majburiy chegara + barqaror tartib (startTime asc, id tie-break).
     const offset = (query.page - 1) * query.pageSize;
-    return db
-      .select()
+    // SC-01: bemor ismi JOIN bilan (kalendar avval faqat birinchi 100 bemordan olardi).
+    // patients RLS — xuddi shu tenant tranzaksiyasida; LEFT JOIN: bemor yo'q bo'lsa ham qator qoladi.
+    const rows = await db
+      .select({ appointment: appointments, patientName: patients.fullName })
       .from(appointments)
+      .leftJoin(patients, eq(patients.id, appointments.patientId))
       .where(filters.length > 0 ? and(...filters) : undefined)
       .orderBy(asc(appointments.startTime), asc(appointments.id))
       .limit(query.pageSize)
       .offset(offset);
+    return rows.map((r) => ({ ...r.appointment, patientName: r.patientName ?? null }));
   }
 
   async function getById(c: Context, id: string) {
@@ -597,7 +605,66 @@ export const createAppointmentsService = (deps: {
     return rows.map((r) => ({ id: r.id, name: r.fullName ?? r.phone }));
   }
 
-  return { list, getById, create, update, cancel, listDoctors };
+  /**
+   * UI-R3: yozilish ekrani konteksti — bemorning tugallanmagan lab buyurtmalari
+   * (muddat ogohlantirishi uchun) va faol rejaning keyingi bosqichi (taklif).
+   * Tor endpoint: `appointment.create` bilan o'qiladi — registratorda `lab_order.view` /
+   * `medical_record.view` yo'q (CLI-153 naqshi), shuning uchun faqat kerakli maydonlar.
+   */
+  async function bookingContext(c: Context, patientId: string) {
+    const db = getDb(c);
+    const labs = await db
+      .select({
+        id: labOrders.id,
+        labName: labOrders.labName,
+        orderType: labOrders.orderType,
+        status: labOrders.status,
+        expectedDate: labOrders.expectedDate,
+      })
+      .from(labOrders)
+      .where(
+        and(
+          eq(labOrders.patientId, patientId),
+          inArray(labOrders.status, ['draft', 'sent', 'in_progress', 'ready']),
+          isNotNull(labOrders.expectedDate),
+        ),
+      )
+      .orderBy(asc(labOrders.expectedDate));
+
+    const [stage] = await db
+      .select({
+        planId: treatmentPlans.id,
+        planTitle: treatmentPlans.title,
+        doctorId: treatmentPlans.doctorId,
+        stageId: treatmentStages.id,
+        sequence: treatmentStages.sequence,
+        serviceId: treatmentStages.serviceId,
+        serviceName: treatmentStages.serviceName,
+        estimatedDurationMinutes: treatmentStages.estimatedDurationMinutes,
+      })
+      .from(treatmentStages)
+      .innerJoin(treatmentPlans, eq(treatmentPlans.id, treatmentStages.treatmentPlanId))
+      .where(
+        and(
+          eq(treatmentPlans.patientId, patientId),
+          inArray(treatmentPlans.status, ['accepted', 'in_progress']),
+          inArray(treatmentStages.status, ['pending', 'in_progress']),
+          eq(treatmentStages.acceptance, 'accepted'),
+        ),
+      )
+      .orderBy(asc(treatmentPlans.createdAt), asc(treatmentStages.sequence))
+      .limit(1);
+
+    return {
+      openLabOrders: labs.map((l) => ({
+        ...l,
+        expectedDate: l.expectedDate ? l.expectedDate.toISOString() : null,
+      })),
+      nextPlanStage: stage ?? null,
+    };
+  }
+
+  return { list, getById, create, update, cancel, listDoctors, bookingContext };
 };
 
 export type AppointmentsService = ReturnType<typeof createAppointmentsService>;

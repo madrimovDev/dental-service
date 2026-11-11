@@ -11,6 +11,8 @@ import { toAppointmentDto } from './appointments.mapper.ts';
 import {
   appointmentDtoSchema,
   appointmentIdParamSchema,
+  bookingContextDtoSchema,
+  bookingContextQuery,
   cancelAppointmentBodySchema,
   createAppointmentSchema,
   doctorListItemDtoSchema,
@@ -144,6 +146,23 @@ export const appointmentRoutes = (deps: {
   app.openapi(listDoctorsRoute, async (c) => {
     const rows = await service.listDoctors(c);
     return c.json(ok(rows), 200);
+  });
+
+  // ─── GET /booking-context — lab muddati + reja bosqichi taklifi (UI-R3) ────
+
+  const bookingContextRoute = createRoute({
+    method: 'get',
+    path: '/booking-context',
+    tags: ['appointments'],
+    operationId: 'getBookingContext',
+    middleware: [requirePermission('appointment.create')] as const,
+    request: { query: bookingContextQuery },
+    responses: okJson(bookingContextDtoSchema, 'Booking context for a patient'),
+  });
+
+  app.openapi(bookingContextRoute, async (c) => {
+    const { patientId } = c.req.valid('query');
+    return c.json(ok(await service.bookingContext(c, patientId)), 200);
   });
 
   // ─── GET /{id} — get by id ────────────────────────────────────────────────

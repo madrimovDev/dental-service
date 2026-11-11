@@ -387,3 +387,39 @@ describe('P4 status-only qayta faollashtirish → eslatma qayta qo‘yiladi', ()
     });
   }
 });
+
+// ─── UI-R2 (SC-01/02): ro'yxat bemor ismini JOIN bilan qaytaradi + sahifalash to'liq ───
+
+describe('UI-R2 list: patientName JOIN + sahifalash (SC-01/02)', () => {
+  test(">100 yozilish sahifalab to'liq olinadi (takrorsiz) va har qatorda patientName bor", async () => {
+    const svc = createAppointmentsService({ audit: noopAudit });
+    const base = new Date('2026-12-09T00:00:00+05:00').getTime();
+    await db.transaction(async (tx) => {
+      await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
+      await tx.insert(appointments).values(
+        Array.from({ length: 120 }, (_, i) => ({
+          tenantId,
+          branchId,
+          doctorId: ownerId,
+          patientId,
+          startTime: new Date(base + i * 60_000),
+          endTime: new Date(base + (i + 1) * 60_000),
+          status: 'scheduled' as const,
+        })),
+      );
+    });
+    const range = {
+      from: new Date(base).toISOString(),
+      to: new Date(base + 24 * 3600_000).toISOString(),
+      pageSize: 100,
+    };
+    const p1 = await run(tenantId, (c) => svc.list(c, { ...range, page: 1 }));
+    const p2 = await run(tenantId, (c) => svc.list(c, { ...range, page: 2 }));
+    expect(p1).toHaveLength(100);
+    expect(p2).toHaveLength(20);
+    const ids = new Set([...p1, ...p2].map((r) => r.id));
+    expect(ids.size).toBe(120);
+    expect(p1.every((r) => r.patientName === 'Ali Valiyev')).toBe(true);
+    expect(p2.every((r) => r.patientName === 'Ali Valiyev')).toBe(true);
+  });
+});
