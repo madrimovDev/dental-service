@@ -7,8 +7,11 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import {
   branches,
   doctorSchedules,
+  labOrders,
   patients,
   roles,
+  treatmentPlans,
+  treatmentStages,
   userAssignments,
   users,
 } from '@dental/db-schema';
@@ -203,5 +206,136 @@ describe('P10 default work hours', () => {
       }),
     );
     expect((created as { ok: boolean; code?: string }).code).toBe('schedule.outside_working_hours');
+  });
+});
+
+// ─── UI-R3 (SC-07): slot sabablari + `now` + booking-context ──────────────────
+describe('UI-R3 availability sabablari', () => {
+  const WED = '2026-12-09';
+  const reasonAt = (
+    av: { unavailable: { start: string; reason: string }[] },
+    iso: string,
+  ): string | undefined => av.unavailable.find((u) => u.start === iso)?.reason;
+
+  beforeAll(async () => {
+    await run(async (c) => {
+      const tx = c.get('db') as DbOrTx;
+      // Chorshanba: 09–13 va 14–18 (tushlik 13–14).
+      await tx.insert(doctorSchedules).values([
+        { tenantId, branchId, doctorId: ownerId, weekday: 3, startMinute: 540, endMinute: 780 },
+        { tenantId, branchId, doctorId: ownerId, weekday: 3, startMinute: 840, endMinute: 1080 },
+      ]);
+    });
+  });
+
+  test("o'tgan slot `past`, band `busy`, tanaffus `lunch`, sig'maydi `too_short`", async () => {
+    // Dushanba 10:15 Toshkent = 05:15Z. Ertalabki 09:00 va 10:00 slotlar o'tgan.
+    const now = new Date('2026-12-07T05:15:00.000Z');
+    // Dushanba 14:00–15:00 band (ownerId jadvali 09–18; avvalgi testda 09:00 yaratilgan).
+    await run(async (c) => {
+      const r = await appts.create(c, {
+        branchId,
+        patientId,
+        doctorId: ownerId,
+        startTime: '2026-12-07T09:00:00.000Z', // 14:00
+        endTime: '2026-12-07T10:00:00.000Z',
+        serviceIds: [],
+      });
+      expect((r as { ok: boolean }).ok).toBe(true);
+    });
+    const av = await run((c) =>
+      schedule.getAvailability(c, { doctorId: ownerId, branchId, date: MON, slotMinutes: 60 }, now),
+    );
+    expect(av.slots.every((s) => new Date(s.start) >= now)).toBe(true);
+    expect(av.slots.length).toBeGreaterThan(0);
+    expect(reasonAt(av, '2026-12-07T04:00:00.000Z')).toBe('past'); // 09:00
+    expect(reasonAt(av, '2026-12-07T09:00:00.000Z')).toBe('busy'); // 14:00
+
+    const wed = await run((c) =>
+      schedule.getAvailability(
+        c,
+        { doctorId: ownerId, branchId, date: WED, slotMinutes: 60 },
+        new Date('2026-12-07T00:00:00.000Z'),
+      ),
+    );
+    expect(reasonAt(wed, '2026-12-09T08:00:00.000Z')).toBe('lunch'); // 13:00
+    // 90 daqiqalik slot: 09–13 oraliqda 12:00–13:00 qoldiq sig'maydi.
+    const wed90 = await run((c) =>
+      schedule.getAvailability(
+        c,
+        { doctorId: ownerId, branchId, date: WED, slotMinutes: 90 },
+        new Date('2026-12-07T00:00:00.000Z'),
+      ),
+    );
+    expect(reasonAt(wed90, '2026-12-09T07:00:00.000Z')).toBe('too_short'); // 12:00
+    // Bo'sh slot unavailable'da takrorlanmaydi.
+    const freeStarts = new Set(wed.slots.map((s) => s.start));
+    expect(wed.unavailable.some((u) => freeStarts.has(u.start))).toBe(false);
+  });
+});
+
+describe('UI-R3 booking-context', () => {
+  test("lab muddati + reja bosqichi qaytadi; bajarilgan lab va qabul qilinmagan bosqich yo'q", async () => {
+    await run(async (c) => {
+      const tx = c.get('db') as DbOrTx;
+      await tx.insert(labOrders).values([
+        {
+          tenantId,
+          patientId,
+          doctorId: ownerId,
+          labName: 'Lab A',
+          orderType: 'crown',
+          status: 'sent',
+          items: [],
+          expectedDate: new Date('2026-12-11T00:00:00.000Z'),
+        },
+        {
+          tenantId,
+          patientId,
+          doctorId: ownerId,
+          labName: 'Lab B',
+          orderType: 'crown',
+          status: 'delivered',
+          items: [],
+          expectedDate: new Date('2026-12-01T00:00:00.000Z'),
+        },
+      ]);
+      const [plan] = await tx
+        .insert(treatmentPlans)
+        .values({ tenantId, patientId, doctorId: ownerId, title: 'Protez', status: 'in_progress' })
+        .returning({ id: treatmentPlans.id });
+      await tx.insert(treatmentStages).values([
+        {
+          treatmentPlanId: plan!.id,
+          sequence: 1,
+          serviceName: 'Tayyor',
+          cost: '100',
+          status: 'completed',
+          acceptance: 'accepted',
+        },
+        {
+          treatmentPlanId: plan!.id,
+          sequence: 2,
+          serviceName: 'Taklif',
+          cost: '100',
+          status: 'pending',
+          acceptance: 'proposed',
+        },
+        {
+          treatmentPlanId: plan!.id,
+          sequence: 3,
+          serviceName: "Toj o'rnatish",
+          cost: '500',
+          status: 'pending',
+          acceptance: 'accepted',
+          estimatedDurationMinutes: 60,
+        },
+      ]);
+    });
+    const ctxOut = await run((c) => appts.bookingContext(c, patientId));
+    expect(ctxOut.openLabOrders.map((l) => l.labName)).toEqual(['Lab A']);
+    expect(ctxOut.nextPlanStage?.serviceName).toBe("Toj o'rnatish");
+    expect(ctxOut.nextPlanStage?.estimatedDurationMinutes).toBe(60);
+    expect(ctxOut.nextPlanStage?.planTitle).toBe('Protez');
   });
 });

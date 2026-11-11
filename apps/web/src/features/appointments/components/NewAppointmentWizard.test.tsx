@@ -5,6 +5,27 @@ import { renderApp } from '../../../test-utils';
 import { NewAppointmentWizard } from './NewAppointmentWizard';
 
 const createMock = vi.hoisted(() => vi.fn());
+const bookingCtx = vi.hoisted(() => ({
+  data: { openLabOrders: [], nextPlanStage: null } as {
+    openLabOrders: {
+      id: string;
+      labName: string;
+      orderType: string;
+      status: string;
+      expectedDate: string | null;
+    }[];
+    nextPlanStage: null | {
+      planId: string;
+      planTitle: string;
+      doctorId: string;
+      stageId: string;
+      sequence: number;
+      serviceId: string | null;
+      serviceName: string;
+      estimatedDurationMinutes: number | null;
+    };
+  },
+}));
 const availabilityMock = vi.hoisted(() => ({
   data: {
     doctorId: 'd1',
@@ -16,6 +37,10 @@ const availabilityMock = vi.hoisted(() => ({
       { start: '2026-06-20T04:00:00.000Z', end: '2026-06-20T04:30:00.000Z' },
       { start: '2026-06-20T04:30:00.000Z', end: '2026-06-20T05:00:00.000Z' },
     ],
+    unavailable: [
+      { start: '2026-06-20T05:00:00.000Z', end: '2026-06-20T05:30:00.000Z', reason: 'busy' },
+      { start: '2026-06-20T08:00:00.000Z', end: '2026-06-20T08:30:00.000Z', reason: 'lunch' },
+    ] as { start: string; end: string; reason: string }[],
   },
   isLoading: false,
 }));
@@ -29,6 +54,7 @@ vi.mock('../appointments.api', () => ({
       { id: 's2', nameUz: 'Tozalash', durationMinutes: 30 },
     ],
   }),
+  useBookingContext: () => ({ data: bookingCtx.data }),
   useBranches: () => ({ data: [{ id: 'b1', name: 'Markaziy filial' }] }),
 }));
 vi.mock('@/features/schedule/schedule.api', () => ({
@@ -64,6 +90,7 @@ describe('NewAppointmentWizard', () => {
   afterEach(() => {
     mockAuth.activeBranchId = 'b1';
     createMock.mockReset();
+    bookingCtx.data = { openLabOrders: [], nextPlanStage: null };
     usePatientsSpy.mockClear();
   });
 
@@ -81,9 +108,10 @@ describe('NewAppointmentWizard', () => {
     );
   });
 
-  it("birinchi qadam (Bemor) ko'rsatadi", () => {
+  it("4 bo'lim bitta ekranda ko'rinadi", () => {
     renderApp(<NewAppointmentWizard onClose={vi.fn()} />);
-    expect(screen.getByText('Bemor')).toBeInTheDocument();
+    for (const h of ['Bemor', 'Xizmat', 'Shifokor', 'Vaqt'])
+      expect(screen.getByRole('heading', { name: new RegExp(h) })).toBeInTheDocument();
   });
 
   it("branch-bound foydalanuvchida filial Select ko'rsatilmaydi", () => {
@@ -98,96 +126,74 @@ describe('NewAppointmentWizard', () => {
     expect(screen.getByText('Filial')).toBeInTheDocument();
   });
 
-  /** Xizmat (Tekshiruv) tanlaydi — slotMinutes>0 bo'lib availability yoqiladi. */
-  async function selectService() {
-    fireEvent.click(screen.getByText('Doktor va xizmat'));
-    // "Xizmatlar" label wrapper'i ichidagi MultiSelect search input'ini ochamiz.
-    const wrapper = screen.getByText('Xizmatlar').closest('.mantine-InputWrapper-root');
-    const input = wrapper?.querySelector('input');
-    if (!input) throw new Error('Xizmatlar input topilmadi');
-    fireEvent.click(input);
-    fireEvent.click(await screen.findByText('Tekshiruv'));
-  }
-
-  /** Bemor qadamida bemorni tanlaydi (A10: `patientId` endi `form.validate()` bilan majburiy). */
   async function selectPatient() {
     const input = screen.getByPlaceholderText('Bemor');
     fireEvent.click(input);
     fireEvent.click(await screen.findByText('Aliyev Vali'));
   }
+  const pickDoctor = () => fireEvent.click(screen.getByRole('button', { name: 'Dr. Ali' }));
+  const pickService = () => fireEvent.click(screen.getByRole('button', { name: /Tekshiruv/ }));
 
-  /** Doktor va xizmat qadamida doktorni tanlaydi (A10: `doctorId` ham majburiy). */
-  async function selectDoctor() {
-    fireEvent.click(screen.getByText('Doktor va xizmat'));
-    const wrapper = screen.getByText('Shifokor').closest('.mantine-InputWrapper-root');
-    const input = wrapper?.querySelector('input');
-    if (!input) throw new Error('Doktor input topilmadi');
-    fireEvent.click(input);
-    fireEvent.click(await screen.findByText('Dr. Ali'));
-  }
-
-  /** To'liq majburiy maydonlar (bemor + doktor + xizmat) — submit muvaffaqiyatli o'tishi uchun. */
-  async function fillRequiredFields() {
+  async function fillAll() {
     await selectPatient();
-    await selectDoctor();
-    await selectService();
+    pickDoctor();
+    pickService();
+    fireEvent.click(await screen.findByRole('button', { name: '09:00' }));
   }
 
-  it("vaqt qadamida bo'sh slot chiplari ko'rsatiladi (Tashkent HH:mm)", async () => {
+  it("xizmat va shifokor tanlangach bo'sh slotlar ko'rsatiladi (Tashkent HH:mm)", async () => {
     renderApp(<NewAppointmentWizard onClose={vi.fn()} />);
-    await selectService();
-    fireEvent.click(screen.getByText('Vaqt'));
-    expect(await screen.findByText('09:00')).toBeInTheDocument();
-    expect(screen.getByText('09:30')).toBeInTheDocument();
+    pickDoctor();
+    pickService();
+    expect(await screen.findByRole('button', { name: '09:00' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '09:30' })).toBeInTheDocument();
+  });
+
+  it("yo'q slot yonida sabab ko'rinadi va bosib bo'lmaydi (SC-07)", async () => {
+    renderApp(<NewAppointmentWizard onClose={vi.fn()} />);
+    pickDoctor();
+    pickService();
+    const busy = await screen.findByRole('button', { name: /10:00.*band/ });
+    expect(busy).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('button', { name: /13:00.*tushlik/ })).toBeInTheDocument();
   });
 
   it("workHoursConfigured=false bo'lsa «ish soati sozlanmagan» xabari (P10)", async () => {
     const prev = availabilityMock.data;
-    availabilityMock.data = { ...prev, slots: [], workHoursConfigured: false } as typeof prev;
+    availabilityMock.data = {
+      ...prev,
+      slots: [],
+      unavailable: [],
+      workHoursConfigured: false,
+    } as typeof prev;
     try {
       renderApp(<NewAppointmentWizard onClose={vi.fn()} />);
-      await selectService();
-      fireEvent.click(screen.getByText('Vaqt'));
+      pickDoctor();
+      pickService();
       expect(
         await screen.findByText('Filial ish soati sozlanmagan — Sozlamalar → Filiallar'),
       ).toBeInTheDocument();
-      expect(screen.queryByText("Bu kun uchun bo'sh vaqt yo'q")).not.toBeInTheDocument();
     } finally {
       availabilityMock.data = prev;
     }
   });
 
-  it("workHoursConfigured=true va slot yo'q — oddiy no_slots (P10)", async () => {
-    const prev = availabilityMock.data;
-    availabilityMock.data = { ...prev, slots: [], workHoursConfigured: true } as typeof prev;
-    try {
-      renderApp(<NewAppointmentWizard onClose={vi.fn()} />);
-      await selectService();
-      fireEvent.click(screen.getByText('Vaqt'));
-      expect(await screen.findByText("Bu kun uchun bo'sh vaqt yo'q")).toBeInTheDocument();
-    } finally {
-      availabilityMock.data = prev;
-    }
+  it("slot tanlanmaguncha «Yozish» o'chiq; tanlangach yoqiladi va eslatma matni chiqadi", async () => {
+    renderApp(<NewAppointmentWizard onClose={vi.fn()} />);
+    await selectPatient();
+    pickDoctor();
+    pickService();
+    const submitBtn = screen.getByRole('button', { name: 'Yozish' });
+    expect(submitBtn).toBeDisabled();
+    fireEvent.click(await screen.findByRole('button', { name: '09:00' }));
+    await waitFor(() => expect(submitBtn).not.toBeDisabled());
+    expect(screen.getByText(/Assalomu alaykum, Aliyev!/)).toBeInTheDocument();
   });
 
-  it("slot tanlanmaguncha Keyingi tugmasi o'chiq, tanlangach yoqiladi", async () => {
+  it("tanlangan slot startTime/endTime'ni submit'ga uzatadi", async () => {
     renderApp(<NewAppointmentWizard onClose={vi.fn()} />);
-    await selectService();
-    fireEvent.click(screen.getByText('Vaqt'));
-    const nextBtn = screen.getByRole('button', { name: 'Keyingi' });
-    expect(nextBtn).toBeDisabled();
-    fireEvent.click(await screen.findByText('09:00'));
-    await waitFor(() => expect(nextBtn).not.toBeDisabled());
-  });
-
-  it("tanlangan slot startTime/endTime'ni auto-to'ldiradi va submit'ga uzatadi", async () => {
-    renderApp(<NewAppointmentWizard onClose={vi.fn()} />);
-    await fillRequiredFields();
-    fireEvent.click(screen.getByText('Vaqt'));
-    fireEvent.click(await screen.findByText('09:00'));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Keyingi' })).not.toBeDisabled());
-    fireEvent.click(screen.getByRole('button', { name: 'Keyingi' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    await fillAll();
+    fireEvent.click(screen.getByRole('button', { name: 'Yozish' }));
     expect(createMock).toHaveBeenCalledWith(
       expect.objectContaining({
         patientId: 'p1',
@@ -199,38 +205,56 @@ describe('NewAppointmentWizard', () => {
     );
   });
 
-  // A10 (CLI-438): `form.validate()` submit'dan oldin chaqiriladi — `patientId`siz
-  // submit endi server 400 kutmasdan inline validatsiya bilan bloklanadi.
-  it("patientId'siz submit inline validatsiya xatosi beradi (server 400 emas)", async () => {
+  it("lab muddati yozilishdan keyin bo'lsa ogohlantirish ko'rinadi", async () => {
+    bookingCtx.data = {
+      openLabOrders: [
+        {
+          id: 'l1',
+          labName: 'Best Lab',
+          orderType: 'crown',
+          status: 'sent',
+          expectedDate: '2099-01-01T00:00:00.000Z',
+        },
+      ],
+      nextPlanStage: null,
+    };
     renderApp(<NewAppointmentWizard onClose={vi.fn()} />);
-    // Bemorni ATAYLAB tanlamaymiz — faqat doktor + xizmat + slot.
-    await selectDoctor();
-    await selectService();
-    fireEvent.click(screen.getByText('Vaqt'));
-    fireEvent.click(await screen.findByText('09:00'));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Keyingi' })).not.toBeDisabled());
-    fireEvent.click(screen.getByRole('button', { name: 'Keyingi' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
-    expect(createMock).not.toHaveBeenCalled();
-    // Validatsiya xatosi Bemor qadamida — wizard shu qadamga qaytariladi
-    // (birinchi qadam "Bekor qilish" tugmasi bilan aniqlanadi, "Orqaga" emas).
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Bekor qilish' })).toBeInTheDocument(),
+    await fillAll();
+    expect(await screen.findByText(/Lab ishi: Best Lab/)).toBeInTheDocument();
+  });
+
+  it("reja bosqichi taklifi «Rejadan tanlash» xizmat va shifokorni to'ldiradi", async () => {
+    bookingCtx.data = {
+      openLabOrders: [],
+      nextPlanStage: {
+        planId: 'pl',
+        planTitle: 'Protez',
+        doctorId: 'd1',
+        stageId: 'st',
+        sequence: 3,
+        serviceId: 's1',
+        serviceName: "Toj o'rnatish",
+        estimatedDurationMinutes: 60,
+      },
+    };
+    renderApp(<NewAppointmentWizard onClose={vi.fn()} />);
+    await selectPatient();
+    fireEvent.click(await screen.findByRole('button', { name: 'Rejadan tanlash' }));
+    expect(await screen.findByRole('button', { name: '09:00' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Tekshiruv/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
     );
   });
 
-  // A10: backend 409 kodlari alohida xabarga aylanadi — hammasi "conflict" emas.
+  // A10: backend 409 kodlari alohida xabarga aylanadi.
   it('409 conflict.doctor_busy — "Doktor bu vaqtda band" xabari', async () => {
     createMock.mockImplementation((_body, opts) =>
       opts.onError(new ApiError('conflict.doctor_busy', 'busy', 409)),
     );
     renderApp(<NewAppointmentWizard onClose={vi.fn()} />);
-    await fillRequiredFields();
-    fireEvent.click(screen.getByText('Vaqt'));
-    fireEvent.click(await screen.findByText('09:00'));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Keyingi' })).not.toBeDisabled());
-    fireEvent.click(screen.getByRole('button', { name: 'Keyingi' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    await fillAll();
+    fireEvent.click(screen.getByRole('button', { name: 'Yozish' }));
     expect(await screen.findByText('Doktor bu vaqtda band')).toBeInTheDocument();
   });
 
@@ -239,12 +263,8 @@ describe('NewAppointmentWizard', () => {
       opts.onError(new ApiError('schedule.outside_working_hours', 'oow', 409)),
     );
     renderApp(<NewAppointmentWizard onClose={vi.fn()} />);
-    await fillRequiredFields();
-    fireEvent.click(screen.getByText('Vaqt'));
-    fireEvent.click(await screen.findByText('09:00'));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Keyingi' })).not.toBeDisabled());
-    fireEvent.click(screen.getByRole('button', { name: 'Keyingi' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    await fillAll();
+    fireEvent.click(screen.getByRole('button', { name: 'Yozish' }));
     expect(await screen.findByText('Bu vaqt doktor ish jadvalidan tashqarida')).toBeInTheDocument();
     expect(screen.queryByText('Doktor bu vaqtda band')).not.toBeInTheDocument();
   });
@@ -254,30 +274,27 @@ describe('NewAppointmentWizard', () => {
       opts.onError(new ApiError('insert.failed', 'x', 400)),
     );
     renderApp(<NewAppointmentWizard onClose={vi.fn()} />);
-    await fillRequiredFields();
-    fireEvent.click(screen.getByText('Vaqt'));
-    fireEvent.click(await screen.findByText('09:00'));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Keyingi' })).not.toBeDisabled());
-    fireEvent.click(screen.getByRole('button', { name: 'Keyingi' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    await fillAll();
+    fireEvent.click(screen.getByRole('button', { name: 'Yozish' }));
     expect(await screen.findByText('Xatolik yuz berdi')).toBeInTheDocument();
   });
 
-  it("availability bazasi (slotMinutes) o'zgarsa tanlangan slot tozalanadi (stale-guard)", async () => {
+  it("patientId'siz submit server'ga ketmaydi (inline validatsiya)", async () => {
     renderApp(<NewAppointmentWizard onClose={vi.fn()} />);
-    await selectService();
-    fireEvent.click(screen.getByText('Vaqt'));
-    fireEvent.click(await screen.findByText('09:00'));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Keyingi' })).not.toBeDisabled());
-    // Xizmat qadamiga qaytib ikkinchi xizmat qo'shamiz → slotMinutes 30→60.
-    fireEvent.click(screen.getByText('Doktor va xizmat'));
-    const wrapper = screen.getByText('Xizmatlar').closest('.mantine-InputWrapper-root');
-    const input = wrapper?.querySelector('input');
-    if (!input) throw new Error('Xizmatlar input topilmadi');
-    fireEvent.click(input);
-    fireEvent.click(await screen.findByText('Tozalash'));
-    // Vaqt qadamiga qaytamiz — eski slot tozalangani uchun Keyingi o'chiq.
-    fireEvent.click(screen.getByText('Vaqt'));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Keyingi' })).toBeDisabled());
+    pickDoctor();
+    pickService();
+    fireEvent.click(await screen.findByRole('button', { name: '09:00' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Yozish' }));
+    expect(createMock).not.toHaveBeenCalled();
+  });
+
+  it("baza (xizmat davomiyligi) o'zgarsa tanlangan slot tozalanadi (stale-guard)", async () => {
+    renderApp(<NewAppointmentWizard onClose={vi.fn()} />);
+    pickDoctor();
+    pickService();
+    fireEvent.click(await screen.findByRole('button', { name: '09:00' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Yozish' })).not.toBeDisabled());
+    fireEvent.click(screen.getByRole('button', { name: /Tozalash/ }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Yozish' })).toBeDisabled());
   });
 });

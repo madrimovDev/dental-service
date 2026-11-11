@@ -1,9 +1,9 @@
 import { Button, IconButton, StateView, StatusPill, Tabs, UndoToast } from '@dental/ui';
-import { Group, Modal, Select } from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
+import { Group, Select } from '@mantine/core';
 import { ChevronRight } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { fullDayRangeToInstants } from '@/features/schedule/schedule.mappers';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import {
@@ -21,7 +21,6 @@ import { AppointmentPanel } from './AppointmentPanel';
 import { CalendarGrid } from './CalendarGrid';
 import { DayStatsCard } from './DayStatsCard';
 import { FreeSlotsCard } from './FreeSlotsCard';
-import { NewAppointmentWizard } from './NewAppointmentWizard';
 import { StatusLegend } from './StatusLegend';
 import { WaitlistCard } from './WaitlistCard';
 import { WeekGrid } from './WeekGrid';
@@ -51,7 +50,8 @@ export function CalendarScreen() {
   const [view, setView] = useState<'day' | 'week'>('day');
   const [branchId, setBranchId] = useState<string | null>(activeBranchId);
   const [date, setDate] = useState(() => new Date());
-  const [opened, { open, close }] = useDisclosure(false);
+  const navigate = useNavigate();
+  const open = () => navigate('/appointments/new');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingAction | null>(null);
   const pendingRef = useRef<PendingAction | null>(null);
@@ -404,9 +404,6 @@ export function CalendarScreen() {
         </div>
       </div>
 
-      <Modal opened={opened} onClose={close} title={t('appointments.create')} size="lg">
-        <NewAppointmentWizard onClose={close} />
-      </Modal>
       {pending != null && (
         <UndoToast
           key={pending.key}

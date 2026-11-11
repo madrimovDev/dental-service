@@ -123,6 +123,14 @@ export const availabilitySlotDtoSchema = z
   .openapi('AvailabilitySlot');
 export type AvailabilitySlotDto = z.infer<typeof availabilitySlotDtoSchema>;
 
+export const unavailableSlotDtoSchema = availabilitySlotDtoSchema
+  .extend({
+    /** SC-07: slot nega taklif qilinmaydi. */
+    reason: z.enum(['past', 'busy', 'lunch', 'time_off', 'too_short']).openapi({ example: 'busy' }),
+  })
+  .openapi('UnavailableSlot');
+export type UnavailableSlotDto = z.infer<typeof unavailableSlotDtoSchema>;
+
 export const availabilityDtoSchema = z
   .object({
     doctorId: z.uuid(),
@@ -130,6 +138,8 @@ export const availabilityDtoSchema = z
     date: z.string().openapi({ example: '2026-06-22' }),
     slotMinutes: z.number().int().openapi({ example: 30 }),
     slots: z.array(availabilitySlotDtoSchema),
+    /** Band/o'tgan/tushlik/sig'maydigan slotlar sababi bilan (Yangi yozilish ekrani). */
+    unavailable: z.array(unavailableSlotDtoSchema),
     /** false → filialda ish soati (branches.workHours) sozlanmagan (null). */
     workHoursConfigured: z.boolean(),
   })
