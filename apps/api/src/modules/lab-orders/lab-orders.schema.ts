@@ -123,6 +123,9 @@ export const labOrderDtoSchema = z
     proposedPrice: z.string().nullable().openapi({ example: null }),
     approvedPrice: z.string().nullable().openapi({ example: null }),
     approvedAt: z.string().nullable().openapi({ example: null }),
+    /** Klinika tasdiqlagan, Hub hali tasdiqlamagan (xarajat yo'q). */
+    priceApprovalPending: z.boolean().openapi({ example: false }),
+    priceApprovalRequestedPrice: z.string().nullable().openapi({ example: null }),
     createdAt: z.string().openapi({ example: '2026-06-12T10:00:00.000Z' }),
     updatedAt: z.string().openapi({ example: '2026-06-12T10:00:00.000Z' }),
   })
@@ -200,10 +203,16 @@ export const approvePriceSchema = z
   .strict()
   .openapi('LabOrderPriceApprovalRequest');
 
+/**
+ * `pending` — so'rov navbatda, Hub (laboratoriya) tasdig'i kutilmoqda; xarajat HALI yozilmagan.
+ * `approved` — Hub tasdiqlagan (takroriy so'rov), xarajat yozilgan.
+ */
 export const approvePriceResponseSchema = z
   .object({
-    approvedPrice: z.string(),
+    status: z.enum(['pending', 'approved']),
+    approvedPrice: z.string().nullable(),
     approvedAt: z.string().nullable(),
+    requestedPrice: z.string().nullable(),
     alreadyApproved: z.boolean(),
     expenseId: z.uuid().nullable(),
   })

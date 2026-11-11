@@ -1,6 +1,4 @@
 import {
-  auditLog,
-  expenses,
   labHubAppliedEvents,
   labHubOutbox,
   labHubState,
@@ -14,10 +12,15 @@ import {
 import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import type { Database, DbOrTx } from '../../db/client.ts';
 import { withTenant } from '../../db/scoped.ts';
+import {
+  isValidLabOrderRemakeTransition,
+  type LabOrderStatus,
+} from '../../modules/lab-orders/lab-orders.transitions.ts';
 import { logger } from '../logger.ts';
 import { createLocalStorageAdapter } from '../storage.ts';
 import { type HubChangeEvent, isLabHubConfigured, LabHubError, labHubClient } from './client.ts';
 import { toHubCase } from './mapper.ts';
+import { bookHubConfirmedPrice, formatSum, rejectPendingPriceApproval } from './price.ts';
 import { hubKeyOf, readLabHubState } from './state.ts';
 
 /**
@@ -66,18 +69,21 @@ const errorCode = (err: unknown) =>
 // ─── Push ────────────────────────────────────────────────────────────────────
 
 /** Bitta outbox op'ini Hub'ga yuboradi (tranzaksiyasiz o'qish + tarmoq + qisqa yozish). */
+/** Op muvaffaqiyatli bo'lsa `done` belgilanadigan tranzaksiya ichida bajariladigan qadam. */
+type Finalize = ((tx: DbOrTx) => Promise<unknown>) | undefined;
+
 const executeOp = async (
   tenantId: string,
   key: string,
   row: ClaimedRow,
   client: ReturnType<typeof labHubClient>,
   now: Date,
-): Promise<void> => {
+): Promise<Finalize> => {
   const order = await withTenant(tenantId, async (tx) => {
     const [r] = await tx.select().from(labOrders).where(eq(labOrders.id, row.lab_order_id));
     return r;
   });
-  if (!order?.labHubCaseRef || !order.labHubLabId) return; // buyurtma yo'q / Hub'dan uzilgan
+  if (!order?.labHubCaseRef || !order.labHubLabId) return undefined; // buyurtma yo'q / Hub'dan uzilgan
   const caseRef = order.labHubCaseRef;
 
   switch (row.op) {
@@ -119,7 +125,7 @@ const executeOp = async (
           })
           .where(eq(labOrders.id, order.id)),
       );
-      return;
+      return undefined;
     }
     case 'file': {
       const fileId = String(row.payload.fileId ?? '');
@@ -127,16 +133,18 @@ const executeOp = async (
         const [r] = await tx.select().from(labOrderFiles).where(eq(labOrderFiles.id, fileId));
         return r;
       });
-      if (!f) return; // fayl o'chirilgan — yuboriladigan narsa yo'q
+      if (!f) return undefined; // fayl o'chirilgan — yuboriladigan narsa yo'q
       const resolved = createLocalStorageAdapter().resolve(f.objectKey);
       if (!resolved) throw new LabHubError(400, 'file.invalid_key', false);
       const bytes = await Bun.file(resolved.path).arrayBuffer();
+      // `clientRef` — barqaror (lokal fayl id'si): javob yo'qolib qayta yuborilsa Hub dublikat yozmaydi.
       await client.uploadFile(
         key,
         caseRef,
         new File([bytes], f.originalFilename, { type: f.contentType }),
+        `file:${f.id}`,
       );
-      return;
+      return undefined;
     }
     case 'message': {
       const messageId = String(row.payload.messageId ?? '');
@@ -147,47 +155,49 @@ const executeOp = async (
           .where(eq(labOrderMessages.id, messageId));
         return r;
       });
-      if (!m?.body) return;
-      const res = await client.postMessage(key, caseRef, m.body, m.authorName);
+      if (!m?.body) return undefined;
+      // `clientRef` — barqaror (lokal xabar id'si): qayta yuborishda Hub dublikat yozmaydi.
+      const res = await client.postMessage(key, caseRef, m.body, m.authorName, `msg:${m.id}`);
       await withTenant(tenantId, (tx) =>
         tx
           .update(labOrderMessages)
           .set({ syncedAt: now, hubRef: res.message.id })
           .where(eq(labOrderMessages.id, m.id)),
       );
-      return;
+      return undefined;
     }
     case 'approve_price': {
-      await client.approvePrice(key, caseRef, Number(row.payload.price));
-      return;
+      // Hub 2xx = tasdiq qabul qilindi → xarajat SHU yerda (yoki poll `price_approved`da,
+      // qaysi biri birinchi) — `done` belgisi bilan bitta tranzaksiyada.
+      const res = await client.approvePrice(key, caseRef, Number(row.payload.price));
+      const approvedAt = res.approvedAt ? new Date(res.approvedAt) : now;
+      return (tx) =>
+        bookHubConfirmedPrice(tx, tenantId, order.id, res.approvedPrice, approvedAt, now);
     }
     case 'delivered': {
       await client.delivered(key, caseRef);
-      return;
+      return undefined;
     }
     default:
       throw new LabHubError(400, `outbox.unknown_op:${row.op}`, false);
   }
 };
 
-/** Hub narx tasdig'ini rad etgan kodlar — lokal tasdiq Hub bilan mos emas. */
-const PRICE_REJECTED = new Set(['price.mismatch', 'price.not_proposed']);
+/** Hub narx tasdig'ini rad etgan kodlar — kutilayotgan tasdiq bekor qilinadi. */
+const PRICE_REJECTED = new Set(['price.mismatch', 'price.not_proposed', 'price.already_approved']);
 
 /**
- * Hub `approve-price`ni `price.mismatch`/`price.not_proposed` bilan rad etdi: klinika eski
- * (keshlangan) taklifni tasdiqlagan, lab esa poll'dan keyin narxni o'zgartirgan. Lokal
- * tasdiq (approvedPrice + avtomatik «Laboratoriya» xarajati) BITTA tranzaksiyada qaytariladi,
- * `proposedPrice` Hub'dagi joriy taklifga o'rnatiladi, tasdiqlovchi va shifokorga xabar,
- * audit (tizim nomidan). Outbox qatori `rejected` — `failedOutbox`ga kirmaydi (yo'qolgan
- * ma'lumot yo'q, foydalanuvchi yangi narxni qayta tasdiqlaydi).
+ * Hub `approve-price`ni rad etdi (klinika eski taklifni tasdiqlagan, lab poll'dan keyin narxni
+ * o'zgartirgan va h.k.). Xarajat yozilmagan (faqat Hub tasdig'ida yoziladi) — kutish holati
+ * tozalanadi, Hub'dagi joriy taklif ko'rsatiladi, xabar. Outbox qatori `rejected` —
+ * `failedOutbox`ga kirmaydi (yo'qolgan ma'lumot yo'q, foydalanuvchi yangi narxni tasdiqlaydi).
  */
-const revertLocalPriceApproval = async (
+const rejectPriceApprovalOp = async (
   tenantId: string,
   row: ClaimedRow,
   err: LabHubError,
   now: Date,
 ) => {
-  const sentPrice = Number(row.payload.price).toFixed(2);
   const details = (err.details ?? {}) as { proposedPrice?: unknown };
   const hubProposed =
     typeof details.proposedPrice === 'string' && details.proposedPrice
@@ -198,73 +208,19 @@ const revertLocalPriceApproval = async (
       .update(labHubOutbox)
       .set({ attempts: row.attempts + 1, lastError: err.code, status: 'rejected', doneAt: now })
       .where(eq(labHubOutbox.id, row.id));
-    const [order] = await tx
-      .select()
-      .from(labOrders)
-      .where(eq(labOrders.id, row.lab_order_id))
-      .for('update');
-    // Faqat shu op tasdiqlagan narx hali turgan bo'lsa (boshqa yo'l bilan o'zgarmagan).
-    if (!order || order.approvedPrice !== sentPrice) return;
-    const removed = await tx
-      .delete(expenses)
-      .where(eq(expenses.labOrderId, order.id))
-      .returning({ id: expenses.id, amount: expenses.amount });
-    const prevCost = row.payload.prevCost;
-    await tx
-      .update(labOrders)
-      .set({
-        approvedPrice: null,
-        approvedAt: null,
-        cost: typeof prevCost === 'string' ? prevCost : null,
-        ...(hubProposed ? { proposedPrice: hubProposed } : {}),
-        ...(err.code === 'price.not_proposed' && !hubProposed ? { proposedPrice: null } : {}),
-        updatedAt: now,
-      })
-      .where(eq(labOrders.id, order.id));
-    await tx.insert(auditLog).values({
+    await rejectPendingPriceApproval(
+      tx,
       tenantId,
-      userId: null,
-      action: 'price_approval_reverted',
-      resourceType: 'lab_order',
-      resourceId: order.id,
-      before: { approvedPrice: order.approvedPrice, proposedPrice: order.proposedPrice },
-      after: {
-        approvedPrice: null,
-        proposedPrice: hubProposed ?? order.proposedPrice,
-        hubError: err.code,
-        removedExpenseIds: removed.map((e) => e.id),
-      },
-    });
-    for (const e of removed) {
-      await tx.insert(auditLog).values({
-        tenantId,
-        userId: null,
-        action: 'deleted',
-        resourceType: 'expense',
-        resourceId: e.id,
-        before: { amount: e.amount, labOrderId: order.id },
-        after: { reason: `lab_hub.${err.code}` },
-      });
-    }
-    const recipients = new Set<string>([order.doctorId]);
-    if (typeof row.payload.approvedBy === 'string') recipients.add(row.payload.approvedBy);
-    const ref = order.orderNumber != null ? `#${order.orderNumber}` : '';
-    const title = hubProposed
-      ? `Narx tasdiqlanmadi: laboratoriya narxni o'zgartirdi — ${formatSum(hubProposed)}`
-      : 'Narx tasdiqlanmadi: laboratoriya taklifni qaytarib oldi';
-    for (const userId of recipients) {
-      await tx.insert(notifications).values({
-        tenantId,
-        userId,
-        type: 'lab_hub.price',
-        title,
-        body: [order.labName, ref].filter(Boolean).join(' · ') || null,
-      });
-    }
+      row.lab_order_id,
+      Number(row.payload.price).toFixed(2),
+      err.code,
+      hubProposed,
+      now,
+    );
   });
   logger.warn(
     { tenantId, labOrderId: row.lab_order_id, code: err.code },
-    'lab-hub price approval rejected by Hub — local approval reverted',
+    'lab-hub price approval rejected by Hub — pending approval cleared',
   );
 };
 
@@ -314,8 +270,9 @@ export const flushLabHubOutbox = async (
         continue;
       }
       try {
-        await executeOp(tenantId, key, row, client, t);
+        const finalize = await executeOp(tenantId, key, row, client, t);
         await withTenant(tenantId, async (tx) => {
+          if (finalize) await finalize(tx);
           await tx
             .update(labHubOutbox)
             .set({ status: 'done', doneAt: now(), lastError: null, attempts: row.attempts + 1 })
@@ -329,8 +286,8 @@ export const flushLabHubOutbox = async (
           err instanceof LabHubError &&
           PRICE_REJECTED.has(err.code)
         ) {
-          // Hub boshqa narxni kutyapti — lokal tasdiq (xarajat) qaytariladi, ish qayta tasdiqqa.
-          await revertLocalPriceApproval(tenantId, row, err, now());
+          // Hub boshqa narxni kutyapti — kutish tozalanadi, ish qayta tasdiqqa.
+          await rejectPriceApprovalOp(tenantId, row, err, now());
           result.failed++;
           continue;
         }
@@ -394,9 +351,6 @@ const STATUS_TITLE: Record<string, string> = {
   ready: 'Laboratoriya ishi tayyor',
 };
 
-const formatSum = (price: string) =>
-  `${Math.round(Number(price)).toLocaleString('ru-RU').replace(/ /g, ' ')} so'm`;
-
 const applyEvent = async (tx: DbOrTx, tenantId: string, ev: HubChangeEvent, now: Date) => {
   const [order] = await tx
     .select({
@@ -431,6 +385,15 @@ const applyEvent = async (tx: DbOrTx, tenantId: string, ev: HubChangeEvent, now:
       if (to === 'rejected') patch.hubRejectReason = String(ev.payload.reason ?? '') || null;
       const target = HUB_TO_CLINIC[to];
       if (
+        to === 'accepted' &&
+        String(ev.payload.from ?? '') === 'remake' &&
+        isValidLabOrderRemakeTransition(order.status as LabOrderStatus)
+      ) {
+        // Qayta ishlash (remake) lab tomonidan qabul qilindi — tayyor/yetkazilgan buyurtma
+        // qayta «jarayonda»ga qaytadi; qayta yetkazilganda yangi sana yoziladi.
+        patch.status = 'in_progress';
+        patch.deliveredDate = null;
+      } else if (
         target &&
         order.status !== 'cancelled' &&
         (CLINIC_RANK[target] ?? -1) > (CLINIC_RANK[order.status] ?? 99)
@@ -453,26 +416,23 @@ const applyEvent = async (tx: DbOrTx, tenantId: string, ev: HubChangeEvent, now:
     case 'price_proposed': {
       const price = String(ev.payload.price ?? '');
       if (!price) return;
-      // Hub tasdiqlangan ishga yangi taklif bermaydi (lab `price.already_approved`), shuning
-      // uchun har `price_proposed` — Hub'dagi joriy taklif: lokal tasdiq bo'lsa ham TASHLANMAYDI.
-      // Lokal tasdiq Hub'da hali qabul qilinmagan bo'lishi mumkin (outbox navbatda) — Hub
-      // `price.mismatch` qaytarsa tasdiq qaytariladi va foydalanuvchi shu yangi narxni ko'radi.
+      // Hub tasdiqlangan ishga yangi taklif bermaydi (lab `price.already_approved`) — Hub
+      // tasdig'i (`approvedPrice`) bo'lmaguncha har `price_proposed` Hub'dagi joriy taklif:
+      // klinika «Tasdiqlash»ni bosgan (kutilmoqda) bo'lsa ham TASHLANMAYDI. Kutilayotgan
+      // tasdiq eski narx uchun bo'lsa Hub `price.mismatch` qaytaradi va kutish tozalanadi.
+      if (order.approvedPrice != null) return;
       await tx
         .update(labOrders)
         .set({ proposedPrice: price, updatedAt: now })
         .where(eq(labOrders.id, order.id));
-      if (order.approvedPrice == null || order.approvedPrice !== price) {
-        await notify('lab_hub.price', `Laboratoriya narx taklif qildi: ${formatSum(price)}`);
-      }
+      await notify('lab_hub.price', `Laboratoriya narx taklif qildi: ${formatSum(price)}`);
       return;
     }
     case 'price_approved': {
+      // Hub tasdiqladi — xarajat shu yerda (push 2xx bilan qaysi biri birinchi; idempotent).
       const price = String(ev.payload.price ?? '');
       if (!price || order.approvedPrice != null) return;
-      await tx
-        .update(labOrders)
-        .set({ approvedPrice: price, approvedAt: new Date(ev.createdAt), updatedAt: now })
-        .where(eq(labOrders.id, order.id));
+      await bookHubConfirmedPrice(tx, tenantId, order.id, price, new Date(ev.createdAt), now);
       return;
     }
     case 'message': {

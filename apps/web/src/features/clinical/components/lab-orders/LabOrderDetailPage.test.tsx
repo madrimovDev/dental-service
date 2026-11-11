@@ -11,6 +11,12 @@ const postMutate = vi.fn();
 const sendMutate = vi.fn();
 const orderOver: { current: Record<string, unknown> } = { current: {} };
 const hubState = { connected: true };
+const extraMessages: { current: Record<string, unknown>[] } = { current: [] };
+const downloadSpy = vi.fn(() => Promise.resolve());
+
+vi.mock('@/hooks/useAuthedObjectUrl', () => ({
+  downloadAuthedFile: (...args: unknown[]) => downloadSpy(...(args as [])),
+}));
 
 vi.mock('../../clinical.api', () => ({
   useLabOrder: () => ({
@@ -74,6 +80,7 @@ vi.mock('./lab-hub.api', () => ({
         synced: true,
         createdAt: '2026-06-11T00:00:00Z',
       },
+      ...extraMessages.current,
     ],
   }),
   usePostLabHubMessage: () => ({ mutate: postMutate, isPending: false }),
@@ -108,8 +115,15 @@ describe('LabOrderDetailPage', () => {
     postMutate.mockReset();
     sendMutate.mockReset();
     orderOver.current = {};
+    extraMessages.current = [];
+    downloadSpy.mockClear();
     hubState.connected = true;
-    permissions.current = new Set(['lab_order.view', 'lab_order.manage', 'patient.view']);
+    permissions.current = new Set([
+      'lab_order.view',
+      'lab_order.manage',
+      'lab_order.approve_price',
+      'patient.view',
+    ]);
   });
 
   it('buyurtma tafsiloti, bemor nomi va qayta tayyorlash havolasi', () => {
@@ -187,5 +201,51 @@ describe('LabOrderDetailPage', () => {
     expect(
       screen.queryByRole('textbox', { name: 'Laboratoriyaga xabar…' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('lab_order.manage bor, lab_order.approve_price yo‘q (Technician): «Tasdiqlash» yo‘q', () => {
+    permissions.current = new Set(['lab_order.view', 'lab_order.manage']);
+    orderOver.current = { labHubLabId: 'hl1', hubStatus: 'ready', proposedPrice: '350000.00' };
+    renderPage();
+    expect(screen.queryByRole('button', { name: 'Tasdiqlash' })).not.toBeInTheDocument();
+    // Xabar yozish (manage) qoladi.
+    expect(screen.getByRole('textbox', { name: 'Laboratoriyaga xabar…' })).toBeInTheDocument();
+  });
+
+  it('tasdiq yuborilgan, Hub hali tasdiqlamagan: «kutilmoqda», tugma yo‘q, xarajat yozuvi yo‘q', () => {
+    orderOver.current = {
+      labHubLabId: 'hl1',
+      hubStatus: 'ready',
+      proposedPrice: '350000.00',
+      approvedPrice: null,
+      priceApprovalPending: true,
+      priceApprovalRequestedPrice: '350000.00',
+    };
+    renderPage();
+    expect(screen.getByTestId('price-pending')).toHaveTextContent(
+      "Tasdiq yuborildi — laboratoriya tasdig'i kutilmoqda",
+    );
+    expect(screen.queryByRole('button', { name: 'Tasdiqlash' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/«Laboratoriya» xarajati/)).not.toBeInTheDocument();
+  });
+
+  it('lab fayli xabarida «Yuklab olish» — proxy manzil bilan', () => {
+    orderOver.current = { labHubLabId: 'hl1', hubStatus: 'ready' };
+    extraMessages.current = [
+      {
+        id: 'm2',
+        labOrderId: 'lo1',
+        author: 'lab',
+        authorName: null,
+        kind: 'file',
+        body: 'natija.pdf',
+        file: { id: 'f1', fileName: 'natija.pdf', mimeType: 'application/pdf', sizeBytes: 10 },
+        synced: true,
+        createdAt: '2026-06-12T00:00:00Z',
+      },
+    ];
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Yuklab olish: natija.pdf' }));
+    expect(downloadSpy).toHaveBeenCalledWith('/api/lab-orders/lo1/hub-files/f1', 'natija.pdf');
   });
 });

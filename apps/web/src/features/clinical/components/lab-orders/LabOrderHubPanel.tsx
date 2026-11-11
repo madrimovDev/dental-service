@@ -3,6 +3,8 @@ import { Button, Group, Select, Stack, Textarea } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { downloadAuthedFile } from '@/hooks/useAuthedObjectUrl';
+import { api } from '@/lib/api.ts';
 import { formatCurrency } from '@/lib/format';
 import classes from './LabOrderForm.module.css';
 import {
@@ -38,13 +40,18 @@ const errorCode = (err: unknown) => (err as { code?: string } | null)?.code ?? '
 /**
  * Lab buyurtma sahifasidagi Lab Hub bloki (W2): portal orqali yuborish, sinxron belgisi,
  * lab holati (rad etish sababi bilan), narx taklifi + «Tasdiqlash» (L4) va yozishma.
+ * Tasdiq ekranda ko'rsatilgan narx bilan yuboriladi; laboratoriya (Hub) tasdiqlaguncha
+ * «kutilmoqda» — xarajat faqat Hub tasdig'idan keyin yoziladi.
  */
 export function LabOrderHubPanel({
   order,
   canManage,
+  canApprovePrice = false,
 }: {
   order: LabOrderWire;
   canManage: boolean;
+  /** `lab_order.approve_price` */
+  canApprovePrice?: boolean;
 }) {
   const { t } = useTranslation();
   const linked = !!order.labHubLabId;
@@ -119,6 +126,8 @@ export function LabOrderHubPanel({
   const sync = order.hubSyncStatus ?? null;
   const proposed = order.proposedPrice ?? null;
   const approved = order.approvedPrice ?? null;
+  const pending = !approved && order.priceApprovalPending === true;
+  const pendingPrice = order.priceApprovalRequestedPrice ?? proposed;
   const list = messages.data ?? [];
 
   return (
@@ -155,18 +164,34 @@ export function LabOrderHubPanel({
               <b>{formatCurrency(Number(approved), t)}</b>{' '}
               <span className={classes.okNote}>{t('labHubClinic.price_approved_note')}</span>
             </div>
+          ) : pending ? (
+            <div data-testid="price-pending">
+              {pendingPrice && (
+                <>
+                  <b>{formatCurrency(Number(pendingPrice), t)}</b>{' '}
+                </>
+              )}
+              <span className={classes.hint}>{t('labHubClinic.price_pending')}</span>
+            </div>
           ) : proposed ? (
             <Group gap="sm">
               <span>
                 {t('labHubClinic.price_proposed')}: <b>{formatCurrency(Number(proposed), t)}</b>
               </span>
-              {canManage && (
+              {canApprovePrice && (
                 <Button
                   loading={approve.isPending}
                   onClick={() =>
+                    // Ekranda ko'rsatilgan narx yuboriladi (server qulflangan taklif bilan solishtiradi).
                     approve.mutate(proposed, {
-                      onSuccess: () =>
-                        notifications.show({ message: t('labHubClinic.approved_toast') }),
+                      onSuccess: (res) =>
+                        notifications.show({
+                          message: t(
+                            res.status === 'approved'
+                              ? 'labHubClinic.approved_toast'
+                              : 'labHubClinic.approval_sent_toast',
+                          ),
+                        }),
                       onError: (err) => notifications.show({ color: 'red', message: errText(err) }),
                     })
                   }
@@ -214,6 +239,26 @@ export function LabOrderHubPanel({
                       ? t('labHubClinic.file_from_lab', { name: m.body ?? m.file?.fileName ?? '' })
                       : m.body}
                   </div>
+                  {m.kind === 'file' && m.file && (
+                    <Button
+                      variant="subtle"
+                      size="compact-sm"
+                      px={0}
+                      aria-label={`${t('labHubClinic.file_download')}: ${m.file.fileName ?? m.body ?? ''}`}
+                      onClick={() => {
+                        const f = m.file;
+                        if (!f) return;
+                        downloadAuthedFile(
+                          api.labHub.hubFileUrl(order.id, f.id),
+                          f.fileName ?? m.body ?? 'file',
+                        ).catch((err) =>
+                          notifications.show({ color: 'red', message: errText(err) }),
+                        );
+                      }}
+                    >
+                      {t('labHubClinic.file_download')}
+                    </Button>
+                  )}
                 </li>
               ))}
             </ol>

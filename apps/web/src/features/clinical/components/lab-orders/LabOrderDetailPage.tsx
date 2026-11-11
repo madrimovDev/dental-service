@@ -20,6 +20,7 @@ export function LabOrderDetailPage() {
   const { id = '' } = useParams();
   const { hasPermission } = useAuthStore();
   const canManage = hasPermission('lab_order.manage');
+  const canApprovePrice = hasPermission('lab_order.approve_price');
   const canViewPatient = hasPermission('patient.view');
 
   const query = useLabOrder(id);
@@ -124,7 +125,7 @@ export function LabOrderDetailPage() {
             </dl>
           </section>
 
-          <LabOrderHubPanel order={order} canManage={canManage} />
+          <LabOrderHubPanel order={order} canManage={canManage} canApprovePrice={canApprovePrice} />
 
           <section className={classes.card}>
             <h3 className={classes.cardTitle}>{t('labOrder.files_section')}</h3>
@@ -148,10 +149,19 @@ export function LabOrderDetailPage() {
                 onChange={(v) =>
                   v && statusMut.mutate({ id: order.id, status: v as LabOrderStatus })
                 }
-                data={allowedLabOrderStatuses(order.status).map((s) => ({
-                  value: s,
-                  label: t(`lab_order.status_${s}`),
-                }))}
+                data={allowedLabOrderStatuses(order.status)
+                  // Portal buyurtmasi: «Yetkazildi» faqat laboratoriya «tayyor» qilgach (server ham 400).
+                  .filter(
+                    (s) =>
+                      s !== 'delivered' ||
+                      !order.labHubLabId ||
+                      order.hubStatus === 'ready' ||
+                      order.status === 'delivered',
+                  )
+                  .map((s) => ({
+                    value: s,
+                    label: t(`lab_order.status_${s}`),
+                  }))}
                 allowDeselect={false}
               />
             )}

@@ -224,6 +224,19 @@ describe('LabOrderNewPage', () => {
     expect(await screen.findByText('detail-page')).toBeInTheDocument();
   });
 
+  it('«Laboratoriya nimani ko‘radi»: Hub’ga yuboriladigan shifokor (doctorId) ismi', async () => {
+    renderPage();
+    expect(await screen.findByTestId('lab-sees-doctor')).toHaveTextContent('Dr. Yusupova');
+    fireEvent.change(await screen.findByLabelText(/Laboratoriya nomi/), {
+      target: { value: 'Lab Z' },
+    });
+    fireEvent.click(screen.getByText('A3'));
+    fireEvent.change(screen.getByLabelText(/Kerakli sana/), { target: { value: '2026-12-01' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Laboratoriyaga yuborish' }));
+    await waitFor(() => expect(createMutateAsync).toHaveBeenCalled());
+    expect(createMutateAsync.mock.calls[0]?.[0]).toMatchObject({ doctorId: 'u1' });
+  });
+
   it('forma: remake belgilansa asl buyurtma va sabab majburiy', async () => {
     renderPage();
     fireEvent.change(await screen.findByLabelText(/Laboratoriya nomi/), {

@@ -54,7 +54,7 @@ export const labOrdersRoutes = (deps: { db: Database; audit: AuditLogger }) => {
   /** Biznes xatosi → `fail()` (4xx — RLS tranzaksiyasi commit bo'ladi, throw emas). */
   const hubFail = (e: unknown) => {
     if (e instanceof LabHubOrderError) {
-      return { body: fail(e.code, e.code, e.details), status: e.status };
+      return { body: fail(e.code, e.message, e.details), status: e.status };
     }
     if (e instanceof InvalidLabOrderTransitionError) {
       return { body: fail('lab_order.invalid_transition', e.message), status: 400 as const };
@@ -73,6 +73,10 @@ export const labOrdersRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     409: {
       content: { 'application/json': { schema: errorResponseSchema } },
       description: 'Conflict (not connected / already sent / price not proposed)',
+    },
+    502: {
+      content: { 'application/json': { schema: errorResponseSchema } },
+      description: 'Lab Hub unreachable',
     },
   };
 
@@ -197,7 +201,11 @@ export const labOrdersRoutes = (deps: { db: Database; audit: AuditLogger }) => {
       ...okJson(labOrderDtoSchema, 'Updated lab order'),
       400: {
         content: { 'application/json': { schema: errorResponseSchema } },
-        description: 'Invalid status transition',
+        description: 'Invalid status transition / Lab Hub work not ready',
+      },
+      409: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Locked by lab (Lab Hub accepted the work)',
       },
       ...notFoundResponse,
     },
@@ -211,11 +219,10 @@ export const labOrdersRoutes = (deps: { db: Database; audit: AuditLogger }) => {
       if (!row) return c.json(fail('lab_order.not_found', 'Not found'), 404);
       return c.json(ok(toLabOrderDto(row)), 200);
     } catch (e) {
-      // CLI-439 B2: noto'g'ri status o'tishi (masalan delivered→draft) → 400.
-      if (e instanceof InvalidLabOrderTransitionError) {
-        return c.json(fail('lab_order.invalid_transition', e.message), 400);
-      }
-      throw e;
+      // CLI-439 B2: noto'g'ri status o'tishi (masalan delivered→draft) → 400; Lab Hub
+      // qoidalari (`lab_hub.not_ready`, `lab_order.locked_by_lab`) → 400/409 (fail, commit).
+      const r = hubFail(e);
+      return c.json(r.body, r.status as 400 | 409);
     }
   });
 
@@ -337,13 +344,19 @@ export const labOrdersRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     path: '/{id}/approve-price',
     tags: ['lab-orders'],
     operationId: 'approveLabOrderPrice',
-    middleware: [requirePermission('lab_order.manage'), requireFeature('labOrders')] as const,
+    middleware: [
+      requirePermission('lab_order.approve_price'),
+      requireFeature('labOrders'),
+    ] as const,
     request: {
       params: labOrderIdParamSchema,
       body: { content: { 'application/json': { schema: approvePriceSchema } }, required: true },
     },
     responses: {
-      ...okJson(approvePriceResponseSchema, 'Price approved (idempotent)'),
+      ...okJson(
+        approvePriceResponseSchema,
+        'Approval requested (pending lab confirmation) or already approved',
+      ),
       ...hubErrorResponses,
     },
   });
@@ -358,6 +371,27 @@ export const labOrdersRoutes = (deps: { db: Database; audit: AuditLogger }) => {
       return c.json(r.body, r.status);
     }
   });
+
+  // GET /{id}/hub-files/{fileId} — lab yuborgan fayl (Hub'dan deshifrlangan oqim). Binar
+  // javob — OpenAPI'dan tashqari (multipart upload naqshi).
+  app.get(
+    '/:id/hub-files/:fileId',
+    requirePermission('lab_order.view'),
+    requireFeature('labOrders'),
+    async (c) => {
+      const id = c.req.param('id');
+      const fileId = c.req.param('fileId');
+      if (!z.uuid().safeParse(id).success || !z.uuid().safeParse(fileId).success) {
+        return c.json(fail('lab_hub.file_not_found', 'Not found'), 404);
+      }
+      try {
+        return await hub.downloadHubFile(c, id, fileId);
+      } catch (e) {
+        const r = hubFail(e);
+        return c.json(r.body, r.status);
+      }
+    },
+  );
 
   const listHubMessagesRoute = createRoute({
     method: 'get',

@@ -118,6 +118,17 @@ export const labOrders = pgTable(
     proposedPrice: numeric('proposed_price', { precision: 14, scale: 2 }),
     approvedPrice: numeric('approved_price', { precision: 14, scale: 2 }),
     approvedAt: timestamp('approved_at', { withTimezone: true }),
+    /**
+     * Klinika «Tasdiqlash»ni bosgan, Hub hali tasdiqlamagan (L4: tasdiqlanmagan xarajat
+     * YOZILMAYDI). Hub 2xx / `price_approved` hodisasi → `approvedPrice` + xarajat va bu
+     * ustunlar tozalanadi; Hub `price.mismatch` → tozalanadi, yangi taklif ko'rsatiladi.
+     */
+    priceApprovalRequestedAt: timestamp('price_approval_requested_at', { withTimezone: true }),
+    priceApprovalRequestedPrice: numeric('price_approval_requested_price', {
+      precision: 14,
+      scale: 2,
+    }),
+    priceApprovalRequestedBy: uuid('price_approval_requested_by'),
 
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

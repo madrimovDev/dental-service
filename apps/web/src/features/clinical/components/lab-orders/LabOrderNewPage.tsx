@@ -88,6 +88,12 @@ export function LabOrderNewPage() {
   const [searchParams] = useSearchParams();
   const remakeOf = searchParams.get('remakeOf');
   const user = useAuthStore((s) => s.user);
+  /**
+   * Buyurtma shifokori — `doctorId` sifatida yuboriladi va Hub'ga (`toHubCase`) aynan shu
+   * shifokorning ismi ketadi. «Laboratoriya nimani ko'radi» ham shu manbadan o'qiydi
+   * (bitta qiymat — oldindan ko'rish va yuborilgan narsa ajralib ketmaydi).
+   */
+  const orderDoctor = user ? { id: user.id, name: user.fullName } : null;
   const canViewAppointments = useAuthStore((s) => s.hasPermission('appointment.view'));
   const [files, setFiles] = useState<File[]>([]);
 
@@ -169,12 +175,12 @@ export function LabOrderNewPage() {
 
   const submit = (send: boolean) =>
     form.onSubmit(async (values) => {
-      if (!user) return;
+      if (!orderDoctor) return;
       const nums = parseToothNumbers(values.toothNumbersText);
       try {
         const order = await createMut.mutateAsync({
           patientId,
-          doctorId: user.id,
+          doctorId: orderDoctor.id,
           labName: values.labName.trim(),
           orderType: values.orderType as LabOrderType,
           items: [
@@ -572,7 +578,9 @@ export function LabOrderNewPage() {
                 <span className={classes.seesKey}>{t('labOrder.due_date')}</span>
                 <span className={classes.seesVal}>{formatDueDate(v.dueDate) ?? '—'}</span>
                 <span className={classes.seesKey}>{t('labOrder.sees_doctor')}</span>
-                <span className={classes.seesVal}>{user?.fullName ?? '—'}</span>
+                <span className={classes.seesVal} data-testid="lab-sees-doctor">
+                  {orderDoctor?.name || '—'}
+                </span>
                 <span className={classes.seesKey}>{t('labOrder.sees_files')}</span>
                 <span className={classes.seesVal}>{files.length}</span>
                 <span className={classes.seesKey}>{t('labOrder.sees_contact')}</span>

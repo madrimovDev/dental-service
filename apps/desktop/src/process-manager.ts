@@ -16,6 +16,7 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { readConfig, resolveLabHubUrl } from './config.js';
 import {
   getOrCreateDbPassword,
   getOrCreateJwtSecret,
@@ -395,6 +396,9 @@ const spawnApi = (port: number): Promise<void> =>
         DENTAL_LOCAL_DESKTOP: 'true',
         RUN_REMINDER_WORKER: 'true',
         NODE_ENV: 'production',
+        // Laboratoriya portali — config.json `labHubUrl` (bo'sh = o'chiq). Har doim aniq
+        // beriladi: tashqi muhitdagi `LAB_HUB_URL` desktop'ga tasodifan o'tib ketmaydi.
+        LAB_HUB_URL: resolveLabHubUrl(readConfig()),
       },
       stdio: 'pipe',
     });

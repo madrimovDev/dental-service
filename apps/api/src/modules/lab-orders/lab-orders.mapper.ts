@@ -29,6 +29,8 @@ export const toLabOrderDto = (row: LabOrder): LabOrderDto => ({
   proposedPrice: row.proposedPrice ?? null,
   approvedPrice: row.approvedPrice ?? null,
   approvedAt: row.approvedAt ? row.approvedAt.toISOString() : null,
+  priceApprovalPending: row.approvedPrice == null && row.priceApprovalRequestedAt != null,
+  priceApprovalRequestedPrice: row.priceApprovalRequestedPrice ?? null,
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(),
 });

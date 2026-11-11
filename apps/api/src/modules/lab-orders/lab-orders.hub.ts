@@ -1,5 +1,4 @@
 import {
-  expenseCategories,
   expenses,
   labHubOutbox,
   labOrderFiles,
@@ -7,26 +6,26 @@ import {
   labOrders,
   users,
 } from '@dental/db-schema';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { onAfterCommit } from '../../db/after-commit.ts';
 import type { DbOrTx } from '../../db/client.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
-import { isLabHubConfigured } from '../../lib/lab-hub/client.ts';
-import { clinicCaseCode } from '../../lib/lab-hub/mapper.ts';
-import { readLabHubState } from '../../lib/lab-hub/state.ts';
+import { isLabHubConfigured, LabHubError, labHubClient } from '../../lib/lab-hub/client.ts';
+import { hubKeyOf, readLabHubState } from '../../lib/lab-hub/state.ts';
 import { kickLabHubOutbox } from '../../lib/lab-hub/sync.ts';
 import { assertLabOrderTransition, type LabOrderStatus } from './lab-orders.transitions.ts';
 
 /** Service qaytaradigan biznes xatosi — routes `fail(code)` + status'ga aylantiradi (4xx → commit). */
 export class LabHubOrderError extends Error {
   constructor(
-    readonly status: 400 | 404 | 409,
+    readonly status: 400 | 404 | 409 | 502,
     readonly code: string,
     readonly details?: Record<string, unknown>,
+    message?: string,
   ) {
-    super(code);
+    super(message ?? code);
     this.name = 'LabHubOrderError';
   }
 }
@@ -38,11 +37,6 @@ export const normalizeMoney = (v: string | number): string | null => {
   if (!Number.isFinite(n) || n < 0 || n >= 1e12) return null;
   return n.toFixed(2);
 };
-
-const LAB_EXPENSE_CATEGORY = { name: 'Laboratoriya', nameRu: 'Лаборатория' } as const;
-
-/** Klinika kalendar kuni (xarajat sanasi) — O'zbekiston vaqti. */
-const todayTashkent = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' });
 
 export type LabOrderHubOp = 'upsert_case' | 'file' | 'message' | 'approve_price' | 'delivered';
 
@@ -128,14 +122,12 @@ export const createLabOrdersHubService = (deps: { audit: AuditLogger }) => {
   }
 
   /**
-   * L4: lab taklif qilgan narxni tasdiqlash → `expenses` («Laboratoriya»). Buyurtma qatori
-   * `FOR UPDATE` bilan qulflanadi (parallel ikki bosish ketma-ket bo'ladi) + `expenses.lab_order_id`
-   * UNIQUE — ikkinchi tasdiq yangi xarajat yaratmaydi (`alreadyApproved: true`).
+   * L4: lab taklif qilgan narxni tasdiqlash SO'ROVI. Qaror: tasdiqlanmagan xarajat yozilmaydi —
+   * bu yerda faqat «kutilmoqda» holati (`price_approval_requested_*`) + outbox `approve_price`.
+   * Xarajat Hub tasdiqlaganda (`bookHubConfirmedPrice`: push 2xx yoki poll `price_approved`).
    *
-   * `shownPrice` — foydalanuvchi ekranda ko'rgan narx (TOCTOU himoyasi): poll orasida lab narxni
-   * o'zgartirgan bo'lsa (qulflangan qatordagi `proposedPrice` boshqa) — 409 `price.changed`,
-   * xarajat yozilmaydi. Hub keyinroq `price.mismatch` qaytarsa (lab poll'dan keyin yana
-   * o'zgartirgan) — outbox lokal tasdiqni qaytaradi (`revertLocalPriceApproval`, sync.ts).
+   * `shownPrice` — foydalanuvchi ekranda ko'rgan narx (TOCTOU): qulflangan qatordagi
+   * `proposedPrice`dan farq qilsa 409 `price.changed`, hech narsa yozilmaydi.
    */
   async function approvePrice(c: Context, id: string, shownPrice: string) {
     const db = getDb(c);
@@ -157,8 +149,10 @@ export const createLabOrdersHubService = (deps: { audit: AuditLogger }) => {
         .from(expenses)
         .where(eq(expenses.labOrderId, id));
       return {
+        status: 'approved' as const,
         approvedPrice: order.approvedPrice,
         approvedAt: order.approvedAt?.toISOString() ?? null,
+        requestedPrice: null,
         alreadyApproved: true,
         expenseId: exp?.id ?? null,
       };
@@ -167,73 +161,111 @@ export const createLabOrdersHubService = (deps: { audit: AuditLogger }) => {
     if (order.proposedPrice !== shown) {
       throw new LabHubOrderError(409, 'price.changed', { proposedPrice: order.proposedPrice });
     }
-    const price = order.proposedPrice;
-
-    let [category] = await db
-      .select({ id: expenseCategories.id })
-      .from(expenseCategories)
-      .where(eq(expenseCategories.name, LAB_EXPENSE_CATEGORY.name))
-      .limit(1);
-    if (!category) {
-      [category] = await db
-        .insert(expenseCategories)
-        .values({ tenantId, ...LAB_EXPENSE_CATEGORY })
-        .returning({ id: expenseCategories.id });
+    if (order.priceApprovalRequestedAt != null) {
+      // Takroriy bosish — o'sha narx uchun so'rov allaqachon navbatda (idempotent).
+      if (order.priceApprovalRequestedPrice === shown) {
+        return {
+          status: 'pending' as const,
+          approvedPrice: null,
+          approvedAt: null,
+          requestedPrice: shown,
+          alreadyApproved: false,
+          expenseId: null,
+        };
+      }
+      // Boshqa narx uchun so'rov hali Hub javobini kutmoqda — u hal bo'lgach qayta.
+      throw new LabHubOrderError(409, 'price.approval_pending', {
+        requestedPrice: order.priceApprovalRequestedPrice,
+      });
     }
 
-    const [expense] = await db
-      .insert(expenses)
-      .values({
-        tenantId,
-        branchId: c.get('activeBranchId') ?? null,
-        categoryId: category?.id ?? null,
-        amount: price,
-        date: todayTashkent(),
-        note: `${order.labName} · ${clinicCaseCode(order)}`,
-        createdBy: c.get('user')?.id ?? null,
-        labOrderId: id,
-      })
-      .onConflictDoNothing()
-      .returning();
-
     const now = new Date();
+    const userId = c.get('user')?.id ?? null;
     await db
       .update(labOrders)
-      .set({ approvedPrice: price, approvedAt: now, cost: price, updatedAt: now })
+      .set({
+        priceApprovalRequestedAt: now,
+        priceApprovalRequestedPrice: shown,
+        priceApprovalRequestedBy: userId,
+        updatedAt: now,
+      })
       .where(eq(labOrders.id, id));
-    // `prevCost`/`approvedBy` — Hub `price.mismatch` qaytarsa lokal tasdiqni qaytarish uchun.
     await enqueueLabHub(c, db, tenantId, id, [
       {
         op: 'approve_price',
         payload: {
-          price: Number(price),
-          prevCost: order.cost ?? null,
-          approvedBy: c.get('user')?.id ?? null,
+          price: Number(shown),
+          requestedBy: userId,
+          branchId: c.get('activeBranchId') ?? null,
         },
       },
     ]);
-
     await deps.audit.record(c, {
-      action: 'price_approved',
+      action: 'price_approval_requested',
       resourceType: 'lab_order',
       resourceId: id,
-      before: { proposedPrice: price, approvedPrice: null },
-      after: { approvedPrice: price, expenseId: expense?.id ?? null },
+      before: { proposedPrice: shown, approvedPrice: null },
+      after: { requestedPrice: shown },
     });
-    if (expense) {
-      await deps.audit.record(c, {
-        action: 'created',
-        resourceType: 'expense',
-        resourceId: expense.id,
-        after: { amount: price, labOrderId: id, category: LAB_EXPENSE_CATEGORY.name },
+    return {
+      status: 'pending' as const,
+      approvedPrice: null,
+      approvedAt: null,
+      requestedPrice: shown,
+      alreadyApproved: false,
+      expenseId: null,
+    };
+  }
+
+  /**
+   * Lab yuborgan faylni Hub'dan (deshifrlangan) oqim sifatida klinikaga beradi. Faqat shu
+   * buyurtmaga sinxron orqali kelgan fayl (`lab_order_messages.hub_ref = file:<id>`) — boshqa
+   * ish/klinika fayli id'si bilan so'rab bo'lmaydi (Hub ham ish/klinika bo'yicha tekshiradi).
+   */
+  async function downloadHubFile(c: Context, id: string, fileId: string): Promise<Response> {
+    const db = getDb(c);
+    const [order] = await db
+      .select({ id: labOrders.id, ref: labOrders.labHubCaseRef })
+      .from(labOrders)
+      .where(eq(labOrders.id, id));
+    if (!order) throw new LabHubOrderError(404, 'lab_order.not_found');
+    if (!order.ref) throw new LabHubOrderError(409, 'lab_hub.not_sent');
+    const [msg] = await db
+      .select({ id: labOrderMessages.id })
+      .from(labOrderMessages)
+      .where(
+        and(eq(labOrderMessages.labOrderId, id), eq(labOrderMessages.hubRef, `file:${fileId}`)),
+      );
+    if (!msg) throw new LabHubOrderError(404, 'lab_hub.file_not_found');
+    if (!isLabHubConfigured()) throw new LabHubOrderError(409, 'lab_hub.not_configured');
+    const key = hubKeyOf(await readLabHubState(db));
+    if (!key) throw new LabHubOrderError(409, 'lab_hub.not_connected');
+    let res: Response;
+    try {
+      res = await labHubClient().downloadFile(key, order.ref, fileId);
+    } catch (err) {
+      if (err instanceof LabHubError && err.status === 404) {
+        throw new LabHubOrderError(404, 'lab_hub.file_not_found');
+      }
+      throw new LabHubOrderError(502, 'lab_hub.unreachable', {
+        hubError: err instanceof LabHubError ? err.code : 'error',
       });
     }
-    return {
-      approvedPrice: price,
-      approvedAt: now.toISOString(),
-      alreadyApproved: false,
-      expenseId: expense?.id ?? null,
-    };
+    await deps.audit.record(c, {
+      action: 'viewed',
+      resourceType: 'lab_order',
+      resourceId: id,
+      after: { hubFileId: fileId },
+    });
+    const headers = new Headers({
+      'Content-Type': res.headers.get('content-type') ?? 'application/octet-stream',
+      'Content-Disposition': res.headers.get('content-disposition') ?? 'attachment',
+      'Cache-Control': 'private, no-store',
+      'X-Content-Type-Options': 'nosniff',
+    });
+    const len = res.headers.get('content-length');
+    if (len) headers.set('Content-Length', len);
+    return new Response(res.body, { status: 200, headers });
   }
 
   async function listMessages(c: Context, id: string) {
@@ -293,5 +325,5 @@ export const createLabOrdersHubService = (deps: { audit: AuditLogger }) => {
     return row;
   }
 
-  return { sendToHub, approvePrice, listMessages, postMessage };
+  return { sendToHub, approvePrice, downloadHubFile, listMessages, postMessage };
 };

@@ -149,9 +149,11 @@ export const labHubClient = (fetchImpl?: FetchFn) => ({
       `/v1/clinic/cases/${ref(caseRef)}`,
       { method: 'PUT', key, json: payload, fetchImpl },
     ),
-  uploadFile: (key: string, caseRef: string, file: File) => {
+  /** `clientRef` — barqaror kalit (qayta yuborishda Hub mavjud faylni qaytaradi, 200). */
+  uploadFile: (key: string, caseRef: string, file: File, clientRef?: string) => {
     const form = new FormData();
     form.set('file', file);
+    if (clientRef) form.set('clientRef', clientRef);
     return json<{ file: { id: string } }>(`/v1/clinic/cases/${ref(caseRef)}/files`, {
       method: 'POST',
       key,
@@ -166,11 +168,21 @@ export const labHubClient = (fetchImpl?: FetchFn) => ({
       timeoutMs: UPLOAD_TIMEOUT_MS,
       fetchImpl,
     }),
-  postMessage: (key: string, caseRef: string, body: string, authorName?: string | null) =>
+  postMessage: (
+    key: string,
+    caseRef: string,
+    body: string,
+    authorName?: string | null,
+    clientRef?: string,
+  ) =>
     json<{ message: { id: string } }>(`/v1/clinic/cases/${ref(caseRef)}/messages`, {
       method: 'POST',
       key,
-      json: authorName ? { body, authorName } : { body },
+      json: {
+        body,
+        ...(authorName ? { authorName } : {}),
+        ...(clientRef ? { clientRef } : {}),
+      },
       fetchImpl,
     }),
   approvePrice: (key: string, caseRef: string, price: number) =>

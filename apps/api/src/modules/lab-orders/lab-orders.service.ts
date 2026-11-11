@@ -9,7 +9,7 @@ import {
   type OwnershipValidator,
 } from '../../lib/ownership.ts';
 import { deleteObject, labOrderFileKey, presignedGetUrl, uploadObject } from '../../lib/s3.ts';
-import { enqueueLabHub, type LabOrderHubOp } from './lab-orders.hub.ts';
+import { enqueueLabHub, LabHubOrderError, type LabOrderHubOp } from './lab-orders.hub.ts';
 import type {
   CreateLabOrderInput,
   ListLabOrdersQuery,
@@ -174,8 +174,51 @@ export const createLabOrdersService = (deps: {
 
   async function update(c: Context, id: string, input: UpdateLabOrderInput) {
     const db = getDb(c);
-    const [before] = await db.select().from(labOrders).where(eq(labOrders.id, id));
+    // `FOR UPDATE` — Hub poll'i parallel `hubStatus`ni o'zgartirsa, tekshiruv eskirmaydi.
+    const [before] = await db.select().from(labOrders).where(eq(labOrders.id, id)).for('update');
     if (!before) return null;
+
+    // Lab Hub qoidalari (yozishdan OLDIN — rad etilsa hech narsa yozilmaydi/navbatga tushmaydi).
+    // jsonb kalit tartibini saqlamaydi — kalitlar saralangan holda solishtiriladi.
+    const json = (v: unknown): string =>
+      JSON.stringify(v ?? null, (_k, val) =>
+        val && typeof val === 'object' && !Array.isArray(val)
+          ? Object.fromEntries(
+              Object.entries(val as Record<string, unknown>)
+                .filter(([, x]) => x !== undefined)
+                .sort(([a], [b]) => a.localeCompare(b)),
+            )
+          : val,
+      );
+    const contentChanged =
+      (input.items !== undefined && json(input.items) !== json(before.items)) ||
+      (input.shade !== undefined && (input.shade || null) !== (before.shade ?? null)) ||
+      (input.dueDate !== undefined && (input.dueDate || null) !== (before.dueDate ?? null)) ||
+      (input.notes !== undefined && (input.notes ?? null) !== (before.notes ?? null)) ||
+      (input.orderType !== undefined && input.orderType !== before.orderType);
+    if (before.labHubCaseRef) {
+      if (
+        input.status === 'delivered' &&
+        before.status !== 'delivered' &&
+        before.hubStatus !== 'ready'
+      ) {
+        throw new LabHubOrderError(
+          400,
+          'lab_hub.not_ready',
+          { hubStatus: before.hubStatus },
+          "Laboratoriya ishni hali «tayyor» deb belgilamagan — «Yetkazildi» faqat tayyor ishga qo'yiladi",
+        );
+      }
+      // Lab ishni qabul qilgan (Hub holati `sent`dan keyin) — tarkib endi lokal tahrirlanmaydi.
+      if (contentChanged && before.hubStatus != null && before.hubStatus !== 'sent') {
+        throw new LabHubOrderError(
+          409,
+          'lab_order.locked_by_lab',
+          { hubStatus: before.hubStatus },
+          "Laboratoriya ishni qabul qilgan — o'zgartirishni laboratoriyaga xabar orqali yuboring",
+        );
+      }
+    }
 
     // CLI-439 B2: status state-machine guard — istalgan status→status o'tish avval
     // ruxsat etilardi (`delivered→draft`, `cancelled→delivered`). Endi forward-only
@@ -216,12 +259,6 @@ export const createLabOrdersService = (deps: {
     // holatida bo'lsa (lab qabul qilmagan) tahrir qayta push qilinadi (idempotent PUT).
     if (row?.labHubCaseRef) {
       const ops: { op: LabOrderHubOp }[] = [];
-      const contentChanged =
-        input.items !== undefined ||
-        input.shade !== undefined ||
-        input.dueDate !== undefined ||
-        input.notes !== undefined ||
-        input.orderType !== undefined;
       if (input.status === 'delivered' && before.status !== 'delivered') {
         ops.push({ op: 'delivered' });
       } else if (contentChanged && (row.hubStatus === null || row.hubStatus === 'sent')) {

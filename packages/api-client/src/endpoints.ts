@@ -55,9 +55,15 @@ export type LabHubMessageRecord = {
   createdAt: string;
 };
 
+/**
+ * `pending` — so'rov navbatda, laboratoriya (Hub) tasdig'i kutilmoqda, xarajat HALI yo'q;
+ * `approved` — Hub tasdiqlagan, xarajat yozilgan.
+ */
 export type LabHubPriceApprovalRecord = {
-  approvedPrice: string;
+  status: 'pending' | 'approved';
+  approvedPrice: string | null;
   approvedAt: string | null;
+  requestedPrice: string | null;
   alreadyApproved: boolean;
   expenseId: string | null;
 };
@@ -71,6 +77,9 @@ export type LabOrderHubFields = {
   proposedPrice?: string | null;
   approvedPrice?: string | null;
   approvedAt?: string | null;
+  /** Klinika tasdiqlagan, laboratoriya (Hub) hali tasdiqlamagan. */
+  priceApprovalPending?: boolean;
+  priceApprovalRequestedPrice?: string | null;
 };
 
 export const createEndpoints = (api: ApiClient) => ({
@@ -89,6 +98,9 @@ export const createEndpoints = (api: ApiClient) => ({
       api.post<LabHubPriceApprovalRecord>(`/api/lab-orders/${labOrderId}/approve-price`, {
         price,
       }),
+    /** Lab yuborgan fayl (Bearer bilan blob — `fetchBlob`/`downloadAuthedFile`). */
+    hubFileUrl: (labOrderId: string, fileId: string) =>
+      `/api/lab-orders/${labOrderId}/hub-files/${fileId}`,
     messages: (labOrderId: string) =>
       api.get<LabHubMessageRecord[]>(`/api/lab-orders/${labOrderId}/hub-messages`),
     postMessage: (labOrderId: string, body: string) =>

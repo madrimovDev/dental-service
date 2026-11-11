@@ -7,6 +7,7 @@ import {
   caseEvents,
   caseFiles,
   caseMessages,
+  cases,
   clinics,
   labs,
   labUsers,
@@ -154,6 +155,7 @@ export const addMessage = async (
     authorName?: string | null;
     body: string;
     actorUserId?: string | null;
+    clientRef?: string | null;
   },
 ) => {
   const [row] = await tx
@@ -165,6 +167,7 @@ export const addMessage = async (
       author: m.author,
       authorName: m.authorName ?? null,
       bodyEnc: encryptString(dek, m.body),
+      clientRef: m.clientRef ?? null,
     })
     .returning();
   await recordEvent(tx, {
@@ -187,7 +190,12 @@ export const addFile = async (
   c: Case,
   dek: Key,
   file: File,
-  opts: { uploadedBy: 'clinic' | 'lab'; maxBytes: number; actorUserId?: string | null },
+  opts: {
+    uploadedBy: 'clinic' | 'lab';
+    maxBytes: number;
+    actorUserId?: string | null;
+    clientRef?: string | null;
+  },
 ) => {
   if (c.purgedAt) throw new ApiError(409, 'case.purged');
   if (file.size === 0) throw new ApiError(400, 'file.empty');
@@ -208,6 +216,7 @@ export const addFile = async (
         mimeType: mime,
         sizeBytes: plain.length,
         storageKey: key,
+        clientRef: opts.clientRef ?? null,
       })
       .returning();
     await recordEvent(tx, {
@@ -234,6 +243,35 @@ export const addFile = async (
     await storage.remove(key).catch(() => {});
     throw err;
   }
+};
+
+/**
+ * Klinika `clientRef` bilan qayta yuborgan (javob yo'qolgan) xabar/faylni topadi. Ish qatori
+ * `FOR UPDATE` bilan qulflanadi — parallel ikki so'rovda ikkinchisi birinchisini kutib, uning
+ * qatorini ko'radi (UNIQUE `(case_id, client_ref)` 500 o'rniga idempotent javob).
+ */
+export const lockCaseForClientRef = async (tx: Tx, caseId: string) => {
+  await tx.select({ id: cases.id }).from(cases).where(eq(cases.id, caseId)).for('update');
+};
+
+export const findMessageByClientRef = (tx: Tx, caseId: string, clientRef: string) =>
+  tx.query.caseMessages.findFirst({
+    where: and(eq(caseMessages.caseId, caseId), eq(caseMessages.clientRef, clientRef)),
+  });
+
+export const findFileByClientRef = async (tx: Tx, dek: Key, caseId: string, clientRef: string) => {
+  const f = await tx.query.caseFiles.findFirst({
+    where: and(eq(caseFiles.caseId, caseId), eq(caseFiles.clientRef, clientRef)),
+  });
+  if (!f) return null;
+  return {
+    id: f.id,
+    fileName: decryptOptional(dek, f.fileNameEnc) ?? 'file',
+    mimeType: f.mimeType,
+    sizeBytes: f.sizeBytes,
+    uploadedBy: f.uploadedBy,
+    createdAt: f.createdAt.toISOString(),
+  };
 };
 
 export const contentDisposition = (name: string) =>
