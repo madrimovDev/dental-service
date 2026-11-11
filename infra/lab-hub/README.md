@@ -1,6 +1,6 @@
 # Lab Hub — deploy (infra/lab-hub)
 
-Laboratoriya portali markaziy xizmati: `apps/lab-hub-api` (+ W2'da `apps/lab-hub-web`).
+Laboratoriya portali markaziy xizmati: `apps/lab-hub-api` + `apps/lab-hub-web` (lab xodimlari portali).
 Spec: `docs/superpowers/specs/2026-11-12-lab-portal-design.md` (L1–L10).
 
 ## Tarkib
@@ -10,7 +10,8 @@ Spec: `docs/superpowers/specs/2026-11-12-lab-portal-design.md` (L1–L10).
 | `postgres` | `lab_hub` bazasi (faqat `hub_internal` tarmog'ida) |
 | `migrate` | drizzle migratsiyalari + RLS + `lab_hub_app` (NOSUPERUSER NOBYPASSRLS) roli |
 | `lab-hub-api` | Bun + Hono, port 8171; `uploads_data` volume — faqat shifrlangan bloblar |
-| `caddy` | TLS 1.2+/HSTS, `/v1/*` → API, `/internal/*` → **404** (tashqariga yopiq) |
+| `lab-hub-web` | Statik SPA (Vite build, Caddy :80); API'ga nisbiy `/v1/*` orqali |
+| `caddy` | TLS 1.2+/HSTS, `/v1/*` → API, `/internal/*` → **404** (tashqariga yopiq), qolgani → `lab-hub-web` |
 
 ## Shifrlash (L2)
 
