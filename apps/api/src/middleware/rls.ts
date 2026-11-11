@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import type { MiddlewareHandler } from 'hono';
+import { type AfterCommitFn, runAfterCommit } from '../db/after-commit.ts';
 import type { Database } from '../db/client.ts';
 
 // Ichki sentinel: tranzaksiyani bekor qiladi, lekin tayyor javobni saqlaydi.
@@ -32,10 +33,13 @@ export const rlsMiddleware =
 
     // Tenant kontekst: transaction ochib SET LOCAL chaqirish
     let nextError: unknown;
+    // P4: side-effect'lar tx ichida ro'yxatga olinadi, commit'dan keyin bajariladi.
+    const afterCommit: AfterCommitFn[] = [];
     try {
       await db.transaction(async (tx) => {
         await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);
         c.set('db', tx);
+        c.set('afterCommit', afterCommit);
         try {
           await next();
         } catch (err) {
@@ -53,4 +57,6 @@ export const rlsMiddleware =
       throw err;
     }
     if (nextError) throw nextError;
+    // Tranzaksiya muvaffaqiyatli commit bo'ldi — best-effort side-effect'lar.
+    await runAfterCommit(afterCommit, c.get('requestId'));
   };
