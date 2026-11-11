@@ -298,7 +298,6 @@ export const ROLE_TEMPLATES = [
       'salary.view',
       'expense.view',
       'expense.manage',
-      'lab_order.approve_price',
       'payroll.view',
       'payroll.manage',
     ],

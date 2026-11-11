@@ -8,6 +8,7 @@ import type { LabOrderOrderType } from './labOrderOrderType';
 import type { LabOrderStatus } from './labOrderStatus';
 import type { LabOrderItemsItem } from './labOrderItemsItem';
 import type { LabOrderRemakeReason } from './labOrderRemakeReason';
+import type { LabOrderHubSyncStatus } from './labOrderHubSyncStatus';
 
 export interface LabOrder {
   id: string;
@@ -39,6 +40,23 @@ export interface LabOrder {
   currency: string;
   /** @nullable */
   notes: string | null;
+  /** @nullable */
+  labHubLabId: string | null;
+  /** @nullable */
+  hubSyncStatus: LabOrderHubSyncStatus;
+  /** @nullable */
+  hubStatus: string | null;
+  /** @nullable */
+  hubRejectReason: string | null;
+  /** @nullable */
+  proposedPrice: string | null;
+  /** @nullable */
+  approvedPrice: string | null;
+  /** @nullable */
+  approvedAt: string | null;
+  priceApprovalPending: boolean;
+  /** @nullable */
+  priceApprovalRequestedPrice: string | null;
   createdAt: string;
   updatedAt: string;
 }

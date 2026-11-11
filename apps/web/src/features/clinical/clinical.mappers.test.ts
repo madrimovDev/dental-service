@@ -477,6 +477,15 @@ function labOrder(over: Partial<LabOrder> = {}): LabOrder {
     shade: null,
     remakeOfId: null,
     remakeReason: null,
+    labHubLabId: null,
+    hubSyncStatus: null,
+    hubStatus: null,
+    hubRejectReason: null,
+    proposedPrice: null,
+    approvedPrice: null,
+    approvedAt: null,
+    priceApprovalPending: false,
+    priceApprovalRequestedPrice: null,
     ...over,
   };
 }

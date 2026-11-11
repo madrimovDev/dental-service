@@ -141,16 +141,10 @@ describe('FU-41 — Branch Manager superset', () => {
 
 /** Lab Hub L4 — narx tasdig'i (pul: xarajatga yoziladi) alohida ruxsat. */
 describe('lab_order.approve_price — rol matritsasi', () => {
-  test.each([
-    'tenant_admin',
-    'branch_manager',
-    'doctor',
-    'doctor_assistant',
-    'accountant',
-  ])('%s — bor', (key) => {
+  test.each(['tenant_admin', 'branch_manager', 'doctor', 'doctor_assistant'])('%s — bor', (key) => {
     expect(permsFor(key)).toContain('lab_order.approve_price');
   });
-  test.each(['technician', 'nurse', 'receptionist'])('%s — YO‘Q', (key) => {
+  test.each(['technician', 'nurse', 'receptionist', 'accountant'])('%s — YO‘Q', (key) => {
     expect(permsFor(key)).not.toContain('lab_order.approve_price');
   });
   test('katalogda bor', async () => {

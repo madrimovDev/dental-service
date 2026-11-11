@@ -5,7 +5,7 @@
  * lane bazasida (`apps/lab-hub-api/.env` → `lab_hub_test_<lane>`, non-superuser rol, RLS)
  * ishlaydi; klinika tomoni — haqiqiy klinika bazasi (RLS, audit). Faqat Supervisor
  * soxta (u Hub'ning bog'liqligi, boshqa ilova). Rollar — real shablon permset'lari
- * (Doctor / Tenant Admin / Accountant), `@owner` EMAS.
+ * (Doctor / Tenant Admin; Accountant — 403), `@owner` EMAS.
  *
  * Tekshiriladi:
  *  - PHI mapper (L3): telefon/manzil/pasport hech qachon Hub so'roviga tushmaydi
@@ -835,8 +835,9 @@ describe('narx qayta taklifi — klinika kitoblari Hub bilan mos qoladi', () => 
     );
     expect(ops).toHaveLength(0);
 
-    // Yangi narx ko'rilib tasdiqlanadi (Accountant ham — lab_order.approve_price) → bitta xarajat.
-    expect((await approve(id, '300000.00', 'accountant')).status).toBe(200);
+    // Yangi narx ko'rilib tasdiqlanadi → bitta xarajat. Accountant'da ruxsat yo'q (klinik ruxsat berilmaydi).
+    expect((await approve(id, '300000.00', 'accountant')).status).toBe(403);
+    expect((await approve(id, '300000.00')).status).toBe(200);
     await releaseOutbox();
     await flushLabHubOutbox(tenantId);
     expect((await expensesOf(id)).map((e) => e.amount)).toEqual(['300000.00']);

@@ -5697,6 +5697,57 @@
             "nullable": true,
             "example": null
           },
+          "labHubLabId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid",
+            "example": null
+          },
+          "hubSyncStatus": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "pending",
+              "synced",
+              "failed",
+              null
+            ],
+            "example": null
+          },
+          "hubStatus": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          },
+          "hubRejectReason": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          },
+          "proposedPrice": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          },
+          "approvedPrice": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          },
+          "approvedAt": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          },
+          "priceApprovalPending": {
+            "type": "boolean",
+            "example": false
+          },
+          "priceApprovalRequestedPrice": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          },
           "createdAt": {
             "type": "string",
             "example": "2026-06-12T10:00:00.000Z"
@@ -5726,6 +5777,15 @@
           "cost",
           "currency",
           "notes",
+          "labHubLabId",
+          "hubSyncStatus",
+          "hubStatus",
+          "hubRejectReason",
+          "proposedPrice",
+          "approvedPrice",
+          "approvedAt",
+          "priceApprovalPending",
+          "priceApprovalRequestedPrice",
           "createdAt",
           "updatedAt"
         ]
@@ -5785,6 +5845,287 @@
         },
         "required": [
           "deleted"
+        ]
+      },
+      "LabOrderPriceApproval": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "approved"
+            ]
+          },
+          "approvedPrice": {
+            "type": "string",
+            "nullable": true
+          },
+          "approvedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "requestedPrice": {
+            "type": "string",
+            "nullable": true
+          },
+          "alreadyApproved": {
+            "type": "boolean"
+          },
+          "expenseId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "status",
+          "approvedPrice",
+          "approvedAt",
+          "requestedPrice",
+          "alreadyApproved",
+          "expenseId"
+        ]
+      },
+      "LabOrderPriceApprovalRequest": {
+        "type": "object",
+        "properties": {
+          "price": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{1,12}(\\.\\d{1,2})?$"
+              },
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 999999999999
+              }
+            ],
+            "example": "350000.00"
+          }
+        },
+        "required": [
+          "price"
+        ],
+        "additionalProperties": false
+      },
+      "LabOrderHubMessage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "labOrderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "author": {
+            "type": "string",
+            "enum": [
+              "clinic",
+              "lab"
+            ]
+          },
+          "authorName": {
+            "type": "string",
+            "nullable": true
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "message",
+              "file"
+            ]
+          },
+          "body": {
+            "type": "string",
+            "nullable": true
+          },
+          "file": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "fileName": {
+                "type": "string",
+                "nullable": true
+              },
+              "mimeType": {
+                "type": "string"
+              },
+              "sizeBytes": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "fileName",
+              "mimeType",
+              "sizeBytes"
+            ]
+          },
+          "synced": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "labOrderId",
+          "author",
+          "authorName",
+          "kind",
+          "body",
+          "file",
+          "synced",
+          "createdAt"
+        ]
+      },
+      "LabHubStatus": {
+        "type": "object",
+        "properties": {
+          "configured": {
+            "type": "boolean"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "desktop",
+              "saas"
+            ]
+          },
+          "connected": {
+            "type": "boolean"
+          },
+          "hubClinicId": {
+            "type": "string",
+            "nullable": true
+          },
+          "connectedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastPollAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastPushAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastError": {
+            "type": "string",
+            "nullable": true
+          },
+          "pendingOutbox": {
+            "type": "integer"
+          },
+          "failedOutbox": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "configured",
+          "mode",
+          "connected",
+          "hubClinicId",
+          "connectedAt",
+          "lastPollAt",
+          "lastPushAt",
+          "lastError",
+          "pendingOutbox",
+          "failedOutbox"
+        ]
+      },
+      "LabHubCatalog": {
+        "type": "object",
+        "properties": {
+          "labs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "city": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "description": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "linkStatus": {
+                  "type": "string",
+                  "nullable": true
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "city",
+                "description",
+                "linkStatus"
+              ]
+            }
+          },
+          "stale": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "labs",
+          "stale"
+        ]
+      },
+      "LabHubLink": {
+        "type": "object",
+        "properties": {
+          "link": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "labId": {
+                "type": "string"
+              },
+              "labName": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "requestedAt": {
+                "type": "string"
+              },
+              "decidedAt": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "labId",
+              "labName",
+              "status",
+              "requestedAt",
+              "decidedAt"
+            ]
+          }
+        },
+        "required": [
+          "link"
         ]
       },
       "StockItemWithLowStock": {
@@ -8767,7 +9108,7 @@
             }
           },
           "404": {
-            "description": "Not available outside Local Desktop",
+            "description": "Not available outside Local Desktop / SaaS subscription mode",
             "content": {
               "application/json": {
                 "schema": {
@@ -21361,7 +21702,7 @@
             }
           },
           "400": {
-            "description": "Invalid status transition",
+            "description": "Invalid status transition / Lab Hub work not ready",
             "content": {
               "application/json": {
                 "schema": {
@@ -21392,6 +21733,16 @@
           },
           "404": {
             "description": "Lab order not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Locked by lab (Lab Hub accepted the work)",
             "content": {
               "application/json": {
                 "schema": {
@@ -21576,6 +21927,774 @@
           },
           "404": {
             "description": "Lab order not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lab-orders/{id}/send-to-hub": {
+      "post": {
+        "tags": [
+          "lab-orders"
+        ],
+        "operationId": "sendLabOrderToHub",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "labId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "labId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Queued for Lab Hub",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/LabOrder"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Lab order not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict (not connected / already sent / price not proposed)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Lab Hub unreachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lab-orders/{id}/approve-price": {
+      "post": {
+        "tags": [
+          "lab-orders"
+        ],
+        "operationId": "approveLabOrderPrice",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabOrderPriceApprovalRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Approval requested (pending lab confirmation) or already approved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/LabOrderPriceApproval"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Lab order not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict (not connected / already sent / price not proposed)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Lab Hub unreachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lab-orders/{id}/hub-messages": {
+      "get": {
+        "tags": [
+          "lab-orders"
+        ],
+        "operationId": "listLabOrderHubMessages",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lab Hub messages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/LabOrderHubMessage"
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Lab order not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "lab-orders"
+        ],
+        "operationId": "postLabOrderHubMessage",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "body": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 5000
+                  }
+                },
+                "required": [
+                  "body"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Message queued for Lab Hub",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/LabOrderHubMessage"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Lab order not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict (not connected / already sent / price not proposed)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Lab Hub unreachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lab-hub/status": {
+      "get": {
+        "tags": [
+          "lab-hub"
+        ],
+        "operationId": "getLabHubStatus",
+        "responses": {
+          "200": {
+            "description": "Lab Hub connection status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/LabHubStatus"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lab-hub/connect": {
+      "post": {
+        "tags": [
+          "lab-hub"
+        ],
+        "operationId": "connectLabHub",
+        "responses": {
+          "200": {
+            "description": "Connected (hub key stored encrypted)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "connected": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "hubClinicId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "connected",
+                        "hubClinicId"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not connected / Hub rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Lab Hub unreachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lab-hub/labs": {
+      "get": {
+        "tags": [
+          "lab-hub"
+        ],
+        "operationId": "listLabHubLabs",
+        "responses": {
+          "200": {
+            "description": "Lab catalog with link status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/LabHubCatalog"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not connected / Hub rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Lab Hub unreachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lab-hub/links": {
+      "post": {
+        "tags": [
+          "lab-hub"
+        ],
+        "operationId": "requestLabHubLink",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "labId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "labId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Link requested",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/LabHubLink"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not connected / Hub rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Lab Hub unreachable",
             "content": {
               "application/json": {
                 "schema": {

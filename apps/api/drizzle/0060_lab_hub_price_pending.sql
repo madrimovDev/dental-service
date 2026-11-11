@@ -12,6 +12,6 @@ SELECT r."id", p."id"
 FROM "roles" r
 CROSS JOIN "permissions" p
 WHERE r."is_system" = true
-  AND r."template_key" IN ('tenant_admin', 'branch_manager', 'doctor', 'doctor_assistant', 'accountant')
+  AND r."template_key" IN ('tenant_admin', 'branch_manager', 'doctor', 'doctor_assistant')
   AND p."code" = 'lab_order.approve_price'
 ON CONFLICT DO NOTHING;

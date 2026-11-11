@@ -263,7 +263,6 @@ export function useWaiveNoShowStrike(patientId: string) {
  * ko'pi bilan 1000 qator oladi — kattaroq fayl bo'laklab ketma-ket yuboriladi, natija birlashtiriladi.
  * `dryRun` — hech narsa yozmaydi (oldindan ko'rish: yangi / dublikat / xato).
  */
-// TODO(generate): generated `importPatients` paydo bo'lgach customInstance o'rniga ishlatiladi.
 export async function runPatientImport(
   rows: ImportRowInput[],
   dryRun: boolean,
