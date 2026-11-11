@@ -356,7 +356,8 @@ export function ReceptionistDashboard() {
     ...attention.doctorsWithoutSchedule.map(
       (d): AttentionItem => ({
         key: `sched-${d.id}`,
-        tier: 2,
+        // P10 fallback: jadvalsiz doktor filial ish soatida ishlaydi — bron to'xtamaydi, faqat ma'lumot.
+        tier: 3,
         title: t('receptionToday.attention_no_schedule_title', { name: d.name }),
         text: t('receptionToday.attention_no_schedule_text'),
         actionLabel: t('receptionToday.attention_open_schedule'),

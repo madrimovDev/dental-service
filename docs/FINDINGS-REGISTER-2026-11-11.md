@@ -374,8 +374,8 @@ To'liq: [`LAB-TECHNICIAN-ACCESS-2026-11-11.md`](./LAB-TECHNICIAN-ACCESS-2026-11-
 | UI-M5 ✅ | UI-3 | Ombor (`Stock.dc.html`) | IR-01, IR-02 |
 | UI-M6 ✅ | UI-3 | Xarajat va ish haqi (`Finance.dc.html`) | — |
 | UI-T1 | UI-4 | Laboratoriya portali (`LabPortal.dc.html`) | lab portali spetsifikatsiyasi (C) |
-| UI-T2 | UI-4 | Telegram bot (`TelegramBot.dc.html`) | **P8** |
-| UI-T3 | UI-4 | Desktop holatlari (`Desktop.dc.html`) | **P2, P14, P15**, DT-01/02/03/18 |
+| UI-T2 ✅ | UI-4 | Telegram bot (`TelegramBot.dc.html`) | **P8** |
+| UI-T3 🟡 | UI-4 | Desktop holatlari (`Desktop.dc.html`) | **P2, P14, P15**, DT-01/02/03/18 |
 
 ---
 
@@ -442,7 +442,7 @@ Sinov 3 ta haqiqiy nuqson topdi (hammasi tuzatildi, testlar bilan): (1) jadvali 
 | FU-22 | L | Bugun ekrani bemor ismini har bemor uchun alohida so'raydi | B.1 qo'shgan `appointment.patientName` (JOIN) dan foydalanish |
 | FU-23 | L | `GET /patients/phone-check` `patient.create` bilan ism qaytaradi | `view_pii`siz faqat `count` qaytarish |
 | FU-24 | L | Kanvas elementlari qurilmagan: Qarzdorlar chip, Excel import, «Keyingi tashrif» ustuni, drag «ushlab turish», narx chip'lari | UI sayqal / P2 |
-| FU-25 | — | Telegram bron so'rovlari (`booking_requests`) | UI-4 (T2) |
+| FU-25 ✅ | — | Telegram bron so'rovlari (`booking_requests`) | UI-4 (T2) da yopildi |
 
 ## 20. UI-2 dan keyingi follow-up'lar
 
@@ -462,4 +462,15 @@ Sinov 3 ta haqiqiy nuqson topdi (hammasi tuzatildi, testlar bilan): (1) jadvali 
 | FU-32 | L | Filial «oflayn» holati yo'q (bitta server modeli) | — (kerak bo'lsa desktop klientlar heartbeat'i) |
 | FU-33 | L | 1C/CSV eksportda formula-injection himoyasi yo'q | `=`,`+`,`-`,`@` bilan boshlanuvchi qiymatlarni `'` bilan prefikslash |
 | FU-34 | 🟡 | Desktop zaxira/tiklash Windows'da tekshirilmagan | `DESKTOP-WINDOWS-BUILD-TEST.md` §4c |
+
+## 22. UI-4 dan keyingi follow-up'lar
+
+| ID | J | Qisqa | Qilinadigan ish |
+|---|---|---|---|
+| FU-35 | M | «Boshqa vaqt» qayta yozilish eski slotga yaqin bo'lsa 409 (patient_busy) | confirm'da eski yozilishni bekor qilish va yangisini yaratish bitta tranzaksiyada, tartib: avval bekor |
+| FU-36 | L | Bot anketasi va til o'zgarishi `audit_log`ga yozilmaydi | §3.10 bo'yicha audit |
+| FU-37 | L | Bot shifokorlar ro'yxati filialga qaramaydi | filial a'zoligi bo'yicha filtrlash |
+| FU-38 | L | Bot sessiyalari xotirada (restart → «Suhbat eskirdi») | kerak bo'lsa Redis |
+| FU-39 | L | Desktop yangilanish vaqti `config.workCloseTime`/19:00 — filial `workHours.close`ga ulanmagan | API'dan yopilish vaqtini olish |
+| FU-40 | 🟡 | UI-T3 desktop holatlari Windows'da tekshirilmagan | `DESKTOP-WINDOWS-BUILD-TEST.md` |
 

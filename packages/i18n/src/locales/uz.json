@@ -1642,7 +1642,7 @@
     "attention_title": "Diqqat talab qiladi",
     "attention_empty": "Hammasi joyida",
     "attention_no_schedule_title": "{{name}} uchun ish jadvali yo'q",
-    "attention_no_schedule_text": "Jadvalsiz shifokorga bemor yozib bo'lmaydi.",
+    "attention_no_schedule_text": "Shaxsiy jadval kiritilmagan — bemorlar filial ish soati bo'yicha yoziladi.",
     "attention_open_schedule": "Jadvalni kiritish",
     "attention_lab_title": "Lab ishi muddati o'tgan",
     "attention_lab_text": "{{n}} ta buyurtma muddati o'tgan.",

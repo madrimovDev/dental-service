@@ -1642,7 +1642,7 @@
     "attention_title": "Требует внимания",
     "attention_empty": "Всё в порядке",
     "attention_no_schedule_title": "У {{name}} нет графика работы",
-    "attention_no_schedule_text": "Врача без графика нельзя записать пациента.",
+    "attention_no_schedule_text": "Личное расписание не задано — запись идёт по часам работы филиала.",
     "attention_open_schedule": "Задать график",
     "attention_lab_title": "Просрочена работа лаборатории",
     "attention_lab_text": "Просрочено заказов: {{n}}.",
