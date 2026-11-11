@@ -225,6 +225,7 @@ async function seed() {
           branchId: s.branchId,
           roleId: s.roleId,
           isActive: true,
+          acceptedAt: new Date(), // P6b: demo xodimlar darhol qabul qilingan
         })
         .onConflictDoNothing();
       await db

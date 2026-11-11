@@ -160,3 +160,29 @@ export const changePasswordResponseSchema = z
   .object({ changed: z.literal(true) })
   .openapi('ChangePasswordResponse');
 export type ChangePasswordResponseDto = z.infer<typeof changePasswordResponseSchema>;
+
+/** P6b — kutilayotgan takliflar (foydalanuvchi o'zi qabul/rad etadi). */
+export const invitationSchema = z
+  .object({
+    id: z.uuid(),
+    tenantId: z.uuid(),
+    tenantName: z.string(),
+    branchId: z.uuid().nullable(),
+    branchName: z.string().nullable(),
+    roleName: z.string(),
+    invitedAt: z.iso.datetime(),
+  })
+  .openapi('Invitation');
+export const invitationsResponseSchema = z.array(invitationSchema);
+export type InvitationDto = z.infer<typeof invitationSchema>;
+
+export const invitationIdParamSchema = z
+  .object({ id: z.uuid() })
+  .openapi({ param: { name: 'id', in: 'path' } });
+
+export const acceptInvitationResponseSchema = z
+  .object({ accepted: z.literal(true) })
+  .openapi('AcceptInvitationResponse');
+export const declineInvitationResponseSchema = z
+  .object({ declined: z.literal(true) })
+  .openapi('DeclineInvitationResponse');

@@ -125,6 +125,7 @@ describe('CLI-428 branch delete referential guard', () => {
         branchId: b,
         roleId,
         isActive: true,
+        acceptedAt: new Date(),
       }),
     );
     const res = await withTx((tx) => branchesSvc.remove(ctx(tx), b));

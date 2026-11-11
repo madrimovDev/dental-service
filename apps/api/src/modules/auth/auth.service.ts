@@ -16,7 +16,7 @@ import {
   userAssignments,
   users,
 } from '@dental/db-schema';
-import { and, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import type { Database, DbTransaction } from '../../db/client.ts';
 import { signAccess, signRefresh, verifyRefresh } from '../../lib/jwt.ts';
 import { logger } from '../../lib/logger.ts';
@@ -227,6 +227,8 @@ async function buildPermissionsForContext(
           eq(userAssignments.userId, userId),
           eq(userAssignments.tenantId, tenantId),
           eq(userAssignments.isActive, true),
+          // P6b: qabul qilinmagan (kutilayotgan) taklif hech qanday huquq bermaydi.
+          isNotNull(userAssignments.acceptedAt),
           or(isNull(userAssignments.validTo), gt(userAssignments.validTo, now)),
           branchFilter,
         ),
@@ -392,6 +394,8 @@ export const createAuthService = (deps: AuthServiceDeps) => {
           and(
             eq(userAssignments.userId, userId),
             eq(userAssignments.isActive, true),
+            // P6b: kutilayotgan taklif workspace ro'yxatida ko'rinmaydi (alohida invitations endpoint).
+            isNotNull(userAssignments.acceptedAt),
             // CLI-441 #3: switchWorkspace bilan izchil — muddati o'tgan (validTo < now)
             // assignment ro'yxatda ko'rinmasin (aks holda ko'rinib, switch'da RAD bo'ladi).
             or(isNull(userAssignments.validTo), gt(userAssignments.validTo, new Date())),
@@ -446,6 +450,7 @@ export const createAuthService = (deps: AuthServiceDeps) => {
             eq(userAssignments.userId, userId),
             eq(userAssignments.tenantId, tenantId),
             eq(userAssignments.isActive, true),
+            isNotNull(userAssignments.acceptedAt),
             or(isNull(userAssignments.validTo), gt(userAssignments.validTo, now)),
           ),
         );
@@ -463,6 +468,119 @@ export const createAuthService = (deps: AuthServiceDeps) => {
       return { branches: rows, allowAllBranches };
     });
   }
+
+  // ─── P6b: taklifga rozilik ────────────────────────────────────────────────
+
+  /**
+   * Foydalanuvchining kutilayotgan takliflari (accept/decline kutayotgan tayinlovlar).
+   * Faqat o'zinikilar: `user_assignments_self_view` RLS siyosati (`app.current_user_id`)
+   * + `roles_self_view` / `branches_self_view` orqali — tenant konteksti kerak EMAS.
+   */
+  async function listInvitations(userId: string) {
+    return await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT set_config('app.current_user_id', ${userId}, true)`);
+      return await tx
+        .select({
+          id: userAssignments.id,
+          tenantId: userAssignments.tenantId,
+          tenantName: tenants.name,
+          branchId: userAssignments.branchId,
+          branchName: branches.name,
+          roleName: roles.name,
+          invitedAt: userAssignments.createdAt,
+        })
+        .from(userAssignments)
+        .innerJoin(tenants, eq(tenants.id, userAssignments.tenantId))
+        .leftJoin(branches, eq(branches.id, userAssignments.branchId))
+        .innerJoin(roles, eq(roles.id, userAssignments.roleId))
+        .where(
+          and(
+            eq(userAssignments.userId, userId),
+            eq(userAssignments.isActive, true),
+            isNull(userAssignments.acceptedAt),
+            or(isNull(userAssignments.validTo), gt(userAssignments.validTo, new Date())),
+          ),
+        )
+        .orderBy(asc(userAssignments.createdAt));
+    });
+  }
+
+  type InvitationMeta = { ip: string | null; userAgent: string | null };
+
+  /**
+   * Taklifni qabul qilish (`accept`) yoki rad etish (`decline`). Faqat taklif egasi
+   * (id + user_id bo'yicha); boshqaning id'si → `null` (route 404 qaytaradi, mavjudligi
+   * oshkor bo'lmaydi). Yozish tenant RLS kontekstida (tayinlovning o'z tenanti) — audit
+   * ham shu tenant bilan, bitta tranzaksiyada.
+   */
+  async function respondToInvitation(
+    userId: string,
+    assignmentId: string,
+    decision: 'accept' | 'decline',
+    meta: InvitationMeta,
+  ): Promise<{ id: string; tenantId: string } | null> {
+    return await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT set_config('app.current_user_id', ${userId}, true)`);
+
+      const [pending] = await tx
+        .select()
+        .from(userAssignments)
+        .where(
+          and(
+            eq(userAssignments.id, assignmentId),
+            eq(userAssignments.userId, userId),
+            eq(userAssignments.isActive, true),
+            isNull(userAssignments.acceptedAt),
+            or(isNull(userAssignments.validTo), gt(userAssignments.validTo, new Date())),
+          ),
+        );
+      if (!pending) return null;
+
+      await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${pending.tenantId}, true)`);
+
+      const now = new Date();
+      const patch =
+        decision === 'accept'
+          ? { acceptedAt: now, updatedAt: now }
+          : { isActive: false, updatedAt: now };
+      const [updated] = await tx
+        .update(userAssignments)
+        .set(patch)
+        .where(
+          and(
+            eq(userAssignments.id, assignmentId),
+            eq(userAssignments.userId, userId),
+            isNull(userAssignments.acceptedAt),
+          ),
+        )
+        .returning({ id: userAssignments.id, tenantId: userAssignments.tenantId });
+      if (!updated) return null;
+
+      await tx.insert(auditLog).values({
+        tenantId: pending.tenantId,
+        userId,
+        action: decision === 'accept' ? 'invitation_accepted' : 'invitation_declined',
+        resourceType: 'user_assignment',
+        resourceId: assignmentId,
+        before: { acceptedAt: null, isActive: true },
+        after: {
+          acceptedAt: decision === 'accept' ? now.toISOString() : null,
+          isActive: decision === 'accept',
+          roleId: pending.roleId,
+          branchId: pending.branchId,
+        },
+        ip: meta.ip,
+        userAgent: meta.userAgent,
+      });
+
+      return updated;
+    });
+  }
+
+  const acceptInvitation = (userId: string, id: string, meta: InvitationMeta) =>
+    respondToInvitation(userId, id, 'accept', meta);
+  const declineInvitation = (userId: string, id: string, meta: InvitationMeta) =>
+    respondToInvitation(userId, id, 'decline', meta);
 
   async function switchWorkspace(userId: string, input: SwitchWorkspaceInput) {
     // 1. Refresh tokenni validatsiya — chain identifikatori sifatida
@@ -516,6 +634,7 @@ export const createAuthService = (deps: AuthServiceDeps) => {
               eq(userAssignments.userId, userId),
               eq(userAssignments.tenantId, input.tenantId),
               eq(userAssignments.isActive, true),
+              isNotNull(userAssignments.acceptedAt),
               or(isNull(userAssignments.validTo), gt(userAssignments.validTo, now)),
               ...(branchFilter ? [branchFilter] : []),
             ),
@@ -729,6 +848,9 @@ export const createAuthService = (deps: AuthServiceDeps) => {
     login,
     getMemberships,
     workspaceBranches,
+    listInvitations,
+    acceptInvitation,
+    declineInvitation,
     switchWorkspace,
     refresh,
     changePassword,

@@ -9,7 +9,7 @@ import {
   userAssignments,
   users,
 } from '@dental/db-schema';
-import { and, eq, gt, isNull, ne, or, sql } from 'drizzle-orm';
+import { and, eq, gt, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { Database } from '../../db/client.ts';
 import { getDb } from '../../db/scoped.ts';
@@ -45,6 +45,8 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
           validFrom: userAssignments.validFrom,
           validTo: userAssignments.validTo,
           isActive: userAssignments.isActive,
+          // P6b: accepted_at NULL = taklif hali qabul qilinmagan (UI «Kutilmoqda»).
+          pending: sql<boolean>`${userAssignments.acceptedAt} IS NULL`,
         })
         .from(userAssignments)
         .innerJoin(users, eq(users.id, userAssignments.userId))
@@ -94,6 +96,9 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
 
       let [user] = await tx.select().from(users).where(eq(users.phone, phone));
       let tempPassword: string | null = null;
+      // P6b: faqat shu so'rovda YARATILGAN foydalanuvchi darhol rozi hisoblanadi (boshqa
+      // identifikatsiyasi yo'q). Mavjud platforma foydalanuvchisi o'zi qabul qilishi shart.
+      let createdNow = false;
 
       if (!user) {
         // Yangi user — temporary password (12 bytes → 16 base64url chars, login validatori min(12) ni qondiradi)
@@ -111,6 +116,7 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
 
         if (!created) return { ok: false as const, code: 'user.create_failed' };
         user = created;
+        createdNow = true;
 
         // Mock OTP — console'ga password log qilinadi (M3 da SMS)
         logger.warn(
@@ -146,6 +152,7 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
             tempPassword,
             alreadyExists: true,
             reactivated: false,
+            pending: existing.acceptedAt === null,
           };
         }
 
@@ -170,6 +177,9 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
           tempPassword,
           alreadyExists: false,
           reactivated: true,
+          // Qayta faollashtirish accepted_at'ni SAQLAYDI: ilgari qabul qilingan bo'lsa rozi,
+          // aks holda (rad etilgan/kutilgan) NULL — yana kutilmoqda.
+          pending: existing.acceptedAt === null,
         };
       }
 
@@ -181,6 +191,7 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
           branchId: input.branchId ?? null,
           roleId: input.roleId,
           isActive: true,
+          acceptedAt: createdNow ? new Date() : null,
         })
         .returning();
 
@@ -200,6 +211,7 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
         tempPassword,
         alreadyExists: false,
         reactivated: false,
+        pending: !createdNow,
       };
     });
   }
@@ -243,6 +255,21 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
       return { ok: true as const, assignment: existing, alreadyExists: true };
     }
 
+    // P6b: foydalanuvchi shu tenantda allaqachon QABUL QILINGAN a'zo bo'lsa (faol qabul
+    // qilingan tayinlovi bor) — yangi tayinlov ham rozi; aks holda u o'zi qabul qilishi shart.
+    const [accepted] = await db
+      .select({ id: userAssignments.id })
+      .from(userAssignments)
+      .where(
+        and(
+          eq(userAssignments.userId, userId),
+          eq(userAssignments.tenantId, tenantId),
+          eq(userAssignments.isActive, true),
+          isNotNull(userAssignments.acceptedAt),
+        ),
+      )
+      .limit(1);
+
     const [assignment] = await db
       .insert(userAssignments)
       .values({
@@ -253,6 +280,7 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
         validFrom: input.validFrom ? new Date(input.validFrom) : new Date(),
         validTo: input.validTo ? new Date(input.validTo) : null,
         isActive: true,
+        acceptedAt: accepted ? new Date() : null,
       })
       .returning();
 
@@ -394,6 +422,9 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
               eq(userAssignments.userId, targetUserId),
               eq(userAssignments.tenantId, tenantId),
               eq(userAssignments.isActive, true),
+              // P6b: kutilayotgan (qabul qilinmagan) taklif a'zolik emas — begona klinika
+              // rozisiz «a'zo» qilib, so'ng parolni tiklab hisobni egallay olmasin.
+              isNotNull(userAssignments.acceptedAt),
             ),
           );
         hasAssignment = !!a;

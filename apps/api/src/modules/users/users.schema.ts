@@ -69,6 +69,8 @@ export const userAssignmentDtoSchema = z
     validFrom: z.string().openapi({ example: '2026-06-12T10:00:00.000Z' }),
     validTo: z.string().nullable().openapi({ example: null }),
     isActive: z.boolean().openapi({ example: true }),
+    // P6b: taklif hali qabul qilinmagan («Kutilmoqda»).
+    pending: z.boolean().openapi({ example: false }),
   })
   .openapi('UserAssignment');
 
@@ -108,6 +110,8 @@ export const inviteUserResponseDtoSchema = z
     alreadyExists: z.boolean().openapi({ example: false }),
     // CLI-427: deaktivlangan xodim qayta-taklifda faollashtirildimi (alreadyExists'dan farqli).
     reactivated: z.boolean().openapi({ example: false }),
+    // P6b: mavjud foydalanuvchi taklif qilindi — u qabul qilgunicha a'zo EMAS.
+    pending: z.boolean().openapi({ example: false }),
   })
   .openapi('InviteUserResponse');
 

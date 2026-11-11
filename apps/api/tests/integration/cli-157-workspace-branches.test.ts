@@ -96,6 +96,7 @@ beforeAll(async () => {
         roleId: role.id,
         branchId: branchMainId,
         isActive: true,
+        acceptedAt: new Date(),
       },
       // branchId=null — barcha filiallar
       {
@@ -104,6 +105,7 @@ beforeAll(async () => {
         roleId: role.id,
         branchId: null,
         isActive: true,
+        acceptedAt: new Date(),
       },
     ]);
   });

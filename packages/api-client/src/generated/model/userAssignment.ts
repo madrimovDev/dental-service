@@ -23,4 +23,5 @@ export interface UserAssignment {
   /** @nullable */
   validTo: string | null;
   isActive: boolean;
+  pending: boolean;
 }
