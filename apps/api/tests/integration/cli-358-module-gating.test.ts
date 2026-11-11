@@ -46,6 +46,11 @@
  *     (`signAccess` — DB seed shart emas, faqat JWT imzo tekshiriladi,
  *     rlsMiddleware ixtiyoriy tenantId bilan ham transaction ochadi).
  *
+ * P18 eslatma: app.ts'dagi global `requireValidLicenseInDesktop()` (auth'dan
+ * OLDIN) litsenziyasiz holatda BARCHA ochiq-bo'lmagan /api/* ni 403
+ * LICENSE_NOT_FOUND bilan bloklaydi — shuning uchun quyida clinical gate-after-auth
+ * va /api/branches 'fall-through to auth' holatlari endi 403 deb kutiladi.
+ *
  * Talab: Postgres running, DATABASE_URL .env'da (createApp() DB pool ochadi;
  * auth header'siz testlar hech qanday query yubormaydi — gating birinchi
  * middleware sifatida so'rovni bloklaydi; auth header'li testlar bitta
@@ -191,12 +196,18 @@ describe('CLI-358 requireModuleInDesktop mounted on gated route groups', () => {
     expect(body.error.code).toBe('LICENSE_NOT_FOUND');
   });
 
-  test('GET /api/treatment-plans (Local Desktop, no auth header) → 401, NOT 403 (documents gate-after-auth for clinical)', async () => {
+  test('GET /api/treatment-plans (Local Desktop, no auth header, no license) → 403 LICENSE_NOT_FOUND (P18 global gate runs BEFORE auth)', async () => {
+    // P18: app.ts'dagi global `requireValidLicenseInDesktop()` auth'dan OLDIN
+    // ishlaydi, shuning uchun litsenziyasiz holatda clinical ham auth header'siz
+    // 403 qaytaradi (ilgari clinical gate-after-auth edi -> 401). Clinical
+    // gate-after-auth farqi endi faqat HAQIQIY (imzolangan) litsenziya bilan
+    // ko'rinadi; integratsiya testida RSA imzosini soxtalashtirib bo'lmaydi —
+    // bu holat license-middleware.test.ts'dagi unit testlar bilan qoplangan.
     const app = createApp();
     const res = await app.request('/api/treatment-plans');
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(403);
     const body = (await res.json()) as { success: boolean; error: { code: string } };
-    expect(body.error.code).toBe('auth.missing_token');
+    expect(body.error.code).toBe('LICENSE_NOT_FOUND');
   });
 
   test('GET /api/patient-images/{id} (Local Desktop, authenticated, no license) → 403 LICENSE_NOT_FOUND (patient-images module)', async () => {
@@ -237,18 +248,17 @@ describe('CLI-358 requireModuleInDesktop mounted on gated route groups', () => {
     }
   });
 
-  test('GET /api/branches (non-gated route, Local Desktop mode) → NOT LICENSE_NOT_FOUND (falls through to auth)', async () => {
-    // /api/branches has no MODULE_MAP entry — requireModuleInDesktop must NOT
-    // be mounted on it, even in simulated Local Desktop mode (WEB_DIST_DIR set
-    // by the shared beforeAll harness). Without a license it should behave
-    // exactly as before this ticket: no Authorization header → 401
-    // auth.missing_token, never 403 LICENSE_NOT_FOUND.
+  test('GET /api/branches (non-module route, Local Desktop mode, no license) → 403 LICENSE_NOT_FOUND (P18 global gate)', async () => {
+    // P18: /api/branches has no MODULE_MAP entry, but the global
+    // requireValidLicenseInDesktop() now blocks EVERY non-open /api/* route in
+    // Local Desktop mode when there is no license (before auth) -> 403
+    // LICENSE_NOT_FOUND. The module-gate bleed guard itself is covered by
+    // license-middleware.test.ts; here we only pin the P18 behaviour.
     const app = createApp();
     const res = await app.request('/api/branches');
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(403);
     const body = (await res.json()) as { success: boolean; error: { code: string } };
-    expect(body.error.code).not.toBe('LICENSE_NOT_FOUND');
-    expect(body.error.code).toBe('auth.missing_token');
+    expect(body.error.code).toBe('LICENSE_NOT_FOUND');
   });
 
   // CLI-433 — expenses/stock/payroll/notifications were PREVIOUSLY entirely
@@ -272,12 +282,13 @@ describe('CLI-358 requireModuleInDesktop mounted on gated route groups', () => {
   // so its gate must NOT leak onto ungated sibling routes mounted before it
   // (e.g. /api/branches, which has no MODULE_MAP entry and must stay
   // reachable at every tier).
-  test('GET /api/branches (non-gated route, Local Desktop mode, no license) → NOT LICENSE_NOT_FOUND (bare-/api bleed regression guard)', async () => {
+  test('GET /api/branches (non-module route, Local Desktop mode, no license) → 403 (P18 global gate) while /api/auth stays open', async () => {
+    // P18: global gate endi bu route'ni ham litsenziyasiz bloklaydi (403).
+    // /api/auth/* (global-ochiq prefiks) esa gate'dan o'tib, auth'ga yetadi.
     const app = createApp();
-    const res = await app.request('/api/branches');
-    expect(res.status).toBe(401);
-    const body = (await res.json()) as { success: boolean; error: { code: string } };
-    expect(body.error.code).not.toBe('LICENSE_NOT_FOUND');
-    expect(body.error.code).toBe('auth.missing_token');
+    const blocked = await app.request('/api/branches');
+    expect(blocked.status).toBe(403);
+    const open = await app.request('/api/auth/me');
+    expect(open.status).not.toBe(403);
   });
 });
