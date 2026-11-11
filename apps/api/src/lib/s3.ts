@@ -7,7 +7,9 @@ import { createLocalStorageAdapter } from './storage.ts';
  * o'zgarmadi, shuning uchun chaqiruvchi modullar (masalan
  * `patient-images.service.ts`) o'zgarishsiz qoladi.
  */
-const storage = createLocalStorageAdapter();
+// Har chaqiruvda `UPLOADS_DIR`ni o'qiydi (`/uploads` route bilan bir xil) — modul darajasidagi
+// yagona adapter test to'plamida boshqa katalogga qarab qolardi. Production'da env o'zgarmaydi.
+const storage = () => createLocalStorageAdapter();
 
 /**
  * Storage key generator — multi-tenant uchun:
@@ -46,7 +48,7 @@ export function labOrderFileKey(args: {
  * chaqiruvchi kodni o'zgartirmaslik uchun saqlanadi.
  */
 export async function presignedGetUrl(objectKey: string, _expiresInSec = 300): Promise<string> {
-  return storage.serveUrl(objectKey);
+  return storage().serveUrl(objectKey);
 }
 
 /**
@@ -61,9 +63,9 @@ export async function uploadObject(args: {
     args.body instanceof Uint8Array
       ? Buffer.from(args.body)
       : Buffer.from(new Uint8Array(args.body));
-  await storage.save(args.key, data);
+  await storage().save(args.key, data);
 }
 
 export async function deleteObject(key: string): Promise<void> {
-  await storage.remove(key);
+  await storage().remove(key);
 }

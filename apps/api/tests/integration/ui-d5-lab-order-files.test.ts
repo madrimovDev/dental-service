@@ -15,7 +15,10 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const testUploadsDir = await mkdtemp(join(tmpdir(), 'ui-d5-uploads-'));
+// `app.ts` storage adapterini modul yuklanganda `UPLOADS_DIR` bilan bir marta yaratadi —
+// to'liq to'plamda boshqa fayl uni oldinroq yuklagan bo'lsa o'sha katalog ishlatiladi.
+// Shuning uchun mavjud qiymatni qayta ishlatamiz (aks holda test boshqa katalogni tekshiradi).
+const testUploadsDir = process.env.UPLOADS_DIR ?? (await mkdtemp(join(tmpdir(), 'ui-d5-uploads-')));
 process.env.UPLOADS_DIR = testUploadsDir;
 
 const { ROLE_TEMPLATES } = await import('@dental/core');
