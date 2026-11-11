@@ -104,7 +104,10 @@ const MODULE_MAP: Record<z.infer<typeof createClinicSchema>['plan'], string[]> =
 // `adminJwtMiddleware` (jwt.middleware.ts:17) tokenning `sub`'ini
 // `adminUserId` deb yozadi. Hono instansiyasi tiplanmasa `c.get(...)`
 // `never` beradi — audit `createdBy` uchun uni aniq e'lon qilamiz.
-const renewSchema = z.object({ expiresAt: z.union([z.iso.datetime(), z.iso.date()]) });
+// supervisor-api zod ^3 ishlatadi — `z.iso.*` (v4) yo'q, v3 `z.string().datetime()/.date()`.
+const renewSchema = z.object({
+  expiresAt: z.union([z.string().datetime(), z.string().date()]),
+});
 
 type AdminEnv = { Variables: { adminUserId?: string } };
 

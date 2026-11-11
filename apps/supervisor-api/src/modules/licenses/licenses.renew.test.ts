@@ -109,9 +109,14 @@ describe('renew', () => {
   test('next heartbeat returns renewed expiresAt', async () => {
     const to = new Date(Date.now() + 300 * 86400000);
     await service.renew(clinicId, to, 'admin-1');
-    const hb = (await service.heartbeat(licenseKey, FP)) as any;
-    const data = hb.data ?? hb.license ?? hb;
-    expect(JSON.stringify(hb)).toContain(to.toISOString());
-    expect(data).toBeDefined();
+    const hb = (await service.heartbeat(licenseKey, FP)) as {
+      expiresAt: string;
+      gracePeriodDays: number;
+      signature: string;
+    };
+    // Imzolangan tekis payload'dagi muddat yangilangan bo'lishi shart.
+    expect(hb.expiresAt).toBe(to.toISOString());
+    expect(hb.gracePeriodDays).toBe(7);
+    expect(hb.signature).toBeTruthy();
   });
 });
