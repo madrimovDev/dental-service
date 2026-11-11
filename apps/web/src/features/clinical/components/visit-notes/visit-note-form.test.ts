@@ -6,6 +6,7 @@ import {
   emptyVisitForm,
   firstUnresolvedRxConflict,
   loadDraft,
+  overrideKey,
   pendingAllergyConflict,
   type RxRow,
   saveDraft,
@@ -52,6 +53,41 @@ describe('dori ↔ allergiya', () => {
     expect(pendingAllergyConflict('Amoksitsillin 500 mg', penicillin, [override])).toBeNull();
     // boshqa yozilish (kirill) ham o'sha dori
     expect(pendingAllergyConflict('Амоксициллин', penicillin, [override])).toBeNull();
+  });
+
+  it('boshqa dori/guruh uchun override amoksitsillin↔penitsillin to‘qnashuvini bostirmaydi', () => {
+    const both = [{ substance: 'Penitsillin' }, { substance: 'Aspirin' }];
+    const ibu = {
+      drug: 'Tab. Ibuprofen 400',
+      group: 'nsaid',
+      allergen: 'Aspirin',
+      reason: 'patient_informed',
+    };
+    expect(pendingAllergyConflict('Tab. Ibuprofen 400', both, [ibu])).toBeNull();
+    for (const d of [
+      'Tab. Amoksitsillin 500',
+      'Таб. Амоксициллин',
+      'Sol. Amoksitsillin',
+      'Rp. Amoksitsillin',
+    ]) {
+      expect(pendingAllergyConflict(d, both, [ibu])?.group).toBe('penicillin');
+    }
+    // bir xil nom, lekin boshqa guruh/allergen uchun berilgan override ham bostirmaydi
+    expect(
+      pendingAllergyConflict('Tab. Amoksitsillin 500', both, [{ ...override, group: 'nsaid' }])
+        ?.group,
+    ).toBe('penicillin');
+    expect(
+      pendingAllergyConflict('Tab. Amoksitsillin 500', both, [{ ...override, allergen: 'Aspirin' }])
+        ?.group,
+    ).toBe('penicillin');
+  });
+
+  it('overrideKey: prefiks va dozani olib tashlaydi, dori nomini saqlaydi', () => {
+    expect(overrideKey('Tab. Amoksitsillin 500 mg')).toBe(overrideKey('Амоксициллин'));
+    expect(overrideKey('Tab. Ibuprofen')).not.toBe(overrideKey('Tab. Amoksitsillin 500'));
+    expect(overrideKey('500 mg Ibuprofen')).not.toBe(overrideKey('500 mg Amoksitsillin'));
+    expect(overrideKey('Tab. 500')).toBe('');
   });
 
   it('allergiya bo‘lmasa yoki dori boshqa guruhda — null', () => {

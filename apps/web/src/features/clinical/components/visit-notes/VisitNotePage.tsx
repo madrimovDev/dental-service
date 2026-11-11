@@ -35,7 +35,7 @@ import {
   firstUnresolvedRxConflict,
   isRxRowComplete,
   loadDraft,
-  overrideKey,
+  overrideCoversConflict,
   pendingAllergyConflict,
   type RxRow,
   saveDraft,
@@ -236,7 +236,7 @@ export function VisitNotePage() {
   const confirmOverride = (reason: string | null) => {
     if (!conflict || !reason) return;
     setOverrides((o) => [
-      ...o.filter((x) => overrideKey(x.drug) !== overrideKey(conflict.drug)),
+      ...o.filter((x) => !overrideCoversConflict(x, conflict.drug, conflict)),
       { drug: conflict.drug, group: conflict.group, allergen: conflict.allergen, reason },
     ]);
     setConflict(null);
