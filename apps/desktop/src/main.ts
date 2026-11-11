@@ -54,11 +54,13 @@ import {
 } from './discovery.js';
 import { isFirstRun, runFirstSetup, runMigrations } from './first-run.js';
 import { fetchBootstrapStatus, licenseGatedUrl, resolveStartupUrl } from './license-status.js';
+import { createPgTools, createStateStore, migrateOnStart } from './migrate-on-start.js';
 import {
   getApiCommand,
+  onServerStatusChange,
+  PortInUseError,
   startApiLayer,
   startDatabaseLayer,
-  startServer,
   stopServer,
 } from './process-manager.js';
 import { type PromptWindowLike, promptServerUrl } from './server-url-prompt.js';
@@ -203,6 +205,9 @@ const openBrowser = (url: string): void => {
  * (TOFU — keyingi startup'lar shu saqlangan manzilni ishlatadi, discovery/
  * tasdiqlash qayta so'ralmaydi).
  */
+const portBusyMessage = (port: number): string =>
+  `Port ${port} boshqa dastur tomonidan band. Sozlamalar → Server porti orqali boshqa port tanlang.`;
+
 const chooseServerUrl = async (servers: DiscoveredServer[]): Promise<string | null> => {
   if (servers.length === 0) return null;
   if (servers.length === 1) {
@@ -286,13 +291,40 @@ app.whenReady().then(async () => {
       const firstRun = isFirstRun();
       if (firstRun) {
         runFirstSetup();
-        await startDatabaseLayer();
-        runMigrations(API_EXE);
-        await startApiLayer(config.serverPort);
-      } else {
-        await startServer(config.serverPort);
       }
+      await startDatabaseLayer();
+      // P2 — har startda migratsiya (yangilanishda ham sxema yangilanadi):
+      // versiya o'zgargan bo'lsa oldin pg_dump, yiqilsa dump'dan tiklanadi
+      // va API ISHGA TUSHIRILMAYDI.
+      const migration = migrateOnStart({
+        ...createStateStore(firstRun),
+        ...createPgTools(),
+        runMigrations: () => runMigrations(API_EXE),
+        appVersion: app.getVersion(),
+        now: () => new Date(),
+      });
+      if (!migration.ok) {
+        const message =
+          migration.reason === 'phone_conflict'
+            ? "Yangilash to'xtatildi: bazada takroriy telefon raqamlari bor. Ta'minotchiga murojaat qiling."
+            : migration.restored
+              ? "Yangilash muvaffaqiyatsiz. Ma'lumotlar avvalgi holatga qaytarildi. Ta'minotchiga murojaat qiling."
+              : `Yangilash muvaffaqiyatsiz. Ma'lumotlarni qaytarib bo'lmadi${migration.backupFile ? `, zaxira: ${migration.backupFile}` : ''}. Ta'minotchiga murojaat qiling.`;
+        dialog.showErrorBox(
+          "Dental Service — yangilash to'xtatildi",
+          `${message}\n\nTafsilot: ${migration.message.slice(-800)}\nLoglarni ko'ring: ${LOGS_DIR}`,
+        );
+        await stopServer();
+        app.quit();
+        return;
+      }
+      await startApiLayer(config.serverPort);
     } catch (err) {
+      if (err instanceof PortInUseError) {
+        dialog.showErrorBox('Port band', portBusyMessage(err.port));
+        app.quit();
+        return;
+      }
       const detail = err instanceof Error ? err.message : String(err);
       dialog.showErrorBox(
         'Dental Service — ishga tushmadi',
@@ -305,27 +337,39 @@ app.whenReady().then(async () => {
     const localUrl = `http://localhost:${config.serverPort}`;
     startServerDiscovery(config.serverPort);
 
-    createTray(
-      'server',
-      { serverUrl: localUrl },
-      {
-        // `licenseGatedUrl` — qaror BOSILGAN paytda hisoblanadi, startup'dagi
-        // bir martalik `hasLicense()` emas (CLI-361 real Windows test'da
-        // topildi: litsenziyasiz tray'dan `Sozlamalar` bosilsa `/login`ga
-        // uloqtirilib, `/activate`ga qaytish imkonsiz bo'lib qolardi).
-        onOpen: () => openBrowser(licenseGatedUrl(localUrl)),
-        // `/settings` index route SPA'da YO'Q (App.tsx catch-all uni `/`ga
-        // qaytaradi — tray "Sozlamalar" hech narsa ochmayotganday ko'rinardi,
-        // 2026-07-06 Linux E2E'da topildi). Desktop-ulanish kartasi
-        // (DesktopServerConnectionCard) joylashgan mavjud sahifaga ochamiz.
-        onSettings: () => openBrowser(licenseGatedUrl(localUrl, '/settings/integrations')),
-        onStop: async () => {
-          stopServerDiscovery();
-          await stopServer();
-          app.quit();
-        },
+    const serverTrayCallbacks = {
+      // `licenseGatedUrl` — qaror BOSILGAN paytda hisoblanadi, startup'dagi
+      // bir martalik `hasLicense()` emas (CLI-361 real Windows test'da
+      // topildi: litsenziyasiz tray'dan `Sozlamalar` bosilsa `/login`ga
+      // uloqtirilib, `/activate`ga qaytish imkonsiz bo'lib qolardi).
+      onOpen: () => openBrowser(licenseGatedUrl(localUrl)),
+      // `/settings` index route SPA'da YO'Q (App.tsx catch-all uni `/`ga
+      // qaytaradi — tray "Sozlamalar" hech narsa ochmayotganday ko'rinardi,
+      // 2026-07-06 Linux E2E'da topildi). Desktop-ulanish kartasi
+      // (DesktopServerConnectionCard) joylashgan mavjud sahifaga ochamiz.
+      onSettings: () => openBrowser(licenseGatedUrl(localUrl, '/settings/integrations')),
+      onStop: async () => {
+        stopServerDiscovery();
+        await stopServer();
+        app.quit();
       },
-    );
+    };
+    createTray('server', { serverUrl: localUrl, serverState: 'ok' }, serverTrayCallbacks);
+    // P15 — child process holati tray'da; urinishlar tugasa xabar beriladi.
+    onServerStatusChange((e) => {
+      const serverState = e.gaveUp ? 'down' : e.status === 'running' ? 'ok' : 'restarting';
+      updateTray('server', { serverUrl: localUrl, serverState }, serverTrayCallbacks);
+      if (e.gaveUp) {
+        if (e.portBusy) {
+          dialog.showErrorBox('Port band', portBusyMessage(e.portBusy));
+        } else {
+          new Notification({
+            title: 'Dental Service',
+            body: "Server komponenti qayta-qayta to'xtadi. Dasturni qayta ishga tushiring.",
+          }).show();
+        }
+      }
+    });
     // Litsenziya faollashtirilmagan bo'lsa (`.lic` fayl yo'q) — asosiy UI
     // o'rniga aktivatsiya sahifasi ochiladi (CLI-348 qaror 1). Web app
     // `/activate` sahifasi qurilgan va ro'yxatdan o'tgan
@@ -472,14 +516,23 @@ app.on('window-all-closed', () => {
   if (isDevWrapMode()) app.quit();
 });
 
-app.on('before-quit', async () => {
+// P15 — server rolida chiqishdan oldin child process'lar toza to'xtatilishi
+// shart (postgres `pg_ctl stop`): quit to'xtatiladi, stopServer() kutiladi,
+// keyin `app.exit(0)` (before-quit'ga qayta kirmaslik uchun bayroq).
+let serverStopHandled = false;
+app.on('before-quit', (event) => {
   if (!isPrimaryInstance) return; // ikkinchi nusxa hech narsa ishga tushirmagan
   if (isDevWrapMode()) return; // dev rejimida process-manager/discovery ishga tushmagan
 
   const config = readConfig();
   if (config.role === 'server') {
+    if (serverStopHandled) return;
+    serverStopHandled = true;
+    event.preventDefault();
     stopServerDiscovery();
-    await stopServer();
+    stopServer()
+      .catch(() => {})
+      .finally(() => app.exit(0));
   } else {
     stopClientReconnectLoop?.();
     stopClientReconnectLoop = null;

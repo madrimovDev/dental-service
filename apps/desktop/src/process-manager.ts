@@ -16,24 +16,12 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { app } from 'electron';
 import {
   getOrCreateDbPassword,
   getOrCreateJwtSecret,
   getOrCreateSuperuserPassword,
 } from './first-run.js';
-
-const getResourcesDir = (): string =>
-  app.isPackaged ? process.resourcesPath : join(import.meta.dirname, '..', 'resources');
-
-// Postgres/Valkey/uploads/logs bir xil ma'lumot papkasi ostida yashaydi
-// (`config.ts`dagi CONFIG_DIR bilan bir xil default — DENTAL_DATA_DIR alohida
-// override qilinishi mumkin, masalan testlarda).
-const getDataDir = (): string =>
-  process.env.DENTAL_DATA_DIR ||
-  (process.platform === 'win32' ? 'C:\\ProgramData\\DentalService' : '/var/lib/dental-service');
-
-const getPgDataDir = (): string => join(getDataDir(), 'postgres', 'data');
+import { getDataDir, getPgDataDir, getResourcesDir } from './paths.js';
 
 // Platform param default `process.platform` — testlarda ikkala tarmoqni ham
 // (win32 va boshqa) haqiqiy joriy platformadan mustaqil sinash uchun.
@@ -42,6 +30,9 @@ export const getPostgresCommand = (platform: NodeJS.Platform = process.platform)
 
 export const getValkeyCommand = (platform: NodeJS.Platform = process.platform): string =>
   platform === 'win32' ? join(getResourcesDir(), 'valkey', 'valkey-server.exe') : 'valkey-server';
+
+export const getPgCtlCommand = (platform: NodeJS.Platform = process.platform): string =>
+  platform === 'win32' ? join(getResourcesDir(), 'postgres', 'bin', 'pg_ctl.exe') : 'pg_ctl';
 
 export const getApiCommand = (platform: NodeJS.Platform = process.platform): string =>
   join(getResourcesDir(), platform === 'win32' ? 'api.exe' : 'api');
@@ -53,61 +44,135 @@ const getValkeyReadyDelayMs = (): number =>
   Number(process.env.DENTAL_VALKEY_READY_DELAY_MS ?? 1000);
 const getApiReadyDelayMs = (): number => Number(process.env.DENTAL_API_READY_DELAY_MS ?? 2000);
 const getStopWaitMs = (): number => Number(process.env.DENTAL_STOP_WAIT_MS ?? 1000);
+// pg_ctl stop -m fast -w -t 10 ga ~5s zaxira bilan (P15).
+const getPgCtlWaitMs = (): number => Number(process.env.DENTAL_PGCTL_WAIT_MS ?? 15000);
 
 export type ServerStatus = 'running' | 'stopped' | 'starting';
+export type ServerChild = 'postgres' | 'valkey' | 'api';
+
+export type ServerStatusEvent = {
+  status: ServerStatus;
+  child?: ServerChild;
+  restarts: number;
+  gaveUp: boolean;
+  /** DT-02: api port band bo'lgani uchun to'xtadi (restart foydasiz). */
+  portBusy?: number;
+};
+
+/** DT-02: api `address already in use` bilan yiqilganda. */
+export class PortInUseError extends Error {
+  readonly port: number;
+  constructor(port: number) {
+    super(`Port ${port} boshqa dastur tomonidan band`);
+    this.name = 'PortInUseError';
+    this.port = port;
+  }
+}
+
+// P15 — restart siyosati: kutilmagan chiqishda backoff bilan qayta ishga
+// tushirish, 10 daqiqa ichida ko'pi bilan MAX_RESTARTS urinish; oshsa to'xtaydi.
+export const RESTART_BACKOFF_MS = [1000, 2000, 5000, 10000, 30000] as const;
+export const MAX_RESTARTS = 5;
+export const RESTART_WINDOW_MS = 10 * 60 * 1000;
+// Testlarda backoff'ni qisqartirish (masalan 0.005).
+const getBackoffScale = (): number => Number(process.env.DENTAL_RESTART_BACKOFF_SCALE ?? 1);
+const getRestartDelayMs = (attemptIndex: number): number =>
+  Math.round(
+    (RESTART_BACKOFF_MS[Math.min(attemptIndex, RESTART_BACKOFF_MS.length - 1)] ?? 30000) *
+      getBackoffScale(),
+  );
+
+const PORT_BUSY_RE = /EADDRINUSE|address already in use/i;
 
 let pgProcess: ChildProcess | null = null;
 let valkeyProcess: ChildProcess | null = null;
 let apiProcess: ChildProcess | null = null;
 let status: ServerStatus = 'stopped';
+let currentApiPort = 80;
 
-// CLI-442#9 — `stopServer()` bilan qasddan to'xtatilayotgan payt bilan
-// kutilmagan crash'ni ajratish uchun bayroq. Qasddan to'xtatishda `exit`
-// eventi kutilgan (SIGTERM/SIGKILL natijasi) — status'ni yana o'zgartirish
-// shart emas (`stopServer` allaqachon 'stopped' qo'yadi). Kutilmagan chiqishda
-// (`stoppingIntentionally === false`) — soxta "running" holatini oldini olish
-// uchun status darhol 'stopped'ga o'tkaziladi.
-let stoppingIntentionally = false;
+// stopServer() (yoki supervisor o'zi) qasddan o'ldirgan jarayonlar — ularning
+// `exit` eventi crash emas (restart ham, soxta status o'zgarishi ham yo'q).
+const intentionalKills = new WeakSet<ChildProcess>();
+// `exit` bergan jarayonlar (waitForExit eventni o'tkazib yubormasligi uchun).
+const exitedProcs = new WeakSet<ChildProcess>();
+const portBusyProcs = new WeakSet<ChildProcess>();
 
-/**
- * CLI-442#9 — crash-supervision: ilgari spawn qilingan bola jarayonlarga
- * `exit`/`error` tinglovchisi umuman ulanmagan edi. Bola kutilmaganda
- * crash bo'lsa (masalan Postgres OOM'dan o'lsa) `status` "running" bo'lib
- * qolar edi — soxta "hammasi yaxshi" holati. Endi har bir bola crash
- * bo'lganda (`stoppingIntentionally` yolg'on bo'lsa) darhol `status='stopped'`
- * qo'yiladi va log fayliga yoziladi. Avtomatik qayta ishga tushirish (restart)
- * QILINMAYDI — spec ruxsat bergan ikkita variantdan ("status='stopped' YOKI
- * cheklangan restart") soddaroq va xavfsizrog'i tanlandi (restart-loop xavfi
- * yo'q); foydalanuvchi tray orqali qayta ishga tushirishi mumkin.
- */
-const attachCrashSupervision = (proc: ChildProcess, label: string): void => {
-  proc.on('exit', (code, signal) => {
-    if (stoppingIntentionally) return; // kutilgan — stopServer() allaqachon 'stopped' qo'yadi
-    status = 'stopped';
-    const logPath = join(getDataDir(), 'logs', `${label}.log`);
+let epoch = 0; // stopServer() har chaqirilganda oshadi — kechikkan restart'larni bekor qiladi
+let restartTimes: number[] = [];
+let gaveUp = false;
+let restartTimer: ReturnType<typeof setTimeout> | null = null;
+let restartRunning = false;
+const pendingRestarts = new Set<ServerChild>();
+const statusListeners = new Set<(e: ServerStatusEvent) => void>();
+
+export const onServerStatusChange = (cb: (e: ServerStatusEvent) => void): (() => void) => {
+  statusListeners.add(cb);
+  return () => {
+    statusListeners.delete(cb);
+  };
+};
+
+const emitStatus = (extra: { child?: ServerChild; portBusy?: number } = {}): void => {
+  const event: ServerStatusEvent = {
+    status,
+    restarts: restartTimes.length,
+    gaveUp,
+    ...extra,
+  };
+  for (const cb of [...statusListeners]) {
     try {
-      appendFileSync(
-        logPath,
-        `\n[crash-supervision] ${label} kutilmaganda chiqdi (code=${code}, signal=${signal}) — status='stopped'\n`,
-      );
+      cb(event);
     } catch {
-      // diskka yozib bo'lmasa ham asosiy oqim to'xtamasin
+      // tinglovchi xatosi supervisor'ni to'xtatmasin
     }
-  });
+  }
+};
+
+const logSupervision = (label: string, message: string): void => {
+  try {
+    appendFileSync(
+      join(getDataDir(), 'logs', `${label}.log`),
+      `\n[crash-supervision] ${message}\n`,
+    );
+  } catch {
+    // diskka yozib bo'lmasa ham asosiy oqim to'xtamasin
+  }
+};
+
+const resetSupervision = (): void => {
+  if (restartTimer) clearTimeout(restartTimer);
+  restartTimer = null;
+  pendingRestarts.clear();
+  restartTimes = [];
+  gaveUp = false;
+};
+
+const giveUp = (child: ServerChild, portBusy?: number): void => {
+  gaveUp = true;
+  status = 'stopped';
+  if (restartTimer) clearTimeout(restartTimer);
+  restartTimer = null;
+  pendingRestarts.clear();
+  logSupervision(
+    child,
+    `qayta ishga tushirish to'xtatildi (gaveUp)${portBusy ? `, port ${portBusy} band` : ''}`,
+  );
+  emitStatus({ child, ...(portBusy ? { portBusy } : {}) });
+};
+
+const killIntentionally = (proc: ChildProcess | null, signal: NodeJS.Signals = 'SIGTERM'): void => {
+  if (!proc) return;
+  intentionalKills.add(proc);
+  proc.kill(signal);
 };
 
 /**
- * CLI-442#9 — bitta bola jarayonning `exit` eventini (yoki `timeoutMs`
- * tugashini, qaysi biri OLDIN kelsa) kutadi. `stopServer`ning SIGTERM→SIGKILL
- * eskalatsiyasi uchun: agar bola `timeoutMs` ichida chiqib ketmasa (Postgres
- * "Smart Shutdown" sekin javob berishi mumkin), chaqiruvchi `SIGKILL`
- * yuboradi — aks holda jarayon orphan qolib, keyingi startda port band/
- * data-dir lock xatosi berardi (`getStopWaitMs()` default 1000ms qat'iy
- * kutish o'rniga — endi haqiqiy tugashni kutadi, keyin escalate qiladi).
+ * Bitta bola jarayonning `exit` eventini (yoki `timeoutMs` tugashini, qaysi
+ * biri OLDIN kelsa) kutadi. Allaqachon chiqib bo'lgan bo'lsa darhol `true`.
  */
 const waitForExit = (proc: ChildProcess | null, timeoutMs: number): Promise<boolean> =>
   new Promise((resolve) => {
-    if (!proc) {
+    if (!proc || exitedProcs.has(proc)) {
       resolve(true);
       return;
     }
@@ -125,6 +190,106 @@ const waitForExit = (proc: ChildProcess | null, timeoutMs: number): Promise<bool
       resolve(false);
     }, timeoutMs).unref?.();
   });
+
+const currentRef = (child: ServerChild): ChildProcess | null =>
+  child === 'postgres' ? pgProcess : child === 'valkey' ? valkeyProcess : apiProcess;
+
+/**
+ * P15 (CLI-442#9 davomi) — crash-supervision: bola kutilmaganda chiqsa
+ * `status='stopped'`, log'ga yoziladi va backoff bilan qayta ishga tushiriladi
+ * (`scheduleRestart`). `stopServer()`/supervisor o'zi o'ldirganlar e'tiborsiz.
+ */
+const attachCrashSupervision = (proc: ChildProcess, label: ServerChild): void => {
+  proc.on('exit', (code, signal) => {
+    exitedProcs.add(proc);
+    if (intentionalKills.has(proc)) return; // kutilgan
+    if (currentRef(label) !== proc) return; // eskirgan jarayon
+    status = 'stopped';
+    logSupervision(
+      label,
+      `${label} kutilmaganda chiqdi (code=${code}, signal=${signal}) — status='stopped'`,
+    );
+    if (label === 'api' && portBusyProcs.has(proc)) {
+      giveUp('api', currentApiPort);
+      return;
+    }
+    scheduleRestart(label);
+  });
+};
+
+const scheduleRestart = (label: ServerChild): void => {
+  if (gaveUp) return;
+  pendingRestarts.add(label);
+  if (restartTimer || restartRunning) return; // mavjud sikl oladi
+  kickRestart(label);
+};
+
+const kickRestart = (label: ServerChild): void => {
+  const now = Date.now();
+  restartTimes = restartTimes.filter((t) => now - t < RESTART_WINDOW_MS);
+  if (restartTimes.length >= MAX_RESTARTS) {
+    giveUp(label);
+    return;
+  }
+  const delay = getRestartDelayMs(restartTimes.length);
+  restartTimes.push(now);
+  emitStatus({ child: label });
+  restartTimer = setTimeout(() => {
+    restartTimer = null;
+    void runRestarts();
+  }, delay);
+  restartTimer.unref?.();
+};
+
+const runRestarts = async (): Promise<void> => {
+  const myEpoch = epoch;
+  restartRunning = true;
+  const labels = new Set(pendingRestarts);
+  pendingRestarts.clear();
+  const done = new Set<ServerChild>();
+  try {
+    if (labels.has('postgres')) {
+      // postgres yiqilsa api ulanishlari ham yaroqsiz — api qayta turadi.
+      const oldApi = apiProcess;
+      if (oldApi && !exitedProcs.has(oldApi)) {
+        killIntentionally(oldApi);
+        if (!(await waitForExit(oldApi, getStopWaitMs()))) oldApi.kill('SIGKILL');
+      }
+      labels.add('api');
+      await spawnPostgres();
+      done.add('postgres');
+    }
+    if (labels.has('valkey')) {
+      await spawnValkey();
+      done.add('valkey');
+    }
+    if (labels.has('api')) {
+      await spawnApi(currentApiPort);
+      done.add('api');
+    }
+    if (epoch !== myEpoch) return;
+    status = 'running';
+    emitStatus();
+  } catch (err) {
+    if (epoch !== myEpoch) return;
+    if (err instanceof PortInUseError) {
+      giveUp('api', err.port);
+      return;
+    }
+    logSupervision('api', `qayta ishga tushirish xatosi: ${(err as Error).message}`);
+    for (const l of labels) if (!done.has(l)) pendingRestarts.add(l);
+  } finally {
+    restartRunning = false;
+    if (epoch !== myEpoch) {
+      // restart paytida stopServer() chaqirilgan — yangi spawn bo'lganlarni yig'ishtiramiz
+      for (const p of [pgProcess, valkeyProcess, apiProcess]) killIntentionally(p, 'SIGKILL');
+      pgProcess = valkeyProcess = apiProcess = null;
+    } else if (pendingRestarts.size > 0 && !gaveUp) {
+      const first = [...pendingRestarts][0] as ServerChild;
+      kickRestart(first);
+    }
+  }
+};
 
 // Har spawn qilingan child process stdout/stderr'ini `<dataDir>/logs/<name>`ga
 // yozadi — avval hech qayerga yozilmasdi (main.ts xato dialogida "Loglarni
@@ -187,6 +352,7 @@ const spawnValkey = (): Promise<void> =>
 
 const spawnApi = (port: number): Promise<void> =>
   new Promise((resolve, reject) => {
+    currentApiPort = port;
     const dataDir = getDataDir();
     apiProcess = spawn(getApiCommand(), [], {
       env: {
@@ -231,10 +397,28 @@ const spawnApi = (port: number): Promise<void> =>
       stdio: 'pipe',
     });
     // postgres/valkey bilan bir xil pattern — binary topilmasa reject.
-    apiProcess.on('error', reject);
-    attachCrashSupervision(apiProcess, 'api');
-    logChildOutput(apiProcess, 'api.log');
-    setTimeout(() => resolve(), getApiReadyDelayMs()).unref?.();
+    const proc = apiProcess;
+    proc.on('error', reject);
+    attachCrashSupervision(proc, 'api');
+    logChildOutput(proc, 'api.log');
+    // DT-02: port band — api stdout/stderr'da `EADDRINUSE`/`address already in
+    // use`. Tayyor bo'lish oynasida bo'lsa darhol PortInUseError bilan reject.
+    let settled = false;
+    const onOutput = (d: Buffer) => {
+      if (!PORT_BUSY_RE.test(d.toString())) return;
+      portBusyProcs.add(proc);
+      if (!settled) {
+        settled = true;
+        reject(new PortInUseError(port));
+      }
+    };
+    proc.stdout?.on('data', onOutput);
+    proc.stderr?.on('data', onOutput);
+    setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    }, getApiReadyDelayMs()).unref?.();
   });
 
 // Postgres+Valkey — first-run'da migratsiyalar shu ikkisi ustida ishlaydi,
@@ -242,14 +426,22 @@ const spawnApi = (port: number): Promise<void> =>
 // runMigrations → startApiLayer). Oddiy (non-first-run) holatda `startServer`
 // hammasini ketma-ket qiladi.
 export const startDatabaseLayer = async (): Promise<void> => {
+  resetSupervision();
   status = 'starting';
   await spawnPostgres();
   await spawnValkey();
 };
 
 export const startApiLayer = async (port: number): Promise<void> => {
-  await spawnApi(port);
-  status = 'running';
+  try {
+    await spawnApi(port);
+  } catch (err) {
+    if (err instanceof PortInUseError) status = 'stopped';
+    throw err;
+  }
+  // Tayyor bo'lish oynasida api yiqilgan bo'lsa (supervisor restart'ni o'zi
+  // boshqaradi) soxta 'running' qo'yilmaydi.
+  if (apiProcess && !exitedProcs.has(apiProcess)) status = 'running';
 };
 
 export const startServer = async (port = 80): Promise<void> => {
@@ -258,36 +450,64 @@ export const startServer = async (port = 80): Promise<void> => {
 };
 
 /**
- * CLI-442#9 — ilgari faqat `SIGTERM` yuborib qat'iy `getStopWaitMs()`
- * (default 1000ms) kutar edi, jarayon haqiqatda tugaganini tekshirmasdan.
- * Postgres SIGTERM'ga (Smart Shutdown) sekin javob berishi mumkin — 1s ichida
- * tugamasa jarayon ORPHAN bo'lib qolardi (keyingi startda port band/data-dir
- * lock xatosi). Endi har bola `exit` eventini kutadi (`waitForExit`,
- * `timeoutMs` ichida chiqmasa `false`); hali tirik bo'lganlarga `SIGKILL`
- * yuboriladi (escalation).
+ * Postgres'ni toza to'xtatish (P15): `pg_ctl stop -m fast -w -t 10`; muvaffaqiyatsiz
+ * bo'lsa (binary yo'q / non-zero / timeout) SIGTERM, keyin SIGKILL fallback.
+ */
+const stopPostgres = async (pg: ChildProcess): Promise<void> => {
+  const pgDown = new Promise<boolean>((resolve) => {
+    let ctl: ChildProcess;
+    try {
+      ctl = spawn(
+        getPgCtlCommand(),
+        ['stop', '-D', getPgDataDir(), '-m', 'fast', '-w', '-t', '10'],
+        { stdio: 'pipe' },
+      );
+    } catch {
+      resolve(false);
+      return;
+    }
+    ctl.once('error', () => resolve(false));
+    ctl.once('exit', (code) => resolve(code === 0));
+    setTimeout(() => {
+      if (!exitedProcs.has(ctl)) ctl.kill('SIGKILL');
+      resolve(false);
+    }, getPgCtlWaitMs()).unref?.();
+    ctl.once('exit', () => exitedProcs.add(ctl));
+  });
+  const ctlOk = await pgDown;
+  if (await waitForExit(pg, ctlOk ? getStopWaitMs() : 0)) return;
+  pg.kill('SIGTERM');
+  if (await waitForExit(pg, getStopWaitMs())) return;
+  pg.kill('SIGKILL');
+};
+
+/**
+ * Hamma bolalarni to'xtatadi: api/valkey — SIGTERM (kutib, keyin SIGKILL);
+ * postgres — `pg_ctl stop -m fast`. Kutilayotgan restart'lar bekor qilinadi.
  */
 export const stopServer = async (): Promise<void> => {
-  stoppingIntentionally = true;
-  try {
-    apiProcess?.kill('SIGTERM');
-    valkeyProcess?.kill('SIGTERM');
-    pgProcess?.kill('SIGTERM');
+  epoch++;
+  if (restartTimer) clearTimeout(restartTimer);
+  restartTimer = null;
+  pendingRestarts.clear();
+  const api = apiProcess;
+  const valkey = valkeyProcess;
+  const pg = pgProcess;
+  for (const p of [api, valkey, pg]) if (p) intentionalKills.add(p);
 
-    const waitMsValue = getStopWaitMs();
-    const [apiExited, valkeyExited, pgExited] = await Promise.all([
-      waitForExit(apiProcess, waitMsValue),
-      waitForExit(valkeyProcess, waitMsValue),
-      waitForExit(pgProcess, waitMsValue),
-    ]);
+  api?.kill('SIGTERM');
+  valkey?.kill('SIGTERM');
+  const wait = getStopWaitMs();
+  const stopApiAndValkey = Promise.all([waitForExit(api, wait), waitForExit(valkey, wait)]).then(
+    ([apiExited, valkeyExited]) => {
+      if (!apiExited) api?.kill('SIGKILL');
+      if (!valkeyExited) valkey?.kill('SIGKILL');
+    },
+  );
+  await Promise.all([stopApiAndValkey, pg ? stopPostgres(pg) : Promise.resolve()]);
 
-    if (!apiExited) apiProcess?.kill('SIGKILL');
-    if (!valkeyExited) valkeyProcess?.kill('SIGKILL');
-    if (!pgExited) pgProcess?.kill('SIGKILL');
-
-    status = 'stopped';
-  } finally {
-    stoppingIntentionally = false;
-  }
+  pgProcess = valkeyProcess = apiProcess = null;
+  status = 'stopped';
 };
 
 export const getServerStatus = (): ServerStatus => status;

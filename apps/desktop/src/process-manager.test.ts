@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, mock, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import { EventEmitter } from 'node:events';
 import { rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -56,6 +56,9 @@ process.env.DENTAL_PG_READY_TIMEOUT_MS = '20';
 process.env.DENTAL_VALKEY_READY_DELAY_MS = '5';
 process.env.DENTAL_API_READY_DELAY_MS = '5';
 process.env.DENTAL_STOP_WAIT_MS = '5';
+process.env.DENTAL_PGCTL_WAIT_MS = '5';
+// Backoff 1000..30000 ms * 0.005 = 5..150 ms (tartib saqlanadi).
+process.env.DENTAL_RESTART_BACKOFF_SCALE = '0.005';
 
 // CLI-390: eski test-run'lardan qolgan db-password.txt bo'lsa tozalaymiz —
 // aks holda isFirstRun()'ning "fresh install" filiali bu statik (mkdtemp
@@ -66,18 +69,37 @@ const { getOrCreateDbPassword, getOrCreateSuperuserPassword } = await import('./
 
 const {
   startServer,
+  startApiLayer,
+  startDatabaseLayer,
   stopServer,
   getServerStatus,
+  onServerStatusChange,
+  PortInUseError,
+  RESTART_BACKOFF_MS,
+  MAX_RESTARTS,
   getPostgresCommand,
   getValkeyCommand,
   getApiCommand,
 } = await import('./process-manager.js');
+
+const waitFor = async (cond: () => boolean, timeoutMs = 2000): Promise<void> => {
+  const start = Date.now();
+  while (!cond()) {
+    if (Date.now() - start > timeoutMs) throw new Error('waitFor timeout');
+    await new Promise((r) => setTimeout(r, 5));
+  }
+};
 
 describe('process-manager', () => {
   beforeEach(() => {
     spawnCalls = [];
     spawnedProcesses = [];
     failSpawnAtIndex = null;
+  });
+
+  // Kutilayotgan restart timer'lari keyingi testga oqib o'tmasin.
+  afterEach(async () => {
+    await stopServer();
   });
 
   test('boshlang\'ich holat "stopped"', () => {
@@ -133,41 +155,46 @@ describe('process-manager', () => {
     expect(env.DENTAL_LOCAL_DESKTOP).toBe('true');
   });
 
-  test('stopServer barcha child process\'larni SIGTERM bilan to\'xtatadi, status "stopped"', async () => {
+  test("stopServer api/valkey'ni SIGTERM bilan, postgres'ni pg_ctl bilan to'xtatadi, status \"stopped\"", async () => {
     await startServer();
     await stopServer();
 
     expect(getServerStatus()).toBe('stopped');
-    expect(spawnedProcesses).toHaveLength(3);
-    for (const proc of spawnedProcesses) {
-      expect(proc.kill).toHaveBeenCalledWith('SIGTERM');
-    }
+    expect(spawnedProcesses[1]?.kill).toHaveBeenCalledWith('SIGTERM'); // valkey
+    expect(spawnedProcesses[2]?.kill).toHaveBeenCalledWith('SIGTERM'); // api
+  });
+
+  test('postgres stop uses pg_ctl stop -m fast', async () => {
+    await startServer();
+    await stopServer();
+
+    expect(spawnCalls).toHaveLength(4);
+    const ctl = spawnCalls[3];
+    expect(ctl?.cmd).toContain('pg_ctl');
+    expect(ctl?.args.slice(0, 1)).toEqual(['stop']);
+    expect(ctl?.args).toContain('-m');
+    expect(ctl?.args[ctl.args.indexOf('-m') + 1]).toBe('fast');
+    expect(ctl?.args).toContain('-w');
   });
 
   // CLI-442#9 — SIGTERM -> grace wait -> SIGKILL escalation. Fake processes
-  // never emit 'exit' on kill() (see FakeChildProcess above), so every
-  // waitForExit() call times out at DENTAL_STOP_WAIT_MS (5ms in this test
-  // env) and SIGKILL must follow — this is the regression guard for the
-  // "process orphaned because SIGTERM alone didn't finish in time" bug.
-  test("bola jarayon vaqt ichida SIGTERM'ga javob bermasa — SIGKILL bilan escalate qiladi", async () => {
+  // never emit 'exit' on kill(), so every wait times out and SIGKILL follows.
+  test('bola jarayon vaqt ichida javob bermasa — SIGKILL bilan escalate qiladi (postgres: pg_ctl -> SIGTERM -> SIGKILL)', async () => {
     await startServer();
     await stopServer();
 
     expect(getServerStatus()).toBe('stopped');
-    for (const proc of spawnedProcesses) {
+    for (const proc of spawnedProcesses.slice(0, 3)) {
       expect(proc.kill).toHaveBeenCalledWith('SIGKILL');
     }
+    expect(spawnedProcesses[0]?.kill).toHaveBeenCalledWith('SIGTERM'); // pg_ctl fallback
   });
 
-  // CLI-442#9 — if the child exits promptly after SIGTERM, stopServer must
-  // NOT escalate to SIGKILL (an unnecessary SIGKILL on an already-dead
-  // process is harmless but the guard proves the escalation is conditional,
-  // not unconditional).
-  test("bola jarayon SIGTERM'dan keyin tez 'exit' bersa — SIGKILL yuborilmaydi", async () => {
+  test("bola jarayonlar tez 'exit' bersa — SIGKILL yuborilmaydi", async () => {
     await startServer();
     const stopPromise = stopServer();
-    // Listeners are registered synchronously inside stopServer() before its
-    // first `await`, so emitting here (before awaiting stopPromise) is safe.
+    // Listeners (va pg_ctl spawn) stopServer() ichida birinchi `await`gacha
+    // sinxron ro'yxatdan o'tadi.
     for (const proc of spawnedProcesses) {
       proc.emit('exit', 0, null);
     }
@@ -189,6 +216,89 @@ describe('process-manager', () => {
     // Simulate e.g. Postgres crashing on its own (OOM, corruption, ...).
     spawnedProcesses[0]?.emit('exit', 1, null);
 
+    expect(getServerStatus()).toBe('stopped');
+  });
+
+  test('restarts api after unexpected exit with backoff', async () => {
+    await startServer(8080);
+    expect(spawnCalls).toHaveLength(3);
+    const events: Array<{ status: string; child?: string; restarts: number; gaveUp: boolean }> = [];
+    const off = onServerStatusChange((e) => events.push(e));
+
+    spawnedProcesses[2]?.emit('exit', 1, null);
+    expect(getServerStatus()).toBe('stopped');
+    expect(events[0]).toMatchObject({
+      status: 'stopped',
+      child: 'api',
+      restarts: 1,
+      gaveUp: false,
+    });
+
+    await waitFor(() => spawnCalls.length === 4 && getServerStatus() === 'running');
+    // Faqat api qayta spawn bo'ldi (port saqlangan)
+    expect(spawnCalls[3]?.cmd).toBe(getApiCommand());
+    expect((spawnCalls[3]?.opts.env as Record<string, string>).API_PORT).toBe('8080');
+    expect(events.at(-1)).toMatchObject({ status: 'running', restarts: 1, gaveUp: false });
+    off();
+
+    // backoff o'sadi: 1s, 2s, 5s, 10s, 30s
+    expect([...RESTART_BACKOFF_MS]).toEqual([1000, 2000, 5000, 10000, 30000]);
+  });
+
+  test('postgres crash restarts postgres and api', async () => {
+    await startServer();
+    spawnedProcesses[0]?.emit('exit', 1, null);
+
+    await waitFor(() => spawnCalls.length === 5 && getServerStatus() === 'running');
+    expect(spawnCalls[3]?.cmd).toBe(getPostgresCommand());
+    expect(spawnCalls[4]?.cmd).toBe(getApiCommand());
+    // eski api to'xtatildi
+    expect(spawnedProcesses[2]?.kill).toHaveBeenCalledWith('SIGTERM');
+  });
+
+  test('gives up after 5 crashes and reports gaveUp', async () => {
+    await startServer();
+    const events: Array<{ status: string; restarts: number; gaveUp: boolean }> = [];
+    const off = onServerStatusChange((e) => events.push(e));
+
+    for (let i = 0; i < MAX_RESTARTS; i++) {
+      const before = spawnCalls.length;
+      spawnedProcesses[spawnedProcesses.length - 1]?.emit('exit', 1, null);
+      await waitFor(() => spawnCalls.length === before + 1 && getServerStatus() === 'running');
+    }
+    expect(spawnCalls).toHaveLength(3 + MAX_RESTARTS);
+
+    // keyingi yiqilish — urinishlar tugagan
+    spawnedProcesses[spawnedProcesses.length - 1]?.emit('exit', 1, null);
+    expect(events.at(-1)).toMatchObject({ status: 'stopped', gaveUp: true });
+    await new Promise((r) => setTimeout(r, 40));
+    expect(spawnCalls).toHaveLength(3 + MAX_RESTARTS);
+    expect(getServerStatus()).toBe('stopped');
+    off();
+  });
+
+  test('intentional stop does not restart', async () => {
+    await startServer();
+    await stopServer();
+    const count = spawnCalls.length;
+    for (const proc of spawnedProcesses) proc.emit('exit', 0, null);
+    await new Promise((r) => setTimeout(r, 40));
+    expect(spawnCalls).toHaveLength(count);
+    expect(getServerStatus()).toBe('stopped');
+  });
+
+  test("DT-02: api port band (EADDRINUSE) — startApiLayer PortInUseError, restart yo'q", async () => {
+    await startDatabaseLayer();
+    const p = startApiLayer(8080);
+    await Promise.resolve();
+    await new Promise((r) => setTimeout(r, 0));
+    const api = spawnedProcesses[2];
+    api?.stderr.emit('data', Buffer.from('error: EADDRINUSE: address already in use :::8080'));
+    await expect(p).rejects.toBeInstanceOf(PortInUseError);
+    api?.emit('exit', 1, null);
+    const count = spawnCalls.length;
+    await new Promise((r) => setTimeout(r, 40));
+    expect(spawnCalls).toHaveLength(count);
     expect(getServerStatus()).toBe('stopped');
   });
 
