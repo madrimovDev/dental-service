@@ -24,6 +24,7 @@ if [ "$cmd" = prep ]; then
   git worktree add -q "$WT" -b "$BR" main
   [ "$(git -C "$WT" rev-parse HEAD)" = "$(git rev-parse main)" ] || { echo "stale worktree base" >&2; exit 1; }
   cp .env "$WT/.env"; cp apps/supervisor-api/.env "$WT/apps/supervisor-api/.env"
+  [ -d .cache ] && cp -r .cache "$WT/.cache"   # kanvas runtime (dc-runtime.js) — gitignored
   (cd "$WT" && bun install --frozen-lockfile >/dev/null 2>&1) || { echo "bun install failed" >&2; exit 1; }
   [ "$(readlink "$WT/node_modules/@dental/core")" = "../../packages/core" ] || { echo "@dental resolve check failed" >&2; exit 1; }
   if [ $want_db = 1 ]; then
