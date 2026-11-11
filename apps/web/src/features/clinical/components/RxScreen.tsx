@@ -12,16 +12,28 @@ const fmtDate = (iso: string) => {
 
 export function RxScreen() {
   const { t } = useTranslation();
-  const { data, isLoading, isError } = useAllPrescriptions();
+  const { data, isLoading, isError, refetch } = useAllPrescriptions();
 
   if (isLoading) return <StateView status="loading" skeleton="table" />;
-  if (isError) return <StateView status="error" />;
+  if (isError)
+    return (
+      <StateView
+        status="error"
+        title={t('states.error_title')}
+        retryLabel={t('states.retry')}
+        onRetry={() => refetch()}
+      />
+    );
 
   return (
     <Stack>
       <PageHead title={t('nav.rx')} />
       {!data?.length ? (
-        <StateView status="empty" />
+        <StateView
+          status="empty"
+          title={t('states.empty_title')}
+          description={t('rx.empty_description')}
+        />
       ) : (
         <Table striped highlightOnHover>
           <Table.Thead>

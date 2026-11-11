@@ -153,11 +153,11 @@ describe('UsersSettingsScreen', () => {
     fireEvent.click(screen.getByText("Xodim qo'shish"));
     const roleInput = (await screen.findAllByLabelText(/^Rol\s*\*?$/))[0] as HTMLElement;
     fireEvent.click(roleInput);
-    await screen.findAllByText(/Receptionist/);
+    await screen.findAllByText(/Registrator/);
     const opts = screen.getAllByRole('option', { hidden: true });
     const labels = opts.map((o) => o.textContent);
-    expect(labels).toContain('Receptionist');
-    expect(labels).not.toContain('Accountant');
+    expect(labels).toContain('Registrator');
+    expect(labels).not.toContain('Buxgalter');
     expect(rolesEnabled.value).toBe(false);
     perms.value = ['@owner'];
     grantable.value = [

@@ -2,6 +2,7 @@ import { Button, IconButton, StatusPill } from '@dental/ui';
 import { X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { formatDayMonth } from '@/lib/format';
 import { localTimeLabel } from '../appointments.mappers';
 import type { Appointment, AppointmentStatus } from '../appointments.types';
 import classes from './AppointmentPanel.module.css';
@@ -73,15 +74,16 @@ export function AppointmentPanel({
   const status = appointment.status;
   const next = NEXT[status];
   const abortable = CAN_ABORT.has(status);
-  const locale = i18n.language === 'ru' ? 'ru-RU' : 'uz-UZ';
-  const fmt = (iso: string) =>
-    new Intl.DateTimeFormat(locale, {
-      day: 'numeric',
-      month: 'long',
+  const fmt = (iso: string) => {
+    const d = new Date(iso);
+    const time = new Intl.DateTimeFormat('en-GB', {
       hour: '2-digit',
       minute: '2-digit',
+      hour12: false,
       timeZone: 'Asia/Tashkent',
-    }).format(new Date(iso));
+    }).format(d);
+    return `${formatDayMonth(d, i18n.language, { timeZone: 'Asia/Tashkent' })}, ${time}`;
+  };
 
   // Holat tarixi: mavjud endpoint yo'q (audit — `audit.view`, registratorda yo'q) →
   // `createdAt`/`updatedAt` + joriy holatdan yo'l quriladi (o'tgan ✓ · joriy ● · kelgusi ○).

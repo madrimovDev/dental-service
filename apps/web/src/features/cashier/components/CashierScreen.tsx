@@ -17,6 +17,7 @@ export function CashierScreen() {
 
   const [branchId, setBranchId] = useState<string | null>(activeBranchId);
   const [patientId, setPatientId] = useState<string | null>(null);
+  const [patientName, setPatientName] = useState<string | undefined>(undefined);
   // CLI-454: bemor Select avval pageSize:100 bilan qidiruvsiz cheklangan edi — 100 tadan
   // ortiq bemorli tenant'da kerakli bemor ko'rinmasdi. Endi qidiruv matni debounced
   // holda serverga uzatiladi (backend `ilike` filtri).
@@ -70,7 +71,11 @@ export function CashierScreen() {
           placeholder={t('cashier.select_patient')}
           data={patientsQuery.data?.data.map((p) => ({ value: p.id, label: p.fullName })) ?? []}
           value={patientId}
-          onChange={setPatientId}
+          onChange={(v) => {
+            setPatientId(v);
+            const found = patientsQuery.data?.data.find((p) => p.id === v);
+            setPatientName(v ? (found?.fullName ?? undefined) : undefined);
+          }}
           searchable
           clearable
           searchValue={patientSearch}
@@ -97,6 +102,7 @@ export function CashierScreen() {
               <PosPanel
                 branchId={branchId}
                 patientId={patientId}
+                patientName={patientName}
                 onDirtyChange={handlePosDirtyChange}
               />
             ) : (

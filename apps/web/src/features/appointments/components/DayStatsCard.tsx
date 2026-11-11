@@ -48,7 +48,16 @@ function Stat({ tileKey, labelKey, value }: { tileKey: string; labelKey: string;
   );
 }
 
-export function DayStatsCard({ appts }: { appts?: Appointment[] }) {
+export function DayStatsCard({
+  appts,
+  isToday = true,
+  dayLabel,
+}: {
+  appts?: Appointment[];
+  /** Tanlangan kun bugunmi (default true). Aks holda sarlavha/jami `dayLabel` bo'yicha. */
+  isToday?: boolean;
+  dayLabel?: string;
+}) {
   const { t } = useTranslation();
   const list = appts ?? [];
   const total = list.length;
@@ -56,7 +65,11 @@ export function DayStatsCard({ appts }: { appts?: Appointment[] }) {
   const pending = list.filter((a) => a.status === 'scheduled').length;
 
   const tiles: Tile[] = [
-    { key: 'total', labelKey: 'dashboard.today_total', value: String(total) },
+    {
+      key: 'total',
+      labelKey: isToday ? 'dashboard.today_total' : 'appointments.day_total',
+      value: String(total),
+    },
     { key: 'confirmed', labelKey: 'appointments.status.confirmed', value: String(confirmed) },
     { key: 'pending', labelKey: 'appointments.status.scheduled', value: String(pending) },
     // "Bo'sh slot" tile olib tashlandi (CLI-374) — FreeSlotsCard.tsx shu rail'da
@@ -84,7 +97,7 @@ export function DayStatsCard({ appts }: { appts?: Appointment[] }) {
           color: 'var(--ink)',
         }}
       >
-        {t('appointments.today')}
+        {isToday || !dayLabel ? t('appointments.today') : dayLabel}
       </span>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         {tiles.map((tile) => (

@@ -20,6 +20,7 @@ import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PhoneInput } from '@/components/PhoneInput.tsx';
+import { roleLabel } from '@/lib/role-label';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import {
   useBranches,
@@ -143,7 +144,12 @@ export function UsersSettingsScreen() {
             placeholder={t('settings.users_filter_role')}
             aria-label={t('settings.users_filter_role')}
             clearable
-            data={filterRoles?.map((r) => ({ value: r.id, label: r.name })) ?? []}
+            data={
+              filterRoles?.map((r) => ({
+                value: r.id,
+                label: roleLabel(r.name, t, 'isSystem' in r ? (r.isSystem as boolean) : undefined),
+              })) ?? []
+            }
             value={filter.roleId}
             onChange={(v) => setFilter((f) => ({ ...f, roleId: v }))}
           />
@@ -177,7 +183,7 @@ export function UsersSettingsScreen() {
                       </Group>
                     </Table.Td>
                     <Table.Td>{a.userPhone}</Table.Td>
-                    <Table.Td>{a.roleName}</Table.Td>
+                    <Table.Td>{roleLabel(a.roleName, t)}</Table.Td>
                     <Table.Td>{a.branchName ?? t('users.all_branches')}</Table.Td>
                     <Table.Td>
                       {a.pending ? (
@@ -275,7 +281,16 @@ export function UsersSettingsScreen() {
               <Select
                 label={t('users.role')}
                 description={t('staffCards.grantHint')}
-                data={grantable.data?.map((r) => ({ value: r.id, label: r.name })) ?? []}
+                data={
+                  grantable.data?.map((r) => ({
+                    value: r.id,
+                    label: roleLabel(
+                      r.name,
+                      t,
+                      'isSystem' in r ? (r.isSystem as boolean) : undefined,
+                    ),
+                  })) ?? []
+                }
                 required
                 {...form.getInputProps('roleId')}
               />

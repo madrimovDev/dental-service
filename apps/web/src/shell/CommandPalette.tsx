@@ -84,6 +84,8 @@ export function CommandPalette() {
       shortcut="mod + K"
       nothingFound={t('palette.nothing_found')}
       highlightQuery
+      scrollable
+      maxHeight={440}
       classNames={classes}
       radius="lg"
       overlayProps={{ blur: 4 }}
