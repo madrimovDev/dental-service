@@ -1,5 +1,5 @@
 import { visitNotes } from '@dental/db-schema';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../../db/scoped.ts';
 
@@ -32,10 +32,23 @@ export const createVisitNotesRepository = () => {
     const [updated] = await db
       .update(visitNotes)
       .set(patch)
-      .where(eq(visitNotes.id, id))
+      // UI-D4: imzolangan yozuv o'zgarmaydi (poyga: find → update orasida imzolansa ham).
+      .where(and(eq(visitNotes.id, id), isNull(visitNotes.signedAt)))
       .returning();
     return updated ?? null;
   }
 
-  return { list, find, insert, update };
+  /** Atomik imzolash: faqat hali imzolanmagan yozuv. Imzolangan/yo'q → null. */
+  async function sign(c: Context, id: string, userId: string | null) {
+    const db = getDb(c);
+    const now = new Date();
+    const [signed] = await db
+      .update(visitNotes)
+      .set({ signedAt: now, signedBy: userId, updatedAt: now })
+      .where(and(eq(visitNotes.id, id), isNull(visitNotes.signedAt)))
+      .returning();
+    return signed ?? null;
+  }
+
+  return { list, find, insert, update, sign };
 };

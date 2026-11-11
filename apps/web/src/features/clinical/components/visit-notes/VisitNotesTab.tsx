@@ -1,40 +1,28 @@
 import type { Diagnosis, VisitNote } from '@dental/api-client';
 import { StateView } from '@dental/ui';
 import { Button, Group, Stack, Title } from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
 import { IconPlus } from '@tabler/icons-react';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth-store.ts';
-import {
-  useCreateVisitNote,
-  useDiagnoses,
-  usePatientAppointments,
-  useServiceCatalog,
-  useTreatmentPlans,
-  useUpdateVisitNote,
-  useVisitNotes,
-} from '../../clinical.api';
+import { useDiagnoses, useVisitNotes } from '../../clinical.api';
 import { VisitNoteCard } from './VisitNoteCard';
-import { VisitNoteFormModal } from './VisitNoteFormModal';
 
 type Props = { patientId: string };
 
+/**
+ * Vizit yozuvlari ro'yxati. UI-D4: yaratish/tahrirlash modal EMAS — alohida sahifa
+ * (`/patients/:id/visits/new`, `/patients/:id/visits/:visitId/edit`).
+ */
 export function VisitNotesTab({ patientId }: Props) {
   const { t } = useTranslation();
-  const { user, hasPermission } = useAuthStore();
-  const [opened, { open, close }] = useDisclosure(false);
-  // CLI-447: null = yaratish, VisitNote = tahrirlash.
-  const [editingNote, setEditingNote] = useState<VisitNote | null>(null);
+  const navigate = useNavigate();
+  const { hasPermission } = useAuthStore();
   const canEdit = hasPermission('medical_record.edit');
 
   const notesQuery = useVisitNotes(patientId);
   const diagnosesQuery = useDiagnoses();
-  const apptQuery = usePatientAppointments(patientId);
-  const servicesQuery = useServiceCatalog();
-  const plansQuery = useTreatmentPlans(patientId);
-  const createMut = useCreateVisitNote(patientId);
-  const updateMut = useUpdateVisitNote(patientId);
 
   const diagnosisMap = useMemo(() => {
     const map = new Map<string, Diagnosis>();
@@ -42,39 +30,8 @@ export function VisitNotesTab({ patientId }: Props) {
     return map;
   }, [diagnosesQuery.data]);
 
-  // CLI-414: BOM auto-deduction uchun aktiv xizmat katalogi.
-  const serviceOptions = useMemo(
-    () =>
-      (servicesQuery.data ?? [])
-        .filter((s) => s.isActive)
-        .map((s) => ({ value: s.id, label: `${s.code} — ${s.nameUz}` })),
-    [servicesQuery.data],
-  );
-
-  // CLI-447: davolash rejasi bosqichlari — stageId Select opsiyalari (reja · bosqich).
-  const stageOptions = useMemo(
-    () =>
-      (plansQuery.data ?? []).flatMap((p) =>
-        (p.stages ?? []).map((s) => ({
-          value: s.id,
-          label: `${p.title} · ${s.sequence}. ${s.serviceName}`,
-        })),
-      ),
-    [plansQuery.data],
-  );
-
-  const openCreate = () => {
-    setEditingNote(null);
-    open();
-  };
-  const openEdit = (note: VisitNote) => {
-    setEditingNote(note);
-    open();
-  };
-  const closeModal = () => {
-    close();
-    setEditingNote(null);
-  };
+  const openCreate = () => navigate(`/patients/${patientId}/visits/new`);
+  const openEdit = (note: VisitNote) => navigate(`/patients/${patientId}/visits/${note.id}/edit`);
 
   return (
     <Stack gap="md">
@@ -107,30 +64,6 @@ export function VisitNotesTab({ patientId }: Props) {
             onEdit={canEdit ? () => openEdit(note) : undefined}
           />
         ))
-      )}
-
-      {user && (
-        <VisitNoteFormModal
-          opened={opened}
-          onClose={closeModal}
-          patientId={patientId}
-          doctorId={user.id}
-          diagnoses={diagnosesQuery.data ?? []}
-          appointments={apptQuery.data ?? []}
-          services={serviceOptions}
-          stages={stageOptions}
-          note={editingNote}
-          pending={createMut.isPending || updateMut.isPending}
-          onSubmit={(body) => {
-            if (editingNote) {
-              // CLI-447: update — patientId/doctorId'siz (backend omit patientId).
-              const { patientId: _p, doctorId: _d, ...rest } = body;
-              updateMut.mutate({ id: editingNote.id, body: rest }, { onSuccess: closeModal });
-            } else {
-              createMut.mutate(body, { onSuccess: closeModal });
-            }
-          }}
-        />
       )}
     </Stack>
   );

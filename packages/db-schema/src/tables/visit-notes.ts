@@ -6,6 +6,14 @@ import { tenants } from './tenants.ts';
 import { treatmentStages } from './treatment-plans.ts';
 import { users } from './users.ts';
 
+/** `visit_notes.metadata` JSONB shakli (UI-D4). */
+export type VisitNoteMetadata = {
+  /** Dori ↔ allergiya ogohlantirishidan sabab bilan o'tilganlar (shu bemorda qayta so'ralmaydi). */
+  allergyOverrides?: Array<{ drug: string; group: string; allergen: string; reason: string }>;
+  /** Keyingi tashrif taklifi (registrator «Bugun»ga tushadi). */
+  nextVisit?: 'none' | '2w' | '6m';
+};
+
 /**
  * Visit Note — har vizit uchun klinik yozuv (SOAP format).
  *
@@ -48,6 +56,12 @@ export const visitNotes = pgTable(
     performedServices: uuid('performed_services').array(),
 
     freeNotes: text('free_notes'),
+
+    // UI-D4: imzolash. NULL = qoralama (tahrirlanadi); NOT NULL = imzolangan (PATCH → 409).
+    signedAt: timestamp('signed_at', { withTimezone: true }),
+    signedBy: uuid('signed_by').references(() => users.id, { onDelete: 'set null' }),
+    // UI-D4: allergiya ogohlantirishidan o'tish sabablari + keyingi tashrif taklifi.
+    metadata: jsonb('metadata').$type<VisitNoteMetadata>(),
 
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

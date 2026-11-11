@@ -1,5 +1,24 @@
 import { z } from '@hono/zod-openapi';
 
+/** UI-D4: dori ↔ allergiya ogohlantirishidan sabab bilan o'tilgan (shu bemorda qayta so'ralmaydi). */
+export const allergyOverrideSchema = z
+  .object({
+    drug: z.string().min(1).max(200),
+    group: z.string().min(1).max(50),
+    allergen: z.string().min(1).max(200),
+    reason: z.string().min(1).max(100),
+  })
+  .openapi('VisitNoteAllergyOverride');
+
+export const nextVisitSchema = z.enum(['none', '2w', '6m']);
+
+export const visitNoteMetadataSchema = z
+  .object({
+    allergyOverrides: z.array(allergyOverrideSchema).optional(),
+    nextVisit: nextVisitSchema.optional(),
+  })
+  .openapi('VisitNoteMetadata');
+
 export const createVisitNoteSchema = z.object({
   patientId: z.uuid(),
   doctorId: z.uuid(),
@@ -14,6 +33,9 @@ export const createVisitNoteSchema = z.object({
   plan: z.string().max(5000).optional(),
   performedServices: z.array(z.uuid()).default([]),
   freeNotes: z.string().max(5000).optional(),
+  // UI-D4: `metadata`ga yoziladi (update'da mavjud kalitlar bilan birlashtiriladi, ezilmaydi).
+  allergyOverrides: z.array(allergyOverrideSchema).max(50).optional(),
+  nextVisit: nextVisitSchema.optional(),
 });
 export type CreateVisitNoteInput = z.infer<typeof createVisitNoteSchema>;
 
@@ -43,6 +65,9 @@ export const visitNoteDtoSchema = z
     plan: z.string().nullable().openapi({ example: null }),
     performedServices: z.array(z.uuid()).nullable().openapi({ example: [] }),
     freeNotes: z.string().nullable().openapi({ example: null }),
+    signedAt: z.string().nullable().openapi({ example: null }),
+    signedBy: z.uuid().nullable().openapi({ example: null }),
+    metadata: visitNoteMetadataSchema.nullable().openapi({ example: null }),
     createdAt: z.string().openapi({ example: '2026-06-12T10:00:00.000Z' }),
     updatedAt: z.string().openapi({ example: '2026-06-12T10:00:00.000Z' }),
   })

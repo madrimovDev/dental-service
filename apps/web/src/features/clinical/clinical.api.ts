@@ -11,11 +11,13 @@ import {
   createToothChart,
   createTreatmentPlan,
   createVisitNote,
+  customInstance,
   deletePatientImage,
   getLatestToothChart,
   getPatient,
   getService,
   getTreatmentPlanEstimate,
+  getVisitNote,
   type LabOrderStatus,
   type ListLabOrdersParams,
   type ListTreatmentPlansParams,
@@ -30,6 +32,7 @@ import {
   listToothCharts,
   listTreatmentPlans,
   listVisitNotes,
+  listVisitNoteTemplates,
   type ServiceWithPrices,
   type SignFormInput,
   type SignTreatmentPlanConsentBody,
@@ -57,6 +60,7 @@ import { recallKeys } from '@/features/recalls/recalls.keys.ts';
 import { api } from '@/lib/api.ts';
 import { lookupKeys } from '@/lib/lookup-keys.ts';
 import { clinicalKeys } from './clinical.keys';
+import type { VisitNoteView } from './clinical.types';
 
 const HOUR = 1000 * 60 * 60;
 
@@ -288,10 +292,68 @@ export function useUpdateVisitNote(patientId: string) {
       updateVisitNote(id, body).then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: clinicalKeys.visitNotes(patientId) });
+      qc.invalidateQueries({ queryKey: ['clinical', 'visit-note'] });
       // stageId completion / performedServices reconcile plan+stock holatiga ta'sir qiladi.
       qc.invalidateQueries({ queryKey: clinicalKeys.plans(patientId) });
     },
   });
+}
+
+// ===== UI-D4: vizit yozuvi sahifasi =====
+export function useVisitNote(id: string | undefined) {
+  return useQuery({
+    queryKey: clinicalKeys.visitNote(id ?? ''),
+    queryFn: () => getVisitNote(id as string).then((r) => r.data as VisitNoteView),
+    enabled: !!id,
+  });
+}
+
+/** CL-12: vizit shablonlari (backend tayyor) — sahifa sarlavhasidagi «Shablon» tanlagichi. */
+export function useVisitNoteTemplates() {
+  return useQuery({
+    queryKey: clinicalKeys.visitNoteTemplates(),
+    queryFn: () => listVisitNoteTemplates().then((r) => r.data),
+    staleTime: HOUR,
+  });
+}
+
+/**
+ * «Imzolash» — `POST /visit-notes/{id}/sign`. Generated klient hali bu endpointni bilmaydi
+ * (keyingi `generate:contract`) — shu paytgacha mutator orqali to'g'ridan chaqiriladi.
+ */
+export function useSignVisitNote(patientId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      customInstance<{ success: boolean; data: VisitNoteView }>({
+        url: `/api/visit-notes/${id}/sign`,
+        method: 'POST',
+      }).then((r) => r.data),
+    onSuccess: (_d, id) => {
+      qc.invalidateQueries({ queryKey: clinicalKeys.visitNotes(patientId) });
+      qc.invalidateQueries({ queryKey: clinicalKeys.visitNote(id) });
+    },
+  });
+}
+
+/** Tanlangan xizmatlarning joriy narxi (filial bo'yicha, `validTo` yo'q) — qulflangan, faqat ko'rsatish. */
+export function useServicePrices(ids: string[], branchId: string | null) {
+  const unique = Array.from(new Set(ids));
+  const results = useQueries({
+    queries: unique.map((id) => ({
+      queryKey: ['services', 'detail', id],
+      queryFn: () => getService(id).then((r) => r.data),
+      staleTime: HOUR,
+    })),
+  });
+  const map = new Map<string, number>();
+  unique.forEach((id, i) => {
+    const prices = results[i]?.data?.prices ?? [];
+    const active = prices.filter((p) => p.validTo === null);
+    const pick = active.find((p) => p.branchId === branchId) ?? active[0];
+    if (pick) map.set(id, Number(pick.price));
+  });
+  return map;
 }
 
 export function useDiagnoses() {
