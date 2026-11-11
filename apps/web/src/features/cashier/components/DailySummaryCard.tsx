@@ -3,6 +3,7 @@ import { Box, Group, Paper, Stack, Text, Title } from '@mantine/core';
 import { IconChartBar, IconCornerDownLeft } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { formatCurrency, formatNumber } from '@/lib/format';
+import { netCashTotal } from '../cashier.mappers';
 
 export interface DailySummaryCardProps {
   summary: DailySummary;
@@ -39,9 +40,8 @@ export function DailySummaryCard({ summary }: DailySummaryCardProps) {
   const cardRefund = sumByMethodAndType(summary, 'card', 'refund');
   const cardNet = cardPayment - cardRefund;
 
-  const totalPayment = sumByType(summary, 'payment');
   const totalRefund = sumByType(summary, 'refund');
-  const totalRevenue = totalPayment - totalRefund;
+  const totalRevenue = netCashTotal(summary.breakdown);
   const cashShare = totalRevenue > 0 ? Math.round((cashNet / totalRevenue) * 100) : 0;
   const cardShare = totalRevenue > 0 ? Math.round((cardNet / totalRevenue) * 100) : 0;
 

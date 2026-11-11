@@ -29,7 +29,11 @@ vi.mock('../dashboard.api.ts', () => ({
 vi.mock('@/features/cashier/cashier.api.ts', () => ({
   useDailySummary: () => ({
     data: {
-      breakdown: [{ paymentMethod: 'cash', type: 'income', total: '900000', count: 3 }],
+      breakdown: [
+        { paymentMethod: 'cash', type: 'income', total: '900000', count: 3 },
+        { paymentMethod: 'cash', type: 'payment', total: '500000', count: 1 },
+        { paymentMethod: 'cash', type: 'refund', total: '300000', count: 1 },
+      ],
     },
   }),
 }));
@@ -48,8 +52,8 @@ describe('AccountantDashboard (DS1-T4 re-skin characterization)', () => {
     expect(screen.getByText('Umumiy daromad')).toBeInTheDocument();
     // revenue_total qiymati (4 200 000) — suffiksdan qat'i nazar raqam ko'rinadi
     expect(screen.getByText(/4\D?200\D?000/)).toBeInTheDocument();
-    // daily_cash qiymati (900 000 = breakdown total) — KPI kartasi + breakdown qatorida ko'rinadi
-    expect(screen.getAllByText(/900\D?000/).length).toBeGreaterThan(0);
+    // P13: daily_cash = 900 000 + 500 000 − 300 000 (refund ayiriladi) = 1 100 000
+    expect(screen.getAllByText(/1\D?100\D?000/).length).toBeGreaterThan(0);
     // by-service BarMini (haftalik tushum kartasi) saqlanadi
     expect(screen.getByText('Tozalash')).toBeInTheDocument();
     // kunlik kassa breakdown qatori (paymentMethod · type) saqlanadi
