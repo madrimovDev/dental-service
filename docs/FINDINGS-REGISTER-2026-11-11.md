@@ -500,3 +500,16 @@ Reja: `docs/superpowers/plans/2026-11-12-completion-leftovers.md`. 5 lane + cont
 | FU-46 | L | Price chip'lari har xizmat uchun alohida `GET /services/{id}` | batch endpoint |
 | FU-47 | L | `/select-workspace`ga SPA orqali o'tilganda bir marta «klinika yo'q» flesh | yuklanish holati |
 
+## 25. Lab portali — Lab Hub (2026-11-12) — natija
+
+Spec `docs/superpowers/specs/2026-11-12-lab-portal-design.md` (L1–L10), reja `docs/superpowers/plans/2026-11-12-lab-hub.md`. W1: `apps/lab-hub-api` (konvert shifrlash AES-256-GCM, har labga DEK + KEK kanareykasi, RLS lab_id bo'yicha, commit-xavfsiz `/changes` kursori), Supervisor «Laboratoriyalar» + SaaS tenantlar Supervisor'da (L8, obuna muddati, P18 naqshi). W2: `apps/lab-hub-web` (lab portali), klinika sinxroni (outbox + 60 s poll, idempotent `clientRef`), narx tasdig'i: **xarajat faqat Hub tasdiqlagandan keyin** (`lab_order.approve_price` — Tenant Admin/BM/Doctor/Doctor+Assistant; Accountant/Technician/Nurse/Receptionist YO'Q). Real-brauzer E2E (SaaS rejimi) to'liq o'tdi: Supervisor'da lab → klinika ulanishi → buyurtma → portal (to'liq ism, telefon/manzil yo'q) → narx → bitta «Laboratoriya» xarajati → yetkazildi; bazada bemor ismi shifrlangan.
+
+| ID | J | Qisqa | Qilinadigan ish |
+|---|---|---|---|
+| FU-48 | 🟡 | Lab Hub desktop rejimi (litsenziya kaliti bilan ulanish) va real Caddy/TLS deploy'i tekshirilmagan | infra bosqichi (VPS/domen) |
+| FU-49 | L | Klinika lab buyurtmani boshqa shifokor nomidan yaratolmaydi (shifokor tanlagich yo'q) | kerak bo'lsa qaror |
+| FU-50 | L | Status o'zgarishi rad etilganda (lab tayyor emas / lab qulflagan) detal sahifada umumiy xato toast'i | aniq xabar |
+| FU-51 | L | Web lab-hub chaqiruvlari qo'lda yozilgan `endpoints.ts` orqali (generated funksiyalar mavjud) | generated'ga o'tkazish |
+| FU-52 | L | SaaS klinikani Supervisor'da bekor qilish (deactivate) yo'li yo'q — faqat uzaytirish | admin amali |
+| FU-53 | M | SaaS'da `MESSAGING_SECRET` env majburiy (bo'lmasa lab-hub connect 500, `/var/lib/dental-service` EACCES) | infra compose'ga qo'shish |
+
