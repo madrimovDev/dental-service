@@ -440,6 +440,81 @@ describe('ClinicDetailPage', () => {
     expect(await screen.findByText('OWNER_PHONE_MISSING')).toBeInTheDocument();
   });
 
+  // Muddatni uzaytirish (P18) — vendor litsenziya expiresAt'ni yangilaydi;
+  // klinika keyingi heartbeat'da yangi muddatni oladi.
+  it('muddatni uzaytirish: modal, sana kiritish va tasdiqlash POST renew {expiresAt} chaqiradi va klinikani qayta yuklaydi', async () => {
+    let renewed = false;
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === 'POST' && url.endsWith('/v1/admin/clinics/c1/renew')) {
+        renewed = true;
+        return jsonResponse({ license: { ...license, expiresAt: '2028-06-30T23:59:59.000Z' } });
+      }
+      if (url.endsWith('/v1/admin/clinics/c1')) {
+        return jsonResponse({ clinic, license });
+      }
+      throw new Error(`unhandled fetch: ${url} ${init?.method ?? 'GET'}`);
+    });
+
+    renderDetail();
+    await screen.findByText('Clinic One');
+    const detailGetsBefore = fetchMock.mock.calls.filter(
+      ([u, init]) => String(u).endsWith('/v1/admin/clinics/c1') && !init?.method,
+    ).length;
+
+    fireEvent.click(screen.getByRole('button', { name: 'Muddatni uzaytirish' }));
+    // Tasdiqsiz hech qanday POST ketmaydi.
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
+
+    const dateInput = await screen.findByLabelText('Yangi amal qilish muddati');
+    expect(dateInput).toHaveAttribute('type', 'date');
+    fireEvent.change(dateInput, { target: { value: '2028-06-30' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Tasdiqlash' }));
+
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/v1/admin/clinics/c1/renew'),
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ expiresAt: '2028-06-30' }),
+        }),
+      ),
+    );
+    expect(renewed).toBe(true);
+
+    // Muvaffaqiyatdan keyin ['clinic', id] invalidate — klinika qayta so'raladi.
+    await vi.waitFor(() => {
+      const detailGetsAfter = fetchMock.mock.calls.filter(
+        ([u, init]) => String(u).endsWith('/v1/admin/clinics/c1') && !init?.method,
+      ).length;
+      expect(detailGetsAfter).toBeGreaterThan(detailGetsBefore);
+    });
+  });
+
+  it("muddatni uzaytirish so'rovi muvaffaqiyatsiz bo'lsa xato kodini ko'rsatadi", async () => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === 'POST' && url.endsWith('/v1/admin/clinics/c1/renew')) {
+        return jsonResponse({ error: { code: 'EXPIRES_IN_PAST' } }, false);
+      }
+      if (url.endsWith('/v1/admin/clinics/c1')) {
+        return jsonResponse({ clinic, license });
+      }
+      throw new Error(`unhandled fetch: ${url} ${init?.method ?? 'GET'}`);
+    });
+
+    renderDetail();
+    await screen.findByText('Clinic One');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Muddatni uzaytirish' }));
+    fireEvent.change(await screen.findByLabelText('Yangi amal qilish muddati'), {
+      target: { value: '2020-01-01' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Tasdiqlash' }));
+
+    expect(await screen.findByText('EXPIRES_IN_PAST')).toBeInTheDocument();
+  });
+
   it("reset-token so'rovi muvaffaqiyatsiz bo'lsa xato xabarini ko'rsatadi", async () => {
     fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);

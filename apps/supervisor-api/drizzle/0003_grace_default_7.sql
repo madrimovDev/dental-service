@@ -1,0 +1,1 @@
+ALTER TABLE "licenses" ALTER COLUMN "grace_period_days" SET DEFAULT 7;
