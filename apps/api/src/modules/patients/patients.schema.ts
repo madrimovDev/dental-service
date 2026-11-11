@@ -191,9 +191,28 @@ export const patientListItemDtoSchema = patientDtoSchema
     // CLI-474 (L7): faol (waivedmas, hali no_show) strike soni + chegara belgisi.
     noShowStrikes: z.number().int(),
     flagged: z.boolean(),
+    // UI-R6: ro'yxat belgilari. allergy — faqat bor/yo'q (mazmuni emas); noShows — faol strike soni.
+    flags: z.object({
+      allergy: z.boolean(),
+      debt: z.boolean(),
+      noShows: z.number().int(),
+      telegram: z.boolean(),
+    }),
   })
   .openapi('PatientListItem');
 export type PatientListItemDto = z.infer<typeof patientListItemDtoSchema>;
+
+/** UI-R6: telefon dublikat tekshiruvi — `GET /patients/phone-check?phone=`. */
+export const phoneCheckQuerySchema = z.object({
+  phone: z.string().max(40),
+});
+
+export const phoneCheckResultSchema = z
+  .object({
+    matches: z.array(z.object({ id: z.uuid(), fullName: z.string() })),
+  })
+  .openapi('PatientPhoneCheck');
+export type PhoneCheckResult = z.infer<typeof phoneCheckResultSchema>;
 
 /** Paginated list response — `{ data, meta }` inside `ok()` envelope. */
 export const patientListResponseDtoSchema = z

@@ -14,6 +14,7 @@ import {
   createQueueTicketSchema,
   queueTicketDtoSchema,
   queueTicketIdParamSchema,
+  queueTicketUpdateResultSchema,
   updateQueueStatusSchema,
 } from './queue.schema.ts';
 import { createQueueService, type QueueService, QueueValidationError } from './queue.service.ts';
@@ -166,7 +167,7 @@ export const queueRoutes = (deps: {
       body: { content: { 'application/json': { schema: updateQueueStatusSchema } } },
     },
     responses: {
-      ...okJson(queueTicketDtoSchema, 'Updated queue ticket'),
+      ...okJson(queueTicketUpdateResultSchema, 'Updated queue ticket'),
       ...notFoundResponse,
       400: {
         content: { 'application/json': { schema: errorResponseSchema } },
@@ -178,16 +179,68 @@ export const queueRoutes = (deps: {
   app.openapi(updateStatusRoute, async (c) => {
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    let ticket: Awaited<ReturnType<typeof service.updateStatus>>;
+    let result: Awaited<ReturnType<typeof service.updateStatusDetailed>>;
     try {
-      ticket = await service.updateStatus(c, id, body);
+      result = await service.updateStatusDetailed(c, id, body);
     } catch (e) {
       // A6 (CLI-438): state-machine violation → 400 (status.invalid_transition).
       if (e instanceof QueueTransitionError) return c.json(fail(e.code, e.message), 400);
       throw e;
     }
-    if (!ticket) return c.json(fail('ticket.not_found', 'Queue ticket not found'), 404);
-    return c.json(ok(toQueueTicketDto(ticket)), 200);
+    if (!result) return c.json(fail('ticket.not_found', 'Queue ticket not found'), 404);
+    return c.json(
+      ok({ ...toQueueTicketDto(result.ticket), appointmentSyncError: result.appointmentSyncError }),
+      200,
+    );
+  });
+
+  // ─── POST /{id}/call-own — shifokor o'z bemorini chaqiradi (UI-R4) ───────
+  // `queue.view` yetarli (yangi permission kodi YO'Q); egalik servisda tekshiriladi:
+  // queue.manage/@owner — hammani, boshqalar — faqat ticket.appointment.doctorId === user.id.
+
+  const callOwnRoute = createRoute({
+    method: 'post',
+    path: '/{id}/call-own',
+    tags: ['queue'],
+    operationId: 'callOwnQueueTicket',
+    middleware: [requirePermission('queue.view')] as const,
+    request: { params: queueTicketIdParamSchema },
+    responses: {
+      ...okJson(queueTicketUpdateResultSchema, 'Called queue ticket'),
+      ...notFoundResponse,
+      400: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Invalid status transition',
+      },
+      403: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Not the doctor of this ticket',
+      },
+    },
+  });
+
+  app.openapi(callOwnRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const perms = c.get('accessClaims')?.perms ?? [];
+    const canCallAny = perms.includes('@owner') || perms.includes('queue.manage');
+    let res: Awaited<ReturnType<typeof service.callOwn>>;
+    try {
+      res = await service.callOwn(c, id, canCallAny);
+    } catch (e) {
+      if (e instanceof QueueTransitionError) return c.json(fail(e.code, e.message), 400);
+      throw e;
+    }
+    if (res === 'not_found') return c.json(fail('ticket.not_found', 'Queue ticket not found'), 404);
+    if (res === 'forbidden') {
+      return c.json(
+        fail('queue.not_own_patient', "Faqat o'zingizga yozilgan bemorni chaqira olasiz"),
+        403,
+      );
+    }
+    return c.json(
+      ok({ ...toQueueTicketDto(res.ticket), appointmentSyncError: res.appointmentSyncError }),
+      200,
+    );
   });
 
   // ─── POST /sweep-no-shows — kun oxiri no-show sweep (A6, CLI-438) ────────

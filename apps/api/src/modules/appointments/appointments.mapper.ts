@@ -2,11 +2,14 @@ import type { Appointment } from '@dental/db-schema';
 import type { AppointmentDto } from './appointments.schema.ts';
 
 /** DB row (Date timestamps) → wire DTO (ISO strings, nullable fields preserved). */
-export const toAppointmentDto = (row: Appointment): AppointmentDto => ({
+export const toAppointmentDto = (
+  row: Appointment & { patientName?: string | null },
+): AppointmentDto => ({
   id: row.id,
   tenantId: row.tenantId,
   branchId: row.branchId,
   patientId: row.patientId,
+  patientName: row.patientName ?? null,
   doctorId: row.doctorId,
   assistantId: row.assistantId ?? null,
   startTime: row.startTime.toISOString(),

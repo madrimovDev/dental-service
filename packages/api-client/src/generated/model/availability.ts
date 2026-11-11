@@ -5,6 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { AvailabilitySlot } from './availabilitySlot';
+import type { UnavailableSlot } from './unavailableSlot';
 
 export interface Availability {
   doctorId: string;
@@ -12,5 +13,6 @@ export interface Availability {
   date: string;
   slotMinutes: number;
   slots: AvailabilitySlot[];
+  unavailable: UnavailableSlot[];
   workHoursConfigured: boolean;
 }

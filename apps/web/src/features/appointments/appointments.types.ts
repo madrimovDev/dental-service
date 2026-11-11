@@ -1,7 +1,41 @@
-import type { Appointment, AppointmentStatus } from '@dental/api-client';
+import type { Appointment as ApiAppointment, AppointmentStatus } from '@dental/api-client';
 import type React from 'react';
 
+/**
+ * Yozilish + bemor ismi (SC-01: `GET /appointments` JOIN bilan to'ldiradi).
+ * Generated modelga `patientName` regen'dan keyin ham keladi — kesishma zararsiz.
+ */
+export type Appointment = ApiAppointment & { patientName?: string | null };
+
 export type Doctor = { id: string; name: string };
+
+/** SC-07: slot nega taklif qilinmaydi (backend `unavailable[].reason`). */
+export type UnavailableReason = 'past' | 'busy' | 'lunch' | 'time_off' | 'too_short';
+export type UnavailableSlot = { start: string; end: string; reason: UnavailableReason };
+
+/**
+ * UI-R3: `GET /appointments/booking-context`. ⚠️ Generated api-client'da hali yo'q —
+ * `generate:contract` dan keyin `getBookingContext` generated tipga almashtiriladi.
+ */
+export type BookingContext = {
+  openLabOrders: {
+    id: string;
+    labName: string;
+    orderType: string;
+    status: string;
+    expectedDate: string | null;
+  }[];
+  nextPlanStage: {
+    planId: string;
+    planTitle: string;
+    doctorId: string;
+    stageId: string;
+    sequence: number;
+    serviceId: string | null;
+    serviceName: string;
+    estimatedDurationMinutes: number | null;
+  } | null;
+};
 
 /** Grid pozitsiyasi (px). */
 export type SlotPosition = { top: number; height: number; lane: number; laneCount: number };
@@ -50,4 +84,4 @@ export function toneVars(tone: Tone): React.CSSProperties {
   } as React.CSSProperties;
 }
 
-export type { Appointment, AppointmentStatus };
+export type { AppointmentStatus };

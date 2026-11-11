@@ -1,7 +1,8 @@
 import { Modal } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { formatCurrency, formatNumber } from '@/lib/format';
-import type { CartItem, TransactionVM } from '../cashier.types';
+import { useTransactionDetail } from '../cashier.api';
+import type { CardProvider, CartItem, TransactionVM } from '../cashier.types';
 
 export interface ReceiptModalProps {
   opened: boolean;
@@ -9,9 +10,8 @@ export interface ReceiptModalProps {
   /** Chek manbasi: POS charge javobi yoki tarixdagi tranzaksiya (toTransactionVM). */
   transaction: TransactionVM;
   /**
-   * Savat satrlari (faqat POS charge snapshot'idan keladi). Tarixda
-   * (TransactionsTable) satrlar tranzaksiya VM'ida mavjud emas (data-gap) →
-   * o'tkazib yuboriladi.
+   * Savat snapshot'i — FAQAT server tafsiloti yuklanguncha (yoki yuklanmasa) zaxira.
+   * Chek manbasi — `GET /cashier/transactions/:id` (server qatorlari, fiskal holat, sub-tur).
    */
   cart?: CartItem[];
   /** Bemor ismi (mavjud bo'lsa). Tarix VM'ida yo'q → placeholder. */
@@ -40,11 +40,34 @@ export function ReceiptModal({
 }: ReceiptModalProps) {
   const { t } = useTranslation();
 
+  // Chek serverdan chiziladi (UI-R5): qatorlar/fiskal holat/sub-tur server javobidan.
+  const detailQuery = useTransactionDetail(transaction.id, opened);
+  const detail = detailQuery.data as
+    | (NonNullable<typeof detailQuery.data> & { cardProvider?: CardProvider | null })
+    | undefined;
+  const serverLines = detail?.items.map((i) => ({
+    key: i.id,
+    name: i.serviceName,
+    quantity: i.quantity,
+    amount: Number(i.subtotal),
+  }));
+  const lines =
+    serverLines ??
+    cart?.map((i) => ({
+      key: i.service.id,
+      name: i.service.nameUz,
+      quantity: i.quantity,
+      amount: i.unitPrice * i.quantity,
+    })) ??
+    [];
+  const fiscalSent = detail ? detail.fiscalReceiptId != null : transaction.fiscalSent;
+  const cardProvider = detail?.cardProvider ?? transaction.cardProvider;
+
   // Subtotal (chegirmadan oldin): savat satrlari bo'lsa undan, aks holda
   // sof jami + chegirma. Bo'sh massiv truthy → `.length` bilan tekshiramiz.
   const subtotal =
-    cart && cart.length > 0
-      ? cart.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0)
+    lines.length > 0
+      ? lines.reduce((sum, l) => sum + l.amount, 0)
       : transaction.totalAmount + transaction.discount;
   const discountPct = subtotal > 0 ? Math.round((transaction.discount / subtotal) * 100) : 0;
 
@@ -159,12 +182,17 @@ export function ReceiptModal({
           <span style={{ color: item }}>{patientName ?? t('cashier.no_patient')}</span>
         </div>
 
-        {/* Savat satrlari (faqat mavjud bo'lsa) */}
-        {cart && cart.length > 0 && (
-          <div style={{ marginBottom: 14 }}>
-            {cart.map((i) => (
+        {/* Chek qatorlari (server) */}
+        {detailQuery.isError && lines.length === 0 && (
+          <div style={{ color: muted, fontSize: 12, marginBottom: 14 }}>
+            {t('cashierPos.receipt.load_error')}
+          </div>
+        )}
+        {lines.length > 0 && (
+          <div style={{ marginBottom: 14 }} data-testid="receipt-lines">
+            {lines.map((l) => (
               <div
-                key={i.service.id}
+                key={l.key}
                 style={{
                   display: 'flex',
                   justifyContent: 'space-between',
@@ -173,11 +201,11 @@ export function ReceiptModal({
                 }}
               >
                 <span style={{ color: item }}>
-                  {i.service.nameUz}
-                  {i.quantity > 1 ? ` × ${formatNumber(i.quantity)}` : ''}
+                  {l.name}
+                  {l.quantity > 1 ? ` × ${formatNumber(l.quantity)}` : ''}
                 </span>
                 <span style={{ fontFamily: mono, fontWeight: 600, color: ink }}>
-                  {formatCurrency(i.unitPrice * i.quantity, t)}
+                  {formatCurrency(l.amount, t)}
                 </span>
               </div>
             ))}
@@ -246,15 +274,38 @@ export function ReceiptModal({
           }}
         >
           <span>{t('cashier.method_label')}</span>
-          <span style={{ color: item }}>{t(`cashier.method.${transaction.paymentMethod}`)}</span>
+          <span style={{ color: item }}>
+            {t(`cashier.method.${transaction.paymentMethod}`)}
+            {transaction.paymentMethod === 'card' && cardProvider
+              ? ` · ${t(`cashierPos.provider.${cardProvider}`)}`
+              : ''}
+          </span>
         </div>
+        {transaction.paidAmount !== transaction.totalAmount && (
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              color: muted,
+              fontSize: 12,
+              marginBottom: 14,
+            }}
+          >
+            <span>{t('cashierPos.receipt.paid')}</span>
+            <span style={{ fontFamily: mono, color: item }}>
+              {formatCurrency(transaction.paidAmount, t)}
+            </span>
+          </div>
+        )}
 
-        {/* NoOp fiskal footer */}
+        {/* Fiskal holat: NoOp provider → «Yuborilmagan» (Soliq real bo'lganda «Yuborilgan») */}
         <div
           data-testid="receipt-noop-footer"
           style={{ textAlign: 'center', color: muted, fontSize: 11, fontStyle: 'italic' }}
         >
-          {t('cashier.noop_fiscal')}
+          {t('cashierPos.receipt.fiscal')}:{' '}
+          {fiscalSent ? t('cashierPos.fiscal.sent') : t('cashierPos.fiscal.not_sent')}
+          {fiscalSent ? '' : ` — ${t('cashier.noop_fiscal')}`}
         </div>
       </div>
     </Modal>

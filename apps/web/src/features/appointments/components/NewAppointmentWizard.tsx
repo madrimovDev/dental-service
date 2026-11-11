@@ -1,19 +1,28 @@
 import { ApiError } from '@dental/api-client';
 import { Button } from '@dental/ui';
-import { Alert, Chip, Group, MultiSelect, Select, Stack, Stepper, Text } from '@mantine/core';
+import { Alert, Select } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { useForm } from '@mantine/form';
 import { useDebouncedValue } from '@mantine/hooks';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, ArrowLeft } from 'lucide-react';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { usePatients } from '@/features/patients';
 import { useAvailability } from '@/features/schedule/schedule.api';
 import { localDateParam, slotTimeLabel } from '@/features/schedule/schedule.mappers';
 import { useAuthStore } from '@/stores/auth-store.ts';
-import { useBranches, useCreateAppointment, useDoctors, useServices } from '../appointments.api';
+import {
+  useBookingContext,
+  useBranches,
+  useCreateAppointment,
+  useDoctors,
+  useServices,
+} from '../appointments.api';
 import { type WizardValues, wizardSchema } from '../appointments.schema';
+import type { UnavailableSlot } from '../appointments.types';
+import styles from './NewAppointmentWizard.module.css';
 
 type Option = { value: string; label: string };
 
@@ -44,15 +53,29 @@ function conflictMessage(err: unknown, t: (key: string) => string, lang: string)
   }
 }
 
+const TZ = 'Asia/Tashkent';
+/** Slot shu klinika-local soatdan oldin bo'lsa «Ertalab», aks holda «Tushdan keyin». */
+const NOON_MINUTE = 12 * 60;
+
+function localMinute(iso: string): number {
+  const [h, m] = slotTimeLabel(iso).split(':').map(Number);
+  return (h ?? 0) * 60 + (m ?? 0);
+}
+
+type SlotCell = { start: string; end: string; reason: UnavailableSlot['reason'] | null };
+
+/**
+ * UI-R3: bitta ekranli yozilish — 1 Bemor · 2 Xizmat · 3 Shifokor · 4 Vaqt + yopishqoq
+ * xulosa. Yo'q slot yonida sabab (SC-07), lab muddati ogohlantirishi, reja bosqichi
+ * taklifi va Telegram eslatma matni oldindan ko'rinadi.
+ */
 export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
   const { activeBranchId } = useAuthStore();
-  const [active, setActive] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const { data: doctors } = useDoctors();
-  // CLI-454: bemor ro'yxati avval pageSize:100 bilan qidiruvsiz cheklangan edi —
-  // 100 tadan ortiq bemorli tenant'da kerakli bemor Select'da ko'rinmasdi. Endi
-  // qidiruv matni debounced holda serverga uzatiladi (backend `ilike` filtri).
+  // CLI-454: bemor qidiruvi serverga debounced uzatiladi (100 ta chegarasiz ro'yxat emas).
   const [patientSearch, setPatientSearch] = useState('');
   const [debouncedPatientSearch] = useDebouncedValue(patientSearch, 300);
   const { data: patientsData } = usePatients({
@@ -64,8 +87,7 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
   const { data: branchesData } = useBranches();
   const createMut = useCreateAppointment();
 
-  // Tenant-wide foydalanuvchi (Owner / "Barcha filiallar") uchun activeBranchId=null —
-  // filialni wizard ichida tanlash kerak, aks holda branchId='' → 400 (CLI-151).
+  // Tenant-wide foydalanuvchi (activeBranchId=null) filialni shu ekranda tanlaydi (CLI-151).
   const needsBranchSelect = activeBranchId == null;
   const branchOptions: Option[] = (branchesData ?? []).map((b) => ({ value: b.id, label: b.name }));
 
@@ -73,7 +95,6 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
     value: p.id,
     label: p.fullName,
   }));
-  const services: Option[] = (servicesData ?? []).map((s) => ({ value: s.id, label: s.nameUz }));
 
   const form = useForm<WizardValues>({
     initialValues: {
@@ -108,12 +129,12 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
     date: dateParam,
     slotMinutes,
   });
-  const slots = availability?.slots ?? [];
+  const freeSlots = availability?.slots ?? [];
+  // Backend `unavailable` (SC-07) — generated tipda regen'gacha yo'q.
+  const unavailable =
+    (availability as { unavailable?: UnavailableSlot[] } | undefined)?.unavailable ?? [];
 
-  // Availability bazasi (doktor/filial/sana/davomiylik) o'zgarsa — eski slot
-  // tanlovini tozalaymiz, aks holda stale start/end submit'ga ketishi mumkin.
-  // ⚠️ `form.setFieldValue` har renderda yangi identifikator → deps'ga qo'shib
-  // bo'lmaydi (cheksiz sikl). Bazani ref'da kuzatamiz, faqat o'zgarganda tozalaymiz.
+  // Baza (doktor/filial/sana/davomiylik) o'zgarsa — eski slot tanlovi tozalanadi.
   const basis = `${form.values.doctorId}|${form.values.branchId}|${dateParam}|${slotMinutes}`;
   const prevBasis = useRef(basis);
   // biome-ignore lint/correctness/useExhaustiveDependencies: faqat baza string o'zgarsa ishlaydi
@@ -125,28 +146,24 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
     }
   }, [basis]);
 
-  // A10: xato maydon → tegishli qadam (validate() barcha qadamlarni bir yo'la
-  // tekshiradi; xato boshqa qadamda bo'lsa foydalanuvchiga ko'rsatish uchun o'sha
-  // qadamga qaytariladi).
-  const FIELD_STEP: Record<string, number> = {
-    branchId: 0,
-    patientId: 0,
-    doctorId: 1,
-    serviceIds: 1,
-    startTime: 2,
-    endTime: 2,
-  };
+  const cells: SlotCell[] = useMemo(() => {
+    const all: SlotCell[] = [
+      ...freeSlots.map((s) => ({ start: s.start, end: s.end, reason: null })),
+      ...unavailable.map((u) => ({ start: u.start, end: u.end, reason: u.reason })),
+    ];
+    return all.sort((a, b) => a.start.localeCompare(b.start));
+  }, [freeSlots, unavailable]);
+  const morning = cells.filter((c) => localMinute(c.start) < NOON_MINUTE);
+  const afternoon = cells.filter((c) => localMinute(c.start) >= NOON_MINUTE);
+
+  const { data: bookingCtx } = useBookingContext(form.values.patientId || null);
+  const plan = bookingCtx?.nextPlanStage ?? null;
 
   const submit = () => {
     setError(null);
-    // A10: patientId (va boshqa majburiy maydonlar) submit'dan oldin majburlanadi —
-    // avval hech qachon chaqirilmagan `form.validate()` inline xato ko'rsatadi.
+    // A10: majburiy maydonlar submit'dan oldin tekshiriladi (inline xato).
     const result = form.validate();
-    if (result.hasErrors) {
-      const errorSteps = Object.keys(result.errors).map((field) => FIELD_STEP[field] ?? 0);
-      if (errorSteps.length > 0) setActive(Math.min(...errorSteps));
-      return;
-    }
+    if (result.hasErrors) return;
     if (!form.values.startTime || !form.values.endTime) return;
     createMut.mutate(
       {
@@ -165,21 +182,77 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
     );
   };
 
-  const next = () => setActive((s) => Math.min(s + 1, 3));
-  const back = () => (active === 0 ? onClose() : setActive((s) => s - 1));
+  const toggleService = (id: string) => {
+    const cur = form.values.serviceIds;
+    form.setFieldValue('serviceIds', cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]);
+  };
 
-  const selectedDoctor = doctorOptions.find((d) => d.value === form.values.doctorId)?.label ?? '—';
-  const selectedPatient = patients.find((p) => p.value === form.values.patientId)?.label ?? '—';
-  // CLI-474 (L7): tanlangan bemorning no-show flag holati (list DTO'dan, qo'shimcha API'siz).
-  const selectedPatientFlagged =
-    patientsData?.items.find((p) => p.id === form.values.patientId) ?? null;
+  const applyPlan = () => {
+    if (!plan) return;
+    if (plan.serviceId) form.setFieldValue('serviceIds', [plan.serviceId]);
+    form.setFieldValue('doctorId', plan.doctorId);
+  };
+
+  const selectedPatient = patientsData?.items.find((p) => p.id === form.values.patientId) ?? null;
+  const selectedDoctor = doctorOptions.find((d) => d.value === form.values.doctorId)?.label ?? null;
+  const branchName =
+    branchOptions.find((b) => b.value === form.values.branchId)?.label ?? t('appointments.branch');
   const slotPicked = form.values.startTime != null;
 
+  const lang = i18n.language === 'ru' ? 'ru-RU' : 'uz-UZ';
+  const dateLabel = (iso: string) =>
+    new Intl.DateTimeFormat(lang, { timeZone: TZ, day: 'numeric', month: 'long' }).format(
+      new Date(iso),
+    );
+  const slotDateLabel = form.values.startTime ? dateLabel(form.values.startTime) : null;
+
+  // Lab muddati: tanlangan slot (yo'q bo'lsa — tanlangan sana) lab kelish sanasidan oldin bo'lsa ogohlantirish.
+  const compareIso = form.values.startTime ?? `${dateParam}T00:00:00+05:00`;
+  const lateLab = (bookingCtx?.openLabOrders ?? []).find(
+    (l) => l.expectedDate != null && new Date(l.expectedDate) > new Date(compareIso),
+  );
+
+  const slotButton = (c: SlotCell) =>
+    c.reason == null ? (
+      <button
+        key={c.start}
+        type="button"
+        className={styles.slot}
+        aria-pressed={form.values.startTime === c.start}
+        onClick={() => {
+          form.setFieldValue('startTime', c.start);
+          form.setFieldValue('endTime', c.end);
+        }}
+      >
+        {slotTimeLabel(c.start)}
+      </button>
+    ) : (
+      <button key={c.start} type="button" className={styles.slotOff} aria-disabled="true">
+        {slotTimeLabel(c.start)}
+        <span className={styles.why}>
+          {t(`booking.reason_${c.reason}`, { minutes: slotMinutes })}
+        </span>
+      </button>
+    );
+
   return (
-    <div>
-      <Stepper active={active} onStepClick={setActive}>
-        <Stepper.Step label={t('appointments.step_patient')}>
-          <Stack mt="md">
+    <div className={styles.page}>
+      <div className={styles.head}>
+        <Button variant="default" onClick={onClose} aria-label={t('booking.back')}>
+          <ArrowLeft size={16} aria-hidden />
+        </Button>
+        <div className={styles.headText}>
+          <h1 className={styles.title}>{t('booking.title')}</h1>
+          <span className={styles.subtitle}>{t('booking.subtitle')}</span>
+        </div>
+      </div>
+
+      <div className={styles.body}>
+        <div className={styles.left}>
+          <section className={styles.card} aria-labelledby="bk-patient">
+            <h2 className={styles.cardTitle} id="bk-patient">
+              <span className={styles.step}>1</span> · {t('booking.patient_h')}
+            </h2>
             {needsBranchSelect && (
               <Select
                 key="branch-select"
@@ -193,125 +266,192 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
             <Select
               key="patient-select"
               placeholder={t('appointments.patient')}
+              aria-label={t('appointments.patient')}
               searchable
               data={patients}
               searchValue={patientSearch}
               onSearchChange={setPatientSearch}
               {...form.getInputProps('patientId')}
             />
-            {/* CLI-474 (L7): tanlangan bemor no-show chegarasidan oshgan bo'lsa ogohlantirish. */}
-            {selectedPatientFlagged != null && selectedPatientFlagged.flagged && (
-              <Alert color="red" variant="light" icon={<AlertTriangle size={16} />}>
-                {t('appointments.patient_flagged', { count: selectedPatientFlagged.noShowStrikes })}
-              </Alert>
+            {selectedPatient != null && (
+              <div className={styles.patientCard}>
+                <b>{selectedPatient.fullName}</b>
+                {selectedPatient.phone && (
+                  <span className={styles.subtitle}>{selectedPatient.phone}</span>
+                )}
+                {selectedPatient.flagged && (
+                  <Alert color="red" variant="light" icon={<AlertTriangle size={16} />}>
+                    {t('appointments.patient_flagged', { count: selectedPatient.noShowStrikes })}
+                  </Alert>
+                )}
+                {plan != null && (
+                  <div className={styles.chips}>
+                    <span className={styles.subtitle}>
+                      {t('booking.plan_suggest', {
+                        plan: plan.planTitle,
+                        n: plan.sequence,
+                        stage: plan.serviceName,
+                      })}
+                    </span>
+                    <Button variant="default" onClick={applyPlan}>
+                      {t('booking.plan_apply')}
+                    </Button>
+                  </div>
+                )}
+              </div>
             )}
-          </Stack>
-        </Stepper.Step>
-        <Stepper.Step label={t('appointments.step_service')}>
-          <Stack mt="md">
-            <Select
-              key="doctor-select"
-              label={t('appointments.doctor')}
-              searchable
-              data={doctorOptions}
-              {...form.getInputProps('doctorId')}
-            />
-            <MultiSelect
-              label={t('appointments.services')}
-              searchable
-              data={services}
-              {...form.getInputProps('serviceIds')}
-            />
-          </Stack>
-        </Stepper.Step>
-        <Stepper.Step label={t('appointments.step_time')}>
-          <Stack mt="md" gap="sm">
-            <DatePickerInput
-              label={t('appointments.date')}
-              valueFormat="DD.MM.YYYY"
-              value={form.values.date}
-              onChange={(d) => form.setFieldValue('date', d ?? new Date())}
-            />
-            <Text size="sm" fw={600}>
-              {t('appointments.free_slots')}
-            </Text>
-            {slotMinutes <= 0 ? (
-              <Text size="sm" c="dimmed">
-                {t('appointments.pick_service_first')}
-              </Text>
-            ) : slotsLoading ? (
-              <Text size="sm" c="dimmed">
-                {t('common.loading')}
-              </Text>
-            ) : slots.length === 0 ? (
-              <Text size="sm" c="dimmed">
-                {availability?.workHoursConfigured === false
-                  ? t('appointments.work_hours_not_configured')
-                  : t('appointments.no_slots')}
-              </Text>
-            ) : (
-              <Chip.Group
-                value={form.values.startTime ?? ''}
-                onChange={(val) => {
-                  const slot = slots.find((s) => s.start === val);
-                  form.setFieldValue('startTime', slot ? slot.start : null);
-                  form.setFieldValue('endTime', slot ? slot.end : null);
-                }}
-              >
-                <Group gap="xs">
-                  {slots.map((s) => (
-                    <Chip key={s.start} value={s.start}>
-                      {slotTimeLabel(s.start)}
-                    </Chip>
-                  ))}
-                </Group>
-              </Chip.Group>
+            <Button variant="default" onClick={() => navigate('/patients/new')}>
+              {t('booking.new_patient')}
+            </Button>
+          </section>
+
+          <section className={styles.card} aria-labelledby="bk-service">
+            <h2 className={styles.cardTitle} id="bk-service">
+              <span className={styles.step}>2</span> · {t('booking.service_h')}
+            </h2>
+            <div className={styles.chips}>
+              {(servicesData ?? []).map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  className={styles.choice}
+                  aria-pressed={form.values.serviceIds.includes(s.id)}
+                  onClick={() => toggleService(s.id)}
+                >
+                  <b>{s.nameUz}</b>
+                  <span className={styles.choiceMeta}>
+                    {s.durationMinutes} {t('booking.minutes_short')}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {slotMinutes > 0 && (
+              <span className={styles.subtitle}>
+                {t('booking.total', { minutes: slotMinutes })}
+              </span>
             )}
-          </Stack>
-        </Stepper.Step>
-        <Stepper.Step label={t('appointments.step_confirm')}>
-          <Stack mt="md" gap="xs">
-            <Text size="sm">
-              {t('appointments.patient')}: {selectedPatient}
-            </Text>
-            <Text size="sm">
-              {t('appointments.doctor')}: {selectedDoctor}
-            </Text>
-            <Text size="sm">
-              {t('appointments.services')}: {form.values.serviceIds.length}
-            </Text>
-            <Text size="sm">
-              {t('appointments.start_time')}:{' '}
-              {form.values.startTime ? slotTimeLabel(form.values.startTime) : '—'}
-            </Text>
-            {error != null && (
-              <Text size="sm" c="red">
-                {error}
-              </Text>
-            )}
-          </Stack>
-        </Stepper.Step>
-      </Stepper>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16 }}>
-        <Button variant="default" onClick={back}>
-          {active === 0 ? t('common.cancel') : t('common.back')}
-        </Button>
-        {active < 3 ? (
-          <Button
-            variant="primary"
-            disabled={
-              (active === 0 && needsBranchSelect && !form.values.branchId) ||
-              (active === 2 && !slotPicked)
-            }
-            onClick={next}
-          >
-            {t('common.next')}
-          </Button>
-        ) : (
-          <Button variant="primary" disabled={createMut.isPending || !slotPicked} onClick={submit}>
-            {t('common.save')}
-          </Button>
+          </section>
+
+          <section className={styles.card} aria-labelledby="bk-doctor">
+            <h2 className={styles.cardTitle} id="bk-doctor">
+              <span className={styles.step}>3</span> · {t('booking.doctor_h')}
+            </h2>
+            <div className={styles.chips}>
+              {doctorOptions.map((d) => (
+                <button
+                  key={d.value}
+                  type="button"
+                  className={styles.choice}
+                  aria-pressed={form.values.doctorId === d.value}
+                  onClick={() => form.setFieldValue('doctorId', d.value)}
+                >
+                  <b>{d.label}</b>
+                </button>
+              ))}
+            </div>
+          </section>
+        </div>
+
+        <section className={`${styles.card} ${styles.right}`} aria-labelledby="bk-time">
+          <h2 className={styles.cardTitle} id="bk-time">
+            <span className={styles.step}>4</span> · {t('booking.time_h')}
+            {selectedDoctor ? ` — ${selectedDoctor}` : ''}
+            {slotMinutes > 0 ? `, ${slotMinutes} ${t('booking.minutes_short')}` : ''}
+          </h2>
+          <DatePickerInput
+            label={t('appointments.date')}
+            valueFormat="DD.MM.YYYY"
+            value={form.values.date}
+            onChange={(d) => form.setFieldValue('date', d ?? new Date())}
+          />
+          {slotMinutes <= 0 || !form.values.doctorId ? (
+            <span className={styles.subtitle}>
+              {t(
+                slotMinutes <= 0 ? 'appointments.pick_service_first' : 'booking.pick_doctor_first',
+              )}
+            </span>
+          ) : slotsLoading ? (
+            <span className={styles.subtitle}>{t('common.loading')}</span>
+          ) : cells.length === 0 ? (
+            <span className={styles.subtitle}>
+              {availability?.workHoursConfigured === false
+                ? t('appointments.work_hours_not_configured')
+                : t('appointments.no_slots')}
+            </span>
+          ) : (
+            <>
+              {freeSlots.length === 0 && (
+                <span className={styles.subtitle}>{t('appointments.no_slots')}</span>
+              )}
+              {morning.length > 0 && (
+                <div className={styles.group}>
+                  <span className={styles.groupLabel}>{t('booking.morning')}</span>
+                  <div className={styles.chips}>{morning.map(slotButton)}</div>
+                </div>
+              )}
+              {afternoon.length > 0 && (
+                <div className={styles.group}>
+                  <span className={styles.groupLabel}>{t('booking.afternoon')}</span>
+                  <div className={styles.chips}>{afternoon.map(slotButton)}</div>
+                </div>
+              )}
+            </>
+          )}
+
+          {lateLab != null && lateLab.expectedDate != null && (
+            <div role="note" className={styles.note}>
+              <AlertTriangle size={20} aria-hidden />
+              <span>
+                {t('booking.lab_warning', {
+                  lab: lateLab.labName,
+                  date: dateLabel(lateLab.expectedDate),
+                })}
+              </span>
+            </div>
+          )}
+
+          <div className={styles.preview}>
+            <b>{t('booking.reminder_title')}</b>
+            <span className={styles.previewText}>
+              {slotPicked && selectedPatient != null && form.values.startTime
+                ? t('booking.reminder_text', {
+                    name: selectedPatient.fullName.split(' ')[0],
+                    date: slotDateLabel,
+                    time: slotTimeLabel(form.values.startTime),
+                    doctor: selectedDoctor ?? '',
+                    branch: branchName,
+                  })
+                : t('booking.reminder_empty')}
+            </span>
+          </div>
+        </section>
+      </div>
+
+      <div className={styles.bar}>
+        <span className={styles.summary}>
+          {slotPicked && selectedPatient != null && form.values.startTime ? (
+            <>
+              <b>{selectedPatient.fullName}</b> · {selectedDoctor} ·{' '}
+              <b>
+                {slotDateLabel} {slotTimeLabel(form.values.startTime)}
+                {form.values.endTime ? `–${slotTimeLabel(form.values.endTime)}` : ''}
+              </b>
+            </>
+          ) : (
+            t('booking.summary_empty')
+          )}
+        </span>
+        {error != null && (
+          <span role="alert" className={styles.error}>
+            {error}
+          </span>
         )}
+        <Button variant="default" onClick={onClose}>
+          {t('booking.cancel')}
+        </Button>
+        <Button variant="primary" disabled={createMut.isPending || !slotPicked} onClick={submit}>
+          {t('booking.submit')}
+        </Button>
       </div>
     </div>
   );

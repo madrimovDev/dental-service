@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { groupByDoctor } from '../appointments.mappers';
 import type { Appointment } from '../appointments.types';
 import {
@@ -38,13 +40,24 @@ export function CalendarGrid({
   doctors,
   patientName,
   onSlotClick,
+  selectedId,
+  unscheduledDoctorIds,
 }: {
   appointments: Appointment[];
   doctors: Doctor[];
   patientName: (patientId: string) => string;
   onSlotClick?: (event: CalendarEvent) => void;
+  /** Tanlangan yozilish (halqa bilan ajratiladi). */
+  selectedId?: string | null;
+  /**
+   * Shu kunda ish jadvali YO'Q doktorlar (`null` — bilinmaydi, `schedule.view`siz rol).
+   * Ularning ustunida sabab bloki chiqadi: jadvalsiz yozib bo'lmaydi (P10).
+   */
+  unscheduledDoctorIds?: ReadonlySet<string> | null;
 }) {
+  const { t } = useTranslation();
   const cols = groupByDoctor(appointments, doctors);
+  const noSchedule = (doctorId: string) => unscheduledDoctorIds?.has(doctorId) ?? false;
   const hours = Array.from(
     { length: GRID.dayEndHour - GRID.dayStartHour },
     (_, i) => GRID.dayStartHour + i,
@@ -64,19 +77,41 @@ export function CalendarGrid({
         {cols.map((col, index) => {
           const tone = col.doctor.id ? toneForIndex(index) : 'muted';
           return (
-            <div key={col.doctor.id} className={classes.col}>
+            <div
+              key={col.doctor.id}
+              className={classes.col}
+              data-no-schedule={noSchedule(col.doctor.id) || undefined}
+            >
               <div className={classes.colHead} style={toneVars(tone)}>
                 <span className={classes.colTile} aria-hidden>
                   {initials(col.doctor.name)}
                 </span>
                 <span className={classes.colHeadText}>
                   <span className={classes.colName}>{col.doctor.name}</span>
-                  {/* sub-line: DoctorListItem faqat {id,name} → specialty data yo'q (bo'sh) */}
+                  {/* sub-line: DoctorListItem faqat {id,name} → specialty yo'q; jadvalsiz bo'lsa qisqa belgi */}
+                  {noSchedule(col.doctor.id) && (
+                    <span className={`${classes.colSub} ${classes.colSubDanger}`}>
+                      {t('calendar.no_schedule_badge')}
+                    </span>
+                  )}
                 </span>
                 <span className={classes.colCount}>{col.events.length}</span>
               </div>
-              <div className={classes.colBody}>
+              <div
+                className={`${classes.colBody} ${noSchedule(col.doctor.id) ? classes.colNoSchedule : ''}`}
+              >
                 <GridLines />
+                {noSchedule(col.doctor.id) && col.events.length === 0 && (
+                  <div className={classes.noScheduleNote} role="note">
+                    <span className={classes.noScheduleTitle}>
+                      {t('calendar.no_schedule_title')}
+                    </span>
+                    <span>{t('calendar.no_schedule_text')}</span>
+                    <Link to="/schedule" className={classes.noScheduleLink}>
+                      {t('calendar.no_schedule_link')}
+                    </Link>
+                  </div>
+                )}
                 <CurrentTimeLine showBadge={index === 0} />
                 {col.events.map((e) => (
                   <AppointmentSlot
@@ -85,6 +120,7 @@ export function CalendarGrid({
                     patientName={patientName}
                     tone={tone}
                     onClick={onSlotClick}
+                    selected={selectedId === e.appointment.id}
                   />
                 ))}
               </div>

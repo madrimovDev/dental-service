@@ -5,6 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { CashierTransactionPaymentMethod } from './cashierTransactionPaymentMethod';
+import type { CashierTransactionCardProvider } from './cashierTransactionCardProvider';
 import type { CashierTransactionType } from './cashierTransactionType';
 import type { CashierTransactionStatus } from './cashierTransactionStatus';
 
@@ -23,6 +24,8 @@ export interface CashierTransaction {
   discount: string;
   currency: string;
   paymentMethod: CashierTransactionPaymentMethod;
+  /** @nullable */
+  cardProvider: CashierTransactionCardProvider;
   type: CashierTransactionType;
   /** @nullable */
   parentTransactionId: string | null;

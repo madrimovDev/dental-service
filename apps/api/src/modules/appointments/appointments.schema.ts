@@ -65,6 +65,8 @@ export const appointmentDtoSchema = z
     tenantId: z.uuid(),
     branchId: z.uuid(),
     patientId: z.uuid(),
+    // SC-01: faqat ro'yxat (`GET /`) JOIN bilan to'ldiriladi; boshqa javoblarda null.
+    patientName: z.string().nullable().optional().openapi({ example: 'Ali Valiyev' }),
     doctorId: z.uuid(),
     assistantId: z.uuid().nullable().openapi({ example: null }),
     startTime: z.string().openapi({ example: '2026-06-12T10:00:00.000Z' }),
@@ -93,3 +95,35 @@ export const doctorListItemDtoSchema = z
   .openapi('DoctorListItem');
 
 export type DoctorListItemDto = z.infer<typeof doctorListItemDtoSchema>;
+
+// ─── UI-R3: yozilish ekrani konteksti (lab muddati + reja bosqichi taklifi) ──
+
+export const bookingContextQuery = z.object({ patientId: z.uuid() });
+
+export const bookingContextDtoSchema = z
+  .object({
+    openLabOrders: z.array(
+      z.object({
+        id: z.uuid(),
+        labName: z.string(),
+        orderType: z.string().openapi({ example: 'crown' }),
+        status: z.string().openapi({ example: 'sent' }),
+        expectedDate: z.string().nullable().openapi({ example: '2026-11-11T00:00:00.000Z' }),
+      }),
+    ),
+    nextPlanStage: z
+      .object({
+        planId: z.uuid(),
+        planTitle: z.string(),
+        doctorId: z.uuid(),
+        stageId: z.uuid(),
+        sequence: z.number().int(),
+        serviceId: z.uuid().nullable(),
+        serviceName: z.string(),
+        estimatedDurationMinutes: z.number().int().nullable(),
+      })
+      .nullable(),
+  })
+  .openapi('BookingContext');
+
+export type BookingContextDto = z.infer<typeof bookingContextDtoSchema>;

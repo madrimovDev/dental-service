@@ -17,11 +17,14 @@ function formatTicketNumber(queueNumber: number) {
 export function QueueCard({
   vm,
   canManage,
+  canCall = canManage,
   busy = false,
   onStatus,
 }: {
   vm: QueueCardVM;
   canManage: boolean;
+  /** Chaqirish tugmasi (shifokor `call-own` orqali ham chaqira oladi — server egalikni tekshiradi). */
+  canCall?: boolean;
   busy?: boolean;
   onStatus: (status: QueueStatus) => void;
 }) {
@@ -32,15 +35,23 @@ export function QueueCard({
       ? `${t('queue.called_at')} ${hhmm(vm.calledAt)}`
       : hhmm(vm.createdAt);
   const metaParts = [vm.serviceName, timeLabel].filter(Boolean);
+  // Kutish vaqti MATN bilan («+7 daq») — faqat rang bilan emas.
+  const waitedMin =
+    vm.status === 'waiting'
+      ? Math.max(0, Math.round((Date.now() - new Date(vm.createdAt).getTime()) / 60_000))
+      : null;
 
   return (
     <div className={classes.card}>
       <span className={classes.numberChip}>{formatTicketNumber(vm.queueNumber)}</span>
+      {waitedMin !== null && (
+        <span className={classes.meta}>{t('queueBoard.waited_short', { count: waitedMin })}</span>
+      )}
       <div className={classes.body}>
         <div className={classes.patient}>{vm.patientName}</div>
         {metaParts.length > 0 && <div className={classes.meta}>{metaParts.join(' · ')}</div>}
       </div>
-      {canManage && vm.status === 'waiting' && (
+      {canCall && vm.status === 'waiting' && (
         <ActionIcon
           className={classes.actions}
           color="blue"

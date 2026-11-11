@@ -1,5 +1,5 @@
 import { fireEvent, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderApp } from '../../../../test-utils';
 import { GeneralTab } from './GeneralTab';
 
@@ -22,6 +22,7 @@ const dataResult = { data: rawPatient, isLoading: false, isError: false, refetch
 // biome-ignore lint/suspicious/noExplicitAny: test-only mutable mock result
 let rawResult: any = dataResult;
 let canEdit = true;
+let canPii = true;
 
 vi.mock('../../patients.api', () => ({
   usePatientRaw: () => rawResult,
@@ -33,7 +34,8 @@ vi.mock('../../patients.api', () => ({
 
 vi.mock('@/stores/auth-store.ts', () => ({
   useAuthStore: () => ({
-    hasPermission: (code: string) => (code === 'patient.edit' ? canEdit : false),
+    hasPermission: (code: string) =>
+      code === 'patient.edit' ? canEdit : code === 'patient.view_pii' ? canPii : false,
   }),
 }));
 
@@ -127,6 +129,57 @@ describe('GeneralTab — GeneralEditForm submit payload (CLI-455 frontend)', () 
     fireEvent.change(addressInput, { target: { value: 'Samarqand' } });
     fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
     expect(updateMutate).toHaveBeenCalledWith(expect.objectContaining({ address: 'Samarqand' }));
+  });
+});
+
+describe('GeneralTab — PT-04 maskalangan PII qayta yozilmaydi', () => {
+  const maskedRaw = {
+    ...rawPatient,
+    phone: '********4567',
+    passport: '***',
+    address: '***',
+  };
+
+  beforeEach(() => {
+    canEdit = true;
+    canPii = false;
+    rawResult = { ...dataResult, data: maskedRaw };
+    updateMutate.mockClear();
+  });
+
+  afterEach(() => {
+    canPii = true;
+  });
+
+  it('view_pii siz: telefon/pasport/manzil o‘qish-uchun (disabled) va izoh ko‘rinadi', () => {
+    renderApp(<GeneralTab patient={patientDetail} />);
+    expect(screen.getByLabelText('Telefon')).toBeDisabled();
+    expect(screen.getByLabelText('Passport')).toBeDisabled();
+    expect(screen.getByLabelText('Manzil')).toBeDisabled();
+    expect(screen.getByTestId('pii-readonly-hint')).toBeInTheDocument();
+  });
+
+  it('view_pii siz: maskalangan qiymat validatsiyani bloklamaydi va PATCH ga YUBORILMAYDI', () => {
+    renderApp(<GeneralTab patient={patientDetail} />);
+    fireEvent.change(screen.getByLabelText("To'liq ism"), { target: { value: 'Ali Yangi' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    expect(updateMutate).toHaveBeenCalledTimes(1);
+    const body = updateMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(body.fullName).toBe('Ali Yangi');
+    for (const k of ['phone', 'phoneSecondary', 'passport', 'address']) {
+      expect(body[k]).toBeUndefined();
+    }
+    expect(JSON.stringify(body)).not.toContain('***');
+  });
+
+  it('view_pii bilan: o‘zgarmagan PII ham yuborilmaydi (faqat o‘zgargan maydonlar)', () => {
+    canPii = true;
+    rawResult = dataResult;
+    renderApp(<GeneralTab patient={patientDetail} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    const body = updateMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(body.phone).toBeUndefined();
+    expect(body.passport).toBeUndefined();
   });
 });
 

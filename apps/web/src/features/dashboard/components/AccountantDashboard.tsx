@@ -166,7 +166,8 @@ export function AccountantDashboard() {
                 title={t('dashboard.daily_cash')}
                 items={(summary.data?.breakdown ?? []).map((b, i) => ({
                   id: `${b.paymentMethod}-${b.type}-${i}`,
-                  label: `${b.paymentMethod} · ${b.type}`,
+                  // FU-16: xom enum o'rniga tarjima (noma'lum qiymat — o'zi qaytadi).
+                  label: `${t(`cashier.method.${b.paymentMethod}`, { defaultValue: b.paymentMethod })} · ${t(`cashier.type.${b.type}`, { defaultValue: b.type })}`,
                   right: `${formatCurrency(Number(b.total), t)} (${b.count})`,
                 }))}
                 emptyText={t('dashboard.empty')}

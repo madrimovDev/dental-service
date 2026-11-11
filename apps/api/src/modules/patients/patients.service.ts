@@ -19,6 +19,7 @@ import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { createOwnershipValidator, type OwnershipValidator } from '../../lib/ownership.ts';
 import type { NonPlanTransactionRow } from './patients.balance.ts';
 import { computeNonPlanRemainder, computePatientBalance } from './patients.balance.ts';
+import { maskPii, userHasPiiAccess } from './patients.mask.ts';
 import { normalizeOptionalPhone } from './patients.phone.ts';
 import type {
   AddEmergencyContactInput,
@@ -47,36 +48,6 @@ export class PatientRelativeConflictError extends Error {
   }
 }
 
-/**
- * PII fieldlarni masklash — user `patient.view_pii` permission yo'q bo'lsa
- */
-const maskPii = <
-  T extends {
-    phone?: string | null;
-    phoneSecondary?: string | null;
-    passport?: string | null;
-    address?: string | null;
-  },
->(
-  patient: T,
-): T => ({
-  ...patient,
-  phone: patient.phone ? maskString(patient.phone, 4) : null,
-  phoneSecondary: patient.phoneSecondary ? maskString(patient.phoneSecondary, 4) : null,
-  passport: patient.passport ? '***' : null,
-  address: patient.address ? '***' : null,
-});
-
-const maskString = (s: string, keepLastN: number): string => {
-  if (s.length <= keepLastN) return '*'.repeat(s.length);
-  return '*'.repeat(s.length - keepLastN) + s.slice(-keepLastN);
-};
-
-const userHasPiiAccess = (c: Context): boolean => {
-  const perms = c.get('accessClaims')?.perms ?? [];
-  return perms.includes('@owner') || perms.includes('patient.view_pii');
-};
-
 /** Qarzga kiruvchi reja statuslari — draft/presented/cancelled chiqariladi. */
 const DEBT_PLAN_STATUSES = ['accepted', 'in_progress', 'completed'] as const;
 
@@ -98,9 +69,13 @@ export const createPatientsService = (deps: {
     if (!query.archived) filters.push(isNull(patients.archivedAt));
     else filters.push(isNotNull(patients.archivedAt));
 
-    // Telefon bazada kanonik saqlanadi (Task 8) — qidiruv predikati xom matn
-    // bilan birga kanonik variantni ham sinaydi (`patients.search.ts`).
-    const searchFilter = query.search ? buildPatientSearchFilter(query.search) : undefined;
+    // Ism: lotin↔kirill variantlar; telefon (kanonik, istalgan format) va passport
+    // bo'yicha qidiruv FAQAT `patient.view_pii` bilan (PT-03 — maskalangan ustunlar
+    // uchun qidiruv oracle bo'lmasin). `patients.search.ts`.
+    const hasPii = userHasPiiAccess(c);
+    const searchFilter = query.search
+      ? buildPatientSearchFilter(query.search, { pii: hasPii })
+      : undefined;
     if (searchFilter) filters.push(searchFilter);
 
     const where = filters.length > 0 ? and(...filters) : undefined;
@@ -222,7 +197,7 @@ export const createPatientsService = (deps: {
     }
 
     // CLI-474 (L7): no-show strike flag — tenant threshold (0=o'chiq) + grouped
-    // faol count (join-anchored). Threshold 0 bo'lsa umuman hisoblamaymiz (perf).
+    // faol count (join-anchored).
     let strikeById = new Map<string, number>();
     let strikeThreshold = 0;
     if (deps.noShowStrike && ids.length > 0) {
@@ -231,18 +206,33 @@ export const createPatientsService = (deps: {
         .from(tenantSettings)
         .limit(1);
       strikeThreshold = settingsRow?.t ?? 0;
-      if (strikeThreshold > 0) {
-        strikeById = await deps.noShowStrike.activeCountForPatients(c, ids);
-      }
+      // UI-R6: `flags.noShows` chegara o'chiq (0) bo'lsa ham haqiqiy faol sonni ko'rsatadi;
+      // `flagged` esa baribir faqat chegara > 0 bo'lganda.
+      strikeById = await deps.noShowStrike.activeCountForPatients(c, ids);
     }
 
-    const hasPii = userHasPiiAccess(c);
+    // UI-R6: allergiya belgisi — faqat «bor/yo'q» (bitta guruhlangan so'rov, N+1 yo'q).
+    const allergyIds = new Set<string>();
+    if (ids.length > 0) {
+      const allergyRows = await db
+        .select({ patientId: medicalRecords.patientId })
+        .from(medicalRecords)
+        .where(
+          and(
+            inArray(medicalRecords.patientId, ids),
+            sql`CASE WHEN jsonb_typeof(${medicalRecords.allergies}) = 'array' THEN jsonb_array_length(${medicalRecords.allergies}) ELSE 0 END > 0`,
+          ),
+        );
+      for (const r of allergyRows) allergyIds.add(r.patientId);
+    }
+
     const masked = hasPii ? rows : rows.map(maskPii);
     const data = masked.map((p) => {
       const noShowStrikes = strikeById.get(p.id) ?? 0;
       return {
         ...p,
         balance: balanceById.get(p.id) ?? 0,
+        hasAllergy: allergyIds.has(p.id),
         noShowStrikes,
         flagged: strikeThreshold > 0 && noShowStrikes >= strikeThreshold,
       };
@@ -447,7 +437,32 @@ export const createPatientsService = (deps: {
       });
     }
 
-    return updated;
+    // PT-01: javob findById/list bilan bir xil maskalash qoidasiga bo'ysunadi
+    // (audit yozuvi esa HAQIQIY qiymat bilan yuqorida yozildi).
+    return updated && !userHasPiiAccess(c) ? maskPii(updated) : updated;
+  }
+
+  /**
+   * UI-R6: telefon dublikat tekshiruvi. Kanonik telefon (asosiy YOKI qo'shimcha raqam) bo'yicha
+   * arxivlanmagan bemorlar; to'liq bo'lmagan/bo'sh raqam → bo'sh natija (qisman raqam
+   * bo'yicha «topildi» noto'g'ri ogohlantirish bo'lardi). Faqat `id` + `fullName` — PII emas.
+   */
+  async function phoneCheck(c: Context, rawPhone: string) {
+    const phone = normalizeOptionalPhone(rawPhone);
+    if (!phone || phone.replace(/\D/g, '').length < 9) return { matches: [] };
+    const db = getDb(c);
+    const rows = await db
+      .select({ id: patients.id, fullName: patients.fullName })
+      .from(patients)
+      .where(
+        and(
+          isNull(patients.archivedAt),
+          or(eq(patients.phone, phone), eq(patients.phoneSecondary, phone)),
+        ),
+      )
+      .orderBy(desc(patients.createdAt))
+      .limit(5);
+    return { matches: rows };
   }
 
   /** Arxivlash (soft delete) */
@@ -822,6 +837,7 @@ export const createPatientsService = (deps: {
 
   return {
     list,
+    phoneCheck,
     findById,
     balanceFor,
     create,

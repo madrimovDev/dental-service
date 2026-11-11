@@ -11,5 +11,6 @@ export const patientKeys = {
   balance: (id: string) => ['patients', 'balance', id] as const,
   relatives: (id: string) => ['patients', 'relatives', id] as const,
   emergencyContacts: (id: string) => ['patients', 'emergency-contacts', id] as const,
+  phoneCheck: (phone: string) => ['patients', 'phone-check', phone] as const,
   noShowStrikes: (id: string) => ['patients', 'no-show-strikes', id] as const,
 };

@@ -11,6 +11,8 @@ export interface Appointment {
   tenantId: string;
   branchId: string;
   patientId: string;
+  /** @nullable */
+  patientName?: string | null;
   doctorId: string;
   /** @nullable */
   assistantId: string | null;

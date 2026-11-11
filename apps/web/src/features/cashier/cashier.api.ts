@@ -2,6 +2,7 @@ import {
   createCashierTransaction,
   getCashierDailySummary,
   getCashierPlanBalance,
+  getCashierTransaction,
   getService,
   listBranches,
   listCashierPatientPlans,
@@ -113,6 +114,18 @@ export function useCreateTransaction() {
       // ustunlari eskirib qolmasligi uchun `patients` keyni ham invalidate qilamiz.
       void qc.invalidateQueries({ queryKey: patientKeys.all });
     },
+  });
+}
+
+/**
+ * Chek serverdan chiziladi: bitta tranzaksiya + items (`GET /cashier/transactions/:id`).
+ * Server qatorlari/fiskal holati/sub-turi manba — local savat snapshot'i emas.
+ */
+export function useTransactionDetail(id: string | null, enabled = true) {
+  return useQuery({
+    queryKey: cashierKeys.detail(id ?? ''),
+    queryFn: () => getCashierTransaction(id ?? '').then((r) => r.data),
+    enabled: !!id && enabled,
   });
 }
 

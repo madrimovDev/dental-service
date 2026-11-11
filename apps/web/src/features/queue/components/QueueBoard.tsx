@@ -9,6 +9,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import {
   useBranches,
+  useCallOwnTicket,
+  useCheckInCandidates,
+  useCreateTicket,
   usePatientsAll,
   useQueueToday,
   useServices,
@@ -42,6 +45,9 @@ export function QueueBoard() {
   const services = useServices();
   const queue = useQueueToday(branchFilter);
   const updateStatus = useUpdateQueueStatus();
+  const callOwn = useCallOwnTicket();
+  const candidates = useCheckInCandidates(branchFilter);
+  const checkInTicket = useCreateTicket();
 
   const lookups: QueueLookups = useMemo(
     () => ({
@@ -65,9 +71,19 @@ export function QueueBoard() {
     [tickets],
   );
 
-  const onStatus = (id: string, status: QueueStatus) => updateStatus.mutate({ id, status });
+  // RBAC: `queue.manage` — hammani chaqiradi; aks holda (shifokor) faqat o'ziga yozilganni —
+  // server `call-own` da egalikni tekshiradi (boshqa shifokor bemori → 403).
+  const onStatus = (id: string, status: QueueStatus) =>
+    !canManage && status === 'in_progress'
+      ? callOwn.mutate(id)
+      : updateStatus.mutate({ id, status });
   // Faqat hozir o'zgartirilayotgan karta tugmalarini bloklash (per-card), butun board emas.
-  const busyId = updateStatus.isPending ? updateStatus.variables?.id : undefined;
+  const busyId = updateStatus.isPending
+    ? updateStatus.variables?.id
+    : callOwn.isPending
+      ? callOwn.variables
+      : undefined;
+  const notArrived = candidates.data ?? [];
 
   const patientName = (id: string | null) => (id ? (lookups.patientNameById.get(id) ?? '—') : '—');
   const serviceName = (id: string | null) =>
@@ -93,7 +109,7 @@ export function QueueBoard() {
               leftSection={<IconLayoutGrid size={18} />}
               onClick={() => navigate('/queue/board')}
             >
-              {t('queue.display_board')}
+              {t('queueBoard.open_tv')}
             </Button>
             <Select
               data={branches.data?.map((b) => ({ value: b.id, label: b.name })) ?? []}
@@ -162,7 +178,7 @@ export function QueueBoard() {
                           count: waitedMinutes(nextWaiting.createdAt),
                         })}
                       </span>
-                      {canManage && (
+                      {(canManage || hasPermission('queue.view')) && (
                         <Button
                           className={classes.callButton}
                           disabled={busyId === nextWaiting.id}
@@ -186,11 +202,53 @@ export function QueueBoard() {
                     title={t(titleKey[column.key])}
                     lookups={lookups}
                     canManage={canManage}
+                    canCall
                     busyId={busyId}
                     onStatus={onStatus}
                   />
                 ))}
               </div>
+
+              {hasPermission('queue.create') && (
+                <section className={classes.notArrived} aria-label={t('queueBoard.not_arrived')}>
+                  <span className={classes.eyebrow}>{t('queueBoard.not_arrived')}</span>
+                  {notArrived.length === 0 ? (
+                    <Text c="dimmed" size="sm">
+                      {t('queueBoard.not_arrived_empty')}
+                    </Text>
+                  ) : (
+                    notArrived.map((a) => (
+                      <div key={a.id} className={classes.notArrivedRow}>
+                        <span className={classes.notArrivedTime}>
+                          {new Date(a.startTime).toLocaleTimeString('uz-UZ', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                        <span className={classes.notArrivedName}>{patientName(a.patientId)}</span>
+                        <Button
+                          size="xs"
+                          variant="default"
+                          loading={
+                            checkInTicket.isPending &&
+                            checkInTicket.variables?.appointmentId === a.id
+                          }
+                          onClick={() =>
+                            checkInTicket.mutate({
+                              branchId: branchFilter,
+                              appointmentId: a.id,
+                              patientId: a.patientId,
+                              serviceId: a.serviceIds?.[0],
+                            })
+                          }
+                        >
+                          {t('queueBoard.arrived')}
+                        </Button>
+                      </div>
+                    ))
+                  )}
+                </section>
+              )}
             </>
           ))}
       </Stack>

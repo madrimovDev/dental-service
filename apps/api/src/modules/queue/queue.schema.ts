@@ -45,6 +45,13 @@ export const queueTicketDtoSchema = z
 
 export type QueueTicketDto = z.infer<typeof queueTicketDtoSchema>;
 
+/** Status/call javobi: tiket + (SC-09) bog'langan yozilish sync xatosi kodi (yo'q bo'lsa null). */
+export const queueTicketUpdateResultSchema = queueTicketDtoSchema
+  .extend({
+    appointmentSyncError: z.string().nullable().openapi({ example: null }),
+  })
+  .openapi('QueueTicketUpdateResult');
+
 /** Wire DTO for a check-in candidate (appointment subset without createdBy). */
 export const checkInCandidateDtoSchema = z
   .object({

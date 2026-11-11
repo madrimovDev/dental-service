@@ -8,6 +8,18 @@ const refundMutate = vi.fn();
 
 vi.mock('../cashier.api', () => ({
   useRefund: () => ({ mutate: refundMutate, isPending: false }),
+  // Chek serverdan chiziladi (UI-R5): tafsilot so'rovi mock — qatorlar server javobidan.
+  useTransactionDetail: () => ({
+    data: {
+      id: 'tx1',
+      fiscalReceiptId: null,
+      cardProvider: null,
+      items: [
+        { id: 'i1', serviceName: 'Plomba', quantity: 1, unitPrice: '120000', subtotal: '120000' },
+      ],
+    },
+    isError: false,
+  }),
 }));
 
 vi.mock('@/stores/auth-store.ts', () => ({
@@ -22,6 +34,7 @@ function tx(over: Partial<CashierTransaction> = {}): CashierTransaction {
     patientId: null,
     treatmentPlanId: null,
     receiptNumber: 'R-001',
+    cardProvider: null,
     totalAmount: '120000',
     paidAmount: '120000',
     discount: '0',
@@ -88,7 +101,9 @@ describe('TransactionsTable', () => {
     expect(inDialog.getAllByText(/120\s?000\s?so'm/).length).toBeGreaterThan(0);
     // NoOp fiskal footer mavjud (matn Task F i18n'dan keladi — strukturaviy tekshiruv,
     // testid orqali — i18n landing'idan mustaqil yashil qoladi).
-    expect(inDialog.getByTestId('receipt-noop-footer')).toBeTruthy();
+    expect(inDialog.getByTestId('receipt-noop-footer').textContent).toContain('Yuborilmagan');
+    // Chek qatori serverdan (items), savat snapshot'idan emas.
+    expect(inDialog.getByText('Plomba')).toBeTruthy();
     // Walk-in bemor (tarix VM'da ism yo'q → placeholder).
     expect(inDialog.getByText('Bemorsiz (walk-in)')).toBeTruthy();
   });

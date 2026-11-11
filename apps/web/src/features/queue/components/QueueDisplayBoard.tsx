@@ -1,12 +1,11 @@
 import type { QueueTicket } from '@dental/api-client';
-import { Avatar } from '@dental/ui';
 import { Button } from '@mantine/core';
 import { IconLogout } from '@tabler/icons-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth-store.ts';
-import { useBranches, usePatientsAll, useQueueToday, useServices } from '../queue.api';
+import { useBranches, useQueueToday } from '../queue.api';
 import classes from './QueueDisplayBoard.module.css';
 
 /** Presentation formatter — schema/API o'zgarmaydi (DS5 spec §3.4). */
@@ -28,11 +27,7 @@ function useClock(): string {
   return hhmmss(now);
 }
 
-type Slot = {
-  ticket: QueueTicket | undefined;
-  patientName: string;
-  serviceName: string | null;
-};
+type Slot = { ticket: QueueTicket | undefined };
 
 export function QueueDisplayBoard() {
   const { t } = useTranslation();
@@ -40,23 +35,10 @@ export function QueueDisplayBoard() {
   const { activeBranchId } = useAuthStore();
 
   const branches = useBranches();
-  const patients = usePatientsAll();
-  const services = useServices();
   const queue = useQueueToday(activeBranchId);
   const clock = useClock();
 
-  const patientNameById = useMemo(
-    () => new Map((patients.data?.data ?? []).map((p) => [p.id, p.fullName] as const)),
-    [patients.data],
-  );
-  const serviceNameById = useMemo(
-    () => new Map((services.data ?? []).map((s) => [s.id, s.nameUz] as const)),
-    [services.data],
-  );
-
-  const patientName = (id: string | null) => (id ? (patientNameById.get(id) ?? '—') : '—');
-  const serviceName = (id: string | null) => (id ? (serviceNameById.get(id) ?? null) : null);
-
+  // PII: TV ekranida bemor ismi/xizmati CHIQMAYDI — faqat navbat raqami.
   const tickets = queue.data ?? [];
 
   // Cabinet showcase manbasi: in_progress ticketlar (≤2), fixed 2 slot.
@@ -74,11 +56,7 @@ export function QueueDisplayBoard() {
 
   const slotOf = (idx: 0 | 1): Slot => {
     const ticket = inProgress[idx];
-    return {
-      ticket,
-      patientName: ticket ? patientName(ticket.patientId) : '—',
-      serviceName: ticket ? serviceName(ticket.serviceId) : null,
-    };
+    return { ticket };
   };
 
   const renderCabinet = (idx: 0 | 1, variant: string | undefined) => {
@@ -89,12 +67,7 @@ export function QueueDisplayBoard() {
         <span className={classes.cabinetNumber}>
           {slot.ticket ? formatTicketNumber(slot.ticket.queueNumber) : '—'}
         </span>
-        {slot.ticket ? (
-          <div className={classes.cabinetMeta}>
-            <span className={classes.cabinetPatient}>{slot.patientName}</span>
-            {slot.serviceName && <span className={classes.cabinetService}>{slot.serviceName}</span>}
-          </div>
-        ) : (
+        {!slot.ticket && (
           <span className={classes.cabinetPlaceholder}>{t('queue.not_called_yet')}</span>
         )}
       </div>
@@ -136,6 +109,7 @@ export function QueueDisplayBoard() {
 
       <section className={classes.nextPanel}>
         <h2 className={classes.nextTitle}>{t('queue.next_queues')}</h2>
+        <p className={classes.nextEmpty}>{t('queueBoard.tv_numbers_only')}</p>
         {nextWaiting.length > 0 ? (
           <div className={classes.nextCards}>
             {nextWaiting.map((tk: QueueTicket, i) => (
@@ -143,15 +117,6 @@ export function QueueDisplayBoard() {
                 <span className={`${classes.nextNumber} ${i === 0 ? classes.nextNumberLead : ''}`}>
                   {formatTicketNumber(tk.queueNumber)}
                 </span>
-                <div className={classes.nextCardMeta}>
-                  <div className={classes.nextNameRow}>
-                    <Avatar name={patientName(tk.patientId)} size="sm" />
-                    <span className={classes.nextName}>{patientName(tk.patientId)}</span>
-                  </div>
-                  {serviceName(tk.serviceId) && (
-                    <span className={classes.nextService}>{serviceName(tk.serviceId)}</span>
-                  )}
-                </div>
               </div>
             ))}
           </div>

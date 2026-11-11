@@ -186,3 +186,29 @@
     grid-template-columns: 1fr;
   }
 }
+
+.notArrived {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+  padding: var(--space-4, 16px);
+  background: var(--surface, var(--mantine-color-body));
+  border: 1px solid var(--border, var(--mantine-color-default-border));
+  border-radius: var(--radius-lg, 12px);
+}
+
+.notArrivedRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3, 12px);
+}
+
+.notArrivedTime {
+  font-family: var(--font-mono, monospace);
+  color: var(--text-muted, var(--mantine-color-dimmed));
+}
+
+.notArrivedName {
+  flex: 1;
+  font-weight: 600;
+}

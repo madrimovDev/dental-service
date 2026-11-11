@@ -173,10 +173,16 @@ export const createQueueService = (deps: {
     });
   }
 
-  async function updateStatus(c: Context, id: string, input: UpdateQueueStatusInput) {
+  /**
+   * SC-09 (UI-R4): bog'langan yozilish sync'i muvaffaqiyatsiz bo'lsa (`{ok:false}` yoki
+   * transition xatosi) tiket baribir yangilanadi, lekin sabab `appointmentSyncError`
+   * sifatida UI'ga qaytadi (ilgari jim yutilardi).
+   */
+  async function updateStatusDetailed(c: Context, id: string, input: UpdateQueueStatusInput) {
     const db = getDb(c);
     const [before] = await db.select().from(queueTickets).where(eq(queueTickets.id, id));
     if (!before) return null;
+    let syncError: string | null = null;
 
     // A6 (CLI-438): state-machine guard — istalgan status→status ilgari mumkin
     // edi (mas. done→waiting). Noto'g'ri o'tish → throw (routes 400ga aylantiradi).
@@ -229,9 +235,13 @@ export const createQueueService = (deps: {
                 if (!(e instanceof AppointmentTransitionError)) throw e;
               }
             }
-            await deps.appointments.update(c, before.appointmentId, { status: apptStatus });
+            const res = await deps.appointments.update(c, before.appointmentId, {
+              status: apptStatus,
+            });
+            if (!res.ok) syncError = res.code;
           } catch (e) {
             if (!(e instanceof AppointmentTransitionError)) throw e;
+            syncError = e.code;
           }
         } else {
           // Legacy fallback (app.ts hali appointmentsService'ni ulamaguncha) —
@@ -268,7 +278,34 @@ export const createQueueService = (deps: {
         after: { status: input.status },
       });
     }
-    return updated;
+    return updated ? { ticket: updated, appointmentSyncError: syncError } : null;
+  }
+
+  async function updateStatus(c: Context, id: string, input: UpdateQueueStatusInput) {
+    const res = await updateStatusDetailed(c, id, input);
+    return res?.ticket ?? null;
+  }
+
+  /**
+   * UI-R4: `queue.manage`siz shifokor faqat O'ZIGA yozilgan bemorni chaqiradi
+   * (`ticket.appointment.doctorId === user.id`). `canCallAny` (queue.manage/@owner) — hammasi.
+   * Natija: `not_found` | `forbidden` | `{ticket, appointmentSyncError}`.
+   */
+  async function callOwn(c: Context, id: string, canCallAny: boolean) {
+    const db = getDb(c);
+    const [row] = await db
+      .select({ ticketId: queueTickets.id, apptDoctorId: appointments.doctorId })
+      .from(queueTickets)
+      .leftJoin(appointments, eq(appointments.id, queueTickets.appointmentId))
+      .where(eq(queueTickets.id, id));
+    if (!row) return 'not_found' as const;
+    const userId = (c.get('user') as { id: string } | undefined)?.id;
+    if (!canCallAny && (!userId || row.apptDoctorId !== userId)) return 'forbidden' as const;
+    const res = await updateStatusDetailed(c, id, {
+      status: 'in_progress',
+      ...(userId ? { doctorId: userId } : {}),
+    });
+    return res ?? ('not_found' as const);
   }
 
   /**
@@ -432,6 +469,8 @@ export const createQueueService = (deps: {
     nextNumber,
     create,
     updateStatus,
+    updateStatusDetailed,
+    callOwn,
     closeLinkedOpenTicket,
     checkInCandidates,
     sweepNoShows,

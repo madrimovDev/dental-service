@@ -391,6 +391,7 @@ export const createCashierService = (deps: {
           paidAmount: String(input.paidAmount),
           discount: String(input.discount),
           paymentMethod: input.paymentMethod,
+          cardProvider: input.paymentMethod === 'card' ? (input.cardProvider ?? null) : null,
           notes: input.notes ?? null,
           createdBy: user?.id ?? null,
         })
@@ -571,6 +572,7 @@ export const createCashierService = (deps: {
           paidAmount: String(refundAmount),
           discount: '0',
           paymentMethod: original.paymentMethod,
+          cardProvider: original.cardProvider,
           type: 'refund',
           parentTransactionId: id,
           status: 'completed',
@@ -669,6 +671,8 @@ export const createCashierService = (deps: {
     const rows = await db
       .select({
         paymentMethod: cashierTransactions.paymentMethod,
+        // UI-R5: karta jami sub-turlar bo'yicha bo'linadi (naqd/o'tkazmada null).
+        cardProvider: cashierTransactions.cardProvider,
         type: cashierTransactions.type,
         // CLI-419: olingan pul = paidAmount (totalAmount = hisob-faktura; sale kam
         // to'langan bo'lishi mumkin → kassa qoldig'i totalAmount emas). `type` bo'yicha
@@ -684,7 +688,11 @@ export const createCashierService = (deps: {
           eq(cashierTransactions.status, 'completed'),
         ),
       )
-      .groupBy(cashierTransactions.paymentMethod, cashierTransactions.type);
+      .groupBy(
+        cashierTransactions.paymentMethod,
+        cashierTransactions.cardProvider,
+        cashierTransactions.type,
+      );
 
     await deps.audit.record(c, {
       action: 'viewed',

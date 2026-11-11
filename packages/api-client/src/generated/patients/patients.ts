@@ -10,6 +10,8 @@ import type {
   AddPatientRelative201,
   AddPatientRelativeBody,
   ArchivePatient200,
+  CheckPatientPhone200,
+  CheckPatientPhoneParams,
   CreatePatient201,
   CreatePatientBody,
   GetMedicalRecord200,
@@ -48,6 +50,15 @@ import { customInstance } from '../../mutator';
       {url: `/api/patients`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
       data: createPatientBody
+    },
+      );
+    }
+  export const checkPatientPhone = (
+    params: CheckPatientPhoneParams,
+ ) => {
+      return customInstance<CheckPatientPhone200>(
+      {url: `/api/patients/phone-check`, method: 'GET',
+        params
     },
       );
     }
@@ -171,6 +182,7 @@ import { customInstance } from '../../mutator';
     }
   export type ListPatientsResult = NonNullable<Awaited<ReturnType<typeof listPatients>>>
 export type CreatePatientResult = NonNullable<Awaited<ReturnType<typeof createPatient>>>
+export type CheckPatientPhoneResult = NonNullable<Awaited<ReturnType<typeof checkPatientPhone>>>
 export type GetPatientResult = NonNullable<Awaited<ReturnType<typeof getPatient>>>
 export type UpdatePatientResult = NonNullable<Awaited<ReturnType<typeof updatePatient>>>
 export type ArchivePatientResult = NonNullable<Awaited<ReturnType<typeof archivePatient>>>

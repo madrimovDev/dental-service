@@ -4,9 +4,9 @@
  * Dental Service API
  * OpenAPI spec version: 0.1.0
  */
-import type { QueueTicket } from './queueTicket';
+import type { QueueTicketUpdateResult } from './queueTicketUpdateResult';
 
 export type UpdateQueueTicketStatus200 = {
   success: boolean;
-  data: QueueTicket;
+  data: QueueTicketUpdateResult;
 };

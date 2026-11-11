@@ -1,0 +1,2 @@
+ALTER TABLE "cashier_transactions" ADD COLUMN "card_provider" text;--> statement-breakpoint
+ALTER TABLE "cashier_transactions" ADD CONSTRAINT "cashier_tx_card_provider_chk" CHECK ("cashier_transactions"."card_provider" IS NULL OR ("cashier_transactions"."payment_method" = 'card' AND "cashier_transactions"."card_provider" IN ('terminal', 'click', 'payme', 'other')));
