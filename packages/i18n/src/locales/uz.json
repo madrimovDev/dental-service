@@ -510,6 +510,21 @@
       "tenant": "Klinika",
       "report": "Hisobotlar",
       "audit": "Audit"
+    },
+    "nav_services": "Xizmatlar va narxlar",
+    "nav_license": "Litsenziya",
+    "nav_backup": "Zaxira nusxa",
+    "license": {
+      "title": "Litsenziya",
+      "state": "Holat",
+      "expires": "Tugash sanasi",
+      "days_left": "Qolgan kun",
+      "state_active": "Faol",
+      "state_expiring": "Tez orada tugaydi",
+      "state_grace": "Imtiyoz muddati",
+      "state_expired": "Muddati tugagan",
+      "state_none": "Yo'q",
+      "renew_hint": "Uzaytirish ta'minotchi orqali; internet bo'lganda «Qayta tekshirish» yangilangan muddatni oladi."
     }
   },
   "users": {
@@ -1921,7 +1936,11 @@
     "plan_teeth": "Rejalashtirilgan tishlar",
     "plan_empty": "Rejalashtirilgan bosqich yo'q",
     "tooth_history": "Tish {{n}} tarixi",
-    "history_empty": "Bu tish bo'yicha tarix yo'q"
+    "history_empty": "Bu tish bo'yicha tarix yo'q",
+    "suggest_title": "Davolash taklifi",
+    "suggest_none": "Mos xizmat topilmadi — katalogdan tanlang",
+    "suggest_other": "Boshqa xizmat tanlash",
+    "suggest_no_price": "narx yo'q"
   },
   "visitNote": {
     "title": "Vizit yozuvi",
@@ -2152,7 +2171,12 @@
     "item_license": "Litsenziya / obuna",
     "item_backup": "Zaxira nusxa",
     "backupSection": "Zaxira nusxa",
-    "backupPlaceholder": "Zaxira bo'limi tez orada."
+    "backupPlaceholder": "Zaxira bo'limi tez orada.",
+    "pill_issues": "{{count}} muammo",
+    "pill_days": "{{count}} kun",
+    "pill_no_prices": "Narx yo'q",
+    "pill_no_channel": "Kanal yo'q",
+    "pill_never": "Hech qachon"
   },
   "staffCards": {
     "can": "Qila oladi",
@@ -2294,5 +2318,41 @@
     "reception_text": "Shifokor imzolagan, hali to'lanmagan bugungi vizitlar.",
     "reception_open": "Kassani ochish",
     "kpi": "Kassada kutmoqda"
+  },
+  "labOrders": {
+    "back": "Orqaga",
+    "previous_labs": "Oldingi laboratoriyalar",
+    "lab_stats": "{{count}} ta buyurtma · o'rtacha {{days}} kun · remake {{remake}}%",
+    "detail_title": "Lab buyurtma №{{number}}",
+    "make_remake": "Qayta tayyorlash",
+    "sees_portal_note": "Laboratoriya portali ulangach, laboratoriya faqat shu ma'lumotni ko'radi."
+  },
+  "staffPanel": {
+    "grant_note": "Hech kim o'zidan yuqori huquqli rol bera olmaydi. Filial menejeri «Administrator» va «Egasi» rollarini ko'rmaydi.",
+    "scope_custom": "maxsus rol",
+    "scope_tenant_admin": "faqat egasi beradi",
+    "can_tenant_admin": "deyarli hammasi",
+    "cannot_tenant_admin": "egalikni o'tkazish",
+    "scope_branch_manager": "filial boshqaruvi",
+    "can_branch_manager": "filial ishi, xodim taklifi, hisobotlar",
+    "cannot_branch_manager": "administrator rolini berish, klinika sozlamalari",
+    "scope_doctor": "davolash",
+    "can_doctor": "tibbiy karta, reja, retsept, lab buyurtma",
+    "cannot_doctor": "kassa, xodimlar",
+    "scope_doctor_assistant": "shifokor yonida",
+    "can_doctor_assistant": "tibbiy yozuv, rasm yuklash, navbat",
+    "cannot_doctor_assistant": "to'lov, xodimlar",
+    "scope_nurse": "hamshira",
+    "can_nurse": "rasm yuklash, vizit yozuvini to'ldirish, navbat",
+    "cannot_nurse": "to'lov, retsept imzolash",
+    "scope_receptionist": "qabulxona",
+    "can_receptionist": "yozilish, navbat, kassa, bemor qo'shish",
+    "cannot_receptionist": "tibbiy yozuv, qaytarish",
+    "scope_accountant": "moliya",
+    "can_accountant": "hisobot, qaytarish, xarajat, ish haqi",
+    "cannot_accountant": "tibbiy ma'lumot",
+    "scope_technician": "laboratoriya",
+    "can_technician": "lab buyurtmalari",
+    "cannot_technician": "kassa, tibbiy karta, xodimlar"
   }
 }

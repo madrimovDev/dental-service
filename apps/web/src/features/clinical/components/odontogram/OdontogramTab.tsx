@@ -38,6 +38,7 @@ import {
 import type { ToothEntry } from '../../clinical.types';
 import { Odontogram } from './Odontogram';
 import { ToothPanel } from './ToothPanel';
+import type { SuggestedService } from './TreatmentSuggestions';
 
 type Props = { patientId: string };
 type View = 'current' | 'plan' | 'history';
@@ -131,7 +132,7 @@ export function OdontogramTab({ patientId }: Props) {
     );
   };
 
-  const addToPlan = (entries: ToothEntry[], label: string) => {
+  const addToPlan = (entries: ToothEntry[], label: string, service?: SuggestedService) => {
     const tooth = selectedTooth;
     if (tooth === null || !user?.id) return;
     save(entries, () =>
@@ -140,7 +141,15 @@ export function OdontogramTab({ patientId }: Props) {
           patientId,
           doctorId: user.id,
           title: t('odontogram.plan_title', { n: tooth }),
-          stages: [{ serviceName: label, toothNumbers: [tooth], estimatedVisits: 1, cost: 0 }],
+          stages: [
+            {
+              serviceName: service?.name ?? label,
+              ...(service ? { serviceId: service.id } : {}),
+              toothNumbers: [tooth],
+              estimatedVisits: 1,
+              cost: service?.cost ?? 0,
+            },
+          ],
         },
         {
           onSuccess: () =>

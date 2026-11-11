@@ -16,6 +16,27 @@ const DX = [
   { id: 'dx-1', code: 'K02.1', nameUz: 'Dentin kariyesi', nameRu: 'Кариес дентина' },
   { id: 'dx-2', code: 'K04.0', nameUz: 'Pulpit', nameRu: 'Пульпит' },
 ];
+const SERVICES = [
+  {
+    id: 'sv-1',
+    code: 'PL',
+    nameUz: 'Plomba (kompozit)',
+    nameRu: null,
+    category: null,
+    descriptionUz: null,
+    isActive: true,
+  },
+  {
+    id: 'sv-2',
+    code: 'IK',
+    nameUz: 'Ildiz kanalini davolash',
+    nameRu: null,
+    category: null,
+    descriptionUz: null,
+    isActive: true,
+  },
+];
+const createPlanMutate = vi.fn();
 const searches: Array<string | undefined> = [];
 
 vi.mock('../../clinical.api', () => ({
@@ -27,10 +48,29 @@ vi.mock('../../clinical.api', () => ({
   },
   useCreateToothChart: () => ({ mutate, isPending: false }),
   useTreatmentPlans: () => ({ data: mockPlans }),
-  useCreatePlan: () => ({ mutate: vi.fn(), isPending: false }),
+  useCreatePlan: () => ({ mutate: createPlanMutate, isPending: false }),
+  useServiceCatalog: () => ({ data: SERVICES }),
+  fetchServicePrices: async (_qc: unknown, id: string) => ({
+    id,
+    prices: [
+      {
+        branchId: 'b1',
+        validFrom: '2026-01-01',
+        validTo: null,
+        price: id === 'sv-2' ? '1800000.00' : '450000.00',
+      },
+    ],
+  }),
 }));
 vi.mock('@/stores/auth-store.ts', () => ({
-  useAuthStore: () => ({ hasPermission: () => mockPermissions, user: { id: 'u1' } }),
+  useAuthStore: (sel?: (s: unknown) => unknown) => {
+    const state = {
+      hasPermission: () => mockPermissions,
+      user: { id: 'u1' },
+      activeBranchId: 'b1',
+    };
+    return sel ? sel(state) : state;
+  },
 }));
 
 const search = (q: string) =>
@@ -46,6 +86,7 @@ const saveSnapshot = () => screen.getByRole('button', { name: /Snapshot saqlash/
 describe('OdontogramTab', () => {
   beforeEach(() => {
     mutate.mockClear();
+    createPlanMutate.mockClear();
     searches.length = 0;
     mockChart = null;
     mockHistory = [];
@@ -196,5 +237,28 @@ describe('OdontogramTab', () => {
     fireEvent.click(screen.getByRole('option'));
     expect(screen.getAllByText(/qaytish|вернуться/i).length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: /Snapshot saqlash/i })).toBeNull();
+  });
+
+  it("Davolash taklifi: tashxis tanlansa mos xizmat + filial narxi ko'rinadi; rejaga serviceId va narx bilan tushadi", async () => {
+    mockChart = { isPrimaryDentition: false, states: [] };
+    mutate.mockImplementation((_body: unknown, opts?: { onSuccess?: () => void }) =>
+      opts?.onSuccess?.(),
+    );
+    renderApp(<OdontogramTab patientId="p1" />);
+    fireEvent.click(screen.getByText('36'));
+    search('pulpit');
+    fireEvent.click(await screen.findByText('Pulpit'));
+    const radio = await screen.findByRole('radio', { name: /Ildiz kanalini davolash/ });
+    expect(radio).toHaveTextContent('1 800 000');
+    fireEvent.click(radio);
+    expect(radio).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(screen.getByRole('button', { name: /Rejaga qo'shish/i }));
+    expect(createPlanMutate).toHaveBeenCalled();
+    expect(createPlanMutate.mock.calls[0]?.[0].stages[0]).toMatchObject({
+      serviceId: 'sv-2',
+      serviceName: 'Ildiz kanalini davolash',
+      cost: 1800000,
+      toothNumbers: [36],
+    });
   });
 });

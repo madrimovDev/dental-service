@@ -510,6 +510,21 @@
       "tenant": "Клиника",
       "report": "Отчёты",
       "audit": "Аудит"
+    },
+    "nav_services": "Услуги и цены",
+    "nav_license": "Лицензия",
+    "nav_backup": "Резервные копии",
+    "license": {
+      "title": "Лицензия",
+      "state": "Статус",
+      "expires": "Действует до",
+      "days_left": "Осталось дней",
+      "state_active": "Активна",
+      "state_expiring": "Скоро истекает",
+      "state_grace": "Льготный период",
+      "state_expired": "Истекла",
+      "state_none": "Нет",
+      "renew_hint": "Продление через поставщика; при наличии интернета «Перепроверить» получит обновлённый срок."
     }
   },
   "users": {
@@ -1921,7 +1936,11 @@
     "plan_teeth": "Запланированные зубы",
     "plan_empty": "Нет запланированных этапов",
     "tooth_history": "История зуба {{n}}",
-    "history_empty": "По этому зубу истории нет"
+    "history_empty": "По этому зубу истории нет",
+    "suggest_title": "Предлагаемое лечение",
+    "suggest_none": "Подходящих услуг нет — выберите из каталога",
+    "suggest_other": "Выбрать другую услугу",
+    "suggest_no_price": "нет цены"
   },
   "visitNote": {
     "title": "Запись о визите",
@@ -2152,7 +2171,12 @@
     "item_license": "Лицензия / подписка",
     "item_backup": "Резервная копия",
     "backupSection": "Резервная копия",
-    "backupPlaceholder": "Раздел резервного копирования скоро появится."
+    "backupPlaceholder": "Раздел резервного копирования скоро появится.",
+    "pill_issues": "{{count}} проблем",
+    "pill_days": "{{count}} дн.",
+    "pill_no_prices": "Нет цен",
+    "pill_no_channel": "Нет канала",
+    "pill_never": "Ни разу"
   },
   "staffCards": {
     "can": "Может",
@@ -2294,5 +2318,41 @@
     "reception_text": "Подписаны врачом, ещё не оплачены (сегодня).",
     "reception_open": "Открыть кассу",
     "kpi": "Ждут в кассе"
+  },
+  "labOrders": {
+    "back": "Назад",
+    "previous_labs": "Прежние лаборатории",
+    "lab_stats": "{{count}} заказов · в среднем {{days}} дн. · переделки {{remake}}%",
+    "detail_title": "Заказ в лабораторию №{{number}}",
+    "make_remake": "Переделать",
+    "sees_portal_note": "Когда портал лаборатории будет подключён, лаборатория увидит только эти данные."
+  },
+  "staffPanel": {
+    "grant_note": "Никто не может выдать роль выше своей. Управляющий филиалом не видит роли «Администратор» и «Владелец».",
+    "scope_custom": "своя роль",
+    "scope_tenant_admin": "выдаёт только владелец",
+    "can_tenant_admin": "почти всё",
+    "cannot_tenant_admin": "передача владения",
+    "scope_branch_manager": "управление филиалом",
+    "can_branch_manager": "работа филиала, приглашение сотрудников, отчёты",
+    "cannot_branch_manager": "выдача роли администратора, настройки клиники",
+    "scope_doctor": "лечение",
+    "can_doctor": "медкарта, план, рецепт, заказ в лабораторию",
+    "cannot_doctor": "касса, сотрудники",
+    "scope_doctor_assistant": "рядом с врачом",
+    "can_doctor_assistant": "мед. записи, загрузка снимков, очередь",
+    "cannot_doctor_assistant": "оплата, сотрудники",
+    "scope_nurse": "медсестра",
+    "can_nurse": "загрузка снимков, заполнение записи визита, очередь",
+    "cannot_nurse": "оплата, подпись рецепта",
+    "scope_receptionist": "регистратура",
+    "can_receptionist": "запись, очередь, касса, добавление пациентов",
+    "cannot_receptionist": "мед. записи, возврат",
+    "scope_accountant": "финансы",
+    "can_accountant": "отчёты, возврат, расходы, зарплата",
+    "cannot_accountant": "медицинские данные",
+    "scope_technician": "лаборатория",
+    "can_technician": "заказы в лабораторию",
+    "cannot_technician": "касса, медкарта, сотрудники"
   }
 }

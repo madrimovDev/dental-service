@@ -1,16 +1,15 @@
 import type { LabOrderStatus } from '@dental/api-client';
 import { Mono, StateView, StatusPill, Tag } from '@dental/ui';
 import { Box, Button, Group, Select, Stack, Text, Title } from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
 import { IconDental, IconPlus } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { useLabOrders, useUpdateLabOrderStatus } from '../../clinical.api';
 import { allowedLabOrderStatuses, toLabOrderVM } from '../../clinical.mappers';
 import { LabOrderChain } from './LabOrderChain';
 import { LabOrderFiles } from './LabOrderFiles';
-import { LabOrderFormModal } from './LabOrderFormModal';
 import { formatDueDate, type LabOrderWire } from './lab-order.helpers';
 
 type Props = { patientId: string };
@@ -25,7 +24,6 @@ const todayYmd = () => {
 export function LabOrdersTab({ patientId }: Props) {
   const { t } = useTranslation();
   const { hasPermission } = useAuthStore();
-  const [opened, { open, close }] = useDisclosure(false);
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const listQuery = useLabOrders(patientId);
@@ -44,7 +42,11 @@ export function LabOrdersTab({ patientId }: Props) {
       <Group justify="space-between">
         <Title order={4}>{t('lab_order.title')}</Title>
         {canManage && (
-          <Button leftSection={<IconPlus size={16} />} onClick={open}>
+          <Button
+            component={Link}
+            to={`/patients/${patientId}/lab-orders/new`}
+            leftSection={<IconPlus size={16} />}
+          >
             {t('lab_order.create')}
           </Button>
         )}
@@ -136,7 +138,14 @@ export function LabOrdersTab({ patientId }: Props) {
                   <Box style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
                     <Group gap={6} wrap="nowrap">
                       <IconDental size={15} style={{ color: 'var(--ink-3)', flex: '0 0 auto' }} />
-                      <Text fw={700} size="sm" style={{ color: 'var(--ink)' }} truncate>
+                      <Text
+                        component={Link}
+                        to={`/lab-orders/${vm.id}`}
+                        fw={700}
+                        size="sm"
+                        style={{ color: 'var(--ink)' }}
+                        truncate
+                      >
                         {vm.labName}
                       </Text>
                     </Group>
@@ -245,15 +254,6 @@ export function LabOrdersTab({ patientId }: Props) {
             );
           })}
         </Box>
-      )}
-
-      {canManage && (
-        <LabOrderFormModal
-          opened={opened}
-          onClose={close}
-          patientId={patientId}
-          existingOrders={orders}
-        />
       )}
     </Stack>
   );

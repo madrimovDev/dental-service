@@ -151,18 +151,44 @@ describe('UsersSettingsScreen', () => {
     grantable.value = [{ id: 'r-low', name: 'Receptionist', isSystem: true }];
     renderApp(<UsersSettingsScreen />);
     fireEvent.click(screen.getByText("Xodim qo'shish"));
-    const roleInput = (await screen.findAllByLabelText(/^Rol\s*\*?$/))[0] as HTMLElement;
-    fireEvent.click(roleInput);
-    await screen.findAllByText(/Registrator/);
-    const opts = screen.getAllByRole('option', { hidden: true });
-    const labels = opts.map((o) => o.textContent);
-    expect(labels).toContain('Registrator');
-    expect(labels).not.toContain('Buxgalter');
+    const radios = await screen.findAllByRole('radio');
+    const labels = radios.map((o) => o.textContent ?? '');
+    expect(labels.some((l) => l.includes('Registrator'))).toBe(true);
+    expect(labels.some((l) => l.includes('Buxgalter'))).toBe(false);
+    // Rol kartasi qisqa «qila oladi / qila olmaydi» bilan, tanlash aria-checked'ni o'zgartiradi
+    expect(radios[0]).toHaveTextContent('yozilish, navbat, kassa');
+    expect(radios[0]).toHaveAttribute('aria-checked', 'false');
+    fireEvent.click(radios[0] as HTMLElement);
+    expect(radios[0]).toHaveAttribute('aria-checked', 'true');
     expect(rolesEnabled.value).toBe(false);
     perms.value = ['@owner'];
     grantable.value = [
       { id: 'r-low', name: 'Receptionist', isSystem: true },
       { id: 'r-high', name: 'Accountant', isSystem: true },
     ];
+  });
+
+  it('taklif paneli: rol kartasi tanlanib yuboriladi — invite roleId bilan chaqiriladi', async () => {
+    inviteMutate.mockClear();
+    renderApp(<UsersSettingsScreen />);
+    fireEvent.click(screen.getByText("Xodim qo'shish"));
+    fireEvent.change(await screen.findByLabelText(/To'liq ism/), {
+      target: { value: 'Nilufar Ahmedova' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('90 123 45 67'), {
+      target: { value: '912440518' },
+    });
+    // Rol tanlanmasa — yuborilmaydi
+    fireEvent.click(screen.getByRole('button', { name: "Qo'shish va parol olish" }));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(inviteMutate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getAllByRole('radio')[0] as HTMLElement);
+    fireEvent.click(screen.getByRole('button', { name: "Qo'shish va parol olish" }));
+    await vi.waitFor(() => expect(inviteMutate).toHaveBeenCalled());
+    expect(inviteMutate.mock.calls[0]?.[0]).toMatchObject({
+      fullName: 'Nilufar Ahmedova',
+      phone: '+998912440518',
+      roleId: 'r-low',
+    });
   });
 });
