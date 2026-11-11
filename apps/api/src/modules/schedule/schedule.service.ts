@@ -163,6 +163,7 @@ export const createScheduleService = (deps: { audit: AuditLogger }) => {
       date: query.date,
       slotMinutes: query.slotMinutes,
       slots: slots.map(toAvailabilitySlotDto),
+      workHoursConfigured: workHours !== null,
     };
   }
 
