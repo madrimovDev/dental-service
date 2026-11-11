@@ -1,7 +1,7 @@
 # Deployment runbook — dental-service
 
 > Scope: how to build, configure, migrate, and run dental-service in production.
-> Stack: Bun (api + worker), static SPA (web), Postgres 16 + RLS, Redis, MinIO,
+> Stack: Bun (api + worker), static SPA (web), Postgres 16 + RLS, Redis, local uploads volume (`uploads_data`),
 > Caddy (edge TLS). Orchestrated by `infra/docker-compose.prod.yml`.
 
 ## 1. Images
@@ -46,7 +46,7 @@ at boot when `NODE_ENV=production`, see `apps/api/src/lib/env-schema.ts`),
 `POSTGRES_PASSWORD`, `DENTAL_APP_DB_PASSWORD` (sets the `dental_app` role's
 actual password — MUST match the password embedded in `DATABASE_URL` below,
 see CLI-383), `DATABASE_URL`, `DATABASE_ADMIN_URL` (migrate only),
-`REDIS_PASSWORD` / `REDIS_URL`, `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD`,
+`REDIS_PASSWORD` / `REDIS_URL`,
 `WEB_ORIGIN`, `DOMAIN`, `ACME_EMAIL`. Generate a JWT secret with:
 
 ```bash
@@ -63,7 +63,7 @@ C="docker compose -f infra/docker-compose.prod.yml --env-file $ENVFILE"
 $C pull        # or build locally: $C build
 
 # 2. Bring up datastores first
-$C up -d postgres redis minio minio-init
+$C up -d postgres redis
 
 # 3. RELEASE MIGRATION — run once, must succeed before app starts (see §4)
 $C run --rm migrate

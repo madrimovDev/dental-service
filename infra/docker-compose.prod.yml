@@ -46,41 +46,6 @@ services:
       retries: 5
     networks: [internal]
 
-  minio:
-    image: minio/minio:latest
-    restart: unless-stopped
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}
-    volumes:
-      - minio_data:/data
-    healthcheck:
-      test: ['CMD', 'mc', 'ready', 'local']
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks: [internal]
-
-  # Creates the bucket. Bucket stays PRIVATE — patient images are PII served
-  # only via short-lived presigned URLs. Do NOT add `mc anonymous set`.
-  minio-init:
-    image: minio/mc:latest
-    depends_on:
-      minio:
-        condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-      mc alias set local http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD};
-      mc mb --ignore-existing local/$${MINIO_BUCKET};
-      exit 0;
-      "
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-      MINIO_BUCKET: ${MINIO_BUCKET}
-    networks: [internal]
-
   # ---- release-time migration (run once per deploy, then exits) ------------
   # `docker compose ... run --rm migrate` applies Drizzle + RLS DDL using the
   # ADMIN (superuser) connection. Not a long-running service.
@@ -111,13 +76,10 @@ services:
     environment:
       NODE_ENV: production
       API_PORT: 8001
+      UPLOADS_DIR: /data/uploads
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
       DATABASE_ADMIN_URL: ${DATABASE_ADMIN_URL:-}
       REDIS_URL: ${REDIS_URL:?set REDIS_URL}
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT:?set MINIO_ENDPOINT}
-      MINIO_BUCKET: ${MINIO_BUCKET:?set MINIO_BUCKET}
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
       JWT_ACCESS_EXPIRES: ${JWT_ACCESS_EXPIRES:-15m}
       JWT_REFRESH_EXPIRES: ${JWT_REFRESH_EXPIRES:-7d}
@@ -126,6 +88,8 @@ services:
       SENTRY_DSN: ${SENTRY_DSN:-}
       # API does NOT run the in-process reminder worker — the `worker` service does.
       RUN_REMINDER_WORKER: 'false'
+    volumes:
+      - uploads_data:/data/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -145,10 +109,6 @@ services:
       NODE_ENV: production
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
       REDIS_URL: ${REDIS_URL:?set REDIS_URL}
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT:?set MINIO_ENDPOINT}
-      MINIO_BUCKET: ${MINIO_BUCKET:?set MINIO_BUCKET}
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
       WEB_ORIGIN: ${WEB_ORIGIN}
       LOG_LEVEL: ${LOG_LEVEL:-info}
@@ -198,6 +158,6 @@ networks:
 volumes:
   postgres_data:
   redis_data:
-  minio_data:
+  uploads_data:
   caddy_data:
   caddy_config:

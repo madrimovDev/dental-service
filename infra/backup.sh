@@ -2,29 +2,31 @@
 # ============================================================================
 # dental-service — backup script (CLI-236 / D5)
 # ============================================================================
-# Dumps Postgres (pg_dump custom format) + mirrors the MinIO bucket, then prunes
-# backups older than RETENTION_DAYS. Designed to run from cron on the host (or as
-# a sidecar). Medical data -> backups are SENSITIVE: store encrypted + off-host.
+# Dumps Postgres (pg_dump custom format) + archives the local uploads directory
+# (UPLOADS_DIR — the API's `uploads_data` volume), then prunes backups older than
+# RETENTION_DAYS (the newest backup is never pruned). Designed to run from cron on
+# the host (or as a sidecar with `uploads_data` mounted read-only). Medical data ->
+# backups are SENSITIVE: files are chmod 600 / dirs 700; store encrypted + off-host.
 #
 # Env (required):
 #   DATABASE_ADMIN_URL   postgres://... (superuser; reads everything past RLS)
-#   MINIO_ENDPOINT       e.g. http://minio:9000  (or http://localhost:9000)
-#   MINIO_ROOT_USER / MINIO_ROOT_PASSWORD
-#   MINIO_BUCKET         e.g. dental-uploads
 # Env (optional):
+#   UPLOADS_DIR          default /data/uploads (path where the uploads volume is mounted)
 #   BACKUP_DIR           default /backups
 #   RETENTION_DAYS       default 14
-#   BACKUP_S3_TARGET     if set (e.g. s3remote/dental-backups), `mc mirror` the
-#                        whole backup dir off-host after each run
+#   BACKUP_RSYNC_TARGET  if set (e.g. user@host:/srv/dental-backups/), rsync the
+#                        whole backup dir off-host after each run (`--delete`)
 #
-# Requires: pg_dump (postgresql-client) + mc (MinIO client) on PATH.
+# Requires: pg_dump (postgresql-client), tar; rsync only if BACKUP_RSYNC_TARGET set.
 # Exit non-zero on any failure so cron/alerting catches it.
 set -eu
+umask 077
 
 BACKUP_DIR="${BACKUP_DIR:-/backups}"
 RETENTION_DAYS="${RETENTION_DAYS:-14}"
 TS="$(date -u +%Y%m%dT%H%M%SZ)"
 DEST="${BACKUP_DIR}/${TS}"
+mkdir -p "${BACKUP_DIR}" && chmod 700 "${BACKUP_DIR}"
 mkdir -p "${DEST}"
 
 log() { echo "[backup ${TS}] $*"; }
@@ -35,31 +37,31 @@ log "pg_dump -> db.dump"
 pg_dump --format=custom --no-owner --no-privileges \
   --file="${DEST}/db.dump" "${DATABASE_ADMIN_URL}"
 
-# --- 2. MinIO: mirror the uploads bucket --------------------------------------
-: "${MINIO_ENDPOINT:?MINIO_ENDPOINT required}"
-: "${MINIO_BUCKET:?MINIO_BUCKET required}"
-log "mc mirror bucket ${MINIO_BUCKET} -> objects/"
-mc alias set bkp "${MINIO_ENDPOINT}" "${MINIO_ROOT_USER}" "${MINIO_ROOT_PASSWORD}" >/dev/null
-mc mirror --overwrite --remove "bkp/${MINIO_BUCKET}" "${DEST}/objects"
+# --- 2. Uploads: archive the local uploads directory --------------------------
+UPLOADS_DIR="${UPLOADS_DIR:-/data/uploads}"
+[ -d "${UPLOADS_DIR}" ] || { echo "UPLOADS_DIR ${UPLOADS_DIR} is not a directory" >&2; exit 1; }
+log "tar ${UPLOADS_DIR} -> uploads.tar.gz"
+tar -C "${UPLOADS_DIR}" -czf "${DEST}/uploads.tar.gz" .
 
 # --- 3. Manifest --------------------------------------------------------------
 {
   echo "timestamp_utc=${TS}"
   echo "db_dump=db.dump"
-  echo "minio_bucket=${MINIO_BUCKET}"
-  echo "objects_dir=objects/"
+  echo "uploads=uploads.tar.gz"
 } > "${DEST}/MANIFEST"
+chmod 600 "${DEST}"/*
 log "wrote ${DEST}"
 
 # --- 4. Off-host copy (optional but STRONGLY recommended for DR) --------------
-if [ -n "${BACKUP_S3_TARGET:-}" ]; then
-  log "mirroring backups off-host -> ${BACKUP_S3_TARGET}"
-  mc mirror --overwrite "${BACKUP_DIR}" "${BACKUP_S3_TARGET}"
+if [ -n "${BACKUP_RSYNC_TARGET:-}" ]; then
+  log "rsync backups off-host -> ${BACKUP_RSYNC_TARGET}"
+  rsync -a --delete "${BACKUP_DIR}/" "${BACKUP_RSYNC_TARGET}"
 fi
 
 # --- 5. Prune local backups older than RETENTION_DAYS -------------------------
-log "pruning local backups older than ${RETENTION_DAYS} days"
+log "pruning local backups older than ${RETENTION_DAYS} days (newest is always kept)"
+NEWEST="$(find "${BACKUP_DIR}" -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1)"
 find "${BACKUP_DIR}" -mindepth 1 -maxdepth 1 -type d -mtime "+${RETENTION_DAYS}" \
-  -exec rm -rf {} +
+  ! -path "${NEWEST}" -exec rm -rf {} +
 
 log "done"
