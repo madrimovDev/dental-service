@@ -1968,5 +1968,21 @@
     "validationEmpty": "Укажите хотя бы жалобы, диагноз или выполненную работу",
     "plan": "План",
     "freeNotes": "Дополнительные заметки"
+  },
+  "settingsShell": {
+    "readinessTitle": "Готовность клиники",
+    "readinessCount": "{{ok}}/{{total}}",
+    "readinessAllDone": "Клиника полностью настроена",
+    "ready": "Готово",
+    "todo": "Не настроено",
+    "item_workHours": "Часы работы филиалов",
+    "item_doctorSchedule": "График врачей",
+    "item_servicePrices": "Цены на услуги",
+    "item_channel": "Канал связи (Telegram/SMS)",
+    "item_staff": "Сотрудники",
+    "item_license": "Лицензия / подписка",
+    "item_backup": "Резервная копия",
+    "backupSection": "Резервная копия",
+    "backupPlaceholder": "Раздел резервного копирования скоро появится."
   }
 }

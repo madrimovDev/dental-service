@@ -1968,5 +1968,21 @@
     "validationEmpty": "Kamida shikoyat, tashxis yoki bajarilgan ishdan birini kiriting",
     "plan": "Reja",
     "freeNotes": "Qo‘shimcha izoh"
+  },
+  "settingsShell": {
+    "readinessTitle": "Klinika ishga tayyorligi",
+    "readinessCount": "{{ok}}/{{total}}",
+    "readinessAllDone": "Klinika to'liq sozlangan",
+    "ready": "Tayyor",
+    "todo": "Sozlanmagan",
+    "item_workHours": "Filial ish soati",
+    "item_doctorSchedule": "Shifokor jadvali",
+    "item_servicePrices": "Xizmat narxlari",
+    "item_channel": "Xabar kanali (Telegram/SMS)",
+    "item_staff": "Xodimlar",
+    "item_license": "Litsenziya / obuna",
+    "item_backup": "Zaxira nusxa",
+    "backupSection": "Zaxira nusxa",
+    "backupPlaceholder": "Zaxira bo'limi tez orada."
   }
 }
