@@ -65,6 +65,11 @@ export const PAIRS: Array<[string, string, number]> = [
   ['--danger', '--danger-bg', 4.5],
   ['--info', '--info-bg', 4.5],
   ['--violet', '--violet-soft', 4.5],
+  ['--text', '--primary-tint', 4.5],
+  ['--text-2', '--primary-tint', 4.5],
+  ['--text', '--danger-bg', 4.5],
+  ['--text', '--warning-bg', 4.5],
+  ['--text-on-primary', '--primary-hover', 4.5],
 ];
 
 let failed = 0;

@@ -33,6 +33,8 @@ export const red: MantineColorsTuple = [
   '#5E1A18',
 ];
 
+const tapInput = { styles: { input: { minHeight: 'var(--tap-min)' } } };
+
 export const mantineTheme = createTheme({
   primaryColor: 'teal',
   // light → index 6 (#0E9384), dark → index 4 (#2FC6B2)
@@ -41,6 +43,24 @@ export const mantineTheme = createTheme({
   fontFamily: 'var(--font-sans)',
   fontFamilyMonospace: 'var(--font-mono)',
   headings: { fontFamily: 'var(--font-sans)', fontWeight: '600' },
+  // UI-0 1.1: asosiy matn 15px (md), eng kichik 13px (xs/sm) — tokens.css bilan mos.
+  fontSizes: {
+    xs: 'var(--text-xs)',
+    sm: 'var(--text-sm)',
+    md: 'var(--text-base)',
+    lg: 'var(--text-lg)',
+    xl: 'var(--text-xl)',
+  },
+  components: {
+    // bosish zonasi >= 44px (--tap-min)
+    Button: { styles: { root: { minHeight: 'var(--tap-min)' } } },
+    ActionIcon: { styles: { root: { minHeight: 'var(--tap-min)', minWidth: 'var(--tap-min)' } } },
+    TextInput: tapInput,
+    PasswordInput: tapInput,
+    NumberInput: tapInput,
+    Select: tapInput,
+    MultiSelect: tapInput,
+  },
   defaultRadius: 'md',
   // Mantine radius shkalasi → token var'lar (drift yo'q).
   // 'md' = token --radius (8px). Primitiv CSS Module kerak joyda
