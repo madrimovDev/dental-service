@@ -1,7 +1,7 @@
-import { getRecallSummary, listPatients } from '@dental/api-client';
+import { getRecallSummary } from '@dental/api-client';
 import { useQuery } from '@tanstack/react-query';
-import { useMemo } from 'react';
 import { useBranchAvailability, useDoctors } from '@/features/appointments/appointments.api.ts';
+import { usePatientNames as useClinicalPatientNames } from '@/features/clinical/clinical.api.ts';
 import { usePatients } from '@/features/patients/patients.api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { useActiveLabOrders } from './dashboard.api.ts';
@@ -16,19 +16,15 @@ export function useDoctorOptions() {
 }
 
 /**
- * Bemor id → ism xaritasi (yozilish/navbat qatorlari uchun; ro'yxat DTO'sida patientName yo'q).
- * Server pagination: eng so'nggi 100 ta bemor — qolganlari «Bemor» deb ko'rinadi.
+ * Bemor id → ism xaritasi: faqat bugungi yozilish/navbat qatorlaridagi NOYOB patientId'lar uchun
+ * `getPatient` (cached + deduped) — bemorlar soni bo'yicha qattiq limit yo'q.
  */
-export function usePatientNames() {
-  const q = useQuery({
-    queryKey: ['reception', 'patient-names'],
-    queryFn: () => listPatients({ pageSize: 100 }).then((r) => r.data.data),
-  });
-  return useMemo(() => {
-    const map = new Map<string, string>();
-    for (const p of q.data ?? []) map.set(p.id, p.fullName);
-    return map;
-  }, [q.data]);
+export function usePatientNames(ids: Array<string | null | undefined>): Map<string, string> {
+  const { hasPermission } = useAuthStore();
+  return useClinicalPatientNames(
+    ids.filter((id): id is string => !!id),
+    hasPermission('patient.view'),
+  );
 }
 
 /** Qidiruv (A.1 endpoint: kirill/lotin + istalgan telefon formati) — kamida 2 belgi. */

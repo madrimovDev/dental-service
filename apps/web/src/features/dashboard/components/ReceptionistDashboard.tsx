@@ -147,7 +147,6 @@ export function ReceptionistDashboard() {
   const range = useTodayRange();
   const appointments = useAppointments({ branchId: activeBranchId ?? undefined, ...range });
   const queue = useQueueToday(activeBranchId);
-  const names = usePatientNames();
   const doctors = useDoctorOptions();
   const attention = useReceptionAttention(activeBranchId);
 
@@ -162,6 +161,10 @@ export function ReceptionistDashboard() {
 
   const appts = appointments.data ?? [];
   const queueItems = queue.data ?? [];
+  const names = usePatientNames([
+    ...appts.map((a) => a.patientId),
+    ...queueItems.map((q) => q.patientId),
+  ]);
   const noShow = appts.filter((a) => a.status === 'no_show').length;
   const pending = appts.filter((a) => matchesStatusFilter(a.status, 'pending')).length;
   const waiting = queueItems.filter((q) => q.status === 'waiting').length;
