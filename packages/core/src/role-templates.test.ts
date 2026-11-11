@@ -138,3 +138,17 @@ describe('FU-41 — Branch Manager superset', () => {
     expect([...flagged].sort()).toEqual(['doctor', 'doctor_assistant']);
   });
 });
+
+/** Lab Hub L4 — narx tasdig'i (pul: xarajatga yoziladi) alohida ruxsat. */
+describe('lab_order.approve_price — rol matritsasi', () => {
+  test.each(['tenant_admin', 'branch_manager', 'doctor', 'doctor_assistant'])('%s — bor', (key) => {
+    expect(permsFor(key)).toContain('lab_order.approve_price');
+  });
+  test.each(['technician', 'nurse', 'receptionist', 'accountant'])('%s — YO‘Q', (key) => {
+    expect(permsFor(key)).not.toContain('lab_order.approve_price');
+  });
+  test('katalogda bor', async () => {
+    const { PERMISSIONS } = await import('./permissions.ts');
+    expect(PERMISSIONS.map((p) => p.code)).toContain('lab_order.approve_price');
+  });
+});

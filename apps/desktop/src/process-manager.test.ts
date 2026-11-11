@@ -155,6 +155,38 @@ describe('process-manager', () => {
     expect(env.DENTAL_LOCAL_DESKTOP).toBe('true');
   });
 
+  test('LAB_HUB_URL — desktop config `labHubUrl`dan; default bo‘sh (o‘chiq), tashqi env o‘tmaydi', async () => {
+    const { mkdtempSync, writeFileSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const dir = mkdtempSync(join(tmpdir(), 'pm-config-'));
+    const savedDir = process.env.DENTAL_CONFIG_DIR;
+    const savedUrl = process.env.LAB_HUB_URL;
+    process.env.DENTAL_CONFIG_DIR = dir;
+    process.env.LAB_HUB_URL = 'http://dev-shell-leak:1';
+    try {
+      await startServer(8080);
+      expect((spawnCalls[2]?.opts.env as Record<string, string>).LAB_HUB_URL).toBe('');
+      await stopServer();
+
+      spawnCalls = [];
+      spawnedProcesses = [];
+      writeFileSync(
+        join(dir, 'config.json'),
+        JSON.stringify({ labHubUrl: 'https://hub.example.uz/' }),
+      );
+      await startServer(8080);
+      expect((spawnCalls[2]?.opts.env as Record<string, string>).LAB_HUB_URL).toBe(
+        'https://hub.example.uz',
+      );
+    } finally {
+      if (savedDir === undefined) delete process.env.DENTAL_CONFIG_DIR;
+      else process.env.DENTAL_CONFIG_DIR = savedDir;
+      if (savedUrl === undefined) delete process.env.LAB_HUB_URL;
+      else process.env.LAB_HUB_URL = savedUrl;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test("stopServer api/valkey'ni SIGTERM bilan, postgres'ni pg_ctl bilan to'xtatadi, status \"stopped\"", async () => {
     await startServer();
     await stopServer();

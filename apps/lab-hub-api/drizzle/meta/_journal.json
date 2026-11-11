@@ -15,6 +15,13 @@
       "when": 1794429521004,
       "tag": "0001_kek_check_and_event_tx",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794433740128,
+      "tag": "0002_client_ref",
+      "breakpoints": true
     }
   ]
 }

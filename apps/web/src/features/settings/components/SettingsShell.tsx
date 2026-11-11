@@ -16,6 +16,7 @@ export type SettingsTab =
   | 'services'
   | 'notify'
   | 'integrations'
+  | 'labs'
   | 'license'
   | 'backup';
 
@@ -27,6 +28,8 @@ type TabConfig = {
   labelKey: string;
   path: string;
   permission: string;
+  /** Qo'shimcha talab qilinadigan ruxsat (ikkalasi ham kerak). */
+  alsoPermission?: string;
   /** Faqat desktopda ko'rinadigan bo'lim (bulutda yo'q). */
   desktopOnly?: 'license' | 'backup';
 };
@@ -63,6 +66,14 @@ const TAB_CONFIG: TabConfig[] = [
     labelKey: 'settings.nav_integrations',
     path: '/settings/integrations',
     permission: 'tenant_settings.view',
+  },
+  {
+    id: 'labs',
+    labelKey: 'labHubClinic.nav',
+    path: '/settings/labs',
+    permission: 'tenant_settings.view',
+    // Lab Hub holati/katalogi `lab_order.view` bilan himoyalangan (bo'sh 403 sahifa ko'rsatilmaydi).
+    alsoPermission: 'lab_order.view',
   },
   {
     id: 'license',
@@ -293,6 +304,7 @@ export function SettingsShell({
   const nav = useSettingsNavData(items, hasPermission);
   const visible = TAB_CONFIG.filter((tab) => {
     if (!hasPermission(tab.permission)) return false;
+    if (tab.alsoPermission && !hasPermission(tab.alsoPermission)) return false;
     if (tab.desktopOnly === 'license') return nav.showLicense;
     if (tab.desktopOnly === 'backup') return nav.showBackup;
     return true;

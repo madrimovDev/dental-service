@@ -22,6 +22,9 @@ const IntegrationsSettingsScreen = lazy(() =>
     default: m.IntegrationsSettingsScreen,
   })),
 );
+const LabsSettingsScreen = lazy(() =>
+  import('./components/LabsSettingsScreen').then((m) => ({ default: m.LabsSettingsScreen })),
+);
 const LicenseSettingsScreen = lazy(() =>
   import('./components/LicenseSettingsScreen').then((m) => ({ default: m.LicenseSettingsScreen })),
 );
@@ -74,6 +77,7 @@ export const settingsRoutes: AppRoute[] = [
     perm: 'tenant_settings.view',
     element: <IntegrationsSettingsScreen />,
   },
+  { path: '/settings/labs', perm: 'tenant_settings.view', element: <LabsSettingsScreen /> },
   { path: '/settings/license', perm: 'tenant_settings.view', element: <LicenseSettingsScreen /> },
   { path: '/settings/backup', perm: 'tenant_settings.view', element: <BackupSettingsScreen /> },
 ];

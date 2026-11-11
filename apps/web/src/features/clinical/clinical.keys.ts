@@ -30,6 +30,10 @@ export const clinicalKeys = {
     ['clinical', 'lab-orders', patientId, status ?? null] as const,
   labOrder: (id: string) => ['clinical', 'lab-order', id] as const,
   labOrderFiles: (labOrderId: string) => ['clinical', 'lab-order-files', labOrderId] as const,
+  // Lab Hub (W2): ulanish holati, katalog, buyurtma yozishmasi.
+  labHubStatus: () => ['clinical', 'lab-hub', 'status'] as const,
+  labHubLabs: () => ['clinical', 'lab-hub', 'labs'] as const,
+  labHubMessages: (labOrderId: string) => ['clinical', 'lab-hub', 'messages', labOrderId] as const,
   consentForms: (patientId: string) => ['clinical', 'consent-forms', patientId] as const,
   consentTemplates: () => ['clinical', 'consent-templates'] as const,
   // C — images

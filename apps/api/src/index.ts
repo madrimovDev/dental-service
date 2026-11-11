@@ -24,6 +24,7 @@ if (process.argv[2] === 'migrate') {
   const { startRecallWorker } = await import('./lib/recall-worker.ts');
   const { startReminderWorker } = await import('./lib/reminder-worker.ts');
   const { startSupervisorSyncScheduler } = await import('./lib/supervisor-saas.ts');
+  const { startLabHubScheduler } = await import('./lib/lab-hub/sync.ts');
   const { startTelegramBotManager } = await import('./lib/telegram-bot-manager.ts');
   const { closeRedisPub } = await import('./modules/tenant-settings/tenant-settings.service.ts');
   const { initSentry } = await import('./lib/sentry.ts');
@@ -76,6 +77,12 @@ if (process.argv[2] === 'migrate') {
     ? startSupervisorSyncScheduler({ adminDb: messagingAdmin.db })
     : null;
 
+  // Lab Hub (W2): outbox push + 60 s poll. Xuddi shu gating (desktop/dev — shu jarayon,
+  // bulut — worker.ts); `LAB_HUB_URL` yo'q bo'lsa no-op.
+  const stopLabHubSync = messagingAdmin
+    ? startLabHubScheduler({ adminDb: messagingAdmin.db })
+    : null;
+
   // CLI-387 — License heartbeat: only relevant for Local Desktop (WEB_DIST_DIR
   // signal, same one requireModuleInDesktop uses — apps/api/src/lib/license-middleware.ts).
   // Cloud/dev/CI never write a .lic file, so this is a no-op there (readLicense()
@@ -104,6 +111,7 @@ if (process.argv[2] === 'migrate') {
       if (messagingAdmin) await messagingAdmin.client.end({ timeout: 5 });
       stopLicenseHeartbeat?.();
       stopSupervisorSync?.();
+      stopLabHubSync?.();
       await reminderQueue.close();
       await recallQueue.close();
       await closeRedisPub(); // CLI-475 B5 — telegram:reload publish ulanishini yopadi

@@ -182,10 +182,15 @@ export const caseFiles = pgTable(
     sizeBytes: integer('size_bytes').notNull(),
     // `<labId>/<uuid>.bin` — UPLOADS_DIR ga nisbatan, faqat shifrlangan blob.
     storageKey: text('storage_key').notNull(),
+    /** Klinika outbox'idagi barqaror kalit — qayta yuborish dublikat yaratmaydi. */
+    clientRef: text('client_ref'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
-  (t) => [index('case_files_case_idx').on(t.caseId)],
+  (t) => [
+    index('case_files_case_idx').on(t.caseId),
+    uniqueIndex('case_files_client_ref_unique').on(t.caseId, t.clientRef),
+  ],
 );
 
 export const caseMessages = pgTable(
@@ -205,9 +210,14 @@ export const caseMessages = pgTable(
     authorName: text('author_name'),
     bodyEnc: text('body_enc'),
     fileId: uuid('file_id').references(() => caseFiles.id, { onDelete: 'set null' }),
+    /** Klinika outbox'idagi barqaror kalit — qayta yuborish dublikat yaratmaydi. */
+    clientRef: text('client_ref'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index('case_messages_case_idx').on(t.caseId)],
+  (t) => [
+    index('case_messages_case_idx').on(t.caseId),
+    uniqueIndex('case_messages_client_ref_unique').on(t.caseId, t.clientRef),
+  ],
 );
 
 export type CaseEventType =

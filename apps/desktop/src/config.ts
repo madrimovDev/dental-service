@@ -8,6 +8,11 @@ export interface AppConfig {
   serverUrl: string | null; // null = hali topilmagan, discovery qayta ishlaydi
   licenseKey: string | null;
   serverPort: number;
+  /**
+   * Laboratoriya portali (Lab Hub) manzili — API'ga `LAB_HUB_URL` sifatida beriladi.
+   * Bo'sh (default) = integratsiya o'chiq.
+   */
+  labHubUrl: string;
 }
 
 const DEFAULTS: AppConfig = {
@@ -15,6 +20,23 @@ const DEFAULTS: AppConfig = {
   serverUrl: null,
   licenseKey: null,
   serverPort: 8080,
+  labHubUrl: '',
+};
+
+/**
+ * Config'dagi Lab Hub manzili → API env qiymati. Faqat `http(s)://` manzil qabul qilinadi
+ * (oxiridagi `/` olib tashlanadi); bo'sh/noto'g'ri qiymat → `''` (integratsiya o'chiq).
+ */
+export const resolveLabHubUrl = (config: Pick<AppConfig, 'labHubUrl'>): string => {
+  const raw = typeof config.labHubUrl === 'string' ? config.labHubUrl.trim() : '';
+  if (!raw) return '';
+  try {
+    const u = new URL(raw);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return '';
+    return raw.replace(/\/+$/, '');
+  } catch {
+    return '';
+  }
 };
 
 // Runtime da har chaqiruvda hisoblanadi (env-override testable bo'lishi uchun) —

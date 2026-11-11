@@ -43,3 +43,14 @@ export function assertLabOrderTransition(from: LabOrderStatus, to: LabOrderStatu
     throw new InvalidLabOrderTransitionError(from, to);
   }
 }
+
+/**
+ * Lab Hub qayta ishlash (remake): lab remake'ni qabul qilganda (`remake → accepted`)
+ * tayyor/yetkazilgan buyurtma `in_progress`ga qaytadi. Bu — foydalanuvchi PATCH'i EMAS
+ * (u forward-only qoladi), faqat Hub sinxroni ishlatadigan alohida, tor o'tish.
+ */
+const LAB_ORDER_REMAKE_FROM: readonly LabOrderStatus[] = ['ready', 'delivered'];
+
+export function isValidLabOrderRemakeTransition(from: LabOrderStatus): boolean {
+  return LAB_ORDER_REMAKE_FROM.includes(from);
+}

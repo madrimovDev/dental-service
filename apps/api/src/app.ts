@@ -27,6 +27,7 @@ import { consentRoutes } from './modules/consent/index.ts';
 import { dashboardRoutes } from './modules/dashboard/index.ts';
 import { expensesRoutes } from './modules/expenses/index.ts';
 import { healthRoutes } from './modules/health/index.ts';
+import { labHubRoutes } from './modules/lab-hub/index.ts';
 import { labOrdersRoutes } from './modules/lab-orders/index.ts';
 import { createNoShowStrikesService, noShowStrikeRoutes } from './modules/no-show-strikes/index.ts';
 import { createNotificationsService, notificationsRoutes } from './modules/notifications/index.ts';
@@ -265,6 +266,8 @@ export const createApp = () => {
   app.route('/api/prescriptions', prescriptionsRoutes({ db, audit }));
   app.route('/api/consent', consentRoutes({ db, audit }));
   app.route('/api/lab-orders', labOrdersRoutes({ db, audit }));
+  // Lab Hub (W2): klinika ↔ laboratoriya portali ulanishi (katalog, so'rov, holat).
+  app.route('/api/lab-hub', labHubRoutes({ db, audit }));
   // R4 Guruh A: xarajatlar (/api/expense-categories, /api/expenses), ombor (/api/stock)
   //
   // CLI-433 — daromad modullari (expenses/stock/payroll/notifications) ilgari

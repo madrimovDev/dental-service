@@ -5,14 +5,21 @@
  * OpenAPI spec version: 0.1.0
  */
 import type {
+  ApproveLabOrderPrice200,
   CreateLabOrder201,
   CreateLabOrderBody,
   DeleteLabOrderFile200,
   GetLabOrder200,
+  LabOrderPriceApprovalRequest,
   ListLabOrderFiles200,
+  ListLabOrderHubMessages200,
   ListLabOrders200,
   ListLabOrdersParams,
   ListOverdueLabOrders200,
+  PostLabOrderHubMessage201,
+  PostLabOrderHubMessageBody,
+  SendLabOrderToHub200,
+  SendLabOrderToHubBody,
   UpdateLabOrder200,
   UpdateLabOrderBody
 } from '.././model';
@@ -84,6 +91,47 @@ import { customInstance } from '../../mutator';
     },
       );
     }
+  export const sendLabOrderToHub = (
+    id: string,
+    sendLabOrderToHubBody: SendLabOrderToHubBody,
+ ) => {
+      return customInstance<SendLabOrderToHub200>(
+      {url: `/api/lab-orders/${id}/send-to-hub`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: sendLabOrderToHubBody
+    },
+      );
+    }
+  export const approveLabOrderPrice = (
+    id: string,
+    labOrderPriceApprovalRequest: LabOrderPriceApprovalRequest,
+ ) => {
+      return customInstance<ApproveLabOrderPrice200>(
+      {url: `/api/lab-orders/${id}/approve-price`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: labOrderPriceApprovalRequest
+    },
+      );
+    }
+  export const listLabOrderHubMessages = (
+    id: string,
+ ) => {
+      return customInstance<ListLabOrderHubMessages200>(
+      {url: `/api/lab-orders/${id}/hub-messages`, method: 'GET'
+    },
+      );
+    }
+  export const postLabOrderHubMessage = (
+    id: string,
+    postLabOrderHubMessageBody: PostLabOrderHubMessageBody,
+ ) => {
+      return customInstance<PostLabOrderHubMessage201>(
+      {url: `/api/lab-orders/${id}/hub-messages`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: postLabOrderHubMessageBody
+    },
+      );
+    }
   export type ListLabOrdersResult = NonNullable<Awaited<ReturnType<typeof listLabOrders>>>
 export type CreateLabOrderResult = NonNullable<Awaited<ReturnType<typeof createLabOrder>>>
 export type ListOverdueLabOrdersResult = NonNullable<Awaited<ReturnType<typeof listOverdueLabOrders>>>
@@ -91,3 +139,7 @@ export type GetLabOrderResult = NonNullable<Awaited<ReturnType<typeof getLabOrde
 export type UpdateLabOrderResult = NonNullable<Awaited<ReturnType<typeof updateLabOrder>>>
 export type ListLabOrderFilesResult = NonNullable<Awaited<ReturnType<typeof listLabOrderFiles>>>
 export type DeleteLabOrderFileResult = NonNullable<Awaited<ReturnType<typeof deleteLabOrderFile>>>
+export type SendLabOrderToHubResult = NonNullable<Awaited<ReturnType<typeof sendLabOrderToHub>>>
+export type ApproveLabOrderPriceResult = NonNullable<Awaited<ReturnType<typeof approveLabOrderPrice>>>
+export type ListLabOrderHubMessagesResult = NonNullable<Awaited<ReturnType<typeof listLabOrderHubMessages>>>
+export type PostLabOrderHubMessageResult = NonNullable<Awaited<ReturnType<typeof postLabOrderHubMessage>>>

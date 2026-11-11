@@ -26,7 +26,10 @@ import {
   addMessage,
   caseDetail,
   contentDisposition,
+  findFileByClientRef,
+  findMessageByClientRef,
   loadLab,
+  lockCaseForClientRef,
   recordEvent,
   toCaseDto,
 } from '../cases/case-core';
@@ -61,6 +64,13 @@ export const hubCaseSchema = z
     note: z.string().trim().max(5000).nullable().optional(),
   })
   .strict();
+
+/** Klinika outbox op'ining barqaror kaliti (`msg:<uuid>` / `file:<uuid>`). */
+const clientRefSchema = z
+  .string()
+  .min(1)
+  .max(100)
+  .regex(/^[A-Za-z0-9._:-]+$/);
 
 const refParam = z.object({
   ref: z
@@ -430,9 +440,20 @@ export const clinicRoutes = (deps: Deps) => {
       const form = await c.req.formData().catch(() => null);
       const file = form?.get('file');
       if (!(file instanceof File)) throw new ApiError(400, 'file.required');
+      const rawRef = form?.get('clientRef');
+      const clientRef = typeof rawRef === 'string' && rawRef ? rawRef : null;
+      if (clientRef && !clientRefSchema.safeParse(clientRef).success) {
+        throw new ApiError(400, 'file.invalid_client_ref');
+      }
+      if (clientRef) {
+        await lockCaseForClientRef(t, row.id);
+        const existing = await findFileByClientRef(t, dek, row.id, clientRef);
+        if (existing) return c.json({ file: existing, duplicate: true }, 200);
+      }
       const out = await addFile(t, deps.storage, row, dek, file, {
         uploadedBy: 'clinic',
         maxBytes: deps.config.maxUploadBytes,
+        clientRef,
       });
       return c.json({ file: out }, 201);
     }),
@@ -463,6 +484,7 @@ export const clinicRoutes = (deps: Deps) => {
             .object({
               body: z.string().trim().min(1).max(5000),
               authorName: z.string().max(200).optional(),
+              clientRef: clientRefSchema.optional(),
             })
             .strict(),
         ),
@@ -474,10 +496,24 @@ export const clinicRoutes = (deps: Deps) => {
         const { c: row, dek } = await findCase(t, clinic.id, c.req.valid('param').ref);
         if (row.purgedAt) throw new ApiError(409, 'case.purged');
         const b = c.req.valid('json');
+        if (b.clientRef) {
+          await lockCaseForClientRef(t, row.id);
+          const existing = await findMessageByClientRef(t, row.id, b.clientRef);
+          if (existing) {
+            return c.json(
+              {
+                message: { id: existing.id, createdAt: existing.createdAt.toISOString() },
+                duplicate: true,
+              },
+              200,
+            );
+          }
+        }
         const m = await addMessage(t, row, dek, {
           author: 'clinic',
           authorName: b.authorName,
           body: b.body,
+          clientRef: b.clientRef ?? null,
         });
         return c.json({ message: { id: m.id, createdAt: m.createdAt.toISOString() } }, 201);
       }),

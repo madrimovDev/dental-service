@@ -350,6 +350,12 @@ export const PERMISSIONS = [
     descriptionRu: 'Управление лаб. заказами',
   },
   {
+    code: 'lab_order.approve_price',
+    category: 'clinical',
+    descriptionUz: 'Laboratoriya taklif qilgan narxni tasdiqlash (xarajatga yoziladi)',
+    descriptionRu: 'Подтверждение цены лаборатории (записывается в расходы)',
+  },
+  {
     code: 'patient_image.view',
     category: 'clinical',
     descriptionUz: "Bemor rasmlarini (X-ray va boshqa) ko'rish",

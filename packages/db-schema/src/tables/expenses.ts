@@ -1,7 +1,17 @@
 import { sql } from 'drizzle-orm';
-import { date, index, numeric, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import {
+  date,
+  index,
+  numeric,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
 import { branches } from './branches.ts';
 import { expenseCategories } from './expense-categories.ts';
+import { labOrders } from './lab-orders.ts';
 import { tenants } from './tenants.ts';
 import { users } from './users.ts';
 
@@ -20,9 +30,15 @@ export const expenses = pgTable(
     date: date('date').notNull(),
     note: text('note'),
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    // Lab Hub (L4): tasdiqlangan lab narxi avtomatik xarajat. UNIQUE — bitta buyurtma
+    // uchun bitta xarajat (ikkinchi «Tasdiqlash» dublikat yaratmaydi).
+    labOrderId: uuid('lab_order_id').references(() => labOrders.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index('expenses_tenant_date_idx').on(t.tenantId, t.date)],
+  (t) => [
+    index('expenses_tenant_date_idx').on(t.tenantId, t.date),
+    uniqueIndex('expenses_lab_order_unique').on(t.labOrderId),
+  ],
 );
 
 export type Expense = typeof expenses.$inferSelect;

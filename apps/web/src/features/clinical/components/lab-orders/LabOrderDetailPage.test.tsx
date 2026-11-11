@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderApp } from '../../../../test-utils';
@@ -6,6 +6,17 @@ import { LabOrderDetailPage } from './LabOrderDetailPage';
 
 const usePatientSpy = vi.fn();
 const permissions = { current: new Set<string>() };
+const approveMutate = vi.fn();
+const postMutate = vi.fn();
+const sendMutate = vi.fn();
+const orderOver: { current: Record<string, unknown> } = { current: {} };
+const hubState = { connected: true };
+const extraMessages: { current: Record<string, unknown>[] } = { current: [] };
+const downloadSpy = vi.fn(() => Promise.resolve());
+
+vi.mock('@/hooks/useAuthedObjectUrl', () => ({
+  downloadAuthedFile: (...args: unknown[]) => downloadSpy(...(args as [])),
+}));
 
 vi.mock('../../clinical.api', () => ({
   useLabOrder: () => ({
@@ -31,6 +42,7 @@ vi.mock('../../clinical.api', () => ({
       notes: 'Ehtiyot bo‘ling',
       createdAt: '2026-06-10T00:00:00Z',
       updatedAt: '2026-06-10T00:00:00Z',
+      ...orderOver.current,
     },
     isLoading: false,
     isError: false,
@@ -41,6 +53,37 @@ vi.mock('./lab-order.api', () => ({
   useLabOrderFiles: () => ({ data: [], isLoading: false, isError: false }),
   useUploadLabOrderFile: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteLabOrderFile: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+vi.mock('./lab-hub.api', () => ({
+  activeLabs: (labs?: { linkStatus: string | null }[]) =>
+    (labs ?? []).filter((l) => l.linkStatus === 'active'),
+  useLabHubStatus: () => ({ data: { connected: hubState.connected }, isLoading: false }),
+  useLabHubLabs: () => ({
+    data: {
+      labs: [{ id: 'hl1', name: 'Oq Tish', city: null, description: null, linkStatus: 'active' }],
+      stale: false,
+    },
+    isLoading: false,
+  }),
+  useSendToLabHub: () => ({ mutate: sendMutate, isPending: false }),
+  useApproveLabPrice: () => ({ mutate: approveMutate, isPending: false }),
+  useLabHubMessages: () => ({
+    data: [
+      {
+        id: 'm1',
+        labOrderId: 'lo1',
+        author: 'lab',
+        authorName: 'Texnik Anvar',
+        kind: 'message',
+        body: 'Rang A2 tasdiqlandimi?',
+        file: null,
+        synced: true,
+        createdAt: '2026-06-11T00:00:00Z',
+      },
+      ...extraMessages.current,
+    ],
+  }),
+  usePostLabHubMessage: () => ({ mutate: postMutate, isPending: false }),
 }));
 vi.mock('@/features/patients/patients.api', () => ({
   usePatient: (id: string) => {
@@ -68,7 +111,19 @@ const renderPage = () =>
 describe('LabOrderDetailPage', () => {
   beforeEach(() => {
     usePatientSpy.mockReset();
-    permissions.current = new Set(['lab_order.view', 'lab_order.manage', 'patient.view']);
+    approveMutate.mockReset();
+    postMutate.mockReset();
+    sendMutate.mockReset();
+    orderOver.current = {};
+    extraMessages.current = [];
+    downloadSpy.mockClear();
+    hubState.connected = true;
+    permissions.current = new Set([
+      'lab_order.view',
+      'lab_order.manage',
+      'lab_order.approve_price',
+      'patient.view',
+    ]);
   });
 
   it('buyurtma tafsiloti, bemor nomi va qayta tayyorlash havolasi', () => {
@@ -88,5 +143,109 @@ describe('LabOrderDetailPage', () => {
     for (const call of usePatientSpy.mock.calls) expect(call[0]).toBe('');
     expect(screen.queryByRole('link', { name: 'Qayta tayyorlash' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Orqaga' })).toHaveAttribute('href', '/lab');
+  });
+
+  it('L3: «Laboratoriya nimani ko‘radi» — to‘liq ism va klinika kodi', () => {
+    renderPage();
+    const block = screen.getByTestId('lab-sees');
+    expect(block).toHaveTextContent('Kamola Ergasheva · ayol · 47');
+    expect(block).not.toHaveTextContent('K. E.');
+    expect(block).toHaveTextContent('LO-7');
+  });
+
+  it('portalga yuborilmagan, ulangan: faol labni tanlab yuborish', () => {
+    renderPage();
+    expect(screen.getByText('Portal orqali yuborish')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('textbox', { name: 'Laboratoriya' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Oq Tish' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Laboratoriyaga yuborish' }));
+    expect(sendMutate).toHaveBeenCalledWith({ labOrderId: 'lo1', labId: 'hl1' }, expect.anything());
+  });
+
+  it('portal buyurtmasi: sinxron/lab holati, narx taklifi «Tasdiqlash», yozishma', () => {
+    orderOver.current = {
+      labHubLabId: 'hl1',
+      hubSyncStatus: 'synced',
+      hubStatus: 'ready',
+      proposedPrice: '350000.00',
+      approvedPrice: null,
+    };
+    renderPage();
+    const panel = screen.getByTestId('lab-hub-panel');
+    expect(panel).toHaveTextContent('Portalga yetkazildi');
+    expect(panel).toHaveTextContent('Tayyor');
+    expect(panel).toHaveTextContent(/350[\s\u00a0 ]?000/);
+    expect(panel).toHaveTextContent('Rang A2 tasdiqlandimi?');
+    fireEvent.click(screen.getByRole('button', { name: 'Tasdiqlash' }));
+    // Ekranda ko'rsatilgan narx yuboriladi (server boshqasini ko'rsa 409 price.changed).
+    expect(approveMutate).toHaveBeenCalledWith('350000.00', expect.anything());
+    fireEvent.change(screen.getByRole('textbox', { name: 'Laboratoriyaga xabar…' }), {
+      target: { value: 'Ha, A2' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Yuborish' }));
+    expect(postMutate).toHaveBeenCalledWith('Ha, A2', expect.anything());
+  });
+
+  it('Nurse (faqat ko‘rish): tasdiqlash va xabar yozish yo‘q; rad etish sababi ko‘rinadi', () => {
+    permissions.current = new Set(['lab_order.view', 'patient.view']);
+    orderOver.current = {
+      labHubLabId: 'hl1',
+      hubSyncStatus: 'synced',
+      hubStatus: 'rejected',
+      hubRejectReason: 'Skan sifatsiz',
+      proposedPrice: '350000.00',
+    };
+    renderPage();
+    expect(screen.getByText('Skan sifatsiz')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Tasdiqlash' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('textbox', { name: 'Laboratoriyaga xabar…' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('lab_order.manage bor, lab_order.approve_price yo‘q (Technician): «Tasdiqlash» yo‘q', () => {
+    permissions.current = new Set(['lab_order.view', 'lab_order.manage']);
+    orderOver.current = { labHubLabId: 'hl1', hubStatus: 'ready', proposedPrice: '350000.00' };
+    renderPage();
+    expect(screen.queryByRole('button', { name: 'Tasdiqlash' })).not.toBeInTheDocument();
+    // Xabar yozish (manage) qoladi.
+    expect(screen.getByRole('textbox', { name: 'Laboratoriyaga xabar…' })).toBeInTheDocument();
+  });
+
+  it('tasdiq yuborilgan, Hub hali tasdiqlamagan: «kutilmoqda», tugma yo‘q, xarajat yozuvi yo‘q', () => {
+    orderOver.current = {
+      labHubLabId: 'hl1',
+      hubStatus: 'ready',
+      proposedPrice: '350000.00',
+      approvedPrice: null,
+      priceApprovalPending: true,
+      priceApprovalRequestedPrice: '350000.00',
+    };
+    renderPage();
+    expect(screen.getByTestId('price-pending')).toHaveTextContent(
+      "Tasdiq yuborildi — laboratoriya tasdig'i kutilmoqda",
+    );
+    expect(screen.queryByRole('button', { name: 'Tasdiqlash' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/«Laboratoriya» xarajati/)).not.toBeInTheDocument();
+  });
+
+  it('lab fayli xabarida «Yuklab olish» — proxy manzil bilan', () => {
+    orderOver.current = { labHubLabId: 'hl1', hubStatus: 'ready' };
+    extraMessages.current = [
+      {
+        id: 'm2',
+        labOrderId: 'lo1',
+        author: 'lab',
+        authorName: null,
+        kind: 'file',
+        body: 'natija.pdf',
+        file: { id: 'f1', fileName: 'natija.pdf', mimeType: 'application/pdf', sizeBytes: 10 },
+        synced: true,
+        createdAt: '2026-06-12T00:00:00Z',
+      },
+    ];
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Yuklab olish: natija.pdf' }));
+    expect(downloadSpy).toHaveBeenCalledWith('/api/lab-orders/lo1/hub-files/f1', 'natija.pdf');
   });
 });

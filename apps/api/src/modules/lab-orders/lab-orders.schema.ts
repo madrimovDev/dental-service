@@ -115,6 +115,17 @@ export const labOrderDtoSchema = z
     cost: z.string().nullable().openapi({ example: '150000.00' }),
     currency: z.string().openapi({ example: 'UZS' }),
     notes: z.string().nullable().openapi({ example: null }),
+    // Lab Hub (W2 clinic-sync) — hammasi NULL = Hub'ga yuborilmagan.
+    labHubLabId: z.uuid().nullable().openapi({ example: null }),
+    hubSyncStatus: z.enum(['pending', 'synced', 'failed']).nullable().openapi({ example: null }),
+    hubStatus: z.string().nullable().openapi({ example: null }),
+    hubRejectReason: z.string().nullable().openapi({ example: null }),
+    proposedPrice: z.string().nullable().openapi({ example: null }),
+    approvedPrice: z.string().nullable().openapi({ example: null }),
+    approvedAt: z.string().nullable().openapi({ example: null }),
+    /** Klinika tasdiqlagan, Hub hali tasdiqlamagan (xarajat yo'q). */
+    priceApprovalPending: z.boolean().openapi({ example: false }),
+    priceApprovalRequestedPrice: z.string().nullable().openapi({ example: null }),
     createdAt: z.string().openapi({ example: '2026-06-12T10:00:00.000Z' }),
     updatedAt: z.string().openapi({ example: '2026-06-12T10:00:00.000Z' }),
   })
@@ -171,3 +182,64 @@ export type LabOrderFileDto = z.infer<typeof labOrderFileDtoSchema>;
 export const labOrderFileDeleteSchema = z
   .object({ deleted: z.literal(true) })
   .openapi('LabOrderFileDelete');
+
+// ─── Lab Hub (W2 clinic-sync) ─────────────────────────────────────────────────
+
+export const sendToHubSchema = z.object({ labId: z.uuid() }).strict();
+
+/**
+ * Foydalanuvchi ekranda ko'rgan narx (`proposedPrice` satri, masalan `"350000.00"`).
+ * Server qulflangan qatordagi taklif bilan solishtiradi — farq bo'lsa 409 `price.changed`.
+ */
+export const approvePriceSchema = z
+  .object({
+    price: z
+      .union([
+        z.string().regex(/^\d{1,12}(\.\d{1,2})?$/),
+        z.number().nonnegative().max(999_999_999_999),
+      ])
+      .openapi({ example: '350000.00' }),
+  })
+  .strict()
+  .openapi('LabOrderPriceApprovalRequest');
+
+/**
+ * `pending` — so'rov navbatda, Hub (laboratoriya) tasdig'i kutilmoqda; xarajat HALI yozilmagan.
+ * `approved` — Hub tasdiqlagan (takroriy so'rov), xarajat yozilgan.
+ */
+export const approvePriceResponseSchema = z
+  .object({
+    status: z.enum(['pending', 'approved']),
+    approvedPrice: z.string().nullable(),
+    approvedAt: z.string().nullable(),
+    requestedPrice: z.string().nullable(),
+    alreadyApproved: z.boolean(),
+    expenseId: z.uuid().nullable(),
+  })
+  .openapi('LabOrderPriceApproval');
+
+export const hubMessageCreateSchema = z
+  .object({ body: z.string().trim().min(1).max(5000) })
+  .strict();
+
+export const hubMessageDtoSchema = z
+  .object({
+    id: z.uuid(),
+    labOrderId: z.uuid(),
+    author: z.enum(['clinic', 'lab']),
+    authorName: z.string().nullable(),
+    kind: z.enum(['message', 'file']),
+    body: z.string().nullable(),
+    file: z
+      .object({
+        id: z.string(),
+        fileName: z.string().nullable(),
+        mimeType: z.string(),
+        sizeBytes: z.number().int(),
+      })
+      .nullable(),
+    synced: z.boolean(),
+    createdAt: z.string(),
+  })
+  .openapi('LabOrderHubMessage');
+export type HubMessageDto = z.infer<typeof hubMessageDtoSchema>;

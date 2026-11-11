@@ -10,9 +10,14 @@ import { authMiddleware } from '../../middleware/auth.ts';
 import { requireFeature } from '../../middleware/require-feature.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
-import { toLabOrderDto, toLabOrderFileDto } from './lab-orders.mapper.ts';
+import { createLabOrdersHubService, LabHubOrderError } from './lab-orders.hub.ts';
+import { toHubMessageDto, toLabOrderDto, toLabOrderFileDto } from './lab-orders.mapper.ts';
 import {
+  approvePriceResponseSchema,
+  approvePriceSchema,
   createLabOrderSchema,
+  hubMessageCreateSchema,
+  hubMessageDtoSchema,
   LAB_FILE_EXTENSIONS,
   LAB_FILE_MAX_BYTES,
   LAB_FILE_TYPES,
@@ -23,6 +28,7 @@ import {
   labOrderIdParamSchema,
   labOrderListResponseDtoSchema,
   listLabOrdersQuerySchema,
+  sendToHubSchema,
   updateLabOrderSchema,
 } from './lab-orders.schema.ts';
 import { createLabOrdersService } from './lab-orders.service.ts';
@@ -43,6 +49,36 @@ export const labOrdersRoutes = (deps: { db: Database; audit: AuditLogger }) => {
   app.use('*', rlsMiddleware(deps.db));
 
   const service = createLabOrdersService(deps);
+  const hub = createLabOrdersHubService(deps);
+
+  /** Biznes xatosi → `fail()` (4xx — RLS tranzaksiyasi commit bo'ladi, throw emas). */
+  const hubFail = (e: unknown) => {
+    if (e instanceof LabHubOrderError) {
+      return { body: fail(e.code, e.message, e.details), status: e.status };
+    }
+    if (e instanceof InvalidLabOrderTransitionError) {
+      return { body: fail('lab_order.invalid_transition', e.message), status: 400 as const };
+    }
+    throw e;
+  };
+  const hubErrorResponses = {
+    400: {
+      content: { 'application/json': { schema: errorResponseSchema } },
+      description: 'Bad request',
+    },
+    404: {
+      content: { 'application/json': { schema: errorResponseSchema } },
+      description: 'Lab order not found',
+    },
+    409: {
+      content: { 'application/json': { schema: errorResponseSchema } },
+      description: 'Conflict (not connected / already sent / price not proposed)',
+    },
+    502: {
+      content: { 'application/json': { schema: errorResponseSchema } },
+      description: 'Lab Hub unreachable',
+    },
+  };
 
   // ─── GET / — list ────────────────────────────────────────────────────────────
 
@@ -165,7 +201,11 @@ export const labOrdersRoutes = (deps: { db: Database; audit: AuditLogger }) => {
       ...okJson(labOrderDtoSchema, 'Updated lab order'),
       400: {
         content: { 'application/json': { schema: errorResponseSchema } },
-        description: 'Invalid status transition',
+        description: 'Invalid status transition / Lab Hub work not ready',
+      },
+      409: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Locked by lab (Lab Hub accepted the work)',
       },
       ...notFoundResponse,
     },
@@ -179,11 +219,10 @@ export const labOrdersRoutes = (deps: { db: Database; audit: AuditLogger }) => {
       if (!row) return c.json(fail('lab_order.not_found', 'Not found'), 404);
       return c.json(ok(toLabOrderDto(row)), 200);
     } catch (e) {
-      // CLI-439 B2: noto'g'ri status o'tishi (masalan delivered→draft) → 400.
-      if (e instanceof InvalidLabOrderTransitionError) {
-        return c.json(fail('lab_order.invalid_transition', e.message), 400);
-      }
-      throw e;
+      // CLI-439 B2: noto'g'ri status o'tishi (masalan delivered→draft) → 400; Lab Hub
+      // qoidalari (`lab_hub.not_ready`, `lab_order.locked_by_lab`) → 400/409 (fail, commit).
+      const r = hubFail(e);
+      return c.json(r.body, r.status as 400 | 409);
     }
   });
 
@@ -270,6 +309,138 @@ export const labOrdersRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     const row = await service.removeFile(c, id, fileId);
     if (!row) return c.json(fail('lab_order.file_not_found', 'Not found'), 404);
     return c.json(ok({ deleted: true as const }), 200);
+  });
+
+  // ─── Lab Hub (W2 clinic-sync) ─────────────────────────────────────────────────
+
+  const sendToHubRoute = createRoute({
+    method: 'post',
+    path: '/{id}/send-to-hub',
+    tags: ['lab-orders'],
+    operationId: 'sendLabOrderToHub',
+    middleware: [requirePermission('lab_order.manage'), requireFeature('labOrders')] as const,
+    request: {
+      params: labOrderIdParamSchema,
+      body: { content: { 'application/json': { schema: sendToHubSchema } } },
+    },
+    responses: { ...okJson(labOrderDtoSchema, 'Queued for Lab Hub'), ...hubErrorResponses },
+  });
+
+  app.openapi(sendToHubRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const { labId } = c.req.valid('json');
+    try {
+      const row = await hub.sendToHub(c, id, labId);
+      if (!row) return c.json(fail('lab_order.not_found', 'Not found'), 404);
+      return c.json(ok(toLabOrderDto(row)), 200);
+    } catch (e) {
+      const r = hubFail(e);
+      return c.json(r.body, r.status);
+    }
+  });
+
+  const approvePriceRoute = createRoute({
+    method: 'post',
+    path: '/{id}/approve-price',
+    tags: ['lab-orders'],
+    operationId: 'approveLabOrderPrice',
+    middleware: [
+      requirePermission('lab_order.approve_price'),
+      requireFeature('labOrders'),
+    ] as const,
+    request: {
+      params: labOrderIdParamSchema,
+      body: { content: { 'application/json': { schema: approvePriceSchema } }, required: true },
+    },
+    responses: {
+      ...okJson(
+        approvePriceResponseSchema,
+        'Approval requested (pending lab confirmation) or already approved',
+      ),
+      ...hubErrorResponses,
+    },
+  });
+
+  app.openapi(approvePriceRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const { price } = c.req.valid('json');
+    try {
+      return c.json(ok(await hub.approvePrice(c, id, String(price))), 200);
+    } catch (e) {
+      const r = hubFail(e);
+      return c.json(r.body, r.status);
+    }
+  });
+
+  // GET /{id}/hub-files/{fileId} — lab yuborgan fayl (Hub'dan deshifrlangan oqim). Binar
+  // javob — OpenAPI'dan tashqari (multipart upload naqshi).
+  app.get(
+    '/:id/hub-files/:fileId',
+    requirePermission('lab_order.view'),
+    requireFeature('labOrders'),
+    async (c) => {
+      const id = c.req.param('id');
+      const fileId = c.req.param('fileId');
+      if (!z.uuid().safeParse(id).success || !z.uuid().safeParse(fileId).success) {
+        return c.json(fail('lab_hub.file_not_found', 'Not found'), 404);
+      }
+      try {
+        return await hub.downloadHubFile(c, id, fileId);
+      } catch (e) {
+        const r = hubFail(e);
+        return c.json(r.body, r.status);
+      }
+    },
+  );
+
+  const listHubMessagesRoute = createRoute({
+    method: 'get',
+    path: '/{id}/hub-messages',
+    tags: ['lab-orders'],
+    operationId: 'listLabOrderHubMessages',
+    middleware: [requirePermission('lab_order.view'), requireFeature('labOrders')] as const,
+    request: { params: labOrderIdParamSchema },
+    responses: {
+      ...okJson(z.array(hubMessageDtoSchema), 'Lab Hub messages'),
+      ...notFoundResponse,
+    },
+  });
+
+  app.openapi(listHubMessagesRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const rows = await hub.listMessages(c, id);
+    if (!rows) return c.json(fail('lab_order.not_found', 'Not found'), 404);
+    return c.json(ok(rows.map(toHubMessageDto)), 200);
+  });
+
+  const postHubMessageRoute = createRoute({
+    method: 'post',
+    path: '/{id}/hub-messages',
+    tags: ['lab-orders'],
+    operationId: 'postLabOrderHubMessage',
+    middleware: [requirePermission('lab_order.manage'), requireFeature('labOrders')] as const,
+    request: {
+      params: labOrderIdParamSchema,
+      body: { content: { 'application/json': { schema: hubMessageCreateSchema } } },
+    },
+    responses: {
+      201: {
+        content: { 'application/json': { schema: apiResponseSchema(hubMessageDtoSchema) } },
+        description: 'Message queued for Lab Hub',
+      },
+      ...hubErrorResponses,
+    },
+  });
+
+  app.openapi(postHubMessageRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const { body } = c.req.valid('json');
+    try {
+      return c.json(ok(toHubMessageDto(await hub.postMessage(c, id, body))), 201);
+    } catch (e) {
+      const r = hubFail(e);
+      return c.json(r.body, r.status);
+    }
   });
 
   return app;

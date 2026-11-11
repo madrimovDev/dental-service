@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import {
   assertLabOrderTransition,
   InvalidLabOrderTransitionError,
+  isValidLabOrderRemakeTransition,
   isValidLabOrderTransition,
 } from './lab-orders.transitions.ts';
 
@@ -52,5 +53,19 @@ describe('CLI-439 B2 — lab order status transitions', () => {
   it('backward within active flow rejected (ready → sent)', () => {
     expect(isValidLabOrderTransition('ready', 'sent')).toBe(false);
     expect(isValidLabOrderTransition('in_progress', 'draft')).toBe(false);
+  });
+});
+
+describe('Lab Hub remake — tor o‘tish (faqat sinxron)', () => {
+  it('ready/delivered → in_progress ruxsat; boshqalar yo‘q', () => {
+    expect(isValidLabOrderRemakeTransition('ready')).toBe(true);
+    expect(isValidLabOrderRemakeTransition('delivered')).toBe(true);
+    for (const s of ['draft', 'sent', 'in_progress', 'cancelled'] as const) {
+      expect(isValidLabOrderRemakeTransition(s)).toBe(false);
+    }
+  });
+  it('foydalanuvchi PATCH’i baribir forward-only', () => {
+    expect(isValidLabOrderTransition('ready', 'in_progress')).toBe(false);
+    expect(isValidLabOrderTransition('delivered', 'in_progress')).toBe(false);
   });
 });

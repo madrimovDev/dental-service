@@ -11,6 +11,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { patients } from './patients.ts';
@@ -103,11 +104,38 @@ export const labOrders = pgTable(
 
     notes: text('notes'),
 
+    // Lab Hub (laboratoriya portali, W2 clinic-sync). Barchasi NULL = Hub'ga
+    // yuborilmagan (erkin `labName` bilan eski oqim). `labHubCaseRef` = Hub'dagi
+    // `clinic_case_ref` (idempotent PUT kaliti) — buyurtma id'si bilan bir xil.
+    labHubLabId: uuid('lab_hub_lab_id'),
+    labHubCaseRef: text('lab_hub_case_ref'),
+    /** `pending` (navbatda) | `synced` | `failed` (qayta urinib bo'lmaydigan xato). */
+    hubSyncStatus: text('hub_sync_status'),
+    /** Hub'dagi oxirgi holat (`sent|accepted|in_progress|ready|rejected|delivered|remake`). */
+    hubStatus: text('hub_status'),
+    hubRejectReason: text('hub_reject_reason'),
+    /** Lab taklif qilgan narx (L4) — klinika «Tasdiqlash» bosmaguncha expense yo'q. */
+    proposedPrice: numeric('proposed_price', { precision: 14, scale: 2 }),
+    approvedPrice: numeric('approved_price', { precision: 14, scale: 2 }),
+    approvedAt: timestamp('approved_at', { withTimezone: true }),
+    /**
+     * Klinika «Tasdiqlash»ni bosgan, Hub hali tasdiqlamagan (L4: tasdiqlanmagan xarajat
+     * YOZILMAYDI). Hub 2xx / `price_approved` hodisasi → `approvedPrice` + xarajat va bu
+     * ustunlar tozalanadi; Hub `price.mismatch` → tozalanadi, yangi taklif ko'rsatiladi.
+     */
+    priceApprovalRequestedAt: timestamp('price_approval_requested_at', { withTimezone: true }),
+    priceApprovalRequestedPrice: numeric('price_approval_requested_price', {
+      precision: 14,
+      scale: 2,
+    }),
+    priceApprovalRequestedBy: uuid('price_approval_requested_by'),
+
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     index('lab_orders_patient_idx').on(t.patientId),
+    uniqueIndex('lab_orders_hub_case_ref_unique').on(t.labHubCaseRef),
     index('lab_orders_tenant_status_idx').on(t.tenantId, t.status),
     index('lab_orders_remake_of_idx').on(t.remakeOfId),
     check(

@@ -7,6 +7,8 @@ import { LabOrderNewPage } from './LabOrderNewPage';
 const createMutateAsync = vi.fn();
 const statusMutateAsync = vi.fn();
 const uploadMutateAsync = vi.fn();
+const sendHubMutateAsync = vi.fn();
+const hub = { connected: false };
 const usePatientSpy = vi.fn();
 const permissions = { current: new Set<string>() };
 
@@ -41,6 +43,35 @@ vi.mock('../../clinical.api', () => ({
 vi.mock('./lab-order.api', () => ({
   useUploadLabOrderFile: () => ({ mutateAsync: uploadMutateAsync, isPending: false }),
 }));
+vi.mock('./lab-hub.api', () => ({
+  activeLabs: (labs?: { linkStatus: string | null }[]) =>
+    (labs ?? []).filter((l) => l.linkStatus === 'active'),
+  useLabHubStatus: () => ({ data: { connected: hub.connected }, isLoading: false }),
+  useLabHubLabs: () => ({
+    data: hub.connected
+      ? {
+          labs: [
+            {
+              id: 'hub-lab-1',
+              name: 'Oq Tish',
+              city: null,
+              description: null,
+              linkStatus: 'active',
+            },
+            {
+              id: 'hub-lab-2',
+              name: 'Kutilayotgan Lab',
+              city: null,
+              description: null,
+              linkStatus: 'pending',
+            },
+          ],
+          stale: false,
+        }
+      : undefined,
+  }),
+  useSendToLabHub: () => ({ mutateAsync: sendHubMutateAsync, isPending: false }),
+}));
 vi.mock('@/features/patients/patients.api', () => ({
   usePatient: (id: string) => {
     usePatientSpy(id);
@@ -73,13 +104,15 @@ describe('LabOrderNewPage', () => {
     createMutateAsync.mockReset().mockResolvedValue({ id: 'new1' });
     statusMutateAsync.mockReset().mockResolvedValue({});
     uploadMutateAsync.mockReset();
+    sendHubMutateAsync.mockReset().mockResolvedValue({ id: 'new1', patientId: 'p1' });
+    hub.connected = false;
     usePatientSpy.mockReset();
     permissions.current = new Set(['lab_order.manage', 'lab_order.view', 'patient.view']);
   });
 
   it('sahifa sarlavhasi bemor nomi bilan, orqaga havola bemor kartasiga', async () => {
     renderPage();
-    expect(await screen.findByText(/Kamola Ergasheva/)).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /Kamola Ergasheva/ })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Orqaga' })).toHaveAttribute('href', '/patients/p1');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
@@ -111,12 +144,50 @@ describe('LabOrderNewPage', () => {
     expect(createMutateAsync).not.toHaveBeenCalled();
   });
 
-  it('forma: «Laboratoriya nimani ko‘radi» bloki telefon/manzilni yashiradi, bemorni qisqartiradi', async () => {
+  it('forma: «Laboratoriya nimani ko‘radi» — L3: bemorning TO‘LIQ ismi, telefon/manzil yashirin', async () => {
     renderPage();
     const block = await screen.findByTestId('lab-sees');
-    expect(block).toHaveTextContent('K. E.');
+    expect(block).toHaveTextContent('Kamola Ergasheva · ayol · 47');
+    expect(block).not.toHaveTextContent('K. E.');
     expect(block).toHaveTextContent("ko'rsatilmaydi");
-    expect(block).not.toHaveTextContent('Kamola Ergasheva');
+    expect(block).toHaveTextContent('Klinika kodi');
+  });
+
+  it('portal ulangan: faqat faol lab kartasi; tanlab «Yuborish» → portal navbati (status PATCH emas)', async () => {
+    hub.connected = true;
+    renderPage();
+    const card = await screen.findByRole('button', { name: /Oq Tish.*Portalda/ });
+    expect(screen.queryByRole('button', { name: /Kutilayotgan Lab/ })).not.toBeInTheDocument();
+    // Tarixdagi «Oq Tish» (shu nomli portal labi bor) — ikkinchi marta ko'rsatilmaydi.
+    expect(screen.getAllByRole('button', { name: /Oq Tish/ })).toHaveLength(1);
+    fireEvent.click(card);
+    expect(card).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByLabelText(/Laboratoriya nomi/)).toHaveValue('Oq Tish');
+    fireEvent.click(screen.getByText('A3'));
+    fireEvent.change(screen.getByLabelText(/Kerakli sana/), { target: { value: '2026-12-01' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Laboratoriyaga yuborish' }));
+    await waitFor(() =>
+      expect(sendHubMutateAsync).toHaveBeenCalledWith({ labOrderId: 'new1', labId: 'hub-lab-1' }),
+    );
+    expect(createMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ labName: 'Oq Tish' }));
+    expect(statusMutateAsync).not.toHaveBeenCalled();
+    expect(await screen.findByText('detail-page')).toBeInTheDocument();
+  });
+
+  it('portal labi tanlanib, nom qo‘lda o‘zgartirilsa — oddiy yuborish (portal emas)', async () => {
+    hub.connected = true;
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: /Oq Tish.*Portalda/ }));
+    fireEvent.change(screen.getByLabelText(/Laboratoriya nomi/), {
+      target: { value: 'Boshqa Lab' },
+    });
+    fireEvent.click(screen.getByText('A3'));
+    fireEvent.change(screen.getByLabelText(/Kerakli sana/), { target: { value: '2026-12-01' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Laboratoriyaga yuborish' }));
+    await waitFor(() =>
+      expect(statusMutateAsync).toHaveBeenCalledWith({ id: 'new1', status: 'sent' }),
+    );
+    expect(sendHubMutateAsync).not.toHaveBeenCalled();
   });
 
   it('forma: muddat keyingi yozilishdan kech bo‘lsa ogohlantirish', async () => {
@@ -151,6 +222,19 @@ describe('LabOrderNewPage', () => {
       expect(statusMutateAsync).toHaveBeenCalledWith({ id: 'new1', status: 'sent' }),
     );
     expect(await screen.findByText('detail-page')).toBeInTheDocument();
+  });
+
+  it('«Laboratoriya nimani ko‘radi»: Hub’ga yuboriladigan shifokor (doctorId) ismi', async () => {
+    renderPage();
+    expect(await screen.findByTestId('lab-sees-doctor')).toHaveTextContent('Dr. Yusupova');
+    fireEvent.change(await screen.findByLabelText(/Laboratoriya nomi/), {
+      target: { value: 'Lab Z' },
+    });
+    fireEvent.click(screen.getByText('A3'));
+    fireEvent.change(screen.getByLabelText(/Kerakli sana/), { target: { value: '2026-12-01' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Laboratoriyaga yuborish' }));
+    await waitFor(() => expect(createMutateAsync).toHaveBeenCalled());
+    expect(createMutateAsync.mock.calls[0]?.[0]).toMatchObject({ doctorId: 'u1' });
   });
 
   it('forma: remake belgilansa asl buyurtma va sabab majburiy', async () => {
