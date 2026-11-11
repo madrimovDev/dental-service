@@ -9,6 +9,7 @@ import { rlsMiddleware } from '../../middleware/rls.ts';
 import { toPayrollRunDto, toPayrollRunWithLinesDto } from './payroll.mapper.ts';
 import {
   createRunSchema,
+  payrollAdjustmentDtoSchema,
   payrollRunDtoSchema,
   payrollRunWithLinesDtoSchema,
   runIdParamSchema,
@@ -142,6 +143,23 @@ export const payrollRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     if (!result) return c.json(fail('payroll_run.not_found', 'Payroll run not found'), 404);
     const { lines, ...run } = result;
     return c.json(ok(toPayrollRunWithLinesDto(run, lines)), 200);
+  });
+
+  // ─── GET /runs/{id}/adjustments — refund-clawback tuzatishlari (UI-M6) ─────
+
+  const runAdjustmentsRoute = createRoute({
+    method: 'get',
+    path: '/runs/{id}/adjustments',
+    tags: ['payroll'],
+    operationId: 'listPayrollRunAdjustments',
+    middleware: [requirePermission('payroll.view')] as const,
+    request: { params: runIdParamSchema },
+    responses: okJson(z.array(payrollAdjustmentDtoSchema), 'Applied refund adjustments'),
+  });
+
+  app.openapi(runAdjustmentsRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    return c.json(ok(await service.listRunAdjustments(c, id)), 200);
   });
 
   // ─── POST /runs/{id}/finalize — finalize draft ────────────────────────────

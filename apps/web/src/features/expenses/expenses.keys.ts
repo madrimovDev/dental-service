@@ -4,4 +4,6 @@ export const expensesKeys = {
   categories: () => ['expenses', 'categories'] as const,
   summary: (range: { from: string; to: string; branchId?: string }) =>
     ['expenses', 'summary', range] as const,
+  pnl: (range: { from: string; to: string; branchId?: string }) =>
+    ['expenses', 'pnl', range] as const,
 };

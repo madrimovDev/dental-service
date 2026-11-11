@@ -219,3 +219,24 @@ export const ownerTodayReportDtoSchema = z
   })
   .openapi('OwnerTodayReport');
 export type OwnerTodayReport = z.infer<typeof ownerTodayReportDtoSchema>;
+
+// ─── P&L (UI-M6) ─────────────────────────────────────────────────────────────
+
+/**
+ * Foyda va zarar agregati: sof foyda = tushum (refund ayirilgan) − xarajat − ish haqi.
+ * Ish haqi (payroll run) filialga bog'lanmagan → `branchId` berilsa `payroll*` null va
+ * `netProfit` ish haqisiz (`payrollIncluded=false`).
+ */
+export const pnlReportDtoSchema = z
+  .object({
+    revenue: z.number(),
+    expenses: z.number(),
+    payroll: z.number().nullable(),
+    payrollFinalized: z.number().nullable(),
+    payrollDraft: z.number().nullable(),
+    payrollRunCount: z.number(),
+    payrollIncluded: z.boolean(),
+    netProfit: z.number(),
+  })
+  .openapi('PnlReport');
+export type PnlReport = z.infer<typeof pnlReportDtoSchema>;
