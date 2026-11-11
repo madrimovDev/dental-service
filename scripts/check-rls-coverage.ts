@@ -117,6 +117,43 @@ async function main() {
 
   console.log(`✅ RLS coverage OK — ${tables.length} ta tenant-scoped jadval policy bilan`);
   console.log(`   Platform jadvallari (RLS yo'q): ${[...PLATFORM_TABLES].join(', ')}`);
+
+  await checkLabHub();
+}
+
+/**
+ * Lab Hub (`apps/lab-hub-api`) — bitta schema.ts, `lab_id` ustunli har jadval
+ * `apps/lab-hub-api/migrations/rls/*.sql`da ENABLE + FORCE bo'lishi shart.
+ * `labs`/`clinics` — platforma jadvallari (katalog/identifikatsiya).
+ */
+async function checkLabHub() {
+  const schemaPath = join(import.meta.dir, '..', 'apps', 'lab-hub-api', 'src', 'db', 'schema.ts');
+  const rlsDir = join(import.meta.dir, '..', 'apps', 'lab-hub-api', 'migrations', 'rls');
+  const content = await readFile(schemaPath, 'utf8');
+  const sqlFiles = (await readdir(rlsDir)).filter((f) => f.endsWith('.sql'));
+  const ddl = (await Promise.all(sqlFiles.map((f) => readFile(join(rlsDir, f), 'utf8')))).join(
+    '\n',
+  );
+
+  // Har pgTable blokini keyingi pgTable'gacha kesib, ichida lab_id bormi — tekshiramiz.
+  const blocks = content.split(/(?=export const \w+ = pgTable\()/);
+  const scoped: string[] = [];
+  for (const b of blocks) {
+    const m = b.match(/pgTable\(\s*['"`]([a-z_]+)['"`]/);
+    if (m?.[1] && /uuid\(['"`]lab_id['"`]\)/.test(b)) scoped.push(m[1]);
+  }
+  const bad = scoped.filter(
+    (t) =>
+      !new RegExp(`ALTER\\s+TABLE\\s+${t}\\s+ENABLE\\s+ROW\\s+LEVEL\\s+SECURITY`, 'i').test(ddl) ||
+      !new RegExp(`ALTER\\s+TABLE\\s+${t}\\s+FORCE\\s+ROW\\s+LEVEL\\s+SECURITY`, 'i').test(ddl),
+  );
+  if (bad.length > 0) {
+    console.error(`❌ Lab Hub RLS coverage FAILED (ENABLE+FORCE yo'q): ${bad.join(', ')}`);
+    process.exit(1);
+  }
+  console.log(
+    `✅ Lab Hub RLS coverage OK — ${scoped.length} ta lab_id jadval (labs, clinics — platforma)`,
+  );
 }
 
 await main();

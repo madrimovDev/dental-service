@@ -25,6 +25,7 @@ COPY package.json bun.lock ./
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 COPY apps/desktop/package.json apps/desktop/
+COPY apps/lab-hub-api/package.json apps/lab-hub-api/
 COPY apps/supervisor-api/package.json apps/supervisor-api/
 COPY apps/supervisor-admin/package.json apps/supervisor-admin/
 COPY packages/core/package.json packages/core/
