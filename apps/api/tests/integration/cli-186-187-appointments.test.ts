@@ -362,3 +362,28 @@ describe('CLI-186 reschedule eslatma hayot-sikli', () => {
     expect(removed).not.toContain(apptId);
   });
 });
+
+describe('P4 status-only qayta faollashtirish → eslatma qayta qo‘yiladi', () => {
+  for (const [from, slot] of [
+    ['cancelled', ['19:00', '20:00']],
+    ['no_show', ['20:00', '21:00']],
+  ] as const) {
+    test(`${from} → scheduled: enqueueReminder bir marta, delay > 0`, async () => {
+      const enqueued: { t: string; id: string; delay: number }[] = [];
+      const svc = createAppointmentsService({
+        audit: noopAudit,
+        enqueueReminder: async (t, id, delay) => {
+          enqueued.push({ t, id, delay });
+        },
+        removeReminder: async () => {},
+      });
+      const apptId = await seedAppt(slot[0], slot[1], from);
+      const upd = await run(tenantId, (c) => svc.update(c, apptId, { status: 'scheduled' }));
+      expect(upd.ok).toBe(true);
+      expect(enqueued).toHaveLength(1);
+      expect(enqueued[0]!.t).toBe(tenantId);
+      expect(enqueued[0]!.id).toBe(apptId);
+      expect(enqueued[0]!.delay).toBeGreaterThan(0);
+    });
+  }
+});

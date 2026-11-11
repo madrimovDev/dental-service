@@ -524,6 +524,18 @@ export const createAppointmentsService = (deps: {
           }
         }
       } else if (
+        (before.status === 'cancelled' || before.status === 'no_show') &&
+        isActiveStatus(updated.status as AppointmentStatus)
+      ) {
+        // P4: status-only qayta faollashtirish (cancelled/no_show → active) —
+        // bekor qilishda eslatma o'chirilgan edi, endi qayta qo'yiladi.
+        const tenantId = c.get('activeTenantId');
+        const delay = reminderDelayMs(new Date(updated.startTime), new Date());
+        if (tenantId && delay != null && deps.enqueueReminder) {
+          const enqueue = deps.enqueueReminder;
+          await onAfterCommit(c, () => enqueue(tenantId, id, delay));
+        }
+      } else if (
         (input.status === 'cancelled' || input.status === 'no_show') &&
         before.status !== input.status
       ) {
