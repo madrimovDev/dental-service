@@ -71,13 +71,21 @@ describe('LabsSettingsScreen', () => {
     expect(rows).toHaveLength(3);
     // Faol ulangan labda so'rov tugmasi yo'q.
     expect(within(rows[0] as HTMLElement).queryByRole('button')).not.toBeInTheDocument();
+    // Holati bor lablar tepada: faol, rad etilgan, keyin so'ralmagan.
     fireEvent.click(
-      within(rows[1] as HTMLElement).getByRole('button', { name: "Ulanish so'rovi" }),
+      within(rows[2] as HTMLElement).getByRole('button', { name: "Ulanish so'rovi" }),
     );
     expect(requestMutate).toHaveBeenCalledWith('l2', expect.anything());
     expect(
-      within(rows[2] as HTMLElement).getByRole('button', { name: "Qayta so'rash" }),
+      within(rows[1] as HTMLElement).getByRole('button', { name: "Qayta so'rash" }),
     ).toBeInTheDocument();
+    // Qidiruv nom/shahar bo'yicha filtrlaydi.
+    fireEvent.change(screen.getByRole('textbox', { name: /qidirish/i }), {
+      target: { value: 'zzz-yoq' },
+    });
+    expect(
+      screen.queryByRole('list', { name: 'Laboratoriyalar katalogi' }),
+    ).not.toBeInTheDocument();
   });
 
   it('ulanmagan: «Portalga ulanish» connect chaqiradi, katalog ko‘rinmaydi', () => {

@@ -1,6 +1,7 @@
 import { AlertBanner, StateView, StatusPill } from '@dental/ui';
-import { Button, Group, Stack } from '@mantine/core';
+import { Button, Group, Stack, TextInput } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   type LabHubLabRecord,
@@ -51,6 +52,12 @@ export function LabsSettingsScreen() {
   const status = useLabHubStatus({ enabled: canView });
   const connected = status.data?.connected === true;
   const labs = useLabHubLabs({ enabled: canView && connected });
+  // QA: katalog uzun bo'lsa qidiruv (nom/shahar); ulangan va so'ralgan lablar tepada.
+  const [catalogQuery, setCatalogQuery] = useState('');
+  const q = catalogQuery.trim().toLowerCase();
+  const visibleLabs = (labs.data?.labs ?? [])
+    .filter((l) => !q || `${l.name} ${l.city ?? ''}`.toLowerCase().includes(q))
+    .sort((x, y) => Number(!x.linkStatus) - Number(!y.linkStatus));
   const connect = useConnectLabHub();
   const request = useRequestLabLink();
 
@@ -176,6 +183,13 @@ export function LabsSettingsScreen() {
                   <AlertBanner tier={3}>{t('labHubClinic.catalog_stale')}</AlertBanner>
                 </div>
               )}
+              <TextInput
+                mb="md"
+                aria-label={t('labHubClinic.catalog_search')}
+                placeholder={t('labHubClinic.catalog_search')}
+                value={catalogQuery}
+                onChange={(e) => setCatalogQuery(e.currentTarget.value)}
+              />
               {labs.isError ? (
                 <StateView
                   status="error"
@@ -185,14 +199,14 @@ export function LabsSettingsScreen() {
                 />
               ) : !labs.data ? (
                 <StateView status="loading" skeleton="table" />
-              ) : labs.data.labs.length === 0 ? (
+              ) : visibleLabs.length === 0 ? (
                 <StateView status="empty" title={t('labHubClinic.catalog_empty')} />
               ) : (
                 <ul
                   aria-label={t('labHubClinic.catalog_title')}
                   style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 10 }}
                 >
-                  {labs.data.labs.map((lab) => {
+                  {visibleLabs.map((lab) => {
                     const st = lab.linkStatus ?? 'none';
                     const canRequest =
                       canEdit && (st === 'none' || st === 'rejected' || st === 'revoked');
