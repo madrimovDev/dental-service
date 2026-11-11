@@ -4,6 +4,7 @@
  * Dental Service API
  * OpenAPI spec version: 0.1.0
  */
+import type { VisitNoteMetadata } from './visitNoteMetadata';
 
 export interface VisitNote {
   id: string;
@@ -27,6 +28,11 @@ export interface VisitNote {
   performedServices: string[] | null;
   /** @nullable */
   freeNotes: string | null;
+  /** @nullable */
+  signedAt: string | null;
+  /** @nullable */
+  signedBy: string | null;
+  metadata: VisitNoteMetadata;
   createdAt: string;
   updatedAt: string;
 }

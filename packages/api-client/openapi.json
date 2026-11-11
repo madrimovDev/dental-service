@@ -1598,6 +1598,15 @@
           "testResults": {
             "$ref": "#/components/schemas/TestResults"
           },
+          "confirmedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "confirmedBy": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
           "lastUpdatedBy": {
             "type": "string",
             "nullable": true,
@@ -1621,6 +1630,8 @@
           "bloodType",
           "pregnancyStatus",
           "testResults",
+          "confirmedAt",
+          "confirmedBy",
           "lastUpdatedBy",
           "createdAt",
           "updatedAt"
@@ -3132,6 +3143,242 @@
           "paymentMethod",
           "amount",
           "patientName"
+        ]
+      },
+      "DoctorPending": {
+        "type": "object",
+        "properties": {
+          "unsignedVisitNotes": {
+            "type": "object",
+            "properties": {
+              "count": {
+                "type": "number"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "patientId": {
+                      "type": "string"
+                    },
+                    "patientName": {
+                      "type": "string"
+                    },
+                    "at": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "patientId",
+                    "patientName",
+                    "at"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "count",
+              "items"
+            ]
+          },
+          "unreviewedImages": {
+            "type": "object",
+            "properties": {
+              "count": {
+                "type": "number"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "patientId": {
+                      "type": "string"
+                    },
+                    "patientName": {
+                      "type": "string"
+                    },
+                    "at": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "patientId",
+                    "patientName",
+                    "at"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "count",
+              "items"
+            ]
+          },
+          "plansAwaitingResponse": {
+            "type": "object",
+            "properties": {
+              "count": {
+                "type": "number"
+              },
+              "oldestDays": {
+                "type": "number",
+                "nullable": true
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "patientId": {
+                      "type": "string"
+                    },
+                    "patientName": {
+                      "type": "string"
+                    },
+                    "at": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "patientId",
+                    "patientName",
+                    "at"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "count",
+              "oldestDays",
+              "items"
+            ]
+          },
+          "nextPatient": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "appointmentId": {
+                "type": "string"
+              },
+              "patientId": {
+                "type": "string"
+              },
+              "patientName": {
+                "type": "string"
+              },
+              "startTime": {
+                "type": "string"
+              },
+              "dateOfBirth": {
+                "type": "string",
+                "nullable": true
+              },
+              "waitingMinutes": {
+                "type": "number",
+                "nullable": true
+              },
+              "queueTicketId": {
+                "type": "string",
+                "nullable": true
+              },
+              "allergies": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "substance": {
+                      "type": "string"
+                    },
+                    "severity": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "substance",
+                    "severity"
+                  ]
+                }
+              },
+              "lab": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "orderType": {
+                    "type": "string"
+                  },
+                  "labName": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "at": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "orderType",
+                  "labName",
+                  "status",
+                  "detail",
+                  "at"
+                ]
+              },
+              "lastVisit": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "date": {
+                    "type": "string"
+                  },
+                  "summary": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "date",
+                  "summary"
+                ]
+              }
+            },
+            "required": [
+              "appointmentId",
+              "patientId",
+              "patientName",
+              "startTime",
+              "dateOfBirth",
+              "waitingMinutes",
+              "queueTicketId",
+              "allergies",
+              "lab",
+              "lastVisit"
+            ]
+          }
+        },
+        "required": [
+          "unsignedVisitNotes",
+          "unreviewedImages",
+          "plansAwaitingResponse",
+          "nextPatient"
         ]
       },
       "AuditListResponse": {
@@ -4731,6 +4978,36 @@
             "nullable": true,
             "example": null
           },
+          "dueDate": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-11-18"
+          },
+          "shade": {
+            "type": "string",
+            "nullable": true,
+            "example": "A3"
+          },
+          "remakeOfId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid",
+            "example": null
+          },
+          "remakeReason": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "margin",
+              "contact",
+              "occlusion",
+              "shade",
+              "esthetics",
+              "other",
+              null
+            ],
+            "example": null
+          },
           "cost": {
             "type": "string",
             "nullable": true,
@@ -4767,11 +5044,72 @@
           "sentDate",
           "expectedDate",
           "deliveredDate",
+          "dueDate",
+          "shade",
+          "remakeOfId",
+          "remakeReason",
           "cost",
           "currency",
           "notes",
           "createdAt",
           "updatedAt"
+        ]
+      },
+      "LabOrderFile": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "labOrderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "originalFilename": {
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": "integer"
+          },
+          "url": {
+            "type": "string",
+            "example": "/uploads/tenants%2F..."
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "labOrderId",
+          "label",
+          "originalFilename",
+          "contentType",
+          "sizeBytes",
+          "url",
+          "createdAt"
+        ]
+      },
+      "LabOrderFileDelete": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "deleted"
         ]
       },
       "StockItemWithLowStock": {
@@ -6002,6 +6340,20 @@
             "nullable": true,
             "example": null
           },
+          "signedAt": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          },
+          "signedBy": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid",
+            "example": null
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/VisitNoteMetadata"
+          },
           "createdAt": {
             "type": "string",
             "example": "2026-06-12T10:00:00.000Z"
@@ -6025,8 +6377,63 @@
           "plan",
           "performedServices",
           "freeNotes",
+          "signedAt",
+          "signedBy",
+          "metadata",
           "createdAt",
           "updatedAt"
+        ]
+      },
+      "VisitNoteMetadata": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "allergyOverrides": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisitNoteAllergyOverride"
+            }
+          },
+          "nextVisit": {
+            "type": "string",
+            "enum": [
+              "none",
+              "2w",
+              "6m"
+            ]
+          }
+        },
+        "example": null
+      },
+      "VisitNoteAllergyOverride": {
+        "type": "object",
+        "properties": {
+          "drug": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "group": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
+          },
+          "allergen": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "drug",
+          "group",
+          "allergen",
+          "reason"
         ]
       },
       "VisitNoteTemplate": {
@@ -11067,6 +11474,92 @@
         }
       }
     },
+    "/api/patients/{id}/medical-record/confirm": {
+      "post": {
+        "tags": [
+          "patients"
+        ],
+        "operationId": "confirmMedicalRecord",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Anamnez tasdiqlandi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/MedicalRecord"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Medical record not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/patients/{id}/medical/history": {
       "get": {
         "tags": [
@@ -14106,6 +14599,71 @@
                     },
                     "data": {
                       "$ref": "#/components/schemas/OneCExportReport"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dashboard/doctor-pending": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "operationId": "getDoctorPending",
+        "responses": {
+          "200": {
+            "description": "Shifokordan kutilayotgan ishlar (faqat o'zi uchun)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/DoctorPending"
                     }
                   },
                   "required": [
@@ -18117,9 +18675,33 @@
                     },
                     "minItems": 1
                   },
+                  "shade": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 20
+                  },
+                  "dueDate": {
+                    "type": "string",
+                    "format": "date"
+                  },
                   "expectedDate": {
                     "type": "string",
                     "format": "date-time"
+                  },
+                  "remakeOfId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "remakeReason": {
+                    "type": "string",
+                    "enum": [
+                      "margin",
+                      "contact",
+                      "occlusion",
+                      "shade",
+                      "esthetics",
+                      "other"
+                    ]
                   },
                   "cost": {
                     "type": "number",
@@ -18136,7 +18718,9 @@
                   "doctorId",
                   "labName",
                   "orderType",
-                  "items"
+                  "items",
+                  "shade",
+                  "dueDate"
                 ]
               }
             }
@@ -18441,6 +19025,15 @@
                       ]
                     }
                   },
+                  "shade": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 20
+                  },
+                  "dueDate": {
+                    "type": "string",
+                    "format": "date"
+                  },
                   "sentDate": {
                     "type": "string",
                     "nullable": true,
@@ -18499,6 +19092,190 @@
           },
           "400": {
             "description": "Invalid status transition",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Lab order not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lab-orders/{id}/files": {
+      "get": {
+        "tags": [
+          "lab-orders"
+        ],
+        "operationId": "listLabOrderFiles",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lab order files",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/LabOrderFile"
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Lab order not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lab-orders/{id}/files/{fileId}": {
+      "delete": {
+        "tags": [
+          "lab-orders"
+        ],
+        "operationId": "deleteLabOrderFile",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "fileId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/LabOrderFileDelete"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
             "content": {
               "application/json": {
                 "schema": {
@@ -21606,8 +22383,7 @@
                         "toothNumbers": {
                           "type": "array",
                           "items": {
-                            "type": "integer",
-                            "nullable": true
+                            "type": "integer"
                           }
                         },
                         "estimatedVisits": {
@@ -22382,6 +23158,21 @@
                   "freeNotes": {
                     "type": "string",
                     "maxLength": 5000
+                  },
+                  "allergyOverrides": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/VisitNoteAllergyOverride"
+                    },
+                    "maxItems": 50
+                  },
+                  "nextVisit": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "2w",
+                      "6m"
+                    ]
                   }
                 },
                 "required": [
@@ -22604,6 +23395,21 @@
                   "freeNotes": {
                     "type": "string",
                     "maxLength": 5000
+                  },
+                  "allergyOverrides": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/VisitNoteAllergyOverride"
+                    },
+                    "maxItems": 50
+                  },
+                  "nextVisit": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "2w",
+                      "6m"
+                    ]
                   }
                 }
               }
@@ -22668,6 +23474,112 @@
           },
           "404": {
             "description": "Visit note not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Visit note is signed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/visit-notes/{id}/sign": {
+      "post": {
+        "tags": [
+          "visit-notes"
+        ],
+        "operationId": "signVisitNote",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Signed visit note",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/VisitNote"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Visit note not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Visit note is already signed",
             "content": {
               "application/json": {
                 "schema": {

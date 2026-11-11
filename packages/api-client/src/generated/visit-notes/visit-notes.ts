@@ -10,6 +10,7 @@ import type {
   GetVisitNote200,
   ListVisitNotes200,
   ListVisitNotesParams,
+  SignVisitNote200,
   UpdateVisitNote200,
   UpdateVisitNoteBody
 } from '.././model';
@@ -56,7 +57,16 @@ import { customInstance } from '../../mutator';
     },
       );
     }
+  export const signVisitNote = (
+    id: string,
+ ) => {
+      return customInstance<SignVisitNote200>(
+      {url: `/api/visit-notes/${id}/sign`, method: 'POST'
+    },
+      );
+    }
   export type ListVisitNotesResult = NonNullable<Awaited<ReturnType<typeof listVisitNotes>>>
 export type CreateVisitNoteResult = NonNullable<Awaited<ReturnType<typeof createVisitNote>>>
 export type GetVisitNoteResult = NonNullable<Awaited<ReturnType<typeof getVisitNote>>>
 export type UpdateVisitNoteResult = NonNullable<Awaited<ReturnType<typeof updateVisitNote>>>
+export type SignVisitNoteResult = NonNullable<Awaited<ReturnType<typeof signVisitNote>>>

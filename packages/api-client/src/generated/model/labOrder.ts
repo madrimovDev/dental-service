@@ -7,6 +7,7 @@
 import type { LabOrderOrderType } from './labOrderOrderType';
 import type { LabOrderStatus } from './labOrderStatus';
 import type { LabOrderItemsItem } from './labOrderItemsItem';
+import type { LabOrderRemakeReason } from './labOrderRemakeReason';
 
 export interface LabOrder {
   id: string;
@@ -25,6 +26,14 @@ export interface LabOrder {
   expectedDate: string | null;
   /** @nullable */
   deliveredDate: string | null;
+  /** @nullable */
+  dueDate: string | null;
+  /** @nullable */
+  shade: string | null;
+  /** @nullable */
+  remakeOfId: string | null;
+  /** @nullable */
+  remakeReason: LabOrderRemakeReason;
   /** @nullable */
   cost: string | null;
   currency: string;

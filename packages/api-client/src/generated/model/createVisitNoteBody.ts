@@ -4,6 +4,8 @@
  * Dental Service API
  * OpenAPI spec version: 0.1.0
  */
+import type { VisitNoteAllergyOverride } from './visitNoteAllergyOverride';
+import type { CreateVisitNoteBodyNextVisit } from './createVisitNoteBodyNextVisit';
 
 export type CreateVisitNoteBody = {
   patientId: string;
@@ -21,4 +23,7 @@ export type CreateVisitNoteBody = {
   performedServices?: string[];
   /** @maxLength 5000 */
   freeNotes?: string;
+  /** @maxItems 50 */
+  allergyOverrides?: VisitNoteAllergyOverride[];
+  nextVisit?: CreateVisitNoteBodyNextVisit;
 };

@@ -25,6 +25,10 @@ export interface MedicalRecord {
   pregnancyStatus: PregnancyStatus;
   testResults: TestResults;
   /** @nullable */
+  confirmedAt: string | null;
+  /** @nullable */
+  confirmedBy: string | null;
+  /** @nullable */
   lastUpdatedBy: string | null;
   createdAt: string;
   updatedAt: string;

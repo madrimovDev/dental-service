@@ -1,6 +1,6 @@
 {
   "id": "9cd028e9-f399-4f2c-914e-eb4a29ed2eef",
-  "prevId": "82ba3889-1e30-41ad-9b20-9e256259a453",
+  "prevId": "9ffdb4cf-7912-4ffc-a857-6cd42037df2c",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1926,6 +1926,152 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.lab_order_files": {
+      "name": "lab_order_files",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "lab_order_id": {
+          "name": "lab_order_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "uploaded_by_user_id": {
+          "name": "uploaded_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "object_key": {
+          "name": "object_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "original_filename": {
+          "name": "original_filename",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content_type": {
+          "name": "content_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "size_bytes": {
+          "name": "size_bytes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "lab_order_files_order_idx": {
+          "name": "lab_order_files_order_idx",
+          "columns": [
+            {
+              "expression": "lab_order_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "lab_order_files_tenant_idx": {
+          "name": "lab_order_files_tenant_idx",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "lab_order_files_tenant_id_tenants_id_fk": {
+          "name": "lab_order_files_tenant_id_tenants_id_fk",
+          "tableFrom": "lab_order_files",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "lab_order_files_lab_order_id_lab_orders_id_fk": {
+          "name": "lab_order_files_lab_order_id_lab_orders_id_fk",
+          "tableFrom": "lab_order_files",
+          "tableTo": "lab_orders",
+          "columnsFrom": [
+            "lab_order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "lab_order_files_uploaded_by_user_id_users_id_fk": {
+          "name": "lab_order_files_uploaded_by_user_id_users_id_fk",
+          "tableFrom": "lab_order_files",
+          "tableTo": "users",
+          "columnsFrom": [
+            "uploaded_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.lab_orders": {
       "name": "lab_orders",
       "schema": "",
@@ -2006,6 +2152,30 @@
           "primaryKey": false,
           "notNull": false
         },
+        "due_date": {
+          "name": "due_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "shade": {
+          "name": "shade",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "remake_of_id": {
+          "name": "remake_of_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "remake_reason": {
+          "name": "remake_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "cost": {
           "name": "cost",
           "type": "numeric(14, 2)",
@@ -2076,6 +2246,21 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "lab_orders_remake_of_idx": {
+          "name": "lab_orders_remake_of_idx",
+          "columns": [
+            {
+              "expression": "remake_of_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -2117,12 +2302,30 @@
           ],
           "onDelete": "restrict",
           "onUpdate": "no action"
+        },
+        "lab_orders_remake_of_id_lab_orders_id_fk": {
+          "name": "lab_orders_remake_of_id_lab_orders_id_fk",
+          "tableFrom": "lab_orders",
+          "tableTo": "lab_orders",
+          "columnsFrom": [
+            "remake_of_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "lab_orders_remake_reason_chk": {
+          "name": "lab_orders_remake_reason_chk",
+          "value": "\"lab_orders\".\"remake_reason\" IS NULL OR \"lab_orders\".\"remake_reason\" IN ('margin', 'contact', 'occlusion', 'shade', 'esthetics', 'other')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.medical_records": {
@@ -2192,6 +2395,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "confirmed_at": {
+          "name": "confirmed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "confirmed_by": {
+          "name": "confirmed_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "last_updated_by": {
           "name": "last_updated_by",
           "type": "uuid",
@@ -2255,6 +2470,19 @@
             "id"
           ],
           "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "medical_records_confirmed_by_users_id_fk": {
+          "name": "medical_records_confirmed_by_users_id_fk",
+          "tableFrom": "medical_records",
+          "tableTo": "users",
+          "columnsFrom": [
+            "confirmed_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         },
         "medical_records_last_updated_by_users_id_fk": {
