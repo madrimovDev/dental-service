@@ -184,6 +184,22 @@ export const labOrderFileDeleteSchema = z
 
 export const sendToHubSchema = z.object({ labId: z.uuid() }).strict();
 
+/**
+ * Foydalanuvchi ekranda ko'rgan narx (`proposedPrice` satri, masalan `"350000.00"`).
+ * Server qulflangan qatordagi taklif bilan solishtiradi — farq bo'lsa 409 `price.changed`.
+ */
+export const approvePriceSchema = z
+  .object({
+    price: z
+      .union([
+        z.string().regex(/^\d{1,12}(\.\d{1,2})?$/),
+        z.number().nonnegative().max(999_999_999_999),
+      ])
+      .openapi({ example: '350000.00' }),
+  })
+  .strict()
+  .openapi('LabOrderPriceApprovalRequest');
+
 export const approvePriceResponseSchema = z
   .object({
     approvedPrice: z.string(),

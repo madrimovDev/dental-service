@@ -84,8 +84,11 @@ export const createEndpoints = (api: ApiClient) => ({
       }),
     sendToHub: <T = unknown>(labOrderId: string, labId: string) =>
       api.post<T>(`/api/lab-orders/${labOrderId}/send-to-hub`, { labId }),
-    approvePrice: (labOrderId: string) =>
-      api.post<LabHubPriceApprovalRecord>(`/api/lab-orders/${labOrderId}/approve-price`, {}),
+    /** `price` — foydalanuvchi ko'rgan taklif; server boshqasini ko'rsa 409 `price.changed`. */
+    approvePrice: (labOrderId: string, price: string) =>
+      api.post<LabHubPriceApprovalRecord>(`/api/lab-orders/${labOrderId}/approve-price`, {
+        price,
+      }),
     messages: (labOrderId: string) =>
       api.get<LabHubMessageRecord[]>(`/api/lab-orders/${labOrderId}/hub-messages`),
     postMessage: (labOrderId: string, body: string) =>

@@ -163,7 +163,8 @@ describe('LabOrderDetailPage', () => {
     expect(panel).toHaveTextContent(/350[\s\u00a0 ]?000/);
     expect(panel).toHaveTextContent('Rang A2 tasdiqlandimi?');
     fireEvent.click(screen.getByRole('button', { name: 'Tasdiqlash' }));
-    expect(approveMutate).toHaveBeenCalled();
+    // Ekranda ko'rsatilgan narx yuboriladi (server boshqasini ko'rsa 409 price.changed).
+    expect(approveMutate).toHaveBeenCalledWith('350000.00', expect.anything());
     fireEvent.change(screen.getByRole('textbox', { name: 'Laboratoriyaga xabar…' }), {
       target: { value: 'Ha, A2' },
     });

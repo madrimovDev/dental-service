@@ -78,12 +78,20 @@ export function useSendToLabHub() {
   });
 }
 
+/**
+ * Narx tasdig'i — ekranda ko'rsatilgan narx yuboriladi (TOCTOU: lab poll orasida narxni
+ * o'zgartirgan bo'lsa server 409 `price.changed` qaytaradi, xarajat yozilmaydi). Xatoda ham
+ * buyurtma qayta so'raladi — foydalanuvchi yangi narxni ko'radi.
+ */
 export function useApproveLabPrice(labOrderId: string) {
   const qc = useQueryClient();
-  return useMutation<LabHubPriceApprovalRecord>({
-    mutationFn: () => api.labHub.approvePrice(labOrderId),
-    onError: quiet,
-    onSuccess: () => qc.invalidateQueries({ queryKey: clinicalKeys.labOrder(labOrderId) }),
+  const refresh = () => qc.invalidateQueries({ queryKey: clinicalKeys.labOrder(labOrderId) });
+  return useMutation<LabHubPriceApprovalRecord, unknown, string>({
+    mutationFn: (shownPrice) => api.labHub.approvePrice(labOrderId, shownPrice),
+    onError: () => {
+      void refresh();
+    },
+    onSuccess: () => refresh(),
   });
 }
 

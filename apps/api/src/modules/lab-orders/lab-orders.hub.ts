@@ -24,11 +24,20 @@ export class LabHubOrderError extends Error {
   constructor(
     readonly status: 400 | 404 | 409,
     readonly code: string,
+    readonly details?: Record<string, unknown>,
   ) {
     super(code);
     this.name = 'LabHubOrderError';
   }
 }
+
+/** Pul satri `numeric(14,2)` shakliga (`"300000.00"`); yaroqsiz bo'lsa `null`. */
+export const normalizeMoney = (v: string | number): string | null => {
+  if (typeof v === 'string' && !/^\d{1,12}(\.\d{1,2})?$/.test(v.trim())) return null;
+  const n = typeof v === 'number' ? v : Number(v.trim());
+  if (!Number.isFinite(n) || n < 0 || n >= 1e12) return null;
+  return n.toFixed(2);
+};
 
 const LAB_EXPENSE_CATEGORY = { name: 'Laboratoriya', nameRu: 'Лаборатория' } as const;
 
@@ -122,15 +131,27 @@ export const createLabOrdersHubService = (deps: { audit: AuditLogger }) => {
    * L4: lab taklif qilgan narxni tasdiqlash → `expenses` («Laboratoriya»). Buyurtma qatori
    * `FOR UPDATE` bilan qulflanadi (parallel ikki bosish ketma-ket bo'ladi) + `expenses.lab_order_id`
    * UNIQUE — ikkinchi tasdiq yangi xarajat yaratmaydi (`alreadyApproved: true`).
+   *
+   * `shownPrice` — foydalanuvchi ekranda ko'rgan narx (TOCTOU himoyasi): poll orasida lab narxni
+   * o'zgartirgan bo'lsa (qulflangan qatordagi `proposedPrice` boshqa) — 409 `price.changed`,
+   * xarajat yozilmaydi. Hub keyinroq `price.mismatch` qaytarsa (lab poll'dan keyin yana
+   * o'zgartirgan) — outbox lokal tasdiqni qaytaradi (`revertLocalPriceApproval`, sync.ts).
    */
-  async function approvePrice(c: Context, id: string) {
+  async function approvePrice(c: Context, id: string, shownPrice: string) {
     const db = getDb(c);
     const tenantId = c.get('activeTenantId') as string;
+    const shown = normalizeMoney(shownPrice);
+    if (shown == null) throw new LabHubOrderError(400, 'price.invalid');
     const order = await lockOrder(db, id);
     if (!order) throw new LabHubOrderError(404, 'lab_order.not_found');
     if (!order.labHubCaseRef) throw new LabHubOrderError(409, 'lab_hub.not_sent');
 
     if (order.approvedPrice != null) {
+      if (order.approvedPrice !== shown) {
+        throw new LabHubOrderError(409, 'price.already_approved', {
+          approvedPrice: order.approvedPrice,
+        });
+      }
       const [exp] = await db
         .select({ id: expenses.id })
         .from(expenses)
@@ -143,6 +164,9 @@ export const createLabOrdersHubService = (deps: { audit: AuditLogger }) => {
       };
     }
     if (order.proposedPrice == null) throw new LabHubOrderError(409, 'price.not_proposed');
+    if (order.proposedPrice !== shown) {
+      throw new LabHubOrderError(409, 'price.changed', { proposedPrice: order.proposedPrice });
+    }
     const price = order.proposedPrice;
 
     let [category] = await db
@@ -177,8 +201,16 @@ export const createLabOrdersHubService = (deps: { audit: AuditLogger }) => {
       .update(labOrders)
       .set({ approvedPrice: price, approvedAt: now, cost: price, updatedAt: now })
       .where(eq(labOrders.id, id));
+    // `prevCost`/`approvedBy` — Hub `price.mismatch` qaytarsa lokal tasdiqni qaytarish uchun.
     await enqueueLabHub(c, db, tenantId, id, [
-      { op: 'approve_price', payload: { price: Number(price) } },
+      {
+        op: 'approve_price',
+        payload: {
+          price: Number(price),
+          prevCost: order.cost ?? null,
+          approvedBy: c.get('user')?.id ?? null,
+        },
+      },
     ]);
 
     await deps.audit.record(c, {

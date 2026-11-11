@@ -14,6 +14,7 @@ import { createLabOrdersHubService, LabHubOrderError } from './lab-orders.hub.ts
 import { toHubMessageDto, toLabOrderDto, toLabOrderFileDto } from './lab-orders.mapper.ts';
 import {
   approvePriceResponseSchema,
+  approvePriceSchema,
   createLabOrderSchema,
   hubMessageCreateSchema,
   hubMessageDtoSchema,
@@ -52,7 +53,9 @@ export const labOrdersRoutes = (deps: { db: Database; audit: AuditLogger }) => {
 
   /** Biznes xatosi → `fail()` (4xx — RLS tranzaksiyasi commit bo'ladi, throw emas). */
   const hubFail = (e: unknown) => {
-    if (e instanceof LabHubOrderError) return { body: fail(e.code, e.code), status: e.status };
+    if (e instanceof LabHubOrderError) {
+      return { body: fail(e.code, e.code, e.details), status: e.status };
+    }
     if (e instanceof InvalidLabOrderTransitionError) {
       return { body: fail('lab_order.invalid_transition', e.message), status: 400 as const };
     }
@@ -335,7 +338,10 @@ export const labOrdersRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     tags: ['lab-orders'],
     operationId: 'approveLabOrderPrice',
     middleware: [requirePermission('lab_order.manage'), requireFeature('labOrders')] as const,
-    request: { params: labOrderIdParamSchema },
+    request: {
+      params: labOrderIdParamSchema,
+      body: { content: { 'application/json': { schema: approvePriceSchema } }, required: true },
+    },
     responses: {
       ...okJson(approvePriceResponseSchema, 'Price approved (idempotent)'),
       ...hubErrorResponses,
@@ -344,8 +350,9 @@ export const labOrdersRoutes = (deps: { db: Database; audit: AuditLogger }) => {
 
   app.openapi(approvePriceRoute, async (c) => {
     const { id } = c.req.valid('param');
+    const { price } = c.req.valid('json');
     try {
-      return c.json(ok(await hub.approvePrice(c, id)), 200);
+      return c.json(ok(await hub.approvePrice(c, id, String(price))), 200);
     } catch (e) {
       const r = hubFail(e);
       return c.json(r.body, r.status);

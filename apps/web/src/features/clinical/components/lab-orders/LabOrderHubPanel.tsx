@@ -164,7 +164,7 @@ export function LabOrderHubPanel({
                 <Button
                   loading={approve.isPending}
                   onClick={() =>
-                    approve.mutate(undefined, {
+                    approve.mutate(proposed, {
                       onSuccess: () =>
                         notifications.show({ message: t('labHubClinic.approved_toast') }),
                       onError: (err) => notifications.show({ color: 'red', message: errText(err) }),
