@@ -44,7 +44,7 @@ import { appendFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { app, BrowserWindow, dialog, ipcMain, Notification, shell } from 'electron';
 import electronUpdater from 'electron-updater';
-import { setupAutoUpdater } from './auto-updater.js';
+import { setupAutoUpdater, type UpdateState } from './auto-updater.js';
 import { createBackupScheduler, resolveDefaultBackupFolder } from './backup-scheduler.js';
 import { createMaintenanceServer, createUploadsTools } from './backup-tools.js';
 import { startClientReconnectLoop } from './client-reconnect.js';
@@ -507,7 +507,20 @@ app.whenReady().then(async () => {
             // `applyServerUrl` (CLI-434 validatsiya + writeConfig + health-check) →
             // ulansa `onServerConnected` tray/brauzerni ulangan holatga o'tkazadi.
             onSettings: async () => {
-              const entered = await promptServerUrl(createPromptWindow);
+              const entered = await promptServerUrl(createPromptWindow, {
+                // «Hozir qidirish» — 30 s kutmasdan darhol discovery.
+                onRescan: () => {
+                  void (async () => {
+                    const found = await findServers();
+                    const confirmed = await chooseServerUrl(found);
+                    if (!confirmed) return;
+                    await applyServerUrl(confirmed, {
+                      writeConfig,
+                      onConnected: onServerConnected,
+                    });
+                  })();
+                },
+              });
               if (!entered) return;
               const res = await applyServerUrl(entered, {
                 writeConfig,
@@ -548,12 +561,24 @@ app.whenReady().then(async () => {
     }
   }
 
-  setupAutoUpdater({
+  // UI-T3 — yangilanish ish vaqtidan (filial yopilishi) keyin o'rnatiladi;
+  // web UpdateBanner holatni IPC orqali oladi. Filial `workHours.close` hali
+  // desktop main'ga yetkazilmagan — config `workCloseTime` (HH:mm) yoki 19:00.
+  let lastUpdateState: UpdateState | null = null;
+  const updaterControls = setupAutoUpdater({
     isPackaged: app.isPackaged,
     updater: autoUpdater,
     notify: (title, body) => new Notification({ title, body }).show(),
     setTrayToolTip,
+    getWorkClose: () => (readConfig() as { workCloseTime?: string }).workCloseTime ?? null,
+    onState: (state) => {
+      lastUpdateState = state;
+      mainWindow?.webContents.send('dental:update-state', state);
+    },
   });
+  ipcMain.handle('dental:update-get-state', () => lastUpdateState);
+  ipcMain.handle('dental:update-install-now', () => updaterControls?.installNow());
+  ipcMain.handle('dental:update-install-tonight', () => updaterControls?.installTonight());
 });
 
 app.on('window-all-closed', () => {

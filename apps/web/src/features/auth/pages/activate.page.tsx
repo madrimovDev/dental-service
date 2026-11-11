@@ -41,15 +41,18 @@ async function activate(licenseKey: string): Promise<ActivateResponse> {
   return res.json() as Promise<ActivateResponse>;
 }
 
+// UI-T3: xato kodi → i18n qo'shimchasi (`error_<x>` = nima bo'ldi, `next_<x>` = nima qilish kerak).
 const ERROR_KEY_MAP: Record<string, string> = {
-  INVALID_KEY: 'auth.activate.error_invalid_key',
-  FINGERPRINT_MISMATCH: 'auth.activate.error_fingerprint_mismatch',
-  FINGERPRINT_UNAVAILABLE: 'auth.activate.error_fingerprint_unavailable',
+  INVALID_KEY: 'invalid_key',
+  FINGERPRINT_MISMATCH: 'fingerprint_mismatch',
+  FINGERPRINT_UNAVAILABLE: 'fingerprint_unavailable',
+  NOT_ACTIVATED: 'not_activated',
+  SUPERVISOR_ERROR: 'supervisor',
 };
 
 export function ActivatePage() {
   const { t } = useTranslation();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null); // ERROR_KEY_MAP qiymati
   const [success, setSuccess] = useState(false);
   const [ownerPhone, setOwnerPhone] = useState<string | null>(null);
   // `null` — provisioning bloki kelmagan; aks holda vendor paroli
@@ -89,14 +92,15 @@ export function ActivatePage() {
         setSuccess(false);
         setOwnerPhone(null);
         setProvisioned(null);
-        setError(t(ERROR_KEY_MAP[res.error.code] ?? 'auth.activate.error_generic'));
+        setError(ERROR_KEY_MAP[res.error.code] ?? 'generic');
       }
     },
     onError: () => {
       setSuccess(false);
       setOwnerPhone(null);
       setProvisioned(null);
-      setError(t('auth.activate.error_generic'));
+      // fetch reject / JSON bo'lmagan javob — tarmoq yoki server javob bermadi.
+      setError('network');
     },
   });
 
@@ -141,7 +145,12 @@ export function ActivatePage() {
 
             {error && (
               <Alert color="red" variant="light" mb="md">
-                {error}
+                <Text size="sm" fw={600}>
+                  {t(`auth.activate.error_${error}`)}
+                </Text>
+                <Text size="sm" mt={4}>
+                  {t(`auth.activate.next_${error}`)}
+                </Text>
               </Alert>
             )}
             {success && (

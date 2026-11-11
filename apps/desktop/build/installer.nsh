@@ -10,7 +10,7 @@
 !macro customInstall
   IfFileExists "$COMMONAPPDATA\DentalService\config.json" config_done 0
 
-  MessageBox MB_YESNO "Bu kompyuter asosiy server bo'lsinmi?$\n$\nHA — Server (ma'lumotlar shu yerda saqlanadi)$\nYO'Q — Klient (boshqa serverga ulanadi)" IDYES server_mode IDNO client_mode
+  MessageBox MB_YESNO "Bu kompyuter qanday ishlaydi?$\n$\nHA — Server: ma'lumotlar shu kompyuterda saqlanadi. Odatda qabulxonadagi, doim yoniq kompyuter.$\nYO'Q — Klient: shifokor xonasidagi kompyuter, serverga lokal tarmoq orqali ulanadi.$\n$\nYangilashda bu savol qayta berilmaydi — rol, port va server manzili saqlanadi." IDYES server_mode IDNO client_mode
 
   server_mode:
     StrCpy $0 "server"

@@ -41,13 +41,13 @@ describe('registerSettingsIpc', () => {
     expect(result).toEqual({ ok: true, connected: true, serverUrl: 'http://10.0.0.7:80' });
   });
 
-  test("ulanish muvaffaqiyatsiz bo'lsa connected:false qaytaradi, lekin config baribir yoziladi", async () => {
+  test("DT-18: ulanish muvaffaqiyatsiz bo'lsa connected:false qaytaradi va config YOZILMAYDI", async () => {
     const checkConnection = mock(async (_url: string) => false);
     registerSettingsIpc({ ipcMain, writeConfig, checkConnection });
 
     const result = await ipcMain.invoke(SET_SERVER_URL_CHANNEL, 'http://10.0.0.9:80');
 
-    expect(writeConfig).toHaveBeenCalledWith({ serverUrl: 'http://10.0.0.9:80' });
+    expect(writeConfig).not.toHaveBeenCalled();
     expect(result).toEqual({ ok: true, connected: false, serverUrl: 'http://10.0.0.9:80' });
   });
 

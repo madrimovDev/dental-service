@@ -37,3 +37,11 @@ describe('electron-builder.yml (DT-01)', () => {
     expect(builder).toMatch(/^\s+-\s+assets\/\*\*\/\*\s*$/m);
   });
 });
+
+describe('installer.nsh (UI-T3 rol izohi)', () => {
+  test("Server/Klient dialogi har rolni oddiy tilda tushuntiradi va yangilashda qayta so'ralmasligini aytadi", () => {
+    expect(nsh).toContain('doim yoniq');
+    expect(nsh).toContain('shifokor xonasidagi');
+    expect(nsh).toContain('Yangilashda bu savol qayta berilmaydi');
+  });
+});

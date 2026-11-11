@@ -6,6 +6,7 @@ import { Outlet } from 'react-router-dom';
 import { LicenseBanner } from '@/features/license';
 import { useUiStore } from '@/stores/ui-store.ts';
 import { CommandPalette } from './CommandPalette';
+import { DesktopUpdateBanner } from './DesktopUpdateBanner';
 import { PageLoader } from './PageLoader';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
@@ -26,6 +27,7 @@ export function AppShell() {
       <CommandPalette />
       <MantineAppShell.Header>
         <LicenseBanner />
+        <DesktopUpdateBanner />
         <Topbar onBurger={toggle} burgerOpened={opened} />
       </MantineAppShell.Header>
       <MantineAppShell.Navbar>

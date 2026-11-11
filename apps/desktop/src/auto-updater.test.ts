@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test';
 import type { UpdaterLike } from './auto-updater.js';
-import { setupAutoUpdater } from './auto-updater.js';
+import { computeInstallAt, setupAutoUpdater } from './auto-updater.js';
 
 class FakeUpdater implements UpdaterLike {
   autoDownload = false;
@@ -132,5 +132,93 @@ describe('setupAutoUpdater', () => {
     });
 
     expect(scheduleInterval.mock.calls[0]?.[1]).toBe(1000);
+  });
+});
+
+describe('computeInstallAt (UI-T3: ish vaqtidan keyin)', () => {
+  const at = (h: number, m = 0) => new Date(2026, 10, 11, h, m, 0, 0);
+
+  test('ish vaqtida (14:00, yopilish 19:00) — bugun 19:00 ga rejalashtiriladi', () => {
+    const r = computeInstallAt(at(14), '19:00');
+    expect(r.now).toBe(false);
+    expect(r.at.getHours()).toBe(19);
+    expect(r.at.getDate()).toBe(11);
+  });
+
+  test("yopilgandan keyin (20:00) — hozir o'rnatiladi", () => {
+    expect(computeInstallAt(at(20), '19:00').now).toBe(true);
+  });
+
+  test("tunda (03:00) — hozir o'rnatiladi, ertalabki qabulni kutdirmaydi", () => {
+    expect(computeInstallAt(at(3), '19:00').now).toBe(true);
+  });
+
+  test('yaroqsiz yopilish vaqti — 19:00 default', () => {
+    expect(computeInstallAt(at(10), 'xato').at.getHours()).toBe(19);
+  });
+});
+
+describe('setupAutoUpdater yangilanish holati (UI-T3)', () => {
+  test("ish vaqtida yuklansa — quitAndInstall CHAQIRILMAYDI, holat ready + installAt bilan emit qilinadi, yopilishga timer qo'yiladi", () => {
+    const updater = new FakeUpdater();
+    const quit = mock(() => {});
+    (updater as unknown as { quitAndInstall: () => void }).quitAndInstall = quit;
+    const states: Array<Record<string, unknown>> = [];
+    const timers: Array<{ fn: () => void; ms: number }> = [];
+    setupAutoUpdater({
+      isPackaged: true,
+      updater,
+      notify: () => {},
+      setTrayToolTip: () => {},
+      scheduleInterval: () => {},
+      now: () => new Date(2026, 10, 11, 14, 0, 0),
+      getWorkClose: () => '19:00',
+      scheduleTimeout: (fn, ms) => void timers.push({ fn, ms }),
+      onState: (s) => void states.push(s as unknown as Record<string, unknown>),
+    });
+    updater.emitDownloaded();
+
+    expect(quit).not.toHaveBeenCalled();
+    expect(states.at(-1)?.phase).toBe('ready');
+    expect(typeof states.at(-1)?.installAt).toBe('string');
+    expect(timers[0]?.ms).toBe(5 * 60 * 60 * 1000);
+    timers[0]?.fn();
+    expect(quit).toHaveBeenCalledTimes(1);
+  });
+
+  test('yopilgandan keyin yuklansa — darhol quitAndInstall', () => {
+    const updater = new FakeUpdater();
+    const quit = mock(() => {});
+    (updater as unknown as { quitAndInstall: () => void }).quitAndInstall = quit;
+    setupAutoUpdater({
+      isPackaged: true,
+      updater,
+      notify: () => {},
+      setTrayToolTip: () => {},
+      scheduleInterval: () => {},
+      now: () => new Date(2026, 10, 11, 21, 0, 0),
+      getWorkClose: () => '19:00',
+    });
+    updater.emitDownloaded();
+    expect(quit).toHaveBeenCalledTimes(1);
+  });
+
+  test("installNow() boshqaruvi ish vaqtida ham darhol o'rnatadi", () => {
+    const updater = new FakeUpdater();
+    const quit = mock(() => {});
+    (updater as unknown as { quitAndInstall: () => void }).quitAndInstall = quit;
+    const ctl = setupAutoUpdater({
+      isPackaged: true,
+      updater,
+      notify: () => {},
+      setTrayToolTip: () => {},
+      scheduleInterval: () => {},
+      now: () => new Date(2026, 10, 11, 14, 0, 0),
+      getWorkClose: () => '19:00',
+      scheduleTimeout: () => {},
+    });
+    updater.emitDownloaded();
+    ctl?.installNow();
+    expect(quit).toHaveBeenCalledTimes(1);
   });
 });
