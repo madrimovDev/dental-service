@@ -512,4 +512,4 @@ Spec `docs/superpowers/specs/2026-11-12-lab-portal-design.md` (L1–L10), reja `
 | FU-51 | L | Web lab-hub chaqiruvlari qo'lda yozilgan `endpoints.ts` orqali (generated funksiyalar mavjud) | generated'ga o'tkazish |
 | FU-52 | L | SaaS klinikani Supervisor'da bekor qilish (deactivate) yo'li yo'q — faqat uzaytirish | admin amali |
 | FU-53 | M | SaaS'da `MESSAGING_SECRET` env majburiy (bo'lmasa lab-hub connect 500, `/var/lib/dental-service` EACCES) | infra compose'ga qo'shish |
-
+| FU-54 | H | Supervisor production RSA private key (`~/supervisor-private.pem`, lokal `apps/supervisor-api/.env`da ham) 2026-11-12 E2E sinovida subagent terminaliga chiqib qoldi (lokal transkript) | infra bosqichida deploy'dan OLDIN yangi keypair: `packages/core/src/supervisor-public-key.ts` + Supervisor env; real klinika yo'q — arzon |
