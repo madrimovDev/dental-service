@@ -103,6 +103,14 @@
     "invalidInput": "Noto'g'ri kiritildi"
   },
   "auth": {
+    "invitations": {
+      "title": "Takliflar",
+      "invited_by_clinic": "Sizni klinikaga taklif qilishdi",
+      "accept": "Qabul qilish",
+      "decline": "Rad etish",
+      "accepted": "Taklif qabul qilindi",
+      "declined": "Taklif rad etildi"
+    },
     "login": {
       "title": "Kirish",
       "phone": "Telefon raqami",
@@ -343,6 +351,10 @@
     "max_discount_percent_hint": "Kassada bitta xizmatga beriladigan eng yuqori chegirma. 100% = cheklovsiz. Faqat klinika administratori o'zgartira oladi."
   },
   "settings": {
+    "users": {
+      "pending": "Kutilmoqda",
+      "invitePending": "Taklif yuborildi — xodim qabul qilgach a'zo bo'ladi"
+    },
     "title": "Sozlamalar",
     "subtitle": "Klinika, rollar, filiallar va xodimlar",
     "nav_tenant": "Klinika",

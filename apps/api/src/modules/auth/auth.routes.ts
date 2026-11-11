@@ -13,8 +13,12 @@ import {
   toTokenPairDto,
 } from './auth.mapper.ts';
 import {
+  acceptInvitationResponseSchema,
   changePasswordResponseSchema,
   changePasswordSchema,
+  declineInvitationResponseSchema,
+  invitationIdParamSchema,
+  invitationsResponseSchema,
   loginResponseSchema,
   loginSchema,
   logoutResponseSchema,
@@ -308,6 +312,76 @@ export const authRoutes = (deps: { db: Database }) => {
     }
     const result = await service.workspaceBranches(user.id, tenantId);
     return c.json(ok(result), 200);
+  });
+
+  // ─── P6b: takliflar — auth required, RBAC-safe (permission SIZ, faqat o'zinikilar) ───
+  // Mavjud foydalanuvchini taklif qilish uni darhol a'zo qilmaydi — u o'zi qabul qiladi.
+  // `pwc` token bu yo'llarga kira olmaydi (auth middleware allowlist'ida yo'q).
+  const invitationMeta = (c: {
+    req: { header: (n: string) => string | undefined };
+  }): { ip: string | null; userAgent: string | null } => ({
+    ip: c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ?? c.req.header('x-real-ip') ?? null,
+    userAgent: c.req.header('user-agent') ?? null,
+  });
+
+  const listInvitationsRoute = createRoute({
+    method: 'get',
+    path: '/invitations',
+    tags: ['auth'],
+    operationId: 'listInvitations',
+    middleware: [authMiddleware()] as const,
+    responses: okJson(invitationsResponseSchema, 'Pending invitations of the current user'),
+  });
+
+  app.openapi(listInvitationsRoute, async (c) => {
+    const user = c.get('user');
+    if (!user) return c.json(fail('auth.required', 'Authentication required'), 401);
+    const rows = await service.listInvitations(user.id);
+    return c.json(ok(rows.map((r) => ({ ...r, invitedAt: r.invitedAt.toISOString() }))), 200);
+  });
+
+  const acceptInvitationRoute = createRoute({
+    method: 'post',
+    path: '/invitations/{id}/accept',
+    tags: ['auth'],
+    operationId: 'acceptInvitation',
+    middleware: [authMiddleware()] as const,
+    request: { params: invitationIdParamSchema },
+    responses: {
+      ...okJson(acceptInvitationResponseSchema, 'Invitation accepted'),
+      404: errResp('Invitation not found'),
+    },
+  });
+
+  app.openapi(acceptInvitationRoute, async (c) => {
+    const user = c.get('user');
+    if (!user) return c.json(fail('auth.required', 'Authentication required'), 401);
+    const { id } = c.req.valid('param');
+    const result = await service.acceptInvitation(user.id, id, invitationMeta(c));
+    if (!result) return c.json(fail('invitation.not_found', 'Taklif topilmadi'), 404);
+    return c.json(ok({ accepted: true as const }), 200);
+  });
+
+  const declineInvitationRoute = createRoute({
+    method: 'post',
+    path: '/invitations/{id}/decline',
+    tags: ['auth'],
+    operationId: 'declineInvitation',
+    middleware: [authMiddleware()] as const,
+    request: { params: invitationIdParamSchema },
+    responses: {
+      ...okJson(declineInvitationResponseSchema, 'Invitation declined'),
+      404: errResp('Invitation not found'),
+    },
+  });
+
+  app.openapi(declineInvitationRoute, async (c) => {
+    const user = c.get('user');
+    if (!user) return c.json(fail('auth.required', 'Authentication required'), 401);
+    const { id } = c.req.valid('param');
+    const result = await service.declineInvitation(user.id, id, invitationMeta(c));
+    if (!result) return c.json(fail('invitation.not_found', 'Taklif topilmadi'), 404);
+    return c.json(ok({ declined: true as const }), 200);
   });
 
   // ─── POST /switch-workspace — auth required (no workspace yet OK) ─────────

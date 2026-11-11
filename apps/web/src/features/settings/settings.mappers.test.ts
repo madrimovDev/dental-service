@@ -27,6 +27,7 @@ function assignment(over: Partial<UserAssignment> = {}): UserAssignment {
     validFrom: '2026-01-01',
     validTo: null,
     isActive: true,
+    pending: false,
     ...over,
   };
 }

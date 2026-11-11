@@ -2,6 +2,7 @@ import { ApiError } from '@dental/api-client';
 import {
   Alert,
   Badge,
+  Button,
   Card,
   Container,
   Group,
@@ -17,7 +18,13 @@ import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth-store.ts';
-import { useMe, useSwitchWorkspace } from '../auth.api';
+import {
+  useAcceptInvitation,
+  useDeclineInvitation,
+  useInvitations,
+  useMe,
+  useSwitchWorkspace,
+} from '../auth.api';
 
 type WorkspaceOption = {
   tenantId: string;
@@ -39,6 +46,10 @@ export function SelectWorkspacePage() {
   const autoSelectedRef = useRef(false);
 
   const meQuery = useMe();
+  const invitations = useInvitations();
+  const acceptMut = useAcceptInvitation();
+  const declineMut = useDeclineInvitation();
+  const invites = invitations.data ?? [];
 
   const switchMut = useSwitchWorkspace({
     onSuccess: (data) => {
@@ -129,6 +140,49 @@ export function SelectWorkspacePage() {
         <Alert color="yellow" variant="light">
           {t('auth.select_workspace.no_workspaces')}
         </Alert>
+      )}
+
+      {invites.length > 0 && (
+        <Stack gap="sm" mb="lg">
+          <Title order={4}>{t('auth.invitations.title')}</Title>
+          {invites.map((inv) => (
+            <Card key={inv.id} withBorder padding="md" radius="md">
+              <Group justify="space-between" wrap="nowrap">
+                <Stack gap={2}>
+                  <Text fw={600}>{inv.tenantName}</Text>
+                  <Text size="sm" c="dimmed">
+                    {inv.branchName ?? t('auth.select_workspace.all_branches')} · {inv.roleName}
+                  </Text>
+                </Stack>
+                <Group gap="xs" wrap="nowrap">
+                  <Button
+                    size="xs"
+                    loading={acceptMut.isPending}
+                    onClick={() =>
+                      acceptMut.mutate(inv.id, {
+                        onSuccess: () =>
+                          notifications.show({
+                            message: t('auth.invitations.accepted'),
+                            color: 'teal',
+                          }),
+                      })
+                    }
+                  >
+                    {t('auth.invitations.accept')}
+                  </Button>
+                  <Button
+                    size="xs"
+                    variant="default"
+                    loading={declineMut.isPending}
+                    onClick={() => declineMut.mutate(inv.id)}
+                  >
+                    {t('auth.invitations.decline')}
+                  </Button>
+                </Group>
+              </Group>
+            </Card>
+          ))}
+        </Stack>
       )}
 
       <Stack gap="sm">

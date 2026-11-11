@@ -141,8 +141,8 @@ beforeAll(async () => {
 
   await withTx((tx) =>
     tx.insert(userAssignments).values([
-      { userId: adminId, tenantId, roleId: adminRoleId },
-      { userId: staffId, tenantId, roleId: staffRoleId },
+      { userId: adminId, tenantId, roleId: adminRoleId, acceptedAt: new Date() },
+      { userId: staffId, tenantId, roleId: staffRoleId, acceptedAt: new Date() },
     ]),
   );
 

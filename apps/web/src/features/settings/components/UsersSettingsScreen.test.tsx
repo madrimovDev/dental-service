@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderApp } from '../../../test-utils';
 import { UsersSettingsScreen } from './UsersSettingsScreen';
 
+const inviteMutate = vi.hoisted(() => vi.fn());
 vi.mock('../settings.api', () => ({
   useUsers: () => ({
     data: [
@@ -33,12 +34,28 @@ vi.mock('../settings.api', () => ({
         validFrom: '2026-01-01',
         validTo: null,
         isActive: true,
+        pending: false,
+      },
+      {
+        assignmentId: 'a3',
+        userId: 'u3',
+        userEmail: null,
+        userPhone: '+998907778899',
+        userFullName: 'Kutuvchi Xodim',
+        branchId: 'b1',
+        branchName: 'Asosiy',
+        roleId: 'r1',
+        roleName: 'Doctor',
+        validFrom: '2026-01-01',
+        validTo: null,
+        isActive: true,
+        pending: true,
       },
     ],
   }),
   useRoles: () => ({ data: [] }),
   useBranches: () => ({ data: [] }),
-  useInviteUser: () => ({ mutate: vi.fn(), isPending: false }),
+  useInviteUser: () => ({ mutate: inviteMutate, isPending: false }),
   useRemoveAssignment: () => ({ mutate: vi.fn(), isPending: false }),
   useResetPassword: () => ({ mutate: vi.fn(), isPending: false }),
 }));
@@ -82,5 +99,13 @@ describe('UsersSettingsScreen', () => {
     renderApp(<UsersSettingsScreen />);
     expect(screen.queryByLabelText('Parolni qayta tiklash')).not.toBeInTheDocument();
     perms.value = ['@owner'];
+  });
+
+  it("kutilayotgan a'zoda «Kutilmoqda» belgisi bor va reset tugmasi yo'q (P6 FU-08)", () => {
+    perms.value = ['@owner'];
+    renderApp(<UsersSettingsScreen />);
+    expect(screen.getByText('Kutilmoqda')).toBeInTheDocument();
+    // 2 ta qabul qilingan a'zo uchun reset, kutilayotgan uchun yo'q
+    expect(screen.getAllByLabelText('Parolni qayta tiklash')).toHaveLength(2);
   });
 });

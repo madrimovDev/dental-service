@@ -323,6 +323,20 @@
       "when": 1794391806424,
       "tag": "0045_users_must_change_password",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1794397272589,
+      "tag": "0046_assignment_accepted_at",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1794398659541,
+      "tag": "0047_user_assignments_accepted_default",
+      "breakpoints": true
     }
   ]
 }

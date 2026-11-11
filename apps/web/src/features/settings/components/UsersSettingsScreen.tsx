@@ -78,7 +78,14 @@ export function UsersSettingsScreen() {
       { phone: v.phone, fullName: v.fullName, roleId: v.roleId, branchId: v.branchId || undefined },
       {
         onSuccess: (data) => {
-          if (data.alreadyExists) {
+          if (data.pending) {
+            // Mavjud foydalanuvchi — a'zolik uning roziligini kutadi (P6 FU-08).
+            notifications.show({
+              message: t('settings.users.invitePending'),
+              color: 'blue',
+            });
+            closeAll();
+          } else if (data.alreadyExists) {
             // Telefon raqami platform bo'yicha unique — mavjud foydalanuvchiga shunchaki
             // yangi rol biriktirildi (yangi user/parol yaratilmadi). Jim yopilish o'rniga
             // aniq xabar — admin "parol qani?" deb chalkashmasin (CLI-158).
@@ -162,9 +169,13 @@ export function UsersSettingsScreen() {
                     <Table.Td>{a.roleName}</Table.Td>
                     <Table.Td>{a.branchName ?? t('users.all_branches')}</Table.Td>
                     <Table.Td>
-                      <StatusPill status={a.isActive ? 'success' : 'neutral'}>
-                        {a.isActive ? t('users.active') : t('users.inactive')}
-                      </StatusPill>
+                      {a.pending ? (
+                        <StatusPill status="warning">{t('settings.users.pending')}</StatusPill>
+                      ) : (
+                        <StatusPill status={a.isActive ? 'success' : 'neutral'}>
+                          {a.isActive ? t('users.active') : t('users.inactive')}
+                        </StatusPill>
+                      )}
                     </Table.Td>
                     <Table.Td>
                       <Group gap="xs" wrap="nowrap" justify="flex-end">
@@ -184,7 +195,7 @@ export function UsersSettingsScreen() {
                             <IconUserCog size={16} />
                           </ActionIcon>
                         )}
-                        {isOwner && a.userId !== currentUser?.id && (
+                        {isOwner && !a.pending && a.userId !== currentUser?.id && (
                           <ActionIcon
                             variant="subtle"
                             color="gray"

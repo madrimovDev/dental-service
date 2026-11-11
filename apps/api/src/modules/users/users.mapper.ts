@@ -20,6 +20,7 @@ export type UserAssignmentListRow = {
   validFrom: Date;
   validTo: Date | null;
   isActive: boolean;
+  pending: boolean;
 };
 
 export const toUserAssignmentDto = (row: UserAssignmentListRow): UserAssignmentDto => ({
@@ -35,6 +36,7 @@ export const toUserAssignmentDto = (row: UserAssignmentListRow): UserAssignmentD
   validFrom: row.validFrom.toISOString(),
   validTo: row.validTo ? row.validTo.toISOString() : null,
   isActive: row.isActive,
+  pending: row.pending,
 });
 
 // ─── Raw assignment row mapper ────────────────────────────────────────────────

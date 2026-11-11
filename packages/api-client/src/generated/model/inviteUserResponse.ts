@@ -13,4 +13,5 @@ export interface InviteUserResponse {
   tempPassword: string | null;
   alreadyExists: boolean;
   reactivated: boolean;
+  pending: boolean;
 }

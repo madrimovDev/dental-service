@@ -1,5 +1,5 @@
 import { appointments, branches, userAssignments } from '@dental/db-schema';
-import { and, eq, gt, inArray, isNull, sql } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
@@ -90,7 +90,13 @@ export const createBranchesService = (deps: { audit: AuditLogger }) => {
     const [{ count: activeAssignments } = { count: 0 }] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(userAssignments)
-      .where(and(eq(userAssignments.branchId, id), eq(userAssignments.isActive, true)));
+      .where(
+        and(
+          eq(userAssignments.branchId, id),
+          eq(userAssignments.isActive, true),
+          isNotNull(userAssignments.acceptedAt),
+        ),
+      );
 
     const [{ count: futureAppointments } = { count: 0 }] = await db
       .select({ count: sql<number>`count(*)::int` })

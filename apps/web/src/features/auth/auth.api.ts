@@ -1,8 +1,11 @@
 import {
   ApiError,
+  acceptInvitation,
   bootstrapStatus,
+  declineInvitation,
   getMe,
   getWorkspaceBranches,
+  listInvitations,
   login,
   registerTenant,
   registrationEnabled,
@@ -169,6 +172,38 @@ export function useBranchSwitch() {
         message: err instanceof ApiError ? err.message : t('shell.branch_switch_error'),
         color: 'red',
       });
+    },
+  });
+}
+
+// Foydalanuvchining kutilayotgan takliflari (P6 FU-08) — workspace tanlash sahifasida
+export function useInvitations() {
+  const accessToken = useAuthStore((s) => s.accessToken);
+  return useQuery({
+    queryKey: authKeys.invitations(),
+    queryFn: () => listInvitations().then((r) => r.data),
+    enabled: !!accessToken,
+  });
+}
+
+// Qabul qilingach a'zolik ro'yxati (`me`) ham o'zgaradi — ikkalasini yangilaymiz.
+export function useAcceptInvitation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => acceptInvitation(id).then((r) => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: authKeys.invitations() });
+      queryClient.invalidateQueries({ queryKey: authKeys.me() });
+    },
+  });
+}
+
+export function useDeclineInvitation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => declineInvitation(id).then((r) => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: authKeys.invitations() });
     },
   });
 }

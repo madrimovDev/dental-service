@@ -33,6 +33,14 @@ export const userAssignments = pgTable(
     validFrom: timestamp('valid_from', { withTimezone: true }).notNull().defaultNow(),
     validTo: timestamp('valid_to', { withTimezone: true }),
     isActive: boolean('is_active').notNull().default(true),
+    /**
+     * P6 (FU-08) — taklifga rozilik. NULL = «kutilmoqda»: foydalanuvchi hali qabul
+     * qilmagan, tayinlov hech qanday huquq bermaydi (permission'lar, workspace, switch,
+     * reset). Mavjud qatorlar migratsiyada `created_at` bilan backfill qilingan.
+     */
+    // NULL = kutilayotgan taklif (faqat invite/addAssignment aniq NULL beradi); boshqa
+    // yo'llar (seed, testlar, kelajakdagi ichki yaratish) default bo'yicha qabul qilingan.
+    acceptedAt: timestamp('accepted_at', { withTimezone: true }).defaultNow(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

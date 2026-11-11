@@ -5,11 +5,14 @@
  * OpenAPI spec version: 0.1.0
  */
 import type {
+  AcceptInvitation200,
   BootstrapStatus200,
   ChangePassword200,
   ChangePasswordBody,
+  DeclineInvitation200,
   GetMe200,
   GetWorkspaceBranches200,
+  ListInvitations200,
   Login200,
   LoginBody,
   Logout200,
@@ -91,6 +94,30 @@ import { customInstance } from '../../mutator';
     },
       );
     }
+  export const listInvitations = (
+    
+ ) => {
+      return customInstance<ListInvitations200>(
+      {url: `/api/auth/invitations`, method: 'GET'
+    },
+      );
+    }
+  export const acceptInvitation = (
+    id: string,
+ ) => {
+      return customInstance<AcceptInvitation200>(
+      {url: `/api/auth/invitations/${id}/accept`, method: 'POST'
+    },
+      );
+    }
+  export const declineInvitation = (
+    id: string,
+ ) => {
+      return customInstance<DeclineInvitation200>(
+      {url: `/api/auth/invitations/${id}/decline`, method: 'POST'
+    },
+      );
+    }
   export const switchWorkspace = (
     switchWorkspaceBody: SwitchWorkspaceBody,
  ) => {
@@ -126,6 +153,9 @@ export type RefreshResult = NonNullable<Awaited<ReturnType<typeof refresh>>>
 export type LogoutResult = NonNullable<Awaited<ReturnType<typeof logout>>>
 export type GetMeResult = NonNullable<Awaited<ReturnType<typeof getMe>>>
 export type GetWorkspaceBranchesResult = NonNullable<Awaited<ReturnType<typeof getWorkspaceBranches>>>
+export type ListInvitationsResult = NonNullable<Awaited<ReturnType<typeof listInvitations>>>
+export type AcceptInvitationResult = NonNullable<Awaited<ReturnType<typeof acceptInvitation>>>
+export type DeclineInvitationResult = NonNullable<Awaited<ReturnType<typeof declineInvitation>>>
 export type SwitchWorkspaceResult = NonNullable<Awaited<ReturnType<typeof switchWorkspace>>>
 export type ChangePasswordResult = NonNullable<Awaited<ReturnType<typeof changePassword>>>
 export type BootstrapStatusResult = NonNullable<Awaited<ReturnType<typeof bootstrapStatus>>>
