@@ -36,6 +36,12 @@
 
 Sabab: `license-middleware.test.ts`/`license.test.ts` `./license.ts`ni `mock.module` bilan almashtiradi; bitta bun jarayonida `getLicenseState` mock'i boshqa fayllarga oqadi. Oxirgi gate: `1001 pass / 18 fail` (17 ta shu ro'yxat sinflari + 1 muhit).
 
+## Desktop (`apps/desktop`, `bun test`) — `mock.module` oqishi, izolyatsiyada yashil
+
+| Fayl | Test |
+|---|---|
+| `src/backup-tools.test.ts` | createUploadsTools > archive -> extract (UI-3) — `process-manager.test.ts`/`first-run.test.ts` `node:child_process`ni mock qiladi; `tar` chaqiruvi mock'ga tushadi |
+
 ## Muhit bilan bog'liq (ro'yxatga kirmaydi)
 - `clinical.test.ts` `(unnamed)` hook — `diagnoses_code_unique (K02.1)`: lane bazasiga `seedDiagnoses` qo'llangan bo'lsa yiqiladi. Lane'ga **faqat `seedPermissions`**.
 - `provisioning-tenant.test.ts` «har rol shabloni o'z permission to'plamini to'liq oladi» — lane bazasida `seedPermissions` ishlatilmagan bo'lsa yiqiladi (permission katalogi migratsiyada emas, API boot'da seed qilinadi). Lane tayyorlashda seed majburiy (qo'llanma §5.3).
