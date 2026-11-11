@@ -244,11 +244,14 @@ export function LabOrderNewPage() {
                     >
                       <span className={classes.labName}>{l.name}</span>
                       <span className={classes.labMeta}>
-                        {t('labOrders.lab_stats', {
-                          count: l.count,
-                          days: l.avgDays ?? '—',
-                          remake: l.remakePct,
-                        })}
+                        {t(
+                          l.avgDays === null ? 'labOrders.lab_stats_nodays' : 'labOrders.lab_stats',
+                          {
+                            count: l.count,
+                            days: l.avgDays,
+                            remake: l.remakePct,
+                          },
+                        )}
                       </span>
                     </button>
                   ))}

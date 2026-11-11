@@ -2325,7 +2325,9 @@
     "lab_stats": "{{count}} ta buyurtma · o'rtacha {{days}} kun · remake {{remake}}%",
     "detail_title": "Lab buyurtma №{{number}}",
     "make_remake": "Qayta tayyorlash",
-    "sees_portal_note": "Laboratoriya portali ulangach, laboratoriya faqat shu ma'lumotni ko'radi."
+    "sees_portal_note": "Laboratoriya portali ulangach, laboratoriya faqat shu ma'lumotni ko'radi.",
+    "lab_stats_nodays": "{{count}} ta buyurtma · remake {{remake}}%",
+    "detail_title_plain": "Lab buyurtma"
   },
   "staffPanel": {
     "grant_note": "Hech kim o'zidan yuqori huquqli rol bera olmaydi. Filial menejeri «Administrator» va «Egasi» rollarini ko'rmaydi.",

@@ -133,14 +133,14 @@ export function UsersSettingsScreen() {
         }}
       >
         <Stack gap="lg">
-          <Group>
+          <Group wrap="wrap">
             <TextInput
               leftSection={<IconSearch size={16} />}
               placeholder={t('settings.users_search')}
               aria-label={t('settings.users_search')}
               value={filter.search}
               onChange={(e) => setFilter((f) => ({ ...f, search: e.currentTarget.value }))}
-              style={{ flex: 1 }}
+              style={{ flex: '1 1 200px' }}
             />
             <Select
               placeholder={t('settings.users_filter_branch')}
@@ -270,6 +270,10 @@ export function UsersSettingsScreen() {
               border: '2px solid var(--primary)',
               background: 'var(--surface)',
               padding: 20,
+              position: 'sticky',
+              top: 0,
+              maxHeight: 'calc(100vh - 96px)',
+              overflowY: 'auto',
             }}
           >
             <h2 style={{ margin: '0 0 12px', fontSize: 18 }}>{t('users.invite')}</h2>

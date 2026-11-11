@@ -66,7 +66,9 @@ export function LabOrderDetailPage() {
         </Link>
         <div className={classes.titleBox}>
           <h1 className={classes.title}>
-            {t('labOrders.detail_title', { number: order.orderNumber ?? dash })}
+            {order.orderNumber != null
+              ? t('labOrders.detail_title', { number: order.orderNumber })
+              : t('labOrders.detail_title_plain')}
             {patient ? ` · ${patient.fullName}` : ''}
           </h1>
           <span className={classes.sub}>
