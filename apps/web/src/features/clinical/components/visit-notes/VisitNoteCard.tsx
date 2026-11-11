@@ -1,11 +1,28 @@
-import type { Diagnosis, VisitNote } from '@dental/api-client';
+import type { Diagnosis, PatientImage, VisitNote } from '@dental/api-client';
 import { Mono } from '@dental/ui';
 import { ActionIcon, Badge, Box, Group, Image, SimpleGrid, Stack, Text } from '@mantine/core';
 import { IconCalendar, IconPencil } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
+import { useAuthedObjectUrl } from '@/hooks/useAuthedObjectUrl';
 import { usePatientImages } from '../../clinical.api';
 import { toVisitNoteVM } from '../../clinical.mappers';
 import classes from './VisitNoteCard.module.css';
+
+/** P11: bog'langan rasm — Bearer'li blob URL (oddiy `<img src=url>` 401 berardi). */
+function LinkedImageThumb({ img }: { img: PatientImage }) {
+  const { src } = useAuthedObjectUrl(img.url);
+  return (
+    <a href={src ?? undefined} target="_blank" rel="noreferrer">
+      <Image
+        src={src ?? undefined}
+        alt={img.title ?? img.originalFilename}
+        h={72}
+        fit="cover"
+        radius="sm"
+      />
+    </a>
+  );
+}
 
 export function VisitNoteCard({
   note,
@@ -97,15 +114,7 @@ export function VisitNoteCard({
             </Text>
             <SimpleGrid cols={4} mt={4} spacing="xs">
               {images.map((img) => (
-                <a key={img.id} href={img.url} target="_blank" rel="noreferrer">
-                  <Image
-                    src={img.url}
-                    alt={img.title ?? img.originalFilename}
-                    h={72}
-                    fit="cover"
-                    radius="sm"
-                  />
-                </a>
+                <LinkedImageThumb key={img.id} img={img} />
               ))}
             </SimpleGrid>
           </Box>

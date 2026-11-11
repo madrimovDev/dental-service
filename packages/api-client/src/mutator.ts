@@ -43,3 +43,15 @@ export const customInstance = async <T>(config: CustomInstanceConfig): Promise<T
   // requestRaw `{success,data}` envelope qaytaradi — generated T = envelope.
   return client.requestRaw(method, path, config.data, config.signal) as Promise<T>;
 };
+
+/**
+ * P11: binary fayl (masalan `/uploads/:key`) — mavjud Bearer + 401 refresh bilan Blob.
+ * `<img src>` Authorization yubormaydi, shuning uchun web shu orqali blob oladi
+ * va `URL.createObjectURL` ishlatadi.
+ */
+export const fetchBlob = async (url: string, signal?: AbortSignal): Promise<Blob> => {
+  if (!client) {
+    throw new Error("api-client not configured — configureClient() ni startup'da chaqiring");
+  }
+  return client.requestBlob(url, signal);
+};

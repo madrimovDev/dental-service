@@ -24,21 +24,45 @@ process.env.UPLOADS_DIR = testUploadsDir;
 const { createApp } = await import('../../src/app.ts');
 const { createLocalStorageAdapter } = await import('../../src/lib/storage.ts');
 const { signAccess } = await import('../../src/lib/jwt.ts');
+const { db } = await import('../../src/db/client.ts');
+const { tenants, users } = await import('@dental/db-schema');
 
 afterAll(async () => {
   await rm(testUploadsDir, { recursive: true, force: true });
 });
 
-async function tokenFor(tenantId: string): Promise<string> {
+async function tokenFor(tenantId: string, sub: string = randomUUID()): Promise<string> {
   const { token } = await signAccess({
-    sub: randomUUID(),
+    sub,
     atid: tenantId,
     abid: null,
-    perms: [],
+    perms: ['patient_image.view'],
     roleKey: null,
     lang: 'uz',
   });
   return token;
+}
+
+/** P11: /uploads endi audit yozadi — real tenant + user qatori kerak (FK). */
+async function seedTenantUser(): Promise<{ tenantId: string; userId: string }> {
+  const suffix = randomUUID().slice(0, 8);
+  const [u] = await db
+    .insert(users)
+    .values({
+      phone: `+9989${Math.floor(Math.random() * 1e8)
+        .toString()
+        .padStart(8, '0')}`,
+      passwordHash: 'x',
+      fullName: 'Uploads Test',
+    })
+    .returning({ id: users.id });
+  if (!u) throw new Error('user insert failed');
+  const [t] = await db
+    .insert(tenants)
+    .values({ name: `Uploads ${suffix}`, slug: `uploads-${suffix}`, ownerUserId: u.id })
+    .returning({ id: tenants.id });
+  if (!t) throw new Error('tenant insert failed');
+  return { tenantId: t.id, userId: u.id };
 }
 
 describe('CLI-405 — /uploads `..` traversal', () => {
@@ -100,12 +124,12 @@ describe('CLI-405 — /uploads `..` traversal', () => {
 
   test('legit own-tenant key still -> 200 (no CLI-359 regression)', async () => {
     const storage = createLocalStorageAdapter(testUploadsDir);
-    const tenantId = randomUUID();
+    const { tenantId, userId } = await seedTenantUser();
     const key = `tenants/${tenantId}/patients/${randomUUID()}/${randomUUID()}.jpg`;
     const bytes = Buffer.from('own-bytes');
     await storage.save(key, bytes);
 
-    const token = await tokenFor(tenantId);
+    const token = await tokenFor(tenantId, userId);
     const app = createApp();
     const res = await app.request(`/uploads/${encodeURIComponent(key)}`, {
       headers: { Authorization: `Bearer ${token}` },

@@ -153,6 +153,36 @@ export const createApiClient = (config: ApiClientConfig) => {
     return parsed;
   };
 
+  // P11: binary (rasm/fayl) — brauzer `<img>` Bearer yubormaydi, shuning uchun
+  // fayl auth header + 401-refresh-retry bilan fetch qilinib Blob qaytariladi.
+  // Xato javob JSON envelope bo'ladi (`{success:false,error}`) — ApiError'ga aylanadi.
+  const requestBlob = async (path: string, signal?: AbortSignal): Promise<Blob> => {
+    const toError = async (res: Response): Promise<ApiError> => {
+      const parsed = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
+      if (parsed && !parsed.success) {
+        return new ApiError(
+          parsed.error.code,
+          parsed.error.message,
+          res.status,
+          parsed.error.details,
+        );
+      }
+      return new ApiError('http.invalid_response', 'Invalid response from server', res.status);
+    };
+
+    let res = await fetchWithAuth('GET', path, undefined, signal);
+    if (res.status === 401) {
+      const refreshed = await tryRefresh();
+      if (refreshed) {
+        res = await fetchWithAuth('GET', path, undefined, signal);
+      } else {
+        config.onUnauthorized?.();
+      }
+    }
+    if (!res.ok) throw await toError(res);
+    return res.blob();
+  };
+
   const upload = async <T>(path: string, form: FormData): Promise<T> => {
     let res = await fetchUpload(path, form);
     let parsed = await parseResponse<T>(res);
@@ -177,6 +207,7 @@ export const createApiClient = (config: ApiClientConfig) => {
     put: <T>(path: string, body?: unknown) => request<T>('PUT', path, body),
     delete: <T>(path: string) => request<T>('DELETE', path),
     requestRaw,
+    requestBlob,
     upload,
   };
 };

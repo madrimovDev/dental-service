@@ -306,7 +306,7 @@ export const createApp = () => {
   // `uploads.ts` ichida (key'dagi tenantId JWT `activeTenantId` bilan
   // solishtiriladi — bu route filesystem-based, RLS qamrovidan tashqarida).
   const uploadsStorage = createLocalStorageAdapter();
-  app.route('/uploads', uploadsRoutes(uploadsStorage));
+  app.route('/uploads', uploadsRoutes(uploadsStorage, { db, audit }));
 
   // Local Desktop bitta-EXE arxitekturasi — Windows'da alohida nginx/Caddy
   // yo'q, api.exe o'zi `apps/web` build outputni ham serve qiladi
