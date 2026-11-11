@@ -1984,5 +1984,15 @@
     "item_backup": "Zaxira nusxa",
     "backupSection": "Zaxira nusxa",
     "backupPlaceholder": "Zaxira bo'limi tez orada."
+  },
+  "staffCards": {
+    "can": "Qila oladi",
+    "cannot": "Qila olmaydi",
+    "owner": "Egasi",
+    "deactivate": "Faolsizlantirish",
+    "confirmDeactivate": "Xodim shu filialda faolsizlantirilsinmi? U tizimga kira olmaydi.",
+    "shownOnce": "Parol faqat bir marta ko'rsatiladi — yopilgach qayta ko'rib bo'lmaydi.",
+    "grantHint": "O'zingizda yo'q ruxsatli rolni bera olmaysiz.",
+    "cannotGrant": "berib bo'lmaydi"
   }
 }

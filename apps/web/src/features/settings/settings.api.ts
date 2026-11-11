@@ -30,7 +30,7 @@ import {
   upsertUserProfile,
 } from '@dental/api-client';
 import type { Vertical } from '@dental/core';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { settingsKeys } from './settings.keys';
 
 // --- Roles ---
@@ -47,6 +47,23 @@ export function useRole(id: string | null, enabled: boolean) {
     queryFn: () => getRole(id ?? '').then((r) => r.data),
     enabled: enabled && !!id,
   });
+}
+
+/** Har rolning ruxsat kodlari (UI `assertCanGrant` ko'zgusi uchun). roleId → kodlar. */
+export function useRolePermissionMap(roleIds: string[], enabled = true) {
+  const results = useQueries({
+    queries: roleIds.map((id) => ({
+      queryKey: settingsKeys.role(id),
+      queryFn: () => getRole(id).then((r) => r.data),
+      enabled,
+    })),
+  });
+  const map = new Map<string, string[]>();
+  roleIds.forEach((id, i) => {
+    const d = results[i]?.data;
+    if (d) map.set(id, d.permissions);
+  });
+  return map;
 }
 
 export function usePermissions() {
