@@ -64,4 +64,9 @@ Compose loyiha nomlari: `dental-supervisor`, `dental-lab-hub`, `dental-cloud`.
 ## Zaxira
 
 Har stack o'z skripti bilan (`infra/backup.sh`, `infra/supervisor/backup.sh`, `infra/lab-hub/backup.sh`),
-cron orqali kuniga bir marta; `ENV_FILE`/loyiha nomlari shu sxemaga mos beriladi.
+bitta o'rovchi bilan: `infra/vps/backup-all.sh` → `/srv/dental/backups/{supervisor,lab-hub,cloud}/<ts>/`.
+Cron (madrimov foydalanuvchisi, 03:30 Toshkent = 22:30 UTC):
+
+```
+30 22 * * * /srv/dental/src/infra/vps/backup-all.sh >> /srv/dental/backups/backup.log 2>&1
+```

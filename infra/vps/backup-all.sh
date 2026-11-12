@@ -23,4 +23,4 @@ docker run --rm --network dental-cloud_internal \
   -v dental-cloud_uploads_data:/data/uploads:ro \
   -v "$B/cloud":/backups \
   -v "$SRC/infra/backup.sh":/backup.sh:ro \
-  postgres:16-alpine sh /backup.sh
+  postgres:16-alpine sh -c "sh /backup.sh && chown -R $(id -u):$(id -g) /backups"

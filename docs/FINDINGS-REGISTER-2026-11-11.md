@@ -511,5 +511,23 @@ Spec `docs/superpowers/specs/2026-11-12-lab-portal-design.md` (L1–L10), reja `
 | FU-50 | L | Status o'zgarishi rad etilganda (lab tayyor emas / lab qulflagan) detal sahifada umumiy xato toast'i | aniq xabar |
 | FU-51 | L | Web lab-hub chaqiruvlari qo'lda yozilgan `endpoints.ts` orqali (generated funksiyalar mavjud) | generated'ga o'tkazish |
 | FU-52 | L | SaaS klinikani Supervisor'da bekor qilish (deactivate) yo'li yo'q — faqat uzaytirish | admin amali |
-| FU-53 | M | SaaS'da `MESSAGING_SECRET` env majburiy (bo'lmasa lab-hub connect 500, `/var/lib/dental-service` EACCES) | infra compose'ga qo'shish |
-| FU-54 | H | Supervisor production RSA private key (`~/supervisor-private.pem`, lokal `apps/supervisor-api/.env`da ham) 2026-11-12 E2E sinovida subagent terminaliga chiqib qoldi (lokal transkript) | infra bosqichida deploy'dan OLDIN yangi keypair: `packages/core/src/supervisor-public-key.ts` + Supervisor env; real klinika yo'q — arzon |
+| FU-53 | M | SaaS'da `MESSAGING_SECRET` env majburiy (bo'lmasa lab-hub connect 500, `/var/lib/dental-service` EACCES) | ✅ 2026-11-12 `infra/docker-compose.prod.yml` api+worker (`93d3a54`) |
+| FU-54 | H | Supervisor production RSA private key (`~/supervisor-private.pem`, lokal `apps/supervisor-api/.env`da ham) 2026-11-12 E2E sinovida subagent terminaliga chiqib qoldi (lokal transkript) | infra bosqichida deploy'dan OLDIN yangi keypair: `packages/core/src/supervisor-public-key.ts` + Supervisor env; real klinika yo'q — arzon | ✅ 2026-11-12 yangi juftlik VPS'da yaratildi (`aedb8c0`, ochiq kalit hash `39d94a73…`); eski `.lic`/installer'lar yaroqsiz; eski lokal fayl `~/supervisor-private.pem.compromised-20261112` |
+
+## 26. Infra — VPS deploy (2026-11-12) — natija
+
+Bitta umumiy VPS (`13.140.211.189`, Ubuntu 24.04; serverda boshqa loyihalar ham bor). Tafsilot: `infra/vps/README.md`.
+
+- **Domenlar:** `dental.madrimov.uz` (bulut), `sv.dental.madrimov.uz` (Supervisor), `lab.dental.madrimov.uz` (Lab Hub). TLS — serverning umumiy Caddy'si (`/etc/caddy/sites/dental-*.caddy`), stack'lardagi ichki caddy o'chiq, portlar faqat `127.0.0.1:41xx`.
+- **Tarmoq:** `dental_shared` + aliaslar `supervisor-api`, `lab-hub-api` (ikki stack'da `api` nomi bor). `/internal/*` uchala domenda 404.
+- **Sirlar:** `/srv/dental/secrets/` (VPS'da yaratilgan, chiqarilmagan). FU-54 bo'yicha RSA juftlik almashtirildi.
+- **Topilib tuzatilgan:** bulut compose'da `MESSAGING_SECRET` yo'q edi (api prod'da boot qilmasdi — FU-53); bulut Caddy `/uploads/*`ni API'ga yo'naltirmasdi (rasmlar ochilmasdi); Supervisor Caddy `/internal`ni faqat SPA'ga tushirib yashirardi (endi aniq 404); bulut zaxirasi root nomidan yozilardi.
+- **Jonli E2E (real domenda, 8/8 PASS):** SaaS ro'yxat → Supervisor'da `mode=saas` klinika; Supervisor'da lab → lab rahbari login + majburiy parol almashtirish; katalog → ulanish → lab tasdig'i → buyurtma Hub'ga (`synced`, ism shifrdan to'g'ri ochiladi); `/uploads` Bearer bilan 200 / tokensiz 401; soxta `X-Forwarded-For`/`X-Real-IP` audit'ga tushmaydi; 4 konteyner restartidan keyin KEK/DEK va loginlar ishlaydi; `backup-all.sh` uchala stack.
+- **Prod'da qolgan sinov yozuvlari:** «E2E-test» tenant/lab/bemor/buyurtma (id'lar `/srv/dental/e2e/state.json`) — real ishdan oldin o'chirish yoki volume'larni tozalash.
+
+| # | Daraja | Topilma | Ish |
+|---|---|---|---|
+| FU-55 | M | Kunlik zaxira cron'i o'rnatilmagan (avtomatik rejimda ruxsat berilmadi) | `crontab -e`: `30 22 * * * /srv/dental/src/infra/vps/backup-all.sh >> /srv/dental/backups/backup.log 2>&1` |
+| FU-56 | M | Zaxira faqat shu VPS'da (off-host nusxa yo'q) | `BACKUP_RSYNC_TARGET` yoki boshqa joyga rsync |
+| FU-57 | L | Offline nusxa: `supervisor-private.pem` va `LAB_HUB_KEK` (parol menejeri/seyf) | foydalanuvchi |
+| FU-58 | M | Desktop installer yangi ochiq kalit + `SUPERVISOR_URL=https://sv.dental.madrimov.uz` bilan qayta qurilishi kerak (kod default `supervisor.dental.uz`) | Windows build bosqichi |
