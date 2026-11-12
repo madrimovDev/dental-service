@@ -1,20 +1,28 @@
-# Dental bulut (SaaS) — /etc/caddy/sites/dental-cloud.caddy. Manba: repo infra/vps/caddy/.
-# Marshrut infra/Caddyfile bilan bir xil + /uploads (API, RLS bilan himoyalangan).
+# Dentdo landing — /etc/caddy/sites/dental-cloud.caddy. Manba: repo infra/vps/caddy/.
+# Statik sahifa: /srv/dental/landing (apps/landing/dist, deploy.sh landing).
+# Ilova app.dental.madrimov.uz da; eski ilova yo'llari u yerga 308.
 dental.madrimov.uz {
-	encode gzip zstd
+	encode zstd gzip
 
-	@api path /api/* /uploads/*
-	handle @api {
-		request_body {
-			max_size 35MB
-		}
-		reverse_proxy 127.0.0.1:4101 {
-			header_up X-Real-IP {remote_host}
-		}
-	}
+	# Asosiy tugma: bosishlar access logida sanaladi (tashqi analitika yo'q).
+	redir /start https://app.dental.madrimov.uz/register-tenant 302
 
-	handle {
-		reverse_proxy 127.0.0.1:4100
+	@app path /login /login/* /register-tenant /select-workspace /change-password-required /reset-owner-password /activate /api/* /uploads/*
+	redir @app https://app.dental.madrimov.uz{uri} 308
+
+	root * /srv/dental/landing
+
+	@assets path /assets/*
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+	@html not path /assets/*
+	header @html Cache-Control "no-cache"
+
+	try_files {path} {path}/index.html
+	file_server
+
+	handle_errors 404 {
+		rewrite * /404.html
+		file_server
 	}
 
 	header {
@@ -22,6 +30,15 @@ dental.madrimov.uz {
 		X-Content-Type-Options "nosniff"
 		X-Frame-Options "DENY"
 		Referrer-Policy "strict-origin-when-cross-origin"
+		Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; frame-ancestors 'none'; base-uri 'self'"
 		-Server
+	}
+
+	log {
+		output file /var/log/caddy/dental-landing.log {
+			roll_size 20MiB
+			roll_keep 10
+		}
+		format json
 	}
 }
