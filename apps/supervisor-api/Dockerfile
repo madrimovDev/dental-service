@@ -30,6 +30,7 @@ COPY apps/api/package.json apps/api/
 COPY apps/desktop/package.json apps/desktop/
 COPY apps/lab-hub-api/package.json apps/lab-hub-api/
 COPY apps/lab-hub-web/package.json apps/lab-hub-web/
+COPY apps/landing/package.json apps/landing/
 COPY apps/supervisor-admin/package.json apps/supervisor-admin/
 COPY apps/supervisor-api/package.json apps/supervisor-api/
 COPY apps/web/package.json apps/web/
