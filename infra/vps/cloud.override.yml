@@ -1,0 +1,26 @@
+# Umumiy VPS (host Caddy) uchun bulut (SaaS) override — infra/vps/README.md.
+# api/worker dental_shared tarmog'iga ulanadi: SUPERVISOR_URL=http://supervisor-api:3101,
+# LAB_HUB_URL=http://lab-hub-api:8171 (`api` nomi ikki stack'da bor — faqat alias ishlatiladi).
+services:
+  caddy:
+    profiles: [bundled-edge]
+  api:
+    environment:
+      TZ: Asia/Tashkent
+    ports: ['127.0.0.1:4101:8001']
+    networks:
+      internal: {}
+      dental_shared: {}
+  worker:
+    environment:
+      TZ: Asia/Tashkent
+    networks:
+      internal: {}
+      dental_shared: {}
+  web:
+    ports: ['127.0.0.1:4100:80']
+
+networks:
+  dental_shared:
+    external: true
+    name: dental_shared

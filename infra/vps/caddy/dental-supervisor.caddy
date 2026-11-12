@@ -1,0 +1,28 @@
+# Supervisor — /etc/caddy/sites/dental-supervisor.caddy. Manba: repo infra/vps/caddy/.
+# /v1/* → API; /internal/* tashqariga HECH QACHON (faqat dental_shared tarmog'ida).
+sv.dental.madrimov.uz {
+	encode gzip zstd
+
+	@internal path /internal /internal/*
+	handle @internal {
+		respond 404
+	}
+
+	handle /v1/* {
+		reverse_proxy 127.0.0.1:4110 {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:4111
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+}

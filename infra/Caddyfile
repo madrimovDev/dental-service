@@ -22,7 +22,9 @@
 	encode gzip zstd
 
 	# API — preserve the /api prefix (Hono mounts routes under /api/*).
-	handle /api/* {
+	# /uploads/* — API (RLS + patient_image.view, P11); SPA'ga tushsa rasmlar ochilmaydi.
+	@api path /api/* /uploads/*
+	handle @api {
 		reverse_proxy api:8001
 	}
 

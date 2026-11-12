@@ -1,0 +1,20 @@
+# Umumiy VPS (host Caddy) uchun Supervisor override — infra/vps/README.md.
+# Ichki caddy ishga tushmaydi (80/443 host Caddy'da), portlar faqat loopback'da.
+services:
+  caddy:
+    profiles: [bundled-edge]
+  api:
+    environment:
+      TZ: Asia/Tashkent
+    ports: ['127.0.0.1:4110:3101']
+    networks:
+      internal: {}
+      dental_shared:
+        aliases: [supervisor-api]
+  admin:
+    ports: ['127.0.0.1:4111:80']
+
+networks:
+  dental_shared:
+    external: true
+    name: dental_shared

@@ -1,0 +1,35 @@
+# Lab Hub — /etc/caddy/sites/dental-lab.caddy. Manba: repo infra/vps/caddy/ (infra/lab-hub/Caddyfile bilan bir xil).
+lab.dental.madrimov.uz {
+	encode gzip zstd
+
+	tls {
+		protocols tls1.2 tls1.3
+	}
+
+	@internal path /internal /internal/*
+	handle @internal {
+		respond 404
+	}
+
+	@api path /v1/* /health
+	handle @api {
+		request_body {
+			max_size 60MB
+		}
+		reverse_proxy 127.0.0.1:4120 {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:4121
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+}

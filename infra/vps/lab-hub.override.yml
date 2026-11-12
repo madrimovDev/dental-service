@@ -1,0 +1,11 @@
+# Umumiy VPS (host Caddy) uchun Lab Hub override — infra/vps/README.md.
+# `supervisor_shared` = dental_shared (SUPERVISOR_NETWORK), Supervisor'ga `supervisor-api` alias orqali.
+services:
+  caddy:
+    profiles: [bundled-edge]
+  lab-hub-api:
+    environment:
+      TZ: Asia/Tashkent
+    ports: ['127.0.0.1:4120:8171']
+  lab-hub-web:
+    ports: ['127.0.0.1:4121:80']

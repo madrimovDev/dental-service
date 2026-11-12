@@ -22,6 +22,12 @@
 {$DOMAIN} {
 	encode gzip zstd
 
+	# /internal/* (Lab Hub, SaaS) — faqat ichki tarmoq; aniq 404 (SPA'ga tushirmaslik).
+	@internal path /internal /internal/*
+	handle @internal {
+		respond 404
+	}
+
 	handle /v1/* {
 		reverse_proxy api:3101
 	}

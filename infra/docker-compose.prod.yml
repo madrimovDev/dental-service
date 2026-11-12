@@ -83,6 +83,8 @@ services:
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
       JWT_ACCESS_EXPIRES: ${JWT_ACCESS_EXPIRES:-15m}
       JWT_REFRESH_EXPIRES: ${JWT_REFRESH_EXPIRES:-7d}
+      # FU-53: per-tenant messaging kredensiallari shifri (>=32 bayt). Prod'da yo'q bo'lsa API ishga tushmaydi.
+      MESSAGING_SECRET: ${MESSAGING_SECRET:?set MESSAGING_SECRET}
       WEB_ORIGIN: ${WEB_ORIGIN:?set WEB_ORIGIN}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       SENTRY_DSN: ${SENTRY_DSN:-}
@@ -118,6 +120,8 @@ services:
       DATABASE_ADMIN_URL: ${DATABASE_ADMIN_URL:-}
       REDIS_URL: ${REDIS_URL:?set REDIS_URL}
       JWT_SECRET: ${JWT_SECRET}
+      # Worker kanal kredensiallarini (Telegram/Eskiz) ochadi — api bilan BIR XIL.
+      MESSAGING_SECRET: ${MESSAGING_SECRET:?set MESSAGING_SECRET}
       WEB_ORIGIN: ${WEB_ORIGIN}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       SENTRY_DSN: ${SENTRY_DSN:-}
