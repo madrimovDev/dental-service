@@ -582,15 +582,15 @@ describe('L8 — /internal/saas/clinics', () => {
       expect(adminJwt.status).toBe(401);
     });
 
-    it("yangi tenant: mode=saas, 14 kunlik sinov, litsenziya/filial YO'Q, telefon kanonik", async () => {
+    it("yangi tenant: mode=saas, 30 kunlik sinov, litsenziya/filial YO'Q, telefon kanonik", async () => {
       const tenantId = crypto.randomUUID();
       const res = await registerSaas(tenantId);
       expect(res.status).toBe(201);
       const body = (await res.json()) as any;
       expect(body.mode).toBe('saas');
       const days = (Date.parse(body.subscriptionExpiresAt) - Date.now()) / 86_400_000;
-      expect(days).toBeGreaterThan(13.9);
-      expect(days).toBeLessThan(14.1);
+      expect(days).toBeGreaterThan(29.9);
+      expect(days).toBeLessThan(30.1);
 
       const [row] = await db.select().from(clinicsTable).where(eq(clinicsTable.id, body.clinicId));
       expect(row?.mode).toBe('saas');
