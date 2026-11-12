@@ -531,3 +531,21 @@ Bitta umumiy VPS (`13.140.211.189`, Ubuntu 24.04; serverda boshqa loyihalar ham 
 | FU-56 | M | Zaxira faqat shu VPS'da (off-host nusxa yo'q) | `BACKUP_RSYNC_TARGET` yoki boshqa joyga rsync |
 | FU-57 | L | Offline nusxa: `supervisor-private.pem` va `LAB_HUB_KEK` (parol menejeri/seyf) | foydalanuvchi |
 | FU-58 | M | Desktop installer yangi ochiq kalit + `SUPERVISOR_URL=https://sv.dental.madrimov.uz` bilan qayta qurilishi kerak (kod default `supervisor.dental.uz`) | Windows build bosqichi |
+
+## 27. Dentdo landing (2026-11-12) — natija
+
+Spec `docs/superpowers/specs/2026-11-12-dentdo-landing-design.md`, reja `docs/superpowers/plans/2026-11-12-dentdo-landing.md`. Dizayn tizimi: https://claude.ai/artifact/BmUmJ67uVQN2zNAaQpuoqF (woodo.uz skeleti, emal-ko'k brand).
+
+- **Nom — Dentdo** (ko'rinadigan matnlar: web, i18n, desktop tray/dialog, Supervisor/lab sarlavhalari, OpenAPI title). Identifikatorlar (`productName`, mDNS, firewall, `ProgramData\DentalService`) ataylab o'zgarmadi.
+- **SaaS sinov 30 kun** (`SAAS_TRIAL_DAYS`).
+- **`apps/landing`** — bitta shablon + uz/ru lug'at → statik `/`, `/ru/`, maxfiylik, 404; 18 ta haqiqiy skrinshot (namuna «Smile Dental», `scripts/ui/seed-demo-clinic.ts`, `scripts/ui/landing-shots.ts`).
+- **Hostlar:** landing `dental.madrimov.uz` (`/start` → `app.…/register-tenant`, eski ilova yo'llari 308), ilova `app.dental.madrimov.uz`.
+- Review topgan va tuzatilgan: «telefondan ham» va'dasi (rahbar ekrani mobilga moslashmagan) olib tashlandi; Dockerfile'larga yangi workspace manifesti qo'shilmagani frozen-lockfile build'ni yiqitdi.
+
+| # | Daraja | Topilma | Ish |
+|---|---|---|---|
+| FU-59 | M | Rahbar bosh sahifasi telefon kengligida yonga siljiydi (mobilga moslashmagan) | responsive qilish, keyin landing'ga «telefondan» qaytadi |
+| FU-60 | L | Rus matni ona tilida so'zlashuvchi tomonidan tekshirilmagan | foydalanuvchi |
+| FU-61 | L | Xizmat nomi web'da faqat `nameUz` dan (ru tenantda ham) | `nameRu` ko'rsatish |
+| FU-62 | L | Skrinshotlardagi summa formati `6,200,000` (ilova en-format) — landing `149 000` bilan nomuvofiq | ilova `formatCurrency` lokal |
+| FU-63 | L | `dentdo.uz` olingach landing/ilova ko'chiriladi (301) | foydalanuvchi domen oladi |
