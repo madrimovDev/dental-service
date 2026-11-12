@@ -326,7 +326,7 @@ app.whenReady().then(async () => {
                 ? "Yangilash muvaffaqiyatsiz. Ma'lumotlar avvalgi holatga qaytarildi. Ta'minotchiga murojaat qiling."
                 : `Yangilash muvaffaqiyatsiz. Ma'lumotlarni qaytarib bo'lmadi${migration.backupFile ? `, zaxira: ${migration.backupFile}` : ''}. Ta'minotchiga murojaat qiling.`;
         dialog.showErrorBox(
-          "Dental Service — yangilash to'xtatildi",
+          "Dentdo — yangilash to'xtatildi",
           `${message}\n\nTafsilot: ${migration.message.slice(-800)}\nLoglarni ko'ring: ${LOGS_DIR}`,
         );
         await stopServer();
@@ -342,7 +342,7 @@ app.whenReady().then(async () => {
       }
       const detail = err instanceof Error ? err.message : String(err);
       dialog.showErrorBox(
-        'Dental Service — ishga tushmadi',
+        'Dentdo — ishga tushmadi',
         `Server komponentlari ishga tushmadi: ${detail}\n\nLoglarni ko'ring: ${LOGS_DIR}`,
       );
       app.quit();
@@ -379,7 +379,7 @@ app.whenReady().then(async () => {
           dialog.showErrorBox('Port band', portBusyMessage(e.portBusy));
         } else {
           new Notification({
-            title: 'Dental Service',
+            title: 'Dentdo',
             body: "Server komponenti qayta-qayta to'xtadi. Dasturni qayta ishga tushiring.",
           }).show();
         }

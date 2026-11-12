@@ -11,7 +11,7 @@ const app = createApp();
 
 const doc = app.getOpenAPIDocument({
   openapi: '3.1.0',
-  info: { title: 'Dental Service API', version: '0.1.0' },
+  info: { title: 'Dentdo API', version: '0.1.0' },
 });
 
 const outPath = resolve(import.meta.dir, '../../../packages/api-client/openapi.json');

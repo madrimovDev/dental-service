@@ -1,0 +1,27 @@
+# Dental ilova (SaaS) — /etc/caddy/sites/dental-app.caddy. Manba: repo infra/vps/caddy/.
+# Marshrut infra/Caddyfile bilan bir xil + /uploads (API, RLS bilan himoyalangan).
+app.dental.madrimov.uz {
+	encode gzip zstd
+
+	@api path /api/* /uploads/*
+	handle @api {
+		request_body {
+			max_size 35MB
+		}
+		reverse_proxy 127.0.0.1:4101 {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:4100
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+}

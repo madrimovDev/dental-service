@@ -12,11 +12,12 @@ loyihalar ham bor** (Woodo, neowise, updates), shuning uchun:
 
 | Sayt fayli (`/etc/caddy/sites/`) | Domen | Loopback |
 |---|---|---|
-| `dental-cloud.caddy` | `dental.madrimov.uz` | web `4100`, api `4101` (`/api/*`, `/uploads/*`) |
+| `dental-cloud.caddy` | `dental.madrimov.uz` | Dentdo landing — statik `/srv/dental/landing` (`deploy.sh landing`); `/start` → ilova `register-tenant` (302); eski ilova yo'llari → `app.` (308) |
+| `dental-app.caddy` | `app.dental.madrimov.uz` | ilova: web `4100`, api `4101` (`/api/*`, `/uploads/*`); `WEB_ORIGIN` shu manzil |
 | `dental-supervisor.caddy` | `sv.dental.madrimov.uz` | api `4110` (`/v1/*`), admin `4111` |
 | `dental-lab.caddy` | `lab.dental.madrimov.uz` | api `4120` (`/v1/*`, `/health`), web `4121` |
 
-DNS: `dental` va `*.dental` A yozuvlari → `13.140.211.189`. Sayt fayllari faqat DNS ishlagandan keyin
+DNS: `dental` va `*.dental` A yozuvlari (shu jumladan `app.dental`) → `13.140.211.189`. Sayt fayllari faqat DNS ishlagandan keyin
 qo'yiladi (aks holda Let's Encrypt urinishlari rate-limit'ga tushadi):
 
 ```sh
@@ -58,6 +59,8 @@ Kod `git archive` orqali yuboriladi (ishchi daraxt emas — lokal `.env`'lar tus
 git archive --format=tar HEAD | ssh madrimov@13.140.211.189 'rm -rf /srv/dental/src.new && mkdir /srv/dental/src.new && tar -x -C /srv/dental/src.new && rm -rf /srv/dental/src && mv /srv/dental/src.new /srv/dental/src'
 ssh madrimov@13.140.211.189 'cd /srv/dental/src && ./infra/vps/deploy.sh all'   # yoki supervisor|lab-hub|cloud
 ```
+
+`/start` bosishlari: `sudo grep -c '"uri":"/start"' /var/log/caddy/dental-landing.log`.
 
 Compose loyiha nomlari: `dental-supervisor`, `dental-lab-hub`, `dental-cloud`.
 

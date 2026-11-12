@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Umumiy VPS'ga deploy (host Caddy, loopback portlar) — infra/vps/README.md.
-#   ./infra/vps/deploy.sh [supervisor|lab-hub|cloud|all]   (repo ildizidan)
+#   ./infra/vps/deploy.sh [supervisor|lab-hub|cloud|landing|all]   (repo ildizidan)
 # Image'lar BITTADAN quriladi (serverda boshqa prod servislar bor). Global
 # `docker system prune` va boshqa stack'larga tegadigan buyruqlar YO'Q.
 set -euo pipefail
@@ -28,5 +28,12 @@ if [[ "$WHAT" == all || "$WHAT" == cloud ]]; then
   cloud build api; cloud build web
   cloud up -d postgres redis; cloud run --rm migrate
   cloud up -d api worker web
+fi
+if [[ "$WHAT" == all || "$WHAT" == landing ]]; then
+  # Statik landing (apps/landing): sof yig'ish, tarmoqsiz; host Caddy /srv/dental/landing'dan beradi.
+  (cd apps/landing && bun run build)
+  mkdir -p /srv/dental/landing
+  rsync -a --delete apps/landing/dist/ /srv/dental/landing/
+  echo "landing: $(find /srv/dental/landing -type f | wc -l) fayl"
 fi
 docker ps --filter name=dental- --format '{{.Names}}\t{{.Status}}'

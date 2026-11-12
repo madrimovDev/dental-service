@@ -15,7 +15,7 @@ import { normalizePhone } from '../../lib/phone';
  */
 
 /** Yangi SaaS tenantga beriladigan sinov muddati (kun). */
-export const SAAS_TRIAL_DAYS = 14;
+export const SAAS_TRIAL_DAYS = 30;
 const DAY_MS = 86_400_000;
 
 const sha256 = (s: string) => crypto.createHash('sha256').update(s).digest();

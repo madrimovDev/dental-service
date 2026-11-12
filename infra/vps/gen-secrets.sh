@@ -5,7 +5,7 @@
 set -euo pipefail
 umask 077
 D="${SECRETS_DIR:-/srv/dental/secrets}"
-CLOUD_HOST="${CLOUD_HOST:-dental.madrimov.uz}"
+CLOUD_HOST="${CLOUD_HOST:-app.dental.madrimov.uz}"
 SV_HOST="${SV_HOST:-sv.dental.madrimov.uz}"
 LAB_HOST="${LAB_HOST:-lab.dental.madrimov.uz}"
 mkdir -p "$D"; chmod 700 "$D"

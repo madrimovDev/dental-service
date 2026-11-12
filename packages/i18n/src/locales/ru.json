@@ -6,7 +6,7 @@
     "forbidden_title": "Нет доступа"
   },
   "app": {
-    "name": "Dental Service",
+    "name": "Dentdo",
     "tagline": "SaaS-система управления стоматологическими клиниками"
   },
   "audit": {
@@ -146,7 +146,7 @@
     },
     "activate": {
       "title": "Активация лицензии",
-      "description": "Введите лицензионный ключ, выданный вашей клинике, чтобы начать пользоваться Dental Service.",
+      "description": "Введите лицензионный ключ, выданный вашей клинике, чтобы начать пользоваться Dentdo.",
       "license_key": "Лицензионный ключ",
       "license_key_placeholder": "XXXXX-XXXXX-XXXXX-XXXXX",
       "submit": "Активировать",

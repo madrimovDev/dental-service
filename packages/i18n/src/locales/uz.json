@@ -6,7 +6,7 @@
     "forbidden_title": "Ruxsat yo'q"
   },
   "app": {
-    "name": "Dental Service",
+    "name": "Dentdo",
     "tagline": "Stomatologiya klinikalari uchun SaaS boshqaruv tizimi"
   },
   "audit": {
@@ -146,7 +146,7 @@
     },
     "activate": {
       "title": "Litsenziyani faollashtirish",
-      "description": "Dental Service'dan foydalanish uchun klinikangizga berilgan litsenziya kalitini kiriting.",
+      "description": "Dentdo'dan foydalanish uchun klinikangizga berilgan litsenziya kalitini kiriting.",
       "license_key": "Litsenziya kaliti",
       "license_key_placeholder": "XXXXX-XXXXX-XXXXX-XXXXX",
       "submit": "Faollashtirish",
