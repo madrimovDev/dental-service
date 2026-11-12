@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="{{lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{meta.title}}</title>
+<meta name="description" content="{{meta.desc}}">
+<link rel="canonical" href="{{canonical}}">
+<link rel="alternate" hreflang="uz" href="{{urlUz}}">
+<link rel="alternate" hreflang="ru" href="{{urlRu}}">
+<link rel="alternate" hreflang="x-default" href="{{urlUz}}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Dentdo">
+<meta property="og:title" content="{{meta.title}}">
+<meta property="og:description" content="{{meta.desc}}">
+<meta property="og:url" content="{{canonical}}">
+<meta property="og:image" content="{{ogImage}}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="{{ogLocale}}">
+<meta property="og:locale:alternate" content="{{ogLocaleAlt}}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#0b6a8f">
+<link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+{{css}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">{{skip}}</a>
+
+<div class="topbar"><div class="wrap">
+  <span class="hide-sm">{{topbar.q}}</span><a href="tel:+998950445014"><b>+998 95 044 50 14</b></a><span class="chip">{{topbar.tg}} <a href="https://t.me/madrimov">@madrimov</a></span>
+  <span class="right chip">{{langSwitch}}</span>
+</div></div>
+
+<div class="wrap nav">
+  <a class="logo" href="{{home}}" aria-label="Dentdo"><span class="mk"><i></i><i></i><i></i><i></i></span><span>Dent<b>do</b></span></a>
+  <nav aria-label="{{nav.label}}"><a href="#features">{{nav.features}}</a><a href="#roles">{{nav.roles}}</a><a href="#pricing">{{nav.pricing}}</a><a href="#faq">{{nav.faq}}</a></nav>
+  <div class="acts"><a class="login" href="{{appUrl}}/login">{{nav.login}}</a><a class="btn btn-p btn-sm" href="/start" data-cta>{{nav.cta}}</a></div>
+</div>
+
+<main id="main">
+<header class="hero"><div class="wrap">
+  <div class="hero-head">
+    <span class="chip offer">{{hero.chip}}</span>
+    <h1>{{hero.h1a}}<br><span class="hl">{{hero.h1b}}</span></h1>
+    <p class="sub">{{hero.sub}}</p>
+    <div class="hero-cta"><a class="btn btn-p" href="/start" data-cta>{{hero.cta}}</a><a class="btn btn-t" href="#how">{{hero.how}}</a></div>
+    <div class="fine"><span>{{hero.fine1}}</span><span>{{hero.fine2}}</span><span>{{hero.fine3}}</span></div>
+  </div>
+
+  <div class="stage">
+    <div class="screen">
+      <div class="scr-top"><i></i><i></i><i></i><span>{{appHost}}/calendar</span></div>
+      <!--shot:calendar--><div class="scr">
+        <div class="side">
+          <div class="lg">Dent<b>do</b></div>
+          <div>{{fb.side.today}}</div><div class="on">{{fb.side.calendar}}</div><div>{{fb.side.queue}}</div><div>{{fb.side.patients}}</div><div>{{fb.side.cashier}}</div><div>{{fb.side.stock}}</div><div>{{fb.side.reports}}</div>
+        </div>
+        <div class="main">
+          <div class="hd"><b>{{fb.cal.day}}</b><em>{{fb.cal.new}}</em></div>
+          <div class="cal">
+            <div></div><div class="dh">{{fb.doc1}}</div><div class="dh">{{fb.doc2}}</div><div class="dh">{{fb.doc3}}</div>
+            <div class="t">09:00</div><div class="ev g"><b>{{fb.p1}}</b>{{fb.t1}}</div><div class="ev v"><b>{{fb.p2}}</b>{{fb.t2}}</div><div class="slot"></div>
+            <div class="t">10:00</div><div class="ev a"><b>{{fb.p3}}</b>{{fb.t3}}</div><div class="slot"></div><div class="ev g"><b>{{fb.p4}}</b>{{fb.t4}}</div>
+            <div class="t">11:00</div><div class="slot"></div><div class="ev g"><b>{{fb.p5}}</b>{{fb.t5}}</div><div class="ev x"><b>{{fb.p6}}</b>{{fb.t6}}</div>
+            <div class="t">12:00</div><div class="ev v"><b>{{fb.p7}}</b>{{fb.t7}}</div><div class="ev a"><b>{{fb.p8}}</b>{{fb.t8}}</div><div class="slot"></div>
+            <div class="t">13:00</div><div class="slot"></div><div class="slot"></div><div class="ev g"><b>{{fb.p9}}</b>{{fb.t9}}</div>
+            <div class="t">14:00</div><div class="ev g"><b>{{fb.p10}}</b>{{fb.t10}}</div><div class="ev v"><b>{{fb.p11}}</b>{{fb.t11}}</div><div class="slot"></div>
+          </div>
+        </div>
+      </div><!--/shot:calendar-->
+    </div>
+
+    <div class="float f-tg">
+      <!--shot:telegram--><div class="who"><span class="av" aria-hidden="true">D</span>Dentdo bot</div>
+      <div class="msg">{{fb.tg.msg}}</div>
+      <div class="btns"><span class="ok">{{fb.tg.ok}}</span><span>{{fb.tg.other}}</span></div><!--/shot:telegram-->
+    </div>
+
+    <div class="float f-ph"><!--shot:owner-phone--><div class="ph">
+      <div class="top"><span>{{fb.ph.role}}</span><span>{{fb.ph.today}}</span></div>
+      <h4>Smile Dental</h4>
+      <div class="kas"><small>{{fb.ph.income}}</small><div>8 450 000</div></div>
+      <div class="row"><span>{{fb.ph.visits}}</span><b>27</b></div>
+      <div class="row"><span>{{fb.ph.noshow}}</span><b>2</b></div>
+      <div class="row"><span>{{fb.ph.debts}}</span><b>3 120 000</b></div>
+    </div><!--/shot:owner-phone--></div>
+  </div>
+</div></header>
+
+<section class="sec"><div class="wrap">
+  <div class="save">
+    <div>
+      <div class="big">0 <small>{{save.cur}}</small></div>
+      <h2>{{save.h}}</h2>
+      <p>{{save.p}}</p>
+    </div>
+    <div class="nots">
+      <div class="no"><div class="eyebrow">{{save.not}}</div><b>{{save.n1h}}</b><span>{{save.n1p}}</span></div>
+      <div class="no"><div class="eyebrow">{{save.not}}</div><b>{{save.n2h}}</b><span>{{save.n2p}}</span></div>
+      <div class="no"><div class="eyebrow">{{save.not}}</div><b>{{save.n3h}}</b><span>{{save.n3p}}</span></div>
+      <div class="no"><div class="eyebrow">{{save.not}}</div><b>{{save.n4h}}</b><span>{{save.n4p}}</span></div>
+    </div>
+  </div>
+</div></section>
+
+<section class="sec" id="features"><div class="wrap">
+  <div class="sec-head"><div class="eyebrow">{{feat.eyebrow}}</div><h2 class="h2">{{feat.h1}} <span class="hl">{{feat.h2}}</span> {{feat.h3}}</h2><p>{{feat.p}}</p></div>
+  <div class="cards">
+    <article class="card"><span class="cdot" style="background:var(--dot-teal)"></span><div class="body"><h3>{{c1.h}} <span>{{c1.hs}}</span></h3><p>{{c1.p}}</p><div class="foot">{{c1.foot}}</div></div>
+      <div class="pic"><!--shot:booking--><div class="ln" style="width:60%;background:rgba(15,181,154,.4)"></div><div class="ln"></div><div class="ln" style="width:80%"></div><div class="ln" style="width:45%;background:rgba(245,158,11,.4)"></div><div class="ln"></div><div class="ln" style="width:70%"></div><!--/shot:booking--></div></article>
+
+    <article class="card"><span class="cdot" style="background:var(--dot-violet)"></span><div class="body"><h3>{{c2.h}} <span>{{c2.hs}}</span></h3><p>{{c2.p}}</p><div class="foot">{{c2.foot}}</div></div>
+      <div class="pic"><!--shot:tooth-chart--><div class="teeth">
+        <div class="tooth">18</div><div class="tooth">17</div><div class="tooth p">16</div><div class="tooth">15</div><div class="tooth">14</div><div class="tooth">13</div><div class="tooth">12</div><div class="tooth c">11</div>
+        <div class="tooth">48</div><div class="tooth">47</div><div class="tooth k">46</div><div class="tooth">45</div><div class="tooth">44</div><div class="tooth">43</div><div class="tooth">42</div><div class="tooth">41</div>
+      </div><div class="ln" style="margin-top:12px;width:85%"></div><div class="ln" style="width:55%"></div><!--/shot:tooth-chart--></div></article>
+
+    <article class="card"><span class="cdot" style="background:var(--amber)"></span><div class="body"><h3>{{c3.h}} <span>{{c3.hs}}</span></h3><p>{{c3.p}}</p><div class="foot">{{c3.foot}}</div></div>
+      <div class="pic"><!--shot:cashier--><div class="mini-row"><span>{{fb.p1}}</span><b class="r">−450 000</b></div><div class="mini-row"><span>{{fb.p3}}</span><b class="r">−1 200 000</b></div><div class="mini-row"><span>{{fb.p4}}</span><b class="gr">{{fb.paid}}</b></div><div class="mini-row"><span>{{fb.p8}}</span><b class="r">−300 000</b></div><!--/shot:cashier--></div></article>
+
+    <article class="card"><span class="cdot" style="background:var(--dot-rose)"></span><div class="body"><h3>{{c4.h}} <span>{{c4.hs}}</span></h3><p>{{c4.p}}</p><div class="foot">{{c4.foot}}</div></div>
+      <div class="pic"><!--shot:queue--><div class="q3"><div><div class="qh">{{fb.q1}}</div><div class="ln"></div><div class="ln"></div><div class="ln"></div></div><div><div class="qh">{{fb.q2}}</div><div class="ln" style="background:rgba(59,187,224,.45)"></div><div class="ln" style="background:rgba(59,187,224,.45)"></div></div><div><div class="qh">{{fb.q3}}</div><div class="ln" style="background:rgba(15,181,154,.4)"></div><div class="ln" style="background:rgba(15,181,154,.4)"></div><div class="ln" style="background:rgba(15,181,154,.4)"></div><div class="ln" style="background:rgba(15,181,154,.4)"></div></div></div><!--/shot:queue--></div></article>
+
+    <article class="card"><span class="cdot" style="background:var(--brand-hi)"></span><div class="body"><h3>{{c5.h}} <span>{{c5.hs}}</span></h3><p>{{c5.p}}</p><div class="foot">{{c5.foot}}</div></div>
+      <div class="pic"><!--shot:reports--><div class="qh" style="color:#8ea4ae;font-weight:800">{{fb.rep}}</div><div class="bars"><i style="height:40%"></i><i style="height:55%"></i><i style="height:48%"></i><i style="height:70%"></i><i style="height:62%"></i><i style="height:82%"></i><i class="on" style="height:95%"></i></div><!--/shot:reports--></div></article>
+
+    <article class="card"><span class="cdot" style="background:var(--dot-lime)"></span><div class="body"><h3>{{c6.h}} <span>{{c6.hs}}</span></h3><p>{{c6.p}}</p><div class="foot">{{c6.foot}}</div></div>
+      <div class="pic"><!--shot:payroll--><div class="mini-row"><span>{{fb.doc1}} · 30%</span><b>6 840 000</b></div><div class="mini-row"><span>{{fb.doc2}} · 25%</span><b>5 120 000</b></div><div class="mini-row"><span>{{fb.mat1}}</span><b class="r">{{fb.mat1v}}</b></div><div class="mini-row"><span>{{fb.mat2}}</span><b class="gr">{{fb.mat2v}}</b></div><!--/shot:payroll--></div></article>
+  </div>
+  <div class="more"><b>{{more.lead}}</b><span class="chip">{{more.1}}</span><span class="chip">{{more.2}}</span><span class="chip">{{more.3}}</span><span class="chip">{{more.4}}</span><span class="chip">{{more.5}}</span><span class="chip">{{more.6}}</span><span class="chip">{{more.7}}</span><span class="chip">{{more.8}}</span></div>
+</div></section>
+
+<section class="sec" id="roles"><div class="wrap">
+  <div class="sec-head"><div class="eyebrow">{{roles.eyebrow}}</div><h2 class="h2">{{roles.h1}} <span class="hl">{{roles.h2}}</span> {{roles.h3}}</h2><p>{{roles.p}}</p></div>
+  <div class="roles">
+    <div class="role"><span class="ic ic-b" aria-hidden="true">{{roles.r1i}}</span><h3>{{roles.r1h}}</h3><ul><li>{{roles.r1a}}</li><li>{{roles.r1b}}</li><li>{{roles.r1c}}</li></ul></div>
+    <div class="role"><span class="ic ic-v" aria-hidden="true">{{roles.r2i}}</span><h3>{{roles.r2h}}</h3><ul><li>{{roles.r2a}}</li><li>{{roles.r2b}}</li><li>{{roles.r2c}}</li></ul></div>
+    <div class="role"><span class="ic ic-a" aria-hidden="true">{{roles.r3i}}</span><h3>{{roles.r3h}}</h3><ul><li>{{roles.r3a}}</li><li>{{roles.r3b}}</li><li>{{roles.r3c}}</li></ul></div>
+    <div class="role"><span class="ic ic-t" aria-hidden="true">{{roles.r4i}}</span><h3>{{roles.r4h}}</h3><ul><li>{{roles.r4a}}</li><li>{{roles.r4b}}</li><li>{{roles.r4c}}</li></ul></div>
+  </div>
+</div></section>
+
+<section class="sec"><div class="wrap">
+  <div class="duo">
+    <div class="lead"><div class="eyebrow">{{duo.eyebrow}}</div><h2 class="h2">{{duo.h1}} <span style="color:#7fd6ef">{{duo.h2}}</span></h2><p>{{duo.p}}</p></div>
+    <div class="mode"><span class="tag">{{duo.cloud.tag}}</span><h3>{{duo.cloud.h}}</h3><p>{{duo.cloud.p}}</p><ul><li>{{duo.cloud.a}}</li><li>{{duo.cloud.b}}</li><li>{{duo.cloud.c}}</li></ul></div>
+    <div class="mode"><span class="tag am">{{duo.pc.tag}}</span><h3>{{duo.pc.h}}</h3><p>{{duo.pc.p}}</p><ul><li>{{duo.pc.a}}</li><li>{{duo.pc.b}}</li><li>{{duo.pc.c}}</li></ul></div>
+  </div>
+</div></section>
+
+<section class="sec"><div class="wrap lab">
+  <div class="sec-head" style="margin:0"><div class="eyebrow">{{lab.eyebrow}}</div><h2 class="h2">{{lab.h1}} <span class="hl">{{lab.h2}}</span> {{lab.h3}}</h2><p>{{lab.p}}</p>
+    <div class="lock"><span class="dot" style="background:var(--dot-teal);width:12px;height:12px"></span>{{lab.lock}}</div></div>
+  <div class="flow">
+    <div class="step"><span class="n">1</span><span class="tx">{{lab.s1}}</span><span class="st st1">{{lab.s1t}}</span></div>
+    <div class="step"><span class="n">2</span><span class="tx">{{lab.s2}}</span><span class="st st2">{{lab.s2t}}</span></div>
+    <div class="step"><span class="n">3</span><span class="tx">{{lab.s3}}</span><span class="st st3">{{lab.s3t}}</span></div>
+    <div class="step"><span class="n">4</span><span class="tx">{{lab.s4}}</span><span class="st st3">{{lab.s4t}}</span></div>
+  </div>
+</div></section>
+
+<section class="sec" id="pricing"><div class="wrap" style="text-align:center">
+  <div class="sec-head center"><div class="eyebrow">{{price.eyebrow}}</div><h2 class="h2">{{price.h1}} <span class="hl">{{price.h2}}</span></h2><p>{{price.p}}</p></div>
+  <div class="toggle" role="group" aria-label="{{price.period}}" hidden><button type="button" class="on" data-period="monthly" aria-pressed="true">{{price.monthly}}</button><button type="button" data-period="yearly" aria-pressed="false">{{price.yearly}} <em>{{price.free2}}</em></button></div>
+  <div class="plans">
+    <div class="plan"><div><h3>Start</h3><div class="for">{{price.p1.for}}</div></div><div class="price"><span class="num" data-monthly="149 000" data-yearly="1 490 000">149 000</span> <span data-monthly="{{price.unitM}}" data-yearly="{{price.unitY}}">{{price.unitM}}</span><small data-monthly="{{price.yearlyNote}} 1 490 000 {{price.cur}}" data-yearly="{{price.monthlyNote}} 149 000 {{price.cur}}">{{price.yearlyNote}} 1 490 000 {{price.cur}}</small></div><ul><li>{{price.f.branch1}}</li><li>{{price.f.all}}</li><li>{{price.f.tg}}</li><li>{{price.f.migr}}</li></ul><a class="btn btn-t" href="/start" data-cta>{{price.cta}}</a></div>
+    <div class="plan pop"><span class="chip offer badge">{{price.pop}}</span><div><h3>{{price.p2.name}}</h3><div class="for">{{price.p2.for}}</div></div><div class="price"><span class="num" data-monthly="299 000" data-yearly="2 990 000">299 000</span> <span data-monthly="{{price.unitM}}" data-yearly="{{price.unitY}}">{{price.unitM}}</span><small data-monthly="{{price.yearlyNote}} 2 990 000 {{price.cur}}" data-yearly="{{price.monthlyNote}} 299 000 {{price.cur}}">{{price.yearlyNote}} 2 990 000 {{price.cur}}</small></div><ul><li>{{price.f.branch1}}</li><li>{{price.f.all}}</li><li>{{price.f.tg}}</li><li>{{price.f.migrTrain}}</li></ul><a class="btn btn-w" href="/start" data-cta>{{price.cta}}</a></div>
+    <div class="plan"><div><h3>Pro</h3><div class="for">{{price.p3.for}}</div></div><div class="price"><span class="num" data-monthly="549 000" data-yearly="5 490 000">549 000</span> <span data-monthly="{{price.unitM}}" data-yearly="{{price.unitY}}">{{price.unitM}}</span><small data-monthly="{{price.yearlyNote}} 5 490 000 {{price.cur}}" data-yearly="{{price.monthlyNote}} 549 000 {{price.cur}}">{{price.yearlyNote}} 5 490 000 {{price.cur}}</small></div><ul><li>{{price.f.branchN}}</li><li>{{price.f.all}}</li><li>{{price.f.tg}}</li><li>{{price.f.migrTrain}}</li></ul><a class="btn btn-t" href="/start" data-cta>{{price.cta}}</a></div>
+  </div>
+  <div class="incl"><h4>{{price.incl}}</h4><ul>
+    <li>{{incl.1}}</li><li>{{incl.2}}</li><li>{{incl.3}}</li>
+    <li>{{incl.4}}</li><li>{{incl.5}}</li><li>{{incl.6}}</li>
+    <li>{{incl.7}}</li><li>{{incl.8}}</li><li>{{incl.9}}</li>
+    <li>{{incl.10}}</li><li>{{incl.11}}</li><li>{{incl.12}}</li></ul></div>
+  <div class="big-note">{{price.big}} <b>{{price.bigb}}</b></div>
+</div></section>
+
+<section class="sec" id="how"><div class="wrap">
+  <div class="sec-head"><div class="eyebrow">{{how.eyebrow}}</div><h2 class="h2">{{how.h1}} <span class="hl">{{how.h2}}</span> {{how.h3}}</h2><p>{{how.p}}</p></div>
+  <div class="three">
+    <div class="s3"><span class="n">1</span><h3>{{how.s1h}}</h3><p>{{how.s1p}}</p></div>
+    <div class="s3"><span class="n">2</span><h3>{{how.s2h}}</h3><p>{{how.s2p}}</p></div>
+    <div class="s3"><span class="n">3</span><h3>{{how.s3h}}</h3><p>{{how.s3p}}</p></div>
+  </div>
+</div></section>
+
+<section class="sec" id="faq"><div class="wrap">
+  <div class="sec-head center" style="text-align:center"><div class="eyebrow">{{faq.eyebrow}}</div><h2 class="h2">{{faq.h}}</h2></div>
+  <div class="faq">
+    <details class="q" open><summary>{{faq.q1}}</summary><p>{{faq.a1}}</p></details>
+    <details class="q"><summary>{{faq.q2}}</summary><p>{{faq.a2}}</p></details>
+    <details class="q"><summary>{{faq.q3}}</summary><p>{{faq.a3}}</p></details>
+    <details class="q"><summary>{{faq.q4}}</summary><p>{{faq.a4}}</p></details>
+    <details class="q"><summary>{{faq.q5}}</summary><p>{{faq.a5}}</p></details>
+    <details class="q"><summary>{{faq.q6}}</summary><p>{{faq.a6}}</p></details>
+  </div>
+</div></section>
+
+<section class="sec"><div class="wrap">
+  <div class="final">
+    <div style="position:relative;z-index:1"><h2>{{final.h1}} <span>{{final.h2}}</span></h2><p>{{final.p}}</p><a class="btn btn-w" href="/start" data-cta>{{hero.cta}}</a></div>
+    <div class="contact">
+      <div class="r"><span>{{final.phone}}</span><a href="tel:+998950445014"><b>+998 95 044 50 14</b></a></div>
+      <div class="r"><span>Telegram</span><a href="https://t.me/madrimov"><b>@madrimov</b></a></div>
+      <div class="r"><span>{{final.pc}}</span><b>{{final.pcv}}</b></div>
+    </div>
+  </div>
+</div></section>
+</main>
+
+<footer><div class="wrap"><span>{{footer.copy}}</span><span class="copy"><span>{{footer.tag}}</span><a href="{{privacyHref}}">{{footer.privacy}}</a></span></div></footer>
+<script src="/assets/app.js" defer></script>
+</body>
+</html>

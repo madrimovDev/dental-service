@@ -18,7 +18,9 @@
       "!**/.next",
       "!**/out",
       "!**/api-client/openapi.json",
-      "!**/api-client/src/generated"
+      "!**/api-client/src/generated",
+      "!apps/landing/src/**/*.html",
+      "!apps/landing/src/style.css"
     ]
   },
   "formatter": {
