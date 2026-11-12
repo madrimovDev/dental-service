@@ -77,3 +77,6 @@ apps/desktop/infra
 # "Permission denied"ga uchraydi (haqiqiy sabab yashiringan xato bilan).
 infra/supervisor/releases/*
 !infra/supervisor/releases/.gitkeep
+
+# Landing build output
+apps/landing/dist

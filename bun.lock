@@ -100,6 +100,13 @@
         "vitest": "^2.1.8",
       },
     },
+    "apps/landing": {
+      "name": "@dental/landing",
+      "version": "0.1.0",
+      "devDependencies": {
+        "bun-types": "latest",
+      },
+    },
     "apps/supervisor-admin": {
       "name": "@supervisor/admin",
       "version": "0.1.0",
@@ -367,6 +374,8 @@
     "@dental/fiscal": ["@dental/fiscal@workspace:packages/fiscal"],
 
     "@dental/i18n": ["@dental/i18n@workspace:packages/i18n"],
+
+    "@dental/landing": ["@dental/landing@workspace:apps/landing"],
 
     "@dental/notifications": ["@dental/notifications@workspace:packages/notifications"],
 
@@ -2155,6 +2164,8 @@
     "@babel/helper-compilation-targets/lru-cache": ["lru-cache@5.1.1", "", { "dependencies": { "yallist": "^3.0.2" } }, "sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w=="],
 
     "@babel/helper-compilation-targets/semver": ["semver@6.3.1", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA=="],
+
+    "@dental/landing/bun-types": ["bun-types@1.4.4", "", { "dependencies": { "@types/node": "*", "undici-types": "*" } }, "sha512-yjrJh5oGX7mMPKGd19YXyIjmEuj4G4zNC30bs7PM9Az7NQ3ndF3j6hbeRdvJTRQEhJ/FYQwW0a2moweEi2hMxQ=="],
 
     "@develar/schema-utils/ajv": ["ajv@6.15.0", "", { "dependencies": { "fast-deep-equal": "^3.1.1", "fast-json-stable-stringify": "^2.0.0", "json-schema-traverse": "^0.4.1", "uri-js": "^4.2.2" } }, "sha512-fgFx7Hfoq60ytK2c7DhnF8jIvzYgOMxfugjLOSMHjLIPgenqa7S7oaagATUq99mV6IYvN2tRmC0wnTYX6iPbMw=="],
 

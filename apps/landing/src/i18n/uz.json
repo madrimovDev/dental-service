@@ -1,0 +1,377 @@
+{
+  "lang": {
+    "name": "O'zbekcha"
+  },
+  "skip": "Asosiy qismga o'tish",
+  "meta": {
+    "title": "Dentdo — stomatologiya klinikasi uchun dastur · 30 kun bepul",
+    "desc": "Yozilish, bemor kartasi, tish xaritasi, kassa va hisobotlar. Bemorlarga Telegram'da eslatma. 30 kun bepul, karta kerak emas. Oyiga 149 000 so'mdan."
+  },
+  "topbar": {
+    "q": "Savolingiz bormi?",
+    "tg": "Telegram"
+  },
+  "nav": {
+    "label": "Bo'limlar",
+    "features": "Imkoniyatlar",
+    "roles": "Kimlar uchun",
+    "pricing": "Narxlar",
+    "faq": "Savollar",
+    "login": "Kirish",
+    "cta": "30 kun bepul"
+  },
+  "hero": {
+    "chip": "30 kun bepul · karta kerak emas",
+    "h1a": "Klinikangiz —",
+    "h1b": "bitta ekranda",
+    "sub": "Yozilish, bemor kartasi, tish xaritasi, kassa va hisobotlar. Bemorlarga Telegram'da eslatma. Internet o'chsa ham ishlaydi.",
+    "cta": "30 kun bepul boshlash →",
+    "how": "Qanday ishlaydi",
+    "fine1": "2 daqiqada ochiladi",
+    "fine2": "oyiga 149 000 so'mdan",
+    "fine3": "Excel'dan bepul ko'chiramiz"
+  },
+  "shot": {
+    "calendar": {
+      "alt": "Dentdo kalendari: uchta shifokorning bugungi yozilishlari"
+    },
+    "telegram": {
+      "alt": "Telegram'dagi eslatma: «Kelaman» va «Boshqa vaqt» tugmalari"
+    },
+    "owner-phone": {
+      "alt": "Rahbarning telefonida bugungi tushum, qabullar va qarzlar"
+    },
+    "booking": {
+      "alt": "Yangi yozilish: shifokor va bo'sh vaqtni tanlash"
+    },
+    "tooth-chart": {
+      "alt": "FDI tish xaritasi: bemorning tishlari va tashxislar"
+    },
+    "cashier": {
+      "alt": "Kassa: to'lovlar va qarzdor bemorlar ro'yxati"
+    },
+    "queue": {
+      "alt": "Navbat: kutayotgan, kresloda va tugatgan bemorlar"
+    },
+    "reports": {
+      "alt": "Hisobotlar: oylik tushum diagrammasi"
+    },
+    "payroll": {
+      "alt": "Shifokorlar ish haqi va ombor qoldig'i"
+    }
+  },
+  "fb": {
+    "side": {
+      "today": "Bugun",
+      "calendar": "Kalendar",
+      "queue": "Navbat",
+      "patients": "Bemorlar",
+      "cashier": "Kassa",
+      "stock": "Ombor",
+      "reports": "Hisobotlar"
+    },
+    "cal": {
+      "day": "Payshanba, 12-noyabr",
+      "new": "+ Yangi yozilish"
+    },
+    "doc1": "Dr. Karimova",
+    "doc2": "Dr. Aliyev",
+    "doc3": "Dr. Rahimov",
+    "p1": "Sardor T.",
+    "t1": "Plomba · 46",
+    "p2": "Malika Y.",
+    "t2": "Konsultatsiya",
+    "p3": "Jasur M.",
+    "t3": "Implant · 2-bosqich",
+    "p4": "Nodira S.",
+    "t4": "Professional tozalash",
+    "p5": "Bekzod R.",
+    "t5": "Kanal · 36",
+    "p6": "Aziz Q.",
+    "t6": "Kelmadi",
+    "p7": "Dilnoza A.",
+    "t7": "Breket nazorati",
+    "p8": "Otabek K.",
+    "t8": "Toj · 21",
+    "p9": "Shahzoda N.",
+    "t9": "Plomba · 14",
+    "p10": "Rustam E.",
+    "t10": "Olib tashlash · 38",
+    "p11": "Kamola B.",
+    "t11": "Oqartirish",
+    "tg": {
+      "msg": "Jasur, ertaga soat 10:00 da Dr. Karimova qabuliga yozilgansiz.",
+      "ok": "Kelaman",
+      "other": "Boshqa vaqt"
+    },
+    "ph": {
+      "role": "Rahbar",
+      "today": "Bugun",
+      "income": "Bugungi tushum",
+      "visits": "Qabullar",
+      "noshow": "Kelmadi",
+      "debts": "Qarzlar"
+    },
+    "paid": "to'landi",
+    "q1": "Kutmoqda",
+    "q2": "Kresloda",
+    "q3": "Tugadi",
+    "rep": "Noyabr · tushum",
+    "mat1": "Kompozit plomba",
+    "mat1v": "4 kunga yetadi",
+    "mat2": "Anestetik",
+    "mat2v": "yetarli"
+  },
+  "save": {
+    "cur": "so'm",
+    "h": "qo'shimcha uskuna va o'rnatish xarajati",
+    "p": "Bor kompyuter va telefonlaringizda ishlaydi. O'rnatish va bemorlarni ko'chirish — bepul.",
+    "not": "Kerak emas",
+    "n1h": "Alohida server",
+    "n1p": "Bulutda yoki klinikadagi oddiy kompyuterda ishlaydi.",
+    "n2h": "IT xodim",
+    "n2p": "Yangilanish va zaxira nusxa o'zi bo'ladi.",
+    "n3h": "Uzoq o'rganish",
+    "n3p": "Har xodim faqat o'z ekranini ko'radi — bir kunda o'rganiladi.",
+    "n4h": "Doimiy internet",
+    "n4p": "Kompyuter versiyasi internetsiz ham ishlaydi."
+  },
+  "feat": {
+    "eyebrow": "Imkoniyatlar",
+    "h1": "Bitta dastur —",
+    "h2": "klinikaning",
+    "h3": "hamma ishi",
+    "p": "Daftar, Excel va xotira o'rniga — har kuni o'zi ishlaydigan tartib."
+  },
+  "c1": {
+    "h": "Yozilish",
+    "hs": "Telegram eslatma bilan",
+    "p": "Bemor ertangi qabul haqida xabar oladi va «Kelaman» yoki «Boshqa vaqt»ni bosadi.",
+    "foot": "Bo'sh kreslo kamayadi"
+  },
+  "c2": {
+    "h": "Tish xaritasi",
+    "hs": "va vizit yozuvi",
+    "p": "FDI xarita, tashxis qidiruvi, davolash rejasi. Allergiya bo'lsa retseptda ogohlantiradi.",
+    "foot": "Bemor tarixi bir qarashda"
+  },
+  "c3": {
+    "h": "Kassa",
+    "hs": "va qarzlar",
+    "p": "Naqd va karta (Terminal, Click, Payme) — kunlik xulosa turi bo'yicha. Bo'lib to'lash va qarz ro'yxati.",
+    "foot": "Kim qancha qarzdor — bitta ro'yxatda"
+  },
+  "c4": {
+    "h": "Navbat",
+    "hs": "qabulxonada",
+    "p": "Kim kutyapti, kim kresloda, kim tugatdi. Shifokor bemorni o'zi chaqiradi.",
+    "foot": "Qabulxonada tartib"
+  },
+  "c5": {
+    "h": "Hisobotlar",
+    "hs": "rahbar uchun",
+    "p": "Tushum, eng ko'p qilingan xizmatlar, qaysi shifokor qancha ishladi — telefondan ham.",
+    "foot": "Oy yakuni — bir tugmada"
+  },
+  "c6": {
+    "h": "Ish haqi",
+    "hs": "va ombor",
+    "p": "Shifokor foizi bajarilgan ishdan avtomatik. Material xizmatdan o'zi yechiladi.",
+    "foot": "Kechqurun kalkulyatorsiz"
+  },
+  "more": {
+    "lead": "…yana:",
+    "1": "Lab portali",
+    "2": "Retsept va konsent",
+    "3": "Rentgen rasmlari",
+    "4": "Excel import",
+    "5": "Rollar va ruxsatlar",
+    "6": "Bir nechta filial",
+    "7": "Kunlik zaxira",
+    "8": "O'zbek va rus tili"
+  },
+  "roles": {
+    "eyebrow": "Kimlar uchun",
+    "h1": "Har xodim",
+    "h2": "faqat o'z ishini",
+    "h3": "ko'radi",
+    "p": "Ortiqcha tugma yo'q. Registrator, shifokor va rahbar uchun alohida ekran.",
+    "r1i": "R",
+    "r1h": "Registrator",
+    "r1a": "Kalendar va yozilish",
+    "r1b": "Navbat",
+    "r1c": "Kassa va chek",
+    "r2i": "S",
+    "r2h": "Shifokor",
+    "r2a": "Mening kunim",
+    "r2b": "Tish xaritasi",
+    "r2c": "Vizit yozuvi, retsept",
+    "r3i": "B",
+    "r3h": "Rahbar",
+    "r3a": "Bugungi tushum",
+    "r3b": "Hisobotlar, qarzlar",
+    "r3c": "Xodimlar va ish haqi",
+    "r4i": "T",
+    "r4h": "Bemor",
+    "r4a": "Telegram bot orqali yozilish",
+    "r4b": "Eslatma va chek",
+    "r4c": "Anketa to'ldirish"
+  },
+  "duo": {
+    "eyebrow": "Internet o'chsa ham",
+    "h1": "Bulut yoki o'z kompyuteringiz —",
+    "h2": "narx bir xil",
+    "p": "Qaysi biri qulay bo'lsa, shuni tanlang. Keyinchalik almashtirish mumkin.",
+    "cloud": {
+      "tag": "Bulut",
+      "h": "Brauzerdan, hech narsa o'rnatilmaydi",
+      "p": "Ro'yxatdan o'ting va 2 daqiqada ishlang — klinikadan, uydan, telefondan.",
+      "a": "Har kuni avtomatik zaxira",
+      "b": "Yangilanishlar o'zi keladi",
+      "c": "Bir nechta filial bitta hisobda"
+    },
+    "pc": {
+      "tag": "Kompyuter versiyasi",
+      "h": "Klinika ichida, internetsiz ishlaydi",
+      "p": "Ma'lumot sizning kompyuteringizda. Boshqa kompyuterlar tarmoq orqali ulanadi.",
+      "a": "Internet uzilsa ham qabul to'xtamaydi",
+      "b": "Har kuni 20:00 da zaxira nusxa",
+      "c": "O'rnatib, sozlab beramiz"
+    }
+  },
+  "lab": {
+    "eyebrow": "Tish laboratoriyasi",
+    "h1": "Buyurtma labga",
+    "h2": "telefonsiz",
+    "h3": "yetadi",
+    "p": "Shifokor buyurtmani dasturdan yuboradi, texnik o'z portalida ko'radi. Holat, narx va yozishma bir joyda.",
+    "lock": "Bemor ismi va rasmlari shifrlangan holda uzatiladi",
+    "s1": "Toj · 21 — Sardor T., rang A2",
+    "s1t": "Labga yuborildi",
+    "s2": "Lab: «Narx 450 000 so'm, 6 kun»",
+    "s2t": "Narx taklifi",
+    "s3": "Shifokor narxni tasdiqladi",
+    "s3t": "Ishda",
+    "s4": "Tayyor — 18-noyabr, xarajat o'zi yozildi",
+    "s4t": "Tayyor"
+  },
+  "price": {
+    "eyebrow": "Narxlar",
+    "h1": "Shifokorlar soniga qarab —",
+    "h2": "boshqa hech narsa",
+    "p": "Hamma tariflarda barcha imkoniyatlar. 30 kun bepul, karta kerak emas.",
+    "period": "To'lov davri",
+    "monthly": "Oylik",
+    "yearly": "Yillik",
+    "free2": "2 oy bepul",
+    "cur": "so'm",
+    "unitM": "so'm/oy",
+    "unitY": "so'm/yil",
+    "yearlyNote": "yillik:",
+    "monthlyNote": "2 oy bepul · oylik:",
+    "p1": {
+      "for": "1–2 shifokor"
+    },
+    "p2": {
+      "name": "Klinika",
+      "for": "3–5 shifokor"
+    },
+    "p3": {
+      "for": "6–10 shifokor"
+    },
+    "pop": "Ko'pchilik tanlaydi",
+    "f": {
+      "branch1": "1 filial",
+      "branchN": "Bir nechta filial",
+      "all": "Barcha imkoniyatlar",
+      "tg": "Telegram eslatma",
+      "migr": "Bepul ko'chirish",
+      "migrTrain": "Bepul ko'chirish va o'rgatish"
+    },
+    "cta": "30 kun bepul",
+    "incl": "Har bir tarifda, qo'shimcha to'lovsiz:",
+    "big": "10 tadan ko'p shifokor yoki tarmoq klinikasi?",
+    "bigb": "Yozing — alohida narx kelishamiz."
+  },
+  "incl": {
+    "1": "Kalendar va navbat",
+    "2": "Bemor kartasi, tish xaritasi",
+    "3": "Kassa, qarzlar, bo'lib to'lash",
+    "4": "Telegram eslatma va bot",
+    "5": "Davolash rejasi, retsept",
+    "6": "Lab portali",
+    "7": "Ombor va materiallar",
+    "8": "Ish haqi hisobi",
+    "9": "Hisobotlar",
+    "10": "Rollar va ruxsatlar",
+    "11": "Kunlik zaxira nusxa",
+    "12": "Kompyuter versiyasi"
+  },
+  "how": {
+    "eyebrow": "Boshlash",
+    "h1": "Ochamiz.",
+    "h2": "Ko'chiramiz.",
+    "h3": "O'rgatamiz.",
+    "p": "Bir kunda butun klinika yangi tizimda ishlaydi.",
+    "s1h": "Ro'yxatdan o'ting",
+    "s1p": "Klinika nomi va telefon raqami — 2 daqiqa. Darhol ishlay boshlaysiz.",
+    "s2h": "Bemorlarni yuklaymiz",
+    "s2p": "Excel yoki daftardagi ro'yxatingizni yuboring — bepul ko'chirib beramiz.",
+    "s3h": "Xodimlarni taklif qiling",
+    "s3p": "Har biri o'z telefoni bilan kiradi. Kerak bo'lsa, klinikaga kelib o'rgatamiz."
+  },
+  "faq": {
+    "eyebrow": "Savollar",
+    "h": "Ko'p so'raladigan savollar",
+    "q1": "30 kun tugagach nima bo'ladi?",
+    "a1": "Tarifni tanlab to'laysiz va davom etasiz. To'lov kechiksa, yana 7 kun bemalol ishlaysiz. Keyin kirish to'xtaydi, lekin ma'lumotlaringiz o'chmaydi.",
+    "q2": "Ma'lumotlarim xavfsizmi?",
+    "a2": "Har klinika ma'lumoti alohida saqlanadi, har kuni zaxira nusxa olinadi, kirish rollar bo'yicha cheklangan.",
+    "q3": "Internet o'chsa ishlaydimi?",
+    "a3": "Kompyuter versiyasi klinika ichida internetsiz ishlaydi. Bulut versiyasi uchun internet kerak.",
+    "q4": "Qanday to'lash mumkin?",
+    "a4": "Bank o'tkazmasi, Click yoki Payme orqali — oylik yoki yillik.",
+    "q5": "Bemorlarimni Excel'dan ko'chirasizmi?",
+    "a5": "Ha, bepul. Ro'yxatni Telegram'da yuboring.",
+    "q6": "Rus tilida ishlaydimi?",
+    "a6": "Ha. Har xodim o'z tilini tanlaydi: o'zbekcha yoki ruscha."
+  },
+  "final": {
+    "h1": "Bugun boshlang —",
+    "h2": "30 kun bepul",
+    "p": "Karta kerak emas. Yoqmasa, hech narsa to'lamaysiz.",
+    "phone": "Telefon",
+    "pc": "Kompyuter versiyasi",
+    "pcv": "Yozing — o'rnatib beramiz"
+  },
+  "footer": {
+    "copy": "© 2026 Dentdo · Woodo oilasidan",
+    "tag": "Stomatologiya klinikalari uchun dastur · O'zbekiston",
+    "privacy": "Maxfiylik"
+  },
+  "privacy": {
+    "title": "Maxfiylik siyosati — Dentdo",
+    "desc": "Dentdo ro'yxatdan o'tishda qanday ma'lumot yig'adi va undan qanday foydalanadi.",
+    "h1": "Maxfiylik siyosati",
+    "upd": "Oxirgi yangilanish: 2026-yil 12-noyabr",
+    "s1h": "Qanday ma'lumot yig'amiz",
+    "s1p": "Ro'yxatdan o'tganingizda: klinika nomi, rahbarning ism-familiyasi, telefon raqami (u kirish uchun login bo'ladi), parol (faqat hash ko'rinishida, ochiq matnda saqlanmaydi) va interfeys tili. Bu sahifada tashqi kuzatuv yoki reklama skriptlari yo'q; faqat shrift Google Fonts'dan yuklanadi.",
+    "s2h": "Bemorlar ma'lumoti",
+    "s2p": "Klinika dasturga kiritgan bemorlar ma'lumoti klinikaning o'ziga tegishli. Har klinika ma'lumoti boshqalardan alohida saqlanadi va faqat o'sha klinika xodimlariga ko'rinadi.",
+    "s3h": "Nima uchun foydalanamiz",
+    "s3p": "Hisobingizni yaratish, dasturga kirishingizni ta'minlash, obunani boshqarish va siz bilan aloqaga chiqish uchun.",
+    "s4h": "Kimga beriladi",
+    "s4p": "Ma'lumotlaringiz uchinchi shaxslarga sotilmaydi va reklama uchun berilmaydi. Faqat qonun talab qilgan hollardagina vakolatli organga berilishi mumkin. Klinika o'zi yoqsa, bemorlarga Telegram orqali xabar yuboriladi — bunda faqat shu xabar matni Telegram orqali o'tadi.",
+    "s5h": "Saqlash va o'chirish",
+    "s5p": "Ma'lumotlar xavfsiz serverda saqlanadi, har kuni zaxira nusxa olinadi. Hisobingiz va ma'lumotlaringizni o'chirishni so'rash uchun biz bilan bog'laning.",
+    "s6h": "Aloqa",
+    "s6p": "Savollar bo'lsa: +998 95 044 50 14 yoki Telegram @madrimov.",
+    "back": "← Bosh sahifaga"
+  },
+  "notfound": {
+    "title": "Sahifa topilmadi — Dentdo",
+    "h": "Sahifa topilmadi",
+    "p": "Manzil noto'g'ri yoki sahifa ko'chirilgan.",
+    "back": "Bosh sahifaga qaytish"
+  }
+}

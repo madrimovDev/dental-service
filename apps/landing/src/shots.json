@@ -1,0 +1,11 @@
+{
+  "calendar": { "w": 1520, "h": 860 },
+  "telegram": { "w": 540, "h": 300 },
+  "owner-phone": { "w": 368, "h": 680 },
+  "booking": { "w": 700, "h": 380 },
+  "tooth-chart": { "w": 700, "h": 380 },
+  "cashier": { "w": 700, "h": 380 },
+  "queue": { "w": 700, "h": 380 },
+  "reports": { "w": 700, "h": 380 },
+  "payroll": { "w": 700, "h": 380 }
+}
