@@ -1,22 +1,20 @@
 // Supervisor's RSA public key — verifies `.lic` signatures offline.
-// The matching private key lives ONLY in the Supervisor VPS's
-// `.env.production` (`RSA_PRIVATE_KEY`), never in this repo.
+// The matching private key lives ONLY on the Supervisor VPS
+// (`/srv/dental/secrets/supervisor-private.pem` → `RSA_PRIVATE_KEY`), never in this repo.
 //
-// UPDATED (CLI-361, 2026-07-11): freshly generated production RSA keypair for
-// the VM deploy (replaces the old dev keypair of CLI-401). This is the SPKI
-// public half; the matching PKCS8 private half lives ONLY in the Supervisor
-// VM's env (`RSA_PRIVATE_KEY`), never in this repo. Generated via
-// `apps/supervisor-api/src/lib/rsa.ts` generateKeyPair() (RSA-2048, SHA256).
+// ROTATED (FU-54, 2026-11-12): the previous production private key was exposed in a
+// local agent transcript, so a fresh RSA-2048 keypair was generated ON the VPS
+// (infra/vps/gen-secrets.sh). Every `.lic` signed by the old key and every desktop
+// installer built before this commit is INVALID — rebuild + redistribute.
 // The keypair MUST stay matched: swapping one half without the other breaks
-// all existing `.lic` signatures. Desktop builds bake THIS public key, so any
-// keypair change requires rebuilding + redistributing the desktop app.
+// all existing `.lic` signatures. Desktop builds bake THIS public key.
 export const SUPERVISOR_PUBLIC_KEY_PEM = `-----BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAq0vbIWAqHLHwMCPCUaqf
-Heez0fvyPcHbKBqODNPkYke/L0cv/ysHqRnKqpWycSHgVsTpiHMsnuD0RLsQznwh
-aKYAT+vNgdDcCe0kvt4ey2xjLcvN++W88O8o0T0gvPuVbmbqipiwOv1WXLKfoa8A
-ztH+cNJ2P4eR8cIyE7kub+UdeE7zD2yiM2hVVDBbzdRnNDi6bDQEMdJFojDUxKcM
-O787ITrDRQPUXxIiDHJ/EzXwVjVpK5LVwQpr61SuVbkwunRp34J9WtUPrXuZOo06
-MSn8sQTl7KHvUrXx6tA6+/+4XA+EnyC8UA1mDX1c3S4udoldRkKgmd+wIvvNFa8D
-XwIDAQAB
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvmbxBkoX5oo3cyqKmdzN
+xls3M3eZcDSLiy8D/MZqCetdnOX+/avPKeEblmgTnKPMD49jZtnocc87mkW17x1I
+bfYt9cH8zXkiKnd419rivzo62UUdKz4VW9y+bVzxxO87m24019trFl0WJaAjsnDr
+xvV1OJT1lARWt9MCT6sCqxYjZ7ttiQYD3g3R9iZyxqyRPCWmDQnKYV8r+vSh+CoH
+ihEfjnJ566kXwHLnvs56A/a7BwhKRk7HlPROHy4pvoxHrrHgXizEcmQdQE7jcC8/
+JilXbBXNmrwEfMHRRr0gPEMb5XH3zEPxuTMbxXCgFywuZxKk7CbA2cgGRm9rtkOm
+wwIDAQAB
 -----END PUBLIC KEY-----
 `;
