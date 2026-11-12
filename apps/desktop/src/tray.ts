@@ -52,7 +52,7 @@ export const createTray = (role: AppRole, info: TrayInfo, callbacks: TrayCallbac
     );
     return;
   }
-  tray.setToolTip('Dental Service');
+  tray.setToolTip('Dentdo');
   updateTray(role, info, callbacks);
 };
 
@@ -67,10 +67,10 @@ export const setTrayToolTip = (text: string): void => {
 export const updateTray = (role: AppRole, info: TrayInfo, callbacks: TrayCallbacks): void => {
   const label =
     role === 'server'
-      ? `Dental Service — Server\n📡 ${info.serverUrl}\n👥 ${info.connectedClients ?? 0} ta qurilma${info.licenseInfo ? `\n🔐 ${info.licenseInfo}` : ''}${info.serverState ? `\n🖥 Server: ${SERVER_STATE_LABELS[info.serverState]}` : ''}`
+      ? `Dentdo — Server\n📡 ${info.serverUrl}\n👥 ${info.connectedClients ?? 0} ta qurilma${info.licenseInfo ? `\n🔐 ${info.licenseInfo}` : ''}${info.serverState ? `\n🖥 Server: ${SERVER_STATE_LABELS[info.serverState]}` : ''}`
       : info.serverFound === false
-        ? 'Dental Service — Klient\n🔍 Server topilmadi (30s da qayta urinilmoqda)'
-        : `Dental Service — Klient\n✅ Ulangan: ${info.serverUrl}`;
+        ? 'Dentdo — Klient\n🔍 Server topilmadi (30s da qayta urinilmoqda)'
+        : `Dentdo — Klient\n✅ Ulangan: ${info.serverUrl}`;
 
   const menu = Menu.buildFromTemplate([
     { label, enabled: false },

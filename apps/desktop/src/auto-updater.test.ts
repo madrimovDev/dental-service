@@ -79,9 +79,9 @@ describe('setupAutoUpdater', () => {
 
     updater.emitDownloaded();
 
-    expect(setTrayToolTip).toHaveBeenCalledWith('Dental Service — yangilash tayyor');
+    expect(setTrayToolTip).toHaveBeenCalledWith('Dentdo — yangilash tayyor');
     expect(notify).toHaveBeenCalledTimes(1);
-    expect(notify.mock.calls[0]?.[0]).toBe('Dental Service');
+    expect(notify.mock.calls[0]?.[0]).toBe('Dentdo');
     expect(notify.mock.calls[0]?.[1]).toContain('Yangilash yuklab olindi');
   });
 

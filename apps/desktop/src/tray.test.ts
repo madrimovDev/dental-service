@@ -24,7 +24,7 @@ describe('tray', () => {
       { onOpen, onSettings, onStop },
     );
 
-    expect(trayMockState.setToolTipCalls).toEqual(['Dental Service']);
+    expect(trayMockState.setToolTipCalls).toEqual(['Dentdo']);
     expect(trayMockState.setContextMenuCalls).toHaveLength(1);
   });
 
@@ -146,12 +146,9 @@ describe('tray', () => {
       { onOpen: mock(() => {}), onSettings: mock(() => {}), onStop: mock(() => {}) },
     );
 
-    setTrayToolTip('Dental Service — yangilash tayyor');
+    setTrayToolTip('Dentdo — yangilash tayyor');
 
-    expect(trayMockState.setToolTipCalls).toEqual([
-      'Dental Service',
-      'Dental Service — yangilash tayyor',
-    ]);
+    expect(trayMockState.setToolTipCalls).toEqual(['Dentdo', 'Dentdo — yangilash tayyor']);
   });
 
   test("ikon fayli yo'q (nativeImage bo'sh qaytaradi) bo'lsa createTray warning log qiladi va crash bo'lmaydi", () => {

@@ -117,8 +117,8 @@ export const setupAutoUpdater = (deps: AutoUpdaterDeps): AutoUpdaterControls | u
   };
 
   updater.on('update-downloaded', () => {
-    setTrayToolTip('Dental Service — yangilash tayyor');
-    notify('Dental Service', "🔄 Yangilash yuklab olindi. Klinika yopilgandan keyin o'rnatiladi.");
+    setTrayToolTip('Dentdo — yangilash tayyor');
+    notify('Dentdo', "🔄 Yangilash yuklab olindi. Klinika yopilgandan keyin o'rnatiladi.");
     planInstall();
   });
 
