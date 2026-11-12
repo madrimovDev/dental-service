@@ -39,7 +39,7 @@
       "alt": "Telegram'dagi eslatma: «Kelaman» va «Boshqa vaqt» tugmalari"
     },
     "owner-phone": {
-      "alt": "Rahbarning telefonida bugungi tushum, qabullar va qarzlar"
+      "alt": "Rahbar bosh sahifasi: bugungi tushum, bemorlar qarzi va qayta chaqirish"
     },
     "booking": {
       "alt": "Yangi yozilish: shifokor va bo'sh vaqtni tanlash"
@@ -48,10 +48,10 @@
       "alt": "FDI tish xaritasi: bemorning tishlari va tashxislar"
     },
     "cashier": {
-      "alt": "Kassa: to'lovlar va qarzdor bemorlar ro'yxati"
+      "alt": "Kassa: kunlik xulosa, naqd va karta (Terminal, Payme) bo'yicha"
     },
     "queue": {
-      "alt": "Navbat: kutayotgan, kresloda va tugatgan bemorlar"
+      "alt": "Navbat: kutayotgan va qabuldagi bemorlar"
     },
     "reports": {
       "alt": "Hisobotlar: oylik tushum diagrammasi"

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { cp, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildSite, flattenDict } from './build';
@@ -126,9 +126,35 @@ describe('buildSite', () => {
     }
   });
 
-  test("skrinshot bo'lmasa maket chizmasi zaxira bo'lib qoladi (sinmaydi)", () => {
-    expect(html['index.html']).toContain('class="scr"');
-    expect(html['index.html']).not.toContain('<!--shot:');
+  test('skrinshotlar bor — 9 ta <img> (uz/ru), maket zaxirasi qolmaydi', () => {
+    for (const [page, lang] of [
+      ['index.html', 'uz'],
+      ['ru/index.html', 'ru'],
+    ] as const) {
+      const h = html[page] ?? '';
+      expect(h).not.toContain('<!--shot:');
+      expect(h).not.toContain('class="scr"');
+      const imgs = [...h.matchAll(/<img class="shot [^>]*>/g)].map((m) => m[0]);
+      expect(imgs).toHaveLength(9);
+      for (const img of imgs) {
+        expect(img).toContain(`src="/assets/shots/${lang}/`);
+        expect(img).toMatch(/width="\d+" height="\d+"/);
+        expect(img).toMatch(/alt="[^"]{8,}"/);
+      }
+    }
+  });
+
+  test("skrinshot bo'lmasa maket chizmasi zaxira bo'lib qoladi (sinmaydi)", async () => {
+    const bare = await mkdtemp(join(tmpdir(), 'landing-bare-'));
+    const srcCopy = join(bare, 'src');
+    await cp(SRC, srcCopy, { recursive: true });
+    await rm(join(srcCopy, 'assets', 'shots'), { recursive: true, force: true });
+    const outBare = join(bare, 'out');
+    await buildSite({ srcDir: srcCopy, outDir: outBare });
+    const h = await readFile(join(outBare, 'index.html'), 'utf8');
+    expect(h).toContain('class="scr"');
+    expect(h).not.toContain('<!--shot:');
+    await rm(bare, { recursive: true, force: true });
   });
 
   test('«Kirish» havolasi ilova hostiga, privacy sahifasi mavjud', () => {
