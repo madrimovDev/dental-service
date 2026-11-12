@@ -125,7 +125,7 @@
   "save": {
     "cur": "so'm",
     "h": "qo'shimcha uskuna va o'rnatish xarajati",
-    "p": "Bor kompyuter va telefonlaringizda ishlaydi. O'rnatish va bemorlarni ko'chirish — bepul.",
+    "p": "Bor kompyuterlaringizda ishlaydi. O'rnatish va bemorlarni ko'chirish — bepul.",
     "not": "Kerak emas",
     "n1h": "Alohida server",
     "n1p": "Bulutda yoki klinikadagi oddiy kompyuterda ishlaydi.",
@@ -170,7 +170,7 @@
   "c5": {
     "h": "Hisobotlar",
     "hs": "rahbar uchun",
-    "p": "Tushum, eng ko'p qilingan xizmatlar, qaysi shifokor qancha ishladi — telefondan ham.",
+    "p": "Tushum, eng ko'p qilingan xizmatlar, qaysi shifokor qancha ishladi.",
     "foot": "Oy yakuni — bir tugmada"
   },
   "c6": {
@@ -225,7 +225,7 @@
     "cloud": {
       "tag": "Bulut",
       "h": "Brauzerdan, hech narsa o'rnatilmaydi",
-      "p": "Ro'yxatdan o'ting va 2 daqiqada ishlang — klinikadan, uydan, telefondan.",
+      "p": "Ro'yxatdan o'ting va 2 daqiqada ishlang — klinikadan yoki uydan, brauzer orqali.",
       "a": "Har kuni avtomatik zaxira",
       "b": "Yangilanishlar o'zi keladi",
       "c": "Bir nechta filial bitta hisobda"
