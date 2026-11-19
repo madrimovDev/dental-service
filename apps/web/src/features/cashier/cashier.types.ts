@@ -44,7 +44,8 @@ export type TransactionVM = {
 };
 
 /** Bosqich to'lov holati. */
-export type StageState = 'paid' | 'partial' | 'unpaid';
+/** `excluded` (FX-151): qarzga kirmaydigan (qabul qilinmagan/o'tkazib yuborilgan) bosqich. */
+export type StageState = 'paid' | 'partial' | 'unpaid' | 'excluded';
 
 /** Plan bosqichi balans view-model'i. */
 export type StageVM = {

@@ -1384,7 +1384,8 @@
       "state": {
         "paid": "To'langan",
         "partial": "Qisman",
-        "unpaid": "To'lanmagan"
+        "unpaid": "To'lanmagan",
+        "excluded": "Qabul qilinmagan"
       }
     },
     "paid_of_total": "to'langan: {{paid}}",

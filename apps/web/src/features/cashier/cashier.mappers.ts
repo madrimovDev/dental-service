@@ -152,6 +152,8 @@ export type AllocationPayload = {
   discount: 0;
   paidAmount: number;
   paymentMethod: PaymentMethod;
+  /** Faqat `card` uchun (FX-150). */
+  cardProvider?: CardProvider;
 };
 
 /** Plan billing allocation body (sof). `paidAmount = Σ amounts`. */
@@ -161,6 +163,7 @@ export function buildAllocationPayload(input: {
   treatmentPlanId: string;
   selections: StageSelection[];
   paymentMethod: PaymentMethod;
+  cardProvider?: CardProvider | null;
 }): AllocationPayload {
   const paidAmount = input.selections.reduce((sum, s) => sum + s.amount, 0);
   return {
@@ -172,6 +175,7 @@ export function buildAllocationPayload(input: {
     discount: 0,
     paidAmount,
     paymentMethod: input.paymentMethod,
+    cardProvider: input.paymentMethod === 'card' ? (input.cardProvider ?? undefined) : undefined,
   };
 }
 
@@ -223,7 +227,8 @@ export function toPlanBalanceVM(b: PlanBalance): PlanBalanceVM {
         cost: s.cost,
         paid: s.paid,
         remaining: s.remaining,
-        state: stageStateOf(s.remaining, s.paid),
+        // FX-151: qarzdan chiqarilgan bosqichda cost=0 → remaining=0 → «paid» bo'lib qolardi.
+        state: s.excludedFromDebt ? 'excluded' : stageStateOf(s.remaining, s.paid),
       }),
     ),
   };

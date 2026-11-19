@@ -237,6 +237,16 @@ describe('toPlanBalanceVM', () => {
     ],
   };
 
+  it("FX-151: excludedFromDebt bosqich 'excluded' (paid emas)", () => {
+    const vm = toPlanBalanceVM({
+      ...balance,
+      stages: [
+        { stageId: 'x', serviceName: 'X', cost: 0, paid: 0, remaining: 0, excludedFromDebt: true },
+      ],
+    });
+    expect(vm.stages[0]?.state).toBe('excluded');
+  });
+
   it('stage state: paid / partial / unpaid', () => {
     const vm = toPlanBalanceVM(balance);
     expect(vm.stages.map((s) => s.state)).toEqual(['paid', 'partial', 'unpaid']);
