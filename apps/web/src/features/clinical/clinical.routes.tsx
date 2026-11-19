@@ -33,5 +33,5 @@ export const clinicalRoutes: AppRoute[] = [
   { path: '/patients/:id/lab-orders/new', perm: 'lab_order.manage', element: <LabOrderNewPage /> },
   { path: '/lab-orders/:id', perm: 'lab_order.view', element: <LabOrderDetailPage /> },
   { path: '/lab', perm: 'lab_order.view', element: <LabOrdersScreen /> },
-  { path: '/rx', perm: 'medical_record.view', element: <RxScreen /> },
+  { path: '/rx', perm: 'prescription.view', element: <RxScreen /> },
 ];

@@ -310,3 +310,10 @@ describe('rolga moslashuvchi sidebar (1.5)', () => {
     }
   });
 });
+
+describe('FX-131 — /rx nav perm endpoint perm bilan mos (prescription.view)', () => {
+  it('rx elementi prescription.view talab qiladi', () => {
+    const rx = NAV_GROUPS.flatMap((g) => g.items).find((i) => i.key === 'rx');
+    expect(rx?.permission).toBe('prescription.view');
+  });
+});

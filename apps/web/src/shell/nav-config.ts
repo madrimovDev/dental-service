@@ -93,7 +93,7 @@ export const NAV_GROUPS: NavGroup[] = [
         feature: 'labOrders',
         permission: 'lab_order.view',
       },
-      { key: 'rx', labelKey: 'nav.rx', icon: Pill, path: '/rx', permission: 'medical_record.view' },
+      { key: 'rx', labelKey: 'nav.rx', icon: Pill, path: '/rx', permission: 'prescription.view' },
       {
         key: 'schedule',
         labelKey: 'nav.schedule',
