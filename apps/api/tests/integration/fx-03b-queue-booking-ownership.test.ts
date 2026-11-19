@@ -26,6 +26,7 @@ import { signAccess } from '../../src/lib/jwt.ts';
 import { createAppointmentsService } from '../../src/modules/appointments/appointments.service.ts';
 import { bookingRequestRoutes } from '../../src/modules/booking-requests/index.ts';
 import { queueRoutes } from '../../src/modules/queue/index.ts';
+import { grantTenantWide } from './_grant-scope.ts';
 
 const receptionist = ROLE_TEMPLATES.find((t) => t.templateKey === 'receptionist');
 if (!receptionist) throw new Error('receptionist template not found');
@@ -126,6 +127,8 @@ beforeAll(async () => {
           acceptedAt: new Date(),
         })),
       );
+      if (memberIds.includes(recepA))
+        await grantTenantWide(tx, tid, recepA, ['appointment.view', 'appointment.create']);
       return { branch: br!.id, patient: p!.id, service: svc!.id };
     });
 

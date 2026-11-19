@@ -45,6 +45,7 @@ import { createAppointmentsService } from '../../src/modules/appointments/index.
 import { expireStaleBookingRequests } from '../../src/modules/booking-requests/index.ts';
 import { createNotificationsService } from '../../src/modules/notifications/notifications.service.ts';
 import { createScheduleService } from '../../src/modules/schedule/index.ts';
+import { grantTenantWide } from './_grant-scope.ts';
 
 const secretPath = `${import.meta.dir}/.ui-t2-telegram-secret-test.txt`;
 process.env.MESSAGING_SECRET_PATH = secretPath;
@@ -256,6 +257,10 @@ beforeAll(async () => {
       .returning({ id: patients.id });
     patient1 = ps[0]!.id;
     patient2 = ps[1]!.id;
+    await grantTenantWide(tx as never, tA, receptionistId, [
+      'appointment.view',
+      'appointment.create',
+    ]);
   });
   await withTenant(tB, async (tx) => {
     const [b] = await tx
