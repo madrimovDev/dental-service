@@ -27,7 +27,6 @@ import { createAppointmentsService } from '../../src/modules/appointments/appoin
 import { bookingRequestRoutes } from '../../src/modules/booking-requests/index.ts';
 import { queueRoutes } from '../../src/modules/queue/index.ts';
 import { grantTenantWide } from './_grant-scope.ts';
-import { seedRoleForUser } from './fx-m2-helpers.ts';
 
 const receptionist = ROLE_TEMPLATES.find((t) => t.templateKey === 'receptionist');
 if (!receptionist) throw new Error('receptionist template not found');
@@ -128,8 +127,9 @@ beforeAll(async () => {
           acceptedAt: new Date(),
         })),
       );
-      if (memberIds.includes(recepA))
-        await grantTenantWide(tx, tid, recepA, ['appointment.view', 'appointment.create']);
+      // X-2 / FX-53 / FX-133: filial doirasi tayinlovlardan o'qiladi — real tenant-wide
+      // Registrator tayinlovi (to'liq receptionist permset; navbat + yozilish yo'llari).
+      if (memberIds.includes(recepA)) await grantTenantWide(tx, tid, recepA, receptionistPerms);
       return { branch: br!.id, patient: p!.id, service: svc!.id };
     });
 
@@ -141,9 +141,6 @@ beforeAll(async () => {
   branchB = b.branch;
   patientB = b.patient;
   serviceB = b.service;
-
-  // FX-133: yozilish filial doirasi tayinlovlardan o'qiladi — real (tenant-wide) tayinlov.
-  await seedRoleForUser(tenantA, recepA, null, receptionistPerms, 'Registrator');
 
   tokenA = (
     await signAccess({
