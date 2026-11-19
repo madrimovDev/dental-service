@@ -13,7 +13,8 @@
  * (`auto-updater.ts`, CLI-357, Task 12); faqat packaged build'da ishlaydi.
  *
  * Klient — CLI-434 (evil-twin fix): `config.serverUrl` mavjud VA yaroqli
- * (`validateServerUrl`) bo'lsa TOFU — discovery/tasdiqlash o'tkazib
+ * (`validateServerUrl`) bo'lsa TOFU — FX-95: avval `/api/health` bilan
+ * tekshiriladi (`client-startup.ts`), javob bersa discovery/tasdiqlash o'tkazib
  * yuboriladi. Aks holda `findServers()` (massiv, BARCHA UDP javob — birinchi
  * javobga sakramaydi) chaqiriladi va foydalanuvchiga `chooseServerUrl()`
  * orqali tasdiqlash/tanlash so'raladi; tasdiqlangach `serverUrl` `writeConfig`
@@ -48,6 +49,7 @@ import { setupAutoUpdater, type UpdateState } from './auto-updater.js';
 import { createBackupScheduler, resolveDefaultBackupFolder } from './backup-scheduler.js';
 import { createMaintenanceServer, createUploadsTools } from './backup-tools.js';
 import { startClientReconnectLoop } from './client-reconnect.js';
+import { attachLoadFailureHandler, resolveClientStartup } from './client-startup.js';
 import { readConfig, writeConfig } from './config.js';
 import {
   type DiscoveredServer,
@@ -74,7 +76,12 @@ import {
   stopServer,
 } from './process-manager.js';
 import { type PromptWindowLike, promptServerUrl } from './server-url-prompt.js';
-import { applyServerUrl, registerSettingsIpc, validateServerUrl } from './settings-ipc.js';
+import {
+  applyServerUrl,
+  checkServerConnection,
+  registerSettingsIpc,
+  validateServerUrl,
+} from './settings-ipc.js';
 import { setupSingleInstance } from './single-instance.js';
 import { createTray, setTrayToolTip, updateTray } from './tray.js';
 
@@ -148,6 +155,10 @@ const openDevWindow = async (): Promise<void> => {
 // ochish uchun oxirgi ochilgan URL (single-instance.ts `reopen`).
 let lastOpenedUrl: string | null = null;
 
+// FX-95 — prod oynada asosiy freym yuklanmasa (klient: server o'chgan / IP
+// o'zgargan) chaqiriladi. Faqat klient rejimi o'rnatadi; server/dev'da null.
+let onMainLoadFailed: ((url: string) => void) | null = null;
+
 // CLI-434(c)/CLI-442#10 — `will-navigate` guard: in-page navigation (redirect,
 // `location = ...`, form submit) is only allowed within the currently-loaded
 // page's origin (same-origin login -> /activate flows etc.); any other
@@ -202,6 +213,7 @@ const openBrowser = (url: string): void => {
     return { action: 'deny' };
   });
   guardNavigation(mainWindow.webContents);
+  attachLoadFailureHandler(mainWindow.webContents, (failedUrl) => onMainLoadFailed?.(failedUrl));
   void mainWindow.loadURL(url);
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -439,8 +451,9 @@ app.whenReady().then(async () => {
   } else {
     // Klient rejimi — CLI-434: TOFU. `config.serverUrl` (avval foydalanuvchi
     // tomonidan tasdiqlangan) mavjud VA hali ham yaroqli host/scheme'ga ega
-    // bo'lsa (eski buzuq/qo'lda tahrirlangan config bo'lishi mumkin) —
-    // discovery/tasdiqlash BUTUNLAY o'tkazib yuboriladi (qayta so'ralmaydi).
+    // bo'lsa (eski buzuq/qo'lda tahrirlangan config bo'lishi mumkin) va
+    // FX-95: `/api/health` javob bersa — discovery/tasdiqlash o'tkazib
+    // yuboriladi. Javob bermasa discovery, keyin "Server topilmadi" holati.
     // Aks holda discovery + foydalanuvchi tasdig'i orqali topiladi — HECH
     // QACHON birinchi UDP javobiga jim ishonilmaydi (evil-twin fix).
     const trustedUrl =
@@ -456,10 +469,24 @@ app.whenReady().then(async () => {
     // Ulanish muvaffaqiyatli bo'lganda (web `/settings` IPC YOKI CLI-404 native
     // prompt orqali) — fon reconnect'ni to'xtat, tray'ni ulangan holatga o'tkaz,
     // brauzerni och. Ikkala yo'l ham shu bitta handler'ni ishlatadi (DRY).
+    // Bitta tray ikonkasi: birinchi marta `createTray`, keyin `updateTray`.
+    let clientTrayShown = false;
+    const showClientTray = (
+      info: Parameters<typeof updateTray>[1],
+      callbacks: Parameters<typeof updateTray>[2],
+    ) => {
+      if (clientTrayShown) {
+        updateTray('client', info, callbacks);
+      } else {
+        createTray('client', info, callbacks);
+        clientTrayShown = true;
+      }
+    };
+
     const onServerConnected = (url: string) => {
       stopClientReconnectLoop?.();
       stopClientReconnectLoop = null;
-      updateTray('client', { serverUrl: url }, connectedCallbacks(url));
+      showClientTray({ serverUrl: url }, connectedCallbacks(url));
       openBrowser(url);
     };
 
@@ -482,88 +509,106 @@ app.whenReady().then(async () => {
     // manzilga o'tadi, joriy fon discovery retry (bo'lsa) to'xtatiladi.
     registerSettingsIpc({ ipcMain, writeConfig, onConnected: onServerConnected });
 
-    if (trustedUrl) {
-      createTray('client', { serverUrl: trustedUrl }, connectedCallbacks(trustedUrl));
-      openBrowser(trustedUrl);
-    } else {
-      const discovered = await findServers();
-      const chosen = await chooseServerUrl(discovered);
-
-      if (chosen) {
-        // TOFU — bir marta tasdiqlangach config'ga yoziladi, keyingi
-        // startup'lar `trustedUrl` orqali qayta so'ramasdan ishlatadi.
-        writeConfig({ serverUrl: chosen });
-        createTray('client', { serverUrl: chosen }, connectedCallbacks(chosen));
-        openBrowser(chosen);
-      } else {
-        // Server topilmadi (yoki foydalanuvchi tasdiqlashni bekor qildi) —
-        // tray "Server topilmadi" holatini ko'rsatadi va har 30s fon da
-        // qayta discovery urinadi (CLI-348 qaror 4). Topilgan har bir
-        // urinish HAM bir xil tasdiqlash oqimidan o'tadi (CLI-434 §2a —
-        // reconnect ham "birinchi ulanish", jim avto-connect qilmaydi).
-        // `updateTray` chaqiriladi — YANGI `createTray` emas, aks holda
-        // ikkinchi tray ikonkasi yaratilib qoladi.
-        createTray(
-          'client',
-          { serverUrl: '', serverFound: false },
-          {
-            onOpen: () => {},
-            // CLI-404: server yo'q → web `/settings` ham serve qilinmaydi
-            // (chicken-egg). Native prompt oynasida serverUrl qo'lda kiritiladi →
-            // `applyServerUrl` (CLI-434 validatsiya + writeConfig + health-check) →
-            // ulansa `onServerConnected` tray/brauzerni ulangan holatga o'tkazadi.
-            onSettings: async () => {
-              const entered = await promptServerUrl(createPromptWindow, {
-                // «Hozir qidirish» — 30 s kutmasdan darhol discovery.
-                onRescan: () => {
-                  void (async () => {
-                    const found = await findServers();
-                    const confirmed = await chooseServerUrl(found);
-                    if (!confirmed) return;
-                    await applyServerUrl(confirmed, {
-                      writeConfig,
-                      onConnected: onServerConnected,
-                    });
-                  })();
-                },
-              });
-              if (!entered) return;
-              const res = await applyServerUrl(entered, {
+    const notFoundCallbacks = {
+      onOpen: () => {},
+      // CLI-404: server yo'q → web `/settings` ham serve qilinmaydi
+      // (chicken-egg). Native prompt oynasida serverUrl qo'lda kiritiladi →
+      // `applyServerUrl` (CLI-434 validatsiya + writeConfig + health-check) →
+      // ulansa `onServerConnected` tray/brauzerni ulangan holatga o'tkazadi.
+      onSettings: async () => {
+        const entered = await promptServerUrl(createPromptWindow, {
+          // «Hozir qidirish» — 30 s kutmasdan darhol discovery.
+          onRescan: () => {
+            void (async () => {
+              const found = await findServers();
+              const confirmed = await chooseServerUrl(found);
+              if (!confirmed) return;
+              await applyServerUrl(confirmed, {
                 writeConfig,
                 onConnected: onServerConnected,
               });
-              if (!res.ok) {
-                dialog.showErrorBox(
-                  "Noto'g'ri manzil",
-                  'Faqat mahalliy tarmoq manzili qabul qilinadi (masalan http://192.168.1.5:8000).',
-                );
-              } else if (!res.connected) {
-                dialog.showErrorBox(
-                  "Ulanib bo'lmadi",
-                  'Server javob bermadi. Manzilni va serverning ishlayotganini tekshiring.',
-                );
-              }
-            },
-            onStop: () => {
-              stopClientReconnectLoop?.();
-              app.quit();
-            },
-          },
-        );
-        stopClientReconnectLoop = startClientReconnectLoop({
-          findServers,
-          onFound: (found) => {
-            stopClientReconnectLoop = null;
-            void (async () => {
-              const confirmed = await chooseServerUrl(found);
-              if (!confirmed) return; // foydalanuvchi bekor qildi — tray "topilmadi" holicha qoladi
-              writeConfig({ serverUrl: confirmed });
-              updateTray('client', { serverUrl: confirmed }, connectedCallbacks(confirmed));
-              openBrowser(confirmed);
             })();
           },
         });
-      }
+        if (!entered) return;
+        const res = await applyServerUrl(entered, {
+          writeConfig,
+          onConnected: onServerConnected,
+        });
+        if (!res.ok) {
+          dialog.showErrorBox(
+            "Noto'g'ri manzil",
+            'Faqat mahalliy tarmoq manzili qabul qilinadi (masalan http://192.168.1.5:8000).',
+          );
+        } else if (!res.connected) {
+          dialog.showErrorBox(
+            "Ulanib bo'lmadi",
+            'Server javob bermadi. Manzilni va serverning ishlayotganini tekshiring.',
+          );
+        }
+      },
+      onStop: () => {
+        stopClientReconnectLoop?.();
+        app.quit();
+      },
+    };
+
+    // Server topilmadi (yoki foydalanuvchi tasdiqlashni bekor qildi, yoki
+    // FX-95: saqlangan manzil javob bermadi / sahifa yuklanmadi) — tray
+    // "Server topilmadi" holatini ko'rsatadi va har 30s fon da qayta urinadi
+    // (CLI-348 qaror 4). Saqlangan manzil qaytsa — dialogsiz unga qaytiladi
+    // (allaqachon TOFU tasdiqlangan); discovery topgan har bir yangi server
+    // esa bir xil tasdiqlash oqimidan o'tadi (CLI-434 §2a).
+    const enterServerNotFound = () => {
+      if (stopClientReconnectLoop) return; // allaqachon shu holatda
+      showClientTray({ serverUrl: '', serverFound: false }, notFoundCallbacks);
+      const saved = readConfig().serverUrl;
+      stopClientReconnectLoop = startClientReconnectLoop({
+        findServers,
+        trustedUrl: saved && validateServerUrl(saved).ok ? saved : null,
+        checkConnection: checkServerConnection,
+        onTrustedBack: (url) => {
+          stopClientReconnectLoop = null;
+          onServerConnected(url);
+        },
+        onFound: (found) => {
+          stopClientReconnectLoop = null;
+          void (async () => {
+            const confirmed = await chooseServerUrl(found);
+            if (!confirmed) return; // foydalanuvchi bekor qildi — tray "topilmadi" holicha qoladi
+            writeConfig({ serverUrl: confirmed });
+            onServerConnected(confirmed);
+          })();
+        },
+      });
+    };
+
+    // FX-95 — ulangan sahifa yuklanmasa (server o'chdi/IP o'zgardi) bo'sh oyna
+    // o'rniga xabar + "Server topilmadi" holati.
+    onMainLoadFailed = () => {
+      enterServerNotFound();
+      void mainWindow?.loadURL(
+        `data:text/html;charset=utf-8,${encodeURIComponent(
+          '<!doctype html><meta charset="utf-8"><title>Dentdo</title>' +
+            '<body style="font-family:sans-serif;padding:40px;color:#1f2937">' +
+            "<h2>Server bilan aloqa yo'q</h2>" +
+            '<p>Server kompyuteri yoqilganini va tarmoqqa ulanganini tekshiring. ' +
+            "Dastur avtomatik qayta ulanadi. Manzilni qo'lda kiritish: tray → Sozlamalar.</p></body>",
+        )}`,
+      );
+    };
+
+    const startup = await resolveClientStartup({
+      trustedUrl,
+      checkConnection: checkServerConnection,
+      findServers,
+      chooseServerUrl,
+      writeConfig,
+    });
+    if (startup.kind === 'connected') {
+      onServerConnected(startup.url);
+    } else {
+      enterServerNotFound();
     }
   }
 

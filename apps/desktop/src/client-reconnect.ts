@@ -28,6 +28,14 @@ export interface DiscoveredServer {
 export interface ClientReconnectDeps {
   findServers: (timeoutMs?: number) => Promise<DiscoveredServer[]>;
   onFound: (servers: DiscoveredServer[]) => void;
+  /**
+   * FX-95 — avval tasdiqlangan (saqlangan) manzil. Berilsa har tick'da avval
+   * shu tekshiriladi; javob bersa `onTrustedBack` (tasdiqlash dialogisiz —
+   * manzil allaqachon TOFU orqali ishonchli) va discovery qilinmaydi.
+   */
+  trustedUrl?: string | null;
+  checkConnection?: (url: string) => Promise<boolean>;
+  onTrustedBack?: (url: string) => void;
   intervalMs?: number;
   scheduleInterval?: (fn: () => void, ms: number) => unknown;
   clearScheduledInterval?: (handle: unknown) => void;
@@ -42,19 +50,38 @@ export const startClientReconnectLoop = (deps: ClientReconnectDeps): (() => void
   const {
     findServers,
     onFound,
+    trustedUrl,
+    checkConnection,
+    onTrustedBack,
     intervalMs = THIRTY_SECONDS_MS,
     scheduleInterval = (fn, ms) => setInterval(fn, ms),
     clearScheduledInterval = (handle) => clearInterval(handle as ReturnType<typeof setInterval>),
   } = deps;
 
   let stopped = false;
+  let busy = false;
+  const tick = async () => {
+    if (trustedUrl && checkConnection && onTrustedBack) {
+      const back = await checkConnection(trustedUrl);
+      if (stopped) return;
+      if (back) {
+        stopped = true;
+        clearScheduledInterval(handle);
+        onTrustedBack(trustedUrl);
+        return;
+      }
+    }
+    const servers = await findServers();
+    if (stopped || servers.length === 0) return;
+    stopped = true;
+    clearScheduledInterval(handle);
+    onFound(servers);
+  };
   const handle = scheduleInterval(() => {
-    if (stopped) return;
-    void findServers().then((servers) => {
-      if (stopped || servers.length === 0) return;
-      stopped = true;
-      clearScheduledInterval(handle);
-      onFound(servers);
+    if (stopped || busy) return;
+    busy = true;
+    void tick().finally(() => {
+      busy = false;
     });
   }, intervalMs);
 

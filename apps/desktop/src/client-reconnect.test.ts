@@ -119,4 +119,53 @@ describe('startClientReconnectLoop', () => {
 
     expect(onFound).not.toHaveBeenCalled();
   });
+
+  // FX-95 (LB-04) — klient serverdan oldin yonganda yoki server vaqtincha
+  // o'chganda: saqlangan (allaqachon tasdiqlangan) manzil har tick'da qayta
+  // tekshiriladi; qaytib kelsa tasdiqlash dialogisiz shu manzilga qaytiladi.
+  test('FX-95: saqlangan manzil qayta javob bersa onTrustedBack chaqiriladi, discovery qilinmaydi', async () => {
+    const findServers = mock(async () => []);
+    const onFound = mock((_servers: unknown) => {});
+    const onTrustedBack = mock((_url: string) => {});
+    const checkConnection = mock(async (_url: string) => true);
+    startClientReconnectLoop({
+      findServers,
+      onFound,
+      trustedUrl: 'http://192.168.1.10:8080',
+      checkConnection,
+      onTrustedBack,
+      scheduleInterval,
+      clearScheduledInterval,
+    });
+
+    scheduledFn?.();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    expect(checkConnection).toHaveBeenCalledWith('http://192.168.1.10:8080');
+    expect(onTrustedBack).toHaveBeenCalledWith('http://192.168.1.10:8080');
+    expect(findServers).not.toHaveBeenCalled();
+    expect(onFound).not.toHaveBeenCalled();
+    expect(clearScheduledInterval).toHaveBeenCalledWith('fake-handle');
+  });
+
+  test('FX-95: saqlangan manzil hali javob bermasa discovery davom etadi', async () => {
+    const findServers = mock(async () => []);
+    const onTrustedBack = mock((_url: string) => {});
+    startClientReconnectLoop({
+      findServers,
+      onFound: mock(() => {}),
+      trustedUrl: 'http://192.168.1.10:8080',
+      checkConnection: mock(async () => false),
+      onTrustedBack,
+      scheduleInterval,
+      clearScheduledInterval,
+    });
+
+    scheduledFn?.();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+
+    expect(onTrustedBack).not.toHaveBeenCalled();
+    expect(findServers).toHaveBeenCalledTimes(1);
+    expect(clearScheduledInterval).not.toHaveBeenCalled();
+  });
 });

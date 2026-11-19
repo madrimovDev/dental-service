@@ -98,7 +98,11 @@ export const SET_SERVER_URL_CHANNEL = 'dental:set-server-url';
 
 const HEALTH_CHECK_TIMEOUT_MS = 3000;
 
-const defaultCheckConnection = async (serverUrl: string): Promise<boolean> => {
+/**
+ * `GET <serverUrl>/api/health` — 3 s timeout. FX-95: klient startup'ida saqlangan
+ * (TOFU) manzil ham shu bilan tekshiriladi (`client-startup.ts`).
+ */
+export const checkServerConnection = async (serverUrl: string): Promise<boolean> => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS);
   try {
@@ -125,7 +129,7 @@ export const applyServerUrl = async (
     onConnected?: (serverUrl: string) => void;
   },
 ): Promise<SetServerUrlResult> => {
-  const { writeConfig, checkConnection = defaultCheckConnection, onConnected } = deps;
+  const { writeConfig, checkConnection = checkServerConnection, onConnected } = deps;
   const validation = validateServerUrl(raw);
   if (!validation.ok || !validation.url) {
     // CLI-434 — invalid scheme/host: writeConfig is NOT called (no rogue URL
