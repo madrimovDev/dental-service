@@ -120,6 +120,8 @@ export const createEndpoints = (api: ApiClient) => ({
       api.get<{ data: LabOrder[]; meta: { page: number; pageSize: number; total: number } }>(
         '/api/lab-orders?activeOnly=true&pageSize=100',
       ),
+    /** FX-112: buyurtma shifokorini tanlash ro'yxati (`lab_order.manage`; `roles.is_practitioner`). */
+    doctors: () => api.get<{ id: string; name: string }[]>('/api/lab-orders/doctors'),
     uploadFile: (id: string, form: FormData) =>
       api.upload<LabOrderFileRecord>(`/api/lab-orders/${id}/files`, form),
     listFiles: (id: string) => api.get<LabOrderFileRecord[]>(`/api/lab-orders/${id}/files`),

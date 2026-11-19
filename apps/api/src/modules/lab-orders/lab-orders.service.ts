@@ -3,6 +3,7 @@ import { and, asc, count, desc, eq, lt, notInArray, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { listPractitioners } from '../../lib/doctor-branch.ts';
 import {
   CrossEntityError,
   createOwnershipValidator,
@@ -101,6 +102,12 @@ export const createLabOrdersService = (deps: {
     return rows;
   }
 
+  /** FX-112: buyurtma shifokorini tanlash ro'yxati (`roles.is_practitioner`). */
+  async function listDoctors(c: Context) {
+    const rows = await listPractitioners(c);
+    return rows.map((r) => ({ id: r.id, name: r.fullName ?? r.phone }));
+  }
+
   async function get(c: Context, id: string) {
     const db = getDb(c);
     const [row] = await db.select().from(labOrders).where(eq(labOrders.id, id));
@@ -126,7 +133,8 @@ export const createLabOrdersService = (deps: {
     // CLI-485: doctorId ham cross-entity ownership tekshiruvidan o'tadi (platform-level
     // user; assertUserExists shu tenantda aktiv assignment'i/owner ekanini tasdiqlaydi —
     // cross-tenant/mavjud bo'lmagan doctorId xom 500 emas, toza 400).
-    await ownership.assertUserExists(c, input.doctorId);
+    // FX-112: doctorId amaliyotchi bo'lishi shart (Technician o'z nomini "shifokor" qilib yubormasin).
+    await ownership.assertPractitioner(c, input.doctorId);
 
     // UI-D5: remake — asl buyurtma shu tenantda (RLS) VA shu bemorniki bo'lishi shart.
     if (input.remakeOfId) {
@@ -406,7 +414,7 @@ export const createLabOrdersService = (deps: {
     return before;
   }
 
-  return { list, get, create, update, overdue, listFiles, uploadFile, removeFile };
+  return { list, get, create, update, overdue, listDoctors, listFiles, uploadFile, removeFile };
 };
 
 export type LabOrdersService = ReturnType<typeof createLabOrdersService>;

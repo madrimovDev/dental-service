@@ -32,7 +32,7 @@ import { parseToothNumbers } from '../../clinical.mappers';
 import { LabOrderChain } from './LabOrderChain';
 import classes from './LabOrderForm.module.css';
 import { activeLabs, useLabHubLabs, useLabHubStatus, useSendToLabHub } from './lab-hub.api';
-import { useUploadLabOrderFile } from './lab-order.api';
+import { useLabOrderDoctors, useUploadLabOrderFile } from './lab-order.api';
 import {
   compareDueWithAppointment,
   formatDueDate,
@@ -90,10 +90,24 @@ export function LabOrderNewPage() {
   const user = useAuthStore((s) => s.user);
   /**
    * Buyurtma shifokori — `doctorId` sifatida yuboriladi va Hub'ga (`toHubCase`) aynan shu
-   * shifokorning ismi ketadi. «Laboratoriya nimani ko'radi» ham shu manbadan o'qiydi
-   * (bitta qiymat — oldindan ko'rish va yuborilgan narsa ajralib ketmaydi).
+   * shifokorning ismi ketadi (FX-112). Shifokor tanlanadi (amaliyotchi rollar); joriy foydalanuvchi
+   * faqat o'zi amaliyotchi (yoki tenant egasi) bo'lsa — standart. Technician o'zini «shifokor»
+   * qilib yubora olmaydi: shifokorni tanlashi shart. «Laboratoriya nimani ko'radi» ham shu
+   * manbadan o'qiydi (oldindan ko'rish va yuborilgan narsa ajralib ketmaydi).
    */
-  const orderDoctor = user ? { id: user.id, name: user.fullName } : null;
+  const isOwner = useAuthStore((s) => s.hasPermission('@owner'));
+  const doctorsQuery = useLabOrderDoctors();
+  const doctorOptions = useMemo(() => {
+    const list = doctorsQuery.data ?? [];
+    if (isOwner && user && !list.some((d) => d.id === user.id)) {
+      return [{ id: user.id, name: user.fullName ?? '—' }, ...list];
+    }
+    return list;
+  }, [doctorsQuery.data, isOwner, user]);
+  const [pickedDoctorId, setPickedDoctorId] = useState<string | null>(null);
+  const [doctorMissing, setDoctorMissing] = useState(false);
+  const selfOption = user ? doctorOptions.find((d) => d.id === user.id) : undefined;
+  const orderDoctor = doctorOptions.find((d) => d.id === pickedDoctorId) ?? selfOption ?? null;
   const canViewAppointments = useAuthStore((s) => s.hasPermission('appointment.view'));
   const [files, setFiles] = useState<File[]>([]);
 
@@ -175,7 +189,10 @@ export function LabOrderNewPage() {
 
   const submit = (send: boolean) =>
     form.onSubmit(async (values) => {
-      if (!orderDoctor) return;
+      if (!orderDoctor) {
+        setDoctorMissing(true);
+        return;
+      }
       const nums = parseToothNumbers(values.toothNumbersText);
       try {
         const order = await createMut.mutateAsync({
@@ -320,6 +337,21 @@ export function LabOrderNewPage() {
                   if (picked && picked.name !== value) setHubLabId(null);
                 }}
                 error={err('labName')}
+              />
+            </section>
+
+            <section className={classes.card}>
+              <Select
+                label={t('labOrder.doctor_label')}
+                placeholder={t('labOrder.doctor_placeholder')}
+                data={doctorOptions.map((d) => ({ value: d.id, label: d.name }))}
+                value={orderDoctor?.id ?? null}
+                onChange={(val) => {
+                  setPickedDoctorId(val);
+                  setDoctorMissing(false);
+                }}
+                error={doctorMissing && !orderDoctor ? t('labOrder.doctor_required') : undefined}
+                withAsterisk
               />
             </section>
 

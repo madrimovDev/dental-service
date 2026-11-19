@@ -2,6 +2,7 @@ import {
   appointments,
   branches,
   patients,
+  roles,
   services,
   stockItems,
   tenants,
@@ -13,6 +14,7 @@ import {
 import { and, eq, isNotNull } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../db/scoped.ts';
+import { practitionerAssignmentConditions } from './doctor-branch.ts';
 
 /**
  * CLI-421 — cross-entity ownership validator (in-tenant).
@@ -30,7 +32,7 @@ import { getDb } from '../db/scoped.ts';
 export class CrossEntityError extends Error {
   constructor(
     readonly entity: string,
-    readonly reason: 'not_found' | 'mismatch',
+    readonly reason: 'not_found' | 'mismatch' | 'not_practitioner',
     message?: string,
   ) {
     super(message ?? `Ownership check failed for ${entity}: ${reason}`);
@@ -124,6 +126,31 @@ export const createOwnershipValidator = () => {
     if (!row) throw new CrossEntityError('user', 'not_found');
   }
 
+  /**
+   * FX-112: `doctorId` amaliyotchi (`roles.is_practitioner`, faol+qabul qilingan tayinlov) bo'lishi
+   * shart — texnik/hamshira "shifokor" sifatida yozilmasin. Tenant OWNER — implicit superuser (istisno).
+   * Avval `assertUserExists` (mavjudlik → `not_found`), keyin amaliyotchi tekshiruvi.
+   */
+  async function assertPractitioner(c: Context, userId: string): Promise<void> {
+    await assertUserExists(c, userId);
+    const db = getDb(c);
+    const activeTenantId: string | null | undefined = c.get('activeTenantId');
+    if (activeTenantId) {
+      const [tenant] = await db
+        .select({ ownerUserId: tenants.ownerUserId })
+        .from(tenants)
+        .where(eq(tenants.id, activeTenantId));
+      if (tenant?.ownerUserId === userId) return;
+    }
+    const [row] = await db
+      .select({ id: userAssignments.id })
+      .from(userAssignments)
+      .innerJoin(roles, eq(roles.id, userAssignments.roleId))
+      .where(and(eq(userAssignments.userId, userId), ...practitionerAssignmentConditions()))
+      .limit(1);
+    if (!row) throw new CrossEntityError('doctor', 'not_practitioner');
+  }
+
   async function assertStageBelongsToPatient(
     c: Context,
     stageId: string,
@@ -177,6 +204,7 @@ export const createOwnershipValidator = () => {
     assertServiceExists,
     assertPatientExists,
     assertUserExists,
+    assertPractitioner,
     assertStageBelongsToPatient,
     assertVisitNoteBelongsToPatient,
     assertAppointmentBelongsToPatient,

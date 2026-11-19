@@ -11,6 +11,7 @@ const sendHubMutateAsync = vi.fn();
 const hub = { connected: false };
 const usePatientSpy = vi.fn();
 const permissions = { current: new Set<string>() };
+const doctors = { current: [{ id: 'u1', name: 'Dr. Yusupova' }] as { id: string; name: string }[] };
 
 const future = new Date(Date.now() + 5 * 86_400_000);
 
@@ -41,6 +42,7 @@ vi.mock('../../clinical.api', () => ({
   }),
 }));
 vi.mock('./lab-order.api', () => ({
+  useLabOrderDoctors: () => ({ data: doctors.current, isLoading: false }),
   useUploadLabOrderFile: () => ({ mutateAsync: uploadMutateAsync, isPending: false }),
 }));
 vi.mock('./lab-hub.api', () => ({
@@ -108,6 +110,7 @@ describe('LabOrderNewPage', () => {
     hub.connected = false;
     usePatientSpy.mockReset();
     permissions.current = new Set(['lab_order.manage', 'lab_order.view', 'patient.view']);
+    doctors.current = [{ id: 'u1', name: 'Dr. Yusupova' }];
   });
 
   it('sahifa sarlavhasi bemor nomi bilan, orqaga havola bemor kartasiga', async () => {
@@ -254,6 +257,28 @@ describe('LabOrderNewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Laboratoriyaga yuborish' }));
     await waitFor(() => expect(createMutateAsync).toHaveBeenCalled());
     expect(createMutateAsync.mock.calls[0]?.[0]).toMatchObject({ doctorId: 'u1' });
+  });
+
+  it("FX-112: Technician (o'zi amaliyotchi emas) shifokorni tanlamaguncha yuborib bo'lmaydi; o'zini «shifokor» qilmaydi", async () => {
+    permissions.current = new Set(['lab_order.manage', 'lab_order.view']);
+    doctors.current = [{ id: 'd9', name: 'Dr. Karimov' }];
+    renderPage();
+    expect(await screen.findByTestId('lab-sees-doctor')).toHaveTextContent('—');
+    fireEvent.change(await screen.findByLabelText(/Laboratoriya nomi/), {
+      target: { value: 'Lab Z' },
+    });
+    fireEvent.click(screen.getByText('A3'));
+    fireEvent.change(screen.getByLabelText(/Kerakli sana/), { target: { value: '2026-12-01' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Laboratoriyaga yuborish' }));
+    expect(await screen.findByText('Buyurtma shifokorini tanlang')).toBeInTheDocument();
+    expect(createMutateAsync).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('textbox', { name: /Buyurtma shifokori/ }));
+    fireEvent.click(await screen.findByText('Dr. Karimov'));
+    expect(screen.getByTestId('lab-sees-doctor')).toHaveTextContent('Dr. Karimov');
+    fireEvent.click(screen.getByRole('button', { name: 'Laboratoriyaga yuborish' }));
+    await waitFor(() => expect(createMutateAsync).toHaveBeenCalled());
+    expect(createMutateAsync.mock.calls[0]?.[0]).toMatchObject({ doctorId: 'd9' });
   });
 
   it('forma: remake belgilansa asl buyurtma va sabab majburiy', async () => {

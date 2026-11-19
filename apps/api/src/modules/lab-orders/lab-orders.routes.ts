@@ -119,6 +119,22 @@ export const labOrdersRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     return c.json(ok(rows.map(toLabOrderDto)), 200);
   });
 
+  // ─── GET /doctors — buyurtma shifokorini tanlash (FX-112) ────────────────────
+  // `lab_order.manage` yetarli: Technician'da `appointment.view` yo'q (CLI-154/155 naqshi — tor endpoint).
+  const doctorsRoute = createRoute({
+    method: 'get',
+    path: '/doctors',
+    tags: ['lab-orders'],
+    operationId: 'listLabOrderDoctors',
+    middleware: [requirePermission('lab_order.manage'), requireFeature('labOrders')] as const,
+    responses: okJson(
+      z.array(z.object({ id: z.uuid(), name: z.string() })),
+      'Practitioners who can be set as the lab order doctor',
+    ),
+  });
+
+  app.openapi(doctorsRoute, async (c) => c.json(ok(await service.listDoctors(c)), 200));
+
   // ─── POST / — create ─────────────────────────────────────────────────────────
 
   const createRoute_ = createRoute({
