@@ -112,7 +112,9 @@ describe('FU-41 — Branch Manager superset', () => {
   for (const key of BRANCH_TEMPLATES) {
     test(`BM ⊇ ${key}`, () => {
       const bm = new Set(permsFor('branch_manager'));
-      for (const p of permsFor(key)) expect(bm.has(p)).toBe(true);
+      // FX-116: payroll.* tenant-wide — BM'ga berilmaydi (Accountant'da bor).
+      for (const p of permsFor(key).filter((x) => !x.startsWith('payroll.')))
+        expect(bm.has(p)).toBe(true);
     });
   }
 
@@ -150,5 +152,16 @@ describe('lab_order.approve_price — rol matritsasi', () => {
   test('katalogda bor', async () => {
     const { PERMISSIONS } = await import('./permissions.ts');
     expect(PERMISSIONS.map((p) => p.code)).toContain('lab_order.approve_price');
+  });
+});
+
+/** FX-116 (LB-25) — payroll klinika bo'yicha: filial mudirida payroll.* yo'q. */
+describe('FX-116 — payroll.* tenant-wide', () => {
+  test.each(['payroll.view', 'payroll.manage'])('branch_manager — %s YO‘Q', (p) => {
+    expect(permsFor('branch_manager')).not.toContain(p);
+  });
+  test.each(['tenant_admin', 'accountant'])('%s — payroll.* bor', (key) => {
+    expect(permsFor(key)).toContain('payroll.view');
+    expect(permsFor(key)).toContain('payroll.manage');
   });
 });
