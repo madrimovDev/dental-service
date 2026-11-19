@@ -27,6 +27,7 @@ import type {
   ListPatientsParams,
   RemovePatientEmergencyContact200,
   RemovePatientRelative200,
+  UnlinkPatientTelegram200,
   UpdateMedicalRecord200,
   UpdateMedicalRecordBody,
   UpdatePatient200,
@@ -107,6 +108,14 @@ import { customInstance } from '../../mutator';
  ) => {
       return customInstance<GetPatientBalance200>(
       {url: `/api/patients/${id}/balance`, method: 'GET'
+    },
+      );
+    }
+  export const unlinkPatientTelegram = (
+    id: string,
+ ) => {
+      return customInstance<UnlinkPatientTelegram200>(
+      {url: `/api/patients/${id}/telegram-link`, method: 'DELETE'
     },
       );
     }
@@ -209,6 +218,7 @@ export type GetPatientResult = NonNullable<Awaited<ReturnType<typeof getPatient>
 export type UpdatePatientResult = NonNullable<Awaited<ReturnType<typeof updatePatient>>>
 export type ArchivePatientResult = NonNullable<Awaited<ReturnType<typeof archivePatient>>>
 export type GetPatientBalanceResult = NonNullable<Awaited<ReturnType<typeof getPatientBalance>>>
+export type UnlinkPatientTelegramResult = NonNullable<Awaited<ReturnType<typeof unlinkPatientTelegram>>>
 export type GetMedicalRecordResult = NonNullable<Awaited<ReturnType<typeof getMedicalRecord>>>
 export type UpdateMedicalRecordResult = NonNullable<Awaited<ReturnType<typeof updateMedicalRecord>>>
 export type ConfirmMedicalRecordResult = NonNullable<Awaited<ReturnType<typeof confirmMedicalRecord>>>

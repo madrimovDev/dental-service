@@ -44,7 +44,11 @@ export function AttentionPanel({
             key={i.key}
             tier={i.tier}
             title={i.title}
-            action={{ label: i.actionLabel, onClick: () => onOpen(i.to) }}
+            action={
+              i.to && i.actionLabel
+                ? { label: i.actionLabel, onClick: () => onOpen(i.to as string) }
+                : undefined
+            }
           >
             {i.text}
           </AlertBanner>

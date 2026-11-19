@@ -10,6 +10,7 @@ import { env } from '../lib/env.ts';
 import { writeLicense } from '../lib/license.ts';
 import { activateLicense, markProvisioned, type ProvisioningBlock } from '../lib/license-client.ts';
 import { logger } from '../lib/logger.ts';
+import { verifyPassword } from '../lib/password.ts';
 import { rateLimit } from '../lib/rate-limit.ts';
 import { provisionTenantInTx } from '../modules/auth/auth.service.ts';
 
@@ -52,11 +53,18 @@ const activateSchema = z.object({ licenseKey: z.string().min(1) });
  * yo'llardi (u o'zi `/register-tenant` orqali boshqa raqam bilan ro'yxatdan
  * o'tgan bo'lishi mumkin). Yangi ma'lumot oshkor qilinmaydi: bu allaqachon shu
  * mashinaning egasi.
+ *
+ * FX-86: skip holatida `vendorCredentialsActive` — mavjud owner'ning joriy
+ * paroli vendor blokidagi vaqtinchalik parolga mos keladimi. Bu «tenant oldingi
+ * urinishda shu blok bilan yaratilgan, lekin `.lic` yozilmay qolgan» holatini
+ * (amal qiladigan yagona parol — vendor paroli) haqiqiy mavjud klinikadan
+ * (owner o'z parolini qo'ygan) ajratadi. Hech narsa YOZILMAYDI — faqat
+ * taqqoslanadi; vendor blokidagi parolni bilgan kishiga yangi ma'lumot bermaydi.
  */
 const applyProvisioning = async (
   db: Database,
   p: ProvisioningBlock,
-): Promise<{ applied: boolean; ownerPhone: string | null }> => {
+): Promise<{ applied: boolean; vendorCredentialsActive: boolean; ownerPhone: string | null }> => {
   const [existing] = await db
     .select({ id: tenants.id, ownerUserId: tenants.ownerUserId })
     .from(tenants)
@@ -70,10 +78,15 @@ const applyProvisioning = async (
     // `users`da RLS yo'q (platform-darajali jadval, `tenant_id` ustuni yo'q) —
     // pre-auth kontekstda ham o'qiladi.
     const [owner] = await db
-      .select({ phone: users.phone })
+      .select({ phone: users.phone, passwordHash: users.passwordHash })
       .from(users)
       .where(eq(users.id, existing.ownerUserId));
-    return { applied: false, ownerPhone: owner?.phone ?? null };
+    const vendorCredentialsActive =
+      !!owner &&
+      !!p.ownerPassword &&
+      normalizePhone(p.ownerPhone) === owner.phone &&
+      (await verifyPassword(p.ownerPassword, owner.passwordHash).catch(() => false));
+    return { applied: false, vendorCredentialsActive, ownerPhone: owner?.phone ?? null };
   }
   await db.transaction((tx) =>
     provisionTenantInTx(tx, {
@@ -90,7 +103,7 @@ const applyProvisioning = async (
       mustChangePassword: true,
     }),
   );
-  return { applied: true, ownerPhone: normalizePhone(p.ownerPhone) };
+  return { applied: true, vendorCredentialsActive: true, ownerPhone: normalizePhone(p.ownerPhone) };
 };
 
 export const activateRoutes = (deps: {
@@ -152,9 +165,11 @@ export const activateRoutes = (deps: {
     } catch (err) {
       const code = err instanceof Error ? err.message : 'ACTIVATION_FAILED';
       // FINGERPRINT_UNAVAILABLE — mahalliy muhit muammosi (VM/konteyner);
+      // SUPERVISOR_UNREACHABLE (FX-88) — Supervisor timeout'da javob bermadi;
       // qolgan barcha kodlar (INVALID_KEY, FINGERPRINT_MISMATCH,
       // SUPERVISOR_ERROR) — Supervisor rad etdi, mijoz xatosi.
-      const status = code === 'FINGERPRINT_UNAVAILABLE' ? 500 : 403;
+      const status =
+        code === 'FINGERPRINT_UNAVAILABLE' ? 500 : code === 'SUPERVISOR_UNREACHABLE' ? 504 : 403;
       return c.json(fail(code, "Litsenziyani faollashtirib bo'lmadi"), status);
     }
 
@@ -165,7 +180,9 @@ export const activateRoutes = (deps: {
      * Vendor bergan vaqtinchalik parol HAQIQATAN qo'llandimi.
      *
      * `undefined` — provisioning bloki umuman kelmadi (litsenziya yangilash).
-     * `true` — yangi tenant yaratildi, vendor kredensiallari amal qiladi.
+     * `true` — vendor kredensiallari amal qiladi: yangi tenant yaratildi YOKI
+     *   (FX-86) skip, lekin tenant oldingi urinishda shu blok bilan yaratilgan
+     *   va owner paroli hali vendor parolining o'zi (`.lic` yozilmay qolgan).
      * `false` — idempotent skip: hisob avvaldan bor, MAVJUD parol saqlandi.
      *
      * 🔴 Web sahifasi login maslahatini AYNAN shu bayroq bo'yicha tanlaydi.
@@ -229,7 +246,11 @@ export const activateRoutes = (deps: {
         // shartiga qo'yish HAR DOIM truthy bo'ladi va typecheck buni
         // ushlamaydi. Doim `.applied`/`.ownerPhone` bo'yicha o'qing.
         const result = await applyProvisioning(deps.db, provisioning);
-        provisioned = result.applied;
+        // FX-86: oldingi urinishda shu blok bilan tenant yaratilib `.lic`
+        // yozilmay qolgan bo'lsa (skip, lekin vendor paroli amalda) — mijozga
+        // vendor parolini maslahat qilamiz va Supervisor'ga `applied:true`
+        // bildiramiz (birinchi urinish unga hech narsa yubormagan).
+        provisioned = result.applied || result.vendorCredentialsActive;
         // Kanonik shakl — ko'rsatilgan login `users.phone` bilan bayt-ma-bayt
         // bir xil (`provisionTenantInTx` ham normallashtiradi, skip yo'lida esa
         // qiymat bevosita `users.phone`dan olinadi).

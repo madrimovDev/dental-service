@@ -526,10 +526,11 @@ export const createPayrollService = (deps: { audit: AuditLogger }) => {
       .select({ commissionPercent: payrollLines.commissionPercent })
       .from(payrollLines)
       .where(and(eq(payrollLines.runId, run.id), eq(payrollLines.userId, args.doctorId)));
-    if (!line) return; // doktor shu run'da komissiya olmagan — tuzatish hisoblab bo'lmaydi.
-
-    const percent = Number(line.commissionPercent);
-    const amount = -(Math.round(args.refundAmount * percent) / 100);
+    // FX-64: doktor shu finalized run'da komissiya olmagan (qator yo'q) — qaytariladigan komissiya
+    // yo'q, lekin refund keyingi davr netting'iga tushib, hech qachon komissiya olinmagan
+    // daromaddan ayirilmasligi uchun 0 summali adjustment yoziladi (netting'dan chiqaradi).
+    const percent = line ? Number(line.commissionPercent) : 0;
+    const amount = line ? -(Math.round(args.refundAmount * percent) / 100) : 0;
 
     await db.insert(payrollAdjustments).values({
       tenantId,

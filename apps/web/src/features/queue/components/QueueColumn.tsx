@@ -1,4 +1,4 @@
-import type { QueueStatus } from '@dental/api-client';
+import type { QueueStatus, QueueTicket } from '@dental/api-client';
 import { toQueueCardVM } from '../queue.mappers';
 import type { QueueColumnKey, QueueColumnVM, QueueLookups } from '../queue.types';
 import { QueueCard } from './QueueCard';
@@ -23,6 +23,7 @@ export function QueueColumn({
   lookups,
   canManage,
   canCall,
+  canCallTicket,
   busyId,
   onStatus,
 }: {
@@ -31,6 +32,8 @@ export function QueueColumn({
   lookups: QueueLookups;
   canManage: boolean;
   canCall?: boolean;
+  /** Per-ticket chaqirish ruxsati (FX-55); berilsa `canCall` ni almashtiradi. */
+  canCallTicket?: (ticket: QueueTicket) => boolean;
   busyId?: string;
   onStatus: (id: string, status: QueueStatus) => void;
 }) {
@@ -49,7 +52,7 @@ export function QueueColumn({
             key={ticket.id}
             vm={toQueueCardVM(ticket, lookups)}
             canManage={canManage}
-            canCall={canCall}
+            canCall={canCallTicket ? canCallTicket(ticket) : canCall}
             busy={busyId === ticket.id}
             onStatus={(status) => onStatus(ticket.id, status)}
           />

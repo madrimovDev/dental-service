@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { db } from '../../db/client';
 import { clinicEvents, clinics } from '../../db/schema';
 import { normalizePhone } from '../../lib/phone';
+import { getSaasSuspendedAt } from './saas-suspension';
 
 /**
  * L8 (Lab Hub) — SaaS tenantlar ham Supervisor'da klinika sifatida. Bu yerdagi
@@ -48,18 +49,45 @@ const registerSchema = z.object({
   ownerPhone: z.string().min(1).max(30),
   contactPhone: z.string().max(30).optional(),
   defaultLanguage: z.enum(['uz', 'ru']).default('uz'),
+  /**
+   * FX-149 (LC-27): tenant `apps/api`da yaratilgan payt (ISO). Sinov muddati shundan
+   * hisoblanadi — Supervisor tenantni yo'qotib (404) qayta ro'yxatga olinganda
+   * muddati o'tgan klinikaga yangi 30 kun berilmasin. Ixtiyoriy (eski klientlar).
+   */
+  tenantCreatedAt: z.string().datetime({ offset: true }).optional(),
+  /**
+   * FX-149 (review): apps/api'da saqlangan obuna muddati (ISO) — Supervisor yozuvni
+   * yo'qotgan (masalan, zaxiradan tiklangan baza) va tenant 404'dan keyin qayta
+   * ro'yxatga olinayotganda yuboriladi. FAQAT yangi qator yaratilganda va sinovdan
+   * kech bo'lsa qo'llanadi (to'langan muddat tiklanadi, aks holda keyingi sinxron uni
+   * sinov oxiri bilan ustiga yozardi). Mavjud klinikada e'tiborsiz — muddatni faqat
+   * vendor o'zgartiradi. Ishonch: ichki `SUPERVISOR_SAAS_TOKEN`.
+   */
+  knownSubscriptionExpiresAt: z.string().datetime({ offset: true }).optional(),
 });
 
 const uuidSchema = z.string().uuid();
 
-const toStatus = (clinic: typeof clinics.$inferSelect) => ({
-  clinicId: clinic.id,
-  tenantId: clinic.saasTenantId,
-  mode: 'saas' as const,
-  subscriptionExpiresAt: clinic.subscriptionExpiresAt
-    ? clinic.subscriptionExpiresAt.toISOString()
-    : null,
-});
+/** Sinov boshlanishi: `tenantCreatedAt` (kelajakdagi sana hozirgi paytga qisiladi) yoki hozir. */
+const trialExpiry = (tenantCreatedAt: string | undefined, nowMs: number): Date => {
+  const created = tenantCreatedAt ? Date.parse(tenantCreatedAt) : Number.NaN;
+  const start = Number.isFinite(created) ? Math.min(created, nowMs) : nowMs;
+  return new Date(start + SAAS_TRIAL_DAYS * DAY_MS);
+};
+
+const toStatus = async (clinic: typeof clinics.$inferSelect) => {
+  // FX-102: vendor to'xtatgan bo'lsa — apps/api imtiyozsiz bloklaydi.
+  const suspendedAt = await getSaasSuspendedAt(clinic.id);
+  return {
+    clinicId: clinic.id,
+    tenantId: clinic.saasTenantId,
+    mode: 'saas' as const,
+    subscriptionExpiresAt: clinic.subscriptionExpiresAt
+      ? clinic.subscriptionExpiresAt.toISOString()
+      : null,
+    suspendedAt: suspendedAt ? suspendedAt.toISOString() : null,
+  };
+};
 
 export const saasRoutes = () => {
   const app = new Hono();
@@ -70,6 +98,11 @@ export const saasRoutes = () => {
   // qayta boshlanmaydi. 201 = yangi, 200 = mavjud.
   app.post('/clinics', zValidator('json', registerSchema), async (c) => {
     const data = c.req.valid('json');
+    const trialEnd = trialExpiry(data.tenantCreatedAt, Date.now());
+    const known = data.knownSubscriptionExpiresAt
+      ? new Date(data.knownSubscriptionExpiresAt)
+      : null;
+    const restoreKnown = known !== null && known.getTime() > trialEnd.getTime();
     const [inserted] = await db
       .insert(clinics)
       .values({
@@ -80,17 +113,31 @@ export const saasRoutes = () => {
         defaultLanguage: data.defaultLanguage,
         mode: 'saas',
         saasTenantId: data.tenantId,
-        subscriptionExpiresAt: new Date(Date.now() + SAAS_TRIAL_DAYS * DAY_MS),
+        subscriptionExpiresAt: restoreKnown ? known : trialEnd,
       })
       .onConflictDoNothing({ target: clinics.saasTenantId })
       .returning();
-    if (inserted) return c.json(toStatus(inserted), 201);
+    if (inserted) {
+      if (known) {
+        // Vendor ko'radi: muddat apps/api'dagi saqlangan qiymatdan tiklandi (yoki yo'q).
+        await db.insert(clinicEvents).values({
+          clinicId: inserted.id,
+          event: 'saas_reregistered',
+          metadata: {
+            trialExpiresAt: trialEnd.toISOString(),
+            knownSubscriptionExpiresAt: known.toISOString(),
+            restored: restoreKnown,
+          },
+        });
+      }
+      return c.json(await toStatus(inserted), 201);
+    }
 
     const existing = await db.query.clinics.findFirst({
       where: eq(clinics.saasTenantId, data.tenantId),
     });
     if (!existing) return c.json({ error: { code: 'NOT_FOUND' } }, 404);
-    return c.json(toStatus(existing), 200);
+    return c.json(await toStatus(existing), 200);
   });
 
   app.get('/clinics/:tenantId/status', async (c) => {
@@ -100,7 +147,7 @@ export const saasRoutes = () => {
       where: eq(clinics.saasTenantId, parsed.data),
     });
     if (!clinic) return c.json({ error: { code: 'NOT_FOUND' } }, 404);
-    return c.json(toStatus(clinic));
+    return c.json(await toStatus(clinic));
   });
 
   return app;
@@ -116,6 +163,8 @@ export const renewSaasClinic = async (clinicId: string, expiresAt: Date, adminId
   if (expiresAt.getTime() <= Date.now()) {
     throw Object.assign(new Error('EXPIRES_IN_PAST'), { status: 400 });
   }
+  // FX-102: `saas_renewed` hodisasi oldingi `saas_suspended`ni ham yechadi
+  // (`getSaasSuspendedAt` — eng oxirgi hodisa bo'yicha).
   return db.transaction(async (tx) => {
     const [before] = await tx
       .select({ subscriptionExpiresAt: clinics.subscriptionExpiresAt })

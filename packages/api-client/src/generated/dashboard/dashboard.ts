@@ -5,7 +5,8 @@
  * OpenAPI spec version: 0.1.0
  */
 import type {
-  GetDoctorPending200
+  GetDoctorPending200,
+  GetReceptionAttention200
 } from '.././model';
 
 import { customInstance } from '../../mutator';
@@ -20,4 +21,13 @@ import { customInstance } from '../../mutator';
     },
       );
     }
+  export const getReceptionAttention = (
+    
+ ) => {
+      return customInstance<GetReceptionAttention200>(
+      {url: `/api/dashboard/reception-attention`, method: 'GET'
+    },
+      );
+    }
   export type GetDoctorPendingResult = NonNullable<Awaited<ReturnType<typeof getDoctorPending>>>
+export type GetReceptionAttentionResult = NonNullable<Awaited<ReturnType<typeof getReceptionAttention>>>

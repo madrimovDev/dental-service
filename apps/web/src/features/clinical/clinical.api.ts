@@ -49,6 +49,7 @@ import {
   updateTreatmentStage,
   updateVisitNote,
 } from '@dental/api-client';
+import { notifications } from '@mantine/notifications';
 import {
   keepPreviousData,
   type QueryClient,
@@ -60,8 +61,13 @@ import {
 import { cashierKeys } from '@/features/cashier/cashier.keys.ts';
 import { patientKeys } from '@/features/patients/patients.keys.ts';
 import { recallKeys } from '@/features/recalls/recalls.keys.ts';
+import { stockKeys } from '@/features/stock/stock.keys.ts';
 import { api } from '@/lib/api.ts';
+import { apiErrorMessage } from '@/lib/api-error-message.ts';
+import { i18n } from '@/lib/i18n.ts';
 import { lookupKeys } from '@/lib/lookup-keys.ts';
+import { handleLicenseBlock } from '@/lib/query-client.ts';
+import { serverAllergyConflict } from './allergy-guard';
 import { clinicalKeys } from './clinical.keys';
 import type { VisitNoteView } from './clinical.types';
 import type { LabOrderCreateExtras } from './components/lab-orders/lab-order.helpers';
@@ -181,6 +187,10 @@ export function useUpdateStage(patientId: string) {
       invalidatePlanFinancials(qc, patientId);
       void qc.invalidateQueries({ queryKey: clinicalKeys.planEstimate(stage.treatmentPlanId) });
       void qc.invalidateQueries({ queryKey: recallKeys.patient(patientId) });
+      // FX-62: `completed` backendda odontogramma snapshot'ini avto yaratadi — keshni yangilamasak
+      // eski qoralamadan saqlash shu snapshot'ni last-write-wins bilan ustiga yozadi.
+      void qc.invalidateQueries({ queryKey: clinicalKeys.toothChartLatest(patientId) });
+      void qc.invalidateQueries({ queryKey: clinicalKeys.toothCharts(patientId) });
     },
   });
 }
@@ -304,6 +314,8 @@ export function useCreateVisitNote(patientId: string) {
       qc.invalidateQueries({ queryKey: clinicalKeys.visitNotes(patientId) });
       // FX-14: qoralama bosqichni `in_progress` qiladi.
       qc.invalidateQueries({ queryKey: clinicalKeys.plans(patientId) });
+      // FX-166: BOM bo'yicha avto-chiqim ombor qoldig'i va bugungi jurnalni o'zgartiradi.
+      qc.invalidateQueries({ queryKey: stockKeys.all });
     },
   });
 }
@@ -320,6 +332,7 @@ export function useUpdateVisitNote(patientId: string) {
       qc.invalidateQueries({ queryKey: ['clinical', 'visit-note'] });
       // stageId completion / performedServices reconcile plan+stock holatiga ta'sir qiladi.
       qc.invalidateQueries({ queryKey: clinicalKeys.plans(patientId) });
+      qc.invalidateQueries({ queryKey: stockKeys.all }); // FX-166: reconcile qoldiqni o'zgartiradi
     },
   });
 }
@@ -408,6 +421,16 @@ export function useCreatePrescription(patientId: string) {
   return useMutation({
     mutationFn: (body: CreatePrescriptionInput) => createPrescription(body).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: clinicalKeys.prescriptions(patientId) }),
+    // FX-22: allergiya 409 — UI kritik oyna ko'rsatadi (qizil toast kerak emas); qolgan
+    // xatolar uchun global default (query-client) bilan bir xil toast.
+    onError: (error) => {
+      if (serverAllergyConflict(error) || handleLicenseBlock(error)) return;
+      notifications.show({
+        color: 'red',
+        title: i18n.t('common.error'),
+        message: apiErrorMessage(error),
+      });
+    },
   });
 }
 

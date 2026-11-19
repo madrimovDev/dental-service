@@ -1,6 +1,7 @@
+import { fail } from '@dental/core';
 import { permissions, rolePermissions, userAssignments } from '@dental/db-schema';
 import { and, eq, gt, isNotNull, isNull, or } from 'drizzle-orm';
-import type { Context } from 'hono';
+import type { Context, MiddlewareHandler } from 'hono';
 import { getDb } from '../db/scoped.ts';
 
 /**
@@ -64,3 +65,55 @@ export const isBranchAllowed = async (
   permissionCode: string,
   branchId: string,
 ): Promise<boolean> => scopeAllows(await loadBranchScope(c, permissionCode), branchId);
+
+/**
+ * FX-33 (LA-31): filial doirasi eskalatsiyasi. Owner bo'lmagan chaqiruvchi `permissionCode`
+ * bilan faqat o'z tayinlov filiallari doirasida tayinlov bera oladi; `branchId = null`
+ * (butun klinika) faqat chaqiruvchida tenant-wide tayinlov bo'lsa. Aks holda 403
+ * `branch.escalation` (error-handler).
+ */
+export class BranchEscalationError extends Error {
+  readonly code = 'branch.escalation';
+  constructor(readonly branchId: string | null) {
+    super(`Branch escalation: caller cannot grant in branch ${branchId ?? '(all branches)'}`);
+    this.name = 'BranchEscalationError';
+  }
+}
+
+export const assertCanGrantBranch = async (
+  c: Context,
+  permissionCode: string,
+  branchId: string | null | undefined,
+): Promise<void> => {
+  const scope = await loadBranchScope(c, permissionCode);
+  if (scope.kind === 'all') return;
+  if (branchId && scope.kind === 'branches' && scope.branchIds.includes(branchId)) return;
+  throw new BranchEscalationError(branchId ?? null);
+};
+
+/**
+ * FX-133: route-darajasidagi filial doirasi middleware'i (`requirePermission`dan KEYIN,
+ * `rlsMiddleware`dan keyin). `resolveBranchId` tekshiriladigan filialni qaytaradi
+ * (query/body/resurs qatoridan); `null`/`undefined` — filial aniqlanmadi (resurs topilmadi
+ * yoki filial filtri berilmagan): faqat doira `none` emasligi tekshiriladi, qolganini
+ * handler hal qiladi (404 / doira bo'yicha filtr). Owner/tenant-wide → har doim o'tadi.
+ */
+export const requireBranchScope =
+  (
+    permissionCode: string,
+    resolveBranchId: (c: Context) => Promise<string | null | undefined> | string | null | undefined,
+  ): MiddlewareHandler =>
+  async (c, next) => {
+    const scope = await loadBranchScope(c, permissionCode);
+    const branchId = await resolveBranchId(c);
+    if (scope.kind === 'none' || (branchId && !scopeAllows(scope, branchId))) {
+      return c.json(fail(BRANCH_FORBIDDEN_CODE, BRANCH_FORBIDDEN_MESSAGE), 403);
+    }
+    await next();
+  };
+
+/** Body'dagi `branchId` (JSON) — Hono body'ni keshlaydi, handler `valid('json')` baribir ishlaydi. */
+export const branchIdFromJson = async (c: Context): Promise<string | undefined> => {
+  const body = (await c.req.json().catch(() => null)) as { branchId?: unknown } | null;
+  return typeof body?.branchId === 'string' ? body.branchId : undefined;
+};

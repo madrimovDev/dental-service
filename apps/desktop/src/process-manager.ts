@@ -20,9 +20,11 @@ import { readConfig, resolveLabHubUrl } from './config.js';
 import {
   getOrCreateDbPassword,
   getOrCreateJwtSecret,
+  getOrCreateServerId,
   getOrCreateSuperuserPassword,
 } from './first-run.js';
 import { getDataDir, getPgDataDir, getResourcesDir } from './paths.js';
+import { buildValkeyArgs, getValkeyDataDir } from './valkey-args.js';
 
 // Platform param default `process.platform` — testlarda ikkala tarmoqni ham
 // (win32 va boshqa) haqiqiy joriy platformadan mustaqil sinash uchun.
@@ -338,9 +340,14 @@ const spawnPostgres = (): Promise<void> =>
 
 const spawnValkey = (): Promise<void> =>
   new Promise((resolve, reject) => {
-    valkeyProcess = spawn(getValkeyCommand(), [join(getDataDir(), 'valkey.conf')], {
-      stdio: 'pipe',
-    });
+    // FX-96: AOF `dir` — mavjud bo'lishi shart (valkey o'zi yaratmaydi).
+    const dataDir = getDataDir();
+    mkdirSync(getValkeyDataDir(dataDir), { recursive: true });
+    valkeyProcess = spawn(
+      getValkeyCommand(),
+      buildValkeyArgs(join(dataDir, 'valkey.conf'), dataDir),
+      { stdio: 'pipe' },
+    );
     // Binary topilmadi/spawn muvaffaqiyatsiz — reject (postgres bilan bir xil
     // pattern), aks holda 'error' hech kim tinglamasa unhandled exception
     // Electron main process'ni crash qiladi (CLI-346 qarori: binary
@@ -394,6 +401,8 @@ const spawnApi = (port: number): Promise<void> =>
         // litsenziyaga aloqasi bo'lmagan static-serve sozlamasi edi, gate
         // signali sifatida noto'g'ri edi — license-middleware.ts izohiga qarang).
         DENTAL_LOCAL_DESKTOP: 'true',
+        // FX-145 — `/api/health` `serverId` (klient TOFU pin'i), first-run.ts.
+        DENTAL_SERVER_ID: getOrCreateServerId(),
         RUN_REMINDER_WORKER: 'true',
         NODE_ENV: 'production',
         // Laboratoriya portali — config.json `labHubUrl` (bo'sh = o'chiq). Har doim aniq

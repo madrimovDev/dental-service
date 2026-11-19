@@ -17,7 +17,7 @@
 
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { ROLE_TEMPLATES } from '@dental/core';
-import { patients, tenants, users } from '@dental/db-schema';
+import { patients, roles, tenants, userAssignments, users } from '@dental/db-schema';
 import { sql } from 'drizzle-orm';
 import { createApp } from '../../src/app.ts';
 import { db } from '../../src/db/client.ts';
@@ -36,6 +36,7 @@ const receptionistPerms = permsFor('receptionist');
 let tenantId: string;
 let ownerId: string;
 let patientId: string;
+let doctorActorId: string;
 let doctorToken: string;
 let technicianToken: string;
 let receptionistToken: string;
@@ -95,6 +96,15 @@ beforeAll(async () => {
       .returning({ id: patients.id });
     if (!p) throw new Error('patient insert failed');
     patientId = p.id;
+    // FX-155: doctorId faqat `is_practitioner` shifokor (yoki owner) bo'la oladi.
+    doctorActorId = doctorActor.id;
+    const [docRole] = await tx
+      .insert(roles)
+      .values({ tenantId, name: 'Doctor412', isPractitioner: true })
+      .returning({ id: roles.id });
+    await tx
+      .insert(userAssignments)
+      .values({ tenantId, userId: doctorActor.id, roleId: docRole!.id });
   });
 
   doctorToken = await tokenFor(doctorActor.id, doctorPerms, 'doctor');
@@ -123,11 +133,30 @@ describe('CLI-412 — real rol permset (NOT @owner) bilan M5 endpoint natijasi',
       },
       body: JSON.stringify({
         patientId,
-        doctorId: ownerId,
+        doctorId: doctorActorId,
         items: [{ medicationName: 'Amoxicillin', dosage: '500mg', frequency: '3x/kun' }],
       }),
     });
     expect(res.status).toBe(201);
+  });
+
+  test('FX-155: Doctor permset boshqa nomidan (owner) retsept → 403 prescription.on_behalf_forbidden', async () => {
+    const app = createApp();
+    const res = await app.request('/api/prescriptions', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${doctorToken}`,
+      },
+      body: JSON.stringify({
+        patientId,
+        doctorId: ownerId,
+        items: [{ medicationName: 'Amoxicillin', dosage: '500mg', frequency: '3x/kun' }],
+      }),
+    });
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe('prescription.on_behalf_forbidden');
   });
 
   test('Technician permset: GET /api/lab-orders → 200 (avval 403 edi)', async () => {

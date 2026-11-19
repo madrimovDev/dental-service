@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { useDiagnoses, useVisitNotes } from '../../clinical.api';
+import { useClinicalAuthor } from '../../clinical-author';
 import { VisitNoteCard } from './VisitNoteCard';
 
 type Props = { patientId: string };
@@ -20,6 +21,9 @@ export function VisitNotesTab({ patientId }: Props) {
   const navigate = useNavigate();
   const { hasPermission } = useAuthStore();
   const canEdit = hasPermission('medical_record.edit');
+  // FX-155 review: yangi yozuv muallifi shifokor bo'lishi shart (yoki `medical_record.on_behalf`).
+  const author = useClinicalAuthor('medical_record.on_behalf');
+  const canCreate = canEdit && author.canAuthor;
 
   const notesQuery = useVisitNotes(patientId);
   const diagnosesQuery = useDiagnoses();
@@ -37,7 +41,7 @@ export function VisitNotesTab({ patientId }: Props) {
     <Stack gap="md">
       <Group justify="space-between">
         <Title order={4}>{t('visit_note.title')}</Title>
-        {canEdit && (
+        {canCreate && (
           <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
             {t('visit_note.create')}
           </Button>

@@ -30,16 +30,16 @@ describe('useTodayRange (CLI-160)', () => {
 // lekin himoya sifatida frontend hook ham permission bilan gate qilinadi (graceful degrade —
 // kelajakda boshqa rol shu dashboard'ni ochsa 403 portlamasin).
 const mockHasPermission = vi.fn((_p: string) => true);
-const mockListLabOrders = vi.fn((..._args: unknown[]) => Promise.resolve({ data: { data: [] } }));
+const mockListLabOrders = vi.fn((..._args: unknown[]) => Promise.resolve({ data: [] }));
 
 vi.mock('@/stores/auth-store.ts', () => ({
   useAuthStore: () => ({ hasPermission: (p: string) => mockHasPermission(p) }),
 }));
 
-vi.mock('@dental/api-client', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@dental/api-client')>();
-  return { ...actual, listLabOrders: (...args: unknown[]) => mockListLabOrders(...args) };
-});
+// FX-109: faol buyurtmalar serverda filtrlangan hand-endpoint orqali olinadi.
+vi.mock('@/lib/api.ts', () => ({
+  api: { labOrders: { listActive: (...args: unknown[]) => mockListLabOrders(...args) } },
+}));
 
 describe('useActiveLabOrders — permission-gated (CLI-412)', () => {
   const wrapper = ({ children }: { children: ReactNode }) => {

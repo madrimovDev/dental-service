@@ -168,11 +168,12 @@ export function CaseDetailPanel({ id }: { id: string }) {
         key={`${c.id}:${c.proposedPrice}:${c.approvedPrice}`}
         c={c}
         items={prices.data?.items ?? []}
-        canPropose={isLead && s !== 'rejected'}
+        canPropose={isLead && s !== 'rejected' && s !== 'cancelled'}
       />
 
       {s === 'ready' && <div className="note">{t('labHub.detail.readyWait')}</div>}
       {s === 'delivered' && <div className="note">{t('labHub.detail.deliveredInfo')}</div>}
+      {s === 'cancelled' && <div className="form-error">{t('labHub.detail.cancelledInfo')}</div>}
       {s === 'rejected' && (
         <div className="form-error">
           {t('labHub.detail.rejectedInfo', { reason: c.rejectReason ?? '—' })}

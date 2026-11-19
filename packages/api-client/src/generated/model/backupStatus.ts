@@ -6,6 +6,7 @@
  */
 import type { BackupStatusMode } from './backupStatusMode';
 import type { BackupFile } from './backupFile';
+import type { BackupRestoreResult } from './backupRestoreResult';
 
 export interface BackupStatus {
   mode: BackupStatusMode;
@@ -16,4 +17,5 @@ export interface BackupStatus {
   /** @nullable */
   lastError: string | null;
   files: BackupFile[];
+  lastRestore: BackupRestoreResult;
 }

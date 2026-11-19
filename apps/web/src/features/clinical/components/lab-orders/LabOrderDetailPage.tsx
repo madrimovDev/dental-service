@@ -129,7 +129,11 @@ export function LabOrderDetailPage() {
 
           <section className={classes.card}>
             <h3 className={classes.cardTitle}>{t('labOrder.files_section')}</h3>
-            <LabOrderFiles labOrderId={order.id} canManage={canManage} />
+            <LabOrderFiles
+              labOrderId={order.id}
+              canManage={canManage}
+              hubLinked={!!order.labHubLabId}
+            />
           </section>
         </div>
 

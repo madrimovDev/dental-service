@@ -12,7 +12,7 @@
  */
 
 import { type SpawnSyncReturns, spawnSync } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { getDataDir, getPgDataDir, getResourcesDir } from './paths.js';
@@ -69,6 +69,26 @@ export const getOrCreateJwtSecret = (): string => {
   const secret = randomBytes(32).toString('hex'); // 64 hex belgi — 32+ talabidan ancha uzun
   writeFileSync(path, secret, { mode: 0o600 });
   return secret;
+};
+
+// FX-145 (LC-23) — server o'rnatmasining barqaror identifikatori. API
+// `/api/health` javobida `serverId` sifatida qaytadi (`DENTAL_SERVER_ID`
+// env, process-manager.ts); klient uni TOFU'da manzil bilan birga pinlaydi va
+// saqlangan IP'da boshqa server javob bersa qayta tasdiqlash so'raydi. Maxfiy
+// emas (LAN'da ochiq) — faqat "o'sha server"ni ajratish uchun. dataDir bilan
+// birga yashaydi: ma'lumotlar papkasi yo'qolsa yangi id = yangi server.
+export const getServerIdPath = (): string => join(getDataDir(), 'server-id.txt');
+
+export const getOrCreateServerId = (): string => {
+  const path = getServerIdPath();
+  if (existsSync(path)) {
+    const existing = readFileSync(path, 'utf8').trim();
+    if (existing) return existing;
+  }
+  mkdirSync(getDataDir(), { recursive: true });
+  const id = randomUUID();
+  writeFileSync(path, id);
+  return id;
 };
 
 // CLI-442#8 — Postgres superuser (`dental`) paroli. Ilgari `initdb -U dental`

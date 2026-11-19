@@ -113,6 +113,22 @@ describe('OdontogramTab', () => {
     expect(arg.states.length).toBe(1);
   });
 
+  it("FX-122: «Sut tishlar» switch'i draft'ni tozalamaydi — doimiy tish holati saqlanadi", () => {
+    mockChart = {
+      isPrimaryDentition: false,
+      states: [{ toothNumber: 16, surface: 'whole', state: 'caries' }],
+    };
+    renderApp(<OdontogramTab patientId="p1" />);
+    fireEvent.click(screen.getByRole('switch', { name: /Sut tishlar|Молочные/i }));
+    expect(saveSnapshot()).toBeEnabled();
+    fireEvent.click(saveSnapshot());
+    const arg = mutate.mock.calls[0]?.[0];
+    expect(arg.isPrimaryDentition).toBe(true);
+    expect(arg.states).toContainEqual(
+      expect.objectContaining({ toothNumber: 16, state: 'caries' }),
+    );
+  });
+
   it('CLI-189: saqlangan non-whole surface + diagnosisId round-trip yuboriladi', () => {
     mockChart = {
       isPrimaryDentition: false,

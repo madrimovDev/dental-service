@@ -4,19 +4,32 @@ import { z } from 'zod';
 export const itemFormSchema = z.object({
   name: z.string().min(1).max(200),
   unit: z.string().min(1).max(32),
-  branchId: z.string().optional(),
+  // FX-165: Mantine Select tozalanganda `null` beradi — `undefined` ham, `null` ham ruxsat.
+  branchId: z.string().nullish(),
+  /** Kategoriya / dona narxi — ixtiyoriy (FX-129). Narx bo'sh = belgilanmagan. */
+  category: z.string().max(100).optional(),
+  price: z.union([z.coerce.number().nonnegative(), z.literal('')]).optional(),
+  /** Faqat yaratishda; tahrirda qoldiq harakat orqali o'zgaradi (CLI-424). */
   quantity: z.coerce.number().nonnegative(),
   minThreshold: z.coerce.number().nonnegative(),
 });
 export type ItemFormSchema = z.infer<typeof itemFormSchema>;
 
 /** Manual harakat formasi (in/out/adjustment). Asistent "chiqim" = type=out. */
-export const movementFormSchema = z.object({
-  itemId: z.string().min(1),
-  type: z.enum(['in', 'out', 'adjustment']),
-  quantity: z.coerce.number().positive(),
-  reason: z.string().max(200).optional(),
-});
+// FX-43: `adjustment` = sanalgan (aniqlangan) qoldiq, set-to-value — 0 qonuniy («hammasi tugadi»);
+// in/out uchun miqdor > 0. API (`createMovementSchema`) bilan bir xil.
+export const movementFormSchema = z
+  .object({
+    itemId: z.string().min(1),
+    type: z.enum(['in', 'out', 'adjustment']),
+    quantity: z.coerce.number().nonnegative(),
+    reason: z.string().max(200).optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.type !== 'adjustment' && val.quantity <= 0) {
+      ctx.addIssue({ code: 'custom', path: ['quantity'], message: 'quantity must be > 0' });
+    }
+  });
 export type MovementFormSchema = z.infer<typeof movementFormSchema>;
 
 /** BOM (xizmat → material) formasi. */

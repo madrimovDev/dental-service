@@ -162,19 +162,17 @@ export const createScheduleRepository = () => {
       );
   }
 
-  /** P10: doktorning shu filialda umuman (istalgan kun) aktiv jadval segmenti bormi. */
-  async function hasAnyActiveSegments(c: Context, doctorId: string, branchId: string) {
+  /**
+   * P10 + FX-126: doktorga shu filialda jadval umuman SOZLANGANMI — istalgan qator (faol segment
+   * yoki «ishlamaydi» sentinel, is_active=false). Sozlanmagan doktor filial ish soati fallback'iga
+   * tushadi; sozlangan (hatto sentinel) — tushmaydi.
+   */
+  async function hasAnyScheduleRows(c: Context, doctorId: string, branchId: string) {
     const db = getDb(c);
     const [row] = await db
       .select({ id: doctorSchedules.id })
       .from(doctorSchedules)
-      .where(
-        and(
-          eq(doctorSchedules.doctorId, doctorId),
-          eq(doctorSchedules.branchId, branchId),
-          eq(doctorSchedules.isActive, true),
-        ),
-      )
+      .where(and(eq(doctorSchedules.doctorId, doctorId), eq(doctorSchedules.branchId, branchId)))
       .limit(1);
     return Boolean(row);
   }
@@ -222,7 +220,6 @@ export const createScheduleRepository = () => {
                 and(
                   eq(doctorSchedules.doctorId, userAssignments.userId),
                   eq(doctorSchedules.branchId, branchId),
-                  eq(doctorSchedules.isActive, true),
                 ),
               ),
           ),
@@ -316,7 +313,7 @@ export const createScheduleRepository = () => {
     listDoctorAppointments,
     listOverlappingTimeOff,
     listActiveSegmentsForDay,
-    hasAnyActiveSegments,
+    hasAnyScheduleRows,
     listBranchActiveSegmentsForDay,
     listBranchDoctorsWithoutSchedule,
     listBranchAppointments,

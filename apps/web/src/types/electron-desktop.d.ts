@@ -12,7 +12,12 @@ export interface DentalDesktopBridge {
   }>;
   /** UI-T3 — desktop yangilanish holati (auto-updater → UpdateBanner). Obuna bekor qilish funksiyasini qaytaradi. */
   onUpdateState?(
-    cb: (state: { phase: 'ready' | 'installing'; installAt: string | null }) => void,
+    cb: (state: {
+      phase: 'ready' | 'installing';
+      installAt: string | null;
+      /** FX-148 — o'rnatma roli; server rolida «Hozir o'rnatish» tasdiq so'raydi. */
+      role?: 'server' | 'client' | null;
+    }) => void,
   ): () => void;
   installUpdateNow?(): Promise<void>;
   installUpdateTonight?(): Promise<void>;

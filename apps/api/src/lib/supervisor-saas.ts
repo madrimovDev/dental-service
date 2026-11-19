@@ -2,6 +2,7 @@ import { tenantSettings, tenants, users } from '@dental/db-schema';
 import { and, eq, isNotNull, isNull, lt, or } from 'drizzle-orm';
 import type { Database } from '../db/client.ts';
 import { withTenant } from '../db/scoped.ts';
+import { MAX_GRACE_DAYS } from './license.ts';
 import { logger } from './logger.ts';
 import { invalidateSubscriptionCache } from './subscription.ts';
 
@@ -36,6 +37,11 @@ export type SupervisorClinicInfo = {
   clinicId: string;
   /** ISO yoki null (Supervisor muddat bermagan). */
   subscriptionExpiresAt: string | null;
+  /**
+   * FX-102 (LB-11): vendor klinikani to'xtatgan payt (ISO) yoki null. Bor bo'lsa
+   * tenant IMTIYOZSIZ bloklanadi (`effectiveSubscriptionExpiry`).
+   */
+  suspendedAt: string | null;
 };
 
 export type SaasRegistration = {
@@ -44,6 +50,18 @@ export type SaasRegistration = {
   ownerFullName: string;
   ownerPhone: string;
   defaultLanguage: 'uz' | 'ru';
+  /**
+   * FX-149 (LC-27): tenant yaratilgan payt (ISO) — Supervisor sinov muddatini
+   * shundan hisoblaydi (qayta ro'yxatda yangi 30 kun berilmaydi).
+   */
+  tenantCreatedAt: string;
+  /**
+   * FX-149 (review): FAQAT 404-tiklash yo'lida — apps/api'da saqlangan obuna muddati
+   * (ISO). Supervisor yangi qatorda uni sinovdan kech bo'lsa klinika muddati qiladi,
+   * shunda to'langan muddat keyingi (oddiy) sinxronda sinov oxiri bilan ustiga
+   * yozilmaydi va vendor ham to'g'ri muddatni ko'radi.
+   */
+  knownSubscriptionExpiresAt?: string;
 };
 
 const call = async (fetchImpl: FetchFn, path: string, init: RequestInit): Promise<Response> =>
@@ -57,9 +75,38 @@ const call = async (fetchImpl: FetchFn, path: string, init: RequestInit): Promis
   });
 
 const parseInfo = async (res: Response): Promise<SupervisorClinicInfo> => {
-  const body = (await res.json()) as { clinicId?: string; subscriptionExpiresAt?: string | null };
+  const body = (await res.json()) as {
+    clinicId?: string;
+    subscriptionExpiresAt?: string | null;
+    suspendedAt?: string | null;
+  };
   if (!body.clinicId) throw new Error('supervisor: clinicId missing');
-  return { clinicId: body.clinicId, subscriptionExpiresAt: body.subscriptionExpiresAt ?? null };
+  return {
+    clinicId: body.clinicId,
+    subscriptionExpiresAt: body.subscriptionExpiresAt ?? null,
+    suspendedAt: body.suspendedAt ?? null,
+  };
+};
+
+const DAY_MS = 86_400_000;
+
+/**
+ * FX-102 (LB-11): saqlanadigan (samarali) obuna muddati. Vendor to'xtatgan
+ * bo'lsa — `suspendedAt - MAX_GRACE_DAYS - 1 s`, ya'ni `computeSubscriptionState`
+ * imtiyozni ham o'tgan deb hisoblab darhol `expired` beradi (migratsiyasiz:
+ * `subscription_expires_at` — Supervisor holatining keshi). Haqiqiy muddat
+ * Supervisor'da o'zgarmaydi; «Muddatni uzaytirish» to'xtatishni yechadi va
+ * keyingi sinxron haqiqiy muddatni qaytaradi. Deterministik — qayta sinxron
+ * bir xil qiymat yozadi.
+ */
+export const effectiveSubscriptionExpiry = (info: SupervisorClinicInfo): Date | null => {
+  const expiresAt = info.subscriptionExpiresAt ? new Date(info.subscriptionExpiresAt) : null;
+  if (!info.suspendedAt) return expiresAt;
+  // Yaroqsiz sana — fail-closed (hozirgi payt): to'xtatish signali e'tiborsiz qolmasin.
+  const parsed = Date.parse(info.suspendedAt);
+  const at = Number.isFinite(parsed) ? parsed : Date.now();
+  const blocked = new Date(at - MAX_GRACE_DAYS * DAY_MS - 1000);
+  return expiresAt && expiresAt < blocked ? expiresAt : blocked;
 };
 
 /** Idempotent (Supervisor `saas_tenant_id` UNIQUE) — qayta chaqiruv xavfsiz. */
@@ -88,13 +135,28 @@ export const fetchClinicStatus = async (
  * Tenant-scoped (RLS) upsert — qator bo'lmasa yaratadi. `withTenant` ishlatiladi
  * (admin conn shart emas): register-tenant yo'li admin ulanishsiz ham ishlashi kerak.
  */
-const saveSupervisorState = async (tenantId: string, info: SupervisorClinicInfo): Promise<void> => {
-  const subscriptionExpiresAt = info.subscriptionExpiresAt
-    ? new Date(info.subscriptionExpiresAt)
-    : null;
+const saveSupervisorState = async (
+  tenantId: string,
+  info: SupervisorClinicInfo,
+  opts: { keepLaterExpiry?: boolean } = {},
+): Promise<void> => {
   const now = new Date();
-  await withTenant(tenantId, (tx) =>
-    tx
+  await withTenant(tenantId, async (tx) => {
+    let subscriptionExpiresAt = effectiveSubscriptionExpiry(info);
+    // FX-149: Supervisor tenantni yo'qotib (404) qayta ro'yxatga olgan bo'lsa, u bergan
+    // muddat (sinov, yaratilgan sanadan) saqlangan, ancha kech (to'langan) muddatni
+    // qisqartirmaydi. Vendor to'xtatgan bo'lsa (suspendedAt) — himoya qo'llanmaydi.
+    // Asosiy himoya — `knownSubscriptionExpiresAt` (Supervisor muddatni o'zi saqlaydi);
+    // bu faqat shu maydonni bilmaydigan eski Supervisor uchun bir sikllik zaxira.
+    if (opts.keepLaterExpiry && !info.suspendedAt) {
+      const [row] = await tx
+        .select({ at: tenantSettings.subscriptionExpiresAt })
+        .from(tenantSettings);
+      if (row?.at && (!subscriptionExpiresAt || row.at > subscriptionExpiresAt)) {
+        subscriptionExpiresAt = row.at;
+      }
+    }
+    await tx
       .insert(tenantSettings)
       .values({
         tenantId,
@@ -110,8 +172,8 @@ const saveSupervisorState = async (tenantId: string, info: SupervisorClinicInfo)
           subscriptionSyncedAt: now,
           updatedAt: now,
         },
-      }),
-  );
+      });
+  });
   invalidateSubscriptionCache(tenantId);
 };
 
@@ -141,6 +203,7 @@ export const runSupervisorSyncCycle = async (deps: SyncDeps): Promise<SyncResult
       tenantId: tenants.id,
       name: tenants.name,
       lang: tenants.defaultLanguage,
+      createdAt: tenants.createdAt,
       ownerName: users.fullName,
       ownerPhone: users.phone,
     })
@@ -159,6 +222,7 @@ export const runSupervisorSyncCycle = async (deps: SyncDeps): Promise<SyncResult
           ownerFullName: t.ownerName ?? t.name,
           ownerPhone: t.ownerPhone ?? '',
           defaultLanguage: t.lang === 'ru' ? 'ru' : 'uz',
+          tenantCreatedAt: t.createdAt.toISOString(),
         },
         f,
       );
@@ -209,11 +273,13 @@ export const syncTenantSubscription = async (
 ): Promise<boolean> => {
   if (!isSaasSupervisorEnabled()) return false;
   let info = await fetchClinicStatus(tenantId, fetchImpl);
+  const reRegistered = !info;
   if (!info) {
     const [t] = await readDb
       .select({
         name: tenants.name,
         lang: tenants.defaultLanguage,
+        createdAt: tenants.createdAt,
         ownerName: users.fullName,
         ownerPhone: users.phone,
       })
@@ -221,6 +287,13 @@ export const syncTenantSubscription = async (
       .innerJoin(users, eq(users.id, tenants.ownerUserId))
       .where(eq(tenants.id, tenantId));
     if (!t) return false;
+    // tenant_settings — RLS jadval: o'z tenant kontekstida o'qiladi.
+    const known = await withTenant(tenantId, async (tx) => {
+      const [row] = await tx
+        .select({ at: tenantSettings.subscriptionExpiresAt })
+        .from(tenantSettings);
+      return row?.at ?? null;
+    });
     info = await registerClinicInSupervisor(
       {
         tenantId,
@@ -228,11 +301,13 @@ export const syncTenantSubscription = async (
         ownerFullName: t.ownerName ?? t.name,
         ownerPhone: t.ownerPhone ?? '',
         defaultLanguage: t.lang === 'ru' ? 'ru' : 'uz',
+        tenantCreatedAt: t.createdAt.toISOString(),
+        ...(known ? { knownSubscriptionExpiresAt: known.toISOString() } : {}),
       },
       fetchImpl,
     );
   }
-  await saveSupervisorState(tenantId, info);
+  await saveSupervisorState(tenantId, info, { keepLaterExpiry: reRegistered });
   return true;
 };
 

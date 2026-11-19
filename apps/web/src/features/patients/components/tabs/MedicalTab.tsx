@@ -16,6 +16,7 @@ import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth-store.ts';
+import { applyQuestionnaire, QUESTIONNAIRE_KEYS } from '../../medical-questionnaire';
 import {
   useMedicalRecord,
   useMedicalRecordHistory,
@@ -68,6 +69,62 @@ function MedicalHistorySection({ patientId }: { patientId: string }) {
           </Accordion.Item>
         ))}
       </Accordion>
+    </Paper>
+  );
+}
+
+function QuestionnaireDraftCard({
+  answers,
+  at,
+  canEdit,
+  onAdopt,
+}: {
+  answers: Record<string, string>;
+  at: string | null;
+  canEdit: boolean;
+  onAdopt: () => void;
+}) {
+  const { t, i18n } = useTranslation();
+  const [adopted, setAdopted] = useState(false);
+  const rows = QUESTIONNAIRE_KEYS.filter((k) => (answers[k] ?? '').trim() !== '');
+  if (rows.length === 0) return null;
+  return (
+    <Paper withBorder p="md" radius="var(--radius-card)" data-testid="questionnaire-draft">
+      <Stack gap="xs">
+        <Text fw={600}>{t('medical.questionnaire_title')}</Text>
+        <Text size="sm" c="dimmed">
+          {t('medical.questionnaire_hint')}
+          {at
+            ? ` ${t('medical.questionnaire_submitted')} ${new Date(at).toLocaleString(
+                i18n.language === 'ru' ? 'ru-RU' : 'uz-UZ',
+              )}`
+            : ''}
+        </Text>
+        {rows.map((k) => (
+          <Text key={k} size="sm">
+            <b>{t(`medical.questionnaire_q.${k}`)}:</b> {answers[k]}
+          </Text>
+        ))}
+        {canEdit && (
+          <Group>
+            <Button
+              size="sm"
+              variant="default"
+              onClick={() => {
+                onAdopt();
+                setAdopted(true);
+              }}
+            >
+              {t('medical.questionnaire_adopt')}
+            </Button>
+            {adopted && (
+              <Text size="sm" c="dimmed">
+                {t('medical.questionnaire_adopted')}
+              </Text>
+            )}
+          </Group>
+        )}
+      </Stack>
     </Paper>
   );
 }
@@ -154,8 +211,40 @@ export function MedicalTab({ patientId }: { patientId: string }) {
     }),
   );
 
+  const questionnaire = medicalQuery.data.questionnaireAnswers;
+  const adoptQuestionnaire = () => {
+    if (!questionnaire) return;
+    const next = applyQuestionnaire(
+      questionnaire,
+      {
+        anamnez: form.values.anamnez,
+        chronicConditionsText: form.values.chronicConditionsText,
+        currentMedicationsText: form.values.currentMedicationsText,
+        allergies,
+      },
+      {
+        pregnancy: t('medical.questionnaire_q.pregnancy'),
+        anesthesia: t('medical.questionnaire_q.anesthesia'),
+      },
+    );
+    form.setValues({
+      anamnez: next.anamnez,
+      chronicConditionsText: next.chronicConditionsText,
+      currentMedicationsText: next.currentMedicationsText,
+    });
+    setAllergies(next.allergies);
+  };
+
   return (
     <Stack gap="md">
+      {questionnaire && (
+        <QuestionnaireDraftCard
+          answers={questionnaire}
+          at={medicalQuery.data.questionnaireAt ?? null}
+          canEdit={canEdit}
+          onAdopt={adoptQuestionnaire}
+        />
+      )}
       <Card title={t('patients.tab_medical')}>
         <form onSubmit={submit}>
           <Stack gap="md">

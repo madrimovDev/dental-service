@@ -268,3 +268,100 @@ describe('lab portali', () => {
     expect(links.links[0]).toMatchObject({ clinicId: clinic.clinicId, status: 'pending' });
   });
 });
+
+describe('FX-94: parolni tiklash', () => {
+  const login401 = async (phone: string, password: string) =>
+    (
+      await app.request('/v1/lab/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-real-ip': crypto.randomUUID() },
+        body: JSON.stringify({ phone, password }),
+      })
+    ).status;
+
+  it('ichki API: lead parolini tiklash — yangi vaqtinchalik parol, eski parol yaroqsiz, eski token bloklanadi', async () => {
+    const lab = await createLab();
+    const users = (await (await internal(`/internal/labs/${lab.labId}/users`, 'GET')).json()) as {
+      users: { id: string; role: string; phone: string }[];
+    };
+    const lead = users.users.find((u) => u.role === 'lead')!;
+    expect(lead.phone).toBe(lab.phone);
+
+    const res = await internal(
+      `/internal/labs/${lab.labId}/users/${lead.id}/reset-password`,
+      'POST',
+    );
+    expect(res.status).toBe(200);
+    const { tempPassword } = (await res.json()) as { tempPassword: string };
+    expect(tempPassword.length).toBe(16);
+
+    expect(await login401(lab.phone, lab.password)).toBe(401);
+    const login = await labLogin(lab.phone, tempPassword);
+    expect(login.mustChangePassword).toBe(true);
+    // parol tiklashdan oldingi token endi faqat parol-almashtirishga ruxsat beradi
+    expect((await labReq(lab, '/v1/lab/cases')).status).toBe(403);
+
+    // boshqa labning foydalanuvchisi / noma'lum lab — 404; tokensiz — 401
+    const other = await createLab();
+    expect(
+      (await internal(`/internal/labs/${other.labId}/users/${lead.id}/reset-password`, 'POST'))
+        .status,
+    ).toBe(404);
+    expect(
+      (
+        await app.request(`/internal/labs/${lab.labId}/users/${lead.id}/reset-password`, {
+          method: 'POST',
+        })
+      ).status,
+    ).toBe(401);
+  });
+
+  it('lead texnik parolini tiklaydi; texnik tiklay olmaydi; boshqa lab / lead / o‘zini — rad', async () => {
+    const lab = await createLab();
+    const tPhone = uniquePhone();
+    const add = await labReq(lab, '/v1/lab/users', {
+      method: 'POST',
+      body: { fullName: 'Texnik Bobur', phone: tPhone },
+    });
+    const { user, tempPassword: tmp1 } = (await add.json()) as {
+      user: { id: string };
+      tempPassword: string;
+    };
+    const first = await labLogin(tPhone, tmp1);
+    const ch = await app.request('/v1/lab/auth/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${first.token}` },
+      body: JSON.stringify({ currentPassword: tmp1, newPassword: 'Texnik-parol-2026' }),
+    });
+    const tech = { ...lab, token: ((await ch.json()) as { token: string }).token };
+
+    // texnik (real cheklangan rol) tiklay olmaydi
+    expect(
+      (await labReq(tech, `/v1/lab/users/${user.id}/reset-password`, { method: 'POST' })).status,
+    ).toBe(403);
+
+    const res = await labReq(lab, `/v1/lab/users/${user.id}/reset-password`, { method: 'POST' });
+    expect(res.status).toBe(200);
+    const { tempPassword } = (await res.json()) as { tempPassword: string };
+    expect(tempPassword.length).toBe(16);
+    expect(await login401(tPhone, 'Texnik-parol-2026')).toBe(401);
+    expect((await labLogin(tPhone, tempPassword)).mustChangePassword).toBe(true);
+    // texnikning eski tokeni endi parol-almashtirishdan boshqasiga yaramaydi
+    expect((await labReq(tech, '/v1/lab/cases')).status).toBe(403);
+
+    // boshqa labning lead'i begona foydalanuvchini tiklay olmaydi (RLS → 404)
+    const other = await createLab();
+    expect(
+      (await labReq(other, `/v1/lab/users/${user.id}/reset-password`, { method: 'POST' })).status,
+    ).toBe(404);
+
+    // lead parolini portal orqali tiklab bo'lmaydi (vendor qiladi) va o'zini ham
+    const list = (await (await labReq(lab, '/v1/lab/users')).json()) as {
+      users: { id: string; role: string }[];
+    };
+    const leadId = list.users.find((u) => u.role === 'lead')!.id;
+    expect(
+      (await labReq(lab, `/v1/lab/users/${leadId}/reset-password`, { method: 'POST' })).status,
+    ).toBe(409);
+  });
+});

@@ -15,6 +15,7 @@ import {
   labReq,
   linkActive,
   sendCase,
+  supervisorCalls,
   supervisorRegistry,
 } from './helpers';
 
@@ -120,6 +121,7 @@ describe('obuna (L10): expiresAt + 7 kun, keyin 403', () => {
       body: JSON.stringify({
         supervisorClinicId: clinic.supervisorClinicId,
         licenseKey: reg.licenseKey,
+        fingerprint: reg.fingerprint,
       }),
     });
     expect(conn.status).toBe(403);
@@ -164,6 +166,28 @@ describe('obuna (L10): expiresAt + 7 kun, keyin 403', () => {
         })
       ).status,
     ).toBe(401);
+  });
+
+  it('FX-138: desktop connect — fingerprint Supervisor’ga yetadi; eski o‘rnatma (boshqa fingerprint) va fingerprint’siz isbot 401', async () => {
+    const clinic = await connectClinic();
+    const reg = supervisorRegistry.get(clinic.supervisorClinicId)!;
+    const post = (body: unknown) =>
+      app.request('/v1/clinic/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-real-ip': crypto.randomUUID() },
+        body: JSON.stringify(body),
+      });
+    const base = { supervisorClinicId: clinic.supervisorClinicId, licenseKey: reg.licenseKey };
+    supervisorCalls.length = 0;
+    const old = await post({ ...base, fingerprint: 'fp-eski-pc' });
+    expect(old.status).toBe(401);
+    expect(await code(old)).toBe('connect.invalid_license');
+    expect(supervisorCalls.at(-1)?.fingerprint).toBe('fp-eski-pc');
+    const bare = await post(base);
+    expect(bare.status).toBe(401);
+    expect(await code(bare)).toBe('connect.invalid_license');
+    // Amaldagi o'rnatma — ulanadi.
+    expect((await post({ ...base, fingerprint: reg.fingerprint })).status).toBe(200);
   });
 
   it('Supervisor revoke push’i (expiresAt=null) klinikani darhol bloklaydi, renew push’i ochadi, hub kaliti saqlanadi', async () => {

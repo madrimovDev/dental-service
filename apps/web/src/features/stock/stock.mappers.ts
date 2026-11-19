@@ -132,3 +132,39 @@ export function formatLogTime(iso: string): string {
 }
 
 export type { AutoDeductionDto };
+
+/** Backend yozadigan texnik sabab kodlari → i18n kalitlari (FX-168). Boshqasi — erkin matn. */
+const REASON_KEYS: Record<string, string> = {
+  initial_balance: 'stock.reason_initial_balance',
+  batch_received: 'stock.reason_batch_received',
+  visit_auto: 'stock.reason_visit_auto',
+  visit_edit_return: 'stock.reason_visit_edit_return',
+};
+
+/** Harakat sababi: ma'lum kod bo'lsa tarjima, erkin matn bo'lsa o'zi, yo'q bo'lsa '—'. */
+export function movementReasonLabel(
+  m: Pick<StockMovementVM, 'reason' | 'sourceVisitNoteId'>,
+  t: (key: string) => string,
+): string {
+  if (m.sourceVisitNoteId && (!m.reason || m.reason === 'visit_auto')) {
+    return t('stock.reason_visit');
+  }
+  if (!m.reason) return '—';
+  const key = REASON_KEYS[m.reason];
+  return key ? t(key) : m.reason;
+}
+
+/** "21.11.2026 01:30" — Asia/Tashkent (UTC+5), vaqt bilan; til/brauzer zonasiga bog'liq emas. */
+export function formatMovementDateTime(iso: string): string {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Tashkent',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date(iso));
+  const g = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+  return `${g('day')}.${g('month')}.${g('year')} ${g('hour')}:${g('minute')}`;
+}

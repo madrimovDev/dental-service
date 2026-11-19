@@ -42,10 +42,7 @@ export const ROLE_TEMPLATES = [
       'user.view',
       'user.invite',
       'user.manage',
-      'user.deactivate',
       'audit_log.view',
-      'notification.view',
-      'notification.manage',
       // M2+ shell perms
       'patient.view',
       'patient.create',
@@ -55,10 +52,7 @@ export const ROLE_TEMPLATES = [
       'patient.view_pii',
       'medical_record.view',
       'medical_record.edit',
-      'staff.view',
-      'staff.invite',
-      'staff.edit',
-      'staff.delete',
+      'medical_record.on_behalf',
       'appointment.view',
       'appointment.create',
       'appointment.edit',
@@ -71,7 +65,6 @@ export const ROLE_TEMPLATES = [
       'cashier.view',
       'cashier.create_transaction',
       'cashier.refund',
-      'cashier.void',
       'report.view',
       'salary.view',
       'expense.view',
@@ -87,6 +80,7 @@ export const ROLE_TEMPLATES = [
       // M5 shell permissions (CLI-412)
       'prescription.view',
       'prescription.manage',
+      'prescription.on_behalf',
       'consent.view',
       'consent.manage',
       'lab_order.view',
@@ -104,8 +98,8 @@ export const ROLE_TEMPLATES = [
     descriptionRu:
       'Менеджер филиала — все права филиальных ролей (администратор, врач, медсестра, бухгалтер, техник)',
     // FU-41: = Receptionist ∪ Doctor ∪ Doctor+Assistant ∪ Nurse ∪ Accountant ∪ Technician ∪ eski BM.
-    // Tenant-darajali huquqlar (tenant.edit, tenant_settings.*, role.*, user.manage/deactivate,
-    // branch.create/delete, notification.*, staff.invite/edit/delete, patient.delete,
+    // Tenant-darajali huquqlar (tenant.edit, tenant_settings.*, role.*, user.manage,
+    // branch.create/delete, patient.delete,
     // service.manage) QASDDAN YO'Q — shuning uchun P5 (assertCanGrant) bo'yicha BM
     // Tenant Admin'ni bera olmaydi. Shifokor ro'yxatiga tushmaydi (`isPractitioner` yo'q).
     permissions: [
@@ -122,7 +116,6 @@ export const ROLE_TEMPLATES = [
       'patient.view_pii',
       'medical_record.view',
       'medical_record.edit',
-      'staff.view',
       'appointment.view',
       'appointment.create',
       'appointment.edit',
@@ -134,15 +127,15 @@ export const ROLE_TEMPLATES = [
       'cashier.view',
       'cashier.create_transaction',
       'cashier.refund',
-      'cashier.void',
       'report.view',
       'salary.view',
       'expense.view',
       'expense.manage',
       'stock.view',
       'stock.manage',
-      'payroll.view',
-      'payroll.manage',
+      // FX-116 (LB-25): payroll.* BM'da YO'Q — payroll klinika bo'yicha (tenant-wide) ish haqi
+      // run'i; filialga tayinlangan mudir boshqa filiallar maoshini ko'rmasligi va umumiy run'ni
+      // yaratish/yakunlash/o'chirishi mumkin emas. Owner/Tenant Admin/Accountant boshqaradi.
       'schedule.view',
       'schedule.manage',
       'recall.view',
@@ -293,7 +286,6 @@ export const ROLE_TEMPLATES = [
       'service.view',
       'cashier.view',
       'cashier.refund',
-      'cashier.void',
       'report.view',
       'salary.view',
       'expense.view',

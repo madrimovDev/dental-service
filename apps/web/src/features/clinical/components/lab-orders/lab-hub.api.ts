@@ -55,6 +55,16 @@ export function useConnectLabHub() {
   });
 }
 
+/** FX-48: «yuborilmadi» op'larni qayta navbatga — holat (navbat soni) qayta so'raladi. */
+export function useRequeueLabHubOutbox() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.labHub.requeueOutbox(),
+    onError: quiet,
+    onSuccess: () => qc.invalidateQueries({ queryKey: clinicalKeys.labHubStatus() }),
+  });
+}
+
 export function useRequestLabLink() {
   const qc = useQueryClient();
   return useMutation({
@@ -74,6 +84,19 @@ export function useSendToLabHub() {
       qc.invalidateQueries({ queryKey: clinicalKeys.labOrder(order.id) });
       qc.invalidateQueries({ queryKey: clinicalKeys.labOrders(order.patientId) });
       qc.invalidateQueries({ queryKey: clinicalKeys.labHubStatus() });
+    },
+  });
+}
+
+/** FX-78: tayyor/yetkazilgan ishni qayta ishlashga qaytarish. */
+export function useRequestLabRemake(labOrderId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (reason?: string) => api.labHub.requestRemake<LabOrderWire>(labOrderId, reason),
+    onError: quiet,
+    onSuccess: (order) => {
+      qc.invalidateQueries({ queryKey: clinicalKeys.labOrder(labOrderId) });
+      qc.invalidateQueries({ queryKey: clinicalKeys.labOrders(order.patientId) });
     },
   });
 }

@@ -7,6 +7,7 @@
 import type { AllergyEntry } from './allergyEntry';
 import type { PregnancyStatus } from './pregnancyStatus';
 import type { TestResults } from './testResults';
+import type { MedicalRecordQuestionnaireAnswers } from './medicalRecordQuestionnaireAnswers';
 
 export interface MedicalRecord {
   id: string;
@@ -28,6 +29,10 @@ export interface MedicalRecord {
   confirmedAt: string | null;
   /** @nullable */
   confirmedBy: string | null;
+  /** @nullable */
+  questionnaireAnswers: MedicalRecordQuestionnaireAnswers;
+  /** @nullable */
+  questionnaireAt: string | null;
   /** @nullable */
   lastUpdatedBy: string | null;
   createdAt: string;

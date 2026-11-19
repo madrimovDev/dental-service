@@ -89,7 +89,7 @@ afterAll(async () => {
   await db.execute(sql`TRUNCATE users, tenants RESTART IDENTITY CASCADE`);
 });
 
-const day = '2026-12-01';
+const day = '2036-12-01';
 const seedAppt = async (
   startH: string,
   endH: string,
@@ -294,13 +294,13 @@ describe('CLI-186 reschedule eslatma hayot-sikli', () => {
     expect(enqueued.some((e) => e.id === apptId && e.delay > 0)).toBe(true);
   });
 
-  test('o‘tgan vaqtga reschedule → faqat remove, re-enqueue YO‘Q (delay null)', async () => {
+  test('lead oynasidan yaqin vaqtga reschedule → remove + FX-57: darhol (delay 0) eslatma', async () => {
     const removed: string[] = [];
-    const enqueued: string[] = [];
+    const enqueued: { id: string; delay: number }[] = [];
     const svc = createAppointmentsService({
       audit: noopAudit,
-      enqueueReminder: async (_t, id) => {
-        enqueued.push(id);
+      enqueueReminder: async (_t, id, delay) => {
+        enqueued.push({ id, delay });
       },
       removeReminder: async (id) => {
         removed.push(id);
@@ -323,7 +323,8 @@ describe('CLI-186 reschedule eslatma hayot-sikli', () => {
     // create ham enqueue qiladi — hisobni tozalaymiz.
     enqueued.length = 0;
 
-    // 1 soatdan keyinga reschedule (lead 24h ichida) → delay null.
+    // 1 soatdan keyinga reschedule (lead 24h ichida) → FX-57: eski job o'chadi,
+    // bemorga ko'chirilgani haqida darhol eslatma (delay 0).
     const near = new Date(Date.now() + 3600_000);
     const upd = await run(tenantId, (c) =>
       svc.update(c, apptId, {
@@ -333,7 +334,7 @@ describe('CLI-186 reschedule eslatma hayot-sikli', () => {
     );
     expect(upd.ok).toBe(true);
     expect(removed).toContain(apptId);
-    expect(enqueued).not.toContain(apptId);
+    expect(enqueued).toEqual([{ id: apptId, delay: 0 }]);
   });
 
   test('doctor-only o‘zgarish (startTime YO‘Q) → eslatma hayot-sikli ishga tushmaydi', async () => {

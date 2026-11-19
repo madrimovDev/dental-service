@@ -32,7 +32,7 @@ const ctx = (tx: DbOrTx, tid = t1): Context =>
       k === 'db'
         ? tx
         : k === 'accessClaims'
-          ? { perms: ['@owner'] }
+          ? { perms: ['@owner'], sub: ownerId, atid: tid }
           : k === 'activeTenantId'
             ? tid
             : k === 'user'

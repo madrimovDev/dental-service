@@ -40,7 +40,7 @@ const noopAudit = { record: async () => {} } as unknown as AuditLogger;
  * oladi (JWT'dagi perms yetarli emas) — testdagi sintetik token egasiga haqiqiy kassir tayinlovi.
  */
 const grantCashierAssignment = async (tid: string, uid: string, branchId: string | null) => {
-  const codes = ['cashier.view', 'cashier.create_transaction', 'cashier.refund', 'cashier.void'];
+  const codes = ['cashier.view', 'cashier.create_transaction', 'cashier.refund'];
   for (const code of codes) {
     await db.insert(permissions).values({ code, category: 'cashier' }).onConflictDoNothing();
   }
@@ -127,7 +127,7 @@ beforeAll(async () => {
       })
     ).token;
   receptionistToken = await mint(['cashier.view', 'cashier.create_transaction', 'cashier.refund']);
-  accountantToken = await mint(['cashier.view', 'cashier.refund', 'cashier.void']);
+  accountantToken = await mint(['cashier.view', 'cashier.refund']);
 });
 
 afterAll(async () => {

@@ -5,6 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { CreatePrescriptionBodyItemsItem } from './createPrescriptionBodyItemsItem';
+import type { VisitNoteAllergyOverride } from './visitNoteAllergyOverride';
 
 export type CreatePrescriptionBody = {
   patientId: string;
@@ -17,4 +18,6 @@ export type CreatePrescriptionBody = {
   diagnosis?: string;
   /** @maxLength 2000 */
   notes?: string;
+  /** @maxItems 50 */
+  allergyOverrides?: VisitNoteAllergyOverride[];
 };

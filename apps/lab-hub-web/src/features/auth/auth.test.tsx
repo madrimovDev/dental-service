@@ -125,4 +125,57 @@ describe('auth', () => {
       newPassword: 'New-Pass-12345',
     });
   });
+  it('FX-100: joriy parol noto‘g‘ri (401) — sessiya saqlanadi, sahifada xato ko‘rinadi', async () => {
+    const hub = mockHub({
+      'POST /v1/lab/auth/change-password': () => ({
+        status: 401,
+        body: { error: { code: 'auth.invalid_credentials' } },
+      }),
+    });
+    vi.stubGlobal('fetch', hub.fn);
+    useAuth.setState({
+      token: 'tok',
+      mustChangePassword: true,
+      user: { ...user, mustChangePassword: true },
+      lab: { id: 'l1', name: 'Oq Tish', subscription: 'active' },
+    });
+    renderApp(tree, { route: '/change-password' });
+    fireEvent.change(screen.getByLabelText('Joriy (vaqtinchalik) parol'), {
+      target: { value: 'Tmp-Pass-WRONG' },
+    });
+    fireEvent.change(screen.getByLabelText('Yangi parol'), { target: { value: 'New-Pass-12345' } });
+    fireEvent.change(screen.getByLabelText('Yangi parolni takrorlang'), {
+      target: { value: 'New-Pass-12345' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Parolni saqlash' }));
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(useAuth.getState().token).toBe('tok');
+    expect(screen.getByTestId('where').textContent).toBe('/change-password');
+  });
+
+  it('FX-100: o‘tgan sessiya (401 auth.unauthorized) — baribir chiqariladi', async () => {
+    const hub = mockHub({
+      'POST /v1/lab/auth/change-password': () => ({
+        status: 401,
+        body: { error: { code: 'auth.unauthorized' } },
+      }),
+    });
+    vi.stubGlobal('fetch', hub.fn);
+    useAuth.setState({
+      token: 'tok',
+      mustChangePassword: true,
+      user: { ...user, mustChangePassword: true },
+      lab: { id: 'l1', name: 'Oq Tish', subscription: 'active' },
+    });
+    renderApp(tree, { route: '/change-password' });
+    fireEvent.change(screen.getByLabelText('Joriy (vaqtinchalik) parol'), {
+      target: { value: 'Tmp-Pass-123' },
+    });
+    fireEvent.change(screen.getByLabelText('Yangi parol'), { target: { value: 'New-Pass-12345' } });
+    fireEvent.change(screen.getByLabelText('Yangi parolni takrorlang'), {
+      target: { value: 'New-Pass-12345' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Parolni saqlash' }));
+    await waitFor(() => expect(useAuth.getState().token).toBeNull());
+  });
 });

@@ -25,6 +25,9 @@ type Dict = {
   menuBook: string;
   menuQuestionnaire: string;
   menuLang: string;
+  menuPatient: string;
+  choosePatient: string;
+  patientSet: (name: string) => string;
   menuPrompt: string;
   notLinked: string;
   chooseBranch: string;
@@ -51,6 +54,7 @@ type Dict = {
   reminderCancelledReply: string;
   reminderAlready: string;
   reminderUnavailable: string;
+  reminderFailed: string;
   notYours: string;
   notFound: string;
   questions: Record<QuestionnaireKey, string>;
@@ -71,6 +75,9 @@ const uz: Dict = {
   menuBook: '📅 Yozilish',
   menuQuestionnaire: '📋 Anketa',
   menuLang: '🌐 Til',
+  menuPatient: '👤 Bemor',
+  choosePatient: 'Kimning nomidan davom etamiz?',
+  patientSet: (name) => `✅ Endi ${name} nomidan ishlaymiz.`,
   menuPrompt: 'Kerakli bo‘limni tanlang:',
   notLinked: 'Avval raqamingizni ulashing — /start',
   chooseBranch: 'Qaysi filialga yozilmoqchisiz?',
@@ -101,6 +108,7 @@ const uz: Dict = {
   reminderCancelledReply: 'Yozilish bekor qilindi.',
   reminderAlready: 'Allaqachon qayd etildi.',
   reminderUnavailable: "Hozir amalni bajarib bo'lmadi. Klinika siz bilan bog'lanadi.",
+  reminderFailed: "Xatolik yuz berdi, amal bajarilmadi. Birozdan keyin qayta urinib ko'ring.",
   notYours: 'Bu amal siz uchun mavjud emas.',
   notFound: 'Yozilish topilmadi.',
   questions: {
@@ -130,6 +138,9 @@ const ru: Dict = {
   menuBook: '📅 Записаться',
   menuQuestionnaire: '📋 Анкета',
   menuLang: '🌐 Язык',
+  menuPatient: '👤 Пациент',
+  choosePatient: 'От чьего имени продолжим?',
+  patientSet: (name) => `✅ Теперь действуем от имени: ${name}.`,
   menuPrompt: 'Выберите раздел:',
   notLinked: 'Сначала поделитесь номером — /start',
   chooseBranch: 'В какой филиал хотите записаться?',
@@ -159,6 +170,7 @@ const ru: Dict = {
   reminderCancelledReply: 'Запись отменена.',
   reminderAlready: 'Уже учтено.',
   reminderUnavailable: 'Сейчас не удалось выполнить действие. Клиника свяжется с вами.',
+  reminderFailed: 'Произошла ошибка, действие не выполнено. Попробуйте ещё раз чуть позже.',
   notYours: 'Это действие вам недоступно.',
   notFound: 'Запись не найдена.',
   questions: {

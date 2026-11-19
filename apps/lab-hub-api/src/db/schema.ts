@@ -46,15 +46,21 @@ export const labUsers = pgTable(
       .notNull()
       .references(() => labs.id, { onDelete: 'cascade' }),
     fullName: text('full_name').notNull(),
-    // Hub'ga xos login — `normalizePhone` kanonik shakli, Hub bo'yicha unique.
+    // Hub'ga xos login — `normalizePhone` kanonik shakli. Unique faqat FAOL qatorlar
+    // uchun (FX-119): nofaol hisob telefonini ozod qiladi.
     phone: text('phone').notNull(),
     passwordHash: text('password_hash').notNull(),
     role: text('role').notNull().$type<'lead' | 'technician'>(),
     mustChangePassword: boolean('must_change_password').notNull().default(true),
     isActive: boolean('is_active').notNull().default(true),
+    // Parol almashtirilganda oshadi; JWT `tv` claim'i bilan solishtiriladi (FX-141).
+    tokenVersion: integer('token_version').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex('lab_users_phone_uq').on(t.phone), index('lab_users_lab_idx').on(t.labId)],
+  (t) => [
+    uniqueIndex('lab_users_phone_uq').on(t.phone).where(sql`${t.isActive}`),
+    index('lab_users_lab_idx').on(t.labId),
+  ],
 );
 
 export const clinics = pgTable('clinics', {
@@ -113,7 +119,9 @@ export type CaseStatus =
   | 'ready'
   | 'rejected'
   | 'delivered'
-  | 'remake';
+  | 'remake'
+  /** FX-46: klinika bekor qildi (yakuniy; lab o'tishlari va narx taklifi yopiq). */
+  | 'cancelled';
 
 export const cases = pgTable(
   'cases',
@@ -278,6 +286,21 @@ export const kekCheck = pgTable('kek_check', {
   id: integer('id').primaryKey().default(1),
   canary: text('canary').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * Hub davri (epoch, bitta qator, id=1) — FX-98. Klinika kursori `<epoch>:<tx_id>.<seq>`:
+ * `tx_id` klaster xid hisoblagichiga bog'liq va `pg_dump`ga tushmaydi. Baza boshqa klasterga
+ * tiklansa (`system_identifier` mos kelmaydi) davr yangilanadi va eski davr kursorlari
+ * boshidan boshlanadi (`lib/hub-epoch.ts`). Qo'lda majburlash: `UPDATE hub_meta SET
+ * epoch = gen_random_uuid()` (README «Tiklash»).
+ */
+export const hubMeta = pgTable('hub_meta', {
+  id: integer('id').primaryKey().default(1),
+  epoch: uuid('epoch').notNull(),
+  systemIdentifier: text('system_identifier').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  rotatedAt: timestamp('rotated_at', { withTimezone: true }),
 });
 
 /** Klinika bo'yicha oylik akt-sverka: to'langanini lab qo'lda belgilaydi. */

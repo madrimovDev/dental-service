@@ -11,6 +11,7 @@ import type {
   DeleteLabOrderFile200,
   GetLabOrder200,
   LabOrderPriceApprovalRequest,
+  ListLabOrderDoctors200,
   ListLabOrderFiles200,
   ListLabOrderHubMessages200,
   ListLabOrders200,
@@ -18,6 +19,8 @@ import type {
   ListOverdueLabOrders200,
   PostLabOrderHubMessage201,
   PostLabOrderHubMessageBody,
+  RequestLabOrderRemake200,
+  RequestLabOrderRemakeBody,
   SendLabOrderToHub200,
   SendLabOrderToHubBody,
   UpdateLabOrder200,
@@ -52,6 +55,14 @@ import { customInstance } from '../../mutator';
  ) => {
       return customInstance<ListOverdueLabOrders200>(
       {url: `/api/lab-orders/overdue`, method: 'GET'
+    },
+      );
+    }
+  export const listLabOrderDoctors = (
+    
+ ) => {
+      return customInstance<ListLabOrderDoctors200>(
+      {url: `/api/lab-orders/doctors`, method: 'GET'
     },
       );
     }
@@ -102,6 +113,17 @@ import { customInstance } from '../../mutator';
     },
       );
     }
+  export const requestLabOrderRemake = (
+    id: string,
+    requestLabOrderRemakeBody: RequestLabOrderRemakeBody,
+ ) => {
+      return customInstance<RequestLabOrderRemake200>(
+      {url: `/api/lab-orders/${id}/remake`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: requestLabOrderRemakeBody
+    },
+      );
+    }
   export const approveLabOrderPrice = (
     id: string,
     labOrderPriceApprovalRequest: LabOrderPriceApprovalRequest,
@@ -135,11 +157,13 @@ import { customInstance } from '../../mutator';
   export type ListLabOrdersResult = NonNullable<Awaited<ReturnType<typeof listLabOrders>>>
 export type CreateLabOrderResult = NonNullable<Awaited<ReturnType<typeof createLabOrder>>>
 export type ListOverdueLabOrdersResult = NonNullable<Awaited<ReturnType<typeof listOverdueLabOrders>>>
+export type ListLabOrderDoctorsResult = NonNullable<Awaited<ReturnType<typeof listLabOrderDoctors>>>
 export type GetLabOrderResult = NonNullable<Awaited<ReturnType<typeof getLabOrder>>>
 export type UpdateLabOrderResult = NonNullable<Awaited<ReturnType<typeof updateLabOrder>>>
 export type ListLabOrderFilesResult = NonNullable<Awaited<ReturnType<typeof listLabOrderFiles>>>
 export type DeleteLabOrderFileResult = NonNullable<Awaited<ReturnType<typeof deleteLabOrderFile>>>
 export type SendLabOrderToHubResult = NonNullable<Awaited<ReturnType<typeof sendLabOrderToHub>>>
+export type RequestLabOrderRemakeResult = NonNullable<Awaited<ReturnType<typeof requestLabOrderRemake>>>
 export type ApproveLabOrderPriceResult = NonNullable<Awaited<ReturnType<typeof approveLabOrderPrice>>>
 export type ListLabOrderHubMessagesResult = NonNullable<Awaited<ReturnType<typeof listLabOrderHubMessages>>>
 export type PostLabOrderHubMessageResult = NonNullable<Awaited<ReturnType<typeof postLabOrderHubMessage>>>

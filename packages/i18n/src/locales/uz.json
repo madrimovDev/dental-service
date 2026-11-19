@@ -285,7 +285,6 @@
     "theme_light": "Yorug'",
     "theme_dark": "Qorong'i",
     "coming_soon": "Tez orada",
-    "all_branches": "Barcha filiallar",
     "select_branch": "Filialni tanlash",
     "branch_switch_error": "Filialni almashtirib bo'lmadi",
     "lang_uz": "O'zbekcha",
@@ -313,7 +312,13 @@
   "notifications": {
     "title": "Bildirishnomalar",
     "mark_all_read": "Hammasini o'qilgan deb belgilash",
-    "empty": "Bildirishnomalar yo'q"
+    "empty": "Bildirishnomalar yo'q",
+    "types": {
+      "stock_low_threshold": {
+        "title": "Kam qoldiq: {{itemName}}",
+        "body": "Qoldiq: {{qty}} (min: {{min}})"
+      }
+    }
   },
   "onboarding": {
     "title": "Klinikani sozlash",
@@ -337,6 +342,17 @@
     "boundary_title": "Xatolik yuz berdi",
     "boundary_desc": "Sahifani qayta yuklab ko'ring",
     "reload": "Qayta yuklash"
+  },
+  "apiErrors": {
+    "ownership": {
+      "not_practitioner": "Yozuv muallifi shifokor bo'lishi kerak. Shifokorni tanlang yoki shifokor hisobidan kiring."
+    },
+    "prescription": {
+      "on_behalf_forbidden": "Boshqa shifokor nomidan retsept yozishga ruxsatingiz yo'q."
+    },
+    "visit_note": {
+      "on_behalf_forbidden": "Boshqa shifokor nomidan vizit yozuvi yaratishga ruxsatingiz yo'q."
+    }
   },
   "dashboard": {
     "welcome": "Salom, {{name}}!",
@@ -653,7 +669,7 @@
     "tab_visit_notes": "Vizit yozuvlari",
     "tab_tooth_chart": "Tish kartasi",
     "tab_prescriptions": "Reseptlar",
-    "tab_consent": "Konsent",
+    "tab_consent": "Rozilik",
     "tab_lab_orders": "Lab buyurtmalar",
     "tab_images": "Rasmlar",
     "tab": {
@@ -665,7 +681,7 @@
       "rx": "Reseptlar",
       "images": "Rasmlar",
       "lab": "Lab",
-      "consent": "Konsent",
+      "consent": "Rozilik",
       "family": "Oila",
       "payments": "To'lovlar"
     },
@@ -753,7 +769,19 @@
     "no_medical_permission": "Sizda tibbiy kartani ko'rish ruxsati yo'q",
     "collect_payment": "To'lov qabul qilish",
     "import_button": "Excel'dan import",
-    "dup_desc_count": "Shu raqam bilan ro'yxatdan o'tgan bemorlar: {{count}} ta (ism faqat bemor ma'lumotlarini ko'ra oladiganlarga ko'rinadi)."
+    "dup_desc_count": "Shu raqam bilan ro'yxatdan o'tgan bemorlar: {{count}} ta (ism faqat bemor ma'lumotlarini ko'ra oladiganlarga ko'rinadi).",
+    "finance": {
+      "plan_debt": "Reja bo'yicha qarz",
+      "non_plan": "Rejasiz qoldiq",
+      "total": "Umumiy balans",
+      "total_credit": "Umumiy balans (avans)",
+      "plan": "Reja",
+      "status": {
+        "pending": "Kutilmoqda",
+        "completed": "Bajarilgan",
+        "voided": "Bekor qilingan"
+      }
+    }
   },
   "medical": {
     "history_title": "O'zgarishlar tarixi",
@@ -787,6 +815,19 @@
       "pregnant": "Homilador",
       "planning": "Rejalashtirilmoqda",
       "lactating": "Emizish"
+    },
+    "questionnaire_title": "Bemor anketasi (qoralama)",
+    "questionnaire_hint": "Bemor Telegram botida to‘ldirgan. Tibbiy kartaga avtomatik yozilmaydi — tekshirib, o‘zingiz ko‘chiring.",
+    "questionnaire_submitted": "Topshirilgan:",
+    "questionnaire_adopt": "Tibbiy kartaga ko‘chirish",
+    "questionnaire_adopted": "Javoblar formaga ko‘chirildi — tekshirib «Saqlash»ni bosing.",
+    "questionnaireAnswers": "Bot anketasi",
+    "questionnaire_q": {
+      "allergies": "Allergiya",
+      "chronic": "Surunkali kasalliklar",
+      "medications": "Hozirgi dorilar",
+      "pregnancy": "Homiladorlik / emizikli",
+      "anesthesia": "Og‘riqsizlantirishga reaksiya"
     }
   },
   "common2": {
@@ -854,12 +895,13 @@
     "balance": "Qoldiq (balans)",
     "consent": "Rozilik",
     "sign_consent": "Rozilikni imzolash",
+    "renew_consent": "Rozilikni yangilash",
     "consent_signed": "Rozilik imzolangan",
     "consent_signed_at": "Imzolangan sana",
     "consent_required": "Avval rozilikni imzolang",
     "financial_summary": "Moliyaviy xulosa",
     "total_plan": "Jami reja",
-    "pdf_consent": "Reja PDF · konsent",
+    "pdf_consent": "Reja PDF · rozilik",
     "list": {
       "title": "Davolash rejalari",
       "subtitle": "Barcha bemorlar bo'yicha rejalar",
@@ -964,7 +1006,7 @@
     "duration_days_suffix": "{{days}} kun"
   },
   "consent": {
-    "title": "Konsent formalar",
+    "title": "Rozilik formalari",
     "templates": "Shablonlar",
     "templates_manage": "Shablonlarni boshqarish",
     "create_template": "Yangi shablon",
@@ -978,20 +1020,20 @@
     "type_photo": "Rasm olish",
     "type_data_processing": "Ma'lumotlar qayta ishlash",
     "type_other": "Boshqa",
-    "sign_new": "Yangi konsent imzolash",
+    "sign_new": "Yangi rozilik imzolash",
     "select_template": "Shablon tanlang",
     "or_custom": "yoki o'z matnini yozing",
     "body_text": "Matn (snapshot)",
     "language": "Til",
     "signed_at": "Imzolangan sana",
     "patient_signature_name": "Bemor F.I.SH. (imzo o'rniga)",
-    "empty": "Imzolangan konsent yo'q",
+    "empty": "Imzolangan rozilik yo'q",
     "no_templates": "Shablonlar yo'q",
     "sign": "Imzolash",
     "is_perpetual": "Muddatsiz (doimiy amal qiladi)",
     "expires_at": "Amal qilish muddati",
-    "select_form": "Konsent-formani tanlang",
-    "no_valid_forms": "Amaldagi konsent-forma topilmadi. Avval \"Rozilik\" bo'limida imzolang.",
+    "select_form": "Rozilik formasini tanlang",
+    "no_valid_forms": "Amaldagi rozilik topilmadi. Quyida yangisini imzolang.",
     "expires_label": "Muddati: {{date}}"
   },
   "lab_order": {
@@ -1069,6 +1111,10 @@
     "files_hint": "Skan (STL/PLY), rang shkalasi bilan surat, PDF — 50 MB gacha",
     "files_empty": "Fayl biriktirilmagan",
     "files_failed": "Buyurtma saqlandi, lekin ba'zi fayllar yuklanmadi",
+    "files_failed_not_sent": "Ba'zi fayllar yuklanmadi — buyurtma qoralama sifatida saqlandi va laboratoriyaga YUBORILMADI. Fayllarni qayta yuklab, keyin yuboring.",
+    "files_from_lab": "Laboratoriyadan",
+    "file_preview": "Ko'rish",
+    "add_photo": "Suratga olish",
     "file_open": "Ochish",
     "file_remove": "Faylni olib tashlash",
     "remake_label": "Bu qayta tayyorlash (remake)",
@@ -1085,6 +1131,9 @@
     "sees_title": "Laboratoriya nimani ko'radi",
     "sees_patient": "Bemor",
     "sees_job": "Ish",
+    "doctor_label": "Buyurtma shifokori",
+    "doctor_placeholder": "Shifokorni tanlang",
+    "doctor_required": "Buyurtma shifokorini tanlang",
     "sees_doctor": "Shifokor",
     "sees_contact": "Telefon, manzil",
     "sees_hidden": "ko'rsatilmaydi",
@@ -1212,6 +1261,8 @@
     "add_segment": "Oraliq qo'shish",
     "remove_segment": "Oraliqni o'chirish",
     "day_off": "Dam olish kuni",
+    "mode_unconfigured": "Jadval sozlanmagan: filial ish soati amal qiladi. Bo'sh saqlansa — shifokor bu filialda ishlamaydi.",
+    "mode_not_working": "Shifokor bu filialda ishlamaydi (bron qilib bo'lmaydi). Oraliq qo'shib saqlang.",
     "weekday": {
       "0": "Yakshanba",
       "1": "Dushanba",
@@ -1265,7 +1316,7 @@
     "board_subtitle": "Navbat — jonli tablo",
     "next_queues": "Keyingi navbatlar",
     "waited_minutes": "{{count}} daqiqa kutdi",
-    "cabinet": "Kabinet {{n}}",
+    "called": "Chaqirilgan",
     "not_called_yet": "Hozircha chaqirilmagan",
     "call_arrow": "Chaqirish →"
   },
@@ -1384,8 +1435,11 @@
       "state": {
         "paid": "To'langan",
         "partial": "Qisman",
-        "unpaid": "To'lanmagan"
-      }
+        "unpaid": "To'lanmagan",
+        "excluded": "Qabul qilinmagan"
+      },
+      "cancelled_credit": "Reja bekor qilingan, lekin {{amount}} kredit qolgan. Uni boshqa reja bosqichiga o'tkazing yoki bemorga qaytaring (refund).",
+      "cancelled_tag": "bekor qilingan"
     },
     "refund_modal": {
       "title": "To'lovni qaytarish",
@@ -1396,7 +1450,8 @@
       "detail_amount": "Summa",
       "detail_method": "To'lov usuli",
       "partial_amount": "Qisman summa (ixtiyoriy)",
-      "partial_hint": "Bo'sh = to'liq qaytarish. Qisman faqat reja to'lovlari uchun."
+      "partial_hint": "Bo'sh = to'liq qaytarish. Qisman faqat reja to'lovlari uchun.",
+      "detail_refundable": "Qaytariladigan summa"
     },
     "status_label": {
       "completed": "Yakunlangan",
@@ -1404,7 +1459,13 @@
       "pending": "Kutilmoqda"
     },
     "switch_mode_confirm": "Savatda saqlanmagan satrlar bor. Rejimni almashtirsangiz ular yo'qoladi. Davom etasizmi?",
-    "transactions_empty_description": "Hali birorta tranzaksiya qayd etilmagan."
+    "transactions_empty_description": "Hali birorta tranzaksiya qayd etilmagan.",
+    "paid_of_total": "to'langan: {{paid}}",
+    "refund_done": "Qaytarildi: {{amount}}",
+    "refund_error": {
+      "over_refund": "Qaytariladigan summa qoldig'idan ko'p. Sahifani yangilab, qoldiqni tekshiring.",
+      "non_plan_partial": "Qisman qaytarish faqat reja to'lovlari uchun."
+    }
   },
   "reports": {
     "title": "Hisobotlar",
@@ -1482,6 +1543,7 @@
     "tab_items": "Mahsulotlar",
     "tab_bom": "Sarflanish (BOM)",
     "create_item": "Yangi mahsulot",
+    "edit_item": "Materialni tahrirlash",
     "batch": {
       "receive": "Partiya qabul qilish",
       "item": "Mahsulot",
@@ -1512,13 +1574,22 @@
       "adjustment": "Inventarizatsiya"
     },
     "counted_qty": "Aniqlangan qoldiq",
+    "current_qty": "Joriy qoldiq: {{qty}} {{unit}}",
+    "adjustment_hint": "Bu — sanalgan qoldiq: qoldiq shu qiymatga o'rnatiladi (farq emas). Hammasi tugagan bo'lsa 0 kiriting.",
     "reason": "Sabab",
     "reason_visit": "Vizit (avto)",
+    "reason_initial_balance": "Boshlang'ich qoldiq",
+    "reason_batch_received": "Kirim qabul qilindi",
+    "reason_visit_auto": "Vizit (avto chiqim)",
+    "reason_visit_edit_return": "Vizit tahriri (qaytarildi)",
+    "load_more": "Ko'proq yuklash",
     "date": "Sana",
     "history_for": "Harakatlar tarixi",
     "no_movements": "Harakatlar yo'q",
     "select_item": "Tarixni ko'rish uchun mahsulot tanlang",
     "bom_service": "Xizmat",
+    "insufficient": "Qoldiq yetarli emas: mavjud {{available}} {{unit}}, so'ralgan {{requested}} {{unit}}",
+    "bom_forbidden": "Xizmatlar ro'yxatini ko'rish uchun ruxsat kerak (xizmatlarni ko'rish). Rahbariyatga murojaat qiling.",
     "bom_empty": "Bu xizmat uchun materiallar belgilanmagan",
     "material": "Material",
     "qty_per_service": "Xizmatga miqdor",
@@ -1644,7 +1715,13 @@
       "recheck": "Qayta tekshirish",
       "stillExpired": "Litsenziya hali ham faol emas",
       "subscriptionTitle": "Obuna muddati tugadi",
-      "subscriptionBody": "To'lov qilishingiz kerak, ta'minotchiga murojaat qiling"
+      "subscriptionBody": "To'lov qilishingiz kerak, ta'minotchiga murojaat qiling",
+      "logout": "Chiqish",
+      "switchWorkspace": "Boshqa klinikaga o'tish"
+    },
+    "module_disabled": {
+      "title": "Bu bo'lim tarifingizda yo'q",
+      "message": "Bu bo'lim joriy tarifingizga kirmaydi. Tarifni kengaytirish uchun ta'minotchiga murojaat qiling."
     }
   },
   "patientsList": {
@@ -1780,6 +1857,7 @@
     "not_arrived_empty": "Hamma yozilgan bemor keldi",
     "arrived": "Keldi",
     "tv_numbers_only": "Faqat raqam ko'rsatiladi — bemor ismi ekranga chiqmaydi",
+    "stale_banner": "Ulanish uzildi — ma'lumot eskirgan, raqamlar hozirgi holatni ko'rsatmasligi mumkin",
     "sync_failed": "Navbat yangilandi, lekin yozilish holati o'zgarmadi ({{code}})"
   },
   "cashierPos": {
@@ -1885,7 +1963,7 @@
       "lab": "Lab buyurtmalar",
       "payments": "To'lovlar",
       "images": "Rasmlar",
-      "consent": "Konsent"
+      "consent": "Rozilik"
     },
     "details": "Batafsil",
     "allergy_title": "Allergiya:",
@@ -2010,7 +2088,8 @@
       "benefit_outweighs_risk": "Foyda xavfdan ustun",
       "patient_informed": "Bemor xabardor, rozi",
       "allergy_not_confirmed": "Allergiya tasdiqlanmagan",
-      "no_alternative": "Muqobil dori yo‘q"
+      "no_alternative": "Muqobil dori yo‘q",
+      "allergy_checked_verbally": "Allergiya og‘zaki so‘rab tekshirildi"
     },
     "planLink": "Reja bilan bog‘lash",
     "noPlan": "Rejasiz vizit",
@@ -2030,6 +2109,7 @@
     "save": "Saqlash",
     "saved": "Vizit yozuvi saqlandi",
     "sign": "Imzolash va kassaga yuborish",
+    "savedRxPending": "Saqlandi. Retsept imzolanganda beriladi va bemorga yuboriladi",
     "signedToast": "Imzolandi",
     "signedBanner": "Imzolangan — endi o‘zgartirib bo‘lmaydi",
     "signedAt": "Imzolangan: {{time}}",
@@ -2037,7 +2117,10 @@
     "readOnly": "Faqat ko‘rish",
     "validationEmpty": "Kamida shikoyat, tashxis yoki bajarilgan ishdan birini kiriting",
     "plan": "Reja",
-    "freeNotes": "Qo‘shimcha izoh"
+    "freeNotes": "Qo‘shimcha izoh",
+    "allergyUnknownTitle": "Allergiya ma’lumoti noma’lum",
+    "allergyUnknownBody": "Bemorning allergiya ma’lumoti yuklanmadi yoki ko‘rish ruxsati yo‘q. Dori allergiyaga zid bo‘lishi mumkin — davom etish sababini tanlang.",
+    "allergyUnknownSafe": "Avval tekshiraman"
   },
   "ownerHome": {
     "title": "Siz hal qiladigan masalalar",
@@ -2047,6 +2130,7 @@
     "levelInfo": "Ma‘lumot",
     "kpiDebt": "Bemorlar qarzi",
     "kpiDebtHint": "{{count}} bemor · {{over}} tasi 90 kundan oshgan",
+    "kpiDebtClinicWide": "Faqat butun klinika rahbarlari ko‘radi",
     "kpiNoShow": "Kelmaganlar",
     "kpiUtil": "Shifokorlar bandligi",
     "backupStaleTitle": "Zaxira nusxa {{days}} kundan beri olinmagan",
@@ -2081,7 +2165,9 @@
     "branchIdle": "Bugun faollik yo‘q",
     "doctorsToday": "Shifokorlar bugun",
     "doctorProgress": "{{done}} / {{planned}} bemor qabul qilindi",
-    "doctorProgressAria": "{{done}} / {{planned}} bemor"
+    "doctorProgressAria": "{{done}} / {{planned}} bemor",
+    "restoreFailedTitle": "Zaxiradan tiklash muvaffaqiyatsiz",
+    "restoreFailedText": "Sabab va ma’lumotlar holati Sozlamalar → Zaxira nusxa bo‘limida."
   },
   "reportsQ": {
     "nav": "Savollar",
@@ -2183,7 +2269,7 @@
       "newPatients": "Yangi — davrda birinchi marta kelgan; qaytgan — avval ham kelgan va davrda qayta kelgan bemorlar.",
       "recall": "Qayta chaqiruvdan keyin qabulga yozilgan yoki yakunlanganlar ulushi.",
       "plans": "Davrda yaratilgan qabul qilingan rejalarning bosqichlari: bajarilgan / jami.",
-      "pnl": "Sof foyda = sof tushum (qaytarishlar ayirilgan) − xarajatlar − yakunlangan ish haqi. Filial tanlansa ish haqi hisobga olinmaydi (ish haqi filialga bog'lanmagan)."
+      "pnl": "Sof foyda = sof tushum (qaytarishlar ayirilgan) − xarajatlar − ish haqi (yakunlangan va qoralama). Filial tanlansa ish haqi hisobga olinmaydi (ish haqi filialga bog'lanmagan)."
     }
   },
   "settingsShell": {
@@ -2311,7 +2397,13 @@
     "restoreConfirm": "Tiklash",
     "restoreCancel": "Bekor qilish",
     "restoreStarted": "Tiklash boshlandi",
-    "restoreFailed": "Tiklashni boshlab bo'lmadi. Klinika nomini va nusxani tekshiring."
+    "restoreFailed": "Tiklashni boshlab bo'lmadi. Klinika nomini va nusxani tekshiring.",
+    "restoreResultFailedTitle": "Tiklash muvaffaqiyatsiz",
+    "restoreResultRolledBack": "Baza avvalgi holatiga qaytarildi — joriy ma’lumotlar saqlangan.",
+    "restoreResultNotRolledBack": "Bazani avvalgi holatga qaytarib bo‘lmadi. Ta’minotchiga murojaat qiling; tiklashdan oldingi nusxa zaxira papkasida saqlangan.",
+    "restoreResultUntouched": "Ma’lumotlar o‘zgarmadi.",
+    "restoreResultReason": "Sabab: {{error}}",
+    "restoreResultOk": "Ma’lumotlar zaxiradan tiklandi ({{date}})."
   },
   "telegramRequests": {
     "empty": "So'rovlar hozircha yo'q",
@@ -2326,18 +2418,27 @@
     "confirm_conflict": "Bu vaqt band bo'lib qoldi — so'rov kutishda qoldi",
     "pick_doctor": "Boshqa shifokorni tanlang",
     "confirm_other_doctor": "Shu shifokor bilan tasdiqlash",
-    "confirm_expired": "So'rov muddati o'tgan — bemorga xabar yuborildi"
+    "confirm_expired": "So'rov muddati o'tgan — bemorga xabar yuborildi",
+    "tab_pending": "Kutilmoqda",
+    "tab_expired": "Muddati o'tgan",
+    "empty_expired": "Muddati o'tgan so'rovlar yo'q",
+    "expired_badge": "Muddati o'tgan",
+    "nav_badge": "Telegram bron so'rovlari"
   },
   "desktopUpdate": {
     "title": "Yangi versiya tayyor",
     "at": "Klinika yopilgandan keyin, bugun {{time}} da o'rnatiladi.",
     "now": "Hozir o'rnatish",
     "tonight": "Kechqurun",
-    "installing": "Yangilanmoqda — kompyuterni o'chirmang"
+    "installing": "Yangilanmoqda — kompyuterni o'chirmang",
+    "serverConfirmTitle": "Server kompyuterini hozir yangilaysizmi?",
+    "serverConfirmBody": "Bu klinika serveri. Yangilanish vaqtida barcha klient kompyuterlar uziladi va saqlanmagan ishlar yo'qolishi mumkin. Odatda yangilanishni klinika yopilgandan keyin qoldirish xavfsiz.",
+    "serverConfirmCancel": "Kechqurun o'rnatish",
+    "serverConfirmProceed": "Baribir hozir o'rnatish"
   },
   "cashierHandoff": {
     "title": "Kutilayotgan vizitlar",
-    "hint": "Shifokor imzolagan, hali to'lanmagan bugungi vizitlar",
+    "hint": "Shifokor imzolagan, hali to'lanmagan vizitlar (oxirgi 30 kun)",
     "empty": "Imzolangan, to'lanmagan vizit yo'q",
     "take": "Kassaga olish",
     "doctor": "Dr. {{name}}",
@@ -2349,7 +2450,7 @@
     "overdue": "Kechikkan: {{date}} kuni imzolangan, hali to'lanmagan",
     "linked_to_plan_stage": "Bu vizit davolash rejasi bosqichiga bog'langan — «Reja bo'yicha to'lash» orqali to'lang",
     "reception_title": "{{n}} ta vizit kassada to'lov kutmoqda",
-    "reception_text": "Shifokor imzolagan, hali to'lanmagan bugungi vizitlar.",
+    "reception_text": "Shifokor imzolagan, hali to'lanmagan vizitlar (oxirgi 30 kun).",
     "reception_open": "Kassani ochish",
     "kpi": "Kassada kutmoqda"
   },
@@ -2551,7 +2652,8 @@
       "ready": "Tayyor",
       "delivered": "Jo'natilgan",
       "rejected": "Rad etilgan",
-      "remake": "Qayta tayyorlash"
+      "remake": "Qayta tayyorlash",
+      "cancelled": "Klinika bekor qildi"
     },
     "due": {
       "overdue": "{{n}} kun kechikdi",
@@ -2609,6 +2711,7 @@
       "rejectConfirm": "Rad etish",
       "readyWait": "Tayyor. Klinika «Yetkazildi» ni tasdiqlaydi.",
       "deliveredInfo": "Jo'natilgan va klinika tomonidan qabul qilingan.",
+      "cancelledInfo": "Klinika ishni bekor qildi — ishlashni to'xtating, narx taklif qilinmaydi.",
       "rejectedInfo": "Rad etildi: {{reason}}",
       "privacy": "Klinika «Yetkazildi» ni tasdiqlaydi. Bemorning telefoni, manzili va kartasi laboratoriyaga hech qachon ko'rinmaydi.",
       "actionError": "Amal bajarilmadi",
@@ -2683,6 +2786,8 @@
       "empty": "Xodim yo'q",
       "formTitle": "Yangi xodim",
       "tempTitle": "Vaqtinchalik parol",
+      "resetPassword": "Parolni tiklash",
+      "resetConfirm": "Xodimning parolini tiklaymizmi? Eski parol ishlamay qoladi, yangi vaqtinchalik parol beriladi.",
       "tempNote": "Bu parol faqat hozir ko'rsatiladi. Xodimga bering — birinchi kirishda almashtiradi.",
       "copy": "Nusxalash",
       "copied": "Nusxalandi",
@@ -2706,6 +2811,8 @@
     "never": "hali bo'lmagan",
     "queue": "Navbat",
     "queue_value": "kutmoqda: {{pending}} · yuborilmadi: {{failed}}",
+    "requeue": "Qayta yuborish",
+    "requeued_toast": "Qayta navbatga qo'yildi: {{count}}",
     "last_error": "Oxirgi xato",
     "catalog_title": "Laboratoriyalar katalogi",
     "catalog_empty": "Katalogda hozircha laboratoriya yo'q",
@@ -2740,6 +2847,7 @@
     "hub_status_rejected": "Rad etildi",
     "hub_status_delivered": "Yetkazildi",
     "hub_status_remake": "Qayta tayyorlash",
+    "hub_status_cancelled": "Bekor qilindi",
     "reject_reason": "Rad etish sababi",
     "price_title": "Narx",
     "price_proposed": "Lab taklif qilgan narx",
@@ -2762,6 +2870,17 @@
     "err_lab_hub_link_not_active": "Bu laboratoriya hali ulanishni tasdiqlamagan.",
     "err_link_not_active": "Laboratoriya ulanishni tasdiqlamagan — tasdiqlagach yuboriladi.",
     "err_lab_hub_already_sent": "Buyurtma allaqachon portalga yuborilgan.",
+    "reassign_title": "Boshqa laboratoriyaga yuborish",
+    "reassign_btn": "Boshqa laboratoriyaga yuborish",
+    "err_lab_order_cancelled": "Bekor qilingan buyurtmaga narx tasdiqlanmaydi.",
+    "err_lab_hub_rejected": "Laboratoriya ishni rad etgan — narx tasdiqlanmaydi. Boshqa laboratoriyaga yuboring.",
+    "remake_title": "Qayta ishlash",
+    "remake_hint": "Ish mos kelmadi — laboratoriyadan qayta ishlashni so'rang. Tasdiqlangan narx o'zgarmaydi.",
+    "remake_reason": "Sabab (ixtiyoriy)",
+    "remake_btn": "Qayta ishlashni so'rash",
+    "remake_toast": "Qayta ishlash so'rovi laboratoriyaga yuboriladi",
+    "err_lab_hub_not_remakable": "Qayta ishlashni faqat tayyor yoki yetkazilgan ish uchun so'rash mumkin.",
+    "err_lab_hub_already_approved": "Narx allaqachon tasdiqlangan — ishni boshqa laboratoriyaga yuborib bo'lmaydi.",
     "err_lab_hub_bad_status": "Bu holatdagi buyurtmani portalga yuborib bo'lmaydi.",
     "err_lab_hub_unknown_lab": "Laboratoriya katalogda topilmadi — ro'yxatni yangilang.",
     "err_lab_hub_not_registered": "Klinika hali ta'minotchida ro'yxatdan o'tmagan. Birozdan keyin qayta urining.",
@@ -2787,5 +2906,11 @@
     "err_clinic_unauthorized": "Portal kaliti yaroqsiz — qayta ulaning.",
     "lab_name_hint_portal": "Portaldagi laboratoriyani tanlang yoki boshqa lab nomini yozing (portalsiz — holat qo'lda)",
     "catalog_search": "Laboratoriya nomi yoki shahri bo'yicha qidirish"
+  },
+  "clinicalAuthor": {
+    "doctor": "Shifokor",
+    "doctorPlaceholder": "Shifokorni tanlang",
+    "notPractitionerTitle": "Vizit yozuvini faqat shifokor yaratadi",
+    "notPractitionerBody": "Sizning rolingiz shifokor emas va boshqa shifokor nomidan yozish ruxsati yo'q."
   }
 }

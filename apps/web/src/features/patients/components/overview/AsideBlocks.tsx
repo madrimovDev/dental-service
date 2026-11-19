@@ -61,7 +61,7 @@ export function NextVisitBlock({ patientId }: { patientId: string }) {
   if (isForbiddenError(query.error)) {
     return (
       <Block titleId="pc-next-h" title={title}>
-        <ForbiddenState />
+        <ForbiddenState error={query.error} />
       </Block>
     );
   }
@@ -122,7 +122,7 @@ export function OpenDiagnosesBlock({ patientId }: { patientId: string }) {
   if (isForbiddenError(chartQuery.error)) {
     return (
       <Block titleId="pc-dx-h" title={title}>
-        <ForbiddenState />
+        <ForbiddenState error={chartQuery.error} />
       </Block>
     );
   }

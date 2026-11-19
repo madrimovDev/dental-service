@@ -33,7 +33,12 @@ export type SoliqConfig = {
   apiKey: string;
   /** Klinikaning soliq/fiskal IDsi. */
   fiscalId?: string;
+  /** FX-77: so'rov muddati (ms). Default 8000 — javob bermasa chek `fiscalId=null` bilan qaytadi. */
+  timeoutMs?: number;
 };
+
+/** FX-77: Soliq fetch uchun default timeout (osilib qolmasligi uchun). */
+export const SOLIQ_DEFAULT_TIMEOUT_MS = 8000;
 
 /**
  * Soliq.uz real fiskal provider — SKELETON (V3-1, CLI-249).
@@ -61,6 +66,7 @@ export const createSoliqFiscalProvider = (config: SoliqConfig): FiscalProvider =
           amount: payment.amount,
           items: payment.items,
         }),
+        signal: AbortSignal.timeout(config.timeoutMs ?? SOLIQ_DEFAULT_TIMEOUT_MS),
       });
       if (!res.ok) {
         return { fiscalId: null, response: { provider: 'soliq', error: `http_${res.status}` } };

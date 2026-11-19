@@ -1,4 +1,5 @@
 import {
+  ApiError,
   createCashierTransaction,
   getCashierDailySummary,
   getCashierPlanBalance,
@@ -13,10 +14,14 @@ import {
   refundCashierTransaction,
   type ServiceWithPrices,
 } from '@dental/api-client';
+import { notifications } from '@mantine/notifications';
 import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { patientKeys } from '@/features/patients/patients.keys';
 import { serviceKeys } from '@/features/services/services.keys';
+import { formatCurrency } from '@/lib/format';
+import { i18n } from '@/lib/i18n.ts';
 import { lookupKeys } from '@/lib/lookup-keys';
+import { handleLicenseBlock } from '@/lib/query-client.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { cashierKeys } from './cashier.keys';
 import type { PendingVisit } from './cashier.types';
@@ -139,13 +144,36 @@ export function useRefund() {
     // amount yo'q = to'liq refund; berilsa = qisman (faqat plan-linked, backend tekshiradi).
     mutationFn: ({ id, amount }: { id: string; amount?: number }) =>
       refundCashierTransaction(id, amount != null ? { amount } : {}).then((r) => r.data),
-    onSuccess: () => {
+    onSuccess: (refund) => {
+      // FX-108: serverda yozilgan HAQIQIY qaytarilgan summa kassirga ko'rsatiladi.
+      notifications.show({
+        color: 'teal',
+        message: i18n.t('cashier.refund_done', {
+          amount: formatCurrency(Number(refund.paidAmount), i18n.t),
+        }),
+      });
       void qc.invalidateQueries({ queryKey: cashierKeys.all });
       // Refund allocation'larni negate qiladi → plan balans tiklanadi.
       void qc.invalidateQueries({ queryKey: cashierKeys.plans });
       // CLI-440 #2: refund ham bemor balansini o'zgartiradi (patients.api'dagi
       // xuddi shu naqsh — clinical.api.ts `invalidatePlanFinancials`).
       void qc.invalidateQueries({ queryKey: patientKeys.all });
+    },
+    // FX-108: over-refund / boshqa rad etishlar uchun aniq matn (global default o'rniga).
+    onError: (error) => {
+      if (handleLicenseBlock(error)) return;
+      const code = error instanceof ApiError ? error.code : null;
+      const key =
+        code === 'refund.over_refund'
+          ? 'cashier.refund_error.over_refund'
+          : code === 'refund.non_plan_partial'
+            ? 'cashier.refund_error.non_plan_partial'
+            : null;
+      notifications.show({
+        color: 'red',
+        title: i18n.t('common.error'),
+        message: key ? i18n.t(key) : error.message || i18n.t('common.error'),
+      });
     },
   });
 }

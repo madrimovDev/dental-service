@@ -135,6 +135,8 @@ export const membershipsResponseSchema = z
         branchName: z.string().nullable(),
         roleId: z.uuid(),
         roleName: z.string(),
+        /** FX-155 review: rol `is_practitioner` — klinik yozuv muallifi bo'la oladimi. */
+        isPractitioner: z.boolean(),
         isOwner: z.boolean(),
       }),
     ),

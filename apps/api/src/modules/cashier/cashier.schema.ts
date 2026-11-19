@@ -124,6 +124,8 @@ export const cashierTransactionDtoSchema = z
     receiptNumber: z.string().nullable(),
     totalAmount: z.string(),
     paidAmount: z.string(),
+    /** FX-108: shu to'lovdan allaqachon qaytarilgan summa (qoldiq = paidAmount - refundedAmount). */
+    refundedAmount: z.string(),
     discount: z.string(),
     currency: z.string(),
     paymentMethod: paymentMethodSchema,

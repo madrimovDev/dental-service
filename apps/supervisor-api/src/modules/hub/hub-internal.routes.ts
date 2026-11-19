@@ -8,8 +8,11 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  * Hub → Supervisor ichki API (`/internal/clinics/*`, `Authorization: Bearer
  * SUPERVISOR_HUB_TOKEN`). Caddy uni tashqariga ochmaydi (infra/supervisor).
  *
- * `GET /internal/clinics/:id/verify?licenseKey=` — klinika rejimi, faolmi, obuna
+ * `GET /internal/clinics/:id/verify?licenseKey=&fingerprint=` — klinika rejimi, faolmi, obuna
  * muddati, desktop litsenziya kaliti mosmi (kalitning o'zi javobda qaytmaydi).
+ * FX-138: desktop'da kalit YETARLI EMAS — `fingerprint` shu kalitga hozir bog'langan
+ * o'rnatmaniki bo'lishi shart (`prepare-reinstall`dan keyin yangisi; eski PC kaliti
+ * bilan Hub kalitini qayta olib, yangi o'rnatmani uza olmaydi).
  * `desktop` — litsenziyalar bo'yicha; `saas` — `subscription_expires_at`
  * (`licenseMatches` doim false — SaaS connect `serviceProof` bilan).
  *
@@ -36,6 +39,7 @@ export const hubInternalRoutes = () => {
     const state = await loadClinicHubState(id);
     if (!state) return c.json({ error: { code: 'NOT_FOUND' } }, 404);
     const key = c.req.query('licenseKey');
+    const fingerprint = c.req.query('fingerprint');
     return c.json({
       clinicId: state.clinicId,
       name: state.name,
@@ -45,7 +49,13 @@ export const hubInternalRoutes = () => {
       licenseMatches:
         state.mode === 'desktop' &&
         !!key &&
-        state.activeLicenseKeys.some((k) => tokenMatches(key, k)),
+        !!fingerprint &&
+        state.activeLicenses.some(
+          (l) =>
+            tokenMatches(key, l.licenseKey) &&
+            !!l.fingerprint &&
+            tokenMatches(fingerprint, l.fingerprint),
+        ),
     });
   });
 

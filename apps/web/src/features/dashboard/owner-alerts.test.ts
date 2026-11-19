@@ -8,6 +8,7 @@ const backup = (over: object) => ({
   lastSuccessAt: null,
   lastError: null,
   files: [],
+  lastRestore: null,
   ...over,
 });
 
@@ -32,6 +33,32 @@ describe('buildOwnerAlerts', () => {
     expect(buildOwnerAlerts({ backup: backup({}), now })[0]?.titleKey).toBe(
       'ownerHome.backupNeverTitle',
     );
+  });
+
+  it('FX-147: yaqinda muvaffaqiyatsiz tiklash -> alohida ogohlantirish (lastError emas); eski -> yo‘q', () => {
+    const mk = (finishedAt: string) =>
+      buildOwnerAlerts({
+        backup: backup({
+          lastSuccessAt: '2026-11-11T08:00:00Z',
+          lastRestore: {
+            status: 'failed',
+            file: 'dental-20261110-200000',
+            finishedAt,
+            error: 'boom',
+            dbRolledBack: false,
+          },
+        }),
+        now,
+      });
+    expect(mk('2026-11-11T09:00:00Z')).toEqual([
+      expect.objectContaining({
+        id: 'backup',
+        level: 'critical',
+        titleKey: 'ownerHome.restoreFailedTitle',
+        href: '/settings',
+      }),
+    ]);
+    expect(mk('2026-11-01T09:00:00Z')).toEqual([]);
   });
 
   it('litsenziya: expiring -> diqqat, grace -> kritik, active -> yo‘q', () => {

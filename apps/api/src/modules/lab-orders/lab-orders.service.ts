@@ -1,8 +1,10 @@
-import { labOrderFiles, labOrders } from '@dental/db-schema';
-import { and, asc, count, desc, eq, lt, notInArray } from 'drizzle-orm';
+import { labHubOutbox, labOrderFiles, labOrders } from '@dental/db-schema';
+import { and, asc, count, desc, eq, lt, notInArray, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
+import { onAfterCommit } from '../../db/after-commit.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { listPractitioners } from '../../lib/doctor-branch.ts';
 import {
   CrossEntityError,
   createOwnershipValidator,
@@ -47,6 +49,9 @@ export const createLabOrdersService = (deps: {
     const filters = [];
     if (query.patientId) filters.push(eq(labOrders.patientId, query.patientId));
     if (query.status) filters.push(eq(labOrders.status, query.status));
+    // FX-109: dashboard navbati — faol buyurtmalar to'liq to'plam ustida (eng yangi N tadan emas).
+    const activeOnly = query.activeOnly === 'true';
+    if (activeOnly) filters.push(notInArray(labOrders.status, ['delivered', 'cancelled']));
     const where = filters.length > 0 ? and(...filters) : undefined;
 
     const [data, totalRows] = await Promise.all([
@@ -54,7 +59,11 @@ export const createLabOrdersService = (deps: {
         .select()
         .from(labOrders)
         .where(where)
-        .orderBy(desc(labOrders.createdAt))
+        .orderBy(
+          ...(activeOnly
+            ? [sql`${labOrders.expectedDate} ASC NULLS LAST`, desc(labOrders.createdAt)]
+            : [desc(labOrders.createdAt)]),
+        )
         .limit(query.pageSize)
         .offset(offset),
       db.select({ total: count() }).from(labOrders).where(where),
@@ -94,6 +103,12 @@ export const createLabOrdersService = (deps: {
     return rows;
   }
 
+  /** FX-112: buyurtma shifokorini tanlash ro'yxati (`roles.is_practitioner`). */
+  async function listDoctors(c: Context) {
+    const rows = await listPractitioners(c);
+    return rows.map((r) => ({ id: r.id, name: r.fullName ?? r.phone }));
+  }
+
   async function get(c: Context, id: string) {
     const db = getDb(c);
     const [row] = await db.select().from(labOrders).where(eq(labOrders.id, id));
@@ -119,7 +134,8 @@ export const createLabOrdersService = (deps: {
     // CLI-485: doctorId ham cross-entity ownership tekshiruvidan o'tadi (platform-level
     // user; assertUserExists shu tenantda aktiv assignment'i/owner ekanini tasdiqlaydi —
     // cross-tenant/mavjud bo'lmagan doctorId xom 500 emas, toza 400).
-    await ownership.assertUserExists(c, input.doctorId);
+    // FX-112: doctorId amaliyotchi bo'lishi shart (Technician o'z nomini "shifokor" qilib yubormasin).
+    await ownership.assertPractitioner(c, input.doctorId);
 
     // UI-D5: remake — asl buyurtma shu tenantda (RLS) VA shu bemorniki bo'lishi shart.
     if (input.remakeOfId) {
@@ -220,6 +236,31 @@ export const createLabOrdersService = (deps: {
       }
     }
 
+    // FX-46: narx tasdig'i Hub'ga yo'lda (`approve_price` op kutishda) — bekor qilinmaydi.
+    // Hub tasdiqlagan bo'lishi mumkin (javob yo'qolgan): bekor qilinsa xarajat yozilmay qolib,
+    // klinika kitoblari lab akt-sverkasidan ajralardi. Op tugagach (tasdiq/rad) bekor qilinadi.
+    if (input.status === 'cancelled' && before.status !== 'cancelled' && before.labHubCaseRef) {
+      const [inFlight] = await db
+        .select({ id: labHubOutbox.id })
+        .from(labHubOutbox)
+        .where(
+          and(
+            eq(labHubOutbox.labOrderId, id),
+            eq(labHubOutbox.op, 'approve_price'),
+            eq(labHubOutbox.status, 'pending'),
+          ),
+        )
+        .limit(1);
+      if (inFlight) {
+        throw new LabHubOrderError(
+          409,
+          'lab_order.price_approval_pending',
+          undefined,
+          "Narx tasdig'i laboratoriyaga yuborilmoqda — tasdiq yakunlangach bekor qiling",
+        );
+      }
+    }
+
     // CLI-439 B2: status state-machine guard — istalgan status→status o'tish avval
     // ruxsat etilardi (`delivered→draft`, `cancelled→delivered`). Endi forward-only
     // chiziqli oqim (draft→sent→in_progress→ready→delivered) + `cancelled` istalgan
@@ -253,13 +294,24 @@ export const createLabOrdersService = (deps: {
       patch.deliveredDate = input.deliveredDate ? new Date(input.deliveredDate) : null;
     if (input.cost !== undefined) patch.cost = input.cost === null ? null : String(input.cost);
     if (input.notes !== undefined) patch.notes = input.notes;
+    // FX-46: bekor qilinayotgan ishda eskirgan kutish holati (op allaqachon `failed`/`rejected`,
+    // Hub tasdiqlamagan) qolmaydi; yo'ldagi tasdiq yuqorida 409 bilan to'xtatilgan.
+    const cancelling = input.status === 'cancelled' && before.status !== 'cancelled';
+    if (cancelling && before.labHubCaseRef) {
+      patch.priceApprovalRequestedAt = null;
+      patch.priceApprovalRequestedPrice = null;
+      patch.priceApprovalRequestedBy = null;
+    }
 
     const [row] = await db.update(labOrders).set(patch).where(eq(labOrders.id, id)).returning();
     // Lab Hub: Hub'ga yuborilgan buyurtma — «yetkazildi» Hub'ga ham ketadi; ish hali `sent`
     // holatida bo'lsa (lab qabul qilmagan) tahrir qayta push qilinadi (idempotent PUT).
     if (row?.labHubCaseRef) {
       const ops: { op: LabOrderHubOp }[] = [];
-      if (input.status === 'delivered' && before.status !== 'delivered') {
+      if (cancelling) {
+        // FX-46: Hub'dagi ish ham bekor qilinadi — lab ishlashni davom ettirmasin.
+        ops.push({ op: 'cancel' });
+      } else if (input.status === 'delivered' && before.status !== 'delivered') {
         ops.push({ op: 'delivered' });
       } else if (contentChanged && (row.hubStatus === null || row.hubStatus === 'sent')) {
         ops.push({ op: 'upsert_case' });
@@ -376,9 +428,8 @@ export const createLabOrdersService = (deps: {
     if (!before) return null;
 
     await db.delete(labOrderFiles).where(eq(labOrderFiles.id, fileId));
-    await deleteObject(before.objectKey).catch((err) =>
-      console.error('[lab-orders] storage delete failed:', err),
-    );
+    // FX-76: fayl faqat commit'dan keyin o'chadi (tx rollback → qator ham, fayl ham qoladi).
+    await onAfterCommit(c, () => deleteObject(before.objectKey));
 
     await deps.audit.record(c, {
       action: 'deleted',
@@ -389,7 +440,7 @@ export const createLabOrdersService = (deps: {
     return before;
   }
 
-  return { list, get, create, update, overdue, listFiles, uploadFile, removeFile };
+  return { list, get, create, update, overdue, listDoctors, listFiles, uploadFile, removeFile };
 };
 
 export type LabOrdersService = ReturnType<typeof createLabOrdersService>;

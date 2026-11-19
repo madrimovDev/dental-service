@@ -4,6 +4,7 @@
  * Dentdo API
  * OpenAPI spec version: 0.1.0
  */
+import type { NotificationParams } from './notificationParams';
 
 export interface Notification {
   id: string;
@@ -13,6 +14,8 @@ export interface Notification {
   title: string;
   /** @nullable */
   body: string | null;
+  /** @nullable */
+  params: NotificationParams;
   /** @nullable */
   readAt: string | null;
   createdAt: string;

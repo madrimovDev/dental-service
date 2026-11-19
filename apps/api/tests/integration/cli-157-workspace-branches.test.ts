@@ -39,6 +39,8 @@ let staffAllBranchesId: string; // A tenant — branchId=null (barcha filiallar)
 let branchMainId: string; // A: Bosh filial
 let branchN2Id: string; // A: N2 filial
 let branchBId: string; // B tenant filiali (RLS izolyatsiya)
+let branchCAcceptedId: string; // C tenant — staffAll'ning QABUL QILINGAN tayinlovi
+let branchCPendingId: string; // C tenant — staffAll'ning KUTILAYOTGAN (acceptedAt=null) taklifi
 
 beforeAll(async () => {
   await db.execute(sql`TRUNCATE users, tenants RESTART IDENTITY CASCADE`);
@@ -50,25 +52,29 @@ beforeAll(async () => {
       { phone: '+998900000061', passwordHash: 'fake', fullName: 'Owner B' },
       { phone: '+998900000062', passwordHash: 'fake', fullName: 'Bir Filial Xodim' },
       { phone: '+998900000063', passwordHash: 'fake', fullName: 'Barcha Filial Xodim' },
+      { phone: '+998900000064', passwordHash: 'fake', fullName: 'Owner C' },
     ])
     .returning({ id: users.id });
-  const [ownerA, ownerB, staffOne, staffAll] = inserted;
-  if (!ownerA || !ownerB || !staffOne || !staffAll) throw new Error('user insert failed');
+  const [ownerA, ownerB, staffOne, staffAll, ownerC] = inserted;
+  if (!ownerA || !ownerB || !staffOne || !staffAll || !ownerC)
+    throw new Error('user insert failed');
   ownerAId = ownerA.id;
   ownerBId = ownerB.id;
   staffOneBranchId = staffOne.id;
   staffAllBranchesId = staffAll.id;
 
-  const [tenantA, tenantB] = await db
+  const [tenantA, tenantB, tenantC] = await db
     .insert(tenants)
     .values([
       { name: 'WS Clinic A', slug: 'ws-clinic-a', ownerUserId: ownerAId },
       { name: 'WS Clinic B', slug: 'ws-clinic-b', ownerUserId: ownerBId },
+      { name: 'WS Clinic C', slug: 'ws-clinic-c', ownerUserId: ownerC.id },
     ])
     .returning({ id: tenants.id });
-  if (!tenantA || !tenantB) throw new Error('tenant insert failed');
+  if (!tenantA || !tenantB || !tenantC) throw new Error('tenant insert failed');
   tenantAId = tenantA.id;
   tenantBId = tenantB.id;
+  const tenantCId = tenantC.id;
 
   await withTenant(tenantAId, async (tx) => {
     const [main, n2] = await tx
@@ -118,6 +124,46 @@ beforeAll(async () => {
     if (!bBranch) throw new Error('branchB insert failed');
     branchBId = bBranch.id;
   });
+
+  // FX-29 regressiyasi: tenant-wide xodim (A) BOSHQA klinikada ham tayinlovga ega —
+  // `branches_self_view` RLS policy'si bu filiallarni ko'rsatadi (kutilayotgan taklif ham).
+  await withTenant(tenantCId, async (tx) => {
+    const [accepted, pending] = await tx
+      .insert(branches)
+      .values([
+        { tenantId: tenantCId, name: 'C-ACCEPTED-BRANCH' },
+        { tenantId: tenantCId, name: 'C-SECRET-BRANCH' },
+      ])
+      .returning({ id: branches.id });
+    if (!accepted || !pending) throw new Error('branchC insert failed');
+    branchCAcceptedId = accepted.id;
+    branchCPendingId = pending.id;
+
+    const [roleC] = await tx
+      .insert(roles)
+      .values({ tenantId: tenantCId, name: 'Receptionist' })
+      .returning({ id: roles.id });
+    if (!roleC) throw new Error('roleC insert failed');
+
+    await tx.insert(userAssignments).values([
+      {
+        userId: staffAllBranchesId,
+        tenantId: tenantCId,
+        roleId: roleC.id,
+        branchId: branchCAcceptedId,
+        isActive: true,
+        acceptedAt: new Date(),
+      },
+      {
+        userId: staffAllBranchesId,
+        tenantId: tenantCId,
+        roleId: roleC.id,
+        branchId: branchCPendingId,
+        isActive: true,
+        acceptedAt: null,
+      },
+    ]);
+  });
 });
 
 afterAll(async () => {
@@ -140,10 +186,20 @@ describe("CLI-157 — workspaceBranches (rol-bo'yicha, @owner EMAS)", () => {
     expect(res.branches.some((b) => b.id === branchN2Id)).toBe(false);
   });
 
-  test("branch-siz (null) assignment → allowAllBranches=true, aniq filial yo'q", async () => {
+  test("FX-29: branch-siz (null) assignment → allowAllBranches=true VA klinikaning barcha filiallari (B tenant'niki emas)", async () => {
     const res = await authService.workspaceBranches(staffAllBranchesId, tenantAId);
     expect(res.allowAllBranches).toBe(true);
-    expect(res.branches).toEqual([]);
+    expect(res.branches.map((b) => b.name).sort()).toEqual(['Bosh filial', 'N2 filial']);
+    expect(res.branches.some((b) => b.id === branchBId)).toBe(false);
+  });
+
+  test("FX-29: tenant-wide xodim boshqa klinikadagi tayinlov filiallarini (qabul qilingan/kutilayotgan) KO'RMAYDI", async () => {
+    const res = await authService.workspaceBranches(staffAllBranchesId, tenantAId);
+    expect(res.allowAllBranches).toBe(true);
+    const ids = res.branches.map((b) => b.id);
+    expect(ids).not.toContain(branchCAcceptedId);
+    expect(ids).not.toContain(branchCPendingId);
+    expect(res.branches.map((b) => b.name).sort()).toEqual(['Bosh filial', 'N2 filial']);
   });
 
   test("RLS: owner A B-tenant filialini KO'RMAYDI", async () => {

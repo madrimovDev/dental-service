@@ -1,5 +1,5 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, notInArray, sql } from 'drizzle-orm';
 import type { Context, MiddlewareHandler } from 'hono';
 import type { Tx } from '../../db/client';
 import {
@@ -17,6 +17,7 @@ import { withClinic } from '../../db/scoped';
 import type { Deps } from '../../deps';
 import { decryptBuffer, decryptOptional, encryptOptional, type Key } from '../../lib/crypto';
 import { ApiError } from '../../lib/errors';
+import { CURSOR_PATTERN, currentHubEpoch, resolveCursor } from '../../lib/hub-epoch';
 import { createRouter, jsonBody, OK } from '../../lib/openapi';
 import { createRateLimiter } from '../../lib/rate-limit';
 import { isBlocked } from '../../lib/subscription';
@@ -24,6 +25,7 @@ import { bearer, generateHubKey, safeEqual, sha256Hex } from '../../lib/tokens';
 import {
   addFile,
   addMessage,
+  CLOSED_FOR_PRICE,
   caseDetail,
   contentDisposition,
   findFileByClientRef,
@@ -84,6 +86,8 @@ const connectSchema = z
   .object({
     supervisorClinicId: z.uuid(),
     licenseKey: z.string().trim().min(1).max(100).optional(),
+    /** FX-138: desktop o'rnatma fingerprint'i — Supervisor uni bog'langan o'rnatma bilan solishtiradi. */
+    fingerprint: z.string().trim().min(1).max(200).optional(),
     serviceProof: z.string().min(1).max(500).optional(),
   })
   .strict()
@@ -139,13 +143,17 @@ export const clinicRoutes = (deps: Deps) => {
       }
       let v: Awaited<ReturnType<typeof deps.supervisor.verifyClinic>>;
       try {
-        v = await deps.supervisor.verifyClinic(b.supervisorClinicId, { licenseKey: b.licenseKey });
+        v = await deps.supervisor.verifyClinic(b.supervisorClinicId, {
+          licenseKey: b.licenseKey,
+          fingerprint: b.fingerprint,
+        });
       } catch {
         throw new ApiError(503, 'supervisor.unavailable');
       }
       if (!v) throw new ApiError(404, 'clinic.unknown');
       if (v.mode !== expectedMode) throw new ApiError(401, 'connect.invalid_proof');
-      if (expectedMode === 'desktop' && !v.licenseMatches) {
+      // FX-138: fingerprint'siz desktop isboti qabul qilinmaydi (eski o'rnatma kaliti bilan).
+      if (expectedMode === 'desktop' && (!b.fingerprint || !v.licenseMatches)) {
         throw new ApiError(401, 'connect.invalid_license');
       }
       const expiresAt = v.expiresAt ? new Date(v.expiresAt) : null;
@@ -537,7 +545,13 @@ export const clinicRoutes = (deps: Deps) => {
           .update(cases)
           .set({ approvedPrice: price, approvedAt: deps.now(), updatedAt: deps.now() })
           .where(
-            and(eq(cases.id, row.id), isNull(cases.approvedPrice), eq(cases.proposedPrice, price)),
+            and(
+              eq(cases.id, row.id),
+              isNull(cases.approvedPrice),
+              eq(cases.proposedPrice, price),
+              // FX-47/46: rad etilgan yoki bekor qilingan ishga narx tasdiqlanmaydi.
+              notInArray(cases.status, CLOSED_FOR_PRICE),
+            ),
           )
           .returning();
         if (approved) {
@@ -554,13 +568,15 @@ export const clinicRoutes = (deps: Deps) => {
           });
         }
         const [cur] = (await t.execute(
-          sql`SELECT proposed_price, approved_price, approved_at FROM cases WHERE id = ${row.id} FOR UPDATE`,
+          sql`SELECT status, proposed_price, approved_price, approved_at FROM cases WHERE id = ${row.id} FOR UPDATE`,
         )) as unknown as {
+          status: string;
           proposed_price: string | null;
           approved_price: string | null;
           approved_at: string | Date | null;
         }[];
         if (cur?.approved_price != null) {
+          // Avval tasdiqlangan (keyin rad etilgan/bekor qilingan bo'lsa ham) — qayta urinish idempotent.
           if (cur.approved_price === price) {
             return c.json({
               approvedPrice: price,
@@ -569,6 +585,9 @@ export const clinicRoutes = (deps: Deps) => {
             });
           }
           throw new ApiError(409, 'price.already_approved');
+        }
+        if (cur && (CLOSED_FOR_PRICE as string[]).includes(cur.status)) {
+          throw new ApiError(409, `case.${cur.status}`);
         }
         if (cur?.proposed_price == null) throw new ApiError(409, 'price.not_proposed');
         throw new ApiError(409, 'price.mismatch', { proposedPrice: cur.proposed_price });
@@ -650,6 +669,43 @@ export const clinicRoutes = (deps: Deps) => {
       }),
   );
 
+  app.openapi(
+    createRoute({
+      method: 'post',
+      path: '/cases/{ref}/cancel',
+      tags,
+      summary: 'Klinika ishni bekor qildi (idempotent; delivered → 409)',
+      request: { params: refParam },
+      responses: OK,
+    }),
+    async (c) =>
+      tx(c, async (t, clinic) => {
+        // FX-46: lab obunasi tugagan bo'lsa ham bekor qilish o'tadi (findCase obuna tekshiradi).
+        const ref = c.req.valid('param').ref;
+        const [cur] = (await t.execute(
+          sql`SELECT id, status FROM cases WHERE clinic_id = ${clinic.id} AND clinic_case_ref = ${ref} FOR UPDATE`,
+        )) as unknown as { id: string; status: string }[];
+        if (!cur) throw new ApiError(404, 'case.not_found');
+        if (cur.status === 'cancelled') return c.json({ status: 'cancelled', changed: false });
+        if (cur.status === 'delivered') {
+          throw new ApiError(409, 'case.bad_transition', { from: cur.status, to: 'cancelled' });
+        }
+        const now = deps.now();
+        const [u] = await t
+          .update(cases)
+          .set({ status: 'cancelled', updatedAt: now })
+          .where(eq(cases.id, cur.id))
+          .returning();
+        await recordEvent(t, {
+          caseRow: u!,
+          type: 'status',
+          actor: 'clinic',
+          payload: { from: cur.status, to: 'cancelled' },
+        });
+        return c.json({ status: 'cancelled', changed: true });
+      }),
+  );
+
   // --- o'zgarishlar (poll) ----------------------------------------------------
   /**
    * Commit-xavfsiz kursor: `<tx_id>.<seq>`. `seq` (bigserial) commit tartibida
@@ -660,19 +716,26 @@ export const clinicRoutes = (deps: Deps) => {
    * hodisa hech qachon paydo bo'lmaydi, kursor xavfsiz oldinga suriladi.
    * Narxi: uzoq davom etayotgan yozuvchi tranzaksiya tugagunicha yangi hodisalar
    * biroz kechikadi (yo'qolmaydi).
+   * FX-98: javob kursori `<epoch>:<tx_id>.<seq>` — baza boshqa klasterga tiklansa davr
+   * almashadi va eski kursor boshidan boshlanadi (`cursorReset: true`); klinika dedup'i
+   * `(tx_id, seq)` bo'yicha, shuning uchun qayta berilgan eski hodisalar ikkilanmaydi.
+   * Tiklangan qatorlar eski klaster xid'ini saqlaydi — u joriy `xmax`dan katta bo'lishi
+   * mumkin (yangi klaster hisoblagichi kichikdan boshlanadi). Bunday `tx_id` shu klasterda
+   * hali berilmagan, demak qator albatta yakunlangan (boshqa klasterdan): u xmin filtrisiz
+   * ko'rinadi va tartib kaliti `(0, seq)` — barcha joriy klaster hodisalaridan OLDIN. Klaster
+   * hisoblagichi uni quvib o'tgach kalit `(tx_id, seq)`ga o'sadi (faqat kattalashadi —
+   * o'tkazib yuborilmaydi, ko'pi bilan qayta beriladi). `txId` javobda o'zgarmaydi
+   * (qayta yozilmaydi) — klinika dedup'i barqaror, eski hodisa ikkinchi marta qo'llanmaydi.
    */
   app.openapi(
     createRoute({
       method: 'get',
       path: '/changes',
       tags,
-      summary: 'Kursordan keyingi hodisalar (kursor `<tx_id>.<seq>`, commit-xavfsiz)',
+      summary: 'Kursordan keyingi hodisalar (kursor `<epoch>:<tx_id>.<seq>`, commit-xavfsiz)',
       request: {
         query: z.object({
-          since: z
-            .string()
-            .regex(/^\d{1,19}\.\d{1,19}$/)
-            .default('0.0'),
+          since: z.string().regex(CURSOR_PATTERN).default('0.0'),
           limit: z.coerce.number().int().min(1).max(500).default(200),
         }),
       },
@@ -681,20 +744,46 @@ export const clinicRoutes = (deps: Deps) => {
     async (c) =>
       tx(c, async (t, clinic) => {
         const { since, limit } = c.req.valid('query');
-        const [sinceTx, sinceSeq] = since.split('.') as [string, string];
-        const rows = await t
-          .select({ ev: caseEvents, ref: cases.clinicCaseRef })
-          .from(caseEvents)
-          .innerJoin(cases, eq(cases.id, caseEvents.caseId))
-          .where(
-            and(
-              eq(caseEvents.clinicId, clinic.id),
-              sql`${caseEvents.txId} < (pg_snapshot_xmin(pg_current_snapshot())::text)::bigint`,
-              sql`(${caseEvents.txId}, ${caseEvents.seq}) > (${sinceTx}::bigint, ${sinceSeq}::bigint)`,
-            ),
-          )
-          .orderBy(asc(caseEvents.txId), asc(caseEvents.seq))
-          .limit(limit);
+        // FX-98: davr (epoch) mos kelmasa / kursor shu klasterda bo'lishi mumkin bo'lmasa — boshidan.
+        const current = await currentHubEpoch(t);
+        const { tx: sinceTx, seq: sinceSeq, reset: cursorReset } = resolveCursor(since, current);
+        const base = () =>
+          t
+            .select({ ev: caseEvents, ref: cases.clinicCaseRef })
+            .from(caseEvents)
+            .innerJoin(cases, eq(cases.id, caseEvents.caseId));
+        // 1) Boshqa klasterdan tiklangan qatorlar (`tx_id >= xmax`) — kalit `(0, seq)`.
+        const restored =
+          BigInt(sinceTx) === 0n
+            ? await base()
+                .where(
+                  and(
+                    eq(caseEvents.clinicId, clinic.id),
+                    sql`${caseEvents.txId} >= (pg_snapshot_xmax(pg_current_snapshot())::text)::bigint`,
+                    sql`${caseEvents.seq} > ${sinceSeq}::bigint`,
+                  ),
+                )
+                .orderBy(asc(caseEvents.seq))
+                .limit(limit)
+            : [];
+        // 2) Shu klaster qatorlari — faqat yakunlanganlar (`tx_id < xmin`), kalit `(tx_id, seq)`.
+        const own =
+          restored.length < limit
+            ? await base()
+                .where(
+                  and(
+                    eq(caseEvents.clinicId, clinic.id),
+                    sql`${caseEvents.txId} < (pg_snapshot_xmin(pg_current_snapshot())::text)::bigint`,
+                    sql`(${caseEvents.txId}, ${caseEvents.seq}) > (${sinceTx}::bigint, ${sinceSeq}::bigint)`,
+                  ),
+                )
+                .orderBy(asc(caseEvents.txId), asc(caseEvents.seq))
+                .limit(limit - restored.length)
+            : [];
+        const rows = [
+          ...restored.map((r) => ({ ...r, key: `0.${r.ev.seq}` })),
+          ...own.map((r) => ({ ...r, key: `${r.ev.txId}.${r.ev.seq}` })),
+        ];
         const msgIds = rows
           .filter((r) => r.ev.type === 'message')
           .map((r) => String(r.ev.payload.messageId));
@@ -720,6 +809,8 @@ export const clinicRoutes = (deps: Deps) => {
           const f = ev.type === 'file' ? fileById.get(String(ev.payload.fileId)) : undefined;
           return {
             seq: ev.seq,
+            // FX-93: `seq` zaxiradan tiklashda qayta ishlatilishi mumkin — klinika dedup'i (tx, seq) bo'yicha.
+            txId: ev.txId,
             caseRef: ref,
             labId: ev.labId,
             type: ev.type,
@@ -745,8 +836,8 @@ export const clinicRoutes = (deps: Deps) => {
                 : null,
           };
         });
-        const last = rows.at(-1)?.ev;
-        return c.json({ events, nextCursor: last ? `${last.txId}.${last.seq}` : since });
+        const pos = rows.at(-1)?.key ?? `${sinceTx}.${sinceSeq}`;
+        return c.json({ events, nextCursor: `${current.epoch}:${pos}`, cursorReset });
       }),
   );
 

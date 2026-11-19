@@ -23,6 +23,7 @@ const MEDICAL_RECORD_TRACKED_FIELDS = [
   'bloodType',
   'pregnancyStatus',
   'testResults',
+  'questionnaireAnswers',
 ] as const;
 
 type AuditHistoryRow = {
@@ -137,6 +138,8 @@ export const toMedicalRecordDto = (row: MedicalRecord): MedicalRecordDto => ({
   testResults: row.testResults ?? null,
   confirmedAt: row.confirmedAt?.toISOString() ?? null,
   confirmedBy: row.confirmedBy ?? null,
+  questionnaireAnswers: row.questionnaireAnswers ?? null,
+  questionnaireAt: row.questionnaireAt?.toISOString() ?? null,
   lastUpdatedBy: row.lastUpdatedBy ?? null,
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(),

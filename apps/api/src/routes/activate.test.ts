@@ -111,4 +111,21 @@ describe('activateRoutes', () => {
     const body = (await res.json()) as { error: { code: string } };
     expect(body.error.code).toBe('FINGERPRINT_UNAVAILABLE');
   });
+
+  // FX-88 — Supervisor timeout'da javob bermadi: «rad etdi» (403) emas, 504.
+  test('Supervisor unreachable (timeout) -> 504, license not written', async () => {
+    activateImpl = async () => {
+      throw new Error('SUPERVISOR_UNREACHABLE');
+    };
+    writeLicenseCalls = [];
+    const app = new Hono();
+    app.route('/', activateRoutes({ db: fakeDb }));
+
+    const res = await post(app, { licenseKey: 'AAAAA-BBBBB-CCCCC-DDDDD' });
+
+    expect(res.status).toBe(504);
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe('SUPERVISOR_UNREACHABLE');
+    expect(writeLicenseCalls).toHaveLength(0);
+  });
 });

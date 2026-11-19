@@ -1,10 +1,11 @@
-import { tenants, userAssignments, users } from '@dental/db-schema';
+import { type Tenant, tenantSettings, tenants, userAssignments, users } from '@dental/db-schema';
 import { and, eq, isNotNull } from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { Database } from '../../db/client.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { verifyPassword } from '../../lib/password.ts';
+import { computeSubscriptionState, effectiveSubscriptionStatus } from '../../lib/subscription.ts';
 import type { TransferOwnershipInput, UpdateTenantInput } from './tenants.schema.ts';
 
 export const createTenantsService = (deps: { db: Database; audit: AuditLogger }) => {
@@ -113,7 +114,22 @@ export const createTenantsService = (deps: { db: Database; audit: AuditLogger })
     return { ok: true as const, tenant: updated };
   }
 
-  return { getCurrent, update, transferOwnership };
+  /**
+   * FX-144 (LC-22): javobdagi `subscriptionStatus` saqlangan obuna muddatidan
+   * (RLS tx, `tenant_settings`) hisoblanadi — HTTP/worker bloki bilan bir manba.
+   */
+  async function withSubscriptionStatus(c: Context, row: Tenant): Promise<Tenant> {
+    const [s] = await getDb(c)
+      .select({ at: tenantSettings.subscriptionExpiresAt })
+      .from(tenantSettings);
+    const { state } = computeSubscriptionState(s?.at ?? null);
+    return {
+      ...row,
+      subscriptionStatus: effectiveSubscriptionStatus(row.subscriptionStatus, state),
+    };
+  }
+
+  return { getCurrent, update, transferOwnership, withSubscriptionStatus };
 };
 
 export type TenantsService = ReturnType<typeof createTenantsService>;

@@ -27,9 +27,9 @@ export interface RunHeartbeatCheckDeps {
   writeLicense: (data: LicenseData) => Promise<void>;
   invalidateLicense: () => Promise<void>;
   sendHeartbeat: (licenseKey: string) => Promise<LicenseData>;
-  // CLI-437 — monotonik langar server-vaqti (`issuedAt`) bilan qayta anchorlanadi
-  // har muvaffaqiyatli heartbeat'da (ishonchli signal — offline mahalliy soatga
-  // qaraganda ustun).
+  // CLI-437 + FX-87 — monotonik langar har muvaffaqiyatli heartbeat'da
+  // server vaqti (`issuedAt`) bilan qayta o'rnatiladi (mahalliy soatdan ustun;
+  // yangi javobda pasaytirilishi ham mumkin — `runLicenseHeartbeatCheck`).
   readAnchor: () => Promise<number>;
   writeAnchor: (ms: number) => Promise<void>;
   // FX-06 (LA-15, X-4) — javob `.lic`ga yozilishidan oldin imzo + mahalliy
@@ -117,14 +117,23 @@ export const runLicenseHeartbeatCheck = async (deps: RunHeartbeatCheckDeps): Pro
       return;
     }
     await deps.writeLicense(fresh);
-    // CLI-437 — Supervisor'ning `issuedAt`i ishonchli server-vaqti; langarni
-    // shu bilan (va joriy langar/mahalliy vaqt bilan `max`) qayta ko'taramiz —
-    // offline'da inflyatsiyalangan langarni haqiqatga moslashtiradi.
+    // CLI-437 + FX-87 — Supervisor'ning imzolangan `issuedAt`i ishonchli server
+    // vaqti, mahalliy `Date.now()` esa emas (soat xato oldinga surilgan bo'lishi
+    // mumkin) — langar faqat `issuedAt` bilan yangilanadi:
+    // - javob keshdagi `.lic`dan YANGI (`issuedAt` kattaroq) → langar aynan
+    //   `issuedAt`ga o'rnatiladi, ya'ni oldinga ketib qolgan langar (xato BIOS
+    //   soati, FX-160) server vaqtiga PASAYTIRILADI. Bu vendor tomonidagi
+    //   tiklash yo'li ham: internet bo'lsa birinchi heartbeat langarni tuzatadi.
+    // - yangi bo'lmasa (masalan MITM eski imzolangan javobni qayta yuborsa) →
+    //   faqat `max(anchor, issuedAt)`: langar pasaytirilmaydi, aks holda soatni
+    //   orqaga surish bilan muddatni cho'zish yo'li ochilardi.
     const anchor = await deps.readAnchor();
     const issuedAtMs = Date.parse(fresh.issuedAt);
-    await deps.writeAnchor(
-      Math.max(anchor, Number.isFinite(issuedAtMs) ? issuedAtMs : 0, Date.now()),
-    );
+    const cachedIssuedAtMs = Date.parse(lic.issuedAt);
+    if (Number.isFinite(issuedAtMs)) {
+      const isNewer = !Number.isFinite(cachedIssuedAtMs) || issuedAtMs > cachedIssuedAtMs;
+      await deps.writeAnchor(isNewer ? issuedAtMs : Math.max(anchor, issuedAtMs));
+    }
     deps.log.info({ clinicId: fresh.clinicId }, 'License heartbeat OK — cached .lic refreshed');
   } catch (err) {
     const code = err instanceof Error ? err.message : 'UNKNOWN';

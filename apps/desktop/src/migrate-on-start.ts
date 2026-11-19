@@ -9,7 +9,16 @@
  * Birinchi o'rnatishda (`state === null`) baza bo'sh — dump shart emas.
  */
 import { spawnSync } from 'node:child_process';
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { getOrCreateSuperuserPassword } from './first-run.js';
 import { getBackupsDir, getDataDir, getResourcesDir } from './paths.js';
@@ -22,6 +31,42 @@ export type MigrateDeps = {
   writeState(s: { lastMigratedVersion: string }): void;
   appVersion: string;
   now(): Date;
+  /**
+   * FX-91: yangi dump olingandan keyin eski `pre-migrate-*.dump`larni tozalaydi
+   * (`keep` — shu startda olingan dump, o'chirilmaydi). Best-effort: xato startni to'xtatmaydi.
+   * Real adapter: `(keep) => prunePreMigrateDumps(getBackupsDir(), keep)`.
+   */
+  pruneOldDumps(keep: string): void;
+  /** Dump papkasi (default `getBackupsDir()`); testlar vaqtinchalik papka beradi. */
+  backupsDir?: string;
+};
+
+/** FX-91: saqlanadigan pre-migrate dump'lar soni (shu startdagi dump bilan birga). */
+export const PRE_MIGRATE_RETENTION = 5;
+
+const PRE_MIGRATE_RE = /^pre-migrate-.+\.dump$/;
+
+/**
+ * FX-91: `dir`dagi `pre-migrate-*.dump` FAYLLARIDAN eng yangi (mtime) `retention` tasi qoladi.
+ * Nom bo'yicha saralanmaydi — versiya qismi (`1.10` < `1.9`) leksikografik tartibni buzadi.
+ * `keep` HECH QACHON o'chmaydi (soat orqaga ketgan bo'lsa mtime eng eski bo'lishi mumkin).
+ * Kunlik zaxira papkalari (`dental-*`) va boshqa fayllarga tegmaydi.
+ */
+export const prunePreMigrateDumps = (
+  dir: string,
+  keep: string,
+  retention: number = PRE_MIGRATE_RETENTION,
+): void => {
+  if (!existsSync(dir)) return;
+  const keepName = keep.split(/[\\/]/).pop();
+  const others = readdirSync(dir, { withFileTypes: true })
+    .filter((e) => e.isFile() && PRE_MIGRATE_RE.test(e.name) && e.name !== keepName)
+    .map((e) => ({ name: e.name, mtime: statSync(join(dir, e.name)).mtimeMs }))
+    .sort((a, b) => b.mtime - a.mtime);
+  const room = Math.max(1, retention) - 1;
+  for (const stale of others.slice(room)) {
+    rmSync(join(dir, stale.name), { force: true });
+  }
 };
 
 export type MigrateResult =
@@ -52,7 +97,10 @@ export const migrateOnStart = (deps: MigrateDeps): MigrateResult => {
   let backupFile: string | null = null;
 
   if (needsBackup) {
-    const file = join(getBackupsDir(), `pre-migrate-${deps.appVersion}-${stamp(deps.now())}.dump`);
+    const file = join(
+      deps.backupsDir ?? getBackupsDir(),
+      `pre-migrate-${deps.appVersion}-${stamp(deps.now())}.dump`,
+    );
     try {
       deps.dump(file);
     } catch (err) {
@@ -65,6 +113,12 @@ export const migrateOnStart = (deps: MigrateDeps): MigrateResult => {
       };
     }
     backupFile = file;
+    // FX-91: migratsiya qayta-qayta yiqilsa ham dump'lar cheksiz to'planmasin.
+    try {
+      deps.pruneOldDumps(file);
+    } catch {
+      // best-effort — disk tozalanmasa ham migratsiya davom etadi.
+    }
   }
 
   try {

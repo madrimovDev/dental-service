@@ -66,6 +66,10 @@ ENV_FILE=/secure/lab-hub.env ./backup.sh          # cron: kuniga bir marta
 `lab_hub.dump` (pg_dump -Fc) + `uploads.tar.gz` — ikkalasi ham allaqachon shifrlangan ma'lumot; KEK qo'shilmaydi.
 Tiklash: `pg_restore --clean --if-exists -d lab_hub lab_hub.dump`, `tar -C /data -xzf uploads.tar.gz`
 (`lab-hub-api` konteyneri ichida, keyin `migrate`), so'ng xuddi o'sha `LAB_HUB_KEK` bilan ishga tushiriladi.
+Klinika kursorlari (FX-93/FX-98): yangi klasterga tiklashda Hub davri avtomatik almashadi va
+klinikalar kursorni boshidan o'qiydi (dublikatsiz). Shu klasterga tiklashda qo'shimcha qadam
+shart emas (xid oldinga ketgan, dedup `(tx_id, seq)`), lekin ehtiyot uchun davrni qo'lda
+almashtirish mumkin: `psql -d lab_hub -c "UPDATE hub_meta SET epoch = gen_random_uuid(), rotated_at = now()"`.
 
 ## Saqlash muddati (L9) va obuna (L10)
 

@@ -1,7 +1,11 @@
-import type { VisitNoteMetadata } from '@dental/db-schema';
+import { prescriptions, type VisitNoteMetadata } from '@dental/db-schema';
+import { eq } from 'drizzle-orm';
 import type { Context } from 'hono';
+import { onAfterCommit } from '../../../db/after-commit.ts';
+import { getDb } from '../../../db/scoped.ts';
 import type { AuditLogger } from '../../../lib/audit-logger.ts';
 import { createOwnershipValidator, type OwnershipValidator } from '../../../lib/ownership.ts';
+import type { PatientMessenger } from '../../../lib/telegram/notify.ts';
 import { InvalidTransitionError } from '../treatment-plans/treatment-plans.transitions.ts';
 import { createVisitNotesRepository } from './visit-notes.repository.ts';
 import type { CreateVisitNoteInput, UpdateVisitNoteInput } from './visit-notes.schema.ts';
@@ -100,6 +104,8 @@ export const createVisitNotesService = (deps: {
   completeStage?: StageCompleteHook;
   ownership?: OwnershipValidator;
   reconcileStock?: ReconcileStockHook;
+  /** FX-123: imzolanganda vizitga bog'langan retseptlar bemorga yuboriladi (commit'dan keyin). */
+  messenger?: PatientMessenger;
 }) => {
   const repo = createVisitNotesRepository();
   const ownership = deps.ownership ?? createOwnershipValidator();
@@ -136,11 +142,14 @@ export const createVisitNotesService = (deps: {
     // UUID → CrossEntityError → routes 400). Stage guard'dan oldin: avval "shu bemornikimi",
     // so'ng "plan statusi ruxsat beradimi" (CLI-415).
     await ownership.assertPatientExists(c, input.patientId);
-    await ownership.assertUserExists(c, input.doctorId);
+    await ownership.assertPractitioner(c, input.doctorId, 'medical_record.on_behalf'); // FX-155
     if (input.stageId)
       await ownership.assertStageBelongsToPatient(c, input.stageId, input.patientId);
-    if (input.appointmentId)
+    if (input.appointmentId) {
       await ownership.assertAppointmentBelongsToPatient(c, input.appointmentId, input.patientId);
+      // FX-117: yozilish shifokori == yozuv shifokori.
+      await ownership.assertAppointmentDoctor(c, input.appointmentId, input.doctorId);
+    }
 
     // FX-14 (LA-33, D-9): qoralama bosqichni YOPMAYDI — faqat `in_progress` qiladi
     // (skipped/plan-guard xatosi shu yerda → routes 400, orphan yozuv yo'q). Yopish —
@@ -180,7 +189,9 @@ export const createVisitNotesService = (deps: {
   }
 
   async function update(c: Context, id: string, input: UpdateVisitNoteInput) {
-    const before = await repo.find(c, id);
+    // FX-156 + FX-67: qator qulfi — parallel imzo bilan poygada yon ta'sirlar (stage/stock)
+    // commit bo'lmasin va reconcile har doim eng so'nggi commit qilingan 'before' ustida.
+    const before = await repo.findForUpdate(c, id);
     if (!before) return null;
     // UI-D4: imzolangan yozuv — hech qanday yon ta'sirdan (stage, stock) OLDIN rad.
     if (before.signedAt) throw new VisitNoteSignedError(id);
@@ -198,11 +209,28 @@ export const createVisitNotesService = (deps: {
 
     // CLI-421: cross-entity ownership — patientId o'zgармаydi (update schema omit qiladi),
     // shu sabab before.patientId'ga nisbatan tekshiramiz. Faqat yuborilgan maydonlar.
-    if (input.doctorId) await ownership.assertUserExists(c, input.doctorId);
+    // FX-155: muallif faqat o'zgarganda tekshiriladi (boshqa shifokor nomidagi yozuvni tahrirlash).
+    if (input.doctorId && input.doctorId !== before.doctorId)
+      await ownership.assertPractitioner(c, input.doctorId, 'medical_record.on_behalf');
     if (input.stageId)
       await ownership.assertStageBelongsToPatient(c, input.stageId, before.patientId);
     if (input.appointmentId)
       await ownership.assertAppointmentBelongsToPatient(c, input.appointmentId, before.patientId);
+    // FX-117: yozilish shifokori == yozuv shifokori — faqat yozilish YOKI shifokor HAQIQATAN
+    // o'zgarganda. Web tahrir har PATCH'da ikkalasini ham yuboradi; yozilish keyin boshqa
+    // shifokorga o'tkazilsa ham mavjud qoralama saqlanishi/imzolanishi kerak (review).
+    const appointmentChanged =
+      input.appointmentId !== undefined && input.appointmentId !== before.appointmentId;
+    const doctorChanged = input.doctorId !== undefined && input.doctorId !== before.doctorId;
+    const effectiveAppointmentId =
+      input.appointmentId !== undefined ? input.appointmentId : before.appointmentId;
+    if (effectiveAppointmentId && (appointmentChanged || doctorChanged)) {
+      await ownership.assertAppointmentDoctor(
+        c,
+        effectiveAppointmentId,
+        input.doctorId ?? before.doctorId,
+      );
+    }
 
     // FX-14: yangi biriktirilgan bosqich `in_progress` bo'ladi (yopilmaydi — imzoda yopiladi).
     if (input.stageId && input.stageId !== before.stageId && deps.completeStage) {
@@ -269,6 +297,24 @@ export const createVisitNotesService = (deps: {
       resourceId: id,
       after: { signedAt: signed.signedAt?.toISOString() ?? null, signedBy: signed.signedBy },
     });
+    // FX-123 (LC-01): retsept xabari yaratilganda emas, vizit imzolanganda ketadi.
+    const messenger = deps.messenger;
+    if (messenger) {
+      const rxRows = await getDb(c)
+        .select()
+        .from(prescriptions)
+        .where(eq(prescriptions.visitNoteId, id));
+      for (const rx of rxRows) {
+        await onAfterCommit(c, () =>
+          messenger.sendPrescription({
+            tenantId: rx.tenantId,
+            patientId: rx.patientId,
+            issuedAt: rx.issuedDate,
+            items: rx.items,
+          }),
+        );
+      }
+    }
     return signed;
   }
 

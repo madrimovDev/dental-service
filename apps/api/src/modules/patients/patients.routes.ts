@@ -39,6 +39,7 @@ import {
   patientListResponseDtoSchema,
   patientRelativeDtoSchema,
   patientRelativeViewSchema,
+  patientTelegramUnlinkResultSchema,
   phoneCheckQuerySchema,
   phoneCheckResultSchema,
   relativeParamSchema,
@@ -279,6 +280,28 @@ export const patientRoutes = (deps: {
     const row = await service.archive(c, id);
     if (!row) return c.json(fail('patient.not_found', 'Patient not found'), 404);
     return c.json(ok({ archived: true as const, id: row.id }), 200);
+  });
+
+  // ─── DELETE /{id}/telegram-link — Telegram bog'lanishini uzish (FX-41) ────
+
+  const unlinkTelegramRoute = createRoute({
+    method: 'delete',
+    path: '/{id}/telegram-link',
+    tags: ['patients'],
+    operationId: 'unlinkPatientTelegram',
+    middleware: [requirePermission('patient.edit')] as const,
+    request: { params: patientIdParamSchema },
+    responses: {
+      ...okJson(patientTelegramUnlinkResultSchema, 'Telegram link removed'),
+      ...patientNotFound,
+    },
+  });
+
+  app.openapi(unlinkTelegramRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const row = await service.unlinkTelegram(c, id);
+    if (!row) return c.json(fail('patient.not_found', 'Patient not found'), 404);
+    return c.json(ok({ unlinked: true as const, id: row.id }), 200);
   });
 
   // ─── Medical record sub-resource ─────────────────────────────────────────

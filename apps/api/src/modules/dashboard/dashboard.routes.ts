@@ -5,7 +5,7 @@ import { okJson } from '../../lib/openapi.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
-import { doctorPendingDtoSchema } from './dashboard.schema.ts';
+import { doctorPendingDtoSchema, receptionAttentionDtoSchema } from './dashboard.schema.ts';
 import { createDashboardService } from './dashboard.service.ts';
 
 export const dashboardRoutes = (deps: { db: Database }) => {
@@ -33,6 +33,18 @@ export const dashboardRoutes = (deps: { db: Database }) => {
     const canLab = perms.includes('lab_order.view') || perms.includes('@owner');
     return c.json(ok(await service.doctorPending(c, userId, canLab)), 200);
   });
+
+  // FX-121: Registrator «Diqqat» — `lab_order.view` talab qilmaydigan tor endpoint (faqat son).
+  const receptionRoute = createRoute({
+    method: 'get',
+    path: '/reception-attention',
+    tags: ['dashboard'],
+    operationId: 'getReceptionAttention',
+    middleware: [requirePermission('appointment.view')] as const,
+    responses: okJson(receptionAttentionDtoSchema, "Registrator uchun muddati o'tgan lab soni"),
+  });
+
+  app.openapi(receptionRoute, async (c) => c.json(ok(await service.receptionAttention(c)), 200));
 
   return app;
 };

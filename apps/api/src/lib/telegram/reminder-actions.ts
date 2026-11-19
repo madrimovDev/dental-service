@@ -1,8 +1,11 @@
-import { appointments, patients } from '@dental/db-schema';
-import { eq } from 'drizzle-orm';
+import { appointments, notifications, patients, queueTickets } from '@dental/db-schema';
+import { and, eq, inArray } from 'drizzle-orm';
+import { runInSavepoint } from '../../db/after-commit.ts';
 import type { DbOrTx } from '../../db/client.ts';
 import { AppointmentTransitionError } from '../../modules/appointments/appointments.transitions.ts';
 import type { AppointmentsService } from '../../modules/appointments/index.ts';
+import { logger } from '../logger.ts';
+import { findRecipientsWithPermission } from '../notify-recipients.ts';
 import { createBotContext } from './bot-context.ts';
 
 /** 24 soatlik eslatma tugmalari: `rm:<action>:<appointmentId>` (≤ 64 bayt). */
@@ -25,6 +28,8 @@ export type ReminderOutcome =
   | 'reschedule'
   | 'already'
   | 'unavailable'
+  /** FX-82: service kutilmagan xato berdi — «allaqachon» emas, bemorga aniq xabar. */
+  | 'failed'
   | 'not_owner'
   | 'not_found';
 
@@ -33,6 +38,46 @@ export type ReminderActionResult = {
   patientId?: string;
   appointmentId?: string;
 };
+
+/**
+ * FX-83: bemor Telegram orqali bekor qilganda xodim (bekor qila oladiganlar + shifokor)
+ * bildirishnoma oladi — bo'shagan slot jimgina yo'qolmasin. Best-effort: savepoint ichida,
+ * xato bekor qilishni orqaga qaytarmaydi.
+ */
+async function notifyStaffPatientCancelled(
+  tx: DbOrTx,
+  tenantId: string,
+  row: { id: string; branchId: string; doctorId: string; patientName: string; startTime: Date },
+): Promise<void> {
+  try {
+    await runInSavepoint(tx, async (sp) => {
+      const c = createBotContext(sp, tenantId);
+      const recipients = new Set(
+        await findRecipientsWithPermission(c, 'appointment.cancel', row.branchId),
+      );
+      recipients.add(row.doctorId);
+      const when = new Intl.DateTimeFormat('uz-UZ', {
+        timeZone: 'Asia/Tashkent',
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).format(row.startTime);
+      await sp.insert(notifications).values(
+        [...recipients].map((userId) => ({
+          tenantId,
+          userId,
+          type: 'appointment_cancelled_by_patient',
+          title: `Bemor yozilishni bekor qildi: ${row.patientName}`,
+          body: when,
+        })),
+      );
+    });
+  } catch (err) {
+    console.error('[reminder-actions] xodimga bekor bildirishnomasi yozilmadi:', err);
+  }
+}
 
 /**
  * Eslatma tugmasi bosilganda: FAQAT yozilish egasi (patients.telegram_chat_id
@@ -50,6 +95,9 @@ export async function handleReminderAction(
       status: appointments.status,
       startTime: appointments.startTime,
       patientId: appointments.patientId,
+      branchId: appointments.branchId,
+      doctorId: appointments.doctorId,
+      patientName: patients.fullName,
       chat: patients.telegramChatId,
     })
     .from(appointments)
@@ -68,25 +116,48 @@ export async function handleReminderAction(
   // 'ok' | 'no' | 're' — hammasiga.
   if (row.startTime.getTime() <= Date.now()) return { outcome: 'already', ...base };
 
-  const c = createBotContext(tx, o.tenantId);
+  // FX-82: update kutilmagan xato bersa (DB xatosi tx'ni abort qiladi) — savepoint ichida
+  // ishlaymiz: xato savepoint'ni qaytaradi, tashqi tx (callback javobi, boshqa yozuvlar)
+  // yashaydi. Poyga (holat o'zgargan) — haqiqatan «already»; qolgan xato — `failed`.
   try {
-    if (o.action === 'ok') {
-      if (row.status === 'confirmed') return { outcome: 'already', ...base };
-      const res = await deps.appointments.update(c, row.id, { status: 'confirmed' });
-      // FX-36: {ok:false} (konflikt/time-off) jimgina «already» emas — bemorga aniq xabar.
-      return { outcome: res.ok ? 'confirmed' : 'unavailable', ...base };
-    }
-    if (o.action === 'no') {
-      const res = await deps.appointments.update(c, row.id, {
-        status: 'cancelled',
-        cancellationReason: 'patient_telegram',
-      });
-      return { outcome: res.ok ? 'cancelled' : 'unavailable', ...base };
-    }
+    return await runInSavepoint(tx, async (sp) => {
+      const c = createBotContext(sp, o.tenantId);
+      if (o.action === 'ok') {
+        if (row.status === 'confirmed') return { outcome: 'already', ...base } as const;
+        const res = await deps.appointments.update(c, row.id, { status: 'confirmed' });
+        // FX-36: {ok:false} (konflikt/time-off) jimgina «already» emas — bemorga aniq xabar.
+        return { outcome: res.ok ? 'confirmed' : 'unavailable', ...base } as const;
+      }
+      if (o.action === 'no') {
+        // FX-58: bemor erta check-in qilgan (ochiq navbat chiptasi bor) — bot service'ida queue
+        // reverse-sync yo'q, bekor qilsak chipta arvoh bo'lib qoladi. Bekor qilishni registraturaga
+        // qoldiramiz (kalendar/navbat reverse-sync bilan yopadi).
+        const [openTicket] = await sp
+          .select({ id: queueTickets.id })
+          .from(queueTickets)
+          .where(
+            and(
+              eq(queueTickets.appointmentId, row.id),
+              inArray(queueTickets.status, ['waiting', 'in_progress']),
+            ),
+          )
+          .limit(1);
+        if (openTicket) return { outcome: 'already', ...base } as const;
+        const res = await deps.appointments.update(c, row.id, {
+          status: 'cancelled',
+          cancellationReason: 'patient_telegram',
+        });
+        if (!res.ok) return { outcome: 'unavailable', ...base } as const;
+        // FX-83: best-effort (o'z savepoint'ida) — xato bekor qilishni qaytarmaydi.
+        await notifyStaffPatientCancelled(sp, o.tenantId, row);
+        return { outcome: 'cancelled', ...base } as const;
+      }
+      // 're' — yozilish o'zgarmaydi; chaqiruvchi bron oqimini (rescheduleOf) boshlaydi.
+      return { outcome: 'reschedule', ...base } as const;
+    });
   } catch (err) {
     if (err instanceof AppointmentTransitionError) return { outcome: 'already', ...base };
-    throw err;
+    logger.error({ err, appointmentId: row.id }, 'Telegram eslatma tugmasi: update xatosi');
+    return { outcome: 'failed', ...base };
   }
-  // 're' — yozilish o'zgarmaydi; chaqiruvchi bron oqimini (rescheduleOf) boshlaydi.
-  return { outcome: 'reschedule', ...base };
 }

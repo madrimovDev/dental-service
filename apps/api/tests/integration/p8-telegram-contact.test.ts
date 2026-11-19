@@ -29,8 +29,13 @@ const chatOf = (id: string) =>
     return p!.c;
   });
 
-const link = (o: { contactUserId?: number; fromId: number; phone: string; chatId: string }) =>
-  withTenant(tenantId, (tx) => linkPatientByContact(tx, o));
+const link = (o: {
+  contactUserId?: number;
+  fromId: number;
+  phone: string;
+  chatId: string;
+  chatType?: string;
+}) => withTenant(tenantId, (tx) => linkPatientByContact(tx, { chatType: 'private', ...o }));
 
 beforeAll(async () => {
   await db.execute(sql`TRUNCATE users, tenants RESTART IDENTITY CASCADE`);
@@ -46,6 +51,19 @@ beforeAll(async () => {
 });
 
 describe('P8 linkPatientByContact', () => {
+  test("FX-84: guruh chat'ida o'z kontakti ham bog'lamaydi → not_private, bemor o'zgarmaydi", async () => {
+    const id = await seedPatient('+998901110099', null);
+    const r = await link({
+      contactUserId: 777,
+      fromId: 777,
+      phone: '+998901110099',
+      chatId: '-100777',
+      chatType: 'supergroup',
+    });
+    expect(r).toBe('not_private');
+    expect(await chatOf(id)).toBeNull();
+  });
+
   test("begona kontakt → not_own_contact, bemor o'zgarmaydi", async () => {
     const id = await seedPatient('+998901110001', null);
     const r = await link({

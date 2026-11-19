@@ -1,0 +1,2 @@
+DROP INDEX "cashier_tx_visit_note_unique";--> statement-breakpoint
+CREATE INDEX "cashier_tx_visit_note_idx" ON "cashier_transactions" USING btree ("visit_note_id") WHERE "cashier_transactions"."visit_note_id" IS NOT NULL;

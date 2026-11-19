@@ -12,6 +12,16 @@ export function useLabOrderFiles(labOrderId: string, enabled = true) {
   });
 }
 
+/** FX-112: shifokorlar (amaliyotchi rollar) — buyurtma shifokorini tanlash; `lab_order.manage`. */
+export function useLabOrderDoctors(enabled = true) {
+  return useQuery({
+    queryKey: clinicalKeys.labOrderDoctors(),
+    queryFn: () => api.labOrders.doctors(),
+    enabled,
+    staleTime: 5 * 60_000,
+  });
+}
+
 export function useUploadLabOrderFile() {
   const qc = useQueryClient();
   return useMutation({

@@ -222,3 +222,24 @@ describe('setupAutoUpdater yangilanish holati (UI-T3)', () => {
     expect(quit).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('setupAutoUpdater rol (FX-148)', () => {
+  test("emit qilingan holat o'rnatma rolini o'z ichiga oladi (server PC'da web tasdiq so'raydi)", () => {
+    const updater = new FakeUpdater();
+    const states: Array<Record<string, unknown>> = [];
+    setupAutoUpdater({
+      isPackaged: true,
+      updater,
+      notify: () => {},
+      setTrayToolTip: () => {},
+      scheduleInterval: () => {},
+      now: () => new Date(2026, 10, 11, 14, 0, 0),
+      getWorkClose: () => '19:00',
+      scheduleTimeout: () => {},
+      getRole: () => 'server',
+      onState: (s) => void states.push(s as unknown as Record<string, unknown>),
+    });
+    updater.emitDownloaded();
+    expect(states.at(-1)?.role).toBe('server');
+  });
+});

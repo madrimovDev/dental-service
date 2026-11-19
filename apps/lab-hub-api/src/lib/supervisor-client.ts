@@ -14,7 +14,7 @@ export type ClinicVerification = {
 export type SupervisorClient = {
   verifyClinic(
     supervisorClinicId: string,
-    opts: { licenseKey?: string },
+    opts: { licenseKey?: string; fingerprint?: string },
   ): Promise<ClinicVerification | null>;
 };
 
@@ -28,6 +28,7 @@ export const createSupervisorClient = (cfg: {
     if (!cfg.baseUrl) throw new Error('supervisor.not_configured');
     const url = new URL(`/internal/clinics/${encodeURIComponent(id)}/verify`, cfg.baseUrl);
     if (opts.licenseKey) url.searchParams.set('licenseKey', opts.licenseKey);
+    if (opts.fingerprint) url.searchParams.set('fingerprint', opts.fingerprint);
     const res = await (cfg.fetch ?? fetch)(url, {
       headers: { Authorization: `Bearer ${cfg.token}` },
       signal: AbortSignal.timeout(cfg.timeoutMs ?? 5000),

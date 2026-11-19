@@ -5,6 +5,7 @@ import { LabsSettingsScreen } from './LabsSettingsScreen';
 
 const connectMutate = vi.fn();
 const requestMutate = vi.fn();
+const requeueMutate = vi.fn();
 const permissions = { current: new Set<string>() };
 const status = {
   current: {
@@ -42,6 +43,7 @@ vi.mock('@/features/clinical/components/lab-orders/lab-hub.api', () => ({
   }),
   useConnectLabHub: () => ({ mutate: connectMutate, isPending: false }),
   useRequestLabLink: () => ({ mutate: requestMutate, isPending: false, variables: undefined }),
+  useRequeueLabHubOutbox: () => ({ mutate: requeueMutate, isPending: false }),
 }));
 vi.mock('@/stores/auth-store.ts', () => ({
   useAuthStore: Object.assign((sel?: (s: unknown) => unknown) => {
@@ -54,7 +56,14 @@ describe('LabsSettingsScreen', () => {
   beforeEach(() => {
     connectMutate.mockReset();
     requestMutate.mockReset();
-    status.current = { ...status.current, connected: true, configured: true, lastError: null };
+    requeueMutate.mockReset();
+    status.current = {
+      ...status.current,
+      connected: true,
+      configured: true,
+      lastError: null,
+      failedOutbox: 0,
+    };
     permissions.current = new Set([
       'tenant_settings.view',
       'tenant_settings.edit',
@@ -110,6 +119,17 @@ describe('LabsSettingsScreen', () => {
     renderApp(<LabsSettingsScreen />);
     expect(screen.getByRole('alert')).toHaveTextContent('sozlanmagan');
     expect(screen.queryByRole('button', { name: 'Portalga ulanish' })).not.toBeInTheDocument();
+  });
+
+  it('FX-48: yuborilmagan op bo‘lsa «Qayta yuborish» requeue chaqiradi; edit ruxsatisiz — yo‘q', () => {
+    status.current = { ...status.current, failedOutbox: 3 };
+    const { unmount } = renderApp(<LabsSettingsScreen />);
+    fireEvent.click(screen.getByRole('button', { name: 'Qayta yuborish' }));
+    expect(requeueMutate).toHaveBeenCalled();
+    unmount();
+    permissions.current = new Set(['tenant_settings.view', 'lab_order.view']);
+    renderApp(<LabsSettingsScreen />);
+    expect(screen.queryByRole('button', { name: 'Qayta yuborish' })).not.toBeInTheDocument();
   });
 
   it('oxirgi xato matnli ko‘rinadi (kod emas)', () => {

@@ -40,6 +40,15 @@ export function adjustmentDelta(current: number, target: number): number {
 export const USAGE_WINDOW_DAYS = 30;
 
 /**
+ * FX-68: item uchun «necha kunga yetadi» oynasi = min(30, item yoshi (kun), kamida 1).
+ * Yangi itemda 30 kunga bo'lish sarfni kamaytirib ko'rsatardi.
+ */
+export function usageWindowForItem(createdAt: Date, now: number = Date.now()): number {
+  const ageDays = (now - createdAt.getTime()) / (24 * 60 * 60 * 1000);
+  return Math.max(1, Math.min(USAGE_WINDOW_DAYS, ageDays));
+}
+
+/**
  * O'rtacha kunlik sarf = oxirgi `USAGE_WINDOW_DAYS` kundagi sof sarf ÷ oyna.
  * Manfiy sof sarf (qaytarishlar ko'p) → 0.
  */

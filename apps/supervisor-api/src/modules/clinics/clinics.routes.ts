@@ -11,6 +11,7 @@ import { adminJwtMiddleware } from '../auth/jwt.middleware';
 import { pushClinicToHub } from '../hub/clinic-state';
 import { createLicenseService } from '../licenses/licenses.service';
 import { renewSaasClinic } from '../saas/saas.routes';
+import { getSaasSuspendedAt, suspendSaasClinic } from '../saas/saas-suspension';
 
 const uuidSchema = z.string().uuid();
 
@@ -69,7 +70,9 @@ const createClinicSchema = z.object({
 // license-signature.ts precedent), kept in LOCKSTEP BY HAND. If you change
 // this table, update apps/api's MODULE_MAP too (see its guard test).
 const MODULE_MAP: Record<z.infer<typeof createClinicSchema>['plan'], string[]> = {
-  starter: ['patients', 'appointments', 'queue'],
+  // FX-99 (LB-08): 'staff' starter'da ham — usiz owner xodim (shifokor) taklif qila
+  // olmaydi (/api/users/* 403 MODULE_DISABLED) va yozilish oqimi (doctorId) ishlamaydi.
+  starter: ['patients', 'appointments', 'queue', 'staff'],
   standard: ['patients', 'appointments', 'queue', 'cashier', 'reports', 'staff'],
   premium: [
     'patients',
@@ -251,7 +254,12 @@ export const clinicsRoutes = (deps: { hubFetch?: typeof fetch } = {}) => {
     // Bu yerda `pickClinicPublic` ISHLATILMAYDI; "tozalash" niyatida
     // almashtirmang, aks holda panel holati jim buziladi (clinics.test.ts
     // "GET /:id (detal) ... ATAYIN bor" testi buni qulflaydi).
-    return c.json({ clinic, license });
+    // FX-102: SaaS klinika to'xtatilganmi (desktop'da — `license.isActive`).
+    const saasSuspendedAt =
+      clinic.mode === 'saas'
+        ? ((await getSaasSuspendedAt(clinic.id))?.toISOString() ?? null)
+        : null;
+    return c.json({ clinic, license, saasSuspendedAt });
   });
 
   // Litsenziyani bekor qilish (revoke) — vendor operatori to'lamayotgan/shartnoma
@@ -264,6 +272,14 @@ export const clinicsRoutes = (deps: { hubFetch?: typeof fetch } = {}) => {
 
     const clinic = await db.query.clinics.findFirst({ where: eq(clinics.id, idResult.data) });
     if (!clinic) return c.json({ error: { code: 'NOT_FOUND' } }, 404);
+
+    // FX-102 (LB-11): SaaS klinikada litsenziya yo'q — obuna to'xtatiladi
+    // (imtiyozsiz blok apps/api sinxronida; «Muddatni uzaytirish» yechadi).
+    if (clinic.mode === 'saas') {
+      const { suspendedAt } = await suspendSaasClinic(clinic.id, c.get('adminUserId'));
+      await pushToHub(clinic.id);
+      return c.json({ clinic: pickClinicPublic(clinic), suspendedAt: suspendedAt.toISOString() });
+    }
 
     const license = await db.query.licenses.findFirst({ where: eq(licenses.clinicId, clinic.id) });
     if (!license) return c.json({ error: { code: 'NOT_FOUND' } }, 404);

@@ -54,11 +54,6 @@ export const resetOwnerPasswordRoutes = (
       );
     }
 
-    const v = await verifyReset(resetToken);
-    if (!v.ok) {
-      return c.json(fail('reset.invalid_token', "Token yaroqsiz yoki muddati o'tgan"), 400);
-    }
-
     // Desktop = bitta tenant (single-tenant EXE, CLI-338/348). Deterministik
     // orderBy (CLI-477 #2) — bu route public + shartsiz mount qilingan; bir
     // nechta tenant holatida tartibsiz `findFirst` DB-tartibiga bog'liq bo'lardi
@@ -73,6 +68,16 @@ export const resetOwnerPasswordRoutes = (
     }
 
     const passwordHash = await hashPassword(newPassword);
+
+    // FX-85: `verifyReset` Supervisor'da tokenni ATOMIK sarflaydi (bir
+    // martalik). Shuning uchun u lokal oldindan shartlar (tenant mavjudligi,
+    // parol hash'i) tekshirilgandan KEYIN chaqiriladi — aks holda
+    // `reset.no_tenant` tokenni behuda yoqib yuborardi.
+    const v = await verifyReset(resetToken);
+    if (!v.ok) {
+      return c.json(fail('reset.invalid_token', "Token yaroqsiz yoki muddati o'tgan"), 400);
+    }
+
     const now = new Date();
 
     await db.transaction(async (tx) => {

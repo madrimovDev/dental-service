@@ -23,8 +23,9 @@ export function buildPendingRows(
       count: p.unsignedVisitNotes.count,
       title: label('notes', p.unsignedVisitNotes.count),
       text: names(p.unsignedVisitNotes.items),
+      // FX-117: yozilish ID uzatiladi — vizit aynan shu yozilishga bog'lanadi (o'tgan kun ham).
       to: p.unsignedVisitNotes.items[0]
-        ? `/patients/${p.unsignedVisitNotes.items[0].patientId}`
+        ? `/patients/${p.unsignedVisitNotes.items[0].patientId}/visits/new?appointmentId=${p.unsignedVisitNotes.items[0].id}`
         : '/patients',
     },
     {

@@ -7,7 +7,8 @@ import type { CreateVisitNoteInput } from '@dental/api-client';
 import {
   type DrugAllergyConflict,
   findDrugAllergyConflicts,
-  normalizeDrugName,
+  overrideCoversConflict,
+  overrideKey,
 } from '@dental/core';
 import type { AllergyOverride, NextVisit } from '../../clinical.types';
 
@@ -76,58 +77,48 @@ export const buildVisitNoteBody = (
   nextVisit: v.nextVisit ?? undefined,
 });
 
-// ===== dori ↔ allergiya =====
-const FORM_PREFIXES = new Set([
-  'tab',
-  'tabl',
-  'tabs',
-  'tabletka',
-  'sol',
-  'rp',
-  'caps',
-  'kaps',
-  'kapsula',
-  'amp',
-  'susp',
-  'sirop',
-  'syr',
-  'ung',
-  'supp',
-  'inj',
-  'gtt',
-]);
-const DOSE_UNITS = new Set(['mg', 'ml', 'g', 'mkg', 'mcg', 'ed', 'me', 'iu', 'l']);
+// ===== yozilishga bog'lash (FX-117) =====
+
+export type LinkableAppointment = {
+  id: string;
+  doctorId: string;
+  status: string;
+  startTime: string;
+};
 
 /**
- * Dori asosiy nomi: shakl prefiksi («Tab.», «Sol.», «Rp.») va doza («500 mg», «2%»)
- * olib tashlanadi, qolgan to'liq nom saqlanadi — «Tab. Amoksitsillin 500» ≡
- * «Амоксициллин», lekin ≠ «Tab. Ibuprofen».
+ * FX-117 (LB-26): yangi vizit yozuvi qaysi yozilishga bog'lanadi.
+ *  - FAQAT shu shifokorning, bekor qilinmagan/kelmagan yozilishi;
+ *  - `requestedId` («Mendan kutilmoqda» bandi `?appointmentId=`) mos kelsa — o'sha (o'tgan kun ham);
+ *  - aks holda bugungi, hali yozuv bog'lanmagan yozilishlardan hozirga eng yaqini.
  */
-export const overrideKey = (drug: string): string => {
-  const tokens = normalizeDrugName(drug)
-    .replace(/[.,;:()/]+/g, ' ')
-    .split(/\s+/)
-    .filter(Boolean);
-  const core = tokens.filter(
-    (tok) => !FORM_PREFIXES.has(tok) && !DOSE_UNITS.has(tok) && !/\d/.test(tok),
+export const pickAppointmentToLink = (opts: {
+  appointments: LinkableAppointment[];
+  doctorId: string;
+  requestedId?: string | null;
+  linkedAppointmentIds?: Array<string | null | undefined>;
+  now?: Date;
+}): string | null => {
+  const now = opts.now ?? new Date();
+  const own = opts.appointments.filter(
+    (a) => a.doctorId === opts.doctorId && a.status !== 'cancelled' && a.status !== 'no_show',
   );
-  return core.join(' ');
+  if (opts.requestedId && own.some((a) => a.id === opts.requestedId)) return opts.requestedId;
+  const linked = new Set(opts.linkedAppointmentIds ?? []);
+  const today = now.toDateString();
+  const candidates = own.filter(
+    (a) => !linked.has(a.id) && new Date(a.startTime).toDateString() === today,
+  );
+  candidates.sort(
+    (x, y) =>
+      Math.abs(new Date(x.startTime).getTime() - now.getTime()) -
+      Math.abs(new Date(y.startTime).getTime() - now.getTime()),
+  );
+  return candidates[0]?.id ?? null;
 };
 
-/** Override aynan shu dori + shu to'qnashuv (guruh, allergen) uchun berilganmi. */
-export const overrideCoversConflict = (
-  o: AllergyOverride,
-  drug: string,
-  conflict: Pick<DrugAllergyConflict, 'group' | 'allergen'>,
-): boolean => {
-  const key = overrideKey(drug);
-  return (
-    key !== '' &&
-    overrideKey(o.drug) === key &&
-    o.group === conflict.group &&
-    normalizeDrugName(o.allergen ?? '') === normalizeDrugName(conflict.allergen)
-  );
-};
+// ===== dori ↔ allergiya =====
+export { overrideCoversConflict, overrideKey };
 
 /** Shu dori uchun allergiya to'qnashuvi va u HALI sabab bilan tasdiqlanmagan bo'lsa. */
 export const pendingAllergyConflict = (

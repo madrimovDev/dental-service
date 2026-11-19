@@ -1,5 +1,6 @@
 import type { Context } from 'hono';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { CrossEntityError, createOwnershipValidator } from '../../lib/ownership.ts';
 import {
   computeAvailability,
   computeAvailabilityDetailed,
@@ -22,6 +23,25 @@ import type {
 
 export const createScheduleService = (deps: { audit: AuditLogger }) => {
   const repo = createScheduleRepository();
+  const ownership = createOwnershipValidator();
+
+  /**
+   * FX-137 (LC-15): doctorId/branchId shu tenantga tegishli bo'lishi shart (FK RLS'ni chetlab
+   * o'tadi). Natija — route 400 koди (`ownership.<entity>.not_found`) yoki `null` (ok).
+   */
+  async function checkRefs(
+    c: Context,
+    refs: { doctorId: string; branchId?: string | null },
+  ): Promise<string | null> {
+    try {
+      if (refs.branchId) await ownership.assertBranchExists(c, refs.branchId);
+      await ownership.assertUserExists(c, refs.doctorId);
+      return null;
+    } catch (e) {
+      if (e instanceof CrossEntityError) return `ownership.${e.entity}.${e.reason}`;
+      throw e;
+    }
+  }
 
   // ─── Working hours ──────────────────────────────────────────────────────
 
@@ -41,21 +61,39 @@ export const createScheduleService = (deps: { audit: AuditLogger }) => {
       if (end <= start) return { ok: false as const, code: 'time.invalid' };
     }
 
+    const refsError = await checkRefs(c, { doctorId, branchId: input.branchId });
+    if (refsError) return { ok: false as const, code: refsError };
+
     const before = await repo.listSegments(c, doctorId, input.branchId);
+    // FX-126: bo'sh saqlash «shifokor bu filialda ishlamaydi» — sentinel (is_active=false) qator.
+    // Qator umuman bo'lmasa (hech qachon sozlanmagan) filial ish soati fallback'i amal qiladi.
+    const segmentRows = input.segments.map((s) => ({
+      tenantId,
+      branchId: input.branchId,
+      doctorId,
+      weekday: s.weekday,
+      startMinute: hhmm(s.start),
+      endMinute: hhmm(s.end),
+      effectiveFrom: s.effectiveFrom ?? null,
+      effectiveUntil: s.effectiveUntil ?? null,
+    }));
     const rows = await repo.replaceSegments(
       c,
       doctorId,
       input.branchId,
-      input.segments.map((s) => ({
-        tenantId,
-        branchId: input.branchId,
-        doctorId,
-        weekday: s.weekday,
-        startMinute: hhmm(s.start),
-        endMinute: hhmm(s.end),
-        effectiveFrom: s.effectiveFrom ?? null,
-        effectiveUntil: s.effectiveUntil ?? null,
-      })),
+      segmentRows.length > 0
+        ? segmentRows
+        : [
+            {
+              tenantId,
+              branchId: input.branchId,
+              doctorId,
+              weekday: 0,
+              startMinute: 0,
+              endMinute: 0,
+              isActive: false,
+            },
+          ],
     );
 
     await deps.audit.record(c, {
@@ -90,6 +128,9 @@ export const createScheduleService = (deps: { audit: AuditLogger }) => {
     const end = new Date(input.endAt);
     if (end <= start) return { ok: false as const, code: 'time.invalid' };
 
+    const refsError = await checkRefs(c, { doctorId: input.doctorId, branchId: input.branchId });
+    if (refsError) return { ok: false as const, code: refsError };
+
     const row = await repo.createTimeOff(c, {
       tenantId,
       doctorId: input.doctorId,
@@ -112,6 +153,11 @@ export const createScheduleService = (deps: { audit: AuditLogger }) => {
     return { ok: true as const, timeOff: toTimeOffDto(row) };
   }
 
+  /** FX-113: route filial-doirasi tekshiruvi uchun (o'chirishdan oldin). */
+  async function getTimeOff(c: Context, id: string) {
+    return repo.getTimeOffById(c, id);
+  }
+
   async function deleteTimeOff(c: Context, id: string) {
     const before = await repo.getTimeOffById(c, id);
     if (!before) return { ok: false as const, code: 'not_found' };
@@ -131,6 +177,7 @@ export const createScheduleService = (deps: { audit: AuditLogger }) => {
   // ─── Availability ───────────────────────────────────────────────────────
 
   /**
+   * FX-126: jadval qatori bor, lekin faol segment yo'q (sentinel) — doktor shu filialda ISHLAMAYDI.
    * P10: shaxsiy jadvali UMUMAN yo'q doktor filial ish soatida ishlaydi deb hisoblanadi
    * (yangi klinikada darhol bron qilish uchun) — FX-34: faqat shu filialga biriktirilgan bo'lsa. Jadvali bor, lekin shu kun segmenti
    * yo'q doktor — dam olish kuni (avvalgidek).
@@ -138,7 +185,7 @@ export const createScheduleService = (deps: { audit: AuditLogger }) => {
   async function segmentsForDay(c: Context, doctorId: string, branchId: string, weekday: number) {
     const segs = await repo.listActiveSegmentsForDay(c, doctorId, branchId, weekday);
     if (segs.length > 0) return segs;
-    if (await repo.hasAnyActiveSegments(c, doctorId, branchId)) return segs;
+    if (await repo.hasAnyScheduleRows(c, doctorId, branchId)) return segs;
     // FX-34 (LA-08): fallback faqat shu filialga biriktirilgan shifokorga — aks holda
     // boshqa filial shifokori bu filialda «butun kun bo'sh» ko'rinardi.
     if (!(await repo.isDoctorInBranch(c, doctorId, branchId))) return segs;
@@ -342,6 +389,7 @@ export const createScheduleService = (deps: { audit: AuditLogger }) => {
     replaceWorkingHours,
     listTimeOff,
     createTimeOff,
+    getTimeOff,
     deleteTimeOff,
     getAvailability,
     getBranchAvailability,

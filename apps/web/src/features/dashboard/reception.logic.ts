@@ -5,8 +5,9 @@ export interface AttentionItem {
   tier: 2 | 3;
   title: string;
   text: string;
-  actionLabel: string;
-  to: string;
+  /** Havola/amal yo'q bo'lsa (masalan, ruxsat yo'q sahifa) — ikkalasi ham berilmaydi (FX-121). */
+  actionLabel?: string;
+  to?: string;
 }
 
 export const ATTENTION_LIMIT = 3;

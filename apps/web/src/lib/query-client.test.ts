@@ -35,6 +35,26 @@ describe('queryClient MutationCache.onError (global error toast)', () => {
     );
   });
 
+  // FX-127 (LC-05): MODULE_DISABLED (desktop tarif) — server inglizcha matni emas,
+  // «tarifingizda yo'q» toast'i.
+  it("MODULE_DISABLED → «tarifingizda yo'q» toast (server matni emas)", () => {
+    const onError = queryClient.getMutationCache().config.onError;
+    onError?.(
+      new ApiError('MODULE_DISABLED', "Module 'staff' is not enabled in your plan", 403),
+      undefined,
+      undefined,
+      { options: {} } as never,
+      undefined as never,
+    );
+    expect(notifications.show).toHaveBeenCalledWith(
+      expect.objectContaining({
+        color: 'red',
+        title: 'license.module_disabled.title',
+        message: 'license.module_disabled.message',
+      }),
+    );
+  });
+
   it("mutation o'z onError handleriga ega bo'lsa global toast chiqmaydi", () => {
     const onError = queryClient.getMutationCache().config.onError;
     onError?.(
@@ -68,6 +88,13 @@ describe('handleLicenseBlock (P18)', () => {
     stubLocation('/patients');
     expect(handleLicenseBlock(new ApiError('LICENSE_NOT_FOUND', 'x', 403))).toBe(true);
     expect(assign).toHaveBeenCalledWith('/activate');
+  });
+
+  // FX-161 — `.lic` vaqtincha o'qilmadi (503): aktivatsiyaga qattiq redirect YO'Q.
+  it("503 LICENSE_UNAVAILABLE — /activate'ga yo'naltirmaydi", () => {
+    stubLocation('/patients');
+    expect(handleLicenseBlock(new ApiError('LICENSE_UNAVAILABLE', 'x', 503))).toBe(false);
+    expect(assign).not.toHaveBeenCalled();
   });
 
   it("maqsad sahifada qayta yo'naltirmaydi; boshqa 403 e'tiborsiz", () => {

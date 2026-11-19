@@ -1,5 +1,12 @@
 import { authFetch } from '../../lib/api';
-import type { CreateLabInput, CreateLabResult, Lab, UpdateLabInput } from './labs.types';
+import type {
+  CreateLabInput,
+  CreateLabResult,
+  Lab,
+  LabUser,
+  ResetPasswordResult,
+  UpdateLabInput,
+} from './labs.types';
 
 /** Supervisor API → Lab Hub ichki API proksisi (`/v1/admin/labs`). */
 const errorFor = async (res: Response, fallback: string) => {
@@ -33,4 +40,22 @@ export const updateLab = async (id: string, input: UpdateLabInput): Promise<Lab>
   });
   if (!res.ok) throw await errorFor(res, "Laboratoriyani yangilab bo'lmadi");
   return ((await res.json()) as { lab: Lab }).lab;
+};
+
+/** FX-94: lab foydalanuvchilari (lead tanlash) va parolni tiklash. */
+export const fetchLabUsers = async (labId: string): Promise<LabUser[]> => {
+  const res = await authFetch(`/v1/admin/labs/${labId}/users`);
+  if (!res.ok) throw await errorFor(res, "Foydalanuvchilar ro'yxatini yuklab bo'lmadi");
+  return ((await res.json()) as { users: LabUser[] }).users;
+};
+
+export const resetLabUserPassword = async (
+  labId: string,
+  userId: string,
+): Promise<ResetPasswordResult> => {
+  const res = await authFetch(`/v1/admin/labs/${labId}/users/${userId}/reset-password`, {
+    method: 'POST',
+  });
+  if (!res.ok) throw await errorFor(res, "Parolni tiklab bo'lmadi");
+  return res.json();
 };

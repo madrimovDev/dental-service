@@ -171,6 +171,14 @@ export const createRecallsService = (deps: { audit: AuditLogger }) => {
     const user = c.get('user');
 
     await assertRefsOwned(c, input);
+    // FX-136 (LC-14): bog'lanadigan yozilish shu recall bemoriniki (RLS ostida) bo'lishi shart.
+    if (input.scheduledAppointmentId) {
+      await ownership.assertAppointmentBelongsToPatient(
+        c,
+        input.scheduledAppointmentId,
+        before.patientId,
+      );
+    }
 
     const patch: Partial<Parameters<typeof repo.update>[2]> = {};
     if (input.status) {

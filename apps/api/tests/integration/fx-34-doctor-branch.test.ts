@@ -26,6 +26,7 @@ import { signAccess } from '../../src/lib/jwt.ts';
 import { appointmentRoutes } from '../../src/modules/appointments/appointments.routes.ts';
 import { createAppointmentsService } from '../../src/modules/appointments/appointments.service.ts';
 import { createScheduleService } from '../../src/modules/schedule/schedule.service.ts';
+import { seedRoleForUser } from './fx-m2-helpers.ts';
 
 const receptionist = ROLE_TEMPLATES.find((t) => t.templateKey === 'receptionist');
 if (!receptionist) throw new Error('receptionist template not found');
@@ -155,6 +156,9 @@ beforeAll(async () => {
         a(docInactive, doctorRole!.id, branchX, { isActive: false }),
       ]);
   });
+
+  // FX-133: yozilish filial doirasi tayinlovlardan o'qiladi — real (tenant-wide) tayinlov.
+  await seedRoleForUser(tenantId, recep, null, receptionistPerms, 'Registrator');
 
   token = (
     await signAccess({

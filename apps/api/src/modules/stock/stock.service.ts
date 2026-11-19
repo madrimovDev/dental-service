@@ -1,4 +1,5 @@
 import {
+  appointments,
   expenses,
   serviceMaterials,
   stockBatches,
@@ -12,8 +13,14 @@ import type { Context } from 'hono';
 import type { DbOrTx } from '../../db/client.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import {
+  type BranchScope,
+  loadBranchScope as loadAssignedBranchScope,
+  scopeAllows,
+} from '../../lib/branch-scope.ts';
 import { findRecipientsWithPermission } from '../../lib/notify-recipients.ts';
 import { CrossEntityError, createOwnershipValidator } from '../../lib/ownership.ts';
+import { pgErrorInfo } from '../../lib/pg-error.ts';
 import {
   adjustmentDelta,
   allocateBatchRemaining,
@@ -22,6 +29,7 @@ import {
   daysOfSupply,
   isLowStock,
   USAGE_WINDOW_DAYS,
+  usageWindowForItem,
 } from './stock.calc.ts';
 import type {
   CreateBatchInput,
@@ -35,6 +43,16 @@ import type {
 
 /** `listMovements` default sahifa hajmi (CLI-442 #3 — chegaralanmagan tarix oldini olish). */
 const DEFAULT_MOVEMENTS_PAGE_SIZE = 50;
+
+/** Vizit avto-chiqimi/qaytarishi ledger sabablari (FX-44/45). */
+const VISIT_RETURN_REASONS = ['visit_edit_return', 'visit_cancel_return'] as const;
+/** FX-45 review: cancelled/no_show → faol qayta-faollashtirishda qaytarilgan chiqim qayta ayiriladi. */
+const VISIT_REACTIVATE_REASON = 'visit_reactivate';
+const VISIT_LEDGER_REASONS = [
+  'visit_auto',
+  VISIT_REACTIVATE_REASON,
+  ...VISIT_RETURN_REASONS,
+] as const;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Asia/Tashkent UTC+5 (DST yo'q) — «bugun» chegarasi cashier/expenses bilan izchil. */
@@ -54,12 +72,43 @@ export class InsufficientStockError extends Error {
   }
 }
 
+/** Owner (`@owner`) — atid'dan qat'i nazar cheksiz; qolganlar uchun tayinlov doirasi. */
+const loadBranchScope = async (c: Context, permission: string): Promise<BranchScope> =>
+  c.get('accessClaims')?.perms?.includes('@owner')
+    ? { kind: 'all' }
+    : loadAssignedBranchScope(c, permission);
+
+/**
+ * FX-115 (D-8): chaqiruvchining filial doirasidan tashqaridagi item/filial.
+ * Routes `branch.forbidden` 403 ga aylantiradi (yozishdan OLDIN tashlanadi — hech narsa yozilmagan).
+ */
+export class StockBranchForbiddenError extends Error {
+  constructor() {
+    super('Stock branch forbidden');
+    this.name = 'StockBranchForbiddenError';
+  }
+}
+
+/** FX-66: bir xil (xizmat, item) BOM jufti ikkinchi marta — routes `bom.duplicate` 409. */
+export class DuplicateBomError extends Error {
+  constructor() {
+    super('BOM for this service/item already exists');
+    this.name = 'DuplicateBomError';
+  }
+}
+
 /** Low-stock alert recipient — `stock.manage` permission egasi (+ owner). */
 type NotificationsDep = {
   notifyInTx: (
     tx: DbOrTx,
     tenantId: string,
-    payload: { userId: string; type: string; title: string; body?: string },
+    payload: {
+      userId: string;
+      type: string;
+      title: string;
+      body?: string;
+      params?: Record<string, string | number>;
+    },
   ) => Promise<unknown>;
 };
 
@@ -68,6 +117,40 @@ export const createStockService = (deps: {
   notifications?: NotificationsDep;
 }) => {
   const ownership = createOwnershipValidator();
+
+  /**
+   * FX-115: item filialiga ruxsat. Doira `permission` bo'yicha (o'qish — `stock.view`,
+   * yozish — `stock.manage`): owner/tenant-wide → hammasi; aks holda tayinlangan filiallar.
+   * Tayinlovsiz (`none`) → fail-closed. Tenant-darajali item (`branchId = null`) —
+   * har qanday tayinlangan xodim uchun operatsion (umumiy zaxira).
+   */
+  const itemAllowed = (scope: BranchScope, itemBranchId: string | null) => {
+    if (scope.kind === 'none') return false;
+    if (itemBranchId === null) return true;
+    return scopeAllows(scope, itemBranchId);
+  };
+  const assertItemBranch = async (
+    c: Context,
+    permission: 'stock.view' | 'stock.manage',
+    itemBranchId: string | null,
+  ) => {
+    if (!itemAllowed(await loadBranchScope(c, permission), itemBranchId)) {
+      throw new StockBranchForbiddenError();
+    }
+  };
+  /** Ro'yxat filtri: so'ralgan filial doirada bo'lishi shart; berilmasa — doiraga toraytiriladi. */
+  const itemBranchFilter = async (c: Context, requested?: string) => {
+    const scope = await loadBranchScope(c, 'stock.view');
+    if (scope.kind === 'none') throw new StockBranchForbiddenError();
+    if (requested) {
+      if (!scopeAllows(scope, requested)) throw new StockBranchForbiddenError();
+      return or(eq(stockItems.branchId, requested), isNull(stockItems.branchId));
+    }
+    if (scope.kind === 'branches') {
+      return or(inArray(stockItems.branchId, scope.branchIds), isNull(stockItems.branchId));
+    }
+    return undefined;
+  };
 
   /**
    * CLI-453 #5: `wasLow`/`isLow` — chaqiruvchi `isLowStock()` bilan oldindan hisoblab
@@ -97,20 +180,32 @@ export const createStockService = (deps: {
         type: 'stock.low_threshold',
         title: `Kam qoldiq: ${item.name}`,
         body: `Qoldiq: ${currentQty} (min: ${threshold})`,
+        params: { itemId: item.id, itemName: item.name, qty: currentQty, min: threshold },
       });
     }
   }
 
   /**
-   * Item bo'yicha oxirgi 30 kun SOF sarfi: `out` yig'indisi − `visit_edit_return` (`in`).
+   * Item bo'yicha oxirgi 30 kun SOF sarfi: `out` yig'indisi − vizit qaytarishlari (`in`).
+   * FX-68: qaytarish FAQAT qaytarilayotgan asl chiqim (shu vizit yozuvi + item) ham oyna ichida
+   * bo'lsa ayriladi — 30 kundan eski chiqimni bugun qaytarish oynani manfiy qilmasin.
+   * Vizit yozuvi belgisiz (eski/qo'lda) qaytarish avvalgidek ayriladi.
    * Qo'lda kirim (`in`) va inventarizatsiya (`adjustment`) sarf emas. RLS tenantni filtrlaydi.
    */
   async function netConsumption(c: Context, itemIds?: string[]) {
     const db = getDb(c);
     const since = new Date(Date.now() - USAGE_WINDOW_DAYS * DAY_MS);
+    const sinceIso = since.toISOString();
     const net = sql<string>`coalesce(sum(case
       when ${stockMovements.type} = 'out' then ${stockMovements.quantity}
-      when ${stockMovements.type} = 'in' and ${stockMovements.reason} = 'visit_edit_return' then -${stockMovements.quantity}
+      when ${stockMovements.type} = 'in' and ${stockMovements.reason} in ('visit_edit_return', 'visit_cancel_return')
+        and (${stockMovements.sourceVisitNoteId} is null or exists (
+          select 1 from stock_movements o
+          where o.source_visit_note_id = ${stockMovements.sourceVisitNoteId}
+            and o.item_id = ${stockMovements.itemId}
+            and o.type = 'out'
+            and o.created_at >= ${sinceIso}::timestamptz))
+        then -${stockMovements.quantity}
       else 0 end), 0)`;
     const rows = await db
       .select({ itemId: stockMovements.itemId, net })
@@ -125,11 +220,13 @@ export const createStockService = (deps: {
     return new Map(rows.map((r) => [r.itemId, Number(r.net)]));
   }
 
-  const withUsage = <T extends { id: string; quantity: string; minThreshold: string }>(
+  const withUsage = <
+    T extends { id: string; quantity: string; minThreshold: string; createdAt: Date },
+  >(
     item: T,
     consumed: Map<string, number>,
   ) => {
-    const avg = avgDailyUsage(consumed.get(item.id) ?? 0);
+    const avg = avgDailyUsage(consumed.get(item.id) ?? 0, usageWindowForItem(item.createdAt));
     return {
       ...item,
       lowStock: isLowStock(Number(item.quantity), Number(item.minThreshold)),
@@ -138,21 +235,24 @@ export const createStockService = (deps: {
     };
   };
 
+  /** Item (RLS ostida) bo'yicha o'qish ruxsati; item topilmasa — bo'sh natija uchun tekshirilmaydi. */
+  async function assertViewableItem(c: Context, itemId: string) {
+    const [item] = await getDb(c)
+      .select({ branchId: stockItems.branchId })
+      .from(stockItems)
+      .where(eq(stockItems.id, itemId));
+    if (item) await assertItemBranch(c, 'stock.view', item.branchId);
+  }
+
   // ===== Stock Items =====
   async function listItems(c: Context, query: ListItemsQuery) {
     const db = getDb(c);
-    const filters = [];
     // CLI-441 #5: branchId bo'yicha filtrlaganda tenant-bo'ylab (branchId=null) itemlar
     // ham ko'rsatilsin — `stockItems.branchId` nullable (barcha filialga tegishli item).
-    if (query.branchId) {
-      filters.push(or(eq(stockItems.branchId, query.branchId), isNull(stockItems.branchId)));
-    }
+    // FX-115: default (branchId yo'q) chaqiruvchi doirasiga toraytiriladi.
+    const filter = await itemBranchFilter(c, query.branchId);
 
-    const rows = await db
-      .select()
-      .from(stockItems)
-      .where(filters.length > 0 ? and(...filters) : undefined)
-      .orderBy(asc(stockItems.name));
+    const rows = await db.select().from(stockItems).where(filter).orderBy(asc(stockItems.name));
 
     // numeric(14,2) → string; Number() bilan solishtiramiz (leksik solishtiruvdan saqlanish).
     const consumed = await netConsumption(c);
@@ -163,6 +263,7 @@ export const createStockService = (deps: {
     const db = getDb(c);
     const [item] = await db.select().from(stockItems).where(eq(stockItems.id, id));
     if (!item) return null;
+    await assertItemBranch(c, 'stock.view', item.branchId);
     return withUsage(item, await netConsumption(c, [item.id]));
   }
 
@@ -170,6 +271,18 @@ export const createStockService = (deps: {
     const db = getDb(c);
     const tenantId = c.get('activeTenantId');
     if (!tenantId) throw new Error('No tenant context');
+    // FX-137 (LC-15): FK RLS'ni chetlab o'tadi — begona branchId insertdan OLDIN rad.
+    if (input.branchId) await ownership.assertBranchExists(c, input.branchId);
+
+    // FX-115: yangi item filiali doirada bo'lishi shart; tenant-darajali (branchId yo'q)
+    // item — faqat owner/tenant-wide. Filial shu tenantda mavjudligi ham tekshiriladi (X-1).
+    const manageScope = await loadBranchScope(c, 'stock.manage');
+    if (input.branchId) {
+      await ownership.assertBranchExists(c, input.branchId);
+      if (!itemAllowed(manageScope, input.branchId)) throw new StockBranchForbiddenError();
+    } else if (manageScope.kind !== 'all') {
+      throw new StockBranchForbiddenError();
+    }
 
     const [item] = await db
       .insert(stockItems)
@@ -213,6 +326,17 @@ export const createStockService = (deps: {
     const db = getDb(c);
     const [before] = await db.select().from(stockItems).where(eq(stockItems.id, id));
     if (!before) return null;
+    // FX-137 (LC-15): begona branchId'ga ko'chirishni rad (null = tenant-darajali, ruxsat).
+    if (input.branchId) await ownership.assertBranchExists(c, input.branchId);
+
+    // FX-115: item filiali doirada bo'lishi shart; filialni O'ZGARTIRISH (item boshqa
+    // filialga/tenant-darajaga ko'chadi) — faqat owner/tenant-wide, va yangi filial shu tenantda.
+    const manageScope = await loadBranchScope(c, 'stock.manage');
+    if (!itemAllowed(manageScope, before.branchId)) throw new StockBranchForbiddenError();
+    if (input.branchId !== undefined && input.branchId !== before.branchId) {
+      if (manageScope.kind !== 'all') throw new StockBranchForbiddenError();
+      if (input.branchId !== null) await ownership.assertBranchExists(c, input.branchId);
+    }
 
     const patch: Record<string, unknown> = { updatedAt: new Date() };
     if (input.branchId !== undefined) patch.branchId = input.branchId;
@@ -271,6 +395,7 @@ export const createStockService = (deps: {
     const db = getDb(c);
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? DEFAULT_MOVEMENTS_PAGE_SIZE;
+    await assertViewableItem(c, query.itemId);
     return db
       .select()
       .from(stockMovements)
@@ -286,6 +411,7 @@ export const createStockService = (deps: {
     const tenantId = c.get('activeTenantId');
     const user = c.get('user');
     if (!tenantId) throw new Error('No tenant context');
+    const manageScope = await loadBranchScope(c, 'stock.manage');
 
     return await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);
@@ -303,6 +429,8 @@ export const createStockService = (deps: {
         .for('update');
       // X-1 (FX-03a): begona/yo'q itemId — routes 404 (RLS bo'sh select).
       if (!item) throw new CrossEntityError('stock_item', 'not_found');
+      // FX-115: begona filial itemi — yozishdan OLDIN rad (qoldiq/ledger o'zgarmaydi).
+      if (!itemAllowed(manageScope, item.branchId)) throw new StockBranchForbiddenError();
 
       const oldQty = Number(item.quantity);
       const newQuantity = applyMovement(oldQty, input.type, input.quantity);
@@ -379,16 +507,32 @@ export const createStockService = (deps: {
     // X-1 (FX-03a): FK RLS'ni chetlab o'tadi — begona serviceId/itemId insertdan OLDIN rad.
     await ownership.assertServiceExists(c, input.serviceId);
     await ownership.assertStockItemExists(c, input.itemId);
+    // FX-115: BOM faqat o'z filiali (yoki tenant-darajali) itemiga.
+    const [bomItem] = await db
+      .select({ branchId: stockItems.branchId })
+      .from(stockItems)
+      .where(eq(stockItems.id, input.itemId));
+    await assertItemBranch(c, 'stock.manage', bomItem?.branchId ?? null);
 
-    const [bom] = await db
-      .insert(serviceMaterials)
-      .values({
-        tenantId,
-        serviceId: input.serviceId,
-        itemId: input.itemId,
-        qtyPerService: String(input.qtyPerService),
-      })
-      .returning();
+    // FX-66: bir xil (xizmat, item) jufti — 500 emas, 409. Savepoint (nested tx): poyga'da
+    // 23505 so'rov tranzaksiyasini buzmaydi.
+    let bom: typeof serviceMaterials.$inferSelect | undefined;
+    try {
+      [bom] = await db.transaction(async (tx) =>
+        tx
+          .insert(serviceMaterials)
+          .values({
+            tenantId,
+            serviceId: input.serviceId,
+            itemId: input.itemId,
+            qtyPerService: String(input.qtyPerService),
+          })
+          .returning(),
+      );
+    } catch (err) {
+      if (pgErrorInfo(err)?.code === '23505') throw new DuplicateBomError();
+      throw err;
+    }
 
     if (bom) {
       await deps.audit.record(c, {
@@ -418,6 +562,333 @@ export const createStockService = (deps: {
   }
 
   /**
+   * FX-35 (LA-11): vizit filiali — yozilish (appointment) filiali, bo'lmasa aktiv filial
+   * (JWT `abid`). Noma'lum bo'lsa `null` (eski xulq: BOM itemi o'z holicha).
+   */
+  async function resolveVisitBranch(c: Context, visitNoteId: string): Promise<string | null> {
+    const [row] = await getDb(c)
+      .select({ branchId: appointments.branchId })
+      .from(visitNotes)
+      .innerJoin(appointments, eq(appointments.id, visitNotes.appointmentId))
+      .where(eq(visitNotes.id, visitNoteId));
+    return row?.branchId ?? c.get('activeBranchId') ?? null;
+  }
+
+  /**
+   * FX-35: BOM itemini vizit filialiga moslaydi. Item tenant-darajali yoki vizit filialida
+   * bo'lsa — o'zi; boshqa filial itemi bo'lsa — vizit filialidagi shu nomli/birlikli item
+   * (tenant-darajali BOM filial itemlarini qamray olmaydi). Mos item yo'q → qator tashlanadi
+   * (begona filial ombori kamaytirilmaydi; vizit yozuvi baribir bloklanmaydi).
+   */
+  async function resolveBomItems<T extends { itemId: string; serviceId: string }>(
+    c: Context,
+    boms: T[],
+    visitNoteId: string,
+  ): Promise<T[]> {
+    if (boms.length === 0) return boms;
+    return resolveBomItemsForBranch(c, boms, await resolveVisitBranch(c, visitNoteId));
+  }
+
+  /** FX-35 mantiqi (filial berilgan holda) — vizit ham, plan-bosqich yo'li ham shuni ishlatadi. */
+  async function resolveBomItemsForBranch<T extends { itemId: string; serviceId: string }>(
+    c: Context,
+    boms: T[],
+    visitBranch: string | null,
+  ): Promise<T[]> {
+    if (boms.length === 0 || !visitBranch) return boms;
+    const db = getDb(c);
+    const items = await db
+      .select({
+        id: stockItems.id,
+        name: stockItems.name,
+        unit: stockItems.unit,
+        branchId: stockItems.branchId,
+      })
+      .from(stockItems)
+      .where(inArray(stockItems.id, [...new Set(boms.map((b) => b.itemId))]));
+    const byId = new Map(items.map((i) => [i.id, i]));
+    const norm = (v: string) => v.trim().toLowerCase();
+    let siblings: { id: string; name: string; unit: string }[] | undefined;
+    // FX-35 review: bir xizmatda har filialning shu nomli itemiga alohida BOM qatori bo'lishi
+    // mumkin (service→Lidokain(A) va service→Lidokain(B)). Moslashdan keyin (serviceId, itemId)
+    // bo'yicha ko'pi bilan bitta qator: avval vizit filialidagi/tenant-darajali o'z qatorlari,
+    // keyin begona filial qatorining mos itemi — faqat shu juftlik hali yo'q bo'lsa.
+    const key = (serviceId: string, itemId: string) => `${serviceId}:${itemId}`;
+    const seen = new Set<string>();
+    const result: T[] = [];
+    const foreign: { bom: T; item: { name: string; unit: string } }[] = [];
+    for (const bom of boms) {
+      const item = byId.get(bom.itemId);
+      if (!item) continue;
+      if (item.branchId === null || item.branchId === visitBranch) {
+        const k = key(bom.serviceId, bom.itemId);
+        if (seen.has(k)) continue;
+        seen.add(k);
+        result.push(bom);
+        continue;
+      }
+      foreign.push({ bom, item });
+    }
+    for (const { bom, item } of foreign) {
+      siblings ??= await db
+        .select({ id: stockItems.id, name: stockItems.name, unit: stockItems.unit })
+        .from(stockItems)
+        .where(eq(stockItems.branchId, visitBranch))
+        .orderBy(asc(stockItems.createdAt));
+      const match = siblings.find((s) => norm(s.name) === norm(item.name) && s.unit === item.unit);
+      if (!match) continue;
+      const k = key(bom.serviceId, match.id);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      result.push({ ...bom, itemId: match.id });
+    }
+    return result;
+  }
+
+  /**
+   * Vizit bilan bog'liq bitta ombor harakati: ledger qatori + qoldiq yangilash + kam qoldiq
+   * ogohlantirishi. Manfiy qoldiq guard'i YO'Q (avto-chiqim vizit yozuvini bloklamasin).
+   */
+  async function postVisitMovement(
+    c: Context,
+    m: {
+      itemId: string;
+      type: 'in' | 'out';
+      quantity: string;
+      reason: string;
+      sourceVisitNoteId: string | null;
+      sourceServiceId: string | null;
+      sourceStageId?: string | null;
+    },
+  ) {
+    const db = getDb(c);
+    const tenantId = c.get('activeTenantId');
+    if (!tenantId) throw new Error('No tenant context');
+    const isOut = m.type === 'out';
+    await db.insert(stockMovements).values({
+      tenantId,
+      itemId: m.itemId,
+      type: m.type,
+      quantity: m.quantity,
+      reason: m.reason,
+      sourceVisitNoteId: m.sourceVisitNoteId,
+      sourceServiceId: m.sourceServiceId,
+      sourceStageId: m.sourceStageId ?? null,
+      createdBy: c.get('user')?.id ?? null,
+    });
+    const [updated] = await db
+      .update(stockItems)
+      .set({
+        quantity: isOut
+          ? sql`${stockItems.quantity} - ${m.quantity}`
+          : sql`${stockItems.quantity} + ${m.quantity}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(stockItems.id, m.itemId))
+      .returning({
+        id: stockItems.id,
+        name: stockItems.name,
+        branchId: stockItems.branchId,
+        quantity: stockItems.quantity,
+        minThreshold: stockItems.minThreshold,
+      });
+    if (updated) {
+      const newQty = Number(updated.quantity);
+      const oldQty = isOut ? newQty + Number(m.quantity) : newQty - Number(m.quantity);
+      const threshold = Number(updated.minThreshold);
+      await maybeAlertLowStock(
+        c,
+        db,
+        updated,
+        isLowStock(oldQty, threshold),
+        isLowStock(newQty, threshold),
+        newQty,
+      );
+    }
+  }
+
+  type VisitMovement = Parameters<typeof postVisitMovement>[1];
+
+  /**
+   * FX-69: bir nechta vizit/bosqich harakatini yozishdan OLDIN ular tegadigan item qatorlarini
+   * item id bo'yicha tartibda qulflaydi (`SELECT ... ORDER BY id FOR UPDATE`). Barcha yozuvchilar
+   * bir xil global tartibda qulflagani uchun parallel vizitlar deadlock'ga tushmaydi (qarama-qarshi
+   * BOM tartibi ham). Keyin harakatlar berilgan tartibda yoziladi.
+   */
+  async function postVisitMovements(c: Context, movements: VisitMovement[]) {
+    if (movements.length === 0) return;
+    const itemIds = [...new Set(movements.map((m) => m.itemId))].sort();
+    await getDb(c)
+      .select({ id: stockItems.id })
+      .from(stockItems)
+      .where(inArray(stockItems.id, itemIds))
+      .orderBy(asc(stockItems.id))
+      .for('update');
+    for (const m of movements) await postVisitMovement(c, m);
+  }
+
+  /** FX-44: vizitda xizmat belgisiz (eski) avto-chiqim bormi — bo'lsa ledger-qaytarish ishonchsiz. */
+  async function noteHasUntaggedDeduction(c: Context, visitNoteId: string): Promise<boolean> {
+    const rows = await getDb(c)
+      .select({ id: stockMovements.id })
+      .from(stockMovements)
+      .where(
+        and(
+          eq(stockMovements.sourceVisitNoteId, visitNoteId),
+          eq(stockMovements.type, 'out'),
+          eq(stockMovements.reason, 'visit_auto'),
+          isNull(stockMovements.sourceServiceId),
+        ),
+      )
+      .limit(1);
+    return rows.length > 0;
+  }
+
+  /**
+   * Vizit uchun item (va xizmat) kesimida hali qaytarilmagan avto-chiqim:
+   * Σ `visit_auto` out − Σ (`visit_edit_return` + `visit_cancel_return`) in. Faqat > 0 qatorlar.
+   * `serviceId` berilsa — faqat shu xizmat; aks holda har (item, xizmat) juftligi alohida.
+   */
+  async function outstandingByItem(
+    c: Context,
+    visitNoteId: string,
+    filter: { serviceId?: string; byItem?: boolean },
+  ): Promise<
+    {
+      itemId: string;
+      serviceId: string | null;
+      outstanding: number;
+      outTotal: number;
+      outCount: number;
+    }[]
+  > {
+    const net = sql<string>`coalesce(sum(case
+      when ${stockMovements.type} = 'out' then ${stockMovements.quantity}
+      else -${stockMovements.quantity} end), 0)`;
+    // O'rtacha occurrence ulushi faqat asl `visit_auto` chiqimlaridan (qayta-faollashtirish
+    // chiqimi `visit_reactivate` bitta yig'ma qator — o'rtachani buzmasin).
+    const outTotal = sql<string>`coalesce(sum(case
+      when ${stockMovements.type} = 'out' and ${stockMovements.reason} = 'visit_auto'
+        then ${stockMovements.quantity} else 0 end), 0)`;
+    const outCount = sql<string>`count(*) filter (where ${stockMovements.type} = 'out'
+      and ${stockMovements.reason} = 'visit_auto')`;
+    const byItem = filter.byItem === true;
+    const rows = await getDb(c)
+      .select({
+        itemId: stockMovements.itemId,
+        serviceId: byItem ? sql<string | null>`null` : stockMovements.sourceServiceId,
+        net,
+        outTotal,
+        outCount,
+      })
+      .from(stockMovements)
+      .where(
+        and(
+          eq(stockMovements.sourceVisitNoteId, visitNoteId),
+          inArray(stockMovements.reason, [...VISIT_LEDGER_REASONS]),
+          filter.serviceId ? eq(stockMovements.sourceServiceId, filter.serviceId) : undefined,
+        ),
+      )
+      .groupBy(
+        ...(byItem
+          ? [stockMovements.itemId]
+          : [stockMovements.itemId, stockMovements.sourceServiceId]),
+      );
+    return rows
+      .map((r) => ({
+        itemId: r.itemId,
+        serviceId: r.serviceId,
+        outstanding: Math.round(Number(r.net) * 100) / 100,
+        outTotal: Number(r.outTotal),
+        outCount: Math.max(Number(r.outCount), 1),
+      }))
+      .filter((r) => r.outstanding > 0);
+  }
+
+  /**
+   * FX-60 (dedup, vizit tomoni): vizit yozuvi bog'langan bosqich plan ekranidan allaqachon
+   * yakunlanib BOM chiqimi qilingan xizmatlar — vizit ularni qayta yechmaydi.
+   */
+  async function stageDeductedServiceIds(c: Context, visitNoteId: string): Promise<Set<string>> {
+    const rows = await getDb(c)
+      .select({ serviceId: stockMovements.sourceServiceId })
+      .from(stockMovements)
+      .innerJoin(visitNotes, eq(visitNotes.stageId, stockMovements.sourceStageId))
+      .where(
+        and(
+          eq(visitNotes.id, visitNoteId),
+          eq(stockMovements.reason, 'stage_auto'),
+          eq(stockMovements.type, 'out'),
+        ),
+      );
+    return new Set(rows.map((r) => r.serviceId).filter((id): id is string => id !== null));
+  }
+
+  /**
+   * FX-60: bosqich plan ekranidan `completed` bo'lganda stage.serviceId BOM'i ombordan
+   * yechiladi (vizit yo'li `performedServices`dan yechadi — ikki yo'l bir ma'no). Idempotent
+   * va dedup:
+   *   - shu bosqich uchun `stage_auto` chiqim bor → tegilmaydi;
+   *   - bosqichga bog'liq vizit yozuvi shu xizmatni allaqachon yechgan (qaytarilmagan qoldiq > 0)
+   *     → tegilmaydi (ikki marta yechilmaydi).
+   * Filial — aktiv filial (FX-35 moslashuvi). Manfiy-guard YO'Q (vizit avto-chiqimi kabi).
+   */
+  async function deductForStage(
+    c: Context,
+    stage: { id: string; serviceId: string | null },
+  ): Promise<void> {
+    if (!stage.serviceId) return;
+    const db = getDb(c);
+
+    const already = await db
+      .select({ id: stockMovements.id })
+      .from(stockMovements)
+      .where(
+        and(eq(stockMovements.sourceStageId, stage.id), eq(stockMovements.reason, 'stage_auto')),
+      )
+      .limit(1);
+    if (already.length > 0) return;
+
+    const [visitNet] = await db
+      .select({
+        net: sql<string>`coalesce(sum(case
+          when ${stockMovements.type} = 'out' then ${stockMovements.quantity}
+          else -${stockMovements.quantity} end), 0)`,
+      })
+      .from(stockMovements)
+      .innerJoin(visitNotes, eq(visitNotes.id, stockMovements.sourceVisitNoteId))
+      .where(
+        and(
+          eq(visitNotes.stageId, stage.id),
+          eq(stockMovements.sourceServiceId, stage.serviceId),
+          inArray(stockMovements.reason, [...VISIT_LEDGER_REASONS]),
+        ),
+      );
+    if (Number(visitNet?.net ?? 0) > 0) return;
+
+    const boms = await resolveBomItemsForBranch(
+      c,
+      await db
+        .select()
+        .from(serviceMaterials)
+        .where(eq(serviceMaterials.serviceId, stage.serviceId)),
+      c.get('activeBranchId') ?? null,
+    );
+    await postVisitMovements(
+      c,
+      boms.map((bom) => ({
+        itemId: bom.itemId,
+        type: 'out' as const,
+        quantity: bom.qtyPerService,
+        reason: 'stage_auto',
+        sourceVisitNoteId: null,
+        sourceServiceId: stage.serviceId,
+        sourceStageId: stage.id,
+      })),
+    );
+  }
+
+  /**
    * Vizit yozuvi → ombor avtomatik chiqim (BOM bo'yicha).
    * clinical.service'ga DI orqali ulanadi (request-tx ichida ishlaydi — to'g'ridan import yo'q).
    * BOM topilmagan service → skip. Manfiyga ruxsat (guard yo'q).
@@ -441,55 +912,32 @@ export const createStockService = (deps: {
       occurrenceCount.set(serviceId, (occurrenceCount.get(serviceId) ?? 0) + 1);
     }
 
-    const boms = await db
-      .select()
-      .from(serviceMaterials)
-      .where(inArray(serviceMaterials.serviceId, serviceIds));
+    const boms = await resolveBomItems(
+      c,
+      await db
+        .select()
+        .from(serviceMaterials)
+        .where(inArray(serviceMaterials.serviceId, serviceIds)),
+      sourceVisitNoteId,
+    );
 
+    const stageDone = await stageDeductedServiceIds(c, sourceVisitNoteId);
+    const pending: VisitMovement[] = [];
     for (const bom of boms) {
+      if (stageDone.has(bom.serviceId)) continue;
       const count = occurrenceCount.get(bom.serviceId) ?? 1;
       for (let i = 0; i < count; i++) {
-        await db.insert(stockMovements).values({
-          tenantId,
+        pending.push({
           itemId: bom.itemId,
           type: 'out',
           quantity: bom.qtyPerService,
           reason: 'visit_auto',
           sourceVisitNoteId,
-          createdBy: c.get('user')?.id ?? null,
+          sourceServiceId: bom.serviceId,
         });
-        // ⚠️ Auto-deduction'da negative-stock guard YO'Q (advisor): vizit yozuvini ombor
-        // noto'g'ri sozlangani uchun bloklamaslik kerak. Manfiyga ruxsat + alert. newQty
-        // olish uchun .returning() (transition alert solishtiruvi uchun).
-        const [updated] = await db
-          .update(stockItems)
-          .set({
-            quantity: sql`${stockItems.quantity} - ${bom.qtyPerService}`,
-            updatedAt: new Date(),
-          })
-          .where(eq(stockItems.id, bom.itemId))
-          .returning({
-            id: stockItems.id,
-            name: stockItems.name,
-            branchId: stockItems.branchId,
-            quantity: stockItems.quantity,
-            minThreshold: stockItems.minThreshold,
-          });
-        if (updated) {
-          const newQty = Number(updated.quantity);
-          const oldQty = newQty + Number(bom.qtyPerService);
-          const threshold = Number(updated.minThreshold);
-          await maybeAlertLowStock(
-            c,
-            db,
-            updated,
-            isLowStock(oldQty, threshold),
-            isLowStock(newQty, threshold),
-            newQty,
-          );
-        }
       }
     }
+    await postVisitMovements(c, pending);
   }
 
   /**
@@ -533,65 +981,182 @@ export const createStockService = (deps: {
     }
     if (deltas.size === 0) return;
 
-    const boms = await db
-      .select()
-      .from(serviceMaterials)
-      .where(inArray(serviceMaterials.serviceId, [...deltas.keys()]));
+    // FX-44 (LA-42): qaytarish ledger bo'yicha (haqiqiy chiqim movement'lari), joriy BOM emas.
+    // Eski (FX-44 dan oldingi) yozuvlarda movement'da xizmat belgisi yo'q (`source_service_id`
+    // NULL) — bunday vizit uchun avvalgi xulq (joriy BOM) saqlanadi.
+    const legacy = await noteHasUntaggedDeduction(c, sourceVisitNoteId);
+    const deductDeltas = new Map([...deltas].filter(([, d]) => d > 0));
+    const returnDeltas = new Map([...deltas].filter(([, d]) => d < 0));
 
-    for (const bom of boms) {
-      const delta = deltas.get(bom.serviceId);
-      if (!delta) continue;
-
-      const occurrences = Math.abs(delta);
-      const isDeduction = delta > 0;
-      const movementType = isDeduction ? ('out' as const) : ('in' as const);
-      const reason = isDeduction ? 'visit_auto' : 'visit_edit_return';
-
-      for (let i = 0; i < occurrences; i++) {
-        await db.insert(stockMovements).values({
-          tenantId,
-          itemId: bom.itemId,
-          type: movementType,
-          quantity: bom.qtyPerService,
-          reason,
-          sourceVisitNoteId,
-          createdBy: c.get('user')?.id ?? null,
-        });
-
-        // ⚠️ Negative-stock guard YO'Q (deductForServices bilan bir xil — advisor qarori).
-        const [updated] = await db
-          .update(stockItems)
-          .set({
-            quantity: isDeduction
-              ? sql`${stockItems.quantity} - ${bom.qtyPerService}`
-              : sql`${stockItems.quantity} + ${bom.qtyPerService}`,
-            updatedAt: new Date(),
-          })
-          .where(eq(stockItems.id, bom.itemId))
-          .returning({
-            id: stockItems.id,
-            name: stockItems.name,
-            branchId: stockItems.branchId,
-            quantity: stockItems.quantity,
-            minThreshold: stockItems.minThreshold,
+    // FX-69: barcha harakatlar yig'iladi va item id tartibida qulflanib yoziladi (deadlock yo'q).
+    const pending: VisitMovement[] = [];
+    if (deductDeltas.size > 0) {
+      const boms = await resolveBomItems(
+        c,
+        await db
+          .select()
+          .from(serviceMaterials)
+          .where(inArray(serviceMaterials.serviceId, [...deductDeltas.keys()])),
+        sourceVisitNoteId,
+      );
+      const stageDone = await stageDeductedServiceIds(c, sourceVisitNoteId);
+      for (const bom of boms) {
+        if (stageDone.has(bom.serviceId)) continue;
+        const occurrences = deductDeltas.get(bom.serviceId) ?? 0;
+        for (let i = 0; i < occurrences; i++) {
+          pending.push({
+            itemId: bom.itemId,
+            type: 'out',
+            quantity: bom.qtyPerService,
+            reason: 'visit_auto',
+            sourceVisitNoteId,
+            sourceServiceId: bom.serviceId,
           });
-        if (updated) {
-          const newQty = Number(updated.quantity);
-          const oldQty = isDeduction
-            ? newQty + Number(bom.qtyPerService)
-            : newQty - Number(bom.qtyPerService);
-          const threshold = Number(updated.minThreshold);
-          await maybeAlertLowStock(
-            c,
-            db,
-            updated,
-            isLowStock(oldQty, threshold),
-            isLowStock(newQty, threshold),
-            newQty,
-          );
         }
       }
     }
+
+    if (returnDeltas.size === 0) {
+      await postVisitMovements(c, pending);
+      return;
+    }
+
+    if (legacy) {
+      const boms = await resolveBomItems(
+        c,
+        await db
+          .select()
+          .from(serviceMaterials)
+          .where(inArray(serviceMaterials.serviceId, [...returnDeltas.keys()])),
+        sourceVisitNoteId,
+      );
+      for (const bom of boms) {
+        const occurrences = Math.abs(returnDeltas.get(bom.serviceId) ?? 0);
+        for (let i = 0; i < occurrences; i++) {
+          pending.push({
+            itemId: bom.itemId,
+            type: 'in',
+            quantity: bom.qtyPerService,
+            reason: 'visit_edit_return',
+            sourceVisitNoteId,
+            // FX-44 review: eski (belgisiz) chiqim qatorlariga mos — xizmat belgisiz yoziladi,
+            // aks holda untagged guruh qoldig'i kamaymaydi va bekor qilish ikki marta qaytaradi.
+            sourceServiceId: null,
+          });
+        }
+      }
+      await postVisitMovements(c, pending);
+      return;
+    }
+
+    for (const [serviceId, delta] of returnDeltas) {
+      const removed = Math.abs(delta);
+      const outstanding = await outstandingByItem(c, sourceVisitNoteId, { serviceId });
+      for (const row of outstanding) {
+        // Har occurrence — alohida movement; bir occurrence ulushi = shu (item, xizmat) bo'yicha
+        // haqiqiy chiqim o'rtachasi (Σout / out qatorlari), qoldiq (outstanding) bilan cheklanadi.
+        const perOccurrence = Math.round((row.outTotal / row.outCount) * 100) / 100;
+        let remaining = row.outstanding;
+        for (let i = 0; i < removed && remaining > 0; i++) {
+          const share = Math.min(perOccurrence, remaining);
+          pending.push({
+            itemId: row.itemId,
+            type: 'in',
+            quantity: String(share),
+            reason: 'visit_edit_return',
+            sourceVisitNoteId,
+            sourceServiceId: serviceId,
+          });
+          remaining = Math.round((remaining - share) * 100) / 100;
+        }
+      }
+    }
+    await postVisitMovements(c, pending);
+  }
+
+  /**
+   * FX-45 (LA-41): yozilish bekor/no_show bo'lganda unga bog'liq BARCHA vizit yozuvlari
+   * (imzolangani ham) uchun hali qaytarilmagan avto-chiqimni qaytaradi. Idempotent:
+   * qaytarish = ledgerdagi (visit_auto `out` − qaytarish `in`) qoldig'i, qayta chaqirish → 0.
+   */
+  async function returnVisitStockForAppointment(c: Context, appointmentId: string) {
+    const db = getDb(c);
+    const notes = await db
+      .select({ id: visitNotes.id })
+      .from(visitNotes)
+      .where(eq(visitNotes.appointmentId, appointmentId));
+    const pending: VisitMovement[] = [];
+    for (const note of notes) {
+      // FX-44 review: eski (belgisiz) chiqimli vizitda xizmat kesimi ishonchsiz — item bo'yicha.
+      const byItem = await noteHasUntaggedDeduction(c, note.id);
+      const outstanding = await outstandingByItem(c, note.id, { byItem });
+      for (const row of outstanding) {
+        pending.push({
+          itemId: row.itemId,
+          type: 'in',
+          quantity: String(row.outstanding),
+          reason: 'visit_cancel_return',
+          sourceVisitNoteId: note.id,
+          sourceServiceId: row.serviceId,
+        });
+      }
+    }
+    await postVisitMovements(c, pending);
+  }
+
+  /**
+   * FX-45 review: yozilish cancelled/no_show → faol holatga QAYTGANDA bekorda qaytarilgan
+   * chiqim qayta ayiriladi (`out`, `reason:'visit_reactivate'`). Idempotent ledger arifmetikasi:
+   * (item, xizmat) bo'yicha Σ `visit_cancel_return` − Σ `visit_reactivate` > 0 bo'lsa shu farq.
+   * Aks holda vizit yozuvi `performedServices`ni saqlab qoladi, ledger esa 0 — keyingi PATCH/imzo
+   * delta 0 bo'lgani uchun material hech qachon ayirilmaydi (drift).
+   */
+  async function redeductVisitStockForAppointment(c: Context, appointmentId: string) {
+    const db = getDb(c);
+    const notes = await db
+      .select({ id: visitNotes.id })
+      .from(visitNotes)
+      .where(eq(visitNotes.appointmentId, appointmentId));
+    if (notes.length === 0) return;
+    const net = sql<string>`coalesce(sum(case
+      when ${stockMovements.reason} = 'visit_cancel_return' then ${stockMovements.quantity}
+      else -${stockMovements.quantity} end), 0)`;
+    const rows = await db
+      .select({
+        noteId: stockMovements.sourceVisitNoteId,
+        itemId: stockMovements.itemId,
+        serviceId: stockMovements.sourceServiceId,
+        net,
+      })
+      .from(stockMovements)
+      .where(
+        and(
+          inArray(
+            stockMovements.sourceVisitNoteId,
+            notes.map((n) => n.id),
+          ),
+          inArray(stockMovements.reason, ['visit_cancel_return', VISIT_REACTIVATE_REASON]),
+        ),
+      )
+      .groupBy(
+        stockMovements.sourceVisitNoteId,
+        stockMovements.itemId,
+        stockMovements.sourceServiceId,
+      );
+    const pending: VisitMovement[] = [];
+    for (const r of rows) {
+      const amount = Math.round(Number(r.net) * 100) / 100;
+      if (amount <= 0) continue;
+      pending.push({
+        itemId: r.itemId,
+        type: 'out',
+        quantity: String(amount),
+        reason: VISIT_REACTIVATE_REASON,
+        sourceVisitNoteId: r.noteId,
+        sourceServiceId: r.serviceId,
+      });
+    }
+    await postVisitMovements(c, pending);
   }
 
   // ===== Stock batches (qabul + expiry/cost/supplier) — V2-2 =====
@@ -599,6 +1164,7 @@ export const createStockService = (deps: {
   /** Item bo'yicha partiyalar (yangi avval). */
   async function listBatches(c: Context, itemId: string) {
     const db = getDb(c);
+    await assertViewableItem(c, itemId);
     return db
       .select()
       .from(stockBatches)
@@ -614,17 +1180,13 @@ export const createStockService = (deps: {
   async function expiringBatches(c: Context, withinDays = 30, branchId?: string) {
     const db = getDb(c);
     const cutoff = new Date(Date.now() + withinDays * DAY_MS);
+    const branchFilter = await itemBranchFilter(c, branchId);
 
     const candidates = await db
       .select({ batch: stockBatches, itemName: stockItems.name, unit: stockItems.unit })
       .from(stockBatches)
       .innerJoin(stockItems, eq(stockItems.id, stockBatches.itemId))
-      .where(
-        and(
-          lte(stockBatches.expiryDate, cutoff),
-          branchId ? or(eq(stockItems.branchId, branchId), isNull(stockItems.branchId)) : undefined,
-        ),
-      )
+      .where(and(lte(stockBatches.expiryDate, cutoff), branchFilter))
       .orderBy(asc(stockBatches.expiryDate));
     if (candidates.length === 0) return [];
 
@@ -666,6 +1228,7 @@ export const createStockService = (deps: {
   async function autoDeductionsToday(c: Context, branchId?: string) {
     const db = getDb(c);
     const dayStart = new Date(`${tashkentDateStr()}T00:00:00+05:00`);
+    const branchFilter = await itemBranchFilter(c, branchId);
     return db
       .select({
         id: stockMovements.id,
@@ -685,8 +1248,8 @@ export const createStockService = (deps: {
       .where(
         and(
           gte(stockMovements.createdAt, dayStart),
-          inArray(stockMovements.reason, ['visit_auto', 'visit_edit_return']),
-          branchId ? or(eq(stockItems.branchId, branchId), isNull(stockItems.branchId)) : undefined,
+          inArray(stockMovements.reason, [...VISIT_LEDGER_REASONS, 'stage_auto']),
+          branchFilter,
         ),
       )
       .orderBy(desc(stockMovements.createdAt))
@@ -705,6 +1268,12 @@ export const createStockService = (deps: {
 
     // X-1 (FX-03a): begona itemId — partiya/harakat yozilmasin.
     await ownership.assertStockItemExists(c, input.itemId);
+    // FX-115: partiya faqat o'z filiali (yoki tenant-darajali) itemiga.
+    const [batchItem] = await db
+      .select({ branchId: stockItems.branchId })
+      .from(stockItems)
+      .where(eq(stockItems.id, input.itemId));
+    await assertItemBranch(c, 'stock.manage', batchItem?.branchId ?? null);
 
     return await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);
@@ -793,7 +1362,10 @@ export const createStockService = (deps: {
     createBom,
     removeBom,
     deductForServices,
+    deductForStage,
     reconcileForServices,
+    returnVisitStockForAppointment,
+    redeductVisitStockForAppointment,
     listBatches,
     expiringBatches,
     autoDeductionsToday,

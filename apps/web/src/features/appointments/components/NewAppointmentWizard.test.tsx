@@ -62,6 +62,15 @@ vi.mock('../appointments.api', () => ({
   useBookingContext: () => ({ data: bookingCtx.data }),
   useBranches: () => ({ data: [{ id: 'b1', name: 'Markaziy filial' }] }),
 }));
+const wsBranchesMock = vi.hoisted(() => ({
+  data: { branches: [{ id: 'b1', name: 'Markaziy filial' }], allowAllBranches: false } as {
+    branches: { id: string; name: string }[];
+    allowAllBranches: boolean;
+  },
+}));
+vi.mock('@/features/auth', () => ({
+  useWorkspaceBranches: () => ({ data: wsBranchesMock.data }),
+}));
 vi.mock('@/features/schedule/schedule.api', () => ({
   useAvailability: () => availabilityMock,
 }));
@@ -72,8 +81,13 @@ const usePatientsSpy = vi.hoisted(() =>
     data: { items: [{ id: 'p1', fullName: 'Aliyev Vali' }], meta: {} },
   })),
 );
+// FX-110: oldindan tanlangan bemor ro'yxatda (qidiruv natijasida) bo'lmasligi mumkin — detail so'rovi.
+const rawPatient = vi.hoisted(() => ({
+  data: undefined as undefined | { id: string; fullName: string; phone: string | null },
+}));
 vi.mock('@/features/patients', () => ({
   usePatients: (params: unknown) => usePatientsSpy(params),
+  usePatientRaw: (id: string) => ({ data: id ? rawPatient.data : undefined }),
 }));
 vi.mock('@/lib/api.ts', () => ({
   api: {
@@ -97,9 +111,28 @@ vi.mock('@/stores/auth-store.ts', () => ({ useAuthStore: () => mockAuth }));
 describe('NewAppointmentWizard', () => {
   afterEach(() => {
     mockAuth.activeBranchId = 'b1';
+    wsBranchesMock.data = {
+      branches: [{ id: 'b1', name: 'Markaziy filial' }],
+      allowAllBranches: false,
+    };
     createMock.mockReset();
     bookingCtx.data = { openLabOrders: [], nextPlanStage: null };
     usePatientsSpy.mockClear();
+    rawPatient.data = undefined;
+  });
+
+  // FX-110 (LB-19): '/appointments/new?patientId=…' bemorni oldindan tanlaydi — hatto u
+  // qidiruv ro'yxatida bo'lmasa ham; xulosa kartasi ham shu bemorni ko'rsatadi.
+  it("initialPatientId — bemor Select'da oldindan tanlangan (ro'yxatda bo'lmasa ham)", () => {
+    rawPatient.data = { id: 'p-far', fullName: 'Karimova Dilnoza', phone: '+998901112233' };
+    renderApp(<NewAppointmentWizard onClose={vi.fn()} initialPatientId="p-far" />);
+    expect(screen.getByPlaceholderText('Bemor')).toHaveValue('Karimova Dilnoza');
+    expect(screen.getByText('+998901112233')).toBeInTheDocument();
+  });
+
+  it("initialPatientId yo'q — bemor maydoni bo'sh", () => {
+    renderApp(<NewAppointmentWizard onClose={vi.fn()} />);
+    expect(screen.getByPlaceholderText('Bemor')).toHaveValue('');
   });
 
   // CLI-454: avval bemor Select faqat oldindan yuklangan (pageSize:100, qidiruvsiz)
@@ -141,6 +174,19 @@ describe('NewAppointmentWizard', () => {
 
   it("tenant-wide foydalanuvchida (activeBranchId=null) filial Select ko'rsatiladi (CLI-151)", () => {
     mockAuth.activeBranchId = null;
+    renderApp(<NewAppointmentWizard onClose={vi.fn()} />);
+    expect(screen.getByText('Filial')).toBeInTheDocument();
+  });
+
+  it("FX-29: tenant-wide xodim (allowAllBranches) filialga bog'langan bo'lsa ham filial Select ko'rsatiladi", () => {
+    mockAuth.activeBranchId = 'b1';
+    wsBranchesMock.data = {
+      branches: [
+        { id: 'b1', name: 'Markaziy filial' },
+        { id: 'b2', name: 'Yangi filial' },
+      ],
+      allowAllBranches: true,
+    };
     renderApp(<NewAppointmentWizard onClose={vi.fn()} />);
     expect(screen.getByText('Filial')).toBeInTheDocument();
   });

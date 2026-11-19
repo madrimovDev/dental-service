@@ -1,6 +1,7 @@
-import { patientImages } from '@dental/db-schema';
+import { patientImages, visitNotes } from '@dental/db-schema';
 import { and, desc, eq } from 'drizzle-orm';
 import type { Context } from 'hono';
+import { onAfterCommit } from '../../db/after-commit.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { createOwnershipValidator, type OwnershipValidator } from '../../lib/ownership.ts';
@@ -28,6 +29,17 @@ export type UploadInput = {
   ext: string;
   body: ArrayBuffer;
 };
+
+/**
+ * FX-111 (LB-20): imzolangan vizit yozuviga biriktirilgan rasm klinik dalil —
+ * o'chirib/tahrirlab bo'lmaydi (routes 409 `image.locked_by_signed_visit`).
+ */
+export class ImageLockedError extends Error {
+  constructor() {
+    super('Image is attached to a signed visit note and cannot be changed');
+    this.name = 'ImageLockedError';
+  }
+}
 
 export const createPatientImagesService = (deps: {
   audit: AuditLogger;
@@ -152,10 +164,20 @@ export const createPatientImagesService = (deps: {
     return { ...row, url: await presignedGetUrl(row.objectKey) };
   }
 
+  async function assertNotLockedBySignedVisit(c: Context, visitNoteId: string | null) {
+    if (!visitNoteId) return;
+    const [vn] = await getDb(c)
+      .select({ signedAt: visitNotes.signedAt })
+      .from(visitNotes)
+      .where(eq(visitNotes.id, visitNoteId));
+    if (vn?.signedAt) throw new ImageLockedError();
+  }
+
   async function updateMetadata(c: Context, id: string, input: UpdateImageMetadataInput) {
     const db = getDb(c);
     const [before] = await db.select().from(patientImages).where(eq(patientImages.id, id));
     if (!before) return null;
+    await assertNotLockedBySignedVisit(c, before.visitNoteId);
 
     const patch: Record<string, unknown> = {};
     if (input.type) patch.type = input.type;
@@ -194,12 +216,12 @@ export const createPatientImagesService = (deps: {
     const db = getDb(c);
     const [before] = await db.select().from(patientImages).where(eq(patientImages.id, id));
     if (!before) return null;
+    await assertNotLockedBySignedVisit(c, before.visitNoteId);
 
     await db.delete(patientImages).where(eq(patientImages.id, id));
-    await deleteObject(before.objectKey).catch((err) =>
-      // Log but don't fail — DB row already gone
-      console.error('[patient-images] delete from S3 failed:', err),
-    );
+    // FX-76: fayl faqat commit'dan keyin o'chadi — tx rollback bo'lsa DB qatori
+    // fayl bilan birga qoladi (yetim yozuv emas). Best-effort, xato javobni buzmaydi.
+    await onAfterCommit(c, () => deleteObject(before.objectKey));
 
     await deps.audit.record(c, {
       action: 'deleted',

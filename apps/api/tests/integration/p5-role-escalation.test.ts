@@ -133,6 +133,19 @@ beforeAll(async () => {
   lowRoleId = await seedRole('FrontDesk', ['patient.view', 'appointment.view']);
   ownRoleId = await seedRole('RoleMgr', roleManagerPerms);
 
+  // FX-33: filial doirasi tekshiruvi real tayinlovga tayanadi — BM klinika miqyosidagi
+  // (branchId=null) faol tayinlovga ega (P5 testlari faqat ROL eskalatsiyasini sinaydi).
+  const bmRoleId = await seedRole('BmWide', bmPerms);
+  await withTx((tx) =>
+    tx.insert(userAssignments).values({
+      userId: bmId,
+      tenantId,
+      roleId: bmRoleId,
+      branchId: null,
+      isActive: true,
+      acceptedAt: new Date(),
+    }),
+  );
   bmToken = await tokenFor(bmId, bmPerms);
   roleMgrToken = await tokenFor(roleMgrId, roleManagerPerms);
   ownerToken = await tokenFor(ownerId, ['@owner']);

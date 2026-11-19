@@ -198,6 +198,9 @@
                 "roleName": {
                   "type": "string"
                 },
+                "isPractitioner": {
+                  "type": "boolean"
+                },
                 "isOwner": {
                   "type": "boolean"
                 }
@@ -210,6 +213,7 @@
                 "branchName",
                 "roleId",
                 "roleName",
+                "isPractitioner",
                 "isOwner"
               ]
             }
@@ -442,6 +446,13 @@
               "desktop",
               "cloud"
             ]
+          },
+          "modules": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -449,7 +460,8 @@
           "expiresAt",
           "graceEndsAt",
           "daysLeft",
-          "mode"
+          "mode",
+          "modules"
         ]
       },
       "PermissionDef": {
@@ -825,6 +837,9 @@
             "items": {
               "$ref": "#/components/schemas/BackupFile"
             }
+          },
+          "lastRestore": {
+            "$ref": "#/components/schemas/BackupRestoreResult"
           }
         },
         "required": [
@@ -832,7 +847,8 @@
           "folder",
           "lastSuccessAt",
           "lastError",
-          "files"
+          "files",
+          "lastRestore"
         ]
       },
       "BackupFile": {
@@ -855,6 +871,43 @@
           "name",
           "sizeBytes",
           "createdAt"
+        ]
+      },
+      "BackupRestoreResult": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "ok",
+              "failed"
+            ]
+          },
+          "file": {
+            "type": "string",
+            "nullable": true
+          },
+          "finishedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          },
+          "dbRolledBack": {
+            "type": "boolean",
+            "nullable": true
+          }
+        },
+        "required": [
+          "status",
+          "file",
+          "finishedAt",
+          "error",
+          "dbRolledBack"
         ]
       },
       "BackupRequested": {
@@ -1796,6 +1849,25 @@
           "id"
         ]
       },
+      "PatientTelegramUnlinkResult": {
+        "type": "object",
+        "properties": {
+          "unlinked": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "unlinked",
+          "id"
+        ]
+      },
       "MedicalRecord": {
         "type": "object",
         "properties": {
@@ -1855,6 +1927,17 @@
             "nullable": true,
             "format": "uuid"
           },
+          "questionnaireAnswers": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "questionnaireAt": {
+            "type": "string",
+            "nullable": true
+          },
           "lastUpdatedBy": {
             "type": "string",
             "nullable": true,
@@ -1880,6 +1963,8 @@
           "testResults",
           "confirmedAt",
           "confirmedBy",
+          "questionnaireAnswers",
+          "questionnaireAt",
           "lastUpdatedBy",
           "createdAt",
           "updatedAt"
@@ -2618,6 +2703,9 @@
           "paidAmount": {
             "type": "string"
           },
+          "refundedAmount": {
+            "type": "string"
+          },
           "discount": {
             "type": "string"
           },
@@ -2697,6 +2785,7 @@
           "receiptNumber",
           "totalAmount",
           "paidAmount",
+          "refundedAmount",
           "discount",
           "currency",
           "paymentMethod",
@@ -3968,6 +4057,17 @@
           "unreviewedImages",
           "plansAwaitingResponse",
           "nextPatient"
+        ]
+      },
+      "ReceptionAttention": {
+        "type": "object",
+        "properties": {
+          "overdueLabs": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "overdueLabs"
         ]
       },
       "AuditListResponse": {
@@ -5384,6 +5484,37 @@
           "medicationName",
           "dosage",
           "frequency"
+        ]
+      },
+      "VisitNoteAllergyOverride": {
+        "type": "object",
+        "properties": {
+          "drug": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "group": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
+          },
+          "allergen": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "drug",
+          "group",
+          "allergen",
+          "reason"
         ]
       },
       "PrescriptionDeleteResult": {
@@ -6817,6 +6948,25 @@
             "nullable": true,
             "example": null
           },
+          "params": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
+            "example": {
+              "itemName": "Plomba",
+              "qty": 2,
+              "min": 5
+            }
+          },
           "readAt": {
             "type": "string",
             "nullable": true,
@@ -6834,6 +6984,7 @@
           "type",
           "title",
           "body",
+          "params",
           "readAt",
           "createdAt"
         ]
@@ -7602,37 +7753,6 @@
           }
         },
         "example": null
-      },
-      "VisitNoteAllergyOverride": {
-        "type": "object",
-        "properties": {
-          "drug": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200
-          },
-          "group": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 50
-          },
-          "allergen": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200
-          },
-          "reason": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 100
-          }
-        },
-        "required": [
-          "drug",
-          "group",
-          "allergen",
-          "reason"
-        ]
       },
       "VisitNoteTemplate": {
         "type": "object",
@@ -9150,6 +9270,16 @@
               }
             }
           },
+          "401": {
+            "description": "SaaS: Bearer token invalid or expired (auth.invalid_token) — client refreshes and retries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Not available outside Local Desktop / SaaS subscription mode",
             "content": {
@@ -9695,6 +9825,16 @@
           },
           "403": {
             "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Telegram bot is already connected to another clinic (FX-25)",
             "content": {
               "application/json": {
                 "schema": {
@@ -10624,7 +10764,7 @@
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Branch is outside the caller scope",
             "content": {
               "application/json": {
                 "schema": {
@@ -13102,6 +13242,92 @@
         }
       }
     },
+    "/api/patients/{id}/telegram-link": {
+      "delete": {
+        "tags": [
+          "patients"
+        ],
+        "operationId": "unlinkPatientTelegram",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Telegram link removed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/PatientTelegramUnlinkResult"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Patient not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/patients/{id}/medical": {
       "get": {
         "tags": [
@@ -14934,6 +15160,16 @@
           },
           "403": {
             "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Service or branch not found in this clinic",
             "content": {
               "application/json": {
                 "schema": {
@@ -17082,6 +17318,71 @@
         }
       }
     },
+    "/api/dashboard/reception-attention": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "operationId": "getReceptionAttention",
+        "responses": {
+          "200": {
+            "description": "Registrator uchun muddati o'tgan lab soni",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ReceptionAttention"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/audit": {
       "get": {
         "tags": [
@@ -18079,6 +18380,15 @@
             "required": false,
             "name": "status",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
           }
         ],
         "responses": {
@@ -18128,7 +18438,7 @@
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Branch is outside the caller scope",
             "content": {
               "application/json": {
                 "schema": {
@@ -18219,7 +18529,7 @@
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Booking request belongs to a branch outside the caller scope",
             "content": {
               "application/json": {
                 "schema": {
@@ -18334,7 +18644,7 @@
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Booking request belongs to a branch outside the caller scope",
             "content": {
               "application/json": {
                 "schema": {
@@ -18528,7 +18838,7 @@
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Branch is outside the caller scope",
             "content": {
               "application/json": {
                 "schema": {
@@ -18694,6 +19004,16 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Branch is outside the caller scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -18771,7 +19091,7 @@
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Branch is outside the caller scope",
             "content": {
               "application/json": {
                 "schema": {
@@ -20216,6 +20536,13 @@
                   "notes": {
                     "type": "string",
                     "maxLength": 2000
+                  },
+                  "allergyOverrides": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/VisitNoteAllergyOverride"
+                    },
+                    "maxItems": 50
                   }
                 },
                 "required": [
@@ -20275,6 +20602,16 @@
           },
           "403": {
             "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Drug conflicts with a recorded allergy and no reasoned override (FX-22)",
             "content": {
               "application/json": {
                 "schema": {
@@ -20450,6 +20787,13 @@
                   "notes": {
                     "type": "string",
                     "maxLength": 2000
+                  },
+                  "allergyOverrides": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/VisitNoteAllergyOverride"
+                    },
+                    "maxItems": 50
                   }
                 }
               }
@@ -20514,6 +20858,16 @@
           },
           "404": {
             "description": "Prescription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Drug conflicts with a recorded allergy and no reasoned override (FX-22)",
             "content": {
               "application/json": {
                 "schema": {
@@ -20598,6 +20952,16 @@
           },
           "404": {
             "description": "Prescription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Linked visit note is signed (FX-154)",
             "content": {
               "application/json": {
                 "schema": {
@@ -21265,6 +21629,20 @@
           },
           {
             "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ],
+              "description": "Only active orders (not delivered/cancelled), most urgent first"
+            },
+            "required": false,
+            "description": "Only active orders (not delivered/cancelled), most urgent first",
+            "name": "activeOnly",
+            "in": "query"
+          },
+          {
+            "schema": {
               "type": "integer",
               "minimum": 0,
               "exclusiveMinimum": true,
@@ -21553,6 +21931,87 @@
                       "type": "array",
                       "items": {
                         "$ref": "#/components/schemas/LabOrder"
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lab-orders/doctors": {
+      "get": {
+        "tags": [
+          "lab-orders"
+        ],
+        "operationId": "listLabOrderDoctors",
+        "responses": {
+          "200": {
+            "description": "Practitioners who can be set as the lab order doctor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name"
+                        ]
                       }
                     }
                   },
@@ -22110,6 +22569,130 @@
         "responses": {
           "200": {
             "description": "Queued for Lab Hub",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/LabOrder"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Lab order not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict (not connected / already sent / price not proposed)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Lab Hub unreachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lab-orders/{id}/remake": {
+      "post": {
+        "tags": [
+          "lab-orders"
+        ],
+        "operationId": "requestLabOrderRemake",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Remake queued for Lab Hub",
             "content": {
               "application/json": {
                 "schema": {
@@ -22828,6 +23411,95 @@
           },
           "503": {
             "description": "Lab Hub unreachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lab-hub/outbox/requeue": {
+      "post": {
+        "tags": [
+          "lab-hub"
+        ],
+        "operationId": "requeueLabHubOutbox",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "labOrderId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Failed outbox ops moved back to pending",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "requeued": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "requeued"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
             "content": {
               "application/json": {
                 "schema": {
@@ -23569,8 +24241,7 @@
                   },
                   "qtyPerService": {
                     "type": "number",
-                    "minimum": 0,
-                    "exclusiveMinimum": true
+                    "minimum": 0.01
                   }
                 },
                 "required": [
@@ -23640,6 +24311,16 @@
           },
           "404": {
             "description": "Referenced stock item / service not found in this clinic",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "BOM for this service/item already exists",
             "content": {
               "application/json": {
                 "schema": {
@@ -25756,7 +26437,7 @@
             }
           },
           "400": {
-            "description": "Validation error",
+            "description": "Foreign/missing categoryId or branchId",
             "content": {
               "application/json": {
                 "schema": {
@@ -25787,6 +26468,16 @@
           },
           "404": {
             "description": "Expense not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Expense is linked to a lab order (FX-80) — only the note is editable",
             "content": {
               "application/json": {
                 "schema": {
@@ -25871,6 +26562,16 @@
           },
           "404": {
             "description": "Expense not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Expense is linked to a lab order (FX-80) — only the note is editable",
             "content": {
               "application/json": {
                 "schema": {
@@ -26621,6 +27322,16 @@
           },
           "404": {
             "description": "Treatment plan not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Plan in progress/completed/cancelled — consent is locked",
             "content": {
               "application/json": {
                 "schema": {
@@ -28359,6 +29070,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Image is attached to a signed visit note",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       },
@@ -28447,6 +29168,16 @@
           },
           "404": {
             "description": "Image not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Image is attached to a signed visit note",
             "content": {
               "application/json": {
                 "schema": {

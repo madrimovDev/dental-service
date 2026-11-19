@@ -8,10 +8,10 @@ import {
   treatmentPlans,
   visitNotes,
 } from '@dental/db-schema';
-import { and, count, desc, eq, gte, inArray, lt, ne, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gte, inArray, lt, ne, notInArray, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
-import type { DoctorPendingDto } from './dashboard.schema.ts';
+import type { DoctorPendingDto, ReceptionAttentionDto } from './dashboard.schema.ts';
 
 const LIST_LIMIT = 5;
 const NOTE_WINDOW_DAYS = 14;
@@ -23,14 +23,34 @@ const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000);
  * Shifokor «mendan kutilmoqda» agregati. Hamma so'rov `doctorId = userId` bilan
  * cheklanadi (boshqa shifokorniki ko'rinmaydi); tenant — RLS.
  *
- * Ta'riflar (hozirgi sxemada «imzolash»/«ko'rildi» holati YO'Q — D4 imzo keyin keladi):
+ * Ta'riflar:
  *  - imzolanmagan vizit yozuvi = shifokorning `in_progress`/`completed` yozilishi
- *    (oxirgi 14 kun), unga bog'langan visit_note hali YO'Q;
+ *    (oxirgi 14 kun), unga bog'langan IMZOLANGAN (`signed_at IS NOT NULL`)
+ *    visit_note hali YO'Q — qoralama yozuv ham «kutilmoqda» (FX-118);
  *  - ko'rilmagan rasm = shifokorning oxirgi 30 kundagi bemorlariga boshqa xodim
  *    yuklagan oxirgi 14 kunlik rasm;
  *  - javob kutayotgan reja = shifokorning `presented` rejasi.
  */
 export const createDashboardService = () => {
+  /**
+   * FX-121: Registrator «Diqqat» — muddati o'tgan faol lab buyurtmalar soni. Butun to'plam ustida
+   * SQL `count` (eng yangi N tadan emas — FX-109) va `lab_order.view`siz rol uchun ochiq (faqat son).
+   * Ta'rif `lab-orders.overdue()` bilan bir xil (`expectedDate < hozir`, delivered/cancelled EMAS).
+   */
+  async function receptionAttention(c: Context): Promise<ReceptionAttentionDto> {
+    const db = getDb(c);
+    const [row] = await db
+      .select({ n: count() })
+      .from(labOrders)
+      .where(
+        and(
+          lt(labOrders.expectedDate, new Date()),
+          notInArray(labOrders.status, ['delivered', 'cancelled']),
+        ),
+      );
+    return { overdueLabs: row?.n ?? 0 };
+  }
+
   async function doctorPending(
     c: Context,
     userId: string,
@@ -42,7 +62,7 @@ export const createDashboardService = () => {
       eq(appointments.doctorId, userId),
       inArray(appointments.status, ['in_progress', 'completed']),
       gte(appointments.startTime, daysAgo(NOTE_WINDOW_DAYS)),
-      sql`NOT EXISTS (SELECT 1 FROM ${visitNotes} WHERE ${visitNotes.appointmentId} = ${appointments.id})`,
+      sql`NOT EXISTS (SELECT 1 FROM ${visitNotes} WHERE ${visitNotes.appointmentId} = ${appointments.id} AND ${visitNotes.signedAt} IS NOT NULL)`,
     );
     const [noteCount] = await db.select({ n: count() }).from(appointments).where(noteWhere);
     const noteRows = await db
@@ -222,6 +242,6 @@ export const createDashboardService = () => {
       },
     };
   }
-  return { doctorPending };
+  return { doctorPending, receptionAttention };
 };
 export type DashboardService = ReturnType<typeof createDashboardService>;

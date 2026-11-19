@@ -12,7 +12,7 @@ import {
   useCallOwnTicket,
   useCheckInCandidates,
   useCreateTicket,
-  usePatientsAll,
+  useQueuePatientNames,
   useQueueToday,
   useServices,
   useUpdateQueueStatus,
@@ -36,12 +36,11 @@ function waitedMinutes(createdAt: string): number {
 export function QueueBoard() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { hasPermission, activeBranchId } = useAuthStore();
+  const { hasPermission, activeBranchId, user } = useAuthStore();
   const [branchFilter, setBranchFilter] = useState<string | null>(activeBranchId);
   const [opened, { open, close }] = useDisclosure(false);
 
   const branches = useBranches();
-  const patients = usePatientsAll();
   const services = useServices({ enabled: hasPermission('service.view') });
   const queue = useQueueToday(branchFilter);
   const updateStatus = useUpdateQueueStatus();
@@ -49,26 +48,34 @@ export function QueueBoard() {
   const candidates = useCheckInCandidates(branchFilter, hasPermission('queue.create'));
   const checkInTicket = useCreateTicket();
 
+  const tickets = queue.data ?? [];
+  const notArrived = candidates.data ?? [];
+  // FX-92: ism faqat ko'rinayotgan id'lar bo'yicha (eng yangi 100 bemor chegarasisiz).
+  const patientNameById = useQueuePatientNames([
+    ...tickets.map((tk) => tk.patientId),
+    ...notArrived.map((a) => a.patientId),
+  ]);
   const lookups: QueueLookups = useMemo(
     () => ({
-      patientNameById: new Map((patients.data?.data ?? []).map((p) => [p.id, p.fullName] as const)),
+      patientNameById,
       serviceNameById: new Map((services.data ?? []).map((s) => [s.id, s.nameUz] as const)),
     }),
-    [patients.data, services.data],
+    [patientNameById, services.data],
   );
 
-  const tickets = queue.data ?? [];
   const columns = useMemo(() => groupByStatus(tickets), [tickets]);
   const canManage = hasPermission('queue.manage');
+  // FX-55: queue.manage'siz shifokor faqat O'ZIGA yozilgan (ticket.doctorId === user.id)
+  // bemorni chaqira oladi — boshqasi uchun server 403 qaytaradi, shuning uchun tugma ham yo'q.
+  const canCallTicket = (tk: QueueTicket) => canManage || (!!user?.id && tk.doctorId === user.id);
 
-  // Lokal derivatsiya (yangi hook YO'Q): now = birinchi in_progress, next = birinchi waiting.
+  // Lokal derivatsiya (yangi hook YO'Q): now = birinchi in_progress, next = birinchi chaqira olinadigan waiting.
   const nowServing = useMemo(
     () => tickets.find((tk: QueueTicket) => tk.status === 'in_progress'),
     [tickets],
   );
-  const nextWaiting = useMemo(
-    () => tickets.find((tk: QueueTicket) => tk.status === 'waiting'),
-    [tickets],
+  const nextWaiting = tickets.find(
+    (tk: QueueTicket) => tk.status === 'waiting' && canCallTicket(tk),
   );
 
   // RBAC: `queue.manage` — hammani chaqiradi; aks holda (shifokor) faqat o'ziga yozilganni —
@@ -83,7 +90,6 @@ export function QueueBoard() {
     : callOwn.isPending
       ? callOwn.variables
       : undefined;
-  const notArrived = candidates.data ?? [];
 
   const patientName = (id: string | null) => (id ? (lookups.patientNameById.get(id) ?? '—') : '—');
   const serviceName = (id: string | null) =>
@@ -202,7 +208,7 @@ export function QueueBoard() {
                     title={t(titleKey[column.key])}
                     lookups={lookups}
                     canManage={canManage}
-                    canCall
+                    canCallTicket={canCallTicket}
                     busyId={busyId}
                     onStatus={onStatus}
                   />

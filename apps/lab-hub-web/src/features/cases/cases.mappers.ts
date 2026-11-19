@@ -10,10 +10,11 @@ export const STATUS_MEANING: Record<CaseStatus, StatusMeaning> = {
   delivered: 'done',
   rejected: 'failed',
   remake: 'failed',
+  cancelled: 'failed',
 };
 
 export const isOpen = (c: Pick<CaseDto, 'status'>) =>
-  c.status !== 'delivered' && c.status !== 'rejected';
+  c.status !== 'delivered' && c.status !== 'rejected' && c.status !== 'cancelled';
 
 export const workTitle = (c: Pick<CaseDto, 'workType' | 'material'>) =>
   c.material ? `${c.workType} · ${c.material}` : c.workType;

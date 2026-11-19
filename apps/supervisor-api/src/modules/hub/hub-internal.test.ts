@@ -17,7 +17,11 @@ afterAll(() => {
 
 const app = createApp();
 
-const seedClinic = async (lic: { isActive: boolean; expiresAt: Date }) => {
+const seedClinic = async (lic: {
+  isActive: boolean;
+  expiresAt: Date;
+  fingerprint?: string | null;
+}) => {
   const [clinic] = await db
     .insert(clinics)
     .values({
@@ -31,7 +35,10 @@ const seedClinic = async (lic: { isActive: boolean; expiresAt: Date }) => {
     .values({ clinicId: clinic!.id, name: 'B' })
     .returning();
   const key = `${crypto.randomUUID().slice(0, 5)}-HUB`.toUpperCase();
+  // Bog'langan o'rnatma (activate) — `prepare-reinstall`dan keyin NULL.
+  const fingerprint = lic.fingerprint === undefined ? `fp-${crypto.randomUUID()}` : lic.fingerprint;
   await db.insert(licenses).values({
+    fingerprint,
     clinicId: clinic!.id,
     branchId: branch!.id,
     licenseKey: key,
@@ -40,7 +47,7 @@ const seedClinic = async (lic: { isActive: boolean; expiresAt: Date }) => {
     expiresAt: lic.expiresAt,
     isActive: lic.isActive,
   });
-  return { clinicId: clinic!.id, key, name: clinic!.name };
+  return { clinicId: clinic!.id, key, fingerprint, name: clinic!.name };
 };
 
 const seedSaasClinic = async (subscriptionExpiresAt: Date | null) => {
@@ -76,10 +83,9 @@ describe('GET /internal/clinics/:id/verify', () => {
   it('desktop klinika: litsenziya kaliti mosligi, faollik, muddat', async () => {
     const exp = new Date(Date.now() + 30 * 86_400_000);
     const c = await seedClinic({ isActive: true, expiresAt: exp });
-    const ok = (await (await verify(c.clinicId, `?licenseKey=${c.key}`)).json()) as Record<
-      string,
-      unknown
-    >;
+    const ok = (await (
+      await verify(c.clinicId, `?licenseKey=${c.key}&fingerprint=${c.fingerprint}`)
+    ).json()) as Record<string, unknown>;
     expect(ok).toMatchObject({
       clinicId: c.clinicId,
       name: c.name,
@@ -144,9 +150,30 @@ describe('GET /internal/clinics/:id/verify', () => {
     expect(sv).toMatchObject({ mode: 'saas', active: true, expiresAt: exp.toISOString() });
 
     const desk = await seedClinic({ isActive: true, expiresAt: exp });
-    const dv = await client.verifyClinic(desk.clinicId, { licenseKey: desk.key });
+    const dv = await client.verifyClinic(desk.clinicId, {
+      licenseKey: desk.key,
+      fingerprint: desk.fingerprint ?? undefined,
+    });
     expect(dv).toMatchObject({ mode: 'desktop', active: true, licenseMatches: true });
     expect(await client.verifyClinic(crypto.randomUUID(), {})).toBeNull();
+  });
+
+  it('FX-138: kalit mos, lekin o‘rnatma (fingerprint) bog‘langani emas — mos emas', async () => {
+    const exp = new Date(Date.now() + 30 * 86_400_000);
+    const c = await seedClinic({ isActive: true, expiresAt: exp, fingerprint: 'fp-yangi-pc' });
+    const m = async (q: string) =>
+      ((await (await verify(c.clinicId, q)).json()) as { licenseMatches: boolean }).licenseMatches;
+    expect(await m(`?licenseKey=${c.key}&fingerprint=fp-yangi-pc`)).toBe(true);
+    // Eski PC (prepare-reinstall'dan keyin yangisi bog'langan) — o'z kaliti bilan ham rad.
+    expect(await m(`?licenseKey=${c.key}&fingerprint=fp-eski-pc`)).toBe(false);
+    // Fingerprint'siz isbot — rad.
+    expect(await m(`?licenseKey=${c.key}`)).toBe(false);
+
+    // prepare-reinstall: bog'lanish NULL — yangi o'rnatma hali aktivatsiya qilmagan, hech kim mos emas.
+    const r = await seedClinic({ isActive: true, expiresAt: exp, fingerprint: null });
+    const mr = async (q: string) =>
+      ((await (await verify(r.clinicId, q)).json()) as { licenseMatches: boolean }).licenseMatches;
+    expect(await mr(`?licenseKey=${r.key}&fingerprint=fp-eski-pc`)).toBe(false);
   });
 
   it('noma‘lum / yaroqsiz id 404', async () => {

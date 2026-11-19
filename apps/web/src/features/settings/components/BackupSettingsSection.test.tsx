@@ -95,4 +95,108 @@ describe('BackupSettingsSection', () => {
     expect(screen.queryByRole('button', { name: /^Tiklash/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Papkani saqlash' })).not.toBeInTheDocument();
   });
+
+  describe('FX-147: oxirgi tiklash natijasi (lastRestore) — lastError dan alohida', () => {
+    const fresh = { lastSuccessAt: daysAgo(0) };
+
+    it('muvaffaqiyatsiz, baza qaytarilgan: alohida «Tiklash muvaffaqiyatsiz» banneri + sabab', () => {
+      hoisted.status = desktopStatus({
+        ...fresh,
+        lastRestore: {
+          status: 'failed',
+          file: 'dental-20261110-200000',
+          finishedAt: daysAgo(0),
+          error: 'restore_uploads: disk full',
+          dbRolledBack: true,
+        },
+      });
+      renderApp(<BackupSettingsSection />);
+      const alert = screen.getByRole('alert');
+      expect(alert).toHaveTextContent('Tiklash muvaffaqiyatsiz');
+      expect(alert).toHaveTextContent('avvalgi holatiga qaytarildi');
+      expect(alert).toHaveTextContent('restore_uploads: disk full');
+      // Zaxira olish xatosi banneri chiqmaydi (lastError null).
+      expect(screen.queryByText('Oxirgi urinish muvaffaqiyatsiz')).not.toBeInTheDocument();
+    });
+
+    it('muvaffaqiyatsiz, baza QAYTARILMAGAN: ta’minotchiga murojaat', () => {
+      hoisted.status = desktopStatus({
+        ...fresh,
+        lastRestore: {
+          status: 'failed',
+          file: 'dental-20261110-200000',
+          finishedAt: daysAgo(0),
+          error: 'migrate: boom',
+          dbRolledBack: false,
+        },
+      });
+      renderApp(<BackupSettingsSection />);
+      expect(screen.getByRole('alert')).toHaveTextContent('qaytarib bo‘lmadi');
+    });
+
+    it('muvaffaqiyatli tiklash: «Tiklandi» xabari; 7 kundan eski natija ko‘rsatilmaydi', () => {
+      hoisted.status = desktopStatus({
+        ...fresh,
+        lastRestore: {
+          status: 'ok',
+          file: 'dental-20261110-200000',
+          finishedAt: daysAgo(1),
+          error: null,
+          dbRolledBack: null,
+        },
+      });
+      const { unmount } = renderApp(<BackupSettingsSection />);
+      expect(screen.getByRole('status')).toHaveTextContent('Ma’lumotlar zaxiradan tiklandi');
+      unmount();
+
+      hoisted.status = desktopStatus({
+        ...fresh,
+        lastRestore: {
+          status: 'failed',
+          file: 'dental-20261110-200000',
+          finishedAt: daysAgo(10),
+          error: 'old',
+          dbRolledBack: true,
+        },
+      });
+      renderApp(<BackupSettingsSection />);
+      expect(screen.queryByText('Tiklash muvaffaqiyatsiz')).not.toBeInTheDocument();
+    });
+
+    it('server «running» desa: jarayon banneri va «Tiklash» tugmalari o‘chiq', () => {
+      hoisted.status = desktopStatus({
+        ...fresh,
+        lastRestore: {
+          status: 'running',
+          file: 'dental-20261110-200000',
+          finishedAt: daysAgo(0),
+          error: null,
+          dbRolledBack: null,
+        },
+      });
+      renderApp(<BackupSettingsSection />);
+      expect(screen.getByRole('status')).toHaveTextContent('Tiklash boshlandi');
+      expect(screen.getByRole('button', { name: /^Tiklash —/ })).toBeDisabled();
+    });
+
+    it('to‘xtab qolgan tiklash (desktop startup «interrupted» deb yozgan): tugmalar faol, «qaytarilmadi» banneri', () => {
+      hoisted.status = desktopStatus({
+        ...fresh,
+        lastRestore: {
+          status: 'failed',
+          file: 'dental-20261110-200000',
+          finishedAt: daysAgo(0),
+          error: "interrupted: tiklash kutilmaganda to'xtadi",
+          dbRolledBack: false,
+        },
+      });
+      renderApp(<BackupSettingsSection />);
+      expect(screen.queryByText(/Tiklash boshlandi/)).not.toBeInTheDocument();
+      const alert = screen.getByRole('alert');
+      expect(alert).toHaveTextContent('Tiklash muvaffaqiyatsiz');
+      expect(alert).toHaveTextContent('qaytarib bo‘lmadi');
+      expect(alert).toHaveTextContent('interrupted');
+      expect(screen.getByRole('button', { name: /^Tiklash —/ })).toBeEnabled();
+    });
+  });
 });

@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { db } from '../../db/client';
 import { clinics, licenses } from '../../db/schema';
+import { getSaasSuspendedAt } from '../saas/saas-suspension';
 import { hubToken } from './hub-token';
 
 /**
@@ -10,7 +11,7 @@ import { hubToken } from './hub-token';
  *  - `desktop`: faol litsenziyalar bo'yicha (eng kech `expiresAt`); hammasi
  *    bekor qilingan bo'lsa `active=false`.
  *  - `saas`: litsenziya yo'q — `clinics.subscription_expires_at`; muddat
- *    belgilanmagan bo'lsa `active=false`.
+ *    belgilanmagan yoki vendor to'xtatgan (FX-102) bo'lsa `active=false`.
  */
 export type ClinicHubState = {
   clinicId: string;
@@ -18,8 +19,11 @@ export type ClinicHubState = {
   mode: 'desktop' | 'saas';
   active: boolean;
   expiresAt: Date | null;
-  /** Faqat desktop: faol litsenziya kalitlari (javobda QAYTMAYDI, faqat moslik uchun). */
-  activeLicenseKeys: string[];
+  /**
+   * Faqat desktop (FX-138): faol litsenziya kalitlari va ularga bog'langan o'rnatma fingerprint'i (`prepare-reinstall`dan
+   * keyin NULL). Javobda QAYTMAYDI — faqat connect isbotini tekshirish uchun.
+   */
+  activeLicenses: { licenseKey: string; fingerprint: string | null }[];
 };
 
 export const loadClinicHubState = async (clinicId: string): Promise<ClinicHubState | null> => {
@@ -30,9 +34,10 @@ export const loadClinicHubState = async (clinicId: string): Promise<ClinicHubSta
       clinicId: clinic.id,
       name: clinic.name,
       mode: 'saas',
-      active: clinic.subscriptionExpiresAt !== null,
+      // FX-102: vendor to'xtatgan SaaS klinika Hub'da ham faol emas.
+      active: clinic.subscriptionExpiresAt !== null && !(await getSaasSuspendedAt(clinic.id)),
       expiresAt: clinic.subscriptionExpiresAt,
-      activeLicenseKeys: [],
+      activeLicenses: [],
     };
   }
   const rows = await db.select().from(licenses).where(eq(licenses.clinicId, clinicId));
@@ -47,7 +52,7 @@ export const loadClinicHubState = async (clinicId: string): Promise<ClinicHubSta
     mode: 'desktop',
     active: active.length > 0,
     expiresAt: latest,
-    activeLicenseKeys: active.map((l) => l.licenseKey),
+    activeLicenses: active.map((l) => ({ licenseKey: l.licenseKey, fingerprint: l.fingerprint })),
   };
 };
 

@@ -15,16 +15,15 @@ import i18n from 'i18next';
 import { useBranchAvailability, useDoctors } from '@/features/appointments/appointments.api.ts';
 import { usePatientNames as useClinicalPatientNames } from '@/features/clinical/clinical.api.ts';
 import { usePatients } from '@/features/patients/patients.api.ts';
+import { api } from '@/lib/api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
-import { useActiveLabOrders } from './dashboard.api.ts';
-import { isLabOverdue } from './reception.logic.ts';
 
 const localIsoDate = (d = new Date()) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 /** Shifokorlar (id → ism) — filtr + «jadvalsiz shifokor» nomlari. `appointment.view` yetarli. */
-export function useDoctorOptions() {
-  return useDoctors();
+export function useDoctorOptions(branchId?: string) {
+  return useDoctors(branchId);
 }
 
 /**
@@ -57,7 +56,13 @@ export function useReceptionAttention(branchId: string | null) {
     date: localIsoDate(),
     enabled: hasPermission('schedule.view'),
   });
-  const labs = useActiveLabOrders();
+  // FX-121: Registratorda `lab_order.view` yo'q — tor endpoint (faqat son), `appointment.view` bilan.
+  const canAppointment = hasPermission('appointment.view');
+  const labs = useQuery({
+    queryKey: ['reception', 'lab-attention'],
+    queryFn: () => api.dashboard.receptionAttention(),
+    enabled: canAppointment,
+  });
   const canRecall = hasPermission('recall.view');
   const recall = useQuery({
     queryKey: ['reception', 'recall-summary', branchId],
@@ -69,8 +74,7 @@ export function useReceptionAttention(branchId: string | null) {
   const doctorsWithoutSchedule = availability.data
     ? (doctors.data ?? []).filter((d) => !withSchedule.has(d.id))
     : [];
-  const today = localIsoDate();
-  const overdueLabs = (labs.data ?? []).filter((o) => isLabOverdue(o, today)).length;
+  const overdueLabs = labs.data?.overdueLabs ?? 0;
   const recallOverdue = canRecall ? (recall.data?.overdue ?? 0) : 0;
   return { doctorsWithoutSchedule, overdueLabs, recallOverdue };
 }
@@ -80,14 +84,26 @@ export type BookingRequestRow = BookingRequest;
 export type BookingRequestList = GeneratedBookingRequestList;
 
 const BOOKING_KEY = ['reception', 'booking-requests'] as const;
+export type BookingRequestStatus = 'pending' | 'expired';
 
-/** `appointment.view` bilan GET; ruxsatsiz rolda so'rov yuborilmaydi (403 portlamasin). */
-export function useBookingRequests() {
+/** FX-23: yangi Telegram so'rovi ~20 s ichida ko'rinadi (fon tabida TanStack to'xtatadi). */
+export const BOOKING_REFETCH_MS = 20_000;
+
+/**
+ * `appointment.view` bilan GET; ruxsatsiz rolda so'rov yuborilmaydi (403 portlamasin).
+ * `pending` — davriy yangilanadi (widget + sidebar badge bitta query-key'ni ulashadi);
+ * `expired` — «Muddati o'tgan» tab, faqat ochilganda (`enabled`).
+ */
+export function useBookingRequests(
+  status: BookingRequestStatus = 'pending',
+  opts: { enabled?: boolean } = {},
+) {
   const { hasPermission } = useAuthStore();
   return useQuery({
-    queryKey: BOOKING_KEY,
-    queryFn: () => listBookingRequests({ status: 'pending' }).then((r) => r.data),
-    enabled: hasPermission('appointment.view'),
+    queryKey: [...BOOKING_KEY, status],
+    queryFn: () => listBookingRequests({ status }).then((r) => r.data),
+    enabled: hasPermission('appointment.view') && (opts.enabled ?? true),
+    refetchInterval: status === 'pending' ? BOOKING_REFETCH_MS : false,
   });
 }
 
@@ -108,14 +124,18 @@ export function useConfirmBookingRequest() {
     onError: (e) => {
       const conflict = e instanceof ApiError && e.status === 409;
       const expired = e instanceof ApiError && e.code === 'booking_request.expired';
+      // FX-172: shifokor shu filialda ishlamaydi — «vaqt band» emas, aniq sabab.
+      const notInBranch = e instanceof ApiError && e.code === 'schedule.doctor_not_in_branch';
       notifications.show({
         color: 'red',
         message: i18n.t(
           expired
             ? 'telegramRequests.confirm_expired'
-            : conflict
-              ? 'telegramRequests.confirm_conflict'
-              : 'common.error',
+            : notInBranch
+              ? 'appointments.doctor_not_in_branch'
+              : conflict
+                ? 'telegramRequests.confirm_conflict'
+                : 'common.error',
         ),
       });
       void qc.invalidateQueries({ queryKey: BOOKING_KEY });

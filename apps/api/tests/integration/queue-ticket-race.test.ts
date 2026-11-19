@@ -79,9 +79,7 @@ describe('CLI-457 queue ticket number race condition', () => {
     // transaction-timestamp to'qnashuvi bilan 23505 xato. Ikkalasi ham tuzatilmagan
     // holatda assertion'larni buzadi (rad etilgan promise YOKI duplikat raqamlar).
     const settled = await Promise.allSettled(
-      Array.from({ length: N }, () =>
-        run(tenantId, (c) => queue.create(c, { branchId, patientId })),
-      ),
+      Array.from({ length: N }, () => run(tenantId, (c) => queue.create(c, { branchId }))),
     );
 
     const fulfilled = settled.filter((r) => r.status === 'fulfilled');

@@ -27,6 +27,9 @@ export const LAB_TRANSITIONS: Record<
   rejected: ['sent', 'remake', 'accepted'],
 };
 
+/** FX-46/47: bu holatlarda narx taklif qilinmaydi va tasdiqlanmaydi (409 `case.<status>`). */
+export const CLOSED_FOR_PRICE: CaseStatus[] = ['rejected', 'cancelled'];
+
 export const loadLab = async (tx: Tx, labId: string) => {
   const lab = await tx.query.labs.findFirst({ where: eq(labs.id, labId) });
   if (!lab) throw new ApiError(404, 'lab.not_found');

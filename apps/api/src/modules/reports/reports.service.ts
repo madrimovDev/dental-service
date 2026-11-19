@@ -114,7 +114,7 @@ type NetServiceRow = {
  * Raw SQL (CTE) — korrelyatsiyalangan child-refund subquery + item-darajasidagi
  * proporsional taqsimot query-builder'da qulay ifodalanmaydi (self-join alias kerak).
  */
-async function netServiceAggregates(
+async function netItemServiceAggregates(
   db: DbOrTx,
   start: Date,
   end: Date,
@@ -182,6 +182,106 @@ async function netServiceAggregates(
     count: Number(r.count),
     revenue: Number(r.revenue),
   }));
+}
+
+/**
+ * FX-107 (LB-16) — davolash rejasi orqali to'langan xizmatlar. Reja to'lovi doim
+ * `items=[]` bilan yoziladi (summa `treatment_stage_payments` allocation'larida), shuning
+ * uchun `netItemServiceAggregates` ularni ko'rmaydi. Bu yerda har bosqich allocation'i
+ * `treatment_stages.service_id` bo'yicha xizmatga yig'iladi.
+ *
+ * Allocation summasi allaqachon to'langan pul (chegirma hisobga olingan; refund manfiy
+ * allocation qatori) — net-faktor kerak emas. Item yo'li bilan bir xil asos: refund
+ * ORIGINAL to'lov davriga netlanadi (refund tx `parent_transaction_id` orqali).
+ * `count` = davr ichida PUL OLGAN bosqichlar soni, faqat bosqichning birinchi to'lovi
+ * shu davrda bo'lsa (taksitlar bir bosqichni qayta-qayta sanamaydi) — taqribiy ko'rsatkich.
+ */
+async function netPlanServiceAggregates(
+  db: DbOrTx,
+  start: Date,
+  end: Date,
+  branchIds?: string[] | null,
+): Promise<NetServiceRow[]> {
+  const branchFilter = branchIds
+    ? sql`AND t.branch_id IN (${sql.join(
+        branchIds.map((b) => sql`${b}`),
+        sql`, `,
+      )})`
+    : sql``;
+  const rows = await db.execute(sql`
+    WITH stage_net AS (
+      SELECT
+        sp.stage_id,
+        SUM(sp.amount) AS amount
+      FROM cashier_transactions t
+      JOIN cashier_transactions x
+        ON x.id = t.id OR (x.parent_transaction_id = t.id AND x.type = 'refund')
+      JOIN treatment_stage_payments sp ON sp.transaction_id = x.id
+      WHERE t.status = 'completed'
+        AND t.type = 'payment'
+        AND t.created_at >= ${start.toISOString()}
+        AND t.created_at < ${end.toISOString()}
+        ${branchFilter}
+      GROUP BY sp.stage_id
+    )
+    SELECT
+      MAX(st.service_name) AS "serviceName",
+      st.service_id::text AS "serviceId",
+      COUNT(*) FILTER (WHERE NOT EXISTS (
+        SELECT 1 FROM treatment_stage_payments sp2
+        JOIN cashier_transactions t2 ON t2.id = sp2.transaction_id
+        WHERE sp2.stage_id = sn.stage_id
+          AND sp2.amount > 0
+          AND t2.type = 'payment'
+          AND t2.created_at < ${start.toISOString()}
+      )) AS "count",
+      COALESCE(SUM(sn.amount), 0) AS "revenue"
+    FROM stage_net sn
+    JOIN treatment_stages st ON st.id = sn.stage_id
+    GROUP BY st.service_id, CASE WHEN st.service_id IS NULL THEN st.service_name END
+  `);
+
+  return (
+    rows as unknown as {
+      serviceName: string;
+      serviceId: string | null;
+      count: string;
+      revenue: string;
+    }[]
+  ).map((r) => ({
+    serviceName: r.serviceName,
+    serviceId: r.serviceId,
+    count: Number(r.count),
+    revenue: Number(r.revenue),
+  }));
+}
+
+/**
+ * byService / procedureMix manbasi: erkin POS item'lari + reja allocation'lari (FX-107),
+ * `serviceId` (yo'q bo'lsa — nom) bo'yicha birlashtirilgan, tushum kamayish tartibida.
+ */
+async function netServiceAggregates(
+  db: DbOrTx,
+  start: Date,
+  end: Date,
+  branchIds?: string[] | null,
+): Promise<NetServiceRow[]> {
+  const [items, plan] = await Promise.all([
+    netItemServiceAggregates(db, start, end, branchIds),
+    netPlanServiceAggregates(db, start, end, branchIds),
+  ]);
+  const merged = new Map<string, NetServiceRow>();
+  for (const r of [...items, ...plan]) {
+    const key = r.serviceId ?? `name:${r.serviceName}`;
+    const prev = merged.get(key);
+    if (prev) {
+      prev.count += r.count;
+      prev.revenue += r.revenue;
+    } else {
+      merged.set(key, { ...r });
+    }
+  }
+  return [...merged.values()].sort((a, b) => b.revenue - a.revenue);
 }
 
 /** Har kun (from..to) uchun 'sun'..'sat' kaliti — Tashkent kuni, noon-anchored (TZ chegarasi xavfsiz). */

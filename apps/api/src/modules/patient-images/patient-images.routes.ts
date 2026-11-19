@@ -22,7 +22,15 @@ import {
   updateImageMetadataSchema,
   uploadImageMetadataSchema,
 } from './patient-images.schema.ts';
-import { createPatientImagesService } from './patient-images.service.ts';
+import { createPatientImagesService, ImageLockedError } from './patient-images.service.ts';
+
+/** FX-111: imzolangan vizitga biriktirilgan rasm — patch/delete 409. */
+const lockedResponse = {
+  409: {
+    content: { 'application/json': { schema: errorResponseSchema } },
+    description: 'Image is attached to a signed visit note',
+  },
+};
 
 /** Standart 404 — get / patch / delete uchun. */
 const notFoundResponse = {
@@ -195,13 +203,24 @@ export const patientImagesRoutes = (deps: { db: Database; audit: AuditLogger }) 
       params: patientImageIdParamSchema,
       body: { content: { 'application/json': { schema: updateImageMetadataSchema } } },
     },
-    responses: { ...okJson(patientImageSchema, 'Updated image'), ...notFoundResponse },
+    responses: {
+      ...okJson(patientImageSchema, 'Updated image'),
+      ...notFoundResponse,
+      ...lockedResponse,
+    },
   });
 
   app.openapi(updateRoute, async (c) => {
-    const row = await service.updateMetadata(c, c.req.valid('param').id, c.req.valid('json'));
-    if (!row) return c.json(fail('image.not_found', 'Not found'), 404);
-    return c.json(ok(toPatientImageDto(row)), 200);
+    try {
+      const row = await service.updateMetadata(c, c.req.valid('param').id, c.req.valid('json'));
+      if (!row) return c.json(fail('image.not_found', 'Not found'), 404);
+      return c.json(ok(toPatientImageDto(row)), 200);
+    } catch (e) {
+      if (e instanceof ImageLockedError) {
+        return c.json(fail('image.locked_by_signed_visit', e.message), 409);
+      }
+      throw e;
+    }
   });
 
   // ─── DELETE /patient-images/{id} — remove ────────────────────────────────
@@ -215,13 +234,24 @@ export const patientImagesRoutes = (deps: { db: Database; audit: AuditLogger }) 
       requirePermission('patient_image.upload'),
     ] as const,
     request: { params: patientImageIdParamSchema },
-    responses: { ...okJson(patientImageDeleteSchema, 'Image deleted'), ...notFoundResponse },
+    responses: {
+      ...okJson(patientImageDeleteSchema, 'Image deleted'),
+      ...notFoundResponse,
+      ...lockedResponse,
+    },
   });
 
   app.openapi(deleteRoute, async (c) => {
-    const row = await service.remove(c, c.req.valid('param').id);
-    if (!row) return c.json(fail('image.not_found', 'Not found'), 404);
-    return c.json(ok({ deleted: true as const }), 200);
+    try {
+      const row = await service.remove(c, c.req.valid('param').id);
+      if (!row) return c.json(fail('image.not_found', 'Not found'), 404);
+      return c.json(ok({ deleted: true as const }), 200);
+    } catch (e) {
+      if (e instanceof ImageLockedError) {
+        return c.json(fail('image.locked_by_signed_visit', e.message), 409);
+      }
+      throw e;
+    }
   });
 
   return app;

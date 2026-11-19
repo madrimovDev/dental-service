@@ -16,6 +16,7 @@ import { sql } from 'drizzle-orm';
 import { createApp } from '../../src/app.ts';
 import { db } from '../../src/db/client.ts';
 import { signAccess } from '../../src/lib/jwt.ts';
+import { seedRoleForUser } from './fx-m2-helpers.ts';
 
 const permsFor = (k: string): string[] => {
   const t = ROLE_TEMPLATES.find((x) => x.templateKey === k);
@@ -103,6 +104,9 @@ beforeAll(async () => {
     walkInTicket = await mkTicket(3, null);
   });
 
+  // FX-133: navbat filial doirasi tayinlovlardan o'qiladi — real tayinlov (tenant-wide).
+  await seedRoleForUser(tenantId, doctorId, null, permsFor('doctor'));
+  await seedRoleForUser(tenantId, receptionistId, null, permsFor('receptionist'));
   doctorToken = await tokenFor(doctorId, permsFor('doctor'), 'doctor');
   receptionistToken = await tokenFor(receptionistId, permsFor('receptionist'), 'receptionist');
 });

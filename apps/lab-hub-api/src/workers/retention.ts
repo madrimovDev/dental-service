@@ -1,11 +1,11 @@
-import { and, eq, inArray, isNull, lt, or } from 'drizzle-orm';
+import { and, inArray, isNull, lt, or } from 'drizzle-orm';
 import { caseFiles, caseMessages, cases, labs } from '../db/schema';
 import { withLab } from '../db/scoped';
 import type { Deps } from '../deps';
 import { recordEvent } from '../modules/cases/case-core';
 
 /**
- * Saqlash muddati (L9): `delivered`dan 12 oy keyin (rad etilgan ishlar — oxirgi
+ * Saqlash muddati (L9): `delivered`dan 12 oy keyin (rad etilgan / bekor qilingan ishlar — oxirgi
  * o'zgarishdan 12 oy keyin) bemor ismi, izoh, rang, xabarlar va fayl nomlari
  * NULL, fayl bloblari diskdan o'chiriladi. Narx/akt (approved_price, settlements)
  * qoladi. `case_events`ga `purged`. Idempotent (`purged_at`).
@@ -33,7 +33,8 @@ export const runRetention = async (deps: Pick<Deps, 'db' | 'storage' | 'now'>) =
             isNull(cases.purgedAt),
             or(
               lt(cases.deliveredAt, cutoff),
-              and(eq(cases.status, 'rejected'), lt(cases.updatedAt, cutoff)),
+              // FX-46: klinika bekor qilgan ishlar ham rad etilganlar kabi o'chadi.
+              and(inArray(cases.status, ['rejected', 'cancelled']), lt(cases.updatedAt, cutoff)),
             ),
           ),
         );

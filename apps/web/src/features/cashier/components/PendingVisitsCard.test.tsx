@@ -1,5 +1,6 @@
 import { fireEvent, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { i18n } from '@/lib/i18n.ts';
 import { renderApp } from '../../../test-utils';
 import type { PendingVisit } from '../cashier.types';
 import { PendingVisitsCard } from './PendingVisitsCard';
@@ -19,6 +20,33 @@ const visit = (over: Partial<PendingVisit> = {}): PendingVisit => ({
 });
 
 describe('PendingVisitsCard', () => {
+  it("FX-174: kechikish sanasi joriy til locale'ida (ru) va matnlar «bugungi» demaydi", async () => {
+    const iso = '2026-11-11T08:00:00Z';
+    const fmt = (loc: string) =>
+      new Date(iso).toLocaleDateString(loc, { timeZone: 'Asia/Tashkent' });
+    expect(fmt('ru-RU')).not.toBe(fmt('uz-UZ'));
+    const prev = i18n.language;
+    await i18n.changeLanguage('ru');
+    try {
+      renderApp(
+        <PendingVisitsCard
+          visits={[visit({ overdue: true, signedAt: iso })]}
+          activeVisitId={null}
+          onTake={vi.fn()}
+        />,
+      );
+      expect(screen.getByTestId('pending-visit-overdue').textContent).toContain(fmt('ru-RU'));
+      for (const lng of ['uz', 'ru']) {
+        for (const k of ['reception_text', 'hint']) {
+          const txt = i18n.t(`cashierHandoff.${k}`, { lng });
+          expect(txt).not.toMatch(/bugungi|сегодня/i);
+        }
+      }
+    } finally {
+      await i18n.changeLanguage(prev);
+    }
+  });
+
   it('FX-17: kechikkan vizit belgilanadi, bugungisi belgilanmaydi', () => {
     renderApp(
       <PendingVisitsCard

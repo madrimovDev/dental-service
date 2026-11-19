@@ -15,6 +15,8 @@ import { CrossEntityError, createOwnershipValidator } from '../../lib/ownership.
 import { assertBranchExists } from '../../lib/ownership-refs.ts';
 import { pgErrorInfo } from '../../lib/pg-error.ts';
 import { reminderDelayMs } from '../../lib/reminder-delay.ts';
+import { readReminderLeadHours } from '../../lib/reminder-lead-hours.ts';
+import { createStockService } from '../stock/stock.service.ts';
 import type {
   CreateAppointmentInput,
   ListAppointmentsQuery,
@@ -151,8 +153,29 @@ export const createAppointmentsService = (deps: {
   recall?: RecallAppointmentHook;
   noShowStrike?: NoShowStrikeHook;
   queue?: QueueReverseSyncHook;
+  /** FX-45: yozilish bekor/no_show → bog'liq vizit yozuvlari ombor chiqimini qaytarish. */
+  returnVisitStock?: (c: Context, appointmentId: string) => Promise<void>;
+  /** FX-45 review: cancelled/no_show → faol qayta-faollashtirishda qaytarilgan chiqimni qayta ayirish. */
+  redeductVisitStock?: (c: Context, appointmentId: string) => Promise<void>;
+  /** FX-45 seam: qayta ayirish qoldiqni chegaradan tushirsa low-stock alert (bo'lmasa jim). */
+  notifications?: Parameters<typeof createStockService>[0]['notifications'];
 }) => {
   const ownership = createOwnershipValidator();
+  const stockService = createStockService({
+    audit: deps.audit,
+    notifications: deps.notifications,
+  });
+  const returnVisitStock = deps.returnVisitStock ?? stockService.returnVisitStockForAppointment;
+  const redeductVisitStock =
+    deps.redeductVisitStock ?? stockService.redeductVisitStockForAppointment;
+
+  /**
+   * FX-39 (LA-23): eslatma `tenant_settings.reminder_lead_hours` soat oldin ketadi
+   * (ilgari hardcode 24). RLS tenantni filtrlaydi; qator yo'q → default 24.
+   */
+  function reminderLeadHours(c: Context): Promise<number> {
+    return readReminderLeadHours(getDb(c));
+  }
 
   /**
    * FX-02 (LA-46, X-1): FK constraint RLS'ni chetlab o'tadi — begona tenant bemori /
@@ -266,10 +289,11 @@ export const createAppointmentsService = (deps: {
     return null;
   }
 
-  async function list(c: Context, query: ListAppointmentsQuery) {
+  async function list(c: Context, query: ListAppointmentsQuery, branchIds?: string[]) {
     const db = getDb(c);
     const filters = [];
     if (query.branchId) filters.push(eq(appointments.branchId, query.branchId));
+    else if (branchIds) filters.push(inArray(appointments.branchId, branchIds));
     if (query.doctorId) filters.push(eq(appointments.doctorId, query.doctorId));
     if (query.patientId) filters.push(eq(appointments.patientId, query.patientId));
     if (query.from && query.to) {
@@ -398,7 +422,7 @@ export const createAppointmentsService = (deps: {
       after: appt,
     });
 
-    const delay = reminderDelayMs(start, new Date());
+    const delay = reminderDelayMs(start, new Date(), await reminderLeadHours(c));
     if (delay != null && deps.enqueueReminder) {
       const enqueue = deps.enqueueReminder;
       await onAfterCommit(c, () => enqueue(tenantId, appt.id, delay));
@@ -412,7 +436,18 @@ export const createAppointmentsService = (deps: {
     return { ok: true as const, appointment: appt };
   }
 
-  async function update(c: Context, id: string, input: UpdateAppointmentInput) {
+  /**
+   * `opts.returnStock` — FX-45 review: faqat QO'LDA bekor/no_show (HTTP PATCH yoki
+   * /cancel) bog'liq vizit chiqimini qaytaradi. Tizim o'tishlari (no-show sweep,
+   * navbat sinxroni, Telegram bot) bermaydi — ishlatilgan material avtomatik
+   * omborga qaytmasin.
+   */
+  async function update(
+    c: Context,
+    id: string,
+    input: UpdateAppointmentInput,
+    opts: { returnStock?: boolean } = {},
+  ) {
     const db = getDb(c);
     const [before] = await db.select().from(appointments).where(eq(appointments.id, id));
     if (!before) return { ok: false as const, code: 'not_found' };
@@ -495,6 +530,12 @@ export const createAppointmentsService = (deps: {
     if (input.doctorId) patch.doctorId = input.doctorId;
     if (input.assistantId !== undefined) patch.assistantId = input.assistantId;
     if (input.status) patch.status = input.status;
+    // FX-57: ko'chirilgan 'confirmed' yozilish — bemor eski vaqtni tasdiqlagan edi; yangi
+    // vaqt tasdiqlanmagan → 'scheduled'ga qaytadi (aniq status berilsa, o'sha saqlanadi).
+    const startMoved =
+      !!input.startTime &&
+      new Date(input.startTime).getTime() !== new Date(before.startTime).getTime();
+    if (startMoved && !input.status && beforeStatus === 'confirmed') patch.status = 'scheduled';
     if (input.serviceIds) patch.serviceIds = input.serviceIds;
     if (input.notes !== undefined) patch.notes = input.notes;
     if (input.cancellationReason !== undefined) patch.cancellationReason = input.cancellationReason;
@@ -521,6 +562,29 @@ export const createAppointmentsService = (deps: {
         before,
         after: updated,
       });
+
+      // FX-45 (LA-41): faolmas holatga (cancelled/no_show) O'TGANDA bog'liq vizit yozuvlari
+      // (imzolangani ham) ombor chiqimi qaytariladi. Idempotent (ledger qoldig'i).
+      // Faqat qo'lda o'tishda (opts.returnStock) — sweep/bot ishlatilgan materialni qaytarmaydi.
+      if (
+        opts.returnStock &&
+        (input.status === 'cancelled' || input.status === 'no_show') &&
+        before.status !== input.status
+      ) {
+        await returnVisitStock(c, id);
+      }
+
+      // FX-45 review: cancelled/no_show → faol (qayta-faollashtirish) — bekorda qaytarilgan
+      // chiqim qayta ayiriladi (idempotent ledger: Σ cancel_return − Σ reactivate). Gate'siz:
+      // faqat haqiqatan qaytarilgan miqdorni tiklaydi, sweep (qaytarmagan) holatda 0.
+      if (
+        input.status &&
+        isActiveStatus(input.status as AppointmentStatus) &&
+        !isActiveStatus(beforeStatus) &&
+        beforeStatus !== 'completed'
+      ) {
+        await redeductVisitStock(c, id);
+      }
 
       // B4: yozilish completed'ga O'TGANDA profilaktik recall (transition guard —
       // before.status != completed && yangi == completed; re-PATCH qayta yoqmaydi).
@@ -578,7 +642,17 @@ export const createAppointmentsService = (deps: {
 
       // CLI-474 (L7): no_show'ga O'TGANDA bemor strike'i (transition edge —
       // re-PATCH no_show→no_show qayta yozmaydi; unique appointmentId ham himoya).
-      if (input.status === 'no_show' && before.status !== 'no_show' && deps.noShowStrike) {
+      // FX-54: hali boshlanmagan (startTime kelajakda) yozilish scheduled/confirmed'dan no_show
+      // qilinsa — bemor hali «kelmagan» emas, strike yozilmaydi (status o'zgaradi). Qabulga
+      // chaqirilgan (in_progress) bemor esa vaqtidan qat'i nazar kelmagan hisoblanadi (CLI-480).
+      const noShowStarted =
+        before.status === 'in_progress' || new Date(updated.startTime).getTime() <= Date.now();
+      if (
+        input.status === 'no_show' &&
+        before.status !== 'no_show' &&
+        noShowStarted &&
+        deps.noShowStrike
+      ) {
         const tenantId = c.get('activeTenantId');
         if (tenantId) {
           await deps.noShowStrike.recordOnNoShow(c, {
@@ -605,7 +679,15 @@ export const createAppointmentsService = (deps: {
             await onAfterCommit(c, () => remove(id));
           }
           if (isActiveStatus(updated.status as AppointmentStatus)) {
-            const delay = reminderDelayMs(new Date(updated.startTime), new Date());
+            const now = new Date();
+            let delay = reminderDelayMs(
+              new Date(updated.startTime),
+              now,
+              await reminderLeadHours(c),
+            );
+            // FX-57: yangi vaqt lead oynasidan yaqin (lekin kelajakda) — bemor ko'chirilganini
+            // bilishi uchun eslatma darhol ketadi.
+            if (delay == null && startMoved && new Date(updated.startTime) > now) delay = 0;
             if (delay != null && deps.enqueueReminder) {
               const enqueue = deps.enqueueReminder;
               await onAfterCommit(c, () => enqueue(tenantId, id, delay));
@@ -619,7 +701,11 @@ export const createAppointmentsService = (deps: {
         // P4: status-only qayta faollashtirish (cancelled/no_show → active) —
         // bekor qilishda eslatma o'chirilgan edi, endi qayta qo'yiladi.
         const tenantId = c.get('activeTenantId');
-        const delay = reminderDelayMs(new Date(updated.startTime), new Date());
+        const delay = reminderDelayMs(
+          new Date(updated.startTime),
+          new Date(),
+          await reminderLeadHours(c),
+        );
         if (tenantId && delay != null && deps.enqueueReminder) {
           const enqueue = deps.enqueueReminder;
           await onAfterCommit(c, () => enqueue(tenantId, id, delay));
@@ -641,8 +727,13 @@ export const createAppointmentsService = (deps: {
     return { ok: true as const, appointment: updated };
   }
 
-  async function cancel(c: Context, id: string, reason?: string) {
-    return update(c, id, { status: 'cancelled', cancellationReason: reason });
+  async function cancel(
+    c: Context,
+    id: string,
+    reason?: string,
+    opts: { returnStock?: boolean } = {},
+  ) {
+    return update(c, id, { status: 'cancelled', cancellationReason: reason }, opts);
   }
 
   /**

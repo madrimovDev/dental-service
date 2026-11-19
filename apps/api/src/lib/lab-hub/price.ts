@@ -64,6 +64,17 @@ export const bookHubConfirmedPrice = async (
 ): Promise<{ booked: boolean; expenseId: string | null }> => {
   const order = await lockOrder(tx, labOrderId);
   if (!order || order.approvedPrice != null) return { booked: false, expenseId: null };
+  // FX-46/47: Hub tasdiqlagan narx — lab akt-sverkasidagi qarz (Hub haqiqat manbai). Lokal
+  // buyurtma bekor qilingan / ish rad etilgan bo'lsa ham xarajat YOZILADI (aks holda kitoblar
+  // Hub'dan ajraladi), lekin xodim ogohlantiriladi. Yangi tasdiq bunday ishga baribir o'tmaydi:
+  // approvePrice lokal 409, Hub approve-price `case.rejected|cancelled` 409, bekor qilish esa
+  // tasdiq yo'lda bo'lganda 409.
+  const mismatch =
+    order.status === 'cancelled'
+      ? 'cancelled'
+      : order.hubStatus === 'rejected' || order.hubStatus === 'cancelled'
+        ? order.hubStatus
+        : null;
   const price = Number(hubPrice).toFixed(2);
   const requestedBy = order.priceApprovalRequestedBy ?? null;
 
@@ -119,7 +130,12 @@ export const bookHubConfirmedPrice = async (
       requestedPrice: order.priceApprovalRequestedPrice,
       approvedPrice: null,
     },
-    after: { approvedPrice: price, expenseId: expense?.id ?? null, source: 'lab_hub' },
+    after: {
+      approvedPrice: price,
+      expenseId: expense?.id ?? null,
+      source: 'lab_hub',
+      ...(mismatch ? { mismatch } : {}),
+    },
   });
   if (expense) {
     await tx.insert(auditLog).values({
@@ -130,6 +146,24 @@ export const bookHubConfirmedPrice = async (
       resourceId: expense.id,
       after: { amount: price, labOrderId, category: LAB_EXPENSE_CATEGORY.name },
     });
+  }
+  if (mismatch) {
+    const recipients = new Set<string>([order.doctorId]);
+    if (requestedBy) recipients.add(requestedBy);
+    const ref = order.orderNumber != null ? `#${order.orderNumber}` : '';
+    const title =
+      mismatch === 'cancelled'
+        ? `Bekor qilingan ish uchun laboratoriya narxni tasdiqlagan — ${formatSum(price)} xarajat yozildi`
+        : `Rad etilgan ish uchun laboratoriya narxni tasdiqlagan — ${formatSum(price)} xarajat yozildi`;
+    for (const userId of recipients) {
+      await tx.insert(notifications).values({
+        tenantId,
+        userId,
+        type: 'lab_hub.price',
+        title,
+        body: [order.labName, ref].filter(Boolean).join(' · ') || null,
+      });
+    }
   }
   return { booked: true, expenseId: expense?.id ?? null };
 };
@@ -175,12 +209,18 @@ export const rejectPendingPriceApproval = async (
   const recipients = new Set<string>([order.doctorId]);
   if (order.priceApprovalRequestedBy) recipients.add(order.priceApprovalRequestedBy);
   const ref = order.orderNumber != null ? `#${order.orderNumber}` : '';
-  const title =
-    hubCode === 'price.already_approved'
+  const priceCode = hubCode.startsWith('price.');
+  const title = !priceCode
+    ? 'Narx tasdig‘i laboratoriyaga yetmadi — qayta tasdiqlang'
+    : hubCode === 'price.already_approved'
       ? 'Narx tasdig‘i qabul qilinmadi: ish boshqa narx bilan tasdiqlangan'
-      : nextProposed
-        ? `Narx tasdiqlanmadi: laboratoriya narxni o'zgartirdi — ${formatSum(nextProposed)}`
-        : 'Narx tasdiqlanmadi: laboratoriya taklifni qaytarib oldi';
+      : hubCode === 'case.rejected'
+        ? 'Narx tasdiqlanmadi: laboratoriya ishni rad etgan'
+        : hubCode === 'case.cancelled'
+          ? 'Narx tasdiqlanmadi: ish bekor qilingan'
+          : nextProposed
+            ? `Narx tasdiqlanmadi: laboratoriya narxni o'zgartirdi — ${formatSum(nextProposed)}`
+            : 'Narx tasdiqlanmadi: laboratoriya taklifni qaytarib oldi';
   for (const userId of recipients) {
     await tx.insert(notifications).values({
       tenantId,

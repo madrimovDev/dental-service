@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { ROLE_TEMPLATES } from '@dental/core';
 import {
   branches,
+  cashierTransactionItems,
   cashierTransactions,
   patients,
   permissions,
@@ -113,17 +114,30 @@ beforeAll(async () => {
     await mk('d45', 45 * DAY);
     await mk('draft', 2 * DAY, false);
     await mk('paidOld', 3 * DAY);
-    await tx.insert(cashierTransactions).values({
-      tenantId,
-      branchId,
-      patientId: p?.id as string,
-      visitNoteId: v.paidOld,
-      totalAmount: '500000',
-      paidAmount: '500000',
-      paymentMethod: 'cash',
-      type: 'payment',
-      status: 'completed',
-      createdBy: userId,
+    // FX-63: undirilgan miqdor to'lov qatorlari (items) bo'yicha hisoblanadi — haqiqiy vizit to'lovi
+    // doim items bilan keladi.
+    const [paidTx] = await tx
+      .insert(cashierTransactions)
+      .values({
+        tenantId,
+        branchId,
+        patientId: p?.id as string,
+        visitNoteId: v.paidOld,
+        totalAmount: '500000',
+        paidAmount: '500000',
+        paymentMethod: 'cash',
+        type: 'payment',
+        status: 'completed',
+        createdBy: userId,
+      })
+      .returning({ id: cashierTransactions.id });
+    await tx.insert(cashierTransactionItems).values({
+      transactionId: paidTx?.id as string,
+      serviceId: svc,
+      serviceName: 'Plomba',
+      quantity: 1,
+      unitPrice: '500000',
+      subtotal: '500000',
     });
   });
 

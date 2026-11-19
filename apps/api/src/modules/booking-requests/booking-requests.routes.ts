@@ -2,6 +2,11 @@ import { fail, ok } from '@dental/core';
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import {
+  BRANCH_FORBIDDEN_CODE,
+  BRANCH_FORBIDDEN_MESSAGE,
+  loadBranchScope,
+} from '../../lib/branch-scope.ts';
 import { errorResponseSchema, okJson } from '../../lib/openapi.ts';
 import type { PatientMessenger } from '../../lib/telegram/notify.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
@@ -48,11 +53,28 @@ export const bookingRequestRoutes = (deps: {
     operationId: 'listBookingRequests',
     middleware: [requirePermission('appointment.view')] as const,
     request: { query: listBookingRequestsQuery },
-    responses: okJson(bookingRequestListSchema, 'Telegram booking requests'),
+    responses: {
+      ...okJson(bookingRequestListSchema, 'Telegram booking requests'),
+      403: errResp('Branch is outside the caller scope'),
+    },
   });
   app.openapi(listRoute, async (c) => {
     const query = c.req.valid('query');
-    return c.json(ok(await service.list(c, query)), 200);
+    // FX-53 (X-2/D-8): ro'yxat va pendingCount chaqiruvchining filiallari bilan cheklanadi.
+    const scope = await loadBranchScope(c, 'appointment.view');
+    if (scope.kind === 'none') {
+      return c.json(fail(BRANCH_FORBIDDEN_CODE, BRANCH_FORBIDDEN_MESSAGE), 403);
+    }
+    let branchIds: string[] | null = null;
+    if (scope.kind === 'branches') {
+      if (query.branchId && !scope.branchIds.includes(query.branchId)) {
+        return c.json(fail(BRANCH_FORBIDDEN_CODE, BRANCH_FORBIDDEN_MESSAGE), 403);
+      }
+      branchIds = query.branchId ? [query.branchId] : scope.branchIds;
+    } else if (query.branchId) {
+      branchIds = [query.branchId];
+    }
+    return c.json(ok(await service.list(c, query, branchIds)), 200);
   });
 
   // ─── POST /booking-requests/{id}/confirm ────────────────────────────────────
@@ -68,6 +90,7 @@ export const bookingRequestRoutes = (deps: {
     },
     responses: {
       ...okJson(bookingRequestDecisionSchema, 'Booking request confirmed, appointment created'),
+      403: errResp('Booking request belongs to a branch outside the caller scope'),
       404: errResp('Booking request not found'),
       409: errResp('Slot is no longer available / request already decided (request stays pending)'),
     },
@@ -82,6 +105,9 @@ export const bookingRequestRoutes = (deps: {
           ok({ id: res.id, status: res.status, appointmentId: res.appointmentId }),
           200,
         );
+      }
+      if (res.code === BRANCH_FORBIDDEN_CODE) {
+        return c.json(fail(BRANCH_FORBIDDEN_CODE, BRANCH_FORBIDDEN_MESSAGE), 403);
       }
       // FX-03b: begona doktor/filial/bemor/yordamchi → 404 (so'rov pending qoladi).
       if (res.code === 'not_found' || res.code.endsWith('.not_found')) {
@@ -107,6 +133,7 @@ export const bookingRequestRoutes = (deps: {
     },
     responses: {
       ...okJson(bookingRequestDecisionSchema, 'Booking request declined'),
+      403: errResp('Booking request belongs to a branch outside the caller scope'),
       404: errResp('Booking request not found'),
       409: errResp('Request already decided'),
     },
@@ -117,6 +144,9 @@ export const bookingRequestRoutes = (deps: {
     const res = await service.decline(c, id, input);
     if (res.ok) {
       return c.json(ok({ id: res.id, status: res.status, appointmentId: null }), 200);
+    }
+    if (res.code === BRANCH_FORBIDDEN_CODE) {
+      return c.json(fail(BRANCH_FORBIDDEN_CODE, BRANCH_FORBIDDEN_MESSAGE), 403);
     }
     return c.json(fail(res.code, res.code), res.code === 'not_found' ? 404 : 409);
   });

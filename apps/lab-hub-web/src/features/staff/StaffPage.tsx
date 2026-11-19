@@ -47,6 +47,14 @@ export function StaffPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: caseKeys.users }),
   });
 
+  const reset = useMutation({
+    mutationFn: (u: LabUserDto) => api.post<Created>(`/v1/lab/users/${u.id}/reset-password`),
+    onSuccess: (r) => {
+      setCreated(r);
+      void qc.invalidateQueries({ queryKey: caseKeys.users });
+    },
+  });
+
   const submit = (e: FormEvent) => {
     e.preventDefault();
     setFormError(null);
@@ -165,6 +173,18 @@ export function StaffPage() {
                         </StatusPill>
                       </td>
                       <td style={{ textAlign: 'right' }}>
+                        {u.id !== me?.id && u.role === 'technician' && (
+                          <button
+                            type="button"
+                            className="btn btn--sm"
+                            disabled={reset.isPending}
+                            onClick={() => {
+                              if (window.confirm(t('labHub.staff.resetConfirm'))) reset.mutate(u);
+                            }}
+                          >
+                            {t('labHub.staff.resetPassword')}
+                          </button>
+                        )}{' '}
                         {u.id !== me?.id && (
                           <button
                             type="button"

@@ -41,3 +41,26 @@ describe('fiscal provider', () => {
     expect(r.fiscalId).toBeNull();
   });
 });
+
+describe('FX-77: Soliq fetch timeout', () => {
+  test('javob kelmasa timeoutMs dan keyin to‘xtaydi (osilib qolmaydi)', async () => {
+    const server = Bun.serve({
+      port: 0,
+      fetch: () => new Promise<Response>(() => {}),
+    });
+    try {
+      const provider = createSoliqFiscalProvider({
+        apiUrl: `http://127.0.0.1:${server.port}`,
+        apiKey: 'k',
+        timeoutMs: 150,
+      });
+      const t0 = Date.now();
+      const r = await provider.createReceipt(payment);
+      expect(Date.now() - t0).toBeLessThan(3000);
+      expect(r.fiscalId).toBeNull();
+      expect((r.response as { provider: string }).provider).toBe('soliq');
+    } finally {
+      server.stop(true);
+    }
+  }, 10000);
+});

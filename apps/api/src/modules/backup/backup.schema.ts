@@ -12,6 +12,8 @@ export const BACKUP_SETTINGS_FILE = 'backup-settings.json';
 export const BACKUP_STATE_FILE = 'backup-state.json';
 export const BACKUP_REQUEST_FILE = 'backup-request.json';
 export const RESTORE_REQUEST_FILE = 'restore-request.json';
+/** FX-147: Electron main tiklash natijasini shu faylga yozadi (`writeRestoreResult`). */
+export const RESTORE_RESULT_FILE = 'restore-result.json';
 
 export const backupFileSchema = z
   .object({
@@ -21,6 +23,22 @@ export const backupFileSchema = z
   })
   .openapi('BackupFile');
 
+/**
+ * FX-147: oxirgi tiklash natijasi (`restore-result.json`). `lastError`dan ALOHIDA — u faqat
+ * zaxira olish holati. `running` — tiklash hozir bajarilmoqda (finishedAt = boshlangan vaqt).
+ */
+export const backupRestoreResultSchema = z
+  .object({
+    status: z.enum(['running', 'ok', 'failed']),
+    file: z.string().nullable(),
+    finishedAt: z.string().nullable(),
+    error: z.string().nullable(),
+    /** `failed`da: baza tiklashdan oldingi nusxaga qaytarildimi (null — baza tegilmagan). */
+    dbRolledBack: z.boolean().nullable(),
+  })
+  .openapi('BackupRestoreResult');
+export type BackupRestoreResultDto = z.infer<typeof backupRestoreResultSchema>;
+
 export const backupStatusSchema = z
   .object({
     mode: z.enum(['desktop', 'cloud']),
@@ -28,6 +46,7 @@ export const backupStatusSchema = z
     lastSuccessAt: z.string().nullable(),
     lastError: z.string().nullable(),
     files: z.array(backupFileSchema),
+    lastRestore: backupRestoreResultSchema.nullable(),
   })
   .openapi('BackupStatus');
 export type BackupStatusDto = z.infer<typeof backupStatusSchema>;

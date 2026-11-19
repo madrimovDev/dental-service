@@ -19,12 +19,19 @@ export const createReminderScheduler = (queue: Queue) => {
     const jobId = reminderJobId(appointmentId);
     const existing = await queue.getJob(jobId);
     if (existing) {
-      try {
-        await existing.changeDelay(delayMs);
-        return;
-      } catch {
-        // Job ACTIVE/completed bo'lib o'zgartirib bo'lmadi — pastda qayta
-        // qo'shishga urinamiz (worker aynan shu lahzada ishlab turgan chekka holat).
+      // FX-83: muvaffaqiyatsiz (failed) job Redis'da `removeOnFail: 100` sabab saqlanadi va bir xil
+      // `jobId` bilan `add()` uni dedupe qilib YUTARDI — qayta rejalashtirilgan eslatma hech qachon
+      // ketmasdi. Failed bo'lsa olib tashlab, yangidan qo'shamiz.
+      if ((await existing.getState()) === 'failed') {
+        await existing.remove().catch(() => {});
+      } else {
+        try {
+          await existing.changeDelay(delayMs);
+          return;
+        } catch {
+          // Job ACTIVE/completed bo'lib o'zgartirib bo'lmadi — pastda qayta
+          // qo'shishga urinamiz (worker aynan shu lahzada ishlab turgan chekka holat).
+        }
       }
     }
     await queue.add(

@@ -28,6 +28,7 @@ import {
   labOrderIdParamSchema,
   labOrderListResponseDtoSchema,
   listLabOrdersQuerySchema,
+  remakeLabOrderSchema,
   sendToHubSchema,
   updateLabOrderSchema,
 } from './lab-orders.schema.ts';
@@ -117,6 +118,22 @@ export const labOrdersRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     const rows = await service.overdue(c);
     return c.json(ok(rows.map(toLabOrderDto)), 200);
   });
+
+  // ─── GET /doctors — buyurtma shifokorini tanlash (FX-112) ────────────────────
+  // `lab_order.manage` yetarli: Technician'da `appointment.view` yo'q (CLI-154/155 naqshi — tor endpoint).
+  const doctorsRoute = createRoute({
+    method: 'get',
+    path: '/doctors',
+    tags: ['lab-orders'],
+    operationId: 'listLabOrderDoctors',
+    middleware: [requirePermission('lab_order.manage'), requireFeature('labOrders')] as const,
+    responses: okJson(
+      z.array(z.object({ id: z.uuid(), name: z.string() })),
+      'Practitioners who can be set as the lab order doctor',
+    ),
+  });
+
+  app.openapi(doctorsRoute, async (c) => c.json(ok(await service.listDoctors(c)), 200));
 
   // ─── POST / — create ─────────────────────────────────────────────────────────
 
@@ -331,6 +348,32 @@ export const labOrdersRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     const { labId } = c.req.valid('json');
     try {
       const row = await hub.sendToHub(c, id, labId);
+      if (!row) return c.json(fail('lab_order.not_found', 'Not found'), 404);
+      return c.json(ok(toLabOrderDto(row)), 200);
+    } catch (e) {
+      const r = hubFail(e);
+      return c.json(r.body, r.status);
+    }
+  });
+
+  const remakeRoute = createRoute({
+    method: 'post',
+    path: '/{id}/remake',
+    tags: ['lab-orders'],
+    operationId: 'requestLabOrderRemake',
+    middleware: [requirePermission('lab_order.manage'), requireFeature('labOrders')] as const,
+    request: {
+      params: labOrderIdParamSchema,
+      body: { content: { 'application/json': { schema: remakeLabOrderSchema } }, required: true },
+    },
+    responses: { ...okJson(labOrderDtoSchema, 'Remake queued for Lab Hub'), ...hubErrorResponses },
+  });
+
+  app.openapi(remakeRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const { reason } = c.req.valid('json');
+    try {
+      const row = await hub.requestRemake(c, id, reason);
       if (!row) return c.json(fail('lab_order.not_found', 'Not found'), 404);
       return c.json(ok(toLabOrderDto(row)), 200);
     } catch (e) {

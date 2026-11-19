@@ -6,6 +6,11 @@ export type AppRole = 'server' | 'client';
 export interface AppConfig {
   role: AppRole;
   serverUrl: string | null; // null = hali topilmagan, discovery qayta ishlaydi
+  /**
+   * FX-145 — klient: `serverUrl` bilan birga pinlangan server identifikatori
+   * (`/api/health` `serverId`). `null` = hali pinlanmagan.
+   */
+  trustedServerId: string | null;
   licenseKey: string | null;
   serverPort: number;
   /**
@@ -18,6 +23,7 @@ export interface AppConfig {
 const DEFAULTS: AppConfig = {
   role: 'server',
   serverUrl: null,
+  trustedServerId: null,
   licenseKey: null,
   serverPort: 8080,
   labHubUrl: '',

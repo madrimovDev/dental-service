@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "tenant_settings_telegram_bot_id_uq" ON "tenant_settings" USING btree (("integration_settings" -> 'telegram' ->> 'botId')) WHERE "tenant_settings"."integration_settings" -> 'telegram' ->> 'botId' IS NOT NULL;

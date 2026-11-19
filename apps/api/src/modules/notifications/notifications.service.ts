@@ -4,6 +4,7 @@ import { and, count, desc, eq, isNull } from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { DbOrTx } from '../../db/client.ts';
 import { getDb } from '../../db/scoped.ts';
+import { sendWithFallback } from '../../lib/tenant-channel.ts';
 import { toNotificationDto } from './notifications.mapper.ts';
 import type { ListNotificationsQuery, NotificationsFeed } from './notifications.schema.ts';
 
@@ -13,6 +14,8 @@ export type NotifyPayload = {
   type: string;
   title: string;
   body?: string;
+  /** FX-167: web t() bilan render qilishi uchun tuzilgan parametrlar (title/body — fallback va SMS matni). */
+  params?: Record<string, string | number>;
   /**
    * Berilsa — bemorga ham xabar yuboriladi (`channel` orqali, aks holda
    * `deps.sms`). Nomi tarixiy ("smsTo") — CLI-379/400dan buyon Telegram
@@ -28,6 +31,10 @@ export type NotifyPayload = {
   channel?: NotificationChannel;
   /** UI-T2: Telegram inline tugmalar (eslatma: Kelaman / Boshqa vaqt / Bekor). SMS e'tiborsiz qoldiradi. */
   buttons?: MessageButton[][];
+  /** FX-41: Telegram ishlamasa SMS zaxirasi (`resolveTenantChannel().fallback`). */
+  fallback?: { channel: NotificationChannel; to: string } | null;
+  /** FX-41: Telegram 403 (bot bloklangan) — chaqiruvchi chat_id bog'lanishini tozalaydi. */
+  onBlocked?: () => Promise<void>;
 };
 
 /**
@@ -53,6 +60,7 @@ export const createNotificationsService = (deps: { sms: NotificationChannel }) =
         type: payload.type,
         title: payload.title,
         body: payload.body ?? null,
+        params: payload.params ?? null,
       })
       .returning();
 
@@ -60,9 +68,10 @@ export const createNotificationsService = (deps: { sms: NotificationChannel }) =
       try {
         const text = payload.title + (payload.body ? ` — ${payload.body}` : '');
         const channel = payload.channel ?? deps.sms;
-        const res = await channel.send(
-          payload.smsTo,
+        const { res } = await sendWithFallback(
+          { channel, to: payload.smsTo, fallback: payload.fallback },
           payload.buttons ? { text, buttons: payload.buttons } : { text },
+          payload.onBlocked,
         );
         if (!res.ok) {
           console.error(`[notifications] SMS yuborilmadi (${payload.smsTo}): ${res.error}`);

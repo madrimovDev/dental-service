@@ -36,7 +36,7 @@ export const tenantRoutes = (deps: { db: Database; audit: AuditLogger }) => {
   app.openapi(getRoute, async (c) => {
     const tenant = await service.getCurrent(c);
     if (!tenant) return c.json(fail('tenant.not_found', 'Tenant not found'), 404);
-    return c.json(ok(toTenantDto(tenant)), 200);
+    return c.json(ok(toTenantDto(await service.withSubscriptionStatus(c, tenant))), 200);
   });
 
   // PATCH /api/tenant — tenant nomini / tilini yangilash
@@ -62,7 +62,7 @@ export const tenantRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     const body = c.req.valid('json');
     const updated = await service.update(c, body);
     if (!updated) return c.json(fail('tenant.not_found', 'Tenant not found'), 404);
-    return c.json(ok(toTenantDto(updated)), 200);
+    return c.json(ok(toTenantDto(await service.withSubscriptionStatus(c, updated))), 200);
   });
 
   // POST /api/tenant/transfer-ownership — OWNER-ONLY (explicit in-handler check, no requirePermission)
@@ -87,7 +87,7 @@ export const tenantRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     if (!result.tenant) {
       return c.json(fail('tenant.not_found', 'Tenant not found'), 400);
     }
-    return c.json(ok(toTenantDto(result.tenant)), 200);
+    return c.json(ok(toTenantDto(await service.withSubscriptionStatus(c, result.tenant))), 200);
   });
 
   return app;

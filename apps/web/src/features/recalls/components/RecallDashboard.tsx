@@ -194,7 +194,7 @@ export function RecallDashboard() {
                           variant="filled"
                           color="teal"
                           component={Link}
-                          to={`/appointments?patientId=${r.patientId}`}
+                          to={`/appointments/new?patientId=${r.patientId}`}
                           leftSection={<IconCalendarPlus size={14} />}
                         >
                           {t('recall.action.schedule')}

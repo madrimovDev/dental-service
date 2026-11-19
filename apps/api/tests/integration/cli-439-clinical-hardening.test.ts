@@ -219,10 +219,29 @@ describe('CLI-439 B2 — lab-order status state machine', () => {
 });
 
 describe('CLI-439 B5 (CLI-461 bilan SUPERSEDE qilingan) — setConsent re-link', () => {
+  // FX-61: in_progress planda konsent bog'lash endi 409 — shu bo'lim alohida presented plan ishlatadi.
+  let consentPlanId: string;
+  beforeAll(async () => {
+    consentPlanId = await db.transaction(async (tx) => {
+      await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
+      const [p] = await tx
+        .insert(treatmentPlans)
+        .values({
+          tenantId,
+          patientId,
+          doctorId: ownerId,
+          title: 'Plan 439 consent',
+          status: 'presented',
+        })
+        .returning({ id: treatmentPlans.id });
+      return p!.id;
+    });
+  });
+
   test('birinchi link (formA) → OK, consentFormId + consentSignedAt saqlanadi', async () => {
     const updated = await db.transaction(async (tx) => {
       await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
-      return plansService.setConsent(ctx(tx), planId, { consentFormId: consentFormIdA });
+      return plansService.setConsent(ctx(tx), consentPlanId, { consentFormId: consentFormIdA });
     });
     expect(updated?.consentFormId).toBe(consentFormIdA);
     expect(updated?.consentSignedAt).not.toBeNull();
@@ -235,7 +254,7 @@ describe('CLI-439 B5 (CLI-461 bilan SUPERSEDE qilingan) — setConsent re-link',
   test('ataylab BOSHQA amaldagi formga qayta linklash → ruxsat etiladi (jim bloklanmaydi)', async () => {
     const updated = await db.transaction(async (tx) => {
       await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
-      return plansService.setConsent(ctx(tx), planId, { consentFormId: consentFormIdB });
+      return plansService.setConsent(ctx(tx), consentPlanId, { consentFormId: consentFormIdB });
     });
     expect(updated?.consentFormId).toBe(consentFormIdB);
   });

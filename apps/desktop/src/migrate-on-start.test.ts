@@ -32,6 +32,7 @@ const makeDeps = (
   }),
   appVersion: opts.version,
   now: () => new Date(2026, 10, 11, 9, 5, 7),
+  pruneOldDumps: mock((_keep: string) => {}),
 });
 
 describe('migrateOnStart', () => {

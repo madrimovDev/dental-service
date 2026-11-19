@@ -293,7 +293,9 @@ export const createBackupScheduler = (deps: BackupSchedulerDeps) => {
           ? ` — baza avvalgi holatga qaytarildi (zaxira: ${preRestore})`
           : ` — baza avvalgi holatga QAYTARILMADI, ma'lumotlar nusxasi: ${preRestore}`;
       }
-      writeState({ lastError: `tiklash muvaffaqiyatsiz (${error})` });
+      // FX-147: tiklash xatosi `restore-result.json`da (API `lastRestore`) — zaxira holati
+      // (`lastError`) bilan aralashtirilmaydi, aks holda keyingi muvaffaqiyatli zaxira uni yashirardi.
+      deps.log(`tiklash muvaffaqiyatsiz: ${error}`);
       return { ok: false, error, ...(dbRolledBack === undefined ? {} : { dbRolledBack }) };
     } finally {
       // Texnik-ish serveri portni bo'shatadi, keyin API qaytadi (API to'xtagan bo'lsa).
@@ -327,7 +329,6 @@ export const createBackupScheduler = (deps: BackupSchedulerDeps) => {
       ...(r.error ? { error: r.error } : {}),
       ...(r.dbRolledBack === undefined ? {} : { dbRolledBack: r.dbRolledBack }),
     });
-    if (r.ok) writeState({ lastError: null });
   };
 
   let polling = false;
@@ -369,9 +370,38 @@ export const createBackupScheduler = (deps: BackupSchedulerDeps) => {
     }, delay);
   };
 
+  /**
+   * FX-147 review: oldingi jarayon tiklash o'rtasida to'xtagan bo'lsa (elektr, Windows o'chishi, tray'dan
+   * chiqish) `restore-result.json` `running`da qolib ketadi → web'da «tiklash bajarilmoqda» abadiy va
+   * barcha «Tiklash» tugmalari bloklanadi. Startup'da (shu jarayonda tiklash ketmayotgan bo'lsa) u
+   * `failed: interrupted` ga qayta yoziladi — baza yarim tiklangan bo'lishi mumkin, egasi qayta tiklaydi.
+   */
+  const reconcileInterruptedRestore = (): void => {
+    if (busy) return;
+    const path = dataPath(RESTORE_RESULT_FILE);
+    if (!existsSync(path)) return;
+    const prev = readJson(path);
+    if (prev.status !== 'running') return;
+    try {
+      writeRestoreResult({
+        status: 'failed',
+        file: typeof prev.file === 'string' ? prev.file : null,
+        error:
+          "interrupted: tiklash kutilmaganda to'xtadi (dastur yopildi yoki elektr o'chdi) — baza yarim tiklangan bo'lishi mumkin, qayta tiklang",
+        // `null` emas: web `null`ni «Ma'lumotlar o'zgarmadi» deb ko'rsatadi — bu yerda baza yarim
+        // tiklangan bo'lishi mumkin va qaytarilmagan → `false` («ta'minotchiga murojaat» matni).
+        dbRolledBack: false,
+      });
+      deps.log('to‘xtab qolgan tiklash natijasi "failed: interrupted" deb belgilandi');
+    } catch (err) {
+      deps.log(`tiklash natijasini tuzatib bo'lmadi: ${errMessage(err)}`);
+    }
+  };
+
   const start = (): void => {
     if (!stopped) return;
     stopped = false;
+    reconcileInterruptedRestore();
     armDaily();
     pollTimer = deps.timers.setInterval(() => void poll(), POLL_INTERVAL_MS);
   };

@@ -31,3 +31,16 @@ export interface UpdateLabInput {
   expiresAt?: string;
   catalogVisible?: boolean;
 }
+
+export interface LabUser {
+  id: string;
+  fullName: string;
+  phone: string;
+  role: 'lead' | 'technician';
+  isActive: boolean;
+}
+
+export interface ResetPasswordResult {
+  user: { id: string; fullName: string; phone: string; role: string };
+  tempPassword: string;
+}

@@ -1,8 +1,10 @@
+import { logout as apiLogout } from '@dental/api-client';
 import { AlertBanner, Button, StateView } from '@dental/ui';
 import { Lock } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '@/stores/auth-store.ts';
 import { useLicenseStatus, useRecheckLicense } from '../license.api';
 
 export function LicenseBlockedScreen() {
@@ -12,6 +14,21 @@ export function LicenseBlockedScreen() {
   const { data: status } = useLicenseStatus();
   const isCloud = status?.mode === 'cloud';
   const [stillExpired, setStillExpired] = useState(false);
+  const refreshToken = useAuthStore((s) => s.refreshToken);
+  const clearAuth = useAuthStore((s) => s.clear);
+
+  // FX-103 (LB-12): blok ekranida qamalib qolmaslik. `/api/auth/*` blokdan ochiq.
+  const onLogout = async () => {
+    if (refreshToken) {
+      try {
+        await apiLogout({ refreshToken });
+      } catch {
+        /* chiqish baribir — lokal sessiya tozalanadi */
+      }
+    }
+    clearAuth();
+    navigate('/login');
+  };
 
   const onRecheck = () => {
     setStillExpired(false);
@@ -49,6 +66,17 @@ export function LicenseBlockedScreen() {
               <Button variant="primary" onClick={onRecheck} disabled={recheck.isPending}>
                 {t('license.blocked.recheck')}
               </Button>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+                {/* SaaS'da obuna klinikaga bog'liq — boshqa (faol) klinikaga o'tish mumkin. */}
+                {isCloud && (
+                  <Button variant="default" onClick={() => navigate('/select-workspace')}>
+                    {t('license.blocked.switchWorkspace')}
+                  </Button>
+                )}
+                <Button variant="ghost" onClick={() => void onLogout()}>
+                  {t('license.blocked.logout')}
+                </Button>
+              </div>
             </div>
           }
         />

@@ -8,9 +8,6 @@
 export type CreateStockBomBody = {
   serviceId: string;
   itemId: string;
-  /**
-   * @minimum 0
-   * @exclusiveMinimum
-   */
+  /** @minimum 0.01 */
   qtyPerService: number;
 };

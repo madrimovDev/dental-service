@@ -113,6 +113,8 @@ export type HubLink = {
 
 export type HubChangeEvent = {
   seq: number;
+  /** Yozgan Hub tranzaksiyasi xid'i (FX-93 dedup kaliti); eski Hub yubormasa — 0. */
+  txId?: number;
   caseRef: string;
   labId: string;
   type: string;
@@ -124,7 +126,7 @@ export type HubChangeEvent = {
 };
 
 export type ConnectProof =
-  | { supervisorClinicId: string; licenseKey: string }
+  | { supervisorClinicId: string; licenseKey: string; fingerprint: string }
   | { supervisorClinicId: string; serviceProof: string };
 
 const ref = (r: string) => encodeURIComponent(r);
@@ -196,8 +198,23 @@ export const labHubClient = (fetchImpl?: FetchFn) => ({
       key,
       fetchImpl,
     }),
+  /** FX-46: klinika ishni bekor qildi — Hub'dagi ish ham yopiladi (lab ishlashni to'xtatadi). */
+  cancelCase: (key: string, caseRef: string) =>
+    json<{ status: string; changed: boolean }>(`/v1/clinic/cases/${ref(caseRef)}/cancel`, {
+      method: 'POST',
+      key,
+      fetchImpl,
+    }),
+  /** FX-78: klinika tayyor/yetkazilgan ishni qayta ishlashga qaytardi (Hub: ready|delivered → remake). */
+  remakeCase: (key: string, caseRef: string, reason?: string | null) =>
+    json<{ status: string; changed: boolean }>(`/v1/clinic/cases/${ref(caseRef)}/remake`, {
+      method: 'POST',
+      key,
+      json: reason ? { reason } : {},
+      fetchImpl,
+    }),
   changes: (key: string, since: string, limit: number) =>
-    json<{ events: HubChangeEvent[]; nextCursor: string }>(
+    json<{ events: HubChangeEvent[]; nextCursor: string; cursorReset?: boolean }>(
       `/v1/clinic/changes?since=${encodeURIComponent(since)}&limit=${limit}`,
       { key, fetchImpl },
     ),

@@ -20,6 +20,7 @@ const dataResult = {
 // biome-ignore lint/suspicious/noExplicitAny: test-only mutable mock result
 let medicalResult: any = dataResult;
 let canView = true;
+let canEditOverride = false;
 
 vi.mock('../../patients.api', () => ({
   useMedicalRecord: () => medicalResult,
@@ -29,7 +30,8 @@ vi.mock('../../patients.api', () => ({
 
 vi.mock('@/stores/auth-store.ts', () => ({
   useAuthStore: () => ({
-    hasPermission: (code: string) => (code === 'medical_record.view' ? canView : false),
+    hasPermission: (code: string) =>
+      code === 'medical_record.view' ? canView : code === 'medical_record.edit' && canEditOverride,
   }),
 }));
 
@@ -37,6 +39,7 @@ describe('MedicalTab', () => {
   beforeEach(() => {
     medicalResult = dataResult;
     canView = true;
+    canEditOverride = false;
     refetchMock.mockClear();
   });
 
@@ -64,5 +67,35 @@ describe('MedicalTab', () => {
   it("ma'lumot yuklangach formani render qiladi", () => {
     renderApp(<MedicalTab patientId="p1" />);
     expect(screen.getByText('Anamnez (umumiy salomatlik tarixi)')).toBeInTheDocument();
+  });
+});
+
+describe('MedicalTab — FX-28 bot anketasi', () => {
+  beforeEach(() => {
+    canView = true;
+  });
+
+  it('anketa qoralamasi ko‘rinadi va «tibbiy kartaga ko‘chirish» formani to‘ldiradi', () => {
+    medicalResult = {
+      ...dataResult,
+      data: {
+        ...dataResult.data,
+        questionnaireAnswers: { allergies: 'penitsillin', chronic: 'diabet' },
+        questionnaireAt: '2026-11-18T10:00:00.000Z',
+      },
+    };
+    canEditOverride = true;
+    renderApp(<MedicalTab patientId="p1" />);
+    expect(screen.getByText('Bemor anketasi (qoralama)')).toBeInTheDocument();
+    expect(screen.getByText('penitsillin')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Tibbiy kartaga ko‘chirish'));
+    expect(screen.getByDisplayValue('diabet')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('penitsillin')).toBeInTheDocument();
+  });
+
+  it('anketa bo‘lmasa blok ko‘rinmaydi', () => {
+    medicalResult = dataResult;
+    renderApp(<MedicalTab patientId="p1" />);
+    expect(screen.queryByText('Bemor anketasi (qoralama)')).toBeNull();
   });
 });

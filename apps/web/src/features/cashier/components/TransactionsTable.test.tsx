@@ -39,6 +39,7 @@ function tx(over: Partial<CashierTransaction> = {}): CashierTransaction {
     visitNoteId: null,
     totalAmount: '120000',
     paidAmount: '120000',
+    refundedAmount: '0',
     discount: '0',
     currency: 'UZS',
     paymentMethod: 'cash',
@@ -108,5 +109,56 @@ describe('TransactionsTable', () => {
     expect(inDialog.getByText('Plomba')).toBeTruthy();
     // Walk-in bemor (tarix VM'da ism yo'q → placeholder).
     expect(inDialog.getByText('Bemorsiz (walk-in)')).toBeTruthy();
+  });
+  it("FX-108: refund dialogi hisob-faktura (500 000) emas, qaytariladigan qoldiqni (paid − refunded) ko'rsatadi", async () => {
+    renderApp(
+      <TransactionsTable
+        transactions={[
+          {
+            ...tx({ totalAmount: '500000', paidAmount: '200000' }),
+            refundedAmount: '0',
+          } as CashierTransaction,
+        ]}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText("To'lovni qaytarish"));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/200\s?000\s?so'm/)).toBeTruthy();
+    expect(within(dialog).queryByText(/500\s?000\s?so'm/)).toBeNull();
+  });
+
+  it('FX-108: qisman refunddan keyin qoldiq (100 000 − 50 000) va max shu qoldiq', async () => {
+    renderApp(
+      <TransactionsTable
+        transactions={[
+          {
+            ...tx({ treatmentPlanId: 'plan1', paidAmount: '100000' }),
+            refundedAmount: '50000',
+          } as CashierTransaction,
+        ]}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText("To'lovni qaytarish"));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/50\s?000\s?so'm/)).toBeTruthy();
+    const input = within(dialog).getByRole('textbox') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '80000' } });
+    fireEvent.blur(input);
+    // max = qoldiq (50 000): 80 000 qisqartiriladi.
+    expect(input.value.replace(/\s/g, '')).toBe('50000');
+  });
+
+  it("FX-108: to'liq qaytarilgan to'lovda refund tugmasi yo'q", () => {
+    renderApp(
+      <TransactionsTable
+        transactions={[
+          {
+            ...tx({ treatmentPlanId: 'plan1', paidAmount: '100000' }),
+            refundedAmount: '100000',
+          } as CashierTransaction,
+        ]}
+      />,
+    );
+    expect(screen.queryByLabelText("To'lovni qaytarish")).toBeNull();
   });
 });

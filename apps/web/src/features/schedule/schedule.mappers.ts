@@ -29,11 +29,23 @@ export function groupSegmentsByWeekday(segments: WorkingHoursSegmentDto[]): Week
   const out: WeeklyHours = {};
   for (let wd = 0; wd <= 6; wd += 1) out[wd] = [];
   for (const s of segments) {
+    // FX-126: is_active=false — «ishlamaydi» sentinel qatori, haqiqiy segment emas.
+    if (s.isActive === false) continue;
     const day = out[s.weekday] ?? [];
     day.push({ key: newSegmentKey(), start: s.start, end: s.end });
     out[s.weekday] = day;
   }
   return out;
+}
+
+/**
+ * FX-126: jadval holati. `unconfigured` — qator yo'q (filial ish soati amal qiladi);
+ * `not_working` — faqat sentinel (shifokor bu filialda ishlamaydi); `custom` — haqiqiy segmentlar.
+ */
+export type ScheduleMode = 'unconfigured' | 'not_working' | 'custom';
+export function scheduleModeOf(segments: WorkingHoursSegmentDto[]): ScheduleMode {
+  if (segments.length === 0) return 'unconfigured';
+  return segments.some((s) => s.isActive !== false) ? 'custom' : 'not_working';
 }
 
 /** Haftalik tahrir-model → PUT body segmentlari (bo'sh kunlar tushadi). */

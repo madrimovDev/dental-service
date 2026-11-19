@@ -87,26 +87,40 @@ describe("LoginPage — desktop'da \"ro'yxatdan o'tish\" havolasi yashirilishi",
   });
 });
 
-describe('LoginPage — vendor-vositachiligidagi owner parol-tiklash havolasi (CLI-226)', () => {
-  it("havola doim ko'rinadi (brauzer/Local Desktop farqisiz) va /reset-owner-password'ga yo'naltiradi", () => {
+describe('LoginPage — vendor-vositachiligidagi owner parol-tiklash havolasi (CLI-226, FX-173)', () => {
+  // FX-173: `/api/reset-owner-password` bulutda 404 (FX-08) — havola faqat desktop'da.
+  it("bulutda (brauzer, enabled=true) havola KO'RINMAYDI", () => {
     renderApp(<LoginPage />);
-    const link = screen.getByText(i18n.t('auth.login.reset_owner'));
-    expect(link).toBeInTheDocument();
-    expect(link.closest('a')).toHaveAttribute('href', '/reset-owner-password');
+    expect(screen.queryByText(i18n.t('auth.login.reset_owner'))).not.toBeInTheDocument();
   });
 
-  it("window.dentalDesktop mavjud bo'lsa ham havola ko'rinadi", () => {
+  it("javob kelmasa (fail-closed) havola ko'rinmaydi", () => {
+    registrationEnabled.value = { data: undefined, isLoading: false };
+    renderApp(<LoginPage />);
+    expect(screen.queryByText(i18n.t('auth.login.reset_owner'))).not.toBeInTheDocument();
+  });
+
+  it("window.dentalDesktop mavjud bo'lsa havola ko'rinadi va /reset-owner-password'ga yo'naltiradi", () => {
     window.dentalDesktop = {
       setServerUrl: async () => ({ ok: true, connected: true, serverUrl: 'x' }),
     };
+    renderApp(<LoginPage />);
+    const link = screen.getByText(i18n.t('auth.login.reset_owner'));
+    expect(link.closest('a')).toHaveAttribute('href', '/reset-owner-password');
+  });
+
+  // LAN stsenariysi: desktop serverga brauzerdan kirilganda window.dentalDesktop yo'q,
+  // lekin server signali (enabled=false == DENTAL_LOCAL_DESKTOP) havolani ochadi.
+  it("brauzerdan LAN orqali: server enabled=false (desktop server) — havola ko'rinadi", () => {
+    registrationEnabled.value = { data: { enabled: false }, isLoading: false };
     renderApp(<LoginPage />);
     expect(screen.getByText(i18n.t('auth.login.reset_owner'))).toBeInTheDocument();
   });
 
   it("forgot-password havolasi ko'rinmaydi (SMS OTP reset olib tashlandi — CLI-478)", () => {
+    registrationEnabled.value = { data: { enabled: false }, isLoading: false };
     renderApp(<LoginPage />);
     expect(screen.queryByText(i18n.t('auth.login.forgot'))).not.toBeInTheDocument();
-    // reset-owner havolasi hamon bor:
     expect(screen.getByText(i18n.t('auth.login.reset_owner'))).toBeInTheDocument();
   });
 });

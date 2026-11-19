@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderApp } from '../../../test-utils';
 import { PlanBillingPanel } from './PlanBillingPanel';
@@ -26,19 +26,67 @@ const planBalanceMock = {
       remaining: 60000,
       excludedFromDebt: false,
     },
+    {
+      stageId: 'st3',
+      serviceName: 'Implant',
+      cost: 0,
+      paid: 0,
+      remaining: 0,
+      excludedFromDebt: true,
+    },
   ],
 };
 
+// biome-ignore lint/suspicious/noExplicitAny: test-only mutable mock
+let plansMock: any[] = [{ id: 'plan1', title: 'Asosiy reja', status: 'in_progress' }];
+// biome-ignore lint/suspicious/noExplicitAny: test-only mutable mock
+let balanceMock: any = planBalanceMock;
+
 vi.mock('../cashier.api', () => ({
-  usePatientPlans: () => ({
-    data: [{ id: 'plan1', title: 'Asosiy reja', status: 'in_progress' }],
-  }),
-  usePlanBalance: () => ({ data: planBalanceMock }),
+  usePatientPlans: () => ({ data: plansMock }),
+  usePlanBalance: () => ({ data: balanceMock }),
   useCreateTransaction: () => ({ mutate: createMutate, isPending: false }),
+  useTransactionDetail: () => ({
+    data: { id: 'tx9', fiscalReceiptId: null, cardProvider: 'click', visitNoteId: null, items: [] },
+    isError: false,
+  }),
 }));
 
 describe('PlanBillingPanel', () => {
-  beforeEach(() => createMutate.mockClear());
+  beforeEach(() => {
+    createMutate.mockClear();
+    plansMock = [{ id: 'plan1', title: 'Asosiy reja', status: 'in_progress' }];
+    balanceMock = planBalanceMock;
+  });
+
+  // FX-65: bekor qilingan rejada kredit qolsa — kassada eslatma (o'tkazish yoki refund).
+  it('bekor qilingan rejada kredit qolsa eslatma ko‘rsatadi', () => {
+    plansMock = [{ id: 'plan1', title: 'Asosiy reja', status: 'cancelled' }];
+    balanceMock = {
+      totalCost: 0,
+      totalPaid: 50000,
+      balance: -50000,
+      stages: [
+        {
+          stageId: 'st1',
+          serviceName: 'Plomba',
+          cost: 0,
+          paid: 50000,
+          remaining: -50000,
+          excludedFromDebt: true,
+        },
+      ],
+    };
+    renderApp(<PlanBillingPanel branchId="b1" patientId="pat1" />);
+    const alert = screen.getByTestId('cancelled-plan-credit');
+    expect(alert.textContent).toMatch(/50\D?000/);
+    expect(alert.textContent).toMatch(/bekor qilingan/i);
+  });
+
+  it('faol rejada eslatma ko‘rinmaydi', () => {
+    renderApp(<PlanBillingPanel branchId="b1" patientId="pat1" />);
+    expect(screen.queryByTestId('cancelled-plan-credit')).toBeNull();
+  });
 
   it("bemor yo'q → hint ko'rsatadi", () => {
     renderApp(<PlanBillingPanel branchId="b1" patientId={null} />);
@@ -68,5 +116,48 @@ describe('PlanBillingPanel', () => {
       }),
       expect.anything(),
     );
+  });
+  it("FX-151: qarzdan chiqarilgan bosqich «To'langan» emas, «Qabul qilinmagan» va tanlab bo'lmaydi", () => {
+    renderApp(<PlanBillingPanel branchId="b1" patientId="pat1" />);
+    expect(screen.getByText('Qabul qilinmagan')).toBeTruthy();
+    expect((screen.getByLabelText('Implant') as HTMLInputElement).disabled).toBe(true);
+    // Haqiqatan to'langan bosqich hamon «To'langan».
+    expect(screen.getAllByText("To'langan").length).toBe(1);
+  });
+
+  it('FX-150: karta tanlansa sub-tur yuboriladi va muvaffaqiyatda chek modali ochiladi', async () => {
+    renderApp(<PlanBillingPanel branchId="b1" patientId="pat1" />);
+    fireEvent.click(screen.getByLabelText('Kanal'));
+    // To'lov usuli = Karta (Mantine Select).
+    fireEvent.click(screen.getByRole('textbox', { name: "To'lov turi" }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Karta' }));
+    // Sub-tur: Click.
+    fireEvent.click(await screen.findByRole('radio', { name: 'Click' }));
+    fireEvent.click(screen.getByText("Tanlanganlarni to'lash"));
+
+    expect(createMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ paymentMethod: 'card', cardProvider: 'click' }),
+      expect.anything(),
+    );
+    // onSuccess → ReceiptModal.
+    const opts = createMutate.mock.calls[0]?.[1] as { onSuccess: (d: unknown) => void };
+    const { act } = await import('@testing-library/react');
+    act(() =>
+      opts.onSuccess({
+        id: 'tx9',
+        receiptNumber: 'R-900',
+        totalAmount: '60000',
+        paidAmount: '60000',
+        discount: '0',
+        paymentMethod: 'card',
+        type: 'payment',
+        status: 'completed',
+        treatmentPlanId: 'plan1',
+        createdAt: '2026-11-20T05:00:00Z',
+        fiscalReceiptId: null,
+      }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/R-900/)).toBeTruthy();
   });
 });

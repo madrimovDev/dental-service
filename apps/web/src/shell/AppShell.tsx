@@ -2,7 +2,7 @@ import { AppShell as MantineAppShell } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { LicenseBanner } from '@/features/license';
 import { useUiStore } from '@/stores/ui-store.ts';
 import { CommandPalette } from './CommandPalette';
@@ -15,22 +15,32 @@ export function AppShell() {
   const [opened, { toggle }] = useDisclosure();
   const { t } = useTranslation();
   const rail = useUiStore((s) => s.sidebarRail);
+  // FX-158: TV navbat ekrani (/queue/board) kiosk rejimi — Topbar/Sidebar yo'q (staff chromi ichida emas).
+  const kiosk = useLocation().pathname.startsWith('/queue/board');
   return (
     <MantineAppShell
-      header={{ height: 62 }}
-      navbar={{ width: rail ? 76 : 266, breakpoint: 'sm', collapsed: { mobile: !opened } }}
+      header={kiosk ? undefined : { height: 62 }}
+      navbar={
+        kiosk
+          ? undefined
+          : { width: rail ? 76 : 266, breakpoint: 'sm', collapsed: { mobile: !opened } }
+      }
       padding="md"
     >
       <a href="#main-content" className="skip-link">
         {t('shell.skip_to_content')}
       </a>
       <CommandPalette />
-      <MantineAppShell.Header>
-        <Topbar onBurger={toggle} burgerOpened={opened} />
-      </MantineAppShell.Header>
-      <MantineAppShell.Navbar>
-        <Sidebar />
-      </MantineAppShell.Navbar>
+      {!kiosk && (
+        <MantineAppShell.Header>
+          <Topbar onBurger={toggle} burgerOpened={opened} />
+        </MantineAppShell.Header>
+      )}
+      {!kiosk && (
+        <MantineAppShell.Navbar>
+          <Sidebar />
+        </MantineAppShell.Navbar>
+      )}
       <MantineAppShell.Main id="main-content">
         {/* Banner'lar header ICHIDA emas (u 62px qat'iy balandlikda — banner Topbar'ni
             qoplab qo'yardi): sarlavha ostida yopishib turadi, kontentni siljitadi. */}

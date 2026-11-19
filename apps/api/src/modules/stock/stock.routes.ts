@@ -2,6 +2,7 @@ import { fail, ok } from '@dental/core';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { BRANCH_FORBIDDEN_CODE, BRANCH_FORBIDDEN_MESSAGE } from '../../lib/branch-scope.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
 import { CrossEntityError } from '../../lib/ownership.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
@@ -39,7 +40,12 @@ import {
   stockMovementDtoSchema,
   updateItemSchema,
 } from './stock.schema.ts';
-import { createStockService, InsufficientStockError } from './stock.service.ts';
+import {
+  createStockService,
+  DuplicateBomError,
+  InsufficientStockError,
+  StockBranchForbiddenError,
+} from './stock.service.ts';
 
 /** Standart 404 — get / patch / delete endpoint'lar uchun. */
 const notFoundResponse = {
@@ -77,6 +83,9 @@ const createdResponses = <T extends z.ZodTypeAny>(schema: T, description: string
 const ownershipNotFound = (e: CrossEntityError) =>
   fail(`ownership.${e.entity}.${e.reason}`, 'not_found');
 
+/** FX-115 (D-8): begona filial → 403 (yozishdan oldin tekshirilgan, hech narsa yozilmagan). */
+const branchForbidden = () => fail(BRANCH_FORBIDDEN_CODE, BRANCH_FORBIDDEN_MESSAGE);
+
 /**
  * Ombor routes:
  *   /api/stock/items     (CRUD — view/manage)
@@ -107,8 +116,13 @@ export const stockRoutes = (deps: {
 
   app.openapi(listItemsRoute, async (c) => {
     const query = c.req.valid('query');
-    const rows = await service.listItems(c, query);
-    return c.json(ok(rows.map(toStockItemWithLowStockDto)), 200);
+    try {
+      const rows = await service.listItems(c, query);
+      return c.json(ok(rows.map(toStockItemWithLowStockDto)), 200);
+    } catch (err) {
+      if (err instanceof StockBranchForbiddenError) return c.json(branchForbidden(), 403);
+      throw err;
+    }
   });
 
   const createItemRoute = createRoute({
@@ -125,9 +139,15 @@ export const stockRoutes = (deps: {
 
   app.openapi(createItemRoute, async (c) => {
     const body = c.req.valid('json');
-    const row = await service.createItem(c, body);
-    if (!row) throw new Error('Stock item creation failed');
-    return c.json(ok(toStockItemDto(row)), 201);
+    try {
+      const row = await service.createItem(c, body);
+      if (!row) throw new Error('Stock item creation failed');
+      return c.json(ok(toStockItemDto(row)), 201);
+    } catch (err) {
+      if (err instanceof CrossEntityError) return c.json(ownershipNotFound(err), 404);
+      if (err instanceof StockBranchForbiddenError) return c.json(branchForbidden(), 403);
+      throw err;
+    }
   });
 
   const getItemRoute = createRoute({
@@ -142,9 +162,14 @@ export const stockRoutes = (deps: {
 
   app.openapi(getItemRoute, async (c) => {
     const { id } = c.req.valid('param');
-    const item = await service.getItem(c, id);
-    if (!item) return c.json(fail('item.not_found', 'Stock item not found'), 404);
-    return c.json(ok(toStockItemWithLowStockDto(item)), 200);
+    try {
+      const item = await service.getItem(c, id);
+      if (!item) return c.json(fail('item.not_found', 'Stock item not found'), 404);
+      return c.json(ok(toStockItemWithLowStockDto(item)), 200);
+    } catch (err) {
+      if (err instanceof StockBranchForbiddenError) return c.json(branchForbidden(), 403);
+      throw err;
+    }
   });
 
   const updateItemRoute = createRoute({
@@ -163,9 +188,15 @@ export const stockRoutes = (deps: {
   app.openapi(updateItemRoute, async (c) => {
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const item = await service.updateItem(c, id, body);
-    if (!item) return c.json(fail('item.not_found', 'Stock item not found'), 404);
-    return c.json(ok(toStockItemDto(item)), 200);
+    try {
+      const item = await service.updateItem(c, id, body);
+      if (!item) return c.json(fail('item.not_found', 'Stock item not found'), 404);
+      return c.json(ok(toStockItemDto(item)), 200);
+    } catch (err) {
+      if (err instanceof CrossEntityError) return c.json(ownershipNotFound(err), 404);
+      if (err instanceof StockBranchForbiddenError) return c.json(branchForbidden(), 403);
+      throw err;
+    }
   });
 
   // ===== Movements =====
@@ -181,8 +212,13 @@ export const stockRoutes = (deps: {
 
   app.openapi(listMovementsRoute, async (c) => {
     const query = c.req.valid('query');
-    const rows = await service.listMovements(c, query);
-    return c.json(ok(rows.map(toStockMovementDto)), 200);
+    try {
+      const rows = await service.listMovements(c, query);
+      return c.json(ok(rows.map(toStockMovementDto)), 200);
+    } catch (err) {
+      if (err instanceof StockBranchForbiddenError) return c.json(branchForbidden(), 403);
+      throw err;
+    }
   });
 
   const createMovementRoute = createRoute({
@@ -211,6 +247,7 @@ export const stockRoutes = (deps: {
       return c.json(ok(toStockMovementDto(movement)), 201);
     } catch (err) {
       if (err instanceof CrossEntityError) return c.json(ownershipNotFound(err), 404);
+      if (err instanceof StockBranchForbiddenError) return c.json(branchForbidden(), 403);
       if (err instanceof InsufficientStockError) {
         return c.json(
           fail('stock.insufficient', 'Insufficient stock for this movement', {
@@ -250,7 +287,13 @@ export const stockRoutes = (deps: {
     request: {
       body: { content: { 'application/json': { schema: createBomSchema } } },
     },
-    responses: createdResponses(serviceMaterialDtoSchema, 'Service material (BOM) created'),
+    responses: {
+      ...createdResponses(serviceMaterialDtoSchema, 'Service material (BOM) created'),
+      409: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'BOM for this service/item already exists',
+      },
+    },
   });
 
   app.openapi(createBomRoute, async (c) => {
@@ -260,7 +303,11 @@ export const stockRoutes = (deps: {
       if (!bom) throw new Error('BOM creation failed');
       return c.json(ok(toServiceMaterialDto(bom)), 201);
     } catch (err) {
+      if (err instanceof DuplicateBomError) {
+        return c.json(fail('bom.duplicate', 'BOM for this service and item already exists'), 409);
+      }
       if (err instanceof CrossEntityError) return c.json(ownershipNotFound(err), 404);
+      if (err instanceof StockBranchForbiddenError) return c.json(branchForbidden(), 403);
       throw err;
     }
   });
@@ -295,8 +342,13 @@ export const stockRoutes = (deps: {
 
   app.openapi(listBatchesRoute, async (c) => {
     const { itemId } = c.req.valid('query');
-    const rows = await service.listBatches(c, itemId);
-    return c.json(ok(rows.map(toStockBatchDto)), 200);
+    try {
+      const rows = await service.listBatches(c, itemId);
+      return c.json(ok(rows.map(toStockBatchDto)), 200);
+    } catch (err) {
+      if (err instanceof StockBranchForbiddenError) return c.json(branchForbidden(), 403);
+      throw err;
+    }
   });
 
   const expiringBatchesRoute = createRoute({
@@ -314,8 +366,13 @@ export const stockRoutes = (deps: {
 
   app.openapi(expiringBatchesRoute, async (c) => {
     const { withinDays, branchId } = c.req.valid('query');
-    const rows = await service.expiringBatches(c, withinDays, branchId);
-    return c.json(ok(rows.map(toExpiringStockBatchDto)), 200);
+    try {
+      const rows = await service.expiringBatches(c, withinDays, branchId);
+      return c.json(ok(rows.map(toExpiringStockBatchDto)), 200);
+    } catch (err) {
+      if (err instanceof StockBranchForbiddenError) return c.json(branchForbidden(), 403);
+      throw err;
+    }
   });
 
   const autoDeductionsRoute = createRoute({
@@ -333,8 +390,13 @@ export const stockRoutes = (deps: {
 
   app.openapi(autoDeductionsRoute, async (c) => {
     const { branchId } = c.req.valid('query');
-    const rows = await service.autoDeductionsToday(c, branchId);
-    return c.json(ok(rows.map(toAutoDeductionDto)), 200);
+    try {
+      const rows = await service.autoDeductionsToday(c, branchId);
+      return c.json(ok(rows.map(toAutoDeductionDto)), 200);
+    } catch (err) {
+      if (err instanceof StockBranchForbiddenError) return c.json(branchForbidden(), 403);
+      throw err;
+    }
   });
 
   const createBatchRoute = createRoute({
@@ -364,6 +426,7 @@ export const stockRoutes = (deps: {
       return c.json(ok(toStockBatchDto(batch)), 201);
     } catch (err) {
       if (err instanceof CrossEntityError) return c.json(ownershipNotFound(err), 404);
+      if (err instanceof StockBranchForbiddenError) return c.json(branchForbidden(), 403);
       throw err;
     }
   });

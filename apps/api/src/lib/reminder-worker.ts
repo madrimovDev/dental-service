@@ -15,6 +15,7 @@ import { createNotificationsService } from '../modules/notifications/index.ts';
 import { env } from './env.ts';
 import type { ReminderJob } from './queue.ts';
 import { renderReminderSms, type SmsLang } from './sms-templates.ts';
+import { isTenantServiceBlocked } from './subscription.ts';
 import { botMessages } from './telegram/messages.ts';
 import { reminderCallbackData } from './telegram/reminder-actions.ts';
 import { type ResolvedTenantChannel, resolveTenantChannel } from './tenant-channel.ts';
@@ -25,7 +26,14 @@ import { type ResolvedTenantChannel, resolveTenantChannel } from './tenant-chann
  * status'ni live tekshirishi shart (race xavfsizligi).
  */
 export function shouldSkipReminder(status: string): boolean {
-  return status === 'cancelled' || status === 'no_show';
+  return (
+    status === 'cancelled' ||
+    status === 'no_show' ||
+    // FX-142 (LC-20): yakunlangan/davom etayotgan yozilishga eslatma ma'nosiz.
+    status === 'completed' ||
+    status === 'in_progress' ||
+    status === 'arrived'
+  );
 }
 
 /** 24 soatlik eslatma inline tugmalari (callback egasi tekshiruvi — reminder-actions.ts). */
@@ -50,10 +58,15 @@ export async function processReminderJob(
   job: ReminderJob,
 ): Promise<void> {
   const { tenantId, appointmentId } = job;
+  // FX-105 (LB-14): obuna/litsenziya `expired` — klinika nomidan xabar ketmaydi
+  // (HTTP bloki bilan bir xil qoida). Job yakunlanadi: eslatma vaqti o'tib ketadi.
+  if (await isTenantServiceBlocked(tenantId)) return;
   await withTenant(tenantId, async (tx: DbOrTx) => {
     const [appt] = await tx.select().from(appointments).where(eq(appointments.id, appointmentId));
     if (!appt) return;
     if (shouldSkipReminder(appt.status)) return;
+    // FX-142 (LC-20) + FX-96 review: o'tgan yozilishga eslatma yuborilmaydi (AOF overdue job).
+    if (new Date(appt.startTime).getTime() <= Date.now()) return;
 
     const [patient] = await tx.select().from(patients).where(eq(patients.id, appt.patientId));
     // Til — tenant default tili (Asia/Tashkent SMS lokalizatsiyasi, CLI-186).
@@ -163,6 +176,17 @@ export async function processReminderJob(
       channel: resolved.source === 'none' ? undefined : resolved.channel,
       // UI-T2: FAQAT Telegram'da inline tugmalar — Kelaman / Boshqa vaqt / Bekor.
       buttons: resolved.source === 'telegram' ? reminderButtons(lang, appt.id) : undefined,
+      // FX-41 (LA-22): Telegram 403/xato → SMS zaxirasi; 403 da bog'lanish eskirgan — tozalanadi.
+      fallback: resolved.source === 'telegram' ? resolved.fallback : undefined,
+      onBlocked:
+        resolved.source === 'telegram'
+          ? async () => {
+              await tx
+                .update(patients)
+                .set({ telegramChatId: null })
+                .where(eq(patients.id, appt.patientId));
+            }
+          : undefined,
     });
   });
 }

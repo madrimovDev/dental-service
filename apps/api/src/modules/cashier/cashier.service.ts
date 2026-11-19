@@ -29,7 +29,8 @@ import {
 } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { onAfterCommit } from '../../db/after-commit.ts';
-import { getDb } from '../../db/scoped.ts';
+import type { DbOrTx } from '../../db/client.ts';
+import { getDb, withTenant } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import type { PatientMessenger } from '../../lib/telegram/notify.ts';
 import {
@@ -165,6 +166,14 @@ export class VisitItemsMismatchError extends Error {
 }
 
 /** FX-handoff: bitta vizit bir marta to'lanadi (pre-check YOKI unique indeks poygasi) — 409. */
+/** FX-171: vizit to'lovida `branchId` vizit (yozilish) filialiga mos emas — routes 403 `branch.forbidden`. */
+export class VisitBranchMismatchError extends Error {
+  constructor() {
+    super('branchId does not match the visit branch');
+    this.name = 'VisitBranchMismatchError';
+  }
+}
+
 export class VisitAlreadyBilledError extends Error {
   constructor() {
     super('Visit note is already billed');
@@ -172,17 +181,41 @@ export class VisitAlreadyBilledError extends Error {
   }
 }
 
-/** `cashier_tx_visit_note_unique` (23505) — pre-check o'tib ketgan poyga. */
-const isVisitUniqueViolation = (err: unknown): boolean => {
-  const e = err as {
-    code?: string;
-    constraint_name?: string;
-    cause?: { code?: string; constraint_name?: string };
-  } | null;
-  if (!e) return false;
-  const code = e.code ?? e.cause?.code;
-  const name = e.constraint_name ?? e.cause?.constraint_name;
-  return code === '23505' && name === 'cashier_tx_visit_note_unique';
+/**
+ * FX-63: vizit bo'yicha FAOL (qaytarilmagan) to'lovlarda undirilgan xizmat miqdorlari.
+ * Faol = `payment`, `voided` emas va to'liq refund bilan qoplanmagan. To'liq refund
+ * qilingan to'lov vizitni «to'langan» holatda qoldirmaydi (qayta undirish mumkin),
+ * qisman undirish esa faqat o'z xizmatlarini yopadi (qolgani qarz bo'lib turadi).
+ * To'liq nasiya (`paid_amount = 0`) to'lov ham FAOL — patients.balance qoidasi bilan bir xil
+ * (u faqat `paid > 0 AND refunded >= paid` holatida tranzaksiyani bekor deb hisoblaydi);
+ * aks holda `0 < 0` vizitni qayta-qayta undirishga va qarzni ikki marta hisoblashga yo'l ochardi.
+ */
+const ACTIVE_VISIT_PAYMENT_SQL = sql`ct.type = 'payment' AND ct.status <> 'voided'
+  AND (ct.paid_amount = 0
+       OR COALESCE((SELECT SUM(r.paid_amount) FROM cashier_transactions r
+                    WHERE r.parent_transaction_id = ct.id AND r.type = 'refund' AND r.status = 'completed'), 0) < ct.paid_amount)`;
+
+const billedByService = async (
+  db: ReturnType<typeof getDb>,
+  visitNoteIds: string[],
+): Promise<Map<string, Map<string, number>>> => {
+  const out = new Map<string, Map<string, number>>();
+  if (visitNoteIds.length === 0) return out;
+  const rows = await db.execute<{ visit_note_id: string; service_id: string; qty: string }>(sql`
+    SELECT ct.visit_note_id, i.service_id, SUM(i.quantity)::int AS qty
+    FROM cashier_transactions ct
+    JOIN cashier_transaction_items i ON i.transaction_id = ct.id
+    WHERE ct.visit_note_id IN (${sql.join(
+      visitNoteIds.map((id) => sql`${id}::uuid`),
+      sql`, `,
+    )}) AND ${ACTIVE_VISIT_PAYMENT_SQL}
+    GROUP BY ct.visit_note_id, i.service_id`);
+  for (const r of rows) {
+    const m = out.get(r.visit_note_id) ?? new Map<string, number>();
+    m.set(r.service_id, Number(r.qty));
+    out.set(r.visit_note_id, m);
+  }
+  return out;
 };
 
 /** Asia/Tashkent kalendar kunining boshi (UTC+5, DST yo'q) — `list` bilan izchil. */
@@ -277,6 +310,31 @@ export const createCashierService = (deps: {
     return row?.branchId ?? null;
   }
 
+  /**
+   * FX-108 (LB-17): har parent uchun allaqachon qaytarilgan summa (refund qatorlari paidAmount
+   * yig'indisi). UI qoldiq = paidAmount - refundedAmount ni shundan ko'rsatadi (refund()dagi
+   * `remaining` bilan bir xil manba).
+   */
+  async function refundedByParent(db: DbOrTx, ids: string[]): Promise<Map<string, string>> {
+    const out = new Map<string, string>();
+    if (ids.length === 0) return out;
+    const rows = await db
+      .select({
+        parentId: cashierTransactions.parentTransactionId,
+        sum: sql<string>`COALESCE(SUM(${cashierTransactions.paidAmount}), 0)`,
+      })
+      .from(cashierTransactions)
+      .where(
+        and(
+          inArray(cashierTransactions.parentTransactionId, ids),
+          eq(cashierTransactions.type, 'refund'),
+        ),
+      )
+      .groupBy(cashierTransactions.parentTransactionId);
+    for (const r of rows) if (r.parentId) out.set(r.parentId, String(Number(r.sum)));
+    return out;
+  }
+
   /** `branchIds`: X-2 doirasi (null = cheklovsiz); `query.branchId` bilan kesishadi (route tekshirgan). */
   async function list(c: Context, query: ListTransactionsQuery, branchIds: string[] | null = null) {
     const db = getDb(c);
@@ -313,6 +371,11 @@ export const createCashierService = (deps: {
     ]);
 
     const total = totalRows[0]?.total ?? 0;
+    const refunded = await refundedByParent(
+      db,
+      rows.map((r) => r.id),
+    );
+    const data = rows.map((r) => ({ ...r, refundedAmount: refunded.get(r.id) ?? '0' }));
 
     await deps.audit.record(c, {
       action: 'viewed',
@@ -325,7 +388,7 @@ export const createCashierService = (deps: {
       },
     });
 
-    return { data: rows, meta: { page: query.page, pageSize: query.pageSize, total } };
+    return { data, meta: { page: query.page, pageSize: query.pageSize, total } };
   }
 
   async function getById(c: Context, id: string) {
@@ -344,7 +407,8 @@ export const createCashierService = (deps: {
       resourceId: id,
     });
 
-    return { ...tx, items };
+    const refunded = await refundedByParent(db, [id]);
+    return { ...tx, items, refundedAmount: refunded.get(id) ?? '0' };
   }
 
   async function create(c: Context, input: CreateTransactionInput) {
@@ -372,39 +436,74 @@ export const createCashierService = (deps: {
     // ichida qolishi va hali to'lanmagan bo'lishi shart. Narxni baribir server hisoblaydi.
     let visitPatientId: string | null = null;
     if (input.visitNoteId) {
+      // FX-63: unique indeks o'rniga qator-qulf — parallel to'lovlar ketma-ket tekshiriladi
+      // (ikkinchisi qulfni kutib, birinchisining undirganini ko'radi).
       const [visit] = await db
         .select({
           patientId: visitNotes.patientId,
           signedAt: visitNotes.signedAt,
           performedServices: visitNotes.performedServices,
           stageId: visitNotes.stageId,
+          appointmentId: visitNotes.appointmentId,
         })
         .from(visitNotes)
         .where(eq(visitNotes.id, input.visitNoteId))
-        .limit(1);
+        .limit(1)
+        .for('update');
       if (!visit) throw new VisitNoteNotFoundError();
       if (!visit.signedAt) throw new VisitNotSignedError();
-      if (visit.stageId) throw new VisitLinkedToPlanStageError();
       if (input.patientId && input.patientId !== visit.patientId) {
         throw new VisitPatientMismatchError();
       }
-      const allowed = new Map<string, number>();
+      // FX-171: vizit filiali = yozilish filiali (yozilishsiz vizit — filiali noma'lum, cheklanmaydi).
+      if (visit.appointmentId) {
+        const [appt] = await db
+          .select({ branchId: appointments.branchId })
+          .from(appointments)
+          .where(eq(appointments.id, visit.appointmentId))
+          .limit(1);
+        if (appt && appt.branchId !== input.branchId) throw new VisitBranchMismatchError();
+      }
+      // FX-170 (D-14): bosqichli vizitda bosqichning O'Z xizmati reja allocation'i bilan
+      // to'lanadi — vizit yo'lida faqat undan BOSHQA xizmatlar (og'riqsizlantirish, rentgen…).
+      let stageServiceId: string | null = null;
+      if (visit.stageId) {
+        const [stage] = await db
+          .select({ serviceId: treatmentStages.serviceId })
+          .from(treatmentStages)
+          .where(eq(treatmentStages.id, visit.stageId))
+          .limit(1);
+        stageServiceId = stage?.serviceId ?? null;
+        // FX-170 review: bosqich xizmati noma'lum (erkin matnli bosqich / xizmat o'chirilgan) —
+        // qaysi xizmat reja allocation'i bilan to'lanishini ajratib bo'lmaydi; eski xulq: vizit
+        // yo'li butunlay yopiq (aks holda reja + vizit = ikki marta to'lov).
+        if (!stageServiceId) throw new VisitLinkedToPlanStageError();
+      }
+      // Qolgan (hali undirilmagan) miqdor = bajarilgan − faol to'lovlarda undirilgan.
+      const remaining = new Map<string, number>();
       for (const sid of visit.performedServices ?? []) {
-        allowed.set(sid, (allowed.get(sid) ?? 0) + 1);
+        remaining.set(sid, (remaining.get(sid) ?? 0) + 1);
+      }
+      if (stageServiceId && remaining.has(stageServiceId)) {
+        remaining.set(stageServiceId, (remaining.get(stageServiceId) ?? 0) - 1);
+      }
+      const payableTotal = [...remaining.values()].reduce((a, q) => a + Math.max(0, q), 0);
+      if (visit.stageId && payableTotal === 0) throw new VisitLinkedToPlanStageError();
+      const billed = (await billedByService(db, [input.visitNoteId])).get(input.visitNoteId);
+      for (const [sid, qty] of billed ?? []) {
+        remaining.set(sid, (remaining.get(sid) ?? 0) - qty);
+      }
+      const remainingTotal = [...remaining.values()].reduce((a, q) => a + Math.max(0, q), 0);
+      if (remainingTotal === 0 && (visit.performedServices?.length ?? 0) > 0) {
+        throw new VisitAlreadyBilledError();
       }
       const requested = new Map<string, number>();
       for (const i of input.items) {
         requested.set(i.serviceId, (requested.get(i.serviceId) ?? 0) + i.quantity);
       }
       for (const [sid, qty] of requested) {
-        if (qty > (allowed.get(sid) ?? 0)) throw new VisitItemsMismatchError();
+        if (qty > (remaining.get(sid) ?? 0)) throw new VisitItemsMismatchError();
       }
-      const [billed] = await db
-        .select({ id: cashierTransactions.id })
-        .from(cashierTransactions)
-        .where(eq(cashierTransactions.visitNoteId, input.visitNoteId))
-        .limit(1);
-      if (billed) throw new VisitAlreadyBilledError();
       visitPatientId = visit.patientId;
     }
 
@@ -610,24 +709,29 @@ export const createCashierService = (deps: {
           );
         }
 
-        // Fiscal (NoOp — M3 da). CLI-449: paidAmount (haqiqatda olingan naqd) —
-        // totalAmount (nominal/hisob-faktura) EMAS, qisman to'langan savdoda fiskal
-        // chek haqiqiy qabul qilingan summaga mos bo'lishi uchun.
-        const fiscalResult = await fiscal.createReceipt({
+        // FX-77: fiskal chek tx ichida YUBORILMAYDI (tashqi so'rov stage qatori qulfi ostida
+        // osilib qolmasin; tx rollback bo'lsa chek soliqqa ketib qolmasin). Commit'dan keyin
+        // yuboriladi, natija alohida tenant-tx'da yoziladi. CLI-449: paidAmount (haqiqatda
+        // olingan naqd) — totalAmount (nominal) EMAS.
+        const fiscalPayment = {
           id: transaction.id,
           amount: Number(transaction.paidAmount),
           items: items,
+        };
+        await onAfterCommit(c, async () => {
+          const fiscalResult = await fiscal.createReceipt(fiscalPayment);
+          if (fiscalResult.fiscalId || fiscalResult.response) {
+            await withTenant(tenantId, (ftx) =>
+              ftx
+                .update(cashierTransactions)
+                .set({
+                  fiscalReceiptId: fiscalResult.fiscalId,
+                  fiscalResponse: fiscalResult.response as object,
+                })
+                .where(eq(cashierTransactions.id, fiscalPayment.id)),
+            );
+          }
         });
-
-        if (fiscalResult.fiscalId || fiscalResult.response) {
-          await tx
-            .update(cashierTransactions)
-            .set({
-              fiscalReceiptId: fiscalResult.fiscalId,
-              fiscalResponse: fiscalResult.response as object,
-            })
-            .where(eq(cashierTransactions.id, transaction.id));
-        }
 
         await deps.audit.record(c, {
           action: 'created',
@@ -654,15 +758,8 @@ export const createCashierService = (deps: {
         return { ...transaction, items };
       });
 
-    // FX-handoff: parallel ikki to'lov — unique indeks yutqazgani 500 emas, 409.
-    // `db.transaction` so'rov-tx ichida SAVEPOINT: yutqazgan insert rollback bo'ladi,
-    // tashqi tx aborted bo'lib qolmaydi.
-    try {
-      return await runInsert();
-    } catch (e) {
-      if (isVisitUniqueViolation(e)) throw new VisitAlreadyBilledError();
-      throw e;
-    }
+    // FX-63: parallel to'lovlar vizit qatori qulfi bilan ketma-ketlashtirilgan (yuqorida).
+    return await runInsert();
   }
 
   /**
@@ -684,20 +781,32 @@ export const createCashierService = (deps: {
     const pageSize = opts.pageSize ?? 50;
     const windowStart = new Date(Date.now() - days * 86_400_000);
 
+    // FX-170 (D-14): bosqichli vizitda bosqichning o'z xizmati (bitta nusxa) reja allocation'i
+    // bilan to'lanadi — vizit yo'lining to'lanadigan soni undan tashqari xizmatlar.
+    const payableCount = sql`(COALESCE(array_length(${visitNotes.performedServices}, 1), 0)
+      - CASE WHEN ${treatmentStages.serviceId} IS NOT NULL
+              AND ${treatmentStages.serviceId} = ANY(${visitNotes.performedServices}) THEN 1 ELSE 0 END)`;
+
     const where = and(
       isNotNull(visitNotes.signedAt),
-      // FX-12: rejadagi bosqichga bog'langan vizit reja allocation'i orqali to'lanadi.
-      isNull(visitNotes.stageId),
       gte(visitNotes.signedAt, windowStart),
-      sql`COALESCE(array_length(${visitNotes.performedServices}, 1), 0) > 0`,
+      sql`${payableCount} > 0`,
+      // FX-170 review: bosqichli vizitda bosqich xizmati NULL/noma'lum — vizit yo'li yopiq.
+      sql`NOT (${visitNotes.stageId} IS NOT NULL AND ${treatmentStages.serviceId} IS NULL)`,
       or(isNull(appointments.id), eq(appointments.branchId, branchId)),
-      sql`NOT EXISTS (SELECT 1 FROM cashier_transactions ct WHERE ct.visit_note_id = ${visitNotes.id})`,
+      // FX-63: faqat faol (qaytarilmagan) to'lovlar hisobga olinadi; qisman undirilgan vizit
+      // qolgan xizmatlari bilan ro'yxatda turadi.
+      sql`${payableCount} > COALESCE((
+        SELECT SUM(i.quantity) FROM cashier_transactions ct
+        JOIN cashier_transaction_items i ON i.transaction_id = ct.id
+        WHERE ct.visit_note_id = ${visitNotes.id} AND ${ACTIVE_VISIT_PAYMENT_SQL}), 0)`,
     );
 
     const [{ total } = { total: 0 }] = await db
       .select({ total: sql<number>`count(*)::int` })
       .from(visitNotes)
       .leftJoin(appointments, eq(appointments.id, visitNotes.appointmentId))
+      .leftJoin(treatmentStages, eq(treatmentStages.id, visitNotes.stageId))
       .where(where);
 
     const rows = await db
@@ -709,11 +818,13 @@ export const createCashierService = (deps: {
         doctorName: users.fullName,
         signedAt: visitNotes.signedAt,
         performed: visitNotes.performedServices,
+        stageServiceId: treatmentStages.serviceId,
       })
       .from(visitNotes)
       .innerJoin(patients, eq(patients.id, visitNotes.patientId))
       .leftJoin(users, eq(users.id, visitNotes.doctorId))
       .leftJoin(appointments, eq(appointments.id, visitNotes.appointmentId))
+      .leftJoin(treatmentStages, eq(treatmentStages.id, visitNotes.stageId))
       .where(where)
       .orderBy(desc(visitNotes.signedAt))
       .limit(pageSize)
@@ -738,9 +849,26 @@ export const createCashierService = (deps: {
       );
     }
 
+    const billedMap = await billedByService(
+      db,
+      rows.map((r) => r.visitNoteId),
+    );
+
     const result: PendingVisitDto[] = rows.map((r) => {
       const qty = new Map<string, number>();
       for (const sid of r.performed ?? []) qty.set(sid, (qty.get(sid) ?? 0) + 1);
+      // FX-170: bosqich xizmati vizit yo'lida emas (reja allocation'i bilan).
+      if (r.stageServiceId && qty.has(r.stageServiceId)) {
+        const left = (qty.get(r.stageServiceId) ?? 0) - 1;
+        if (left > 0) qty.set(r.stageServiceId, left);
+        else qty.delete(r.stageServiceId);
+      }
+      // FX-63: qisman undirilgan xizmatlar chiqariladi — faqat qolgani qarz.
+      for (const [sid, billedQty] of billedMap.get(r.visitNoteId) ?? []) {
+        const left = (qty.get(sid) ?? 0) - billedQty;
+        if (left > 0) qty.set(sid, left);
+        else qty.delete(sid);
+      }
       let totalCents = 0;
       let hasUnpriced = false;
       const lines = [...qty].map(([serviceId, quantity]) => {

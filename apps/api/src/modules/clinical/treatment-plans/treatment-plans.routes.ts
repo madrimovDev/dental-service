@@ -23,10 +23,12 @@ import {
 // CLI-114: list endi har planning stage'larini nested qaytaradi (N+1 oldini olish).
 import {
   ConsentInvalidError,
+  ConsentLockedError,
   ConsentRequiredError,
   createTreatmentPlansService,
   type PriceLookup,
   type RecallStageHook,
+  type StageStockHook,
   type ToothChartStageHook,
 } from './treatment-plans.service.ts';
 import { InvalidTransitionError } from './treatment-plans.transitions.ts';
@@ -53,6 +55,8 @@ export const treatmentPlansRoutes = (deps: {
   priceLookup?: PriceLookup;
   /** CLI-488: bosqich completed → odontogramma auto-update (createTreatmentPlansService'ga forward). */
   toothChart?: ToothChartStageHook;
+  /** FX-60: plan ekranidan completed → BOM ombor chiqimi (createTreatmentPlansService'ga forward). */
+  deductStageStock?: StageStockHook;
 }) => {
   const app = new OpenAPIHono();
   const service = createTreatmentPlansService(deps);
@@ -251,6 +255,10 @@ export const treatmentPlansRoutes = (deps: {
         content: { 'application/json': { schema: errorResponseSchema } },
         description: 'Validation error',
       },
+      409: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Plan in progress/completed/cancelled — consent is locked',
+      },
       ...planNotFound,
     },
   });
@@ -267,6 +275,10 @@ export const treatmentPlansRoutes = (deps: {
       // turdagi/muddati o'tgan → 400 (bo'sh/mazmunsiz consent bilan link bo'lmaydi).
       if (e instanceof ConsentInvalidError) {
         return c.json(fail('plan.consent_invalid', e.message), 400);
+      }
+      // FX-61: terminal/bajarilayotgan planda qayta bog'lash — 409.
+      if (e instanceof ConsentLockedError) {
+        return c.json(fail('plan.consent_locked', e.message), 409);
       }
       throw e;
     }

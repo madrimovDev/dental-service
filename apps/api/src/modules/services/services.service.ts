@@ -3,6 +3,7 @@ import { and, desc, eq, getTableColumns, isNull, lte, or, sql } from 'drizzle-or
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { createOwnershipValidator } from '../../lib/ownership.ts';
 import { pgErrorInfo } from '../../lib/pg-error.ts';
 import type { ServiceCategoriesService } from '../service-categories/service-categories.service.ts';
 import type {
@@ -26,6 +27,8 @@ const isCodeTaken = (err: unknown): boolean => {
   const pg = pgErrorInfo(err);
   return pg?.code === '23505' && pg.constraint === 'services_tenant_code_unique';
 };
+
+const ownership = createOwnershipValidator();
 
 export const createServicesService = (deps: {
   audit: AuditLogger;
@@ -221,6 +224,9 @@ export const createServicesService = (deps: {
   }
 
   async function setPrice(c: Context, serviceId: string, input: SetServicePriceInput) {
+    // FX-137 (LC-15): begona serviceId/branchId yozishdan OLDIN rad (FK RLS'ni chetlab o'tadi).
+    await ownership.assertServiceExists(c, serviceId);
+    await ownership.assertBranchExists(c, input.branchId);
     const db = getDb(c);
     const today = new Date().toISOString().slice(0, 10);
 

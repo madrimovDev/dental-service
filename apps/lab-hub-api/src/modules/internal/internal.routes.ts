@@ -1,5 +1,5 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import type { MiddlewareHandler } from 'hono';
 import { clinics, labs, labUsers } from '../../db/schema';
 import { withLab } from '../../db/scoped';
@@ -158,6 +158,61 @@ export const internalRoutes = (deps: Deps) => {
         .returning();
       if (!row) throw new ApiError(404, 'lab.not_found');
       return c.json({ lab: labDto(row, deps.now()) });
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: 'get',
+      path: '/labs/{id}/users',
+      tags,
+      summary: 'Lab foydalanuvchilari (parolni tiklash uchun tanlash)',
+      request: { params: z.object({ id: z.uuid() }) },
+      responses: OK,
+    }),
+    async (c) => {
+      const { id } = c.req.valid('param');
+      const rows = await withLab(deps.db, id, (tx) =>
+        tx.select().from(labUsers).where(eq(labUsers.labId, id)).orderBy(desc(labUsers.createdAt)),
+      );
+      return c.json({
+        users: rows.map((u) => ({
+          id: u.id,
+          fullName: u.fullName,
+          phone: u.phone,
+          role: u.role,
+          isActive: u.isActive,
+        })),
+      });
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: 'post',
+      path: '/labs/{id}/users/{userId}/reset-password',
+      tags,
+      summary: 'Lab foydalanuvchisi parolini tiklash (yangi vaqtinchalik parol bir marta)',
+      request: { params: z.object({ id: z.uuid(), userId: z.uuid() }) },
+      responses: OK,
+    }),
+    async (c) => {
+      const { id, userId } = c.req.valid('param');
+      const tempPassword = generateTempPassword();
+      const passwordHash = await hashPassword(tempPassword);
+      const user = await withLab(deps.db, id, async (tx) => {
+        const [u] = await tx
+          .update(labUsers)
+          .set({ passwordHash, mustChangePassword: true })
+          .where(and(eq(labUsers.id, userId), eq(labUsers.labId, id)))
+          .returning();
+        return u;
+      });
+      if (!user) throw new ApiError(404, 'lab_user.not_found');
+      return c.json({
+        user: { id: user.id, fullName: user.fullName, phone: user.phone, role: user.role },
+        tempPassword,
+      });
     },
   );
 
