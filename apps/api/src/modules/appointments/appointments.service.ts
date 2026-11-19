@@ -2,7 +2,6 @@ import {
   appointments,
   labOrders,
   patients,
-  tenantSettings,
   treatmentPlans,
   treatmentStages,
 } from '@dental/db-schema';
@@ -16,6 +15,7 @@ import { CrossEntityError, createOwnershipValidator } from '../../lib/ownership.
 import { assertBranchExists } from '../../lib/ownership-refs.ts';
 import { pgErrorInfo } from '../../lib/pg-error.ts';
 import { reminderDelayMs } from '../../lib/reminder-delay.ts';
+import { readReminderLeadHours } from '../../lib/reminder-lead-hours.ts';
 import { createStockService } from '../stock/stock.service.ts';
 import type {
   CreateAppointmentInput,
@@ -168,12 +168,8 @@ export const createAppointmentsService = (deps: {
    * FX-39 (LA-23): eslatma `tenant_settings.reminder_lead_hours` soat oldin ketadi
    * (ilgari hardcode 24). RLS tenantni filtrlaydi; qator yo'q → default 24.
    */
-  async function reminderLeadHours(c: Context): Promise<number> {
-    const [row] = await getDb(c)
-      .select({ hours: tenantSettings.reminderLeadHours })
-      .from(tenantSettings)
-      .limit(1);
-    return row?.hours ?? 24;
+  function reminderLeadHours(c: Context): Promise<number> {
+    return readReminderLeadHours(getDb(c));
   }
 
   /**

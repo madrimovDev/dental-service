@@ -6,11 +6,21 @@
  *   - bazada yo'q / bekor qilingan / eslatma oynasidan o'tgan yozilishning job'ini o'chiradi.
  * REAL DB (dental_app, FORCE RLS) + REAL Redis + REAL BullMQ Queue.
  *
+ * Seam (FX-39): reconcile tenantning `reminder_lead_hours`ini o'qiydi (24 hardcode emas).
+ *
  *   cd apps/api && bun test --env-file=../../.env --timeout 30000 tests/integration/fx-89-reminder-reconcile.test.ts
  */
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { randomUUID } from 'node:crypto';
-import { appointments, branches, notifications, patients, tenants, users } from '@dental/db-schema';
+import {
+  appointments,
+  branches,
+  notifications,
+  patients,
+  tenantSettings,
+  tenants,
+  users,
+} from '@dental/db-schema';
 import { createNoOpChannel } from '@dental/notifications';
 import { Queue, Worker } from 'bullmq';
 import { eq, sql } from 'drizzle-orm';
@@ -230,5 +240,35 @@ describe("FX-96 — overdue eslatma job'lari (real DB + real Redis + real Worker
         .where(eq(appointments.id, past)),
     );
     expect(appt!.status).toBe('scheduled');
+  });
+});
+
+/**
+ * FX-89 seam × FX-39: reconcile boot'da tenantning `tenant_settings.reminder_lead_hours`ini
+ * hisobga oladi. Ilgari 24 soat hardcode edi → lead=2 tenantda 10 soatdan keyingi yozilishning
+ * (to'g'ri, now+8h) job'i o'chirilar, 72 soatdan keyingisi esa 24 soat oldinga qo'yilardi.
+ */
+describe('FX-89 seam — tenant reminder_lead_hours (real DB + real Redis)', () => {
+  test("lead=2 tenant: 10h yozilish job'i saqlanadi, 72h yozilish start−2h ga qo'yiladi", async () => {
+    const C = await seedTenant('c', '+998900008903');
+    await withTenant(C.tenantId, (tx) =>
+      tx.insert(tenantSettings).values({ tenantId: C.tenantId, reminderLeadHours: 2 }),
+    );
+    const now = Date.now();
+    const soonStart = now + 10 * HOUR;
+    const soon = await insertAppt(C, new Date(soonStart));
+    await addJob(C.tenantId, soon, 8 * HOUR);
+    const farStart = now + 72 * HOUR;
+    const far = await insertAppt(C, new Date(farStart), 'confirmed');
+
+    const res = await reconcileReminders({ adminDb: admin.db, queue });
+    expect(res.failed).toBe(0);
+
+    const tol = 60_000;
+    const kept = await queue.getJob(reminderJobId(soon));
+    expect(kept).toBeTruthy();
+    expect(await kept!.getState()).toBe('delayed');
+    expect(Math.abs((await fireAt(soon))! - (soonStart - 2 * HOUR))).toBeLessThan(tol);
+    expect(Math.abs((await fireAt(far))! - (farStart - 2 * HOUR))).toBeLessThan(tol);
   });
 });

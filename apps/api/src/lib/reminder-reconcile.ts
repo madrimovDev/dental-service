@@ -7,6 +7,7 @@ import { ACTIVE_STATUSES } from '../modules/appointments/appointments.transition
 import { logger } from './logger.ts';
 import type { ReminderJob } from './queue.ts';
 import { reminderDelayMs } from './reminder-delay.ts';
+import { readReminderLeadHours } from './reminder-lead-hours.ts';
 import { createReminderScheduler } from './reminder-scheduler.ts';
 
 /**
@@ -23,7 +24,8 @@ import { createReminderScheduler } from './reminder-scheduler.ts';
  *      (mavjud job — `changeDelay` bilan bazadagi vaqtga to'g'rilanadi, yo'q bo'lsa qo'shiladi;
  *      jobId deterministik — dublikat yo'q, idempotent).
  *
- * Oddiy yozilish oqimi bilan bir xil qoidalar: `reminderDelayMs(start, now)` (24 soat),
+ * Oddiy yozilish oqimi bilan bir xil qoidalar: `reminderDelayMs(start, now, lead)` — `lead`
+ * tenantning `tenant_settings.reminder_lead_hours` (FX-39, default 24; `readReminderLeadHours`),
  * `ACTIVE_STATUSES`. Har tenant mustaqil try/catch.
  */
 export type ReminderReconcileDeps = {
@@ -73,8 +75,9 @@ export async function reconcileReminders(
   for (const [tenantId, jobs] of byTenant) {
     try {
       const ids = jobs.map((j) => j.data.appointmentId);
-      const rows = await run(tenantId, (tx) =>
-        tx
+      const { rows, lead } = await run(tenantId, async (tx) => ({
+        lead: await readReminderLeadHours(tx),
+        rows: await tx
           .select({
             id: appointments.id,
             status: appointments.status,
@@ -82,7 +85,7 @@ export async function reconcileReminders(
           })
           .from(appointments)
           .where(inArray(appointments.id, ids)),
-      );
+      }));
       const live = new Map(rows.map((r) => [r.id, r]));
       for (const job of jobs) {
         const appt = live.get(job.data.appointmentId);
@@ -96,7 +99,7 @@ export async function reconcileReminders(
           appt != null &&
           ACTIVE_STATUSES.includes(appt.status) &&
           startMs > now.getTime() &&
-          (overdue || reminderDelayMs(new Date(appt.start), now) != null);
+          (overdue || reminderDelayMs(new Date(appt.start), now, lead) != null);
         if (keep) continue;
         try {
           await job.remove();
@@ -114,22 +117,27 @@ export async function reconcileReminders(
   // 2) Yetishmayotgan / vaqti noto'g'ri job'lar — bazadagi kelajakdagi faol yozilishlardan.
   const tenantRows = await deps.adminDb.select({ id: tenants.id }).from(tenants);
   result.tenants = tenantRows.length;
-  const minStart = new Date(now.getTime() + 24 * 3600_000);
   for (const { id: tenantId } of tenantRows) {
     try {
-      const rows = await run(tenantId, (tx) =>
-        tx
-          .select({ id: appointments.id, start: appointments.startTime })
-          .from(appointments)
-          .where(
-            and(
-              inArray(appointments.status, [...ACTIVE_STATUSES]),
-              gt(appointments.startTime, minStart),
+      const { rows, lead } = await run(tenantId, async (tx) => {
+        // FX-89 seam (FX-39): tenant lead soati — 24 hardcode emas.
+        const leadHours = await readReminderLeadHours(tx);
+        const minStart = new Date(now.getTime() + leadHours * 3600_000);
+        return {
+          lead: leadHours,
+          rows: await tx
+            .select({ id: appointments.id, start: appointments.startTime })
+            .from(appointments)
+            .where(
+              and(
+                inArray(appointments.status, [...ACTIVE_STATUSES]),
+                gt(appointments.startTime, minStart),
+              ),
             ),
-          ),
-      );
+        };
+      });
       for (const r of rows) {
-        const delay = reminderDelayMs(new Date(r.start), now);
+        const delay = reminderDelayMs(new Date(r.start), now, lead);
         if (delay == null) continue;
         await scheduler.enqueueReminder(tenantId, r.id, delay);
         result.enqueued++;
