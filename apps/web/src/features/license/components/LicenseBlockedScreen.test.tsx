@@ -1,15 +1,18 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/lib/i18n.ts';
+import { useAuthStore } from '@/stores/auth-store.ts';
 import { renderApp } from '../../../test-utils';
 import { LicenseBlockedScreen } from './LicenseBlockedScreen';
 
 const recheck = vi.hoisted(() => vi.fn());
 const getStatus = vi.hoisted(() => vi.fn());
+const apiLogout = vi.hoisted(() => vi.fn());
 vi.mock('@dental/api-client', async (orig) => ({
   ...(await orig<object>()),
   recheckLicense: recheck,
   getLicenseStatus: getStatus,
+  logout: apiLogout,
 }));
 const navigate = vi.hoisted(() => vi.fn());
 vi.mock('react-router-dom', async (orig) => ({
@@ -53,5 +56,42 @@ describe('LicenseBlockedScreen', () => {
     expect(screen.queryByText(new RegExp(i18n.t('license.blocked.internet')))).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: i18n.t('license.blocked.recheck') }));
     await waitFor(() => expect(navigate).toHaveBeenCalledWith('/'));
+  });
+
+  // FX-103 (LB-12): blok ekranida qamalib qolmaslik — chiqish va boshqa klinikaga o'tish.
+  it('«Chiqish»: refresh token bekor qilinadi, store tozalanadi, /login ga otadi', async () => {
+    navigate.mockClear();
+    apiLogout.mockResolvedValue({ success: true, data: null });
+    getStatus.mockResolvedValue(res('expired'));
+    useAuthStore.getState().setTokens('acc', 'ref-1');
+    useAuthStore.getState().setContext('t1', 'b1', ['patient.view']);
+    renderApp(<LicenseBlockedScreen />);
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('license.blocked.logout') }));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/login'));
+    expect(apiLogout).toHaveBeenCalledWith({ refreshToken: 'ref-1' });
+    expect(useAuthStore.getState().accessToken).toBeNull();
+    expect(useAuthStore.getState().activeTenantId).toBeNull();
+  });
+  it('«Chiqish»: logout API yiqilsa ham chiqadi', async () => {
+    navigate.mockClear();
+    apiLogout.mockRejectedValue(new Error('net'));
+    getStatus.mockResolvedValue(res('expired'));
+    useAuthStore.getState().setTokens('acc', 'ref-2');
+    renderApp(<LicenseBlockedScreen />);
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('license.blocked.logout') }));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/login'));
+    expect(useAuthStore.getState().refreshToken).toBeNull();
+  });
+  it('SaaS: «Boshqa klinikaga o‘tish» /select-workspace ga otadi', async () => {
+    navigate.mockClear();
+    getStatus.mockResolvedValue({
+      success: true,
+      data: { state: 'expired', mode: 'cloud', daysLeft: null, expiresAt: null, graceEndsAt: null },
+    });
+    renderApp(<LicenseBlockedScreen />);
+    fireEvent.click(
+      await screen.findByRole('button', { name: i18n.t('license.blocked.switchWorkspace') }),
+    );
+    expect(navigate).toHaveBeenCalledWith('/select-workspace');
   });
 });

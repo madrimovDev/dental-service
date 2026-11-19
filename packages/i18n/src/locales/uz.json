@@ -1644,7 +1644,9 @@
       "recheck": "Qayta tekshirish",
       "stillExpired": "Litsenziya hali ham faol emas",
       "subscriptionTitle": "Obuna muddati tugadi",
-      "subscriptionBody": "To'lov qilishingiz kerak, ta'minotchiga murojaat qiling"
+      "subscriptionBody": "To'lov qilishingiz kerak, ta'minotchiga murojaat qiling",
+      "logout": "Chiqish",
+      "switchWorkspace": "Boshqa klinikaga o'tish"
     },
     "module_disabled": {
       "title": "Bu bo'lim tarifingizda yo'q",
