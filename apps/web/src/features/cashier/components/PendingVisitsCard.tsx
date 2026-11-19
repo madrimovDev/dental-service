@@ -17,7 +17,8 @@ export interface PendingVisitsCardProps {
  * Bo'sh bo'lsa ham ko'rinadi — kassir ro'yxat bo'shligini biladi.
  */
 export function PendingVisitsCard({ visits, activeVisitId, onTake }: PendingVisitsCardProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const locale = i18n.language === 'ru' ? 'ru-RU' : 'uz-UZ';
   return (
     <Box
       data-testid="pending-visits"
@@ -92,7 +93,7 @@ export function PendingVisitsCard({ visits, activeVisitId, onTake }: PendingVisi
                       style={{ fontSize: 11.5, color: 'var(--warning, var(--danger))' }}
                     >
                       {t('cashierHandoff.overdue', {
-                        date: new Date(v.signedAt).toLocaleDateString('uz-UZ', {
+                        date: new Date(v.signedAt).toLocaleDateString(locale, {
                           timeZone: 'Asia/Tashkent',
                         }),
                       })}
