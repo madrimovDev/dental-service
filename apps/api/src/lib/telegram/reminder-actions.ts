@@ -1,5 +1,5 @@
-import { appointments, patients } from '@dental/db-schema';
-import { eq } from 'drizzle-orm';
+import { appointments, patients, queueTickets } from '@dental/db-schema';
+import { and, eq, inArray } from 'drizzle-orm';
 import type { DbOrTx } from '../../db/client.ts';
 import { AppointmentTransitionError } from '../../modules/appointments/appointments.transitions.ts';
 import type { AppointmentsService } from '../../modules/appointments/index.ts';
@@ -77,6 +77,20 @@ export async function handleReminderAction(
       return { outcome: res.ok ? 'confirmed' : 'unavailable', ...base };
     }
     if (o.action === 'no') {
+      // FX-58: bemor erta check-in qilgan (ochiq navbat chiptasi bor) — bot service'ida queue
+      // reverse-sync yo'q, bekor qilsak chipta arvoh bo'lib qoladi. Bekor qilishni registraturaga
+      // qoldiramiz (kalendar/navbat reverse-sync bilan yopadi).
+      const [openTicket] = await tx
+        .select({ id: queueTickets.id })
+        .from(queueTickets)
+        .where(
+          and(
+            eq(queueTickets.appointmentId, row.id),
+            inArray(queueTickets.status, ['waiting', 'in_progress']),
+          ),
+        )
+        .limit(1);
+      if (openTicket) return { outcome: 'already', ...base };
       const res = await deps.appointments.update(c, row.id, {
         status: 'cancelled',
         cancellationReason: 'patient_telegram',
