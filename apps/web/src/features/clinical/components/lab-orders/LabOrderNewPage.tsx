@@ -209,7 +209,12 @@ export function LabOrderNewPage() {
           }
         }
         const hubLab = hubLabId ? hubLabs.find((l) => l.id === hubLabId) : undefined;
-        if (send && hubLab) {
+        // FX-50: fayl yuklanmagan buyurtma labga YUBORILMAYDI (lab fayllarsiz ishlay olmaydi) —
+        // qoralama bo'lib qoladi, foydalanuvchi fayllarni qayta yuklab, keyin yuboradi.
+        const hold = failed > 0;
+        if (hold && send) {
+          notifications.show({ color: 'red', message: t('labOrder.files_failed_not_sent') });
+        } else if (send && hubLab) {
           // Portal orqali: ish navbatga tushadi (internet yo'q bo'lsa — qaytganda ketadi).
           try {
             await sendHubMut.mutateAsync({ labOrderId: order.id, labId: hubLab.id });
@@ -220,7 +225,7 @@ export function LabOrderNewPage() {
         } else if (send) {
           await statusMut.mutateAsync({ id: order.id, status: 'sent' as LabOrderStatus });
         }
-        if (failed > 0) {
+        if (failed > 0 && !send) {
           notifications.show({ color: 'yellow', message: t('labOrder.files_failed') });
         }
         navigate(`/lab-orders/${order.id}`, { replace: true });
@@ -487,6 +492,17 @@ export function LabOrderNewPage() {
                     {(props) => (
                       <Button variant="default" {...props}>
                         {t('labOrder.add_file')}
+                      </Button>
+                    )}
+                  </FileButton>
+                  <FileButton
+                    accept="image/*"
+                    capture="environment"
+                    onChange={(picked) => picked && setFiles((cur) => [...cur, picked])}
+                  >
+                    {(props) => (
+                      <Button variant="default" {...props}>
+                        {t('labOrder.add_photo')}
                       </Button>
                     )}
                   </FileButton>

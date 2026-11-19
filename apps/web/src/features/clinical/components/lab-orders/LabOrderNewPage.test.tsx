@@ -224,6 +224,25 @@ describe('LabOrderNewPage', () => {
     expect(await screen.findByText('detail-page')).toBeInTheDocument();
   });
 
+  it('FX-50: fayl yuklanmasa buyurtma labga YUBORILMAYDI (qoralama qoladi)', async () => {
+    uploadMutateAsync.mockRejectedValue(new Error('413'));
+    renderPage();
+    fireEvent.change(await screen.findByLabelText(/Laboratoriya nomi/), {
+      target: { value: 'Lab Z' },
+    });
+    fireEvent.click(screen.getByText('A3'));
+    fireEvent.change(screen.getByLabelText(/Kerakli sana/), { target: { value: '2026-12-01' } });
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, {
+      target: { files: [new File(['x'], 'skan.stl', { type: 'model/stl' })] },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Laboratoriyaga yuborish' }));
+    await waitFor(() => expect(uploadMutateAsync).toHaveBeenCalled());
+    expect(await screen.findByText('detail-page')).toBeInTheDocument();
+    expect(statusMutateAsync).not.toHaveBeenCalled();
+    expect(sendHubMutateAsync).not.toHaveBeenCalled();
+  });
+
   it('«Laboratoriya nimani ko‘radi»: Hub’ga yuboriladigan shifokor (doctorId) ismi', async () => {
     renderPage();
     expect(await screen.findByTestId('lab-sees-doctor')).toHaveTextContent('Dr. Yusupova');

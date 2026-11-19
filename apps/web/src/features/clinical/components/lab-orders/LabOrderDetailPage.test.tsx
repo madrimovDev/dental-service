@@ -242,6 +242,30 @@ describe('LabOrderDetailPage', () => {
     expect(screen.queryByTestId('lab-hub-remake')).not.toBeInTheDocument();
   });
 
+  it('FX-50: lab qaytargan fayl buyurtma «Fayllar» ro‘yxatida (ko‘rish + yuklab olish)', () => {
+    orderOver.current = { labHubLabId: 'hl1', hubStatus: 'ready' };
+    extraMessages.current = [
+      {
+        id: 'm3',
+        labOrderId: 'lo1',
+        author: 'lab',
+        authorName: null,
+        kind: 'file',
+        body: 'skan.png',
+        file: { id: 'f9', fileName: 'skan.png', mimeType: 'image/png', sizeBytes: 2048 },
+        synced: true,
+        createdAt: '2026-06-12T00:00:00Z',
+      },
+    ];
+    renderPage();
+    const list = screen.getByTestId('lab-returned-files');
+    expect(list).toHaveTextContent('skan.png');
+    fireEvent.click(screen.getByRole('button', { name: "Ko'rish: skan.png" }));
+    expect(downloadSpy).toHaveBeenCalledWith('/api/lab-orders/lo1/hub-files/f9', 'skan.png', {
+      openInNewTab: true,
+    });
+  });
+
   it('lab fayli xabarida «Yuklab olish» — proxy manzil bilan', () => {
     orderOver.current = { labHubLabId: 'hl1', hubStatus: 'ready' };
     extraMessages.current = [
@@ -258,7 +282,10 @@ describe('LabOrderDetailPage', () => {
       },
     ];
     renderPage();
-    fireEvent.click(screen.getByRole('button', { name: 'Yuklab olish: natija.pdf' }));
+    // Yozishmada ham, «Fayllar» ro'yxatida ham (FX-50) — ikkalasi bir xil proksi manzilga.
+    const buttons = screen.getAllByRole('button', { name: 'Yuklab olish: natija.pdf' });
+    expect(buttons).toHaveLength(2);
+    fireEvent.click(buttons[0] as HTMLElement);
     expect(downloadSpy).toHaveBeenCalledWith('/api/lab-orders/lo1/hub-files/f1', 'natija.pdf');
   });
 });

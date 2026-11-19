@@ -244,7 +244,11 @@ export function LabOrdersTab({ patientId }: Props) {
                       marginTop: 14,
                     }}
                   >
-                    <LabOrderFiles labOrderId={vm.id} canManage={canManage} />
+                    <LabOrderFiles
+                      labOrderId={vm.id}
+                      canManage={canManage}
+                      hubLinked={!!wire?.labHubLabId}
+                    />
                     {vm.status !== 'draft' && vm.status !== 'cancelled' && (
                       <LabOrderChain current={vm.status} />
                     )}
