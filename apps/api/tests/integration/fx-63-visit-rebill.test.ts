@@ -48,6 +48,7 @@ let svc2: string; // 50k
 let visitRefund: string;
 let visitPartial: string;
 let visitRace: string;
+let visitCredit: string;
 
 const app = createApp();
 let tok: string;
@@ -150,6 +151,7 @@ beforeAll(async () => {
     visitRefund = await mkVisit([svc1]);
     visitPartial = await mkVisit([svc1, svc1, svc2]); // 250k
     visitRace = await mkVisit([svc1, svc1]); // 200k
+    visitCredit = await mkVisit([svc1]); // 100k, to'liq nasiya
     const [role] = await tx
       .insert(roles)
       .values({ tenantId, name: 'Kassir (test)' })
@@ -238,6 +240,26 @@ describe('FX-63: qisman undirish', () => {
         .select({ id: cashierTransactions.id })
         .from(cashierTransactions)
         .where(sql`visit_note_id = ${visitRace}`),
+    );
+    expect(rows.length).toBe(1);
+  });
+});
+
+describe('FX-63 review: to`liq nasiya (paidAmount=0) vizit to`lovi', () => {
+  test('paid=0 to`lov vizitni yopadi: ro`yxatda yo`q, ikkinchi to`lov 409, bitta tranzaksiya', async () => {
+    const first = await pay(visitCredit, [{ serviceId: svc1, quantity: 1 }], 0);
+    expect(first.status).toBe(201);
+    expect((await pending()).map((v) => v.visitNoteId)).not.toContain(visitCredit);
+
+    const second = await pay(visitCredit, [{ serviceId: svc1, quantity: 1 }], 0);
+    expect(second.status).toBe(409);
+    expect(second.json.error?.code).toBe('cashier.visit_already_billed');
+
+    const rows = await withTenant(tenantId, (tx) =>
+      tx
+        .select({ id: cashierTransactions.id })
+        .from(cashierTransactions)
+        .where(sql`visit_note_id = ${visitCredit}`),
     );
     expect(rows.length).toBe(1);
   });

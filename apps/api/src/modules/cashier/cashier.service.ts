@@ -186,10 +186,14 @@ export class VisitAlreadyBilledError extends Error {
  * Faol = `payment`, `voided` emas va to'liq refund bilan qoplanmagan. To'liq refund
  * qilingan to'lov vizitni «to'langan» holatda qoldirmaydi (qayta undirish mumkin),
  * qisman undirish esa faqat o'z xizmatlarini yopadi (qolgani qarz bo'lib turadi).
+ * To'liq nasiya (`paid_amount = 0`) to'lov ham FAOL — patients.balance qoidasi bilan bir xil
+ * (u faqat `paid > 0 AND refunded >= paid` holatida tranzaksiyani bekor deb hisoblaydi);
+ * aks holda `0 < 0` vizitni qayta-qayta undirishga va qarzni ikki marta hisoblashga yo'l ochardi.
  */
 const ACTIVE_VISIT_PAYMENT_SQL = sql`ct.type = 'payment' AND ct.status <> 'voided'
-  AND COALESCE((SELECT SUM(r.paid_amount) FROM cashier_transactions r
-                WHERE r.parent_transaction_id = ct.id AND r.type = 'refund' AND r.status = 'completed'), 0) < ct.paid_amount`;
+  AND (ct.paid_amount = 0
+       OR COALESCE((SELECT SUM(r.paid_amount) FROM cashier_transactions r
+                    WHERE r.parent_transaction_id = ct.id AND r.type = 'refund' AND r.status = 'completed'), 0) < ct.paid_amount)`;
 
 const billedByService = async (
   db: ReturnType<typeof getDb>,
