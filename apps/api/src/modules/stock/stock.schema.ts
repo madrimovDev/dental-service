@@ -51,7 +51,13 @@ export type CreateMovementInput = z.infer<typeof createMovementSchema>;
 export const createBomSchema = z.object({
   serviceId: z.uuid(),
   itemId: z.uuid(),
-  qtyPerService: z.coerce.number().positive(),
+  // FX-169: numeric(14,2) — 0.01 dan kichik yoki 2 xonadan ortiq aniqlik 0.00 ga yaxlitlanib qolardi.
+  qtyPerService: z.coerce
+    .number()
+    .min(0.01)
+    .refine((v) => Math.abs(v * 100 - Math.round(v * 100)) < 1e-6, {
+      message: 'qtyPerService must have at most 2 decimal places',
+    }),
 });
 export type CreateBomInput = z.infer<typeof createBomSchema>;
 
