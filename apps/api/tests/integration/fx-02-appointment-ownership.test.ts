@@ -28,6 +28,7 @@ import {
   createAppointmentsService,
   exclusionConflictCode,
 } from '../../src/modules/appointments/appointments.service.ts';
+import { seedRoleForUser } from './fx-m2-helpers.ts';
 
 const receptionist = ROLE_TEMPLATES.find((t) => t.templateKey === 'receptionist');
 if (!receptionist) throw new Error('receptionist template not found');
@@ -142,6 +143,10 @@ beforeAll(async () => {
   patientA2 = a.p2;
   branchB = b.branch;
   patientB = b.p1;
+
+  // FX-133: yozilish filial doirasi tayinlovlardan o'qiladi — registratorlarga real (tenant-wide) tayinlov.
+  await seedRoleForUser(tenantA, recepA, null, receptionistPerms, 'Registrator');
+  await seedRoleForUser(tenantB, recepB, null, receptionistPerms, 'Registrator');
 
   const claims = (sub: string, atid: string) => ({
     sub,

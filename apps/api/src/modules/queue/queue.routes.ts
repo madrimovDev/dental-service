@@ -2,6 +2,7 @@ import { fail, ok } from '@dental/core';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { branchIdFromJson, loadBranchScope, requireBranchScope } from '../../lib/branch-scope.ts';
 import { requireModuleInDesktop } from '../../lib/license-middleware.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
@@ -70,7 +71,10 @@ export const queueRoutes = (deps: {
     path: '/',
     tags: ['queue'],
     operationId: 'getQueueToday',
-    middleware: [requirePermission('queue.view')] as const,
+    middleware: [
+      requirePermission('queue.view'),
+      requireBranchScope('queue.view', (c) => c.req.query('branchId')),
+    ] as const,
     request: {
       query: z.object({ branchId: z.uuid() }),
     },
@@ -90,7 +94,10 @@ export const queueRoutes = (deps: {
     path: '/check-in-candidates',
     tags: ['queue'],
     operationId: 'getCheckInCandidates',
-    middleware: [requirePermission('queue.create')] as const,
+    middleware: [
+      requirePermission('queue.create'),
+      requireBranchScope('queue.create', (c) => c.req.query('branchId')),
+    ] as const,
     request: {
       query: z.object({ branchId: z.uuid() }),
     },
@@ -113,7 +120,10 @@ export const queueRoutes = (deps: {
     path: '/',
     tags: ['queue'],
     operationId: 'createQueueTicket',
-    middleware: [requirePermission('queue.create')] as const,
+    middleware: [
+      requirePermission('queue.create'),
+      requireBranchScope('queue.create', branchIdFromJson),
+    ] as const,
     request: {
       body: { content: { 'application/json': { schema: createQueueTicketSchema } } },
     },
@@ -170,7 +180,10 @@ export const queueRoutes = (deps: {
     path: '/{id}/status',
     tags: ['queue'],
     operationId: 'updateQueueTicketStatus',
-    middleware: [requirePermission('queue.manage')] as const,
+    middleware: [
+      requirePermission('queue.manage'),
+      requireBranchScope('queue.manage', (c) => service.getBranchId(c, c.req.param('id') ?? '')),
+    ] as const,
     request: {
       params: queueTicketIdParamSchema,
       body: { content: { 'application/json': { schema: updateQueueStatusSchema } } },
@@ -212,7 +225,10 @@ export const queueRoutes = (deps: {
     path: '/{id}/call-own',
     tags: ['queue'],
     operationId: 'callOwnQueueTicket',
-    middleware: [requirePermission('queue.view')] as const,
+    middleware: [
+      requirePermission('queue.view'),
+      requireBranchScope('queue.view', (c) => service.getBranchId(c, c.req.param('id') ?? '')),
+    ] as const,
     request: { params: queueTicketIdParamSchema },
     responses: {
       ...okJson(queueTicketUpdateResultSchema, 'Called queue ticket'),
@@ -261,7 +277,10 @@ export const queueRoutes = (deps: {
     path: '/sweep-no-shows',
     tags: ['queue'],
     operationId: 'sweepQueueNoShows',
-    middleware: [requirePermission('queue.manage')] as const,
+    middleware: [
+      requirePermission('queue.manage'),
+      requireBranchScope('queue.manage', branchIdFromJson),
+    ] as const,
     request: {
       body: {
         required: false,
@@ -275,8 +294,16 @@ export const queueRoutes = (deps: {
 
   app.openapi(sweepNoShowsRoute, async (c) => {
     const body = c.req.valid('json');
-    const swept = await service.sweepNoShows(c, body?.branchId);
-    return c.json(ok({ swept }), 200);
+    if (body?.branchId)
+      return c.json(ok({ swept: await service.sweepNoShows(c, body.branchId) }), 200);
+    // FX-133: filialsiz trigger — faqat chaqiruvchining filiallari (tenant-wide/owner → hammasi).
+    const scope = await loadBranchScope(c, 'queue.manage');
+    if (scope.kind === 'branches') {
+      let swept = 0;
+      for (const id of scope.branchIds) swept += await service.sweepNoShows(c, id);
+      return c.json(ok({ swept }), 200);
+    }
+    return c.json(ok({ swept: await service.sweepNoShows(c) }), 200);
   });
 
   return app;

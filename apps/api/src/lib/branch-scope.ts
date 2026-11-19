@@ -1,6 +1,7 @@
+import { fail } from '@dental/core';
 import { permissions, rolePermissions, userAssignments } from '@dental/db-schema';
 import { and, eq, gt, isNotNull, isNull, or } from 'drizzle-orm';
-import type { Context } from 'hono';
+import type { Context, MiddlewareHandler } from 'hono';
 import { getDb } from '../db/scoped.ts';
 
 /**
@@ -64,3 +65,30 @@ export const isBranchAllowed = async (
   permissionCode: string,
   branchId: string,
 ): Promise<boolean> => scopeAllows(await loadBranchScope(c, permissionCode), branchId);
+
+/**
+ * FX-133: route-darajasidagi filial doirasi middleware'i (`requirePermission`dan KEYIN,
+ * `rlsMiddleware`dan keyin). `resolveBranchId` tekshiriladigan filialni qaytaradi
+ * (query/body/resurs qatoridan); `null`/`undefined` — filial aniqlanmadi (resurs topilmadi
+ * yoki filial filtri berilmagan): faqat doira `none` emasligi tekshiriladi, qolganini
+ * handler hal qiladi (404 / doira bo'yicha filtr). Owner/tenant-wide → har doim o'tadi.
+ */
+export const requireBranchScope =
+  (
+    permissionCode: string,
+    resolveBranchId: (c: Context) => Promise<string | null | undefined> | string | null | undefined,
+  ): MiddlewareHandler =>
+  async (c, next) => {
+    const scope = await loadBranchScope(c, permissionCode);
+    const branchId = await resolveBranchId(c);
+    if (scope.kind === 'none' || (branchId && !scopeAllows(scope, branchId))) {
+      return c.json(fail(BRANCH_FORBIDDEN_CODE, BRANCH_FORBIDDEN_MESSAGE), 403);
+    }
+    await next();
+  };
+
+/** Body'dagi `branchId` (JSON) — Hono body'ni keshlaydi, handler `valid('json')` baribir ishlaydi. */
+export const branchIdFromJson = async (c: Context): Promise<string | undefined> => {
+  const body = (await c.req.json().catch(() => null)) as { branchId?: unknown } | null;
+  return typeof body?.branchId === 'string' ? body.branchId : undefined;
+};

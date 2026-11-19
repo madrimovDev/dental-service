@@ -66,6 +66,15 @@ export const createQueueService = (deps: {
       .orderBy(asc(queueTickets.queueNumber));
   }
 
+  /** FX-133: ticket filiali (RLS ostida) — filial doirasi tekshiruvi uchun. */
+  async function getBranchId(c: Context, id: string): Promise<string | null> {
+    const [row] = await getDb(c)
+      .select({ branchId: queueTickets.branchId })
+      .from(queueTickets)
+      .where(eq(queueTickets.id, id));
+    return row?.branchId ?? null;
+  }
+
   async function nextNumber(c: Context, branchId: string): Promise<number> {
     const db = getDb(c);
     const todayStart = tashkentDayStart();
@@ -519,6 +528,7 @@ export const createQueueService = (deps: {
 
   return {
     todayList,
+    getBranchId,
     nextNumber,
     create,
     updateStatus,
