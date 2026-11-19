@@ -271,6 +271,38 @@ describe('FX-41 — bog‘lanishni bekor qilish', () => {
     expect(await chatOf(tTgOnly, patientId)).toBeNull();
   });
 
+  test('review: o‘sha bot (id bir xil) tokeni yangi sir bilan almashsa yoki Telegram o‘chirilib qayta yoqilsa — bog‘lanish saqlanadi; boshqa bot id — tozalanadi', async () => {
+    const settings = createTenantSettingsService({ audit: noopAudit });
+    await withTenant(tTgOnly, async (tx) => {
+      await settings.update(ctx(tx, tTgOnly), { telegram: { botToken: '777:old-secret' } });
+    });
+    const { patientId } = await seedAppt(tTgOnly, branchTgOnly, '+998901000065', '4165');
+
+    // BotFather /revoke — bot id (':' oldidan) o'zgarmaydi, faqat sir.
+    await withTenant(tTgOnly, async (tx) => {
+      await settings.update(ctx(tx, tTgOnly), { telegram: { botToken: '777:new-secret' } });
+    });
+    expect(await chatOf(tTgOnly, patientId)).toBe('4165');
+
+    // O'chirish — bog'lanishlar tegilmaydi (403/onBlocked yo'li bemor bo'yicha tozalaydi).
+    await withTenant(tTgOnly, async (tx) => {
+      await settings.update(ctx(tx, tTgOnly), { telegram: null });
+    });
+    expect(await chatOf(tTgOnly, patientId)).toBe('4165');
+
+    // Xuddi shu bot bilan qayta yoqish — saqlanadi.
+    await withTenant(tTgOnly, async (tx) => {
+      await settings.update(ctx(tx, tTgOnly), { telegram: { botToken: '777:new-secret' } });
+    });
+    expect(await chatOf(tTgOnly, patientId)).toBe('4165');
+
+    // Boshqa bot (id farqli) — tozalanadi.
+    await withTenant(tTgOnly, async (tx) => {
+      await settings.update(ctx(tx, tTgOnly), { telegram: { botToken: '888:other-bot' } });
+    });
+    expect(await chatOf(tTgOnly, patientId)).toBeNull();
+  });
+
   test('xodim «Telegramni uzish»: chat tozalanadi + audit; begona tenant bemori 404', async () => {
     const { patientId } = await seedAppt(tBoth, branchBoth, '+998901000064', '4164');
     const audits: unknown[] = [];

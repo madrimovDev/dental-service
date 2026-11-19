@@ -111,12 +111,13 @@ export const createTenantSettingsService = (deps: { audit: AuditLogger }) => {
       patch.integrationSettings = next;
     }
 
-    // FX-41 (LA-22): bot tokeni boshqasiga almashtirilsa yoki o'chirilsa — eski bot bilan
-    // bog'langan barcha bemor chat_id'lari yangi bot uchun yaroqsiz (403/«chat not found»,
-    // PII eski bot orqali boshqaning chat'iga ketishi mumkin). Xuddi shu token qayta
-    // saqlansa — tegilmaydi.
-    let tokenChanged = false;
-    if (telegram !== undefined) {
+    // FX-41 (LA-22): boshqa BOT ulansa (bot id — tokendagi ':' oldidagi qism — farqli) eski
+    // bot bilan bog'langan chat_id'lar tozalanadi. Review: o'sha botning tokeni yangi sir
+    // bilan almashtirilsa (BotFather /revoke) yoki Telegram o'chirilsa (`null`) — tegilmaydi:
+    // shaxsiy chat'da chat_id = foydalanuvchi id, ya'ni boshqa bot ham faqat o'sha odamga,
+    // u /start bosgandan keyingina yeta oladi; aks holda 403 → onBlocked bemor bo'yicha tozalaydi.
+    let botChanged = false;
+    if (telegram) {
       const prevEnc = (
         (before.integrationSettings ?? {}) as { telegram?: { botTokenEnc?: string } | null }
       ).telegram?.botTokenEnc;
@@ -128,12 +129,13 @@ export const createTenantSettingsService = (deps: { audit: AuditLogger }) => {
           prevToken = null;
         }
       }
-      tokenChanged = (telegram === null ? null : telegram.botToken) !== prevToken;
+      const botIdOf = (token: string) => token.split(':')[0];
+      botChanged = prevToken !== null && botIdOf(telegram.botToken) !== botIdOf(prevToken);
     }
 
     const [updated] = await db.update(tenantSettings).set(patch).returning();
 
-    if (tokenChanged) {
+    if (botChanged) {
       await db
         .update(patients)
         .set({ telegramChatId: null })
