@@ -112,6 +112,11 @@ export const createScheduleService = (deps: { audit: AuditLogger }) => {
     return { ok: true as const, timeOff: toTimeOffDto(row) };
   }
 
+  /** FX-113: route filial-doirasi tekshiruvi uchun (o'chirishdan oldin). */
+  async function getTimeOff(c: Context, id: string) {
+    return repo.getTimeOffById(c, id);
+  }
+
   async function deleteTimeOff(c: Context, id: string) {
     const before = await repo.getTimeOffById(c, id);
     if (!before) return { ok: false as const, code: 'not_found' };
@@ -342,6 +347,7 @@ export const createScheduleService = (deps: { audit: AuditLogger }) => {
     replaceWorkingHours,
     listTimeOff,
     createTimeOff,
+    getTimeOff,
     deleteTimeOff,
     getAvailability,
     getBranchAvailability,
