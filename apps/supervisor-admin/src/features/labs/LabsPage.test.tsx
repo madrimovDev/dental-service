@@ -113,4 +113,38 @@ describe('LabsPage', () => {
       });
     });
   });
+  it('FX-94: rahbar parolini tiklash — yangi vaqtinchalik parol ko‘rsatiladi', async () => {
+    fetchMock.mockImplementation(async (input: unknown, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === 'POST' && url.endsWith('/v1/admin/labs/l1/users/u1/reset-password')) {
+        return jsonResponse({
+          user: { id: 'u1', fullName: 'Rahbar', phone: '+998901234567', role: 'lead' },
+          tempPassword: 'ResetPass2345678',
+        });
+      }
+      if (url.endsWith('/v1/admin/labs/l1/users')) {
+        return jsonResponse({
+          users: [
+            { id: 'u1', fullName: 'Rahbar', phone: '+998901234567', role: 'lead', isActive: true },
+            {
+              id: 'u2',
+              fullName: 'Texnik',
+              phone: '+998909999999',
+              role: 'technician',
+              isActive: true,
+            },
+          ],
+        });
+      }
+      return jsonResponse({ labs: [labOne] });
+    });
+    renderApp(<LabsPage />);
+    await screen.findByText('Dental Lab Pro');
+    fireEvent.click(screen.getByRole('button', { name: 'Parolni tiklash' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByText(/Rahbar · \+998901234567/)).toBeInTheDocument();
+    expect(within(dialog).queryByText(/Texnik/)).toBeNull();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Parolni tiklash' }));
+    expect(await screen.findByText('ResetPass2345678')).toBeInTheDocument();
+  });
 });

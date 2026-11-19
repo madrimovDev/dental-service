@@ -112,6 +112,51 @@ describe('/v1/admin/labs (Hub proksisi)', () => {
     expect(((await list.json()) as { labs: unknown[] }).labs).toHaveLength(1);
   });
 
+  it("FX-94: foydalanuvchilar ro‘yxati va parolni tiklash Hub ichki API'siga proksi qilinadi", async () => {
+    const labId = '2f1c3a4e-0000-4000-8000-000000000001';
+    const userId = '2f1c3a4e-0000-4000-8000-000000000002';
+    calls.length = 0;
+    expect((await app.request(`/v1/admin/labs/${labId}/users`)).status).toBe(401);
+    expect(
+      (
+        await app.request(`/v1/admin/labs/${labId}/users/${userId}/reset-password`, {
+          method: 'POST',
+        })
+      ).status,
+    ).toBe(401);
+
+    next = { status: 200, body: { users: [{ id: userId, role: 'lead' }] } };
+    const list = await app.request(`/v1/admin/labs/${labId}/users`, { headers: await admin() });
+    expect(list.status).toBe(200);
+    expect(calls[0]).toMatchObject({
+      method: 'GET',
+      url: `http://hub.internal:8171/internal/labs/${labId}/users`,
+      auth: `Bearer ${TOKEN}`,
+    });
+
+    next = { status: 200, body: { tempPassword: 'RESET-PASS-1234567' } };
+    const res = await app.request(`/v1/admin/labs/${labId}/users/${userId}/reset-password`, {
+      method: 'POST',
+      headers: await admin(),
+    });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { tempPassword: string }).tempPassword).toBe(
+      'RESET-PASS-1234567',
+    );
+    expect(calls[1]).toMatchObject({
+      method: 'POST',
+      url: `http://hub.internal:8171/internal/labs/${labId}/users/${userId}/reset-password`,
+    });
+    expect(
+      (
+        await app.request(`/v1/admin/labs/${labId}/users/not-a-uuid/reset-password`, {
+          method: 'POST',
+          headers: await admin(),
+        })
+      ).status,
+    ).toBe(404);
+  });
+
   it('Hub sozlanmagan bo‘lsa 503', async () => {
     delete process.env.LAB_HUB_URL;
     const res = await app.request('/v1/admin/labs', { headers: await admin() });
