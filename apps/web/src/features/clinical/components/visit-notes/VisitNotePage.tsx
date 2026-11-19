@@ -32,6 +32,7 @@ import {
 } from '../../clinical.api';
 import { diagnosisSearchIndex, normalizeSearch, toDiagnosisOptions } from '../../clinical.mappers';
 import type { AllergyOverride, NextVisit, VisitNoteView } from '../../clinical.types';
+import { useClinicalAuthor } from '../../clinical-author';
 import classes from './VisitNotePage.module.css';
 import {
   buildVisitNoteBody,
@@ -100,6 +101,10 @@ export function VisitNotePage() {
   const updateNote = useUpdateVisitNote(patientId);
   const signNote = useSignVisitNote(patientId);
   const createRx = useCreatePrescription(patientId);
+  // FX-155 review: muallif shifokor bo'lishi shart (server `assertPractitioner`). Branch Manager /
+  // Tenant Admin o'z nomidan yoza olmaydi; `medical_record.on_behalf` bo'lsa shifokor tanlanadi.
+  const author = useClinicalAuthor('medical_record.on_behalf');
+  const [pickedDoctorId, setPickedDoctorId] = useState<string | null>(null);
 
   const [noteId, setNoteId] = useState<string | null>(visitId ?? null);
   const [values, setValues] = useState<VisitFormValues>(emptyVisitForm);
@@ -130,6 +135,15 @@ export function VisitNotePage() {
 
   const note = noteQuery.data as VisitNoteView | undefined;
   const signed = !!note?.signedAt;
+  // Mavjud yozuv — muallif o'zgarmaydi (PATCH doctorId'ni yubormaydi); yangi — tanlangan/o'zi.
+  const authorId = note?.doctorId ?? pickedDoctorId ?? author.defaultDoctorId;
+  // Retsept muallifi: vizit muallifi, agar bu o'zi yoki `prescription.on_behalf` bo'lsa; aks holda
+  // (boshqa shifokorning yozuvini tahrirlayotgan shifokor) — o'zi.
+  const rxAuthorId =
+    authorId && (authorId === user?.id || hasPermission('prescription.on_behalf'))
+      ? authorId
+      : (user?.id ?? null);
+  const authorLabel = author.options.find((o) => o.value === authorId)?.label ?? user?.fullName;
   const key = draftKey(patientId, noteId);
 
   // ── hydrate: server yozuvi yoki saqlanmagan lokal qoralama ───────────────
@@ -329,21 +343,21 @@ export function VisitNotePage() {
       notifications.show({ message: t('visitNote.validationEmpty'), color: 'red' });
       return null;
     }
-    if (!user) return null;
+    if (!user || !authorId || !rxAuthorId) return null;
     // Yangi vizit: shifokorning o'z yozilishi (FX-117) — `?appointmentId=` yoki bugungi bo'sh yozilish.
     const linkedId = noteId
       ? null
       : (values.appointmentId ??
         pickAppointmentToLink({
           appointments: apptQuery.data ?? [],
-          doctorId: user.id,
+          doctorId: authorId,
           requestedId: requestedAppointmentId,
           linkedAppointmentIds: (notesQuery.data ?? []).map((n) => n.appointmentId),
         }));
     const linked = noteId ? values : { ...values, appointmentId: linkedId };
     const body = buildVisitNoteBody(linked, {
       patientId,
-      doctorId: user.id,
+      doctorId: authorId,
       isEdit: !!noteId,
       overrides:
         unknownAck && completeRx.length > 0
@@ -370,7 +384,7 @@ export function VisitNotePage() {
       try {
         await createRx.mutateAsync({
           patientId,
-          doctorId: user.id,
+          doctorId: rxAuthorId,
           visitNoteId: id,
           items: completeRx.map((r) => ({
             medicationName: r.drug.trim(),
@@ -454,6 +468,17 @@ export function VisitNotePage() {
     );
   }
 
+  if (!visitId && author.isLoading) return <StateView status="loading" skeleton="detail" />;
+  if (!visitId && !author.canAuthor) {
+    return (
+      <StateView
+        status="forbidden"
+        title={t('clinicalAuthor.notPractitionerTitle')}
+        description={t('clinicalAuthor.notPractitionerBody')}
+      />
+    );
+  }
+
   const patientName = patientQuery.data?.fullName ?? '';
   const pending = busy || createNote.isPending || updateNote.isPending || signNote.isPending;
   const savedRx = (prescriptionsQuery.data ?? []).filter((p) => p.visitNoteId === noteId);
@@ -473,10 +498,23 @@ export function VisitNotePage() {
             {t(visitId ? 'visitNote.titleEdit' : 'visitNote.titleFor', { name: patientName })}
           </h1>
           <span className={classes.sub}>
-            {user?.fullName ? `${user.fullName} · ` : ''}
+            {authorLabel ? `${authorLabel} · ` : ''}
             {new Date(note?.visitDate ?? Date.now()).toLocaleDateString()}
           </span>
         </div>
+        {!visitId && author.showPicker && (
+          <Select
+            label={t('clinicalAuthor.doctor')}
+            placeholder={t('clinicalAuthor.doctorPlaceholder')}
+            data={author.options}
+            value={authorId}
+            onChange={setPickedDoctorId}
+            allowDeselect={false}
+            disabled={readOnly || !!noteId}
+            required
+            w={240}
+          />
+        )}
         <Select
           aria-label={t('visitNote.template')}
           placeholder={t('visitNote.templatePlaceholder')}
@@ -752,10 +790,10 @@ export function VisitNotePage() {
               ? t('visitNote.draftSaved', { time: timeOf(draftAt) })
               : t('visitNote.draftNone')}
           </span>
-          <Button variant="default" size="lg" disabled={pending} onClick={onSave}>
+          <Button variant="default" size="lg" disabled={pending || !authorId} onClick={onSave}>
             {t('visitNote.save')}
           </Button>
-          <Button variant="primary" size="lg" disabled={pending} onClick={onSign}>
+          <Button variant="primary" size="lg" disabled={pending || !authorId} onClick={onSign}>
             {t('visitNote.sign')}
           </Button>
         </div>

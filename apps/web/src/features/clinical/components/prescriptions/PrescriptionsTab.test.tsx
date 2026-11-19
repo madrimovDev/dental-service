@@ -29,6 +29,29 @@ vi.mock('@/stores/auth-store.ts', () => ({
   useAuthStore: () => ({ user: { id: 'u1' }, hasPermission: () => true }),
 }));
 
+type Author = {
+  canSelf: boolean;
+  canOnBehalf: boolean;
+  options: { value: string; label: string }[];
+  canAuthor: boolean;
+  showPicker: boolean;
+  defaultDoctorId: string | null;
+  isLoading: boolean;
+};
+const selfAuthor: Author = {
+  canSelf: true,
+  canOnBehalf: false,
+  options: [{ value: 'u1', label: 'Men' }],
+  canAuthor: true,
+  showPicker: false,
+  defaultDoctorId: 'u1',
+  isLoading: false,
+};
+let author: Author = selfAuthor;
+vi.mock('../../clinical-author', () => ({
+  useClinicalAuthor: () => author,
+}));
+
 const fillAndSave = async (drug: string) => {
   renderApp(<PrescriptionsTab patientId="p1" />);
   fireEvent.click(screen.getByText('Yangi resept'));
@@ -46,11 +69,48 @@ describe('PrescriptionsTab', () => {
     mutate.mockClear();
     medical = { data: { allergies: null }, isError: false, isLoading: false };
     serverError = null;
+    author = selfAuthor;
+  });
+
+  it('FX-155: shifokor emas va on_behalf yo‘q (Branch Manager) → «Yangi resept» ko‘rinmaydi', () => {
+    author = {
+      ...selfAuthor,
+      canSelf: false,
+      options: [],
+      canAuthor: false,
+      defaultDoctorId: null,
+    };
+    renderApp(<PrescriptionsTab patientId="p1" />);
+    expect(screen.queryByText('Yangi resept')).not.toBeInTheDocument();
+  });
+
+  it('FX-155: on_behalf (Tenant Admin) — shifokor tanlanmaguncha saqlanmaydi; tanlangan doctorId ketadi', async () => {
+    author = {
+      canSelf: false,
+      canOnBehalf: true,
+      options: [
+        { value: 'doc-a', label: 'Doc A' },
+        { value: 'doc-b', label: 'Doc B' },
+      ],
+      canAuthor: true,
+      showPicker: true,
+      defaultDoctorId: null,
+      isLoading: false,
+    };
+    await fillAndSave('Amoxicillin');
+    expect(screen.getByRole('button', { name: 'Reseptni saqlash' })).toBeDisabled();
+    expect(mutate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('textbox', { name: 'Shifokor' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Doc B' }));
+    fireEvent.click(screen.getByText('Reseptni saqlash'));
+    await waitFor(() => expect(mutate).toHaveBeenCalledTimes(1));
+    expect(mutate.mock.calls[0]?.[0]).toMatchObject({ doctorId: 'doc-b' });
   });
 
   it("dori qo'shib saqlash → createPrescription chaqiradi", async () => {
     await fillAndSave('Amoxicillin');
     await waitFor(() => expect(mutate).toHaveBeenCalled());
+    expect(mutate.mock.calls[0]?.[0]).toMatchObject({ doctorId: 'u1' });
   });
 
   it('FX-22: allergiyaga zid dori → kritik oyna, sabab tanlanmaguncha yuborilmaydi; sabab bilan override ketadi', async () => {

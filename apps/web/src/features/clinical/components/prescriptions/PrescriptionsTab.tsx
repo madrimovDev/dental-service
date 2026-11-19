@@ -7,6 +7,7 @@ import {
   Group,
   Modal,
   NumberInput,
+  Select,
   Stack,
   Text,
   Textarea,
@@ -32,6 +33,7 @@ import { useCreatePrescription, usePrescriptions } from '../../clinical.api';
 import { toPrescriptionVM } from '../../clinical.mappers';
 import { type PrescriptionFormValues, prescriptionFormSchema } from '../../clinical.schema';
 import type { AllergyOverride } from '../../clinical.types';
+import { useClinicalAuthor } from '../../clinical-author';
 
 const CONFLICT_REASONS = [
   'benefit_outweighs_risk',
@@ -63,6 +65,12 @@ export function PrescriptionsTab({ patientId }: Props) {
   const [opened, { open, close }] = useDisclosure(false);
   const canManage = hasPermission('prescription.manage');
   const canView = hasPermission('prescription.view');
+  // FX-155 review: muallif shifokor bo'lishi shart — Branch Manager/Tenant Admin o'z nomidan
+  // yoza olmaydi (server 400). `on_behalf` bo'lsa shifokor tanlanadi; aks holda tugma yo'q.
+  const author = useClinicalAuthor('prescription.on_behalf');
+  const canCreate = canManage && author.canAuthor;
+  const [pickedDoctorId, setPickedDoctorId] = useState<string | null>(null);
+  const doctorId = pickedDoctorId ?? author.defaultDoctorId;
 
   const listQuery = usePrescriptions(patientId);
   const createMut = useCreatePrescription(patientId);
@@ -79,12 +87,12 @@ export function PrescriptionsTab({ patientId }: Props) {
   if (!canView) return <Text c="dimmed">{t('patients.no_medical_permission')}</Text>;
 
   const send = (values: PrescriptionFormValues, overrides: AllergyOverride[]) => {
-    if (!user) return;
+    if (!user || !doctorId) return;
     const drugs = values.items.map((i) => i.medicationName);
     createMut.mutate(
       {
         patientId,
-        doctorId: user.id,
+        doctorId,
         items: values.items,
         diagnosis: values.diagnosis || undefined,
         notes: values.notes || undefined,
@@ -149,7 +157,7 @@ export function PrescriptionsTab({ patientId }: Props) {
     <Stack gap="md">
       <Group justify="space-between">
         <Title order={4}>{t('prescription.title')}</Title>
-        {canManage && (
+        {canCreate && (
           <Button leftSection={<IconPlus size={16} />} onClick={open}>
             {t('prescription.create')}
           </Button>
@@ -283,6 +291,17 @@ export function PrescriptionsTab({ patientId }: Props) {
       <Modal opened={opened} onClose={close} title={t('prescription.create')} size="xl">
         <form onSubmit={submit}>
           <Stack gap="md">
+            {author.showPicker && (
+              <Select
+                label={t('clinicalAuthor.doctor')}
+                placeholder={t('clinicalAuthor.doctorPlaceholder')}
+                data={author.options}
+                value={doctorId}
+                onChange={setPickedDoctorId}
+                allowDeselect={false}
+                required
+              />
+            )}
             <TextInput label={t('prescription.diagnosis')} {...form.getInputProps('diagnosis')} />
             <Group justify="space-between">
               <Text fw={600}>{t('prescription.items')}</Text>
@@ -357,7 +376,11 @@ export function PrescriptionsTab({ patientId }: Props) {
               <Button variant="default" onClick={close}>
                 {t('common.cancel')}
               </Button>
-              <Button type="submit" loading={createMut.isPending} disabled={!form.isValid()}>
+              <Button
+                type="submit"
+                loading={createMut.isPending}
+                disabled={!form.isValid() || !doctorId}
+              >
                 {t('prescription.save')}
               </Button>
             </Group>

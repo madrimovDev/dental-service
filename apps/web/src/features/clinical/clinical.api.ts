@@ -62,6 +62,7 @@ import { cashierKeys } from '@/features/cashier/cashier.keys.ts';
 import { patientKeys } from '@/features/patients/patients.keys.ts';
 import { recallKeys } from '@/features/recalls/recalls.keys.ts';
 import { api } from '@/lib/api.ts';
+import { apiErrorMessage } from '@/lib/api-error-message.ts';
 import { i18n } from '@/lib/i18n.ts';
 import { lookupKeys } from '@/lib/lookup-keys.ts';
 import { handleLicenseBlock } from '@/lib/query-client.ts';
@@ -419,7 +420,7 @@ export function useCreatePrescription(patientId: string) {
       notifications.show({
         color: 'red',
         title: i18n.t('common.error'),
-        message: error.message || i18n.t('common.error'),
+        message: apiErrorMessage(error),
       });
     },
   });

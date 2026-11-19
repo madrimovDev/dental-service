@@ -338,6 +338,17 @@
     "boundary_desc": "Sahifani qayta yuklab ko'ring",
     "reload": "Qayta yuklash"
   },
+  "apiErrors": {
+    "ownership": {
+      "not_practitioner": "Yozuv muallifi shifokor bo'lishi kerak. Shifokorni tanlang yoki shifokor hisobidan kiring."
+    },
+    "prescription": {
+      "on_behalf_forbidden": "Boshqa shifokor nomidan retsept yozishga ruxsatingiz yo'q."
+    },
+    "visit_note": {
+      "on_behalf_forbidden": "Boshqa shifokor nomidan vizit yozuvi yaratishga ruxsatingiz yo'q."
+    }
+  },
   "dashboard": {
     "welcome": "Salom, {{name}}!",
     "your_role": "Sizning rolingiz",
@@ -2792,5 +2803,11 @@
     "err_clinic_unauthorized": "Portal kaliti yaroqsiz — qayta ulaning.",
     "lab_name_hint_portal": "Portaldagi laboratoriyani tanlang yoki boshqa lab nomini yozing (portalsiz — holat qo'lda)",
     "catalog_search": "Laboratoriya nomi yoki shahri bo'yicha qidirish"
+  },
+  "clinicalAuthor": {
+    "doctor": "Shifokor",
+    "doctorPlaceholder": "Shifokorni tanlang",
+    "notPractitionerTitle": "Vizit yozuvini faqat shifokor yaratadi",
+    "notPractitionerBody": "Sizning rolingiz shifokor emas va boshqa shifokor nomidan yozish ruxsati yo'q."
   }
 }

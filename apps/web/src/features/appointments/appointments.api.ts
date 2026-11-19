@@ -56,8 +56,9 @@ export function useAppointments(range: { branchId?: string; from: string; to: st
  * ruxsat yo'q → 403 → dropdown bo'sh edi (CLI-154). Backend allaqachon `{id, name}`
  * qaytaradi (doctor-rolli, dedupe).
  */
-export function useDoctors(branchId?: string) {
+export function useDoctors(branchId?: string, opts?: { enabled?: boolean }) {
   return useQuery({
+    enabled: opts?.enabled,
     queryKey: appointmentKeys.doctors(branchId),
     queryFn: () => listDoctors(branchId ? { branchId } : undefined).then((r) => r.data),
   });
