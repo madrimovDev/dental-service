@@ -46,7 +46,9 @@ const post = async <T = LicenseData>(path: string, body: object): Promise<T> => 
   });
   const json = (await res.json()) as { error?: { code?: string } };
   if (!res.ok) {
-    throw new Error(json?.error?.code ?? 'SUPERVISOR_ERROR');
+    // FX-07 — xato tanasi (`body`) ham uzatiladi: `LICENSE_REVOKED` imzolangan
+    // `error.revocation` bayonotini olib yuradi, heartbeat uni tekshiradi.
+    throw Object.assign(new Error(json?.error?.code ?? 'SUPERVISOR_ERROR'), { body: json });
   }
   return json as T;
 };

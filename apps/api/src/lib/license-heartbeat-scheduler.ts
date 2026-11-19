@@ -1,6 +1,7 @@
 import {
   invalidateLicense,
   isLicenseAuthenticForThisMachine,
+  isRevocationAuthenticForThisMachine,
   type LicenseData,
   readAnchor,
   readLicense,
@@ -36,6 +37,9 @@ export interface RunHeartbeatCheckDeps {
   // (`isLicenseAuthenticForThisMachine`) — chaqiruvchi uni unutsa ham
   // tekshirilmagan payload yozilmaydi (xavfsiz default).
   verifyLicense?: (data: LicenseData) => Promise<boolean>;
+  // FX-07 (LA-16, X-4) — `LICENSE_REVOKED` bayonotining imzosi/bog'lanishi.
+  // STANDART qiymati haqiqiy tekshiruv (`isRevocationAuthenticForThisMachine`).
+  verifyRevocation?: (revocation: unknown, current: LicenseData) => Promise<boolean>;
   log: HeartbeatLogger;
 }
 
@@ -48,12 +52,19 @@ export interface RunHeartbeatCheckDeps {
  *   (activate bilan bir xil shakl) → imzo + fingerprint tekshiriladi (FX-06) →
  *   cache yangilanadi (`writeLicense`). Tekshiruvdan o'tmasa — faqat log, eski
  *   `.lic` va langar tegilmaydi.
- * - `INVALID_KEY` (Supervisor `isActive:false` topdi — deaktivatsiya) →
- *   `.lic` invalidatsiya qilinadi, `getActiveModules()` keyingi chaqiruvda
- *   darhol `[]` qaytaradi (fayl cache qilinmaydi, spec §5).
- * - Boshqa har qanday xato (tarmoq, `FINGERPRINT_MISMATCH`,
- *   `SUPERVISOR_ERROR`, `FINGERPRINT_UNAVAILABLE`) → faqat log, `.lic`
- *   tegilmaydi (offline-resilience global constraint, spec §6).
+ * - `expiresAt` regressiyasi (yangi < joriy — masalan Supervisor bazasi eski
+ *   zaxiradan tiklanib eski muddatni qayta imzoladi) → faqat log, eski `.lic`
+ *   saqlanadi (FX-07): to'langan uzaytirish jimgina bekor bo'lmasin.
+ * - `LICENSE_REVOKED` + IMZOLANGAN `revocation` (FX-07, LA-16) — imzo, shu
+ *   mashina fingerprint'i, shu `licenseKey` va joriy `.lic`dan eski bo'lmagan
+ *   `issuedAt` tekshiriladi → `.lic` invalidatsiya qilinadi,
+ *   `getActiveModules()` keyingi chaqiruvda darhol `[]` qaytaradi. Tekshiruvdan
+ *   o'tmasa — faqat log.
+ * - Boshqa har qanday xato — imzosiz `INVALID_KEY` (eski Supervisor yoki MITM
+ *   403) ham, `UNKNOWN_KEY` (Supervisor'da qator yo'q) ham, tarmoq,
+ *   `FINGERPRINT_MISMATCH`, `SUPERVISOR_ERROR`, `FINGERPRINT_UNAVAILABLE` →
+ *   faqat log, `.lic` tegilmaydi (offline-resilience global constraint, spec §6).
+ *   Imzosiz signal `.lic`ni o'chira olmaydi.
  */
 export const runLicenseHeartbeatCheck = async (deps: RunHeartbeatCheckDeps): Promise<void> => {
   const lic = await deps.readLicense();
@@ -74,6 +85,27 @@ export const runLicenseHeartbeatCheck = async (deps: RunHeartbeatCheckDeps): Pro
       );
       return;
     }
+    // FX-07 — `expiresAt` orqaga ketmaydi. Zaxiradan tiklangan Supervisor
+    // uzaytirishdan OLDINGI muddatni yaroqli imzo bilan qaytaradi; uni yozish
+    // to'lov qilgan klinikani bloklardi. Muddatni qisqartirish kerak bo'lsa
+    // vendor deaktivatsiya (imzolangan `LICENSE_REVOKED`) qiladi.
+    const freshExpiresMs = Date.parse(fresh.expiresAt);
+    const currentExpiresMs = Date.parse(lic.expiresAt);
+    if (
+      Number.isFinite(freshExpiresMs) &&
+      Number.isFinite(currentExpiresMs) &&
+      freshExpiresMs < currentExpiresMs
+    ) {
+      deps.log.warn(
+        {
+          clinicId: lic.clinicId,
+          currentExpiresAt: lic.expiresAt,
+          freshExpiresAt: fresh.expiresAt,
+        },
+        'License heartbeat: response expiresAt is earlier than the cached license — keeping cached license',
+      );
+      return;
+    }
     await deps.writeLicense(fresh);
     // CLI-437 — Supervisor'ning `issuedAt`i ishonchli server-vaqti; langarni
     // shu bilan (va joriy langar/mahalliy vaqt bilan `max`) qayta ko'taramiz —
@@ -86,11 +118,20 @@ export const runLicenseHeartbeatCheck = async (deps: RunHeartbeatCheckDeps): Pro
     deps.log.info({ clinicId: fresh.clinicId }, 'License heartbeat OK — cached .lic refreshed');
   } catch (err) {
     const code = err instanceof Error ? err.message : 'UNKNOWN';
-    if (code === 'INVALID_KEY') {
-      await deps.invalidateLicense();
+    if (code === 'LICENSE_REVOKED') {
+      const body = (err as { body?: { error?: { revocation?: unknown } } }).body;
+      const verifyRevocation = deps.verifyRevocation ?? isRevocationAuthenticForThisMachine;
+      if (await verifyRevocation(body?.error?.revocation, lic)) {
+        await deps.invalidateLicense();
+        deps.log.warn(
+          { code, clinicId: lic.clinicId },
+          'License heartbeat: Supervisor signed revocation verified — .lic invalidated',
+        );
+        return;
+      }
       deps.log.warn(
-        { code },
-        'License heartbeat: Supervisor reports deactivated (INVALID_KEY) — .lic invalidated',
+        { code, clinicId: lic.clinicId },
+        'License heartbeat: LICENSE_REVOKED failed signature/binding verification — keeping cached license',
       );
       return;
     }
