@@ -2,6 +2,7 @@ import {
   appointments,
   labOrders,
   patients,
+  tenantSettings,
   treatmentPlans,
   treatmentStages,
 } from '@dental/db-schema';
@@ -153,6 +154,18 @@ export const createAppointmentsService = (deps: {
   queue?: QueueReverseSyncHook;
 }) => {
   const ownership = createOwnershipValidator();
+
+  /**
+   * FX-39 (LA-23): eslatma `tenant_settings.reminder_lead_hours` soat oldin ketadi
+   * (ilgari hardcode 24). RLS tenantni filtrlaydi; qator yo'q → default 24.
+   */
+  async function reminderLeadHours(c: Context): Promise<number> {
+    const [row] = await getDb(c)
+      .select({ hours: tenantSettings.reminderLeadHours })
+      .from(tenantSettings)
+      .limit(1);
+    return row?.hours ?? 24;
+  }
 
   /**
    * FX-02 (LA-46, X-1): FK constraint RLS'ni chetlab o'tadi — begona tenant bemori /
@@ -398,7 +411,7 @@ export const createAppointmentsService = (deps: {
       after: appt,
     });
 
-    const delay = reminderDelayMs(start, new Date());
+    const delay = reminderDelayMs(start, new Date(), await reminderLeadHours(c));
     if (delay != null && deps.enqueueReminder) {
       const enqueue = deps.enqueueReminder;
       await onAfterCommit(c, () => enqueue(tenantId, appt.id, delay));
@@ -605,7 +618,11 @@ export const createAppointmentsService = (deps: {
             await onAfterCommit(c, () => remove(id));
           }
           if (isActiveStatus(updated.status as AppointmentStatus)) {
-            const delay = reminderDelayMs(new Date(updated.startTime), new Date());
+            const delay = reminderDelayMs(
+              new Date(updated.startTime),
+              new Date(),
+              await reminderLeadHours(c),
+            );
             if (delay != null && deps.enqueueReminder) {
               const enqueue = deps.enqueueReminder;
               await onAfterCommit(c, () => enqueue(tenantId, id, delay));
@@ -619,7 +636,11 @@ export const createAppointmentsService = (deps: {
         // P4: status-only qayta faollashtirish (cancelled/no_show → active) —
         // bekor qilishda eslatma o'chirilgan edi, endi qayta qo'yiladi.
         const tenantId = c.get('activeTenantId');
-        const delay = reminderDelayMs(new Date(updated.startTime), new Date());
+        const delay = reminderDelayMs(
+          new Date(updated.startTime),
+          new Date(),
+          await reminderLeadHours(c),
+        );
         if (tenantId && delay != null && deps.enqueueReminder) {
           const enqueue = deps.enqueueReminder;
           await onAfterCommit(c, () => enqueue(tenantId, id, delay));
