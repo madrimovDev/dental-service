@@ -8,7 +8,7 @@
  * - Bir zaxira = `<papka>/dental-YYYYMMDD-HHMMSS/{db.dump, uploads.tar}`; avval
  *   `<nom>.partial` ga yoziladi, muvaffaqiyatdan keyingina nomlanadi — yarim zaxira hech qachon
  *   ro'yxatga/retention'ga kirmaydi.
- * - Retention: oxirgi 14 nusxa; eng yangisi HECH QACHON o'chmaydi.
+ * - Retention: oxirgi 14 nusxa; shu chaqiruvda yaratilgan nusxa HECH QACHON o'chmaydi.
  * - Tiklash: texnik-ish serveri → API to'xtatiladi → tiklashdan OLDIN avtomatik zaxira (retention'siz,
  *   tiklanayotgan nusxa o'chib ketmasin) → `pg_restore` (buzilgan dump bazani o'chirmaydi:
  *   `createPgTools.restore` oldin `--list`) → uploads → migratsiya → API qayta ishga tushadi.
@@ -136,10 +136,14 @@ export const createBackupScheduler = (deps: BackupSchedulerDeps) => {
       .reverse();
   };
 
-  /** Eng yangi `BACKUP_RETENTION` ta saqlanadi; eng yangisi hech qachon o'chmaydi. */
-  const applyRetention = (folder: string): void => {
-    const names = listBackups(folder);
-    for (const stale of names.slice(Math.max(1, BACKUP_RETENTION))) {
+  /**
+   * Eng yangi `BACKUP_RETENTION` ta saqlanadi. Shu chaqiruvda yaratilgan nusxa (`keep`) HECH QACHON
+   * o'chmaydi — soat orqaga ketgan bo'lsa nomi leksikografik eng kichik bo'lishi mumkin (FX-51 / LA-17).
+   */
+  const applyRetention = (folder: string, keep: string): void => {
+    const others = listBackups(folder).filter((n) => n !== keep);
+    const room = Math.max(1, BACKUP_RETENTION) - 1;
+    for (const stale of others.slice(room)) {
       rmSync(join(folder, stale), { recursive: true, force: true });
     }
   };
@@ -162,14 +166,24 @@ export const createBackupScheduler = (deps: BackupSchedulerDeps) => {
         // Shu soniyada allaqachon nusxa bor — yangisi shuning o'zi.
         return { ok: true, name };
       }
+      // Soat orqaga ketgan: yangi nom mavjud eng yangi nomdan kichik (BIOS/CMOS, NTP yo'q).
+      const newestExisting = listBackups(folder)[0];
+      const clockWarning =
+        newestExisting !== undefined && name < newestExisting
+          ? `tizim soati noto'g'ri ko'rinadi: yangi zaxira (${name}) mavjud nusxadan (${newestExisting}) eski. Kompyuter soatini tekshiring.`
+          : null;
       mkdirSync(partial, { recursive: true });
       deps.dump(join(partial, BACKUP_DB_FILE));
       if (!existsSync(join(partial, BACKUP_DB_FILE))) throw new Error('pg_dump fayl yaratmadi');
       deps.archiveUploads(join(partial, BACKUP_UPLOADS_FILE));
       renameSync(partial, join(folder, name));
       // Tiklashdan oldingi zaxirada retention YO'Q: tiklanayotgan eng eski nusxa o'chib ketmasin.
-      if (kind !== 'pre-restore') applyRetention(folder);
-      writeState({ lastSuccessAt: deps.now().toISOString(), lastError: null });
+      if (kind !== 'pre-restore') applyRetention(folder, name);
+      if (!existsSync(join(folder, name, BACKUP_DB_FILE))) {
+        throw new Error('zaxira retention tufayli yo‘qoldi');
+      }
+      writeState({ lastSuccessAt: deps.now().toISOString(), lastError: clockWarning });
+      if (clockWarning) deps.log(clockWarning);
       deps.log(`zaxira olindi (${kind}): ${name}`);
       return { ok: true, name };
     } catch (err) {

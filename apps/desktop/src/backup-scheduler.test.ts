@@ -158,6 +158,25 @@ describe('runBackup', () => {
     expect(names).toContain('dental-20261002-200000');
   });
 
+  test('FX-51: soat orqaga ketsa (nom eski nusxalardan kichik) yangi nusxa o‘chmaydi va ogohlantirish yoziladi', async () => {
+    // 14 ta mavjud nusxa kelajak sanali (2030), hozirgi soat esa undan oldin.
+    for (let d = 1; d <= BACKUP_RETENTION; d++) {
+      seedBackup(`dental-203001${String(d).padStart(2, '0')}-200000`);
+    }
+    const s = createBackupScheduler(makeDeps());
+    const r = await s.runBackup('scheduled');
+    expect(r.ok).toBe(true);
+    if (!r.ok) throw new Error('unreachable');
+    // Yangi olingan nusxa diskda qoladi.
+    expect(existsSync(join(folder, r.name, 'db.dump'))).toBe(true);
+    expect(s.listBackups(folder)).toContain(r.name);
+    expect(s.listBackups(folder).length).toBe(BACKUP_RETENTION);
+    // Soat haqida ogohlantirish lastError orqali.
+    const state = JSON.parse(readFileSync(join(dataDir, 'backup-state.json'), 'utf8'));
+    expect(state.lastError).toContain('soat');
+    expect(state.lastSuccessAt).toBe(clock.toISOString());
+  });
+
   test('yiqilgan dump: yarim papka qolmaydi, eski nusxalar tegilmaydi, xato holatga yoziladi', async () => {
     seedBackup('dental-20261001-200000');
     failDump = true;
