@@ -4,6 +4,8 @@ export const bookingRequestStatusSchema = z.enum(['pending', 'confirmed', 'decli
 
 export const listBookingRequestsQuery = z.object({
   status: bookingRequestStatusSchema.default('pending'),
+  /** Filial bo'yicha filtr (FX-53). Berilmasa — chaqiruvchining tayinlangan filiallari. */
+  branchId: z.uuid().optional(),
 });
 export type ListBookingRequestsQuery = z.infer<typeof listBookingRequestsQuery>;
 

@@ -3,6 +3,7 @@ import type { Context } from 'hono';
 import { onAfterCommit } from '../../db/after-commit.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { BRANCH_FORBIDDEN_CODE, loadBranchScope, scopeAllows } from '../../lib/branch-scope.ts';
 import { CrossEntityError } from '../../lib/ownership.ts';
 import { assertBranchExists } from '../../lib/ownership-refs.ts';
 import { BOOKING_SLOT_MINUTES } from '../../lib/telegram/booking.ts';
@@ -55,13 +56,18 @@ export const createBookingRequestsService = (deps: {
     }
   }
 
-  async function list(c: Context, query: ListBookingRequestsQuery, now: Date = new Date()) {
+  async function list(
+    c: Context,
+    query: ListBookingRequestsQuery,
+    branchIds: string[] | null = null,
+    now: Date = new Date(),
+  ) {
     // Lazy expiry — RLS tx ichida faqat shu tenant (taymer — barcha tenantlar uchun alohida).
     const db = c.get('db');
     if (db) await notifyExpired(c, await expireStaleBookingRequestsReturning(db, now));
     const [rows, pendingCount] = await Promise.all([
-      repo.list(c, query.status),
-      repo.pendingCount(c),
+      repo.list(c, query.status, branchIds),
+      repo.pendingCount(c, branchIds),
     ]);
     return { items: rows.map(toBookingRequestDto), pendingCount };
   }
@@ -79,6 +85,10 @@ export const createBookingRequestsService = (deps: {
     if (!tenantId) throw new Error('No tenant context');
     const row = await repo.findById(c, id, { lock: true });
     if (!row) return { ok: false, code: 'not_found', conflict: false };
+    // FX-53 (X-2/D-8): boshqa filial so'rovini tasdiqlab bo'lmaydi.
+    if (!scopeAllows(await loadBranchScope(c, 'appointment.create'), row.branchId)) {
+      return { ok: false, code: BRANCH_FORBIDDEN_CODE, conflict: false };
+    }
     if (row.status !== 'pending') {
       return { ok: false, code: 'booking_request.not_pending', conflict: true };
     }
@@ -184,6 +194,10 @@ export const createBookingRequestsService = (deps: {
     if (!tenantId) throw new Error('No tenant context');
     const row = await repo.findById(c, id, { lock: true });
     if (!row) return { ok: false as const, code: 'not_found' };
+    // FX-53 (X-2/D-8): boshqa filial so'rovini rad etib bo'lmaydi.
+    if (!scopeAllows(await loadBranchScope(c, 'appointment.create'), row.branchId)) {
+      return { ok: false as const, code: BRANCH_FORBIDDEN_CODE };
+    }
     if (row.status !== 'pending') {
       return { ok: false as const, code: 'booking_request.not_pending' };
     }

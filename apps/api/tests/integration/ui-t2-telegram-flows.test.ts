@@ -45,6 +45,7 @@ import { createAppointmentsService } from '../../src/modules/appointments/index.
 import { expireStaleBookingRequests } from '../../src/modules/booking-requests/index.ts';
 import { createNotificationsService } from '../../src/modules/notifications/notifications.service.ts';
 import { createScheduleService } from '../../src/modules/schedule/index.ts';
+import { grantTenantWide } from './_grant-scope.ts';
 
 const secretPath = `${import.meta.dir}/.ui-t2-telegram-secret-test.txt`;
 process.env.MESSAGING_SECRET_PATH = secretPath;
@@ -256,6 +257,10 @@ beforeAll(async () => {
       .returning({ id: patients.id });
     patient1 = ps[0]!.id;
     patient2 = ps[1]!.id;
+    await grantTenantWide(tx as never, tA, receptionistId, [
+      'appointment.view',
+      'appointment.create',
+    ]);
   });
   await withTenant(tB, async (tx) => {
     const [b] = await tx
@@ -306,7 +311,11 @@ describe('UI-T2 — bron oqimi (bot ichidagi suhbat)', () => {
       const slotBtns = r3.reply?.buttons?.flat().filter((b) => b.data.startsWith('bk:s:')) ?? [];
       expect(slotBtns.length).toBeGreaterThan(0);
 
-      const r4 = await flows.onCallback(tx, { tenantId: tA, chatId: CHAT_A, data: 'bk:s:0' });
+      const r4 = await flows.onCallback(tx, {
+        tenantId: tA,
+        chatId: CHAT_A,
+        data: slotBtns[0]!.data,
+      });
       expect(r4.reply?.text).toContain('So‘rov yuborildi');
     });
 
@@ -325,6 +334,31 @@ describe('UI-T2 — bron oqimi (bot ichidagi suhbat)', () => {
       const again = await flows.onCommand(tx, { tenantId: tA, chatId: CHAT_A, command: 'book' });
       expect(again.text).toContain('ko‘rib chiqilmoqda');
     });
+    await run((tx) => tx.delete(bookingRequests).where(eq(bookingRequests.patientId, patient1)));
+  });
+
+  test('FX-56: eski kunning slot tugmasi yangi kun slotiga mos kelmaydi — so‘rov yaratilmaydi', async () => {
+    await run((tx) => tx.delete(bookingRequests).where(eq(bookingRequests.patientId, patient1)));
+    await run(async (tx) => {
+      const r1 = await flows.onCommand(tx, { tenantId: tA, chatId: CHAT_A, command: 'book' });
+      const docBtn = r1.buttons?.flat().find((b) => b.text === 'Doktor T2');
+      await flows.onCallback(tx, { tenantId: tA, chatId: CHAT_A, data: docBtn!.data });
+      const day2 = await flows.onCallback(tx, { tenantId: tA, chatId: CHAT_A, data: 'bk:t:2' });
+      const staleBtn = day2.reply?.buttons?.flat().find((b) => b.data.startsWith('bk:s:'));
+      expect(staleBtn).toBeDefined();
+      // Foydalanuvchi boshqa kunni tanlaydi (yangi slotlar), keyin eski xabardagi tugmani bosadi.
+      await flows.onCallback(tx, { tenantId: tA, chatId: CHAT_A, data: 'bk:t:3' });
+      const stale = await flows.onCallback(tx, {
+        tenantId: tA,
+        chatId: CHAT_A,
+        data: staleBtn!.data,
+      });
+      expect(stale.reply?.text).not.toContain('So‘rov yuborildi');
+    });
+    const rows = await run((tx) =>
+      tx.select().from(bookingRequests).where(eq(bookingRequests.patientId, patient1)),
+    );
+    expect(rows).toHaveLength(0);
     await run((tx) => tx.delete(bookingRequests).where(eq(bookingRequests.patientId, patient1)));
   });
 
@@ -714,8 +748,13 @@ describe('UI-T2 — eslatma tugmalari (egalik tekshiruvi)', () => {
       expect(r.reply?.text).toContain('Shifokor'); // bitta filial → shifokor bosqichi
       const doc = r.reply?.buttons?.flat().find((b) => b.text === 'Doktor T2');
       await flows.onCallback(tx, { tenantId: tA, chatId: CHAT_A, data: doc!.data });
-      await flows.onCallback(tx, { tenantId: tA, chatId: CHAT_A, data: 'bk:t:3' });
-      const done = await flows.onCallback(tx, { tenantId: tA, chatId: CHAT_A, data: 'bk:s:1' });
+      const day = await flows.onCallback(tx, { tenantId: tA, chatId: CHAT_A, data: 'bk:t:3' });
+      const slotBtn = day.reply?.buttons?.flat().filter((b) => b.data.startsWith('bk:s:'))[1];
+      const done = await flows.onCallback(tx, {
+        tenantId: tA,
+        chatId: CHAT_A,
+        data: slotBtn!.data,
+      });
       expect(done.reply?.text).toContain('Boshqa vaqt');
     });
     // Eski yozilish hali tegilmagan — registrator tasdiqlaguncha.

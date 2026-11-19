@@ -1,5 +1,5 @@
 import { bookingRequests, branches, patients, users } from '@dental/db-schema';
-import { and, count, desc, eq, lt, lte, or } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, lt, lte, or } from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { DbOrTx } from '../../db/client.ts';
 import { getDb } from '../../db/scoped.ts';
@@ -79,7 +79,12 @@ export async function expireAndNotifyStaleBookingRequests(
 }
 
 export const createBookingRequestsRepository = () => {
-  const list = async (c: Context, status: (typeof bookingRequests.$inferSelect)['status']) => {
+  /** `branchIds` null — filial cheklovi yo'q (owner / tenant-wide); aks holda faqat shu filiallar (FX-53). */
+  const list = async (
+    c: Context,
+    status: (typeof bookingRequests.$inferSelect)['status'],
+    branchIds: string[] | null = null,
+  ) => {
     const db = getDb(c);
     return db
       .select({
@@ -92,17 +97,27 @@ export const createBookingRequestsRepository = () => {
       .leftJoin(branches, eq(branches.id, bookingRequests.branchId))
       .leftJoin(patients, eq(patients.id, bookingRequests.patientId))
       .leftJoin(users, eq(users.id, bookingRequests.doctorId))
-      .where(eq(bookingRequests.status, status))
+      .where(
+        and(
+          eq(bookingRequests.status, status),
+          branchIds ? inArray(bookingRequests.branchId, branchIds) : undefined,
+        ),
+      )
       .orderBy(desc(bookingRequests.createdAt))
       .limit(200);
   };
 
-  const pendingCount = async (c: Context): Promise<number> => {
+  const pendingCount = async (c: Context, branchIds: string[] | null = null): Promise<number> => {
     const db = getDb(c);
     const [r] = await db
       .select({ n: count() })
       .from(bookingRequests)
-      .where(eq(bookingRequests.status, 'pending'));
+      .where(
+        and(
+          eq(bookingRequests.status, 'pending'),
+          branchIds ? inArray(bookingRequests.branchId, branchIds) : undefined,
+        ),
+      );
     return Number(r?.n ?? 0);
   };
 

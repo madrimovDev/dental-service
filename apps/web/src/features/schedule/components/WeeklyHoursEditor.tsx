@@ -7,7 +7,12 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { useSaveWorkingHours, useWorkingHours } from '../schedule.api';
-import { groupSegmentsByWeekday, newSegmentKey, toPutSegments } from '../schedule.mappers';
+import {
+  groupSegmentsByWeekday,
+  newSegmentKey,
+  scheduleModeOf,
+  toPutSegments,
+} from '../schedule.mappers';
 import type { EditableSegment, WeeklyHours } from '../schedule.types';
 
 const WEEKDAYS = [1, 2, 3, 4, 5, 6, 0]; // Dushanba..Yakshanba (0=Sun oxirida)
@@ -93,8 +98,21 @@ export function WeeklyHoursEditor({
     saveMut.mutate({ doctorId, branchId, segments: toPutSegments(week) });
   };
 
+  const mode = scheduleModeOf(data ?? []);
+  const modeNote =
+    mode === 'unconfigured'
+      ? t('schedule.mode_unconfigured')
+      : mode === 'not_working'
+        ? t('schedule.mode_not_working')
+        : null;
+
   return (
     <Stack gap="sm">
+      {modeNote && (
+        <Text size="sm" c="dimmed" role="status">
+          {modeNote}
+        </Text>
+      )}
       {WEEKDAYS.map((wd) => (
         <Paper key={wd} withBorder p="md" style={dayCardStyle}>
           <Group align="flex-start" wrap="nowrap">

@@ -3,6 +3,7 @@ import {
   fullDayRangeToInstants,
   groupSegmentsByWeekday,
   minutesToHhmm,
+  scheduleModeOf,
   slotTimeLabel,
   toPutSegments,
 } from './schedule.mappers';
@@ -84,4 +85,24 @@ describe('slotTimeLabel', () => {
     // 2026-06-20T04:00:00Z = 09:00 Tashkent
     expect(slotTimeLabel('2026-06-20T04:00:00.000Z')).toBe('09:00');
   });
+});
+
+describe('FX-126 scheduleModeOf / sentinel', () => {
+  const seg = (isActive: boolean) => ({
+    id: '1',
+    doctorId: 'd',
+    branchId: 'b',
+    weekday: 0,
+    start: '00:00',
+    end: '00:00',
+    isActive,
+    effectiveFrom: null,
+    effectiveUntil: null,
+  });
+  it('qator yo`q → unconfigured', () => expect(scheduleModeOf([])).toBe('unconfigured'));
+  it('faqat sentinel → not_working, haftalik modelda segment yo`q', () => {
+    expect(scheduleModeOf([seg(false)])).toBe('not_working');
+    expect(toPutSegments(groupSegmentsByWeekday([seg(false)]))).toEqual([]);
+  });
+  it('faol segment → custom', () => expect(scheduleModeOf([seg(true)])).toBe('custom'));
 });

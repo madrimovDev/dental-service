@@ -26,6 +26,7 @@ import { encryptSecret } from '../../src/lib/crypto.ts';
 import { signAccess } from '../../src/lib/jwt.ts';
 import { createPatientMessenger } from '../../src/lib/telegram/notify.ts';
 import { expireAndNotifyStaleBookingRequests } from '../../src/modules/booking-requests/index.ts';
+import { grantTenantWide } from './_grant-scope.ts';
 
 const secretPath = `${import.meta.dir}/.fx-24-secret-test.txt`;
 process.env.MESSAGING_SECRET_PATH = secretPath;
@@ -131,6 +132,10 @@ beforeAll(async () => {
       isActive: true,
       acceptedAt: new Date(),
     });
+    await grantTenantWide(tx as never, tenantA, recepId, [
+      'appointment.view',
+      'appointment.create',
+    ]);
     const ps = await tx
       .insert(patients)
       .values([

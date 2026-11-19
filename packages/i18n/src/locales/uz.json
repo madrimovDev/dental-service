@@ -1226,6 +1226,8 @@
     "add_segment": "Oraliq qo'shish",
     "remove_segment": "Oraliqni o'chirish",
     "day_off": "Dam olish kuni",
+    "mode_unconfigured": "Jadval sozlanmagan: filial ish soati amal qiladi. Bo'sh saqlansa — shifokor bu filialda ishlamaydi.",
+    "mode_not_working": "Shifokor bu filialda ishlamaydi (bron qilib bo'lmaydi). Oraliq qo'shib saqlang.",
     "weekday": {
       "0": "Yakshanba",
       "1": "Dushanba",

@@ -55,6 +55,14 @@ const addDays = (date: string, n: number): string => {
   return d.toISOString().slice(0, 10);
 };
 
+/**
+ * FX-56: slot tugmasi `bk:s:<indeks>:<token>` — token slot boshlanish vaqtidan (epoch daqiqa,
+ * base36). Eski xabardagi tugma (boshqa kun/filial/shifokor slotlari) indeks bo'yicha
+ * yangi ro'yxatning boshqa slotiga mos kelmasin.
+ */
+const slotToken = (startIso: string): string =>
+  Math.floor(new Date(startIso).getTime() / 60_000).toString(36);
+
 const ddmm = (date: string): string => `${date.slice(8, 10)}.${date.slice(5, 7)}`;
 
 const chunk = <T>(arr: T[], n: number): T[][] => {
@@ -136,7 +144,7 @@ export function createBookingFlow(deps: BookingDeps) {
     const rows = chunk<BotButton>(
       s.slots.map((sl, i) => ({
         text: fmtWhen(new Date(sl.start)).slice(-5),
-        data: `${BOOKING_PREFIX}:s:${i}`,
+        data: `${BOOKING_PREFIX}:s:${i}:${slotToken(sl.start)}`,
       })),
       4,
     );
@@ -209,7 +217,7 @@ export function createBookingFlow(deps: BookingDeps) {
       sessions.delete(k);
       return { text: m.sessionExpired };
     }
-    const [, op, arg] = data.split(':');
+    const [, op, arg, token] = data.split(':');
 
     if (op === 'bk') {
       if (s.step === 'slot') return renderDays(ctx, s);
@@ -248,8 +256,11 @@ export function createBookingFlow(deps: BookingDeps) {
       return renderSlots(ctx, s);
     }
     if (op === 's') {
-      const slot = s.slots[Number(arg)];
-      if (!slot || !s.branchId) return { text: m.sessionExpired };
+      // FX-56: faqat slot bosqichida + tugma tokeni shu indeksdagi slot bilan mos bo'lsa.
+      const slot = s.step === 'slot' ? s.slots[Number(arg)] : undefined;
+      if (!slot || !s.branchId || token !== slotToken(slot.start)) {
+        return { text: m.sessionExpired };
+      }
       const start = new Date(slot.start);
       await ctx.tx.insert(bookingRequests).values({
         tenantId: ctx.tenantId,

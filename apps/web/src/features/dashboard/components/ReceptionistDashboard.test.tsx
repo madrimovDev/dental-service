@@ -69,6 +69,7 @@ vi.mock('@/features/queue/queue.api.ts', () => ({
 }));
 
 // UI-R1: yangi hooklar (ismlar, diqqat manbalari, shifokorlar, qidiruv) — alohida modul.
+const doctorOptionsBranchCalls: Array<string | undefined> = [];
 const confirmMutate = vi.fn();
 const declineMutate = vi.fn();
 const confirmState: { error: unknown; variables: { id: string } | undefined } = {
@@ -86,12 +87,15 @@ const attention = {
 };
 vi.mock('../reception.api.ts', () => ({
   usePatientNames: () => new Map([['p1', 'Jasur Tursunov']]),
-  useDoctorOptions: () => ({
-    data: [
-      { id: 'd1', name: 'Dr. Karimov' },
-      { id: 'd2', name: 'Dr. Nazarov' },
-    ],
-  }),
+  useDoctorOptions: (branchId?: string) => {
+    doctorOptionsBranchCalls.push(branchId);
+    return {
+      data: [
+        { id: 'd1', name: 'Dr. Karimov' },
+        { id: 'd2', name: 'Dr. Nazarov' },
+      ],
+    };
+  },
   useReceptionAttention: () => attention,
   usePatientSearch: () => ({ data: { items: [] }, isFetching: false }),
   useBookingRequests: () => ({ data: bookingRequests, isLoading: false }),
@@ -110,6 +114,7 @@ afterEach(() => {
   attention.recallOverdue = 7;
   bookingRequests.items = [];
   bookingRequests.pendingCount = 0;
+  doctorOptionsBranchCalls.length = 0;
   confirmMutate.mockClear();
   confirmState.error = null;
   confirmState.variables = undefined;
@@ -245,6 +250,21 @@ describe('ReceptionistDashboard (DS1-T5 re-skin characterization)', () => {
     expect(confirmMutate).toHaveBeenCalledWith({ id: 'r1' });
   });
 
+  it('FX-59: so‘rov vaqti brauzer mintaqasidan qat‘i nazar Asia/Tashkent (UTC+5) da ko‘rsatiladi', async () => {
+    const prevTz = process.env.TZ;
+    process.env.TZ = 'America/New_York'; // brauzer klinikadan boshqa mintaqada
+    try {
+      bookingRequests.items = [req('r1')]; // 14:00Z = 19:00 Toshkent
+      bookingRequests.pendingCount = 1;
+      const { ReceptionistDashboard } = await import('./ReceptionistDashboard.tsx');
+      renderApp(<ReceptionistDashboard />);
+      expect(screen.getByText(/22[./]06,? 19:00/)).toBeInTheDocument();
+    } finally {
+      if (prevTz === undefined) delete process.env.TZ;
+      else process.env.TZ = prevTz;
+    }
+  });
+
   it('UI-T2: Rad etish sabab so‘raydi; sababsiz yuborilmaydi', async () => {
     bookingRequests.items = [req('r1')];
     bookingRequests.pendingCount = 1;
@@ -304,5 +324,13 @@ describe('ReceptionistDashboard (DS1-T5 re-skin characterization)', () => {
     confirmState.error = new ApiError('booking_request.expired', 'expired', 409);
     renderApp(<ReceptionistDashboard />);
     expect(screen.queryByPlaceholderText('Boshqa shifokorni tanlang')).not.toBeInTheDocument();
+  });
+  it('FX-172: shifokor tanlovi so‘rov filiali bo‘yicha so‘raladi (boshqa filial shifokori taklif qilinmaydi)', async () => {
+    bookingRequests.items = [req('r1', { branchId: 'b-other' })]; // doctorId yo'q -> tanlov ko'rinadi
+    bookingRequests.pendingCount = 1;
+    const { ReceptionistDashboard } = await import('./ReceptionistDashboard.tsx');
+    renderApp(<ReceptionistDashboard />);
+    expect(screen.getByPlaceholderText('Boshqa shifokorni tanlang')).toBeInTheDocument();
+    expect(doctorOptionsBranchCalls).toContain('b-other');
   });
 });

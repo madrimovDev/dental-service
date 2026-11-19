@@ -2,6 +2,11 @@ import { fail, ok } from '@dental/core';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import {
+  BRANCH_FORBIDDEN_CODE,
+  BRANCH_FORBIDDEN_MESSAGE,
+  isBranchAllowed,
+} from '../../lib/branch-scope.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
@@ -118,12 +123,23 @@ export const branchRoutes = (deps: { db: Database; audit: AuditLogger }) => {
       params: branchIdParamSchema,
       body: { content: { 'application/json': { schema: updateBranchSchema } } },
     },
-    responses: { ...okJson(branchDtoSchema, 'Updated branch'), ...notFoundResponse },
+    responses: {
+      ...okJson(branchDtoSchema, 'Updated branch'),
+      ...notFoundResponse,
+      403: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Branch is outside the caller scope',
+      },
+    },
   });
 
   app.openapi(updateRoute, async (c) => {
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
+    // FX-113 (X-2, LB-22): faqat chaqiruvchining filiallari (owner / tenant-wide — hammasi).
+    if (!(await isBranchAllowed(c, 'branch.edit', id))) {
+      return c.json(fail(BRANCH_FORBIDDEN_CODE, BRANCH_FORBIDDEN_MESSAGE), 403);
+    }
     const row = await service.update(c, id, body);
     if (!row) return c.json(fail('branch.not_found', 'Branch not found'), 404);
     return c.json(ok(toBranchDto(row)), 200);

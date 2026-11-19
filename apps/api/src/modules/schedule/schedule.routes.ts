@@ -2,6 +2,13 @@ import { fail, ok } from '@dental/core';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import {
+  BRANCH_FORBIDDEN_CODE,
+  BRANCH_FORBIDDEN_MESSAGE,
+  loadBranchScope,
+  scopeAllows,
+} from '../../lib/branch-scope.ts';
+import { isDoctorInBranch } from '../../lib/doctor-branch.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
@@ -33,6 +40,13 @@ const badRequestResponse = {
   400: {
     content: { 'application/json': { schema: errorResponseSchema } },
     description: 'Validation error',
+  },
+};
+
+const forbiddenResponse = {
+  403: {
+    content: { 'application/json': { schema: errorResponseSchema } },
+    description: 'Branch is outside the caller scope',
   },
 };
 
@@ -77,12 +91,22 @@ export const scheduleRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     responses: {
       ...okJson(z.array(workingHoursSegmentDtoSchema), 'Replaced working hours'),
       ...badRequestResponse,
+      ...forbiddenResponse,
     },
   });
 
   app.openapi(putWorkingHoursRoute, async (c) => {
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
+    // FX-113 (X-2, LB-22): yozilayotgan filial chaqiruvchi doirasida; cheklangan doirada
+    // shifokor shu filialga biriktirilgan bo'lishi shart.
+    const scope = await loadBranchScope(c, 'schedule.manage');
+    if (!scopeAllows(scope, body.branchId)) {
+      return c.json(fail(BRANCH_FORBIDDEN_CODE, BRANCH_FORBIDDEN_MESSAGE), 403);
+    }
+    if (scope.kind !== 'all' && !(await isDoctorInBranch(c, id, body.branchId))) {
+      return c.json(fail('schedule.doctor_not_in_branch', 'schedule.doctor_not_in_branch'), 400);
+    }
     const result = await service.replaceWorkingHours(c, id, body);
     if (!result.ok) return c.json(fail(result.code, result.code), 400);
     return c.json(ok(result.segments), 200);
@@ -123,11 +147,24 @@ export const scheduleRoutes = (deps: { db: Database; audit: AuditLogger }) => {
         description: 'Time-off created',
       },
       ...badRequestResponse,
+      ...forbiddenResponse,
     },
   });
 
   app.openapi(createTimeOffRoute, async (c) => {
     const body = c.req.valid('json');
+    // FX-113 (X-2, LB-22): `branchId: null` (barcha filiallar) faqat owner / tenant-wide tayinlov.
+    const scope = await loadBranchScope(c, 'schedule.manage');
+    if (!body.branchId ? scope.kind !== 'all' : !scopeAllows(scope, body.branchId)) {
+      return c.json(fail(BRANCH_FORBIDDEN_CODE, BRANCH_FORBIDDEN_MESSAGE), 403);
+    }
+    if (
+      scope.kind !== 'all' &&
+      body.branchId &&
+      !(await isDoctorInBranch(c, body.doctorId, body.branchId))
+    ) {
+      return c.json(fail('schedule.doctor_not_in_branch', 'schedule.doctor_not_in_branch'), 400);
+    }
     const result = await service.createTimeOff(c, body);
     if (!result.ok) return c.json(fail(result.code, result.code), 400);
     return c.json(ok(result.timeOff), 201);
@@ -145,11 +182,21 @@ export const scheduleRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     responses: {
       ...okJson(z.object({ id: z.uuid() }), 'Deleted'),
       ...notFoundResponse,
+      ...forbiddenResponse,
     },
   });
 
   app.openapi(deleteTimeOffRoute, async (c) => {
     const { id } = c.req.valid('param');
+    // FX-113 (X-2, LB-22): begona filial yoki tenant-wide (null) time-off'ni faqat owner / tenant-wide o'chiradi.
+    const existing = await service.getTimeOff(c, id);
+    if (existing) {
+      const scope = await loadBranchScope(c, 'schedule.manage');
+      const allowed = existing.branchId
+        ? scopeAllows(scope, existing.branchId)
+        : scope.kind === 'all';
+      if (!allowed) return c.json(fail(BRANCH_FORBIDDEN_CODE, BRANCH_FORBIDDEN_MESSAGE), 403);
+    }
     const result = await service.deleteTimeOff(c, id);
     if (!result.ok) return c.json(fail(result.code, result.code), 404);
     return c.json(ok({ id }), 200);

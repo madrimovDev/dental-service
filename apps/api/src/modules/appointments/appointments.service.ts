@@ -2,6 +2,7 @@ import {
   appointments,
   labOrders,
   patients,
+  tenantSettings,
   treatmentPlans,
   treatmentStages,
 } from '@dental/db-schema';
@@ -153,6 +154,18 @@ export const createAppointmentsService = (deps: {
   queue?: QueueReverseSyncHook;
 }) => {
   const ownership = createOwnershipValidator();
+
+  /**
+   * FX-39 (LA-23): eslatma `tenant_settings.reminder_lead_hours` soat oldin ketadi
+   * (ilgari hardcode 24). RLS tenantni filtrlaydi; qator yo'q → default 24.
+   */
+  async function reminderLeadHours(c: Context): Promise<number> {
+    const [row] = await getDb(c)
+      .select({ hours: tenantSettings.reminderLeadHours })
+      .from(tenantSettings)
+      .limit(1);
+    return row?.hours ?? 24;
+  }
 
   /**
    * FX-02 (LA-46, X-1): FK constraint RLS'ni chetlab o'tadi — begona tenant bemori /
@@ -398,7 +411,7 @@ export const createAppointmentsService = (deps: {
       after: appt,
     });
 
-    const delay = reminderDelayMs(start, new Date());
+    const delay = reminderDelayMs(start, new Date(), await reminderLeadHours(c));
     if (delay != null && deps.enqueueReminder) {
       const enqueue = deps.enqueueReminder;
       await onAfterCommit(c, () => enqueue(tenantId, appt.id, delay));
@@ -495,6 +508,12 @@ export const createAppointmentsService = (deps: {
     if (input.doctorId) patch.doctorId = input.doctorId;
     if (input.assistantId !== undefined) patch.assistantId = input.assistantId;
     if (input.status) patch.status = input.status;
+    // FX-57: ko'chirilgan 'confirmed' yozilish — bemor eski vaqtni tasdiqlagan edi; yangi
+    // vaqt tasdiqlanmagan → 'scheduled'ga qaytadi (aniq status berilsa, o'sha saqlanadi).
+    const startMoved =
+      !!input.startTime &&
+      new Date(input.startTime).getTime() !== new Date(before.startTime).getTime();
+    if (startMoved && !input.status && beforeStatus === 'confirmed') patch.status = 'scheduled';
     if (input.serviceIds) patch.serviceIds = input.serviceIds;
     if (input.notes !== undefined) patch.notes = input.notes;
     if (input.cancellationReason !== undefined) patch.cancellationReason = input.cancellationReason;
@@ -578,7 +597,17 @@ export const createAppointmentsService = (deps: {
 
       // CLI-474 (L7): no_show'ga O'TGANDA bemor strike'i (transition edge —
       // re-PATCH no_show→no_show qayta yozmaydi; unique appointmentId ham himoya).
-      if (input.status === 'no_show' && before.status !== 'no_show' && deps.noShowStrike) {
+      // FX-54: hali boshlanmagan (startTime kelajakda) yozilish scheduled/confirmed'dan no_show
+      // qilinsa — bemor hali «kelmagan» emas, strike yozilmaydi (status o'zgaradi). Qabulga
+      // chaqirilgan (in_progress) bemor esa vaqtidan qat'i nazar kelmagan hisoblanadi (CLI-480).
+      const noShowStarted =
+        before.status === 'in_progress' || new Date(updated.startTime).getTime() <= Date.now();
+      if (
+        input.status === 'no_show' &&
+        before.status !== 'no_show' &&
+        noShowStarted &&
+        deps.noShowStrike
+      ) {
         const tenantId = c.get('activeTenantId');
         if (tenantId) {
           await deps.noShowStrike.recordOnNoShow(c, {
@@ -605,7 +634,15 @@ export const createAppointmentsService = (deps: {
             await onAfterCommit(c, () => remove(id));
           }
           if (isActiveStatus(updated.status as AppointmentStatus)) {
-            const delay = reminderDelayMs(new Date(updated.startTime), new Date());
+            const now = new Date();
+            let delay = reminderDelayMs(
+              new Date(updated.startTime),
+              now,
+              await reminderLeadHours(c),
+            );
+            // FX-57: yangi vaqt lead oynasidan yaqin (lekin kelajakda) — bemor ko'chirilganini
+            // bilishi uchun eslatma darhol ketadi.
+            if (delay == null && startMoved && new Date(updated.startTime) > now) delay = 0;
             if (delay != null && deps.enqueueReminder) {
               const enqueue = deps.enqueueReminder;
               await onAfterCommit(c, () => enqueue(tenantId, id, delay));
@@ -619,7 +656,11 @@ export const createAppointmentsService = (deps: {
         // P4: status-only qayta faollashtirish (cancelled/no_show → active) —
         // bekor qilishda eslatma o'chirilgan edi, endi qayta qo'yiladi.
         const tenantId = c.get('activeTenantId');
-        const delay = reminderDelayMs(new Date(updated.startTime), new Date());
+        const delay = reminderDelayMs(
+          new Date(updated.startTime),
+          new Date(),
+          await reminderLeadHours(c),
+        );
         if (tenantId && delay != null && deps.enqueueReminder) {
           const enqueue = deps.enqueueReminder;
           await onAfterCommit(c, () => enqueue(tenantId, id, delay));

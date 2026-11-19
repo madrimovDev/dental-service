@@ -1,5 +1,5 @@
 import { roles, tenants, userAssignments, users } from '@dental/db-schema';
-import { and, eq, isNotNull, isNull, or, type SQL } from 'drizzle-orm';
+import { and, eq, gt, isNotNull, isNull, or, type SQL } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../db/scoped.ts';
 
@@ -8,7 +8,7 @@ import { getDb } from '../db/scoped.ts';
  *
  * Doktor shu filialda ishlaydi, agar `user_assignments` da: faol (`is_active`), qabul qilingan
  * (`accepted_at IS NOT NULL`), filiali NULL (tenant-wide) YOKI shu filial, va roli
- * `roles.is_practitioner` bo'lgan tayinlov bor. Query'dan foydalanuvchi `userAssignments` +
+ * `roles.is_practitioner` bo'lgan, muddati o'tmagan (`valid_to` NULL yoki kelajakda — FX-70) tayinlov bor. Query'dan foydalanuvchi `userAssignments` +
  * `roles` ni JOIN qilgan bo'lishi shart. RLS tenant'ni filtrlaydi.
  *
  * `branchId` berilmasa — filial cheklovi yo'q (tenant bo'yicha barcha shifokorlar).
@@ -18,6 +18,8 @@ export function practitionerAssignmentConditions(branchId?: string | null): SQL[
     eq(userAssignments.isActive, true),
     isNotNull(userAssignments.acceptedAt),
     eq(roles.isPractitioner, true),
+    // FX-70: muddati o'tgan (valid_to < now) tayinlov hisoblanmaydi (auth/branch-scope bilan izchil).
+    or(isNull(userAssignments.validTo), gt(userAssignments.validTo, new Date())) as SQL,
   ];
   if (branchId) {
     conds.push(or(isNull(userAssignments.branchId), eq(userAssignments.branchId, branchId)) as SQL);
