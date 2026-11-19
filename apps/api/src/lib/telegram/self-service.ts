@@ -1,5 +1,12 @@
-import { appointments, branches, users } from '@dental/db-schema';
-import { and, asc, eq, gt, inArray } from 'drizzle-orm';
+import {
+  appointments,
+  branches,
+  prescriptions,
+  treatmentPlans,
+  treatmentStages,
+  users,
+} from '@dental/db-schema';
+import { and, asc, desc, eq, gt, inArray } from 'drizzle-orm';
 import type { DbOrTx } from '../../db/client.ts';
 import type { PatientsService } from '../../modules/patients/patients.service.ts';
 import { createBotContext } from './bot-context.ts';
@@ -77,5 +84,61 @@ export function createSelfServiceFlow(deps: SelfServiceDeps) {
     return { text: m.balanceZero };
   }
 
-  return { myAppointments, balance };
+  /**
+   * Eng so'nggi FAOL reja (taqdim etilgan/qabul qilingan/jarayonda): nomi, bosqichlar
+   * nomi+holati, umumiy summa. Qoralama va bekor/yakunlangan rejalar ko'rsatilmaydi;
+   * bosqich narxi/izohi/odontogramma yo'q.
+   */
+  async function myPlan(ctx: SelfServiceCtx): Promise<BotReply> {
+    const m = botMessages(ctx.lang);
+    const [plan] = await ctx.tx
+      .select({
+        id: treatmentPlans.id,
+        title: treatmentPlans.title,
+        total: treatmentPlans.totalCost,
+      })
+      .from(treatmentPlans)
+      .where(
+        and(
+          eq(treatmentPlans.patientId, ctx.patientId),
+          inArray(treatmentPlans.status, ['presented', 'accepted', 'in_progress']),
+        ),
+      )
+      .orderBy(desc(treatmentPlans.createdAt), desc(treatmentPlans.id))
+      .limit(1);
+    if (!plan) return { text: m.planEmpty };
+    const stages = await ctx.tx
+      .select({ name: treatmentStages.serviceName, status: treatmentStages.status })
+      .from(treatmentStages)
+      .where(eq(treatmentStages.treatmentPlanId, plan.id))
+      .orderBy(asc(treatmentStages.sequence));
+    const lines = [m.planTitle(plan.title), ...stages.map((s) => m.planStage(s))];
+    lines.push(m.planTotal(fmtMoney(plan.total, ctx.lang)));
+    return { text: lines.join('\n') };
+  }
+
+  /** Eng oxirgi retsept (mavjud xabar shabloni qayta ishlatiladi). */
+  async function lastPrescription(ctx: SelfServiceCtx): Promise<BotReply> {
+    const m = botMessages(ctx.lang);
+    const [rx] = await ctx.tx
+      .select({ issuedDate: prescriptions.issuedDate, items: prescriptions.items })
+      .from(prescriptions)
+      .where(eq(prescriptions.patientId, ctx.patientId))
+      .orderBy(desc(prescriptions.issuedDate), desc(prescriptions.id))
+      .limit(1);
+    if (!rx || rx.items.length === 0) return { text: m.prescriptionEmpty };
+    return {
+      text: m.prescription({
+        when: fmtWhen(rx.issuedDate),
+        items: rx.items.map((i) => ({
+          name: i.medicationName,
+          dosage: i.dosage,
+          frequency: i.frequency,
+          days: i.durationDays,
+        })),
+      }),
+    };
+  }
+
+  return { myAppointments, balance, myPlan, lastPrescription };
 }

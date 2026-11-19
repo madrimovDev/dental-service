@@ -28,6 +28,8 @@ type Dict = {
   menuPatient: string;
   menuMyAppointments: string;
   menuBalance: string;
+  menuPlan: string;
+  menuPrescription: string;
   choosePatient: string;
   patientSet: (name: string) => string;
   menuPrompt: string;
@@ -81,6 +83,15 @@ type Dict = {
   balanceDebt: (amount: string) => string;
   balanceCredit: (amount: string) => string;
   balanceZero: string;
+  /** FT-07.2: «Davolash rejam» va «Oxirgi retsept». */
+  planTitle: (title: string) => string;
+  planEmpty: string;
+  planStage: (s: {
+    name: string;
+    status: 'pending' | 'in_progress' | 'completed' | 'skipped';
+  }) => string;
+  planTotal: (amount: string) => string;
+  prescriptionEmpty: string;
 };
 
 const uz: Dict = {
@@ -90,6 +101,8 @@ const uz: Dict = {
   menuPatient: '👤 Bemor',
   menuMyAppointments: '📅 Mening yozilishlarim',
   menuBalance: '💳 Balans',
+  menuPlan: '🦷 Davolash rejam',
+  menuPrescription: '💊 Oxirgi retsept',
   choosePatient: 'Kimning nomidan davom etamiz?',
   patientSet: (name) => `✅ Endi ${name} nomidan ishlaymiz.`,
   menuPrompt: 'Kerakli bo‘limni tanlang:',
@@ -154,6 +167,12 @@ const uz: Dict = {
   balanceDebt: (amount) => `💳 Qarzingiz: ${amount}`,
   balanceCredit: (amount) => `💳 Avans (oldindan to‘lov): ${amount}`,
   balanceZero: '💳 Qarzingiz yo‘q.',
+  planTitle: (title) => `🦷 Davolash rejangiz: ${title}`,
+  planEmpty: 'Hozircha faol davolash rejangiz yo‘q.',
+  planStage: ({ name, status }) =>
+    `${{ completed: '✅', in_progress: '🔄', pending: '⏳', skipped: '➖' }[status]} ${name}`,
+  planTotal: (amount) => `Jami: ${amount}`,
+  prescriptionEmpty: 'Retseptlaringiz yo‘q.',
 };
 
 const ru: Dict = {
@@ -163,6 +182,8 @@ const ru: Dict = {
   menuPatient: '👤 Пациент',
   menuMyAppointments: '📅 Мои записи',
   menuBalance: '💳 Баланс',
+  menuPlan: '🦷 План лечения',
+  menuPrescription: '💊 Последний рецепт',
   choosePatient: 'От чьего имени продолжим?',
   patientSet: (name) => `✅ Теперь действуем от имени: ${name}.`,
   menuPrompt: 'Выберите раздел:',
@@ -224,6 +245,12 @@ const ru: Dict = {
   balanceDebt: (amount) => `💳 Ваш долг: ${amount}`,
   balanceCredit: (amount) => `💳 Аванс (предоплата): ${amount}`,
   balanceZero: '💳 Долга нет.',
+  planTitle: (title) => `🦷 Ваш план лечения: ${title}`,
+  planEmpty: 'Активного плана лечения пока нет.',
+  planStage: ({ name, status }) =>
+    `${{ completed: '✅', in_progress: '🔄', pending: '⏳', skipped: '➖' }[status]} ${name}`,
+  planTotal: (amount) => `Итого: ${amount}`,
+  prescriptionEmpty: 'Рецептов нет.',
 };
 
 export const botMessages = (lang: BotLang): Dict => (lang === 'ru' ? ru : uz);

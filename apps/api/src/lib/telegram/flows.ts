@@ -117,6 +117,7 @@ export function createTelegramFlows(deps: FlowDeps) {
       keyboard: [
         [m.menuBook, m.menuQuestionnaire],
         [m.menuMyAppointments, m.menuBalance],
+        [m.menuPlan, m.menuPrescription],
         multi ? [m.menuLang, m.menuPatient] : [m.menuLang],
       ],
     };
@@ -186,6 +187,8 @@ export function createTelegramFlows(deps: FlowDeps) {
       if (a.text === m.menuQuestionnaire) return questionnaire.start({ ...ctx, lang });
       if (a.text === m.menuMyAppointments) return selfService.myAppointments({ ...ctx, lang });
       if (a.text === m.menuBalance) return selfService.balance({ ...ctx, lang });
+      if (a.text === m.menuPlan) return selfService.myPlan({ ...ctx, lang });
+      if (a.text === m.menuPrescription) return selfService.lastPrescription({ ...ctx, lang });
       if (a.text === m.menuLang) return langPicker(lang);
       if (multi && a.text === m.menuPatient) return patientPicker({ ...st, lang });
     }
