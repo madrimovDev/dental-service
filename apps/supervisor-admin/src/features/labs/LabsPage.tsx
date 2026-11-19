@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { CreateLabModal } from './components/CreateLabModal';
 import { RenewLabModal } from './components/RenewLabModal';
+import { ResetLeadPasswordModal } from './components/ResetLeadPasswordModal';
 import { fetchLabs, updateLab } from './labs.api';
 import type { Lab, LabSubscription } from './labs.types';
 
@@ -23,6 +24,7 @@ export const LabsPage = () => {
   } = useQuery({ queryKey: ['labs'], queryFn: fetchLabs });
   const [opened, { open, close }] = useDisclosure(false);
   const [renewing, setRenewing] = useState<Lab | null>(null);
+  const [resetting, setResetting] = useState<Lab | null>(null);
   const toggle = useMutation({
     mutationFn: (l: Lab) => updateLab(l.id, { catalogVisible: !l.catalogVisible }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['labs'] }),
@@ -36,6 +38,7 @@ export const LabsPage = () => {
       </Group>
       <CreateLabModal opened={opened} onClose={close} />
       <RenewLabModal lab={renewing} onClose={() => setRenewing(null)} />
+      <ResetLeadPasswordModal lab={resetting} onClose={() => setResetting(null)} />
       {isError && (
         <Text c="red" mb="md">
           {error instanceof Error ? error.message : "Laboratoriyalar ro'yxatini yuklab bo'lmadi"}
@@ -85,6 +88,9 @@ export const LabsPage = () => {
                   <Table.Td>
                     <Button size="xs" variant="subtle" onClick={() => setRenewing(lab)}>
                       Uzaytirish
+                    </Button>
+                    <Button size="xs" variant="subtle" onClick={() => setResetting(lab)}>
+                      Parolni tiklash
                     </Button>
                   </Table.Td>
                 </Table.Tr>

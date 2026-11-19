@@ -2683,6 +2683,8 @@
       "empty": "Xodim yo'q",
       "formTitle": "Yangi xodim",
       "tempTitle": "Vaqtinchalik parol",
+      "resetPassword": "Parolni tiklash",
+      "resetConfirm": "Xodimning parolini tiklaymizmi? Eski parol ishlamay qoladi, yangi vaqtinchalik parol beriladi.",
       "tempNote": "Bu parol faqat hozir ko'rsatiladi. Xodimga bering — birinchi kirishda almashtiradi.",
       "copy": "Nusxalash",
       "copied": "Nusxalandi",

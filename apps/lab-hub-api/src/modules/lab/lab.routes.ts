@@ -860,5 +860,32 @@ export const labRoutes = (deps: Deps) => {
       }),
   );
 
+  app.openapi(
+    createRoute({
+      method: 'post',
+      path: '/users/{id}/reset-password',
+      tags,
+      summary: 'Texnik parolini tiklash (lead): yangi vaqtinchalik parol bir marta (FX-94)',
+      request: { params: idParam },
+      responses: OK,
+    }),
+    async (c) =>
+      tx(c, async (t) => {
+        requireLead(c);
+        const { id } = c.req.valid('param');
+        const target = await t.query.labUsers.findFirst({ where: eq(labUsers.id, id) });
+        if (!target) throw new ApiError(404, 'lab_user.not_found');
+        // Lead parolini faqat vendor (Supervisor) tiklaydi; o'zini ham shu yo'l bilan emas.
+        if (target.role === 'lead') throw new ApiError(409, 'lab_user.cannot_reset_lead');
+        const tempPassword = generateTempPassword();
+        const [u] = await t
+          .update(labUsers)
+          .set({ passwordHash: await hashPassword(tempPassword), mustChangePassword: true })
+          .where(eq(labUsers.id, id))
+          .returning();
+        return c.json({ user: userDto(u!), tempPassword });
+      }),
+  );
+
   return app;
 };

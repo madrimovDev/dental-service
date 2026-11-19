@@ -84,5 +84,27 @@ export const labsRoutes = (deps: { fetch?: typeof fetch } = {}) => {
     );
   });
 
+  // FX-94: lab foydalanuvchisi parolini tiklash (Hub ichki API proksisi). Yangi
+  // vaqtinchalik parol Supervisor'da SAQLANMAYDI — javobda bir marta qaytadi.
+  const uuid = /^[0-9a-f-]{36}$/i;
+  app.get('/:id/users', async (c) => {
+    const id = c.req.param('id');
+    if (!uuid.test(id)) return c.json({ error: { code: 'NOT_FOUND' } }, 404);
+    return send(c, await hub(`/internal/labs/${id}/users`, { method: 'GET' }));
+  });
+
+  app.post('/:id/users/:userId/reset-password', async (c) => {
+    const id = c.req.param('id');
+    const userId = c.req.param('userId');
+    if (!uuid.test(id) || !uuid.test(userId)) return c.json({ error: { code: 'NOT_FOUND' } }, 404);
+    return send(
+      c,
+      await hub(`/internal/labs/${id}/users/${userId}/reset-password`, {
+        method: 'POST',
+        body: {},
+      }),
+    );
+  });
+
   return app;
 };

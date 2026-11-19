@@ -125,6 +125,27 @@ describe('lead pages', () => {
     });
   });
 
+  it('FX-94: lead texnik parolini tiklaydi — yangi vaqtinchalik parol ko‘rsatiladi; lead qatorida tugma yo‘q', async () => {
+    signIn('lead');
+    vi.stubGlobal('confirm', () => true);
+    const hub = mockHub({
+      'GET /v1/lab/users': () => ({ body: { users } }),
+      'POST /v1/lab/users/t1/reset-password': () => ({
+        body: { user: users[0], tempPassword: 'Reset-Secret-123' },
+      }),
+    });
+    vi.stubGlobal('fetch', hub.fn);
+    renderApp(<StaffPage />);
+    await screen.findByText('Shoxrux Olimov');
+    const buttons = screen.getAllByRole('button', { name: 'Parolni tiklash' });
+    expect(buttons).toHaveLength(users.filter((u) => u.role === 'technician').length);
+    fireEvent.click(buttons[0]!);
+    expect(await screen.findByTestId('temp-password')).toHaveTextContent('Reset-Secret-123');
+    expect(hub.calls.find((c) => c.method === 'POST')?.url).toContain(
+      '/v1/lab/users/t1/reset-password',
+    );
+  });
+
   it('prays-list: yangi qator narxi son bo‘lib yuboriladi', async () => {
     signIn('lead');
     const hub = mockHub({
