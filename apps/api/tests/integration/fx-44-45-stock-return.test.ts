@@ -8,6 +8,7 @@ import { beforeAll, describe, expect, test } from 'bun:test';
 import {
   appointments,
   branches,
+  notifications,
   patientNoShowStrikes,
   patients,
   permissions,
@@ -22,7 +23,7 @@ import {
   userAssignments,
   users,
 } from '@dental/db-schema';
-import { eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { createApp } from '../../src/app.ts';
 import { createAdminDb, db } from '../../src/db/client.ts';
 import { signAccess } from '../../src/lib/jwt.ts';
@@ -520,5 +521,38 @@ describe('FX-45 review: cancelled/no_show -> scheduled qayta faollashtirish chiq
     // bitta X olib tashlansa — bitta occurrence ulushi (2) qaytadi
     await call('doc', 'PATCH', `/api/visit-notes/${note}`, { performedServices: [svcX] });
     expect(await qty(item)).toBe(18);
+  });
+
+  test('seam: qayta ayirish qoldiqni chegaradan pastga tushirsa — low-stock alert (stock.manage)', async () => {
+    const [storeUser] = await admin.db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.phone, '+998900004404'));
+    const lowAlerts = async () =>
+      (
+        await admin.db
+          .select({ params: notifications.params })
+          .from(notifications)
+          .where(
+            and(
+              eq(notifications.userId, storeUser!.id),
+              eq(notifications.type, 'stock.low_threshold'),
+            ),
+          )
+      ).filter((n) => (n.params as { itemId?: string } | null)?.itemId === item).length;
+
+    await setQty(item, 2); // min 1 — past emas
+    await setBom(svcX, 2);
+    const appt = await inHoursAppt();
+    await newNote([svcX], appt);
+    expect(await qty(item)).toBe(0);
+    expect((await call('rec', 'POST', `/api/appointments/${appt}/cancel`, {})).status).toBe(200);
+    expect(await qty(item)).toBe(2);
+    const before = await lowAlerts();
+    expect(
+      (await call('rec', 'PATCH', `/api/appointments/${appt}`, { status: 'scheduled' })).status,
+    ).toBe(200);
+    expect(await qty(item)).toBe(0);
+    expect(await lowAlerts()).toBe(before + 1);
   });
 });

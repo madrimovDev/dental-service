@@ -234,6 +234,8 @@ export const createApp = () => {
   const reminderScheduler = createReminderScheduler(reminderQueue);
   const appointmentsService = createAppointmentsService({
     audit,
+    // FX-45 seam: qayta faollashtirishdagi ombor qayta ayirishi low-stock alert beradi.
+    notifications,
     schedule,
     recall,
     noShowStrike,
