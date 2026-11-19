@@ -1058,3 +1058,56 @@ describe('FX-139 — poll bekor qilingan buyurtmani qayta tiriltirmaydi', () => 
     expect(row?.hubStatus).toBe('ready');
   });
 });
+
+// ─── FX-49: lab qabul qilgan ishga kechikkan tahrir ──────────────────────────
+describe('FX-49 — Hub tahrirni qo‘llamasa (applied:false) «synced» emas', () => {
+  test('poll kelmasdan lab qabul qildi: tahrir push → failed, hubStatus yangilanadi, keyingi tahrir 409', async () => {
+    const id = await createOrder();
+    expect(
+      (await call('doctor', 'POST', `/api/lab-orders/${id}/send-to-hub`, { labId: lab.labId }))
+        .status,
+    ).toBe(200);
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+    expect((await orderRow(id))?.hubSyncStatus).toBe('synced');
+    expect((await orderRow(id))?.hubStatus).toBe('sent');
+
+    // Lab qabul qiladi — klinika hali poll qilmagan (lokal hubStatus = 'sent').
+    const [hc] = await hubCaseByRef(id);
+    const r = await hubJson(`/v1/lab/cases/${hc!.id}/status`, {
+      method: 'POST',
+      token: lab.token,
+      body: { to: 'accepted' },
+    });
+    expect(r.status).toBe(200);
+
+    // Shifokor rangni o'zgartiradi — lokal tekshiruv o'tadi, upsert_case navbatga tushadi.
+    await whileHubDown(async () => {
+      const edit = await call('doctor', 'PATCH', `/api/lab-orders/${id}`, { shade: 'B2' });
+      expect(edit.status).toBe(200);
+    });
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+
+    const row = await orderRow(id);
+    // Hub eski rang bilan ishlaydi — klinika «sinxronlangan» demasligi kerak.
+    expect(row?.hubSyncStatus).not.toBe('synced');
+    expect(row?.hubSyncStatus).toBe('failed');
+    expect(row?.hubStatus).toBe('accepted');
+    const [op] = await inTenant((tx) =>
+      tx
+        .select()
+        .from(labHubOutbox)
+        .where(and(eq(labHubOutbox.labOrderId, id), eq(labHubOutbox.status, 'failed'))),
+    );
+    expect(op?.op).toBe('upsert_case');
+    expect(op?.lastError).toBe('lab_order.locked_by_lab');
+
+    // Keyingi tahrir endi lokal bloklanadi — xabar orqali.
+    const locked = await call('doctor', 'PATCH', `/api/lab-orders/${id}`, { shade: 'C1' });
+    expect(locked.status).toBe(409);
+    expect(((await locked.json()) as { error: { code: string } }).error.code).toBe(
+      'lab_order.locked_by_lab',
+    );
+  });
+});

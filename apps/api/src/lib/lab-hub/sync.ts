@@ -9,7 +9,7 @@ import {
   patients,
   users,
 } from '@dental/db-schema';
-import { and, eq, isNotNull, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import type { Database, DbOrTx } from '../../db/client.ts';
 import { withTenant } from '../../db/scoped.ts';
 import {
@@ -116,6 +116,24 @@ const executeOp = async (
           now,
         }),
       );
+      if (!res.created && res.applied === false) {
+        // FX-49: lab ishni allaqachon qabul qilgan (poll hali kelmagan) — Hub tahrirni
+        // qo'llamadi. «synced» yozilmaydi: lokal hubStatus Hub'dagi holatga suriladi (faqat
+        // hali `sent`/bo'sh bo'lsa — poll yangiroq holatni yozgan bo'lsa orqaga qaytarmaymiz),
+        // shunda keyingi tahrir `locked_by_lab` bilan bloklanadi; op `failed` (pastdagi catch).
+        await withTenant(tenantId, (tx) =>
+          tx
+            .update(labOrders)
+            .set({ hubStatus: res.status, updatedAt: now })
+            .where(
+              and(
+                eq(labOrders.id, order.id),
+                or(isNull(labOrders.hubStatus), eq(labOrders.hubStatus, 'sent')),
+              ),
+            ),
+        );
+        throw new LabHubError(409, 'lab_order.locked_by_lab', false);
+      }
       await withTenant(tenantId, (tx) =>
         tx
           .update(labOrders)
