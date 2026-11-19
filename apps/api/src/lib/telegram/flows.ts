@@ -164,6 +164,8 @@ export function createTelegramFlows(deps: FlowDeps) {
           return { reply: null, toast: m.reminderAlready };
         case 'unavailable':
           return { reply: { text: m.reminderUnavailable } };
+        case 'failed':
+          return { reply: { text: m.reminderFailed } };
         case 'reschedule': {
           // Eslatma egasi (r.patientId) shu chat'ning bemori — oqim shu bemor nomidan.
           const reply = await booking.start(

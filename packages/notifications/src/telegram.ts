@@ -8,12 +8,19 @@ import type { NotificationChannel, NotificationMessage, SendResult } from './typ
  * kerak (foydalanuvchi taqdim etadi). Token yo'q bo'lsa factory NoOp qaytaradi.
  * Xato'da throw EMAS — `{ok:false}` (notification oqimi bloklanmaydi).
  */
-export const createTelegramChannel = (config: { botToken: string }): NotificationChannel => ({
+/** FX-82: tashqi HTTP muddati — osilgan provayder tx'ni cheksiz ushlab turmasin. */
+export const DEFAULT_CHANNEL_TIMEOUT_MS = 10_000;
+
+export const createTelegramChannel = (config: {
+  botToken: string;
+  timeoutMs?: number;
+}): NotificationChannel => ({
   async send(to: string, message: NotificationMessage): Promise<SendResult> {
     try {
       const res = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(config.timeoutMs ?? DEFAULT_CHANNEL_TIMEOUT_MS),
         body: JSON.stringify({
           chat_id: to,
           text: message.text,

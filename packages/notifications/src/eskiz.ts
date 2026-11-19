@@ -1,12 +1,17 @@
 import type { NotificationChannel } from './types.ts';
 
+/** FX-82: tashqi HTTP muddati (telegram.ts bilan bir xil default). */
+const DEFAULT_TIMEOUT_MS = 10_000;
+
 const BASE = 'https://notify.eskiz.uz/api';
 
 /** Eskiz SMS kanal — token auth (login) + sms send. */
 export const createEskizChannel = (config: {
   email: string;
   password: string;
+  timeoutMs?: number;
 }): NotificationChannel => {
+  const timeout = () => AbortSignal.timeout(config.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   let token: string | null = null;
 
   async function auth(): Promise<string> {
@@ -14,6 +19,7 @@ export const createEskizChannel = (config: {
     const res = await fetch(`${BASE}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: timeout(),
       body: JSON.stringify({ email: config.email, password: config.password }),
     });
     const json = (await res.json()) as { data?: { token?: string } };
@@ -29,6 +35,7 @@ export const createEskizChannel = (config: {
         const res = await fetch(`${BASE}/message/sms/send`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' },
+          signal: timeout(),
           body: JSON.stringify({
             mobile_phone: to.replace(/\D/g, ''),
             message: message.text,
