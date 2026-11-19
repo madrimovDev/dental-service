@@ -1,5 +1,7 @@
+import { ApiError } from '@dental/api-client';
 import { Button, Group, Modal, NumberInput, Select, Stack, Text, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
+import { notifications } from '@mantine/notifications';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -71,7 +73,29 @@ export function MovementFormModal({ opened, onClose, item }: MovementFormModalPr
               quantity: values.quantity,
               reason: values.reason || undefined,
             },
-            { onSuccess: handleClose },
+            {
+              onSuccess: handleClose,
+              // FX-162: 409 stock.insufficient — server inglizcha matni o'rniga tarjima + details.
+              onError: (error) => {
+                const details = (error instanceof ApiError ? error.details : null) as {
+                  available?: number;
+                  requested?: number;
+                } | null;
+                const insufficient =
+                  error instanceof ApiError && error.code === 'stock.insufficient';
+                notifications.show({
+                  color: 'red',
+                  title: t('common.error'),
+                  message: insufficient
+                    ? t('stock.insufficient', {
+                        available: formatQty(Number(details?.available ?? 0)),
+                        requested: formatQty(Number(details?.requested ?? 0)),
+                        unit: item?.unit ?? '',
+                      })
+                    : error.message || t('common.error'),
+                });
+              },
+            },
           ),
         )}
       >

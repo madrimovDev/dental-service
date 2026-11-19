@@ -1522,6 +1522,7 @@
     "no_movements": "Harakatlar yo'q",
     "select_item": "Tarixni ko'rish uchun mahsulot tanlang",
     "bom_service": "Xizmat",
+    "insufficient": "Qoldiq yetarli emas: mavjud {{available}} {{unit}}, so'ralgan {{requested}} {{unit}}",
     "bom_empty": "Bu xizmat uchun materiallar belgilanmagan",
     "material": "Material",
     "qty_per_service": "Xizmatga miqdor",

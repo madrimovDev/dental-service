@@ -1,3 +1,5 @@
+import { ApiError } from '@dental/api-client';
+import { notifications } from '@mantine/notifications';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderApp } from '../../../test-utils';
@@ -82,5 +84,28 @@ describe('MovementFormModal — inventarizatsiya (FX-43)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
     await new Promise((r) => setTimeout(r, 50));
     expect(createStockMovement).not.toHaveBeenCalled();
+  });
+});
+
+describe('MovementFormModal — 409 stock.insufficient (FX-162)', () => {
+  it('inglizcha server matni o‘rniga tarjima qilingan xabar (available/requested bilan) ko‘rsatiladi', async () => {
+    const show = vi.spyOn(notifications, 'show').mockImplementation(() => 'x');
+    createStockMovement.mockRejectedValue(
+      new ApiError('stock.insufficient', 'Insufficient stock for this movement', 409, {
+        available: 3,
+        requested: 10,
+      }),
+    );
+    renderApp(<MovementFormModal opened onClose={() => {}} item={item} />);
+    fireEvent.click(screen.getByRole('textbox', { name: 'Tur' }));
+    fireEvent.click(await screen.findByText('Chiqim'));
+    fireEvent.change(screen.getByLabelText(/Miqdor/), { target: { value: '10' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    await waitFor(() => expect(show).toHaveBeenCalled());
+    const message = String(show.mock.calls[0]?.[0].message);
+    expect(message).not.toContain('Insufficient');
+    expect(message).toContain('3');
+    expect(message).toContain('10');
+    show.mockRestore();
   });
 });
