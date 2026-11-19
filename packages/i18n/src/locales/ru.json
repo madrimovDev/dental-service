@@ -526,7 +526,8 @@
       "user": "Сотрудники",
       "tenant": "Клиника",
       "report": "Отчёты",
-      "audit": "Аудит"
+      "audit": "Аудит",
+      "discount": "Скидка"
     },
     "nav_services": "Услуги и цены",
     "nav_license": "Лицензия",

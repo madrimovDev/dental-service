@@ -526,7 +526,8 @@
       "user": "Xodimlar",
       "tenant": "Klinika",
       "report": "Hisobotlar",
-      "audit": "Audit"
+      "audit": "Audit",
+      "discount": "Chegirma"
     },
     "nav_services": "Xizmatlar va narxlar",
     "nav_license": "Litsenziya",
