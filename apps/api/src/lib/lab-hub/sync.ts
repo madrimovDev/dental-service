@@ -154,7 +154,16 @@ const executeOp = async (
       if (!f) return undefined; // fayl o'chirilgan — yuboriladigan narsa yo'q
       const resolved = createLocalStorageAdapter().resolve(f.objectKey);
       if (!resolved) throw new LabHubError(400, 'file.invalid_key', false);
-      const bytes = await Bun.file(resolved.path).arrayBuffer();
+      // FX-79: diskda yo'q fayl qayta urinishda paydo bo'lmaydi — retryable xato sifatida u
+      // cheksiz takrorlanib, shu buyurtmaning keyingi op'larini (FIFO) bloklardi.
+      const bytes = await Bun.file(resolved.path)
+        .arrayBuffer()
+        .catch((e: unknown) => {
+          if ((e as { code?: string } | null)?.code === 'ENOENT') {
+            throw new LabHubError(404, 'file.missing', false);
+          }
+          throw e;
+        });
       // `clientRef` — barqaror (lokal fayl id'si): javob yo'qolib qayta yuborilsa Hub dublikat yozmaydi.
       await client.uploadFile(
         key,

@@ -32,6 +32,7 @@ import {
   expenses,
   labHubOutbox,
   labHubState,
+  labOrderFiles,
   labOrderMessages,
   labOrders,
   notifications,
@@ -1109,5 +1110,64 @@ describe('FX-49 — Hub tahrirni qo‘llamasa (applied:false) «synced» emas', 
     expect(((await locked.json()) as { error: { code: string } }).error.code).toBe(
       'lab_order.locked_by_lab',
     );
+  });
+});
+
+// ─── FX-79: diskda yo'q fayl FIFO'ni bloklamaydi ─────────────────────────────
+describe('FX-79 — yo‘q fayl (ENOENT) cheksiz qayta urinilmaydi', () => {
+  test('file op «failed» (file.missing), keyingi xabar op baribir yuboriladi', async () => {
+    const id = await createOrder();
+    expect(
+      (await call('doctor', 'POST', `/api/lab-orders/${id}/send-to-hub`, { labId: lab.labId }))
+        .status,
+    ).toBe(200);
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+    expect((await orderRow(id))?.hubSyncStatus).toBe('synced');
+
+    // Fayl qatori bor, lekin diskdan yo'qolgan (tiklash/qo'lda o'chirish).
+    await inTenant(async (tx) => {
+      const [f] = await tx
+        .insert(labOrderFiles)
+        .values({
+          tenantId,
+          labOrderId: id,
+          objectKey: `${tenantId}/lab-orders/${id}/yoq-${crypto.randomUUID()}.pdf`,
+          originalFilename: 'yoq.pdf',
+          contentType: 'application/pdf',
+          sizeBytes: 10,
+        })
+        .returning({ id: labOrderFiles.id });
+      await tx.insert(labHubOutbox).values({
+        tenantId,
+        labOrderId: id,
+        op: 'file',
+        payload: { fileId: f!.id },
+      });
+    });
+    // Undan keyin xabar — FIFO bo'yicha fayl op'idan keyin turadi.
+    await whileHubDown(async () => {
+      const m = await call('doctor', 'POST', `/api/lab-orders/${id}/hub-messages`, {
+        body: 'Rangni tekshiring',
+      });
+      expect(m.status).toBeLessThan(300);
+    });
+
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+
+    const ops = await inTenant((tx) =>
+      tx.select().from(labHubOutbox).where(eq(labHubOutbox.labOrderId, id)),
+    );
+    const fileOp = ops.find((o) => o.op === 'file');
+    expect(fileOp?.status).toBe('failed');
+    expect(fileOp?.lastError).toBe('file.missing');
+    expect(ops.find((o) => o.op === 'message')?.status).toBe('done');
+    const [msg] = await inTenant((tx) =>
+      tx.select().from(labOrderMessages).where(eq(labOrderMessages.labOrderId, id)),
+    );
+    expect(msg?.syncedAt).not.toBeNull();
   });
 });
