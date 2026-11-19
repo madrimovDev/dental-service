@@ -182,6 +182,7 @@ Konservativ variant tanlandi; foydalanuvchi keyin o'zgartirishi mumkin.
 | D-10 | Bosqichli vizitni vizit yo'li bilan to'lash rad etiladi (409 `visit.linked_to_plan_stage`); kassa «reja bo'yicha to'lash»ga yo'naltiradi | Ikki marta to'lovni yopadi, pul mantig'i o'zgarmaydi |
 | D-11 | Accepted bo'lmagan bosqichni completed qilish 400; UI faqat qabul qilingan bosqichlarni taklif qiladi | Jim qarz qo'shilmaydi |
 | D-12 | EXCLUDE constraint'lar tenant'ga bog'lanadi (`tenant_id WITH =`) | Tenantlararo bloklash/ma'lumot sizishi yo'q |
+| D-13 | Vizit orqali POS to'lovi (rejasiz davolash) vizit doktoriga komissiya manbai bo'ladi (`COALESCE(plan.doctor_id, visit_note.doctor_id)`), baza `paidAmount` | Rejasiz ish uchun doktor haqi yo'qolmasin (LA-29) |
 
 ## 5. Hali audit qilinmagan (keyingi round)
 
