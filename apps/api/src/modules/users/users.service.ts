@@ -16,6 +16,7 @@ import type { Context } from 'hono';
 import type { Database } from '../../db/client.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { assertCanGrantBranch } from '../../lib/branch-scope.ts';
 import { logger } from '../../lib/logger.ts';
 import { hashPassword } from '../../lib/password.ts';
 import {
@@ -113,6 +114,8 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
     if (!role) return { ok: false as const, code: 'role.not_found' };
     // P5: tayinlanayotgan rol chaqiruvchining huquqlaridan yuqori bo'lmasin (yozishdan OLDIN).
     assertCanGrant(callerPerms(c), (await loadRolePermissionCodes(dbContext, input.roleId)) ?? []);
+    // FX-33: filial doirasi eskalatsiyasi (LA-31) — rol tekshiruvidan keyin, yozishdan OLDIN.
+    await assertCanGrantBranch(c, 'user.invite', input.branchId);
 
     if (input.branchId) {
       const [branch] = await dbContext
@@ -269,6 +272,8 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
     if (!role) return { ok: false as const, code: 'role.not_found' as const };
     // P5: tayinlanayotgan rol chaqiruvchining huquqlaridan yuqori bo'lmasin.
     assertCanGrant(callerPerms(c), (await loadRolePermissionCodes(db, input.roleId)) ?? []);
+    // FX-33: filial doirasi eskalatsiyasi (LA-31).
+    await assertCanGrantBranch(c, 'user.manage', input.branchId);
 
     if (input.branchId) {
       const [branch] = await db.select().from(branches).where(eq(branches.id, input.branchId));
@@ -358,6 +363,16 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
       const codes = await loadRolePermissionCodes(db, effectiveRoleId);
       if (codes === null) return { ok: false as const, code: 'role.not_found' as const };
       assertCanGrant(callerPerms(c), codes);
+    }
+    // FX-33: filial doirasi — filial o'zgarsa yoki tayinlov qayta yoqilsa/uzaytirilsa, EFFEKTIV
+    // filial chaqiruvchining doirasida bo'lishi shart (B filial tayinlovini A mudiri tiriltirmasin).
+    const branchChanged = input.branchId !== undefined && input.branchId !== before.branchId;
+    if (branchChanged || roleChanged || reactivates || extendsValidity) {
+      const effectiveBranchId = input.branchId !== undefined ? input.branchId : before.branchId;
+      await assertCanGrantBranch(c, 'user.manage', effectiveBranchId);
+      if (branchChanged && before.branchId !== effectiveBranchId) {
+        await assertCanGrantBranch(c, 'user.manage', before.branchId);
+      }
     }
 
     const patch: Record<string, unknown> = { updatedAt: new Date() };

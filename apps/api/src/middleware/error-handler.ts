@@ -2,6 +2,7 @@ import { fail } from '@dental/core';
 import type { ErrorHandler } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { ZodError, z } from 'zod';
+import { BranchEscalationError } from '../lib/branch-scope.ts';
 import { logger } from '../lib/logger.ts';
 import { RoleEscalationError } from '../lib/role-escalation.ts';
 import { captureException } from '../lib/sentry.ts';
@@ -16,6 +17,15 @@ export const errorHandler: ErrorHandler = (err, c) => {
   if (err instanceof RoleEscalationError) {
     return c.json(
       fail(err.code, "Siz o'zingizda yo'q huquqlarni bera olmaysiz", { missing: err.missing }),
+      403,
+    );
+  }
+
+  if (err instanceof BranchEscalationError) {
+    return c.json(
+      fail(err.code, "Bu filial doirasida tayinlov berishga ruxsatingiz yo'q", {
+        branchId: err.branchId,
+      }),
       403,
     );
   }
