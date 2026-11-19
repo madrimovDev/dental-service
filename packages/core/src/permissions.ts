@@ -117,12 +117,6 @@ export const PERMISSIONS = [
     descriptionUz: 'Xodimlar assignmentlarini boshqarish',
     descriptionRu: 'Управление назначениями пользователей',
   },
-  {
-    code: 'user.deactivate',
-    category: 'user',
-    descriptionUz: 'Xodimni faolsizlantirish',
-    descriptionRu: 'Деактивация пользователя',
-  },
 
   // ===== Audit log =====
   {
@@ -146,7 +140,7 @@ export const PERMISSIONS = [
     descriptionRu: 'Управление уведомлениями',
   },
 
-  // ===== M2 shell permissions (patient/staff — actual usage M2'da) =====
+  // ===== M2 shell permissions (patient) =====
   {
     code: 'patient.view',
     category: 'patient',
@@ -194,30 +188,6 @@ export const PERMISSIONS = [
     category: 'clinical',
     descriptionUz: 'Tibbiy karta tahrirlash',
     descriptionRu: 'Редактирование медкарты',
-  },
-  {
-    code: 'staff.view',
-    category: 'staff',
-    descriptionUz: "Xodimlarni ko'rish",
-    descriptionRu: 'Просмотр сотрудников',
-  },
-  {
-    code: 'staff.invite',
-    category: 'staff',
-    descriptionUz: 'Xodim taklif qilish (HR)',
-    descriptionRu: 'Приглашение сотрудника',
-  },
-  {
-    code: 'staff.edit',
-    category: 'staff',
-    descriptionUz: 'Xodim profilini tahrirlash',
-    descriptionRu: 'Редактирование профиля сотрудника',
-  },
-  {
-    code: 'staff.delete',
-    category: 'staff',
-    descriptionUz: 'Xodimni arxivlash',
-    descriptionRu: 'Архивирование сотрудника',
   },
 
   // ===== M3 shell permissions (appointment, queue, cashier, service) =====

@@ -1,5 +1,6 @@
 import { DIAGNOSES_SEED, PERMISSIONS } from '@dental/core';
 import { diagnoses, permissions } from '@dental/db-schema';
+import { notInArray } from 'drizzle-orm';
 import { logger } from '../lib/logger.ts';
 import type { Database } from './client.ts';
 
@@ -34,7 +35,19 @@ export async function seedPermissions(db: Database): Promise<void> {
     upserted++;
   }
 
-  logger.info({ count: upserted }, 'Permissions catalog seeded');
+  // FX-72: katalogdan olib tashlangan (o'lik) kodlarni bazadan ham tozalash — aks holda rol
+  // quruvchida tanlanaveradi. `role_permissions` FK ON DELETE CASCADE.
+  const pruned = await db
+    .delete(permissions)
+    .where(
+      notInArray(
+        permissions.code,
+        PERMISSIONS.map((p) => p.code),
+      ),
+    )
+    .returning({ code: permissions.code });
+
+  logger.info({ count: upserted, pruned: pruned.length }, 'Permissions catalog seeded');
 }
 
 export async function seedDiagnoses(db: Database): Promise<void> {

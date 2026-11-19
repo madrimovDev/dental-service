@@ -42,7 +42,6 @@ export const ROLE_TEMPLATES = [
       'user.view',
       'user.invite',
       'user.manage',
-      'user.deactivate',
       'audit_log.view',
       'notification.view',
       'notification.manage',
@@ -55,10 +54,6 @@ export const ROLE_TEMPLATES = [
       'patient.view_pii',
       'medical_record.view',
       'medical_record.edit',
-      'staff.view',
-      'staff.invite',
-      'staff.edit',
-      'staff.delete',
       'appointment.view',
       'appointment.create',
       'appointment.edit',
@@ -104,8 +99,8 @@ export const ROLE_TEMPLATES = [
     descriptionRu:
       'Менеджер филиала — все права филиальных ролей (администратор, врач, медсестра, бухгалтер, техник)',
     // FU-41: = Receptionist ∪ Doctor ∪ Doctor+Assistant ∪ Nurse ∪ Accountant ∪ Technician ∪ eski BM.
-    // Tenant-darajali huquqlar (tenant.edit, tenant_settings.*, role.*, user.manage/deactivate,
-    // branch.create/delete, notification.*, staff.invite/edit/delete, patient.delete,
+    // Tenant-darajali huquqlar (tenant.edit, tenant_settings.*, role.*, user.manage,
+    // branch.create/delete, notification.*, patient.delete,
     // service.manage) QASDDAN YO'Q — shuning uchun P5 (assertCanGrant) bo'yicha BM
     // Tenant Admin'ni bera olmaydi. Shifokor ro'yxatiga tushmaydi (`isPractitioner` yo'q).
     permissions: [
@@ -122,7 +117,6 @@ export const ROLE_TEMPLATES = [
       'patient.view_pii',
       'medical_record.view',
       'medical_record.edit',
-      'staff.view',
       'appointment.view',
       'appointment.create',
       'appointment.edit',
