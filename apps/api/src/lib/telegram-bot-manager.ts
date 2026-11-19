@@ -22,6 +22,7 @@ import {
   verifyPhoneByContact,
 } from './telegram/phone-verify.ts';
 import { type BotReply, toTelegrafExtra } from './telegram/reply.ts';
+import { createBotSubscriptionGate } from './telegram/subscription-gate.ts';
 
 type ManagerDeps = {
   adminDb: Database;
@@ -90,6 +91,8 @@ export function startTelegramBotManager(deps: ManagerDeps) {
         },
       });
     bot.catch((err) => logger.error({ err, tenantId }, 'bot handler failed'));
+    // FX-105 (LB-14): `expired` obuna/litsenziya — barcha handler'lardan OLDIN.
+    bot.use(createBotSubscriptionGate(tenantId));
 
     bot.start(async (ctx) => {
       // FU-15: `/start pv_<token>` — xodim telefonini tasdiqlash (bemor oqimidan alohida).

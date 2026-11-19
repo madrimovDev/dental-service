@@ -2,7 +2,12 @@ import { tenantSettings } from '@dental/db-schema';
 import type { Context } from 'hono';
 import { withTenant } from '../db/scoped.ts';
 import { verifyAccess } from './jwt.ts';
-import { computeExpiryState, type LicenseState, MAX_GRACE_DAYS } from './license.ts';
+import {
+  computeExpiryState,
+  getLicenseState,
+  type LicenseState,
+  MAX_GRACE_DAYS,
+} from './license.ts';
 import { logger } from './logger.ts';
 
 /**
@@ -74,3 +79,22 @@ export const tenantIdFromBearer = async (c: Context): Promise<string | null> => 
 
 export const getTenantSubscriptionState = async (tenantId: string): Promise<LicenseState> =>
   computeSubscriptionState(await getTenantSubscriptionExpiry(tenantId));
+
+/**
+ * FX-105 (LB-14): HTTP'dan TASHQARI kirish nuqtalari (eslatma/recall worker'lari,
+ * Telegram bot) uchun blok tekshiruvi — HTTP gate (`requireValidSubscription`) bilan
+ * bir xil qoida: Local Desktop → `.lic` holati, bulut → tenant obunasi; faqat
+ * `expired` bloklaydi (`none`/noma'lum muddat — fail-open, Supervisor o'chiq bo'lsa
+ * klinika ishlashda davom etadi). Natija 30 s keshlanadi (`getTenantSubscriptionExpiry`).
+ */
+export const isTenantServiceBlocked = async (tenantId: string): Promise<boolean> => {
+  try {
+    if (process.env.DENTAL_LOCAL_DESKTOP === 'true') {
+      return (await getLicenseState()).state === 'expired';
+    }
+    return (await getTenantSubscriptionState(tenantId)).state === 'expired';
+  } catch (err) {
+    logger.warn({ err, tenantId }, 'service block check failed — fail-open');
+    return false;
+  }
+};
