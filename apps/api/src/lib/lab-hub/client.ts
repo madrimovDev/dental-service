@@ -199,7 +199,7 @@ export const labHubClient = (fetchImpl?: FetchFn) => ({
       fetchImpl,
     }),
   changes: (key: string, since: string, limit: number) =>
-    json<{ events: HubChangeEvent[]; nextCursor: string }>(
+    json<{ events: HubChangeEvent[]; nextCursor: string; cursorReset?: boolean }>(
       `/v1/clinic/changes?since=${encodeURIComponent(since)}&limit=${limit}`,
       { key, fetchImpl },
     ),

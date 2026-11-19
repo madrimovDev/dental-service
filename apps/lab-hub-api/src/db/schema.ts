@@ -280,6 +280,21 @@ export const kekCheck = pgTable('kek_check', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+/**
+ * Hub davri (epoch, bitta qator, id=1) — FX-98. Klinika kursori `<epoch>:<tx_id>.<seq>`:
+ * `tx_id` klaster xid hisoblagichiga bog'liq va `pg_dump`ga tushmaydi. Baza boshqa klasterga
+ * tiklansa (`system_identifier` mos kelmaydi) davr yangilanadi va eski davr kursorlari
+ * boshidan boshlanadi (`lib/hub-epoch.ts`). Qo'lda majburlash: `UPDATE hub_meta SET
+ * epoch = gen_random_uuid()` (README «Tiklash»).
+ */
+export const hubMeta = pgTable('hub_meta', {
+  id: integer('id').primaryKey().default(1),
+  epoch: uuid('epoch').notNull(),
+  systemIdentifier: text('system_identifier').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  rotatedAt: timestamp('rotated_at', { withTimezone: true }),
+});
+
 /** Klinika bo'yicha oylik akt-sverka: to'langanini lab qo'lda belgilaydi. */
 export const settlements = pgTable(
   'settlements',

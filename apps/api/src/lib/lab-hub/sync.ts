@@ -508,6 +508,11 @@ export const pollLabHubChanges = async (
       throw err;
     }
     const since = cursor;
+    if (res.cursorReset) {
+      // FX-98: Hub davri almashdi (boshqa klasterga tiklangan) — kursor boshidan; dedup
+      // `(tx_id, seq)` bo'yicha, shuning uchun allaqachon qo'llangan hodisalar ikkilanmaydi.
+      logger.warn({ tenantId, since }, 'lab-hub cursor reset by Hub (epoch changed)');
+    }
     const applied = await withTenant(tenantId, async (tx) => {
       let n = 0;
       for (const ev of res.events) {

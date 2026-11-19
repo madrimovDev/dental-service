@@ -309,3 +309,31 @@ describe('Hub shu klasterga zaxiradan tiklandi — qayta ishlatilgan seq tashlan
     expect(await pollUntilApplied(1)).toBeGreaterThanOrEqual(1);
   });
 });
+
+// ─── FX-98 / LB-07 ───────────────────────────────────────────────────────────
+describe('Hub boshqa klasterga tiklandi — davr almashadi, kursor boshidan, dublikatsiz (FX-98)', () => {
+  test('eski davr kursori yangi hodisani o‘tkazib yubormaydi; qo‘llanganlar qayta qo‘llanmaydi', async () => {
+    await pollUntilApplied(0);
+    const cursor = (await state()).cursor;
+    expect(cursor).toMatch(/^[0-9a-f-]{36}:\d+\.\d+$/);
+    const epoch = cursor.split(':')[0]!;
+
+    const ref = await linkAndSendCase();
+    const evs = (await hubAdmin`
+      SELECT e.tx_id::bigint AS tx, e.seq::bigint AS seq FROM case_events e
+      JOIN cases c ON c.id = e.case_id WHERE c.clinic_case_ref = ${ref}
+      ORDER BY e.tx_id DESC, e.seq DESC`) as unknown as { tx: string; seq: string }[];
+    expect(evs.length).toBeGreaterThanOrEqual(1);
+    // Yangi klasterda xid kichik — klinikaning eski kursori yangi hodisalardan «katta».
+    await setCursor(`${epoch}:${evs[0]!.tx}.${evs[0]!.seq}`);
+    // `pg_restore` boshqa klasterdan: hub_meta eski klaster identifikatori bilan.
+    await hubAdmin`UPDATE hub_meta SET system_identifier = '0'`;
+
+    const applied = await pollUntilApplied(evs.length);
+    // Faqat yangi ishning hodisalari — avvalgi (allaqachon qo'llangan) hodisalar dedup'da.
+    expect(applied).toBe(evs.length);
+    const after = (await state()).cursor;
+    expect(after.split(':')[0]).not.toBe(epoch);
+    expect(await pollUntilApplied(0)).toBe(0);
+  });
+});

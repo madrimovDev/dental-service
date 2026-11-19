@@ -38,7 +38,7 @@ butunlay bloklanadi (mavjud ishlar ham).
 
 ## `/v1/clinic/changes` kursori (commit-xavfsiz)
 
-`GET /v1/clinic/changes?since=<cursor>&limit=` — kursor shaffof satr `"<tx_id>.<seq>"`
+`GET /v1/clinic/changes?since=<cursor>&limit=` — kursor shaffof satr `"<epoch>:<tx_id>.<seq>"`
 (boshlang'ich `0.0`), javobdagi `nextCursor`ni keyingi so'rovga bering.
 
 - `case_events.seq` (bigserial) **commit tartibida emas**: kichik seq olgan tranzaksiya
@@ -52,7 +52,15 @@ butunlay bloklanadi (mavjud ishlar ham).
 - Narxi: uzoq davom etayotgan yozuvchi tranzaksiya (shu Postgres klasterida) tugagunicha
   yangi hodisalar biroz kechikadi — yo'qolmaydi.
 - Iste'molchi (klinika sinxroni, wave 2) baribir hodisalarni **idempotent** qo'llashi
-  kerak (`seq` bo'yicha dedup): tarmoq uzilib javob yo'qolsa, xuddi shu sahifa qayta keladi.
+  kerak (**`(txId, seq)`** bo'yicha dedup — FX-93): tarmoq uzilib javob yo'qolsa, xuddi shu
+  sahifa qayta keladi. Faqat `seq` yetmaydi: baza shu klasterga zaxiradan tiklansa
+  sequence orqaga qaytadi va yangi hodisa eski `seq`ni oladi (lekin yangi `tx_id`).
+- **Davr (epoch, FX-98):** `tx_id` klaster xid hisoblagichi — `pg_dump`ga tushmaydi. Hub
+  `hub_meta` (bitta qator) da davr UUID'i va klaster `system_identifier`ini saqlaydi; baza
+  boshqa klasterga tiklansa (identifikator mos kelmaydi) boot'da yoki birinchi so'rovda davr
+  yangilanadi. Kursor davri joriy emas yoki kursor `tx_id`si joriy `xmax`dan kichik emas
+  bo'lsa — kursor boshidan (`0.0`) boshlanadi va javobda `cursorReset: true`. Klinika dedup'i
+  allaqachon qo'llangan hodisalarni qayta qo'llamaydi.
 
 ## Supervisor bilan aloqa
 

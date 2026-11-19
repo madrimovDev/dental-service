@@ -17,6 +17,7 @@ import { withClinic } from '../../db/scoped';
 import type { Deps } from '../../deps';
 import { decryptBuffer, decryptOptional, encryptOptional, type Key } from '../../lib/crypto';
 import { ApiError } from '../../lib/errors';
+import { CURSOR_PATTERN, currentHubEpoch, resolveCursor } from '../../lib/hub-epoch';
 import { createRouter, jsonBody, OK } from '../../lib/openapi';
 import { createRateLimiter } from '../../lib/rate-limit';
 import { isBlocked } from '../../lib/subscription';
@@ -660,19 +661,19 @@ export const clinicRoutes = (deps: Deps) => {
    * hodisa hech qachon paydo bo'lmaydi, kursor xavfsiz oldinga suriladi.
    * Narxi: uzoq davom etayotgan yozuvchi tranzaksiya tugagunicha yangi hodisalar
    * biroz kechikadi (yo'qolmaydi).
+   * FX-98: javob kursori `<epoch>:<tx_id>.<seq>` — baza boshqa klasterga tiklansa davr
+   * almashadi va eski kursor boshidan boshlanadi (`cursorReset: true`); klinika dedup'i
+   * `(tx_id, seq)` bo'yicha, shuning uchun qayta berilgan eski hodisalar ikkilanmaydi.
    */
   app.openapi(
     createRoute({
       method: 'get',
       path: '/changes',
       tags,
-      summary: 'Kursordan keyingi hodisalar (kursor `<tx_id>.<seq>`, commit-xavfsiz)',
+      summary: 'Kursordan keyingi hodisalar (kursor `<epoch>:<tx_id>.<seq>`, commit-xavfsiz)',
       request: {
         query: z.object({
-          since: z
-            .string()
-            .regex(/^\d{1,19}\.\d{1,19}$/)
-            .default('0.0'),
+          since: z.string().regex(CURSOR_PATTERN).default('0.0'),
           limit: z.coerce.number().int().min(1).max(500).default(200),
         }),
       },
@@ -681,7 +682,9 @@ export const clinicRoutes = (deps: Deps) => {
     async (c) =>
       tx(c, async (t, clinic) => {
         const { since, limit } = c.req.valid('query');
-        const [sinceTx, sinceSeq] = since.split('.') as [string, string];
+        // FX-98: davr (epoch) mos kelmasa / kursor shu klasterda bo'lishi mumkin bo'lmasa — boshidan.
+        const current = await currentHubEpoch(t);
+        const { tx: sinceTx, seq: sinceSeq, reset: cursorReset } = resolveCursor(since, current);
         const rows = await t
           .select({ ev: caseEvents, ref: cases.clinicCaseRef })
           .from(caseEvents)
@@ -748,7 +751,8 @@ export const clinicRoutes = (deps: Deps) => {
           };
         });
         const last = rows.at(-1)?.ev;
-        return c.json({ events, nextCursor: last ? `${last.txId}.${last.seq}` : since });
+        const pos = last ? `${last.txId}.${last.seq}` : `${sinceTx}.${sinceSeq}`;
+        return c.json({ events, nextCursor: `${current.epoch}:${pos}`, cursorReset });
       }),
   );
 
