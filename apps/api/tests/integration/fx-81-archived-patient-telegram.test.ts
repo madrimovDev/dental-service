@@ -60,6 +60,7 @@ describe('FX-81 — arxivlangan bemor', () => {
         fromId: 7,
         phone: '+998901008101',
         chatId: '8101',
+        chatType: 'private', // FX-84: faqat shaxsiy chat bog'lanadi
       }),
     );
     expect(out).toBe('not_found');
@@ -77,6 +78,7 @@ describe('FX-81 — arxivlangan bemor', () => {
         fromId: 8,
         phone: '+998901008102',
         chatId: '8102',
+        chatType: 'private', // FX-84: faqat shaxsiy chat bog'lanadi
       }),
     );
     expect(out2).toBe('linked');
