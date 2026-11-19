@@ -46,15 +46,21 @@ export const labUsers = pgTable(
       .notNull()
       .references(() => labs.id, { onDelete: 'cascade' }),
     fullName: text('full_name').notNull(),
-    // Hub'ga xos login — `normalizePhone` kanonik shakli, Hub bo'yicha unique.
+    // Hub'ga xos login — `normalizePhone` kanonik shakli. Unique faqat FAOL qatorlar
+    // uchun (FX-119): nofaol hisob telefonini ozod qiladi.
     phone: text('phone').notNull(),
     passwordHash: text('password_hash').notNull(),
     role: text('role').notNull().$type<'lead' | 'technician'>(),
     mustChangePassword: boolean('must_change_password').notNull().default(true),
     isActive: boolean('is_active').notNull().default(true),
+    // Parol almashtirilganda oshadi; JWT `tv` claim'i bilan solishtiriladi (FX-141).
+    tokenVersion: integer('token_version').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex('lab_users_phone_uq').on(t.phone), index('lab_users_lab_idx').on(t.labId)],
+  (t) => [
+    uniqueIndex('lab_users_phone_uq').on(t.phone).where(sql`${t.isActive}`),
+    index('lab_users_lab_idx').on(t.labId),
+  ],
 );
 
 export const clinics = pgTable('clinics', {

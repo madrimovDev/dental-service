@@ -76,6 +76,8 @@ const monthRange = (p: string) => {
 export const labRoutes = (deps: Deps) => {
   const app = createRouter<LabEnv>();
   const loginLimiter = createRateLimiter(10, 15 * 60_000);
+  // Parolni taxmin qilish: sessiyasi o'g'irlangan tokenda ham joriy parolni brute-force qilib bo'lmasin.
+  const changePasswordLimiter = createRateLimiter(10, 15 * 60_000);
 
   // --- login (tokensiz) -------------------------------------------------------
   app.openapi(
@@ -102,7 +104,9 @@ export const labRoutes = (deps: Deps) => {
         'unknown';
       if (!loginLimiter.hit(`${ip}|${phone}`)) throw new ApiError(429, 'rate_limited');
       const user = await withLoginPhone(deps.db, phone, (t) =>
-        t.query.labUsers.findFirst({ where: eq(labUsers.phone, phone) }),
+        t.query.labUsers.findFirst({
+          where: and(eq(labUsers.phone, phone), eq(labUsers.isActive, true)),
+        }),
       );
       if (!user || !user.isActive || !(await verifyPassword(b.password, user.passwordHash))) {
         throw new ApiError(401, 'auth.invalid_credentials');
@@ -113,6 +117,7 @@ export const labRoutes = (deps: Deps) => {
         lab: user.labId,
         role: user.role,
         pwc: user.mustChangePassword,
+        tv: user.tokenVersion,
       });
       return c.json({
         token,
@@ -140,10 +145,13 @@ export const labRoutes = (deps: Deps) => {
     const user = await withLab(deps.db, lab.id, (t) =>
       t.query.labUsers.findFirst({
         where: eq(labUsers.id, claims.sub),
-        columns: { isActive: true, mustChangePassword: true },
+        columns: { isActive: true, mustChangePassword: true, tokenVersion: true },
       }),
     );
     if (!user?.isActive) return c.json({ error: { code: 'auth.unauthorized' } }, 401);
+    // Parol almashtirilgan bo'lsa eski tokenlar yaroqsiz (FX-141).
+    if (claims.tv !== user.tokenVersion)
+      return c.json({ error: { code: 'auth.unauthorized' } }, 401);
     if (user.mustChangePassword && !OPEN_WHEN_PWC.has(c.req.path)) {
       return c.json({ error: { code: 'auth.password_change_required' } }, 403);
     }
@@ -190,6 +198,7 @@ export const labRoutes = (deps: Deps) => {
       const b = c.req.valid('json');
       if (b.currentPassword === b.newPassword) throw new ApiError(400, 'auth.password_same');
       const claims = c.get('claims');
+      if (!changePasswordLimiter.hit(claims.sub)) throw new ApiError(429, 'rate_limited');
       const user = await tx(c, async (t) => {
         const u = await t.query.labUsers.findFirst({ where: eq(labUsers.id, claims.sub) });
         if (!u || !(await verifyPassword(b.currentPassword, u.passwordHash))) {
@@ -197,7 +206,11 @@ export const labRoutes = (deps: Deps) => {
         }
         const [updated] = await t
           .update(labUsers)
-          .set({ passwordHash: await hashPassword(b.newPassword), mustChangePassword: false })
+          .set({
+            passwordHash: await hashPassword(b.newPassword),
+            mustChangePassword: false,
+            tokenVersion: sql`${labUsers.tokenVersion} + 1`,
+          })
           .where(eq(labUsers.id, u.id))
           .returning();
         return updated!;
@@ -207,6 +220,7 @@ export const labRoutes = (deps: Deps) => {
         lab: user.labId,
         role: user.role,
         pwc: false,
+        tv: user.tokenVersion,
       });
       return c.json({ token, user: userDto(user) });
     },
@@ -840,24 +854,31 @@ export const labRoutes = (deps: Deps) => {
       },
       responses: OK,
     }),
-    async (c) =>
-      tx(c, async (t) => {
-        requireLead(c);
-        const { id } = c.req.valid('param');
-        const b = c.req.valid('json');
-        if (id === c.get('claims').sub && b.isActive === false)
-          throw new ApiError(409, 'lab_user.cannot_deactivate_self');
-        const [u] = await t
-          .update(labUsers)
-          .set({
-            ...(b.fullName !== undefined ? { fullName: b.fullName } : {}),
-            ...(b.isActive !== undefined ? { isActive: b.isActive } : {}),
-          })
-          .where(eq(labUsers.id, id))
-          .returning();
-        if (!u) throw new ApiError(404, 'lab_user.not_found');
-        return c.json({ user: userDto(u) });
-      }),
+    async (c) => {
+      requireLead(c);
+      const { id } = c.req.valid('param');
+      const b = c.req.valid('json');
+      if (id === c.get('claims').sub && b.isActive === false)
+        throw new ApiError(409, 'lab_user.cannot_deactivate_self');
+      try {
+        return await tx(c, async (t) => {
+          const [u] = await t
+            .update(labUsers)
+            .set({
+              ...(b.fullName !== undefined ? { fullName: b.fullName } : {}),
+              ...(b.isActive !== undefined ? { isActive: b.isActive } : {}),
+            })
+            .where(eq(labUsers.id, id))
+            .returning();
+          if (!u) throw new ApiError(404, 'lab_user.not_found');
+          return c.json({ user: userDto(u) });
+        });
+      } catch (err) {
+        // Qayta aktivatsiya: telefon boshqa faol hisobda band (FX-119).
+        if (isUniqueViolation(err)) throw new ApiError(409, 'lab_user.phone_taken');
+        throw err;
+      }
+    },
   );
 
   app.openapi(
