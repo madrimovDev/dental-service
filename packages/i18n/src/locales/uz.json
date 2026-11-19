@@ -2183,7 +2183,7 @@
       "newPatients": "Yangi — davrda birinchi marta kelgan; qaytgan — avval ham kelgan va davrda qayta kelgan bemorlar.",
       "recall": "Qayta chaqiruvdan keyin qabulga yozilgan yoki yakunlanganlar ulushi.",
       "plans": "Davrda yaratilgan qabul qilingan rejalarning bosqichlari: bajarilgan / jami.",
-      "pnl": "Sof foyda = sof tushum (qaytarishlar ayirilgan) − xarajatlar − yakunlangan ish haqi. Filial tanlansa ish haqi hisobga olinmaydi (ish haqi filialga bog'lanmagan)."
+      "pnl": "Sof foyda = sof tushum (qaytarishlar ayirilgan) − xarajatlar − ish haqi (yakunlangan va qoralama). Filial tanlansa ish haqi hisobga olinmaydi (ish haqi filialga bog'lanmagan)."
     }
   },
   "settingsShell": {
