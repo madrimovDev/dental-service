@@ -407,6 +407,9 @@ export const createAuthService = (deps: AuthServiceDeps) => {
           branchName: branches.name,
           roleId: userAssignments.roleId,
           roleName: roles.name,
+          // FX-155 review: web klinik yozuv yaratish tugmasini shu belgiga qarab ko'rsatadi
+          // (server muallifni `assertPractitioner` bilan baribir tekshiradi).
+          isPractitioner: roles.isPractitioner,
           isOwner: sql<boolean>`${tenants.ownerUserId} = ${userId}`,
         })
         .from(userAssignments)
