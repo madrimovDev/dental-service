@@ -37,8 +37,11 @@ let docToken: string;
 let itemA: string;
 let itemB: string;
 let svcX: string; // BOM: itemA 1
-let svcY: string; // BOM: itemA 1 -> itemB 1 (A, B tartibida)
-let svcZ: string; // BOM: itemB 1 -> itemA 1 (B, A tartibida)
+// Ikki xizmatli to'plamlar: BOM qatorlari xizmat id'si (indeks) va kiritish (heap) bo'yicha
+// bir xil tartibda: P -> A keyin B; Q -> B keyin A. (Bitta xizmat ichida tartibni indeks
+// item_id bo'yicha o'zi tartiblab qo'yadi, shuning uchun to'plamlar xizmatlar bo'yicha quriladi.)
+let setP: string[];
+let setQ: string[];
 
 const call = async (method: string, path: string, body?: unknown) => {
   const res = await app.request(path, {
@@ -135,20 +138,19 @@ beforeAll(async () => {
     itemB = await mkItem('B');
     const sv = await tx
       .insert(services)
-      .values([
-        { tenantId, code: 'X67', nameUz: 'X' },
-        { tenantId, code: 'Y67', nameUz: 'Y' },
-        { tenantId, code: 'Z67', nameUz: 'Z' },
-      ])
-      .returning({ id: services.id });
-    [svcX, svcY, svcZ] = [sv[0]!.id, sv[1]!.id, sv[2]!.id];
-    // Qatorlar ataylab qarama-qarshi tartibda kiritiladi (heap tartibi = kiritish tartibi).
+      .values(['X67', 'P1', 'P2', 'Q1', 'Q2'].map((code) => ({ tenantId, code, nameUz: code })))
+      .returning({ id: services.id, code: services.code });
+    svcX = sv.find((x) => x.code === 'X67')!.id;
+    const four = sv.filter((x) => x.code !== 'X67').sort((a, b) => a.id.localeCompare(b.id));
+    const [s0, s1, s2, s3] = four.map((x) => x.id) as [string, string, string, string];
+    setP = [s0, s1];
+    setQ = [s2, s3];
     await tx.insert(serviceMaterials).values([
       { tenantId, serviceId: svcX, itemId: itemA, qtyPerService: '1' },
-      { tenantId, serviceId: svcY, itemId: itemA, qtyPerService: '1' },
-      { tenantId, serviceId: svcY, itemId: itemB, qtyPerService: '1' },
-      { tenantId, serviceId: svcZ, itemId: itemB, qtyPerService: '1' },
-      { tenantId, serviceId: svcZ, itemId: itemA, qtyPerService: '1' },
+      { tenantId, serviceId: s0, itemId: itemA, qtyPerService: '1' },
+      { tenantId, serviceId: s1, itemId: itemB, qtyPerService: '1' },
+      { tenantId, serviceId: s2, itemId: itemB, qtyPerService: '1' },
+      { tenantId, serviceId: s3, itemId: itemA, qtyPerService: '1' },
     ]);
   });
 
@@ -184,5 +186,83 @@ describe('FX-67: parallel vizit PATCH — qo‘sh chiqim yo‘q', () => {
         .where(eq(stockMovements.sourceVisitNoteId, note));
       expect(out.length).toBe(3);
     }
+  });
+});
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+describe('FX-69: BOM qatorlari item bo‘yicha tartibli qulflanadi — deadlock yo‘q', () => {
+  test('deterministik: P (A,B) A da kutadi, Q (B,A) B ni ushlab A ni kutadi — ikkalasi 201', async () => {
+    await setQty(itemA, 1000);
+    await setQty(itemB, 1000);
+    let release!: () => void;
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    let locked!: () => void;
+    const lockedP = new Promise<void>((r) => {
+      locked = r;
+    });
+    // Tashqi tranzaksiya A qatorini ushlab turadi (ombor ishchisi qo'lda tahrirlayotgandek).
+    const holder = admin.db.transaction(async (tx) => {
+      // UPDATE (FOR NO KEY UPDATE) — FK key-share tekshiruvini emas, aynan qoldiq yangilashni bloklaydi.
+      await tx.execute(sql`update stock_items set updated_at = updated_at where id = ${itemA}`);
+      locked();
+      await gate;
+    });
+    await lockedP;
+    const y = call('POST', '/api/visit-notes', {
+      patientId,
+      doctorId: docId,
+      performedServices: setP,
+    });
+    await sleep(400);
+    const z = call('POST', '/api/visit-notes', {
+      patientId,
+      doctorId: docId,
+      performedServices: setQ,
+    });
+    await sleep(600);
+    release();
+    await holder;
+    const [ry, rz] = await Promise.all([y, z]);
+    // Tartibsiz yangilashda biri 40P01 (deadlock) bilan 500 oladi va vizit saqlanmaydi.
+    expect([ry.status, rz.status]).toEqual([201, 201]);
+    expect(await qty(itemA)).toBe(998);
+    expect(await qty(itemB)).toBe(998);
+  });
+
+  test('qarama-qarshi BOM tartibli xizmatlar bilan parallel vizitlar: hammasi 201, chiqim to‘liq', async () => {
+    await setQty(itemA, 1000);
+    await setQty(itemB, 1000);
+    const ROUNDS = 6;
+    const results = await Promise.all(
+      Array.from({ length: ROUNDS * 2 }, (_, i) =>
+        call('POST', '/api/visit-notes', {
+          patientId,
+          doctorId: docId,
+          performedServices: i % 2 === 0 ? setP : setQ,
+        }),
+      ),
+    );
+    expect(results.map((r) => r.status)).toEqual(Array(ROUNDS * 2).fill(201));
+    // Har vizit A va B dan 1 tadan ayiradi.
+    expect(await qty(itemA)).toBe(1000 - ROUNDS * 2);
+    expect(await qty(itemB)).toBe(1000 - ROUNDS * 2);
+  });
+
+  test('parallel reconcile (qo‘shish + qaytarish aralash) deadlock bermaydi', async () => {
+    await setQty(itemA, 1000);
+    await setQty(itemB, 1000);
+    // Bir vaqtda P va Q to'plamlari qo'shiladi (A,B va B,A tartibida) — reconcile yo'li.
+    const notes = await Promise.all(Array.from({ length: 6 }, (_, i) => newNote([svcX])));
+    const results = await Promise.all(
+      notes.map((id, i) =>
+        call('PATCH', `/api/visit-notes/${id}`, {
+          performedServices: [svcX, ...(i % 2 === 0 ? setP : setQ)],
+        }),
+      ),
+    );
+    expect(results.map((r) => r.status)).toEqual(Array(6).fill(200));
   });
 });

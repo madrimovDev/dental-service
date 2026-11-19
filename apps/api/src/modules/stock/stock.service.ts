@@ -673,6 +673,26 @@ export const createStockService = (deps: {
     }
   }
 
+  type VisitMovement = Parameters<typeof postVisitMovement>[1];
+
+  /**
+   * FX-69: bir nechta vizit/bosqich harakatini yozishdan OLDIN ular tegadigan item qatorlarini
+   * item id bo'yicha tartibda qulflaydi (`SELECT ... ORDER BY id FOR UPDATE`). Barcha yozuvchilar
+   * bir xil global tartibda qulflagani uchun parallel vizitlar deadlock'ga tushmaydi (qarama-qarshi
+   * BOM tartibi ham). Keyin harakatlar berilgan tartibda yoziladi.
+   */
+  async function postVisitMovements(c: Context, movements: VisitMovement[]) {
+    if (movements.length === 0) return;
+    const itemIds = [...new Set(movements.map((m) => m.itemId))].sort();
+    await getDb(c)
+      .select({ id: stockItems.id })
+      .from(stockItems)
+      .where(inArray(stockItems.id, itemIds))
+      .orderBy(asc(stockItems.id))
+      .for('update');
+    for (const m of movements) await postVisitMovement(c, m);
+  }
+
   /** FX-44: vizitda xizmat belgisiz (eski) avto-chiqim bormi — bo'lsa ledger-qaytarish ishonchsiz. */
   async function noteHasUntaggedDeduction(c: Context, visitNoteId: string): Promise<boolean> {
     const rows = await getDb(c)
@@ -811,17 +831,18 @@ export const createStockService = (deps: {
         .where(eq(serviceMaterials.serviceId, stage.serviceId)),
       c.get('activeBranchId') ?? null,
     );
-    for (const bom of boms) {
-      await postVisitMovement(c, {
+    await postVisitMovements(
+      c,
+      boms.map((bom) => ({
         itemId: bom.itemId,
-        type: 'out',
+        type: 'out' as const,
         quantity: bom.qtyPerService,
         reason: 'stage_auto',
         sourceVisitNoteId: null,
         sourceServiceId: stage.serviceId,
         sourceStageId: stage.id,
-      });
-    }
+      })),
+    );
   }
 
   /**
@@ -858,11 +879,12 @@ export const createStockService = (deps: {
     );
 
     const stageDone = await stageDeductedServiceIds(c, sourceVisitNoteId);
+    const pending: VisitMovement[] = [];
     for (const bom of boms) {
       if (stageDone.has(bom.serviceId)) continue;
       const count = occurrenceCount.get(bom.serviceId) ?? 1;
       for (let i = 0; i < count; i++) {
-        await postVisitMovement(c, {
+        pending.push({
           itemId: bom.itemId,
           type: 'out',
           quantity: bom.qtyPerService,
@@ -872,6 +894,7 @@ export const createStockService = (deps: {
         });
       }
     }
+    await postVisitMovements(c, pending);
   }
 
   /**
@@ -922,6 +945,8 @@ export const createStockService = (deps: {
     const deductDeltas = new Map([...deltas].filter(([, d]) => d > 0));
     const returnDeltas = new Map([...deltas].filter(([, d]) => d < 0));
 
+    // FX-69: barcha harakatlar yig'iladi va item id tartibida qulflanib yoziladi (deadlock yo'q).
+    const pending: VisitMovement[] = [];
     if (deductDeltas.size > 0) {
       const boms = await resolveBomItems(
         c,
@@ -936,7 +961,7 @@ export const createStockService = (deps: {
         if (stageDone.has(bom.serviceId)) continue;
         const occurrences = deductDeltas.get(bom.serviceId) ?? 0;
         for (let i = 0; i < occurrences; i++) {
-          await postVisitMovement(c, {
+          pending.push({
             itemId: bom.itemId,
             type: 'out',
             quantity: bom.qtyPerService,
@@ -948,7 +973,10 @@ export const createStockService = (deps: {
       }
     }
 
-    if (returnDeltas.size === 0) return;
+    if (returnDeltas.size === 0) {
+      await postVisitMovements(c, pending);
+      return;
+    }
 
     if (legacy) {
       const boms = await resolveBomItems(
@@ -962,7 +990,7 @@ export const createStockService = (deps: {
       for (const bom of boms) {
         const occurrences = Math.abs(returnDeltas.get(bom.serviceId) ?? 0);
         for (let i = 0; i < occurrences; i++) {
-          await postVisitMovement(c, {
+          pending.push({
             itemId: bom.itemId,
             type: 'in',
             quantity: bom.qtyPerService,
@@ -972,6 +1000,7 @@ export const createStockService = (deps: {
           });
         }
       }
+      await postVisitMovements(c, pending);
       return;
     }
 
@@ -985,7 +1014,7 @@ export const createStockService = (deps: {
         let remaining = row.outstanding;
         for (let i = 0; i < removed && remaining > 0; i++) {
           const share = Math.min(perOccurrence, remaining);
-          await postVisitMovement(c, {
+          pending.push({
             itemId: row.itemId,
             type: 'in',
             quantity: String(share),
@@ -997,6 +1026,7 @@ export const createStockService = (deps: {
         }
       }
     }
+    await postVisitMovements(c, pending);
   }
 
   /**
@@ -1010,10 +1040,11 @@ export const createStockService = (deps: {
       .select({ id: visitNotes.id })
       .from(visitNotes)
       .where(eq(visitNotes.appointmentId, appointmentId));
+    const pending: VisitMovement[] = [];
     for (const note of notes) {
       const outstanding = await outstandingByItem(c, note.id, {});
       for (const row of outstanding) {
-        await postVisitMovement(c, {
+        pending.push({
           itemId: row.itemId,
           type: 'in',
           quantity: String(row.outstanding),
@@ -1023,6 +1054,7 @@ export const createStockService = (deps: {
         });
       }
     }
+    await postVisitMovements(c, pending);
   }
 
   // ===== Stock batches (qabul + expiry/cost/supplier) — V2-2 =====
