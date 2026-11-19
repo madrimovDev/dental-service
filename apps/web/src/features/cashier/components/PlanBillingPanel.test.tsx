@@ -29,16 +29,52 @@ const planBalanceMock = {
   ],
 };
 
+// biome-ignore lint/suspicious/noExplicitAny: test-only mutable mock
+let plansMock: any[] = [{ id: 'plan1', title: 'Asosiy reja', status: 'in_progress' }];
+// biome-ignore lint/suspicious/noExplicitAny: test-only mutable mock
+let balanceMock: any = planBalanceMock;
+
 vi.mock('../cashier.api', () => ({
-  usePatientPlans: () => ({
-    data: [{ id: 'plan1', title: 'Asosiy reja', status: 'in_progress' }],
-  }),
-  usePlanBalance: () => ({ data: planBalanceMock }),
+  usePatientPlans: () => ({ data: plansMock }),
+  usePlanBalance: () => ({ data: balanceMock }),
   useCreateTransaction: () => ({ mutate: createMutate, isPending: false }),
 }));
 
 describe('PlanBillingPanel', () => {
-  beforeEach(() => createMutate.mockClear());
+  beforeEach(() => {
+    createMutate.mockClear();
+    plansMock = [{ id: 'plan1', title: 'Asosiy reja', status: 'in_progress' }];
+    balanceMock = planBalanceMock;
+  });
+
+  // FX-65: bekor qilingan rejada kredit qolsa — kassada eslatma (o'tkazish yoki refund).
+  it('bekor qilingan rejada kredit qolsa eslatma ko‘rsatadi', () => {
+    plansMock = [{ id: 'plan1', title: 'Asosiy reja', status: 'cancelled' }];
+    balanceMock = {
+      totalCost: 0,
+      totalPaid: 50000,
+      balance: -50000,
+      stages: [
+        {
+          stageId: 'st1',
+          serviceName: 'Plomba',
+          cost: 0,
+          paid: 50000,
+          remaining: -50000,
+          excludedFromDebt: true,
+        },
+      ],
+    };
+    renderApp(<PlanBillingPanel branchId="b1" patientId="pat1" />);
+    const alert = screen.getByTestId('cancelled-plan-credit');
+    expect(alert.textContent).toMatch(/50\D?000/);
+    expect(alert.textContent).toMatch(/bekor qilingan/i);
+  });
+
+  it('faol rejada eslatma ko‘rinmaydi', () => {
+    renderApp(<PlanBillingPanel branchId="b1" patientId="pat1" />);
+    expect(screen.queryByTestId('cancelled-plan-credit')).toBeNull();
+  });
 
   it("bemor yo'q → hint ko'rsatadi", () => {
     renderApp(<PlanBillingPanel branchId="b1" patientId={null} />);

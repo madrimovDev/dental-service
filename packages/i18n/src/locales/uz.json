@@ -285,7 +285,6 @@
     "theme_light": "Yorug'",
     "theme_dark": "Qorong'i",
     "coming_soon": "Tez orada",
-    "all_branches": "Barcha filiallar",
     "select_branch": "Filialni tanlash",
     "branch_switch_error": "Filialni almashtirib bo'lmadi",
     "lang_uz": "O'zbekcha",
@@ -753,7 +752,19 @@
     "no_medical_permission": "Sizda tibbiy kartani ko'rish ruxsati yo'q",
     "collect_payment": "To'lov qabul qilish",
     "import_button": "Excel'dan import",
-    "dup_desc_count": "Shu raqam bilan ro'yxatdan o'tgan bemorlar: {{count}} ta (ism faqat bemor ma'lumotlarini ko'ra oladiganlarga ko'rinadi)."
+    "dup_desc_count": "Shu raqam bilan ro'yxatdan o'tgan bemorlar: {{count}} ta (ism faqat bemor ma'lumotlarini ko'ra oladiganlarga ko'rinadi).",
+    "finance": {
+      "plan_debt": "Reja bo'yicha qarz",
+      "non_plan": "Rejasiz qoldiq",
+      "total": "Umumiy balans",
+      "total_credit": "Umumiy balans (avans)",
+      "plan": "Reja",
+      "status": {
+        "pending": "Kutilmoqda",
+        "completed": "Bajarilgan",
+        "voided": "Bekor qilingan"
+      }
+    }
   },
   "medical": {
     "history_title": "O'zgarishlar tarixi",
@@ -1401,7 +1412,9 @@
         "paid": "To'langan",
         "partial": "Qisman",
         "unpaid": "To'lanmagan"
-      }
+      },
+      "cancelled_credit": "Reja bekor qilingan, lekin {{amount}} kredit qolgan. Uni boshqa reja bosqichiga o'tkazing yoki bemorga qaytaring (refund).",
+      "cancelled_tag": "bekor qilingan"
     },
     "refund_modal": {
       "title": "To'lovni qaytarish",
@@ -2080,6 +2093,7 @@
     "levelInfo": "Ma‘lumot",
     "kpiDebt": "Bemorlar qarzi",
     "kpiDebtHint": "{{count}} bemor · {{over}} tasi 90 kundan oshgan",
+    "kpiDebtClinicWide": "Faqat butun klinika rahbarlari ko‘radi",
     "kpiNoShow": "Kelmaganlar",
     "kpiUtil": "Shifokorlar bandligi",
     "backupStaleTitle": "Zaxira nusxa {{days}} kundan beri olinmagan",
@@ -2359,7 +2373,12 @@
     "confirm_conflict": "Bu vaqt band bo'lib qoldi — so'rov kutishda qoldi",
     "pick_doctor": "Boshqa shifokorni tanlang",
     "confirm_other_doctor": "Shu shifokor bilan tasdiqlash",
-    "confirm_expired": "So'rov muddati o'tgan — bemorga xabar yuborildi"
+    "confirm_expired": "So'rov muddati o'tgan — bemorga xabar yuborildi",
+    "tab_pending": "Kutilmoqda",
+    "tab_expired": "Muddati o'tgan",
+    "empty_expired": "Muddati o'tgan so'rovlar yo'q",
+    "expired_badge": "Muddati o'tgan",
+    "nav_badge": "Telegram bron so'rovlari"
   },
   "desktopUpdate": {
     "title": "Yangi versiya tayyor",
@@ -2370,7 +2389,7 @@
   },
   "cashierHandoff": {
     "title": "Kutilayotgan vizitlar",
-    "hint": "Shifokor imzolagan, hali to'lanmagan bugungi vizitlar",
+    "hint": "Shifokor imzolagan, hali to'lanmagan vizitlar (oxirgi 30 kun)",
     "empty": "Imzolangan, to'lanmagan vizit yo'q",
     "take": "Kassaga olish",
     "doctor": "Dr. {{name}}",
@@ -2382,7 +2401,7 @@
     "overdue": "Kechikkan: {{date}} kuni imzolangan, hali to'lanmagan",
     "linked_to_plan_stage": "Bu vizit davolash rejasi bosqichiga bog'langan — «Reja bo'yicha to'lash» orqali to'lang",
     "reception_title": "{{n}} ta vizit kassada to'lov kutmoqda",
-    "reception_text": "Shifokor imzolagan, hali to'lanmagan bugungi vizitlar.",
+    "reception_text": "Shifokor imzolagan, hali to'lanmagan vizitlar (oxirgi 30 kun).",
     "reception_open": "Kassani ochish",
     "kpi": "Kassada kutmoqda"
   },

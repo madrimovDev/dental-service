@@ -2,6 +2,7 @@ import { Stack, Text, Title } from '@mantine/core';
 import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth-store.ts';
+import { TelegramRequests } from './widgets/TelegramRequests.tsx';
 
 const cardStyle: CSSProperties = {
   borderRadius: 'var(--radius-card)',
@@ -21,6 +22,9 @@ export function GenericDashboard() {
     <div style={{ width: '100%' }}>
       <Stack gap="lg">
         <Title order={2}>{t('dashboard.welcome', { name: user?.fullName ?? user?.phone })}</Title>
+
+        {/* FX-23: Telegram bron so'rovlari — faqat appointment.create + kutilayotgani bor bo'lsa. */}
+        <TelegramRequests compact />
 
         <div
           style={{

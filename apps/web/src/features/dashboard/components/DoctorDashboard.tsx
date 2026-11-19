@@ -14,6 +14,7 @@ import { buildPendingRows, DoctorPendingPanel } from './widgets/DoctorPendingPan
 import { LabPanel } from './widgets/LabPanel.tsx';
 import { NextPatientCard } from './widgets/NextPatientCard.tsx';
 import { ScheduleList } from './widgets/ScheduleList.tsx';
+import { TelegramRequests } from './widgets/TelegramRequests.tsx';
 
 const fmtDay = (iso: string) =>
   new Date(iso).toLocaleDateString('uz-UZ', { day: '2-digit', month: '2-digit' });
@@ -109,6 +110,9 @@ export function DoctorDashboard() {
           )}
         </Group>
       </Group>
+
+      {/* FX-23: Telegram bron so'rovlari — faqat appointment.create + kutilayotgani bor bo'lsa. */}
+      <TelegramRequests compact />
 
       {appointments.isLoading ? (
         <StateView status="loading" skeleton="cards" />

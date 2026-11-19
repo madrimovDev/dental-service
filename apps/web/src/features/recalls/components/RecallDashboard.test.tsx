@@ -90,6 +90,14 @@ describe('RecallDashboard', () => {
     expect(markContactedMutate).toHaveBeenCalledWith({ id: 'r1' });
   });
 
+  // FX-110 (LB-19): «Yozish» kalendarga emas, bemor oldindan tanlangan yozilish ekraniga olib boradi.
+  it("'Yozish' havolasi /appointments/new?patientId=… ga olib boradi", () => {
+    recalls = [makeRecall()];
+    renderApp(<RecallDashboard />);
+    const link = screen.getByRole('link', { name: 'Yozish' });
+    expect(link).toHaveAttribute('href', '/appointments/new?patientId=p1');
+  });
+
   it("'Bekor qilish' tugmasi status=dismissed bilan update chaqiradi", () => {
     recalls = [makeRecall()];
     renderApp(<RecallDashboard />);

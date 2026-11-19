@@ -15,12 +15,14 @@ import {
   useDoctorNames,
   useManagerKpi,
   useOwnerToday,
+  useTenantWideReports,
 } from '../dashboard.api.ts';
 import { OnboardingChecklist } from './OnboardingChecklist.tsx';
 import { OwnerAlertsPanel } from './OwnerAlertsPanel.tsx';
 import { BranchesToday, DoctorsToday } from './OwnerTodaySections.tsx';
 import { MiniList } from './widgets/MiniList.tsx';
 import { StatCard } from './widgets/StatCard.tsx';
+import { TelegramRequests } from './widgets/TelegramRequests.tsx';
 
 const fmtPct = (n: number) => `${Math.round(n * 100)}%`;
 
@@ -142,6 +144,7 @@ export function ManagerDashboard() {
   const { revenue, appointments } = useManagerKpi(period);
   const doctorNames = useDoctorNames();
   const debt = useDebtAging().data;
+  const tenantWide = useTenantWideReports();
   const today = useOwnerToday().data;
   const methodsHint = today
     ? [
@@ -186,6 +189,9 @@ export function ManagerDashboard() {
 
       <OnboardingChecklist />
 
+      {/* FX-23: Telegram bron so'rovlari — faqat appointment.create + kutilayotgani bor bo'lsa. */}
+      <TelegramRequests compact />
+
       {revenue.isLoading ? (
         <StateView status="loading" skeleton="cards" />
       ) : revenue.isError ? (
@@ -213,7 +219,15 @@ export function ManagerDashboard() {
                 hint={methodsHint}
               />
             </KpiLink>
-            {hasPermission('report.view') && (
+            {hasPermission('report.view') && tenantWide.restricted && (
+              // FX-73: filialga tayinlangan rahbar — butun-klinika qarzi yopiq; jim '—' emas, sabab aytiladi.
+              <StatCard
+                label={t('ownerHome.kpiDebt')}
+                value="—"
+                hint={t('ownerHome.kpiDebtClinicWide')}
+              />
+            )}
+            {hasPermission('report.view') && !tenantWide.restricted && (
               <KpiLink to="/reports">
                 <StatCard
                   label={t('ownerHome.kpiDebt')}

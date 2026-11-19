@@ -1,6 +1,7 @@
 import type { PaymentMethod } from '@dental/api-client';
 import { StatusPill } from '@dental/ui';
 import {
+  Alert,
   Button,
   Card,
   Checkbox,
@@ -60,6 +61,13 @@ export function PlanBillingPanel({ branchId, patientId }: PlanBillingPanelProps)
   }, [plans, planId]);
 
   const balanceVM = balanceQuery.data ? toPlanBalanceVM(balanceQuery.data) : null;
+  // FX-65: bekor qilingan rejada to'langan summa kredit bo'lib qoladi (umumiy balansda boshqa
+  // reja qarzini neytrallaydi), lekin uni qo'llash yo'li yo'q — kassirga eslatamiz.
+  const selectedPlan = plans.find((p) => p.id === planId);
+  const cancelledCredit =
+    selectedPlan?.status === 'cancelled' && balanceVM && balanceVM.balance < 0
+      ? Math.abs(balanceVM.balance)
+      : 0;
 
   const toggleStage = (stageId: string, remaining: number) => {
     setSelections((prev) => {
@@ -115,7 +123,13 @@ export function PlanBillingPanel({ branchId, patientId }: PlanBillingPanelProps)
         ) : (
           <Select
             label={t('cashier.plan_billing.select_plan')}
-            data={plans.map((p) => ({ value: p.id, label: p.title }))}
+            data={plans.map((p) => ({
+              value: p.id,
+              label:
+                p.status === 'cancelled'
+                  ? `${p.title} (${t('cashier.plan_billing.cancelled_tag')})`
+                  : p.title,
+            }))}
             value={planId}
             onChange={(v) => {
               setPlanId(v);
@@ -123,6 +137,14 @@ export function PlanBillingPanel({ branchId, patientId }: PlanBillingPanelProps)
             }}
             clearable
           />
+        )}
+
+        {cancelledCredit > 0 && (
+          <Alert color="orange" data-testid="cancelled-plan-credit">
+            {t('cashier.plan_billing.cancelled_credit', {
+              amount: formatCurrency(cancelledCredit, t),
+            })}
+          </Alert>
         )}
 
         {balanceVM && (

@@ -18,6 +18,7 @@ import {
   listUserAssignments,
 } from '@dental/api-client';
 import { useQuery } from '@tanstack/react-query';
+import { useReportBranches } from '@/features/reports/reports.api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { dashboardKeys } from './dashboard.keys';
 import { filterActiveLabOrders, toBranchNameMap, toDoctorNameMap } from './dashboard.mappers';
@@ -117,7 +118,27 @@ export function useDoctorNames() {
   });
 }
 
+/**
+ * FX-73: butun-klinika (tenant-wide) hisobotlar — qarz, davolash rejalari — filialga tayinlangan
+ * xodimga serverda 403 (`report.tenant_scope_required`). Filial doirasi `/reports/branches`dan
+ * (server `reportBranchScope` bilan bir xil manba): `allowAllBranches` aniq `true` bo'lmaguncha
+ * (yuklanmoqda / xato / filialga tayinlangan) tenant-wide so'rovlar yuborilmaydi (fail-closed).
+ */
+export function useTenantWideReports() {
+  const { hasPermission } = useAuthStore();
+  const scope = useReportBranches();
+  const canView = hasPermission('report.view');
+  return {
+    allowed: canView && scope.data?.allowAllBranches === true,
+    /** Doira hali aniqlanmagan — plitkada «yopiq» xabari miltillamasin. */
+    pending: canView && scope.isPending,
+    /** Aniq filial doirasi: tenant-wide hisobotlar yopiq. */
+    restricted: canView && scope.isSuccess && scope.data.allowAllBranches !== true,
+  };
+}
+
 export function useManagerKpi(range: KpiRange) {
+  const tenantWide = useTenantWideReports();
   const q = { from: range.from, to: range.to, branchId: range.branchId };
   const revenue = useQuery({
     queryKey: dashboardKeys.managerRevenue(q),
@@ -134,19 +155,20 @@ export function useManagerKpi(range: KpiRange) {
   const treatmentPlans = useQuery({
     queryKey: dashboardKeys.managerPlans(q),
     queryFn: () => getPlanCompletionReport(q).then((r) => r.data),
+    enabled: tenantWide.allowed,
   });
   return { revenue, appointments, doctors, treatmentPlans };
 }
 
 export type DebtAging = DebtAgingReport;
 
-/** Bemorlar qarzi muddat bo'yicha — faqat `report.view` bo'lsa so'raladi. */
+/** Bemorlar qarzi muddat bo'yicha — `report.view` + butun-klinika doirasi bo'lsagina so'raladi (FX-73). */
 export function useDebtAging() {
-  const { hasPermission } = useAuthStore();
+  const tenantWide = useTenantWideReports();
   return useQuery({
     queryKey: dashboardKeys.debtAging(),
     queryFn: () => getDebtAgingReport().then((r) => r.data),
-    enabled: hasPermission('report.view'),
+    enabled: tenantWide.allowed,
     retry: false,
   });
 }

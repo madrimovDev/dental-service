@@ -10,7 +10,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useWorkspaceBranches } from '@/features/auth';
-import { usePatients } from '@/features/patients';
+import { usePatientRaw, usePatients } from '@/features/patients';
 import { useAvailability } from '@/features/schedule/schedule.api';
 import { localDateParam, slotTimeLabel } from '@/features/schedule/schedule.mappers';
 import { formatCurrency, formatDayMonth } from '@/lib/format';
@@ -76,7 +76,14 @@ type SlotCell = { start: string; end: string; reason: UnavailableSlot['reason'] 
  * xulosa. Yo'q slot yonida sabab (SC-07), lab muddati ogohlantirishi, reja bosqichi
  * taklifi va Telegram eslatma matni oldindan ko'rinadi.
  */
-export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
+export function NewAppointmentWizard({
+  onClose,
+  initialPatientId,
+}: {
+  onClose: () => void;
+  /** FX-110: «Yozish» tugmalari uzatgan bemor (`?patientId=`) — oldindan tanlanadi. */
+  initialPatientId?: string;
+}) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { activeBranchId, hasPermission } = useAuthStore();
@@ -101,15 +108,21 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
     workspaceBranches?.allowAllBranches ? workspaceBranches.branches : (branchesData ?? [])
   ).map((b) => ({ value: b.id, label: b.name }));
 
+  // FX-110: oldindan tanlangan bemor qidiruv natijasida bo'lmasligi mumkin — detail alohida yuklanadi.
+  const { data: initialPatient } = usePatientRaw(initialPatientId ?? '');
+
   const patients: Option[] = (patientsData?.items ?? []).map((p) => ({
     value: p.id,
     label: p.fullName,
   }));
+  if (initialPatient && !patients.some((p) => p.value === initialPatient.id)) {
+    patients.unshift({ value: initialPatient.id, label: initialPatient.fullName });
+  }
 
   const form = useForm<WizardValues>({
     initialValues: {
       branchId: activeBranchId ?? '',
-      patientId: '',
+      patientId: initialPatientId ?? '',
       doctorId: '',
       serviceIds: [],
       date: new Date(),
@@ -220,7 +233,16 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
     form.setFieldValue('doctorId', plan.doctorId);
   };
 
-  const selectedPatient = patientsData?.items.find((p) => p.id === form.values.patientId) ?? null;
+  const selectedPatient =
+    patientsData?.items.find((p) => p.id === form.values.patientId) ??
+    (initialPatient && initialPatient.id === form.values.patientId
+      ? {
+          fullName: initialPatient.fullName,
+          phone: initialPatient.phone,
+          flagged: false,
+          noShowStrikes: 0,
+        }
+      : null);
   const selectedDoctor = doctorOptions.find((d) => d.value === form.values.doctorId)?.label ?? null;
   const branchName =
     branchOptions.find((b) => b.value === form.values.branchId)?.label ?? t('appointments.branch');

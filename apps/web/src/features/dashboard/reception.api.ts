@@ -80,14 +80,26 @@ export type BookingRequestRow = BookingRequest;
 export type BookingRequestList = GeneratedBookingRequestList;
 
 const BOOKING_KEY = ['reception', 'booking-requests'] as const;
+export type BookingRequestStatus = 'pending' | 'expired';
 
-/** `appointment.view` bilan GET; ruxsatsiz rolda so'rov yuborilmaydi (403 portlamasin). */
-export function useBookingRequests() {
+/** FX-23: yangi Telegram so'rovi ~20 s ichida ko'rinadi (fon tabida TanStack to'xtatadi). */
+export const BOOKING_REFETCH_MS = 20_000;
+
+/**
+ * `appointment.view` bilan GET; ruxsatsiz rolda so'rov yuborilmaydi (403 portlamasin).
+ * `pending` — davriy yangilanadi (widget + sidebar badge bitta query-key'ni ulashadi);
+ * `expired` — «Muddati o'tgan» tab, faqat ochilganda (`enabled`).
+ */
+export function useBookingRequests(
+  status: BookingRequestStatus = 'pending',
+  opts: { enabled?: boolean } = {},
+) {
   const { hasPermission } = useAuthStore();
   return useQuery({
-    queryKey: BOOKING_KEY,
-    queryFn: () => listBookingRequests({ status: 'pending' }).then((r) => r.data),
-    enabled: hasPermission('appointment.view'),
+    queryKey: [...BOOKING_KEY, status],
+    queryFn: () => listBookingRequests({ status }).then((r) => r.data),
+    enabled: hasPermission('appointment.view') && (opts.enabled ?? true),
+    refetchInterval: status === 'pending' ? BOOKING_REFETCH_MS : false,
   });
 }
 

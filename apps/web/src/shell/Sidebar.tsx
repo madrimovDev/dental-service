@@ -5,6 +5,7 @@ import { Building2, Check, ChevronDown, LogOut } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useBranchSwitch, useWorkspaceBranches } from '@/features/auth';
+import { BookingRequestNavBadge } from '@/features/dashboard/components/BookingRequestNavBadge.tsx';
 import { RecallNavBadge } from '@/features/recalls/components/RecallNavBadge.tsx';
 import { useVertical } from '@/features/settings/settings.api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
@@ -32,11 +33,12 @@ function SidebarWorkspaceSwitcher({ rail }: { rail: boolean }) {
 
   const clinicLetter = (user?.fullName ?? t('app.name')).charAt(0).toUpperCase();
   const data = branchesQuery.data;
-  const totalChoices = (data?.branches.length ?? 0) + (data?.allowAllBranches ? 1 : 0);
+  // FX-74: «Barcha filiallar» tanlovi yo'q — branchId'siz almashtirish eng eski filialga o'tkazadi.
+  const totalChoices = data?.branches.length ?? 0;
 
   const currentBranchName = activeBranchId
     ? (data?.branches.find((b) => b.id === activeBranchId)?.name ?? t('shell.select_branch'))
-    : t('shell.all_branches');
+    : t('shell.select_branch');
 
   const avatarEl = <span className={classes.wsAvatar}>{clinicLetter}</span>;
 
@@ -75,14 +77,6 @@ function SidebarWorkspaceSwitcher({ rail }: { rail: boolean }) {
 
   const branchMenuItems = (
     <>
-      {data.allowAllBranches && (
-        <Menu.Item
-          leftSection={!activeBranchId ? <Check size={16} /> : <span style={{ width: 16 }} />}
-          onClick={() => activeBranchId && switchMut.mutate({ tenantId })}
-        >
-          {t('shell.all_branches')}
-        </Menu.Item>
-      )}
       {data.branches.map((b) => (
         <Menu.Item
           key={b.id}
@@ -301,6 +295,7 @@ export function Sidebar() {
       >
         <Icon />
         <span className={classes.label}>{label}</span>
+        {item.key === 'home' && <BookingRequestNavBadge />}
         {item.key === 'recalls' && <RecallNavBadge />}
       </Link>
     );

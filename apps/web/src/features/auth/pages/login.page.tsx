@@ -121,9 +121,16 @@ export function LoginPage() {
             </Button>
 
             <Stack gap={4} align="center">
-              <Anchor component={Link} to="/reset-owner-password" size="sm">
-                {t('auth.login.reset_owner')}
-              </Anchor>
+              {/* FX-173: `/api/reset-owner-password` faqat desktop serverda mavjud
+                  (bulutda 404 — FX-08). Desktop oynasi (`window.dentalDesktop`) yoki
+                  desktop serverga LAN-brauzer (server signali `enabled === false`)
+                  bo'lsagina ko'rinadi; javob kelmasa yashirin (fail-closed). */}
+              {((typeof window !== 'undefined' && !!window.dentalDesktop) ||
+                registration.data?.enabled === false) && (
+                <Anchor component={Link} to="/reset-owner-password" size="sm">
+                  {t('auth.login.reset_owner')}
+                </Anchor>
+              )}
               {/* Fail-open (`!== false`): javob kelmasa yoki eski backend
                   endpointni bilmasa havola KO'RINADI — cloud foydalanuvchisidan
                   ro'yxatdan o'tish imkoniyati tortib olinmaydi. */}
