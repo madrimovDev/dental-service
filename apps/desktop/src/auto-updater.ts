@@ -25,6 +25,11 @@ export interface UpdateState {
   phase: 'ready' | 'installing';
   /** ISO — rejalashtirilgan o'rnatish vaqti (phase=ready). */
   installAt: string | null;
+  /**
+   * FX-148 — o'rnatma roli. Server PC'da «Hozir o'rnatish» barcha klientlarni
+   * uzadi, shuning uchun web banner server rolida tasdiq so'raydi.
+   */
+  role: 'server' | 'client' | null;
 }
 
 /**
@@ -73,6 +78,8 @@ export interface AutoUpdaterDeps {
   getWorkClose?: () => string | null | undefined;
   scheduleTimeout?: (fn: () => void, ms: number) => void;
   onState?: (state: UpdateState) => void;
+  /** FX-148 — joriy o'rnatma roli (config.role); holatga qo'shib emit qilinadi. */
+  getRole?: () => 'server' | 'client' | null | undefined;
 }
 
 export const setupAutoUpdater = (deps: AutoUpdaterDeps): AutoUpdaterControls | undefined => {
@@ -91,7 +98,9 @@ export const setupAutoUpdater = (deps: AutoUpdaterDeps): AutoUpdaterControls | u
       setTimeout(fn, ms);
     },
     onState,
+    getRole = () => null,
   } = deps;
+  const role = (): UpdateState['role'] => getRole() ?? null;
 
   if (!isPackaged) return undefined; // dev rejimida o'chirilgan
 
@@ -102,7 +111,7 @@ export const setupAutoUpdater = (deps: AutoUpdaterDeps): AutoUpdaterControls | u
   const installNow = (): void => {
     if (installing) return;
     installing = true;
-    onState?.({ phase: 'installing', installAt: null });
+    onState?.({ phase: 'installing', installAt: null, role: role() });
     updater.quitAndInstall?.();
   };
 
@@ -112,7 +121,7 @@ export const setupAutoUpdater = (deps: AutoUpdaterDeps): AutoUpdaterControls | u
       installNow();
       return;
     }
-    onState?.({ phase: 'ready', installAt: plan.at.toISOString() });
+    onState?.({ phase: 'ready', installAt: plan.at.toISOString(), role: role() });
     scheduleTimeout(installNow, Math.max(0, plan.at.getTime() - now().getTime()));
   };
 

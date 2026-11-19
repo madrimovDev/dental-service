@@ -4,7 +4,11 @@ import { i18n } from '@/lib/i18n.ts';
 import { renderApp } from '../test-utils';
 import { DesktopUpdateBanner } from './DesktopUpdateBanner';
 
-type Cb = (s: { phase: 'ready' | 'installing'; installAt: string | null }) => void;
+type Cb = (s: {
+  phase: 'ready' | 'installing';
+  installAt: string | null;
+  role?: 'server' | 'client' | null;
+}) => void;
 
 const bridge = () => {
   let cb: Cb | null = null;
@@ -55,5 +59,38 @@ describe('DesktopUpdateBanner (UI-T3)', () => {
     b.emit({ phase: 'installing', installAt: null });
     expect(screen.getByText(i18n.t('desktopUpdate.installing'))).toBeInTheDocument();
     expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it("FX-148: server rolida «Hozir o'rnatish» avval tasdiq so'raydi, bekor qilinsa o'rnatilmaydi", () => {
+    const b = bridge();
+    renderApp(<DesktopUpdateBanner />);
+    b.emit({
+      phase: 'ready',
+      installAt: new Date(2026, 10, 11, 19, 0).toISOString(),
+      role: 'server',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('desktopUpdate.now') }));
+    expect(b.installUpdateNow).not.toHaveBeenCalled();
+    expect(screen.getByText(i18n.t('desktopUpdate.serverConfirmBody'))).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: i18n.t('desktopUpdate.serverConfirmCancel') }),
+    );
+    expect(b.installUpdateNow).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('desktopUpdate.now') }));
+    fireEvent.click(
+      screen.getByRole('button', { name: i18n.t('desktopUpdate.serverConfirmProceed') }),
+    );
+    expect(b.installUpdateNow).toHaveBeenCalledTimes(1);
+  });
+
+  it("FX-148: klient rolida tasdiqsiz darhol o'rnatiladi", () => {
+    const b = bridge();
+    renderApp(<DesktopUpdateBanner />);
+    b.emit({ phase: 'ready', installAt: null, role: 'client' });
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('desktopUpdate.now') }));
+    expect(b.installUpdateNow).toHaveBeenCalledTimes(1);
   });
 });

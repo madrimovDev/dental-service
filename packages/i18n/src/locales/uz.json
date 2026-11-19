@@ -2341,7 +2341,11 @@
     "at": "Klinika yopilgandan keyin, bugun {{time}} da o'rnatiladi.",
     "now": "Hozir o'rnatish",
     "tonight": "Kechqurun",
-    "installing": "Yangilanmoqda — kompyuterni o'chirmang"
+    "installing": "Yangilanmoqda — kompyuterni o'chirmang",
+    "serverConfirmTitle": "Server kompyuterini hozir yangilaysizmi?",
+    "serverConfirmBody": "Bu klinika serveri. Yangilanish vaqtida barcha klient kompyuterlar uziladi va saqlanmagan ishlar yo'qolishi mumkin. Odatda yangilanishni klinika yopilgandan keyin qoldirish xavfsiz.",
+    "serverConfirmCancel": "Kechqurun o'rnatish",
+    "serverConfirmProceed": "Baribir hozir o'rnatish"
   },
   "cashierHandoff": {
     "title": "Kutilayotgan vizitlar",

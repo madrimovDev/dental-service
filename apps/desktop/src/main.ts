@@ -662,6 +662,7 @@ app.whenReady().then(async () => {
     notify: (title, body) => new Notification({ title, body }).show(),
     setTrayToolTip,
     getWorkClose: () => (readConfig() as { workCloseTime?: string }).workCloseTime ?? null,
+    getRole: () => readConfig().role ?? null,
     onState: (state) => {
       lastUpdateState = state;
       mainWindow?.webContents.send('dental:update-state', state);
