@@ -402,35 +402,45 @@ export const createQueueService = (deps: {
     const todayStart = tashkentDayStart();
     const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
 
-    return db
-      .select({
-        id: appointments.id,
-        tenantId: appointments.tenantId,
-        branchId: appointments.branchId,
-        patientId: appointments.patientId,
-        doctorId: appointments.doctorId,
-        assistantId: appointments.assistantId,
-        startTime: appointments.startTime,
-        endTime: appointments.endTime,
-        status: appointments.status,
-        serviceIds: appointments.serviceIds,
-        notes: appointments.notes,
-        cancellationReason: appointments.cancellationReason,
-        createdAt: appointments.createdAt,
-        updatedAt: appointments.updatedAt,
-      })
-      .from(appointments)
-      .leftJoin(queueTickets, eq(queueTickets.appointmentId, appointments.id))
-      .where(
-        and(
-          eq(appointments.branchId, branchId),
-          gte(appointments.startTime, todayStart),
-          lt(appointments.startTime, todayEnd),
-          isNull(queueTickets.id),
-          sql`${appointments.status} in ('scheduled','confirmed')`,
-        ),
-      )
-      .orderBy(asc(appointments.startTime));
+    return (
+      db
+        .select({
+          id: appointments.id,
+          tenantId: appointments.tenantId,
+          branchId: appointments.branchId,
+          patientId: appointments.patientId,
+          doctorId: appointments.doctorId,
+          assistantId: appointments.assistantId,
+          startTime: appointments.startTime,
+          endTime: appointments.endTime,
+          status: appointments.status,
+          serviceIds: appointments.serviceIds,
+          notes: appointments.notes,
+          cancellationReason: appointments.cancellationReason,
+          createdAt: appointments.createdAt,
+          updatedAt: appointments.updatedAt,
+        })
+        .from(appointments)
+        // FX-124: faqat OCHIQ (waiting/in_progress) ticket yozilishni nomzoddan chiqaradi —
+        // terminal (missed/done) ticket'li, lekin hali scheduled/confirmed yozilish qayta check-in qilinadi.
+        .leftJoin(
+          queueTickets,
+          and(
+            eq(queueTickets.appointmentId, appointments.id),
+            sql`${queueTickets.status} in ('waiting','in_progress')`,
+          ),
+        )
+        .where(
+          and(
+            eq(appointments.branchId, branchId),
+            gte(appointments.startTime, todayStart),
+            lt(appointments.startTime, todayEnd),
+            isNull(queueTickets.id),
+            sql`${appointments.status} in ('scheduled','confirmed')`,
+          ),
+        )
+        .orderBy(asc(appointments.startTime))
+    );
   }
 
   /**
