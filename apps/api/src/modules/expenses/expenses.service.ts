@@ -1,8 +1,11 @@
 import { expenseCategories, expenses } from '@dental/db-schema';
-import { and, between, count, desc, eq, gte, lte, sql } from 'drizzle-orm';
+import { and, between, count, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { type BranchScope, scopeAllows } from '../../lib/branch-scope.ts';
+import { CrossEntityError } from '../../lib/ownership.ts';
+import { assertBranchExists } from '../../lib/ownership-refs.ts';
 import type {
   CreateCategoryInput,
   CreateExpenseInput,
@@ -21,7 +24,41 @@ import type {
  * to'g'ridan-to'g'ri `between`/`gte`/`lte` ga uzatamiz — bu klinika kalendar kunini
  * avtomatik beradi.
  */
+/** FX-106 (D-8): xarajat chaqiruvchining filial doirasidan tashqarida. Route 403 `branch.forbidden`ga aylantiradi. */
+export class ExpenseBranchForbiddenError extends Error {
+  constructor() {
+    super('expense.branch_forbidden');
+    this.name = 'ExpenseBranchForbiddenError';
+  }
+}
+
+/** Yozuv filiali doirada bo'lishi shart; tenant-darajali (`null`) yozuv faqat `all` doiraga ochiq. */
+const rowInScope = (scope: BranchScope | undefined, branchId: string | null): boolean => {
+  if (!scope || scope.kind === 'all') return true;
+  return branchId !== null && scopeAllows(scope, branchId);
+};
+
 export const createExpensesService = (deps: { audit: AuditLogger }) => {
+  /**
+   * FX-153 (LC-31): categoryId/branchId shu tenantga tegishli bo'lishi shart. FK RLS'ni
+   * chetlab o'tadi (begona UUID jimgina bog'lanardi yoki 23503 → 500) — RLS-bound SELECT
+   * bilan insert/update'dan OLDIN tekshiriladi. Topilmasa `CrossEntityError` (route → 400).
+   */
+  async function assertRefsOwned(
+    c: Context,
+    refs: { categoryId?: string | null; branchId?: string | null },
+  ) {
+    if (refs.branchId) await assertBranchExists(c, refs.branchId);
+    if (refs.categoryId) {
+      const [row] = await getDb(c)
+        .select({ id: expenseCategories.id })
+        .from(expenseCategories)
+        .where(eq(expenseCategories.id, refs.categoryId))
+        .limit(1);
+      if (!row) throw new CrossEntityError('expense_category', 'not_found');
+    }
+  }
+
   // ===== Kategoriya =====
 
   async function listCategories(c: Context) {
@@ -109,13 +146,18 @@ export const createExpensesService = (deps: { audit: AuditLogger }) => {
 
   // ===== Xarajat =====
 
-  async function list(c: Context, query: ListExpensesQuery) {
+  /**
+   * `branchIds` — chaqiruvchining majburiy filial doirasi (FX-106/D-8): `null` = cheklovsiz
+   * (owner / tenant-wide), massiv = faqat shu filiallar (tenant-darajali xarajat kirmaydi).
+   */
+  async function list(c: Context, query: ListExpensesQuery, branchIds: string[] | null = null) {
     const db = getDb(c);
     const offset = (query.page - 1) * query.pageSize;
 
     const filters = [];
     if (query.categoryId) filters.push(eq(expenses.categoryId, query.categoryId));
     if (query.branchId) filters.push(eq(expenses.branchId, query.branchId));
+    else if (branchIds) filters.push(inArray(expenses.branchId, branchIds));
     // `date` — kalendar kun; ISO date string'ni to'g'ridan uzatamiz (instant arifmetikasi yo'q).
     if (query.from && query.to) filters.push(between(expenses.date, query.from, query.to));
     else if (query.from) filters.push(gte(expenses.date, query.from));
@@ -150,9 +192,10 @@ export const createExpensesService = (deps: { audit: AuditLogger }) => {
     return { data: rows, meta: { page: query.page, pageSize: query.pageSize, total } };
   }
 
-  async function getById(c: Context, id: string) {
+  async function getById(c: Context, id: string, scope?: BranchScope) {
     const db = getDb(c);
     const [row] = await db.select().from(expenses).where(eq(expenses.id, id));
+    if (row && !rowInScope(scope, row.branchId)) throw new ExpenseBranchForbiddenError();
     if (row) {
       await deps.audit.record(c, {
         action: 'viewed',
@@ -163,7 +206,9 @@ export const createExpensesService = (deps: { audit: AuditLogger }) => {
     return row ?? null;
   }
 
-  async function create(c: Context, input: CreateExpenseInput) {
+  async function create(c: Context, input: CreateExpenseInput, scope?: BranchScope) {
+    if (!rowInScope(scope, input.branchId ?? null)) throw new ExpenseBranchForbiddenError();
+    await assertRefsOwned(c, input);
     const db = getDb(c);
     const tenantId = c.get('activeTenantId');
     const user = c.get('user');
@@ -198,10 +243,16 @@ export const createExpensesService = (deps: { audit: AuditLogger }) => {
     });
   }
 
-  async function update(c: Context, id: string, input: UpdateExpenseInput) {
+  async function update(c: Context, id: string, input: UpdateExpenseInput, scope?: BranchScope) {
     const db = getDb(c);
     const [before] = await db.select().from(expenses).where(eq(expenses.id, id));
     if (!before) return null;
+    // FX-114 (D-8): eski filial ham, yangi filial ham doirada bo'lsin (ko'chirish/ajratib yuborish ham).
+    if (!rowInScope(scope, before.branchId)) throw new ExpenseBranchForbiddenError();
+    if (input.branchId !== undefined && !rowInScope(scope, input.branchId)) {
+      throw new ExpenseBranchForbiddenError();
+    }
+    await assertRefsOwned(c, input);
 
     const patch = {
       ...(input.categoryId !== undefined ? { categoryId: input.categoryId } : {}),
@@ -228,10 +279,11 @@ export const createExpensesService = (deps: { audit: AuditLogger }) => {
     return updated;
   }
 
-  async function remove(c: Context, id: string) {
+  async function remove(c: Context, id: string, scope?: BranchScope) {
     const db = getDb(c);
     const [before] = await db.select().from(expenses).where(eq(expenses.id, id));
     if (!before) return null;
+    if (!rowInScope(scope, before.branchId)) throw new ExpenseBranchForbiddenError();
 
     await db.delete(expenses).where(eq(expenses.id, id));
 
@@ -250,11 +302,12 @@ export const createExpensesService = (deps: { audit: AuditLogger }) => {
    * `categoryId` nullable (FK `onDelete: set null`) — kategoriyasiz xarajatlar `null` guruhga tushadi.
    * `total` — `SUM(amount)` string sifatida qaytadi (numeric).
    */
-  async function summary(c: Context, query: SummaryQuery) {
+  async function summary(c: Context, query: SummaryQuery, branchIds: string[] | null = null) {
     const db = getDb(c);
 
     const filters = [];
     if (query.branchId) filters.push(eq(expenses.branchId, query.branchId));
+    else if (branchIds) filters.push(inArray(expenses.branchId, branchIds));
     if (query.from && query.to) filters.push(between(expenses.date, query.from, query.to));
     else if (query.from) filters.push(gte(expenses.date, query.from));
     else if (query.to) filters.push(lte(expenses.date, query.to));

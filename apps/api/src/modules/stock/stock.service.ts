@@ -170,6 +170,8 @@ export const createStockService = (deps: {
     const db = getDb(c);
     const tenantId = c.get('activeTenantId');
     if (!tenantId) throw new Error('No tenant context');
+    // FX-137 (LC-15): FK RLS'ni chetlab o'tadi — begona branchId insertdan OLDIN rad.
+    if (input.branchId) await ownership.assertBranchExists(c, input.branchId);
 
     const [item] = await db
       .insert(stockItems)
@@ -213,6 +215,8 @@ export const createStockService = (deps: {
     const db = getDb(c);
     const [before] = await db.select().from(stockItems).where(eq(stockItems.id, id));
     if (!before) return null;
+    // FX-137 (LC-15): begona branchId'ga ko'chirishni rad (null = tenant-darajali, ruxsat).
+    if (input.branchId) await ownership.assertBranchExists(c, input.branchId);
 
     const patch: Record<string, unknown> = { updatedAt: new Date() };
     if (input.branchId !== undefined) patch.branchId = input.branchId;

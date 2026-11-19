@@ -3,6 +3,7 @@ import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
+import { CrossEntityError } from '../../lib/ownership.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
@@ -215,15 +216,26 @@ export const serviceRoutes = (deps: { db: Database; audit: AuditLogger }) => {
         content: { 'application/json': { schema: errorResponseSchema } },
         description: 'Forbidden',
       },
+      404: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Service or branch not found in this clinic',
+      },
     },
   });
 
   app.openapi(setPriceRoute, async (c) => {
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const row = await service.setPrice(c, id, body);
-    if (!row) throw new Error('Service price insert failed');
-    return c.json(ok(toServicePriceDto(row)), 201);
+    try {
+      const row = await service.setPrice(c, id, body);
+      if (!row) throw new Error('Service price insert failed');
+      return c.json(ok(toServicePriceDto(row)), 201);
+    } catch (e) {
+      if (e instanceof CrossEntityError) {
+        return c.json(fail(`ownership.${e.entity}.${e.reason}`, 'not_found'), 404);
+      }
+      throw e;
+    }
   });
 
   return app;

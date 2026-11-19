@@ -133,8 +133,9 @@ export const ROLE_TEMPLATES = [
       'expense.manage',
       'stock.view',
       'stock.manage',
-      'payroll.view',
-      'payroll.manage',
+      // FX-116 (LB-25): payroll.* BM'da YO'Q — payroll klinika bo'yicha (tenant-wide) ish haqi
+      // run'i; filialga tayinlangan mudir boshqa filiallar maoshini ko'rmasligi va umumiy run'ni
+      // yaratish/yakunlash/o'chirishi mumkin emas. Owner/Tenant Admin/Accountant boshqaradi.
       'schedule.view',
       'schedule.manage',
       'recall.view',

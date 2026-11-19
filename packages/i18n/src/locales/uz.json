@@ -1422,7 +1422,8 @@
       "state": {
         "paid": "To'langan",
         "partial": "Qisman",
-        "unpaid": "To'lanmagan"
+        "unpaid": "To'lanmagan",
+        "excluded": "Qabul qilinmagan"
       },
       "cancelled_credit": "Reja bekor qilingan, lekin {{amount}} kredit qolgan. Uni boshqa reja bosqichiga o'tkazing yoki bemorga qaytaring (refund).",
       "cancelled_tag": "bekor qilingan"
@@ -1436,7 +1437,8 @@
       "detail_amount": "Summa",
       "detail_method": "To'lov usuli",
       "partial_amount": "Qisman summa (ixtiyoriy)",
-      "partial_hint": "Bo'sh = to'liq qaytarish. Qisman faqat reja to'lovlari uchun."
+      "partial_hint": "Bo'sh = to'liq qaytarish. Qisman faqat reja to'lovlari uchun.",
+      "detail_refundable": "Qaytariladigan summa"
     },
     "status_label": {
       "completed": "Yakunlangan",
@@ -1444,7 +1446,13 @@
       "pending": "Kutilmoqda"
     },
     "switch_mode_confirm": "Savatda saqlanmagan satrlar bor. Rejimni almashtirsangiz ular yo'qoladi. Davom etasizmi?",
-    "transactions_empty_description": "Hali birorta tranzaksiya qayd etilmagan."
+    "transactions_empty_description": "Hali birorta tranzaksiya qayd etilmagan.",
+    "paid_of_total": "to'langan: {{paid}}",
+    "refund_done": "Qaytarildi: {{amount}}",
+    "refund_error": {
+      "over_refund": "Qaytariladigan summa qoldig'idan ko'p. Sahifani yangilab, qoldiqni tekshiring.",
+      "non_plan_partial": "Qisman qaytarish faqat reja to'lovlari uchun."
+    }
   },
   "reports": {
     "title": "Hisobotlar",
@@ -2248,7 +2256,7 @@
       "newPatients": "Yangi — davrda birinchi marta kelgan; qaytgan — avval ham kelgan va davrda qayta kelgan bemorlar.",
       "recall": "Qayta chaqiruvdan keyin qabulga yozilgan yoki yakunlanganlar ulushi.",
       "plans": "Davrda yaratilgan qabul qilingan rejalarning bosqichlari: bajarilgan / jami.",
-      "pnl": "Sof foyda = sof tushum (qaytarishlar ayirilgan) − xarajatlar − yakunlangan ish haqi. Filial tanlansa ish haqi hisobga olinmaydi (ish haqi filialga bog'lanmagan)."
+      "pnl": "Sof foyda = sof tushum (qaytarishlar ayirilgan) − xarajatlar − ish haqi (yakunlangan va qoralama). Filial tanlansa ish haqi hisobga olinmaydi (ish haqi filialga bog'lanmagan)."
     }
   },
   "settingsShell": {

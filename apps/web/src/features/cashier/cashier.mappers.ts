@@ -152,6 +152,8 @@ export type AllocationPayload = {
   discount: 0;
   paidAmount: number;
   paymentMethod: PaymentMethod;
+  /** Faqat `card` uchun (FX-150). */
+  cardProvider?: CardProvider;
 };
 
 /** Plan billing allocation body (sof). `paidAmount = Σ amounts`. */
@@ -161,6 +163,7 @@ export function buildAllocationPayload(input: {
   treatmentPlanId: string;
   selections: StageSelection[];
   paymentMethod: PaymentMethod;
+  cardProvider?: CardProvider | null;
 }): AllocationPayload {
   const paidAmount = input.selections.reduce((sum, s) => sum + s.amount, 0);
   return {
@@ -172,18 +175,27 @@ export function buildAllocationPayload(input: {
     discount: 0,
     paidAmount,
     paymentMethod: input.paymentMethod,
+    cardProvider: input.paymentMethod === 'card' ? (input.cardProvider ?? undefined) : undefined,
   };
 }
 
 /** Tranzaksiya → VM (string pul → number). */
 export function toTransactionVM(tx: CashierTransaction): TransactionVM {
   // `cardProvider` generated tipda regeneratsiyagacha yo'q — kengaytirilgan o'qish.
-  const ext = tx as CashierTransaction & { cardProvider?: CardProvider | null };
+  const ext = tx as CashierTransaction & {
+    cardProvider?: CardProvider | null;
+    refundedAmount?: string;
+  };
+  const paidAmount = Number(tx.paidAmount);
+  const refundedAmount = Number(ext.refundedAmount ?? 0);
+  const refundableAmount = Math.max(0, paidAmount - refundedAmount);
   return {
     id: tx.id,
     receiptNumber: tx.receiptNumber,
     totalAmount: Number(tx.totalAmount),
-    paidAmount: Number(tx.paidAmount),
+    paidAmount,
+    refundedAmount,
+    refundableAmount,
     discount: Number(tx.discount),
     paymentMethod: tx.paymentMethod,
     cardProvider: ext.cardProvider ?? null,
@@ -191,7 +203,7 @@ export function toTransactionVM(tx: CashierTransaction): TransactionVM {
     status: tx.status,
     createdAt: tx.createdAt,
     fiscalSent: tx.fiscalReceiptId != null,
-    refundable: tx.status === 'completed' && tx.type === 'payment',
+    refundable: tx.status === 'completed' && tx.type === 'payment' && refundableAmount > 0,
     planLinked: tx.treatmentPlanId != null,
   };
 }
@@ -215,7 +227,8 @@ export function toPlanBalanceVM(b: PlanBalance): PlanBalanceVM {
         cost: s.cost,
         paid: s.paid,
         remaining: s.remaining,
-        state: stageStateOf(s.remaining, s.paid),
+        // FX-151: qarzdan chiqarilgan bosqichda cost=0 → remaining=0 → «paid» bo'lib qolardi.
+        state: s.excludedFromDebt ? 'excluded' : stageStateOf(s.remaining, s.paid),
       }),
     ),
   };

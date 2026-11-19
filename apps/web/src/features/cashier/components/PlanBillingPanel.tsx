@@ -1,4 +1,4 @@
-import type { PaymentMethod } from '@dental/api-client';
+import type { CashierTransaction, PaymentMethod } from '@dental/api-client';
 import { StatusPill } from '@dental/ui';
 import {
   Alert,
@@ -12,19 +12,22 @@ import {
   Table,
   Text,
   Title,
+  UnstyledButton,
 } from '@mantine/core';
 import { IconCash } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatCurrency } from '@/lib/format';
 import { useCreateTransaction, usePatientPlans, usePlanBalance } from '../cashier.api';
-import { buildAllocationPayload, toPlanBalanceVM } from '../cashier.mappers';
-import type { StageState } from '../cashier.types';
+import { buildAllocationPayload, toPlanBalanceVM, toTransactionVM } from '../cashier.mappers';
+import { CARD_PROVIDERS, type CardProvider, type StageState } from '../cashier.types';
+import { ReceiptModal } from './ReceiptModal';
 
-const STATE_TONE: Record<StageState, 'success' | 'warning' | 'danger'> = {
+const STATE_TONE: Record<StageState, 'success' | 'warning' | 'danger' | 'planned'> = {
   paid: 'success',
   partial: 'warning',
   unpaid: 'danger',
+  excluded: 'planned',
 };
 
 export interface PlanBillingPanelProps {
@@ -39,7 +42,9 @@ export function PlanBillingPanel({ branchId, patientId }: PlanBillingPanelProps)
   const plansQuery = usePatientPlans(patientId);
   const [planId, setPlanId] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
+  const [cardProvider, setCardProvider] = useState<CardProvider>('terminal');
   const [selections, setSelections] = useState<Record<string, Selection>>({});
+  const [receiptTx, setReceiptTx] = useState<CashierTransaction | null>(null);
 
   const balanceQuery = usePlanBalance(planId);
   const createMut = useCreateTransaction();
@@ -97,9 +102,15 @@ export function PlanBillingPanel({ branchId, patientId }: PlanBillingPanelProps)
       treatmentPlanId: planId,
       selections: activeSelections,
       paymentMethod,
+      cardProvider: paymentMethod === 'card' ? cardProvider : null,
     });
     createMut.mutate(payload, {
-      onSuccess: () => setSelections({}),
+      onSuccess: (data: CashierTransaction) => {
+        setSelections({});
+        setCardProvider('terminal');
+        // FX-150: reja to'lovida ham chek ochiladi (erkin POS bilan bir xil).
+        if (data) setReceiptTx(data);
+      },
     });
   };
 
@@ -163,7 +174,7 @@ export function PlanBillingPanel({ branchId, patientId }: PlanBillingPanelProps)
               <Table.Tbody>
                 {balanceVM.stages.map((s) => {
                   const sel = selections[s.stageId];
-                  const disabled = s.state === 'paid';
+                  const disabled = s.state === 'paid' || s.state === 'excluded';
                   return (
                     <Table.Tr key={s.stageId}>
                       <Table.Td>
@@ -224,6 +235,36 @@ export function PlanBillingPanel({ branchId, patientId }: PlanBillingPanelProps)
               />
             </Group>
 
+            {/* Karta sub-turi (FX-150) — erkin POS bilan bir xil, integratsiyasiz yorliq. */}
+            {paymentMethod === 'card' && (
+              <Group gap={8} role="radiogroup" aria-label={t('cashierPos.card_provider')}>
+                {CARD_PROVIDERS.map((p) => {
+                  const active = cardProvider === p;
+                  return (
+                    <UnstyledButton
+                      key={p}
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => setCardProvider(p)}
+                      style={{
+                        height: 30,
+                        padding: '0 12px',
+                        borderRadius: 99,
+                        fontSize: 12.5,
+                        fontWeight: 600,
+                        fontFamily: 'var(--font-sans)',
+                        border: active ? '1px solid var(--primary)' : '1px solid var(--border)',
+                        background: active ? 'var(--primary)' : 'var(--surface)',
+                        color: active ? 'var(--on-primary)' : 'var(--ink-2)',
+                      }}
+                    >
+                      {t(`cashierPos.provider.${p}`)}
+                    </UnstyledButton>
+                  );
+                })}
+              </Group>
+            )}
+
             <Button
               leftSection={<IconCash size={18} />}
               color="teal"
@@ -236,6 +277,14 @@ export function PlanBillingPanel({ branchId, patientId }: PlanBillingPanelProps)
           </>
         )}
       </Stack>
+
+      {receiptTx && (
+        <ReceiptModal
+          opened
+          onClose={() => setReceiptTx(null)}
+          transaction={toTransactionVM(receiptTx)}
+        />
+      )}
     </Card>
   );
 }

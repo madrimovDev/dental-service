@@ -2,7 +2,13 @@ import { fail, ok } from '@dental/core';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import {
+  BRANCH_FORBIDDEN_CODE,
+  BRANCH_FORBIDDEN_MESSAGE,
+  loadBranchScope,
+} from '../../lib/branch-scope.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
+import { CrossEntityError } from '../../lib/ownership.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
@@ -21,7 +27,7 @@ import {
   updateCategorySchema,
   updateExpenseSchema,
 } from './expenses.schema.ts';
-import { createExpensesService } from './expenses.service.ts';
+import { createExpensesService, ExpenseBranchForbiddenError } from './expenses.service.ts';
 
 /** Standart 404 (kategoriya). */
 const categoryNotFoundResponse = {
@@ -38,6 +44,12 @@ const expenseNotFoundResponse = {
     description: 'Expense not found',
   },
 };
+
+/** FX-153: begona/yo'q categoryId/branchId → 400 (yozishdan oldin tekshirilgan, hech narsa yozilmagan). */
+const ownershipInvalid = (e: CrossEntityError) =>
+  fail(`ownership.${e.entity}.${e.reason}`, 'not_found');
+
+const branchForbidden = () => fail(BRANCH_FORBIDDEN_CODE, BRANCH_FORBIDDEN_MESSAGE);
 
 /**
  * Xarajatlar route'lari — bitta OpenAPIHono app, `/api` ga mount qilinadi.
@@ -169,7 +181,17 @@ export const expensesRoutes = (deps: { db: Database; audit: AuditLogger }) => {
 
   app.openapi(summaryRoute, async (c) => {
     const query = c.req.valid('query');
-    const result = await service.summary(c, query);
+    // FX-106 (D-8): svod chaqiruvchining filiallari bilan cheklanadi.
+    const scope = await loadBranchScope(c, 'expense.view');
+    if (scope.kind === 'none') return c.json(branchForbidden(), 403);
+    let branchIds: string[] | null = null;
+    if (scope.kind === 'branches') {
+      if (query.branchId && !scope.branchIds.includes(query.branchId)) {
+        return c.json(branchForbidden(), 403);
+      }
+      branchIds = scope.branchIds;
+    }
+    const result = await service.summary(c, query, branchIds);
     return c.json(ok(result), 200);
   });
 
@@ -186,7 +208,17 @@ export const expensesRoutes = (deps: { db: Database; audit: AuditLogger }) => {
 
   app.openapi(listRoute, async (c) => {
     const query = c.req.valid('query');
-    const result = await service.list(c, query);
+    // FX-106 (D-8): ro'yxat chaqiruvchining filiallari bilan cheklanadi.
+    const scope = await loadBranchScope(c, 'expense.view');
+    if (scope.kind === 'none') return c.json(branchForbidden(), 403);
+    let branchIds: string[] | null = null;
+    if (scope.kind === 'branches') {
+      if (query.branchId && !scope.branchIds.includes(query.branchId)) {
+        return c.json(branchForbidden(), 403);
+      }
+      branchIds = scope.branchIds;
+    }
+    const result = await service.list(c, query, branchIds);
     return c.json(ok({ data: result.data.map(toExpenseDto), meta: result.meta }), 200);
   });
 
@@ -222,8 +254,15 @@ export const expensesRoutes = (deps: { db: Database; audit: AuditLogger }) => {
 
   app.openapi(createExpenseRoute, async (c) => {
     const body = c.req.valid('json');
-    const row = await service.create(c, body);
-    return c.json(ok(toExpenseDto(row)), 201);
+    const scope = await loadBranchScope(c, 'expense.manage');
+    try {
+      const row = await service.create(c, body, scope);
+      return c.json(ok(toExpenseDto(row)), 201);
+    } catch (e) {
+      if (e instanceof ExpenseBranchForbiddenError) return c.json(branchForbidden(), 403);
+      if (e instanceof CrossEntityError) return c.json(ownershipInvalid(e), 400);
+      throw e;
+    }
   });
 
   // ─── GET /expenses/{id} — get by id ──────────────────────────────────────
@@ -239,9 +278,15 @@ export const expensesRoutes = (deps: { db: Database; audit: AuditLogger }) => {
 
   app.openapi(getRoute, async (c) => {
     const { id } = c.req.valid('param');
-    const row = await service.getById(c, id);
-    if (!row) return c.json(fail('expense.not_found', 'Expense not found'), 404);
-    return c.json(ok(toExpenseDto(row)), 200);
+    const scope = await loadBranchScope(c, 'expense.view');
+    try {
+      const row = await service.getById(c, id, scope);
+      if (!row) return c.json(fail('expense.not_found', 'Expense not found'), 404);
+      return c.json(ok(toExpenseDto(row)), 200);
+    } catch (e) {
+      if (e instanceof ExpenseBranchForbiddenError) return c.json(branchForbidden(), 403);
+      throw e;
+    }
   });
 
   // ─── PATCH /expenses/{id} — update ───────────────────────────────────────
@@ -255,15 +300,29 @@ export const expensesRoutes = (deps: { db: Database; audit: AuditLogger }) => {
       params: expenseIdParamSchema,
       body: { content: { 'application/json': { schema: updateExpenseSchema } } },
     },
-    responses: { ...okJson(expenseDtoSchema, 'Updated expense'), ...expenseNotFoundResponse },
+    responses: {
+      ...okJson(expenseDtoSchema, 'Updated expense'),
+      ...expenseNotFoundResponse,
+      400: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Foreign/missing categoryId or branchId',
+      },
+    },
   });
 
   app.openapi(updateExpenseRoute, async (c) => {
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const row = await service.update(c, id, body);
-    if (!row) return c.json(fail('expense.not_found', 'Expense not found'), 404);
-    return c.json(ok(toExpenseDto(row)), 200);
+    const scope = await loadBranchScope(c, 'expense.manage');
+    try {
+      const row = await service.update(c, id, body, scope);
+      if (!row) return c.json(fail('expense.not_found', 'Expense not found'), 404);
+      return c.json(ok(toExpenseDto(row)), 200);
+    } catch (e) {
+      if (e instanceof ExpenseBranchForbiddenError) return c.json(branchForbidden(), 403);
+      if (e instanceof CrossEntityError) return c.json(ownershipInvalid(e), 400);
+      throw e;
+    }
   });
 
   // ─── DELETE /expenses/{id} — delete ──────────────────────────────────────
@@ -282,9 +341,15 @@ export const expensesRoutes = (deps: { db: Database; audit: AuditLogger }) => {
 
   app.openapi(deleteExpenseRoute, async (c) => {
     const { id } = c.req.valid('param');
-    const row = await service.remove(c, id);
-    if (!row) return c.json(fail('expense.not_found', 'Expense not found'), 404);
-    return c.json(ok({ deleted: true as const }), 200);
+    const scope = await loadBranchScope(c, 'expense.manage');
+    try {
+      const row = await service.remove(c, id, scope);
+      if (!row) return c.json(fail('expense.not_found', 'Expense not found'), 404);
+      return c.json(ok({ deleted: true as const }), 200);
+    } catch (e) {
+      if (e instanceof ExpenseBranchForbiddenError) return c.json(branchForbidden(), 403);
+      throw e;
+    }
   });
 
   return app;

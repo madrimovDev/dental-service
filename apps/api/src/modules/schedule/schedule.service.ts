@@ -1,5 +1,6 @@
 import type { Context } from 'hono';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { CrossEntityError, createOwnershipValidator } from '../../lib/ownership.ts';
 import {
   computeAvailability,
   computeAvailabilityDetailed,
@@ -22,6 +23,25 @@ import type {
 
 export const createScheduleService = (deps: { audit: AuditLogger }) => {
   const repo = createScheduleRepository();
+  const ownership = createOwnershipValidator();
+
+  /**
+   * FX-137 (LC-15): doctorId/branchId shu tenantga tegishli bo'lishi shart (FK RLS'ni chetlab
+   * o'tadi). Natija — route 400 koди (`ownership.<entity>.not_found`) yoki `null` (ok).
+   */
+  async function checkRefs(
+    c: Context,
+    refs: { doctorId: string; branchId?: string | null },
+  ): Promise<string | null> {
+    try {
+      if (refs.branchId) await ownership.assertBranchExists(c, refs.branchId);
+      await ownership.assertUserExists(c, refs.doctorId);
+      return null;
+    } catch (e) {
+      if (e instanceof CrossEntityError) return `ownership.${e.entity}.${e.reason}`;
+      throw e;
+    }
+  }
 
   // ─── Working hours ──────────────────────────────────────────────────────
 
@@ -40,6 +60,9 @@ export const createScheduleService = (deps: { audit: AuditLogger }) => {
       const end = hhmm(s.end);
       if (end <= start) return { ok: false as const, code: 'time.invalid' };
     }
+
+    const refsError = await checkRefs(c, { doctorId, branchId: input.branchId });
+    if (refsError) return { ok: false as const, code: refsError };
 
     const before = await repo.listSegments(c, doctorId, input.branchId);
     // FX-126: bo'sh saqlash «shifokor bu filialda ishlamaydi» — sentinel (is_active=false) qator.
@@ -104,6 +127,9 @@ export const createScheduleService = (deps: { audit: AuditLogger }) => {
     const start = new Date(input.startAt);
     const end = new Date(input.endAt);
     if (end <= start) return { ok: false as const, code: 'time.invalid' };
+
+    const refsError = await checkRefs(c, { doctorId: input.doctorId, branchId: input.branchId });
+    if (refsError) return { ok: false as const, code: refsError };
 
     const row = await repo.createTimeOff(c, {
       tenantId,
