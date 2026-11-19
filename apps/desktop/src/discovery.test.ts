@@ -64,7 +64,9 @@ mock.module('@homebridge/ciao', () => ({
   },
 }));
 
-const { startServerDiscovery, stopServerDiscovery, findServers } = await import('./discovery.js');
+const { startServerDiscovery, stopServerDiscovery, findServers, pickLocalIpFor } = await import(
+  './discovery.js'
+);
 
 describe('discovery', () => {
   beforeEach(() => {
@@ -144,6 +146,7 @@ describe('discovery', () => {
     clientSocket.emit(
       'message',
       Buffer.from(`DENTAL_SERVER_v1:${JSON.stringify({ ip: '10.0.0.9', port: 8080 })}`),
+      { address: '10.0.0.9', port: 47890 },
     );
 
     const servers = await promise;
@@ -163,10 +166,12 @@ describe('discovery', () => {
     clientSocket.emit(
       'message',
       Buffer.from(`DENTAL_SERVER_v1:${JSON.stringify({ ip: '10.0.0.9', port: 8080 })}`),
+      { address: '10.0.0.9', port: 47890 },
     );
     clientSocket.emit(
       'message',
       Buffer.from(`DENTAL_SERVER_v1:${JSON.stringify({ ip: '10.0.0.66', port: 8080 })}`),
+      { address: '10.0.0.66', port: 47890 },
     );
 
     const servers = await promise;
@@ -182,8 +187,8 @@ describe('discovery', () => {
     if (!clientSocket) throw new Error('client socket yaratilmadi');
 
     const msg = Buffer.from(`DENTAL_SERVER_v1:${JSON.stringify({ ip: '10.0.0.9', port: 8080 })}`);
-    clientSocket.emit('message', msg);
-    clientSocket.emit('message', msg);
+    clientSocket.emit('message', msg, { address: '10.0.0.9', port: 47890 });
+    clientSocket.emit('message', msg, { address: '10.0.0.9', port: 47890 });
 
     const servers = await promise;
     expect(servers).toHaveLength(1);
@@ -192,5 +197,67 @@ describe('discovery', () => {
   test("findServers javob kelmasa timeout tugagach bo'sh massiv qaytaradi", async () => {
     const servers = await findServers(20);
     expect(servers).toEqual([]);
+  });
+
+  // FX-104 (LB-13) — server JSON'da virtual/VPN adapter IP'sini yuborishi mumkin
+  // (vEthernet 172.x, VirtualBox 192.168.56.1); javob paketi esa haqiqiy LAN
+  // IP'dan keladi. Klient manzilni JSON'dagi `ip`dan emas, `rinfo.address`dan
+  // quradi — saqlanadigan manzil aynan javob kelgan interfeys bo'ladi.
+  test('FX-104: findServers JSON ichidagi ip emas, javob kelgan manzil (rinfo.address) bilan URL quradi', async () => {
+    const promise = findServers(20);
+    const clientSocket = createdSockets[0];
+    if (!clientSocket) throw new Error('client socket yaratilmadi');
+
+    clientSocket.emit(
+      'message',
+      Buffer.from(`DENTAL_SERVER_v1:${JSON.stringify({ ip: '172.20.0.1', port: 8080 })}`),
+      { address: '192.168.1.10', port: 47890 },
+    );
+
+    const servers = await promise;
+    expect(servers).toEqual([{ url: 'http://192.168.1.10:8080', ip: '192.168.1.10', port: 8080 }]);
+  });
+
+  test("FX-104: yaroqsiz port bo'lsa javob e'tiborsiz qoldiriladi", async () => {
+    const promise = findServers(20);
+    const clientSocket = createdSockets[0];
+    if (!clientSocket) throw new Error('client socket yaratilmadi');
+
+    clientSocket.emit(
+      'message',
+      Buffer.from(`DENTAL_SERVER_v1:${JSON.stringify({ ip: '10.0.0.9', port: 'x' })}`),
+      { address: '10.0.0.9', port: 47890 },
+    );
+
+    expect(await promise).toEqual([]);
+  });
+});
+
+describe('FX-104: pickLocalIpFor (server javobidagi ip)', () => {
+  const nets = {
+    'vEthernet (WSL)': [
+      { address: '172.20.0.1', netmask: '255.255.240.0', family: 'IPv4', internal: false },
+    ],
+    'Ethernet 2': [
+      { address: '169.254.10.20', netmask: '255.255.0.0', family: 'IPv4', internal: false },
+    ],
+    Ethernet: [
+      { address: 'fe80::1', netmask: 'ffff:ffff:ffff:ffff::', family: 'IPv6', internal: false },
+      { address: '192.168.1.10', netmask: '255.255.255.0', family: 'IPv4', internal: false },
+    ],
+    Loopback: [{ address: '127.0.0.1', netmask: '255.0.0.0', family: 'IPv4', internal: true }],
+  };
+
+  test("so'rov kelgan manzil bilan bir subnetdagi interfeysni tanlaydi (ro'yxatdagi birinchisini emas)", () => {
+    expect(pickLocalIpFor('192.168.1.33', nets)).toBe('192.168.1.10');
+  });
+
+  test("mos subnet bo'lmasa — link-local (169.254/16) emas, birinchi oddiy tashqi IPv4", () => {
+    const onlyLinkLocalFirst = { 'Ethernet 2': nets['Ethernet 2'], Ethernet: nets.Ethernet };
+    expect(pickLocalIpFor('10.9.9.9', onlyLinkLocalFirst)).toBe('192.168.1.10');
+  });
+
+  test("hech qanday tashqi IPv4 bo'lmasa 127.0.0.1", () => {
+    expect(pickLocalIpFor('10.9.9.9', { Loopback: nets.Loopback })).toBe('127.0.0.1');
   });
 });
