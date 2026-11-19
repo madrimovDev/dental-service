@@ -95,6 +95,9 @@ export function PlanCard({
   // `consentFormId`, cache faqat informatsion).
   const proposedStageIds = plan.stages.filter((s) => s.acceptance === 'proposed').map((s) => s.id);
   const hasConsent = plan.consentFormId != null;
+  const consentActionKey = hasConsent
+    ? 'treatment_plan.renew_consent'
+    : 'treatment_plan.sign_consent';
   const canCancelPlan = CANCELLABLE_PLAN_STATUSES.includes(plan.status);
 
   // Yil — plan.createdAt'dan (vizual sarlavha uchun; yangi data YO'Q).
@@ -188,14 +191,19 @@ export function PlanCard({
                 {t('treatment_plan.present')}
               </Button>
             )}
-            {!hasConsent && !CONSENT_LOCKED_PLAN_STATUSES.includes(plan.status) && (
+            {/* FX-26 review: `hasConsent` faqat bog'langanini bildiradi, bog'langan forma
+                hali amaldami — yo'q (muddati o'tishi mumkin; backend `updatePlan` shunda
+                ConsentRequiredError beradi). Shuning uchun draft/presented/accepted'da
+                (backend `setConsent` qayta bog'lashga ruxsat beradi) tugma doim ko'rinadi:
+                bog'lanmagan bo'lsa «imzolash», bog'langan bo'lsa «yangilash». */}
+            {!CONSENT_LOCKED_PLAN_STATUSES.includes(plan.status) && (
               <Button
                 size="compact-sm"
                 variant="default"
                 leftSection={<IconWritingSign size={14} />}
                 onClick={consent.open}
               >
-                {t('treatment_plan.sign_consent')}
+                {t(consentActionKey)}
               </Button>
             )}
             {plan.status === 'presented' && (
@@ -307,7 +315,7 @@ export function PlanCard({
 
       <EstimateView planId={plan.id} opened={estimateOpened} onClose={estimate.close} />
 
-      <Modal opened={consentOpened} onClose={closeConsent} title={t('treatment_plan.sign_consent')}>
+      <Modal opened={consentOpened} onClose={closeConsent} title={t(consentActionKey)}>
         <Stack gap="md">
           {consentFormsQuery.isLoading ? (
             <Text c="dimmed">{t('common.loading')}</Text>

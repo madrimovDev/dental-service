@@ -867,6 +867,7 @@
     "balance": "Qoldiq (balans)",
     "consent": "Rozilik",
     "sign_consent": "Rozilikni imzolash",
+    "renew_consent": "Rozilikni yangilash",
     "consent_signed": "Rozilik imzolangan",
     "consent_signed_at": "Imzolangan sana",
     "consent_required": "Avval rozilikni imzolang",

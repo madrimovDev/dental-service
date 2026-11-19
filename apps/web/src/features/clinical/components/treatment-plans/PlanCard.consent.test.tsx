@@ -52,6 +52,7 @@ const handlers = () => ({
 });
 
 const SIGN = 'Rozilikni imzolash';
+const RENEW = 'Rozilikni yangilash';
 
 describe('PlanCard — rozilik tugmasi (FX-26/FX-61)', () => {
   it("rozilik bog'lanmagan planda BITTA tugma (aside dublikati yo'q)", () => {
@@ -59,9 +60,31 @@ describe('PlanCard — rozilik tugmasi (FX-26/FX-61)', () => {
     expect(screen.getAllByRole('button', { name: SIGN })).toHaveLength(1);
   });
 
-  it("rozilik bog'langandan keyin tugma yo'q", () => {
+  it("rozilik bog'langandan keyin «imzolash» o'rniga «yangilash» tugmasi (bitta)", () => {
     renderApp(<PlanCard plan={plan({ consentFormId: 'cf1' })} canEdit {...handlers()} />);
     expect(screen.queryByRole('button', { name: SIGN })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: RENEW })).toHaveLength(1);
+  });
+
+  // FX-26 review: bog'langan rozilik muddati o'tgan bo'lsa backend `updatePlan`
+  // ConsentRequiredError beradi — UI qayta bog'lash yo'lini yopib qo'ymasligi kerak.
+  it.each([
+    'draft',
+    'presented',
+    'accepted',
+  ] as const)("%s planda bog'langan (muddati o'tgan) rozilikni yangilash mumkin", async (status) => {
+    const h = handlers();
+    signMutate.mockImplementation((_body, opts) => opts.onSuccess({ id: 'cf-new2' }));
+    renderApp(<PlanCard plan={plan({ status, consentFormId: 'cf-expired' })} canEdit {...h} />);
+    fireEvent.click(screen.getByRole('button', { name: RENEW }));
+    fireEvent.change(await screen.findByLabelText(/Shablon nomi/), {
+      target: { value: 'Davolashga rozilik' },
+    });
+    fireEvent.change(screen.getByLabelText(/Matn/), {
+      target: { value: 'Yetarlicha uzun matn' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Imzolash' }));
+    expect(h.onSignConsent).toHaveBeenCalledWith('pl1', { consentFormId: 'cf-new2' });
   });
 
   it.each([
@@ -71,6 +94,8 @@ describe('PlanCard — rozilik tugmasi (FX-26/FX-61)', () => {
   ] as const)("%s planda tugma yo'q (FX-61)", (status) => {
     renderApp(<PlanCard plan={plan({ status })} canEdit {...handlers()} />);
     expect(screen.queryByRole('button', { name: SIGN })).not.toBeInTheDocument();
+    renderApp(<PlanCard plan={plan({ status, consentFormId: 'cf1' })} canEdit {...handlers()} />);
+    expect(screen.queryByRole('button', { name: RENEW })).not.toBeInTheDocument();
   });
 
   it("modaldan imzolab bog'lash: sign → onSignConsent(planId, {consentFormId})", async () => {

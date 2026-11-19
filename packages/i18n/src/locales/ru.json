@@ -867,6 +867,7 @@
     "balance": "Остаток (баланс)",
     "consent": "Согласие",
     "sign_consent": "Подписать согласие",
+    "renew_consent": "Обновить согласие",
     "consent_signed": "Согласие подписано",
     "consent_signed_at": "Дата подписания",
     "consent_required": "Сначала подпишите согласие",
