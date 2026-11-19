@@ -43,7 +43,7 @@
  */
 import { appendFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { app, BrowserWindow, dialog, ipcMain, Notification, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Notification, session, shell } from 'electron';
 import electronUpdater from 'electron-updater';
 import { setupAutoUpdater, type UpdateState } from './auto-updater.js';
 import { createBackupScheduler, resolveDefaultBackupFolder } from './backup-scheduler.js';
@@ -63,6 +63,7 @@ import {
 } from './discovery.js';
 import { isFirstRun, runFirstSetup, runMigrations } from './first-run.js';
 import { fetchBootstrapStatus, licenseGatedUrl, resolveStartupUrl } from './license-status.js';
+import { installMediaPermissionHandlers } from './media-permissions.js';
 import {
   createPgTools,
   createStateStore,
@@ -297,6 +298,13 @@ app.whenReady().then(async () => {
   if (!isPrimaryInstance) return; // ikkinchi nusxa — quit() allaqachon chaqirilgan
 
   app.dock?.hide(); // macOS: dock'da ko'rsatmaydi — faqat tray
+
+  // FT-06 — kamera: faqat asosiy oynaning ilova origin'i uchun `media` (video),
+  // qolgan barcha brauzer ruxsatlari rad etiladi (media-permissions.ts).
+  installMediaPermissionHandlers(session.defaultSession, {
+    isMainContents: (wc) => mainWindow !== null && wc === mainWindow.webContents,
+    getAppUrl: () => lastOpenedUrl,
+  });
 
   if (isDevWrapMode()) {
     await openDevWindow();
