@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
-import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { verifyLicenseSignature } from '@dental/core/license-signature';
 import { SUPERVISOR_PUBLIC_KEY_PEM } from '@dental/core/supervisor-public-key';
@@ -110,6 +110,43 @@ const getKey = async () => {
   return Buffer.from(fp, 'hex');
 };
 
+/**
+ * FX-161 (review) — atomik yozish: shu papkada unikal tmp faylga yoziladi,
+ * fsync qilinadi, keyin asl fayl ustiga `rename`. Joyida `writeFile`
+ * (truncate, keyin write) parallel o'quvchiga bo'sh/yarim faylni ko'rsatardi
+ * (`invalid` → 403 LICENSE_NOT_FOUND → `/activate`), elektr uzilsa esa bo'sh
+ * `.lic` abadiy qolardi. `rename` POSIX'da atomik; Windows'da mavjud faylni
+ * almashtiradi, lekin antivirus/o'quvchi faylni ushlab tursa EPERM/EBUSY/EACCES
+ * berishi mumkin — shuning uchun qisqa qayta urinish.
+ */
+const RENAME_RETRY_CODES = new Set(['EPERM', 'EBUSY', 'EACCES']);
+const atomicWriteFile = async (targetPath: string, contents: string): Promise<void> => {
+  await mkdir(dirname(targetPath), { recursive: true });
+  const tmpPath = `${targetPath}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`;
+  try {
+    const fh = await open(tmpPath, 'w', 0o600);
+    try {
+      await fh.writeFile(contents);
+      await fh.sync();
+    } finally {
+      await fh.close();
+    }
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await rename(tmpPath, targetPath);
+        return;
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException).code ?? '';
+        if (attempt >= 4 || !RENAME_RETRY_CODES.has(code)) throw err;
+        await new Promise((r) => setTimeout(r, 50 * (attempt + 1)));
+      }
+    }
+  } catch (err) {
+    await unlink(tmpPath).catch(() => {});
+    throw err;
+  }
+};
+
 export const writeLicense = async (data: LicenseData): Promise<void> => {
   const key = await getKey();
   const iv = randomBytes(16);
@@ -117,9 +154,7 @@ export const writeLicense = async (data: LicenseData): Promise<void> => {
   const json = JSON.stringify(data);
   const encrypted = Buffer.concat([cipher.update(json, 'utf8'), cipher.final()]);
   const payload = Buffer.concat([iv, encrypted]);
-  const licensePath = getLicensePath();
-  await mkdir(dirname(licensePath), { recursive: true });
-  await writeFile(licensePath, payload.toString('base64'));
+  await atomicWriteFile(getLicensePath(), payload.toString('base64'));
 };
 
 /**
@@ -411,9 +446,7 @@ export const writeAnchor = async (ms: number): Promise<void> => {
   const json = JSON.stringify(ms);
   const encrypted = Buffer.concat([cipher.update(json, 'utf8'), cipher.final()]);
   const payload = Buffer.concat([iv, encrypted]);
-  const anchorPath = getAnchorPath();
-  await mkdir(dirname(anchorPath), { recursive: true });
-  await writeFile(anchorPath, payload.toString('base64'));
+  await atomicWriteFile(getAnchorPath(), payload.toString('base64'));
 };
 
 /**

@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import { createSign, generateKeyPairSync } from 'node:crypto';
-import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Hono } from 'hono';
@@ -133,5 +133,51 @@ describe("FX-161 — vaqtinchalik .lic o'qish xatosi", () => {
     expect(res.status).toBe(403);
     const body = (await res.json()) as { error: { code: string } };
     expect(body.error.code).toBe('LICENSE_NOT_FOUND');
+  });
+
+  // Review (FX-161): `writeFile` joyida truncate+write qilardi — heartbeat yoki
+  // recheck `.lic`ni qayta yozayotganda parallel so'rov bo'sh/yarim faylni
+  // o'qib `invalid` → 403 LICENSE_NOT_FOUND → `/activate` redirect olardi.
+  // Endi tmp fayl + rename: o'quvchi har doim eski YOKI yangi to'liq faylni ko'radi.
+  test('writeLicense faylni joyida qayta yozmaydi — tmp + rename (yangi inode), tmp qolmaydi', async () => {
+    const lic = await validLicense();
+    await license.writeLicense(lic);
+    const before = await stat(licPath());
+    await license.writeLicense(lic);
+    const after = await stat(licPath());
+    expect(after.ino).not.toBe(before.ino);
+    const leftovers = (await readdir(tmpDir)).filter((f) => f.endsWith('.tmp'));
+    expect(leftovers).toEqual([]);
+    const r = await license.readLicenseResult();
+    expect(r.kind).toBe('ok');
+  });
+
+  test('writeAnchor ham atomik — tmp + rename (yangi inode)', async () => {
+    await license.writeAnchor(1_000);
+    const anchorPath = process.env.LICENSE_ANCHOR_PATH as string;
+    const before = await stat(anchorPath);
+    await license.writeAnchor(2_000);
+    const after = await stat(anchorPath);
+    expect(after.ino).not.toBe(before.ino);
+    expect(await license.readAnchor()).toBe(2_000);
+    const leftovers = (await readdir(tmpDir)).filter((f) => f.endsWith('.tmp'));
+    expect(leftovers).toEqual([]);
+  });
+
+  test("parallel qayta yozish paytida o'quvchi hech qachon invalid/missing ko'rmaydi", async () => {
+    const lic = await validLicense();
+    await license.writeLicense(lic);
+    let stop = false;
+    const writer = (async () => {
+      while (!stop) await license.writeLicense(lic);
+    })();
+    const kinds = new Map<string, number>();
+    for (let i = 0; i < 3000; i++) {
+      const r = await license.readLicenseResult();
+      kinds.set(r.kind, (kinds.get(r.kind) ?? 0) + 1);
+    }
+    stop = true;
+    await writer;
+    expect([...kinds.keys()]).toEqual(['ok']);
   });
 });
