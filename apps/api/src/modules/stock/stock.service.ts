@@ -1,4 +1,5 @@
 import {
+  appointments,
   expenses,
   serviceMaterials,
   stockBatches,
@@ -507,6 +508,65 @@ export const createStockService = (deps: {
   }
 
   /**
+   * FX-35 (LA-11): vizit filiali — yozilish (appointment) filiali, bo'lmasa aktiv filial
+   * (JWT `abid`). Noma'lum bo'lsa `null` (eski xulq: BOM itemi o'z holicha).
+   */
+  async function resolveVisitBranch(c: Context, visitNoteId: string): Promise<string | null> {
+    const [row] = await getDb(c)
+      .select({ branchId: appointments.branchId })
+      .from(visitNotes)
+      .innerJoin(appointments, eq(appointments.id, visitNotes.appointmentId))
+      .where(eq(visitNotes.id, visitNoteId));
+    return row?.branchId ?? c.get('activeBranchId') ?? null;
+  }
+
+  /**
+   * FX-35: BOM itemini vizit filialiga moslaydi. Item tenant-darajali yoki vizit filialida
+   * bo'lsa — o'zi; boshqa filial itemi bo'lsa — vizit filialidagi shu nomli/birlikli item
+   * (tenant-darajali BOM filial itemlarini qamray olmaydi). Mos item yo'q → qator tashlanadi
+   * (begona filial ombori kamaytirilmaydi; vizit yozuvi baribir bloklanmaydi).
+   */
+  async function resolveBomItems<T extends { itemId: string }>(
+    c: Context,
+    boms: T[],
+    visitNoteId: string,
+  ): Promise<T[]> {
+    if (boms.length === 0) return boms;
+    const visitBranch = await resolveVisitBranch(c, visitNoteId);
+    if (!visitBranch) return boms;
+    const db = getDb(c);
+    const items = await db
+      .select({
+        id: stockItems.id,
+        name: stockItems.name,
+        unit: stockItems.unit,
+        branchId: stockItems.branchId,
+      })
+      .from(stockItems)
+      .where(inArray(stockItems.id, [...new Set(boms.map((b) => b.itemId))]));
+    const byId = new Map(items.map((i) => [i.id, i]));
+    const norm = (v: string) => v.trim().toLowerCase();
+    let siblings: { id: string; name: string; unit: string }[] | undefined;
+    const result: T[] = [];
+    for (const bom of boms) {
+      const item = byId.get(bom.itemId);
+      if (!item) continue;
+      if (item.branchId === null || item.branchId === visitBranch) {
+        result.push(bom);
+        continue;
+      }
+      siblings ??= await db
+        .select({ id: stockItems.id, name: stockItems.name, unit: stockItems.unit })
+        .from(stockItems)
+        .where(eq(stockItems.branchId, visitBranch))
+        .orderBy(asc(stockItems.createdAt));
+      const match = siblings.find((s) => norm(s.name) === norm(item.name) && s.unit === item.unit);
+      if (match) result.push({ ...bom, itemId: match.id });
+    }
+    return result;
+  }
+
+  /**
    * Vizit yozuvi → ombor avtomatik chiqim (BOM bo'yicha).
    * clinical.service'ga DI orqali ulanadi (request-tx ichida ishlaydi — to'g'ridan import yo'q).
    * BOM topilmagan service → skip. Manfiyga ruxsat (guard yo'q).
@@ -530,10 +590,14 @@ export const createStockService = (deps: {
       occurrenceCount.set(serviceId, (occurrenceCount.get(serviceId) ?? 0) + 1);
     }
 
-    const boms = await db
-      .select()
-      .from(serviceMaterials)
-      .where(inArray(serviceMaterials.serviceId, serviceIds));
+    const boms = await resolveBomItems(
+      c,
+      await db
+        .select()
+        .from(serviceMaterials)
+        .where(inArray(serviceMaterials.serviceId, serviceIds)),
+      sourceVisitNoteId,
+    );
 
     for (const bom of boms) {
       const count = occurrenceCount.get(bom.serviceId) ?? 1;
@@ -622,10 +686,14 @@ export const createStockService = (deps: {
     }
     if (deltas.size === 0) return;
 
-    const boms = await db
-      .select()
-      .from(serviceMaterials)
-      .where(inArray(serviceMaterials.serviceId, [...deltas.keys()]));
+    const boms = await resolveBomItems(
+      c,
+      await db
+        .select()
+        .from(serviceMaterials)
+        .where(inArray(serviceMaterials.serviceId, [...deltas.keys()])),
+      sourceVisitNoteId,
+    );
 
     for (const bom of boms) {
       const delta = deltas.get(bom.serviceId);

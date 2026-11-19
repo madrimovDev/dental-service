@@ -283,3 +283,102 @@ describe('FX-115: ombor filial doirasi (D-8)', () => {
     expect(r.status).toBe(201);
   });
 });
+
+describe('FX-35: BOM avto-chiqimi vizit filialidagi itemdan', () => {
+  const noopAudit = { record: async () => {} } as unknown as AuditLogger;
+  const stock = createStockService({ audit: noopAudit });
+  const ctx = (tx: DbOrTx, activeBranchId: string | null): Context =>
+    ({
+      get: (k: string) =>
+        k === 'db'
+          ? tx
+          : k === 'accessClaims'
+            ? { perms: ['@owner'], atid: tenantId, sub: docId }
+            : k === 'activeTenantId'
+              ? tenantId
+              : k === 'activeBranchId'
+                ? activeBranchId
+                : k === 'user'
+                  ? { id: docId }
+                  : undefined,
+      req: { header: () => undefined },
+    }) as unknown as Context;
+  const withTx = <T>(fn: (tx: DbOrTx) => Promise<T>): Promise<T> =>
+    db.transaction(async (tx) => {
+      await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
+      return fn(tx);
+    });
+
+  let visitId: string;
+  let apptBId: string;
+  let visitViaApptId: string;
+  beforeAll(async () => {
+    await admin.db.execute(sql`DELETE FROM service_materials`);
+    await withTx(async (tx) => {
+      await tx.update(stockItems).set({ quantity: '10' });
+      // BOM faqat A itemiga yozilgan (tenant-darajali BOM)
+      await tx
+        .insert(serviceMaterials)
+        .values({ tenantId, serviceId: svcId, itemId: itemA, qtyPerService: '2' });
+      const [p] = await tx
+        .insert(patients)
+        .values({ tenantId, fullName: 'P35' })
+        .returning({ id: patients.id });
+      const [vn] = await tx
+        .insert(visitNotes)
+        .values({ tenantId, patientId: p!.id, doctorId: docId })
+        .returning({ id: visitNotes.id });
+      visitId = vn!.id;
+      const [ap] = await tx
+        .insert(appointments)
+        .values({
+          tenantId,
+          branchId: brB,
+          patientId: p!.id,
+          doctorId: docId,
+          startTime: new Date('2030-01-01T10:00:00Z'),
+          endTime: new Date('2030-01-01T10:30:00Z'),
+        } as never)
+        .returning({ id: appointments.id });
+      apptBId = ap!.id;
+      const [vn2] = await tx
+        .insert(visitNotes)
+        .values({ tenantId, patientId: p!.id, doctorId: docId, appointmentId: apptBId })
+        .returning({ id: visitNotes.id });
+      visitViaApptId = vn2!.id;
+    });
+  });
+
+  test('B filialdagi vizit: chiqim B’ning o‘z itemidan, A itemi tegilmaydi', async () => {
+    await withTx((tx) => stock.deductForServices(ctx(tx, brB), [svcId], visitId));
+    expect(await qty(itemA)).toBe(10);
+    expect(await qty(itemB)).toBe(8);
+  });
+
+  test('qaytarish (reconcile) ham shu B itemiga', async () => {
+    await withTx((tx) => stock.reconcileForServices(ctx(tx, brB), [svcId], [], visitId));
+    expect(await qty(itemB)).toBe(10);
+    expect(await qty(itemA)).toBe(10);
+  });
+
+  test('vizit filiali yozilish (appointment) filialidan: aktiv filial A bo‘lsa ham B', async () => {
+    await withTx((tx) => stock.deductForServices(ctx(tx, brA), [svcId], visitViaApptId));
+    expect(await qty(itemB)).toBe(8);
+    expect(await qty(itemA)).toBe(10);
+  });
+
+  test('o‘z filialidagi item to‘g‘ridan: A vizit A itemini kamaytiradi', async () => {
+    await withTx((tx) => stock.deductForServices(ctx(tx, brA), [svcId], visitId));
+    expect(await qty(itemA)).toBe(8);
+  });
+
+  test('filialda mos item yo‘q bo‘lsa — boshqa filial itemidan AYIRILMAYDI', async () => {
+    await withTx(async (tx) => {
+      await tx.update(stockItems).set({ name: 'Boshqa' }).where(eq(stockItems.id, itemB));
+    });
+    const aBefore = await qty(itemA);
+    await withTx((tx) => stock.deductForServices(ctx(tx, brB), [svcId], visitId));
+    expect(await qty(itemA)).toBe(aBefore);
+    expect(await qty(itemB)).toBe(8);
+  });
+});
