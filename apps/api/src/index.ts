@@ -50,8 +50,9 @@ if (process.argv[2] === 'migrate') {
   // - prod: gated by RUN_REMINDER_WORKER (api service sets it false; the dedicated
   //   `worker` process owns the queue consumer — see worker.ts / D6)
   // - dev: defaults to true so a single `bun dev` runs everything
-  const inProcessWorker =
-    env.NODE_ENV !== 'test' && env.RUN_REMINDER_WORKER ? startReminderWorker() : null;
+  // FX-96 review: worker reconcile'dan KEYIN ishga tushadi (pastda) — aks holda restartdan
+  // omon qolgan kechikkan job reconcile'dan oldin otilib ketadi (poyga).
+  const runInProcessWorkers = env.NODE_ENV !== 'test' && env.RUN_REMINDER_WORKER;
 
   // Epic B: recall scan worker + daily scheduler. Same gating as the reminder
   // worker — dev (RUN_REMINDER_WORKER=true) runs everything in one `bun dev`; prod
@@ -71,20 +72,26 @@ if (process.argv[2] === 'migrate') {
   // Cloud sets RUN_REMINDER_WORKER=false on the api service and runs the
   // dedicated worker process (worker.ts), which boots its own bot-manager —
   // so exactly one of the two processes ever starts it, never both.
-  const messagingAdmin =
-    env.NODE_ENV !== 'test' && env.RUN_REMINDER_WORKER ? createAdminDb() : null;
+  const messagingAdmin = runInProcessWorkers ? createAdminDb() : null;
   const inProcessBotManager = messagingAdmin
     ? startTelegramBotManager({ adminDb: messagingAdmin.db, withTenant })
     : null;
 
   // FX-89 / FX-96 (LB-05): eslatma navbatini bazadan qayta qurish — desktop zaxira tiklangandan
   // keyin (API qayta ishga tushadi) yoki Valkey ma'lumoti yo'qolganda navbat bazaga mos kelmaydi.
-  // Xuddi shu gating (navbat egasi shu jarayon); boot'ni bloklamaydi, best-effort.
+  // Xuddi shu gating (navbat egasi shu jarayon); best-effort. FX-96 review: reminder worker'dan
+  // OLDIN await qilinadi (HTTP server allaqachon tinglayapti) — eskirgan job worker ularni
+  // olishidan oldin o'chiriladi; xato bo'lsa ham worker ishga tushadi (worker'ning o'z
+  // `startTime <= now` guard'i bor).
   if (messagingAdmin) {
-    void reconcileReminders({ adminDb: messagingAdmin.db, queue: reminderQueue })
-      .then((res) => logger.info({ ...res }, 'Reminder queue reconciled'))
-      .catch((err) => logger.error({ err }, 'Reminder queue reconcile failed'));
+    try {
+      const res = await reconcileReminders({ adminDb: messagingAdmin.db, queue: reminderQueue });
+      logger.info({ ...res }, 'Reminder queue reconciled');
+    } catch (err) {
+      logger.error({ err }, 'Reminder queue reconcile failed');
+    }
   }
+  const inProcessWorker = runInProcessWorkers ? startReminderWorker() : null;
 
   // L8: SaaS tenantlarni Supervisor'ga ro'yxatga olish retry + kunlik obuna sinxroni.
   // Bot-manager bilan bir xil gating (admin conn); `SUPERVISOR_SAAS_TOKEN` yo'q yoki

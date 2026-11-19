@@ -1,5 +1,5 @@
 import { appointments, tenants } from '@dental/db-schema';
-import type { Queue } from 'bullmq';
+import type { Job, Queue } from 'bullmq';
 import { and, gt, inArray } from 'drizzle-orm';
 import type { Database, DbOrTx } from '../db/client.ts';
 import { withTenant as defaultWithTenant } from '../db/scoped.ts';
@@ -16,8 +16,9 @@ import { createReminderScheduler } from './reminder-scheduler.ts';
  * kelmay qoladigan holatlar: desktop zaxiradan tiklash (baza eski holatga qaytadi, Valkey
  * esa yo'q), Valkey ma'lumoti yo'qolishi (AOF'dan oldingi o'rnatmalar, buzilgan AOF).
  *
- *   1) Delayed job'lar: yozilishi bazada yo'q / faol emas / eslatma oynasi o'tgan → o'chiriladi
- *      (aks holda noto'g'ri vaqtda yoki o'tgan yozilish uchun eslatma ketardi).
+ *   1) Delayed job'lar: yozilishi bazada yo'q / faol emas / allaqachon o'tgan / eslatma oynasi
+ *      o'tgan va fire vaqti hali kelajakda → o'chiriladi. Kechikkan (overdue) job yozilish hali
+ *      oldinda bo'lsa saqlanadi (FX-96 review — kech, lekin foydali eslatma).
  *   2) Har tenant: faol va eslatma vaqti kelajakda bo'lgan yozilishlar → `enqueueReminder`
  *      (mavjud job — `changeDelay` bilan bazadagi vaqtga to'g'rilanadi, yo'q bo'lsa qo'shiladi;
  *      jobId deterministik — dublikat yo'q, idempotent).
@@ -39,6 +40,17 @@ export type ReminderReconcileResult = {
   removed: number;
   failed: number;
 };
+
+/**
+ * Delayed job'ning haqiqiy fire vaqti (ms) — delayed zset score'idan (BullMQ: ts * 0x1000 +
+ * counter). `job.timestamp + delay` `changeDelay`dan keyin noto'g'ri (timestamp yangilanmaydi).
+ */
+async function delayedFireAt(queue: Queue<ReminderJob>, job: Job<ReminderJob>): Promise<number> {
+  const client = await queue.client;
+  const score = job.id ? await client.zscore(queue.toKey('delayed'), job.id) : null;
+  if (score != null) return Math.floor(Number(score) / 0x1000);
+  return (job.timestamp ?? 0) + (job.delay ?? 0);
+}
 
 export async function reconcileReminders(
   deps: ReminderReconcileDeps,
@@ -74,10 +86,17 @@ export async function reconcileReminders(
       const live = new Map(rows.map((r) => [r.id, r]));
       for (const job of jobs) {
         const appt = live.get(job.data.appointmentId);
+        const startMs = appt ? new Date(appt.start).getTime() : 0;
+        // FX-96 review: kechikkan (overdue — fire vaqti o'tgan, masalan server o'chiq turgan)
+        // job yozilish hali oldinda bo'lsa saqlanadi — kech bo'lsa ham foydali eslatma.
+        // Fire vaqti kelajakda, lekin eslatma oynasi o'tgan job (tiklashdan keyingi vaqt
+        // farqi) — yozilishdan keyin otilardi, o'chiriladi.
+        const overdue = (await delayedFireAt(deps.queue, job)) <= now.getTime();
         const keep =
           appt != null &&
           ACTIVE_STATUSES.includes(appt.status) &&
-          reminderDelayMs(new Date(appt.start), now) != null;
+          startMs > now.getTime() &&
+          (overdue || reminderDelayMs(new Date(appt.start), now) != null);
         if (keep) continue;
         try {
           await job.remove();

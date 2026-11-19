@@ -54,6 +54,11 @@ export async function processReminderJob(
     const [appt] = await tx.select().from(appointments).where(eq(appointments.id, appointmentId));
     if (!appt) return;
     if (shouldSkipReminder(appt.status)) return;
+    // FX-96 review: AOF'dan keyin kechikkan (overdue) job restartdan omon qoladi — server
+    // > 24 soat o'chiq turgan bo'lsa yozilish allaqachon o'tib ketgan bo'lishi mumkin.
+    // O'tgan yozilishga eslatma yuborilmaydi, holat o'zgartirilmaydi (deterministik guard,
+    // boot'dagi reconcile poygasidan qat'i nazar).
+    if (new Date(appt.startTime).getTime() <= Date.now()) return;
 
     const [patient] = await tx.select().from(patients).where(eq(patients.id, appt.patientId));
     // Til — tenant default tili (Asia/Tashkent SMS lokalizatsiyasi, CLI-186).

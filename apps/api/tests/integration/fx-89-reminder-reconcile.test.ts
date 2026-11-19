@@ -10,14 +10,17 @@
  */
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { randomUUID } from 'node:crypto';
-import { appointments, branches, patients, tenants, users } from '@dental/db-schema';
-import { Queue } from 'bullmq';
-import { sql } from 'drizzle-orm';
+import { appointments, branches, notifications, patients, tenants, users } from '@dental/db-schema';
+import { createNoOpChannel } from '@dental/notifications';
+import { Queue, Worker } from 'bullmq';
+import { eq, sql } from 'drizzle-orm';
 import { createAdminDb, db } from '../../src/db/client.ts';
 import { withTenant } from '../../src/db/scoped.ts';
 import type { ReminderJob } from '../../src/lib/queue.ts';
 import { reminderJobId } from '../../src/lib/reminder-job-id.ts';
 import { reconcileReminders } from '../../src/lib/reminder-reconcile.ts';
+import { processReminderJob } from '../../src/lib/reminder-worker.ts';
+import { createNotificationsService } from '../../src/modules/notifications/notifications.service.ts';
 
 type Seed = { tenantId: string; branchId: string; patientId: string; ownerId: string };
 const admin = createAdminDb();
@@ -144,5 +147,88 @@ describe('FX-89 — reconcileReminders (real DB + real Redis)', () => {
     const again = await reconcileReminders({ adminDb: admin.db, queue });
     expect(again).toMatchObject({ removed: 0, failed: 0 });
     expect(await queue.getDelayedCount()).toBe(4);
+  });
+});
+
+/**
+ * FX-96 review: AOF yoqilgandan keyin kechikkan (overdue) delayed job'lar restartdan omon
+ * qoladi — server PC > 24 soat o'chiq turgan holat. Eslatma vaqti o'tgan, lekin yozilish:
+ *   - allaqachon o'tib ketgan → hech narsa yuborilmaydi (worker guard + reconcile o'chiradi);
+ *   - hali oldinda → job saqlanadi (kech bo'lsa ham foydali eslatma).
+ */
+describe("FX-96 — overdue eslatma job'lari (real DB + real Redis + real Worker)", () => {
+  const waitOverdue = () => new Promise((r) => setTimeout(r, 50));
+
+  test("reconcile: o'tgan yozilish job'i o'chiriladi, oldindagi yozilishniki saqlanadi", async () => {
+    const now = Date.now();
+    const past = await insertAppt(A, new Date(now - 2 * HOUR));
+    const ahead = await insertAppt(A, new Date(now + 14 * HOUR), 'confirmed');
+    await addJob(A.tenantId, past, 1);
+    await addJob(A.tenantId, ahead, 1);
+    await waitOverdue();
+
+    await reconcileReminders({ adminDb: admin.db, queue });
+
+    expect(await queue.getJob(reminderJobId(past))).toBeFalsy();
+    const kept = await queue.getJob(reminderJobId(ahead));
+    expect(kept).toBeTruthy();
+    expect(await kept!.getState()).toBe('delayed');
+  });
+
+  test("worker: o'tib ketgan yozilishga overdue job hech narsa yubormaydi", async () => {
+    const wq = new Queue<ReminderJob>('reminders-fx96-worker-test', {
+      connection: { url: process.env.REDIS_URL },
+    });
+    await wq.obliterate({ force: true });
+    const sent: string[] = [];
+    const svc = createNotificationsService({
+      sms: {
+        send: async (to: string, msg: { text: string }) => {
+          sent.push(to);
+          return createNoOpChannel(() => {}).send(to, msg);
+        },
+      },
+    });
+    const past = await insertAppt(B, new Date(Date.now() - 2 * HOUR));
+    await wq.add(
+      'appointment-reminder',
+      { tenantId: B.tenantId, appointmentId: past },
+      { delay: 1, jobId: reminderJobId(past), removeOnComplete: true },
+    );
+    await waitOverdue();
+
+    const worker = new Worker<ReminderJob>(
+      'reminders-fx96-worker-test',
+      async (job) => {
+        await processReminderJob(svc, job.data);
+      },
+      { connection: { url: process.env.REDIS_URL } },
+    );
+    try {
+      await new Promise<void>((resolve, reject) => {
+        worker.on('completed', () => resolve());
+        worker.on('failed', (_j, err) => reject(err));
+      });
+    } finally {
+      await worker.close();
+      await wq.obliterate({ force: true });
+      await wq.close();
+    }
+
+    expect(sent).toEqual([]);
+    const rows = await withTenant(B.tenantId, (tx) =>
+      tx
+        .select({ type: notifications.type })
+        .from(notifications)
+        .where(eq(notifications.userId, B.ownerId)),
+    );
+    expect(rows.filter((r) => r.type.startsWith('appointment_reminder'))).toEqual([]);
+    const [appt] = await withTenant(B.tenantId, (tx) =>
+      tx
+        .select({ status: appointments.status })
+        .from(appointments)
+        .where(eq(appointments.id, past)),
+    );
+    expect(appt!.status).toBe('scheduled');
   });
 });
