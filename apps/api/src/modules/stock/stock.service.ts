@@ -20,6 +20,7 @@ import {
 } from '../../lib/branch-scope.ts';
 import { findRecipientsWithPermission } from '../../lib/notify-recipients.ts';
 import { CrossEntityError, createOwnershipValidator } from '../../lib/ownership.ts';
+import { pgErrorInfo } from '../../lib/pg-error.ts';
 import {
   adjustmentDelta,
   allocateBatchRemaining,
@@ -78,6 +79,14 @@ export class StockBranchForbiddenError extends Error {
   constructor() {
     super('Stock branch forbidden');
     this.name = 'StockBranchForbiddenError';
+  }
+}
+
+/** FX-66: bir xil (xizmat, item) BOM jufti ikkinchi marta — routes `bom.duplicate` 409. */
+export class DuplicateBomError extends Error {
+  constructor() {
+    super('BOM for this service/item already exists');
+    this.name = 'DuplicateBomError';
   }
 }
 
@@ -474,15 +483,25 @@ export const createStockService = (deps: {
       .where(eq(stockItems.id, input.itemId));
     await assertItemBranch(c, 'stock.manage', bomItem?.branchId ?? null);
 
-    const [bom] = await db
-      .insert(serviceMaterials)
-      .values({
-        tenantId,
-        serviceId: input.serviceId,
-        itemId: input.itemId,
-        qtyPerService: String(input.qtyPerService),
-      })
-      .returning();
+    // FX-66: bir xil (xizmat, item) jufti — 500 emas, 409. Savepoint (nested tx): poyga'da
+    // 23505 so'rov tranzaksiyasini buzmaydi.
+    let bom: typeof serviceMaterials.$inferSelect | undefined;
+    try {
+      [bom] = await db.transaction(async (tx) =>
+        tx
+          .insert(serviceMaterials)
+          .values({
+            tenantId,
+            serviceId: input.serviceId,
+            itemId: input.itemId,
+            qtyPerService: String(input.qtyPerService),
+          })
+          .returning(),
+      );
+    } catch (err) {
+      if (pgErrorInfo(err)?.code === '23505') throw new DuplicateBomError();
+      throw err;
+    }
 
     if (bom) {
       await deps.audit.record(c, {

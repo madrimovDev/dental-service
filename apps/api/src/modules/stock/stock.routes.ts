@@ -42,6 +42,7 @@ import {
 } from './stock.schema.ts';
 import {
   createStockService,
+  DuplicateBomError,
   InsufficientStockError,
   StockBranchForbiddenError,
 } from './stock.service.ts';
@@ -286,7 +287,13 @@ export const stockRoutes = (deps: {
     request: {
       body: { content: { 'application/json': { schema: createBomSchema } } },
     },
-    responses: createdResponses(serviceMaterialDtoSchema, 'Service material (BOM) created'),
+    responses: {
+      ...createdResponses(serviceMaterialDtoSchema, 'Service material (BOM) created'),
+      409: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'BOM for this service/item already exists',
+      },
+    },
   });
 
   app.openapi(createBomRoute, async (c) => {
@@ -296,6 +303,9 @@ export const stockRoutes = (deps: {
       if (!bom) throw new Error('BOM creation failed');
       return c.json(ok(toServiceMaterialDto(bom)), 201);
     } catch (err) {
+      if (err instanceof DuplicateBomError) {
+        return c.json(fail('bom.duplicate', 'BOM for this service and item already exists'), 409);
+      }
       if (err instanceof CrossEntityError) return c.json(ownershipNotFound(err), 404);
       if (err instanceof StockBranchForbiddenError) return c.json(branchForbidden(), 403);
       throw err;
