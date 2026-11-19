@@ -89,7 +89,7 @@ afterAll(async () => {
   await db.execute(sql`TRUNCATE users, tenants RESTART IDENTITY CASCADE`);
 });
 
-const day = '2026-12-01';
+const day = '2036-12-01';
 const seedAppt = async (
   startH: string,
   endH: string,

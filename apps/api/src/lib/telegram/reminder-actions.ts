@@ -3,6 +3,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import type { DbOrTx } from '../../db/client.ts';
 import { AppointmentTransitionError } from '../../modules/appointments/appointments.transitions.ts';
 import type { AppointmentsService } from '../../modules/appointments/index.ts';
+import { logger } from '../logger.ts';
 import { findRecipientsWithPermission } from '../notify-recipients.ts';
 import { createBotContext } from './bot-context.ts';
 
@@ -26,6 +27,8 @@ export type ReminderOutcome =
   | 'reschedule'
   | 'already'
   | 'unavailable'
+  /** FX-82: service kutilmagan xato berdi — «allaqachon» emas, bemorga aniq xabar. */
+  | 'failed'
   | 'not_owner'
   | 'not_found';
 
@@ -112,41 +115,48 @@ export async function handleReminderAction(
   // 'ok' | 'no' | 're' — hammasiga.
   if (row.startTime.getTime() <= Date.now()) return { outcome: 'already', ...base };
 
-  const c = createBotContext(tx, o.tenantId);
+  // FX-82: update kutilmagan xato bersa (DB xatosi tx'ni abort qiladi) — savepoint ichida
+  // ishlaymiz: xato savepoint'ni qaytaradi, tashqi tx (callback javobi, boshqa yozuvlar)
+  // yashaydi. Poyga (holat o'zgargan) — haqiqatan «already»; qolgan xato — `failed`.
   try {
-    if (o.action === 'ok') {
-      if (row.status === 'confirmed') return { outcome: 'already', ...base };
-      const res = await deps.appointments.update(c, row.id, { status: 'confirmed' });
-      // FX-36: {ok:false} (konflikt/time-off) jimgina «already» emas — bemorga aniq xabar.
-      return { outcome: res.ok ? 'confirmed' : 'unavailable', ...base };
-    }
-    if (o.action === 'no') {
-      // FX-58: bemor erta check-in qilgan (ochiq navbat chiptasi bor) — bot service'ida queue
-      // reverse-sync yo'q, bekor qilsak chipta arvoh bo'lib qoladi. Bekor qilishni registraturaga
-      // qoldiramiz (kalendar/navbat reverse-sync bilan yopadi).
-      const [openTicket] = await tx
-        .select({ id: queueTickets.id })
-        .from(queueTickets)
-        .where(
-          and(
-            eq(queueTickets.appointmentId, row.id),
-            inArray(queueTickets.status, ['waiting', 'in_progress']),
-          ),
-        )
-        .limit(1);
-      if (openTicket) return { outcome: 'already', ...base };
-      const res = await deps.appointments.update(c, row.id, {
-        status: 'cancelled',
-        cancellationReason: 'patient_telegram',
-      });
-      if (!res.ok) return { outcome: 'unavailable', ...base };
-      await notifyStaffPatientCancelled(tx, o.tenantId, row);
-      return { outcome: 'cancelled', ...base };
-    }
+    return await tx.transaction(async (sp) => {
+      const c = createBotContext(sp, o.tenantId);
+      if (o.action === 'ok') {
+        if (row.status === 'confirmed') return { outcome: 'already', ...base } as const;
+        const res = await deps.appointments.update(c, row.id, { status: 'confirmed' });
+        // FX-36: {ok:false} (konflikt/time-off) jimgina «already» emas — bemorga aniq xabar.
+        return { outcome: res.ok ? 'confirmed' : 'unavailable', ...base } as const;
+      }
+      if (o.action === 'no') {
+        // FX-58: bemor erta check-in qilgan (ochiq navbat chiptasi bor) — bot service'ida queue
+        // reverse-sync yo'q, bekor qilsak chipta arvoh bo'lib qoladi. Bekor qilishni registraturaga
+        // qoldiramiz (kalendar/navbat reverse-sync bilan yopadi).
+        const [openTicket] = await sp
+          .select({ id: queueTickets.id })
+          .from(queueTickets)
+          .where(
+            and(
+              eq(queueTickets.appointmentId, row.id),
+              inArray(queueTickets.status, ['waiting', 'in_progress']),
+            ),
+          )
+          .limit(1);
+        if (openTicket) return { outcome: 'already', ...base } as const;
+        const res = await deps.appointments.update(c, row.id, {
+          status: 'cancelled',
+          cancellationReason: 'patient_telegram',
+        });
+        if (!res.ok) return { outcome: 'unavailable', ...base } as const;
+        // FX-83: best-effort (o'z savepoint'ida) — xato bekor qilishni qaytarmaydi.
+        await notifyStaffPatientCancelled(sp, o.tenantId, row);
+        return { outcome: 'cancelled', ...base } as const;
+      }
+      // 're' — yozilish o'zgarmaydi; chaqiruvchi bron oqimini (rescheduleOf) boshlaydi.
+      return { outcome: 'reschedule', ...base } as const;
+    });
   } catch (err) {
     if (err instanceof AppointmentTransitionError) return { outcome: 'already', ...base };
-    throw err;
+    logger.error({ err, appointmentId: row.id }, 'Telegram eslatma tugmasi: update xatosi');
+    return { outcome: 'failed', ...base };
   }
-  // 're' — yozilish o'zgarmaydi; chaqiruvchi bron oqimini (rescheduleOf) boshlaydi.
-  return { outcome: 'reschedule', ...base };
 }

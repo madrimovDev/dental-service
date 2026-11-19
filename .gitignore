@@ -80,3 +80,7 @@ infra/supervisor/releases/*
 
 # Landing build output
 apps/landing/dist
+
+# Testlar yaratadigan vaqtinchalik messaging kalit fayllari (FX-11) — hech qachon commit qilinmaydi
+apps/api/tests/**/.*secret*.txt
+apps/api/tests/**/*-secret-test.txt

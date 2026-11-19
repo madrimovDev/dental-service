@@ -8,7 +8,7 @@ import {
 } from '@dental/db-schema';
 import type { NotificationChannel } from '@dental/notifications';
 import { Worker } from 'bullmq';
-import { and, asc, desc, eq, lte } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, lte } from 'drizzle-orm';
 import { createAdminDb, type Database, type DbOrTx } from '../db/client.ts';
 import { withTenant } from '../db/scoped.ts';
 import { env } from './env.ts';
@@ -16,7 +16,7 @@ import { logger } from './logger.ts';
 import { RECALL_QUEUE_NAME } from './queue.ts';
 import { CLINIC_TZ, renderRecallSms, type SmsLang } from './sms-templates.ts';
 import { isTenantServiceBlocked } from './subscription.ts';
-import { resolveTenantChannel } from './tenant-channel.ts';
+import { resolveTenantChannel, sendWithFallback } from './tenant-channel.ts';
 
 /** Klinika-local kun (YYYY-MM-DD) berilgan TZ'da. */
 export function localDateString(tz: string, now: Date = new Date()): string {
@@ -106,7 +106,12 @@ export async function processRecallScan(deps: RecallScanDeps): Promise<RecallSca
     .innerJoin(tenants, eq(tenants.id, recalls.tenantId))
     .leftJoin(tenantSettings, eq(tenantSettings.tenantId, recalls.tenantId))
     .where(
-      and(eq(recalls.status, 'pending'), lte(recalls.dueDate, localDateString(CLINIC_TZ, now))),
+      and(
+        eq(recalls.status, 'pending'),
+        lte(recalls.dueDate, localDateString(CLINIC_TZ, now)),
+        // FX-81: arxivlangan bemorga recall yuborilmaydi.
+        isNull(patients.archivedAt),
+      ),
     );
 
   for (const row of due) {
@@ -231,7 +236,19 @@ export async function processRecallScan(deps: RecallScanDeps): Promise<RecallSca
         });
         const text = `${title} — ${body}`;
 
-        const sendRes = await channel.send(to, { text });
+        // FX-41 (LA-22): Telegram 403/xato → SMS zaxirasi; 403 da chat_id tozalanadi.
+        const { res: sendRes, usedFallback } = await sendWithFallback(
+          { channel, to, fallback: resolved.fallback },
+          { text },
+          resolved.source === 'telegram'
+            ? async () => {
+                await tx
+                  .update(patients)
+                  .set({ telegramChatId: null })
+                  .where(eq(patients.id, row.patientId));
+              }
+            : undefined,
+        );
 
         await tx.insert(recallLogs).values({
           tenantId: row.tenantId,
@@ -244,7 +261,7 @@ export async function processRecallScan(deps: RecallScanDeps): Promise<RecallSca
           // (xabar bemor chat_id'ga ketadi) — `source !== 'telegram'` bilan gate
           // (sms YOKI none — ikkalasida ham `to` telefonga yuboriladi).
           detail:
-            emergencyFallback && resolved.source !== 'telegram'
+            emergencyFallback && (resolved.source !== 'telegram' || usedFallback)
               ? `Favqulodda aloqaga yuborildi${sendRes.ok ? '' : ' (xato)'}`
               : sendRes.ok
                 ? (sendRes.providerId ?? null)
@@ -252,7 +269,11 @@ export async function processRecallScan(deps: RecallScanDeps): Promise<RecallSca
         });
 
         if (sendRes.ok) {
-          await tx
+          // FX-120 (LB-29): send davomida (tarmoq, soniyalar) qator parallel o'zgargan bo'lishi
+          // mumkin (registrator yozdi -> 'scheduled', menejer yopdi -> 'dismissed'/'completed').
+          // Shartsiz UPDATE ularni 'contacted'ga qaytarardi — faqat hali 'pending' bo'lsa yoziladi.
+          // (Xabar allaqachon ketgan: log 'sent' qoladi, holat esa yangi egasiniki.)
+          const moved = await tx
             .update(recalls)
             .set({
               status: 'contacted',
@@ -260,7 +281,14 @@ export async function processRecallScan(deps: RecallScanDeps): Promise<RecallSca
               contactAttempts: live.attempts + 1,
               updatedAt: now,
             })
-            .where(eq(recalls.id, row.recallId));
+            .where(and(eq(recalls.id, row.recallId), eq(recalls.status, 'pending')))
+            .returning({ id: recalls.id });
+          if (moved.length === 0) {
+            logger.warn(
+              { tenantId: row.tenantId, recallId: row.recallId },
+              'Recall scan: send paytida recall holati o‘zgardi — contacted yozilmadi',
+            );
+          }
           result.sent++;
         } else {
           result.failed++;

@@ -12,7 +12,9 @@
  *   eslatma tugmalari (Telegram kanalida inline_keyboard), chek/retsept xabari.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
-import { existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { ROLE_TEMPLATES } from '@dental/core';
 import {
   appointments,
@@ -47,7 +49,9 @@ import { createNotificationsService } from '../../src/modules/notifications/noti
 import { createScheduleService } from '../../src/modules/schedule/index.ts';
 import { grantTenantWide } from './_grant-scope.ts';
 
-const secretPath = `${import.meta.dir}/.ui-t2-telegram-secret-test.txt`;
+// FX-11: kalit fayli repo ichida emas — OS temp papkasida (commit'ga tushmaydi).
+const secretDir = mkdtempSync(join(tmpdir(), 'ui-t2-telegram-'));
+const secretPath = join(secretDir, 'messaging-secret.txt');
 process.env.MESSAGING_SECRET_PATH = secretPath;
 
 const { createApp } = await import('../../src/app.ts');
@@ -282,7 +286,7 @@ beforeAll(async () => {
 afterAll(async () => {
   globalThis.fetch = realFetch;
   await db.execute(sql`TRUNCATE users, tenants RESTART IDENTITY CASCADE`);
-  if (existsSync(secretPath)) rmSync(secretPath);
+  rmSync(secretDir, { recursive: true, force: true });
 });
 
 beforeEach(() => {

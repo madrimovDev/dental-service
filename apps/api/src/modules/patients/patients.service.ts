@@ -468,7 +468,12 @@ export const createPatientsService = (deps: {
     if (input.gender !== undefined) patch.gender = input.gender;
     // `null` — ustunni tozalash (PATCH semantikasi saqlanadi), qiymat bo'lsa
     // kanonik shaklga keltiriladi.
-    if (input.phone !== undefined) patch.phone = normalizeOptionalPhone(input.phone);
+    if (input.phone !== undefined) {
+      patch.phone = normalizeOptionalPhone(input.phone);
+      // FX-41 (LA-22): telefon o'zgarsa — eski raqam egasi bilan bog'langan Telegram chat
+      // bekor (chek/retsept PII eski egasiga ketmasin); yangi raqam egasi kontakt ulashadi.
+      if (patch.phone !== before.phone) patch.telegramChatId = null;
+    }
     if (input.phoneSecondary !== undefined)
       patch.phoneSecondary = normalizeOptionalPhone(input.phoneSecondary);
     if (input.passport !== undefined) patch.passport = input.passport;
@@ -495,6 +500,28 @@ export const createPatientsService = (deps: {
     // PT-01: javob findById/list bilan bir xil maskalash qoidasiga bo'ysunadi
     // (audit yozuvi esa HAQIQIY qiymat bilan yuqorida yozildi).
     return updated && !userHasPiiAccess(c) ? maskPii(updated) : updated;
+  }
+
+  /**
+   * FX-41 (LA-22): xodim bemorning Telegram bog'lanishini uzadi (audit). Bemor yo'q
+   * (yoki boshqa tenant — RLS) → null.
+   */
+  async function unlinkTelegram(c: Context, id: string) {
+    const db = getDb(c);
+    const [before] = await db
+      .select({ id: patients.id, telegramChatId: patients.telegramChatId })
+      .from(patients)
+      .where(eq(patients.id, id));
+    if (!before) return null;
+    await db.update(patients).set({ telegramChatId: null }).where(eq(patients.id, id));
+    await deps.audit.record(c, {
+      action: 'telegram_unlinked',
+      resourceType: 'patient',
+      resourceId: id,
+      before: { linked: before.telegramChatId !== null },
+      after: { linked: false },
+    });
+    return { id: before.id };
   }
 
   /**
@@ -1043,6 +1070,7 @@ export const createPatientsService = (deps: {
     create,
     update,
     archive,
+    unlinkTelegram,
     getMedicalRecord,
     updateMedicalRecord,
     confirmMedicalRecord,

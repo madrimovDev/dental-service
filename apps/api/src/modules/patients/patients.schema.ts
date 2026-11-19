@@ -318,6 +318,11 @@ export const patientArchiveResultSchema = z
   .object({ archived: z.literal(true), id: z.uuid() })
   .openapi('PatientArchiveResult');
 
+/** DELETE /{id}/telegram-link — xodim Telegram bog'lanishini uzdi (FX-41). */
+export const patientTelegramUnlinkResultSchema = z
+  .object({ unlinked: z.literal(true), id: z.uuid() })
+  .openapi('PatientTelegramUnlinkResult');
+
 /** DELETE relatives remove response. */
 export const relativeRemoveResultSchema = z
   .object({ removed: z.literal(true), id: z.uuid() })

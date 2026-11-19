@@ -1,10 +1,11 @@
-import { tenantSettings } from '@dental/db-schema';
-import { sql } from 'drizzle-orm';
+import { patients, tenantSettings } from '@dental/db-schema';
+import { isNotNull, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import IORedis from 'ioredis';
+import { onAfterCommit } from '../../db/after-commit.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
-import { encryptSecret } from '../../lib/crypto.ts';
+import { decryptSecret, encryptSecret } from '../../lib/crypto.ts';
 import { env } from '../../lib/env.ts';
 import { logger } from '../../lib/logger.ts';
 import { pgErrorInfo } from '../../lib/pg-error.ts';
@@ -128,6 +129,28 @@ export const createTenantSettingsService = (deps: { audit: AuditLogger }) => {
       patch.integrationSettings = next;
     }
 
+    // FX-41 (LA-22): boshqa BOT ulansa (bot id — tokendagi ':' oldidagi qism — farqli) eski
+    // bot bilan bog'langan chat_id'lar tozalanadi. Review: o'sha botning tokeni yangi sir
+    // bilan almashtirilsa (BotFather /revoke) yoki Telegram o'chirilsa (`null`) — tegilmaydi:
+    // shaxsiy chat'da chat_id = foydalanuvchi id, ya'ni boshqa bot ham faqat o'sha odamga,
+    // u /start bosgandan keyingina yeta oladi; aks holda 403 → onBlocked bemor bo'yicha tozalaydi.
+    let botChanged = false;
+    if (telegram) {
+      const prevEnc = (
+        (before.integrationSettings ?? {}) as { telegram?: { botTokenEnc?: string } | null }
+      ).telegram?.botTokenEnc;
+      let prevToken: string | null = null;
+      if (prevEnc) {
+        try {
+          prevToken = decryptSecret(prevEnc);
+        } catch {
+          prevToken = null;
+        }
+      }
+      const botIdOf = (token: string) => token.split(':')[0];
+      botChanged = prevToken !== null && botIdOf(telegram.botToken) !== botIdOf(prevToken);
+    }
+
     let updated: typeof before | undefined;
     try {
       // SAVEPOINT: unique buzilishi (23505) so'rov tranzaksiyasini aborted qilmasin.
@@ -142,6 +165,13 @@ export const createTenantSettingsService = (deps: { audit: AuditLogger }) => {
       throw err;
     }
 
+    if (botChanged) {
+      await db
+        .update(patients)
+        .set({ telegramChatId: null })
+        .where(isNotNull(patients.telegramChatId));
+    }
+
     if (updated) {
       await deps.audit.record(c, {
         action: 'updated',
@@ -152,17 +182,20 @@ export const createTenantSettingsService = (deps: { audit: AuditLogger }) => {
       });
     }
 
-    // CLI-379: telegram cred o'zgargandan keyin bot-manager'ga reload signal
-    // yuboriladi (token yangilanishi/o'chirilishi bot'ni qayta ishga tushirishi
-    // kerak). Best-effort — Redis xatosi settings save'ni HECH QACHON buzmaydi.
+    // CLI-379: telegram cred o'zgargandan keyin bot-manager'ga reload signal.
+    // FX-10 (LA-24): publish FAQAT COMMIT'dan keyin — bot-manager alohida ulanishda
+    // o'qiydi va commit bo'lmagan qatorni ko'rmaydi (eski/yo'q token bilan ishga tushardi).
+    // Best-effort — Redis xatosi settings save'ni HECH QACHON buzmaydi.
     if (telegram !== undefined) {
       const tenantId = c.get('activeTenantId');
       if (tenantId) {
-        try {
-          await getRedisPub().publish('telegram:reload', tenantId);
-        } catch (err) {
-          logger.error({ err, tenantId }, 'telegram:reload publish failed');
-        }
+        await onAfterCommit(c, async () => {
+          try {
+            await getRedisPub().publish('telegram:reload', tenantId);
+          } catch (err) {
+            logger.error({ err, tenantId }, 'telegram:reload publish failed');
+          }
+        });
       }
     }
 

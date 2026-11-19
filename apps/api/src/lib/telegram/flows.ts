@@ -1,5 +1,5 @@
 import { patients, tenants } from '@dental/db-schema';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq, isNull } from 'drizzle-orm';
 import type { DbOrTx } from '../../db/client.ts';
 import type { AppointmentsService } from '../../modules/appointments/index.ts';
 import type { NotificationsService } from '../../modules/notifications/index.ts';
@@ -70,7 +70,8 @@ export function createTelegramFlows(deps: FlowDeps) {
     const rows = await tx
       .select({ id: patients.id, name: patients.fullName, pref: patients.preferredLanguage })
       .from(patients)
-      .where(eq(patients.telegramChatId, chatId))
+      // FX-81: arxivlangan bemor bot oqimlarida faol emas.
+      .where(and(eq(patients.telegramChatId, chatId), isNull(patients.archivedAt)))
       .orderBy(asc(patients.createdAt), asc(patients.id));
     if (rows.length === 0) return null;
     const [t] = await tx
@@ -257,6 +258,8 @@ export function createTelegramFlows(deps: FlowDeps) {
           return { reply: null, toast: m.reminderAlready };
         case 'unavailable':
           return { reply: { text: m.reminderUnavailable } };
+        case 'failed':
+          return { reply: { text: m.reminderFailed } };
         case 'reschedule': {
           // Eslatma egasi (r.patientId) shu chat'ning bemori — oqim shu bemor nomidan.
           const owner = r.patientId ?? l.patientId;
