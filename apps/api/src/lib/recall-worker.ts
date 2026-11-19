@@ -261,7 +261,11 @@ export async function processRecallScan(deps: RecallScanDeps): Promise<RecallSca
         });
 
         if (sendRes.ok) {
-          await tx
+          // FX-120 (LB-29): send davomida (tarmoq, soniyalar) qator parallel o'zgargan bo'lishi
+          // mumkin (registrator yozdi -> 'scheduled', menejer yopdi -> 'dismissed'/'completed').
+          // Shartsiz UPDATE ularni 'contacted'ga qaytarardi — faqat hali 'pending' bo'lsa yoziladi.
+          // (Xabar allaqachon ketgan: log 'sent' qoladi, holat esa yangi egasiniki.)
+          const moved = await tx
             .update(recalls)
             .set({
               status: 'contacted',
@@ -269,7 +273,14 @@ export async function processRecallScan(deps: RecallScanDeps): Promise<RecallSca
               contactAttempts: live.attempts + 1,
               updatedAt: now,
             })
-            .where(eq(recalls.id, row.recallId));
+            .where(and(eq(recalls.id, row.recallId), eq(recalls.status, 'pending')))
+            .returning({ id: recalls.id });
+          if (moved.length === 0) {
+            logger.warn(
+              { tenantId: row.tenantId, recallId: row.recallId },
+              'Recall scan: send paytida recall holati o‘zgardi — contacted yozilmadi',
+            );
+          }
           result.sent++;
         } else {
           result.failed++;
