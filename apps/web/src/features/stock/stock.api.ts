@@ -15,6 +15,7 @@ import {
   updateStockItem,
 } from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { expensesKeys } from '@/features/expenses/expenses.keys';
 import { lookupKeys } from '@/lib/lookup-keys';
 import { stockKeys } from './stock.keys';
 
@@ -86,7 +87,11 @@ export function useCreateBatch() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: CreateBatchPayload) => createStockBatch(body).then((r) => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: stockKeys.all }),
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: stockKeys.all });
+      // FX-166: «xarajatga yoz» kirimi xarajat yaratadi — xarajatlar/P&L keshi ham yangilanadi.
+      if (vars.recordAsExpense) void qc.invalidateQueries({ queryKey: expensesKeys.all });
+    },
   });
 }
 
