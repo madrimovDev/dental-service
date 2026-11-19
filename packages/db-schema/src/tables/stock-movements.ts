@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { index, numeric, pgEnum, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { services } from './services.ts';
 import { stockItems } from './stock-items.ts';
 import { tenants } from './tenants.ts';
 import { users } from './users.ts';
@@ -21,6 +22,10 @@ export const stockMovements = pgTable(
     quantity: numeric('quantity', { precision: 14, scale: 2 }).notNull(),
     reason: text('reason'),
     sourceVisitNoteId: uuid('source_visit_note_id').references(() => visitNotes.id, {
+      onDelete: 'set null',
+    }),
+    // FX-44: vizit BOM chiqimi qaysi xizmat uchun (ledger-asosli qaytarish). Eski qatorlarda NULL.
+    sourceServiceId: uuid('source_service_id').references(() => services.id, {
       onDelete: 'set null',
     }),
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),

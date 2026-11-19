@@ -42,6 +42,10 @@ import type {
 /** `listMovements` default sahifa hajmi (CLI-442 #3 — chegaralanmagan tarix oldini olish). */
 const DEFAULT_MOVEMENTS_PAGE_SIZE = 50;
 
+/** Vizit avto-chiqimi/qaytarishi ledger sabablari (FX-44/45). */
+const VISIT_RETURN_REASONS = ['visit_edit_return'] as const;
+const VISIT_LEDGER_REASONS = ['visit_auto', ...VISIT_RETURN_REASONS] as const;
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Asia/Tashkent UTC+5 (DST yo'q) — «bugun» chegarasi cashier/expenses bilan izchil. */
 const TASHKENT_OFFSET_MS = 5 * 60 * 60 * 1000;
@@ -167,7 +171,7 @@ export const createStockService = (deps: {
     const since = new Date(Date.now() - USAGE_WINDOW_DAYS * DAY_MS);
     const net = sql<string>`coalesce(sum(case
       when ${stockMovements.type} = 'out' then ${stockMovements.quantity}
-      when ${stockMovements.type} = 'in' and ${stockMovements.reason} = 'visit_edit_return' then -${stockMovements.quantity}
+      when ${stockMovements.type} = 'in' and ${stockMovements.reason} in ('visit_edit_return', 'visit_cancel_return') then -${stockMovements.quantity}
       else 0 end), 0)`;
     const rows = await db
       .select({ itemId: stockMovements.itemId, net })
@@ -567,6 +571,135 @@ export const createStockService = (deps: {
   }
 
   /**
+   * Vizit bilan bog'liq bitta ombor harakati: ledger qatori + qoldiq yangilash + kam qoldiq
+   * ogohlantirishi. Manfiy qoldiq guard'i YO'Q (avto-chiqim vizit yozuvini bloklamasin).
+   */
+  async function postVisitMovement(
+    c: Context,
+    m: {
+      itemId: string;
+      type: 'in' | 'out';
+      quantity: string;
+      reason: string;
+      sourceVisitNoteId: string;
+      sourceServiceId: string | null;
+    },
+  ) {
+    const db = getDb(c);
+    const tenantId = c.get('activeTenantId');
+    if (!tenantId) throw new Error('No tenant context');
+    const isOut = m.type === 'out';
+    await db.insert(stockMovements).values({
+      tenantId,
+      itemId: m.itemId,
+      type: m.type,
+      quantity: m.quantity,
+      reason: m.reason,
+      sourceVisitNoteId: m.sourceVisitNoteId,
+      sourceServiceId: m.sourceServiceId,
+      createdBy: c.get('user')?.id ?? null,
+    });
+    const [updated] = await db
+      .update(stockItems)
+      .set({
+        quantity: isOut
+          ? sql`${stockItems.quantity} - ${m.quantity}`
+          : sql`${stockItems.quantity} + ${m.quantity}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(stockItems.id, m.itemId))
+      .returning({
+        id: stockItems.id,
+        name: stockItems.name,
+        branchId: stockItems.branchId,
+        quantity: stockItems.quantity,
+        minThreshold: stockItems.minThreshold,
+      });
+    if (updated) {
+      const newQty = Number(updated.quantity);
+      const oldQty = isOut ? newQty + Number(m.quantity) : newQty - Number(m.quantity);
+      const threshold = Number(updated.minThreshold);
+      await maybeAlertLowStock(
+        c,
+        db,
+        updated,
+        isLowStock(oldQty, threshold),
+        isLowStock(newQty, threshold),
+        newQty,
+      );
+    }
+  }
+
+  /** FX-44: vizitda xizmat belgisiz (eski) avto-chiqim bormi — bo'lsa ledger-qaytarish ishonchsiz. */
+  async function noteHasUntaggedDeduction(c: Context, visitNoteId: string): Promise<boolean> {
+    const rows = await getDb(c)
+      .select({ id: stockMovements.id })
+      .from(stockMovements)
+      .where(
+        and(
+          eq(stockMovements.sourceVisitNoteId, visitNoteId),
+          eq(stockMovements.type, 'out'),
+          eq(stockMovements.reason, 'visit_auto'),
+          isNull(stockMovements.sourceServiceId),
+        ),
+      )
+      .limit(1);
+    return rows.length > 0;
+  }
+
+  /**
+   * Vizit uchun item (va xizmat) kesimida hali qaytarilmagan avto-chiqim:
+   * Σ `visit_auto` out − Σ (`visit_edit_return` + `visit_cancel_return`) in. Faqat > 0 qatorlar.
+   * `serviceId` berilsa — faqat shu xizmat; aks holda har (item, xizmat) juftligi alohida.
+   */
+  async function outstandingByItem(
+    c: Context,
+    visitNoteId: string,
+    filter: { serviceId?: string },
+  ): Promise<
+    {
+      itemId: string;
+      serviceId: string | null;
+      outstanding: number;
+      outTotal: number;
+      outCount: number;
+    }[]
+  > {
+    const net = sql<string>`coalesce(sum(case
+      when ${stockMovements.type} = 'out' then ${stockMovements.quantity}
+      else -${stockMovements.quantity} end), 0)`;
+    const outTotal = sql<string>`coalesce(sum(case
+      when ${stockMovements.type} = 'out' then ${stockMovements.quantity} else 0 end), 0)`;
+    const outCount = sql<string>`count(*) filter (where ${stockMovements.type} = 'out')`;
+    const rows = await getDb(c)
+      .select({
+        itemId: stockMovements.itemId,
+        serviceId: stockMovements.sourceServiceId,
+        net,
+        outTotal,
+        outCount,
+      })
+      .from(stockMovements)
+      .where(
+        and(
+          eq(stockMovements.sourceVisitNoteId, visitNoteId),
+          inArray(stockMovements.reason, [...VISIT_LEDGER_REASONS]),
+          filter.serviceId ? eq(stockMovements.sourceServiceId, filter.serviceId) : undefined,
+        ),
+      )
+      .groupBy(stockMovements.itemId, stockMovements.sourceServiceId);
+    return rows
+      .map((r) => ({
+        itemId: r.itemId,
+        serviceId: r.serviceId,
+        outstanding: Math.round(Number(r.net) * 100) / 100,
+        outTotal: Number(r.outTotal),
+        outCount: Math.max(Number(r.outCount), 1),
+      }))
+      .filter((r) => r.outstanding > 0);
+  }
+
+  /**
    * Vizit yozuvi → ombor avtomatik chiqim (BOM bo'yicha).
    * clinical.service'ga DI orqali ulanadi (request-tx ichida ishlaydi — to'g'ridan import yo'q).
    * BOM topilmagan service → skip. Manfiyga ruxsat (guard yo'q).
@@ -602,45 +735,14 @@ export const createStockService = (deps: {
     for (const bom of boms) {
       const count = occurrenceCount.get(bom.serviceId) ?? 1;
       for (let i = 0; i < count; i++) {
-        await db.insert(stockMovements).values({
-          tenantId,
+        await postVisitMovement(c, {
           itemId: bom.itemId,
           type: 'out',
           quantity: bom.qtyPerService,
           reason: 'visit_auto',
           sourceVisitNoteId,
-          createdBy: c.get('user')?.id ?? null,
+          sourceServiceId: bom.serviceId,
         });
-        // ⚠️ Auto-deduction'da negative-stock guard YO'Q (advisor): vizit yozuvini ombor
-        // noto'g'ri sozlangani uchun bloklamaslik kerak. Manfiyga ruxsat + alert. newQty
-        // olish uchun .returning() (transition alert solishtiruvi uchun).
-        const [updated] = await db
-          .update(stockItems)
-          .set({
-            quantity: sql`${stockItems.quantity} - ${bom.qtyPerService}`,
-            updatedAt: new Date(),
-          })
-          .where(eq(stockItems.id, bom.itemId))
-          .returning({
-            id: stockItems.id,
-            name: stockItems.name,
-            branchId: stockItems.branchId,
-            quantity: stockItems.quantity,
-            minThreshold: stockItems.minThreshold,
-          });
-        if (updated) {
-          const newQty = Number(updated.quantity);
-          const oldQty = newQty + Number(bom.qtyPerService);
-          const threshold = Number(updated.minThreshold);
-          await maybeAlertLowStock(
-            c,
-            db,
-            updated,
-            isLowStock(oldQty, threshold),
-            isLowStock(newQty, threshold),
-            newQty,
-          );
-        }
       }
     }
   }
@@ -686,66 +788,83 @@ export const createStockService = (deps: {
     }
     if (deltas.size === 0) return;
 
-    const boms = await resolveBomItems(
-      c,
-      await db
-        .select()
-        .from(serviceMaterials)
-        .where(inArray(serviceMaterials.serviceId, [...deltas.keys()])),
-      sourceVisitNoteId,
-    );
+    // FX-44 (LA-42): qaytarish ledger bo'yicha (haqiqiy chiqim movement'lari), joriy BOM emas.
+    // Eski (FX-44 dan oldingi) yozuvlarda movement'da xizmat belgisi yo'q (`source_service_id`
+    // NULL) — bunday vizit uchun avvalgi xulq (joriy BOM) saqlanadi.
+    const legacy = await noteHasUntaggedDeduction(c, sourceVisitNoteId);
+    const deductDeltas = new Map([...deltas].filter(([, d]) => d > 0));
+    const returnDeltas = new Map([...deltas].filter(([, d]) => d < 0));
 
-    for (const bom of boms) {
-      const delta = deltas.get(bom.serviceId);
-      if (!delta) continue;
-
-      const occurrences = Math.abs(delta);
-      const isDeduction = delta > 0;
-      const movementType = isDeduction ? ('out' as const) : ('in' as const);
-      const reason = isDeduction ? 'visit_auto' : 'visit_edit_return';
-
-      for (let i = 0; i < occurrences; i++) {
-        await db.insert(stockMovements).values({
-          tenantId,
-          itemId: bom.itemId,
-          type: movementType,
-          quantity: bom.qtyPerService,
-          reason,
-          sourceVisitNoteId,
-          createdBy: c.get('user')?.id ?? null,
-        });
-
-        // ⚠️ Negative-stock guard YO'Q (deductForServices bilan bir xil — advisor qarori).
-        const [updated] = await db
-          .update(stockItems)
-          .set({
-            quantity: isDeduction
-              ? sql`${stockItems.quantity} - ${bom.qtyPerService}`
-              : sql`${stockItems.quantity} + ${bom.qtyPerService}`,
-            updatedAt: new Date(),
-          })
-          .where(eq(stockItems.id, bom.itemId))
-          .returning({
-            id: stockItems.id,
-            name: stockItems.name,
-            branchId: stockItems.branchId,
-            quantity: stockItems.quantity,
-            minThreshold: stockItems.minThreshold,
+    if (deductDeltas.size > 0) {
+      const boms = await resolveBomItems(
+        c,
+        await db
+          .select()
+          .from(serviceMaterials)
+          .where(inArray(serviceMaterials.serviceId, [...deductDeltas.keys()])),
+        sourceVisitNoteId,
+      );
+      for (const bom of boms) {
+        const occurrences = deductDeltas.get(bom.serviceId) ?? 0;
+        for (let i = 0; i < occurrences; i++) {
+          await postVisitMovement(c, {
+            itemId: bom.itemId,
+            type: 'out',
+            quantity: bom.qtyPerService,
+            reason: 'visit_auto',
+            sourceVisitNoteId,
+            sourceServiceId: bom.serviceId,
           });
-        if (updated) {
-          const newQty = Number(updated.quantity);
-          const oldQty = isDeduction
-            ? newQty + Number(bom.qtyPerService)
-            : newQty - Number(bom.qtyPerService);
-          const threshold = Number(updated.minThreshold);
-          await maybeAlertLowStock(
-            c,
-            db,
-            updated,
-            isLowStock(oldQty, threshold),
-            isLowStock(newQty, threshold),
-            newQty,
-          );
+        }
+      }
+    }
+
+    if (returnDeltas.size === 0) return;
+
+    if (legacy) {
+      const boms = await resolveBomItems(
+        c,
+        await db
+          .select()
+          .from(serviceMaterials)
+          .where(inArray(serviceMaterials.serviceId, [...returnDeltas.keys()])),
+        sourceVisitNoteId,
+      );
+      for (const bom of boms) {
+        const occurrences = Math.abs(returnDeltas.get(bom.serviceId) ?? 0);
+        for (let i = 0; i < occurrences; i++) {
+          await postVisitMovement(c, {
+            itemId: bom.itemId,
+            type: 'in',
+            quantity: bom.qtyPerService,
+            reason: 'visit_edit_return',
+            sourceVisitNoteId,
+            sourceServiceId: bom.serviceId,
+          });
+        }
+      }
+      return;
+    }
+
+    for (const [serviceId, delta] of returnDeltas) {
+      const removed = Math.abs(delta);
+      const outstanding = await outstandingByItem(c, sourceVisitNoteId, { serviceId });
+      for (const row of outstanding) {
+        // Har occurrence — alohida movement; bir occurrence ulushi = shu (item, xizmat) bo'yicha
+        // haqiqiy chiqim o'rtachasi (Σout / out qatorlari), qoldiq (outstanding) bilan cheklanadi.
+        const perOccurrence = Math.round((row.outTotal / row.outCount) * 100) / 100;
+        let remaining = row.outstanding;
+        for (let i = 0; i < removed && remaining > 0; i++) {
+          const share = Math.min(perOccurrence, remaining);
+          await postVisitMovement(c, {
+            itemId: row.itemId,
+            type: 'in',
+            quantity: String(share),
+            reason: 'visit_edit_return',
+            sourceVisitNoteId,
+            sourceServiceId: serviceId,
+          });
+          remaining = Math.round((remaining - share) * 100) / 100;
         }
       }
     }
@@ -840,7 +959,7 @@ export const createStockService = (deps: {
       .where(
         and(
           gte(stockMovements.createdAt, dayStart),
-          inArray(stockMovements.reason, ['visit_auto', 'visit_edit_return']),
+          inArray(stockMovements.reason, [...VISIT_LEDGER_REASONS]),
           branchFilter,
         ),
       )

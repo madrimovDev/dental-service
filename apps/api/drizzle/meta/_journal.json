@@ -442,6 +442,13 @@
       "when": 1795110388061,
       "tag": "0062_visit_note_completes_stage",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1795115419379,
+      "tag": "0064_stock_movement_service",
+      "breakpoints": true
     }
   ]
 }
