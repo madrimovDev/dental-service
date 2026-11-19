@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
-import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { verifyLicenseSignature } from '@dental/core/license-signature';
 import { SUPERVISOR_PUBLIC_KEY_PEM } from '@dental/core/supervisor-public-key';
@@ -110,6 +110,43 @@ const getKey = async () => {
   return Buffer.from(fp, 'hex');
 };
 
+/**
+ * FX-161 (review) — atomik yozish: shu papkada unikal tmp faylga yoziladi,
+ * fsync qilinadi, keyin asl fayl ustiga `rename`. Joyida `writeFile`
+ * (truncate, keyin write) parallel o'quvchiga bo'sh/yarim faylni ko'rsatardi
+ * (`invalid` → 403 LICENSE_NOT_FOUND → `/activate`), elektr uzilsa esa bo'sh
+ * `.lic` abadiy qolardi. `rename` POSIX'da atomik; Windows'da mavjud faylni
+ * almashtiradi, lekin antivirus/o'quvchi faylni ushlab tursa EPERM/EBUSY/EACCES
+ * berishi mumkin — shuning uchun qisqa qayta urinish.
+ */
+const RENAME_RETRY_CODES = new Set(['EPERM', 'EBUSY', 'EACCES']);
+const atomicWriteFile = async (targetPath: string, contents: string): Promise<void> => {
+  await mkdir(dirname(targetPath), { recursive: true });
+  const tmpPath = `${targetPath}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`;
+  try {
+    const fh = await open(tmpPath, 'w', 0o600);
+    try {
+      await fh.writeFile(contents);
+      await fh.sync();
+    } finally {
+      await fh.close();
+    }
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await rename(tmpPath, targetPath);
+        return;
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException).code ?? '';
+        if (attempt >= 4 || !RENAME_RETRY_CODES.has(code)) throw err;
+        await new Promise((r) => setTimeout(r, 50 * (attempt + 1)));
+      }
+    }
+  } catch (err) {
+    await unlink(tmpPath).catch(() => {});
+    throw err;
+  }
+};
+
 export const writeLicense = async (data: LicenseData): Promise<void> => {
   const key = await getKey();
   const iv = randomBytes(16);
@@ -117,24 +154,51 @@ export const writeLicense = async (data: LicenseData): Promise<void> => {
   const json = JSON.stringify(data);
   const encrypted = Buffer.concat([cipher.update(json, 'utf8'), cipher.final()]);
   const payload = Buffer.concat([iv, encrypted]);
-  const licensePath = getLicensePath();
-  await mkdir(dirname(licensePath), { recursive: true });
-  await writeFile(licensePath, payload.toString('base64'));
+  await atomicWriteFile(getLicensePath(), payload.toString('base64'));
 };
 
-export const readLicense = async (): Promise<LicenseData | null> => {
+/**
+ * FX-161 (LC-40) — `.lic` o'qish natijasi sababi bilan.
+ *
+ * - `missing` — fayl haqiqatan yo'q (ENOENT): aktivatsiya kerak.
+ * - `unreadable` — fayl BOR, lekin hozir o'qib bo'lmadi (EACCES/EBUSY/EPERM —
+ *   antivirus/zaxira dasturi faylni ushlab turgan, ruxsat vaqtincha buzilgan).
+ *   Bu «litsenziya yo'q» EMAS: gate'lar 503 `LICENSE_UNAVAILABLE` qaytaradi,
+ *   web `/activate`ga qattiq redirect qilmaydi.
+ * - `invalid` — fayl o'qildi, lekin decrypt/JSON bo'lmadi yoki fingerprint
+ *   hisoblanmadi (avvalgidek — qayta aktivatsiya yo'li, `LICENSE_NOT_FOUND`).
+ */
+export type LicenseReadResult =
+  | { kind: 'ok'; data: LicenseData }
+  | { kind: 'missing' }
+  | { kind: 'unreadable' }
+  | { kind: 'invalid' };
+
+export const readLicenseResult = async (): Promise<LicenseReadResult> => {
+  let raw: string;
   try {
-    const raw = await readFile(getLicensePath(), 'utf8');
+    raw = await readFile(getLicensePath(), 'utf8');
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === 'ENOENT'
+      ? { kind: 'missing' }
+      : { kind: 'unreadable' };
+  }
+  try {
     const payload = Buffer.from(raw, 'base64');
     const iv = payload.subarray(0, 16);
     const encrypted = payload.subarray(16);
     const key = await getKey();
     const decipher = createDecipheriv('aes-256-cbc', key, iv);
     const json = Buffer.concat([decipher.update(encrypted), decipher.final()]).toString('utf8');
-    return JSON.parse(json) as LicenseData;
+    return { kind: 'ok', data: JSON.parse(json) as LicenseData };
   } catch {
-    return null;
+    return { kind: 'invalid' };
   }
+};
+
+export const readLicense = async (): Promise<LicenseData | null> => {
+  const r = await readLicenseResult();
+  return r.kind === 'ok' ? r.data : null;
 };
 
 const DAY_MS = 86400000;
@@ -382,9 +446,45 @@ export const writeAnchor = async (ms: number): Promise<void> => {
   const json = JSON.stringify(ms);
   const encrypted = Buffer.concat([cipher.update(json, 'utf8'), cipher.final()]);
   const payload = Buffer.concat([iv, encrypted]);
-  const anchorPath = getAnchorPath();
-  await mkdir(dirname(anchorPath), { recursive: true });
-  await writeFile(anchorPath, payload.toString('base64'));
+  await atomicWriteFile(getAnchorPath(), payload.toString('base64'));
+};
+
+/**
+ * FX-160 (LC-39) — modul-gate bitta jarayon ichida langarni ko'pi bilan
+ * "real o'tgan vaqt + shu sakrash" qadar suradi. Avval har gate so'rovi
+ * `max(anchor, Date.now())` yozardi: soat bir marta xato oldinga ketsa
+ * (CMOS batareya, BIOS'da noto'g'ri yil, NTP yo'q) langar o'sha sanaga
+ * yopishib qolardi va soat tuzatilgandan keyin ham litsenziya o'sha sanagacha
+ * qisqarib/bloklanib turardi. 7 kun — imtiyoz muddati (`MAX_GRACE_DAYS`) bilan
+ * bir xil: xato soatning eng yomon izi klinikani bloklamaydi, faqat imtiyozga
+ * o'tkazadi; o'chiq turgan kompyuterning (dam olish kunlari) qonuniy soat
+ * sakrashi esa to'liq qabul qilinadi. To'liq tiklash — birinchi muvaffaqiyatli
+ * heartbeat (FX-87: langar server `issuedAt`iga o'rnatiladi).
+ */
+const ANCHOR_MAX_FORWARD_JUMP_MS = 7 * DAY_MS;
+
+// Jarayon bo'yicha tayanch nuqta: birinchi gate so'rovidagi langar (yoki
+// `issuedAt`) va o'sha paytdagi monotonik soat. `globalThis`da — fingerprint
+// keshi bilan bir xil sabab (`mock.module` modulning bir necha nusxasi).
+const GATE_REF_KEY = Symbol.for('dental.license.anchorGateRef');
+type GateRefCarrier = { [GATE_REF_KEY]?: { baseMs: number; monoMs: number } };
+
+/** Testlar uchun — jarayon tayanch nuqtasini tozalaydi (qayta ishga tushish simulyatsiyasi). */
+export const resetAnchorGateRef = (): void => {
+  delete (globalThis as GateRefCarrier)[GATE_REF_KEY];
+};
+
+const nextGateAnchorMs = (lic: LicenseData, anchorMs: number): number => {
+  const carrier = globalThis as GateRefCarrier;
+  const monoMs = performance.now();
+  let ref = carrier[GATE_REF_KEY];
+  if (!ref) {
+    const issuedAtMs = Date.parse(lic.issuedAt);
+    ref = { baseMs: Math.max(anchorMs, Number.isFinite(issuedAtMs) ? issuedAtMs : 0), monoMs };
+    carrier[GATE_REF_KEY] = ref;
+  }
+  const ceilingMs = ref.baseMs + Math.max(0, monoMs - ref.monoMs) + ANCHOR_MAX_FORWARD_JUMP_MS;
+  return Math.max(anchorMs, Math.min(Date.now(), ceilingMs));
 };
 
 export const getActiveModules = async (): Promise<string[]> => {
@@ -400,12 +500,14 @@ export const getActiveModules = async (): Promise<string[]> => {
   }
   const anchorMs = await readAnchor();
   if (!isLicenseValid(lic, localFingerprint, anchorMs)) return [];
-  // CLI-437 — langarni oldinga suramiz (hech qachon orqaga emas — `max`).
-  // Faylga yozib bo'lmasa ham (masalan disk xatosi) modul ro'yxati baribir
-  // qaytarilsin — langar-advance best-effort telemetriya, muddat tekshiruvi
+  // CLI-437 — langarni oldinga suramiz (hech qachon orqaga emas — `max`),
+  // FX-160 — lekin jarayon ichida real o'tgan vaqt + 7 kundan oshirmay
+  // (`nextGateAnchorMs`). Faylga yozib bo'lmasa ham (masalan disk xatosi) modul
+  // ro'yxati baribir qaytarilsin — langar-advance best-effort, muddat tekshiruvi
   // uchun kritik emas (allaqachon `isLicenseValid` yuqorida o'tdi).
   try {
-    await writeAnchor(Math.max(anchorMs, Date.now()));
+    const nextMs = nextGateAnchorMs(lic, anchorMs);
+    if (nextMs > anchorMs) await writeAnchor(nextMs);
   } catch {
     // no-op — anchor faylga yozilmasa ham modul ro'yxati qaytariladi
   }

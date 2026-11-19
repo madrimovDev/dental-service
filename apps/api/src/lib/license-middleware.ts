@@ -1,6 +1,6 @@
 import { fail } from '@dental/core';
-import type { MiddlewareHandler } from 'hono';
-import { getActiveModules, getLicenseState } from './license.ts';
+import type { Context, MiddlewareHandler } from 'hono';
+import { getActiveModules, getLicenseState, readLicenseResult } from './license.ts';
 import { getTenantSubscriptionState, tenantIdFromBearer } from './subscription.ts';
 
 /**
@@ -22,9 +22,26 @@ const WHITELIST = [
 ];
 
 /**
+ * FX-161 — litsenziya «yo'q» ko'rinsa, sababini aniqlaydi: `.lic` bor, lekin
+ * hozir o'qib bo'lmasa (fayl band/ruxsat) — 503, aks holda `null` (chaqiruvchi
+ * odatdagi `LICENSE_NOT_FOUND`ni beradi). Faqat rad etish yo'lida chaqiriladi.
+ */
+const licenseUnavailableResponse = async (c: Context) =>
+  (await readLicenseResult()).kind === 'unreadable'
+    ? c.json(
+        fail(
+          'LICENSE_UNAVAILABLE',
+          "Litsenziya faylini hozir o'qib bo'lmadi. Birozdan keyin qayta urinib ko'ring",
+        ),
+        503,
+      )
+    : null;
+
+/**
  * Hono middleware — berilgan modul joriy litsenziyada yoqilganmi tekshiradi.
  *
  * - `.lic` yo'q yoki muddati (grace period bilan) o'tgan bo'lsa → 403 `LICENSE_NOT_FOUND`
+ * - `.lic` bor, lekin hozir o'qib bo'lmaydi (FX-161) → 503 `LICENSE_UNAVAILABLE`
  * - `.lic` bor, lekin `module` ro'yxatda yo'q → 403 `MODULE_DISABLED`
  * - `modules` ichida `'*'` bo'lsa (enterprise tarif) — barcha modul ruxsat etiladi
  */
@@ -37,7 +54,10 @@ export const requireModule = (module: string): MiddlewareHandler => {
 
     const modules = await getActiveModules();
     if (!modules.length) {
-      return c.json(fail('LICENSE_NOT_FOUND', 'License not activated'), 403);
+      return (
+        (await licenseUnavailableResponse(c)) ??
+        c.json(fail('LICENSE_NOT_FOUND', 'License not activated'), 403)
+      );
     }
     if (!modules.includes('*') && !modules.includes(module)) {
       return c.json(fail('MODULE_DISABLED', `Module '${module}' is not enabled in your plan`), 403);
@@ -179,7 +199,10 @@ export const requireValidLicenseInDesktop = (): MiddlewareHandler => {
       );
     }
     if (state === 'none') {
-      return c.json(fail('LICENSE_NOT_FOUND', 'License not activated'), 403);
+      return (
+        (await licenseUnavailableResponse(c)) ??
+        c.json(fail('LICENSE_NOT_FOUND', 'License not activated'), 403)
+      );
     }
     await next();
   };
