@@ -15,14 +15,18 @@ import {
   branches,
   expenses,
   patients,
+  permissions,
+  rolePermissions,
+  roles,
   stockBatches,
   stockItems,
   stockMovements,
   tenants,
+  userAssignments,
   users,
   visitNotes,
 } from '@dental/db-schema';
-import { eq, sql } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import { createApp } from '../../src/app.ts';
 import { db } from '../../src/db/client.ts';
 import { signAccess } from '../../src/lib/jwt.ts';
@@ -122,6 +126,28 @@ beforeAll(async () => {
     const [b] = await tx.insert(branches).values({ tenantId, name: 'B' }).returning();
     branchA = a!.id;
     branchB = b!.id;
+  });
+  // FX-115 (D-8): ombor endpoint'lari `user_assignments` doirasiga bog'liq — real tayinlovlar
+  // (tenant-wide, `stock.view`/`stock.manage` beradigan rol).
+  for (const code of ['stock.view', 'stock.manage']) {
+    await db.insert(permissions).values({ code, category: 'stock' }).onConflictDoNothing();
+  }
+  const stockPerms = await db
+    .select({ id: permissions.id })
+    .from(permissions)
+    .where(inArray(permissions.code, ['stock.view', 'stock.manage']));
+  await withTenant(async (tx) => {
+    const [role] = await tx
+      .insert(roles)
+      .values({ tenantId, name: 'Ombor' })
+      .returning({ id: roles.id });
+    await tx
+      .insert(rolePermissions)
+      .values(stockPerms.map((p) => ({ roleId: role!.id, permissionId: p.id })));
+    await tx.insert(userAssignments).values([
+      { tenantId, userId: manager.id, branchId: null, roleId: role!.id },
+      { tenantId, userId: doctor.id, branchId: null, roleId: role!.id },
+    ]);
   });
   managerToken = await tokenFor(manager.id, permsFor('branch_manager'), 'branch_manager');
   doctorToken = await tokenFor(doctor.id, permsFor('doctor'), 'doctor');

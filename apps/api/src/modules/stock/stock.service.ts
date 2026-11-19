@@ -12,6 +12,11 @@ import type { Context } from 'hono';
 import type { DbOrTx } from '../../db/client.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import {
+  type BranchScope,
+  loadBranchScope as loadAssignedBranchScope,
+  scopeAllows,
+} from '../../lib/branch-scope.ts';
 import { findRecipientsWithPermission } from '../../lib/notify-recipients.ts';
 import { CrossEntityError, createOwnershipValidator } from '../../lib/ownership.ts';
 import {
@@ -54,6 +59,23 @@ export class InsufficientStockError extends Error {
   }
 }
 
+/** Owner (`@owner`) — atid'dan qat'i nazar cheksiz; qolganlar uchun tayinlov doirasi. */
+const loadBranchScope = async (c: Context, permission: string): Promise<BranchScope> =>
+  c.get('accessClaims')?.perms?.includes('@owner')
+    ? { kind: 'all' }
+    : loadAssignedBranchScope(c, permission);
+
+/**
+ * FX-115 (D-8): chaqiruvchining filial doirasidan tashqaridagi item/filial.
+ * Routes `branch.forbidden` 403 ga aylantiradi (yozishdan OLDIN tashlanadi — hech narsa yozilmagan).
+ */
+export class StockBranchForbiddenError extends Error {
+  constructor() {
+    super('Stock branch forbidden');
+    this.name = 'StockBranchForbiddenError';
+  }
+}
+
 /** Low-stock alert recipient — `stock.manage` permission egasi (+ owner). */
 type NotificationsDep = {
   notifyInTx: (
@@ -68,6 +90,40 @@ export const createStockService = (deps: {
   notifications?: NotificationsDep;
 }) => {
   const ownership = createOwnershipValidator();
+
+  /**
+   * FX-115: item filialiga ruxsat. Doira `permission` bo'yicha (o'qish — `stock.view`,
+   * yozish — `stock.manage`): owner/tenant-wide → hammasi; aks holda tayinlangan filiallar.
+   * Tayinlovsiz (`none`) → fail-closed. Tenant-darajali item (`branchId = null`) —
+   * har qanday tayinlangan xodim uchun operatsion (umumiy zaxira).
+   */
+  const itemAllowed = (scope: BranchScope, itemBranchId: string | null) => {
+    if (scope.kind === 'none') return false;
+    if (itemBranchId === null) return true;
+    return scopeAllows(scope, itemBranchId);
+  };
+  const assertItemBranch = async (
+    c: Context,
+    permission: 'stock.view' | 'stock.manage',
+    itemBranchId: string | null,
+  ) => {
+    if (!itemAllowed(await loadBranchScope(c, permission), itemBranchId)) {
+      throw new StockBranchForbiddenError();
+    }
+  };
+  /** Ro'yxat filtri: so'ralgan filial doirada bo'lishi shart; berilmasa — doiraga toraytiriladi. */
+  const itemBranchFilter = async (c: Context, requested?: string) => {
+    const scope = await loadBranchScope(c, 'stock.view');
+    if (scope.kind === 'none') throw new StockBranchForbiddenError();
+    if (requested) {
+      if (!scopeAllows(scope, requested)) throw new StockBranchForbiddenError();
+      return or(eq(stockItems.branchId, requested), isNull(stockItems.branchId));
+    }
+    if (scope.kind === 'branches') {
+      return or(inArray(stockItems.branchId, scope.branchIds), isNull(stockItems.branchId));
+    }
+    return undefined;
+  };
 
   /**
    * CLI-453 #5: `wasLow`/`isLow` — chaqiruvchi `isLowStock()` bilan oldindan hisoblab
@@ -138,21 +194,24 @@ export const createStockService = (deps: {
     };
   };
 
+  /** Item (RLS ostida) bo'yicha o'qish ruxsati; item topilmasa — bo'sh natija uchun tekshirilmaydi. */
+  async function assertViewableItem(c: Context, itemId: string) {
+    const [item] = await getDb(c)
+      .select({ branchId: stockItems.branchId })
+      .from(stockItems)
+      .where(eq(stockItems.id, itemId));
+    if (item) await assertItemBranch(c, 'stock.view', item.branchId);
+  }
+
   // ===== Stock Items =====
   async function listItems(c: Context, query: ListItemsQuery) {
     const db = getDb(c);
-    const filters = [];
     // CLI-441 #5: branchId bo'yicha filtrlaganda tenant-bo'ylab (branchId=null) itemlar
     // ham ko'rsatilsin — `stockItems.branchId` nullable (barcha filialga tegishli item).
-    if (query.branchId) {
-      filters.push(or(eq(stockItems.branchId, query.branchId), isNull(stockItems.branchId)));
-    }
+    // FX-115: default (branchId yo'q) chaqiruvchi doirasiga toraytiriladi.
+    const filter = await itemBranchFilter(c, query.branchId);
 
-    const rows = await db
-      .select()
-      .from(stockItems)
-      .where(filters.length > 0 ? and(...filters) : undefined)
-      .orderBy(asc(stockItems.name));
+    const rows = await db.select().from(stockItems).where(filter).orderBy(asc(stockItems.name));
 
     // numeric(14,2) → string; Number() bilan solishtiramiz (leksik solishtiruvdan saqlanish).
     const consumed = await netConsumption(c);
@@ -163,6 +222,7 @@ export const createStockService = (deps: {
     const db = getDb(c);
     const [item] = await db.select().from(stockItems).where(eq(stockItems.id, id));
     if (!item) return null;
+    await assertItemBranch(c, 'stock.view', item.branchId);
     return withUsage(item, await netConsumption(c, [item.id]));
   }
 
@@ -170,6 +230,16 @@ export const createStockService = (deps: {
     const db = getDb(c);
     const tenantId = c.get('activeTenantId');
     if (!tenantId) throw new Error('No tenant context');
+
+    // FX-115: yangi item filiali doirada bo'lishi shart; tenant-darajali (branchId yo'q)
+    // item — faqat owner/tenant-wide. Filial shu tenantda mavjudligi ham tekshiriladi (X-1).
+    const manageScope = await loadBranchScope(c, 'stock.manage');
+    if (input.branchId) {
+      await ownership.assertBranchExists(c, input.branchId);
+      if (!itemAllowed(manageScope, input.branchId)) throw new StockBranchForbiddenError();
+    } else if (manageScope.kind !== 'all') {
+      throw new StockBranchForbiddenError();
+    }
 
     const [item] = await db
       .insert(stockItems)
@@ -213,6 +283,15 @@ export const createStockService = (deps: {
     const db = getDb(c);
     const [before] = await db.select().from(stockItems).where(eq(stockItems.id, id));
     if (!before) return null;
+
+    // FX-115: item filiali doirada bo'lishi shart; filialni O'ZGARTIRISH (item boshqa
+    // filialga/tenant-darajaga ko'chadi) — faqat owner/tenant-wide, va yangi filial shu tenantda.
+    const manageScope = await loadBranchScope(c, 'stock.manage');
+    if (!itemAllowed(manageScope, before.branchId)) throw new StockBranchForbiddenError();
+    if (input.branchId !== undefined && input.branchId !== before.branchId) {
+      if (manageScope.kind !== 'all') throw new StockBranchForbiddenError();
+      if (input.branchId !== null) await ownership.assertBranchExists(c, input.branchId);
+    }
 
     const patch: Record<string, unknown> = { updatedAt: new Date() };
     if (input.branchId !== undefined) patch.branchId = input.branchId;
@@ -271,6 +350,7 @@ export const createStockService = (deps: {
     const db = getDb(c);
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? DEFAULT_MOVEMENTS_PAGE_SIZE;
+    await assertViewableItem(c, query.itemId);
     return db
       .select()
       .from(stockMovements)
@@ -286,6 +366,7 @@ export const createStockService = (deps: {
     const tenantId = c.get('activeTenantId');
     const user = c.get('user');
     if (!tenantId) throw new Error('No tenant context');
+    const manageScope = await loadBranchScope(c, 'stock.manage');
 
     return await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);
@@ -303,6 +384,8 @@ export const createStockService = (deps: {
         .for('update');
       // X-1 (FX-03a): begona/yo'q itemId — routes 404 (RLS bo'sh select).
       if (!item) throw new CrossEntityError('stock_item', 'not_found');
+      // FX-115: begona filial itemi — yozishdan OLDIN rad (qoldiq/ledger o'zgarmaydi).
+      if (!itemAllowed(manageScope, item.branchId)) throw new StockBranchForbiddenError();
 
       const oldQty = Number(item.quantity);
       const newQuantity = applyMovement(oldQty, input.type, input.quantity);
@@ -379,6 +462,12 @@ export const createStockService = (deps: {
     // X-1 (FX-03a): FK RLS'ni chetlab o'tadi — begona serviceId/itemId insertdan OLDIN rad.
     await ownership.assertServiceExists(c, input.serviceId);
     await ownership.assertStockItemExists(c, input.itemId);
+    // FX-115: BOM faqat o'z filiali (yoki tenant-darajali) itemiga.
+    const [bomItem] = await db
+      .select({ branchId: stockItems.branchId })
+      .from(stockItems)
+      .where(eq(stockItems.id, input.itemId));
+    await assertItemBranch(c, 'stock.manage', bomItem?.branchId ?? null);
 
     const [bom] = await db
       .insert(serviceMaterials)
@@ -599,6 +688,7 @@ export const createStockService = (deps: {
   /** Item bo'yicha partiyalar (yangi avval). */
   async function listBatches(c: Context, itemId: string) {
     const db = getDb(c);
+    await assertViewableItem(c, itemId);
     return db
       .select()
       .from(stockBatches)
@@ -614,17 +704,13 @@ export const createStockService = (deps: {
   async function expiringBatches(c: Context, withinDays = 30, branchId?: string) {
     const db = getDb(c);
     const cutoff = new Date(Date.now() + withinDays * DAY_MS);
+    const branchFilter = await itemBranchFilter(c, branchId);
 
     const candidates = await db
       .select({ batch: stockBatches, itemName: stockItems.name, unit: stockItems.unit })
       .from(stockBatches)
       .innerJoin(stockItems, eq(stockItems.id, stockBatches.itemId))
-      .where(
-        and(
-          lte(stockBatches.expiryDate, cutoff),
-          branchId ? or(eq(stockItems.branchId, branchId), isNull(stockItems.branchId)) : undefined,
-        ),
-      )
+      .where(and(lte(stockBatches.expiryDate, cutoff), branchFilter))
       .orderBy(asc(stockBatches.expiryDate));
     if (candidates.length === 0) return [];
 
@@ -666,6 +752,7 @@ export const createStockService = (deps: {
   async function autoDeductionsToday(c: Context, branchId?: string) {
     const db = getDb(c);
     const dayStart = new Date(`${tashkentDateStr()}T00:00:00+05:00`);
+    const branchFilter = await itemBranchFilter(c, branchId);
     return db
       .select({
         id: stockMovements.id,
@@ -686,7 +773,7 @@ export const createStockService = (deps: {
         and(
           gte(stockMovements.createdAt, dayStart),
           inArray(stockMovements.reason, ['visit_auto', 'visit_edit_return']),
-          branchId ? or(eq(stockItems.branchId, branchId), isNull(stockItems.branchId)) : undefined,
+          branchFilter,
         ),
       )
       .orderBy(desc(stockMovements.createdAt))
@@ -705,6 +792,12 @@ export const createStockService = (deps: {
 
     // X-1 (FX-03a): begona itemId — partiya/harakat yozilmasin.
     await ownership.assertStockItemExists(c, input.itemId);
+    // FX-115: partiya faqat o'z filiali (yoki tenant-darajali) itemiga.
+    const [batchItem] = await db
+      .select({ branchId: stockItems.branchId })
+      .from(stockItems)
+      .where(eq(stockItems.id, input.itemId));
+    await assertItemBranch(c, 'stock.manage', batchItem?.branchId ?? null);
 
     return await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);
