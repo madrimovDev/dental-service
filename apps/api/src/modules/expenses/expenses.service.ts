@@ -4,6 +4,8 @@ import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { type BranchScope, scopeAllows } from '../../lib/branch-scope.ts';
+import { CrossEntityError } from '../../lib/ownership.ts';
+import { assertBranchExists } from '../../lib/ownership-refs.ts';
 import type {
   CreateCategoryInput,
   CreateExpenseInput,
@@ -37,6 +39,26 @@ const rowInScope = (scope: BranchScope | undefined, branchId: string | null): bo
 };
 
 export const createExpensesService = (deps: { audit: AuditLogger }) => {
+  /**
+   * FX-153 (LC-31): categoryId/branchId shu tenantga tegishli bo'lishi shart. FK RLS'ni
+   * chetlab o'tadi (begona UUID jimgina bog'lanardi yoki 23503 → 500) — RLS-bound SELECT
+   * bilan insert/update'dan OLDIN tekshiriladi. Topilmasa `CrossEntityError` (route → 400).
+   */
+  async function assertRefsOwned(
+    c: Context,
+    refs: { categoryId?: string | null; branchId?: string | null },
+  ) {
+    if (refs.branchId) await assertBranchExists(c, refs.branchId);
+    if (refs.categoryId) {
+      const [row] = await getDb(c)
+        .select({ id: expenseCategories.id })
+        .from(expenseCategories)
+        .where(eq(expenseCategories.id, refs.categoryId))
+        .limit(1);
+      if (!row) throw new CrossEntityError('expense_category', 'not_found');
+    }
+  }
+
   // ===== Kategoriya =====
 
   async function listCategories(c: Context) {
@@ -186,6 +208,7 @@ export const createExpensesService = (deps: { audit: AuditLogger }) => {
 
   async function create(c: Context, input: CreateExpenseInput, scope?: BranchScope) {
     if (!rowInScope(scope, input.branchId ?? null)) throw new ExpenseBranchForbiddenError();
+    await assertRefsOwned(c, input);
     const db = getDb(c);
     const tenantId = c.get('activeTenantId');
     const user = c.get('user');
@@ -229,6 +252,7 @@ export const createExpensesService = (deps: { audit: AuditLogger }) => {
     if (input.branchId !== undefined && !rowInScope(scope, input.branchId)) {
       throw new ExpenseBranchForbiddenError();
     }
+    await assertRefsOwned(c, input);
 
     const patch = {
       ...(input.categoryId !== undefined ? { categoryId: input.categoryId } : {}),

@@ -8,6 +8,7 @@ import {
   loadBranchScope,
 } from '../../lib/branch-scope.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
+import { CrossEntityError } from '../../lib/ownership.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
@@ -43,6 +44,10 @@ const expenseNotFoundResponse = {
     description: 'Expense not found',
   },
 };
+
+/** FX-153: begona/yo'q categoryId/branchId → 400 (yozishdan oldin tekshirilgan, hech narsa yozilmagan). */
+const ownershipInvalid = (e: CrossEntityError) =>
+  fail(`ownership.${e.entity}.${e.reason}`, 'not_found');
 
 const branchForbidden = () => fail(BRANCH_FORBIDDEN_CODE, BRANCH_FORBIDDEN_MESSAGE);
 
@@ -254,6 +259,7 @@ export const expensesRoutes = (deps: { db: Database; audit: AuditLogger }) => {
       return c.json(ok(toExpenseDto(row)), 201);
     } catch (e) {
       if (e instanceof ExpenseBranchForbiddenError) return c.json(branchForbidden(), 403);
+      if (e instanceof CrossEntityError) return c.json(ownershipInvalid(e), 400);
       throw e;
     }
   });
@@ -293,7 +299,14 @@ export const expensesRoutes = (deps: { db: Database; audit: AuditLogger }) => {
       params: expenseIdParamSchema,
       body: { content: { 'application/json': { schema: updateExpenseSchema } } },
     },
-    responses: { ...okJson(expenseDtoSchema, 'Updated expense'), ...expenseNotFoundResponse },
+    responses: {
+      ...okJson(expenseDtoSchema, 'Updated expense'),
+      ...expenseNotFoundResponse,
+      400: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Foreign/missing categoryId or branchId',
+      },
+    },
   });
 
   app.openapi(updateExpenseRoute, async (c) => {
@@ -306,6 +319,7 @@ export const expensesRoutes = (deps: { db: Database; audit: AuditLogger }) => {
       return c.json(ok(toExpenseDto(row)), 200);
     } catch (e) {
       if (e instanceof ExpenseBranchForbiddenError) return c.json(branchForbidden(), 403);
+      if (e instanceof CrossEntityError) return c.json(ownershipInvalid(e), 400);
       throw e;
     }
   });
