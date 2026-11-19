@@ -2510,6 +2510,13 @@
           "notNull": true,
           "default": "'0.0'"
         },
+        "legacy_tx_ceiling": {
+          "name": "legacy_tx_ceiling",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
         "labs_cache": {
           "name": "labs_cache",
           "type": "jsonb",

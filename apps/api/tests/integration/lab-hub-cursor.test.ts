@@ -310,6 +310,36 @@ describe('Hub shu klasterga zaxiradan tiklandi — qayta ishlatilgan seq tashlan
   });
 });
 
+// ─── FX-98: migratsiya 0068 dan oldingi (tx_id = 0) dedup qatorlari ─────────────
+describe('migratsiyadan oldin qo‘llangan hodisalar davr almashganda qayta qo‘llanmaydi (FX-98)', () => {
+  test('legacy (0, seq) qatorlar + legacy_tx_ceiling → davr almashishi → applied = 0', async () => {
+    await pollUntilApplied(0);
+    await linkAndSendCase();
+    expect(await pollUntilApplied(1)).toBeGreaterThanOrEqual(1);
+    await pollUntilApplied(0);
+    const total = await appliedCount();
+    // Migratsiya 0068: eski qatorlar faqat seq bilan edi → tx_id = 0 (DEFAULT 0) va chegara
+    // joriy kursorning tx'i (migratsiyadagi bilan bir xil SQL). Qayta ishlatilgan seq'li
+    // (FX-93) qatorlar migratsiyadan oldin bo'lishi mumkin emas edi — ular tegilmaydi.
+    await inTenant(async (tx) => {
+      await tx.execute(sql`UPDATE lab_hub_applied_events SET tx_id = 0
+        WHERE seq IN (SELECT seq FROM lab_hub_applied_events GROUP BY seq HAVING count(*) = 1)`);
+      await tx.execute(sql`UPDATE lab_hub_state SET legacy_tx_ceiling =
+        split_part(regexp_replace(cursor, '^.*:', ''), '.', 1)::bigint
+        WHERE regexp_replace(cursor, '^.*:', '') ~ '^[0-9]+\.[0-9]+$'`);
+    });
+    expect(await appliedCount()).toBe(total);
+    expect((await state()).legacyTxCeiling).toBeGreaterThan(0);
+
+    // Hub boshqa klasterga tiklandi — kursor boshidan, butun tarix haqiqiy txId bilan qayta keladi.
+    await hubAdmin`UPDATE hub_meta SET system_identifier = '0'`;
+    let reapplied = 0;
+    for (let i = 0; i < 5; i++) reapplied += (await pollLabHubChanges(tenantId)).applied;
+    expect(reapplied).toBe(0);
+    expect(await appliedCount()).toBe(total);
+  });
+});
+
 // ─── FX-98 / LB-07 ───────────────────────────────────────────────────────────
 describe('Hub boshqa klasterga tiklandi — davr almashadi, kursor boshidan, dublikatsiz (FX-98)', () => {
   test('eski davr kursori yangi hodisani o‘tkazib yubormaydi; qo‘llanganlar qayta qo‘llanmaydi', async () => {

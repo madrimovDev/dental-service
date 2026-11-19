@@ -562,9 +562,21 @@ export const pollLabHubChanges = async (
     const applied = await withTenant(tenantId, async (tx) => {
       let n = 0;
       for (const ev of res.events) {
+        const txId = ev.txId ?? 0;
+        // FX-98: migratsiyadan oldin qo'llangan hodisa `(0, seq)` bo'lib saqlangan; davr
+        // almashib u haqiqiy txId bilan qayta kelsa — chegaradan oshmagan txId = o'sha hodisa.
+        // Chegaradan yuqorida `(txId, seq)` kaliti (FX-93: shu klasterda qayta ishlatilgan seq).
+        if (txId > 0 && txId <= state.legacyTxCeiling) {
+          const [legacy] = await tx
+            .select({ seq: labHubAppliedEvents.seq })
+            .from(labHubAppliedEvents)
+            .where(and(eq(labHubAppliedEvents.txId, 0), eq(labHubAppliedEvents.seq, ev.seq)))
+            .limit(1);
+          if (legacy) continue;
+        }
         const [fresh] = await tx
           .insert(labHubAppliedEvents)
-          .values({ tenantId, txId: ev.txId ?? 0, seq: ev.seq })
+          .values({ tenantId, txId, seq: ev.seq })
           .onConflictDoNothing()
           .returning({ seq: labHubAppliedEvents.seq });
         if (!fresh) continue; // allaqachon qo'llangan (sahifa qayta keldi)

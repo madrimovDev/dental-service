@@ -185,7 +185,7 @@ export const labHubRoutes = (deps: { db: Database; audit: AuditLogger }) => {
           connectedAt: now,
           lastError: null,
           updatedAt: now,
-          ...(namespaceChanged ? { cursor: '0.0' } : {}),
+          ...(namespaceChanged ? { cursor: '0.0', legacyTxCeiling: 0 } : {}),
         };
         if (namespaceChanged) await db.delete(labHubAppliedEvents);
         await db

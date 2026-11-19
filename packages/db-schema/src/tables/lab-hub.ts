@@ -39,6 +39,13 @@ export const labHubState = pgTable(
     hubKeyEnc: text('hub_key_enc'),
     /** Shaffof Hub kursori `"<tx_id>.<seq>"` (boshlang'ich `0.0`). */
     cursor: text('cursor').notNull().default('0.0'),
+    /**
+     * FX-98: migratsiya 0068 dan oldingi kursorning `tx_id`si. O'sha paytgacha qo'llangan
+     * hodisalar `(tx_id = 0, seq)` bo'lib saqlangan va ularning hammasida haqiqiy `tx_id`
+     * shu chegaradan oshmaydi (kursor faqat oldinga suriladi). Davr almashib tarix qayta
+     * kelganda `(0, seq)` qatori + `txId <= legacyTxCeiling` = allaqachon qo'llangan.
+     */
+    legacyTxCeiling: bigint('legacy_tx_ceiling', { mode: 'number' }).notNull().default(0),
     /** Oxirgi muvaffaqiyatli katalog javobi — internet yo'q paytda lab tanlash uchun. */
     labsCache: jsonb('labs_cache').$type<LabHubCachedLab[] | null>(),
     connectedAt: timestamp('connected_at', { withTimezone: true }),
