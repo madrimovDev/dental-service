@@ -24,6 +24,7 @@ import {
   getOrCreateSuperuserPassword,
 } from './first-run.js';
 import { getDataDir, getPgDataDir, getResourcesDir } from './paths.js';
+import { buildValkeyArgs, getValkeyDataDir } from './valkey-args.js';
 
 // Platform param default `process.platform` — testlarda ikkala tarmoqni ham
 // (win32 va boshqa) haqiqiy joriy platformadan mustaqil sinash uchun.
@@ -339,9 +340,14 @@ const spawnPostgres = (): Promise<void> =>
 
 const spawnValkey = (): Promise<void> =>
   new Promise((resolve, reject) => {
-    valkeyProcess = spawn(getValkeyCommand(), [join(getDataDir(), 'valkey.conf')], {
-      stdio: 'pipe',
-    });
+    // FX-96: AOF `dir` — mavjud bo'lishi shart (valkey o'zi yaratmaydi).
+    const dataDir = getDataDir();
+    mkdirSync(getValkeyDataDir(dataDir), { recursive: true });
+    valkeyProcess = spawn(
+      getValkeyCommand(),
+      buildValkeyArgs(join(dataDir, 'valkey.conf'), dataDir),
+      { stdio: 'pipe' },
+    );
     // Binary topilmadi/spawn muvaffaqiyatsiz — reject (postgres bilan bir xil
     // pattern), aks holda 'error' hech kim tinglamasa unhandled exception
     // Electron main process'ni crash qiladi (CLI-346 qarori: binary
