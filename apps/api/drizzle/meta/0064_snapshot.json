@@ -1,5 +1,5 @@
 {
-  "id": "5c523041-d140-4bab-ad20-47ed08a7b17d",
+  "id": "e10b2308-cec5-4332-bdd5-3d4547938083",
   "prevId": "5dd372cf-7803-4046-a201-b66824e03e51",
   "version": "7",
   "dialect": "postgresql",
@@ -7105,6 +7105,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "source_stage_id": {
+          "name": "source_stage_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_by": {
           "name": "created_by",
           "type": "uuid",
@@ -7194,6 +7200,19 @@
           "tableTo": "services",
           "columnsFrom": [
             "source_service_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "stock_movements_source_stage_id_treatment_stages_id_fk": {
+          "name": "stock_movements_source_stage_id_treatment_stages_id_fk",
+          "tableFrom": "stock_movements",
+          "tableTo": "treatment_stages",
+          "columnsFrom": [
+            "source_stage_id"
           ],
           "columnsTo": [
             "id"

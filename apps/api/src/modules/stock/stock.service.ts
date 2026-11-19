@@ -536,8 +536,16 @@ export const createStockService = (deps: {
     visitNoteId: string,
   ): Promise<T[]> {
     if (boms.length === 0) return boms;
-    const visitBranch = await resolveVisitBranch(c, visitNoteId);
-    if (!visitBranch) return boms;
+    return resolveBomItemsForBranch(c, boms, await resolveVisitBranch(c, visitNoteId));
+  }
+
+  /** FX-35 mantiqi (filial berilgan holda) — vizit ham, plan-bosqich yo'li ham shuni ishlatadi. */
+  async function resolveBomItemsForBranch<T extends { itemId: string }>(
+    c: Context,
+    boms: T[],
+    visitBranch: string | null,
+  ): Promise<T[]> {
+    if (boms.length === 0 || !visitBranch) return boms;
     const db = getDb(c);
     const items = await db
       .select({
@@ -581,8 +589,9 @@ export const createStockService = (deps: {
       type: 'in' | 'out';
       quantity: string;
       reason: string;
-      sourceVisitNoteId: string;
+      sourceVisitNoteId: string | null;
       sourceServiceId: string | null;
+      sourceStageId?: string | null;
     },
   ) {
     const db = getDb(c);
@@ -597,6 +606,7 @@ export const createStockService = (deps: {
       reason: m.reason,
       sourceVisitNoteId: m.sourceVisitNoteId,
       sourceServiceId: m.sourceServiceId,
+      sourceStageId: m.sourceStageId ?? null,
       createdBy: c.get('user')?.id ?? null,
     });
     const [updated] = await db
@@ -700,6 +710,88 @@ export const createStockService = (deps: {
   }
 
   /**
+   * FX-60 (dedup, vizit tomoni): vizit yozuvi bog'langan bosqich plan ekranidan allaqachon
+   * yakunlanib BOM chiqimi qilingan xizmatlar — vizit ularni qayta yechmaydi.
+   */
+  async function stageDeductedServiceIds(c: Context, visitNoteId: string): Promise<Set<string>> {
+    const rows = await getDb(c)
+      .select({ serviceId: stockMovements.sourceServiceId })
+      .from(stockMovements)
+      .innerJoin(visitNotes, eq(visitNotes.stageId, stockMovements.sourceStageId))
+      .where(
+        and(
+          eq(visitNotes.id, visitNoteId),
+          eq(stockMovements.reason, 'stage_auto'),
+          eq(stockMovements.type, 'out'),
+        ),
+      );
+    return new Set(rows.map((r) => r.serviceId).filter((id): id is string => id !== null));
+  }
+
+  /**
+   * FX-60: bosqich plan ekranidan `completed` bo'lganda stage.serviceId BOM'i ombordan
+   * yechiladi (vizit yo'li `performedServices`dan yechadi — ikki yo'l bir ma'no). Idempotent
+   * va dedup:
+   *   - shu bosqich uchun `stage_auto` chiqim bor → tegilmaydi;
+   *   - bosqichga bog'liq vizit yozuvi shu xizmatni allaqachon yechgan (qaytarilmagan qoldiq > 0)
+   *     → tegilmaydi (ikki marta yechilmaydi).
+   * Filial — aktiv filial (FX-35 moslashuvi). Manfiy-guard YO'Q (vizit avto-chiqimi kabi).
+   */
+  async function deductForStage(
+    c: Context,
+    stage: { id: string; serviceId: string | null },
+  ): Promise<void> {
+    if (!stage.serviceId) return;
+    const db = getDb(c);
+
+    const already = await db
+      .select({ id: stockMovements.id })
+      .from(stockMovements)
+      .where(
+        and(eq(stockMovements.sourceStageId, stage.id), eq(stockMovements.reason, 'stage_auto')),
+      )
+      .limit(1);
+    if (already.length > 0) return;
+
+    const [visitNet] = await db
+      .select({
+        net: sql<string>`coalesce(sum(case
+          when ${stockMovements.type} = 'out' then ${stockMovements.quantity}
+          else -${stockMovements.quantity} end), 0)`,
+      })
+      .from(stockMovements)
+      .innerJoin(visitNotes, eq(visitNotes.id, stockMovements.sourceVisitNoteId))
+      .where(
+        and(
+          eq(visitNotes.stageId, stage.id),
+          eq(stockMovements.sourceServiceId, stage.serviceId),
+          inArray(stockMovements.reason, [...VISIT_LEDGER_REASONS]),
+        ),
+      );
+    if (Number(visitNet?.net ?? 0) > 0) return;
+
+    const boms = await resolveBomItemsForBranch(
+      c,
+      await db
+        .select()
+        .from(serviceMaterials)
+        .where(eq(serviceMaterials.serviceId, stage.serviceId)),
+      c.get('activeBranchId') ?? null,
+    );
+    for (const bom of boms) {
+      await postVisitMovement(c, {
+        itemId: bom.itemId,
+        type: 'out',
+        quantity: bom.qtyPerService,
+        reason: 'stage_auto',
+        sourceVisitNoteId: null,
+        sourceServiceId: stage.serviceId,
+        sourceStageId: stage.id,
+      });
+    }
+  }
+
+  /**
    * Vizit yozuvi → ombor avtomatik chiqim (BOM bo'yicha).
    * clinical.service'ga DI orqali ulanadi (request-tx ichida ishlaydi — to'g'ridan import yo'q).
    * BOM topilmagan service → skip. Manfiyga ruxsat (guard yo'q).
@@ -732,7 +824,9 @@ export const createStockService = (deps: {
       sourceVisitNoteId,
     );
 
+    const stageDone = await stageDeductedServiceIds(c, sourceVisitNoteId);
     for (const bom of boms) {
+      if (stageDone.has(bom.serviceId)) continue;
       const count = occurrenceCount.get(bom.serviceId) ?? 1;
       for (let i = 0; i < count; i++) {
         await postVisitMovement(c, {
@@ -804,7 +898,9 @@ export const createStockService = (deps: {
           .where(inArray(serviceMaterials.serviceId, [...deductDeltas.keys()])),
         sourceVisitNoteId,
       );
+      const stageDone = await stageDeductedServiceIds(c, sourceVisitNoteId);
       for (const bom of boms) {
+        if (stageDone.has(bom.serviceId)) continue;
         const occurrences = deductDeltas.get(bom.serviceId) ?? 0;
         for (let i = 0; i < occurrences; i++) {
           await postVisitMovement(c, {
@@ -985,7 +1081,7 @@ export const createStockService = (deps: {
       .where(
         and(
           gte(stockMovements.createdAt, dayStart),
-          inArray(stockMovements.reason, [...VISIT_LEDGER_REASONS]),
+          inArray(stockMovements.reason, [...VISIT_LEDGER_REASONS, 'stage_auto']),
           branchFilter,
         ),
       )
@@ -1099,6 +1195,7 @@ export const createStockService = (deps: {
     createBom,
     removeBom,
     deductForServices,
+    deductForStage,
     reconcileForServices,
     returnVisitStockForAppointment,
     listBatches,

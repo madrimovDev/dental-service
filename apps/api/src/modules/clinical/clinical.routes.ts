@@ -93,6 +93,7 @@ export const clinicalRoutes = (deps: {
     recall: deps.recall,
     priceLookup: deps.priceLookup,
     toothChart,
+    deductStageStock: stockService.deductForStage,
   });
 
   // CLI-414/CLI-445: visit-note UPDATE'da `performedServices` reconciliation — stock modul
@@ -114,6 +115,7 @@ export const clinicalRoutes = (deps: {
       recall: deps.recall,
       priceLookup: deps.priceLookup,
       toothChart,
+      deductStageStock: stockService.deductForStage,
     }),
   );
   app.route(
