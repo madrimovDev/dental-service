@@ -18,6 +18,7 @@ import {
 } from '../../modules/lab-orders/lab-orders.transitions.ts';
 import { logger } from '../logger.ts';
 import { createLocalStorageAdapter } from '../storage.ts';
+import { isTenantServiceBlocked } from '../subscription.ts';
 import { type HubChangeEvent, isLabHubConfigured, LabHubError, labHubClient } from './client.ts';
 import { toHubCase } from './mapper.ts';
 import { bookHubConfirmedPrice, formatSum, rejectPendingPriceApproval } from './price.ts';
@@ -544,9 +545,13 @@ export const kickLabHubOutbox = async (tenantId: string): Promise<void> => {
   );
 };
 
-/** Barcha ulangan tenantlar: avval push, keyin poll. Har tenant o'z try/catch'ida. */
+/**
+ * Barcha ulangan tenantlar: avval push, keyin poll. Har tenant o'z try/catch'ida.
+ * FX-128 (LC-06): litsenziya/obuna `expired` tenant o'tkazib yuboriladi — Hub'ga
+ * murojaat yo'q, outbox `pending` va kursor joyida qoladi (to'lovdan keyin davom etadi).
+ */
 export const runLabHubCycle = async (deps: { adminDb: Database }) => {
-  const out = { tenants: 0, sent: 0, applied: 0, failed: 0 };
+  const out = { tenants: 0, sent: 0, applied: 0, failed: 0, blocked: 0 };
   if (!isLabHubConfigured()) return out;
   const rows = await deps.adminDb
     .select({ tenantId: labHubState.tenantId })
@@ -554,6 +559,10 @@ export const runLabHubCycle = async (deps: { adminDb: Database }) => {
     .where(and(isNotNull(labHubState.hubKeyEnc)));
   for (const { tenantId } of rows) {
     out.tenants++;
+    if (await isTenantServiceBlocked(tenantId)) {
+      out.blocked++;
+      continue;
+    }
     try {
       out.sent += (await flushLabHubOutbox(tenantId)).sent;
       out.applied += (await pollLabHubChanges(tenantId)).applied;

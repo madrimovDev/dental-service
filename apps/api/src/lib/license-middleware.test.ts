@@ -161,7 +161,9 @@ describe('requireModuleInDesktop', () => {
 // two guard tests fails.
 describe('MODULE_MAP — supervisor/api dictionary lockstep (CLI-433)', () => {
   const AGREED_MODULE_MAP: Record<string, string[]> = {
-    starter: ['patients', 'appointments', 'queue'],
+    // FX-99 (LB-08): starter'ga 'staff' — usiz /api/users/invite 403 MODULE_DISABLED,
+    // shifokor yaratib bo'lmaydi va 'appointments' oqimi (doctorId majburiy) o'lik.
+    starter: ['patients', 'appointments', 'queue', 'staff'],
     standard: ['patients', 'appointments', 'queue', 'cashier', 'reports', 'staff'],
     premium: [
       'patients',

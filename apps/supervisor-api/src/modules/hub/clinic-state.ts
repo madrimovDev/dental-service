@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { db } from '../../db/client';
 import { clinics, licenses } from '../../db/schema';
+import { getSaasSuspendedAt } from '../saas/saas-suspension';
 import { hubToken } from './hub-token';
 
 /**
@@ -10,7 +11,7 @@ import { hubToken } from './hub-token';
  *  - `desktop`: faol litsenziyalar bo'yicha (eng kech `expiresAt`); hammasi
  *    bekor qilingan bo'lsa `active=false`.
  *  - `saas`: litsenziya yo'q — `clinics.subscription_expires_at`; muddat
- *    belgilanmagan bo'lsa `active=false`.
+ *    belgilanmagan yoki vendor to'xtatgan (FX-102) bo'lsa `active=false`.
  */
 export type ClinicHubState = {
   clinicId: string;
@@ -30,7 +31,8 @@ export const loadClinicHubState = async (clinicId: string): Promise<ClinicHubSta
       clinicId: clinic.id,
       name: clinic.name,
       mode: 'saas',
-      active: clinic.subscriptionExpiresAt !== null,
+      // FX-102: vendor to'xtatgan SaaS klinika Hub'da ham faol emas.
+      active: clinic.subscriptionExpiresAt !== null && !(await getSaasSuspendedAt(clinic.id)),
       expiresAt: clinic.subscriptionExpiresAt,
       activeLicenseKeys: [],
     };

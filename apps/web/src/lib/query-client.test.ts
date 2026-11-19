@@ -35,6 +35,26 @@ describe('queryClient MutationCache.onError (global error toast)', () => {
     );
   });
 
+  // FX-127 (LC-05): MODULE_DISABLED (desktop tarif) — server inglizcha matni emas,
+  // «tarifingizda yo'q» toast'i.
+  it("MODULE_DISABLED → «tarifingizda yo'q» toast (server matni emas)", () => {
+    const onError = queryClient.getMutationCache().config.onError;
+    onError?.(
+      new ApiError('MODULE_DISABLED', "Module 'staff' is not enabled in your plan", 403),
+      undefined,
+      undefined,
+      { options: {} } as never,
+      undefined as never,
+    );
+    expect(notifications.show).toHaveBeenCalledWith(
+      expect.objectContaining({
+        color: 'red',
+        title: 'license.module_disabled.title',
+        message: 'license.module_disabled.message',
+      }),
+    );
+  });
+
   it("mutation o'z onError handleriga ega bo'lsa global toast chiqmaydi", () => {
     const onError = queryClient.getMutationCache().config.onError;
     onError?.(

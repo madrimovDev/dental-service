@@ -15,6 +15,7 @@ import { env } from './env.ts';
 import { logger } from './logger.ts';
 import { RECALL_QUEUE_NAME } from './queue.ts';
 import { CLINIC_TZ, renderRecallSms, type SmsLang } from './sms-templates.ts';
+import { isTenantServiceBlocked } from './subscription.ts';
 import { resolveTenantChannel } from './tenant-channel.ts';
 
 /** Klinika-local kun (YYYY-MM-DD) berilgan TZ'da. */
@@ -125,6 +126,13 @@ export async function processRecallScan(deps: RecallScanDeps): Promise<RecallSca
     // skip qiladi va recall hech qachon yuborilmaydi (kunlik trigger soddaligi
     // bahosi). Default 10 ≤ 11 → doim o'tadi.
     if (localHour(tz, now) < sendHour) {
+      result.skipped++;
+      continue;
+    }
+
+    // FX-105 (LB-14): obuna/litsenziya `expired` — recall yuborilmaydi, urinish ham
+    // hisoblanmaydi (pending qoladi; to'lovdan keyin keyingi skanda yuboriladi).
+    if (await isTenantServiceBlocked(row.tenantId)) {
       result.skipped++;
       continue;
     }

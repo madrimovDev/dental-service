@@ -25,6 +25,7 @@ import {
   Users,
   Wallet,
 } from 'lucide-react';
+import { isModuleLicensed, type LicensedModules, moduleForPath } from './license-modules';
 
 export type NavItem = {
   key: string;
@@ -225,8 +226,11 @@ export function isVisible(
   has: (p: string) => boolean,
   vertical: Vertical,
   isOwner: boolean,
+  modules?: LicensedModules,
 ): boolean {
   if (item.feature && !hasFeature(vertical, item.feature)) return false;
+  // FX-127: desktop tarifida yo'q modul — ruxsat bo'lsa ham ko'rinmaydi (API 403 MODULE_DISABLED).
+  if (!isModuleLicensed(moduleForPath(item.path), modules)) return false;
   if (item.disabled) return isOwner;
   if (!item.permission) return true;
   const perms = Array.isArray(item.permission) ? item.permission : [item.permission];
@@ -248,10 +252,11 @@ export function visibleGroups(
   has: (p: string) => boolean,
   vertical: Vertical = 'dental',
   isOwner = false,
+  modules?: LicensedModules,
 ): NavGroup[] {
   return NAV_GROUPS.map((g) => ({
     ...g,
-    items: g.items.filter((i) => isVisible(i, has, vertical, isOwner)),
+    items: g.items.filter((i) => isVisible(i, has, vertical, isOwner, modules)),
   })).filter((g) => g.items.length > 0);
 }
 
@@ -370,11 +375,12 @@ function resolveEntries(
   has: (p: string) => boolean,
   vertical: Vertical,
   isOwner: boolean,
+  modules?: LicensedModules,
 ): NavItem[] {
   const out: NavItem[] = [];
   for (const e of entries) {
     const base = CATALOGUE.get(e.key);
-    if (!base || !isVisible(base, has, vertical, isOwner)) continue;
+    if (!base || !isVisible(base, has, vertical, isOwner, modules)) continue;
     out.push(e.labelKey ? { ...base, labelKey: e.labelKey } : base);
   }
   return out;
@@ -398,22 +404,28 @@ export function sidebarModel(input: {
   has: (p: string) => boolean;
   vertical?: Vertical;
   isOwner?: boolean;
+  /** FX-127: desktop tarif modullari; `null`/yo'q = cheklovsiz. */
+  modules?: LicensedModules;
 }): SidebarModel {
-  const { roleKey, has, vertical = 'dental', isOwner = false } = input;
+  const { roleKey, has, vertical = 'dental', isOwner = false, modules } = input;
   const layout = layoutForRole(roleKey, isOwner);
   if (layout) {
     const def = ROLE_LAYOUTS[layout];
     const groups = def.groups
       .map((g) => ({
         labelKey: g.labelKey,
-        items: resolveEntries(g.entries, has, vertical, isOwner),
+        items: resolveEntries(g.entries, has, vertical, isOwner, modules),
       }))
       .filter((g) => g.items.length > 0);
     if (groups.length > 0) {
-      return { groups, footer: resolveEntries(def.footer, has, vertical, isOwner), layout };
+      return {
+        groups,
+        footer: resolveEntries(def.footer, has, vertical, isOwner, modules),
+        layout,
+      };
     }
   }
-  return { groups: visibleGroups(has, vertical, isOwner), footer: [], layout: null };
+  return { groups: visibleGroups(has, vertical, isOwner, modules), footer: [], layout: null };
 }
 
 /**
@@ -424,8 +436,9 @@ export function paletteNavItems(
   has: (p: string) => boolean,
   vertical: Vertical = 'dental',
   isOwner = false,
+  modules?: LicensedModules,
 ): NavItem[] {
-  return visibleGroups(has, vertical, isOwner)
+  return visibleGroups(has, vertical, isOwner, modules)
     .flatMap((g) => g.items)
     .filter((i) => !i.disabled);
 }

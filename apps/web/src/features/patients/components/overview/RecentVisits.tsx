@@ -34,7 +34,7 @@ export function RecentVisits({ patientId }: { patientId: string }) {
   if (isForbiddenError(notesQuery.error)) {
     return (
       <Block titleId="pc-visits-h" title={title}>
-        <ForbiddenState />
+        <ForbiddenState error={notesQuery.error} />
       </Block>
     );
   }

@@ -13,12 +13,14 @@ import { useAuthStore } from '@/stores/auth-store.ts';
 import classes from './CommandPalette.module.css';
 import { buildPatientActions, buildQuickActions, buildStaffActions } from './command-actions';
 import { paletteNavItems } from './nav-config';
+import { useLicensedModules } from './use-licensed-modules';
 
 export function CommandPalette() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { hasPermission, permissions } = useAuthStore();
   const vertical = useVertical();
+  const modules = useLicensedModules();
 
   const [query, setQuery] = useState('');
   const [debounced] = useDebouncedValue(query, 250);
@@ -40,6 +42,7 @@ export function CommandPalette() {
     hasPermission,
     vertical,
     permissions.includes('@owner'),
+    modules,
   ).map((item) => {
     const Icon = item.icon;
     return {

@@ -15,6 +15,7 @@ import { createNotificationsService } from '../modules/notifications/index.ts';
 import { env } from './env.ts';
 import type { ReminderJob } from './queue.ts';
 import { renderReminderSms, type SmsLang } from './sms-templates.ts';
+import { isTenantServiceBlocked } from './subscription.ts';
 import { botMessages } from './telegram/messages.ts';
 import { reminderCallbackData } from './telegram/reminder-actions.ts';
 import { type ResolvedTenantChannel, resolveTenantChannel } from './tenant-channel.ts';
@@ -50,6 +51,9 @@ export async function processReminderJob(
   job: ReminderJob,
 ): Promise<void> {
   const { tenantId, appointmentId } = job;
+  // FX-105 (LB-14): obuna/litsenziya `expired` — klinika nomidan xabar ketmaydi
+  // (HTTP bloki bilan bir xil qoida). Job yakunlanadi: eslatma vaqti o'tib ketadi.
+  if (await isTenantServiceBlocked(tenantId)) return;
   await withTenant(tenantId, async (tx: DbOrTx) => {
     const [appt] = await tx.select().from(appointments).where(eq(appointments.id, appointmentId));
     if (!appt) return;

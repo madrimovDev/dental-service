@@ -317,3 +317,59 @@ describe('FX-131 — /rx nav perm endpoint perm bilan mos (prescription.view)', 
     expect(rx?.permission).toBe('prescription.view');
   });
 });
+
+// FX-127 (LC-05): desktop `.lic` tarif modullari — tarifda yo'q modul menyuda ko'rinmasin.
+describe("tarif modullari bo'yicha filtr (FX-127)", () => {
+  const STARTER = ['patients', 'appointments', 'queue', 'staff'];
+  const keysOf = (groups: { items: NavItem[] }[]) =>
+    groups.flatMap((g) => g.items.map((i) => i.key));
+
+  it("starter: tarifda yo'q modul elementlari tushadi, modulsiz sahifalar qoladi", () => {
+    const keys = keysOf(visibleGroups(ALL, 'dental', true, STARTER));
+    for (const k of [
+      'cashier',
+      'transactions',
+      'plans',
+      'lab',
+      'rx',
+      'reports',
+      'stock',
+      'expenses',
+      'payroll',
+    ]) {
+      expect(keys).not.toContain(k);
+    }
+    for (const k of [
+      'home',
+      'appointments',
+      'queue',
+      'patients',
+      'patient-new',
+      'users',
+      'schedule',
+      'recalls',
+      'branches',
+      'roles',
+      'settings',
+    ]) {
+      expect(keys).toContain(k);
+    }
+  });
+
+  it("modules null (bulut / cheklovsiz) yoki '*' (enterprise) — hech narsa tushmaydi", () => {
+    const all = keysOf(visibleGroups(ALL, 'dental', true));
+    expect(keysOf(visibleGroups(ALL, 'dental', true, null))).toEqual(all);
+    expect(keysOf(visibleGroups(ALL, 'dental', true, ['*']))).toEqual(all);
+  });
+
+  it("sidebarModel (rol maketi) va paletteNavItems ham tarif bo'yicha filtrlaydi", () => {
+    const owner = sidebarModel({ roleKey: null, has: ALL, isOwner: true, modules: STARTER });
+    const keys = [...keysOf(owner.groups), ...owner.footer.map((i) => i.key)];
+    expect(keys).not.toContain('cashier');
+    expect(keys).not.toContain('reports');
+    expect(keys).toContain('users');
+    const palette = paletteNavItems(ALL, 'dental', true, STARTER).map((i) => i.key);
+    expect(palette).not.toContain('cashier');
+    expect(palette).toContain('patients');
+  });
+});

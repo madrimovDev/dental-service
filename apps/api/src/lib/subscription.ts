@@ -1,8 +1,13 @@
-import { tenantSettings } from '@dental/db-schema';
+import { type Tenant, tenantSettings } from '@dental/db-schema';
 import type { Context } from 'hono';
 import { withTenant } from '../db/scoped.ts';
 import { verifyAccess } from './jwt.ts';
-import { computeExpiryState, type LicenseState, MAX_GRACE_DAYS } from './license.ts';
+import {
+  computeExpiryState,
+  getLicenseState,
+  type LicenseState,
+  MAX_GRACE_DAYS,
+} from './license.ts';
 import { logger } from './logger.ts';
 
 /**
@@ -22,6 +27,20 @@ export const computeSubscriptionState = (
   if (!expiresAt) return { state: 'none', expiresAt: null, graceEndsAt: null, daysLeft: null };
   const iso = expiresAt instanceof Date ? expiresAt.toISOString() : expiresAt;
   return computeExpiryState(iso, MAX_GRACE_DAYS, nowMs);
+};
+
+/**
+ * FX-144 (LC-22): ko'rsatiladigan obuna holati. Yagona manba — saqlangan muddat
+ * (`tenant_settings.subscription_expires_at`, Supervisor sinxroni); `tenants.subscription_status`
+ * ustunini hech kim yangilamaydi (default `trial`), shuning uchun u faqat muddat
+ * NOMA'LUM (`none`) bo'lganda qaytariladi. `expired` → `suspended`, qolgani → `active`.
+ */
+export const effectiveSubscriptionStatus = (
+  stored: Tenant['subscriptionStatus'],
+  state: LicenseState['state'],
+): Tenant['subscriptionStatus'] => {
+  if (state === 'none') return stored;
+  return state === 'expired' ? 'suspended' : 'active';
 };
 
 // ─── Tenant obunasi o'qish (30 s kesh) ───────────────────────────────────────
@@ -74,3 +93,22 @@ export const tenantIdFromBearer = async (c: Context): Promise<string | null> => 
 
 export const getTenantSubscriptionState = async (tenantId: string): Promise<LicenseState> =>
   computeSubscriptionState(await getTenantSubscriptionExpiry(tenantId));
+
+/**
+ * FX-105 (LB-14): HTTP'dan TASHQARI kirish nuqtalari (eslatma/recall worker'lari,
+ * Telegram bot) uchun blok tekshiruvi — HTTP gate (`requireValidSubscription`) bilan
+ * bir xil qoida: Local Desktop → `.lic` holati, bulut → tenant obunasi; faqat
+ * `expired` bloklaydi (`none`/noma'lum muddat — fail-open, Supervisor o'chiq bo'lsa
+ * klinika ishlashda davom etadi). Natija 30 s keshlanadi (`getTenantSubscriptionExpiry`).
+ */
+export const isTenantServiceBlocked = async (tenantId: string): Promise<boolean> => {
+  try {
+    if (process.env.DENTAL_LOCAL_DESKTOP === 'true') {
+      return (await getLicenseState()).state === 'expired';
+    }
+    return (await getTenantSubscriptionState(tenantId)).state === 'expired';
+  } catch (err) {
+    logger.warn({ err, tenantId }, 'service block check failed — fail-open');
+    return false;
+  }
+};

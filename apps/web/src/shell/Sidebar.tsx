@@ -12,6 +12,7 @@ import { useUiStore } from '@/stores/ui-store.ts';
 import { type NavItem, sidebarModel } from './nav-config';
 import classes from './Sidebar.module.css';
 import { useConnectionKind } from './use-connection-status';
+import { useLicensedModules } from './use-licensed-modules';
 
 function isActive(pathname: string, path: string, allPaths: string[]): boolean {
   if (path === '/') return pathname === '/';
@@ -259,6 +260,7 @@ export function Sidebar() {
   const { hasPermission, permissions, roleKey } = useAuthStore();
   const { pathname } = useLocation();
   const vertical = useVertical();
+  const modules = useLicensedModules();
   const rail = useUiStore((s) => s.sidebarRail);
   const isOwner = permissions.includes('@owner');
   const { groups, footer } = sidebarModel({
@@ -266,6 +268,7 @@ export function Sidebar() {
     has: hasPermission,
     vertical,
     isOwner,
+    modules,
   });
   const allPaths = [...groups.flatMap((g) => g.items), ...footer]
     .filter((i) => !i.disabled)

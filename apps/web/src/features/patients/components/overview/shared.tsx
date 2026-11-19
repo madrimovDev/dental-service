@@ -2,6 +2,7 @@ import { ApiError } from '@dental/api-client';
 import { StateView } from '@dental/ui';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { isModuleDisabledError } from '@/shell/license-modules.ts';
 import classes from './Overview.module.css';
 
 /** Server 403 qaytargan (ruxsat yo'q) — bo'sh/default emas, `forbidden` holati ko'rsatiladi. */
@@ -28,8 +29,21 @@ export function Block({
   );
 }
 
-export function ForbiddenState() {
+/**
+ * `error` berilsa va u `403 MODULE_DISABLED` (FX-127, desktop tarifida yo'q modul)
+ * bo'lsa — «tarifingizda yo'q»; aks holda rol ruxsati matni.
+ */
+export function ForbiddenState({ error }: { error?: unknown } = {}) {
   const { t } = useTranslation();
+  if (isModuleDisabledError(error)) {
+    return (
+      <StateView
+        status="forbidden"
+        title={t('license.module_disabled.title')}
+        description={t('license.module_disabled.message')}
+      />
+    );
+  }
   return (
     <StateView
       status="forbidden"
