@@ -11,8 +11,19 @@
  *   cd apps/api && bun test --env-file=../../.env tests/integration/ui-r5-card-provider.test.ts
  */
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { branches, patients, servicePrices, services, tenants, users } from '@dental/db-schema';
-import { sql } from 'drizzle-orm';
+import {
+  branches,
+  patients,
+  permissions,
+  rolePermissions,
+  roles,
+  servicePrices,
+  services,
+  tenants,
+  userAssignments,
+  users,
+} from '@dental/db-schema';
+import { inArray, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { createApp } from '../../src/app.ts';
 import type { DbOrTx } from '../../src/db/client.ts';
@@ -23,6 +34,34 @@ import { createTransactionSchema } from '../../src/modules/cashier/cashier.schem
 import { createCashierService } from '../../src/modules/cashier/cashier.service.ts';
 
 const noopAudit = { record: async () => {} } as unknown as AuditLogger;
+
+/**
+ * X-2/FX-32: kassa endpoint'lari filial doirasini real `user_assignments` + rol-permission'dan
+ * oladi (JWT'dagi perms yetarli emas) — testdagi sintetik token egasiga haqiqiy kassir tayinlovi.
+ */
+const grantCashierAssignment = async (tid: string, uid: string, branchId: string | null) => {
+  const codes = ['cashier.view', 'cashier.create_transaction', 'cashier.refund', 'cashier.void'];
+  for (const code of codes) {
+    await db.insert(permissions).values({ code, category: 'cashier' }).onConflictDoNothing();
+  }
+  const permRows = await db
+    .select({ id: permissions.id })
+    .from(permissions)
+    .where(inArray(permissions.code, codes));
+  await db.transaction(async (tx) => {
+    await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tid}'`));
+    const [role] = await tx
+      .insert(roles)
+      .values({ tenantId: tid, name: 'Kassir (test)' })
+      .returning({ id: roles.id });
+    await tx
+      .insert(rolePermissions)
+      .values(permRows.map((p) => ({ roleId: role!.id, permissionId: p.id })));
+    await tx
+      .insert(userAssignments)
+      .values({ tenantId: tid, userId: uid, branchId, roleId: role!.id });
+  });
+};
 
 let tenantId: string;
 let ownerId: string;
@@ -72,6 +111,8 @@ beforeAll(async () => {
     serviceId = s.id;
     await tx.insert(servicePrices).values({ tenantId, serviceId, branchId, price: '100000' });
   });
+
+  await grantCashierAssignment(tenantId, ownerId, branchId);
 
   // Real cheklangan rollar (role-templates.ts ro'yxati bilan bir xil) — @owner EMAS.
   const mint = async (perms: string[]) =>

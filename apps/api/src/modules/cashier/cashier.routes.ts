@@ -3,6 +3,13 @@ import type { FiscalProvider } from '@dental/fiscal';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import {
+  BRANCH_FORBIDDEN_CODE,
+  BRANCH_FORBIDDEN_MESSAGE,
+  isBranchAllowed,
+  loadBranchScope,
+  scopeAllows,
+} from '../../lib/branch-scope.ts';
 import { requireModuleInDesktop } from '../../lib/license-middleware.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
 import { createPatientMessenger } from '../../lib/telegram/notify.ts';
@@ -89,7 +96,18 @@ export const cashierRoutes = (deps: {
 
   app.openapi(listRoute, async (c) => {
     const query = c.req.valid('query');
-    const result = await service.list(c, query);
+    // X-2/FX-32: ro'yxat chaqiruvchining filiallari bilan cheklanadi.
+    const scope = await loadBranchScope(c, 'cashier.view');
+    if (scope.kind === 'none')
+      return c.json(fail(BRANCH_FORBIDDEN_CODE, BRANCH_FORBIDDEN_MESSAGE), 403);
+    let branchIds: string[] | null = null;
+    if (scope.kind === 'branches') {
+      if (query.branchId && !scope.branchIds.includes(query.branchId)) {
+        return c.json(fail(BRANCH_FORBIDDEN_CODE, BRANCH_FORBIDDEN_MESSAGE), 403);
+      }
+      branchIds = query.branchId ? [query.branchId] : scope.branchIds;
+    }
+    const result = await service.list(c, query, branchIds);
     return c.json(ok({ data: result.data.map(toCashierTransactionDto), meta: result.meta }), 200);
   });
 
@@ -132,6 +150,10 @@ export const cashierRoutes = (deps: {
 
   app.openapi(createTransactionRoute, async (c) => {
     const body = c.req.valid('json');
+    // X-2/FX-32: yozilayotgan filial chaqiruvchining doirasida bo'lsin.
+    if (!(await isBranchAllowed(c, 'cashier.create_transaction', body.branchId))) {
+      return c.json(fail(BRANCH_FORBIDDEN_CODE, BRANCH_FORBIDDEN_MESSAGE), 403);
+    }
     try {
       const tx = await service.create(c, body);
       return c.json(ok(toCashierTransactionWithItemsDto(tx, tx.items)), 201);
@@ -230,6 +252,11 @@ export const cashierRoutes = (deps: {
 
   app.openapi(getRoute, async (c) => {
     const { id } = c.req.valid('param');
+    // X-2/FX-32: filial tekshiruvi audit('viewed') yozuvidan OLDIN.
+    const txBranch = await service.getBranchId(c, id);
+    if (txBranch && !scopeAllows(await loadBranchScope(c, 'cashier.view'), txBranch)) {
+      return c.json(fail(BRANCH_FORBIDDEN_CODE, BRANCH_FORBIDDEN_MESSAGE), 403);
+    }
     const tx = await service.getById(c, id);
     if (!tx) return c.json(fail('transaction.not_found', 'Transaction not found'), 404);
     return c.json(ok(toCashierTransactionWithItemsDto(tx, tx.items)), 200);
@@ -259,6 +286,11 @@ export const cashierRoutes = (deps: {
   app.openapi(refundRoute, async (c) => {
     const { id } = c.req.valid('param');
     const { amount } = c.req.valid('json');
+    // X-2/FX-32: refund original tranzaksiya filiali bo'yicha tekshiriladi.
+    const original = await service.getBranchId(c, id);
+    if (original && !scopeAllows(await loadBranchScope(c, 'cashier.refund'), original)) {
+      return c.json(fail(BRANCH_FORBIDDEN_CODE, BRANCH_FORBIDDEN_MESSAGE), 403);
+    }
     const res = await service.refund(c, id, amount);
     if (!res.ok) {
       const msg =
@@ -287,6 +319,9 @@ export const cashierRoutes = (deps: {
 
   app.openapi(dailySummaryRoute, async (c) => {
     const { branchId, date } = c.req.valid('query');
+    if (!(await isBranchAllowed(c, 'cashier.view', branchId))) {
+      return c.json(fail(BRANCH_FORBIDDEN_CODE, BRANCH_FORBIDDEN_MESSAGE), 403);
+    }
     const dateStr = date ?? new Date().toISOString().slice(0, 10);
     const result = await service.dailySummary(c, branchId, dateStr);
     return c.json(ok(result), 200);
@@ -342,6 +377,9 @@ export const cashierRoutes = (deps: {
 
   app.openapi(pendingVisitsRoute, async (c) => {
     const { branchId } = c.req.valid('query');
+    if (!(await isBranchAllowed(c, 'cashier.view', branchId))) {
+      return c.json(fail(BRANCH_FORBIDDEN_CODE, BRANCH_FORBIDDEN_MESSAGE), 403);
+    }
     const rows = await service.listPendingVisits(c, branchId);
     return c.json(ok(rows), 200);
   });

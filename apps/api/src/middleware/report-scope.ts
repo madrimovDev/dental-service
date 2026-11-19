@@ -1,8 +1,6 @@
 import { fail } from '@dental/core';
-import { permissions, rolePermissions, userAssignments } from '@dental/db-schema';
-import { and, eq, gt, isNotNull, isNull, or } from 'drizzle-orm';
 import type { MiddlewareHandler } from 'hono';
-import { getDb } from '../db/scoped.ts';
+import { type BranchScope, decideBranchScope, loadBranchScope } from '../lib/branch-scope.ts';
 
 declare module 'hono' {
   interface ContextVariableMap {
@@ -11,21 +9,7 @@ declare module 'hono' {
   }
 }
 
-export type BranchScope =
-  | { kind: 'all' }
-  | { kind: 'branches'; branchIds: string[] }
-  | { kind: 'none' };
-
-/**
- * Sof qaror: faol, qabul qilingan va `report.view` beruvchi tayinlovlardan filial doirasi.
- * Bitta tenant-wide (`branchId = null`) tayinlov → butun klinika; aks holda tayinlangan
- * filiallar; tayinlov yo'q → hech narsa (fail-closed).
- */
-export const decideBranchScope = (assignmentBranchIds: (string | null)[]): BranchScope => {
-  if (assignmentBranchIds.length === 0) return { kind: 'none' };
-  if (assignmentBranchIds.some((b) => b === null)) return { kind: 'all' };
-  return { kind: 'branches', branchIds: [...new Set(assignmentBranchIds as string[])] };
-};
+export { type BranchScope, decideBranchScope };
 
 /**
  * Hisobot filial doirasini SERVER tomonida majburlaydi (IR-06).
@@ -42,33 +26,8 @@ export const reportBranchScope =
     const claims = c.get('accessClaims');
     if (!claims?.atid) return c.json(fail('auth.required', 'Authentication required'), 401);
 
-    let scope: BranchScope = { kind: 'all' };
-    if (!claims.perms.includes('@owner')) {
-      const now = new Date();
-      const rows = await getDb(c)
-        .select({ branchId: userAssignments.branchId })
-        .from(userAssignments)
-        // IR-06: doiraga FAQAT roli `report.view` beradigan tayinlovlar kiradi. Aks holda boshqa
-        // filialdagi report.view'siz rol (masalan Doctor) hisobot doirasini kengaytirib yuboradi.
-        .innerJoin(rolePermissions, eq(rolePermissions.roleId, userAssignments.roleId))
-        .innerJoin(
-          permissions,
-          and(
-            eq(permissions.id, rolePermissions.permissionId),
-            eq(permissions.code, 'report.view'),
-          ),
-        )
-        .where(
-          and(
-            eq(userAssignments.userId, claims.sub),
-            eq(userAssignments.tenantId, claims.atid),
-            eq(userAssignments.isActive, true),
-            isNotNull(userAssignments.acceptedAt),
-            or(isNull(userAssignments.validTo), gt(userAssignments.validTo, now)),
-          ),
-        );
-      scope = decideBranchScope([...new Set(rows.map((r) => r.branchId))]);
-    }
+    // IR-06: doiraga FAQAT roli `report.view` beradigan tayinlovlar kiradi (umumiy helper).
+    const scope: BranchScope = await loadBranchScope(c, 'report.view');
 
     if (scope.kind === 'none') {
       return c.json(fail('report.no_branch_access', 'Hech bir filialga tayinlanmagansiz'), 403);

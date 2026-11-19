@@ -253,12 +253,23 @@ export const createCashierService = (deps: {
   // DI: env'da SOLIQ_* bo'lsa real Soliq provider, aks holda NoOp (V3-1).
   const fiscal: FiscalProvider = deps.fiscal ?? createNoOpFiscalProvider();
 
-  async function list(c: Context, query: ListTransactionsQuery) {
+  /** X-2: refund filial tekshiruvi uchun (audit yozmaydi, faqat RLS ichida). */
+  async function getBranchId(c: Context, id: string): Promise<string | null> {
+    const [row] = await getDb(c)
+      .select({ branchId: cashierTransactions.branchId })
+      .from(cashierTransactions)
+      .where(eq(cashierTransactions.id, id));
+    return row?.branchId ?? null;
+  }
+
+  /** `branchIds`: X-2 doirasi (null = cheklovsiz); `query.branchId` bilan kesishadi (route tekshirgan). */
+  async function list(c: Context, query: ListTransactionsQuery, branchIds: string[] | null = null) {
     const db = getDb(c);
     const offset = (query.page - 1) * query.pageSize;
 
     const filters = [];
     if (query.branchId) filters.push(eq(cashierTransactions.branchId, query.branchId));
+    else if (branchIds) filters.push(inArray(cashierTransactions.branchId, branchIds));
     if (query.patientId) filters.push(eq(cashierTransactions.patientId, query.patientId));
     if (query.from && query.to) {
       // from/to date-only (z.iso.date). Asia/Tashkent kun chegarasi — dailySummary bilan
@@ -1046,6 +1057,7 @@ export const createCashierService = (deps: {
 
   return {
     list,
+    getBranchId,
     getById,
     create,
     refund,
