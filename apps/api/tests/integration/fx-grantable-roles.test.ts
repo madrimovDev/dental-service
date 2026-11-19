@@ -154,12 +154,15 @@ describe('GET /api/users/grantable-roles (real Branch Manager permset)', () => {
     expect(bad.status).toBe(403);
   });
 
-  test('FU-41: BM Receptionist/Doctor/Doctor+Assistant/Nurse/Accountant/Technician rollarini oladi (201), Tenant Admin — yo‘q (403 role.escalation)', async () => {
+  test('FU-41: BM Receptionist/Doctor/Doctor+Assistant/Nurse/Technician rollarini oladi (201); Tenant Admin va Accountant (payroll.* tenant-wide, FX-116) — 403 role.escalation', async () => {
     const res = await call(bmToken, 'GET', '/users/grantable-roles');
     const ids = ((await res.json()) as { data: { id: string }[] }).data.map((r) => r.id);
     expect(ids).not.toContain(adminRoleId);
+    // FX-116: Accountant shabloni payroll.* ga ega, BM'da yo'q → eskalatsiya.
+    expect(ids).not.toContain(branchRoleIds.accountant as string);
     let n = 0;
     for (const [key, roleId] of Object.entries(branchRoleIds)) {
+      if (key === 'accountant') continue;
       expect(ids).toContain(roleId);
       const ok = await call(bmToken, 'POST', '/users/invite', {
         phone: `+99890000620${n++}`,
@@ -168,13 +171,17 @@ describe('GET /api/users/grantable-roles (real Branch Manager permset)', () => {
       });
       expect(ok.status).toBe(201);
     }
-    const bad = await call(bmToken, 'POST', '/users/invite', {
-      phone: '+998900006299',
-      fullName: 'Invited Admin2',
-      roleId: adminRoleId,
-    });
-    expect(bad.status).toBe(403);
-    expect(((await bad.json()) as { error: { code: string } }).error.code).toBe('role.escalation');
+    for (const [i, roleId] of [adminRoleId, branchRoleIds.accountant as string].entries()) {
+      const bad = await call(bmToken, 'POST', '/users/invite', {
+        phone: `+99890000629${i}`,
+        fullName: `Invited Escalation${i}`,
+        roleId,
+      });
+      expect(bad.status).toBe(403);
+      expect(((await bad.json()) as { error: { code: string } }).error.code).toBe(
+        'role.escalation',
+      );
+    }
   });
 
   test('owner sees every role', async () => {
