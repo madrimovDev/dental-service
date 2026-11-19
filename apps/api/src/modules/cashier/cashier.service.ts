@@ -29,7 +29,7 @@ import {
 } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { onAfterCommit } from '../../db/after-commit.ts';
-import { getDb } from '../../db/scoped.ts';
+import { getDb, withTenant } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import type { PatientMessenger } from '../../lib/telegram/notify.ts';
 import {
@@ -636,24 +636,29 @@ export const createCashierService = (deps: {
           );
         }
 
-        // Fiscal (NoOp — M3 da). CLI-449: paidAmount (haqiqatda olingan naqd) —
-        // totalAmount (nominal/hisob-faktura) EMAS, qisman to'langan savdoda fiskal
-        // chek haqiqiy qabul qilingan summaga mos bo'lishi uchun.
-        const fiscalResult = await fiscal.createReceipt({
+        // FX-77: fiskal chek tx ichida YUBORILMAYDI (tashqi so'rov stage qatori qulfi ostida
+        // osilib qolmasin; tx rollback bo'lsa chek soliqqa ketib qolmasin). Commit'dan keyin
+        // yuboriladi, natija alohida tenant-tx'da yoziladi. CLI-449: paidAmount (haqiqatda
+        // olingan naqd) — totalAmount (nominal) EMAS.
+        const fiscalPayment = {
           id: transaction.id,
           amount: Number(transaction.paidAmount),
           items: items,
+        };
+        await onAfterCommit(c, async () => {
+          const fiscalResult = await fiscal.createReceipt(fiscalPayment);
+          if (fiscalResult.fiscalId || fiscalResult.response) {
+            await withTenant(tenantId, (ftx) =>
+              ftx
+                .update(cashierTransactions)
+                .set({
+                  fiscalReceiptId: fiscalResult.fiscalId,
+                  fiscalResponse: fiscalResult.response as object,
+                })
+                .where(eq(cashierTransactions.id, fiscalPayment.id)),
+            );
+          }
         });
-
-        if (fiscalResult.fiscalId || fiscalResult.response) {
-          await tx
-            .update(cashierTransactions)
-            .set({
-              fiscalReceiptId: fiscalResult.fiscalId,
-              fiscalResponse: fiscalResult.response as object,
-            })
-            .where(eq(cashierTransactions.id, transaction.id));
-        }
 
         await deps.audit.record(c, {
           action: 'created',
