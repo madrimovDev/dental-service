@@ -32,7 +32,7 @@ import { parseToothNumbers } from '../../clinical.mappers';
 import { LabOrderChain } from './LabOrderChain';
 import classes from './LabOrderForm.module.css';
 import { activeLabs, useLabHubLabs, useLabHubStatus, useSendToLabHub } from './lab-hub.api';
-import { useUploadLabOrderFile } from './lab-order.api';
+import { useLabOrderDoctors, useUploadLabOrderFile } from './lab-order.api';
 import {
   compareDueWithAppointment,
   formatDueDate,
@@ -90,10 +90,24 @@ export function LabOrderNewPage() {
   const user = useAuthStore((s) => s.user);
   /**
    * Buyurtma shifokori — `doctorId` sifatida yuboriladi va Hub'ga (`toHubCase`) aynan shu
-   * shifokorning ismi ketadi. «Laboratoriya nimani ko'radi» ham shu manbadan o'qiydi
-   * (bitta qiymat — oldindan ko'rish va yuborilgan narsa ajralib ketmaydi).
+   * shifokorning ismi ketadi (FX-112). Shifokor tanlanadi (amaliyotchi rollar); joriy foydalanuvchi
+   * faqat o'zi amaliyotchi (yoki tenant egasi) bo'lsa — standart. Technician o'zini «shifokor»
+   * qilib yubora olmaydi: shifokorni tanlashi shart. «Laboratoriya nimani ko'radi» ham shu
+   * manbadan o'qiydi (oldindan ko'rish va yuborilgan narsa ajralib ketmaydi).
    */
-  const orderDoctor = user ? { id: user.id, name: user.fullName } : null;
+  const isOwner = useAuthStore((s) => s.hasPermission('@owner'));
+  const doctorsQuery = useLabOrderDoctors();
+  const doctorOptions = useMemo(() => {
+    const list = doctorsQuery.data ?? [];
+    if (isOwner && user && !list.some((d) => d.id === user.id)) {
+      return [{ id: user.id, name: user.fullName ?? '—' }, ...list];
+    }
+    return list;
+  }, [doctorsQuery.data, isOwner, user]);
+  const [pickedDoctorId, setPickedDoctorId] = useState<string | null>(null);
+  const [doctorMissing, setDoctorMissing] = useState(false);
+  const selfOption = user ? doctorOptions.find((d) => d.id === user.id) : undefined;
+  const orderDoctor = doctorOptions.find((d) => d.id === pickedDoctorId) ?? selfOption ?? null;
   const canViewAppointments = useAuthStore((s) => s.hasPermission('appointment.view'));
   const [files, setFiles] = useState<File[]>([]);
 
@@ -175,7 +189,10 @@ export function LabOrderNewPage() {
 
   const submit = (send: boolean) =>
     form.onSubmit(async (values) => {
-      if (!orderDoctor) return;
+      if (!orderDoctor) {
+        setDoctorMissing(true);
+        return;
+      }
       const nums = parseToothNumbers(values.toothNumbersText);
       try {
         const order = await createMut.mutateAsync({
@@ -209,7 +226,12 @@ export function LabOrderNewPage() {
           }
         }
         const hubLab = hubLabId ? hubLabs.find((l) => l.id === hubLabId) : undefined;
-        if (send && hubLab) {
+        // FX-50: fayl yuklanmagan buyurtma labga YUBORILMAYDI (lab fayllarsiz ishlay olmaydi) —
+        // qoralama bo'lib qoladi, foydalanuvchi fayllarni qayta yuklab, keyin yuboradi.
+        const hold = failed > 0;
+        if (hold && send) {
+          notifications.show({ color: 'red', message: t('labOrder.files_failed_not_sent') });
+        } else if (send && hubLab) {
           // Portal orqali: ish navbatga tushadi (internet yo'q bo'lsa — qaytganda ketadi).
           try {
             await sendHubMut.mutateAsync({ labOrderId: order.id, labId: hubLab.id });
@@ -220,7 +242,7 @@ export function LabOrderNewPage() {
         } else if (send) {
           await statusMut.mutateAsync({ id: order.id, status: 'sent' as LabOrderStatus });
         }
-        if (failed > 0) {
+        if (failed > 0 && !send) {
           notifications.show({ color: 'yellow', message: t('labOrder.files_failed') });
         }
         navigate(`/lab-orders/${order.id}`, { replace: true });
@@ -315,6 +337,21 @@ export function LabOrderNewPage() {
                   if (picked && picked.name !== value) setHubLabId(null);
                 }}
                 error={err('labName')}
+              />
+            </section>
+
+            <section className={classes.card}>
+              <Select
+                label={t('labOrder.doctor_label')}
+                placeholder={t('labOrder.doctor_placeholder')}
+                data={doctorOptions.map((d) => ({ value: d.id, label: d.name }))}
+                value={orderDoctor?.id ?? null}
+                onChange={(val) => {
+                  setPickedDoctorId(val);
+                  setDoctorMissing(false);
+                }}
+                error={doctorMissing && !orderDoctor ? t('labOrder.doctor_required') : undefined}
+                withAsterisk
               />
             </section>
 
@@ -487,6 +524,17 @@ export function LabOrderNewPage() {
                     {(props) => (
                       <Button variant="default" {...props}>
                         {t('labOrder.add_file')}
+                      </Button>
+                    )}
+                  </FileButton>
+                  <FileButton
+                    accept="image/*"
+                    capture="environment"
+                    onChange={(picked) => picked && setFiles((cur) => [...cur, picked])}
+                  >
+                    {(props) => (
+                      <Button variant="default" {...props}>
+                        {t('labOrder.add_photo')}
                       </Button>
                     )}
                   </FileButton>

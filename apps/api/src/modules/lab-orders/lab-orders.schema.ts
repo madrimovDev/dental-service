@@ -86,6 +86,11 @@ export const labOrderIdParamSchema = z
 export const listLabOrdersQuerySchema = z.object({
   patientId: z.uuid().optional().openapi({ description: 'Filter by patient UUID' }),
   status: orderStatusSchema.optional().openapi({ description: 'Filter by order status' }),
+  /** FX-109: `true` — faqat faol (delivered/cancelled EMAS), muddati bo'yicha (eng shoshilinchi birinchi). */
+  activeOnly: z
+    .enum(['true', 'false'])
+    .optional()
+    .openapi({ description: 'Only active orders (not delivered/cancelled), most urgent first' }),
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(100).default(20),
 });
@@ -186,6 +191,11 @@ export const labOrderFileDeleteSchema = z
 // ─── Lab Hub (W2 clinic-sync) ─────────────────────────────────────────────────
 
 export const sendToHubSchema = z.object({ labId: z.uuid() }).strict();
+
+/** FX-78: tayyor/yetkazilgan ishni qayta ishlashga qaytarish — sabab ixtiyoriy (Hub'da xabar bo'ladi). */
+export const remakeLabOrderSchema = z
+  .object({ reason: z.string().trim().min(1).max(2000).optional() })
+  .strict();
 
 /**
  * Foydalanuvchi ekranda ko'rgan narx (`proposedPrice` satri, masalan `"350000.00"`).

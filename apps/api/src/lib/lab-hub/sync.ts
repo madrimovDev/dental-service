@@ -9,7 +9,7 @@ import {
   patients,
   users,
 } from '@dental/db-schema';
-import { and, eq, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
 import type { Database, DbOrTx } from '../../db/client.ts';
 import { withTenant } from '../../db/scoped.ts';
 import {
@@ -87,7 +87,48 @@ const executeOp = async (
   if (!order?.labHubCaseRef || !order.labHubLabId) return undefined; // buyurtma yo'q / Hub'dan uzilgan
   const caseRef = order.labHubCaseRef;
 
+  // FX-46/47: bekor qilingan ishga cancel'dan boshqa hech narsa yuborilmaydi (PHI ham, narx ham);
+  // lab rad etgan ishga narx tasdig'i yuborilmaydi.
+  if (order.status === 'cancelled' && row.op !== 'cancel') return undefined;
+  if (order.hubStatus === 'rejected' && row.op === 'approve_price') return undefined;
+
   switch (row.op) {
+    case 'cancel': {
+      // Reassign'da eski ref payload'da; oddiy bekor qilishda joriy ref.
+      const target = typeof row.payload.caseRef === 'string' ? row.payload.caseRef : caseRef;
+      try {
+        await client.cancelCase(key, target);
+      } catch (err) {
+        // Faqat Hub'da ish YO'Q bo'lsa (`case.not_found`) — yopiladigan narsa yo'q. Boshqa 404
+        // (masalan, eski Hub'da yo'l yo'q — `not_found`) jim yutilmaydi: op `failed` bo'ladi va
+        // FX-48 qayta navbatga qo'yish orqali Hub yangilangach yuboriladi.
+        if (err instanceof LabHubError && err.code === 'case.not_found') {
+          logger.warn({ tenantId, caseRef: target }, 'lab-hub cancel: case not found on Hub');
+          return undefined;
+        }
+        throw err;
+      }
+      return undefined;
+    }
+    case 'remake': {
+      // FX-78: Hub holati `remake` bo'ladi; sabab Hub'da klinika xabari sifatida yoziladi.
+      await client.remakeCase(
+        key,
+        caseRef,
+        typeof row.payload.reason === 'string' ? row.payload.reason : null,
+      );
+      // Hub 2xx — holat `remake` (takroriy so'rov idempotent bo'lsin; poll aks-sadosi ham shuni yozadi).
+      // Poll lab'ning keyingi holatini allaqachon qo'llagan bo'lsa (ready/delivered emas) tegilmaydi.
+      await withTenant(tenantId, (tx) =>
+        tx
+          .update(labOrders)
+          .set({ hubStatus: 'remake', hubSyncStatus: 'synced' })
+          .where(
+            and(eq(labOrders.id, order.id), inArray(labOrders.hubStatus, ['ready', 'delivered'])),
+          ),
+      );
+      return undefined;
+    }
     case 'upsert_case': {
       // PHI faqat shu yerda, push paytida va faqat L3 ustunlari o'qiladi (PII ustunlari emas).
       const data = await withTenant(tenantId, async (tx) => {
@@ -212,7 +253,14 @@ const executeOp = async (
 };
 
 /** Hub narx tasdig'ini rad etgan kodlar — kutilayotgan tasdiq bekor qilinadi. */
-const PRICE_REJECTED = new Set(['price.mismatch', 'price.not_proposed', 'price.already_approved']);
+const PRICE_REJECTED = new Set([
+  'price.mismatch',
+  'price.not_proposed',
+  'price.already_approved',
+  // FX-46/47: lab rad etgan / bekor qilingan ish (klinika hali poll qilmagan bo'lishi mumkin).
+  'case.rejected',
+  'case.cancelled',
+]);
 
 /**
  * Hub `approve-price`ni rad etdi (klinika eski taklifni tasdiqlagan, lab poll'dan keyin narxni
@@ -429,7 +477,13 @@ const applyEvent = async (tx: DbOrTx, tenantId: string, ev: HubChangeEvent, now:
       const to = String(ev.payload.to ?? '');
       if (!to) return;
       const patch: Partial<typeof labOrders.$inferInsert> = { hubStatus: to, updatedAt: now };
-      if (to === 'rejected') patch.hubRejectReason = String(ev.payload.reason ?? '') || null;
+      if (to === 'rejected') {
+        patch.hubRejectReason = String(ev.payload.reason ?? '') || null;
+        // FX-47: rad etilgan ishda kutilayotgan narx tasdig'i qolmaydi.
+        patch.priceApprovalRequestedAt = null;
+        patch.priceApprovalRequestedPrice = null;
+        patch.priceApprovalRequestedBy = null;
+      }
       const target = HUB_TO_CLINIC[to];
       if (
         to === 'accepted' &&
@@ -468,6 +522,8 @@ const applyEvent = async (tx: DbOrTx, tenantId: string, ev: HubChangeEvent, now:
       // klinika «Tasdiqlash»ni bosgan (kutilmoqda) bo'lsa ham TASHLANMAYDI. Kutilayotgan
       // tasdiq eski narx uchun bo'lsa Hub `price.mismatch` qaytaradi va kutish tozalanadi.
       if (order.approvedPrice != null) return;
+      // FX-46: bekor qilingan ishga yangi taklif yozilmaydi va bildirishnoma yuborilmaydi.
+      if (order.status === 'cancelled') return;
       await tx
         .update(labOrders)
         .set({ proposedPrice: price, updatedAt: now })

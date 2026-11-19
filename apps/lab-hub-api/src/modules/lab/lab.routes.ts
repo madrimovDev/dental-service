@@ -1,5 +1,5 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, notInArray, sql } from 'drizzle-orm';
 import type { Context, MiddlewareHandler } from 'hono';
 import type { Tx } from '../../db/client';
 import {
@@ -31,6 +31,7 @@ import { bearer } from '../../lib/tokens';
 import {
   addFile,
   addMessage,
+  CLOSED_FOR_PRICE,
   caseDetail,
   LAB_TRANSITIONS,
   recordEvent,
@@ -51,7 +52,7 @@ const TABS: Record<string, CaseStatus[]> = {
   in_work: ['accepted', 'in_progress'],
   ready: ['ready'],
   shipped: ['delivered'],
-  rejected: ['rejected'],
+  rejected: ['rejected', 'cancelled'],
 };
 
 // Parol almashtirilmaguncha yoki obuna tugaganda ham ochiq yo'llar.
@@ -435,9 +436,25 @@ export const labRoutes = (deps: Deps) => {
         const [u] = await t
           .update(cases)
           .set({ proposedPrice: price, updatedAt: deps.now() })
-          .where(and(eq(cases.id, row.id), isNull(cases.approvedPrice)))
+          .where(
+            and(
+              eq(cases.id, row.id),
+              isNull(cases.approvedPrice),
+              // FX-46/47: rad etilgan / klinika bekor qilgan ishga narx taklif qilinmaydi.
+              notInArray(cases.status, CLOSED_FOR_PRICE),
+            ),
+          )
           .returning();
-        if (!u) throw new ApiError(409, 'price.already_approved');
+        if (!u) {
+          const [cur] = await t
+            .select({ status: cases.status, approvedPrice: cases.approvedPrice })
+            .from(cases)
+            .where(eq(cases.id, row.id));
+          if (cur && cur.approvedPrice == null && CLOSED_FOR_PRICE.includes(cur.status)) {
+            throw new ApiError(409, `case.${cur.status}`);
+          }
+          throw new ApiError(409, 'price.already_approved');
+        }
         await recordEvent(t, {
           caseRow: u,
           type: 'price_proposed',

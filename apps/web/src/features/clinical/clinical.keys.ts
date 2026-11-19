@@ -29,6 +29,7 @@ export const clinicalKeys = {
   labOrders: (patientId: string, status?: LabOrderStatus) =>
     ['clinical', 'lab-orders', patientId, status ?? null] as const,
   labOrder: (id: string) => ['clinical', 'lab-order', id] as const,
+  labOrderDoctors: () => ['clinical', 'lab-order-doctors'] as const,
   labOrderFiles: (labOrderId: string) => ['clinical', 'lab-order-files', labOrderId] as const,
   // Lab Hub (W2): ulanish holati, katalog, buyurtma yozishmasi.
   labHubStatus: () => ['clinical', 'lab-hub', 'status'] as const,

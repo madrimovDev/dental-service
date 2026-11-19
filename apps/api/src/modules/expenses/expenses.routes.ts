@@ -27,7 +27,11 @@ import {
   updateCategorySchema,
   updateExpenseSchema,
 } from './expenses.schema.ts';
-import { createExpensesService, ExpenseBranchForbiddenError } from './expenses.service.ts';
+import {
+  createExpensesService,
+  ExpenseBranchForbiddenError,
+  ExpenseLabLinkedError,
+} from './expenses.service.ts';
 
 /** Standart 404 (kategoriya). */
 const categoryNotFoundResponse = {
@@ -50,6 +54,14 @@ const ownershipInvalid = (e: CrossEntityError) =>
   fail(`ownership.${e.entity}.${e.reason}`, 'not_found');
 
 const branchForbidden = () => fail(BRANCH_FORBIDDEN_CODE, BRANCH_FORBIDDEN_MESSAGE);
+
+/** FX-80: Hub tasdig'idan yozilgan «Laboratoriya» xarajati — PATCH/DELETE 409. */
+const expenseLabLinkedResponse = {
+  409: {
+    content: { 'application/json': { schema: errorResponseSchema } },
+    description: 'Expense is linked to a lab order (FX-80) — only the note is editable',
+  },
+};
 
 /**
  * Xarajatlar route'lari — bitta OpenAPIHono app, `/api` ga mount qilinadi.
@@ -307,6 +319,7 @@ export const expensesRoutes = (deps: { db: Database; audit: AuditLogger }) => {
         content: { 'application/json': { schema: errorResponseSchema } },
         description: 'Foreign/missing categoryId or branchId',
       },
+      ...expenseLabLinkedResponse,
     },
   });
 
@@ -321,6 +334,9 @@ export const expensesRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     } catch (e) {
       if (e instanceof ExpenseBranchForbiddenError) return c.json(branchForbidden(), 403);
       if (e instanceof CrossEntityError) return c.json(ownershipInvalid(e), 400);
+      if (e instanceof ExpenseLabLinkedError) {
+        return c.json(fail('expense.lab_order_linked', e.message), 409);
+      }
       throw e;
     }
   });
@@ -336,6 +352,7 @@ export const expensesRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     responses: {
       ...okJson(expenseDeleteResultSchema, 'Expense deleted'),
       ...expenseNotFoundResponse,
+      ...expenseLabLinkedResponse,
     },
   });
 
@@ -348,6 +365,9 @@ export const expensesRoutes = (deps: { db: Database; audit: AuditLogger }) => {
       return c.json(ok({ deleted: true as const }), 200);
     } catch (e) {
       if (e instanceof ExpenseBranchForbiddenError) return c.json(branchForbidden(), 403);
+      if (e instanceof ExpenseLabLinkedError) {
+        return c.json(fail('expense.lab_order_linked', e.message), 409);
+      }
       throw e;
     }
   });

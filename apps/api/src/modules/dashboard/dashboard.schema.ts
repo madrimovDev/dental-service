@@ -49,3 +49,12 @@ export const doctorPendingDtoSchema = z
   })
   .openapi('DoctorPending');
 export type DoctorPendingDto = z.infer<typeof doctorPendingDtoSchema>;
+
+/**
+ * Registrator «Diqqat» agregati (FX-121) — `appointment.view` bilan ochiq (`lab_order.view`siz):
+ * muddati o'tgan faol lab buyurtmalar SONI (PII yo'q, ro'yxat yo'q).
+ */
+export const receptionAttentionDtoSchema = z
+  .object({ overdueLabs: z.number().int() })
+  .openapi('ReceptionAttention');
+export type ReceptionAttentionDto = z.infer<typeof receptionAttentionDtoSchema>;

@@ -15,9 +15,8 @@ import i18n from 'i18next';
 import { useBranchAvailability, useDoctors } from '@/features/appointments/appointments.api.ts';
 import { usePatientNames as useClinicalPatientNames } from '@/features/clinical/clinical.api.ts';
 import { usePatients } from '@/features/patients/patients.api.ts';
+import { api } from '@/lib/api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
-import { useActiveLabOrders } from './dashboard.api.ts';
-import { isLabOverdue } from './reception.logic.ts';
 
 const localIsoDate = (d = new Date()) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -57,7 +56,13 @@ export function useReceptionAttention(branchId: string | null) {
     date: localIsoDate(),
     enabled: hasPermission('schedule.view'),
   });
-  const labs = useActiveLabOrders();
+  // FX-121: Registratorda `lab_order.view` yo'q — tor endpoint (faqat son), `appointment.view` bilan.
+  const canAppointment = hasPermission('appointment.view');
+  const labs = useQuery({
+    queryKey: ['reception', 'lab-attention'],
+    queryFn: () => api.dashboard.receptionAttention(),
+    enabled: canAppointment,
+  });
   const canRecall = hasPermission('recall.view');
   const recall = useQuery({
     queryKey: ['reception', 'recall-summary', branchId],
@@ -69,8 +74,7 @@ export function useReceptionAttention(branchId: string | null) {
   const doctorsWithoutSchedule = availability.data
     ? (doctors.data ?? []).filter((d) => !withSchedule.has(d.id))
     : [];
-  const today = localIsoDate();
-  const overdueLabs = (labs.data ?? []).filter((o) => isLabOverdue(o, today)).length;
+  const overdueLabs = labs.data?.overdueLabs ?? 0;
   const recallOverdue = canRecall ? (recall.data?.overdue ?? 0) : 0;
   return { doctorsWithoutSchedule, overdueLabs, recallOverdue };
 }

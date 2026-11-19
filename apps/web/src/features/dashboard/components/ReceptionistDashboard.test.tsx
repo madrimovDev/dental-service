@@ -210,6 +210,24 @@ describe('ReceptionistDashboard (DS1-T5 re-skin characterization)', () => {
     expect(screen.getByText('Yana 1 ta')).toBeInTheDocument();
   });
 
+  it('FX-121: lab muddati diqqati lab_order.view siz Registratorda ham chiqadi, lekin /lab havolasisiz', async () => {
+    attention.doctorsWithoutSchedule = [];
+    mockHasPermission.mockImplementation((p) => p !== 'lab_order.view');
+    const { ReceptionistDashboard } = await import('./ReceptionistDashboard.tsx');
+    renderApp(<ReceptionistDashboard />);
+
+    expect(screen.getByText("Lab ishi muddati o'tgan")).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Buyurtmani ochish' })).not.toBeInTheDocument();
+  });
+
+  it('FX-121: lab_order.view bor rolda lab diqqati /lab havolasi bilan', async () => {
+    attention.doctorsWithoutSchedule = [];
+    const { ReceptionistDashboard } = await import('./ReceptionistDashboard.tsx');
+    renderApp(<ReceptionistDashboard />);
+
+    expect(screen.getByRole('button', { name: 'Buyurtmani ochish' })).toBeInTheDocument();
+  });
+
   it("UI-R1: status filtri URL param'dan (?status=no_show)", async () => {
     const { ReceptionistDashboard } = await import('./ReceptionistDashboard.tsx');
     renderApp(<ReceptionistDashboard />, { route: '/?status=no_show' });

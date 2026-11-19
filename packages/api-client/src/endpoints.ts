@@ -1,5 +1,5 @@
 import type { ApiClient } from './client.ts';
-import type { PatientImage } from './generated/model/index.ts';
+import type { LabOrder, PatientImage } from './generated/model/index.ts';
 
 /**
  * Lab buyurtma fayli (UI-D5, `lab_order_files`). Kontrakt generatsiyasigacha qo'lda tip;
@@ -83,6 +83,11 @@ export type LabOrderHubFields = {
 };
 
 export const createEndpoints = (api: ApiClient) => ({
+  // FX-121: Registrator «Diqqat» — kontrakt generatsiyasigacha qo'lda.
+  dashboard: {
+    receptionAttention: () =>
+      api.get<{ overdueLabs: number }>('/api/dashboard/reception-attention'),
+  },
   labHub: {
     status: () => api.get<LabHubStatusRecord>('/api/lab-hub/status'),
     connect: () => api.post<{ connected: true; hubClinicId: string }>('/api/lab-hub/connect', {}),
@@ -99,6 +104,9 @@ export const createEndpoints = (api: ApiClient) => ({
       }),
     sendToHub: <T = unknown>(labOrderId: string, labId: string) =>
       api.post<T>(`/api/lab-orders/${labOrderId}/send-to-hub`, { labId }),
+    /** FX-78: tayyor/yetkazilgan ishni qayta ishlashga qaytarish (sabab ixtiyoriy). */
+    requestRemake: <T = unknown>(labOrderId: string, reason?: string) =>
+      api.post<T>(`/api/lab-orders/${labOrderId}/remake`, reason ? { reason } : {}),
     /** `price` — foydalanuvchi ko'rgan taklif; server boshqasini ko'rsa 409 `price.changed`. */
     approvePrice: (labOrderId: string, price: string) =>
       api.post<LabHubPriceApprovalRecord>(`/api/lab-orders/${labOrderId}/approve-price`, {
@@ -115,6 +123,16 @@ export const createEndpoints = (api: ApiClient) => ({
   // lab-order fayllari (UI-D5): multipart upload hand (orval multipart'ni qo'llamaydi);
   // list/delete ham shu namespace'da — generatsiyadan keyin generated funksiyalarga ko'chadi.
   labOrders: {
+    /**
+     * FX-109: dashboard navbati — faol (delivered/cancelled EMAS) buyurtmalar serverda filtrlangan,
+     * eng shoshilinchi birinchi (eng yangi 20 ta bilan cheklanmaydi). Kontrakt generatsiyasigacha qo'lda.
+     */
+    listActive: () =>
+      api.get<{ data: LabOrder[]; meta: { page: number; pageSize: number; total: number } }>(
+        '/api/lab-orders?activeOnly=true&pageSize=100',
+      ),
+    /** FX-112: buyurtma shifokorini tanlash ro'yxati (`lab_order.manage`; `roles.is_practitioner`). */
+    doctors: () => api.get<{ id: string; name: string }[]>('/api/lab-orders/doctors'),
     uploadFile: (id: string, form: FormData) =>
       api.upload<LabOrderFileRecord>(`/api/lab-orders/${id}/files`, form),
     listFiles: (id: string) => api.get<LabOrderFileRecord[]>(`/api/lab-orders/${id}/files`),

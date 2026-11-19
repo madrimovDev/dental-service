@@ -8,10 +8,10 @@ import {
   treatmentPlans,
   visitNotes,
 } from '@dental/db-schema';
-import { and, count, desc, eq, gte, inArray, lt, ne, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gte, inArray, lt, ne, notInArray, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
-import type { DoctorPendingDto } from './dashboard.schema.ts';
+import type { DoctorPendingDto, ReceptionAttentionDto } from './dashboard.schema.ts';
 
 const LIST_LIMIT = 5;
 const NOTE_WINDOW_DAYS = 14;
@@ -32,6 +32,25 @@ const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000);
  *  - javob kutayotgan reja = shifokorning `presented` rejasi.
  */
 export const createDashboardService = () => {
+  /**
+   * FX-121: Registrator «Diqqat» — muddati o'tgan faol lab buyurtmalar soni. Butun to'plam ustida
+   * SQL `count` (eng yangi N tadan emas — FX-109) va `lab_order.view`siz rol uchun ochiq (faqat son).
+   * Ta'rif `lab-orders.overdue()` bilan bir xil (`expectedDate < hozir`, delivered/cancelled EMAS).
+   */
+  async function receptionAttention(c: Context): Promise<ReceptionAttentionDto> {
+    const db = getDb(c);
+    const [row] = await db
+      .select({ n: count() })
+      .from(labOrders)
+      .where(
+        and(
+          lt(labOrders.expectedDate, new Date()),
+          notInArray(labOrders.status, ['delivered', 'cancelled']),
+        ),
+      );
+    return { overdueLabs: row?.n ?? 0 };
+  }
+
   async function doctorPending(
     c: Context,
     userId: string,
@@ -223,6 +242,6 @@ export const createDashboardService = () => {
       },
     };
   }
-  return { doctorPending };
+  return { doctorPending, receptionAttention };
 };
 export type DashboardService = ReturnType<typeof createDashboardService>;

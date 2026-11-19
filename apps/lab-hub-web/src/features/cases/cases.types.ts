@@ -5,7 +5,8 @@ export type CaseStatus =
   | 'ready'
   | 'rejected'
   | 'delivered'
-  | 'remake';
+  | 'remake'
+  | 'cancelled';
 
 export type TabKey = 'new' | 'in_work' | 'ready' | 'shipped' | 'rejected';
 export const TAB_KEYS: TabKey[] = ['new', 'in_work', 'ready', 'shipped', 'rejected'];

@@ -1,5 +1,5 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, notInArray, sql } from 'drizzle-orm';
 import type { Context, MiddlewareHandler } from 'hono';
 import type { Tx } from '../../db/client';
 import {
@@ -25,6 +25,7 @@ import { bearer, generateHubKey, safeEqual, sha256Hex } from '../../lib/tokens';
 import {
   addFile,
   addMessage,
+  CLOSED_FOR_PRICE,
   caseDetail,
   contentDisposition,
   findFileByClientRef,
@@ -544,7 +545,13 @@ export const clinicRoutes = (deps: Deps) => {
           .update(cases)
           .set({ approvedPrice: price, approvedAt: deps.now(), updatedAt: deps.now() })
           .where(
-            and(eq(cases.id, row.id), isNull(cases.approvedPrice), eq(cases.proposedPrice, price)),
+            and(
+              eq(cases.id, row.id),
+              isNull(cases.approvedPrice),
+              eq(cases.proposedPrice, price),
+              // FX-47/46: rad etilgan yoki bekor qilingan ishga narx tasdiqlanmaydi.
+              notInArray(cases.status, CLOSED_FOR_PRICE),
+            ),
           )
           .returning();
         if (approved) {
@@ -561,13 +568,15 @@ export const clinicRoutes = (deps: Deps) => {
           });
         }
         const [cur] = (await t.execute(
-          sql`SELECT proposed_price, approved_price, approved_at FROM cases WHERE id = ${row.id} FOR UPDATE`,
+          sql`SELECT status, proposed_price, approved_price, approved_at FROM cases WHERE id = ${row.id} FOR UPDATE`,
         )) as unknown as {
+          status: string;
           proposed_price: string | null;
           approved_price: string | null;
           approved_at: string | Date | null;
         }[];
         if (cur?.approved_price != null) {
+          // Avval tasdiqlangan (keyin rad etilgan/bekor qilingan bo'lsa ham) — qayta urinish idempotent.
           if (cur.approved_price === price) {
             return c.json({
               approvedPrice: price,
@@ -576,6 +585,9 @@ export const clinicRoutes = (deps: Deps) => {
             });
           }
           throw new ApiError(409, 'price.already_approved');
+        }
+        if (cur && (CLOSED_FOR_PRICE as string[]).includes(cur.status)) {
+          throw new ApiError(409, `case.${cur.status}`);
         }
         if (cur?.proposed_price == null) throw new ApiError(409, 'price.not_proposed');
         throw new ApiError(409, 'price.mismatch', { proposedPrice: cur.proposed_price });
@@ -654,6 +666,43 @@ export const clinicRoutes = (deps: Deps) => {
         });
         if (reason) await addMessage(t, u!, dek, { author: 'clinic', body: reason });
         return c.json({ status: 'remake', changed: true });
+      }),
+  );
+
+  app.openapi(
+    createRoute({
+      method: 'post',
+      path: '/cases/{ref}/cancel',
+      tags,
+      summary: 'Klinika ishni bekor qildi (idempotent; delivered → 409)',
+      request: { params: refParam },
+      responses: OK,
+    }),
+    async (c) =>
+      tx(c, async (t, clinic) => {
+        // FX-46: lab obunasi tugagan bo'lsa ham bekor qilish o'tadi (findCase obuna tekshiradi).
+        const ref = c.req.valid('param').ref;
+        const [cur] = (await t.execute(
+          sql`SELECT id, status FROM cases WHERE clinic_id = ${clinic.id} AND clinic_case_ref = ${ref} FOR UPDATE`,
+        )) as unknown as { id: string; status: string }[];
+        if (!cur) throw new ApiError(404, 'case.not_found');
+        if (cur.status === 'cancelled') return c.json({ status: 'cancelled', changed: false });
+        if (cur.status === 'delivered') {
+          throw new ApiError(409, 'case.bad_transition', { from: cur.status, to: 'cancelled' });
+        }
+        const now = deps.now();
+        const [u] = await t
+          .update(cases)
+          .set({ status: 'cancelled', updatedAt: now })
+          .where(eq(cases.id, cur.id))
+          .returning();
+        await recordEvent(t, {
+          caseRow: u!,
+          type: 'status',
+          actor: 'clinic',
+          payload: { from: cur.status, to: 'cancelled' },
+        });
+        return c.json({ status: 'cancelled', changed: true });
       }),
   );
 

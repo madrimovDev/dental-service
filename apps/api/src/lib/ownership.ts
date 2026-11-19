@@ -212,11 +212,13 @@ export const createOwnershipValidator = () => {
    * FX-155 (LC-33): klinik yozuv muallifi (`doctorId`) — (1) shu tenantda faol, qabul qilingan
    * `roles.is_practitioner` tayinlovi bor shifokor (tenant OWNER — implicit superuser istisno),
    * (2) joriy foydalanuvchi emas bo'lsa — `onBehalfPermission` (yoki `@owner`) shart.
+   * FX-112: lab buyurtma shifokori ham shu tekshiruvdan o'tadi — u yerda `onBehalfPermission`
+   * berilmaydi (Technician shifokorni tanlaydi; faqat amaliyotchi ekanligi tekshiriladi).
    */
   async function assertPractitioner(
     c: Context,
     doctorId: string,
-    onBehalfPermission: string,
+    onBehalfPermission?: string,
   ): Promise<void> {
     const db = getDb(c);
     const activeTenantId: string | null | undefined = c.get('activeTenantId');
@@ -243,7 +245,7 @@ export const createOwnershipValidator = () => {
       }
     }
     const currentUserId: string | undefined = c.get('user')?.id;
-    if (doctorId !== currentUserId) {
+    if (onBehalfPermission && doctorId !== currentUserId) {
       const perms: string[] = c.get('accessClaims')?.perms ?? [];
       if (!perms.includes('@owner') && !perms.includes(onBehalfPermission)) {
         throw new OnBehalfForbiddenError(onBehalfPermission);
@@ -252,13 +254,13 @@ export const createOwnershipValidator = () => {
   }
 
   return {
-    assertPractitioner,
     assertBranchExists,
     assertTreatmentPlanExists,
     assertStockItemExists,
     assertServiceExists,
     assertPatientExists,
     assertUserExists,
+    assertPractitioner,
     assertStageBelongsToPatient,
     assertVisitNoteBelongsToPatient,
     assertAppointmentBelongsToPatient,

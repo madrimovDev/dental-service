@@ -14,11 +14,11 @@ import {
   getRevenueReport,
   listAppointments,
   listBranches,
-  listLabOrders,
   listUserAssignments,
 } from '@dental/api-client';
 import { useQuery } from '@tanstack/react-query';
 import { useReportBranches } from '@/features/reports/reports.api.ts';
+import { api } from '@/lib/api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { dashboardKeys } from './dashboard.keys';
 import { filterActiveLabOrders, toBranchNameMap, toDoctorNameMap } from './dashboard.mappers';
@@ -95,7 +95,9 @@ export function useActiveLabOrders() {
   const { hasPermission } = useAuthStore();
   return useQuery({
     queryKey: dashboardKeys.labOrders(),
-    queryFn: () => listLabOrders().then((r) => r.data.data),
+    // FX-109: faol buyurtmalar serverda filtrlanadi — eng yangi 20 tadan tashqaridagi eski/muddati
+    // o'tgan ish yo'qolmaydi. `select` himoya qatlami sifatida qoladi.
+    queryFn: () => api.labOrders.listActive().then((r) => r.data),
     select: filterActiveLabOrders,
     enabled: hasPermission('lab_order.view'),
   });

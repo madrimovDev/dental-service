@@ -38,7 +38,14 @@ export const normalizeMoney = (v: string | number): string | null => {
   return n.toFixed(2);
 };
 
-export type LabOrderHubOp = 'upsert_case' | 'file' | 'message' | 'approve_price' | 'delivered';
+export type LabOrderHubOp =
+  | 'upsert_case'
+  | 'file'
+  | 'message'
+  | 'approve_price'
+  | 'delivered'
+  | 'cancel'
+  | 'remake';
 
 /** Outbox'ga qator (biznes tranzaksiyasi ichida) + commit'dan keyin bir marta push urinishi. */
 export const enqueueLabHub = async (
@@ -77,7 +84,14 @@ export const createLabOrdersHubService = (deps: { audit: AuditLogger }) => {
 
     const order = await lockOrder(db, id);
     if (!order) throw new LabHubOrderError(404, 'lab_order.not_found');
-    if (order.labHubCaseRef) throw new LabHubOrderError(409, 'lab_hub.already_sent');
+    // FX-47: lab rad etgan ish boshqa labga (yangi Hub ref bilan) qayta yuboriladi.
+    const reassign = !!order.labHubCaseRef && order.hubStatus === 'rejected';
+    if (order.labHubCaseRef && !reassign) {
+      throw new LabHubOrderError(409, 'lab_hub.already_sent');
+    }
+    if (reassign && order.approvedPrice != null) {
+      throw new LabHubOrderError(409, 'lab_hub.already_approved');
+    }
     if (order.status !== 'draft' && order.status !== 'sent') {
       throw new LabHubOrderError(409, 'lab_hub.bad_status');
     }
@@ -86,13 +100,31 @@ export const createLabOrdersHubService = (deps: { audit: AuditLogger }) => {
     }
 
     const now = new Date();
+    const oldCaseRef = order.labHubCaseRef;
+    if (reassign) {
+      // Eski ref'ning kutilayotgan op'lari yangi ishga yuborilmasin (executeOp joriy ref'ni oladi).
+      await db
+        .update(labHubOutbox)
+        .set({ status: 'superseded', doneAt: now })
+        .where(and(eq(labHubOutbox.labOrderId, id), eq(labHubOutbox.status, 'pending')));
+    }
     const [row] = await db
       .update(labOrders)
       .set({
         labHubLabId: lab.id,
-        labHubCaseRef: order.id,
+        // Hub'da (klinika, ref) unikal — boshqa labga yuborish uchun yangi ref (eski ish rad etilgan holda qoladi).
+        labHubCaseRef: reassign ? crypto.randomUUID() : order.id,
         hubSyncStatus: 'pending',
         hubStatus: null,
+        ...(reassign
+          ? {
+              hubRejectReason: null,
+              proposedPrice: null,
+              priceApprovalRequestedAt: null,
+              priceApprovalRequestedPrice: null,
+              priceApprovalRequestedBy: null,
+            }
+          : {}),
         labName: lab.name,
         status: 'sent',
         sentDate: order.sentDate ?? now,
@@ -107,16 +139,69 @@ export const createLabOrdersHubService = (deps: { audit: AuditLogger }) => {
       .where(eq(labOrderFiles.labOrderId, id))
       .orderBy(asc(labOrderFiles.createdAt));
     await enqueueLabHub(c, db, tenantId, id, [
+      // Eski (rad etilgan) ishni Hub'da yopish — rad etgan lab keyin uni qayta qabul qilmasin.
+      ...(reassign && oldCaseRef
+        ? [{ op: 'cancel' as const, payload: { caseRef: oldCaseRef } }]
+        : []),
       { op: 'upsert_case' },
       ...files.map((f) => ({ op: 'file' as const, payload: { fileId: f.id } })),
     ]);
 
     await deps.audit.record(c, {
-      action: 'sent_to_lab_hub',
+      action: reassign ? 'reassigned_to_lab_hub' : 'sent_to_lab_hub',
       resourceType: 'lab_order',
       resourceId: id,
-      before: { status: order.status, labName: order.labName },
+      before: {
+        status: order.status,
+        labName: order.labName,
+        ...(reassign ? { labHubLabId: order.labHubLabId, hubStatus: order.hubStatus } : {}),
+      },
       after: { status: 'sent', labHubLabId: lab.id, labName: lab.name, files: files.length },
+    });
+    return row;
+  }
+
+  /**
+   * FX-78: tayyor/yetkazilgan ishni qayta ishlashga qaytarish. Hub holati (`hub_status`) `ready`
+   * yoki `delivered` bo'lishi shart; klinika holati lab qayta qabul qilganda (poll) `in_progress`ga
+   * qaytadi. Tasdiqlangan narx va xarajat TEGILMAYDI (qayta ishlash — bepul). Takroriy bosish —
+   * kutilayotgan remake op bo'lsa yoki Hub allaqachon `remake`da bo'lsa idempotent (yangi op yo'q).
+   */
+  async function requestRemake(c: Context, id: string, reason?: string) {
+    const db = getDb(c);
+    const tenantId = c.get('activeTenantId') as string;
+    const order = await lockOrder(db, id);
+    if (!order) throw new LabHubOrderError(404, 'lab_order.not_found');
+    if (!order.labHubCaseRef) throw new LabHubOrderError(409, 'lab_hub.not_sent');
+    if (order.status === 'cancelled') throw new LabHubOrderError(409, 'lab_order.cancelled');
+    if (order.hubStatus === 'remake') return order;
+    if (order.hubStatus !== 'ready' && order.hubStatus !== 'delivered') {
+      throw new LabHubOrderError(409, 'lab_hub.not_remakable', { hubStatus: order.hubStatus });
+    }
+    const [pending] = await db
+      .select({ id: labHubOutbox.id })
+      .from(labHubOutbox)
+      .where(
+        and(
+          eq(labHubOutbox.labOrderId, id),
+          eq(labHubOutbox.op, 'remake'),
+          eq(labHubOutbox.status, 'pending'),
+        ),
+      );
+    if (pending) return order;
+
+    const [row] = await db
+      .update(labOrders)
+      .set({ hubSyncStatus: 'pending', updatedAt: new Date() })
+      .where(eq(labOrders.id, id))
+      .returning();
+    await enqueueLabHub(c, db, tenantId, id, [{ op: 'remake', payload: reason ? { reason } : {} }]);
+    await deps.audit.record(c, {
+      action: 'remake_requested',
+      resourceType: 'lab_order',
+      resourceId: id,
+      before: { status: order.status, hubStatus: order.hubStatus },
+      after: { hubStatus: 'remake', reasonLength: reason?.length ?? 0 },
     });
     return row;
   }
@@ -137,6 +222,9 @@ export const createLabOrdersHubService = (deps: { audit: AuditLogger }) => {
     const order = await lockOrder(db, id);
     if (!order) throw new LabHubOrderError(404, 'lab_order.not_found');
     if (!order.labHubCaseRef) throw new LabHubOrderError(409, 'lab_hub.not_sent');
+    // FX-46/47: bekor qilingan yoki lab rad etgan ishga narx tasdiqlanmaydi (xarajat yozilmaydi).
+    if (order.status === 'cancelled') throw new LabHubOrderError(409, 'lab_order.cancelled');
+    if (order.hubStatus === 'rejected') throw new LabHubOrderError(409, 'lab_hub.rejected');
 
     if (order.approvedPrice != null) {
       if (order.approvedPrice !== shown) {
@@ -325,5 +413,5 @@ export const createLabOrdersHubService = (deps: { audit: AuditLogger }) => {
     return row;
   }
 
-  return { sendToHub, approvePrice, downloadHubFile, listMessages, postMessage };
+  return { sendToHub, requestRemake, approvePrice, downloadHubFile, listMessages, postMessage };
 };

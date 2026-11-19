@@ -65,6 +65,8 @@ export const LAB_HUB_OUTBOX_OPS = [
   'message',
   'approve_price',
   'delivered',
+  'cancel',
+  'remake',
 ] as const;
 export type LabHubOutboxOp = (typeof LAB_HUB_OUTBOX_OPS)[number];
 
