@@ -98,9 +98,11 @@ const executeOp = async (
       try {
         await client.cancelCase(key, target);
       } catch (err) {
-        // Hub'da ish (yoki endpoint) yo'q — yopiladigan narsa yo'q, qayta urinishning foydasi yo'q.
-        if (err instanceof LabHubError && err.status === 404) {
-          logger.warn({ tenantId, caseRef: target }, 'lab-hub cancel: case/endpoint not found');
+        // Faqat Hub'da ish YO'Q bo'lsa (`case.not_found`) — yopiladigan narsa yo'q. Boshqa 404
+        // (masalan, eski Hub'da yo'l yo'q — `not_found`) jim yutilmaydi: op `failed` bo'ladi va
+        // FX-48 qayta navbatga qo'yish orqali Hub yangilangach yuboriladi.
+        if (err instanceof LabHubError && err.code === 'case.not_found') {
+          logger.warn({ tenantId, caseRef: target }, 'lab-hub cancel: case not found on Hub');
           return undefined;
         }
         throw err;
@@ -223,7 +225,14 @@ const executeOp = async (
 };
 
 /** Hub narx tasdig'ini rad etgan kodlar — kutilayotgan tasdiq bekor qilinadi. */
-const PRICE_REJECTED = new Set(['price.mismatch', 'price.not_proposed', 'price.already_approved']);
+const PRICE_REJECTED = new Set([
+  'price.mismatch',
+  'price.not_proposed',
+  'price.already_approved',
+  // FX-46/47: lab rad etgan / bekor qilingan ish (klinika hali poll qilmagan bo'lishi mumkin).
+  'case.rejected',
+  'case.cancelled',
+]);
 
 /**
  * Hub `approve-price`ni rad etdi (klinika eski taklifni tasdiqlagan, lab poll'dan keyin narxni

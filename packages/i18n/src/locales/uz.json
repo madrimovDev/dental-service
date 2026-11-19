@@ -2558,7 +2558,8 @@
       "ready": "Tayyor",
       "delivered": "Jo'natilgan",
       "rejected": "Rad etilgan",
-      "remake": "Qayta tayyorlash"
+      "remake": "Qayta tayyorlash",
+      "cancelled": "Klinika bekor qildi"
     },
     "due": {
       "overdue": "{{n}} kun kechikdi",
@@ -2616,6 +2617,7 @@
       "rejectConfirm": "Rad etish",
       "readyWait": "Tayyor. Klinika «Yetkazildi» ni tasdiqlaydi.",
       "deliveredInfo": "Jo'natilgan va klinika tomonidan qabul qilingan.",
+      "cancelledInfo": "Klinika ishni bekor qildi — ishlashni to'xtating, narx taklif qilinmaydi.",
       "rejectedInfo": "Rad etildi: {{reason}}",
       "privacy": "Klinika «Yetkazildi» ni tasdiqlaydi. Bemorning telefoni, manzili va kartasi laboratoriyaga hech qachon ko'rinmaydi.",
       "actionError": "Amal bajarilmadi",
@@ -2747,6 +2749,7 @@
     "hub_status_rejected": "Rad etildi",
     "hub_status_delivered": "Yetkazildi",
     "hub_status_remake": "Qayta tayyorlash",
+    "hub_status_cancelled": "Bekor qilindi",
     "reject_reason": "Rad etish sababi",
     "price_title": "Narx",
     "price_proposed": "Lab taklif qilgan narx",

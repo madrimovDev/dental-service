@@ -1,4 +1,4 @@
-import { labOrderFiles, labOrders } from '@dental/db-schema';
+import { labHubOutbox, labOrderFiles, labOrders } from '@dental/db-schema';
 import { and, asc, count, desc, eq, lt, notInArray, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
@@ -235,6 +235,31 @@ export const createLabOrdersService = (deps: {
       }
     }
 
+    // FX-46: narx tasdig'i Hub'ga yo'lda (`approve_price` op kutishda) — bekor qilinmaydi.
+    // Hub tasdiqlagan bo'lishi mumkin (javob yo'qolgan): bekor qilinsa xarajat yozilmay qolib,
+    // klinika kitoblari lab akt-sverkasidan ajralardi. Op tugagach (tasdiq/rad) bekor qilinadi.
+    if (input.status === 'cancelled' && before.status !== 'cancelled' && before.labHubCaseRef) {
+      const [inFlight] = await db
+        .select({ id: labHubOutbox.id })
+        .from(labHubOutbox)
+        .where(
+          and(
+            eq(labHubOutbox.labOrderId, id),
+            eq(labHubOutbox.op, 'approve_price'),
+            eq(labHubOutbox.status, 'pending'),
+          ),
+        )
+        .limit(1);
+      if (inFlight) {
+        throw new LabHubOrderError(
+          409,
+          'lab_order.price_approval_pending',
+          undefined,
+          "Narx tasdig'i laboratoriyaga yuborilmoqda — tasdiq yakunlangach bekor qiling",
+        );
+      }
+    }
+
     // CLI-439 B2: status state-machine guard — istalgan status→status o'tish avval
     // ruxsat etilardi (`delivered→draft`, `cancelled→delivered`). Endi forward-only
     // chiziqli oqim (draft→sent→in_progress→ready→delivered) + `cancelled` istalgan
@@ -268,7 +293,8 @@ export const createLabOrdersService = (deps: {
       patch.deliveredDate = input.deliveredDate ? new Date(input.deliveredDate) : null;
     if (input.cost !== undefined) patch.cost = input.cost === null ? null : String(input.cost);
     if (input.notes !== undefined) patch.notes = input.notes;
-    // FX-46: bekor qilinayotgan ishda kutilayotgan narx tasdig'i qolmaydi (Hub'ga yuborilmaydi).
+    // FX-46: bekor qilinayotgan ishda eskirgan kutish holati (op allaqachon `failed`/`rejected`,
+    // Hub tasdiqlamagan) qolmaydi; yo'ldagi tasdiq yuqorida 409 bilan to'xtatilgan.
     const cancelling = input.status === 'cancelled' && before.status !== 'cancelled';
     if (cancelling && before.labHubCaseRef) {
       patch.priceApprovalRequestedAt = null;

@@ -34,6 +34,7 @@ const HUB_TONE: Record<string, Meaning> = {
   delivered: 'done',
   rejected: 'failed',
   remake: 'waiting',
+  cancelled: 'failed',
 };
 
 const errorCode = (err: unknown) => (err as { code?: string } | null)?.code ?? '';

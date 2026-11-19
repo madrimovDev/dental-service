@@ -113,7 +113,9 @@ export type CaseStatus =
   | 'ready'
   | 'rejected'
   | 'delivered'
-  | 'remake';
+  | 'remake'
+  /** FX-46: klinika bekor qildi (yakuniy; lab o'tishlari va narx taklifi yopiq). */
+  | 'cancelled';
 
 export const cases = pgTable(
   'cases',
