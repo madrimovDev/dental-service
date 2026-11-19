@@ -787,6 +787,19 @@
       "pregnant": "Беременна",
       "planning": "Планирование",
       "lactating": "Кормление"
+    },
+    "questionnaire_title": "Анкета пациента (черновик)",
+    "questionnaire_hint": "Заполнено пациентом в Telegram-боте. В медкарту автоматически не попадает — проверьте и перенесите сами.",
+    "questionnaire_submitted": "Отправлено:",
+    "questionnaire_adopt": "Перенести в медкарту",
+    "questionnaire_adopted": "Ответы перенесены в форму — проверьте и нажмите «Сохранить».",
+    "questionnaireAnswers": "Анкета из бота",
+    "questionnaire_q": {
+      "allergies": "Аллергия",
+      "chronic": "Хронические заболевания",
+      "medications": "Текущие лекарства",
+      "pregnancy": "Беременность / лактация",
+      "anesthesia": "Реакция на обезболивание"
     }
   },
   "common2": {

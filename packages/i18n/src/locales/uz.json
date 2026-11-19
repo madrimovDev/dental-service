@@ -787,6 +787,19 @@
       "pregnant": "Homilador",
       "planning": "Rejalashtirilmoqda",
       "lactating": "Emizish"
+    },
+    "questionnaire_title": "Bemor anketasi (qoralama)",
+    "questionnaire_hint": "Bemor Telegram botida to‘ldirgan. Tibbiy kartaga avtomatik yozilmaydi — tekshirib, o‘zingiz ko‘chiring.",
+    "questionnaire_submitted": "Topshirilgan:",
+    "questionnaire_adopt": "Tibbiy kartaga ko‘chirish",
+    "questionnaire_adopted": "Javoblar formaga ko‘chirildi — tekshirib «Saqlash»ni bosing.",
+    "questionnaireAnswers": "Bot anketasi",
+    "questionnaire_q": {
+      "allergies": "Allergiya",
+      "chronic": "Surunkali kasalliklar",
+      "medications": "Hozirgi dorilar",
+      "pregnancy": "Homiladorlik / emizikli",
+      "anesthesia": "Og‘riqsizlantirishga reaksiya"
     }
   },
   "common2": {
