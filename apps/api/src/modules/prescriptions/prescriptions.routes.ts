@@ -9,6 +9,7 @@ import { createPatientMessenger } from '../../lib/telegram/notify.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
+import { VisitNoteSignedError } from '../clinical/visit-notes/visit-notes.service.ts';
 import { toPrescriptionDto } from './prescriptions.mapper.ts';
 import {
   createPrescriptionSchema,
@@ -105,6 +106,9 @@ export const prescriptionsRoutes = (deps: { db: Database; audit: AuditLogger }) 
       if (e instanceof AllergyConflictError) {
         return c.json(fail('prescription.allergy_conflict', e.message, e.conflicts), 409);
       }
+      if (e instanceof VisitNoteSignedError) {
+        return c.json(fail('visit_note.signed', e.message), 409);
+      }
       throw e;
     }
   });
@@ -167,6 +171,9 @@ export const prescriptionsRoutes = (deps: { db: Database; audit: AuditLogger }) 
       if (e instanceof AllergyConflictError) {
         return c.json(fail('prescription.allergy_conflict', e.message, e.conflicts), 409);
       }
+      if (e instanceof VisitNoteSignedError) {
+        return c.json(fail('visit_note.signed', e.message), 409);
+      }
       throw e;
     }
   });
@@ -185,14 +192,25 @@ export const prescriptionsRoutes = (deps: { db: Database; audit: AuditLogger }) 
     responses: {
       ...okJson(prescriptionDeleteResultSchema, 'Prescription deleted'),
       ...notFoundResponse,
+      409: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Linked visit note is signed (FX-154)',
+      },
     },
   });
 
   app.openapi(deleteRoute, async (c) => {
     const { id } = c.req.valid('param');
-    const row = await service.remove(c, id);
-    if (!row) return c.json(fail('prescription.not_found', 'Not found'), 404);
-    return c.json(ok({ deleted: true as const }), 200);
+    try {
+      const row = await service.remove(c, id);
+      if (!row) return c.json(fail('prescription.not_found', 'Not found'), 404);
+      return c.json(ok({ deleted: true as const }), 200);
+    } catch (e) {
+      if (e instanceof VisitNoteSignedError) {
+        return c.json(fail('visit_note.signed', e.message), 409);
+      }
+      throw e;
+    }
   });
 
   return app;

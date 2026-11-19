@@ -3,7 +3,7 @@ import {
   findDrugAllergyConflicts,
   overrideCoversConflict,
 } from '@dental/core';
-import { medicalRecords, prescriptions } from '@dental/db-schema';
+import { medicalRecords, prescriptions, visitNotes } from '@dental/db-schema';
 import { and, desc, eq } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { onAfterCommit } from '../../db/after-commit.ts';
@@ -11,6 +11,7 @@ import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { createOwnershipValidator, type OwnershipValidator } from '../../lib/ownership.ts';
 import type { PatientMessenger } from '../../lib/telegram/notify.ts';
+import { VisitNoteSignedError } from '../clinical/visit-notes/visit-notes.service.ts';
 import type { CreatePrescriptionInput, UpdatePrescriptionInput } from './prescriptions.schema.ts';
 
 /**
@@ -61,6 +62,20 @@ export const createPrescriptionsService = (deps: {
     if (unresolved.length > 0) throw new AllergyConflictError(unresolved);
   }
 
+  /**
+   * FX-154 (LC-32): imzolangan vizit yozuvi o'zgarmas — unga bog'langan retseptni
+   * yaratish/o'zgartirish/o'chirish `VisitNoteSignedError` (route → 409 `visit_note.signed`).
+   * Hech narsa yozilmasdan OLDIN chaqiriladi.
+   */
+  async function assertVisitNoteNotSigned(c: Context, visitNoteId: string | null | undefined) {
+    if (!visitNoteId) return;
+    const [note] = await getDb(c)
+      .select({ signedAt: visitNotes.signedAt })
+      .from(visitNotes)
+      .where(eq(visitNotes.id, visitNoteId));
+    if (note?.signedAt) throw new VisitNoteSignedError(visitNoteId);
+  }
+
   async function list(c: Context, patientId?: string) {
     const db = getDb(c);
     const filters = [];
@@ -104,6 +119,7 @@ export const createPrescriptionsService = (deps: {
     await ownership.assertUserExists(c, input.doctorId);
     if (input.visitNoteId)
       await ownership.assertVisitNoteBelongsToPatient(c, input.visitNoteId, input.patientId);
+    await assertVisitNoteNotSigned(c, input.visitNoteId);
     await assertNoUnresolvedAllergyConflict(
       c,
       input.patientId,
@@ -156,6 +172,8 @@ export const createPrescriptionsService = (deps: {
     const db = getDb(c);
     const [before] = await db.select().from(prescriptions).where(eq(prescriptions.id, id));
     if (!before) return null;
+    await assertVisitNoteNotSigned(c, before.visitNoteId);
+    if (input.visitNoteId) await assertVisitNoteNotSigned(c, input.visitNoteId);
 
     // CLI-421: cross-entity ownership — patientId o'zgармаydi (update schema omit
     // qiladi), shu sabab before.patientId'ga nisbatan tekshiramiz. Faqat yuborilgan
@@ -203,6 +221,7 @@ export const createPrescriptionsService = (deps: {
     const db = getDb(c);
     const [before] = await db.select().from(prescriptions).where(eq(prescriptions.id, id));
     if (!before) return null;
+    await assertVisitNoteNotSigned(c, before.visitNoteId);
 
     await db.delete(prescriptions).where(eq(prescriptions.id, id));
     await deps.audit.record(c, {
