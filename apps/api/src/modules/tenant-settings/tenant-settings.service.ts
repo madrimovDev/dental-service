@@ -2,6 +2,7 @@ import { tenantSettings } from '@dental/db-schema';
 import { sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import IORedis from 'ioredis';
+import { onAfterCommit } from '../../db/after-commit.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { encryptSecret } from '../../lib/crypto.ts';
@@ -122,17 +123,20 @@ export const createTenantSettingsService = (deps: { audit: AuditLogger }) => {
       });
     }
 
-    // CLI-379: telegram cred o'zgargandan keyin bot-manager'ga reload signal
-    // yuboriladi (token yangilanishi/o'chirilishi bot'ni qayta ishga tushirishi
-    // kerak). Best-effort — Redis xatosi settings save'ni HECH QACHON buzmaydi.
+    // CLI-379: telegram cred o'zgargandan keyin bot-manager'ga reload signal.
+    // FX-10 (LA-24): publish FAQAT COMMIT'dan keyin — bot-manager alohida ulanishda
+    // o'qiydi va commit bo'lmagan qatorni ko'rmaydi (eski/yo'q token bilan ishga tushardi).
+    // Best-effort — Redis xatosi settings save'ni HECH QACHON buzmaydi.
     if (telegram !== undefined) {
       const tenantId = c.get('activeTenantId');
       if (tenantId) {
-        try {
-          await getRedisPub().publish('telegram:reload', tenantId);
-        } catch (err) {
-          logger.error({ err, tenantId }, 'telegram:reload publish failed');
-        }
+        await onAfterCommit(c, async () => {
+          try {
+            await getRedisPub().publish('telegram:reload', tenantId);
+          } catch (err) {
+            logger.error({ err, tenantId }, 'telegram:reload publish failed');
+          }
+        });
       }
     }
 
