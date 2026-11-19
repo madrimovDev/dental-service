@@ -64,3 +64,28 @@ export const isBranchAllowed = async (
   permissionCode: string,
   branchId: string,
 ): Promise<boolean> => scopeAllows(await loadBranchScope(c, permissionCode), branchId);
+
+/**
+ * FX-33 (LA-31): filial doirasi eskalatsiyasi. Owner bo'lmagan chaqiruvchi `permissionCode`
+ * bilan faqat o'z tayinlov filiallari doirasida tayinlov bera oladi; `branchId = null`
+ * (butun klinika) faqat chaqiruvchida tenant-wide tayinlov bo'lsa. Aks holda 403
+ * `branch.escalation` (error-handler).
+ */
+export class BranchEscalationError extends Error {
+  readonly code = 'branch.escalation';
+  constructor(readonly branchId: string | null) {
+    super(`Branch escalation: caller cannot grant in branch ${branchId ?? '(all branches)'}`);
+    this.name = 'BranchEscalationError';
+  }
+}
+
+export const assertCanGrantBranch = async (
+  c: Context,
+  permissionCode: string,
+  branchId: string | null | undefined,
+): Promise<void> => {
+  const scope = await loadBranchScope(c, permissionCode);
+  if (scope.kind === 'all') return;
+  if (branchId && scope.kind === 'branches' && scope.branchIds.includes(branchId)) return;
+  throw new BranchEscalationError(branchId ?? null);
+};

@@ -206,6 +206,17 @@ export async function provisionTenantInTx(
   return { userId: user.id, tenantId: tenant.id, slug: tenant.slug, branchId: branch.id };
 }
 
+/**
+ * Bir foydalanuvchining bir nechta tayinlovi orasida birlamchisini tanlash tartibi (FX-71):
+ * klinika miqyosidagi (branchId=null) avval, so'ng eng eski, so'ng id — fizik qator
+ * tartibiga bog'liq bo'lmasin.
+ */
+const assignmentPriorityOrder = () => [
+  sql`(${userAssignments.branchId} IS NOT NULL)`,
+  asc(userAssignments.createdAt),
+  asc(userAssignments.id),
+];
+
 type ContextPermissions = {
   perms: string[];
   /** Aktiv kontekstdagi birlamchi rol templateKey'i; owner / no-assignment / custom rol → null. */
@@ -252,7 +263,10 @@ async function buildPermissionsForContext(
           or(isNull(userAssignments.validTo), gt(userAssignments.validTo, now)),
           branchFilter,
         ),
-      );
+      )
+      // FX-71/FX-25r: ko'p tayinlovda birlamchi rol deterministik — avval klinika miqyosidagi
+      // (branchId=null), so'ng eng eski, so'ng id.
+      .orderBy(...assignmentPriorityOrder());
 
     if (assignments.length === 0) return { perms: [], roleKey: null };
 
@@ -465,7 +479,9 @@ export const createAuthService = (deps: AuthServiceDeps) => {
         const rows = await tx
           .select({ id: branches.id, name: branches.name })
           .from(branches)
-          .where(isNull(branches.deletedAt));
+          // FX-134: `branches_self_view` RLS policy'si owner boshqa klinikada xodim bo'lsa o'sha
+          // klinika filialini ham ko'rsatadi — tenantId bo'yicha aniq filtr shart.
+          .where(and(eq(branches.tenantId, tenantId), isNull(branches.deletedAt)));
         return { branches: rows, allowAllBranches: true };
       }
 
@@ -488,12 +504,28 @@ export const createAuthService = (deps: AuthServiceDeps) => {
       const branchIds = [
         ...new Set(asg.map((a) => a.branchId).filter((b): b is string => b !== null)),
       ];
-      const rows = branchIds.length
+      // FX-29: tenant-wide (branchId=null) tayinlovli xodim — egasi kabi klinikaning barcha
+      // filiallarini ko'radi (aks holda Sidebar filial menyusi chiqmasdi, eng eski filialga qulflanardi).
+      // Aks holda faqat o'z tayinlov filiallari.
+      // FX-134 bilan bir xil: `branches_self_view` RLS policy'si xodimning BOSHQA klinikadagi
+      // (hatto kutilayotgan) tayinlov filiallarini ham ko'rsatadi — tenantId filtri shart.
+      const rows = allowAllBranches
         ? await tx
             .select({ id: branches.id, name: branches.name })
             .from(branches)
-            .where(and(inArray(branches.id, branchIds), isNull(branches.deletedAt)))
-        : [];
+            .where(and(eq(branches.tenantId, tenantId), isNull(branches.deletedAt)))
+        : branchIds.length
+          ? await tx
+              .select({ id: branches.id, name: branches.name })
+              .from(branches)
+              .where(
+                and(
+                  eq(branches.tenantId, tenantId),
+                  inArray(branches.id, branchIds),
+                  isNull(branches.deletedAt),
+                ),
+              )
+          : [];
       return { branches: rows, allowAllBranches };
     });
   }
@@ -755,7 +787,9 @@ export const createAuthService = (deps: AuthServiceDeps) => {
               or(isNull(userAssignments.validTo), gt(userAssignments.validTo, now)),
               ...(branchFilter ? [branchFilter] : []),
             ),
-          );
+          )
+          .orderBy(...assignmentPriorityOrder())
+          .limit(1);
 
         if (!assignment) return { code: 'auth.no_workspace_access' as const };
         assignedBranchId = assignment.branchId ?? null;
@@ -776,6 +810,15 @@ export const createAuthService = (deps: AuthServiceDeps) => {
 
       if (!resolvedBranchId) {
         if (assignedBranchId) {
+          // FX-135: assignment'dan kelgan filial ham tekshiriladi (o'chirilgan/begona filial
+          // JWT'ga yozilmasin).
+          const [assigned] = await tx
+            .select({ tenantId: branches.tenantId })
+            .from(branches)
+            .where(and(eq(branches.id, assignedBranchId), isNull(branches.deletedAt)));
+          if (!assigned || assigned.tenantId !== input.tenantId) {
+            return { code: 'auth.invalid_branch' as const };
+          }
           resolvedBranchId = assignedBranchId;
         } else {
           const [first] = await tx

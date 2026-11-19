@@ -14,6 +14,7 @@ import {
   rolePermissions,
   roles,
   tenants,
+  userAssignments,
   users,
 } from '@dental/db-schema';
 import { inArray, sql } from 'drizzle-orm';
@@ -114,6 +115,18 @@ beforeAll(async () => {
     branchRoleIds[key] = await seedRole(`T-${key}`, templatePerms(key));
   }
 
+  // FX-33: filial doirasi tekshiruvi real tayinlovga tayanadi — BM klinika miqyosida tayinlangan.
+  await db.transaction(async (tx) => {
+    await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
+    await tx.insert(userAssignments).values({
+      userId: bmId,
+      tenantId,
+      roleId: bmRoleId,
+      branchId: null,
+      isActive: true,
+      acceptedAt: new Date(),
+    });
+  });
   bmToken = await tokenFor(bmId, bmPerms);
   ownerToken = await tokenFor(ownerId, ['@owner']);
   noInviteToken = await tokenFor(noInviteId, ['patient.view']);

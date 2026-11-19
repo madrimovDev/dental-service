@@ -7,6 +7,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAppointments } from '@/features/appointments/appointments.api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { useTodayRange } from '../dashboard.api.ts';
+import { usePatientNames } from '../reception.api.ts';
 import { ScheduleList } from './widgets/ScheduleList.tsx';
 
 const fmtTime = (iso: string) =>
@@ -53,7 +54,10 @@ export function AssistantDashboard() {
   const appointments = useAppointments({ branchId: activeBranchId ?? undefined, ...range });
   const appts = appointments.data ?? [];
 
-  const canAppointment = hasPermission('appointment.view');
+  // FX-132: bemor ismi `patient.view` bilan (usePatientNames o'zi gate qiladi); tugma — create bilan.
+  const names = usePatientNames(appts.map((a) => a.patientId));
+
+  const canAppointment = hasPermission('appointment.create');
   const canCashier = hasPermission('cashier.view');
 
   return (
@@ -96,7 +100,7 @@ export function AssistantDashboard() {
           rows={appts.map((a) => ({
             id: a.id,
             time: fmtTime(a.startTime),
-            patient: '—',
+            patient: names.get(a.patientId) ?? '—',
             duration: fmtDuration(a.startTime, a.endTime),
             status: a.status,
             statusLabel: t(`appointments.status.${a.status}`, a.status),

@@ -117,12 +117,6 @@ export const PERMISSIONS = [
     descriptionUz: 'Xodimlar assignmentlarini boshqarish',
     descriptionRu: 'Управление назначениями пользователей',
   },
-  {
-    code: 'user.deactivate',
-    category: 'user',
-    descriptionUz: 'Xodimni faolsizlantirish',
-    descriptionRu: 'Деактивация пользователя',
-  },
 
   // ===== Audit log =====
   {
@@ -132,21 +126,7 @@ export const PERMISSIONS = [
     descriptionRu: 'Просмотр журнала аудита',
   },
 
-  // ===== Notifications =====
-  {
-    code: 'notification.view',
-    category: 'notification',
-    descriptionUz: "Notification jurnalini ko'rish",
-    descriptionRu: 'Просмотр журнала уведомлений',
-  },
-  {
-    code: 'notification.manage',
-    category: 'notification',
-    descriptionUz: 'Notification sozlamalari va test SMS yuborish',
-    descriptionRu: 'Управление уведомлениями',
-  },
-
-  // ===== M2 shell permissions (patient/staff — actual usage M2'da) =====
+  // ===== M2 shell permissions (patient) =====
   {
     code: 'patient.view',
     category: 'patient',
@@ -194,30 +174,6 @@ export const PERMISSIONS = [
     category: 'clinical',
     descriptionUz: 'Tibbiy karta tahrirlash',
     descriptionRu: 'Редактирование медкарты',
-  },
-  {
-    code: 'staff.view',
-    category: 'staff',
-    descriptionUz: "Xodimlarni ko'rish",
-    descriptionRu: 'Просмотр сотрудников',
-  },
-  {
-    code: 'staff.invite',
-    category: 'staff',
-    descriptionUz: 'Xodim taklif qilish (HR)',
-    descriptionRu: 'Приглашение сотрудника',
-  },
-  {
-    code: 'staff.edit',
-    category: 'staff',
-    descriptionUz: 'Xodim profilini tahrirlash',
-    descriptionRu: 'Редактирование профиля сотрудника',
-  },
-  {
-    code: 'staff.delete',
-    category: 'staff',
-    descriptionUz: 'Xodimni arxivlash',
-    descriptionRu: 'Архивирование сотрудника',
   },
 
   // ===== M3 shell permissions (appointment, queue, cashier, service) =====
@@ -292,12 +248,6 @@ export const PERMISSIONS = [
     category: 'cashier',
     descriptionUz: "To'lovni qaytarish",
     descriptionRu: 'Возврат платежа',
-  },
-  {
-    code: 'cashier.void',
-    category: 'cashier',
-    descriptionUz: "To'lovni bekor qilish",
-    descriptionRu: 'Отмена платежа',
   },
   {
     code: 'report.view',

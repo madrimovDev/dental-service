@@ -65,15 +65,22 @@ export const toUserAssignmentRowDto = (row: UserAssignment): UserAssignmentRowDt
  * `startedAt` is a `date`-mode Drizzle column (string | null), no ISO conversion needed.
  * `baseSalary`/`commissionPercent` are `numeric` (string). Only timestamps need toISOString().
  */
-export const toStaffProfileDto = (row: StaffProfile): StaffProfileDto => ({
+const MASKED_AMOUNT = '0.00';
+
+export const toStaffProfileDto = (
+  row: StaffProfile,
+  /** FX-130: maosh maydonlari faqat `salary.view` (yoki payroll/owner) bilan ochiladi. */
+  includeSalary: boolean,
+): StaffProfileDto => ({
   id: row.id,
   tenantId: row.tenantId,
   userId: row.userId,
   specialty: row.specialty ?? null,
   employmentStatus: row.employmentStatus,
   startedAt: row.startedAt ?? null,
-  baseSalary: row.baseSalary,
-  commissionPercent: row.commissionPercent,
+  // Niqoblangan qiymat: sxema `string` (kontrakni o'zgartirmaslik uchun), '0.00' = "ko'rsatilmaydi".
+  baseSalary: includeSalary ? row.baseSalary : MASKED_AMOUNT,
+  commissionPercent: includeSalary ? row.commissionPercent : MASKED_AMOUNT,
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(),
 });

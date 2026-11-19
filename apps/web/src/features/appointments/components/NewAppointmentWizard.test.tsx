@@ -62,6 +62,15 @@ vi.mock('../appointments.api', () => ({
   useBookingContext: () => ({ data: bookingCtx.data }),
   useBranches: () => ({ data: [{ id: 'b1', name: 'Markaziy filial' }] }),
 }));
+const wsBranchesMock = vi.hoisted(() => ({
+  data: { branches: [{ id: 'b1', name: 'Markaziy filial' }], allowAllBranches: false } as {
+    branches: { id: string; name: string }[];
+    allowAllBranches: boolean;
+  },
+}));
+vi.mock('@/features/auth', () => ({
+  useWorkspaceBranches: () => ({ data: wsBranchesMock.data }),
+}));
 vi.mock('@/features/schedule/schedule.api', () => ({
   useAvailability: () => availabilityMock,
 }));
@@ -97,6 +106,10 @@ vi.mock('@/stores/auth-store.ts', () => ({ useAuthStore: () => mockAuth }));
 describe('NewAppointmentWizard', () => {
   afterEach(() => {
     mockAuth.activeBranchId = 'b1';
+    wsBranchesMock.data = {
+      branches: [{ id: 'b1', name: 'Markaziy filial' }],
+      allowAllBranches: false,
+    };
     createMock.mockReset();
     bookingCtx.data = { openLabOrders: [], nextPlanStage: null };
     usePatientsSpy.mockClear();
@@ -141,6 +154,19 @@ describe('NewAppointmentWizard', () => {
 
   it("tenant-wide foydalanuvchida (activeBranchId=null) filial Select ko'rsatiladi (CLI-151)", () => {
     mockAuth.activeBranchId = null;
+    renderApp(<NewAppointmentWizard onClose={vi.fn()} />);
+    expect(screen.getByText('Filial')).toBeInTheDocument();
+  });
+
+  it("FX-29: tenant-wide xodim (allowAllBranches) filialga bog'langan bo'lsa ham filial Select ko'rsatiladi", () => {
+    mockAuth.activeBranchId = 'b1';
+    wsBranchesMock.data = {
+      branches: [
+        { id: 'b1', name: 'Markaziy filial' },
+        { id: 'b2', name: 'Yangi filial' },
+      ],
+      allowAllBranches: true,
+    };
     renderApp(<NewAppointmentWizard onClose={vi.fn()} />);
     expect(screen.getByText('Filial')).toBeInTheDocument();
   });

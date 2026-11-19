@@ -54,7 +54,7 @@ export const expensesRoutes = (deps: { db: Database; audit: AuditLogger }) => {
 
   const service = createExpensesService({ audit: deps.audit });
 
-  // ===== Kategoriyalar (expense.manage) =====
+  // ===== Kategoriyalar (o'qish — expense.view, yozish — expense.manage) =====
 
   // ─── GET /expense-categories — list ──────────────────────────────────────
   const listCategoriesRoute = createRoute({
@@ -62,7 +62,8 @@ export const expensesRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     path: '/expense-categories',
     tags: ['expenses'],
     operationId: 'listExpenseCategories',
-    middleware: [requirePermission('expense.manage')] as const,
+    // FX-131: ro'yxat `/expenses` ekranining nom ustuni — `expense.view` yetarli (yozish — manage).
+    middleware: [requirePermission('expense.view')] as const,
     responses: okJson(z.array(expenseCategoryDtoSchema), 'List of expense categories'),
   });
 
