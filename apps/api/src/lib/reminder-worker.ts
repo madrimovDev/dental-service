@@ -163,6 +163,17 @@ export async function processReminderJob(
       channel: resolved.source === 'none' ? undefined : resolved.channel,
       // UI-T2: FAQAT Telegram'da inline tugmalar — Kelaman / Boshqa vaqt / Bekor.
       buttons: resolved.source === 'telegram' ? reminderButtons(lang, appt.id) : undefined,
+      // FX-41 (LA-22): Telegram 403/xato → SMS zaxirasi; 403 da bog'lanish eskirgan — tozalanadi.
+      fallback: resolved.source === 'telegram' ? resolved.fallback : undefined,
+      onBlocked:
+        resolved.source === 'telegram'
+          ? async () => {
+              await tx
+                .update(patients)
+                .set({ telegramChatId: null })
+                .where(eq(patients.id, appt.patientId));
+            }
+          : undefined,
     });
   });
 }

@@ -15,7 +15,7 @@ import { env } from './env.ts';
 import { logger } from './logger.ts';
 import { RECALL_QUEUE_NAME } from './queue.ts';
 import { CLINIC_TZ, renderRecallSms, type SmsLang } from './sms-templates.ts';
-import { resolveTenantChannel } from './tenant-channel.ts';
+import { resolveTenantChannel, sendWithFallback } from './tenant-channel.ts';
 
 /** Klinika-local kun (YYYY-MM-DD) berilgan TZ'da. */
 export function localDateString(tz: string, now: Date = new Date()): string {
@@ -223,7 +223,19 @@ export async function processRecallScan(deps: RecallScanDeps): Promise<RecallSca
         });
         const text = `${title} — ${body}`;
 
-        const sendRes = await channel.send(to, { text });
+        // FX-41 (LA-22): Telegram 403/xato → SMS zaxirasi; 403 da chat_id tozalanadi.
+        const { res: sendRes, usedFallback } = await sendWithFallback(
+          { channel, to, fallback: resolved.fallback },
+          { text },
+          resolved.source === 'telegram'
+            ? async () => {
+                await tx
+                  .update(patients)
+                  .set({ telegramChatId: null })
+                  .where(eq(patients.id, row.patientId));
+              }
+            : undefined,
+        );
 
         await tx.insert(recallLogs).values({
           tenantId: row.tenantId,
@@ -236,7 +248,7 @@ export async function processRecallScan(deps: RecallScanDeps): Promise<RecallSca
           // (xabar bemor chat_id'ga ketadi) — `source !== 'telegram'` bilan gate
           // (sms YOKI none — ikkalasida ham `to` telefonga yuboriladi).
           detail:
-            emergencyFallback && resolved.source !== 'telegram'
+            emergencyFallback && (resolved.source !== 'telegram' || usedFallback)
               ? `Favqulodda aloqaga yuborildi${sendRes.ok ? '' : ' (xato)'}`
               : sendRes.ok
                 ? (sendRes.providerId ?? null)

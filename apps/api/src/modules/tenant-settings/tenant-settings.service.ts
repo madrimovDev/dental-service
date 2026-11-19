@@ -1,11 +1,11 @@
-import { tenantSettings } from '@dental/db-schema';
-import { sql } from 'drizzle-orm';
+import { patients, tenantSettings } from '@dental/db-schema';
+import { isNotNull, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import IORedis from 'ioredis';
 import { onAfterCommit } from '../../db/after-commit.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
-import { encryptSecret } from '../../lib/crypto.ts';
+import { decryptSecret, encryptSecret } from '../../lib/crypto.ts';
 import { env } from '../../lib/env.ts';
 import { logger } from '../../lib/logger.ts';
 import { mergeNotificationSettings } from './tenant-settings.mapper.ts';
@@ -111,7 +111,34 @@ export const createTenantSettingsService = (deps: { audit: AuditLogger }) => {
       patch.integrationSettings = next;
     }
 
+    // FX-41 (LA-22): bot tokeni boshqasiga almashtirilsa yoki o'chirilsa — eski bot bilan
+    // bog'langan barcha bemor chat_id'lari yangi bot uchun yaroqsiz (403/«chat not found»,
+    // PII eski bot orqali boshqaning chat'iga ketishi mumkin). Xuddi shu token qayta
+    // saqlansa — tegilmaydi.
+    let tokenChanged = false;
+    if (telegram !== undefined) {
+      const prevEnc = (
+        (before.integrationSettings ?? {}) as { telegram?: { botTokenEnc?: string } | null }
+      ).telegram?.botTokenEnc;
+      let prevToken: string | null = null;
+      if (prevEnc) {
+        try {
+          prevToken = decryptSecret(prevEnc);
+        } catch {
+          prevToken = null;
+        }
+      }
+      tokenChanged = (telegram === null ? null : telegram.botToken) !== prevToken;
+    }
+
     const [updated] = await db.update(tenantSettings).set(patch).returning();
+
+    if (tokenChanged) {
+      await db
+        .update(patients)
+        .set({ telegramChatId: null })
+        .where(isNotNull(patients.telegramChatId));
+    }
 
     if (updated) {
       await deps.audit.record(c, {
