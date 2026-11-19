@@ -46,7 +46,13 @@ const DEFAULT_MOVEMENTS_PAGE_SIZE = 50;
 
 /** Vizit avto-chiqimi/qaytarishi ledger sabablari (FX-44/45). */
 const VISIT_RETURN_REASONS = ['visit_edit_return', 'visit_cancel_return'] as const;
-const VISIT_LEDGER_REASONS = ['visit_auto', ...VISIT_RETURN_REASONS] as const;
+/** FX-45 review: cancelled/no_show → faol qayta-faollashtirishda qaytarilgan chiqim qayta ayiriladi. */
+const VISIT_REACTIVATE_REASON = 'visit_reactivate';
+const VISIT_LEDGER_REASONS = [
+  'visit_auto',
+  VISIT_REACTIVATE_REASON,
+  ...VISIT_RETURN_REASONS,
+] as const;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Asia/Tashkent UTC+5 (DST yo'q) — «bugun» chegarasi cashier/expenses bilan izchil. */
@@ -755,9 +761,13 @@ export const createStockService = (deps: {
     const net = sql<string>`coalesce(sum(case
       when ${stockMovements.type} = 'out' then ${stockMovements.quantity}
       else -${stockMovements.quantity} end), 0)`;
+    // O'rtacha occurrence ulushi faqat asl `visit_auto` chiqimlaridan (qayta-faollashtirish
+    // chiqimi `visit_reactivate` bitta yig'ma qator — o'rtachani buzmasin).
     const outTotal = sql<string>`coalesce(sum(case
-      when ${stockMovements.type} = 'out' then ${stockMovements.quantity} else 0 end), 0)`;
-    const outCount = sql<string>`count(*) filter (where ${stockMovements.type} = 'out')`;
+      when ${stockMovements.type} = 'out' and ${stockMovements.reason} = 'visit_auto'
+        then ${stockMovements.quantity} else 0 end), 0)`;
+    const outCount = sql<string>`count(*) filter (where ${stockMovements.type} = 'out'
+      and ${stockMovements.reason} = 'visit_auto')`;
     const byItem = filter.byItem === true;
     const rows = await getDb(c)
       .select({
@@ -1090,6 +1100,61 @@ export const createStockService = (deps: {
     await postVisitMovements(c, pending);
   }
 
+  /**
+   * FX-45 review: yozilish cancelled/no_show → faol holatga QAYTGANDA bekorda qaytarilgan
+   * chiqim qayta ayiriladi (`out`, `reason:'visit_reactivate'`). Idempotent ledger arifmetikasi:
+   * (item, xizmat) bo'yicha Σ `visit_cancel_return` − Σ `visit_reactivate` > 0 bo'lsa shu farq.
+   * Aks holda vizit yozuvi `performedServices`ni saqlab qoladi, ledger esa 0 — keyingi PATCH/imzo
+   * delta 0 bo'lgani uchun material hech qachon ayirilmaydi (drift).
+   */
+  async function redeductVisitStockForAppointment(c: Context, appointmentId: string) {
+    const db = getDb(c);
+    const notes = await db
+      .select({ id: visitNotes.id })
+      .from(visitNotes)
+      .where(eq(visitNotes.appointmentId, appointmentId));
+    if (notes.length === 0) return;
+    const net = sql<string>`coalesce(sum(case
+      when ${stockMovements.reason} = 'visit_cancel_return' then ${stockMovements.quantity}
+      else -${stockMovements.quantity} end), 0)`;
+    const rows = await db
+      .select({
+        noteId: stockMovements.sourceVisitNoteId,
+        itemId: stockMovements.itemId,
+        serviceId: stockMovements.sourceServiceId,
+        net,
+      })
+      .from(stockMovements)
+      .where(
+        and(
+          inArray(
+            stockMovements.sourceVisitNoteId,
+            notes.map((n) => n.id),
+          ),
+          inArray(stockMovements.reason, ['visit_cancel_return', VISIT_REACTIVATE_REASON]),
+        ),
+      )
+      .groupBy(
+        stockMovements.sourceVisitNoteId,
+        stockMovements.itemId,
+        stockMovements.sourceServiceId,
+      );
+    const pending: VisitMovement[] = [];
+    for (const r of rows) {
+      const amount = Math.round(Number(r.net) * 100) / 100;
+      if (amount <= 0) continue;
+      pending.push({
+        itemId: r.itemId,
+        type: 'out',
+        quantity: String(amount),
+        reason: VISIT_REACTIVATE_REASON,
+        sourceVisitNoteId: r.noteId,
+        sourceServiceId: r.serviceId,
+      });
+    }
+    await postVisitMovements(c, pending);
+  }
+
   // ===== Stock batches (qabul + expiry/cost/supplier) — V2-2 =====
 
   /** Item bo'yicha partiyalar (yangi avval). */
@@ -1296,6 +1361,7 @@ export const createStockService = (deps: {
     deductForStage,
     reconcileForServices,
     returnVisitStockForAppointment,
+    redeductVisitStockForAppointment,
     listBatches,
     expiringBatches,
     autoDeductionsToday,

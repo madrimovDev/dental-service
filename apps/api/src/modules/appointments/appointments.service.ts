@@ -154,11 +154,14 @@ export const createAppointmentsService = (deps: {
   queue?: QueueReverseSyncHook;
   /** FX-45: yozilish bekor/no_show → bog'liq vizit yozuvlari ombor chiqimini qaytarish. */
   returnVisitStock?: (c: Context, appointmentId: string) => Promise<void>;
+  /** FX-45 review: cancelled/no_show → faol qayta-faollashtirishda qaytarilgan chiqimni qayta ayirish. */
+  redeductVisitStock?: (c: Context, appointmentId: string) => Promise<void>;
 }) => {
   const ownership = createOwnershipValidator();
-  const returnVisitStock =
-    deps.returnVisitStock ??
-    createStockService({ audit: deps.audit }).returnVisitStockForAppointment;
+  const stockService = createStockService({ audit: deps.audit });
+  const returnVisitStock = deps.returnVisitStock ?? stockService.returnVisitStockForAppointment;
+  const redeductVisitStock =
+    deps.redeductVisitStock ?? stockService.redeductVisitStockForAppointment;
 
   /**
    * FX-02 (LA-46, X-1): FK constraint RLS'ni chetlab o'tadi — begona tenant bemori /
@@ -548,6 +551,18 @@ export const createAppointmentsService = (deps: {
         before.status !== input.status
       ) {
         await returnVisitStock(c, id);
+      }
+
+      // FX-45 review: cancelled/no_show → faol (qayta-faollashtirish) — bekorda qaytarilgan
+      // chiqim qayta ayiriladi (idempotent ledger: Σ cancel_return − Σ reactivate). Gate'siz:
+      // faqat haqiqatan qaytarilgan miqdorni tiklaydi, sweep (qaytarmagan) holatda 0.
+      if (
+        input.status &&
+        isActiveStatus(input.status as AppointmentStatus) &&
+        !isActiveStatus(beforeStatus) &&
+        beforeStatus !== 'completed'
+      ) {
+        await redeductVisitStock(c, id);
       }
 
       // B4: yozilish completed'ga O'TGANDA profilaktik recall (transition guard —

@@ -434,3 +434,91 @@ describe('FX-44 review: eski (belgisiz) chiqimli vizit — tahrir qaytarishidan 
     expect(await qty(item)).toBe(10);
   });
 });
+
+describe('FX-45 review: cancelled/no_show -> scheduled qayta faollashtirish chiqimni qayta ayiradi', () => {
+  // Chorshanba 11:00 Toshkent — filial ish soati ichida (API orqali qayta faollashtirish).
+  let day = 0;
+  beforeAll(async () => {
+    const allDays = Object.fromEntries(
+      ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => [
+        d,
+        { open: '00:00', close: '23:59' },
+      ]),
+    );
+    await admin.db.update(branches).set({ workHours: allDays }).where(eq(branches.id, branchId));
+    // jadvalsiz doktor filial ish soatiga fallback qiladi — faqat practitioner rolda
+    await admin.db
+      .update(roles)
+      .set({ isPractitioner: true })
+      .where(sql`${roles.tenantId} = ${tenantId} and ${roles.name} = 'R-doc'`);
+    // to'g'ridan yozilgan tayinlov qabul qilingan bo'lishi shart
+    await admin.db
+      .update(userAssignments)
+      .set({ acceptedAt: new Date() })
+      .where(eq(userAssignments.userId, docId));
+  });
+  const inHoursAppt = async () => {
+    const start = new Date(Date.UTC(2031, 0, 8 + 7 * ++day, 6, 0));
+    return (
+      await admin.db
+        .insert(appointments)
+        .values({
+          tenantId,
+          branchId,
+          patientId,
+          doctorId: docId,
+          startTime: start,
+          endTime: new Date(start.getTime() + 1_800_000),
+          status: 'in_progress',
+        } as never)
+        .returning({ id: appointments.id })
+    )[0]!.id;
+  };
+
+  test('qoralama 2 dona -> no_show -> scheduled -> PATCH + imzo: qoldiq 8', async () => {
+    await setQty(item, 10);
+    await setBom(svcX, 2);
+    await setBom(svcY, null);
+    const appt = await inHoursAppt();
+    const note = await newNote([svcX], appt);
+    expect(await qty(item)).toBe(8);
+    expect(
+      (await call('rec', 'PATCH', `/api/appointments/${appt}`, { status: 'no_show' })).status,
+    ).toBe(200);
+    expect(await qty(item)).toBe(10);
+    const re = await call('rec', 'PATCH', `/api/appointments/${appt}`, { status: 'scheduled' });
+    expect(re.json).toMatchObject({ data: { status: 'scheduled' } });
+    expect(await qty(item)).toBe(8);
+    expect(
+      (await call('doc', 'PATCH', `/api/visit-notes/${note}`, { performedServices: [svcX] }))
+        .status,
+    ).toBe(200);
+    expect((await call('doc', 'POST', `/api/visit-notes/${note}/sign`)).status).toBe(200);
+    expect(await qty(item)).toBe(8);
+    const rows = await admin.db
+      .select()
+      .from(stockMovements)
+      .where(eq(stockMovements.sourceVisitNoteId, note));
+    const net = rows.reduce((s, m) => s + (m.type === 'out' ? 1 : -1) * Number(m.quantity), 0);
+    expect(net).toBe(2);
+  });
+
+  test('takroriy bekor/qayta faollashtirish sikli: har safar to‘g‘ri, keyin tahrir qaytarishi ham to‘g‘ri', async () => {
+    await setQty(item, 20);
+    await setBom(svcX, 2);
+    const appt = await inHoursAppt();
+    const note = await newNote([svcX, svcX], appt);
+    expect(await qty(item)).toBe(16);
+    for (let i = 0; i < 2; i++) {
+      expect((await call('rec', 'POST', `/api/appointments/${appt}/cancel`, {})).status).toBe(200);
+      expect(await qty(item)).toBe(20);
+      expect(
+        (await call('rec', 'PATCH', `/api/appointments/${appt}`, { status: 'scheduled' })).status,
+      ).toBe(200);
+      expect(await qty(item)).toBe(16);
+    }
+    // bitta X olib tashlansa — bitta occurrence ulushi (2) qaytadi
+    await call('doc', 'PATCH', `/api/visit-notes/${note}`, { performedServices: [svcX] });
+    expect(await qty(item)).toBe(18);
+  });
+});
