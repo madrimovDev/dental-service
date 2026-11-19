@@ -24,6 +24,7 @@ if (process.argv[2] === 'migrate') {
   const { registerRecallScheduler } = await import('./lib/recall-scheduler.ts');
   const { startRecallWorker } = await import('./lib/recall-worker.ts');
   const { startReminderWorker } = await import('./lib/reminder-worker.ts');
+  const { reconcileReminders } = await import('./lib/reminder-reconcile.ts');
   const { startSupervisorSyncScheduler } = await import('./lib/supervisor-saas.ts');
   const { startLabHubScheduler } = await import('./lib/lab-hub/sync.ts');
   const { startTelegramBotManager } = await import('./lib/telegram-bot-manager.ts');
@@ -75,6 +76,15 @@ if (process.argv[2] === 'migrate') {
   const inProcessBotManager = messagingAdmin
     ? startTelegramBotManager({ adminDb: messagingAdmin.db, withTenant })
     : null;
+
+  // FX-89 / FX-96 (LB-05): eslatma navbatini bazadan qayta qurish — desktop zaxira tiklangandan
+  // keyin (API qayta ishga tushadi) yoki Valkey ma'lumoti yo'qolganda navbat bazaga mos kelmaydi.
+  // Xuddi shu gating (navbat egasi shu jarayon); boot'ni bloklamaydi, best-effort.
+  if (messagingAdmin) {
+    void reconcileReminders({ adminDb: messagingAdmin.db, queue: reminderQueue })
+      .then((res) => logger.info({ ...res }, 'Reminder queue reconciled'))
+      .catch((err) => logger.error({ err }, 'Reminder queue reconcile failed'));
+  }
 
   // L8: SaaS tenantlarni Supervisor'ga ro'yxatga olish retry + kunlik obuna sinxroni.
   // Bot-manager bilan bir xil gating (admin conn); `SUPERVISOR_SAAS_TOKEN` yo'q yoki
