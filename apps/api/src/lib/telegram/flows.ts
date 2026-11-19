@@ -2,7 +2,9 @@ import { patients, tenants } from '@dental/db-schema';
 import { asc, eq } from 'drizzle-orm';
 import type { DbOrTx } from '../../db/client.ts';
 import type { AppointmentsService } from '../../modules/appointments/index.ts';
+import type { NotificationsService } from '../../modules/notifications/index.ts';
 import type { ScheduleService } from '../../modules/schedule/index.ts';
+import type { AuditLogger } from '../audit-logger.ts';
 import { BOOKING_PREFIX, createBookingFlow } from './booking.ts';
 import { type BotLang, botMessages, toBotLang } from './messages.ts';
 import { createQuestionnaireFlow, QUESTIONNAIRE_PREFIX } from './questionnaire.ts';
@@ -26,6 +28,9 @@ type ChatState = {
 export type FlowDeps = {
   appointments: Pick<AppointmentsService, 'listDoctors' | 'update'>;
   schedule: Pick<ScheduleService, 'getAvailability'>;
+  /** FX-23b: bron so'rovi auditi va xodim bildirishnomasi (ixtiyoriy). */
+  audit?: Pick<AuditLogger, 'record'>;
+  notifications?: Pick<NotificationsService, 'notifyInTx'>;
   now?: () => Date;
   /** Test/DI — chat uchun tanlangan bemor (`tenantId:chatId` → bemor). */
   selection?: Map<string, { patientId: string; expiresAt: number }>;
@@ -42,6 +47,8 @@ export function createTelegramFlows(deps: FlowDeps) {
   const booking = createBookingFlow({
     schedule: deps.schedule,
     appointments: deps.appointments,
+    audit: deps.audit,
+    notifications: deps.notifications,
     now: deps.now,
   });
   const questionnaire = createQuestionnaireFlow({ now: deps.now });
