@@ -508,6 +508,12 @@ export const createAppointmentsService = (deps: {
     if (input.doctorId) patch.doctorId = input.doctorId;
     if (input.assistantId !== undefined) patch.assistantId = input.assistantId;
     if (input.status) patch.status = input.status;
+    // FX-57: ko'chirilgan 'confirmed' yozilish — bemor eski vaqtni tasdiqlagan edi; yangi
+    // vaqt tasdiqlanmagan → 'scheduled'ga qaytadi (aniq status berilsa, o'sha saqlanadi).
+    const startMoved =
+      !!input.startTime &&
+      new Date(input.startTime).getTime() !== new Date(before.startTime).getTime();
+    if (startMoved && !input.status && beforeStatus === 'confirmed') patch.status = 'scheduled';
     if (input.serviceIds) patch.serviceIds = input.serviceIds;
     if (input.notes !== undefined) patch.notes = input.notes;
     if (input.cancellationReason !== undefined) patch.cancellationReason = input.cancellationReason;
@@ -618,11 +624,15 @@ export const createAppointmentsService = (deps: {
             await onAfterCommit(c, () => remove(id));
           }
           if (isActiveStatus(updated.status as AppointmentStatus)) {
-            const delay = reminderDelayMs(
+            const now = new Date();
+            let delay = reminderDelayMs(
               new Date(updated.startTime),
-              new Date(),
+              now,
               await reminderLeadHours(c),
             );
+            // FX-57: yangi vaqt lead oynasidan yaqin (lekin kelajakda) — bemor ko'chirilganini
+            // bilishi uchun eslatma darhol ketadi.
+            if (delay == null && startMoved && new Date(updated.startTime) > now) delay = 0;
             if (delay != null && deps.enqueueReminder) {
               const enqueue = deps.enqueueReminder;
               await onAfterCommit(c, () => enqueue(tenantId, id, delay));

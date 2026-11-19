@@ -1,5 +1,7 @@
 /**
- * FX-39 (LA-23) eslatma vaqti `tenant_settings.reminder_lead_hours`dan.
+ * FX-39 (LA-23) eslatma vaqti `tenant_settings.reminder_lead_hours`dan;
+ * FX-57 ko'chirilgan 'confirmed' yozilish 'scheduled'ga qaytadi va yaqin vaqtga
+ * ko'chirilsa darhol eslatma navbatga qo'yiladi.
  * Real DB (dental_app, FORCE RLS). Eslatma navbati spy (enqueue chaqiruvlari kuzatiladi).
  *
  *   cd apps/api && bun test --env-file=../../.env --timeout 30000 tests/integration/fx-39-57-reminder-lead.test.ts
@@ -13,7 +15,7 @@ import {
   tenants,
   users,
 } from '@dental/db-schema';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { DbOrTx } from '../../src/db/client.ts';
 import { db } from '../../src/db/client.ts';
@@ -135,6 +137,13 @@ const seed = (status: 'scheduled' | 'confirmed', startH: number, pat = patientId
     return a!.id;
   });
 
+const statusOf = (id: string) =>
+  db.transaction(async (tx) => {
+    await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
+    const [a] = await tx.select().from(appointments).where(eq(appointments.id, id));
+    return a!.status;
+  });
+
 describe('FX-39 eslatma vaqti tenant sozlamasidan', () => {
   test("reminderLeadHours=3: start +10h -> delay ~7h (24h hardcode bo'lsa null)", async () => {
     enqueued = [];
@@ -166,5 +175,54 @@ describe('FX-39 eslatma vaqti tenant sozlamasidan', () => {
     expect(r.ok).toBe(true);
     expect(enqueued.length).toBe(1);
     expect(Math.abs(enqueued[0]!.delayMs - 17 * HOUR)).toBeLessThan(60_000);
+  });
+});
+
+describe("FX-57 ko'chirilgan confirmed yozilish", () => {
+  test("confirmed + startTime o'zgardi -> scheduled ga qaytadi", async () => {
+    const id = await seed('confirmed', 60);
+    const r = await run(tenantId, (c) =>
+      svc.update(c, id, {
+        startTime: at(70).toISOString(),
+        endTime: at(70.5).toISOString(),
+      } as never),
+    );
+    expect(r.ok).toBe(true);
+    expect(await statusOf(id)).toBe('scheduled');
+  });
+
+  test('confirmed + faqat notes -> confirmed qoladi', async () => {
+    const id = await seed('confirmed', 80);
+    const r = await run(tenantId, (c) => svc.update(c, id, { notes: 'x' } as never));
+    expect(r.ok).toBe(true);
+    expect(await statusOf(id)).toBe('confirmed');
+  });
+
+  test("confirmed + ko'chirish + aniq status=confirmed -> aniq so'ralgani saqlanadi", async () => {
+    const id = await seed('confirmed', 90);
+    const r = await run(tenantId, (c) =>
+      svc.update(c, id, {
+        startTime: at(95).toISOString(),
+        endTime: at(95.5).toISOString(),
+        status: 'confirmed',
+      } as never),
+    );
+    expect(r.ok).toBe(true);
+    expect(await statusOf(id)).toBe('confirmed');
+  });
+
+  test('yangi vaqt lead oynasidan yaqin (+2h, lead=3) -> darhol eslatma (delay 0)', async () => {
+    const id = await seed('confirmed', 100);
+    enqueued = [];
+    const r = await run(tenantId, (c) =>
+      svc.update(c, id, {
+        startTime: at(2).toISOString(),
+        endTime: at(2.5).toISOString(),
+      } as never),
+    );
+    expect(r.ok).toBe(true);
+    expect(enqueued.length).toBe(1);
+    expect(enqueued[0]!.appointmentId).toBe(id);
+    expect(enqueued[0]!.delayMs).toBe(0);
   });
 });
