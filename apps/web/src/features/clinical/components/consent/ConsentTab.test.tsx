@@ -27,8 +27,8 @@ vi.mock('@/stores/auth-store.ts', () => ({
 describe('ConsentTab', () => {
   it('imzolash modalini ochadi', async () => {
     renderApp(<ConsentTab patientId="p1" />);
-    // consent.sign_new = "Yangi konsent imzolash"
-    fireEvent.click(screen.getByText('Yangi konsent imzolash'));
+    // consent.sign_new = "Yangi rozilik imzolash"
+    fireEvent.click(screen.getByText('Yangi rozilik imzolash'));
     // consent.select_template = "Shablon tanlang" (modal portal — async)
     expect(await screen.findByText('Shablon tanlang')).toBeInTheDocument();
   });
@@ -37,7 +37,7 @@ describe('ConsentTab', () => {
   it("sign form submit → signConsent to'g'ri shape bilan", async () => {
     signMutate.mockClear();
     renderApp(<ConsentTab patientId="p1" />);
-    fireEvent.click(screen.getByText('Yangi konsent imzolash'));
+    fireEvent.click(screen.getByText('Yangi rozilik imzolash'));
     // consent.template_title = "Shablon nomi", consent.body_text = "Matn (snapshot)"
     fireEvent.change(await screen.findByLabelText(/Shablon nomi/), {
       target: { value: 'Konsent A' },

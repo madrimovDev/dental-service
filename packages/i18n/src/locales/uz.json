@@ -653,7 +653,7 @@
     "tab_visit_notes": "Vizit yozuvlari",
     "tab_tooth_chart": "Tish kartasi",
     "tab_prescriptions": "Reseptlar",
-    "tab_consent": "Konsent",
+    "tab_consent": "Rozilik",
     "tab_lab_orders": "Lab buyurtmalar",
     "tab_images": "Rasmlar",
     "tab": {
@@ -665,7 +665,7 @@
       "rx": "Reseptlar",
       "images": "Rasmlar",
       "lab": "Lab",
-      "consent": "Konsent",
+      "consent": "Rozilik",
       "family": "Oila",
       "payments": "To'lovlar"
     },
@@ -859,7 +859,7 @@
     "consent_required": "Avval rozilikni imzolang",
     "financial_summary": "Moliyaviy xulosa",
     "total_plan": "Jami reja",
-    "pdf_consent": "Reja PDF · konsent",
+    "pdf_consent": "Reja PDF · rozilik",
     "list": {
       "title": "Davolash rejalari",
       "subtitle": "Barcha bemorlar bo'yicha rejalar",
@@ -964,7 +964,7 @@
     "duration_days_suffix": "{{days}} kun"
   },
   "consent": {
-    "title": "Konsent formalar",
+    "title": "Rozilik formalari",
     "templates": "Shablonlar",
     "templates_manage": "Shablonlarni boshqarish",
     "create_template": "Yangi shablon",
@@ -978,20 +978,20 @@
     "type_photo": "Rasm olish",
     "type_data_processing": "Ma'lumotlar qayta ishlash",
     "type_other": "Boshqa",
-    "sign_new": "Yangi konsent imzolash",
+    "sign_new": "Yangi rozilik imzolash",
     "select_template": "Shablon tanlang",
     "or_custom": "yoki o'z matnini yozing",
     "body_text": "Matn (snapshot)",
     "language": "Til",
     "signed_at": "Imzolangan sana",
     "patient_signature_name": "Bemor F.I.SH. (imzo o'rniga)",
-    "empty": "Imzolangan konsent yo'q",
+    "empty": "Imzolangan rozilik yo'q",
     "no_templates": "Shablonlar yo'q",
     "sign": "Imzolash",
     "is_perpetual": "Muddatsiz (doimiy amal qiladi)",
     "expires_at": "Amal qilish muddati",
-    "select_form": "Konsent-formani tanlang",
-    "no_valid_forms": "Amaldagi konsent-forma topilmadi. Avval \"Rozilik\" bo'limida imzolang.",
+    "select_form": "Rozilik formasini tanlang",
+    "no_valid_forms": "Amaldagi rozilik topilmadi. Quyida yangisini imzolang.",
     "expires_label": "Muddati: {{date}}"
   },
   "lab_order": {
@@ -1885,7 +1885,7 @@
       "lab": "Lab buyurtmalar",
       "payments": "To'lovlar",
       "images": "Rasmlar",
-      "consent": "Konsent"
+      "consent": "Rozilik"
     },
     "details": "Batafsil",
     "allergy_title": "Allergiya:",

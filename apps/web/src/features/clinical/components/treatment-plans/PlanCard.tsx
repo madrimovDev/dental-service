@@ -7,7 +7,7 @@ import type {
   TreatmentStageStatus,
 } from '@dental/api-client';
 import { Mono, StatusPill } from '@dental/ui';
-import { Button, Group, Modal, Select, Stack, Text } from '@mantine/core';
+import { Button, Divider, Group, Modal, Select, Stack, Text } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import {
   IconBan,
@@ -20,8 +20,10 @@ import {
 } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useAuthStore } from '@/stores/auth-store.ts';
 import { useConsentForms } from '../../clinical.api';
 import { toConsentFormVM, toPlanCardVM } from '../../clinical.mappers';
+import { ConsentSignForm } from '../consent/ConsentSignForm';
 import { EstimateView } from './EstimateView';
 import { StageRow } from './StageRow';
 import classes from './TreatmentPlansTab.module.css';
@@ -34,6 +36,14 @@ const CANCELLABLE_PLAN_STATUSES: readonly TreatmentPlanStatus[] = [
   'presented',
   'accepted',
   'in_progress',
+];
+
+// FX-61: davolash boshlangan/tugagan/bekor qilingan planda rozilikni (qayta) bog'lash yo'q —
+// backend ham 409 (`plan.consent_locked`) qaytaradi.
+const CONSENT_LOCKED_PLAN_STATUSES: readonly TreatmentPlanStatus[] = [
+  'in_progress',
+  'completed',
+  'cancelled',
 ];
 
 export function PlanCard({
@@ -76,6 +86,9 @@ export function PlanCard({
   const [estimateOpened, estimate] = useDisclosure(false);
   const [consentOpened, consent] = useDisclosure(false);
   const [selectedConsentFormId, setSelectedConsentFormId] = useState<string | null>(null);
+  const [signNewOpened, signNew] = useDisclosure(false);
+  // FX-26: reja modalida inline imzolash (ConsentTab bilan bir xil forma) — `consent.manage` kerak.
+  const canSignConsent = useAuthStore().hasPermission('consent.manage');
 
   // CLI-461 — "to'liq bog'lash": planni asoslovchi haqiqiy consent_forms yozuvi
   // linklanganmi (avval `consentSignedAt` cache tekshirilardi — endi haqiqiy manba
@@ -105,7 +118,12 @@ export function PlanCard({
   const submitConsent = () => {
     if (!selectedConsentFormId) return;
     onSignConsent(plan.id, { consentFormId: selectedConsentFormId });
+    closeConsent();
+  };
+
+  const closeConsent = () => {
     consent.close();
+    signNew.close();
     setSelectedConsentFormId(null);
   };
 
@@ -170,7 +188,7 @@ export function PlanCard({
                 {t('treatment_plan.present')}
               </Button>
             )}
-            {!hasConsent && (
+            {!hasConsent && !CONSENT_LOCKED_PLAN_STATUSES.includes(plan.status) && (
               <Button
                 size="compact-sm"
                 variant="default"
@@ -285,55 +303,66 @@ export function PlanCard({
             · <Mono>{progressPct}%</Mono>
           </div>
         </div>
-
-        <Button
-          variant="default"
-          fullWidth
-          leftSection={<IconWritingSign size={16} />}
-          onClick={consent.open}
-        >
-          {t('treatment_plan.sign_consent')}
-        </Button>
       </aside>
 
       <EstimateView planId={plan.id} opened={estimateOpened} onClose={estimate.close} />
 
-      <Modal
-        opened={consentOpened}
-        onClose={consent.close}
-        title={t('treatment_plan.sign_consent')}
-      >
+      <Modal opened={consentOpened} onClose={closeConsent} title={t('treatment_plan.sign_consent')}>
         <Stack gap="md">
           {consentFormsQuery.isLoading ? (
             <Text c="dimmed">{t('common.loading')}</Text>
           ) : validConsentOptions.length === 0 ? (
             <Text c="dimmed">{t('consent.no_valid_forms')}</Text>
           ) : (
-            <Select
-              label={t('consent.select_form')}
-              placeholder={t('common.select')}
-              data={validConsentOptions.map((f) => ({
-                value: f.id,
-                label: f.isPerpetual
-                  ? f.title
-                  : `${f.title} — ${t('consent.expires_label', { date: f.expiryText })}`,
-              }))}
-              value={selectedConsentFormId}
-              onChange={setSelectedConsentFormId}
-            />
+            <>
+              <Select
+                label={t('consent.select_form')}
+                placeholder={t('common.select')}
+                data={validConsentOptions.map((f) => ({
+                  value: f.id,
+                  label: f.isPerpetual
+                    ? f.title
+                    : `${f.title} — ${t('consent.expires_label', { date: f.expiryText })}`,
+                }))}
+                value={selectedConsentFormId}
+                onChange={setSelectedConsentFormId}
+              />
+              <Group justify="flex-end">
+                <Button variant="default" onClick={closeConsent}>
+                  {t('common.cancel')}
+                </Button>
+                <Button
+                  loading={consentPending}
+                  disabled={!selectedConsentFormId}
+                  onClick={submitConsent}
+                >
+                  {t('treatment_plan.sign_consent')}
+                </Button>
+              </Group>
+            </>
           )}
-          <Group justify="flex-end">
-            <Button variant="default" onClick={consent.close}>
-              {t('common.cancel')}
-            </Button>
-            <Button
-              loading={consentPending}
-              disabled={!selectedConsentFormId}
-              onClick={submitConsent}
-            >
-              {t('treatment_plan.sign_consent')}
-            </Button>
-          </Group>
+
+          {/* FX-26: yangi rozilikni shu modalning o'zida imzolash va rejaga bog'lash. */}
+          {canSignConsent && !consentFormsQuery.isLoading && (
+            <>
+              <Divider />
+              {validConsentOptions.length > 0 && !signNewOpened ? (
+                <Button variant="subtle" onClick={signNew.open}>
+                  {t('consent.sign_new')}
+                </Button>
+              ) : (
+                <ConsentSignForm
+                  patientId={plan.patientId}
+                  fixedType="treatment"
+                  onSigned={(form) => {
+                    onSignConsent(plan.id, { consentFormId: form.id });
+                    closeConsent();
+                  }}
+                  onCancel={closeConsent}
+                />
+              )}
+            </>
+          )}
         </Stack>
       </Modal>
     </div>
