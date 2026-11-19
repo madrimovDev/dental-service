@@ -61,6 +61,11 @@ butunlay bloklanadi (mavjud ishlar ham).
   yangilanadi. Kursor davri joriy emas yoki kursor `tx_id`si joriy `xmax`dan kichik emas
   bo'lsa — kursor boshidan (`0.0`) boshlanadi va javobda `cursorReset: true`. Klinika dedup'i
   allaqachon qo'llangan hodisalarni qayta qo'llamaydi.
+- **Tiklangan qatorlar:** ular eski klaster `tx_id`sini saqlaydi (qayta yozilmaydi — dedup
+  kaliti barqaror). `tx_id >= xmax` qator shu klasterda yozilgan bo'lishi mumkin emas, demak
+  yakunlangan: xmin filtrisiz beriladi, tartib kaliti `(0, seq)` (joriy klaster
+  hodisalaridan oldin). Hisoblagich uni quvib o'tgach kalit `(tx_id, seq)` bo'ladi — faqat
+  kattalashadi, hodisa o'tkazib yuborilmaydi (ko'pi bilan qayta beriladi, dedup tashlaydi).
 
 ## Supervisor bilan aloqa
 

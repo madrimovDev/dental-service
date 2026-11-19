@@ -83,4 +83,49 @@ describe('Hub davri (epoch) — kursor zaxiradan tiklashdan omon qoladi (FX-98)'
     expect(again.cursorReset ?? false).toBe(false);
     expect(again.nextCursor.startsWith(`${newEpoch}:`)).toBe(true);
   });
+
+  it('tiklangan (eski klaster xid’li, hali so‘ralmagan) hodisalar yangi klasterda ko‘rinadi — bir martadan, yangilaridan oldin', async () => {
+    const lab = await createLab();
+    const clinic = await connectClinic();
+    await linkActive(lab, clinic);
+    const first = await changesOnce(clinic, '0.0');
+    const epoch = first.nextCursor.split(':')[0]!;
+
+    // Shanba: lab ishni yubordi/tayyorladi — klinika (desktop o'chiq) hali so'ramagan.
+    const { ref } = await sendCase(clinic, lab.labId);
+    const [snap] = (await adminSql`
+      SELECT (pg_snapshot_xmax(pg_current_snapshot())::text)::bigint AS xmax`) as unknown as {
+      xmax: string;
+    }[];
+    const xmax = snap!.xmax;
+    // Yakshanba dump, dushanba boshqa klasterga tiklash: qatorlar eski klaster xid'ini saqlaydi
+    // (yangi klaster hisoblagichidan ancha katta) va hub_meta eski klaster identifikatori bilan.
+    const oldTx = BigInt(xmax) + 5_000_000n;
+    await adminSql`
+      UPDATE case_events SET tx_id = ${oldTx.toString()}::bigint
+       WHERE case_id IN (SELECT id FROM cases WHERE clinic_case_ref = ${ref})`;
+    await adminSql`UPDATE hub_meta SET system_identifier = '0'`;
+    const restored = (await adminSql`
+      SELECT e.seq::bigint AS seq FROM case_events e JOIN cases c ON c.id = e.case_id
+       WHERE c.clinic_case_ref = ${ref} ORDER BY e.seq`) as unknown as { seq: string }[];
+    expect(restored.length).toBeGreaterThanOrEqual(1);
+
+    // Seshanba: klinika eski davr kursori bilan so'raydi.
+    const page = await changesOnce(clinic, `${epoch}:${(oldTx - 1n).toString()}.0`);
+    expect(page.cursorReset).toBe(true);
+    const got = page.events.filter((e) => e.caseRef === ref).map((e) => String(e.seq));
+    expect(got).toEqual(restored.map((r) => String(r.seq)));
+    // Dedup kaliti — saqlangan (eski klaster) xid, tiklashda o'zgarmaydi.
+    const restoredEvents = page.events.filter((e) => e.caseRef === ref);
+    expect(restoredEvents.every((e) => String(e.txId) === oldTx.toString())).toBe(true);
+
+    // Yangi klasterdagi keyingi hodisa — tiklanganlardan keyin; tiklanganlar qayta berilmaydi.
+    const { ref: ref2 } = await sendCase(clinic, lab.labId);
+    const next = await changesUntil(clinic, page.nextCursor, hasRef(ref2));
+    expect(next.cursorReset ?? false).toBe(false);
+    expect(next.events.some((e) => e.caseRef === ref2)).toBe(true);
+    expect(next.events.some((e) => e.caseRef === ref)).toBe(false);
+    const tail = await changesOnce(clinic, next.nextCursor);
+    expect(tail.events.some((e) => e.caseRef === ref || e.caseRef === ref2)).toBe(false);
+  });
 });

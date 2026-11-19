@@ -336,4 +336,35 @@ describe('Hub boshqa klasterga tiklandi — davr almashadi, kursor boshidan, dub
     expect(after.split(':')[0]).not.toBe(epoch);
     expect(await pollUntilApplied(0)).toBe(0);
   });
+
+  test('dump’dan oldin yozilgan, hali so‘ralmagan hodisalar (eski klaster xid’i) tiklashdan keyin bir marta yetadi', async () => {
+    await pollUntilApplied(0);
+    const epoch = (await state()).cursor.split(':')[0]!;
+    // Desktop klinika o'chiq: lab ish bo'yicha hodisa yozdi, klinika so'ramadi.
+    const ref = await linkAndSendCase();
+    const [{ xmax }] = (await hubAdmin`
+      SELECT (pg_snapshot_xmax(pg_current_snapshot())::text)::bigint AS xmax`) as unknown as {
+      xmax: string;
+    }[];
+    // Boshqa klasterga tiklash: qatorlar eski klaster xid'i bilan (yangi hisoblagichdan katta).
+    const oldTx = BigInt(xmax) + 5_000_000n;
+    const evs = (await hubAdmin`
+      UPDATE case_events SET tx_id = ${oldTx.toString()}::bigint
+       WHERE case_id IN (SELECT id FROM cases WHERE clinic_case_ref = ${ref})
+       RETURNING seq`) as unknown as { seq: string }[];
+    expect(evs.length).toBeGreaterThanOrEqual(1);
+    await hubAdmin`UPDATE hub_meta SET system_identifier = '0'`;
+    // Klinika kursori eski klasterda shu hodisalardan oldin turgan edi.
+    await setCursor(`${epoch}:${(oldTx - 1n).toString()}.0`);
+    const before = await appliedCount();
+
+    expect(await pollUntilApplied(evs.length)).toBe(evs.length);
+    expect(await appliedCount()).toBe(before + evs.length);
+    expect((await state()).cursor.split(':')[0]).not.toBe(epoch);
+    // Qayta so'rov va yana bir davr almashishi (kursor boshidan) — ikkinchi marta qo'llanmaydi.
+    expect(await pollUntilApplied(0)).toBe(0);
+    await hubAdmin`UPDATE hub_meta SET system_identifier = '0'`;
+    expect(await pollUntilApplied(0)).toBe(0);
+    expect(await appliedCount()).toBe(before + evs.length);
+  });
 });

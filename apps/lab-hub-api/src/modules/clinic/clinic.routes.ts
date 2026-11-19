@@ -670,6 +670,13 @@ export const clinicRoutes = (deps: Deps) => {
    * FX-98: javob kursori `<epoch>:<tx_id>.<seq>` — baza boshqa klasterga tiklansa davr
    * almashadi va eski kursor boshidan boshlanadi (`cursorReset: true`); klinika dedup'i
    * `(tx_id, seq)` bo'yicha, shuning uchun qayta berilgan eski hodisalar ikkilanmaydi.
+   * Tiklangan qatorlar eski klaster xid'ini saqlaydi — u joriy `xmax`dan katta bo'lishi
+   * mumkin (yangi klaster hisoblagichi kichikdan boshlanadi). Bunday `tx_id` shu klasterda
+   * hali berilmagan, demak qator albatta yakunlangan (boshqa klasterdan): u xmin filtrisiz
+   * ko'rinadi va tartib kaliti `(0, seq)` — barcha joriy klaster hodisalaridan OLDIN. Klaster
+   * hisoblagichi uni quvib o'tgach kalit `(tx_id, seq)`ga o'sadi (faqat kattalashadi —
+   * o'tkazib yuborilmaydi, ko'pi bilan qayta beriladi). `txId` javobda o'zgarmaydi
+   * (qayta yozilmaydi) — klinika dedup'i barqaror, eski hodisa ikkinchi marta qo'llanmaydi.
    */
   app.openapi(
     createRoute({
@@ -691,19 +698,43 @@ export const clinicRoutes = (deps: Deps) => {
         // FX-98: davr (epoch) mos kelmasa / kursor shu klasterda bo'lishi mumkin bo'lmasa — boshidan.
         const current = await currentHubEpoch(t);
         const { tx: sinceTx, seq: sinceSeq, reset: cursorReset } = resolveCursor(since, current);
-        const rows = await t
-          .select({ ev: caseEvents, ref: cases.clinicCaseRef })
-          .from(caseEvents)
-          .innerJoin(cases, eq(cases.id, caseEvents.caseId))
-          .where(
-            and(
-              eq(caseEvents.clinicId, clinic.id),
-              sql`${caseEvents.txId} < (pg_snapshot_xmin(pg_current_snapshot())::text)::bigint`,
-              sql`(${caseEvents.txId}, ${caseEvents.seq}) > (${sinceTx}::bigint, ${sinceSeq}::bigint)`,
-            ),
-          )
-          .orderBy(asc(caseEvents.txId), asc(caseEvents.seq))
-          .limit(limit);
+        const base = () =>
+          t
+            .select({ ev: caseEvents, ref: cases.clinicCaseRef })
+            .from(caseEvents)
+            .innerJoin(cases, eq(cases.id, caseEvents.caseId));
+        // 1) Boshqa klasterdan tiklangan qatorlar (`tx_id >= xmax`) — kalit `(0, seq)`.
+        const restored =
+          BigInt(sinceTx) === 0n
+            ? await base()
+                .where(
+                  and(
+                    eq(caseEvents.clinicId, clinic.id),
+                    sql`${caseEvents.txId} >= (pg_snapshot_xmax(pg_current_snapshot())::text)::bigint`,
+                    sql`${caseEvents.seq} > ${sinceSeq}::bigint`,
+                  ),
+                )
+                .orderBy(asc(caseEvents.seq))
+                .limit(limit)
+            : [];
+        // 2) Shu klaster qatorlari — faqat yakunlanganlar (`tx_id < xmin`), kalit `(tx_id, seq)`.
+        const own =
+          restored.length < limit
+            ? await base()
+                .where(
+                  and(
+                    eq(caseEvents.clinicId, clinic.id),
+                    sql`${caseEvents.txId} < (pg_snapshot_xmin(pg_current_snapshot())::text)::bigint`,
+                    sql`(${caseEvents.txId}, ${caseEvents.seq}) > (${sinceTx}::bigint, ${sinceSeq}::bigint)`,
+                  ),
+                )
+                .orderBy(asc(caseEvents.txId), asc(caseEvents.seq))
+                .limit(limit - restored.length)
+            : [];
+        const rows = [
+          ...restored.map((r) => ({ ...r, key: `0.${r.ev.seq}` })),
+          ...own.map((r) => ({ ...r, key: `${r.ev.txId}.${r.ev.seq}` })),
+        ];
         const msgIds = rows
           .filter((r) => r.ev.type === 'message')
           .map((r) => String(r.ev.payload.messageId));
@@ -756,8 +787,7 @@ export const clinicRoutes = (deps: Deps) => {
                 : null,
           };
         });
-        const last = rows.at(-1)?.ev;
-        const pos = last ? `${last.txId}.${last.seq}` : `${sinceTx}.${sinceSeq}`;
+        const pos = rows.at(-1)?.key ?? `${sinceTx}.${sinceSeq}`;
         return c.json({ events, nextCursor: `${current.epoch}:${pos}`, cursorReset });
       }),
   );
