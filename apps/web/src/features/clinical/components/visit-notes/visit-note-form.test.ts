@@ -8,6 +8,7 @@ import {
   loadDraft,
   overrideKey,
   pendingAllergyConflict,
+  pickAppointmentToLink,
   type RxRow,
   saveDraft,
 } from './visit-note-form';
@@ -153,5 +154,65 @@ describe('avto-qoralama (localStorage)', () => {
   it('buzilgan JSON → null (yiqitmaydi)', () => {
     localStorage.setItem('bad', '{nope');
     expect(loadDraft('bad')).toBeNull();
+  });
+});
+
+describe('pickAppointmentToLink (FX-117)', () => {
+  const now = new Date('2026-11-20T12:00:00');
+  const mk = (id: string, doctorId: string, iso: string, status = 'completed') => ({
+    id,
+    doctorId,
+    status,
+    startTime: iso,
+  });
+  const appts = [
+    mk('other-doc', 'doc-B', '2026-11-20T09:00:00'),
+    mk('mine-late', 'doc-A', '2026-11-20T15:00:00', 'scheduled'),
+    mk('mine-near', 'doc-A', '2026-11-20T11:30:00'),
+    mk('mine-cancelled', 'doc-A', '2026-11-20T12:00:00', 'cancelled'),
+    mk('mine-yesterday', 'doc-A', '2026-11-19T17:00:00', 'in_progress'),
+  ];
+
+  it("boshqa shifokorning yozilishi tanlanmaydi (bugungi birinchi yozilish bo'lsa ham)", () => {
+    expect(pickAppointmentToLink({ appointments: appts, doctorId: 'doc-A', now })).toBe(
+      'mine-near',
+    );
+    expect(
+      pickAppointmentToLink({
+        appointments: [mk('x', 'doc-B', '2026-11-20T11:00:00')],
+        doctorId: 'doc-A',
+        now,
+      }),
+    ).toBeNull();
+  });
+  it("so'ralgan (o'tgan kun) yozilish — o'zinikiga tegishli bo'lsa tanlanadi", () => {
+    expect(
+      pickAppointmentToLink({
+        appointments: appts,
+        doctorId: 'doc-A',
+        requestedId: 'mine-yesterday',
+        now,
+      }),
+    ).toBe('mine-yesterday');
+  });
+  it("so'ralgan yozilish boshqa shifokorniki bo'lsa e'tiborsiz (avto tanlovga qaytadi)", () => {
+    expect(
+      pickAppointmentToLink({
+        appointments: appts,
+        doctorId: 'doc-A',
+        requestedId: 'other-doc',
+        now,
+      }),
+    ).toBe('mine-near');
+  });
+  it("allaqachon vizit bog'langan yozilish o'tkazib yuboriladi", () => {
+    expect(
+      pickAppointmentToLink({
+        appointments: appts,
+        doctorId: 'doc-A',
+        linkedAppointmentIds: ['mine-near'],
+        now,
+      }),
+    ).toBe('mine-late');
   });
 });

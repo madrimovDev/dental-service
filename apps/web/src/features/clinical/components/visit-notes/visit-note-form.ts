@@ -77,6 +77,46 @@ export const buildVisitNoteBody = (
   nextVisit: v.nextVisit ?? undefined,
 });
 
+// ===== yozilishga bog'lash (FX-117) =====
+
+export type LinkableAppointment = {
+  id: string;
+  doctorId: string;
+  status: string;
+  startTime: string;
+};
+
+/**
+ * FX-117 (LB-26): yangi vizit yozuvi qaysi yozilishga bog'lanadi.
+ *  - FAQAT shu shifokorning, bekor qilinmagan/kelmagan yozilishi;
+ *  - `requestedId` («Mendan kutilmoqda» bandi `?appointmentId=`) mos kelsa — o'sha (o'tgan kun ham);
+ *  - aks holda bugungi, hali yozuv bog'lanmagan yozilishlardan hozirga eng yaqini.
+ */
+export const pickAppointmentToLink = (opts: {
+  appointments: LinkableAppointment[];
+  doctorId: string;
+  requestedId?: string | null;
+  linkedAppointmentIds?: Array<string | null | undefined>;
+  now?: Date;
+}): string | null => {
+  const now = opts.now ?? new Date();
+  const own = opts.appointments.filter(
+    (a) => a.doctorId === opts.doctorId && a.status !== 'cancelled' && a.status !== 'no_show',
+  );
+  if (opts.requestedId && own.some((a) => a.id === opts.requestedId)) return opts.requestedId;
+  const linked = new Set(opts.linkedAppointmentIds ?? []);
+  const today = now.toDateString();
+  const candidates = own.filter(
+    (a) => !linked.has(a.id) && new Date(a.startTime).toDateString() === today,
+  );
+  candidates.sort(
+    (x, y) =>
+      Math.abs(new Date(x.startTime).getTime() - now.getTime()) -
+      Math.abs(new Date(y.startTime).getTime() - now.getTime()),
+  );
+  return candidates[0]?.id ?? null;
+};
+
 // ===== dori ↔ allergiya =====
 export { overrideCoversConflict, overrideKey };
 

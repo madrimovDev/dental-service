@@ -5,7 +5,7 @@ import { notifications } from '@mantine/notifications';
 import { IconChevronLeft } from '@tabler/icons-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMedicalRecord, usePatient } from '@/features/patients/patients.api';
 import { formatCurrency } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth-store.ts';
@@ -43,6 +43,7 @@ import {
   loadDraft,
   overrideCoversConflict,
   pendingAllergyConflict,
+  pickAppointmentToLink,
   type RxRow,
   saveDraft,
   type VisitFormValues,
@@ -81,6 +82,8 @@ export function VisitNotePage() {
   const lang = i18n.language === 'ru' ? 'ru' : 'uz';
   const navigate = useNavigate();
   const { id: patientId = '', visitId } = useParams<{ id: string; visitId?: string }>();
+  const [searchParams] = useSearchParams();
+  const requestedAppointmentId = searchParams.get('appointmentId');
   const { user, hasPermission, activeBranchId } = useAuthStore();
 
   const patientQuery = usePatient(patientId);
@@ -114,6 +117,16 @@ export function VisitNotePage() {
   const [unknownAck, setUnknownAck] = useState<string | null>(null);
   const [unknownPrompt, setUnknownPrompt] = useState(false);
   const hydrated = useRef(false);
+
+  // FX-117: «Mendan kutilmoqda» bandi — shu yozilish uchun qoralama allaqachon bo'lsa, ikkinchisini
+  // yaratmasdan o'shani ochamiz.
+  useEffect(() => {
+    if (visitId || !requestedAppointmentId) return;
+    const existing = ((notesQuery.data ?? []) as VisitNoteView[]).find(
+      (n) => n.appointmentId === requestedAppointmentId && !n.signedAt,
+    );
+    if (existing) navigate(`/patients/${patientId}/visits/${existing.id}/edit`, { replace: true });
+  }, [visitId, requestedAppointmentId, notesQuery.data, navigate, patientId]);
 
   const note = noteQuery.data as VisitNoteView | undefined;
   const signed = !!note?.signedAt;
@@ -310,17 +323,17 @@ export function VisitNotePage() {
       return null;
     }
     if (!user) return null;
-    // Yangi vizit: bugungi yozilish (bekor qilinmagan) bo'lsa avtomatik bog'lanadi.
-    const todayStr = new Date().toDateString();
-    const todayAppt = (apptQuery.data ?? []).find(
-      (a) =>
-        new Date(a.startTime).toDateString() === todayStr &&
-        a.status !== 'cancelled' &&
-        a.status !== 'no_show',
-    );
-    const linked = noteId
-      ? values
-      : { ...values, appointmentId: values.appointmentId ?? todayAppt?.id ?? null };
+    // Yangi vizit: shifokorning o'z yozilishi (FX-117) — `?appointmentId=` yoki bugungi bo'sh yozilish.
+    const linkedId = noteId
+      ? null
+      : (values.appointmentId ??
+        pickAppointmentToLink({
+          appointments: apptQuery.data ?? [],
+          doctorId: user.id,
+          requestedId: requestedAppointmentId,
+          linkedAppointmentIds: (notesQuery.data ?? []).map((n) => n.appointmentId),
+        }));
+    const linked = noteId ? values : { ...values, appointmentId: linkedId };
     const body = buildVisitNoteBody(linked, {
       patientId,
       doctorId: user.id,
