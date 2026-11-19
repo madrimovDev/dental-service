@@ -507,16 +507,24 @@ export const createAuthService = (deps: AuthServiceDeps) => {
       // FX-29: tenant-wide (branchId=null) tayinlovli xodim — egasi kabi klinikaning barcha
       // filiallarini ko'radi (aks holda Sidebar filial menyusi chiqmasdi, eng eski filialga qulflanardi).
       // Aks holda faqat o'z tayinlov filiallari.
+      // FX-134 bilan bir xil: `branches_self_view` RLS policy'si xodimning BOSHQA klinikadagi
+      // (hatto kutilayotgan) tayinlov filiallarini ham ko'rsatadi — tenantId filtri shart.
       const rows = allowAllBranches
         ? await tx
             .select({ id: branches.id, name: branches.name })
             .from(branches)
-            .where(isNull(branches.deletedAt))
+            .where(and(eq(branches.tenantId, tenantId), isNull(branches.deletedAt)))
         : branchIds.length
           ? await tx
               .select({ id: branches.id, name: branches.name })
               .from(branches)
-              .where(and(inArray(branches.id, branchIds), isNull(branches.deletedAt)))
+              .where(
+                and(
+                  eq(branches.tenantId, tenantId),
+                  inArray(branches.id, branchIds),
+                  isNull(branches.deletedAt),
+                ),
+              )
           : [];
       return { branches: rows, allowAllBranches };
     });
