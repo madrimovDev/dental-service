@@ -9,8 +9,15 @@
  *   cd apps/api && bun test tests/integration/cli-474-l7-no-show-strikes.test.ts --env-file=../../.env
  */
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { branches, patients, tenantSettings, tenants, users } from '@dental/db-schema';
-import { sql } from 'drizzle-orm';
+import {
+  appointments,
+  branches,
+  patients,
+  tenantSettings,
+  tenants,
+  users,
+} from '@dental/db-schema';
+import { eq, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { DbOrTx } from '../../src/db/client.ts';
 import { db } from '../../src/db/client.ts';
@@ -66,6 +73,22 @@ const createAppt = async (patientId: string) => {
   return created.appointment.id;
 };
 
+// FX-54: strike faqat boshlanish vaqti o'tgan yozilishga yoziladi — o'tmishga ko'chirilgan
+// yozilish (create o'tmishni rad etadi, shuning uchun to'g'ridan-to'g'ri UPDATE).
+let pastDay = 1;
+const createPastAppt = async (patientId: string) => {
+  const id = await createAppt(patientId);
+  const start = new Date(Date.UTC(2020, 0, pastDay++, 4, 0, 0));
+  await run(tenantId, async (c) => {
+    const tx = c.get('db') as DbOrTx;
+    await tx
+      .update(appointments)
+      .set({ startTime: start, endTime: new Date(start.getTime() + 45 * 60_000) })
+      .where(eq(appointments.id, id));
+  });
+  return id;
+};
+
 beforeAll(async () => {
   await db.execute(sql`TRUNCATE users, tenants RESTART IDENTITY CASCADE`);
   const [owner] = await db
@@ -94,7 +117,7 @@ afterAll(async () => {
 describe('CLI-474 L7 — no-show strikes', () => {
   test('no_show transition → strike, activeCount = 1', async () => {
     const patientId = await seedPatient('Strike1');
-    const apptId = await createAppt(patientId);
+    const apptId = await createPastAppt(patientId);
     await run(tenantId, (c) => apptSvc.update(c, apptId, { status: 'no_show' }));
     const cnt = await run(tenantId, (c) => strikeSvc.activeCount(c, patientId));
     expect(cnt).toBe(1);
@@ -102,7 +125,7 @@ describe('CLI-474 L7 — no-show strikes', () => {
 
   test('no_show → scheduled (misclick tuzatildi) → activeCount = 0, strike row saqlanadi', async () => {
     const patientId = await seedPatient('Strike2');
-    const apptId = await createAppt(patientId);
+    const apptId = await createPastAppt(patientId);
     await run(tenantId, (c) => apptSvc.update(c, apptId, { status: 'no_show' }));
     expect(await run(tenantId, (c) => strikeSvc.activeCount(c, patientId))).toBe(1);
 
@@ -116,7 +139,7 @@ describe('CLI-474 L7 — no-show strikes', () => {
 
   test('idempotent: no_show → scheduled → no_show → activeCount = 1 (unique appointment_id)', async () => {
     const patientId = await seedPatient('Strike3');
-    const apptId = await createAppt(patientId);
+    const apptId = await createPastAppt(patientId);
     await run(tenantId, (c) => apptSvc.update(c, apptId, { status: 'no_show' }));
     await run(tenantId, (c) => apptSvc.update(c, apptId, { status: 'scheduled' }));
     await run(tenantId, (c) => apptSvc.update(c, apptId, { status: 'no_show' }));
@@ -128,7 +151,7 @@ describe('CLI-474 L7 — no-show strikes', () => {
 
   test('waive → activeCount = 0, row saqlanadi', async () => {
     const patientId = await seedPatient('Strike4');
-    const apptId = await createAppt(patientId);
+    const apptId = await createPastAppt(patientId);
     await run(tenantId, (c) => apptSvc.update(c, apptId, { status: 'no_show' }));
     const list = await run(tenantId, (c) => strikeSvc.listByPatient(c, patientId));
     const strikeId = list[0]!.id;
@@ -140,7 +163,7 @@ describe('CLI-474 L7 — no-show strikes', () => {
 
   test('waive ikkinchi marta → already_waived', async () => {
     const patientId = await seedPatient('Strike5');
-    const apptId = await createAppt(patientId);
+    const apptId = await createPastAppt(patientId);
     await run(tenantId, (c) => apptSvc.update(c, apptId, { status: 'no_show' }));
     const list = await run(tenantId, (c) => strikeSvc.listByPatient(c, patientId));
     const strikeId = list[0]!.id;
@@ -160,7 +183,7 @@ describe('CLI-474 L7 — no-show strikes', () => {
         .onConflictDoNothing();
     });
     const patientId = await seedPatient('Summary');
-    const apptId = await createAppt(patientId);
+    const apptId = await createPastAppt(patientId);
     await run(tenantId, (c) => apptSvc.update(c, apptId, { status: 'no_show' }));
     const s = await run(tenantId, (c) => strikeSvc.patientSummary(c, patientId));
     expect(s.activeCount).toBe(1);
@@ -172,12 +195,28 @@ describe('CLI-474 L7 — no-show strikes', () => {
   test('activeCountForPatients (grouped) — ro‘yxat uchun', async () => {
     const p1 = await seedPatient('Grp1');
     const p2 = await seedPatient('Grp2');
-    const a1 = await createAppt(p1);
-    const a2 = await createAppt(p2);
+    const a1 = await createPastAppt(p1);
+    const a2 = await createPastAppt(p2);
     await run(tenantId, (c) => apptSvc.update(c, a1, { status: 'no_show' }));
     await run(tenantId, (c) => apptSvc.update(c, a2, { status: 'no_show' }));
     const map = await run(tenantId, (c) => strikeSvc.activeCountForPatients(c, [p1, p2]));
     expect(map.get(p1)).toBe(1);
     expect(map.get(p2)).toBe(1);
+  });
+  test('FX-54: kelajakdagi (hali boshlanmagan) yozilish no_show qilinsa strike YOZILMAYDI', async () => {
+    const patientId = await seedPatient('FutureNoShow');
+    const apptId = await createAppt(patientId); // 2027 — kelajak
+    const res = await run(tenantId, (c) => apptSvc.update(c, apptId, { status: 'no_show' }));
+    expect(res.ok).toBe(true);
+    expect(await run(tenantId, (c) => strikeSvc.activeCount(c, patientId))).toBe(0);
+    expect(await run(tenantId, (c) => strikeSvc.listByPatient(c, patientId))).toHaveLength(0);
+  });
+
+  test('FX-54: qabulga chaqirilgan (in_progress) bemor kelajak vaqtli yozilishda no_show bo‘lsa strike yoziladi', async () => {
+    const patientId = await seedPatient('InProgressNoShow');
+    const apptId = await createAppt(patientId);
+    await run(tenantId, (c) => apptSvc.update(c, apptId, { status: 'in_progress' }));
+    await run(tenantId, (c) => apptSvc.update(c, apptId, { status: 'no_show' }));
+    expect(await run(tenantId, (c) => strikeSvc.activeCount(c, patientId))).toBe(1);
   });
 });

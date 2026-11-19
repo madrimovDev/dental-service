@@ -597,7 +597,17 @@ export const createAppointmentsService = (deps: {
 
       // CLI-474 (L7): no_show'ga O'TGANDA bemor strike'i (transition edge —
       // re-PATCH no_show→no_show qayta yozmaydi; unique appointmentId ham himoya).
-      if (input.status === 'no_show' && before.status !== 'no_show' && deps.noShowStrike) {
+      // FX-54: hali boshlanmagan (startTime kelajakda) yozilish scheduled/confirmed'dan no_show
+      // qilinsa — bemor hali «kelmagan» emas, strike yozilmaydi (status o'zgaradi). Qabulga
+      // chaqirilgan (in_progress) bemor esa vaqtidan qat'i nazar kelmagan hisoblanadi (CLI-480).
+      const noShowStarted =
+        before.status === 'in_progress' || new Date(updated.startTime).getTime() <= Date.now();
+      if (
+        input.status === 'no_show' &&
+        before.status !== 'no_show' &&
+        noShowStarted &&
+        deps.noShowStrike
+      ) {
         const tenantId = c.get('activeTenantId');
         if (tenantId) {
           await deps.noShowStrike.recordOnNoShow(c, {
