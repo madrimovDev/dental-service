@@ -689,3 +689,400 @@ Tasdiqlangan faktlar:
 - **booking** (A2): QueueDisplayBoard (TV) PII ochilishi (ommaviy ekranda bemor ismi/telefoni, autentifikatsiyasiz endpoint-mi), CheckInDialog, ScheduleScreen/WeekGrid, booking_requests RLS policy mazmuni, savepoint+EXCLUDE real-DB xulqi o'qilmagan.
 - **booking** (A2): Desktop rejimida (offline/modul gate/litsenziya bloki) umuman hech bir biznes oqim (booking, kassa, ombor, treatment) bosib o'tilmagan: requireModuleInDesktop + license-expired blokning /uploads va ish oqimiga ta'siri, grace davridagi xulq. Cloud-vs-desktop farqi alohida oqim sifatida audit qilinmagan.
 - **inventory** (A2): Web StockScreen/BomPanel/ItemFormModal/BatchFormModal oqimlari (409 stock.insufficient xabari, query invalidation) va stock.low_threshold bildirishnomasining Notifications UI/kanalga yetib borishi ko'rilmagan; begona itemId bilan FK/RLS xulqi real DB'da tasdiqlanmagan (confidence low).
+
+---
+
+# 2-round: qamrov bo'shliqlari (run `wf_52f45158-dac`, 42 agent, ~3,6M token)
+
+Tanqidchining 11 bo'shlig'i oqim sifatida (rbac/tenancy/lab/license/money/treatment — A3 opus; messaging/booking/inventory — A2). 80 noyob topilma → 30 tekshirildi, **30 tasdiqlandi**; 50 tasi alohida refuter run'ida (`FIX-BACKLOG` To'lqin 10). Advisor grep: 0.
+
+| ID | Og'irlik | Oqim | Topilma |
+|---|---|---|---|
+| LB-01 | high | booking-gap8 | Navbat sahifalarida bemor ismi faqat eng yangi 100 bemordan hal qilinadi: check-in ro'yxati va navbat kartalarida '—' |
+| LB-02 | high | lab-gap3 | Hub bazasi zaxiradan tiklangandan keyin klinika sinxroni jimgina buziladi: seq qayta ishlatiladi va dedupe uni tashlab yuboradi, yangi klasterda esa tx_id kursordan kichik bo'lib qoladi |
+| LB-03 | high | lab-gap3 | Lab foydalanuvchilari uchun parolni tiklash yo'li umuman yo'q: lead ham, texnik ham. Supervisor javobi yo'qolsa, lead vaqtinchalik parolini hech qachon olmaydi |
+| LB-04 | high | license-gap5 | Klient PC saqlangan (TOFU) server manziliga health-check'siz ulanadi: server IP o'zgarsa yoki server kechroq yonsa mahsulot ichida qayta ulanish yo'li yo'q |
+| LB-05 | high | messaging-gap4 | Desktop: Valkey doimiylikka ega emas — har qayta ishga tushganda kutilayotgan barcha 24 soatlik eslatmalar yo'qoladi, DB'dan qayta tiklash yo'q |
+| LB-06 | high | tenancy-gap2 | Qayta ulanishda (hubClinicId o'zgarganda) kursor va lab_hub_applied_events qayta o'rnatilmaydi — yangi Hub hodisalari jimgina yo'qoladi |
+| LB-07 | high | tenancy-gap2 | Kursor/dedup kaliti Postgres klaster xid'i va sequence qiymatiga bog'langan — Hub pg_dump'dan tiklansa barcha klinikalar sinxroni jimgina to'xtaydi yoki hodisalar tashlanadi |
+| LB-08 | medium | booking-gap9 | Starter tarif desktop'da shifokor yarata olmaydi: 'staff' moduli yo'q -> /api/users/invite 403 -> yozilish (booking) oqimi ishlamaydi |
+| LB-09 | medium | lab-gap3 | Vaqtinchalik parol noto'g'ri kiritilsa, ChangePasswordPage xatoni ko'rsatmaydi: global 401 handler sessiyani o'chiradi va foydalanuvchini /login ga otadi |
+| LB-10 | medium | license-gap5 | SaaS 'Qayta tekshirish' tugmasi access token muddati o'tgach doim 'hali tugagan' deydi: vendor renew qilgan bo'lsa ham klinika ochilmaydi |
+| LB-11 | medium | license-gap5 | Vendor SaaS klinikani to'xtata olmaydi: deactivate faqat litsenziya qatorini qidiradi, renew o'tgan sanani rad etadi, admin UI'da SaaS uchun tugma yo'q |
+| LB-12 | medium | license-gap5 | Blok ekranida chiqish va workspace almashtirish yo'q: ko'p klinikali xodim faol bo'lmagan klinikada qamalib qoladi |
+| LB-13 | medium | license-gap5 | Server discovery javobida birinchi tashqi IPv4 interfeysini yuboradi, so'rov kelgan interfeysni emas: virtual/VPN adapterli serverda klient noto'g'ri manzilni saqlaydi |
+| LB-14 | medium | messaging-gap4 | Obunasi/litsenziyasi tugagan tenant uchun worker (eslatma, recall) va Telegram bot to'liq ishlashda davom etadi — blok faqat HTTP'da |
+| LB-15 | medium | money-gap6 | Xarajatlar modulida filial doirasi umuman yo'q: filial mudiri boshqa filial va klinika miqyosidagi xarajatlarni ko'radi, yaratadi, tahrirlaydi va o'chiradi |
+| LB-16 | medium | money-gap6 | Xizmat foydasi (procedureMix) va revenue.byService faqat erkin POS item'laridan: davolash rejasi orqali to'langan barcha xizmatlar «Qaysi xizmat ko'p foyda beradi?» javobidan tushib qoladi |
+| LB-17 | medium | money-gap6 | Refund dialogi va tranzaksiya jadvali hisob-faktura summasini (totalAmount) ko'rsatadi, server esa faqat qolgan paidAmount'ni qaytaradi: qisman to'langan sotuvda kassir ko'rsatilgandan kam yozilgan pulni qaytarib beradi |
+| LB-18 | medium | rbac-gap0 | Lab navbati/diqqat widget'lari faqat eng yangi 20 ta buyurtma ustida hisoblanadi: eski faol va muddati o'tgan buyurtmalar Texnik, Shifokor va Registrator dashboard'idan yo'qoladi |
+| LB-19 | medium | rbac-gap0 | 'Yozish' tugmalari (Bemorlar ro'yxati, Recall paneli) patientId'ni URL'da uzatadi, lekin yozilish ekrani uni o'qimaydi: bemor oldindan tanlanmaydi |
+| LB-20 | medium | rbac-gap0 | patient_image.upload (Nurse'da ham bor) rasmni butunlay o'chirishga ruxsat beradi, imzolangan vizit yozuviga biriktirilgan rentgenni ham |
+| LB-21 | medium | rbac-gap0 | Lab buyurtma 'shifokori' doim ekranni ochgan foydalanuvchi: Technician (lab_order.manage) yaratgan buyurtma Hub'ga texnik nomi bilan ketadi va haqiqiy shifokorga ko'rinmaydi |
+| LB-22 | medium | tenancy-gap1 | A Branch Manager assigned to one branch can edit another branch's settings and its doctors' schedules and time off, which breaks booking in that branch |
+| LB-23 | medium | tenancy-gap1 | Expenses: decision D-8 restricts expenses to the caller's branches, but there is no FX item. The screen loads the whole clinic's expenses by default, and a branch user can edit or delete another branch's expenses |
+| LB-24 | medium | tenancy-gap1 | Stock: a doctor or Branch Manager assigned to one branch can adjust, set to zero or move another branch's stock items |
+| LB-25 | medium | tenancy-gap1 | Payroll is clinic-wide, but the Branch Manager template has payroll.manage: a branch-assigned manager sees every branch's salaries and can create, finalize and delete the clinic-wide run |
+| LB-26 | medium | treatment-gap7 | Vizitning yozilishga avto-bog'lanishi faqat «bugungi birinchi bekor qilinmagan yozilish» bo'yicha, tanlash UI'si yo'q: o'tgan kun bandi hech qachon yopilmaydi, boshqa shifokor yozilishi bog'lanadi |
+| LB-27 | medium | treatment-gap7 | «Imzolanmagan vizit yozuvi» hisoblagichi qoralamani bajarilgan deb hisoblaydi (signedAt tekshirilmaydi) |
+| LB-28 | low | lab-gap3 | lab_users.phone butun Hub bo'yicha unique, hisobni o'chirib ham, telefonini o'zgartirib ham bo'lmaydi: labdan ketgan texnik boshqa labga qo'shila olmaydi va o'z labining lead'i bo'la olmaydi |
+| LB-29 | low | messaging-gap4 | Recall worker: `contacted`ga UPDATE shartsiz va qator qulflanmagan — tashqi send davomida (timeout'siz) parallel o'zgarish ustidan yoziladi |
+| LB-30 | low | rbac-gap0 | Registrator 'Bugun' ekranidagi 'Lab muddati o'tgan' diqqat bandi Receptionist roli uchun hech qachon chiqmaydi va havolasi taqiqlangan sahifaga olib boradi |
+
+### LB-01 [high] Navbat sahifalarida bemor ismi faqat eng yangi 100 bemordan hal qilinadi: check-in ro'yxati va navbat kartalarida '—'
+
+- **Oqim:** booking-gap8 · auditor `high` → refuter `high` · 📖 statik
+- **Invariant:** Har navbat/check-in satrida bemor ismi tenant'dagi istalgan bemor uchun to'g'ri ko'rsatilishi kerak
+- **Scenariy:** Klinikada 400 bemor bor. Registrator ertalab 'Yangi chipta' -> 'Yozilishdan' ni ochadi: bugungi 15 ta yozilishdan eski (eng yangi 100 ga kirmagan) bemorlar qatorida ism o'rnida '—' va faqat vaqt. Qaysi bemor kelganini tanlab bo'lmaydi, adashib boshqa kishining yozilishini check-in qilish mumkin. Xuddi shu '—' QueueBoard'dagi 'Hozir xizmatda', 'Keyingi' va 'Hali kelmagan' kartalarida ham chiqadi. Testlar mockda 5 ta bemor beradi, shuning uchun ushlanmagan.
+- **Dalil:**
+  - apps/web/src/features/queue/components/CheckInDialog.tsx:23 `const patients = usePatientsAll();` va :66 `const patientName = (id: string) => patients.data?.data.find((p) => p.id === id)?.fullName ?? '—';`
+  - apps/web/src/features/queue/queue.api.ts: usePatientsAll -> `listPatients({ search: search || undefined, pageSize: 100 })`; apps/api/src/modules/patients/patients.service.ts:221 `.orderBy(desc(patients.createdAt)).limit(query.pageSize)` va patients.schema.ts:115 `max(100)` (faqat eng yangi 100 ta)
+  - apps/web/src/features/queue/components/QueueBoard.tsx:44,54,88 — `patientNameById` ham shu 100 talik ro'yxatdan, `?? '—'`; check-in-candidates DTO (queue.mapper.ts:toCheckInCandidateDto) patientName qaytarmaydi
+  - Dashboard bu muammoni allaqachon hal qilgan (reception.api.ts:34 usePatientNames -> getPatient(id) per id), navbat sahifalari ko'chirilmagan; CheckInDialog.tsx:19-21 izohi 'cheklanmagan' deydi, aslida cheklangan
+- **Tuzatish yo'nalishi:** Navbat ticketlari va check-in-candidates DTO'siga backend'da `patientName` qo'shish (patients bilan join), yoki web'da reception.api.ts dagi usePatientNames(ids) (per-id getPatient) ni QueueBoard va CheckInDialog'ga ko'chirish; usePatientsAll'ni nom lookup uchun ishlatmaslik.
+
+### LB-02 [high] Hub bazasi zaxiradan tiklangandan keyin klinika sinxroni jimgina buziladi: seq qayta ishlatiladi va dedupe uni tashlab yuboradi, yangi klasterda esa tx_id kursordan kichik bo'lib qoladi
+
+- **Oqim:** lab-gap3 · auditor `high` → refuter `high` · 📖 statik
+- **Invariant:** I1
+- **Scenariy:** Vendor kunlik zaxiradan (seq=N) hujjatlashtirilgan pg_restore bilan Hub bazasini tiklaydi. Klinika A tiklashdan oldin seq N+1..M gacha hodisalarni qo'llagan, ular lab_hub_applied_events'da turibdi. (a) Tiklash o'sha klasterda bo'lsa: setval sequence'ni N ga qaytaradi. Lab yangi ishni 'accepted', keyin 'ready' qiladi, narx taklif qiladi, xabar yozadi. Bu hodisalar yana N+1..M seq'larini oladi. tx_id yangi va katta, shuning uchun /changes ularni qaytaradi. Lekin klinika `if (!fresh) continue` bilan hammasini «allaqachon qo'llangan» deb o'tkazib yuboradi va kursorni oldinga suradi. Natijada klinikada holat, narx taklifi va lab xabarlari ko'rinmaydi, xato ham chiqmaydi. (b) Tiklash yangi klasterda bo'lsa (VPS yoki volume yo'qolgani uchun tiklash): xid kichik sondan boshlanadi. Klinika kursori `<eski katta tx>.<seq>` bo'lgani uchun `(tx_id,seq) > cursor` hech qachon bajarilmaydi. Barcha klinikalar uchun poll abadiy 0 hodisa qaytaradi, lastError bo'sh, lab bilan sinxron butunlay to'xtaydi.
+- **Dalil:**
+  - apps/api/src/lib/lab-hub/sync.ts:514-519 `.insert(labHubAppliedEvents).values({ tenantId, seq: ev.seq }).onConflictDoNothing()... if (!fresh) continue; // allaqachon qo'llangan` (dedupe faqat Hub seq bo'yicha)
+  - packages/db-schema/src/tables/lab-hub.ts:161 `primaryKey({ columns: [t.tenantId, t.seq] })`
+  - apps/lab-hub-api/src/db/schema.ts:245-249 `seq: bigserial(...)`, `txId ... default(sql`(pg_current_xact_id()::text)::bigint`)` (xid klasterga xos)
+  - apps/lab-hub-api/src/modules/clinic/clinic.routes.ts:692-693 `txId < pg_snapshot_xmin(...)` va `(txId, seq) > (sinceTx, sinceSeq)`
+- **Tuzatish yo'nalishi:** Hub'ga instansiya yoki davr identifikatorini (masalan, `hub_epoch`ni Hub DB'da `system_identifier` yoki restore'dan keyin yangilanadigan UUID sifatida) qo'shish kerak. Uni `/changes` javobida qaytarish, klinika esa epoch o'zgarganini ko'rganda kursorni '0.0'ga tushirishi va `lab_hub_applied_events`ni tozalashi (yoki dedupe kalitini (epoch, seq) qilishi) kerak. Eng kam yo'l: README'ga restore'dan keyin barcha klinika kursorlarini qayta o'rnatish qadamini va epoch tekshiruvini qo'shish.
+
+### LB-03 [high] Lab foydalanuvchilari uchun parolni tiklash yo'li umuman yo'q: lead ham, texnik ham. Supervisor javobi yo'qolsa, lead vaqtinchalik parolini hech qachon olmaydi
+
+- **Oqim:** lab-gap3 · auditor `high` → refuter `high` · 📖 statik
+- **Invariant:** I2
+- **Scenariy:** 1) Texnik T parolini unutadi. Lead StaffPage'da faqat «o'chirish/faollashtirish»ni ko'radi. Yangi hisob ham ochib bo'lmaydi, chunki telefon band (409). T portalga qayta kira olmaydi. 2) Lead parolini unutadi. Vendor Supervisor'da ham, Hub ichki API'da ham hech narsa qila olmaydi. Lab ish taqsimlash, narx taklif qilish, ulanishlarni tasdiqlash va akt-sverkadan butunlay mahrum bo'ladi. 3) Vendor lab yaratadi. Hub commit qiladi, lekin javob 10 s ichida kelmaydi (argon2 + sekin tarmoq) yoki uziladi. Admin 502 ko'radi va qayta bosadi, endi 409 phone_taken keladi. Lab katalogda paydo bo'lgan, lekin lead'ning vaqtinchalik paroli hech kimda yo'q va uni tiklab bo'lmaydi. Labni o'chirish endpointi ham yo'q. 4) Ikki lead bir vaqtda bir-birini o'chiradi va labda faol lead qolmaydi; tiklash yo'li yo'q.
+- **Dalil:**
+  - apps/lab-hub-api/src/modules/lab/lab.routes.ts:198-201 passwordHash faqat change-password'da o'zgaradi va u currentPassword'ni talab qiladi
+  - apps/lab-hub-api/src/modules/lab/lab.routes.ts:832-839 PATCH /users/{id} faqat `fullName`, `isActive` qabul qiladi (`.strict()`), parolni tiklash yo'q
+  - apps/lab-hub-api/src/modules/internal/internal.routes.ts:75-192 ichki API'da faqat GET/POST/PATCH labs va POST clinics bor, lab_users uchun reset yo'q
+  - apps/supervisor-api/src/modules/labs/labs.routes.ts:11-12 `Lead vaqtinchalik paroli Supervisor'da SAQLANMAYDI — yaratish javobida bir marta ko'rsatiladi`; :50 `AbortSignal.timeout(10_000)`, :54-55 `catch { return 502 LAB_HUB_UNREACHABLE }`
+- **Tuzatish yo'nalishi:** Add `POST /internal/labs/{id}/users/{userId}/reset-password` with a Supervisor proxy and a button that resets the lead (new temporary password plus `mustChangePassword = true`), and in the Lab Hub add a lead-only `POST /users/{id}/reset-password` for technicians. Optionally make lab creation idempotent and add a guard that prevents deactivating the last active lead.
+
+### LB-04 [high] Klient PC saqlangan (TOFU) server manziliga health-check'siz ulanadi: server IP o'zgarsa yoki server kechroq yonsa mahsulot ichida qayta ulanish yo'li yo'q
+
+- **Oqim:** license-gap5 · auditor `high` → refuter `high` · 📖 statik
+- **Invariant:** I6
+- **Scenariy:** Klinika routeri DHCP bilan server PC'ga 192.168.1.10 beradi, shifokor xonasidagi klient bir marta tasdiqlab uni config.json'ga saqlaydi. Elektr o'chib-yongandan keyin server 192.168.1.14 oladi. Ertasi kuni klient http://192.168.1.10:8080 ni ochadi: Electron oynasi bo'sh, tray esa '✅ Ulangan: 192.168.1.10' deydi. Tray -> Sozlamalar ham o'sha o'lik manzilni ochadi, fon qayta qidiruvi ishlamaydi, reinstall config'ni saqlaydi. Klient PC ProgramData/DentalService/config.json'dan serverUrl qo'lda o'chirilmaguncha ishlamaydi. Ertalab klient serverdan oldin yonganda ham xuddi shunday bo'sh oyna chiqadi va xabar yo'q.
+- **Dalil:**
+  - apps/desktop/src/main.ts:485-487 — `if (trustedUrl) { createTray('client', { serverUrl: trustedUrl }, connectedCallbacks(trustedUrl)); openBrowser(trustedUrl); }` — tekshiruv yo'q, reconnect loop ishga tushmaydi
+  - apps/desktop/src/main.ts:449-454 — ulangan holatdagi tray 'Sozlamalar': `onSettings: () => openBrowser(`${url}/settings/integrations`)` — o'sha yetib bo'lmaydigan serverdan sahifa so'raydi
+  - apps/desktop/src/main.ts:142 — `did-fail-load` faqat dev-wrap rejimida; prod openBrowser (main.ts:181-209) yuklash xatosini ushlamaydi
+  - apps/desktop/src/main.ts:510-546 — CLI-404 qo'lda manzil kiritish oynasi faqat 'server topilmadi' tarmog'ida
+- **Tuzatish yo'nalishi:** In the trustedUrl branch, run the same `/api/health` check from settings-ipc.ts `defaultCheckConnection` before opening the window. If it fails, switch to the 'Server topilmadi' state (the CLI-404 prompt plus the reconnect/discovery loop). Also add a `did-fail-load` handler to `openBrowser` that shows a local error page or that state.
+
+### LB-05 [high] Desktop: Valkey doimiylikka ega emas — har qayta ishga tushganda kutilayotgan barcha 24 soatlik eslatmalar yo'qoladi, DB'dan qayta tiklash yo'q
+
+- **Oqim:** messaging-gap4 · auditor `high` → refuter `high` · 📖 statik
+- **Invariant:** Rejalashtirilgan yozilish eslatmasi infra qayta ishga tushganda yo'qolmasligi kerak (yoki boot'da DB'dan qayta quriladi)
+- **Scenariy:** Klinika desktop (Server rejimi) o'rnatilgan. Registrator juma kuni dushanba 10:00 ga yozilish yaratadi -> yakshanba 10:00 ga delayed job Redis'ga qo'yiladi. Shanba kechqurun server kompyuteri o'chiriladi yoki Windows yangilanishi/Electron avto-update qayta ishga tushiradi (yoki valkey crash supervision restart). Valkey qayta ko'tarilganda xotira bo'sh (RDB/AOF yo'q) — barcha delayed 'appointment-reminder' joblar yo'q. API qayta boot bo'lganda faqat recall cron qayta ro'yxatga olinadi, eslatmalar tiklanmaydi. Yakshanba 10:00 da bemorlarga hech narsa yuborilmaydi, hech qanday xato/log/bildirishnoma yo'q; faqat kunlik clinic ish bilan ketayotgan, ertasi kunga yozilganlar uchun ishlaydigan eslatma (Telegram/SMS 'Kelaman/Bekor' tugmalari bilan) yozilishdan >1 kun oldin qo'yilgan hammasi uchun jimgina buziladi, no-show ko'payadi. Qo'shimcha: dushanba 11:00 recall cron ham kompyuter o'chiq bo'lsa o'sha kun o'tkazib yuboriladi (keyingi kun lte-dueDate bilan yetib oladi — bu faqat bir kun kechikish).
+- **Dalil:**
+  - infra/valkey-win.conf:10-11 `appendonly no` / `save ""` (infra/valkey-linux.conf:12-13 ham xuddi shunday) — desktop first-run shu konfni dataDir'ga ko'chiradi (apps/desktop/src/first-run.ts:174) va valkey faqat shu bilan spawn qilinadi (apps/desktop/src/process-manager.ts:341)
+  - apps/api/src/modules/appointments/appointments.service.ts:344-348 — eslatma faqat `enqueueReminder` orqali BullMQ delayed job sifatida qo'yiladi (`reminderDelayMs(start, now)`); DB'da 'reminder yuborilishi kerak' belgisi yoki ustun yo'q
+  - apps/api/src/index.ts:46-59 — boot'da faqat `startReminderWorker()` va `registerRecallScheduler()` chaqiriladi; mavjud yozilishlar uchun eslatmalarni qayta enqueue qiluvchi (reconcile/backfill) kod yo'q (enqueueReminder chaqiruvchilari: faqat appointments.service.ts:346,533,547 va telegram/deps.ts:30)
+  - infra/docker-compose.prod.yml:39 — bulutda `--appendonly yes`; muammo faqat desktop topologiyasida (CLAUDE.md: desktop in-process worker, birlamchi maqsad)
+- **Tuzatish yo'nalishi:** Desktop valkey konfida `appendonly yes` (yoki `save 60 1`, `dir` dataDir) yoqish va/yoki API boot'da kelajakdagi scheduled/confirmed yozilishlar uchun enqueueReminder'ni idempotent (jobId dedupe) qayta qurish.
+
+### LB-06 [high] Qayta ulanishda (hubClinicId o'zgarganda) kursor va lab_hub_applied_events qayta o'rnatilmaydi — yangi Hub hodisalari jimgina yo'qoladi
+
+- **Oqim:** tenancy-gap2 · auditor `high` → refuter `high` · 📖 statik
+- **Invariant:** I1, I2, I3: kursor/dedup (Hub, hubClinicId) juftligiga bog'liq; juftlik o'zgarsa reset bo'lishi shart
+- **Scenariy:** 1) Klinika A (SaaS yoki desktop) oylar davomida Hub bilan ishlagan, lab_hub_state.cursor = '48211.1530', applied_events'da A uchun seq 1..1530 oralig'idagi yuzlab qiymat bor. 2) Hub VPS volume'i yo'qoladi (FU-55: zaxira cron'i yo'q) va Hub toza o'rnatiladi; Supervisor lablarni qayta yaratadi. 3) A'ning eski kaliti 401 'clinic.unauthorized' (retryable) — owner Sozlamalar -> Laboratoriyalar -> «Qayta ulash»ni bosadi: Hub yangi clinics qatori (yangi hubClinicId) va kalit beradi; klinika faqat hubClinicId/kalitni yangilaydi, cursor '48211.1530' qoladi. 4) Link qayta tasdiqlanadi, shifokor yangi buyurtma yuboradi; lab qabul qiladi, narx taklif qiladi, xabar yozadi. Yangi Hub klasterida tx_id ~800, seq 1..N. 5) Poll `(800,k) > (48211,1530)` sharti bilan hech narsa olmaydi, nextCursor = since — xato ham yo'q, lastError null, lastPollAt yangilanib 'sinxronlangan' ko'rinadi. Natija: statuslar, narx takliflari (demak Hub tasdig'i va 'Laboratoriya' xarajati ham), lab xabarlari/fayllari klinikaga hech qachon yetmaydi; tx_id 48211 dan oshgach ham seq 1..1530 bilan to'qnashgan hodisalar applied_events'da 'allaqachon qo'llangan' deb tashlanadi. Qo'shimcha: eski buyurtmalarning labHubCaseRef'i yangi namespace'da yo'q — keyingi tahrir upsert_case'i (link faol bo'lsa) Hub'da YANGI 'sent' ish yaratadi (lab dublikat buyurtma oladi), approve_price/delivered/message esa 404 case.not_found -> outbox 'failed'. Xuddi shu yo'l desktop'da .lic boshqa Supervisor klinika id'si bilan qayta aktivatsiya qilinganda yoki LAB_HUB_URL boshqa Hub'ga almashtirilganda ham ochiladi.
+- **Dalil:**
+  - apps/api/src/modules/lab-hub/lab-hub.routes.ts:166-176 — `const values = { hubClinicId: res.clinicId, hubKeyEnc: encryptSecret(res.hubKey), connectedAt: now, lastError: null, updatedAt: now }; ... .onConflictDoUpdate({ target: labHubState.tenantId, set: values })` — cursor tegilmaydi, eski hubClinicId bilan solishtiril
+  - packages/db-schema/src/tables/lab-hub.ts:41 `cursor: text('cursor').notNull().default('0.0')` va :152-161 `lab_hub_applied_events` PK `(tenant_id, seq)` — Hub instansiyasi/hubClinicId ustuni yo'q
+  - apps/lab-hub-api/src/modules/clinic/clinic.routes.ts:693 `(${caseEvents.txId}, ${caseEvents.seq}) > (${sinceTx}::bigint, ${sinceSeq}::bigint)` va :749 `nextCursor: last ? ... : since` — bo'sh sahifada kursor o'zgarmaydi
+  - apps/api/src/lib/lab-hub/sync.ts:514-519 `.insert(labHubAppliedEvents).values({ tenantId, seq: ev.seq }).onConflictDoNothing()` -> `if (!fresh) continue;`
+- **Tuzatish yo'nalishi:** Have the Hub return a stable instance or epoch id (e.g. a random value written once to a hub_meta table, or the cluster's system_identifier) in both /connect and /changes; the clinic stores it and, whenever it or hubClinicId changes, resets the cursor to '0.0' and deletes this tenant's lab_hub_applied_events (or adds a hub_epoch column to the primary key). Separately, add an alert for when the cursor's tx part is larger than the Hub's current xid.
+
+### LB-07 [high] Kursor/dedup kaliti Postgres klaster xid'i va sequence qiymatiga bog'langan — Hub pg_dump'dan tiklansa barcha klinikalar sinxroni jimgina to'xtaydi yoki hodisalar tashlanadi
+
+- **Oqim:** tenancy-gap2 · auditor `high` → refuter `high` · 📖 statik
+- **Invariant:** I2, I3: commit bo'lgan hodisa yetkaziladi; seq qayta ishlatilmaydi
+- **Scenariy:** (a) Yangi klasterga tiklash: Hub VPS almashtiriladi yoki postgres volume yo'qolib zaxiradan `pg_restore` qilinadi (yoki PG major versiyasi dump/restore bilan ko'tariladi). Tiklangan case_events.tx_id qiymatlari eski (masalan 2 000 000), yangi klaster xid'i esa ~1000 dan boshlanadi. Klinikalar kaliti va hubClinicId o'zgarmagan — qayta ulash ham shart emas. Har klinikaning cursor'i '2000000.x' — yangi hodisalar (tx_id ~1000..) `(tx_id,seq) > since` shartidan o'tmaydi; poll xatosiz bo'sh javob oladi, kursor joyida qoladi. Natija: barcha klinikalar xid 2 mln'dan oshguncha (kichik Hub'da oylar) lab statusi, narx taklifi, xabar/fayllarni olmaydi, ekranda xato yo'q. (b) Xuddi shu klasterga eskiroq zaxirani tiklash (`pg_restore --clean`): bigserial setval zaxira paytidagi S qiymatiga qaytadi, yo'qolgan oynada klinika A allaqachon S+1..S+k dagi o'z seq'larini qo'llagan; tiklashdan keyingi yangi hodisalar shu seq'larni qayta oladi va A uchun to'qnashganlari applied_events'da 'allaqachon qo'llangan' deb jimgina tashlanadi (masalan lab 'ready' statusi yoki price_proposed). Eslatma: bu lab-qamrovidagi «Hub DB tiklanganda kursor» bandiga yaqin — bu yerda aniq mexanizm (xid/sequence kalitlari) ko'rsatildi.
+- **Dalil:**
+  - apps/lab-hub-api/src/db/schema.ts:245-249 `seq: bigserial('seq'...)`, `txId ... .default(sql`(pg_current_xact_id()::text)::bigint`)` — tx_id klasterning xid hisoblagichi; ma'lumot sifatida dump'ga tushadi, hisoblagich esa tushmaydi
+  - infra/lab-hub/README.md:67 `Tiklash: pg_restore --clean --if-exists -d lab_hub lab_hub.dump` (yangi VPS/volume'da = yangi initdb klaster)
+  - apps/lab-hub-api/src/modules/clinic/clinic.routes.ts:692-696 `txId < pg_snapshot_xmin(...)` AND `(txId, seq) > (since)` ORDER BY txId, seq
+  - apps/api/src/lib/lab-hub/sync.ts:514-519 applied_events (tenantId, seq) ON CONFLICT DO NOTHING -> `continue`
+- **Tuzatish yo'nalishi:** Kursor va dedup kalitiga Hub epoch'ini kiritish: masalan Hub jadvalida yoki `pg_control_system().system_identifier` + restore'da yangilanadigan instance UUID. Epoch mos kelmasa Hub `cursor.reset` qaytaradi. Klinika esa kursorni `0.0` ga tushiradi va dedup'ni `(epoch, seq)` yoki hodisa UUID'i bo'yicha qiladi. README'ga restore qadami ham qo'shilsin: epoch'ni almashtirish va setval'ni oldinga surish.
+
+### LB-08 [medium] Starter tarif desktop'da shifokor yarata olmaydi: 'staff' moduli yo'q -> /api/users/invite 403 -> yozilish (booking) oqimi ishlamaydi
+
+- **Oqim:** booking-gap9 · auditor `high` → refuter `medium` · 📖 statik
+- **Invariant:** Tarifdagi modullar o'z oqimini oxirigacha o'tkaza olishi kerak: starter = patients+appointments+queue, lekin appointments uchun majburiy shifokorni yaratish yo'li (users/invite) 'staff' modulida va starter'da yo'q
+- **Scenariy:** Vendor Supervisor'da klinikani `plan: starter` bilan yaratadi. Klinika desktop'ni aktivatsiya qiladi: tenant+owner+filial+8 rol shabloni bor, lekin birorta xodim yo'q (owner shifokor hisoblanmaydi). Owner 'Xodimlar' -> 'Taklif qilish' bosadi -> POST /api/users/invite -> requireModuleInDesktop('staff') -> 403 MODULE_DISABLED (web bu kodni tanimaydi, umumiy xato toast). /api/appointments/doctors bo'sh qaytadi, yozilish yaratishda doctorId talab qilinadi -> starter klinikada bitta ham yozilish yaratib bo'lmaydi, registrator/shifokor ham qo'sha olinmaydi. Aylanib o'tish faqat vendor tomonidan plan'ni standard'ga ko'tarish (heartbeat kutish ≤4 soat). Tarif lug'ati CLI-433'da kelishilgan (knownDecision emas — oqibat ko'rib chiqilmagan).
+- **Dalil:**
+  - apps/supervisor-api/src/modules/clinics/clinics.routes.ts:72 — `starter: ['patients', 'appointments', 'queue'],` ('staff' faqat standard'dan boshlanadi, :73)
+  - apps/api/src/modules/users/users.routes.ts:49 — `app.use('*', requireModuleInDesktop('staff'));` (invite, addAssignment, reset-password, grantable-roles — hammasi shu sub-app ichida)
+  - apps/api/src/modules/users/users.service.ts:226 va :313 — `insert(userAssignments)` faqat shu serviceda (boshqa yo'l yo'q; db/seed-demo.ts dan tashqari)
+  - apps/api/src/modules/appointments/appointments.service.ts:587-602 — listDoctors: `eq(roles.isPractitioner, true)` + `isNotNull(userAssignments.acceptedAt)`; owner (`@owner`, auth.service.ts:~218) assignment'siz, ya'ni shifokor emas
+- **Tuzatish yo'nalishi:** Eng kichik yo'l: 'staff' (yoki kamida users invite/grantable-roles/assignments) ni starter MODULE_MAP'ga (ikkala nusxada va guard-testda) qo'shish, yoki starter'da owner'ni shifokor sifatida ro'yxatga qo'shish (provisioning'da owner'ga practitioner assignment berish / listDoctors'ga owner'ni qo'shish); qo'shimcha: web'da MODULE_DISABLED kodini tanib tushunarli xabar ko'rsatish.
+
+### LB-09 [medium] Vaqtinchalik parol noto'g'ri kiritilsa, ChangePasswordPage xatoni ko'rsatmaydi: global 401 handler sessiyani o'chiradi va foydalanuvchini /login ga otadi
+
+- **Oqim:** lab-gap3 · auditor `medium` → refuter `medium` · 📖 statik
+- **Invariant:** I6
+- **Scenariy:** Yangi texnik birinchi marta kiradi va /change-password ga yo'naltiriladi. 16 belgili vaqtinchalik parolda bitta belgini adashtiradi. Server 401 qaytaradi, api.ts sideEffects logout() qiladi va token null bo'ladi. Sahifa qayta render bo'lib /login ga Navigate qiladi. «Joriy parol noto'g'ri» xabari ko'rinmaydi. Foydalanuvchi sababsiz chiqarib yuborilganini ko'radi, yangi parol maydonlari ham tozalanadi. U yana login qilishi kerak; har adashganda shu takrorlanadi. Mo'ljallangan currentWrong xabari amalda o'lik kod.
+- **Dalil:**
+  - apps/lab-hub-api/src/modules/lab/lab.routes.ts:195-197 `if (!u || !(await verifyPassword(b.currentPassword, ...))) throw new ApiError(401, 'auth.invalid_credentials')`
+  - apps/lab-hub-web/src/lib/api.ts:18 `if (status === 401 && auth.token) auth.logout();` (har qanday 401 uchun)
+  - apps/lab-hub-web/src/features/auth/ChangePasswordPage.tsx:22 `if (!token) return <Navigate to="/login" replace />;`
+  - apps/lab-hub-web/src/features/auth/ChangePasswordPage.tsx:41-42 `const wrong = err instanceof HubApiError && err.status === 401; setErrors({ form: wrong ? t('labHub.auth.currentWrong') ...` (bu yo'lga hech qachon yetib bo'lmaydi)
+
+### LB-10 [medium] SaaS 'Qayta tekshirish' tugmasi access token muddati o'tgach doim 'hali tugagan' deydi: vendor renew qilgan bo'lsa ham klinika ochilmaydi
+
+- **Oqim:** license-gap5 · auditor `medium` → refuter `medium` · 📖 statik
+- **Invariant:** I2
+- **Scenariy:** SaaS klinika owner'i 09:00 da 403 LICENSE_EXPIRED oladi va /license-expired ekraniga o'tadi. U vendorga to'laydi, vendor 09:40 da Supervisor'da 'Muddatni uzaytirish'ni bosadi. 09:41 da owner 'Qayta tekshirish'ni bosadi. localStorage'dagi access token 09:15 da tugagan, shuning uchun tenantIdFromBearer null qaytaradi, endpoint 404 beradi va ekranda 'Hali ham muddati tugagan' chiqadi (global toast 'Not found' ham). syncSub umuman chaqirilmaydi. Owner to'lov o'tmadi deb o'ylaydi. Faqat qo'lda '/' ga o'tsa (me -> 401 -> refresh) va yana blokka qaytib bossa ishlaydi, aks holda keyingi sinxrongacha (20 soatgacha) bloklangan qoladi.
+- **Dalil:**
+  - apps/api/src/routes/license-status.ts:133-134 — `const tenantId = isSaasSupervisorEnabled() ? await tenantIdFromBearer(c) : null; if (!tenantId) return c.json(fail('NOT_FOUND', 'Not found'), 404);`
+  - apps/api/src/lib/subscription.ts:64-72 — tenantIdFromBearer: `verifyAccess(...)` throw qilsa (muddati o'tgan JWT) `return null`; 401 emas
+  - apps/api/src/lib/jwt.ts:40 — `ACCESS_TTL_SECONDS = parseDuration(env.JWT_ACCESS_EXPIRES); // '15m' default`
+  - apps/web/src/features/license/components/LicenseBlockedScreen.tsx:16-27 — recheck onError -> `setStillExpired(true)`; ekranda faqat status (auth'siz, 200) va recheck (404) chaqiriladi, hech biri 401 bermaydi, shuning uchun api-client refresh qilmaydi
+- **Tuzatish yo'nalishi:** `LicenseBlockedScreen` recheck'dan oldin refresh token bilan access'ni yangilasin (yoki 404 olinsa bir marta refresh qilib qayta urinsin). Muqobil: recheck endpoint'i muddati o'tgan lekin imzosi yaroqli JWT'dan tenantni olsin (faqat `atid`, `ignoreExpiration`), yoki muddati o'tgan tokenda 404 o'rniga 401 `auth.invalid_token` qaytarsin. Shunda api-client refresh qilib retry qiladi.
+
+### LB-11 [medium] Vendor SaaS klinikani to'xtata olmaydi: deactivate faqat litsenziya qatorini qidiradi, renew o'tgan sanani rad etadi, admin UI'da SaaS uchun tugma yo'q
+
+- **Oqim:** license-gap5 · auditor `medium` → refuter `medium` · 📖 statik
+- **Invariant:** I3
+- **Scenariy:** SaaS klinika shartnomani bekor qiladi, pulni qaytarib oladi yoki suiiste'mol aniqlanadi. Vendor Supervisor admin'da klinikani ochadi: SaaS kartasida faqat 'Uzaytirish' bor. API orqali PATCH /deactivate 404 qaytaradi. Eng yaqin chora — renew'ni ertangi sanaga qo'yish, shunda ham tenant +7 kunlik imtiyoz va 20 soatgacha sinxron kechikishi davomida (taxminan 8-9 kun) to'liq ishlaydi. Desktop klinika esa keyingi heartbeat'da to'xtaydi: ikki rejimda bir xil vendor amali har xil ishlaydi.
+- **Dalil:**
+  - apps/supervisor-api/src/modules/clinics/clinics.routes.ts:270-271 — deactivate: `const license = await db.query.licenses.findFirst(...); if (!license) return c.json({ error: { code: 'NOT_FOUND' } }, 404);` (SaaS klinikada litsenziya yo'q)
+  - apps/supervisor-api/src/modules/saas/saas.routes.ts:116-118 — `if (expiresAt.getTime() <= Date.now()) throw ... 'EXPIRES_IN_PAST'`
+  - apps/supervisor-admin/src/features/clinics/ClinicDetailPage.tsx:221-257 — `isSaas` kartasida faqat 'Muddatni uzaytirish'; deactivate tugmasi `{!isSaas && (` blokida (:257, :304)
+  - apps/api/src/lib/subscription.ts:22-24 — tenant faqat `expiresAt + MAX_GRACE_DAYS` dan keyin bloklanadi
+- **Tuzatish yo'nalishi:** SaaS klinika uchun klinika darajasidagi suspend/deactivate qo'shing (masalan `clinics.suspended_at`, uni `toStatus` va apps/api sinxronida o'qib `computeSubscriptionState` ichida imtiyozsiz `expired` qilish), yoki SaaS renew'da o'tgan sanaga ruxsat berib grace'ni chetlab o'tadigan «darhol bloklash» bayrog'ini kiriting. Admin UI'da SaaS kartasiga mos tugma qo'shing.
+
+### LB-12 [medium] Blok ekranida chiqish va workspace almashtirish yo'q: ko'p klinikali xodim faol bo'lmagan klinikada qamalib qoladi
+
+- **Oqim:** license-gap5 · auditor `medium` → refuter `medium` · 📖 statik
+- **Invariant:** I5
+- **Scenariy:** Shifokor A klinikada (SaaS, obunasi tugagan) va B klinikada (faol) ishlaydi. U oxirgi marta A workspace'ida ishlagan. Keyingi kirishda har so'rov 403 LICENSE_EXPIRED qaytaradi va /license-expired'ga otadi. Ekranda faqat 'To'lov qilishingiz kerak' va 'Qayta tekshirish' bor, B klinikaga o'tish ham, chiqish ham yo'q. Qabulxonadagi umumiy kompyuterda registrator boshqa xodim sifatida kira olmaydi. Yagona chora — manzil satriga /select-workspace'ni qo'lda yozish yoki localStorage'ni tozalash.
+- **Dalil:**
+  - apps/web/src/features/license/components/LicenseBlockedScreen.tsx:43-53 — action'da faqat 'Qayta tekshirish' tugmasi; logout ham, workspace tanlash ham yo'q
+  - apps/web/src/features/license/license.routes.tsx:4-7 — 'Public route — shell tashqarisida' (sidebar/topbar logout yo'q)
+  - apps/web/src/lib/query-client.ts:23-25 — keyingi har 403 LICENSE_EXPIRED yana `window.location.assign('/license-expired')`
+  - apps/api/src/lib/license-middleware.ts:149-160 — `/api/auth` (switch-workspace, logout) ochiq, ya'ni backend ruxsat beradi, faqat UI yo'l bermaydi
+- **Tuzatish yo'nalishi:** LicenseBlockedScreen action'iga ikkita tugma qo'shish: "Chiqish" (`useAuthStore.clear()` + `/login`) va "Boshqa klinikaga o'tish" (`/select-workspace`). Ikkalasi ham `/api/auth` orqali ochiq, qo'shimcha backend o'zgarishi kerak emas.
+
+### LB-13 [medium] Server discovery javobida birinchi tashqi IPv4 interfeysini yuboradi, so'rov kelgan interfeysni emas: virtual/VPN adapterli serverda klient noto'g'ri manzilni saqlaydi
+
+- **Oqim:** license-gap5 · auditor `medium` → refuter `medium` · 📖 statik
+- **Invariant:** I7
+- **Scenariy:** Server PC'da Hyper-V/WSL (vEthernet 172.x), VirtualBox (192.168.56.1) yoki Radmin/ZeroTier VPN adapteri bor va u networkInterfaces() ro'yxatida Ethernet'dan oldin turadi. Klient UDP so'rov yuboradi, javob haqiqiy LAN IP'dan keladi, lekin ichida `http://172.x.x.x:8080` yozilgan. TOFU dialogi shu manzilni ko'rsatadi, registrator 'Ulanish'ni bosadi va manzil config'ga saqlanadi. Natijada bo'sh oyna chiqadi va oldingi topilmadagi tufayli qayta ulanish yo'li yo'q. Ishonch past: Windows'da interfeys tartibi kafolatlanmagan, jismoniy PC'da sinalmagan.
+- **Dalil:**
+  - apps/desktop/src/discovery.ts:28-36 — `for (const iface of Object.values(nets)) { for (const net of iface ?? []) { if (net.family === 'IPv4' && !net.internal) return net.address; } }`
+  - apps/desktop/src/discovery.ts:59 — `const response = `${RESPONSE_PREFIX}${JSON.stringify({ ip: getLocalIp(), port: serverPort })}`;`
+  - apps/desktop/src/discovery.ts:94-100 — klient `rinfo.address`'ni e'tiborsiz qoldirib, JSON'dagi `ip`'dan URL quradi
+- **Tuzatish yo'nalishi:** Klientda JSON ichidagi `ip` o'rniga `rinfo.address` dan foydalaning (yoki server tomonda `rinfo.address` bilan bir subnetdagi lokal interfeysni tanlang). Qo'shimcha: virtual va link-local (169.254/16) adapterlarni filtrlang, hamda saqlangan `serverUrl` ga ulanish bo'lmasa qayta discovery yo'lini qo'shing.
+
+### LB-14 [medium] Obunasi/litsenziyasi tugagan tenant uchun worker (eslatma, recall) va Telegram bot to'liq ishlashda davom etadi — blok faqat HTTP'da
+
+- **Oqim:** messaging-gap4 · auditor `medium` → refuter `medium` · 📖 statik
+- **Invariant:** Obuna muddati + imtiyoz tugagach (P18/L8 'to'liq blok') klinika nomidan hech qanday avtomatik chiquvchi xabar/bot oqimi ishlamasligi kerak
+- **Scenariy:** SaaS klinika obunasi tugab 7 kun imtiyoz ham o'tadi: xodimlar ilovada 403 LICENSE_EXPIRED oladi (to'lov ekrani). Lekin worker.ts har kuni 11:00 da shu tenant uchun recall SMS/Telegram yuborishda davom etadi, mavjud 24-soatlik eslatma joblar ham fire bo'ladi (klinikaning o'z Eskiz/bot kredensialida) va bot bemorlarga bron/anketa qabul qilib, `booking_requests`ga yozadi hamda 'Kelaman/Bekor' tugmalari orqali yozilish statusini o'zgartiradi — xodimlar esa buni ko'ra olmaydi (UI bloklangan), so'rovlar 24 soatdan keyin expired bo'ladi. Klinika to'lamasdan mahsulot ish ko'rsatib turadi; bemorga klinika nomidan xizmat 'ishlayotgandek' ko'rinadi. Desktop'da ham: license `expired` bo'lganda in-process worker/bot (index.ts:51-70) to'xtamaydi, faqat `/api/*` bloklanadi.
+- **Dalil:**
+  - apps/api/src/app.ts:151-152 — `app.use('/api/*', requireValidSubscription()); app.use('/uploads/*', ...)` yagona gate; apps/api/src/lib/license-middleware.ts:196-215 `requireValidSubscriptionInCloud` faqat Bearer JWT'li HTTP so'rovda
+  - apps/api/src/lib/reminder-worker.ts:48-157 va apps/api/src/lib/recall-worker.ts:86-262 — `getTenantSubscriptionState`/`computeSubscriptionState`/license tekshiruvi yo'q (grep subscription|license lib/recall-worker.ts lib/reminder-worker.ts lib/telegram lib/telegram-bot-manager.ts -> 0)
+  - apps/api/src/lib/telegram-bot-manager.ts:170-196 va 242-252 bootAll — barcha `tenant_settings` qatorlari uchun bot ishga tushadi; holatga qaramaydi; flows (booking_requests insert, anketa, 'Kelaman/Bekor' yozilish update) `withTenant` orqali bevosita DB'ga yozadi
+  - apps/api/src/lib/subscription.ts:21-27 — `none` (NULL) hech qachon bloklamaydi, `expired` esa HTTP'da 403 beradi — lekin worker bu ma'lumotdan foydalanmaydi
+- **Tuzatish yo'nalishi:** Worker/bot kirish nuqtalarida `getTenantSubscriptionState` (SaaS) / `getLicenseState` (desktop) tekshiruvini qo'shing: `processReminderJob`, recall worker va bot flows (`run`/`withTenant` o'rami) `expired` holatda ishni o'tkazib yuborsin. Bot uchun `bootAll`/`launch` ham `expired` tenantlarni ishga tushirmasin va jonli botlarga javob bermaslik gate'i bo'lsin.
+
+### LB-15 [medium] Xarajatlar modulida filial doirasi umuman yo'q: filial mudiri boshqa filial va klinika miqyosidagi xarajatlarni ko'radi, yaratadi, tahrirlaydi va o'chiradi
+
+- **Oqim:** money-gap6 · auditor `medium` → refuter `medium` · 📖 statik
+- **Invariant:** I1: filialga tayinlangan xodim faqat o'z filiali moliyasini ko'radi/o'zgartiradi (IR-06)
+- **Scenariy:** Filial mudiri faqat A filialiga tayinlangan (Branch Manager: expense.view/manage). 1) Moliya sahifasini ochadi: filial tanlanmagan, GET /api/expenses va /api/expenses/summary butun klinika xarajatlarini (B filial, ijara kabi tenant-darajali) qaytaradi. 2) B filialining 'Ijara 12 000 000' xarajatini PATCH bilan 1 000 000 qiladi yoki DELETE qiladi — 200, audit yoziladi, lekin hech qanday filial tekshiruvi yo'q. 3) Natija: B filial va egasining P&L'i, kunlik xulosadagi netCashFlow (cashier.service.ts dailySummary branch xarajati) buziladi. LA-25 (/pnl) va LA-27/30 (kassa) bilan bir xil naqsh, lekin FX-31/FX-32 faqat pnl va kassani qamraydi — expenses ro'yxatda yo'q.
+- **Dalil:**
+  - apps/api/src/modules/expenses/expenses.routes.ts:181,198,252,274 — `middleware: [requirePermission('expense.view')]` / `requirePermission('expense.manage')`: reportBranchScope yoki filial tekshiruvi yo'q
+  - apps/api/src/modules/expenses/expenses.service.ts:118 — `if (query.branchId) filters.push(eq(expenses.branchId, query.branchId));` (branchId berilmasa butun tenant)
+  - apps/api/src/modules/expenses/expenses.service.ts:180 — `branchId: input.branchId ?? null,` (istalgan filial yoki tenant-darajali)
+  - apps/api/src/modules/expenses/expenses.service.ts:201-247 — update/remove faqat `eq(expenses.id, id)`, filial tekshiruvisiz
+- **Tuzatish yo'nalishi:** Expenses routes'ga reportBranchScope-ga o'xshash filial-doirasi middleware qo'shing (expense.view/manage beruvchi tayinlovlardan), list/summary'da scope filialiga cheklang, create/update/remove'da before.branchId va input.branchId ni scope bilan solishtiring (tenant-darajali branchId=null yozuvga filialga tayinlangan xodim 403 oladi).
+
+### LB-16 [medium] Xizmat foydasi (procedureMix) va revenue.byService faqat erkin POS item'laridan: davolash rejasi orqali to'langan barcha xizmatlar «Qaysi xizmat ko'p foyda beradi?» javobidan tushib qoladi
+
+- **Oqim:** money-gap6 · auditor `medium` → refuter `medium` · 📖 statik
+- **Invariant:** I2: xizmat bo'yicha tushum/foyda klinikaning xizmat tushumini to'liq qamraydi yoki cheklovni ochiq aytadi
+- **Scenariy:** Klinika oyida 40 ta implantni davolash rejasi orqali (PlanBillingPanel, allocations) har biri 5 000 000 dan oladi = 200 mln, va 300 ta konsultatsiyani POS orqali 100 000 dan = 30 mln. Egasi Hisobotlar -> «Qaysi xizmat ko'p foyda beradi?» ni ochadi: jadvalda faqat 'Konsultatsiya' (30 mln) va boshqa POS xizmatlari bor, 'Implant' umuman yo'q; javob jumlasi 'Eng ko'p foyda beradigan xizmat — Konsultatsiya'. Daromad hisobotida esa total 230 mln, lekin byService jadvali 30 mln — farq izohsiz. IR-05 (refund davri farqi) dan alohida: bu yerda butun reja kanali yo'q.
+- **Dalil:**
+  - apps/api/src/modules/reports/reports.service.ts:139-155 — `FROM cashier_transaction_items i JOIN tx_net ...` — faqat item'li tranzaksiyalar
+  - apps/api/src/modules/cashier/cashier.schema.ts — `.refine((v) => !(v.items.length > 0 && (v.allocations?.length ?? 0) > 0)` : reja to'lovi doim items=[] bilan yoziladi (cashier.mappers.ts:171 `items: []`)
+  - packages/db-schema/src/tables/treatment-plans.ts:110 — `serviceId: uuid('service_id')` bosqichda bor, lekin treatment_stage_payments -> stage.serviceId hech qayerda xizmat agregatsiyasiga qo'shilmaydi
+  - apps/api/src/modules/reports/reports.service.ts:532 — `const mixRows = await netServiceAggregates(db, start, end, ids);`
+- **Tuzatish yo'nalishi:** Reja to'lovlarini (treatment_stage_payments -> treatment_stages.service_id) netServiceAggregates ga UNION qilib, tx net-faktori bilan proporsional taqsimlash. Imkon bo'lmasa, hech bo'lmasa howText.services va byService izohida «faqat erkin POS xizmatlari, reja to'lovlari kirmaydi» cheklovini aytish va reja bo'yicha alohida «reja tushumi» qatorini ko'rsatish.
+
+### LB-17 [medium] Refund dialogi va tranzaksiya jadvali hisob-faktura summasini (totalAmount) ko'rsatadi, server esa faqat qolgan paidAmount'ni qaytaradi: qisman to'langan sotuvda kassir ko'rsatilgandan kam yozilgan pulni qaytarib beradi
+
+- **Oqim:** money-gap6 · auditor `medium` → refuter `medium` · 📖 statik
+- **Invariant:** I4: refund dialogidagi summa serverda yoziladigan refund summasiga teng
+- **Scenariy:** Kassir erkin POS sotuvini 500 000 ga yozadi, bemor 200 000 to'laydi (300 000 qarzga). Ertasi bemor davolanishdan voz kechadi. Kassir jadvalda 'Summa 500 000' ni ko'radi, refund dialogida ham 'Summa 500 000' yozilgan, 'Qaytarish'ni bosadi. Server 200 000 lik refund yozadi (remaining paid). Dialog natijani ko'rsatmay yopiladi; kassir ko'rsatilgan 500 000 ni naqd qaytaradi — kassa 300 000 kam chiqadi, tizimda izi yo'q. Reja to'lovida ham ikkinchi qisman refundda max=paidAmount bo'lgani uchun foydalanuvchi qolgandan katta summa kiritadi va faqat umumiy 'Xatolik' toast'ini oladi (refund.over_refund matni ko'rsatilmaydi).
+- **Dalil:**
+  - apps/web/src/features/cashier/components/TransactionsTable.tsx:149 — `<Text fw={600}>{formatCurrency(selected.totalAmount, t)}</Text>` (yorliq 'Summa')
+  - apps/web/src/features/cashier/components/TransactionsTable.tsx:84 — jadval ustuni `formatCurrency(tx.totalAmount, t)`
+  - apps/web/src/features/cashier/components/TransactionsTable.tsx:167 — qisman refund `max={selected.paidAmount}` (avvalgi refundlar ayirilmagan)
+  - apps/api/src/modules/cashier/cashier.service.ts:781-783 — `const remaining = paid - alreadyRefunded; const refundAmount = amount ?? remaining;`
+- **Tuzatish yo'nalishi:** Refund dialogida va jadvalda `paidAmount - alreadyRefunded`ni (server `remaining` ni DTO'da qaytarsin) ko'rsat; `max`ni shu qoldiqqa tenglashtir; refund natijasidagi haqiqiy summani toast/dialogda ko'rsat va `refund.over_refund` xatosi uchun alohida matn qo'sh.
+
+### LB-18 [medium] Lab navbati/diqqat widget'lari faqat eng yangi 20 ta buyurtma ustida hisoblanadi: eski faol va muddati o'tgan buyurtmalar Texnik, Shifokor va Registrator dashboard'idan yo'qoladi
+
+- **Oqim:** rbac-gap0 · auditor `medium` → refuter `medium` · 📖 statik
+- **Invariant:** I4: navbat va overdue hisobi to'liq to'plam ustida bo'lishi kerak
+- **Scenariy:** Klinikada 25 ta lab buyurtma bor. Eng eskisi, 3 hafta oldin yuborilgan toj, holati 'in_progress' va muddati o'tgan. Keyingi 22 tasi yangiroq va ko'pi 'delivered'. Texnik tizimga kiradi va TechnicianDashboard faqat eng yangi 20 tani oladi: 3 hafta oldingi toj 'Lab navbati'da ko'rinmaydi. Shifokorning 'Mening kunim' lab panelida ham, registratorning 'Diqqat' hisobida ham (F2 tuzatilsa) yo'q. Eng kechikkan ish, ya'ni eng muhimi, aynan yashirinadi.
+- **Dalil:**
+  - apps/web/src/features/dashboard/dashboard.api.ts:93-100 — `queryFn: () => listLabOrders().then((r) => r.data.data), select: filterActiveLabOrders` (parametrsiz chaqiruv)
+  - apps/api/src/modules/lab-orders/lab-orders.schema.ts:90 — `pageSize: z.coerce.number().int().positive().max(100).default(20)`
+  - apps/api/src/modules/lab-orders/lab-orders.service.ts:57-58 — `.orderBy(desc(labOrders.createdAt)) .limit(query.pageSize)`
+  - apps/web/src/features/dashboard/components/TechnicianDashboard.tsx:43 — `const labOrders = useActiveLabOrders();` (Texnik navbati)
+- **Tuzatish yo'nalishi:** Dashboard so'rovlarini serverda filtrlangan qilish: status bo'yicha faol buyurtmalar uchun maxsus endpoint (masalan `status != delivered/cancelled`, doktor uchun `doctorId`) yoki mavjud `/lab-orders/overdue`ni overdue hisobi uchun ishlatish; muqobil: to'liq sahifalash yoki `pageSize=100` va faol statuslarni serverda filtrlash.
+
+### LB-19 [medium] 'Yozish' tugmalari (Bemorlar ro'yxati, Recall paneli) patientId'ni URL'da uzatadi, lekin yozilish ekrani uni o'qimaydi: bemor oldindan tanlanmaydi
+
+- **Oqim:** rbac-gap0 · auditor `medium` → refuter `medium` · 📖 statik
+- **Invariant:** I7: ekranlar orasida uzatilgan kontekst qabul qiluvchi ekranda o'qilishi kerak
+- **Scenariy:** Registrator /recalls'da 'Qayta chaqirish' ro'yxatini ko'radi va bemor bilan gaplashib 'Rejalashtirish'ni bosadi. /appointments?patientId=... kalendar ochiladi, patientId hech qayerda ishlatilmaydi. Registrator 'Yangi yozilish'ni ochib bemorni qaytadan qidirishi kerak. Xuddi shunday, /patients ro'yxatidagi 'Yozish' tugmasi wizard'ni bo'sh bemor maydoni bilan ochadi. Bir xil familiyali ikki bemor bo'lsa, noto'g'ri bemorni tanlash xavfi bor. Noto'g'ri bemor tanlansa, recall `closeOpenOnRebook` boshqa bemorga yopiladi va asl recall 'pending'da qoladi.
+- **Dalil:**
+  - apps/web/src/features/patients/components/PatientsListScreen.tsx:279 — `navigate(`/appointments/new?patientId=${p.id}`);`
+  - apps/web/src/features/recalls/components/RecallDashboard.tsx:197 — `to={`/appointments?patientId=${r.patientId}`}` (kalendarga, wizard'ga ham emas)
+  - apps/web/src/features/appointments/components/NewAppointmentScreen.tsx:5-8 — `return <NewAppointmentWizard onClose={() => navigate('/appointments')} />;` (searchParams o'qilmaydi)
+  - apps/web/src/features/appointments/components/NewAppointmentWizard.tsx:103-106 — `initialValues: { branchId: activeBranchId ?? '', patientId: '', ...}`
+- **Tuzatish yo'nalishi:** NewAppointmentScreen'da `useSearchParams().get('patientId')` o'qib wizardga `initialPatientId` prop sifatida ber (useForm initialValues va bemor Select'ning option'lari shu bemorni o'z ichiga olsin). RecallDashboard 'Rejalashtirish' havolasini `/appointments/new?patientId=...` ga o'zgartir.
+
+### LB-20 [medium] patient_image.upload (Nurse'da ham bor) rasmni butunlay o'chirishga ruxsat beradi, imzolangan vizit yozuviga biriktirilgan rentgenni ham
+
+- **Oqim:** rbac-gap0 · auditor `medium` → refuter `medium` · 📖 statik
+- **Invariant:** I5: imzolangan vizit yozuvi va uning klinik dalillari faqat klinik boshqaruv huquqi bilan o'zgaradi
+- **Scenariy:** Shifokor vizit yozuviga periapikal rentgenni biriktirib (visitNoteId) imzolaydi. Nurse shablonidagi hamshira bemor kartasi -> Hujjatlar -> Rasmlar'da noto'g'ri rasm deb o'ylab o'sha rentgenni o'chiradi (shablon izohiga ko'ra unda 'manage YO'Q'). DB qatori va diskdagi fayl darhol yo'qoladi. Imzolangan vizit kartasida rasm endi ko'rinmaydi. Tiklash yo'li yo'q, faqat audit_log'da 'before' qoladi. Shablon izohi bilan permission tavsifi ('yuklash va boshqarish') bir-biriga zid; qasddan qilingan qaror hujjatlashtirilmagan.
+- **Dalil:**
+  - apps/api/src/modules/patient-images/patient-images.routes.ts:209-216 — DELETE `/patient-images/{id}` `requirePermission('patient_image.upload')`
+  - apps/api/src/modules/patient-images/patient-images.service.ts:193-201 — `await db.delete(patientImages)...; await deleteObject(before.objectKey)` (qattiq o'chirish, `visitNoteId`/`signedAt` tekshiruvi yo'q)
+  - packages/core/src/role-templates.ts:248-253 — Nurse: `// M5 ... *.view + patient_image.upload (manage YO'Q)` ... `'patient_image.upload'`
+  - apps/web/src/features/clinical/components/images/PatientImagesTab.tsx:33,52,76 — `canUpload` o'chirish tugmasini ham ochadi (ImageCard.tsx:123)
+- **Tuzatish yo'nalishi:** patient-images.service.ts remove() va updateMetadata() ichida before.visitNoteId bog'langan imzolangan (signedAt != null) vizit yozuvi bo'lsa 409 bilan rad etish. Qo'shimcha: DELETE uchun alohida permission (masalan patient_image.manage, Nurse'ga berilmaydi) kiritish yoki soft-delete qilish. Permission tavsifi va Nurse izohini moslashtirish.
+
+### LB-21 [medium] Lab buyurtma 'shifokori' doim ekranni ochgan foydalanuvchi: Technician (lab_order.manage) yaratgan buyurtma Hub'ga texnik nomi bilan ketadi va haqiqiy shifokorga ko'rinmaydi
+
+- **Oqim:** rbac-gap0 · auditor `medium` → refuter `medium` · 📖 statik
+- **Invariant:** I6: doctorId amaliyotchini ko'rsatishi kerak
+- **Scenariy:** Shifokor texnikka og'zaki tarzda 46-tishga toj tayyorlashni aytadi. Technician bemor kartasi -> Davolash -> Lab -> 'Yaratish' orqali buyurtma ochib Hub'ga yuboradi. doctorId=texnik bo'lib qoladi: Lab Hub portalida 'Shifokor: <texnik ismi>' chiqadi va lab savollarini noto'g'ri odamga yo'naltiradi. Shifokorning 'Mening kunim' lab panelida bu buyurtma yo'q (filtr doctorId===user.id). Lab hisobotlari va 'kim buyurtma berdi' tarixi ham noto'g'ri.
+- **Dalil:**
+  - apps/web/src/features/clinical/components/lab-orders/LabOrderNewPage.tsx:96 — `const orderDoctor = user ? { id: user.id, name: user.fullName } : null;` (:183 `doctorId: orderDoctor.id`), shifokor tanlash maydoni yo'q
+  - apps/web/src/features/clinical/components/lab-orders/LabOrdersTab.tsx:32,43-51 — 'Yaratish' tugmasi faqat `lab_order.manage` bilan, Technician'da bor
+  - packages/core/src/role-templates.ts:306-317 — Technician: `'lab_order.view', 'lab_order.manage'`
+  - apps/api/src/modules/lab-orders/lab-orders.service.ts:122 — `ownership.assertUserExists(c, input.doctorId)` (faqat mavjudlik, is_practitioner tekshirilmaydi)
+- **Tuzatish yo'nalishi:** Add a practitioner selector (users with `roles.is_practitioner`, defaulting to the current user only if they are a practitioner) to LabOrderNewPage. Make the API reject a `doctorId` that is not a practitioner. Alternatively, add a separate `orderedBy` field and keep `doctorId` for the treating doctor.
+
+### LB-22 [medium] A Branch Manager assigned to one branch can edit another branch's settings and its doctors' schedules and time off, which breaks booking in that branch
+
+- **Oqim:** tenancy-gap1 · auditor `medium` → refuter `medium` · 📖 statik
+- **Invariant:** I1: a branch-assigned Branch Manager runs only their own branch
+- **Scenariy:** A clinic has branches A and B. X is assigned as Branch Manager to branch A only (branchId=A). 1) X sends PATCH /api/branches/<B> {workHours: {mon: null, ..., sat: null}} and gets 200. B's work hours are gone. Because of the P10 fallback, scheduleless doctors in B now get no slots, and the bot and the booking wizard find no free time in B. 2) X sends POST /api/schedule/time-off {doctorId: <B doctor>, branchId: null, startAt: today, endAt: +30 days} and gets 200. Bookings for the B doctor fail in every branch with 'schedule.doctor_on_time_off'. 3) X sends PUT /doctors/<B doctor>/working-hours {branchId: B, segments: []}, which deletes the doctor's B schedule. B's receptionist and owner do not know why this happened. The audit log shows it, but nothing blocks it. FX-32/X-2 cover only kassa and reports; branches and schedule are not on any FX list.
+- **Dalil:**
+  - packages/core/src/role-templates.ts:102-114: Branch Manager description 'Filial mudiri — filial ichida hamma narsani boshqaradi', permissions include `'branch.edit'`
+  - packages/core/src/role-templates.ts:146-147: Branch Manager has `'schedule.view', 'schedule.manage'`
+  - apps/api/src/modules/branches/branches.routes.ts:116: `middleware: [requirePermission('branch.edit')]`, no branch-scope check
+  - apps/api/src/modules/branches/branches.service.ts:61-64: `db.update(branches).set({ ...input, updatedAt: new Date() }).where(eq(branches.id, id))` (workHours, name and phone for any branch in the tenant)
+- **Tuzatish yo'nalishi:** Extend the report-scope.ts pattern to branches.update and schedule.replaceWorkingHours/createTimeOff/deleteTimeOff. The target branchId must be in the caller's user_assignments branch set. A time-off with branchId null is allowed only for owner or tenant-wide assignment. The doctor must be assigned to that branch. This fits the X-2 helper, and branches/schedule should be added to FX-32 or X-2.
+
+### LB-23 [medium] Expenses: decision D-8 restricts expenses to the caller's branches, but there is no FX item. The screen loads the whole clinic's expenses by default, and a branch user can edit or delete another branch's expenses
+
+- **Oqim:** tenancy-gap1 · auditor `medium` → refuter `medium` · 📖 statik
+- **Invariant:** I1 + D-8: 'Kassa/xarajat operatsiyalari chaqiruvchining tayinlangan filiallari bilan cheklanadi'
+- **Scenariy:** Y is a Branch Manager assigned only to branch A. Y opens Moliya -> Xarajatlar. The default 'Barcha filiallar' view returns 200 with every expense in the clinic: branch B's rent, salary-like payments and the 'Laboratoriya' expenses, plus the grandTotal. Y sends PATCH /api/expenses/<B expense> {amount: 1} or DELETE and gets 200, so B's expense disappears and the clinic's P&L changes. When the pnl fix (FX-31) is done, the same figures stay open through /expenses/summary, so the IR-06 protection becomes theatre a second time.
+- **Dalil:**
+  - docs/FIX-BACKLOG-2026-11-19.md:230: D-8 `Kassa/xarajat operatsiyalari chaqiruvchining tayinlangan filiallari bilan cheklanadi`. Wave 4 (lines 84-90) has only FX-31 pnl and FX-32 kassa, no expenses ticket
+  - apps/web/src/features/expenses/components/ExpensesScreen.tsx:58: `useState<string | null>(null)`; :75-84 useExpenses/useExpenseSummary/usePnl called with `branchId ?? undefined` (all branches)
+  - apps/api/src/modules/expenses/expenses.service.ts:118: `if (query.branchId) filters.push(...)`: with no branchId the whole tenant's expenses are returned
+  - apps/api/src/modules/expenses/expenses.service.ts:257: summary works the same way (all branches plus tenant-level expenses)
+- **Tuzatish yo'nalishi:** Xarajat modulida pnl/kassa bilan bir xil filial-doirasi helper'ini (`reportBranchScope` / `decideBranchScope`) qo'llash: ro'yxat va summary'da ruxsat etilgan filiallar bilan majburiy filtr, `getById`/`update`/`remove` da `before.branchId` ni tekshirish, `create`/`update` da kiruvchi `input.branchId` ni tekshirish, shuningdek D-8 ostida yangi FX tiketi ochish.
+
+### LB-24 [medium] Stock: a doctor or Branch Manager assigned to one branch can adjust, set to zero or move another branch's stock items
+
+- **Oqim:** tenancy-gap1 · auditor `medium` → refuter `medium` · 📖 statik
+- **Invariant:** I1: a branch item is managed only by staff of that branch
+- **Scenariy:** Dr. D is assigned only to branch A (Doctor role, stock.manage). In Ombor the default list shows every branch's items, including B's 'Lidokain (B)'. D does a stocktake/adjustment on that item (set-to-value 0) or an 'out' movement. B's stock drops to zero, B's managers get a false low-stock alert, B's 'necha kunga yetadi' becomes wrong, and B's BOM auto-deduction can fail with 409 stock.insufficient. D can also send PATCH /stock/items/<B item> {branchId: A}, and the item drops out of B's list and moves to A. D-8 decided only kassa and expenses; stock is undecided (👤).
+- **Dalil:**
+  - packages/core/src/role-templates.ts:180-181: the Doctor template has `'stock.view','stock.manage'`; Branch Manager has the same (:142-143)
+  - apps/api/src/modules/stock/stock.service.ts:290-300: createMovement `select ... branchId ... from(stockItems).where(eq(stockItems.id, input.itemId)).for('update')`. branchId is read only for the alert and is not compared with the caller's branches
+  - apps/api/src/modules/stock/stock.service.ts:215: updateItem `if (input.branchId !== undefined) patch.branchId = input.branchId;` (any branch or null, also not checked for being in the tenant)
+  - apps/web/src/features/stock/components/StockScreen.tsx:40,53: `useState<string | null>(null)` -> `useStockItems(branchId ?? undefined)` shows items from all branches
+- **Tuzatish yo'nalishi:** D-8 ni omborga kengaytirib, createMovement/updateItem/createBatch/createBom/getItem'da item.branchId chaqiruvchining tayinlangan filiallari (yoki owner/tenant-wide tayinlov) bilan solishtirilsin (reports/report-scope.ts'dagi IR-06 yordamchisini qayta ishlatib), updateItem'da branchId o'zgartirish owner/tenant-wide bilan cheklansin va createOwnershipValidator bilan tekshirilsin; listItems default'i chaqiruvchi filiallariga toraytirilsin.
+
+### LB-25 [medium] Payroll is clinic-wide, but the Branch Manager template has payroll.manage: a branch-assigned manager sees every branch's salaries and can create, finalize and delete the clinic-wide run
+
+- **Oqim:** tenancy-gap1 · auditor `medium` → refuter `medium` · 📖 statik
+- **Invariant:** I1: a branch-assigned role sees no tenant-wide financial or HR data (the IR-06 spirit)
+- **Scenariy:** Z is a Branch Manager assigned only to branch A. Z opens GET /api/payroll/runs/<id> or the Payroll screen and sees baseSalary, commission and the total payout for every doctor and nurse in branch B and the whole clinic. Z sends POST /payroll/runs {periodFrom, periodTo} and then /finalize. The clinic-wide run is frozen, and the owner or accountant can no longer create a run for that period (overlap guard), only redo it through DELETE. Z can also delete a draft run (DELETE /runs/{id}). Either drop payroll.* from the Branch Manager template or give payroll explicit tenant-wide scope (👤).
+- **Dalil:**
+  - packages/core/src/role-templates.ts:144-145: Branch Manager `'payroll.view','payroll.manage'`
+  - apps/api/src/modules/payroll/payroll.routes.ts:42,76,130,172,208: only requirePermission('payroll.*'), no branch scope
+  - apps/api/src/modules/payroll/payroll.service.ts:124-131: `from(staffProfiles).where(eq(staffProfiles.employmentStatus, 'active'))`: every active employee in the tenant (all branches)
+  - apps/api/src/modules/payroll/payroll.service.ts:66-71: the period-overlap guard is tenant-wide, so there is one run per period
+- **Tuzatish yo'nalishi:** Remove payroll.view and payroll.manage from the Branch Manager template (as with the other tenant-wide permissions), or add a tenant-wide-assignment check to the payroll routes. This needs a product decision.
+
+### LB-26 [medium] Vizitning yozilishga avto-bog'lanishi faqat «bugungi birinchi bekor qilinmagan yozilish» bo'yicha, tanlash UI'si yo'q: o'tgan kun bandi hech qachon yopilmaydi, boshqa shifokor yozilishi bog'lanadi
+
+- **Oqim:** treatment-gap7 · auditor `medium` → refuter `medium` · 📖 statik
+- **Invariant:** I1: vizit yozuvi o'z yozilishiga bog'lanadi va «Mendan kutilmoqda» bandi shu bilan yopiladi
+- **Scenariy:** (a) Shifokor A kecha 17:00 dagi in_progress yozilish uchun yozuv yozmagan; ertasi kuni «Mendan kutilmoqda»dagi bandni bosadi -> bemor kartasi -> «Yangi vizit» -> saqlaydi. Bemorning bugun yozilishi yo'q, appointmentId=null bo'ladi; band 14 kun davomida yo'qolmaydi, UI orqali uni yopishning yo'li yo'q. (b) Bemor bugun 09:00 da gigienist B ga (completed) va 15:00 da shifokor A ga yozilgan. A vizit yozuvini saqlaydi: find() birinchi (B ning 09:00) yozilishini tanlaydi. Natija: B ning bandi yozuvsiz yopiladi, A ning 15:00 dagi yozilishi «yozuvsiz» bo'lib qoladi; agar B yozilishi boshqa filialda bo'lsa, kassa «Kutilayotgan vizitlar» A filialida bu vizitni ko'rsatmaydi.
+- **Dalil:**
+  - apps/web/src/features/clinical/components/visit-notes/VisitNotePage.tsx:272-283 — `const todayAppt = (apptQuery.data ?? []).find((a) => new Date(a.startTime).toDateString() === todayStr && a.status !== 'cancelled' && a.status !== 'no_show'); ... appointmentId: values.appointmentId ?? todayAppt?.id ?? null` (doktor, sta
+  - apps/web/src/features/dashboard/components/widgets/DoctorPendingPanel.tsx:26-27 — band faqat `/patients/${patientId}`ga olib boradi, appointmentId uzatilmaydi
+  - apps/api/src/modules/dashboard/dashboard.service.ts:41-46 — `eq(appointments.doctorId, userId) ... NOT EXISTS (SELECT 1 FROM visit_notes WHERE visit_notes.appointment_id = appointments.id)` (14 kunlik oyna)
+  - apps/api/src/modules/cashier/cashier.service.ts:664-667 — `or(isNull(appointments.id), eq(appointments.branchId, branchId))` kassa filiali vizit bog'langan yozilish orqali aniqlanadi
+- **Tuzatish yo'nalishi:** Avto-bog'lashni `a.doctorId === user.id` bilan cheklab, vizitga yaqin/mos yozilishni tanlash (yoki «Mendan kutilmoqda» bandidan `?appointmentId=` uzatib, formada yozilish tanlash maydonini qo'shish); backend'da create/update'da appointment doktori == yozuvchi shifokorni tekshirish.
+
+### LB-27 [medium] «Imzolanmagan vizit yozuvi» hisoblagichi qoralamani bajarilgan deb hisoblaydi (signedAt tekshirilmaydi)
+
+- **Oqim:** treatment-gap7 · auditor `medium` → refuter `medium` · 📖 statik
+- **Invariant:** I2: qoralama yozuv shifokorning «kutilmoqda» ro'yxatidan chiqib ketmasligi kerak
+- **Scenariy:** Shifokor vizit sahifasida «Saqlash» (qoralama) bosadi, «Imzolash»ni unutadi. Yozuv appointment'ga bog'langan, shuning uchun DoctorDashboard'dagi «Imzolanmagan vizit yozuvlari» bandi darhol 0 ga tushadi. Kassa esa imzolanmagan vizitni «Kutilayotgan vizitlar»da ko'rsatmaydi, ombor esa allaqachon yechilgan. Natijada vizit hech qayerda eslatilmaydi: na shifokorga, na kassirga, xizmat to'lovsiz qoladi.
+- **Dalil:**
+  - apps/api/src/modules/dashboard/dashboard.service.ts:25-29 — izoh: «hozirgi sxemada imzolash holati YO'Q — D4 imzo keyin keladi»; imzo esa 0052 migratsiyasi bilan qo'shilgan
+  - apps/api/src/modules/dashboard/dashboard.service.ts:45 — `NOT EXISTS (SELECT 1 FROM visit_notes WHERE visit_notes.appointment_id = appointments.id)` — `signed_at IS NOT NULL` sharti yo'q
+  - apps/api/src/modules/cashier/cashier.service.ts:664-665 — kassa faqat `isNotNull(visitNotes.signedAt)` vizitlarni ko'radi
+- **Tuzatish yo'nalishi:** Dashboard `noteWhere`ni qayta yozing: yozilishga bog'langan visit_note yo'q YOKI mavjud bo'lsa ham `signed_at IS NULL` (masalan `NOT EXISTS (... WHERE appointment_id = appointments.id AND signed_at IS NOT NULL)`). Eskirgan izohni yangilang.
+
+### LB-28 [low] lab_users.phone butun Hub bo'yicha unique, hisobni o'chirib ham, telefonini o'zgartirib ham bo'lmaydi: labdan ketgan texnik boshqa labga qo'shila olmaydi va o'z labining lead'i bo'la olmaydi
+
+- **Oqim:** lab-gap3 · auditor `medium` → refuter `low` · 📖 statik
+- **Invariant:** I3
+- **Scenariy:** Texnik T Lab A'da ishlagan, Lab A lead'i uni nofaol qiladi. T Lab B'ga o'tadi. Lab B lead'i uni +998901234567 bilan qo'shmoqchi bo'ladi va 409 lab_user.phone_taken oladi. T o'z labini ochsa, vendor Supervisor'da yaratishga uringanda ham 409 chiqadi. Yagona yechim boshqa SIM. Bundan tashqari 409 javobi telefon boshqa labda ro'yxatdan o'tganini oshkor qiladi. Login global telefon bo'yicha bo'lgani uchun bu qisman dizayn oqibati, lekin o'tish yo'li umuman yo'q.
+- **Dalil:**
+  - apps/lab-hub-api/src/db/schema.ts:57 `uniqueIndex('lab_users_phone_uq').on(t.phone)` (lab_id'siz, global)
+  - apps/lab-hub-api/src/modules/lab/lab.routes.ts:817-818 `if (isUniqueViolation(err)) throw new ApiError(409, 'lab_user.phone_taken')`
+  - apps/lab-hub-api/src/modules/lab/lab.routes.ts:832-839 PATCH users'da phone yo'q; DELETE users endpointi yo'q
+  - apps/lab-hub-api/src/modules/internal/internal.routes.ts:128-129 lab yaratishda ham xuddi shu 409
+- **Tuzatish yo'nalishi:** Telefon bandligini faqat faol qatorlar uchun majbur qiling (partial unique `WHERE is_active`) va nofaol qatorning telefonini ozod qiling yoki qayta aktivatsiyada tekshiring; muqobil sifatida lead/vendor uchun «xodimni boshqa labga ko'chirish» yoki telefonni o'zgartirish endpointini qo'shing. Login global bo'lgani uchun avval bitta telefon = bitta faol hisob qoidasini hal qiling.
+
+### LB-29 [low] Recall worker: `contacted`ga UPDATE shartsiz va qator qulflanmagan — tashqi send davomida (timeout'siz) parallel o'zgarish ustidan yoziladi
+
+- **Oqim:** messaging-gap4 · auditor `medium` → refuter `low` · 📖 statik
+- **Invariant:** Recall holat o'tishi pending->contacted faqat qator hali pending bo'lganida (SELECT ... FOR UPDATE yoki UPDATE ... WHERE status='pending'); yopilgan/rejalashtirilgan recall qayta ochilmasligi kerak
+- **Scenariy:** Bemorning recall'i bugun due. 11:00 scan worker `live.status='pending'` o'qiydi va Eskiz/Telegram'ga send qiladi (bir necha soniya, tarmoq sekin bo'lsa uzoqroq). Shu paytda registrator bemorni yozadi: appointments.create -> closeOpenOnRebook recall'ni 'scheduled' + scheduledAppointmentId qiladi va commit qiladi (yoki menejer recall'ni 'cancelled' qiladi). Worker send tugagach `UPDATE recalls SET status='contacted' WHERE id=...` — shartsiz bo'lgani uchun 'scheduled'/'cancelled' holatini 'contacted'ga qaytaradi. Natija: yozilgan bemor recall ro'yxatida yana 'bog'lanish kerak' bo'lib qoladi, efficacyPct (scheduled+completed) kamayadi, menejerning cancel'i yo'qoladi. Bir xil mexanizm ikkita bir vaqtdagi scan (BullMQ stalled-job qayta yetkazish yoki ikkita consumer) bo'lsa dublikat xabarga ham olib keladi, chunki ikkalasi 'pending' ko'radi. Eslatma: oddiy BullMQ'da recall-scan kuniga bitta job va concurrency=1, shuning uchun dublikat faqat stalled/ikkinchi consumer bilan; asosiy real xavf parallel foydalanuvchi o'zgarishi.
+- **Dalil:**
+  - apps/api/src/lib/recall-worker.ts:139-148 — `const [live] = await tx.select({status,attempts}).from(recalls).where(eq(recalls.id,...)).limit(1); if (live.status !== 'pending') {skipped}` — `.for('update')` yo'q
+  - apps/api/src/lib/recall-worker.ts:221 — `const sendRes = await channel.send(to, { text });` tx ichida, tashqi HTTP (Eskiz/Telegram fetch'larda timeout yo'q: packages/notifications/src/telegram.ts, eskiz.ts)
+  - apps/api/src/lib/recall-worker.ts:241-250 — `.update(recalls).set({status:'contacted', lastContactedAt, contactAttempts: live.attempts+1}).where(eq(recalls.id, row.recallId))` — `status='pending'` sharti yo'q; READ COMMITTED'da parallel commit'dan keyin ham ustidan yoziladi
+  - apps/api/src/modules/recalls/recalls.service.ts:268-273 closeOpenOnRebook (status:'scheduled') va :151 update() (cancelled/completed) boshqa tx'da shu qatorni o'zgartiradi
+- **Tuzatish yo'nalishi:** Yakuniy UPDATE'ga status='pending' shartini qo'shing (va/yoki o'qishda .for('update')); send'ni tx tashqarisiga chiqarish ma'qul.
+
+### LB-30 [low] Registrator 'Bugun' ekranidagi 'Lab muddati o'tgan' diqqat bandi Receptionist roli uchun hech qachon chiqmaydi va havolasi taqiqlangan sahifaga olib boradi
+
+- **Oqim:** rbac-gap0 · auditor `medium` → refuter `low` · 📖 statik
+- **Invariant:** I1: dashboard widget'i shu dashboard'ni ko'radigan yagona rolning ruxsatlari bilan ishlashi kerak
+- **Scenariy:** Receptionist shablonidagi xodim bemorni toj kiydirishga chaqiradi. Lab ishi 2 kun kechikkan. Spec bo'yicha 'Bugun' ekranining Diqqat panelida 'Lab muddati o'tgan' bandi chiqishi kerak. Lekin Registratorda lab_order.view yo'q: so'rov yuborilmaydi, overdueLabs=0, band chiqmaydi va hech qanday 'ruxsat yo'q' belgisi ham yo'q. Owner rolga lab_order.view qo'shsa ham, band 20 ta eng yangi buyurtma ustida hisoblanadi (F1). Spec'dagi feature amalda faqat Receptionist bo'lmagan, lekin bu dashboard'ni ko'rmaydigan rollarda ishlaydi.
+- **Dalil:**
+  - apps/web/src/features/dashboard/role-dashboard-map.ts:16 — `receptionist: ReceptionistDashboard` (bu dashboard'ni faqat Receptionist templateKey ko'radi)
+  - packages/core/src/role-templates.ts:257-279 — Receptionist ruxsatlarida `lab_order.view` YO'Q
+  - apps/web/src/features/dashboard/dashboard.api.ts:99 — `enabled: hasPermission('lab_order.view')` -> Registratorda so'rov ketmaydi, overdueLabs doim 0
+  - apps/web/src/features/dashboard/components/ReceptionistDashboard.tsx:383-392 — `...(attention.overdueLabs > 0 ? [{ key: 'lab', ..., to: '/lab' }] : [])`
+- **Tuzatish yo'nalishi:** Registrator uchun lab muddati diqqatini `lab_order.view` talab qilmaydigan tor endpoint (masalan `appointment.view`/`recall.view` bilan `GET /dashboard/reception-attention` ichida overdueLabs soni) orqali oling yoki Receptionist shabloniga `lab_order.view` qo'shing (yangi tenantlar uchun, backfill bilan), band esa mavjud bo'lmasa `/lab` havolasisiz ko'rsating.
+
