@@ -1,4 +1,4 @@
-import { tenantSettings } from '@dental/db-schema';
+import { type Tenant, tenantSettings } from '@dental/db-schema';
 import type { Context } from 'hono';
 import { withTenant } from '../db/scoped.ts';
 import { verifyAccess } from './jwt.ts';
@@ -27,6 +27,20 @@ export const computeSubscriptionState = (
   if (!expiresAt) return { state: 'none', expiresAt: null, graceEndsAt: null, daysLeft: null };
   const iso = expiresAt instanceof Date ? expiresAt.toISOString() : expiresAt;
   return computeExpiryState(iso, MAX_GRACE_DAYS, nowMs);
+};
+
+/**
+ * FX-144 (LC-22): ko'rsatiladigan obuna holati. Yagona manba — saqlangan muddat
+ * (`tenant_settings.subscription_expires_at`, Supervisor sinxroni); `tenants.subscription_status`
+ * ustunini hech kim yangilamaydi (default `trial`), shuning uchun u faqat muddat
+ * NOMA'LUM (`none`) bo'lganda qaytariladi. `expired` → `suspended`, qolgani → `active`.
+ */
+export const effectiveSubscriptionStatus = (
+  stored: Tenant['subscriptionStatus'],
+  state: LicenseState['state'],
+): Tenant['subscriptionStatus'] => {
+  if (state === 'none') return stored;
+  return state === 'expired' ? 'suspended' : 'active';
 };
 
 // ─── Tenant obunasi o'qish (30 s kesh) ───────────────────────────────────────

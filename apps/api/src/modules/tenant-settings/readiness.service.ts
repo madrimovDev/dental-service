@@ -12,6 +12,7 @@ import { and, count, eq, isNotNull, isNull } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import { getLicenseState as defaultGetLicenseState, type LicenseState } from '../../lib/license.ts';
+import { computeSubscriptionState } from '../../lib/subscription.ts';
 import type { ReadinessKey } from './tenant-settings.schema.ts';
 
 export interface ReadinessItem {
@@ -89,11 +90,18 @@ export const createReadinessService = (deps: ReadinessDeps = {}) => {
       const st = await getLicenseState().catch(() => null);
       licenseOk = st?.state === 'active' || st?.state === 'expiring';
     } else {
-      const [t] = await db
-        .select({ s: tenants.subscriptionStatus })
-        .from(tenants)
-        .where(eq(tenants.id, c.get('activeTenantId') as string));
-      licenseOk = t?.s === 'active' || t?.s === 'trial';
+      // FX-144 (LC-22): bulutda obuna holati saqlangan muddatdan (desktop bilan bir xil
+      // qoida: faqat active/expiring — imtiyoz «tayyor» emas). Muddat noma'lum → ustun.
+      const sub = computeSubscriptionState(settings?.subscriptionExpiresAt ?? null);
+      if (sub.state !== 'none') {
+        licenseOk = sub.state === 'active' || sub.state === 'expiring';
+      } else {
+        const [t] = await db
+          .select({ s: tenants.subscriptionStatus })
+          .from(tenants)
+          .where(eq(tenants.id, c.get('activeTenantId') as string));
+        licenseOk = t?.s === 'active' || t?.s === 'trial';
+      }
     }
 
     const items: ReadinessItem[] = [
