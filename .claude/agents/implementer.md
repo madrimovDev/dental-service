@@ -3,6 +3,7 @@ name: implementer
 description: Implements one planned task in its own git worktree for dental-service workflows and commits to its own branch. Model/effort set per call by the controller.
 tools: Read, Edit, Write, Bash
 model: sonnet
+effort: medium
 ---
 Sen reja vazifasini o'z worktree'ingda kodlaydigan agentsan. Reja va spec'ga qat'iy amal qil, scope'dan chiqma.
 

@@ -3,6 +3,7 @@ name: scout
 description: Read-only codebase mapper for dental-service workflows. Reads code and returns an inventory/map. Never edits files.
 tools: Read, Bash
 model: haiku
+effort: medium
 ---
 Sen dental-service kodini o'qib xarita/inventar tuzadigan agentsan. Hech qanday faylni o'zgartirma; Bash faqat o'qish uchun (grep, find, git log/diff, cat).
 

@@ -28,6 +28,22 @@ Controller reja yozganda **har vazifaga daraja** qo'yadi (agent o'zi tanlamaydi)
 - **Whole-branch review va merge qarori** — controller (asosiy sessiya, advisor bilan). Workflow'ga berilmaydi.
 - Workflow'da: `agent(prompt, { model, effort, agentType, ... })`. Agent tool'da: `model` parametri; effort — agent turi frontmatter'i.
 
+## 1b. Mantiqiy audit darajalari (2026-11-19, 👤 «qiyin-osonligiga qarab har xil model»)
+
+Audit (kod yozmaydigan, xato qidiradigan) ishlar uchun T-shkalasining davomi. Controller oqimga daraja qo'yadi; topilmani tekshirish darajasi **topilma og'irligidan** avtomatik kelib chiqadi.
+
+| Daraja | Ish | `model` · `effort` |
+|---|---|---|
+| **A0 Xarita** | endpoint/permission/rol matritsasi inventari, grep | `haiku` · `low` (`scout`) |
+| **A1 Yengil** | UI-only oqim; `low` topilmani tekshirish | `sonnet` · `medium` |
+| **A2 Oqim** | modullararo biznes-oqim auditi (bron, davolash, ombor, lab, xabarlar); `medium`/`high` topilmani tekshirish | `sonnet` · `high` |
+| **A3 Xavfli** | pul, RLS/tranzaksiya, litsenziya/imzo, ruxsatlar oqimi auditi; `critical` yoki xavfli oqimdagi `high` topilmani tekshirish (critical — 2 ta turli lens) | `opus` · `high` |
+
+- **Eskalatsiya:** auditor `unsure`/`failed` qaytarsa — bir daraja yuqorida qayta (A3 yiqilsa — controller).
+- **Hukm 3 xil:** `confirmed` / `refuted` / `unproven`. `unproven` reyestrda qoladi (statik o'qish bilan hal bo'lmaydi → real-DB probe yoki brauzer). Ikki lens kelishmasa — `disputed`, controller hal qiladi.
+- **Real-DB probe parallel emas:** faqat pul/RLS `critical` topilmalar uchun, controller ketma-ket yoki lane bazasida (§5.3) yurgizadi. Workflow refuter'lari statik.
+- **Saqlangan workflow:** `.claude/workflows/logic-audit.js` (`/logic-audit`). `args`: `{ only?: ['money','rbac'], flows?: [...], maxVerify?: 36 }`. Standart 9 oqim: booking, treatment, inventory, lab, messaging (A2); money, rbac, tenancy, license (A3). `maxVerify` dan oshgan topilmalar `unverified` sifatida qaytadi (jimgina tashlanmaydi). Natijani controller reyestrga yozadi va advisor bilan ko'rib chiqadi; `advisorFlags > 0` bo'lsa §2 auditi.
+
 ## 2. Advisor taqiqi — qanday majburlanadi
 
 ✅ **Spike natijalari (2026-11-11, restart'dan keyin):**
@@ -51,7 +67,11 @@ Agar keyinchalik Claude Code per-agent opt-out qo'shsa — shu bo'lim yangilanad
 | `implementer` | reja vazifasini kodlaydi, o'z branch'iga commit | darajaga qarab (per-call override) | Read, Edit, Write, Bash | ha (o'z worktree'sida) |
 | `test-runner` | **berilgan** test fayllari + typecheck, natijani qaytaradi | haiku · low | Bash, Read | yo'q |
 | `reviewer` | lane diff'ini spec/reja bo'yicha ko'radi | sonnet · medium | Read, Bash (git diff) | yo'q |
-| `verifier` | pul/xavfsizlik/RLS adversarial tekshiruv (rad etishga urinadi) | opus · high | Read, Bash | yo'q (faqat test skripti scratchpad'da) |
+| `verifier` | pul/xavfsizlik/RLS **o'zgarish**ini adversarial tekshiruv (rad etishga urinadi; shubhada — refuted) | opus · high | Read, Bash | yo'q (faqat test skripti scratchpad'da) |
+| `auditor` | bitta biznes-oqimni modullararo bosib o'tib mantiqiy kamchilik topadi (invariant + fayl:qator + scenariy) | sonnet · high (A3 oqimda opus) | Read, Bash (faqat o'qish) | yo'q |
+| `refuter` | bitta auditor **topilma**sini mustaqil tekshiradi: confirmed/refuted/**unproven** (shubhada — unproven, refuted emas) | sonnet · high (critical/xavfli — opus) | Read, Bash | yo'q |
+
+Frontmatter'da `model` + `effort` (✅ `effort`: `low|medium|high|xhigh|max`, Claude Code sub-agents hujjati) — standart qiymat; Workflow `agent(..., {model, effort})` chaqiruvi uni ustidan yozadi.
 
 Agent turlari fayllari: `.claude/agents/*.md` (frontmatter `name`, `description`, `tools`, `model`; tana — §4 qoidalari). ⚠️ Tool nomlari: bu muhitda subagentlarda `Grep`/`Glob` yo'q — qidiruv `Bash` (grep/find) orqali. ✅ Workflow'da `agentType` + `schema` + `model`/`effort` birga ishlaydi: allowlist'li turda `StructuredOutput` avtomatik qo'shiladi (probe: `test-runner`, haiku/low → `claude-haiku-5-5`, tools `Bash, Read, StructuredOutput, advisor`).
 
