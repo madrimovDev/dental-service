@@ -2081,7 +2081,9 @@
     "branchIdle": "Сегодня нет активности",
     "doctorsToday": "Врачи сегодня",
     "doctorProgress": "Принято {{done}} из {{planned}}",
-    "doctorProgressAria": "{{done}} из {{planned}} пациентов"
+    "doctorProgressAria": "{{done}} из {{planned}} пациентов",
+    "restoreFailedTitle": "Восстановление из копии не удалось",
+    "restoreFailedText": "Причина и состояние данных — в разделе Настройки → Резервная копия."
   },
   "reportsQ": {
     "nav": "Вопросы",
@@ -2311,7 +2313,13 @@
     "restoreConfirm": "Восстановить",
     "restoreCancel": "Отмена",
     "restoreStarted": "Восстановление начато",
-    "restoreFailed": "Не удалось начать восстановление. Проверьте название клиники и копию."
+    "restoreFailed": "Не удалось начать восстановление. Проверьте название клиники и копию.",
+    "restoreResultFailedTitle": "Восстановление не удалось",
+    "restoreResultRolledBack": "База возвращена в прежнее состояние — текущие данные сохранены.",
+    "restoreResultNotRolledBack": "Не удалось вернуть базу в прежнее состояние. Обратитесь к поставщику; копия, сделанная перед восстановлением, сохранена в папке резервных копий.",
+    "restoreResultUntouched": "Данные не изменились.",
+    "restoreResultReason": "Причина: {{error}}",
+    "restoreResultOk": "Данные восстановлены из копии ({{date}})."
   },
   "telegramRequests": {
     "empty": "Заявок пока нет",

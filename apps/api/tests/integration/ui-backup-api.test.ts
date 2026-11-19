@@ -253,6 +253,7 @@ describe('cloud rejimi (DENTAL_LOCAL_DESKTOP yo‘q) — haqiqiy createApp()', (
       lastSuccessAt: null,
       lastError: null,
       files: [],
+      lastRestore: null,
     });
     expect((await api(ownerToken, 'POST', '/backup/run')).status).toBe(404);
     expect(

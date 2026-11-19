@@ -2081,7 +2081,9 @@
     "branchIdle": "Bugun faollik yo‘q",
     "doctorsToday": "Shifokorlar bugun",
     "doctorProgress": "{{done}} / {{planned}} bemor qabul qilindi",
-    "doctorProgressAria": "{{done}} / {{planned}} bemor"
+    "doctorProgressAria": "{{done}} / {{planned}} bemor",
+    "restoreFailedTitle": "Zaxiradan tiklash muvaffaqiyatsiz",
+    "restoreFailedText": "Sabab va ma’lumotlar holati Sozlamalar → Zaxira nusxa bo‘limida."
   },
   "reportsQ": {
     "nav": "Savollar",
@@ -2311,7 +2313,13 @@
     "restoreConfirm": "Tiklash",
     "restoreCancel": "Bekor qilish",
     "restoreStarted": "Tiklash boshlandi",
-    "restoreFailed": "Tiklashni boshlab bo'lmadi. Klinika nomini va nusxani tekshiring."
+    "restoreFailed": "Tiklashni boshlab bo'lmadi. Klinika nomini va nusxani tekshiring.",
+    "restoreResultFailedTitle": "Tiklash muvaffaqiyatsiz",
+    "restoreResultRolledBack": "Baza avvalgi holatiga qaytarildi — joriy ma’lumotlar saqlangan.",
+    "restoreResultNotRolledBack": "Bazani avvalgi holatga qaytarib bo‘lmadi. Ta’minotchiga murojaat qiling; tiklashdan oldingi nusxa zaxira papkasida saqlangan.",
+    "restoreResultUntouched": "Ma’lumotlar o‘zgarmadi.",
+    "restoreResultReason": "Sabab: {{error}}",
+    "restoreResultOk": "Ma’lumotlar zaxiradan tiklandi ({{date}})."
   },
   "telegramRequests": {
     "empty": "So'rovlar hozircha yo'q",

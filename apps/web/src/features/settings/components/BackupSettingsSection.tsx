@@ -16,6 +16,8 @@ import { useTenant } from '../settings.api';
 /** >2 kun zaxirasiz — ogohlantirish (roadmap §4.1). */
 const STALE_DAYS = 2;
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** FX-147: tugagan tiklash natijasi shu muddat ko'rsatiladi. */
+const RESTORE_RESULT_DAYS = 7;
 
 const CARD_STYLE: React.CSSProperties = {
   borderRadius: 'var(--radius-card)',
@@ -47,7 +49,9 @@ export function BackupSettingsSection() {
   const [folder, setFolder] = useState('');
   const [restoreTarget, setRestoreTarget] = useState<BackupFile | null>(null);
   const [typedName, setTypedName] = useState('');
-  const [restoring, setRestoring] = useState(false);
+  // FX-147: so'rov yuborilganda serverdagi oxirgi natijaning `finishedAt`i (undefined = so'rov yo'q).
+  // Natija o'zgarmaguncha (yoki `running` bo'lsa) «tiklash bajarilmoqda» — soat farqiga bog'liq emas.
+  const [pendingBaseline, setPendingBaseline] = useState<string | null | undefined>(undefined);
 
   const serverFolder = status.data?.folder ?? '';
   useEffect(() => setFolder(serverFolder), [serverFolder]);
@@ -60,6 +64,18 @@ export function BackupSettingsSection() {
   const days = lastMs === null ? null : Math.floor((Date.now() - lastMs) / DAY_MS);
   const stale = days === null || days > STALE_DAYS;
   const failed = data.lastError !== null;
+  const lastRestore = data.lastRestore ?? null;
+  const restoreRunning = lastRestore?.status === 'running';
+  const restoring =
+    restoreRunning ||
+    (pendingBaseline !== undefined && (lastRestore?.finishedAt ?? null) === pendingBaseline);
+  const restoreFinishedMs = lastRestore?.finishedAt ? Date.parse(lastRestore.finishedAt) : NaN;
+  const showRestoreResult =
+    !restoring &&
+    lastRestore !== null &&
+    lastRestore.status !== 'running' &&
+    Number.isFinite(restoreFinishedMs) &&
+    Date.now() - restoreFinishedMs <= RESTORE_RESULT_DAYS * DAY_MS;
   const level = stale ? 'danger' : failed ? 'warning' : 'ok';
   const borderColor =
     level === 'danger' ? 'var(--danger)' : level === 'warning' ? 'var(--warning)' : 'var(--border)';
@@ -82,7 +98,7 @@ export function BackupSettingsSection() {
       { file: restoreTarget.name, confirmName: typedName },
       {
         onSuccess: () => {
-          setRestoring(true);
+          setPendingBaseline(lastRestore?.finishedAt ?? null);
           notifications.show({ color: 'teal', message: t('backup.restoreStarted') });
           closeRestore();
         },
@@ -119,6 +135,25 @@ export function BackupSettingsSection() {
           </AlertBanner>
         )}
         {restoring && <AlertBanner tier={3}>{t('backup.restoreInProgress')}</AlertBanner>}
+        {showRestoreResult && lastRestore?.status === 'failed' && (
+          <AlertBanner tier={2} title={t('backup.restoreResultFailedTitle')}>
+            {lastRestore.dbRolledBack === true
+              ? t('backup.restoreResultRolledBack')
+              : lastRestore.dbRolledBack === false
+                ? t('backup.restoreResultNotRolledBack')
+                : t('backup.restoreResultUntouched')}
+            {lastRestore.error && (
+              <> {t('backup.restoreResultReason', { error: lastRestore.error })}</>
+            )}
+          </AlertBanner>
+        )}
+        {showRestoreResult && lastRestore?.status === 'ok' && (
+          <AlertBanner tier={3}>
+            {t('backup.restoreResultOk', {
+              date: new Date(restoreFinishedMs).toLocaleString('uz-UZ'),
+            })}
+          </AlertBanner>
+        )}
 
         <TextInput
           label={t('backup.folderLabel')}

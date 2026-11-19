@@ -300,7 +300,8 @@ describe('so‘rov fayllari (poll)', () => {
     expect(result.dbRolledBack).toBe(true);
     expect(result.error).toContain('restore_uploads');
     expect(result.error).toContain('baza avvalgi holatga qaytarildi');
-    expect(readState().lastError).toContain('baza avvalgi holatga qaytarildi');
+    // FX-147: tiklash xatosi restore-result.json'da; zaxira holati (lastError) bilan aralashmaydi.
+    expect(readState().lastError).toBeNull();
   });
 
   test('FX-52: migratsiya yiqilsa — baza pre-restore nusxaga qaytariladi (API eski sxemada yonmaydi)', async () => {
@@ -331,7 +332,7 @@ describe('so‘rov fayllari (poll)', () => {
     expect(result.status).toBe('failed');
     expect(result.dbRolledBack).toBe(false);
     expect(result.error).toContain('baza avvalgi holatga QAYTARILMADI');
-    expect(readState().lastError).toContain('QAYTARILMADI');
+    expect(readState().lastError).toBeNull();
   });
 
   test('yaroqsiz fayl nomi (../) — hech narsa to‘xtatilmaydi, baza tegilmaydi', async () => {

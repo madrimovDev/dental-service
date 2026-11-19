@@ -293,7 +293,9 @@ export const createBackupScheduler = (deps: BackupSchedulerDeps) => {
           ? ` — baza avvalgi holatga qaytarildi (zaxira: ${preRestore})`
           : ` — baza avvalgi holatga QAYTARILMADI, ma'lumotlar nusxasi: ${preRestore}`;
       }
-      writeState({ lastError: `tiklash muvaffaqiyatsiz (${error})` });
+      // FX-147: tiklash xatosi `restore-result.json`da (API `lastRestore`) — zaxira holati
+      // (`lastError`) bilan aralashtirilmaydi, aks holda keyingi muvaffaqiyatli zaxira uni yashirardi.
+      deps.log(`tiklash muvaffaqiyatsiz: ${error}`);
       return { ok: false, error, ...(dbRolledBack === undefined ? {} : { dbRolledBack }) };
     } finally {
       // Texnik-ish serveri portni bo'shatadi, keyin API qaytadi (API to'xtagan bo'lsa).
@@ -327,7 +329,6 @@ export const createBackupScheduler = (deps: BackupSchedulerDeps) => {
       ...(r.error ? { error: r.error } : {}),
       ...(r.dbRolledBack === undefined ? {} : { dbRolledBack: r.dbRolledBack }),
     });
-    if (r.ok) writeState({ lastError: null });
   };
 
   let polling = false;

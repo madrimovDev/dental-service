@@ -825,6 +825,9 @@
             "items": {
               "$ref": "#/components/schemas/BackupFile"
             }
+          },
+          "lastRestore": {
+            "$ref": "#/components/schemas/BackupRestoreResult"
           }
         },
         "required": [
@@ -832,7 +835,8 @@
           "folder",
           "lastSuccessAt",
           "lastError",
-          "files"
+          "files",
+          "lastRestore"
         ]
       },
       "BackupFile": {
@@ -855,6 +859,43 @@
           "name",
           "sizeBytes",
           "createdAt"
+        ]
+      },
+      "BackupRestoreResult": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "ok",
+              "failed"
+            ]
+          },
+          "file": {
+            "type": "string",
+            "nullable": true
+          },
+          "finishedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          },
+          "dbRolledBack": {
+            "type": "boolean",
+            "nullable": true
+          }
+        },
+        "required": [
+          "status",
+          "file",
+          "finishedAt",
+          "error",
+          "dbRolledBack"
         ]
       },
       "BackupRequested": {

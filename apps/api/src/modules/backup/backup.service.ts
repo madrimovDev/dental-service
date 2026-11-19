@@ -20,8 +20,10 @@ import {
   BACKUP_REQUEST_FILE,
   BACKUP_SETTINGS_FILE,
   BACKUP_STATE_FILE,
+  type BackupRestoreResultDto,
   type BackupStatusDto,
   RESTORE_REQUEST_FILE,
+  RESTORE_RESULT_FILE,
 } from './backup.schema.ts';
 
 export type BackupFailure =
@@ -105,9 +107,32 @@ export const createBackupService = (deps: BackupServiceDeps) => {
     return files.sort((a, b) => (a.name < b.name ? 1 : a.name > b.name ? -1 : 0));
   };
 
+  /** FX-147: `restore-result.json` — yo'q/buzilgan/noma'lum status bo'lsa `null`. */
+  const readRestoreResult = (): BackupRestoreResultDto | null => {
+    const path = dataPath(RESTORE_RESULT_FILE);
+    if (!existsSync(path)) return null;
+    const r = readJson<Record<string, unknown>>(path);
+    if (r.status !== 'running' && r.status !== 'ok' && r.status !== 'failed') return null;
+    const str = (v: unknown): string | null => (typeof v === 'string' ? v : null);
+    return {
+      status: r.status,
+      file: str(r.file),
+      finishedAt: str(r.finishedAt),
+      error: str(r.error),
+      dbRolledBack: typeof r.dbRolledBack === 'boolean' ? r.dbRolledBack : null,
+    };
+  };
+
   const status = (): BackupStatusDto => {
     if (!isDesktop()) {
-      return { mode: 'cloud', folder: null, lastSuccessAt: null, lastError: null, files: [] };
+      return {
+        mode: 'cloud',
+        folder: null,
+        lastSuccessAt: null,
+        lastError: null,
+        files: [],
+        lastRestore: null,
+      };
     }
     const folder = getFolder();
     const state = readJson<{ lastSuccessAt: string | null; lastError: string | null }>(
@@ -119,6 +144,7 @@ export const createBackupService = (deps: BackupServiceDeps) => {
       lastSuccessAt: typeof state.lastSuccessAt === 'string' ? state.lastSuccessAt : null,
       lastError: typeof state.lastError === 'string' ? state.lastError : null,
       files: listFiles(folder),
+      lastRestore: readRestoreResult(),
     };
   };
 
