@@ -43,8 +43,6 @@ export const ROLE_TEMPLATES = [
       'user.invite',
       'user.manage',
       'audit_log.view',
-      'notification.view',
-      'notification.manage',
       // M2+ shell perms
       'patient.view',
       'patient.create',
@@ -66,7 +64,6 @@ export const ROLE_TEMPLATES = [
       'cashier.view',
       'cashier.create_transaction',
       'cashier.refund',
-      'cashier.void',
       'report.view',
       'salary.view',
       'expense.view',
@@ -100,7 +97,7 @@ export const ROLE_TEMPLATES = [
       'Менеджер филиала — все права филиальных ролей (администратор, врач, медсестра, бухгалтер, техник)',
     // FU-41: = Receptionist ∪ Doctor ∪ Doctor+Assistant ∪ Nurse ∪ Accountant ∪ Technician ∪ eski BM.
     // Tenant-darajali huquqlar (tenant.edit, tenant_settings.*, role.*, user.manage,
-    // branch.create/delete, notification.*, patient.delete,
+    // branch.create/delete, patient.delete,
     // service.manage) QASDDAN YO'Q — shuning uchun P5 (assertCanGrant) bo'yicha BM
     // Tenant Admin'ni bera olmaydi. Shifokor ro'yxatiga tushmaydi (`isPractitioner` yo'q).
     permissions: [
@@ -128,7 +125,6 @@ export const ROLE_TEMPLATES = [
       'cashier.view',
       'cashier.create_transaction',
       'cashier.refund',
-      'cashier.void',
       'report.view',
       'salary.view',
       'expense.view',
@@ -287,7 +283,6 @@ export const ROLE_TEMPLATES = [
       'service.view',
       'cashier.view',
       'cashier.refund',
-      'cashier.void',
       'report.view',
       'salary.view',
       'expense.view',

@@ -126,20 +126,6 @@ export const PERMISSIONS = [
     descriptionRu: 'Просмотр журнала аудита',
   },
 
-  // ===== Notifications =====
-  {
-    code: 'notification.view',
-    category: 'notification',
-    descriptionUz: "Notification jurnalini ko'rish",
-    descriptionRu: 'Просмотр журнала уведомлений',
-  },
-  {
-    code: 'notification.manage',
-    category: 'notification',
-    descriptionUz: 'Notification sozlamalari va test SMS yuborish',
-    descriptionRu: 'Управление уведомлениями',
-  },
-
   // ===== M2 shell permissions (patient) =====
   {
     code: 'patient.view',
@@ -262,12 +248,6 @@ export const PERMISSIONS = [
     category: 'cashier',
     descriptionUz: "To'lovni qaytarish",
     descriptionRu: 'Возврат платежа',
-  },
-  {
-    code: 'cashier.void',
-    category: 'cashier',
-    descriptionUz: "To'lovni bekor qilish",
-    descriptionRu: 'Отмена платежа',
   },
   {
     code: 'report.view',

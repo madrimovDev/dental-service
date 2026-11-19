@@ -51,7 +51,7 @@ const withTenant = <T>(tid: string, fn: (tx: typeof db) => Promise<T>): Promise<
  * oladi (JWT'dagi perms yetarli emas) — testdagi sintetik token egasiga haqiqiy kassir tayinlovi.
  */
 const grantCashierAssignment = async (tid: string, uid: string, branchId: string | null) => {
-  const codes = ['cashier.view', 'cashier.create_transaction', 'cashier.refund', 'cashier.void'];
+  const codes = ['cashier.view', 'cashier.create_transaction', 'cashier.refund'];
   for (const code of codes) {
     await db.insert(permissions).values({ code, category: 'cashier' }).onConflictDoNothing();
   }

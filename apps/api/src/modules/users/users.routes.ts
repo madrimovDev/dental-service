@@ -1,5 +1,6 @@
 import { fail, ok } from '@dental/core';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
+import type { Context } from 'hono';
 import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { requireModuleInDesktop } from '../../lib/license-middleware.ts';
@@ -27,6 +28,13 @@ import {
   userIdParamSchema,
 } from './users.schema.ts';
 import { createUsersService } from './users.service.ts';
+
+/** FX-130: maosh maydonlarini ko'rish — `salary.view` (payroll.view/manage va @owner ham ko'radi). */
+const SALARY_VISIBLE_PERMS = ['@owner', 'salary.view', 'payroll.view', 'payroll.manage'];
+const canSeeSalary = (c: Context): boolean => {
+  const perms = c.get('accessClaims')?.perms ?? [];
+  return SALARY_VISIBLE_PERMS.some((p) => perms.includes(p));
+};
 
 /** Standart 404 response — assignment not found */
 const assignmentNotFoundResponse = {
@@ -311,7 +319,7 @@ export const userRoutes = (deps: { db: Database; audit: AuditLogger }) => {
   app.openapi(getProfileRoute, async (c) => {
     const { userId } = c.req.valid('param');
     const profile = await service.getProfile(c, userId);
-    return c.json(ok(profile ? toStaffProfileDto(profile) : null), 200);
+    return c.json(ok(profile ? toStaffProfileDto(profile, canSeeSalary(c)) : null), 200);
   });
 
   // ─── PUT /{userId}/profile — profilni upsert ─────────────────────────────
@@ -352,7 +360,7 @@ export const userRoutes = (deps: { db: Database; audit: AuditLogger }) => {
       // upsert + RETURNING kutilmagan holda bo'sh qaytdi — 500 (runtime cast emas).
       throw new Error('upsertProfile returned no row');
     }
-    return c.json(ok(toStaffProfileDto(result.profile)), 200);
+    return c.json(ok(toStaffProfileDto(result.profile, canSeeSalary(c))), 200);
   });
 
   return app;
