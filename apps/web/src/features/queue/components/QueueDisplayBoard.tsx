@@ -27,8 +27,6 @@ function useClock(): string {
   return hhmmss(now);
 }
 
-type Slot = { ticket: QueueTicket | undefined };
-
 export function QueueDisplayBoard() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -41,9 +39,12 @@ export function QueueDisplayBoard() {
   // PII: TV ekranida bemor ismi/xizmati CHIQMAYDI — faqat navbat raqami.
   const tickets = queue.data ?? [];
 
-  // Cabinet showcase manbasi: in_progress ticketlar (≤2), fixed 2 slot.
+  // Chaqirilganlar: barcha in_progress ticketlar (navbat raqami bo'yicha barqaror tartib).
   const inProgress = useMemo(
-    () => tickets.filter((tk: QueueTicket) => tk.status === 'in_progress'),
+    () =>
+      tickets
+        .filter((tk: QueueTicket) => tk.status === 'in_progress')
+        .sort((a: QueueTicket, b: QueueTicket) => a.queueNumber - b.queueNumber),
     [tickets],
   );
   // "Keyingi navbatlar" manbasi: birinchi 3 waiting ticket.
@@ -54,25 +55,17 @@ export function QueueDisplayBoard() {
 
   const branchName = branches.data?.find((b) => b.id === activeBranchId)?.name ?? '';
 
-  const slotOf = (idx: 0 | 1): Slot => {
-    const ticket = inProgress[idx];
-    return { ticket };
-  };
-
-  const renderCabinet = (idx: 0 | 1, variant: string | undefined) => {
-    const slot = slotOf(idx);
-    return (
-      <div className={`${classes.cabinet} ${variant}`}>
-        <span className={classes.cabinetEyebrow}>{t('queue.cabinet', { n: idx + 1 })}</span>
-        <span className={classes.cabinetNumber}>
-          {slot.ticket ? formatTicketNumber(slot.ticket.queueNumber) : '—'}
-        </span>
-        {!slot.ticket && (
-          <span className={classes.cabinetPlaceholder}>{t('queue.not_called_yet')}</span>
-        )}
-      </div>
-    );
-  };
+  // FX-125: «Kabinet N» yorlig'i slot-indeksga bog'liq edi (raqamlar sakrardi, 3-bemor ko'rinmasdi) —
+  // endi barcha chaqirilganlar cheklovsiz, navbat raqami bo'yicha barqaror ro'yxat.
+  const renderCalled = (ticket: QueueTicket | undefined, key: string) => (
+    <div key={key} className={`${classes.cabinet} ${classes.cabinetPrimary}`}>
+      <span className={classes.cabinetEyebrow}>{t('queue.called')}</span>
+      <span className={classes.cabinetNumber}>
+        {ticket ? formatTicketNumber(ticket.queueNumber) : '—'}
+      </span>
+      {!ticket && <span className={classes.cabinetPlaceholder}>{t('queue.not_called_yet')}</span>}
+    </div>
+  );
 
   return (
     <div className={classes.root}>
@@ -103,8 +96,9 @@ export function QueueDisplayBoard() {
       </header>
 
       <div className={classes.cabinets}>
-        {renderCabinet(0, classes.cabinetPrimary)}
-        {renderCabinet(1, classes.cabinetViolet)}
+        {inProgress.length > 0
+          ? inProgress.map((tk: QueueTicket) => renderCalled(tk, tk.id))
+          : renderCalled(undefined, 'empty')}
       </div>
 
       <section className={classes.nextPanel}>
