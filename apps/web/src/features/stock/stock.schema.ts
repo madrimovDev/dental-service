@@ -11,12 +11,20 @@ export const itemFormSchema = z.object({
 export type ItemFormSchema = z.infer<typeof itemFormSchema>;
 
 /** Manual harakat formasi (in/out/adjustment). Asistent "chiqim" = type=out. */
-export const movementFormSchema = z.object({
-  itemId: z.string().min(1),
-  type: z.enum(['in', 'out', 'adjustment']),
-  quantity: z.coerce.number().positive(),
-  reason: z.string().max(200).optional(),
-});
+// FX-43: `adjustment` = sanalgan (aniqlangan) qoldiq, set-to-value — 0 qonuniy («hammasi tugadi»);
+// in/out uchun miqdor > 0. API (`createMovementSchema`) bilan bir xil.
+export const movementFormSchema = z
+  .object({
+    itemId: z.string().min(1),
+    type: z.enum(['in', 'out', 'adjustment']),
+    quantity: z.coerce.number().nonnegative(),
+    reason: z.string().max(200).optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.type !== 'adjustment' && val.quantity <= 0) {
+      ctx.addIssue({ code: 'custom', path: ['quantity'], message: 'quantity must be > 0' });
+    }
+  });
 export type MovementFormSchema = z.infer<typeof movementFormSchema>;
 
 /** BOM (xizmat → material) formasi. */

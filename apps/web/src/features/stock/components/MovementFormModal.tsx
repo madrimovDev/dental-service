@@ -1,9 +1,10 @@
-import { Button, Group, Modal, NumberInput, Select, Stack, TextInput } from '@mantine/core';
+import { Button, Group, Modal, NumberInput, Select, Stack, Text, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCreateMovement } from '../stock.api';
+import { formatQty } from '../stock.mappers';
 import { type MovementFormSchema, movementFormSchema } from '../stock.schema';
 import type { StockItemVM } from '../stock.types';
 
@@ -38,6 +39,17 @@ export function MovementFormModal({ opened, onClose, item }: MovementFormModalPr
     onClose();
   };
 
+  const isAdjustment = form.values.type === 'adjustment';
+
+  // Inventarizatsiyaga o'tganda boshlang'ich qiymat = joriy qoldiq (delta emas, sanalgan miqdor);
+  // boshqa turga qaytganda 1.
+  const handleTypeChange = (value: string | null) => {
+    if (value !== 'in' && value !== 'out' && value !== 'adjustment') return;
+    form.setFieldValue('type', value);
+    if (value === 'adjustment' && item) form.setFieldValue('quantity', item.quantity);
+    else if (form.values.type === 'adjustment') form.setFieldValue('quantity', 1);
+  };
+
   const typeOptions = (['in', 'out', 'adjustment'] as const).map((v) => ({
     value: v,
     label: t(`stock.type_label.${v}`),
@@ -69,9 +81,16 @@ export function MovementFormModal({ opened, onClose, item }: MovementFormModalPr
             data={typeOptions}
             allowDeselect={false}
             {...form.getInputProps('type')}
+            onChange={handleTypeChange}
           />
+          {isAdjustment && item && (
+            <Text size="sm" c="dimmed">
+              {t('stock.current_qty', { qty: formatQty(item.quantity), unit: item.unit })}
+            </Text>
+          )}
           <NumberInput
-            label={t('stock.quantity')}
+            label={isAdjustment ? t('stock.counted_qty') : t('stock.quantity')}
+            description={isAdjustment ? t('stock.adjustment_hint') : undefined}
             min={0}
             withAsterisk
             {...form.getInputProps('quantity')}
