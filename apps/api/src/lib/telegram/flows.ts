@@ -1,5 +1,5 @@
 import { patients, tenants } from '@dental/db-schema';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq, isNull } from 'drizzle-orm';
 import type { DbOrTx } from '../../db/client.ts';
 import type { AppointmentsService } from '../../modules/appointments/index.ts';
 import type { ScheduleService } from '../../modules/schedule/index.ts';
@@ -43,7 +43,8 @@ export function createTelegramFlows(deps: FlowDeps) {
     const [p] = await tx
       .select({ id: patients.id, pref: patients.preferredLanguage })
       .from(patients)
-      .where(eq(patients.telegramChatId, chatId))
+      // FX-81: arxivlangan bemor bot oqimlarida faol emas.
+      .where(and(eq(patients.telegramChatId, chatId), isNull(patients.archivedAt)))
       .orderBy(asc(patients.createdAt))
       .limit(1);
     if (!p) return null;

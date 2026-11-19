@@ -8,7 +8,7 @@ import {
 } from '@dental/db-schema';
 import type { NotificationChannel } from '@dental/notifications';
 import { Worker } from 'bullmq';
-import { and, asc, desc, eq, lte } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, lte } from 'drizzle-orm';
 import { createAdminDb, type Database, type DbOrTx } from '../db/client.ts';
 import { withTenant } from '../db/scoped.ts';
 import { env } from './env.ts';
@@ -105,7 +105,12 @@ export async function processRecallScan(deps: RecallScanDeps): Promise<RecallSca
     .innerJoin(tenants, eq(tenants.id, recalls.tenantId))
     .leftJoin(tenantSettings, eq(tenantSettings.tenantId, recalls.tenantId))
     .where(
-      and(eq(recalls.status, 'pending'), lte(recalls.dueDate, localDateString(CLINIC_TZ, now))),
+      and(
+        eq(recalls.status, 'pending'),
+        lte(recalls.dueDate, localDateString(CLINIC_TZ, now)),
+        // FX-81: arxivlangan bemorga recall yuborilmaydi.
+        isNull(patients.archivedAt),
+      ),
     );
 
   for (const row of due) {

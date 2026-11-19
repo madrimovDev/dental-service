@@ -1,6 +1,6 @@
 import { normalizePhone } from '@dental/core';
 import { patients } from '@dental/db-schema';
-import { asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import IORedis from 'ioredis';
 import { Telegraf } from 'telegraf';
 import { message } from 'telegraf/filters';
@@ -61,7 +61,13 @@ export async function linkPatientByContact(
   const [p] = await tx
     .select({ id: patients.id, chat: patients.telegramChatId })
     .from(patients)
-    .where(inArray(patients.phone, [o.phone, o.phone.replace(/^\+/, '')]))
+    // FX-81: arxivlangan bemor bog'lanmaydi.
+    .where(
+      and(
+        inArray(patients.phone, [o.phone, o.phone.replace(/^\+/, '')]),
+        isNull(patients.archivedAt),
+      ),
+    )
     .orderBy(asc(patients.createdAt))
     .limit(1);
   if (!p) return 'not_found';
