@@ -8,6 +8,7 @@ import { requirePermission } from '../../../middleware/require-permission.ts';
 import { toPlanDto, toPlanWithStagesDto, toStageDto } from './treatment-plans.mapper.ts';
 import {
   consentSchema,
+  createStageSchema,
   createTreatmentPlanSchema,
   listPlansQuerySchema,
   planIdParamSchema,
@@ -26,6 +27,7 @@ import {
   ConsentLockedError,
   ConsentRequiredError,
   createTreatmentPlansService,
+  PlanStagesLockedError,
   type PriceLookup,
   type RecallStageHook,
   type StageStockHook,
@@ -162,6 +164,56 @@ export const treatmentPlansRoutes = (deps: {
     const plan = await service.getPlan(c, id);
     if (!plan) return c.json(fail('plan.not_found', 'Plan not found'), 404);
     return c.json(ok(toPlanWithStagesDto(plan)), 200);
+  });
+
+  // ─── POST /treatment-plans/{id}/stages — FT-01 bosqich qo'shish ──────────────
+
+  const addStageRoute = createRoute({
+    method: 'post',
+    path: '/treatment-plans/{id}/stages',
+    tags: ['treatment-plans'],
+    operationId: 'addTreatmentStage',
+    middleware: [
+      requireModuleInDesktop('clinical'),
+      requirePermission('medical_record.edit'),
+    ] as const,
+    request: {
+      params: planIdParamSchema,
+      body: { content: { 'application/json': { schema: createStageSchema } } },
+    },
+    responses: {
+      201: {
+        content: { 'application/json': { schema: apiResponseSchema(treatmentStageDtoSchema) } },
+        description: 'Stage added to the plan (pending, proposed)',
+      },
+      400: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Validation error or invalid service reference',
+      },
+      409: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Plan is completed or cancelled',
+      },
+      ...planNotFound,
+    },
+  });
+
+  app.openapi(addStageRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const body = c.req.valid('json');
+    try {
+      const stage = await service.addStage(c, id, body);
+      if (!stage) return c.json(fail('plan.not_found', 'Plan not found'), 404);
+      return c.json(ok(toStageDto(stage)), 201);
+    } catch (e) {
+      if (e instanceof PlanStagesLockedError) {
+        return c.json(fail('plan.locked', e.message), 409);
+      }
+      if (e instanceof CrossEntityError) {
+        return c.json(fail(`ownership.${e.reason}`, e.message), 400);
+      }
+      throw e;
+    }
   });
 
   // ─── GET /treatment-plans/{id}/estimate — C6 computed smeta ────────────────

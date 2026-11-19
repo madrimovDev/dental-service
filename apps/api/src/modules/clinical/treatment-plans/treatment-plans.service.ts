@@ -11,6 +11,7 @@ import { computePlanBalance } from '../../cashier/cashier.billing.ts';
 import { createTreatmentPlansRepository } from './treatment-plans.repository.ts';
 import type {
   ConsentInput,
+  CreateStageInput,
   CreateTreatmentPlanInput,
   ListPlansQuery,
   UpdateStageInput,
@@ -142,6 +143,19 @@ export class ConsentLockedError extends Error {
   }
 }
 
+/**
+ * FT-01: yakunlangan/bekor qilingan rejaga bosqich qo'shib bo'lmaydi. Routes 409
+ * (`plan.locked`).
+ */
+export class PlanStagesLockedError extends Error {
+  constructor(readonly planStatus: string) {
+    super(`Cannot add stages to a ${planStatus} plan`);
+    this.name = 'PlanStagesLockedError';
+  }
+}
+
+const PLAN_STAGES_LOCKED_STATUSES = ['completed', 'cancelled'] as const;
+
 const CONSENT_LOCKED_STATUSES = ['in_progress', 'completed', 'cancelled'] as const;
 
 export const createTreatmentPlansService = (deps: {
@@ -250,6 +264,57 @@ export const createTreatmentPlansService = (deps: {
       after: { totalCost, totalVisits, stages: input.stages.length },
     });
     return plan;
+  }
+
+  /**
+   * FT-01 (CF-11): mavjud rejaga bitta bosqich qo'shish (odontogramma «Joriy rejaga
+   * qo'shish»). Reja `FOR UPDATE` bilan qulflanadi → `sequence` = max + 1 poygasiz.
+   * Yakunlangan/bekor qilingan reja → `PlanStagesLockedError` (409). Narx `createPlan`
+   * bilan bir xil (CLI-443): serviceId + filialda faol narx → server narxi.
+   * Yangi bosqich doim `pending` + `proposed` (qarzga faqat qabul qilingandan keyin tushadi).
+   */
+  async function addStage(c: Context, planId: string, input: CreateStageInput) {
+    const plan = await repo.lockPlan(c, planId);
+    if (!plan) return null;
+    if ((PLAN_STAGES_LOCKED_STATUSES as readonly string[]).includes(plan.status)) {
+      throw new PlanStagesLockedError(plan.status);
+    }
+    if (input.serviceId) await ownership.assertServiceExists(c, input.serviceId);
+
+    let cost = input.cost;
+    const activeBranchId = c.get('activeBranchId');
+    if (input.serviceId && activeBranchId && deps.priceLookup) {
+      const price = await deps.priceLookup.getActivePrice(c, input.serviceId, activeBranchId);
+      if (price) cost = Number(price.price);
+    }
+
+    const sequence = await repo.nextStageSequence(c, planId);
+    const stage = await repo.insertStage(c, {
+      treatmentPlanId: planId,
+      sequence,
+      serviceId: input.serviceId ?? null,
+      serviceName: input.serviceName,
+      toothNumbers: input.toothNumbers ?? null,
+      estimatedVisits: input.estimatedVisits,
+      estimatedDurationMinutes: input.estimatedDurationMinutes ?? null,
+      cost: String(cost),
+      notes: input.notes ?? null,
+      resultingToothState: input.resultingToothState ?? null,
+    });
+
+    await deps.audit.record(c, {
+      action: 'created',
+      resourceType: 'treatment_stage',
+      resourceId: stage.id,
+      after: {
+        treatmentPlanId: planId,
+        sequence,
+        serviceId: stage.serviceId,
+        cost: stage.cost,
+        toothNumbers: stage.toothNumbers,
+      },
+    });
+    return stage;
   }
 
   async function updatePlan(c: Context, id: string, input: UpdateTreatmentPlanInput) {
@@ -572,6 +637,7 @@ export const createTreatmentPlansService = (deps: {
     listPlans,
     getPlan,
     createPlan,
+    addStage,
     updatePlan,
     setConsent,
     updateStage,

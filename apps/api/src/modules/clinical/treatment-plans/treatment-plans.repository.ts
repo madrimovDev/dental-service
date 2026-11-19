@@ -105,6 +105,38 @@ export const createTreatmentPlansRepository = () => {
     return plan ?? null;
   }
 
+  /**
+   * FT-01: rejani `FOR UPDATE` bilan qulflab o'qiydi (RLS tranzaksiyasi ichida) — parallel
+   * bosqich qo'shishlar bir xil `sequence` olmasin va totalCost qayta hisobi ketma-ket bo'lsin.
+   */
+  async function lockPlan(c: Context, id: string) {
+    const db = getDb(c);
+    const [plan] = await db
+      .select()
+      .from(treatmentPlans)
+      .where(eq(treatmentPlans.id, id))
+      .for('update');
+    return plan ?? null;
+  }
+
+  /** FT-01: rejadagi keyingi bosqich tartib raqami (max(sequence) + 1). */
+  async function nextStageSequence(c: Context, planId: string) {
+    const db = getDb(c);
+    const [row] = await db
+      .select({ max: sql<number | null>`max(${treatmentStages.sequence})` })
+      .from(treatmentStages)
+      .where(eq(treatmentStages.treatmentPlanId, planId));
+    return Number(row?.max ?? 0) + 1;
+  }
+
+  /** FT-01: bitta bosqich qo'shish. */
+  async function insertStage(c: Context, values: typeof treatmentStages.$inferInsert) {
+    const db = getDb(c);
+    const [stage] = await db.insert(treatmentStages).values(values).returning();
+    if (!stage) throw new Error('Stage insert failed');
+    return stage;
+  }
+
   /** FX-15: rejadagi 'completed' bosqichlar soni (bekor qilish guard'i uchun). */
   async function countCompletedStages(c: Context, planId: string) {
     const db = getDb(c);
@@ -216,6 +248,9 @@ export const createTreatmentPlansRepository = () => {
     getPlanWithStages,
     insertPlanWithStages,
     findPlan,
+    lockPlan,
+    nextStageSequence,
+    insertStage,
     findStage,
     countCompletedStages,
     countOpenAcceptedStages,

@@ -22,32 +22,33 @@ export const toothStateSchema = z.enum(toothStateValues);
 
 // ─── Request schemas ──────────────────────────────────────────────────────────
 
+/**
+ * Bitta bosqich (create-plan ichida VA FT-01 `POST /treatment-plans/{id}/stages` uchun —
+ * bitta manba, qoidalar drift qilmaydi).
+ */
+export const createStageSchema = z.object({
+  serviceId: z.uuid().optional(),
+  serviceName: z.string().min(1).max(200),
+  // UI-D3 (CL-01): FDI — doimiy 11–18/21–28/31–38/41–48, sut 51–55/61–65/71–75/81–85.
+  toothNumbers: z
+    .array(z.coerce.number().int().refine(isValidFdi, { message: 'Invalid FDI tooth number' }))
+    .optional(),
+  estimatedVisits: z.coerce.number().int().positive().default(1),
+  estimatedDurationMinutes: z.coerce.number().int().positive().optional(),
+  cost: z.coerce.number().nonnegative(),
+  notes: z.string().max(500).optional(),
+  // FX-27 (LA-35): bosqich 'completed' bo'lganda odontogramma shu holatga o'tadi
+  // (CLI-488 hook; create'da ham berish mumkin — odontogramma `addToPlan` shuni yuboradi).
+  resultingToothState: toothStateSchema.optional(),
+});
+export type CreateStageInput = z.infer<typeof createStageSchema>;
+
 export const createTreatmentPlanSchema = z.object({
   patientId: z.uuid(),
   doctorId: z.uuid(),
   title: z.string().min(2).max(200),
   notes: z.string().max(2000).optional(),
-  stages: z
-    .array(
-      z.object({
-        serviceId: z.uuid().optional(),
-        serviceName: z.string().min(1).max(200),
-        // UI-D3 (CL-01): FDI — doimiy 11–18/21–28/31–38/41–48, sut 51–55/61–65/71–75/81–85.
-        toothNumbers: z
-          .array(
-            z.coerce.number().int().refine(isValidFdi, { message: 'Invalid FDI tooth number' }),
-          )
-          .optional(),
-        estimatedVisits: z.coerce.number().int().positive().default(1),
-        estimatedDurationMinutes: z.coerce.number().int().positive().optional(),
-        cost: z.coerce.number().nonnegative(),
-        notes: z.string().max(500).optional(),
-        // FX-27 (LA-35): bosqich 'completed' bo'lganda odontogramma shu holatga o'tadi
-        // (CLI-488 hook; create'da ham berish mumkin — odontogramma `addToPlan` shuni yuboradi).
-        resultingToothState: toothStateSchema.optional(),
-      }),
-    )
-    .default([]),
+  stages: z.array(createStageSchema).default([]),
 });
 export type CreateTreatmentPlanInput = z.infer<typeof createTreatmentPlanSchema>;
 
