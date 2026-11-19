@@ -68,8 +68,9 @@ import {
   createStateStore,
   logMigrateFailure,
   migrateOnStart,
+  prunePreMigrateDumps,
 } from './migrate-on-start.js';
-import { getDataDir } from './paths.js';
+import { getBackupsDir, getDataDir } from './paths.js';
 import {
   getApiCommand,
   onServerStatusChange,
@@ -330,6 +331,7 @@ app.whenReady().then(async () => {
         runMigrations: () => runMigrations(API_EXE),
         appVersion: app.getVersion(),
         now: () => new Date(),
+        pruneOldDumps: (keep) => prunePreMigrateDumps(getBackupsDir(), keep),
       });
       if (!migration.ok) {
         logMigrateFailure(LOGS_DIR, migration);
