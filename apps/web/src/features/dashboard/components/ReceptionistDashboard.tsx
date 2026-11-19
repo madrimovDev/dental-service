@@ -425,8 +425,10 @@ export function ReceptionistDashboard() {
             tier: 2 as const,
             title: t('receptionToday.attention_lab_title'),
             text: t('receptionToday.attention_lab_text', { n: attention.overdueLabs }),
-            actionLabel: t('receptionToday.attention_open_lab'),
-            to: '/lab',
+            // FX-121: `/lab` `lab_order.view` talab qiladi — Registratorda yo'q → havolasiz band.
+            ...(hasPermission('lab_order.view')
+              ? { actionLabel: t('receptionToday.attention_open_lab'), to: '/lab' }
+              : {}),
           },
         ]
       : []),

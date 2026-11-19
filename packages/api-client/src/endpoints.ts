@@ -83,6 +83,11 @@ export type LabOrderHubFields = {
 };
 
 export const createEndpoints = (api: ApiClient) => ({
+  // FX-121: Registrator «Diqqat» — kontrakt generatsiyasigacha qo'lda.
+  dashboard: {
+    receptionAttention: () =>
+      api.get<{ overdueLabs: number }>('/api/dashboard/reception-attention'),
+  },
   labHub: {
     status: () => api.get<LabHubStatusRecord>('/api/lab-hub/status'),
     connect: () => api.post<{ connected: true; hubClinicId: string }>('/api/lab-hub/connect', {}),
