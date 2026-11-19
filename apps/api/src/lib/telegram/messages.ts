@@ -26,6 +26,8 @@ type Dict = {
   menuQuestionnaire: string;
   menuLang: string;
   menuPatient: string;
+  menuMyAppointments: string;
+  menuBalance: string;
   choosePatient: string;
   patientSet: (name: string) => string;
   menuPrompt: string;
@@ -69,6 +71,16 @@ type Dict = {
     items: { name: string; dosage: string; frequency: string; days?: number }[];
   }) => string;
   slotTaken: string;
+  /** FT-07.1: «Mening yozilishlarim». */
+  myAppointmentsTitle: string;
+  myAppointmentsEmpty: string;
+  myAppointmentsMore: (n: number) => string;
+  /** Tugma: «❌ Bekor: DD.MM.YYYY HH:mm». */
+  cancelAppointmentButton: (when: string) => string;
+  /** FT-07.1: «Balans» — faqat summa. */
+  balanceDebt: (amount: string) => string;
+  balanceCredit: (amount: string) => string;
+  balanceZero: string;
 };
 
 const uz: Dict = {
@@ -76,6 +88,8 @@ const uz: Dict = {
   menuQuestionnaire: '📋 Anketa',
   menuLang: '🌐 Til',
   menuPatient: '👤 Bemor',
+  menuMyAppointments: '📅 Mening yozilishlarim',
+  menuBalance: '💳 Balans',
   choosePatient: 'Kimning nomidan davom etamiz?',
   patientSet: (name) => `✅ Endi ${name} nomidan ishlaymiz.`,
   menuPrompt: 'Kerakli bo‘limni tanlang:',
@@ -132,6 +146,14 @@ const uz: Dict = {
       .map((i) => `• ${i.name} — ${i.dosage}, ${i.frequency}${i.days ? `, ${i.days} kun` : ''}`)
       .join('\n')}`,
   slotTaken: 'Bu vaqt band bo‘lib qoldi. Boshqa vaqtni tanlang.',
+  myAppointmentsTitle: '📅 Kelgusi yozilishlaringiz:',
+  myAppointmentsEmpty:
+    'Kelgusi yozilishlaringiz yo‘q. Yozilish uchun «📅 Yozilish» tugmasini bosing.',
+  myAppointmentsMore: (n) => `…va yana ${n} ta yozilish. Klinikaga murojaat qiling.`,
+  cancelAppointmentButton: (when) => `❌ Bekor: ${when}`,
+  balanceDebt: (amount) => `💳 Qarzingiz: ${amount}`,
+  balanceCredit: (amount) => `💳 Avans (oldindan to‘lov): ${amount}`,
+  balanceZero: '💳 Qarzingiz yo‘q.',
 };
 
 const ru: Dict = {
@@ -139,6 +161,8 @@ const ru: Dict = {
   menuQuestionnaire: '📋 Анкета',
   menuLang: '🌐 Язык',
   menuPatient: '👤 Пациент',
+  menuMyAppointments: '📅 Мои записи',
+  menuBalance: '💳 Баланс',
   choosePatient: 'От чьего имени продолжим?',
   patientSet: (name) => `✅ Теперь действуем от имени: ${name}.`,
   menuPrompt: 'Выберите раздел:',
@@ -193,9 +217,23 @@ const ru: Dict = {
       .map((i) => `• ${i.name} — ${i.dosage}, ${i.frequency}${i.days ? `, ${i.days} дн.` : ''}`)
       .join('\n')}`,
   slotTaken: 'Это время уже занято. Выберите другое.',
+  myAppointmentsTitle: '📅 Ваши предстоящие записи:',
+  myAppointmentsEmpty: 'Предстоящих записей нет. Чтобы записаться, нажмите «📅 Записаться».',
+  myAppointmentsMore: (n) => `…и ещё ${n} запис. Обратитесь в клинику.`,
+  cancelAppointmentButton: (when) => `❌ Отменить: ${when}`,
+  balanceDebt: (amount) => `💳 Ваш долг: ${amount}`,
+  balanceCredit: (amount) => `💳 Аванс (предоплата): ${amount}`,
+  balanceZero: '💳 Долга нет.',
 };
 
 export const botMessages = (lang: BotLang): Dict => (lang === 'ru' ? ru : uz);
+
+/** Summa + valyuta («150 000 so‘m»). */
+export const fmtMoney = (amount: number | string, lang: BotLang): string => {
+  const n = Number(amount);
+  const s = Number.isFinite(n) ? n.toLocaleString('ru-RU') : String(amount);
+  return `${s} ${lang === 'ru' ? 'сум' : 'so‘m'}`;
+};
 
 /** Klinika-local "DD.MM.YYYY HH:mm". */
 export const fmtWhen = (d: Date): string => formatClinicTime(d);

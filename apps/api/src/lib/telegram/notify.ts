@@ -6,7 +6,7 @@ import type { DbOrTx } from '../../db/client.ts';
 import { withTenant as defaultWithTenant } from '../../db/scoped.ts';
 import { logger } from '../logger.ts';
 import { resolveTenantChannel } from '../tenant-channel.ts';
-import { type BotLang, botMessages, fmtWhen, toBotLang } from './messages.ts';
+import { type BotLang, botMessages, fmtMoney, fmtWhen, toBotLang } from './messages.ts';
 import type { BotReply } from './reply.ts';
 
 type WithTenant = <T>(tenantId: string, fn: (tx: DbOrTx) => Promise<T>) => Promise<T>;
@@ -38,12 +38,6 @@ export type MessengerDeps = {
   withTenant?: WithTenant;
   /** Test/DI: kanal tanlovini almashtirish (default — `resolveTenantChannel`). */
   resolveChannel?: typeof resolveTenantChannel;
-};
-
-const fmtMoney = (amount: number | string, lang: BotLang): string => {
-  const n = Number(amount);
-  const s = Number.isFinite(n) ? n.toLocaleString('ru-RU') : String(amount);
-  return `${s} ${lang === 'ru' ? 'сум' : 'so‘m'}`;
 };
 
 /**
