@@ -1,6 +1,7 @@
 import { patientImages, visitNotes } from '@dental/db-schema';
 import { and, desc, eq } from 'drizzle-orm';
 import type { Context } from 'hono';
+import { onAfterCommit } from '../../db/after-commit.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { createOwnershipValidator, type OwnershipValidator } from '../../lib/ownership.ts';
@@ -218,10 +219,9 @@ export const createPatientImagesService = (deps: {
     await assertNotLockedBySignedVisit(c, before.visitNoteId);
 
     await db.delete(patientImages).where(eq(patientImages.id, id));
-    await deleteObject(before.objectKey).catch((err) =>
-      // Log but don't fail — DB row already gone
-      console.error('[patient-images] delete from S3 failed:', err),
-    );
+    // FX-76: fayl faqat commit'dan keyin o'chadi — tx rollback bo'lsa DB qatori
+    // fayl bilan birga qoladi (yetim yozuv emas). Best-effort, xato javobni buzmaydi.
+    await onAfterCommit(c, () => deleteObject(before.objectKey));
 
     await deps.audit.record(c, {
       action: 'deleted',
