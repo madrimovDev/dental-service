@@ -135,6 +135,11 @@ export const licenseStatusRoutes = (
         content: { 'application/json': { schema: apiResponseSchema(licenseStatusResponseSchema) } },
         description: 'Heartbeat run immediately; refreshed license state',
       },
+      401: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description:
+          'SaaS: Bearer token invalid or expired (auth.invalid_token) — client refreshes and retries',
+      },
       404: {
         content: { 'application/json': { schema: errorResponseSchema } },
         description: 'Not available outside Local Desktop / SaaS subscription mode',
@@ -146,8 +151,18 @@ export const licenseStatusRoutes = (
     if (!isDesktop()) {
       // L8: SaaS — blok ekranidagi «Qayta tekshirish» Supervisor'dan muddatni
       // darhol oladi. Token yo'q / integratsiya o'chiq → avvalgidek 404.
-      const tenantId = isSaasSupervisorEnabled() ? await tenantIdFromBearer(c) : null;
-      if (!tenantId) return c.json(fail('NOT_FOUND', 'Not found'), 404);
+      if (!isSaasSupervisorEnabled()) return c.json(fail('NOT_FOUND', 'Not found'), 404);
+      const tenantId = await tenantIdFromBearer(c);
+      if (!tenantId) {
+        // FX-101 (LB-10): Bearer bor, lekin yaroqsiz/muddati o'tgan → 401
+        // `auth.invalid_token` (authMiddleware bilan bir xil kod) — api-client
+        // refresh qilib qayta urinadi. Avval 404 qaytib, blok ekrani muddati
+        // o'tgan access token bilan doim «hali tugagan» derdi.
+        if (c.req.header('Authorization')?.startsWith('Bearer ')) {
+          return c.json(fail('auth.invalid_token', 'Token invalid or expired'), 401);
+        }
+        return c.json(fail('NOT_FOUND', 'Not found'), 404);
+      }
       try {
         await syncSub(tenantId);
       } catch (err) {
