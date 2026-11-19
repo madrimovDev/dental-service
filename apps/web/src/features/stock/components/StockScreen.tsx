@@ -253,7 +253,10 @@ export function StockScreen() {
                   <Card withBorder padding="md">
                     <MovementHistory
                       itemName={selectedItem?.name ?? null}
-                      movements={movements.data ?? []}
+                      movements={movements.data?.pages.flat() ?? []}
+                      hasMore={movements.hasNextPage}
+                      onLoadMore={() => void movements.fetchNextPage()}
+                      loadingMore={movements.isFetchingNextPage}
                     />
                   </Card>
                 </Stack>
