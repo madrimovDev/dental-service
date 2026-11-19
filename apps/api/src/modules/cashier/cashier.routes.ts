@@ -47,6 +47,7 @@ import {
   type PriceLookup,
   VisitAlreadyBilledError,
   VisitItemsMismatchError,
+  VisitLinkedToPlanStageError,
   VisitNoteNotFoundError,
   VisitNotSignedError,
   VisitPatientMismatchError,
@@ -211,6 +212,15 @@ export const cashierRoutes = (deps: {
             'Items must be services performed in the visit note',
           ),
           400,
+        );
+      }
+      if (e instanceof VisitLinkedToPlanStageError) {
+        return c.json(
+          fail(
+            'visit.linked_to_plan_stage',
+            'Visit is linked to a treatment plan stage; pay via the plan',
+          ),
+          409,
         );
       }
       if (e instanceof VisitAlreadyBilledError) {

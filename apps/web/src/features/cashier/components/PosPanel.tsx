@@ -289,6 +289,13 @@ export function PosPanel({
           clearVisit();
           return;
         }
+        // FX-12: vizit reja bosqichiga bog'langan — «reja bo'yicha to'lash» (allocation) kerak.
+        if (e instanceof ApiError && e.code === 'visit.linked_to_plan_stage') {
+          notifications.show({ color: 'red', message: t('cashierHandoff.linked_to_plan_stage') });
+          void qc.invalidateQueries({ queryKey: cashierKeys.all });
+          clearVisit();
+          return;
+        }
         // Per-mutation onError global toast'ni o'chiradi — umumiy xatoni o'zimiz ko'rsatamiz.
         notifications.show({ color: 'red', message: t('common.error') });
       },

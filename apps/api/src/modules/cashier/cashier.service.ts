@@ -128,6 +128,18 @@ export class VisitNoteNotFoundError extends Error {
   }
 }
 
+/**
+ * FX-12 (LA-03/39, D-10): vizit rejadagi bosqichga bog'langan (`stageId`) — uni vizit
+ * yo'li bilan to'lash bemordan ikki marta pul olishga olib keladi; «reja bo'yicha to'lash»
+ * (allocation) ishlatilishi kerak. routes 409 `visit.linked_to_plan_stage`.
+ */
+export class VisitLinkedToPlanStageError extends Error {
+  constructor() {
+    super('Visit note is linked to a treatment plan stage');
+    this.name = 'VisitLinkedToPlanStageError';
+  }
+}
+
 /** FX-handoff: vizit imzolanmagan (qoralama) — to'lov qabul qilinmaydi. */
 export class VisitNotSignedError extends Error {
   constructor() {
@@ -362,12 +374,14 @@ export const createCashierService = (deps: {
           patientId: visitNotes.patientId,
           signedAt: visitNotes.signedAt,
           performedServices: visitNotes.performedServices,
+          stageId: visitNotes.stageId,
         })
         .from(visitNotes)
         .where(eq(visitNotes.id, input.visitNoteId))
         .limit(1);
       if (!visit) throw new VisitNoteNotFoundError();
       if (!visit.signedAt) throw new VisitNotSignedError();
+      if (visit.stageId) throw new VisitLinkedToPlanStageError();
       if (input.patientId && input.patientId !== visit.patientId) {
         throw new VisitPatientMismatchError();
       }
@@ -675,6 +689,8 @@ export const createCashierService = (deps: {
       .where(
         and(
           isNotNull(visitNotes.signedAt),
+          // FX-12: rejadagi bosqichga bog'langan vizit reja allocation'i orqali to'lanadi.
+          isNull(visitNotes.stageId),
           gte(visitNotes.signedAt, dayStart),
           sql`COALESCE(array_length(${visitNotes.performedServices}, 1), 0) > 0`,
           or(isNull(appointments.id), eq(appointments.branchId, branchId)),
