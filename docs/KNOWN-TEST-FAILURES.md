@@ -46,3 +46,8 @@ Sabab: `license-middleware.test.ts`/`license.test.ts` `./license.ts`ni `mock.mod
 - `clinical.test.ts` `(unnamed)` hook — `diagnoses_code_unique (K02.1)`: lane bazasiga `seedDiagnoses` qo'llangan bo'lsa yiqiladi. Lane'ga **faqat `seedPermissions`**.
 - `provisioning-tenant.test.ts` «har rol shabloni o'z permission to'plamini to'liq oladi» — lane bazasida `seedPermissions` ishlatilmagan bo'lsa yiqiladi (permission katalogi migratsiyada emas, API boot'da seed qilinadi). Lane tayyorlashda seed majburiy (qo'llanma §5.3).
 - `bun run lint` (`biome check .`) — `apps/supervisor-api` dagi avvaldan mavjud `noNonNullAssertion`/`noExplicitAny` xatolari bilan exit 1. Gate'da faqat **tegilgan fayllar** biome'dan toza bo'lishi tekshiriladi (pre-commit hook shuni qiladi).
+
+## Batch 1 tuzatishlari (2026-11-19) qo'shganlari — `mock.module` oqishi sinfi, izolyatsiyada yashil
+
+To'liq to'plamda (`wf/fx-gate`, 1474 pass / 39 fail) litsenziya/fingerprint mock'lari quyidagi fayllarga oqadi; har fayl alohida jarayonda yashil (2026-11-19 tekshirildi): `tests/integration/fx-06-heartbeat-verify.test.ts` (4), `tests/integration/fx-07-license-revoke.test.ts` (17), `tests/integration/cli-358-module-gating.test.ts` (19 — P18 global gate testlari), `tests/integration/cli-387-license-heartbeat.test.ts` (3 — nomlari FX-07 bilan yangilandi), `src/lib/license.test.ts` (25 — «grace cap + license state (P18)» qo'shildi), `src/lib/license-heartbeat-scheduler.test.ts` (15).
+`tests/integration/lab-hub-sync.test.ts` — lane worktree'da `apps/lab-hub-api/.env` bo'lmasa «Unhandled error» (muhit); `scripts/wf-lane.sh` endi uni nusxalaydi.

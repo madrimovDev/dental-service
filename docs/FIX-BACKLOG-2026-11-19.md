@@ -262,6 +262,18 @@ LB — `LOGIC-AUDIT-2026-11-19.md` «2-round» bo'limi; LC — refuter hukmlari 
 | FX-168 | I2 | low | LC-48 MovementHistory: xom sabab kodlari va 50 ta bilan cheklangan tarix | reason kodlarini i18n kalitlariga map qil (stock.reason_initial_balance, reason_batch_received), useStockMovements'ga page/pageSize + "ko'proq yuklash" qo'sh, sanani vaqt bilan Asia/Tashkent'da ko'rsat. |
 | FX-169 | I1 | low | LC-49 BOM qtyPerService numeric(14,2) ga yaxlitlanib 0.00 bo'lib qolishi mumkin | Schema'da qtyPerService ni kamida 0.01 qilib cheklang (`.min(0.01)` va 2 xonali aniqlik) yoki ustunni scale 3-4 ga kengaytirib DB'ga CHECK (qty_per_service > 0) qo'shing. |
 
+### To'lqin 11 — batch 1 whole-branch review (minor)
+
+| ID | Lane | Og'irlik | Topilma | Tuzatish yo'nalishi |
+|---|---|---|---|---|
+| FX-170 | n | minor | Bosqichli vizitdagi bosqich xizmatidan tashqari qo'shimcha `performedServices` (og'riqsizlantirish, rentgen) kassada vizit orqali to'lanmaydi va komissiyaga tushmaydi (D-10 × D-13) | 🛠 D-14: bosqichli vizitda bosqichning o'z xizmatidan BOSHQA xizmatlar vizit yo'li bilan to'lanadi (pending ro'yxatda faqat shu qoldiq), bosqich xizmati — reja allocation'i bilan; komissiya vizit doktoriga |
+| FX-171 | n | minor | Vizit to'lovida `branchId` vizit (appointment) filiali bilan solishtirilmaydi — B filial kassiri A vizitini o'z filialiga yozadi | vizit yo'lida `branchId` = vizit filiali, aks holda 403 `branch.forbidden` |
+| FX-172 | m1 | minor | Telegram so'rovini tasdiqlashda doktor tanlovi filial bo'yicha filtrlanmagan; `schedule.doctor_not_in_branch` 409 «vaqt band» deb ko'rsatiladi | `useDoctors(r.branchId)` + alohida toast |
+| FX-173 | l | minor | Bulut login sahifasida `/reset-owner-password` havolasi ko'rinadi, lekin endpoint bulutda 404 (FX-08) | havolani faqat desktop'da (`window.dentalDesktop`) ko'rsatish |
+| FX-174 | l | minor | Pending vizitlar 30 kun, lekin `cashierHandoff.reception_text` «bugungi» deydi; `PendingVisitsCard` sanani `'uz-UZ'` bilan qattiq formatlaydi | matn yangilash (uz/ru), joriy til locale'i |
+
+Eslatma (tuzatilmaydi): batch 1 dan oldin finalize qilingan payroll davrlaridagi vizit to'lovlari refund bo'lsa, to'lanmagan komissiya clawback qilinishi mumkin — real klinika yo'q, faqat tarixiy ma'lumot; qayd etildi.
+
 ---
 
 ## 3. Feature'lar (bug emas — klinika so'ragan yangi imkoniyatlar)
@@ -318,6 +330,7 @@ Konservativ variant tanlandi; foydalanuvchi keyin o'zgartirishi mumkin.
 | D-10 | Bosqichli vizitni vizit yo'li bilan to'lash rad etiladi (409 `visit.linked_to_plan_stage`); kassa «reja bo'yicha to'lash»ga yo'naltiradi | Ikki marta to'lovni yopadi, pul mantig'i o'zgarmaydi |
 | D-11 | Accepted bo'lmagan bosqichni completed qilish 400; UI faqat qabul qilingan bosqichlarni taklif qiladi | Jim qarz qo'shilmaydi |
 | D-12 | EXCLUDE constraint'lar tenant'ga bog'lanadi (`tenant_id WITH =`) | Tenantlararo bloklash/ma'lumot sizishi yo'q |
+| D-14 | Bosqichli vizitda bosqich xizmatidan tashqari xizmatlar vizit yo'li bilan to'lanadi va vizit doktoriga komissiya beradi; bosqich xizmati faqat reja allocation'i bilan | Ikki marta to'lovsiz qo'shimcha ishni undirish (FX-170) |
 | D-13 | Vizit orqali POS to'lovi (rejasiz davolash) vizit doktoriga komissiya manbai bo'ladi (`COALESCE(plan.doctor_id, visit_note.doctor_id)`), baza `paidAmount` | Rejasiz ish uchun doktor haqi yo'qolmasin (LA-29) |
 
 ## 5. Hali audit qilinmagan (keyingi round)
