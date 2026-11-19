@@ -13,6 +13,7 @@ import type { Context } from 'hono';
 import { onAfterCommit } from '../../db/after-commit.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { CrossEntityError, createOwnershipValidator } from '../../lib/ownership.ts';
 import { pgErrorInfo } from '../../lib/pg-error.ts';
 import { reminderDelayMs } from '../../lib/reminder-delay.ts';
 import type {
@@ -152,6 +153,40 @@ export const createAppointmentsService = (deps: {
   noShowStrike?: NoShowStrikeHook;
   queue?: QueueReverseSyncHook;
 }) => {
+  const ownership = createOwnershipValidator();
+
+  /**
+   * FX-02 (LA-46, X-1): FK constraint RLS'ni chetlab o'tadi — begona tenant bemori /
+   * doktori / yordamchisi qabul qilinardi. Har havola RLS ostida tekshiriladi:
+   * bemor `patients`dan, xodim shu tenantdagi faol (qabul qilingan) `user_assignments`
+   * dan (owner istisno). Topilmasa — 404 kodi (routes → 404). Faqat berilgan
+   * (`undefined`/`null` emas) maydonlar tekshiriladi.
+   */
+  async function checkRefs(
+    c: Context,
+    refs: { patientId?: string; doctorId?: string; assistantId?: string | null },
+  ): Promise<'patient.not_found' | 'doctor.not_found' | 'assistant.not_found' | null> {
+    try {
+      if (refs.patientId) await ownership.assertPatientExists(c, refs.patientId);
+    } catch (e) {
+      if (e instanceof CrossEntityError) return 'patient.not_found';
+      throw e;
+    }
+    try {
+      if (refs.doctorId) await ownership.assertUserExists(c, refs.doctorId);
+    } catch (e) {
+      if (e instanceof CrossEntityError) return 'doctor.not_found';
+      throw e;
+    }
+    try {
+      if (refs.assistantId) await ownership.assertUserExists(c, refs.assistantId);
+    } catch (e) {
+      if (e instanceof CrossEntityError) return 'assistant.not_found';
+      throw e;
+    }
+    return null;
+  }
+
   async function checkConflict(
     c: Context,
     doctorId: string,
@@ -285,6 +320,14 @@ export const createAppointmentsService = (deps: {
       return { ok: false as const, code: 'time.in_past' };
     }
 
+    // FX-02: begona tenant bemori/doktori/yordamchisi → 404 (konflikt tekshiruvlaridan OLDIN).
+    const refsError = await checkRefs(c, {
+      patientId: input.patientId,
+      doctorId: input.doctorId,
+      assistantId: input.assistantId,
+    });
+    if (refsError) return { ok: false as const, code: refsError };
+
     const conflict = await checkConflict(c, input.doctorId, start, end);
     if (conflict) {
       return { ok: false as const, code: 'conflict.doctor_busy' };
@@ -379,6 +422,17 @@ export const createAppointmentsService = (deps: {
         input.cancellationReason !== undefined;
       if (touchesFields) throw new AppointmentTransitionError('status.terminal', 'completed');
     }
+
+    // FX-02: o'zgartirilayotgan doktor/yordamchi shu tenantniki bo'lishi shart.
+    // O'zgarmagan qiymat (mavjud tayinlov keyin o'chirilgan bo'lishi mumkin) qayta tekshirilmaydi.
+    const refsError = await checkRefs(c, {
+      doctorId: input.doctorId && input.doctorId !== before.doctorId ? input.doctorId : undefined,
+      assistantId:
+        input.assistantId && input.assistantId !== before.assistantId
+          ? input.assistantId
+          : undefined,
+    });
+    if (refsError) return { ok: false as const, code: refsError };
 
     // CLI-409: re-validatsiya triggeri — vaqt/doktor o'zgarganda YOKI yangi holat
     // active (scheduled/confirmed/in_progress) ga o'tganda (vaqt o'zgarmasa ham).

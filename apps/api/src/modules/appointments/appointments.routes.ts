@@ -43,6 +43,10 @@ const conflictResponse = {
   },
 };
 
+/** FX-02: begona/mavjud bo'lmagan bemor/doktor/yordamchi → 404. */
+const isRefNotFound = (code: string) =>
+  code === 'patient.not_found' || code === 'doctor.not_found' || code === 'assistant.not_found';
+
 export const appointmentRoutes = (deps: {
   db: Database;
   audit: AuditLogger;
@@ -108,6 +112,7 @@ export const appointmentRoutes = (deps: {
         content: { 'application/json': { schema: errorResponseSchema } },
         description: 'Forbidden',
       },
+      ...notFoundResponse,
       ...conflictResponse,
     },
   });
@@ -125,6 +130,7 @@ export const appointmentRoutes = (deps: {
         result.code === 'schedule.doctor_on_time_off'
       )
         return c.json(fail(result.code, result.code), 409);
+      if (isRefNotFound(result.code)) return c.json(fail(result.code, result.code), 404);
       return c.json(fail(result.code, result.code), 400);
     }
     if (!result.appointment)
@@ -227,7 +233,8 @@ export const appointmentRoutes = (deps: {
         result.code === 'schedule.doctor_on_time_off'
       )
         return c.json(fail(result.code, result.code), 409);
-      if (result.code === 'not_found') return c.json(fail(result.code, result.code), 404);
+      if (result.code === 'not_found' || isRefNotFound(result.code))
+        return c.json(fail(result.code, result.code), 404);
       return c.json(fail(result.code, result.code), 400);
     }
     if (!result.appointment)
