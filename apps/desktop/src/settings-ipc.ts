@@ -116,6 +116,35 @@ export const checkServerConnection = async (serverUrl: string): Promise<boolean>
 };
 
 /**
+ * FX-145 (LC-23) — `/api/health` javobidan server identifikatori
+ * (`data.serverId`, faqat desktop server beradi). Yetib bo'lmasa / javob ok
+ * bo'lmasa `null`; id yo'q bo'lsa `{ serverId: null }`.
+ */
+export const probeServer = async (
+  serverUrl: string,
+): Promise<{ serverId: string | null } | null> => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${serverUrl}/api/health`, { signal: controller.signal });
+    if (!res.ok) return null;
+    let serverId: string | null = null;
+    try {
+      const body = (await res.json()) as { data?: { serverId?: unknown } };
+      const raw = body?.data?.serverId;
+      if (typeof raw === 'string' && raw.length > 0) serverId = raw;
+    } catch {
+      // JSON emas — server javob berdi, lekin identifikatorsiz.
+    }
+    return { serverId };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
+/**
  * serverUrl'ni qo'llash yadrosi (validate → writeConfig → health-check →
  * onConnected). IPC handler (web `/settings`) VA CLI-404 native prompt (tray
  * "Server topilmadi" holatida) — ikkalasi shu funksiyani chaqiradi (DRY, bir

@@ -155,6 +155,20 @@ describe('process-manager', () => {
     expect(env.DENTAL_LOCAL_DESKTOP).toBe('true');
   });
 
+  // FX-145 (LC-23) — API `/api/health` javobida server identifikatori bo'lishi
+  // uchun barqaror `DENTAL_SERVER_ID` (dataDir'da saqlanadi) beriladi.
+  test('FX-145: api env DENTAL_SERVER_ID — barqaror (qayta ishga tushirishda o‘zgarmaydi)', async () => {
+    await startServer(8080);
+    const first = (spawnCalls[2]?.opts.env as Record<string, string>).DENTAL_SERVER_ID;
+    await stopServer();
+    spawnCalls = [];
+    spawnedProcesses = [];
+    await startServer(8080);
+    const second = (spawnCalls[2]?.opts.env as Record<string, string>).DENTAL_SERVER_ID;
+    expect(first).toMatch(/^[0-9a-f-]{36}$/);
+    expect(second).toBe(first);
+  });
+
   test('LAB_HUB_URL — desktop config `labHubUrl`dan; default bo‘sh (o‘chiq), tashqi env o‘tmaydi', async () => {
     const { mkdtempSync, writeFileSync } = await import('node:fs');
     const { tmpdir } = await import('node:os');

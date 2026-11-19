@@ -49,7 +49,11 @@ import { setupAutoUpdater, type UpdateState } from './auto-updater.js';
 import { createBackupScheduler, resolveDefaultBackupFolder } from './backup-scheduler.js';
 import { createMaintenanceServer, createUploadsTools } from './backup-tools.js';
 import { startClientReconnectLoop } from './client-reconnect.js';
-import { attachLoadFailureHandler, resolveClientStartup } from './client-startup.js';
+import {
+  attachLoadFailureHandler,
+  checkTrustedServer,
+  resolveClientStartup,
+} from './client-startup.js';
 import { readConfig, writeConfig } from './config.js';
 import {
   type DiscoveredServer,
@@ -78,7 +82,7 @@ import {
 import { type PromptWindowLike, promptServerUrl } from './server-url-prompt.js';
 import {
   applyServerUrl,
-  checkServerConnection,
+  probeServer,
   registerSettingsIpc,
   validateServerUrl,
 } from './settings-ipc.js';
@@ -483,11 +487,39 @@ app.whenReady().then(async () => {
       }
     };
 
+    // FX-145 — yangi manzil yozilganda eski server pin'i o'chiriladi (qo'lda
+    // kiritish / tasdiqlash = yangi TOFU); identifikator ulanishdan keyin
+    // `pinIfUnset` bilan yoziladi.
+    const writeNewServerUrl = (partial: { serverUrl: string }) =>
+      writeConfig({ ...partial, trustedServerId: null });
+    const pinIfUnset = async (url: string) => {
+      const cfg = readConfig();
+      if (cfg.serverUrl !== url || cfg.trustedServerId) return;
+      const probe = await probeServer(url);
+      if (probe?.serverId && readConfig().serverUrl === url) {
+        writeConfig({ trustedServerId: probe.serverId });
+      }
+    };
+    const notifyIdentityMismatch = (url: string) =>
+      new Notification({
+        title: 'Dentdo',
+        body: `${url} manzilida boshqa server javob berdi. Serverni qayta tasdiqlang.`,
+      }).show();
+    // Fon sikli uchun: mos kelmaslik har 30 s'da xabar bermasin (startup bir
+    // marta xabar beradi) — faqat «qaytmadi» deb hisoblanadi.
+    const checkSavedServer = (url: string) =>
+      checkTrustedServer(url, {
+        pinnedServerId: readConfig().trustedServerId,
+        probe: probeServer,
+        writeConfig,
+      });
+
     const onServerConnected = (url: string) => {
       stopClientReconnectLoop?.();
       stopClientReconnectLoop = null;
       showClientTray({ serverUrl: url }, connectedCallbacks(url));
       openBrowser(url);
+      void pinIfUnset(url);
     };
 
     // CLI-404: "Server topilmadi" holatidagi native prompt oynasi (web yo'q).
@@ -507,7 +539,11 @@ app.whenReady().then(async () => {
     // (CLI-434(b) — settings-ipc.ts), shuning uchun bu yerda qo'shimcha
     // tekshiruv shart emas. Muvaffaqiyatli ulansa tray/brauzer yangi
     // manzilga o'tadi, joriy fon discovery retry (bo'lsa) to'xtatiladi.
-    registerSettingsIpc({ ipcMain, writeConfig, onConnected: onServerConnected });
+    registerSettingsIpc({
+      ipcMain,
+      writeConfig: writeNewServerUrl,
+      onConnected: onServerConnected,
+    });
 
     const notFoundCallbacks = {
       onOpen: () => {},
@@ -524,7 +560,7 @@ app.whenReady().then(async () => {
               const confirmed = await chooseServerUrl(found);
               if (!confirmed) return;
               await applyServerUrl(confirmed, {
-                writeConfig,
+                writeConfig: writeNewServerUrl,
                 onConnected: onServerConnected,
               });
             })();
@@ -532,7 +568,7 @@ app.whenReady().then(async () => {
         });
         if (!entered) return;
         const res = await applyServerUrl(entered, {
-          writeConfig,
+          writeConfig: writeNewServerUrl,
           onConnected: onServerConnected,
         });
         if (!res.ok) {
@@ -566,7 +602,7 @@ app.whenReady().then(async () => {
       stopClientReconnectLoop = startClientReconnectLoop({
         findServers,
         trustedUrl: saved && validateServerUrl(saved).ok ? saved : null,
-        checkConnection: checkServerConnection,
+        checkConnection: checkSavedServer,
         onTrustedBack: (url) => {
           stopClientReconnectLoop = null;
           onServerConnected(url);
@@ -576,7 +612,7 @@ app.whenReady().then(async () => {
           void (async () => {
             const confirmed = await chooseServerUrl(found);
             if (!confirmed) return; // foydalanuvchi bekor qildi — tray "topilmadi" holicha qoladi
-            writeConfig({ serverUrl: confirmed });
+            writeNewServerUrl({ serverUrl: confirmed });
             onServerConnected(confirmed);
           })();
         },
@@ -600,10 +636,12 @@ app.whenReady().then(async () => {
 
     const startup = await resolveClientStartup({
       trustedUrl,
-      checkConnection: checkServerConnection,
+      pinnedServerId: config.trustedServerId,
+      probe: probeServer,
       findServers,
       chooseServerUrl,
       writeConfig,
+      onIdentityMismatch: notifyIdentityMismatch,
     });
     if (startup.kind === 'connected') {
       onServerConnected(startup.url);

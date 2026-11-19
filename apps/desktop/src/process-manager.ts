@@ -20,6 +20,7 @@ import { readConfig, resolveLabHubUrl } from './config.js';
 import {
   getOrCreateDbPassword,
   getOrCreateJwtSecret,
+  getOrCreateServerId,
   getOrCreateSuperuserPassword,
 } from './first-run.js';
 import { getDataDir, getPgDataDir, getResourcesDir } from './paths.js';
@@ -394,6 +395,8 @@ const spawnApi = (port: number): Promise<void> =>
         // litsenziyaga aloqasi bo'lmagan static-serve sozlamasi edi, gate
         // signali sifatida noto'g'ri edi — license-middleware.ts izohiga qarang).
         DENTAL_LOCAL_DESKTOP: 'true',
+        // FX-145 — `/api/health` `serverId` (klient TOFU pin'i), first-run.ts.
+        DENTAL_SERVER_ID: getOrCreateServerId(),
         RUN_REMINDER_WORKER: 'true',
         NODE_ENV: 'production',
         // Laboratoriya portali — config.json `labHubUrl` (bo'sh = o'chiq). Har doim aniq
