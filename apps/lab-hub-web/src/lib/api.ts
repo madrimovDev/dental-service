@@ -15,7 +15,9 @@ export class HubApiError extends Error {
 
 const sideEffects = (status: number, code: string) => {
   const auth = useAuth.getState();
-  if (status === 401 && auth.token) auth.logout();
+  // `auth.invalid_credentials` = noto'g'ri joriy parol (change-password) — sessiya
+  // o'tgani emas; sahifa xatoni o'zi ko'rsatadi (FX-100).
+  if (status === 401 && auth.token && code !== 'auth.invalid_credentials') auth.logout();
   if (status === 403 && code === 'auth.password_change_required') auth.setMustChangePassword(true);
   if (status === 403 && code === 'lab.subscription_expired') auth.setSubscription('expired');
 };
