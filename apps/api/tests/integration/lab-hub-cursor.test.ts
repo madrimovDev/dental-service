@@ -282,3 +282,30 @@ describe('qayta ulanish — hubClinicId o‘zgarsa kursor va dedup tiklanadi (FX
     expect(await pollUntilApplied(1)).toBeGreaterThanOrEqual(1);
   });
 });
+
+// ─── FX-93 / LB-02 ───────────────────────────────────────────────────────────
+describe('Hub shu klasterga zaxiradan tiklandi — qayta ishlatilgan seq tashlanmaydi (FX-93)', () => {
+  test('tiklashdan keyingi yangi hodisa (eski seq, yangi tx) klinikaga yetadi', async () => {
+    await pollUntilApplied(0); // oldingi hodisalarni yutib yuboramiz
+    const [{ seqName }] = (await hubAdmin`
+      SELECT pg_get_serial_sequence('case_events', 'seq') AS "seqName"`) as unknown as {
+      seqName: string;
+    }[];
+    // Zaxira nuqtasi: sequence S0 da.
+    const [{ s0 }] = (await hubAdmin`
+      SELECT nextval(${seqName}::regclass)::bigint AS s0`) as unknown as { s0: string }[];
+
+    // Zaxiradan KEYIN: ish yuborildi, klinika uning hodisa(lar)ini qo'lladi (seq > S0).
+    const lost = await linkAndSendCase();
+    expect(await pollUntilApplied(1)).toBeGreaterThanOrEqual(1);
+
+    // Vendor kechagi zaxirani tiklaydi (`pg_restore --clean`): S0 dan keyingi qatorlar yo'q,
+    // sequence S0 ga qaytadi. xid hisoblagichi esa (shu klaster) oldinga ketgan.
+    await hubAdmin`DELETE FROM cases WHERE clinic_case_ref = ${lost}`;
+    await hubAdmin`SELECT setval(${seqName}::regclass, ${s0}::bigint)`;
+
+    // Tiklashdan keyin lab yangi ish oladi — hodisa yana S0+1… seq'larini oladi.
+    await linkAndSendCase();
+    expect(await pollUntilApplied(1)).toBeGreaterThanOrEqual(1);
+  });
+});

@@ -33,7 +33,7 @@ import { hubKeyOf, readLabHubState } from './state.ts';
  *    (`seq`) — oldingi op kutayotgan bo'lsa keyingisi olinmaydi. Xatolik: tarmoq/5xx/
  *    «keyinroq o'zgaradi» → backoff bilan qayta; boshqa 4xx → `failed`.
  *  - **Poll (pull):** `GET /v1/clinic/changes?since=<cursor>` — Hub kursori commit-xavfsiz
- *    (README), overlap kerak emas; baribir har hodisa `seq` bo'yicha bir marta qo'llanadi
+ *    (README), overlap kerak emas; baribir har hodisa `(tx_id, seq)` bo'yicha bir marta qo'llanadi
  *    (`lab_hub_applied_events`) — javob yo'qolib sahifa qayta kelsa ham holat/bildirishnoma
  *    ikkilanmaydi. Kursor compare-and-set bilan suriladi (eski sahifa uni orqaga qaytarmaydi).
  */
@@ -513,7 +513,7 @@ export const pollLabHubChanges = async (
       for (const ev of res.events) {
         const [fresh] = await tx
           .insert(labHubAppliedEvents)
-          .values({ tenantId, seq: ev.seq })
+          .values({ tenantId, txId: ev.txId ?? 0, seq: ev.seq })
           .onConflictDoNothing()
           .returning({ seq: labHubAppliedEvents.seq });
         if (!fresh) continue; // allaqachon qo'llangan (sahifa qayta keldi)

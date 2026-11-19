@@ -720,6 +720,8 @@ export const clinicRoutes = (deps: Deps) => {
           const f = ev.type === 'file' ? fileById.get(String(ev.payload.fileId)) : undefined;
           return {
             seq: ev.seq,
+            // FX-93: `seq` zaxiradan tiklashda qayta ishlatilishi mumkin — klinika dedup'i (tx, seq) bo'yicha.
+            txId: ev.txId,
             caseRef: ref,
             labId: ev.labId,
             type: ev.type,

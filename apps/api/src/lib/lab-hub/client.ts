@@ -113,6 +113,8 @@ export type HubLink = {
 
 export type HubChangeEvent = {
   seq: number;
+  /** Yozgan Hub tranzaksiyasi xid'i (FX-93 dedup kaliti); eski Hub yubormasa — 0. */
+  txId?: number;
   caseRef: string;
   labId: string;
   type: string;
