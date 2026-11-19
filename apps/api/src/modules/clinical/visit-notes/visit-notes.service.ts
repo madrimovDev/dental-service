@@ -189,7 +189,8 @@ export const createVisitNotesService = (deps: {
   }
 
   async function update(c: Context, id: string, input: UpdateVisitNoteInput) {
-    const before = await repo.find(c, id);
+    // FX-156: qator qulfi — parallel imzo bilan poygada yon ta'sirlar (stage/stock) commit bo'lmasin.
+    const before = await repo.findForUpdate(c, id);
     if (!before) return null;
     // UI-D4: imzolangan yozuv — hech qanday yon ta'sirdan (stage, stock) OLDIN rad.
     if (before.signedAt) throw new VisitNoteSignedError(id);
