@@ -179,6 +179,25 @@ describe("ActivatePage — tenant yo'q holati (audit C1)", () => {
     ).not.toBeInTheDocument();
   });
 
+  // LA-01 (FX-09): vendor prepare-reinstall'dan keyin .lic hamon bor, tenant yo'q —
+  // mijoz mahsulot ichida qayta aktivatsiya qila olishi shart.
+  it("needsVendor — «Ta'minotchi tayyorladi» tugmasi mavjud aktivatsiya formasini ochadi", async () => {
+    const label = i18n.t('auth.activate.vendor_prepared');
+    expect(label).not.toBe('auth.activate.vendor_prepared');
+
+    bootstrapStatus.value = { data: { hasLicense: true, hasTenant: false } };
+    renderApp(<ActivatePage />);
+
+    const btn = await screen.findByRole('button', { name: label });
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    fireEvent.click(btn);
+
+    expect(await screen.findByRole('textbox')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: i18n.t('auth.activate.submit') }),
+    ).toBeInTheDocument();
+  });
+
   it("litsenziya yo'q — oddiy aktivatsiya formasi ko'rinadi", async () => {
     bootstrapStatus.value = { data: { hasLicense: false, hasTenant: false } };
     renderApp(<ActivatePage />);
