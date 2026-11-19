@@ -91,20 +91,32 @@ export function useBookingRequests() {
   });
 }
 
-/** Slot band bo'lsa 409 — so'rov `pending` qoladi: aniq xabar, ro'yxat qayta yuklanadi. */
+/**
+ * Slot band bo'lsa 409 — so'rov `pending` qoladi: aniq xabar, ro'yxat qayta yuklanadi
+ * (UI shu xatoda shifokor tanlashni taklif qiladi — `doctorId` bilan qayta tasdiqlash, FX-24).
+ * Muddati o'tgan (`booking_request.expired`) so'rov `expired` bo'ladi — alohida xabar.
+ */
 export function useConfirmBookingRequest() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id }: { id: string }) => confirmBookingRequest(id, {}),
+    mutationFn: ({ id, doctorId }: { id: string; doctorId?: string }) =>
+      confirmBookingRequest(id, doctorId ? { doctorId } : {}),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: BOOKING_KEY });
       void qc.invalidateQueries({ queryKey: ['appointments'] });
     },
     onError: (e) => {
       const conflict = e instanceof ApiError && e.status === 409;
+      const expired = e instanceof ApiError && e.code === 'booking_request.expired';
       notifications.show({
         color: 'red',
-        message: i18n.t(conflict ? 'telegramRequests.confirm_conflict' : 'common.error'),
+        message: i18n.t(
+          expired
+            ? 'telegramRequests.confirm_expired'
+            : conflict
+              ? 'telegramRequests.confirm_conflict'
+              : 'common.error',
+        ),
       });
       void qc.invalidateQueries({ queryKey: BOOKING_KEY });
     },

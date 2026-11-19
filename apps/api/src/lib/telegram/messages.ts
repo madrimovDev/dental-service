@@ -42,6 +42,7 @@ type Dict = {
   requestSent: (when: string) => string;
   requestConfirmed: (when: string) => string;
   requestDeclined: (reason: string | null) => string;
+  requestExpired: (when: string) => string;
   rescheduleSent: (when: string) => string;
   reminderYes: string;
   reminderOther: string;
@@ -89,6 +90,8 @@ const uz: Dict = {
   requestConfirmed: (when) => `✅ Yozilishingiz tasdiqlandi: ${when}.`,
   requestDeclined: (reason) =>
     `❌ Afsuski, so‘rov rad etildi${reason ? ` (${reason})` : ''}. Boshqa vaqtni tanlab ko‘ring.`,
+  requestExpired: (when) =>
+    `⌛ So‘rovingiz (${when}) muddati o‘tdi va tasdiqlanmadi. Iltimos, boshqa vaqtni tanlab, qayta so‘rov yuboring.`,
   rescheduleSent: (when) =>
     `✅ Boshqa vaqt so‘rovi yuborildi: ${when}. Registrator tasdiqlagach, xabar beramiz.`,
   reminderYes: '✅ Kelaman',
@@ -145,6 +148,8 @@ const ru: Dict = {
   requestConfirmed: (when) => `✅ Ваша запись подтверждена: ${when}.`,
   requestDeclined: (reason) =>
     `❌ К сожалению, заявка отклонена${reason ? ` (${reason})` : ''}. Попробуйте выбрать другое время.`,
+  requestExpired: (when) =>
+    `⌛ Срок вашей заявки (${when}) истек, она не была подтверждена. Пожалуйста, выберите другое время и отправьте заявку заново.`,
   rescheduleSent: (when) =>
     `✅ Заявка на другое время отправлена: ${when}. Мы сообщим, когда регистратор подтвердит.`,
   reminderYes: '✅ Приду',

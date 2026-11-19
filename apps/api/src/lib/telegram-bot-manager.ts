@@ -5,12 +5,13 @@ import IORedis from 'ioredis';
 import { Telegraf } from 'telegraf';
 import { message } from 'telegraf/filters';
 import type { Database, DbOrTx } from '../db/client.ts';
-import { expireStaleBookingRequests } from '../modules/booking-requests/booking-requests.repository.ts';
+import { expireAndNotifyStaleBookingRequests } from '../modules/booking-requests/booking-requests.repository.ts';
 import { decryptSecret } from './crypto.ts';
 import { env } from './env.ts';
 import { logger } from './logger.ts';
 import { createBotFlows } from './telegram/deps.ts';
 import type { TelegramFlows } from './telegram/flows.ts';
+import { createPatientMessenger } from './telegram/notify.ts';
 import {
   bindPhoneVerification,
   hasPendingPhoneVerification,
@@ -250,9 +251,11 @@ export function startTelegramBotManager(deps: ManagerDeps) {
 
   void bootAll().catch((err) => logger.error({ err }, 'bot bootAll failed'));
 
-  // UI-T2: 24 soatdan eski `pending` bron so'rovlari → `expired` (admin conn, barcha tenantlar).
+  // UI-T2/FX-24: muddati tugagan (24 soat yoki slot o'tgan) `pending` bron so'rovlari →
+  // `expired` (admin conn, barcha tenantlar) + bemorga Telegram xabari.
+  const messenger = createPatientMessenger();
   const expire = () =>
-    expireStaleBookingRequests(deps.adminDb).catch((err) =>
+    expireAndNotifyStaleBookingRequests(deps.adminDb, messenger).catch((err) =>
       logger.error({ err }, 'booking request expiry failed'),
     );
   void expire();

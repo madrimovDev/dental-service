@@ -13,7 +13,7 @@ import { toBookingRequestDto } from './booking-requests.mapper.ts';
 import {
   BOOKING_REQUEST_TTL_MS,
   createBookingRequestsRepository,
-  expireStaleBookingRequests,
+  expireStaleBookingRequestsReturning,
 } from './booking-requests.repository.ts';
 import type { ListBookingRequestsQuery } from './booking-requests.schema.ts';
 
@@ -36,10 +36,29 @@ export const createBookingRequestsService = (deps: {
 }) => {
   const repo = deps.repository ?? createBookingRequestsRepository();
 
+  /** Muddati tugagan so'rov egasiga xabar (commit'dan keyin, best-effort — FX-24). */
+  async function notifyExpired(
+    c: Context,
+    rows: { tenantId: string; patientId: string; requestedStart: Date }[],
+  ) {
+    const messenger = deps.messenger;
+    if (!messenger) return;
+    for (const r of rows) {
+      await onAfterCommit(c, () =>
+        messenger.sendBookingDecision({
+          tenantId: r.tenantId,
+          patientId: r.patientId,
+          decision: 'expired',
+          start: r.requestedStart,
+        }),
+      );
+    }
+  }
+
   async function list(c: Context, query: ListBookingRequestsQuery, now: Date = new Date()) {
     // Lazy expiry — RLS tx ichida faqat shu tenant (taymer — barcha tenantlar uchun alohida).
     const db = c.get('db');
-    if (db) await expireStaleBookingRequests(db, now);
+    if (db) await notifyExpired(c, await expireStaleBookingRequestsReturning(db, now));
     const [rows, pendingCount] = await Promise.all([
       repo.list(c, query.status),
       repo.pendingCount(c),
@@ -63,8 +82,13 @@ export const createBookingRequestsService = (deps: {
     if (row.status !== 'pending') {
       return { ok: false, code: 'booking_request.not_pending', conflict: true };
     }
-    if (row.createdAt.getTime() < now.getTime() - BOOKING_REQUEST_TTL_MS) {
-      await repo.markExpired(c, id);
+    // FX-24 (LA-40): 24 soat o'tgan YOKI so'ralgan slot o'tib ketgan — so'rov abadiy
+    // `pending` qolmaydi: `expired` + bemorga xabar (409 — `fail()`, yozuv commit bo'ladi).
+    if (
+      row.createdAt.getTime() < now.getTime() - BOOKING_REQUEST_TTL_MS ||
+      row.requestedStart.getTime() <= now.getTime()
+    ) {
+      if (await repo.markExpired(c, id)) await notifyExpired(c, [row]);
       return { ok: false, code: 'booking_request.expired', conflict: true };
     }
     const doctorId = input.doctorId ?? row.doctorId;
