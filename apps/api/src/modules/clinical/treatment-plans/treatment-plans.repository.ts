@@ -202,6 +202,17 @@ export const createTreatmentPlansRepository = () => {
     return row ?? null;
   }
 
+  /** FT-01: bosqichga kamida bitta to'lov allocation'i bormi (kontent tahriri qulfi). */
+  async function hasStageAllocations(c: Context, stageId: string) {
+    const db = getDb(c);
+    const [row] = await db
+      .select({ id: treatmentStagePayments.id })
+      .from(treatmentStagePayments)
+      .where(eq(treatmentStagePayments.stageId, stageId))
+      .limit(1);
+    return !!row;
+  }
+
   /** C6: estimate uchun plan bosqichlariga tegishli allocation'lar (RLS filtrlaydi). */
   async function listStageAllocations(c: Context, planId: string) {
     const db = getDb(c);
@@ -257,6 +268,7 @@ export const createTreatmentPlansRepository = () => {
     findConsentForm,
     findLabOrderStatus,
     listStageAllocations,
+    hasStageAllocations,
     updatePlan,
     updateStage,
   };

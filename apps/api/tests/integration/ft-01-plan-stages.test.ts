@@ -10,12 +10,14 @@ import { beforeAll, describe, expect, test } from 'bun:test';
 import { PERMISSIONS, ROLE_TEMPLATES } from '@dental/core';
 import {
   branches,
+  cashierTransactions,
   patients,
   permissions as permissionsTable,
   roles,
   servicePrices,
   services,
   treatmentPlans,
+  treatmentStagePayments,
   treatmentStages,
   userAssignments,
   users,
@@ -259,5 +261,142 @@ describe('FT-01.1 — POST /treatment-plans/{id}/stages', () => {
       { serviceName: 'Plomba', cost: 1000 },
     );
     expect(res.status).toBe(404);
+  });
+});
+
+describe('FT-01.1 — PATCH /treatment-stages/{id} bosqich tahriri', () => {
+  const firstStage = async (stages: unknown[]) => {
+    const plan = await createPlan(stages);
+    const stage = plan.stages[0];
+    if (!stage) throw new Error('no stage');
+    return { plan, stage };
+  };
+  const patch = (stageId: string, body: unknown, token = tokens.doctor as string) =>
+    call(token, 'PATCH', `/treatment-stages/${stageId}`, body);
+  const readStage = async (id: string) => {
+    const [row] = await inTenant((tx) =>
+      tx.select().from(treatmentStages).where(eq(treatmentStages.id, id)),
+    );
+    return row!;
+  };
+  const allocate = (stageId: string, amount: string) =>
+    inTenant(async (tx) => {
+      const [t] = await tx
+        .insert(cashierTransactions)
+        .values({
+          tenantId,
+          branchId,
+          patientId,
+          totalAmount: amount,
+          paidAmount: amount,
+          paymentMethod: 'cash',
+        })
+        .returning({ id: cashierTransactions.id });
+      await tx
+        .insert(treatmentStagePayments)
+        .values({ tenantId, transactionId: t!.id, stageId, amount });
+    });
+
+  test('pending + allocation yo‘q: serviceName/cost/toothNumbers/notes tahrirlanadi → 200', async () => {
+    const { stage } = await firstStage([{ serviceName: 'Ko‘rik', cost: 50000 }]);
+    const res = await patch(stage.id, {
+      serviceName: 'Plomba 36',
+      cost: 80000,
+      toothNumbers: [36],
+      notes: 'distal',
+    });
+    expect(res.status).toBe(200);
+    const dto = ((await res.json()) as { data: StageDto }).data;
+    expect(dto.serviceName).toBe('Plomba 36');
+    expect(Number(dto.cost)).toBe(80000);
+    expect(dto.toothNumbers).toEqual([36]);
+    expect(dto.notes).toBe('distal');
+    const row = await readStage(stage.id);
+    expect(Number(row.cost)).toBe(80000);
+    expect(row.toothNumbers).toEqual([36]);
+  });
+
+  test('serviceId o‘rnatilsa narx filial narxidan (CLI-443) — client cost e’tiborsiz', async () => {
+    const { stage } = await firstStage([{ serviceName: 'Erkin', cost: 1000 }]);
+    const res = await patch(stage.id, { serviceId, serviceName: 'Plomba', cost: 5 });
+    expect(res.status).toBe(200);
+    const row = await readStage(stage.id);
+    expect(row.serviceId).toBe(serviceId);
+    expect(Number(row.cost)).toBe(250000);
+  });
+
+  test('mavjud bo‘lmagan serviceId → 400 ownership.*', async () => {
+    const { stage } = await firstStage([{ serviceName: 'Erkin', cost: 1000 }]);
+    const res = await patch(stage.id, { serviceId: crypto.randomUUID() });
+    expect(res.status).toBe(400);
+    expect(await errCode(res)).toMatch(/^ownership\./);
+  });
+
+  test('yaroqsiz FDI → 400', async () => {
+    const { stage } = await firstStage([{ serviceName: 'Erkin', cost: 1000 }]);
+    const res = await patch(stage.id, { toothNumbers: [10] });
+    expect(res.status).toBe(400);
+  });
+
+  test('Receptionist → 403, bosqich o‘zgarmaydi', async () => {
+    const { stage } = await firstStage([{ serviceName: 'Erkin', cost: 1000 }]);
+    const res = await patch(stage.id, { cost: 1 }, tokens.receptionist as string);
+    expect(res.status).toBe(403);
+    expect(Number((await readStage(stage.id)).cost)).toBe(1000);
+  });
+
+  test('in_progress bosqich: cost/toothNumbers/serviceId → 409 stage.locked, o‘zgarmaydi', async () => {
+    const { plan, stage } = await firstStage([
+      { serviceName: 'Kanal', cost: 300000, toothNumbers: [46] },
+    ]);
+    await setPlanStatus(plan.id, 'in_progress');
+    await inTenant((tx) =>
+      tx
+        .update(treatmentStages)
+        .set({ status: 'in_progress', acceptance: 'accepted' })
+        .where(eq(treatmentStages.id, stage.id)),
+    );
+    for (const body of [{ cost: 1 }, { toothNumbers: [47] }, { serviceId }]) {
+      const res = await patch(stage.id, body);
+      expect(res.status).toBe(409);
+      expect(await errCode(res)).toBe('stage.locked');
+    }
+    const row = await readStage(stage.id);
+    expect(Number(row.cost)).toBe(300000);
+    expect(row.toothNumbers).toEqual([46]);
+    expect(row.serviceId).toBeNull();
+  });
+
+  test('in_progress bosqich: notes/resultingToothState va o‘zgarmagan cost → 200 (qulf emas)', async () => {
+    const { plan, stage } = await firstStage([
+      { serviceName: 'Kanal', cost: 300000, toothNumbers: [46] },
+    ]);
+    await setPlanStatus(plan.id, 'in_progress');
+    await inTenant((tx) =>
+      tx
+        .update(treatmentStages)
+        .set({ status: 'in_progress', acceptance: 'accepted' })
+        .where(eq(treatmentStages.id, stage.id)),
+    );
+    const res = await patch(stage.id, {
+      notes: 'ikkinchi seans',
+      resultingToothState: 'root_canal',
+      cost: 300000,
+    });
+    expect(res.status).toBe(200);
+    const row = await readStage(stage.id);
+    expect(row.notes).toBe('ikkinchi seans');
+    expect(row.resultingToothState).toBe('root_canal');
+  });
+
+  test('pending, lekin to‘lov allocation’i bor → 409 stage.locked', async () => {
+    const { stage } = await firstStage([
+      { serviceName: 'Plomba', cost: 100000, toothNumbers: [16] },
+    ]);
+    await allocate(stage.id, '50000');
+    const res = await patch(stage.id, { cost: 90000 });
+    expect(res.status).toBe(409);
+    expect(await errCode(res)).toBe('stage.locked');
+    expect(Number((await readStage(stage.id)).cost)).toBe(100000);
   });
 });

@@ -154,6 +154,31 @@ export class PlanStagesLockedError extends Error {
   }
 }
 
+/**
+ * FT-01: bosqich kontenti (serviceId/serviceName/cost/toothNumbers) faqat `pending` va
+ * to'lov allocation'i yo'q bo'lsa tahrirlanadi — boshlangan/to'langan ish narxi jimgina
+ * o'zgarmasin. Routes 409 (`stage.locked`).
+ */
+export class StageLockedError extends Error {
+  constructor(
+    readonly stageStatus: string,
+    readonly hasAllocations: boolean,
+  ) {
+    super(
+      hasAllocations
+        ? 'Stage has payment allocations — its content cannot be edited'
+        : `Stage is ${stageStatus} — only pending stages can be edited`,
+    );
+    this.name = 'StageLockedError';
+  }
+}
+
+const sameTeeth = (a: readonly number[] | null, b: readonly number[] | null) => {
+  const x = a ?? [];
+  const y = b ?? [];
+  return x.length === y.length && x.every((n, i) => n === y[i]);
+};
+
 const PLAN_STAGES_LOCKED_STATUSES = ['completed', 'cancelled'] as const;
 
 const CONSENT_LOCKED_STATUSES = ['in_progress', 'completed', 'cancelled'] as const;
@@ -441,6 +466,39 @@ export const createTreatmentPlansService = (deps: {
     }
     if (input.labOrderId !== undefined) patch.labOrderId = input.labOrderId;
 
+    // FT-01: kontent tahriri (serviceId/serviceName/cost/toothNumbers). Faqat haqiqatda
+    // o'zgargan maydonlar hisobga olinadi (bir xil qiymatni qayta yuborish qulfga urilmaydi).
+    const content: Record<string, unknown> = {};
+    if (input.serviceName !== undefined && input.serviceName !== current.serviceName) {
+      content.serviceName = input.serviceName;
+    }
+    if (input.toothNumbers !== undefined && !sameTeeth(input.toothNumbers, current.toothNumbers)) {
+      content.toothNumbers = input.toothNumbers;
+    }
+    if (input.serviceId !== undefined && input.serviceId !== current.serviceId) {
+      if (input.serviceId) await ownership.assertServiceExists(c, input.serviceId);
+      content.serviceId = input.serviceId;
+    }
+    if (input.cost !== undefined || 'serviceId' in content) {
+      const effectiveServiceId =
+        input.serviceId !== undefined ? input.serviceId : current.serviceId;
+      let cost = input.cost ?? Number(current.cost);
+      // CLI-443: xizmatli bosqich narxi filial narxidan (createPlan/addStage bilan bir xil).
+      const activeBranchId = c.get('activeBranchId');
+      if (effectiveServiceId && activeBranchId && deps.priceLookup) {
+        const price = await deps.priceLookup.getActivePrice(c, effectiveServiceId, activeBranchId);
+        if (price) cost = Number(price.price);
+      }
+      if (cost !== Number(current.cost)) content.cost = String(cost);
+    }
+    if (Object.keys(content).length > 0) {
+      const hasAllocations = await repo.hasStageAllocations(c, stageId);
+      if (current.status !== 'pending' || hasAllocations) {
+        throw new StageLockedError(current.status, hasAllocations);
+      }
+      Object.assign(patch, content);
+    }
+
     // Hech narsa o'zgarmadi (idempotent yoki bo'sh PATCH) — plan fetch/guard'dan
     // OLDIN erta qaytamiz (no-op arzon qoladi; guard'ga yetmaydi — xavfsiz).
     if (Object.keys(patch).length === 0) return current;
@@ -494,10 +552,19 @@ export const createTreatmentPlansService = (deps: {
         action: 'updated',
         resourceType: 'treatment_stage',
         resourceId: stageId,
-        before: { status: current.status, acceptance: current.acceptance, notes: current.notes },
+        before: {
+          status: current.status,
+          acceptance: current.acceptance,
+          notes: current.notes,
+          ...('serviceId' in content ? { serviceId: current.serviceId } : {}),
+          ...('serviceName' in content ? { serviceName: current.serviceName } : {}),
+          ...('cost' in content ? { cost: current.cost } : {}),
+          ...('toothNumbers' in content ? { toothNumbers: current.toothNumbers } : {}),
+        },
         after: {
           status: input.status,
           acceptance: input.acceptance,
+          ...content,
           ...(patch.status === 'completed' ? { source } : {}),
         },
       });

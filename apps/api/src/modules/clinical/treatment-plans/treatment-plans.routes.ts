@@ -30,6 +30,7 @@ import {
   PlanStagesLockedError,
   type PriceLookup,
   type RecallStageHook,
+  StageLockedError,
   type StageStockHook,
   type ToothChartStageHook,
 } from './treatment-plans.service.ts';
@@ -357,6 +358,10 @@ export const treatmentPlansRoutes = (deps: {
         content: { 'application/json': { schema: errorResponseSchema } },
         description: 'Invalid stage transition',
       },
+      409: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Stage content locked (not pending or has payment allocations)',
+      },
       ...stageNotFound,
     },
   });
@@ -371,6 +376,9 @@ export const treatmentPlansRoutes = (deps: {
     } catch (e) {
       if (e instanceof InvalidTransitionError) {
         return c.json(fail('stage.invalid_transition', e.message), 400);
+      }
+      if (e instanceof StageLockedError) {
+        return c.json(fail('stage.locked', e.message), 409);
       }
       // CLI-487: lab-order linkage cross-entity mismatch → 400 (noto'g'ri havola).
       if (e instanceof CrossEntityError) {

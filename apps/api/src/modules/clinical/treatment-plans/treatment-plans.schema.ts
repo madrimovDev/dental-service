@@ -71,6 +71,15 @@ export const updateStageSchema = z.object({
   labOrderId: z.uuid().nullable().optional(),
   // CLI-488: bosqich 'completed' bo'lganda odontogram shu holatga o'tadi (`null` → o'tmaydi).
   resultingToothState: toothStateSchema.nullable().optional(),
+  // FT-01: bosqich kontenti tahriri — faqat `status=pending` va to'lov allocation'i yo'q
+  // bo'lsa (aks holda 409 `stage.locked`). serviceId bor + filialda faol narx → cost server
+  // narxidan (CLI-443, client cost e'tiborsiz). `serviceId: null` → erkin bosqichga aylantirish.
+  serviceId: z.uuid().nullable().optional(),
+  serviceName: z.string().min(1).max(200).optional(),
+  cost: z.coerce.number().nonnegative().optional(),
+  toothNumbers: z
+    .array(z.coerce.number().int().refine(isValidFdi, { message: 'Invalid FDI tooth number' }))
+    .optional(),
 });
 export type UpdateStageInput = z.infer<typeof updateStageSchema>;
 
