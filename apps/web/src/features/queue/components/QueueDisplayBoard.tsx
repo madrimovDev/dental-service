@@ -17,14 +17,17 @@ function hhmmss(d: Date): string {
   return d.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
+/** FX-158: shu muddatdan eski ma'lumot TV'da «eskirgan» deb belgilanadi (poll 10 s). */
+const STALE_AFTER_MS = 30_000;
+
 /** Jonli soat — setInterval(1000), unmount'da clearInterval (cleanup). */
-function useClock(): string {
+function useClock(): Date {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
-  return hhmmss(now);
+  return now;
 }
 
 export function QueueDisplayBoard() {
@@ -34,7 +37,12 @@ export function QueueDisplayBoard() {
 
   const branches = useBranches();
   const queue = useQueueToday(activeBranchId);
-  const clock = useClock();
+  const now = useClock();
+  const clock = hhmmss(now);
+  // FX-158: xato yoki uzoq vaqt yangilanmagan ma'lumot — eskirgan raqamlarni jonli ko'rsatmaymiz.
+  const stale =
+    queue.isError ||
+    (queue.dataUpdatedAt > 0 && now.getTime() - queue.dataUpdatedAt > STALE_AFTER_MS);
 
   // PII: TV ekranida bemor ismi/xizmati CHIQMAYDI — faqat navbat raqami.
   const tickets = queue.data ?? [];
@@ -95,13 +103,19 @@ export function QueueDisplayBoard() {
         </div>
       </header>
 
-      <div className={classes.cabinets}>
+      {stale && (
+        <div role="alert" className={classes.staleBanner}>
+          {t('queueBoard.stale_banner')}
+        </div>
+      )}
+
+      <div className={`${classes.cabinets} ${stale ? classes.stale : ''}`}>
         {inProgress.length > 0
           ? inProgress.map((tk: QueueTicket) => renderCalled(tk, tk.id))
           : renderCalled(undefined, 'empty')}
       </div>
 
-      <section className={classes.nextPanel}>
+      <section className={`${classes.nextPanel} ${stale ? classes.stale : ''}`}>
         <h2 className={classes.nextTitle}>{t('queue.next_queues')}</h2>
         <p className={classes.nextEmpty}>{t('queueBoard.tv_numbers_only')}</p>
         {nextWaiting.length > 0 ? (

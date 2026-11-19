@@ -9,6 +9,8 @@ const { navigateSpy } = vi.hoisted(() => ({ navigateSpy: vi.fn() }));
 
 // Mutable queue dataset — per-test injectable (mirrors QueueBoard.test pattern).
 let queueData: Array<Record<string, unknown>> = [];
+let queueIsError = false;
+let queueUpdatedAt = Date.now();
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
@@ -29,7 +31,12 @@ vi.mock('../queue.api', () => ({
     },
   }),
   useServices: () => ({ data: [{ id: 's1', nameUz: 'Tozalash' }] }),
-  useQueueToday: () => ({ data: queueData, isLoading: false, isError: false }),
+  useQueueToday: () => ({
+    data: queueData,
+    isLoading: false,
+    isError: queueIsError,
+    dataUpdatedAt: queueUpdatedAt,
+  }),
 }));
 vi.mock('@/stores/auth-store.ts', () => ({
   useAuthStore: () => ({ activeBranchId: 'b1' }),
@@ -58,6 +65,8 @@ describe('QueueDisplayBoard', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     queueData = [];
+    queueIsError = false;
+    queueUpdatedAt = Date.now();
     navigateSpy.mockClear();
   });
 
@@ -131,5 +140,26 @@ describe('QueueDisplayBoard', () => {
     const clock = container.querySelector('[class*="clock"]');
     expect(clock).not.toBeNull();
     expect(clock?.textContent ?? '').toMatch(/\d{1,2}:\d{2}/);
+  });
+
+  it("FX-158: yangi ma'lumotda 'ulanish uzildi' banneri yo'q", () => {
+    queueData = [ticket({ id: 'ip1', status: 'in_progress', queueNumber: 6 })];
+    renderApp(<QueueDisplayBoard />);
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it("FX-158: so'rov xatosida banner chiqadi va raqamlar xiralashadi", () => {
+    queueData = [ticket({ id: 'ip1', status: 'in_progress', queueNumber: 6 })];
+    queueIsError = true;
+    const { container } = renderApp(<QueueDisplayBoard />);
+    expect(screen.getByRole('alert')).toHaveTextContent(/eskirgan/i);
+    expect(container.querySelector('[class*="stale"]')).not.toBeNull();
+  });
+
+  it("FX-158: 30 soniyadan eski ma'lumotda (isError'siz) banner chiqadi", () => {
+    queueData = [ticket({ id: 'ip1', status: 'in_progress', queueNumber: 6 })];
+    queueUpdatedAt = Date.now() - 45_000;
+    renderApp(<QueueDisplayBoard />);
+    expect(screen.getByRole('alert')).toHaveTextContent(/eskirgan/i);
   });
 });

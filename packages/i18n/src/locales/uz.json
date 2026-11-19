@@ -1780,6 +1780,7 @@
     "not_arrived_empty": "Hamma yozilgan bemor keldi",
     "arrived": "Keldi",
     "tv_numbers_only": "Faqat raqam ko'rsatiladi — bemor ismi ekranga chiqmaydi",
+    "stale_banner": "Ulanish uzildi — ma'lumot eskirgan, raqamlar hozirgi holatni ko'rsatmasligi mumkin",
     "sync_failed": "Navbat yangilandi, lekin yozilish holati o'zgarmadi ({{code}})"
   },
   "cashierPos": {
