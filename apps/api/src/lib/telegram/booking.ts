@@ -1,8 +1,11 @@
-import { bookingRequests, branches } from '@dental/db-schema';
+import { bookingRequests, branches, patients } from '@dental/db-schema';
 import { and, asc, eq, isNull } from 'drizzle-orm';
 import type { DbOrTx } from '../../db/client.ts';
 import type { AppointmentsService } from '../../modules/appointments/index.ts';
+import type { NotificationsService } from '../../modules/notifications/index.ts';
 import type { ScheduleService } from '../../modules/schedule/index.ts';
+import type { AuditLogger } from '../audit-logger.ts';
+import { findRecipientsWithPermission } from '../notify-recipients.ts';
 import { CLINIC_TZ } from '../sms-templates.ts';
 import { createBotContext } from './bot-context.ts';
 import { type BotLang, botMessages, fmtWhen } from './messages.ts';
@@ -34,6 +37,10 @@ export type BookingSession = {
 export type BookingDeps = {
   schedule: Pick<ScheduleService, 'getAvailability'>;
   appointments: Pick<AppointmentsService, 'listDoctors'>;
+  /** FX-23b: bot insert auditi (userId=null — bemor Telegram orqali). */
+  audit?: Pick<AuditLogger, 'record'>;
+  /** FX-23b: yangi so'rov haqida xodimga in-app bildirishnoma (`appointment.create` egalari). */
+  notifications?: Pick<NotificationsService, 'notifyInTx'>;
   sessions?: Map<string, BookingSession>;
   now?: () => Date;
 };
@@ -202,6 +209,52 @@ export function createBookingFlow(deps: BookingDeps) {
     return { text: m.chooseBranch, buttons: rows };
   }
 
+  /**
+   * FX-23b: audit (bot — userId=null) + `appointment.create` egalariga in-app bildirishnoma.
+   * Shu tx ichida; best-effort EMAS — bildirishnoma xatosi so'rovni yo'qotmasligi uchun
+   * savepoint'siz, lekin faqat DB yozuvi (tashqi kanal yo'q) bo'lgani uchun xavfsiz.
+   */
+  async function announceRequest(
+    ctx: BookingCtx,
+    s: BookingSession,
+    requestId: string,
+    doctorId: string,
+    start: Date,
+  ): Promise<void> {
+    const c = createBotContext(ctx.tx, ctx.tenantId);
+    await deps.audit?.record(c, {
+      action: 'created',
+      resourceType: 'booking_request',
+      resourceId: requestId,
+      after: {
+        source: 'telegram',
+        patientId: s.patientId,
+        branchId: s.branchId,
+        doctorId,
+        requestedStart: start.toISOString(),
+        rescheduleOfAppointmentId: s.rescheduleOf,
+      },
+    });
+    if (!deps.notifications) return;
+    const [p] = await ctx.tx
+      .select({ name: patients.fullName })
+      .from(patients)
+      .where(eq(patients.id, s.patientId));
+    const recipients = await findRecipientsWithPermission(
+      c,
+      'appointment.create',
+      s.branchId ?? null,
+    );
+    for (const userId of recipients) {
+      await deps.notifications.notifyInTx(ctx.tx, ctx.tenantId, {
+        userId,
+        type: 'booking_request.new',
+        title: s.rescheduleOf ? "Yozilishni ko'chirish so'rovi" : "Yangi bron so'rovi",
+        body: `${p?.name ?? ''} — ${fmtWhen(start)}`,
+      });
+    }
+  }
+
   /** `bk:*` callback. */
   async function handle(ctx: BookingCtx, data: string): Promise<BotReply> {
     const m = botMessages(ctx.lang);
@@ -262,14 +315,18 @@ export function createBookingFlow(deps: BookingDeps) {
         return { text: m.sessionExpired };
       }
       const start = new Date(slot.start);
-      await ctx.tx.insert(bookingRequests).values({
-        tenantId: ctx.tenantId,
-        branchId: s.branchId,
-        patientId: s.patientId,
-        doctorId: slot.doctorId,
-        requestedStart: start,
-        rescheduleOfAppointmentId: s.rescheduleOf,
-      });
+      const [created] = await ctx.tx
+        .insert(bookingRequests)
+        .values({
+          tenantId: ctx.tenantId,
+          branchId: s.branchId,
+          patientId: s.patientId,
+          doctorId: slot.doctorId,
+          requestedStart: start,
+          rescheduleOfAppointmentId: s.rescheduleOf,
+        })
+        .returning({ id: bookingRequests.id });
+      if (created) await announceRequest(ctx, s, created.id, slot.doctorId, start);
       sessions.delete(k);
       return { text: (s.rescheduleOf ? m.rescheduleSent : m.requestSent)(fmtWhen(start)) };
     }

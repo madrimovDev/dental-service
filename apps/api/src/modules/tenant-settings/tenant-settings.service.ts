@@ -7,6 +7,7 @@ import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { encryptSecret } from '../../lib/crypto.ts';
 import { env } from '../../lib/env.ts';
 import { logger } from '../../lib/logger.ts';
+import { pgErrorInfo } from '../../lib/pg-error.ts';
 import { mergeNotificationSettings } from './tenant-settings.mapper.ts';
 import type { UpdateSettingsInput } from './tenant-settings.schema.ts';
 
@@ -30,6 +31,19 @@ export const closeRedisPub = async (): Promise<void> => {
     redisPub = null;
   }
 };
+
+/** FX-25: bu bot boshqa tenantga ulangan (`tenant_settings_telegram_bot_id_uq`). */
+export class TelegramTokenInUseError extends Error {
+  readonly code = 'telegram_token_in_use';
+  constructor() {
+    super('This Telegram bot is already connected to another clinic');
+    this.name = 'TelegramTokenInUseError';
+  }
+}
+
+/** Bot token `<bot_id>:<secret>` — bot id (raqam) token prefiksi; getMe().id bilan bir xil. */
+export const telegramBotIdFromToken = (token: string): string | null =>
+  /^(\d{3,20}):/.exec(token.trim())?.[1] ?? null;
 
 export const createTenantSettingsService = (deps: { audit: AuditLogger }) => {
   /**
@@ -95,8 +109,12 @@ export const createTenantSettingsService = (deps: { audit: AuditLogger }) => {
       const current = (before.integrationSettings ?? {}) as Record<string, unknown>;
       const next = { ...current };
       if (telegram !== undefined) {
+        // FX-25: bot id alohida saqlanadi — unique indeks tenantlar orasida takrorni rad etadi.
+        const botId = telegram === null ? null : telegramBotIdFromToken(telegram.botToken);
         next.telegram =
-          telegram === null ? null : { botTokenEnc: encryptSecret(telegram.botToken) };
+          telegram === null
+            ? null
+            : { botTokenEnc: encryptSecret(telegram.botToken), ...(botId ? { botId } : {}) };
       }
       if (sms !== undefined) {
         next.sms =
@@ -110,7 +128,19 @@ export const createTenantSettingsService = (deps: { audit: AuditLogger }) => {
       patch.integrationSettings = next;
     }
 
-    const [updated] = await db.update(tenantSettings).set(patch).returning();
+    let updated: typeof before | undefined;
+    try {
+      // SAVEPOINT: unique buzilishi (23505) so'rov tranzaksiyasini aborted qilmasin.
+      [updated] = await db.transaction(async (sp) =>
+        sp.update(tenantSettings).set(patch).returning(),
+      );
+    } catch (err) {
+      const pg = pgErrorInfo(err);
+      if (pg?.code === '23505' && pg.constraint === 'tenant_settings_telegram_bot_id_uq') {
+        throw new TelegramTokenInUseError();
+      }
+      throw err;
+    }
 
     if (updated) {
       await deps.audit.record(c, {

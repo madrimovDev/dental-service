@@ -9,6 +9,11 @@ import { expireAndNotifyStaleBookingRequests } from '../modules/booking-requests
 import { decryptSecret } from './crypto.ts';
 import { env } from './env.ts';
 import { logger } from './logger.ts';
+import {
+  createBotLifecycle,
+  type LifecycleBot,
+  telegrafLifecycleBot,
+} from './telegram/bot-lifecycle.ts';
 import { createBotFlows } from './telegram/deps.ts';
 import type { TelegramFlows } from './telegram/flows.ts';
 import { createPatientMessenger } from './telegram/notify.ts';
@@ -46,7 +51,12 @@ async function readToken(adminDb: Database, tenantId: string): Promise<string | 
   return enc ? decryptSecret(enc) : null;
 }
 
-export type LinkOutcome = 'linked' | 'not_found' | 'not_own_contact' | 'already_linked';
+export type LinkOutcome =
+  | 'linked'
+  | 'not_found'
+  | 'not_own_contact'
+  | 'already_linked'
+  | 'not_private';
 
 /**
  * P8 — kontakt egaligi: faqat foydalanuvchining O'Z kontakti (`contact.user_id`
@@ -55,30 +65,43 @@ export type LinkOutcome = 'linked' | 'not_found' | 'not_own_contact' | 'already_
  */
 export async function linkPatientByContact(
   tx: DbOrTx,
-  o: { contactUserId: number | undefined; fromId: number; phone: string; chatId: string },
+  o: {
+    contactUserId: number | undefined;
+    fromId: number;
+    phone: string;
+    chatId: string;
+    chatType: string | undefined;
+  },
 ): Promise<LinkOutcome> {
+  // FX-84: faqat shaxsiy chat — guruh chat_id'si bemorga yozilsa, eslatma/chek/retsept
+  // (PHI) guruhga ketardi.
+  if (o.chatType !== 'private') return 'not_private';
   if (o.contactUserId === undefined || o.contactUserId !== o.fromId) return 'not_own_contact';
-  // CLI-475 B7 — deterministik: eng eski bemor (createdAt asc).
-  const [p] = await tx
+  // FX-42 (LA-21): oilaviy telefon — shu raqamdagi BARCHA bemorlar (ona + bolalar) bir chat'ga
+  // bog'lanadi; har bemor o'z chat_id'sini saqlaydi, shuning uchun eslatma/chek/retsept
+  // har birining o'z yozuvi bo'yicha yetadi. Boshqa chat'ga bog'langanlarga tegilmaydi.
+  const matches = await tx
     .select({ id: patients.id, chat: patients.telegramChatId })
     .from(patients)
     .where(inArray(patients.phone, [o.phone, o.phone.replace(/^\+/, '')]))
-    .orderBy(asc(patients.createdAt))
-    .limit(1);
-  if (!p) return 'not_found';
-  if (p.chat && p.chat !== o.chatId) return 'already_linked';
-  if (!p.chat) {
-    await tx.update(patients).set({ telegramChatId: o.chatId }).where(eq(patients.id, p.id));
+    .orderBy(asc(patients.createdAt));
+  if (matches.length === 0) return 'not_found';
+  const free = matches.filter((p) => !p.chat).map((p) => p.id);
+  const mine = matches.some((p) => p.chat === o.chatId);
+  if (free.length > 0) {
+    await tx.update(patients).set({ telegramChatId: o.chatId }).where(inArray(patients.id, free));
   }
+  if (free.length === 0 && !mine) return 'already_linked';
   return 'linked';
 }
 
 export function startTelegramBotManager(deps: ManagerDeps) {
-  const bots = new Map<string, Telegraf>();
   const flows = deps.flows ?? createBotFlows(deps.adminDb);
 
-  const launch = async (tenantId: string, token: string) => {
+  /** Telegraf instansiyasini handlerlar bilan quradi (ishga tushirmaydi). */
+  const buildBot = (tenantId: string, token: string): LifecycleBot => {
     const bot = new Telegraf(token);
+    const lcBot = telegrafLifecycleBot(bot);
     const run = <T>(fn: (tx: DbOrTx) => Promise<T>) => deps.withTenant(tenantId, fn);
     const send = (ctx: { reply: (t: string, e?: object) => Promise<unknown> }, r: BotReply) =>
       ctx.reply(r.text, toTelegrafExtra(r));
@@ -168,12 +191,14 @@ export function startTelegramBotManager(deps: ManagerDeps) {
           fromId: ctx.from.id,
           phone,
           chatId,
+          chatType: ctx.chat.type,
         }),
       );
       const replies: Record<LinkOutcome, string> = {
         linked: "✅ Bog'landingiz — endi eslatmalar shu yerga keladi.",
         not_found: '⚠️ Raqamingiz topilmadi. Klinikaga murojaat qiling.',
         not_own_contact: "⚠️ Faqat o'z raqamingizni ulashing.",
+        not_private: '⚠️ Raqamni faqat botning shaxsiy chatida ulashing.',
         already_linked:
           "⚠️ Bu raqam boshqa Telegram hisobiga bog'langan. Klinikaga murojaat qiling.",
       };
@@ -203,31 +228,14 @@ export function startTelegramBotManager(deps: ManagerDeps) {
       await ctx.answerCbQuery(res.toast);
       if (res.reply) await send(ctx, res.reply);
     });
-    // NOTE: `bot.launch()`'s promise does NOT resolve on start — it resolves only
-    // after `bot.stop()` (Telegraf's `Polling.loop()` is a `for await` that runs
-    // until `abortController.abort()`; confirmed against the installed
-    // `telegraf` source, `node_modules/telegraf/lib/polling.js`). `await`-ing it
-    // here would hang `bootAll()`'s per-tenant loop on the first tenant with a
-    // token, and `bots.set(...)` below would never run during normal operation.
-    // Fire-and-forget instead — same API, just not awaited.
-    void bot.launch().catch((err) => logger.error({ err, tenantId }, 'bot launch failed'));
-    bots.set(tenantId, bot);
-    logger.info({ tenantId }, 'Telegram bot launched');
+    return lcBot;
   };
 
-  const stop = async (tenantId: string) => {
-    const bot = bots.get(tenantId);
-    if (bot) {
-      bot.stop('reload');
-      bots.delete(tenantId);
-    }
-  };
+  // FX-40/FX-143: launch/stop/reload per-tenant ketma-ket, stop xatosiga chidamli.
+  const lifecycle = createBotLifecycle({ create: buildBot });
 
-  const reload = async (tenantId: string) => {
-    await stop(tenantId);
-    const token = await readToken(deps.adminDb, tenantId);
-    if (token) await launch(tenantId, token);
-  };
+  const reload = (tenantId: string) =>
+    lifecycle.reload(tenantId, () => readToken(deps.adminDb, tenantId));
 
   // Boot: launch every tenant that currently has a telegram token.
   const bootAll = async () => {
@@ -238,7 +246,8 @@ export function startTelegramBotManager(deps: ManagerDeps) {
     for (const r of rows) {
       try {
         const enc = (r.s as { telegram?: { botTokenEnc?: string } } | null)?.telegram?.botTokenEnc;
-        if (enc) await launch(r.tenantId, decryptSecret(enc));
+        // Token zanjir ichida QAYTA o'qiladi — boot snapshot'i kechikib, orada kelgan yangi token'ni bosmasin.
+        if (enc) await reload(r.tenantId);
       } catch (err) {
         logger.error({ err, tenantId: r.tenantId }, 'bot bootAll: tenant failed, skipping');
       }
@@ -267,9 +276,11 @@ export function startTelegramBotManager(deps: ManagerDeps) {
 
   const stopAll = async () => {
     clearInterval(expiryTimer);
-    for (const [, bot] of bots) bot.stop('shutdown');
-    bots.clear();
-    await sub.quit();
+    try {
+      lifecycle.stopAll();
+    } finally {
+      await sub.quit();
+    }
   };
 
   return { reload, stopAll };

@@ -1,8 +1,8 @@
-import { ok } from '@dental/core';
+import { fail, ok } from '@dental/core';
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
-import { okJson } from '../../lib/openapi.ts';
+import { errorResponseSchema, okJson } from '../../lib/openapi.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
@@ -17,7 +17,7 @@ import {
   tenantVerticalDtoSchema,
   updateSettingsSchema,
 } from './tenant-settings.schema.ts';
-import { createTenantSettingsService } from './tenant-settings.service.ts';
+import { createTenantSettingsService, TelegramTokenInUseError } from './tenant-settings.service.ts';
 
 export const tenantSettingsRoutes = (deps: { db: Database; audit: AuditLogger }) => {
   const app = new OpenAPIHono();
@@ -84,13 +84,27 @@ export const tenantSettingsRoutes = (deps: { db: Database; audit: AuditLogger })
     request: {
       body: { content: { 'application/json': { schema: updateSettingsSchema } } },
     },
-    responses: okJson(tenantSettingsDtoSchema, 'Updated tenant settings'),
+    responses: {
+      ...okJson(tenantSettingsDtoSchema, 'Updated tenant settings'),
+      409: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Telegram bot is already connected to another clinic (FX-25)',
+      },
+    },
   });
 
   app.openapi(patchRoute, async (c) => {
     const body = c.req.valid('json');
-    const row = await service.update(c, body);
-    return c.json(ok(toTenantSettingsDto(row)), 200);
+    try {
+      const row = await service.update(c, body);
+      return c.json(ok(toTenantSettingsDto(row)), 200);
+    } catch (e) {
+      // FX-25: bir bot — bitta klinika (tx rollback bo'ladi, hech narsa saqlanmaydi).
+      if (e instanceof TelegramTokenInUseError) {
+        return c.json(fail('tenant_settings.telegram_token_in_use', e.message), 409);
+      }
+      throw e;
+    }
   });
 
   // CLI-379/400: "test these creds" action — validates a Telegram bot token

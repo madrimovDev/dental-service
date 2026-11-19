@@ -61,3 +61,30 @@ export const onAfterCommit = async (c: Context, fn: AfterCommitFn): Promise<void
   }
   await runOne(fn, c.get('requestId'));
 };
+
+/**
+ * FX-75: HTTP'siz (bot/worker) yo'lda `rlsMiddleware` yo'q — ro'yxatni `withTenant`
+ * boshqaradi. Ro'yxat tx obyektiga bog'lanadi: `createBotContext(tx)` uni
+ * `afterCommit` sifatida store'ga qo'yadi, `withTenant` esa commit'dan keyin
+ * `drainTxAfterCommit` bilan bajaradi (rollback'da — `dropTxAfterCommit`).
+ */
+const txAfterCommit = new WeakMap<object, AfterCommitFn[]>();
+
+export const getTxAfterCommit = (tx: object): AfterCommitFn[] => {
+  let list = txAfterCommit.get(tx);
+  if (!list) {
+    list = [];
+    txAfterCommit.set(tx, list);
+  }
+  return list;
+};
+
+export const drainTxAfterCommit = async (tx: object): Promise<void> => {
+  const list = txAfterCommit.get(tx);
+  txAfterCommit.delete(tx);
+  if (list?.length) await runAfterCommit(list);
+};
+
+export const dropTxAfterCommit = (tx: object): void => {
+  txAfterCommit.delete(tx);
+};

@@ -1,6 +1,8 @@
+import { createNoOpChannel } from '@dental/notifications';
 import type { Database } from '../../db/client.ts';
 import { createAppointmentsService } from '../../modules/appointments/index.ts';
 import { createNoShowStrikesService } from '../../modules/no-show-strikes/index.ts';
+import { createNotificationsService } from '../../modules/notifications/index.ts';
 import { createRecallsService } from '../../modules/recalls/index.ts';
 import { createScheduleService } from '../../modules/schedule/index.ts';
 import { createAuditLogger } from '../audit-logger.ts';
@@ -31,5 +33,7 @@ export function createBotFlows(adminDb: Database) {
       (await reminders()).enqueueReminder(tenantId, appointmentId, delayMs),
     removeReminder: async (appointmentId) => (await reminders()).removeReminder(appointmentId),
   });
-  return createTelegramFlows({ appointments, schedule });
+  // In-app bildirishnoma uchun kanal kerak emas (smsTo berilmaydi) — NoOp.
+  const notifications = createNotificationsService({ sms: createNoOpChannel() });
+  return createTelegramFlows({ appointments, schedule, audit, notifications });
 }
