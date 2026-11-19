@@ -753,7 +753,19 @@
     "no_medical_permission": "Sizda tibbiy kartani ko'rish ruxsati yo'q",
     "collect_payment": "To'lov qabul qilish",
     "import_button": "Excel'dan import",
-    "dup_desc_count": "Shu raqam bilan ro'yxatdan o'tgan bemorlar: {{count}} ta (ism faqat bemor ma'lumotlarini ko'ra oladiganlarga ko'rinadi)."
+    "dup_desc_count": "Shu raqam bilan ro'yxatdan o'tgan bemorlar: {{count}} ta (ism faqat bemor ma'lumotlarini ko'ra oladiganlarga ko'rinadi).",
+    "finance": {
+      "plan_debt": "Reja bo'yicha qarz",
+      "non_plan": "Rejasiz qoldiq",
+      "total": "Umumiy balans",
+      "total_credit": "Umumiy balans (avans)",
+      "plan": "Reja",
+      "status": {
+        "pending": "Kutilmoqda",
+        "completed": "Bajarilgan",
+        "voided": "Bekor qilingan"
+      }
+    }
   },
   "medical": {
     "history_title": "O'zgarishlar tarixi",

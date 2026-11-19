@@ -11,6 +11,7 @@ import {
   getPatientBalance,
   getPatientNoShowStrikes,
   importPatients,
+  listCashierPatientPlans,
   listCashierTransactions,
   listPatientEmergencyContacts,
   listPatientRelatives,
@@ -165,10 +166,24 @@ export function useMedicalRecordHistory(id: string) {
   });
 }
 
-export function usePatientPayments(id: string) {
+export const PATIENT_PAYMENTS_PAGE_SIZE = 50;
+
+export function usePatientPayments(id: string, page = 1) {
   return useQuery({
-    queryKey: patientKeys.payments(id),
-    queryFn: () => listCashierTransactions({ patientId: id, pageSize: 50 }).then((r) => r.data),
+    queryKey: [...patientKeys.payments(id), page] as const,
+    queryFn: () =>
+      listCashierTransactions({ patientId: id, page, pageSize: PATIENT_PAYMENTS_PAGE_SIZE }).then(
+        (r) => r.data,
+      ),
+    enabled: !!id,
+  });
+}
+
+/** To'lov qatorida reja nomini ko'rsatish uchun (`cashier.view` — PaymentsTab bilan bir ruxsat). */
+export function usePatientPlanTitles(id: string) {
+  return useQuery({
+    queryKey: [...patientKeys.payments(id), 'plan-titles'] as const,
+    queryFn: () => listCashierPatientPlans({ patientId: id }).then((r) => r.data),
     enabled: !!id,
   });
 }
