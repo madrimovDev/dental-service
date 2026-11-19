@@ -36,15 +36,15 @@ Bu hujjat dalillarni takrorlamaydi — har band manbaga havola qiladi. Kod hali 
 
 | ID | Manba | Nima tuzatiladi | Qabul mezoni | Hajm | Holat |
 |---|---|---|---|---|---|
-| FX-01 | LA-06 | Recall create'da `patientId`/`treatmentPlanId`/`assignedDoctorId`/`branchId` egalik tekshiruvi (X-1); recall-worker admin join'iga `patients.tenant_id = recalls.tenant_id` | Real-DB test: A kontekstida B bemoriga recall → 404, qator yaratilmaydi; worker begona juftni o'tkazib yuboradi. Mavjud arvoh qatorlarni topuvchi SQL so'rovi hujjatlangan | S | ochiq |
-| FX-02 | LA-46 + audit low | Appointment create/update'da patient/doctor/assistant egaligi (X-1); global EXCLUDE'ga `tenant_id WITH =` (yoki ikki-tenant doktor bloki qasddan ekanini Qaror sifatida yozish) 👤 | Real-DB test: begona `patientId` → 404; ikki tenant bir-birining bronini bloklay olmaydi (yoki qaror hujjatlangan) | M | ochiq |
-| FX-03 | audit low (tenancy) | Qolgan create endpoint'lardagi begona FK'lar: queue walk-in, cashier, stock BOM/batch/movement, booking confirm (X-1) | Har endpoint uchun begona ID → 404 testi | M | ochiq |
-| FX-04 | LA-05 | `rlsMiddleware` qayta kirish guard'i (kontekstda tx bor bo'lsa — `next()`), yoki auth/rls'ni bare-`/api` modullaridan ota darajaga ko'chirish | Test: `/api/patients/:id/images` so'rovida `db.transaction` 1 marta chaqiriladi; clinical/patient-images RLS izolyatsiyasi saqlanadi | S | ochiq |
-| FX-05 | LA-19 | Vendor orqali owner parol tiklashda refresh token'larni bekor qilish + `mustChangePassword: false` | Test: tiklashdan keyin eski refresh token 401 | S | ochiq |
-| FX-06 | LA-15 (X-4) | Heartbeat javobini `writeLicense`dan oldin imzo+fingerprint bilan tekshirish; yaroqsiz bo'lsa eski `.lic` saqlanadi | Test: imzosiz/boshqa fingerprint javobi `.lic`ni o'zgartirmaydi 🪟 | S | ochiq |
-| FX-07 | LA-16 (X-4) | Supervisor «qator yo'q» va «deaktivatsiya» uchun alohida kod qaytaradi; `.lic` faqat **imzolangan** revoke'da o'chiriladi; `expiresAt` regressiyasi rad etiladi | Test: imzosiz `INVALID_KEY` `.lic`ni o'chirmaydi; imzolangan revoke o'chiradi | M | ochiq |
-| FX-08 | LA-45 | `/api/activate` va `/api/reset-owner-password` faqat `DENTAL_LOCAL_DESKTOP` bo'lganda mount (bulutda 404) | Bulut rejimida ikkala route 404 | S | ochiq |
-| FX-09 | LA-01 | `needsVendor` holatida «Ta'minotchi tayyorladi — kalitni kiriting» tugmasi mavjud aktivatsiya formasini ochadi | Vitest: needsVendor'da tugma → forma; Linux E2E: `.lic` bor, baza bo'sh → UI orqali qayta aktivatsiya → login 🪟 | S | ochiq |
+| FX-01 | LA-06 | Recall create'da `patientId`/`treatmentPlanId`/`assignedDoctorId`/`branchId` egalik tekshiruvi (X-1); recall-worker admin join'iga `patients.tenant_id = recalls.tenant_id` | Real-DB test: A kontekstida B bemoriga recall → 404, qator yaratilmaydi; worker begona juftni o'tkazib yuboradi. Mavjud arvoh qatorlarni topuvchi SQL so'rovi hujjatlangan | S | qilindi (batch 1) |
+| FX-02 | LA-46 + audit low | Appointment create/update'da patient/doctor/assistant egaligi (X-1); global EXCLUDE'ga `tenant_id WITH =` (yoki ikki-tenant doktor bloki qasddan ekanini Qaror sifatida yozish) 👤 | Real-DB test: begona `patientId` → 404; ikki tenant bir-birining bronini bloklay olmaydi (yoki qaror hujjatlangan) | M | qilindi (batch 1) |
+| FX-03 | audit low (tenancy) | Qolgan create endpoint'lardagi begona FK'lar: queue walk-in, cashier, stock BOM/batch/movement, booking confirm (X-1) | Har endpoint uchun begona ID → 404 testi | M | qilindi (batch 1) |
+| FX-04 | LA-05 | `rlsMiddleware` qayta kirish guard'i (kontekstda tx bor bo'lsa — `next()`), yoki auth/rls'ni bare-`/api` modullaridan ota darajaga ko'chirish | Test: `/api/patients/:id/images` so'rovida `db.transaction` 1 marta chaqiriladi; clinical/patient-images RLS izolyatsiyasi saqlanadi | S | qilindi (batch 1) |
+| FX-05 | LA-19 | Vendor orqali owner parol tiklashda refresh token'larni bekor qilish + `mustChangePassword: false` | Test: tiklashdan keyin eski refresh token 401 | S | qilindi (batch 1) |
+| FX-06 | LA-15 (X-4) | Heartbeat javobini `writeLicense`dan oldin imzo+fingerprint bilan tekshirish; yaroqsiz bo'lsa eski `.lic` saqlanadi | Test: imzosiz/boshqa fingerprint javobi `.lic`ni o'zgartirmaydi 🪟 | S | qilindi (batch 1) |
+| FX-07 | LA-16 (X-4) | Supervisor «qator yo'q» va «deaktivatsiya» uchun alohida kod qaytaradi; `.lic` faqat **imzolangan** revoke'da o'chiriladi; `expiresAt` regressiyasi rad etiladi | Test: imzosiz `INVALID_KEY` `.lic`ni o'chirmaydi; imzolangan revoke o'chiradi | M | qilindi (batch 1) |
+| FX-08 | LA-45 | `/api/activate` va `/api/reset-owner-password` faqat `DENTAL_LOCAL_DESKTOP` bo'lganda mount (bulutda 404) | Bulut rejimida ikkala route 404 | S | qilindi (batch 1) |
+| FX-09 | LA-01 | `needsVendor` holatida «Ta'minotchi tayyorladi — kalitni kiriting» tugmasi mavjud aktivatsiya formasini ochadi | Vitest: needsVendor'da tugma → forma; Linux E2E: `.lic` bor, baza bo'sh → UI orqali qayta aktivatsiya → login 🪟 | S | qilindi (batch 1) |
 | FX-10 | LA-24 | `telegram:reload` publish'ni `onAfterCommit` ichiga | Test: publish commit'dan keyin chaqiriladi | S | ochiq |
 | FX-11 | gigiena | `apps/api/tests/integration/.ui-t2-telegram-secret-test.txt` — git'dan chiqarish, `.gitignore`, ichida haqiqiy kalit yo'qligini tekshirish | `git ls-files` da yo'q; test temp fayl ishlatadi | S | ochiq |
 
@@ -52,16 +52,16 @@ Bu hujjat dalillarni takrorlamaydi — har band manbaga havola qiladi. Kod hali 
 
 | ID | Manba | Nima tuzatiladi | Qabul mezoni | Hajm | Holat |
 |---|---|---|---|---|---|
-| FX-12 | LA-03, LA-39 | `stageId`li vizit kassa «kutilayotgan» ro'yxatiga tushmaydi; `create(visitNoteId)` stageId'li vizitni rad etadi yoki to'lovni shu bosqichga allocation qiladi 👤 (qaysi biri) | Real-DB: bosqichli vizit pending'da yo'q; vizit yo'li bilan to'lash → 409 (yoki allocation, reja qarzi kamayadi) | S | ochiq |
-| FX-13 | LA-36 (X-3) | Bosqich `completed` faqat effektiv `acceptance='accepted'` bo'lsa; vizit formasida faqat qabul qilingan bosqichlar | Test: proposed bosqichni completed qilish → 400 (yoki avto-accept — 👤) | S | ochiq |
-| FX-14 | LA-33 (X-3) 👤 | Bosqich yakunlash + recall + odontogramma `sign()` ga ko'chadi (qoralama saqlash bosqichni yopmaydi); ko'p vizitli bosqich uchun «yakunlovchi vizit» bayrog'i. Qaror #37 bilan solishtirish | Test: qoralama vizit → bosqich `in_progress`; imzo → `completed` | M | ochiq |
-| FX-15 | LA-32 | Completed bosqichning acceptance'ini rad etish/proposed qilish taqiqlanadi; completed bosqichli rejani bekor qilish rad etiladi yoki sabab + ruxsat talab qiladi | Real-DB: bekor qilishdan keyin ham bajarilgan ish qarzi saqlanadi | S | ochiq |
-| FX-16 | LA-37 | Rejani `completed` qilishda bajarilmagan accepted bosqich bo'lsa rad etish (yoki «skipped qilib yopish» dialogi) | Test + UI tasdiq dialogi | S | ochiq |
-| FX-17 | LA-38 | `listPendingVisits` faqat bugun emas — N kunlik oyna (30) + «kechikkan» belgisi + paginatsiya | Test: kecha imzolangan to'lanmagan vizit ro'yxatda | S | ochiq |
-| FX-18 | LA-28 | Payroll `finalizeRun` draft snapshot'idan keyingi to'lov/refund'ni aniqlaydi: rad etadi (`stale_snapshot`) yoki qayta hisoblaydi | Real-DB: draft → to'lov qo'shildi → finalize → yo'qolmaydi. CLI-479 invarianti testi yashil | M | ochiq |
-| FX-19 | LA-29 👤 | Vizit orqali POS to'lovi doktorga bog'lanadi: `COALESCE(plan.doctor_id, visit_note.doctor_id)` payroll, hisobot va refund hook'ida. Qaror #16 kengaytmasi | Real-DB: vizit to'lovi komissiyada ko'rinadi; refund to'g'ri clawback | M | ochiq |
-| FX-20 | LA-26 | Debt-aging langari — to'lanmagan qoldiq (FIFO bo'yicha birinchi to'liq yopilmagan bosqich / qoldiqli tranzaksiya) | Real-DB: eski to'langan + yangi qarz → yangi bucket | S | ochiq |
-| FX-21 | CF-20 | Erkin (items) to'lovda `patientId` majburiy: schema `.refine` + web Charge gate | Test: items rejimida patientsiz → 400 | S | ochiq |
+| FX-12 | LA-03, LA-39 | `stageId`li vizit kassa «kutilayotgan» ro'yxatiga tushmaydi; `create(visitNoteId)` stageId'li vizitni rad etadi yoki to'lovni shu bosqichga allocation qiladi 👤 (qaysi biri) | Real-DB: bosqichli vizit pending'da yo'q; vizit yo'li bilan to'lash → 409 (yoki allocation, reja qarzi kamayadi) | S | qilindi (batch 1) |
+| FX-13 | LA-36 (X-3) | Bosqich `completed` faqat effektiv `acceptance='accepted'` bo'lsa; vizit formasida faqat qabul qilingan bosqichlar | Test: proposed bosqichni completed qilish → 400 (yoki avto-accept — 👤) | S | qilindi (batch 1) |
+| FX-14 | LA-33 (X-3) 👤 | Bosqich yakunlash + recall + odontogramma `sign()` ga ko'chadi (qoralama saqlash bosqichni yopmaydi); ko'p vizitli bosqich uchun «yakunlovchi vizit» bayrog'i. Qaror #37 bilan solishtirish | Test: qoralama vizit → bosqich `in_progress`; imzo → `completed` | M | qilindi (batch 1) |
+| FX-15 | LA-32 | Completed bosqichning acceptance'ini rad etish/proposed qilish taqiqlanadi; completed bosqichli rejani bekor qilish rad etiladi yoki sabab + ruxsat talab qiladi | Real-DB: bekor qilishdan keyin ham bajarilgan ish qarzi saqlanadi | S | qilindi (batch 1) |
+| FX-16 | LA-37 | Rejani `completed` qilishda bajarilmagan accepted bosqich bo'lsa rad etish (yoki «skipped qilib yopish» dialogi) | Test + UI tasdiq dialogi | S | qilindi (batch 1) |
+| FX-17 | LA-38 | `listPendingVisits` faqat bugun emas — N kunlik oyna (30) + «kechikkan» belgisi + paginatsiya | Test: kecha imzolangan to'lanmagan vizit ro'yxatda | S | qilindi (batch 1) |
+| FX-18 | LA-28 | Payroll `finalizeRun` draft snapshot'idan keyingi to'lov/refund'ni aniqlaydi: rad etadi (`stale_snapshot`) yoki qayta hisoblaydi | Real-DB: draft → to'lov qo'shildi → finalize → yo'qolmaydi. CLI-479 invarianti testi yashil | M | qilindi (batch 1) |
+| FX-19 | LA-29 👤 | Vizit orqali POS to'lovi doktorga bog'lanadi: `COALESCE(plan.doctor_id, visit_note.doctor_id)` payroll, hisobot va refund hook'ida. Qaror #16 kengaytmasi | Real-DB: vizit to'lovi komissiyada ko'rinadi; refund to'g'ri clawback | M | qilindi (batch 1) |
+| FX-20 | LA-26 | Debt-aging langari — to'lanmagan qoldiq (FIFO bo'yicha birinchi to'liq yopilmagan bosqich / qoldiqli tranzaksiya) | Real-DB: eski to'langan + yangi qarz → yangi bucket | S | qilindi (batch 1) |
+| FX-21 | CF-20 | Erkin (items) to'lovda `patientId` majburiy: schema `.refine` + web Charge gate | Test: items rejimida patientsiz → 400 | S | qilindi (batch 1) |
 | FX-22 | LA-34 🔒 | Dori↔allergiya: noma'lum allergiyada (xato/403/loading) `CriticalActionDialog`; `PrescriptionsTab`da ham tekshiruv; server tomonda override sababisiz 409 | Test: konfliktli retsept serverda 409; override sababi audit'da | M | ochiq |
 
 ### To'lqin 3 — Klinikada ko'ringan buglar
@@ -69,10 +69,10 @@ Bu hujjat dalillarni takrorlamaydi — har band manbaga havola qiladi. Kod hali 
 | ID | Manba | Nima tuzatiladi | Qabul mezoni | Hajm | Holat |
 |---|---|---|---|---|---|
 | FX-23 | CF-1 | Telegram bron so'rovlari: `refetchInterval ~20s`; `TelegramRequests` umumiy widget — Manager/Doctor/Generic dashboard'larda ham (`appointment.create` gate); sidebar badge `pendingCount`; yangi so'rovda xodimga bildirishnoma (`findRecipientsWithPermission`); «Muddati o'tgan» tab | Brauzer: owner, branch manager va registrator yangi so'rovni 30 s ichida ko'radi | M | ochiq |
-| FX-24 | CF-1 / LA-40 | Bron muddati tugaganda (24 soat yoki slot o'tganda) bemorga xabar; 409 band slotda tasdiqlashda doktor/vaqt almashtirish | Test: expire → bemorga xabar | S | ochiq |
+| FX-24 | CF-1 / LA-40 | Bron muddati tugaganda (24 soat yoki slot o'tganda) bemorga xabar; 409 band slotda tasdiqlashda doktor/vaqt almashtirish | Test: expire → bemorga xabar | S | qilindi (batch 1) |
 | FX-25 | CF-1 (P2) | Bot insert'iga `audit.record`; `roleKey` tanlashda `ORDER BY`; bot token unikalligi (bot username bo'yicha) | Testlar | S | ochiq |
 | FX-26 | CF-5 | Rozilik: bitta tugma (`hasConsent` gate), bitta termin («Rozilik»); plan modalida inline imzolash (`signForm` + `setConsent`) | Vitest: bog'langandan keyin tugma yo'q; modaldan imzolab bog'lash | S | ochiq |
-| FX-27 | LA-35, CF-11 (X-3) | `resultingToothState` create-stage schema'siga; odontogramma va StageRow'da tanlash; bosqich tugaganda tish snapshot'i | E2E: bosqich completed → odontogrammada yangi holat | M | ochiq |
+| FX-27 | LA-35, CF-11 (X-3) | `resultingToothState` create-stage schema'siga; odontogramma va StageRow'da tanlash; bosqich tugaganda tish snapshot'i | E2E: bosqich completed → odontogrammada yangi holat | M | qilindi (batch 1) |
 | FX-28 | LA-02 | Telegram anketasi: DTO'ga `questionnaireAnswers/At`; MedicalTab'da «Bemor anketasi» bloki + «tibbiy kartaga ko'chirish»; qayta topshirishda tarix | Brauzer: bot anketasi shifokorga ko'rinadi | M | ochiq |
 | FX-29 | LA-04 (X-2) | Tenant-wide tayinlovli xodimga barcha filiallar; yozilish ustasida filial selektori | Rol testi: tenant-wide registrator filial almashtiradi | S | ochiq |
 | FX-30 | CF-13 | Bemor moliyasi ekrani: `planDebt` / `nonPlanBalance` / avans alohida kartalar; refund turi va status ajratiladi; to'lovda reja/bosqich nomi; paginatsiya; yagona termin. Pul mantig'i o'zgarmaydi | Brauzer: ekran yig'indisi sarlavhaga mos | M | ochiq |
@@ -83,19 +83,19 @@ Bu hujjat dalillarni takrorlamaydi — har band manbaga havola qiladi. Kod hali 
 
 | ID | Manba | Nima tuzatiladi | Hajm | Holat |
 |---|---|---|---|---|
-| FX-31 | LA-25 | `/api/reports/pnl` ga `reportBranchScope` | S | ochiq |
-| FX-32 | LA-27, LA-30 | Kassa endpoint'lari (create, refund, daily-summary, transactions, pending-visits) X-2 bilan | M | ochiq |
+| FX-31 | LA-25 | `/api/reports/pnl` ga `reportBranchScope` | S | qilindi (batch 1) |
+| FX-32 | LA-27, LA-30 | Kassa endpoint'lari (create, refund, daily-summary, transactions, pending-visits) X-2 bilan | M | qilindi (batch 1) |
 | FX-33 | LA-31 | Invite/addAssignment/updateAssignment'da filial eskalatsiyasi taqiqi (`branch.escalation` 403) | S | ochiq |
-| FX-34 | LA-08 | Doktor↔filial moslik helper'i: `listDoctors(branchId)`, slot fallback, appointment create/update (`schedule.doctor_not_in_branch`) | M | ochiq |
+| FX-34 | LA-08 | Doktor↔filial moslik helper'i: `listDoctors(branchId)`, slot fallback, appointment create/update (`schedule.doctor_not_in_branch`) | M | qilindi (batch 1) |
 | FX-35 | LA-11 👤 | BOM avto-chiqimi vizit filialidagi itemdan (`service_materials.branch_id` yoki filialga mos item) | M | ochiq |
 
 ### To'lqin 5 — Bron va xabarlar
 
 | ID | Manba | Nima tuzatiladi | Hajm | Holat |
 |---|---|---|---|---|
-| FX-36 | LA-09 | Faol→faol status o'tishida ish soati/time-off qayta tekshirilmaydi; `{ok:false}` natijalar bot va navbatda ochiq ko'rsatiladi | S | ochiq |
-| FX-37 | LA-10 | Telegram «Boshqa vaqt»: eski yozilish yangisidan oldin bekor qilinadi (yoki `excludeId`); recall yangi yozilishga qayta bog'lanadi | S | ochiq |
-| FX-38 | LA-07 | No-show sweep kunlik job sifatida ulanadi (Toshkent vaqti, `RUN_REMINDER_WORKER` gating) | S | ochiq |
+| FX-36 | LA-09 | Faol→faol status o'tishida ish soati/time-off qayta tekshirilmaydi; `{ok:false}` natijalar bot va navbatda ochiq ko'rsatiladi | S | qilindi (batch 1) |
+| FX-37 | LA-10 | Telegram «Boshqa vaqt»: eski yozilish yangisidan oldin bekor qilinadi (yoki `excludeId`); recall yangi yozilishga qayta bog'lanadi | S | qilindi (batch 1) |
+| FX-38 | LA-07 | No-show sweep kunlik job sifatida ulanadi (Toshkent vaqti, `RUN_REMINDER_WORKER` gating) | S | qilindi (batch 1) |
 | FX-39 | LA-23 | Eslatma vaqti `tenant_settings.reminder_lead_hours` dan | S | ochiq |
 | FX-40 | LA-20 | Bot `stop()` try/catch; launch yiqilsa bot ro'yxatdan o'chiriladi (qayta yuklanadi) | S | ochiq |
 | FX-41 | LA-22 | Telegram 403/blocked → SMS fallback, `telegramChatId` tozalanadi; telefon/token o'zgarsa bog'lanish bekor; xodim uchun «Telegramni uzish» (audit) | M | ochiq |
@@ -123,8 +123,8 @@ Bu hujjat dalillarni takrorlamaydi — har band manbaga havola qiladi. Kod hali 
 
 | ID | Manba | Nima tuzatiladi | Hajm | Holat |
 |---|---|---|---|---|
-| FX-51 | LA-17 | Retention shu chaqiruvda yaratilgan nusxani o'chirmaydi; soat orqaga ketsa ogohlantirish | S | ochiq |
-| FX-52 | LA-18 | Tiklash uploads/migratsiya bosqichida yiqilsa pre-restore dump'ga qaytarish; natija aniq («baza qaytarildi / qaytarilmadi») | M | ochiq |
+| FX-51 | LA-17 | Retention shu chaqiruvda yaratilgan nusxani o'chirmaydi; soat orqaga ketsa ogohlantirish | S | qilindi (batch 1) |
+| FX-52 | LA-18 | Tiklash uploads/migratsiya bosqichida yiqilsa pre-restore dump'ga qaytarish; natija aniq («baza qaytarildi / qaytarilmadi») | M | qilindi (batch 1) |
 
 ### To'lqin 9 — tasdiqlangan low topilmalar (refuter run `wf_46ae37fd-f08`, 43/44 tasdiqlandi)
 
