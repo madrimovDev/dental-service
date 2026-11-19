@@ -86,6 +86,11 @@ export const labOrderIdParamSchema = z
 export const listLabOrdersQuerySchema = z.object({
   patientId: z.uuid().optional().openapi({ description: 'Filter by patient UUID' }),
   status: orderStatusSchema.optional().openapi({ description: 'Filter by order status' }),
+  /** FX-109: `true` — faqat faol (delivered/cancelled EMAS), muddati bo'yicha (eng shoshilinchi birinchi). */
+  activeOnly: z
+    .enum(['true', 'false'])
+    .optional()
+    .openapi({ description: 'Only active orders (not delivered/cancelled), most urgent first' }),
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(100).default(20),
 });

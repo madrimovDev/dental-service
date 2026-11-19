@@ -1,5 +1,5 @@
 import { labOrderFiles, labOrders } from '@dental/db-schema';
-import { and, asc, count, desc, eq, lt, notInArray } from 'drizzle-orm';
+import { and, asc, count, desc, eq, lt, notInArray, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
@@ -47,6 +47,9 @@ export const createLabOrdersService = (deps: {
     const filters = [];
     if (query.patientId) filters.push(eq(labOrders.patientId, query.patientId));
     if (query.status) filters.push(eq(labOrders.status, query.status));
+    // FX-109: dashboard navbati — faol buyurtmalar to'liq to'plam ustida (eng yangi N tadan emas).
+    const activeOnly = query.activeOnly === 'true';
+    if (activeOnly) filters.push(notInArray(labOrders.status, ['delivered', 'cancelled']));
     const where = filters.length > 0 ? and(...filters) : undefined;
 
     const [data, totalRows] = await Promise.all([
@@ -54,7 +57,11 @@ export const createLabOrdersService = (deps: {
         .select()
         .from(labOrders)
         .where(where)
-        .orderBy(desc(labOrders.createdAt))
+        .orderBy(
+          ...(activeOnly
+            ? [sql`${labOrders.expectedDate} ASC NULLS LAST`, desc(labOrders.createdAt)]
+            : [desc(labOrders.createdAt)]),
+        )
         .limit(query.pageSize)
         .offset(offset),
       db.select({ total: count() }).from(labOrders).where(where),

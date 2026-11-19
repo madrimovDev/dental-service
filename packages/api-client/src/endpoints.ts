@@ -1,5 +1,5 @@
 import type { ApiClient } from './client.ts';
-import type { PatientImage } from './generated/model/index.ts';
+import type { LabOrder, PatientImage } from './generated/model/index.ts';
 
 /**
  * Lab buyurtma fayli (UI-D5, `lab_order_files`). Kontrakt generatsiyasigacha qo'lda tip;
@@ -112,6 +112,14 @@ export const createEndpoints = (api: ApiClient) => ({
   // lab-order fayllari (UI-D5): multipart upload hand (orval multipart'ni qo'llamaydi);
   // list/delete ham shu namespace'da — generatsiyadan keyin generated funksiyalarga ko'chadi.
   labOrders: {
+    /**
+     * FX-109: dashboard navbati — faol (delivered/cancelled EMAS) buyurtmalar serverda filtrlangan,
+     * eng shoshilinchi birinchi (eng yangi 20 ta bilan cheklanmaydi). Kontrakt generatsiyasigacha qo'lda.
+     */
+    listActive: () =>
+      api.get<{ data: LabOrder[]; meta: { page: number; pageSize: number; total: number } }>(
+        '/api/lab-orders?activeOnly=true&pageSize=100',
+      ),
     uploadFile: (id: string, form: FormData) =>
       api.upload<LabOrderFileRecord>(`/api/lab-orders/${id}/files`, form),
     listFiles: (id: string) => api.get<LabOrderFileRecord[]>(`/api/lab-orders/${id}/files`),
