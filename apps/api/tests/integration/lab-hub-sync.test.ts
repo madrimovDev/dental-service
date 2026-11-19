@@ -52,6 +52,7 @@ import { hubCaseSchema } from '../../../lab-hub-api/src/modules/clinic/clinic.ro
 import { createApp } from '../../src/app.ts';
 import { db } from '../../src/db/client.ts';
 import { signAccess } from '../../src/lib/jwt.ts';
+import { labHubClient } from '../../src/lib/lab-hub/client.ts';
 import { toHubCase } from '../../src/lib/lab-hub/mapper.ts';
 import { hubKeyOf } from '../../src/lib/lab-hub/state.ts';
 import { flushLabHubOutbox, pollLabHubChanges } from '../../src/lib/lab-hub/sync.ts';
@@ -967,5 +968,93 @@ describe('narx taklifisiz tasdiq', () => {
       tx.select().from(expenses).where(eq(expenses.labOrderId, id)),
     );
     expect(rows).toHaveLength(0);
+  });
+});
+
+// ─── Umumiy klaster xmin'i (boshqa lane'lar) Hub hodisasini qisqa ushlab turishi mumkin ──
+/** Hub joriy kursordan kamida `min` hodisani bera oladimi — kursorni surmasdan tekshiradi. */
+const waitHubEvents = async (min: number) => {
+  for (let i = 0; i < 100; i++) {
+    const [state] = await inTenant((tx) => tx.select().from(labHubState));
+    const res = await labHubClient().changes(await clinicHubKey(), state!.cursor, 200);
+    if (res.events.length >= min) return;
+    await Bun.sleep(50);
+  }
+  throw new Error(`Hub did not expose ${min} event(s)`);
+};
+/** Poll'ni shart bajarilguncha takrorlaydi (hodisa xmin bilan kechiksa ham). */
+const pollUntil = async (ok: () => Promise<boolean>) => {
+  for (let i = 0; i < 100; i++) {
+    await pollLabHubChanges(tenantId);
+    if (await ok()) return;
+    await Bun.sleep(50);
+  }
+  throw new Error('poll condition not reached');
+};
+
+// ─── FX-139: poll ↔ bekor qilish poygasi ─────────────────────────────────────
+describe('FX-139 — poll bekor qilingan buyurtmani qayta tiriltirmaydi', () => {
+  test('bekor qilish tranzaksiyasi poll paytida commit qilinsa, status «cancelled» qoladi', async () => {
+    const id = await createOrder();
+    expect(
+      (await call('doctor', 'POST', `/api/lab-orders/${id}/send-to-hub`, { labId: lab.labId }))
+        .status,
+    ).toBe(200);
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+    const [hc] = await hubCaseByRef(id);
+    const labStatus = async (to: string) => {
+      const r = await hubJson(`/v1/lab/cases/${hc!.id}/status`, {
+        method: 'POST',
+        token: lab.token,
+        body: { to },
+      });
+      expect(r.status).toBe(200);
+    };
+    await labStatus('accepted');
+    await labStatus('in_progress');
+    await pollUntil(async () => (await orderRow(id))?.status === 'in_progress');
+    // Navbatda BITTA hodisa qoladi — u holatni o'zgartiradigan (`ready`).
+    await labStatus('ready');
+    await waitHubEvents(1);
+
+    // Parallel «bekor qilish»: qator yangilangan, lekin commit hali bo'lmagan.
+    let release!: () => void;
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    let cancelStarted!: () => void;
+    const started = new Promise<void>((r) => {
+      cancelStarted = r;
+    });
+    const cancelTx = inTenant(async (tx) => {
+      await tx
+        .update(labOrders)
+        .set({ status: 'cancelled', updatedAt: new Date() })
+        .where(eq(labOrders.id, id));
+      cancelStarted();
+      await gate;
+    });
+    await started;
+
+    const poll = pollLabHubChanges(tenantId);
+    // Poll tranzaksiyasi lab_orders qatori qulfida kutayotganini ko'ramiz (deterministik).
+    const deadline = Date.now() + 10_000;
+    for (;;) {
+      const [w] = (await db.execute(
+        sql`SELECT count(*)::int AS n FROM pg_stat_activity
+             WHERE datname = current_database() AND wait_event_type = 'Lock'`,
+      )) as unknown as { n: number }[];
+      if ((w?.n ?? 0) > 0) break;
+      if (Date.now() > deadline) throw new Error('poll did not block on the lab_orders row lock');
+      await Bun.sleep(20);
+    }
+    release();
+    await cancelTx;
+    await poll;
+
+    const row = await orderRow(id);
+    expect(row?.status).toBe('cancelled');
+    expect(row?.hubStatus).toBe('ready');
   });
 });

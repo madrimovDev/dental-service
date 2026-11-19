@@ -352,6 +352,8 @@ const STATUS_TITLE: Record<string, string> = {
 };
 
 const applyEvent = async (tx: DbOrTx, tenantId: string, ev: HubChangeEvent, now: Date) => {
+  // FX-139: qator qulflanadi — parallel «bekor qilish» commit bo'lsa, poll uning natijasini
+  // ko'radi (`cancelled`) va eski o'qish bo'yicha statusni `ready`/`in_progress`ga qaytarmaydi.
   const [order] = await tx
     .select({
       id: labOrders.id,
@@ -364,7 +366,8 @@ const applyEvent = async (tx: DbOrTx, tenantId: string, ev: HubChangeEvent, now:
       deliveredDate: labOrders.deliveredDate,
     })
     .from(labOrders)
-    .where(eq(labOrders.labHubCaseRef, ev.caseRef));
+    .where(eq(labOrders.labHubCaseRef, ev.caseRef))
+    .for('update');
   if (!order) return;
 
   const ref = order.orderNumber != null ? `#${order.orderNumber}` : '';
