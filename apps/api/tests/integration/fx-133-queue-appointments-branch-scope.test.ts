@@ -161,9 +161,7 @@ describe('FX-133 navbat: begona filial → 403 branch.forbidden', () => {
 
   test('ticket yaratish', async () => {
     forbidden(await call('recA', 'POST', '/api/queue', { branchId: brB, patientId }));
-    expect((await call('recA', 'POST', '/api/queue', { branchId: brA, patientId })).status).toBe(
-      201,
-    );
+    expect((await call('recA', 'POST', '/api/queue', { branchId: brA })).status).toBe(201);
   });
 
   test('status o‘zgartirish va call-own begona filial ticketida', async () => {

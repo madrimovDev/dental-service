@@ -186,6 +186,24 @@ export const createQueueService = (deps: {
 
       const todayStart = tashkentDayStart();
 
+      // FX-159: walk-in ticket yozilishdan mustaqil — bir bemorga shu filialda bugun
+      // ikkita ochiq ticket berilardi. Advisory lock ostida tekshiriladi (parallel poyga yo'q).
+      if (input.patientId) {
+        const [patientOpen] = await tx
+          .select({ id: queueTickets.id })
+          .from(queueTickets)
+          .where(
+            and(
+              eq(queueTickets.branchId, input.branchId),
+              eq(queueTickets.patientId, input.patientId),
+              gte(queueTickets.ticketDate, todayStart),
+              sql`${queueTickets.status} in ('waiting','in_progress')`,
+            ),
+          )
+          .limit(1);
+        if (patientOpen) throw new QueueValidationError('queue.duplicate_ticket');
+      }
+
       const [maxRow] = await tx
         .select({ max: max(queueTickets.queueNumber) })
         .from(queueTickets)

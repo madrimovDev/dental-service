@@ -24,6 +24,7 @@ const permsFor = (k: string): string[] => {
 let tenantId: string;
 let branchId: string;
 let patientId: string;
+let otherPatientId: string;
 let doctorId: string;
 let otherDoctorId: string;
 let doctorApptId: string;
@@ -71,13 +72,19 @@ beforeAll(async () => {
       .values({ tenantId, fullName: 'Bemor 55' })
       .returning({ id: patients.id });
     patientId = p!.id;
-    const mk = async (docId: string, hour: number) => {
+    // FX-159: bir bemorga bitta ochiq ticket — ikkinchi shifokor yozilishi boshqa bemorda.
+    const [p2] = await tx
+      .insert(patients)
+      .values({ tenantId, fullName: 'Bemor 55b' })
+      .returning({ id: patients.id });
+    otherPatientId = p2!.id;
+    const mk = async (docId: string, hour: number, pid: string) => {
       const [a] = await tx
         .insert(appointments)
         .values({
           tenantId,
           branchId,
-          patientId,
+          patientId: pid,
           doctorId: docId,
           startTime: new Date(Date.UTC(2030, 0, 1, hour)),
           endTime: new Date(Date.UTC(2030, 0, 1, hour, 30)),
@@ -86,8 +93,8 @@ beforeAll(async () => {
         .returning({ id: appointments.id });
       return a!.id;
     };
-    doctorApptId = await mk(doctorId, 4);
-    otherApptId = await mk(otherDoctorId, 6);
+    doctorApptId = await mk(doctorId, 4, patientId);
+    otherApptId = await mk(otherDoctorId, 6, otherPatientId);
   });
 
   // FX-133: navbat filial doirasi tayinlovlardan o'qiladi — real tayinlov (tenant-wide).
@@ -119,7 +126,7 @@ describe('FX-55 navbat ticket shifokori', () => {
 
     const other = await req('POST', '/api/queue', receptionToken, {
       branchId,
-      patientId,
+      patientId: otherPatientId,
       appointmentId: otherApptId,
     });
     expect(other.status).toBe(201);
@@ -142,7 +149,7 @@ describe('FX-55 navbat ticket shifokori', () => {
   });
 
   test("walk-in ticket: doctorId bo'sh (registrator chaqiradi)", async () => {
-    const res = await req('POST', '/api/queue', receptionToken, { branchId, patientId });
+    const res = await req('POST', '/api/queue', receptionToken, { branchId });
     expect(res.status).toBe(201);
     const body = (await res.json()) as { data: { doctorId: string | null } };
     expect(body.data.doctorId).toBeNull();
