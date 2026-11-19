@@ -64,6 +64,9 @@ export type PatientDetail = {
 export type MedicalRecordView = MedicalRecord & {
   confirmedAt?: string | null;
   confirmedBy?: string | null;
+  /** FX-28: bot anketasi (qoralama) — kontrakt regeneratsiyasigacha kengaytma. */
+  questionnaireAnswers?: Record<string, string> | null;
+  questionnaireAt?: string | null;
 };
 
 export type { Patient };

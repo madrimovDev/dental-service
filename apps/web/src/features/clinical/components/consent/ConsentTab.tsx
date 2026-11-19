@@ -1,8 +1,7 @@
-import type { ConsentTemplate, ConsentType } from '@dental/api-client';
+import type { ConsentType } from '@dental/api-client';
 import { Card, Mono, StateView, Tag } from '@dental/ui';
 import {
   Button,
-  Checkbox,
   Group,
   Modal,
   Select,
@@ -12,89 +11,39 @@ import {
   TextInput,
   Title,
 } from '@mantine/core';
-import { DatePickerInput } from '@mantine/dates';
 import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
 import { IconFileText, IconPlus, IconWriting } from '@tabler/icons-react';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth-store.ts';
-import {
-  useConsentForms,
-  useConsentTemplates,
-  useCreateConsentTemplate,
-  useSignConsent,
-} from '../../clinical.api';
-import { templateBodyForLang, toConsentFormVM } from '../../clinical.mappers';
-import {
-  type ConsentSignFormValues,
-  type ConsentTemplateFormValues,
-  consentSignFormSchema,
-  consentTemplateFormSchema,
-} from '../../clinical.schema';
+import { useConsentForms, useCreateConsentTemplate } from '../../clinical.api';
+import { toConsentFormVM } from '../../clinical.mappers';
+import { type ConsentTemplateFormValues, consentTemplateFormSchema } from '../../clinical.schema';
+import { CONSENT_TYPE_OPTIONS, ConsentSignForm } from './ConsentSignForm';
 
 type Props = { patientId: string };
 
-const TYPE_OPTIONS: ConsentType[] = [
-  'treatment',
-  'anesthesia',
-  'photo',
-  'data_processing',
-  'other',
-];
+const TYPE_OPTIONS = CONSENT_TYPE_OPTIONS;
 
 export function ConsentTab({ patientId }: Props) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { hasPermission } = useAuthStore();
   const [signOpened, signCtl] = useDisclosure(false);
   const [tplOpened, tplCtl] = useDisclosure(false);
-
-  const signForm = useForm<ConsentSignFormValues>({
-    initialValues: {
-      templateId: null,
-      type: 'treatment',
-      title: '',
-      bodyText: '',
-      patientSignatureName: '',
-      // CLI-461: default muddatsiz — avvalgi (muddat tushunchasi yo'q) xulqni
-      // saqlaydi; staff aniq muddat qo'yishni tanlasa checkbox'ni o'chiradi.
-      isPerpetual: true,
-      expiresAt: null,
-    },
-    validate: zod4Resolver(consentSignFormSchema),
-  });
 
   const tplForm = useForm<ConsentTemplateFormValues>({
     initialValues: { type: 'treatment', title: '', bodyUz: '', bodyRu: '' },
     validate: zod4Resolver(consentTemplateFormSchema),
   });
 
-  // Sign modalni yopganda formani tozalash (oldingi konsent ma'lumoti qolmasligi uchun).
-  const closeSign = () => {
-    signCtl.close();
-    signForm.reset();
-  };
-
-  const tplQuery = useConsentTemplates();
   const formsQuery = useConsentForms(patientId);
   const createTplMut = useCreateConsentTemplate();
-  const signMut = useSignConsent(patientId);
 
   const canManage = hasPermission('consent.manage');
   const canView = hasPermission('consent.view');
 
   if (!canView) return <Text c="dimmed">{t('patients.no_medical_permission')}</Text>;
-
-  const lang = i18n.language === 'ru' ? 'ru' : 'uz';
-
-  const applyTemplate = (tpl: ConsentTemplate) => {
-    signForm.setValues({
-      templateId: tpl.id,
-      type: tpl.type,
-      title: tpl.title,
-      bodyText: templateBodyForLang(tpl, lang),
-    });
-  };
 
   const createTemplate = tplForm.onSubmit((values) => {
     createTplMut.mutate(
@@ -108,28 +57,6 @@ export function ConsentTab({ patientId }: Props) {
         onSuccess: () => {
           tplForm.reset();
           tplCtl.close();
-        },
-      },
-    );
-  });
-
-  const sign = signForm.onSubmit((values) => {
-    signMut.mutate(
-      {
-        patientId,
-        templateId: values.templateId ?? undefined,
-        type: values.type as ConsentType,
-        title: values.title,
-        bodyText: values.bodyText,
-        language: lang,
-        patientSignatureName: values.patientSignatureName || undefined,
-        // CLI-461
-        isPerpetual: values.isPerpetual,
-        expiresAt: values.isPerpetual ? undefined : (values.expiresAt?.toISOString() ?? undefined),
-      },
-      {
-        onSuccess: () => {
-          closeSign();
         },
       },
     );
@@ -195,74 +122,8 @@ export function ConsentTab({ patientId }: Props) {
       )}
 
       {/* Sign form modal */}
-      <Modal opened={signOpened} onClose={closeSign} title={t('consent.sign_new')} size="xl">
-        <form onSubmit={sign}>
-          <Stack gap="md">
-            {tplQuery.data && tplQuery.data.length > 0 ? (
-              <Select
-                label={t('consent.select_template')}
-                placeholder={t('common.select')}
-                data={tplQuery.data.map((tpl) => ({
-                  value: tpl.id,
-                  label: `${t(`consent.type_${tpl.type}`)} — ${tpl.title}`,
-                }))}
-                clearable
-                value={signForm.values.templateId}
-                onChange={(v) => {
-                  signForm.setFieldValue('templateId', v);
-                  if (v) {
-                    const tpl = tplQuery.data?.find((x) => x.id === v);
-                    if (tpl) applyTemplate(tpl);
-                  }
-                }}
-              />
-            ) : (
-              <Text c="dimmed">{t('consent.no_templates')}</Text>
-            )}
-            <Select
-              label={t('consent.type')}
-              data={TYPE_OPTIONS.map((tp) => ({ value: tp, label: t(`consent.type_${tp}`) }))}
-              {...signForm.getInputProps('type')}
-            />
-            <TextInput
-              label={t('consent.template_title')}
-              required
-              {...signForm.getInputProps('title')}
-            />
-            <Textarea
-              label={t('consent.body_text')}
-              rows={10}
-              required
-              {...signForm.getInputProps('bodyText')}
-            />
-            <TextInput
-              label={t('consent.patient_signature_name')}
-              {...signForm.getInputProps('patientSignatureName')}
-            />
-            {/* CLI-461: muddat — treatment-plan accept gate shu ikkalasiga tayanadi. */}
-            <Checkbox
-              label={t('consent.is_perpetual')}
-              checked={signForm.values.isPerpetual}
-              onChange={(e) => signForm.setFieldValue('isPerpetual', e.currentTarget.checked)}
-            />
-            {!signForm.values.isPerpetual && (
-              <DatePickerInput
-                label={t('consent.expires_at')}
-                minDate={new Date()}
-                clearable
-                {...signForm.getInputProps('expiresAt')}
-              />
-            )}
-            <Group justify="flex-end">
-              <Button variant="default" onClick={closeSign}>
-                {t('common.cancel')}
-              </Button>
-              <Button type="submit" loading={signMut.isPending} disabled={!signForm.isValid()}>
-                {t('consent.sign')}
-              </Button>
-            </Group>
-          </Stack>
-        </form>
+      <Modal opened={signOpened} onClose={signCtl.close} title={t('consent.sign_new')} size="xl">
+        <ConsentSignForm patientId={patientId} onSigned={signCtl.close} onCancel={signCtl.close} />
       </Modal>
 
       {/* Template create modal */}

@@ -1,6 +1,7 @@
 import { labOrderFiles, labOrders } from '@dental/db-schema';
 import { and, asc, count, desc, eq, lt, notInArray } from 'drizzle-orm';
 import type { Context } from 'hono';
+import { onAfterCommit } from '../../db/after-commit.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import {
@@ -376,9 +377,8 @@ export const createLabOrdersService = (deps: {
     if (!before) return null;
 
     await db.delete(labOrderFiles).where(eq(labOrderFiles.id, fileId));
-    await deleteObject(before.objectKey).catch((err) =>
-      console.error('[lab-orders] storage delete failed:', err),
-    );
+    // FX-76: fayl faqat commit'dan keyin o'chadi (tx rollback → qator ham, fayl ham qoladi).
+    await onAfterCommit(c, () => deleteObject(before.objectKey));
 
     await deps.audit.record(c, {
       action: 'deleted',

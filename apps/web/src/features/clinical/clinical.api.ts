@@ -181,6 +181,10 @@ export function useUpdateStage(patientId: string) {
       invalidatePlanFinancials(qc, patientId);
       void qc.invalidateQueries({ queryKey: clinicalKeys.planEstimate(stage.treatmentPlanId) });
       void qc.invalidateQueries({ queryKey: recallKeys.patient(patientId) });
+      // FX-62: `completed` backendda odontogramma snapshot'ini avto yaratadi — keshni yangilamasak
+      // eski qoralamadan saqlash shu snapshot'ni last-write-wins bilan ustiga yozadi.
+      void qc.invalidateQueries({ queryKey: clinicalKeys.toothChartLatest(patientId) });
+      void qc.invalidateQueries({ queryKey: clinicalKeys.toothCharts(patientId) });
     },
   });
 }

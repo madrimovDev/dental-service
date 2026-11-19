@@ -198,8 +198,9 @@ export function OdontogramTab({ patientId }: Props) {
             label={t('tooth_chart.primary_dentition')}
             checked={isReadOnly ? viewingSnapshot.isPrimaryDentition : isPrimary}
             onChange={(e) => {
+              // FX-122: bu faqat ko'rinish to'plami bayrog'i — draft saqlanadi, aks holda
+              // saqlash boshqa to'plamdagi barcha tish holatlarini snapshot'dan o'chirardi.
               setIsPrimary(e.currentTarget.checked);
-              setDraft([]);
               setSelectedTooth(null);
             }}
             disabled={!editing}

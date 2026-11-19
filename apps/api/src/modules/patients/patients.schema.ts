@@ -261,6 +261,10 @@ export const medicalRecordDtoSchema = z
     /** Anamnez oxirgi tasdig'i (UI-D2) — hali tasdiqlanmagan bo'lsa null. */
     confirmedAt: z.string().nullable(),
     confirmedBy: z.uuid().nullable(),
+    /** FX-28: Telegram bot anketasi javoblari (QORALAMA, savol kaliti → javob). */
+    questionnaireAnswers: z.record(z.string(), z.string()).nullable(),
+    /** FX-28: anketa oxirgi topshirilgan vaqt (ISO). */
+    questionnaireAt: z.string().nullable(),
     lastUpdatedBy: z.uuid().nullable(),
     createdAt: z.string(),
     updatedAt: z.string(),

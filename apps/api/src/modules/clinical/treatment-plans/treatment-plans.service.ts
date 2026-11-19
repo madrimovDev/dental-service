@@ -124,6 +124,20 @@ export class ConsentInvalidError extends Error {
   }
 }
 
+/**
+ * FX-61: plan allaqachon bajarilmoqda/tugagan/bekor qilingan (in_progress, completed,
+ * cancelled) bo'lsa konsentni qayta bog'lash RAD — davolash boshlangandan keyin
+ * konsent tarixini jimgina almashtirib bo'lmaydi. Routes 409 (`plan.consent_locked`).
+ */
+export class ConsentLockedError extends Error {
+  constructor(readonly planStatus: string) {
+    super(`Consent cannot be relinked on a ${planStatus} plan`);
+    this.name = 'ConsentLockedError';
+  }
+}
+
+const CONSENT_LOCKED_STATUSES = ['in_progress', 'completed', 'cancelled'] as const;
+
 export const createTreatmentPlansService = (deps: {
   audit: AuditLogger;
   recall?: RecallStageHook;
@@ -282,6 +296,10 @@ export const createTreatmentPlansService = (deps: {
   async function setConsent(c: Context, id: string, input: ConsentInput) {
     const before = await repo.findPlan(c, id);
     if (!before) return null;
+
+    if ((CONSENT_LOCKED_STATUSES as readonly string[]).includes(before.status)) {
+      throw new ConsentLockedError(before.status);
+    }
 
     const form = await repo.findConsentForm(c, input.consentFormId);
     if (!isConsentFormCurrentlyValid(form, before.patientId) || !form) {
