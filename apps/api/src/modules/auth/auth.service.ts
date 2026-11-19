@@ -479,7 +479,9 @@ export const createAuthService = (deps: AuthServiceDeps) => {
         const rows = await tx
           .select({ id: branches.id, name: branches.name })
           .from(branches)
-          .where(isNull(branches.deletedAt));
+          // FX-134: `branches_self_view` RLS policy'si owner boshqa klinikada xodim bo'lsa o'sha
+          // klinika filialini ham ko'rsatadi — tenantId bo'yicha aniq filtr shart.
+          .where(and(eq(branches.tenantId, tenantId), isNull(branches.deletedAt)));
         return { branches: rows, allowAllBranches: true };
       }
 
@@ -800,6 +802,15 @@ export const createAuthService = (deps: AuthServiceDeps) => {
 
       if (!resolvedBranchId) {
         if (assignedBranchId) {
+          // FX-135: assignment'dan kelgan filial ham tekshiriladi (o'chirilgan/begona filial
+          // JWT'ga yozilmasin).
+          const [assigned] = await tx
+            .select({ tenantId: branches.tenantId })
+            .from(branches)
+            .where(and(eq(branches.id, assignedBranchId), isNull(branches.deletedAt)));
+          if (!assigned || assigned.tenantId !== input.tenantId) {
+            return { code: 'auth.invalid_branch' as const };
+          }
           resolvedBranchId = assignedBranchId;
         } else {
           const [first] = await tx

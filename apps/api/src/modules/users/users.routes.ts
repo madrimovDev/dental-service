@@ -225,7 +225,11 @@ export const userRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     const body = c.req.valid('json');
     const result = await service.updateAssignment(c, assignmentId, body);
     if (!result) return c.json(fail('assignment.not_found', 'Assignment not found'), 404);
-    if (!result.ok) return c.json(fail('role.not_found', 'Role not found'), 404);
+    if (!result.ok) {
+      return result.code === 'branch.not_found'
+        ? c.json(fail('branch.not_found', 'Branch not found'), 404)
+        : c.json(fail('role.not_found', 'Role not found'), 404);
+    }
     return c.json(ok(toUserAssignmentRowDto(result.row)), 200);
   });
 

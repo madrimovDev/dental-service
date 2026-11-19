@@ -367,6 +367,24 @@ export const createUsersService = (deps: { db: Database; audit: AuditLogger }) =
     // FX-33: filial doirasi — filial o'zgarsa yoki tayinlov qayta yoqilsa/uzaytirilsa, EFFEKTIV
     // filial chaqiruvchining doirasida bo'lishi shart (B filial tayinlovini A mudiri tiriltirmasin).
     const branchChanged = input.branchId !== undefined && input.branchId !== before.branchId;
+    // FX-135: yangi filial shu klinikada mavjud va o'chirilmagan bo'lishi shart. RLS-bound
+    // lookup yetmaydi (`branches_self_view` boshqa klinika filialini ham ko'rsatadi) — tenantId
+    // aniq tekshiriladi.
+    if (branchChanged && input.branchId) {
+      const tenantId = c.get('activeTenantId');
+      if (!tenantId) throw new Error('No tenant context');
+      const [branch] = await db
+        .select({ id: branches.id })
+        .from(branches)
+        .where(
+          and(
+            eq(branches.id, input.branchId),
+            eq(branches.tenantId, tenantId),
+            isNull(branches.deletedAt),
+          ),
+        );
+      if (!branch) return { ok: false as const, code: 'branch.not_found' as const };
+    }
     if (branchChanged || roleChanged || reactivates || extendsValidity) {
       const effectiveBranchId = input.branchId !== undefined ? input.branchId : before.branchId;
       await assertCanGrantBranch(c, 'user.manage', effectiveBranchId);
