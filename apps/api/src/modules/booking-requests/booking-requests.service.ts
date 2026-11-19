@@ -1,5 +1,7 @@
+import { sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { onAfterCommit } from '../../db/after-commit.ts';
+import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { CrossEntityError } from '../../lib/ownership.ts';
 import { assertBranchExists } from '../../lib/ownership-refs.ts';
@@ -83,6 +85,28 @@ export const createBookingRequestsService = (deps: {
 
     const start = row.requestedStart;
     const end = new Date(start.getTime() + BOOKING_SLOT_MINUTES * 60_000);
+
+    // FX-37 (LA-10): «Boshqa vaqt» — eski yozilish yangisidan OLDIN bekor qilinadi
+    // (aks holda yangi slot eskisi bilan to'qnashadi va reopenOnCancel recall'ni
+    // pending'ga qaytarib qo'yardi). Yangi yozilish rad etilsa (409 — slot band)
+    // SAVEPOINT'ga qaytamiz: eski yozilish/recall/audit/after-commit o'zgarmaydi,
+    // so'rov `pending` qoladi.
+    const rescheduleOf = row.rescheduleOfAppointmentId;
+    const savepoint = 'fx37_reschedule';
+    const afterCommitMark = c.get('afterCommit')?.length ?? 0;
+    if (rescheduleOf) {
+      await getDb(c).execute(sql.raw(`SAVEPOINT ${savepoint}`));
+      try {
+        await deps.appointments.update(c, rescheduleOf, {
+          status: 'cancelled',
+          cancellationReason: 'rescheduled_via_telegram',
+        });
+      } catch (err) {
+        if (!(err instanceof AppointmentTransitionError)) throw err;
+        // Eski yozilish allaqachon yopilgan (completed/cancelled) — e'tiborsiz.
+      }
+    }
+
     // Slot band bo'lib qolgan bo'lsa (conflict/schedule/o'tmish) — 409 va so'rov
     // `pending` QOLADI (registrator boshqa vaqt/shifokor tanlay oladi yoki rad etadi).
     const res = await deps.appointments.create(c, {
@@ -93,7 +117,15 @@ export const createBookingRequestsService = (deps: {
       endTime: end.toISOString(),
       serviceIds: row.serviceId ? [row.serviceId] : [],
     });
-    if (!res.ok) return { ok: false, code: res.code, conflict: isConflictCode(res.code) };
+    if (!res.ok) {
+      if (rescheduleOf) {
+        await getDb(c).execute(sql.raw(`ROLLBACK TO SAVEPOINT ${savepoint}`));
+        // Bekor qilishdan qo'yilgan side-effect'lar (eslatmani o'chirish) bekor.
+        c.get('afterCommit')?.splice(afterCommitMark);
+      }
+      return { ok: false, code: res.code, conflict: isConflictCode(res.code) };
+    }
+    if (rescheduleOf) await getDb(c).execute(sql.raw(`RELEASE SAVEPOINT ${savepoint}`));
 
     const decided = await repo.markDecided(c, id, {
       status: 'confirmed',
@@ -101,19 +133,6 @@ export const createBookingRequestsService = (deps: {
       appointmentId: res.appointment.id,
     });
     if (!decided) return { ok: false, code: 'booking_request.not_pending', conflict: true };
-
-    // «Boshqa vaqt» — eski yozilish yangisiga almashtiriladi.
-    if (row.rescheduleOfAppointmentId) {
-      try {
-        await deps.appointments.update(c, row.rescheduleOfAppointmentId, {
-          status: 'cancelled',
-          cancellationReason: 'rescheduled_via_telegram',
-        });
-      } catch (err) {
-        if (!(err instanceof AppointmentTransitionError)) throw err;
-        // Eski yozilish allaqachon yopilgan (completed/cancelled) — e'tiborsiz.
-      }
-    }
 
     await deps.audit.record(c, {
       action: 'confirmed',
