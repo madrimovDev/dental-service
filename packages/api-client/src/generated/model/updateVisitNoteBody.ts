@@ -11,6 +11,7 @@ export type UpdateVisitNoteBody = {
   doctorId?: string;
   appointmentId?: string;
   stageId?: string;
+  completesStage?: boolean;
   visitDate?: string;
   /** @maxLength 5000 */
   subjective?: string;

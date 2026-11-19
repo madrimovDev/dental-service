@@ -1,30 +1,80 @@
 import { bookingRequests, branches, patients, users } from '@dental/db-schema';
-import { and, count, desc, eq, lt } from 'drizzle-orm';
+import { and, count, desc, eq, lt, lte, or } from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { DbOrTx } from '../../db/client.ts';
 import { getDb } from '../../db/scoped.ts';
+import type { PatientMessenger } from '../../lib/telegram/notify.ts';
 
 /** `pending` so'rov shuncha soatdan keyin `expired` bo'ladi. */
 export const BOOKING_REQUEST_TTL_MS = 24 * 60 * 60_000;
 
+export type ExpiredBookingRequest = {
+  id: string;
+  tenantId: string;
+  patientId: string;
+  requestedStart: Date;
+};
+
 /**
- * 24 soatdan eski `pending` → `expired`. `db` tenant-RLS tx (so'rov ichida —
- * faqat shu tenant) YOKI admin db (taymer — barcha tenantlar). Idempotent.
+ * Muddati tugagan `pending` → `expired` va yopilgan qatorlarni qaytaradi (bemorga xabar uchun).
+ * Muddat = so'rov 24 soatdan eski YOKI so'ralgan slot o'tib ketgan (FX-24, LA-40).
+ * `db` tenant-RLS tx (so'rov ichida — faqat shu tenant) YOKI admin db (taymer — barcha
+ * tenantlar). Idempotent: `status='pending'` sharti — har qator faqat bir marta qaytadi.
  */
-export async function expireStaleBookingRequests(
+export async function expireStaleBookingRequestsReturning(
   db: DbOrTx,
   now: Date = new Date(),
-): Promise<number> {
-  const rows = await db
+): Promise<ExpiredBookingRequest[]> {
+  return db
     .update(bookingRequests)
     .set({ status: 'expired', decidedAt: now })
     .where(
       and(
         eq(bookingRequests.status, 'pending'),
-        lt(bookingRequests.createdAt, new Date(now.getTime() - BOOKING_REQUEST_TTL_MS)),
+        or(
+          lt(bookingRequests.createdAt, new Date(now.getTime() - BOOKING_REQUEST_TTL_MS)),
+          lte(bookingRequests.requestedStart, now),
+        ),
       ),
     )
-    .returning({ id: bookingRequests.id });
+    .returning({
+      id: bookingRequests.id,
+      tenantId: bookingRequests.tenantId,
+      patientId: bookingRequests.patientId,
+      requestedStart: bookingRequests.requestedStart,
+    });
+}
+
+/** Yopilgan so'rovlar soni (xabarsiz). */
+export async function expireStaleBookingRequests(
+  db: DbOrTx,
+  now: Date = new Date(),
+): Promise<number> {
+  return (await expireStaleBookingRequestsReturning(db, now)).length;
+}
+
+/**
+ * Taymer yo'li (admin conn): muddati tugaganlarni yopadi va har bir bemorga xabar yuboradi
+ * (xato yutiladi — messenger o'zi throw qilmaydi; baribir himoya).
+ */
+export async function expireAndNotifyStaleBookingRequests(
+  adminDb: DbOrTx,
+  messenger: Pick<PatientMessenger, 'sendBookingDecision'> | undefined,
+  now: Date = new Date(),
+): Promise<number> {
+  const rows = await expireStaleBookingRequestsReturning(adminDb, now);
+  if (messenger) {
+    for (const r of rows) {
+      await messenger
+        .sendBookingDecision({
+          tenantId: r.tenantId,
+          patientId: r.patientId,
+          decision: 'expired',
+          start: r.requestedStart,
+        })
+        .catch(() => {});
+    }
+  }
   return rows.length;
 }
 
@@ -90,12 +140,14 @@ export const createBookingRequestsRepository = () => {
     return row ?? null;
   };
 
-  const markExpired = async (c: Context, id: string) => {
+  const markExpired = async (c: Context, id: string): Promise<boolean> => {
     const db = getDb(c);
-    await db
+    const rows = await db
       .update(bookingRequests)
       .set({ status: 'expired', decidedAt: new Date() })
-      .where(and(eq(bookingRequests.id, id), eq(bookingRequests.status, 'pending')));
+      .where(and(eq(bookingRequests.id, id), eq(bookingRequests.status, 'pending')))
+      .returning({ id: bookingRequests.id });
+    return rows.length > 0;
   };
 
   return { list, pendingCount, findById, markDecided, markExpired };

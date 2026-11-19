@@ -44,7 +44,10 @@ const recallSpy = {
 const plansService = createTreatmentPlansService({ audit: noopAudit, recall: recallSpy });
 const visitService = createVisitNotesService({
   audit: noopAudit,
-  completeStage: { completeStageForVisit: plansService.completeStageForVisit },
+  completeStage: {
+    completeStageForVisit: plansService.completeStageForVisit,
+    startStageForVisit: plansService.startStageForVisit,
+  },
 });
 
 const ctx = (tx: DbOrTx, tenantId: string): Context =>

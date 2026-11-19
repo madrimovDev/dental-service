@@ -3,6 +3,8 @@ import { and, asc, eq, gte, isNull, lt, max, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { CrossEntityError, createOwnershipValidator } from '../../lib/ownership.ts';
+import { assertBranchExists, assertServiceExists } from '../../lib/ownership-refs.ts';
 import { CLINIC_TZ } from '../../lib/sms-templates.ts';
 import type { AppointmentsService } from '../appointments/appointments.service.ts';
 import { AppointmentTransitionError } from '../appointments/appointments.transitions.ts';
@@ -76,10 +78,41 @@ export const createQueueService = (deps: {
     return (row?.max ?? 0) + 1;
   }
 
+  const ownership = createOwnershipValidator();
+
+  /**
+   * FX-03b (X-1): walk-in `branchId`/`patientId`/`serviceId` RLS ostida tekshiriladi
+   * (FK begona tenant ID'sini qabul qilardi). Topilmasa `QueueValidationError('<x>.not_found')`
+   * → routes 404.
+   */
+  async function assertRefs(c: Context, input: CreateQueueTicketInput) {
+    const checks: Array<[string, () => Promise<void>]> = [
+      ['branch', () => assertBranchExists(c, input.branchId)],
+    ];
+    if (input.patientId) {
+      const pid = input.patientId;
+      checks.push(['patient', () => ownership.assertPatientExists(c, pid)]);
+    }
+    if (input.serviceId) {
+      const sid = input.serviceId;
+      checks.push(['service', () => assertServiceExists(c, sid)]);
+    }
+    for (const [entity, run] of checks) {
+      try {
+        await run();
+      } catch (e) {
+        if (e instanceof CrossEntityError) throw new QueueValidationError(`${entity}.not_found`);
+        throw e;
+      }
+    }
+  }
+
   async function create(c: Context, input: CreateQueueTicketInput) {
     const db = getDb(c);
     const tenantId = c.get('activeTenantId');
     if (!tenantId) throw new Error('No tenant context');
+
+    await assertRefs(c, input);
 
     return await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);
@@ -228,9 +261,11 @@ export const createQueueService = (deps: {
               // bu qadam AppointmentTransitionError beradi, xavfsiz e'tiborsiz
               // qoldiriladi.
               try {
-                await deps.appointments.update(c, before.appointmentId, {
+                const mid = await deps.appointments.update(c, before.appointmentId, {
                   status: 'in_progress',
                 });
+                // FX-36: oraliq {ok:false} jim yutilmaydi.
+                if (!mid.ok) syncError = mid.code;
               } catch (e) {
                 if (!(e instanceof AppointmentTransitionError)) throw e;
               }
@@ -238,10 +273,10 @@ export const createQueueService = (deps: {
             const res = await deps.appointments.update(c, before.appointmentId, {
               status: apptStatus,
             });
-            if (!res.ok) syncError = res.code;
+            if (!res.ok) syncError = syncError ?? res.code;
           } catch (e) {
             if (!(e instanceof AppointmentTransitionError)) throw e;
-            syncError = e.code;
+            syncError = syncError ?? e.code;
           }
         } else {
           // Legacy fallback (app.ts hali appointmentsService'ni ulamaguncha) —
@@ -394,10 +429,9 @@ export const createQueueService = (deps: {
 
   /**
    * A6 (CLI-438): kun oxiri no-show sweep — o'tgan kun(lar)dagi hal qilinmagan
-   * (waiting/in_progress) tiketlarni `missed`ga o'tkazadi. ⚠️ Cron/repeatable
-   * job registratsiyasi (`lib/queue.ts` + `index.ts` — bu agent egaligidan
-   * tashqari) hali ULANMAGAN; bu funksiya + `POST /queue/sweep-no-shows` route
-   * (queue.manage) qo'lda yoki kelajakdagi wiring uchun tayyor. Faqat BUGUNDAN
+   * (waiting/in_progress) tiketlarni `missed`ga o'tkazadi. FX-38: kunlik cron
+   * `lib/no-show-sweep.ts` (Toshkent 00:30, har tenant) shuni chaqiradi; `POST
+   * /queue/sweep-no-shows` (queue.manage) qo'lda trigger sifatida qoladi. Faqat BUGUNDAN
    * OLDINGI tiketlar (bugungi hali kutayotgan tiketlar tegilmaydi — kun hali
    * tugamagan).
    *
@@ -416,7 +450,10 @@ export const createQueueService = (deps: {
 
     const filters = [
       lt(queueTickets.ticketDate, todayStart),
-      sql`${queueTickets.status} in ('waiting','in_progress')`,
+      // FX-38 review: faqat 'waiting' — 'in_progress' ticket = bemor kelgan
+      // (qabulda bo'lgan). Uni missed qilish appt'ni in_progress→no_show
+      // sync qilib, kelgan bemorga strike yozardi. in_progress tegilmaydi.
+      eq(queueTickets.status, 'waiting'),
     ];
     if (branchId) filters.push(eq(queueTickets.branchId, branchId));
 

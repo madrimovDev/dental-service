@@ -128,6 +128,18 @@ export class VisitNoteNotFoundError extends Error {
   }
 }
 
+/**
+ * FX-12 (LA-03/39, D-10): vizit rejadagi bosqichga bog'langan (`stageId`) — uni vizit
+ * yo'li bilan to'lash bemordan ikki marta pul olishga olib keladi; «reja bo'yicha to'lash»
+ * (allocation) ishlatilishi kerak. routes 409 `visit.linked_to_plan_stage`.
+ */
+export class VisitLinkedToPlanStageError extends Error {
+  constructor() {
+    super('Visit note is linked to a treatment plan stage');
+    this.name = 'VisitLinkedToPlanStageError';
+  }
+}
+
 /** FX-handoff: vizit imzolanmagan (qoralama) — to'lov qabul qilinmaydi. */
 export class VisitNotSignedError extends Error {
   constructor() {
@@ -174,6 +186,9 @@ const isVisitUniqueViolation = (err: unknown): boolean => {
 };
 
 /** Asia/Tashkent kalendar kunining boshi (UTC+5, DST yo'q) — `list` bilan izchil. */
+/** FX-17: kassa «kutilayotgan vizit» oynasi (kun). */
+export const PENDING_VISITS_WINDOW_DAYS = 30;
+
 const tashkentDayStart = (now = new Date()): Date => {
   const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tashkent' }).format(now);
   return new Date(`${day}T00:00:00+05:00`);
@@ -253,12 +268,23 @@ export const createCashierService = (deps: {
   // DI: env'da SOLIQ_* bo'lsa real Soliq provider, aks holda NoOp (V3-1).
   const fiscal: FiscalProvider = deps.fiscal ?? createNoOpFiscalProvider();
 
-  async function list(c: Context, query: ListTransactionsQuery) {
+  /** X-2: refund filial tekshiruvi uchun (audit yozmaydi, faqat RLS ichida). */
+  async function getBranchId(c: Context, id: string): Promise<string | null> {
+    const [row] = await getDb(c)
+      .select({ branchId: cashierTransactions.branchId })
+      .from(cashierTransactions)
+      .where(eq(cashierTransactions.id, id));
+    return row?.branchId ?? null;
+  }
+
+  /** `branchIds`: X-2 doirasi (null = cheklovsiz); `query.branchId` bilan kesishadi (route tekshirgan). */
+  async function list(c: Context, query: ListTransactionsQuery, branchIds: string[] | null = null) {
     const db = getDb(c);
     const offset = (query.page - 1) * query.pageSize;
 
     const filters = [];
     if (query.branchId) filters.push(eq(cashierTransactions.branchId, query.branchId));
+    else if (branchIds) filters.push(inArray(cashierTransactions.branchId, branchIds));
     if (query.patientId) filters.push(eq(cashierTransactions.patientId, query.patientId));
     if (query.from && query.to) {
       // from/to date-only (z.iso.date). Asia/Tashkent kun chegarasi — dailySummary bilan
@@ -351,12 +377,14 @@ export const createCashierService = (deps: {
           patientId: visitNotes.patientId,
           signedAt: visitNotes.signedAt,
           performedServices: visitNotes.performedServices,
+          stageId: visitNotes.stageId,
         })
         .from(visitNotes)
         .where(eq(visitNotes.id, input.visitNoteId))
         .limit(1);
       if (!visit) throw new VisitNoteNotFoundError();
       if (!visit.signedAt) throw new VisitNotSignedError();
+      if (visit.stageId) throw new VisitLinkedToPlanStageError();
       if (input.patientId && input.patientId !== visit.patientId) {
         throw new VisitPatientMismatchError();
       }
@@ -643,9 +671,34 @@ export const createCashierService = (deps: {
    * filialda bo'lgan YOKI yozilishga bog'lanmagan (filiali noma'lum) vizitlar. Narx
    * filialning FAOL narxidan (POS bilan bir manba); narxsiz xizmat → `unitPrice: null`.
    */
-  async function listPendingVisits(c: Context, branchId: string): Promise<PendingVisitDto[]> {
+  async function listPendingVisits(
+    c: Context,
+    branchId: string,
+    opts: { days?: number; page?: number; pageSize?: number } = {},
+  ): Promise<{ data: PendingVisitDto[]; meta: { page: number; pageSize: number; total: number } }> {
     const db = getDb(c);
     const dayStart = tashkentDayStart();
+    // FX-17 (LA-38): faqat bugun emas — N kunlik oyna; bugundan oldingilari `overdue`.
+    const days = opts.days ?? PENDING_VISITS_WINDOW_DAYS;
+    const page = opts.page ?? 1;
+    const pageSize = opts.pageSize ?? 50;
+    const windowStart = new Date(Date.now() - days * 86_400_000);
+
+    const where = and(
+      isNotNull(visitNotes.signedAt),
+      // FX-12: rejadagi bosqichga bog'langan vizit reja allocation'i orqali to'lanadi.
+      isNull(visitNotes.stageId),
+      gte(visitNotes.signedAt, windowStart),
+      sql`COALESCE(array_length(${visitNotes.performedServices}, 1), 0) > 0`,
+      or(isNull(appointments.id), eq(appointments.branchId, branchId)),
+      sql`NOT EXISTS (SELECT 1 FROM cashier_transactions ct WHERE ct.visit_note_id = ${visitNotes.id})`,
+    );
+
+    const [{ total } = { total: 0 }] = await db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(visitNotes)
+      .leftJoin(appointments, eq(appointments.id, visitNotes.appointmentId))
+      .where(where);
 
     const rows = await db
       .select({
@@ -661,17 +714,10 @@ export const createCashierService = (deps: {
       .innerJoin(patients, eq(patients.id, visitNotes.patientId))
       .leftJoin(users, eq(users.id, visitNotes.doctorId))
       .leftJoin(appointments, eq(appointments.id, visitNotes.appointmentId))
-      .where(
-        and(
-          isNotNull(visitNotes.signedAt),
-          gte(visitNotes.signedAt, dayStart),
-          sql`COALESCE(array_length(${visitNotes.performedServices}, 1), 0) > 0`,
-          or(isNull(appointments.id), eq(appointments.branchId, branchId)),
-          sql`NOT EXISTS (SELECT 1 FROM cashier_transactions ct WHERE ct.visit_note_id = ${visitNotes.id})`,
-        ),
-      )
+      .where(where)
       .orderBy(desc(visitNotes.signedAt))
-      .limit(100);
+      .limit(pageSize)
+      .offset((page - 1) * pageSize);
 
     const serviceIds = [...new Set(rows.flatMap((r) => r.performed ?? []))];
     const names = new Map<string, string>();
@@ -715,6 +761,7 @@ export const createCashierService = (deps: {
         doctorId: r.doctorId,
         doctorName: r.doctorName ?? null,
         signedAt: (r.signedAt as Date).toISOString(),
+        overdue: (r.signedAt as Date).getTime() < dayStart.getTime(),
         services: lines,
         total: String(fromCents(totalCents)),
         hasUnpriced,
@@ -725,10 +772,10 @@ export const createCashierService = (deps: {
       action: 'viewed',
       resourceType: 'cashier_pending_visits',
       resourceId: null,
-      after: { branchId, count: result.length },
+      after: { branchId, count: result.length, total },
     });
 
-    return result;
+    return { data: result, meta: { page, pageSize, total } };
   }
 
   /**
@@ -861,10 +908,9 @@ export const createCashierService = (deps: {
 
       // CLI-446 G3: payroll carry-forward hook uchun kerakli maydonlarni tx
       // ichidan tashqariga olib chiqamiz (tx yopilgandan keyin hook chaqiriladi).
-      // Faqat plan-linked tranzaksiyada doktor bor (treatmentPlans.doctorId) —
-      // non-plan savdo payroll attributsiyasiga umuman bog'lanmagan (createRun
-      // ham faqat treatmentPlanId orqali join qiladi), shuning uchun bu yerda
-      // ANIQLASH kifoya, hookni CHAQIRISH emas.
+      // FX-19 (D-13): doktor = COALESCE(plan.doctorId, vizit.doctorId) — createRun/reports
+      // bilan bir xil manba. Ikkalasi ham yo'q (anonim erkin POS) → payroll attributsiyasiga
+      // bog'lanmagan, hook chaqirilmaydi.
       let payrollDoctorId: string | null = null;
       if (original.treatmentPlanId) {
         const [plan] = await tx
@@ -872,6 +918,13 @@ export const createCashierService = (deps: {
           .from(treatmentPlans)
           .where(eq(treatmentPlans.id, original.treatmentPlanId));
         payrollDoctorId = plan?.doctorId ?? null;
+      }
+      if (!payrollDoctorId && original.visitNoteId) {
+        const [visit] = await tx
+          .select({ doctorId: visitNotes.doctorId })
+          .from(visitNotes)
+          .where(eq(visitNotes.id, original.visitNoteId));
+        payrollDoctorId = visit?.doctorId ?? null;
       }
 
       return {
@@ -1046,6 +1099,7 @@ export const createCashierService = (deps: {
 
   return {
     list,
+    getBranchId,
     getById,
     create,
     refund,

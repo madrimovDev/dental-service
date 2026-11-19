@@ -12,7 +12,7 @@ export interface PendingVisitsCardProps {
 }
 
 /**
- * «Kutilayotgan vizitlar»: shifokor imzolagan, hali to'lanmagan bugungi vizitlar.
+ * «Kutilayotgan vizitlar»: shifokor imzolagan, hali to'lanmagan vizitlar (kechikkanlari belgilanadi).
  * «Kassaga olish» savatni vizit xizmatlari (qulflangan narx) bilan to'ldiradi.
  * Bo'sh bo'lsa ham ko'rinadi — kassir ro'yxat bo'shligini biladi.
  */
@@ -86,6 +86,18 @@ export function PendingVisitsCard({ visits, activeVisitId, onTake }: PendingVisi
                       .filter(Boolean)
                       .join(' · ')}
                   </Text>
+                  {v.overdue && (
+                    <Text
+                      data-testid="pending-visit-overdue"
+                      style={{ fontSize: 11.5, color: 'var(--warning, var(--danger))' }}
+                    >
+                      {t('cashierHandoff.overdue', {
+                        date: new Date(v.signedAt).toLocaleDateString('uz-UZ', {
+                          timeZone: 'Asia/Tashkent',
+                        }),
+                      })}
+                    </Text>
+                  )}
                   {v.hasUnpriced && (
                     <Text style={{ fontSize: 11.5, color: 'var(--danger)' }}>
                       {t('cashierHandoff.unpriced')}

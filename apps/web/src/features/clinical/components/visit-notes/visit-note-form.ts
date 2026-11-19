@@ -27,6 +27,8 @@ export type VisitFormValues = {
   freeNotes: string;
   performedServices: string[];
   stageId: string | null;
+  /** FX-14 (D-9): imzo bosqichni yopadimi (default true; false — oraliq vizit). */
+  completesStage: boolean;
   appointmentId: string | null;
   nextVisit: NextVisit | null;
 };
@@ -39,6 +41,7 @@ export const emptyVisitForm = (): VisitFormValues => ({
   freeNotes: '',
   performedServices: [],
   stageId: null,
+  completesStage: true,
   appointmentId: null,
   nextVisit: null,
 });
@@ -68,6 +71,7 @@ export const buildVisitNoteBody = (
   appointmentId: v.appointmentId ?? undefined,
   performedServices: ctx.isEdit || v.performedServices.length > 0 ? v.performedServices : undefined,
   stageId: v.stageId ?? undefined,
+  completesStage: v.stageId ? v.completesStage : undefined,
   allergyOverrides: ctx.overrides.length > 0 ? ctx.overrides : undefined,
   nextVisit: v.nextVisit ?? undefined,
 });

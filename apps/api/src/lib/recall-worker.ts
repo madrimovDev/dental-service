@@ -96,7 +96,12 @@ export async function processRecallScan(deps: RecallScanDeps): Promise<RecallSca
       sendHourLocal: tenantSettings.recallSendHourLocal,
     })
     .from(recalls)
-    .innerJoin(patients, eq(patients.id, recalls.patientId))
+    // FX-01 (LA-06): admin ulanish RLS'siz — bemor shu recall tenantiga tegishli bo'lishi
+    // SHART (arvoh recall'lar begona tenant bemoriga SMS yubormasin).
+    .innerJoin(
+      patients,
+      and(eq(patients.id, recalls.patientId), eq(patients.tenantId, recalls.tenantId)),
+    )
     .innerJoin(tenants, eq(tenants.id, recalls.tenantId))
     .leftJoin(tenantSettings, eq(tenantSettings.tenantId, recalls.tenantId))
     .where(

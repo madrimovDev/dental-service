@@ -45,6 +45,7 @@ describe.skipIf(!enabled)('zaxira + tiklash — real Postgres + tar', () => {
   const uploads = join(dataDir, 'uploads');
   const calls: string[] = [];
   let clock = new Date(2026, 10, 11, 20, 0, 0);
+  let failMigrate = false;
 
   const tools = createPgTools({
     host,
@@ -69,7 +70,10 @@ describe.skipIf(!enabled)('zaxira + tiklash — real Postgres + tar', () => {
     restoreDb: tools.restore,
     archiveUploads: up.archiveUploads,
     extractUploads: up.extractUploads,
-    migrate: () => calls.push('migrate'),
+    migrate: () => {
+      calls.push('migrate');
+      if (failMigrate) throw new Error('migration 0043 failed');
+    },
     stopApi: async () => {
       calls.push('stopApi');
     },
@@ -148,5 +152,31 @@ describe.skipIf(!enabled)('zaxira + tiklash — real Postgres + tar', () => {
     const result = JSON.parse(readFileSync(join(dataDir, 'restore-result.json'), 'utf8'));
     expect(result.status).toBe('failed');
     expect(result.error).toContain('restore_db');
+  });
+  test('FX-52: tiklangandan keyin migratsiya yiqilsa — real baza va uploads tiklashdan oldingi holatga qaytadi', async () => {
+    // Zaxira (holat A: Ali / asl-rasm).
+    clock = new Date(2026, 10, 14, 9, 0, 0);
+    const r = await scheduler.runBackup('manual');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    // Joriy holat B (tiklashdan oldingi): keyingi ma'lumotlar.
+    psql(DB, "UPDATE patients SET name = 'Yangi-B'");
+    writeFileSync(join(uploads, 'rasm.txt'), 'rasm-B');
+
+    calls.length = 0;
+    failMigrate = true;
+    clock = new Date(2026, 10, 14, 10, 0, 0);
+    writeFileSync(join(dataDir, 'restore-request.json'), JSON.stringify({ file: r.name }));
+    await scheduler.poll();
+    failMigrate = false;
+
+    // Baza A emas, B qaytdi (eski zaxirada QOLMADI).
+    expect(psql(DB, 'select name from patients where id = 1')).toBe('Yangi-B');
+    expect(readFileSync(join(uploads, 'rasm.txt'), 'utf8')).toBe('rasm-B');
+    const result = JSON.parse(readFileSync(join(dataDir, 'restore-result.json'), 'utf8'));
+    expect(result.status).toBe('failed');
+    expect(result.dbRolledBack).toBe(true);
+    expect(result.error).toContain('baza avvalgi holatga qaytarildi');
+    expect(calls.slice(-2)).toEqual(['maint:stop', 'startApi']);
   });
 });

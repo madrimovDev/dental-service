@@ -1,3 +1,4 @@
+import { ApiError } from '@dental/api-client';
 import { fireEvent, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderApp } from '../../../test-utils';
@@ -70,6 +71,10 @@ vi.mock('@/features/queue/queue.api.ts', () => ({
 // UI-R1: yangi hooklar (ismlar, diqqat manbalari, shifokorlar, qidiruv) — alohida modul.
 const confirmMutate = vi.fn();
 const declineMutate = vi.fn();
+const confirmState: { error: unknown; variables: { id: string } | undefined } = {
+  error: null,
+  variables: undefined,
+};
 const bookingRequests: { items: Record<string, unknown>[]; pendingCount: number } = {
   items: [],
   pendingCount: 0,
@@ -90,7 +95,12 @@ vi.mock('../reception.api.ts', () => ({
   useReceptionAttention: () => attention,
   usePatientSearch: () => ({ data: { items: [] }, isFetching: false }),
   useBookingRequests: () => ({ data: bookingRequests, isLoading: false }),
-  useConfirmBookingRequest: () => ({ mutate: confirmMutate, isPending: false }),
+  useConfirmBookingRequest: () => ({
+    mutate: confirmMutate,
+    isPending: false,
+    error: confirmState.error,
+    variables: confirmState.variables,
+  }),
   useDeclineBookingRequest: () => ({ mutate: declineMutate, isPending: false }),
 }));
 
@@ -101,6 +111,8 @@ afterEach(() => {
   bookingRequests.items = [];
   bookingRequests.pendingCount = 0;
   confirmMutate.mockClear();
+  confirmState.error = null;
+  confirmState.variables = undefined;
   declineMutate.mockClear();
   mockHasPermission.mockClear();
   mockHasPermission.mockImplementation(() => true);
@@ -259,5 +271,38 @@ describe('ReceptionistDashboard (DS1-T5 re-skin characterization)', () => {
 
     expect(screen.getByText('Dilnoza Karimova')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Tasdiqlash' })).not.toBeInTheDocument();
+  });
+
+  it('FX-24: shifokorsiz so‘rovda doktor tanlanadi va doctorId bilan tasdiqlanadi', async () => {
+    bookingRequests.items = [req('r1')];
+    bookingRequests.pendingCount = 1;
+    const { ReceptionistDashboard } = await import('./ReceptionistDashboard.tsx');
+    renderApp(<ReceptionistDashboard />);
+
+    const pickBtn = screen.getByRole('button', { name: 'Shu shifokor bilan tasdiqlash' });
+    expect(pickBtn).toBeDisabled();
+    fireEvent.click(screen.getByPlaceholderText('Boshqa shifokorni tanlang'));
+    fireEvent.click(await screen.findByRole('option', { name: 'Dr. Nazarov' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Shu shifokor bilan tasdiqlash' }));
+    expect(confirmMutate).toHaveBeenCalledWith({ id: 'r1', doctorId: 'd2' });
+  });
+
+  it('FX-24: shifokori bor so‘rovda tanlash faqat 409 (band slot) dan keyin chiqadi; expired da chiqmaydi', async () => {
+    bookingRequests.items = [req('r1', { doctorId: 'd1', doctorName: 'Dr. Karimov' })];
+    bookingRequests.pendingCount = 1;
+    const { ReceptionistDashboard } = await import('./ReceptionistDashboard.tsx');
+    const view = renderApp(<ReceptionistDashboard />);
+    expect(screen.queryByPlaceholderText('Boshqa shifokorni tanlang')).not.toBeInTheDocument();
+    view.unmount();
+
+    confirmState.error = new ApiError('conflict.doctor_busy', 'busy', 409);
+    confirmState.variables = { id: 'r1' };
+    const v2 = renderApp(<ReceptionistDashboard />);
+    expect(screen.getByPlaceholderText('Boshqa shifokorni tanlang')).toBeInTheDocument();
+    v2.unmount();
+
+    confirmState.error = new ApiError('booking_request.expired', 'expired', 409);
+    renderApp(<ReceptionistDashboard />);
+    expect(screen.queryByPlaceholderText('Boshqa shifokorni tanlang')).not.toBeInTheDocument();
   });
 });

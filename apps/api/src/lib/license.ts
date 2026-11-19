@@ -159,6 +159,110 @@ const isLicenseAuthentic = (data: LicenseData, localFingerprint: string): boolea
   return Boolean(payload.fingerprint) && payload.fingerprint === localFingerprint;
 };
 
+/**
+ * FX-06 (LA-15, X-4) — Supervisor'dan kelgan payload SHU mashina uchun haqiqiymi
+ * (litsenziya shakli + imzo + mahalliy fingerprint; muddatdan mustaqil). Heartbeat javobi `.lic`
+ * ustiga yozilishidan oldin shu bilan tekshiriladi. Fingerprint hisoblab
+ * bo'lmasa (VM/konteyner) — `false` (yozmaslik tomoniga).
+ */
+/**
+ * FX-07 (review) — payload aynan LITSENZIYA shaklidami. Bekor qilish bayonoti
+ * (`LicenseRevocation`) ham tekis, shu mashina fingerprint'iga ega va shu kalit
+ * bilan imzolangan — imzo+fingerprint tekshiruvi ikkisini ajratmaydi. Shu
+ * sababli `status` kaliti bo'lgan yoki litsenziya maydonlari yo'q/buzuq payload
+ * `.lic` sifatida qabul qilinmaydi (domen ajratish).
+ */
+const hasLicenseShape = (data: unknown): data is LicenseData => {
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) return false;
+  const d = data as Record<string, unknown>;
+  if ('status' in d) return false;
+  return (
+    typeof d.licenseKey === 'string' &&
+    d.licenseKey.length > 0 &&
+    typeof d.clinicId === 'string' &&
+    Array.isArray(d.modules) &&
+    d.modules.every((m) => typeof m === 'string') &&
+    typeof d.expiresAt === 'string' &&
+    Number.isFinite(Date.parse(d.expiresAt)) &&
+    typeof d.gracePeriodDays === 'number' &&
+    Number.isFinite(d.gracePeriodDays) &&
+    typeof d.issuedAt === 'string' &&
+    Number.isFinite(Date.parse(d.issuedAt)) &&
+    typeof d.fingerprint === 'string' &&
+    typeof d.signature === 'string'
+  );
+};
+
+export const isLicenseAuthenticForThisMachine = async (data: LicenseData): Promise<boolean> => {
+  if (!hasLicenseShape(data)) return false;
+  let localFingerprint: string;
+  try {
+    localFingerprint = await getFingerprint();
+  } catch {
+    return false;
+  }
+  try {
+    return isLicenseAuthentic(data, localFingerprint);
+  } catch {
+    // Buzuq shakl (masalan `signature` hex emas) — rad.
+    return false;
+  }
+};
+
+/**
+ * FX-07 (LA-16, X-4) — Supervisor'ning imzolangan bekor qilish bayonoti
+ * (heartbeat `403 { error: { code: 'LICENSE_REVOKED', revocation } }`).
+ *
+ * ⚠️ LOCKSTEP: `apps/supervisor-api/src/modules/licenses/licenses.service.ts`
+ * dagi `buildRevocation` bilan AYNAN bir xil maydonlar (tekis — Qaror #40).
+ */
+export interface LicenseRevocation {
+  status: 'revoked';
+  licenseKey: string;
+  clinicId: string;
+  fingerprint: string;
+  issuedAt: string;
+  signature: string;
+}
+
+/**
+ * FX-07 — bekor qilish bayonoti SHU mashinadagi JORIY `.lic` uchun haqiqiymi.
+ * `.lic` faqat shu `true` qaytarganda o'chiriladi. Talablar:
+ * - Supervisor ochiq kaliti bilan imzo (imzosiz/MITM 403 yetmaydi);
+ * - `status === 'revoked'` (oddiy litsenziya javobi imzosidan domen ajratish);
+ * - `licenseKey` joriy `.lic`niki, `fingerprint` mahalliy mashinaniki;
+ * - `issuedAt` joriy `.lic`ning `issuedAt`idan eski emas — litsenziya avval
+ *   bekor qilinib keyin qayta yoqilgan bo'lsa, eski bayonotni qayta yuborish
+ *   (replay) yangi `.lic`ni o'chira olmaydi.
+ * Har qanday shubhada — `false` (`.lic` saqlanadi).
+ */
+export const isRevocationAuthenticForThisMachine = async (
+  revocation: unknown,
+  current: LicenseData,
+): Promise<boolean> => {
+  if (typeof revocation !== 'object' || revocation === null || Array.isArray(revocation)) {
+    return false;
+  }
+  const { signature, ...payload } = revocation as Partial<LicenseRevocation> &
+    Record<string, unknown>;
+  if (typeof signature !== 'string') return false;
+  if (!verifyLicenseSignature(payload, signature, SUPERVISOR_PUBLIC_KEY_PEM)) return false;
+  if (payload.status !== 'revoked') return false;
+  if (payload.licenseKey !== current.licenseKey) return false;
+  let localFingerprint: string;
+  try {
+    localFingerprint = await getFingerprint();
+  } catch {
+    return false;
+  }
+  if (!payload.fingerprint || payload.fingerprint !== localFingerprint) return false;
+  const revokedAtMs = Date.parse(String(payload.issuedAt));
+  const currentIssuedAtMs = Date.parse(current.issuedAt);
+  if (!Number.isFinite(revokedAtMs)) return false;
+  if (Number.isFinite(currentIssuedAtMs) && revokedAtMs < currentIssuedAtMs) return false;
+  return true;
+};
+
 /** CLI-437 — `max(Date.now(), anchor, issuedAt)`: soat orqaga surilsa ham muddat tiklanmaydi. */
 const effectiveNowMs = (data: LicenseData, anchorMs: number): number => {
   const issuedAtMs = Date.parse(data.issuedAt);

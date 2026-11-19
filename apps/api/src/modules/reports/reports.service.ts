@@ -33,6 +33,7 @@ import type { Context } from 'hono';
 import type { DbOrTx } from '../../db/client.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { txDoctorId } from '../../lib/tx-doctor.ts';
 import type { NonPlanTransactionRow } from '../patients/patients.balance.ts';
 import { computeNonPlanRemainder, computePatientBalance } from '../patients/patients.balance.ts';
 import {
@@ -302,23 +303,20 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
       .groupBy(cashierTransactions.paymentMethod)
       .orderBy(desc(signedPaidAmount));
 
-    // byDoctor — plan-linked (treatment_plans.doctorId), plansiz → null
-    const byDoctorPlan = await db
-      .select({ doctorId: treatmentPlans.doctorId, total: signedPaidAmount })
+    // byDoctor — doktor = COALESCE(plan.doctorId, vizit.doctorId) (FX-19); ikkalasi ham yo'q → null
+    const byDoctorRows = await db
+      .select({ doctorId: txDoctorId, total: signedPaidAmount })
       .from(cashierTransactions)
-      .innerJoin(treatmentPlans, eq(cashierTransactions.treatmentPlanId, treatmentPlans.id))
+      .leftJoin(treatmentPlans, eq(cashierTransactions.treatmentPlanId, treatmentPlans.id))
       .where(and(...base))
-      .groupBy(treatmentPlans.doctorId);
-    const [unassigned] = await db
-      .select({ total: signedPaidAmount })
-      .from(cashierTransactions)
-      .where(and(...base, isNull(cashierTransactions.treatmentPlanId)));
+      .groupBy(txDoctorId);
 
-    const byDoctor: RevenueReport['byDoctor'] = byDoctorPlan.map((r) => ({
-      doctorId: r.doctorId,
-      total: Number(r.total),
-    }));
-    const unassignedTotal = Number(unassigned?.total ?? 0);
+    const byDoctor: RevenueReport['byDoctor'] = byDoctorRows
+      .filter((r) => r.doctorId != null)
+      .map((r) => ({ doctorId: r.doctorId, total: Number(r.total) }));
+    const unassignedTotal = byDoctorRows
+      .filter((r) => r.doctorId == null)
+      .reduce((sum, r) => sum + Number(r.total), 0);
     if (unassignedTotal !== 0) byDoctor.push({ doctorId: null, total: unassignedTotal });
 
     const currentTotal = Number(totalRow?.total ?? 0);
@@ -712,21 +710,23 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
   /**
    * Bemorlar qarzi muddat bo'yicha (UI-M1). Qarz = bemor balansi > 0
    * (plan qarzi + non-plan qoldiq, patients.balance bilan bir xil formula).
-   * Yosh = qarz "langari"dan hozirgacha kun: bajarilgan qarz-bosqichi `completedAt`
-   * yoki reja `createdAt` (eng eskisi), non-plan to'lov `createdAt`.
+   * Yosh = TO'LANMAGAN qoldiq "langari"dan hozirgacha kun (FX-20): qoldig'i bor bosqichning
+   * `completedAt`/reja `createdAt` (eng eskisi) va qoldig'i bor non-plan tranzaksiya `createdAt`.
+   * To'liq to'langan eski bosqich/tranzaksiya langar bo'lmaydi.
    * Bemorlar tenant-darajali (Qaror #29) — filial bo'yicha bo'linmaydi.
    */
   async function debtAging(c: Context): Promise<DebtAgingReport> {
     const db = getDb(c);
     const now = Date.now();
 
-    const planRows = await db
+    // FX-20 (LA-26): langar = TO'LANMAGAN qoldiq yoshi. Bosqich-darajali qatorlar (cost, bosqichga
+    // ajratilgan to'lov) — to'liq yopilgan eski bosqich langar bo'lmaydi.
+    const stageRows = await db
       .select({
         patientId: treatmentPlans.patientId,
-        cost: sql<string>`COALESCE(SUM(${treatmentStages.cost}), 0)`,
-        anchor: sql<
-          string | null
-        >`MIN(COALESCE(${treatmentStages.completedAt}, ${treatmentPlans.createdAt}))`,
+        cost: treatmentStages.cost,
+        paid: sql<string>`COALESCE((SELECT SUM(${treatmentStagePayments.amount}) FROM ${treatmentStagePayments} WHERE ${treatmentStagePayments.stageId} = ${treatmentStages.id}), 0)`,
+        anchor: sql<string>`COALESCE(${treatmentStages.completedAt}, ${treatmentPlans.createdAt})`,
       })
       .from(treatmentStages)
       .innerJoin(treatmentPlans, eq(treatmentStages.treatmentPlanId, treatmentPlans.id))
@@ -736,8 +736,16 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
           ne(treatmentStages.status, 'skipped'),
           eq(treatmentStages.acceptance, 'accepted'),
         ),
-      )
-      .groupBy(treatmentPlans.patientId);
+      );
+    const planCost = new Map<string, number>();
+    const planAnchor = new Map<string, number>();
+    for (const r of stageRows) {
+      planCost.set(r.patientId, (planCost.get(r.patientId) ?? 0) + Number(r.cost));
+      if (Number(r.cost) - Number(r.paid) > 0) {
+        const t = new Date(r.anchor).getTime();
+        planAnchor.set(r.patientId, Math.min(planAnchor.get(r.patientId) ?? t, t));
+      }
+    }
 
     const allocRows = await db
       .select({
@@ -781,10 +789,6 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
       .groupBy(cashierTransactions.parentTransactionId);
     const refunded = new Map(refundRows.map((r) => [r.parent as string, Number(r.sum)]));
 
-    const planCost = new Map(planRows.map((r) => [r.patientId, Number(r.cost)]));
-    const planAnchor = new Map<string, number>();
-    for (const r of planRows)
-      if (r.anchor) planAnchor.set(r.patientId, new Date(r.anchor).getTime());
     const alloc = new Map(allocRows.map((r) => [r.patientId, Number(r.sum)]));
     const npRows = new Map<string, NonPlanTransactionRow[]>();
     const npAnchor = new Map<string, number>();
@@ -797,8 +801,12 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
         refundedSum: refunded.get(r.id) ?? 0,
       });
       npRows.set(pid, list);
-      const t = new Date(r.createdAt).getTime();
-      npAnchor.set(pid, Math.min(npAnchor.get(pid) ?? t, t));
+      // FX-20: faqat qoldig'i bor (to'liq to'lanmagan, bekor qilinmagan) tranzaksiya langar bo'ladi.
+      const row = list[list.length - 1] as NonPlanTransactionRow;
+      if (computeNonPlanRemainder([row]) > 0) {
+        const t = new Date(r.createdAt).getTime();
+        npAnchor.set(pid, Math.min(npAnchor.get(pid) ?? t, t));
+      }
     }
 
     const buckets = debtAgingBucketKeys.map((key) => ({ key, amount: 0, patients: 0 }));
@@ -872,12 +880,16 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
       .from(cashierTransactions)
       .where(and(...txBase))
       .groupBy(cashierTransactions.branchId);
-    const doctorRev = await db
-      .select({ doctorId: treatmentPlans.doctorId, total: signedPaidAmount })
+    const doctorRevRows = await db
+      .select({ doctorId: txDoctorId, total: signedPaidAmount })
       .from(cashierTransactions)
-      .innerJoin(treatmentPlans, eq(cashierTransactions.treatmentPlanId, treatmentPlans.id))
+      .leftJoin(treatmentPlans, eq(cashierTransactions.treatmentPlanId, treatmentPlans.id))
       .where(and(...txBase))
-      .groupBy(treatmentPlans.doctorId);
+      .groupBy(txDoctorId);
+    // FX-19: doktori aniqlanmagan tushum shifokor qatoriga kirmaydi (avvalgi INNER JOIN xulqi).
+    const doctorRev = doctorRevRows.filter(
+      (r): r is { doctorId: string; total: string } => r.doctorId != null,
+    );
 
     const apBase = [
       inRange(appointments.startTime, start, end),
@@ -966,15 +978,19 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
    *  - tushum: `revenueTotal` (refund manfiy — `signedPaidAmount`), Tashkent yarim-ochiq oraliq.
    *  - xarajat: `expenses.date` kalendar kuni bo'yicha [from, to]; branchId bo'lsa shu filial.
    *  - ish haqi: davri (`periodTo`) [from, to]ga tushgan payroll run'lar (finalized + draft) jami.
-   *    Payroll filialga bog'lanmagan → branchId berilsa hisobga olinmaydi (`payrollIncluded=false`).
+   *    Payroll filialga bog'lanmagan → branchId berilsa yoki chaqiruvchi filialga cheklangan bo'lsa
+   *    hisobga olinmaydi (`payrollIncluded=false`).
    */
   async function pnl(c: Context, range: ReportRange): Promise<PnlReport> {
     const db = getDb(c);
     const { from, to, branchId } = range;
     const revenueAmount = await revenueTotal(c, range);
+    // FX-31 (IR-06): xarajat va payroll ham revenueTotal bilan bir xil doirada
+    // (`reportBranchScope` → `reportBranchIds`, aks holda so'ralgan `branchId`).
+    const ids = scopeIds(c, branchId);
 
     const expFilters = [between(expenses.date, from, to)];
-    if (branchId) expFilters.push(eq(expenses.branchId, branchId));
+    if (ids) expFilters.push(branchIn(expenses.branchId, ids));
     const [expRow] = await db
       .select({ total: sql<string>`COALESCE(SUM(${expenses.amount}), 0)` })
       .from(expenses)
@@ -984,7 +1000,8 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
     let payrollFinalized: number | null = null;
     let payrollDraft: number | null = null;
     let payrollRunCount = 0;
-    if (!branchId) {
+    // Payroll filialga bog'lanmagan → filial doirasidagi (scoped yoki ?branchId) so'rovda chiqarilmaydi.
+    if (!ids) {
       const rows = await db
         .select({
           status: payrollRuns.status,

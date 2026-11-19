@@ -24,6 +24,7 @@ export type ReminderOutcome =
   | 'cancelled'
   | 'reschedule'
   | 'already'
+  | 'unavailable'
   | 'not_owner'
   | 'not_found';
 
@@ -72,14 +73,15 @@ export async function handleReminderAction(
     if (o.action === 'ok') {
       if (row.status === 'confirmed') return { outcome: 'already', ...base };
       const res = await deps.appointments.update(c, row.id, { status: 'confirmed' });
-      return { outcome: res.ok ? 'confirmed' : 'already', ...base };
+      // FX-36: {ok:false} (konflikt/time-off) jimgina «already» emas — bemorga aniq xabar.
+      return { outcome: res.ok ? 'confirmed' : 'unavailable', ...base };
     }
     if (o.action === 'no') {
       const res = await deps.appointments.update(c, row.id, {
         status: 'cancelled',
         cancellationReason: 'patient_telegram',
       });
-      return { outcome: res.ok ? 'cancelled' : 'already', ...base };
+      return { outcome: res.ok ? 'cancelled' : 'unavailable', ...base };
     }
   } catch (err) {
     if (err instanceof AppointmentTransitionError) return { outcome: 'already', ...base };

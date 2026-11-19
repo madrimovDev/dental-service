@@ -222,6 +222,10 @@ export const visitNotesRoutes = (deps: {
       if (e instanceof VisitNoteAlreadySignedError) {
         return c.json(fail('visit_note.already_signed', e.message), 409);
       }
+      // FX-14: bosqichni yopish guard'i (acceptance/plan/lab) → 400, imzo yozilmaydi.
+      if (e instanceof InvalidTransitionError) {
+        return c.json(fail('stage.invalid_transition', e.message), 400);
+      }
       throw e;
     }
   });

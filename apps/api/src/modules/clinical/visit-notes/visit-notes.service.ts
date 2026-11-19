@@ -69,10 +69,13 @@ export const mergeVisitNoteMetadata = (
 /**
  * C5 (CLI-222) — treatment-plans modulidan inject qilinadigan narrow dep.
  * Bog'liqlik yo'nalishi: visit-notes → treatment-plans (factory injection, to'g'ridan
- * import emas). Bosqichni 'completed' qiladi (C2 guard ichida; skipped→completed RAD).
+ * import emas). FX-14: qoralama bosqichni faqat boshlaydi, `sign()` yopadi.
  */
 export type StageCompleteHook = {
+  /** `sign()`da: bosqichni yakunlash (acceptance/plan/lab guard + recall + odontogramma). */
   completeStageForVisit: (c: Context, stageId: string) => Promise<unknown>;
+  /** FX-14: qoralama saqlashda bosqichni `in_progress` qilish (yopmasdan). */
+  startStageForVisit: (c: Context, stageId: string) => Promise<unknown>;
 };
 
 /**
@@ -139,11 +142,11 @@ export const createVisitNotesService = (deps: {
     if (input.appointmentId)
       await ownership.assertAppointmentBelongsToPatient(c, input.appointmentId, input.patientId);
 
-    // C5: stageId berilgan bo'lsa AVVAL bosqichni 'completed' qilamiz (C2 guard).
-    // Guard fail (skipped→completed) → InvalidTransitionError → routes 400. Yozuv
-    // yaratilishidan oldin tekshiramiz: noto'g'ri transition'da orphan yozuv qolmaydi.
+    // FX-14 (LA-33, D-9): qoralama bosqichni YOPMAYDI — faqat `in_progress` qiladi
+    // (skipped/plan-guard xatosi shu yerda → routes 400, orphan yozuv yo'q). Yopish —
+    // `sign()`da, `completesStage=true` bo'lsa.
     if (input.stageId && deps.completeStage) {
-      await deps.completeStage.completeStageForVisit(c, input.stageId);
+      await deps.completeStage.startStageForVisit(c, input.stageId);
     }
 
     const note = await repo.insert(c, {
@@ -152,6 +155,7 @@ export const createVisitNotesService = (deps: {
       doctorId: input.doctorId,
       appointmentId: input.appointmentId ?? null,
       stageId: input.stageId ?? null,
+      completesStage: input.completesStage ?? true,
       visitDate: input.visitDate ? new Date(input.visitDate) : new Date(),
       subjective: input.subjective ?? null,
       objective: input.objective ?? null,
@@ -200,15 +204,16 @@ export const createVisitNotesService = (deps: {
     if (input.appointmentId)
       await ownership.assertAppointmentBelongsToPatient(c, input.appointmentId, before.patientId);
 
-    // C5: stageId yangi berilgan/o'zgargan bo'lsa o'sha bosqichni 'completed' qilamiz (C2 guard).
+    // FX-14: yangi biriktirilgan bosqich `in_progress` bo'ladi (yopilmaydi — imzoda yopiladi).
     if (input.stageId && input.stageId !== before.stageId && deps.completeStage) {
-      await deps.completeStage.completeStageForVisit(c, input.stageId);
+      await deps.completeStage.startStageForVisit(c, input.stageId);
     }
 
     const patch: Record<string, unknown> = { updatedAt: new Date() };
     if (input.doctorId) patch.doctorId = input.doctorId;
     if (input.appointmentId !== undefined) patch.appointmentId = input.appointmentId;
     if (input.stageId !== undefined) patch.stageId = input.stageId;
+    if (input.completesStage !== undefined) patch.completesStage = input.completesStage;
     if (input.visitDate) patch.visitDate = new Date(input.visitDate);
     if (input.subjective !== undefined) patch.subjective = input.subjective;
     if (input.objective !== undefined) patch.objective = input.objective;
@@ -249,6 +254,13 @@ export const createVisitNotesService = (deps: {
     const before = await repo.find(c, id);
     if (!before) return null;
     if (before.signedAt) throw new VisitNoteAlreadySignedError(id);
+    // FX-14 (LA-33, D-9): bosqich yakunlanishi (recall, odontogramma, acceptance/plan/lab
+    // guard'lari) FAQAT imzoda va `completesStage=true` bo'lsa. Imzodan OLDIN: guard
+    // xatosi (400 — rlsMiddleware `fail()` 4xx'ni COMMIT qiladi) hech narsa yozilmasdan
+    // chiqadi, yarim-imzolangan holat qolmaydi. Allaqachon completed bosqich — idempotent.
+    if (before.stageId && before.completesStage && deps.completeStage) {
+      await deps.completeStage.completeStageForVisit(c, before.stageId);
+    }
     const signed = await repo.sign(c, id, c.get('user')?.id ?? null);
     if (!signed) throw new VisitNoteAlreadySignedError(id);
     await deps.audit.record(c, {

@@ -67,7 +67,12 @@ export const licensesRoutes = (deps: { service?: LicenseService } = {}) => {
       const data = await service.heartbeat(licenseKey, fingerprint);
       return c.json(data);
     } catch (e: any) {
-      return c.json({ error: { code: e.message } }, e.status ?? 500);
+      // FX-07 — `LICENSE_REVOKED` imzolangan `revocation` bayonotini olib
+      // yuradi; klient `.lic`ni faqat shu imzo tekshiruvidan keyin o'chiradi.
+      return c.json(
+        { error: { code: e.message, ...(e.revocation ? { revocation: e.revocation } : {}) } },
+        e.status ?? 500,
+      );
     }
   });
 

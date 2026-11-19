@@ -17,10 +17,14 @@ import {
   payrollAdjustments,
   payrollLines,
   payrollRuns,
+  permissions,
+  rolePermissions,
+  roles,
   tenants,
+  userAssignments,
   users,
 } from '@dental/db-schema';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { createApp } from '../../src/app.ts';
 import { db } from '../../src/db/client.ts';
 import { signAccess } from '../../src/lib/jwt.ts';
@@ -90,7 +94,32 @@ beforeAll(async () => {
     .returning({ id: tenants.id });
   tenantId = tenant!.id;
 
+  // FX-31: /pnl `reportBranchScope` — real user_assignments (tenant-wide, report.view beruvchi rol) kerak.
+  await db
+    .insert(permissions)
+    .values({ code: 'report.view', category: 'report' })
+    .onConflictDoNothing();
+  const [reportView] = await db
+    .select({ id: permissions.id })
+    .from(permissions)
+    .where(eq(permissions.code, 'report.view'));
+
   await withTenant(async (tx) => {
+    const [reportRole] = await tx
+      .insert(roles)
+      .values({ tenantId, name: 'M6 report' })
+      .returning({ id: roles.id });
+    await tx
+      .insert(rolePermissions)
+      .values({ roleId: reportRole!.id, permissionId: reportView!.id });
+    await tx.insert(userAssignments).values(
+      [accountant.id, manager.id].map((userId) => ({
+        tenantId,
+        userId,
+        branchId: null,
+        roleId: reportRole!.id,
+      })),
+    );
     const [a] = await tx.insert(branches).values({ tenantId, name: 'A' }).returning();
     const [b] = await tx.insert(branches).values({ tenantId, name: 'B' }).returning();
     branchA = a!.id;

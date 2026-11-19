@@ -132,13 +132,16 @@ export const createScheduleService = (deps: { audit: AuditLogger }) => {
 
   /**
    * P10: shaxsiy jadvali UMUMAN yo'q doktor filial ish soatida ishlaydi deb hisoblanadi
-   * (yangi klinikada darhol bron qilish uchun). Jadvali bor, lekin shu kun segmenti
+   * (yangi klinikada darhol bron qilish uchun) — FX-34: faqat shu filialga biriktirilgan bo'lsa. Jadvali bor, lekin shu kun segmenti
    * yo'q doktor — dam olish kuni (avvalgidek).
    */
   async function segmentsForDay(c: Context, doctorId: string, branchId: string, weekday: number) {
     const segs = await repo.listActiveSegmentsForDay(c, doctorId, branchId, weekday);
     if (segs.length > 0) return segs;
     if (await repo.hasAnyActiveSegments(c, doctorId, branchId)) return segs;
+    // FX-34 (LA-08): fallback faqat shu filialga biriktirilgan shifokorga — aks holda
+    // boshqa filial shifokori bu filialda «butun kun bo'sh» ko'rinardi.
+    if (!(await repo.isDoctorInBranch(c, doctorId, branchId))) return segs;
     return [
       {
         weekday,

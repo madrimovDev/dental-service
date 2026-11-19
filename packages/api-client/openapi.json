@@ -2932,6 +2932,40 @@
           "status"
         ]
       },
+      "PendingVisitsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PendingVisit"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer"
+              },
+              "pageSize": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "page",
+              "pageSize",
+              "total"
+            ]
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
       "PendingVisit": {
         "type": "object",
         "properties": {
@@ -2956,6 +2990,9 @@
           },
           "signedAt": {
             "type": "string"
+          },
+          "overdue": {
+            "type": "boolean"
           },
           "services": {
             "type": "array",
@@ -2999,6 +3036,7 @@
           "doctorId",
           "doctorName",
           "signedAt",
+          "overdue",
           "services",
           "total",
           "hasUnpriced"
@@ -7453,6 +7491,10 @@
             "format": "uuid",
             "example": null
           },
+          "completesStage": {
+            "type": "boolean",
+            "example": true
+          },
           "visitDate": {
             "type": "string",
             "example": "2026-06-12T10:00:00.000Z"
@@ -7525,6 +7567,7 @@
           "doctorId",
           "appointmentId",
           "stageId",
+          "completesStage",
           "visitDate",
           "subjective",
           "objective",
@@ -16017,11 +16060,43 @@
             "required": true,
             "name": "branchId",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 90,
+              "default": 30
+            },
+            "required": false,
+            "name": "days",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            },
+            "required": false,
+            "name": "pageSize",
+            "in": "query"
           }
         ],
         "responses": {
           "200": {
-            "description": "Signed, unbilled visits of today",
+            "description": "Signed, unbilled visits (last N days, paginated)",
             "content": {
               "application/json": {
                 "schema": {
@@ -16034,10 +16109,7 @@
                       ]
                     },
                     "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/PendingVisit"
-                      }
+                      "$ref": "#/components/schemas/PendingVisitsResponse"
                     }
                   },
                   "required": [
@@ -17463,8 +17535,28 @@
               }
             }
           },
+          "404": {
+            "description": "Appointment not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "409": {
             "description": "Scheduling conflict (doctor busy / patient busy / outside working hours / on time-off)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Doctor is not assigned to this branch (schedule.doctor_not_in_branch)",
             "content": {
               "application/json": {
                 "schema": {
@@ -17482,6 +17574,17 @@
           "appointments"
         ],
         "operationId": "listDoctors",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
         "responses": {
           "200": {
             "description": "List of doctors for booking",
@@ -17843,6 +17946,16 @@
           },
           "409": {
             "description": "Scheduling conflict (doctor busy / patient busy / outside working hours / on time-off)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Doctor is not assigned to this branch (schedule.doctor_not_in_branch)",
             "content": {
               "application/json": {
                 "schema": {
@@ -19052,6 +19165,16 @@
               }
             }
           },
+          "404": {
+            "description": "Patient / branch / service not found in this tenant",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "409": {
             "description": "Duplicate open ticket for the linked appointment",
             "content": {
@@ -19577,6 +19700,16 @@
           },
           "400": {
             "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Referenced patient/branch/plan/doctor not found in this clinic",
             "content": {
               "application/json": {
                 "schema": {
@@ -22894,6 +23027,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "Referenced stock item / service not found in this clinic",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -23304,6 +23447,16 @@
               }
             }
           },
+          "404": {
+            "description": "Referenced stock item / service not found in this clinic",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "409": {
             "description": "Insufficient stock (negative guard)",
             "content": {
@@ -23477,6 +23630,16 @@
           },
           "403": {
             "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Referenced stock item / service not found in this clinic",
             "content": {
               "application/json": {
                 "schema": {
@@ -23749,6 +23912,16 @@
           },
           "403": {
             "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Referenced stock item / service not found in this clinic",
             "content": {
               "application/json": {
                 "schema": {
@@ -24506,6 +24679,16 @@
           },
           "404": {
             "description": "Payroll run not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Draft snapshot is stale (payments/refunds changed after creation)",
             "content": {
               "application/json": {
                 "schema": {
@@ -25964,6 +26147,21 @@
                         "notes": {
                           "type": "string",
                           "maxLength": 500
+                        },
+                        "resultingToothState": {
+                          "type": "string",
+                          "enum": [
+                            "healthy",
+                            "caries",
+                            "filling",
+                            "crown",
+                            "implant",
+                            "missing",
+                            "root_canal",
+                            "to_extract",
+                            "temporary",
+                            "veneer"
+                          ]
                         }
                       },
                       "required": [
@@ -26681,6 +26879,9 @@
                     "type": "string",
                     "format": "uuid"
                   },
+                  "completesStage": {
+                    "type": "boolean"
+                  },
                   "visitDate": {
                     "type": "string",
                     "format": "date-time",
@@ -26919,6 +27120,9 @@
                   "stageId": {
                     "type": "string",
                     "format": "uuid"
+                  },
+                  "completesStage": {
+                    "type": "boolean"
                   },
                   "visitDate": {
                     "type": "string",

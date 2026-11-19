@@ -1,5 +1,6 @@
 import type { Context } from 'hono';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { createOwnershipValidator } from '../../lib/ownership.ts';
 import { CLINIC_TZ } from '../../lib/sms-templates.ts';
 import { createRecallsRepository } from './recalls.repository.ts';
 import type {
@@ -84,6 +85,26 @@ export function computeDueDate(intervalMonths: number, now: Date = new Date()): 
 
 export const createRecallsService = (deps: { audit: AuditLogger }) => {
   const repo = createRecallsRepository();
+  const ownership = createOwnershipValidator();
+
+  /**
+   * X-1: body'dagi har FK RLS ostida tekshiriladi (Postgres FK RLS'ni chetlab o'tadi).
+   * Begona/yo'q ID → CrossEntityError (route 404 ga map qiladi). Hech qanday yozuvdan OLDIN.
+   */
+  async function assertRefsOwned(
+    c: Context,
+    refs: {
+      patientId?: string;
+      branchId?: string | null;
+      treatmentPlanId?: string | null;
+      assignedDoctorId?: string | null;
+    },
+  ): Promise<void> {
+    if (refs.patientId) await ownership.assertPatientExists(c, refs.patientId);
+    if (refs.branchId) await ownership.assertBranchExists(c, refs.branchId);
+    if (refs.treatmentPlanId) await ownership.assertTreatmentPlanExists(c, refs.treatmentPlanId);
+    if (refs.assignedDoctorId) await ownership.assertUserExists(c, refs.assignedDoctorId);
+  }
 
   const list = (c: Context, query: ListRecallsQuery) => repo.list(c, query);
   const listByPatient = (c: Context, patientId: string) => repo.listByPatient(c, patientId);
@@ -93,6 +114,8 @@ export const createRecallsService = (deps: { audit: AuditLogger }) => {
     const tenantId = c.get('activeTenantId');
     const user = c.get('user');
     if (!tenantId) throw new Error('No tenant context');
+
+    await assertRefsOwned(c, input);
 
     const created = await repo.insert(c, {
       tenantId,
@@ -146,6 +169,8 @@ export const createRecallsService = (deps: { audit: AuditLogger }) => {
     const before = await repo.findById(c, id);
     if (!before) return null;
     const user = c.get('user');
+
+    await assertRefsOwned(c, input);
 
     const patch: Partial<Parameters<typeof repo.update>[2]> = {};
     if (input.status) {

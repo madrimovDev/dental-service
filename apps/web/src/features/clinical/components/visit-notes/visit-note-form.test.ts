@@ -42,6 +42,20 @@ describe('buildVisitNoteBody', () => {
   });
 });
 
+describe('buildVisitNoteBody — FX-14 completesStage', () => {
+  const ctx = { patientId: 'p1', doctorId: 'u1', isEdit: false, overrides: [] };
+
+  it('bosqich tanlanmagan bo‘lsa completesStage yuborilmaydi', () => {
+    expect(buildVisitNoteBody(emptyVisitForm(), ctx).completesStage).toBeUndefined();
+  });
+
+  it('bosqich bilan: default true; oraliq vizit (false) tanaga tushadi', () => {
+    const v = { ...emptyVisitForm(), stageId: 's1' };
+    expect(buildVisitNoteBody(v, ctx).completesStage).toBe(true);
+    expect(buildVisitNoteBody({ ...v, completesStage: false }, ctx).completesStage).toBe(false);
+  });
+});
+
 describe('dori ↔ allergiya', () => {
   it('penitsillin allergiyasi + amoksitsillin → to‘qnashuv', () => {
     expect(pendingAllergyConflict('Amoksitsillin 500 mg', penicillin, [])?.group).toBe(

@@ -1,3 +1,4 @@
+import { ApiError } from '@dental/api-client';
 import { StateView } from '@dental/ui';
 import { Box, Button, Group, Select, Stack, Text, TextInput } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
@@ -155,9 +156,23 @@ function TelegramRequests({
   const { t } = useTranslation();
   const confirm = useConfirmBookingRequest();
   const decline = useDeclineBookingRequest();
+  const doctors = useDoctorOptions();
+  const [pickedDoctor, setPickedDoctor] = useState<string | null>(null);
   const [decliningId, setDecliningId] = useState<string | null>(null);
   const [reason, setReason] = useState('');
   const [reasonError, setReasonError] = useState(false);
+
+  // FX-24: band slot (409) yoki shifokorsiz so'rov (400) — registrator boshqa shifokor tanlaydi.
+  // Muddati o'tgan / allaqachon hal qilingan so'rovda shifokor tanlash yordam bermaydi.
+  const needsDoctorPick = (r: BookingRequestRow) => {
+    if (!r.doctorId) return true;
+    const err = confirm.error;
+    if (!(err instanceof ApiError) || confirm.variables?.id !== r.id) return false;
+    if (err.code === 'booking_request.expired' || err.code === 'booking_request.not_pending') {
+      return false;
+    }
+    return err.status === 409 || err.code === 'booking_request.doctor_required';
+  };
 
   const submitDecline = (id: string) => {
     const trimmed = reason.trim();
@@ -239,6 +254,29 @@ function TelegramRequests({
                   </Group>
                 )}
               </Group>
+              {canDecide && decliningId !== r.id && needsDoctorPick(r) && (
+                <Group gap="xs" mt="xs" align="flex-start" wrap="nowrap">
+                  <Select
+                    size="xs"
+                    style={{ flex: 1 }}
+                    aria-label={t('telegramRequests.pick_doctor')}
+                    placeholder={t('telegramRequests.pick_doctor')}
+                    data={(doctors.data ?? []).map((d) => ({ value: d.id, label: d.name }))}
+                    value={pickedDoctor}
+                    onChange={setPickedDoctor}
+                  />
+                  <Button
+                    size="xs"
+                    disabled={!pickedDoctor}
+                    loading={confirm.isPending}
+                    onClick={() =>
+                      pickedDoctor && confirm.mutate({ id: r.id, doctorId: pickedDoctor })
+                    }
+                  >
+                    {t('telegramRequests.confirm_other_doctor')}
+                  </Button>
+                </Group>
+              )}
               {canDecide && decliningId === r.id && (
                 <Group gap="xs" mt="xs" align="flex-start" wrap="nowrap">
                   <TextInput

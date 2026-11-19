@@ -2,17 +2,17 @@ import {
   appointments,
   labOrders,
   patients,
-  roles,
   treatmentPlans,
   treatmentStages,
-  userAssignments,
-  users,
 } from '@dental/db-schema';
 import { and, asc, between, eq, gt, gte, inArray, isNotNull, lt, lte, ne } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { onAfterCommit } from '../../db/after-commit.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { isDoctorInBranch, listPractitioners } from '../../lib/doctor-branch.ts';
+import { CrossEntityError, createOwnershipValidator } from '../../lib/ownership.ts';
+import { assertBranchExists } from '../../lib/ownership-refs.ts';
 import { pgErrorInfo } from '../../lib/pg-error.ts';
 import { reminderDelayMs } from '../../lib/reminder-delay.ts';
 import type {
@@ -152,6 +152,40 @@ export const createAppointmentsService = (deps: {
   noShowStrike?: NoShowStrikeHook;
   queue?: QueueReverseSyncHook;
 }) => {
+  const ownership = createOwnershipValidator();
+
+  /**
+   * FX-02 (LA-46, X-1): FK constraint RLS'ni chetlab o'tadi — begona tenant bemori /
+   * doktori / yordamchisi qabul qilinardi. Har havola RLS ostida tekshiriladi:
+   * bemor `patients`dan, xodim shu tenantdagi faol (qabul qilingan) `user_assignments`
+   * dan (owner istisno). Topilmasa — 404 kodi (routes → 404). Faqat berilgan
+   * (`undefined`/`null` emas) maydonlar tekshiriladi.
+   */
+  async function checkRefs(
+    c: Context,
+    refs: { patientId?: string; doctorId?: string; assistantId?: string | null },
+  ): Promise<'patient.not_found' | 'doctor.not_found' | 'assistant.not_found' | null> {
+    try {
+      if (refs.patientId) await ownership.assertPatientExists(c, refs.patientId);
+    } catch (e) {
+      if (e instanceof CrossEntityError) return 'patient.not_found';
+      throw e;
+    }
+    try {
+      if (refs.doctorId) await ownership.assertUserExists(c, refs.doctorId);
+    } catch (e) {
+      if (e instanceof CrossEntityError) return 'doctor.not_found';
+      throw e;
+    }
+    try {
+      if (refs.assistantId) await ownership.assertUserExists(c, refs.assistantId);
+    } catch (e) {
+      if (e instanceof CrossEntityError) return 'assistant.not_found';
+      throw e;
+    }
+    return null;
+  }
+
   async function checkConflict(
     c: Context,
     doctorId: string,
@@ -285,6 +319,29 @@ export const createAppointmentsService = (deps: {
       return { ok: false as const, code: 'time.in_past' };
     }
 
+    // FX-02: begona tenant bemori/doktori/yordamchisi → 404 (konflikt tekshiruvlaridan OLDIN).
+    const refsError = await checkRefs(c, {
+      patientId: input.patientId,
+      doctorId: input.doctorId,
+      assistantId: input.assistantId,
+    });
+    if (refsError) return { ok: false as const, code: refsError };
+
+    // Review (X-1): body `branchId` ham RLS ostida tekshiriladi — FK begona tenant filialini
+    // qabul qilardi, isDoctorInBranch esa owner / tenant-wide doktor uchun har qanday
+    // filialga true qaytaradi (B filiali o'chirilsa A yozilishi CASCADE bilan o'chardi).
+    try {
+      await assertBranchExists(c, input.branchId);
+    } catch (e) {
+      if (e instanceof CrossEntityError) return { ok: false as const, code: 'branch.not_found' };
+      throw e;
+    }
+
+    // FX-34 (LA-08): doktor shu filialda ishlashi shart.
+    if (!(await isDoctorInBranch(c, input.doctorId, input.branchId))) {
+      return { ok: false as const, code: 'schedule.doctor_not_in_branch' };
+    }
+
     const conflict = await checkConflict(c, input.doctorId, start, end);
     if (conflict) {
       return { ok: false as const, code: 'conflict.doctor_busy' };
@@ -380,13 +437,33 @@ export const createAppointmentsService = (deps: {
       if (touchesFields) throw new AppointmentTransitionError('status.terminal', 'completed');
     }
 
+    // FX-02: o'zgartirilayotgan doktor/yordamchi shu tenantniki bo'lishi shart.
+    // O'zgarmagan qiymat (mavjud tayinlov keyin o'chirilgan bo'lishi mumkin) qayta tekshirilmaydi.
+    const refsError = await checkRefs(c, {
+      doctorId: input.doctorId && input.doctorId !== before.doctorId ? input.doctorId : undefined,
+      assistantId:
+        input.assistantId && input.assistantId !== before.assistantId
+          ? input.assistantId
+          : undefined,
+    });
+    if (refsError) return { ok: false as const, code: refsError };
+
+    // FX-34 (LA-08): doktor almashtirilsa — yangi doktor shu filialda ishlashi shart.
+    if (input.doctorId && input.doctorId !== before.doctorId) {
+      if (!(await isDoctorInBranch(c, input.doctorId, before.branchId))) {
+        return { ok: false as const, code: 'schedule.doctor_not_in_branch' };
+      }
+    }
+
     // CLI-409: re-validatsiya triggeri — vaqt/doktor o'zgarganda YOKI yangi holat
-    // active (scheduled/confirmed/in_progress) ga o'tganda (vaqt o'zgarmasa ham).
+    // NOFAOL (cancelled/no_show) dan faolga qaytganda (vaqt o'zgarmasa ham).
     // Bu H5'ni yopadi: cancelled→scheduled band slotga endi conflict topadi.
+    // FX-36 (LA-09): faol→faol (scheduled→confirmed/in_progress) slotni o'zgartirmaydi —
+    // keyin kiritilgan time-off/ish soati o'zgarishi «Kelaman»/navbat sinxronini yiqitmasin.
     const targetStatus = (input.status ?? beforeStatus) as AppointmentStatus;
     const targetActive = isActiveStatus(targetStatus);
     const timeOrDoctorChanged = !!(input.startTime || input.endTime || input.doctorId);
-    if (timeOrDoctorChanged || (targetActive && beforeStatus !== targetStatus)) {
+    if (timeOrDoctorChanged || (targetActive && !isActiveStatus(beforeStatus))) {
       const start = new Date(input.startTime ?? before.startTime);
       const end = new Date(input.endTime ?? before.endTime);
       const doctor = input.doctorId ?? before.doctorId;
@@ -584,26 +661,9 @@ export const createAppointmentsService = (deps: {
    * RLS tenant'ni filtrlaydi; `selectDistinct` bir userni bir nechta filial
    * assignment'idan dedupe qiladi.
    */
-  async function listDoctors(c: Context) {
-    const db = getDb(c);
-    const rows = await db
-      .selectDistinct({
-        id: users.id,
-        fullName: users.fullName,
-        phone: users.phone,
-      })
-      .from(userAssignments)
-      .innerJoin(users, eq(users.id, userAssignments.userId))
-      .innerJoin(roles, eq(roles.id, userAssignments.roleId))
-      .where(
-        and(
-          eq(userAssignments.isActive, true),
-          isNotNull(userAssignments.acceptedAt),
-          eq(roles.isPractitioner, true),
-        ),
-      )
-      .orderBy(users.fullName);
-
+  async function listDoctors(c: Context, branchId?: string) {
+    // FX-34: `branchId` berilsa — faqat shu filialga biriktirilgan (yoki tenant-wide) shifokorlar.
+    const rows = await listPractitioners(c, branchId);
     return rows.map((r) => ({ id: r.id, name: r.fullName ?? r.phone }));
   }
 

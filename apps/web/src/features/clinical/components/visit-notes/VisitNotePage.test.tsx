@@ -11,13 +11,14 @@ const rxMutate = vi.fn();
 let note: Record<string, unknown> | undefined;
 let notes: Array<Record<string, unknown>> = [];
 let allergies: Array<{ substance: string }> | null = [{ substance: 'Penitsillin' }];
+let plans: Array<Record<string, unknown>> = [];
 
 vi.mock('../../clinical.api', () => ({
   useVisitNote: () => ({ data: note, isLoading: false, isError: false, refetch: vi.fn() }),
   useVisitNotes: () => ({ data: notes }),
   useDiagnoses: () => ({ data: [] }),
   useServiceCatalog: () => ({ data: [] }),
-  useTreatmentPlans: () => ({ data: [] }),
+  useTreatmentPlans: () => ({ data: plans }),
   usePatientAppointments: () => ({ data: [] }),
   useVisitNoteTemplates: () => ({ data: [] }),
   usePrescriptions: () => ({ data: [] }),
@@ -88,6 +89,7 @@ describe('VisitNotePage — dori ↔ allergiya (UI-D4)', () => {
     note = undefined;
     notes = [];
     allergies = [{ substance: 'Penitsillin' }];
+    plans = [];
   });
 
   it('penitsillin allergiyali bemorga amoksitsillin → kritik oyna; sabab tanlanmaguncha davom etib bo‘lmaydi', () => {
@@ -196,5 +198,115 @@ describe('VisitNotePage — dori ↔ allergiya (UI-D4)', () => {
     await waitFor(() =>
       expect(localStorage.getItem('visit-note-draft:p1:new')).toContain('qoralama matni'),
     );
+  });
+
+  it('FX-14 review: bosqichga bog‘langan qoralamada «Rejasiz vizit» disabled; «Bosqich yakunlandi» tahrirlanadi', async () => {
+    plans = [
+      {
+        id: 'plan-1',
+        title: 'Reja',
+        status: 'in_progress',
+        stages: [
+          {
+            id: 's1',
+            sequence: 1,
+            serviceName: 'Plomba',
+            status: 'in_progress',
+            acceptance: 'accepted',
+          },
+          {
+            id: 's2',
+            sequence: 2,
+            serviceName: 'Kanal',
+            status: 'pending',
+            acceptance: 'accepted',
+          },
+        ],
+      },
+    ];
+    note = {
+      id: 'n1',
+      patientId: 'p1',
+      subjective: 'Shikoyat',
+      objective: null,
+      plan: null,
+      freeNotes: null,
+      assessmentDiagnoses: [],
+      performedServices: [],
+      stageId: 's1',
+      completesStage: true,
+      appointmentId: null,
+      visitDate: '2026-11-11T10:00:00Z',
+      updatedAt: '2026-11-11T10:05:00Z',
+      signedAt: null,
+      metadata: null,
+    };
+    mount('/patients/p1/visits/n1/edit');
+    expect(screen.getByRole('radio', { name: 'Rejasiz vizit' })).toBeDisabled();
+    expect(screen.getByRole('radio', { name: /Kanal/ })).toBeDisabled();
+    expect(screen.getByRole('radio', { name: /Plomba/ })).toBeChecked();
+
+    const completes = screen.getByRole('checkbox', { name: /Bosqich yakunlandi/ });
+    expect(completes).toBeEnabled();
+    fireEvent.click(completes);
+    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    await waitFor(() => expect(updateMutate).toHaveBeenCalledTimes(1));
+    expect(updateMutate.mock.calls[0]?.[0]).toMatchObject({
+      id: 'n1',
+      body: { stageId: 's1', completesStage: false },
+    });
+  });
+
+  it('FX-14 review: eski lokal qoralama («Rejasiz») bog‘langan yozuv bosqichini ezmaydi', () => {
+    plans = [
+      {
+        id: 'plan-1',
+        title: 'Reja',
+        status: 'in_progress',
+        stages: [
+          {
+            id: 's1',
+            sequence: 1,
+            serviceName: 'Plomba',
+            status: 'in_progress',
+            acceptance: 'accepted',
+          },
+        ],
+      },
+    ];
+    note = {
+      id: 'n1',
+      patientId: 'p1',
+      subjective: 'Shikoyat',
+      objective: null,
+      plan: null,
+      freeNotes: null,
+      assessmentDiagnoses: [],
+      performedServices: [],
+      stageId: 's1',
+      completesStage: true,
+      appointmentId: null,
+      visitDate: '2026-11-11T10:00:00Z',
+      updatedAt: '2026-11-11T10:05:00Z',
+      signedAt: null,
+      metadata: null,
+    };
+    localStorage.setItem(
+      'visit-note-draft:p1:n1',
+      JSON.stringify({
+        values: { subjective: 'lokal', stageId: null, completesStage: true },
+        rx: [],
+        overrides: [],
+        savedAt: '2026-11-12T10:00:00Z',
+      }),
+    );
+    mount('/patients/p1/visits/n1/edit');
+    expect(screen.getByRole('radio', { name: /Plomba/ })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Rejasiz vizit' })).not.toBeChecked();
+  });
+
+  it('bog‘lanmagan qoralamada «Rejasiz vizit» tanlanadi', () => {
+    mount();
+    expect(screen.getByRole('radio', { name: 'Rejasiz vizit' })).toBeEnabled();
   });
 });

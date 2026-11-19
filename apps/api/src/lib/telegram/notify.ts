@@ -28,7 +28,7 @@ export type PatientMessenger = {
   sendBookingDecision: (a: {
     tenantId: string;
     patientId: string;
-    decision: 'confirmed' | 'declined';
+    decision: 'confirmed' | 'declined' | 'expired';
     start: Date;
     reason?: string | null;
   }) => Promise<void>;
@@ -131,7 +131,9 @@ export function createPatientMessenger(deps: MessengerDeps = {}): PatientMesseng
           text:
             a.decision === 'confirmed'
               ? m.requestConfirmed(fmtWhen(a.start))
-              : m.requestDeclined(a.reason ?? null),
+              : a.decision === 'expired'
+                ? m.requestExpired(fmtWhen(a.start))
+                : m.requestDeclined(a.reason ?? null),
         };
       });
     },

@@ -337,6 +337,7 @@ describe('B4/B5 trigger wiring (through real services)', () => {
           sequence: 1,
           serviceName: 'Plomba',
           cost: '100',
+          acceptance: 'accepted',
         })
         .returning({ id: treatmentStages.id });
       return stage!.id;

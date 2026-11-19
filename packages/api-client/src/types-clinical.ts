@@ -63,6 +63,8 @@ export type CreateVisitNoteInput = {
   // `createVisitNoteSchema` (stageId + stock reconcile) allaqachon qo'llaydi —
   // endi web forma ham uzatadi (RFC-0010 hand-maintained istisnosi kengaytirildi).
   stageId?: string;
+  // FX-14 (D-9): imzo bosqichni yopadimi (default true; false — oraliq vizit).
+  completesStage?: boolean;
   freeNotes?: string;
 };
 

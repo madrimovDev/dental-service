@@ -1,6 +1,10 @@
+import { sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { onAfterCommit } from '../../db/after-commit.ts';
+import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { CrossEntityError } from '../../lib/ownership.ts';
+import { assertBranchExists } from '../../lib/ownership-refs.ts';
 import { BOOKING_SLOT_MINUTES } from '../../lib/telegram/booking.ts';
 import type { PatientMessenger } from '../../lib/telegram/notify.ts';
 import { AppointmentTransitionError } from '../appointments/appointments.transitions.ts';
@@ -9,7 +13,7 @@ import { toBookingRequestDto } from './booking-requests.mapper.ts';
 import {
   BOOKING_REQUEST_TTL_MS,
   createBookingRequestsRepository,
-  expireStaleBookingRequests,
+  expireStaleBookingRequestsReturning,
 } from './booking-requests.repository.ts';
 import type { ListBookingRequestsQuery } from './booking-requests.schema.ts';
 
@@ -32,10 +36,29 @@ export const createBookingRequestsService = (deps: {
 }) => {
   const repo = deps.repository ?? createBookingRequestsRepository();
 
+  /** Muddati tugagan so'rov egasiga xabar (commit'dan keyin, best-effort — FX-24). */
+  async function notifyExpired(
+    c: Context,
+    rows: { tenantId: string; patientId: string; requestedStart: Date }[],
+  ) {
+    const messenger = deps.messenger;
+    if (!messenger) return;
+    for (const r of rows) {
+      await onAfterCommit(c, () =>
+        messenger.sendBookingDecision({
+          tenantId: r.tenantId,
+          patientId: r.patientId,
+          decision: 'expired',
+          start: r.requestedStart,
+        }),
+      );
+    }
+  }
+
   async function list(c: Context, query: ListBookingRequestsQuery, now: Date = new Date()) {
     // Lazy expiry — RLS tx ichida faqat shu tenant (taymer — barcha tenantlar uchun alohida).
     const db = c.get('db');
-    if (db) await expireStaleBookingRequests(db, now);
+    if (db) await notifyExpired(c, await expireStaleBookingRequestsReturning(db, now));
     const [rows, pendingCount] = await Promise.all([
       repo.list(c, query.status),
       repo.pendingCount(c),
@@ -59,8 +82,13 @@ export const createBookingRequestsService = (deps: {
     if (row.status !== 'pending') {
       return { ok: false, code: 'booking_request.not_pending', conflict: true };
     }
-    if (row.createdAt.getTime() < now.getTime() - BOOKING_REQUEST_TTL_MS) {
-      await repo.markExpired(c, id);
+    // FX-24 (LA-40): 24 soat o'tgan YOKI so'ralgan slot o'tib ketgan — so'rov abadiy
+    // `pending` qolmaydi: `expired` + bemorga xabar (409 — `fail()`, yozuv commit bo'ladi).
+    if (
+      row.createdAt.getTime() < now.getTime() - BOOKING_REQUEST_TTL_MS ||
+      row.requestedStart.getTime() <= now.getTime()
+    ) {
+      if (await repo.markExpired(c, id)) await notifyExpired(c, [row]);
       return { ok: false, code: 'booking_request.expired', conflict: true };
     }
     const doctorId = input.doctorId ?? row.doctorId;
@@ -68,8 +96,41 @@ export const createBookingRequestsService = (deps: {
       return { ok: false, code: 'booking_request.doctor_required', conflict: false };
     }
 
+    // FX-03b (X-1): so'rovdagi filial shu tenantniki bo'lishi shart (FK RLS'ni chetlab o'tadi).
+    // Doktor (body yoki so'rov) appointments.create ichida tekshiriladi (`doctor.not_found`).
+    try {
+      await assertBranchExists(c, row.branchId);
+    } catch (e) {
+      if (e instanceof CrossEntityError) {
+        return { ok: false, code: 'branch.not_found', conflict: false };
+      }
+      throw e;
+    }
+
     const start = row.requestedStart;
     const end = new Date(start.getTime() + BOOKING_SLOT_MINUTES * 60_000);
+
+    // FX-37 (LA-10): «Boshqa vaqt» — eski yozilish yangisidan OLDIN bekor qilinadi
+    // (aks holda yangi slot eskisi bilan to'qnashadi va reopenOnCancel recall'ni
+    // pending'ga qaytarib qo'yardi). Yangi yozilish rad etilsa (409 — slot band)
+    // SAVEPOINT'ga qaytamiz: eski yozilish/recall/audit/after-commit o'zgarmaydi,
+    // so'rov `pending` qoladi.
+    const rescheduleOf = row.rescheduleOfAppointmentId;
+    const savepoint = 'fx37_reschedule';
+    const afterCommitMark = c.get('afterCommit')?.length ?? 0;
+    if (rescheduleOf) {
+      await getDb(c).execute(sql.raw(`SAVEPOINT ${savepoint}`));
+      try {
+        await deps.appointments.update(c, rescheduleOf, {
+          status: 'cancelled',
+          cancellationReason: 'rescheduled_via_telegram',
+        });
+      } catch (err) {
+        if (!(err instanceof AppointmentTransitionError)) throw err;
+        // Eski yozilish allaqachon yopilgan (completed/cancelled) — e'tiborsiz.
+      }
+    }
+
     // Slot band bo'lib qolgan bo'lsa (conflict/schedule/o'tmish) — 409 va so'rov
     // `pending` QOLADI (registrator boshqa vaqt/shifokor tanlay oladi yoki rad etadi).
     const res = await deps.appointments.create(c, {
@@ -80,7 +141,15 @@ export const createBookingRequestsService = (deps: {
       endTime: end.toISOString(),
       serviceIds: row.serviceId ? [row.serviceId] : [],
     });
-    if (!res.ok) return { ok: false, code: res.code, conflict: isConflictCode(res.code) };
+    if (!res.ok) {
+      if (rescheduleOf) {
+        await getDb(c).execute(sql.raw(`ROLLBACK TO SAVEPOINT ${savepoint}`));
+        // Bekor qilishdan qo'yilgan side-effect'lar (eslatmani o'chirish) bekor.
+        c.get('afterCommit')?.splice(afterCommitMark);
+      }
+      return { ok: false, code: res.code, conflict: isConflictCode(res.code) };
+    }
+    if (rescheduleOf) await getDb(c).execute(sql.raw(`RELEASE SAVEPOINT ${savepoint}`));
 
     const decided = await repo.markDecided(c, id, {
       status: 'confirmed',
@@ -88,19 +157,6 @@ export const createBookingRequestsService = (deps: {
       appointmentId: res.appointment.id,
     });
     if (!decided) return { ok: false, code: 'booking_request.not_pending', conflict: true };
-
-    // «Boshqa vaqt» — eski yozilish yangisiga almashtiriladi.
-    if (row.rescheduleOfAppointmentId) {
-      try {
-        await deps.appointments.update(c, row.rescheduleOfAppointmentId, {
-          status: 'cancelled',
-          cancellationReason: 'rescheduled_via_telegram',
-        });
-      } catch (err) {
-        if (!(err instanceof AppointmentTransitionError)) throw err;
-        // Eski yozilish allaqachon yopilgan (completed/cancelled) — e'tiborsiz.
-      }
-    }
 
     await deps.audit.record(c, {
       action: 'confirmed',
