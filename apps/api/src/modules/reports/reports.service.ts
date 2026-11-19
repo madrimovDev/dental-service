@@ -33,6 +33,7 @@ import type { Context } from 'hono';
 import type { DbOrTx } from '../../db/client.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { txDoctorId } from '../../lib/tx-doctor.ts';
 import type { NonPlanTransactionRow } from '../patients/patients.balance.ts';
 import { computeNonPlanRemainder, computePatientBalance } from '../patients/patients.balance.ts';
 import {
@@ -302,23 +303,20 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
       .groupBy(cashierTransactions.paymentMethod)
       .orderBy(desc(signedPaidAmount));
 
-    // byDoctor — plan-linked (treatment_plans.doctorId), plansiz → null
-    const byDoctorPlan = await db
-      .select({ doctorId: treatmentPlans.doctorId, total: signedPaidAmount })
+    // byDoctor — doktor = COALESCE(plan.doctorId, vizit.doctorId) (FX-19); ikkalasi ham yo'q → null
+    const byDoctorRows = await db
+      .select({ doctorId: txDoctorId, total: signedPaidAmount })
       .from(cashierTransactions)
-      .innerJoin(treatmentPlans, eq(cashierTransactions.treatmentPlanId, treatmentPlans.id))
+      .leftJoin(treatmentPlans, eq(cashierTransactions.treatmentPlanId, treatmentPlans.id))
       .where(and(...base))
-      .groupBy(treatmentPlans.doctorId);
-    const [unassigned] = await db
-      .select({ total: signedPaidAmount })
-      .from(cashierTransactions)
-      .where(and(...base, isNull(cashierTransactions.treatmentPlanId)));
+      .groupBy(txDoctorId);
 
-    const byDoctor: RevenueReport['byDoctor'] = byDoctorPlan.map((r) => ({
-      doctorId: r.doctorId,
-      total: Number(r.total),
-    }));
-    const unassignedTotal = Number(unassigned?.total ?? 0);
+    const byDoctor: RevenueReport['byDoctor'] = byDoctorRows
+      .filter((r) => r.doctorId != null)
+      .map((r) => ({ doctorId: r.doctorId, total: Number(r.total) }));
+    const unassignedTotal = byDoctorRows
+      .filter((r) => r.doctorId == null)
+      .reduce((sum, r) => sum + Number(r.total), 0);
     if (unassignedTotal !== 0) byDoctor.push({ doctorId: null, total: unassignedTotal });
 
     const currentTotal = Number(totalRow?.total ?? 0);
@@ -872,12 +870,16 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
       .from(cashierTransactions)
       .where(and(...txBase))
       .groupBy(cashierTransactions.branchId);
-    const doctorRev = await db
-      .select({ doctorId: treatmentPlans.doctorId, total: signedPaidAmount })
+    const doctorRevRows = await db
+      .select({ doctorId: txDoctorId, total: signedPaidAmount })
       .from(cashierTransactions)
-      .innerJoin(treatmentPlans, eq(cashierTransactions.treatmentPlanId, treatmentPlans.id))
+      .leftJoin(treatmentPlans, eq(cashierTransactions.treatmentPlanId, treatmentPlans.id))
       .where(and(...txBase))
-      .groupBy(treatmentPlans.doctorId);
+      .groupBy(txDoctorId);
+    // FX-19: doktori aniqlanmagan tushum shifokor qatoriga kirmaydi (avvalgi INNER JOIN xulqi).
+    const doctorRev = doctorRevRows.filter(
+      (r): r is { doctorId: string; total: string } => r.doctorId != null,
+    );
 
     const apBase = [
       inRange(appointments.startTime, start, end),

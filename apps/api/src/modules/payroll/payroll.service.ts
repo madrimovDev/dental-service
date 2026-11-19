@@ -14,6 +14,7 @@ import type { DbOrTx } from '../../db/client.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { pgErrorInfo } from '../../lib/pg-error.ts';
+import { txDoctorId } from '../../lib/tx-doctor.ts';
 import { computePayrollLine } from './payroll.calc.ts';
 import type { CreateRunInput } from './payroll.schema.ts';
 
@@ -51,13 +52,15 @@ const periodBounds = (periodFrom: string, periodTo: string) => {
 const attributedRevenueRows = async (tx: DbOrTx, start: Date, end: Date) =>
   tx
     .select({
-      doctorId: treatmentPlans.doctorId,
+      doctorId: txDoctorId,
       revenue: sql<string>`COALESCE(SUM(CASE WHEN ${cashierTransactions.type} = 'refund' THEN -${cashierTransactions.paidAmount} ELSE ${cashierTransactions.paidAmount} END), 0)`,
     })
     .from(cashierTransactions)
-    .innerJoin(treatmentPlans, eq(cashierTransactions.treatmentPlanId, treatmentPlans.id))
+    .leftJoin(treatmentPlans, eq(cashierTransactions.treatmentPlanId, treatmentPlans.id))
     .where(
       and(
+        // FX-19: doktori aniqlanmagan (rejasiz, vizitsiz) tushum komissiyaga kirmaydi.
+        sql`${txDoctorId} IS NOT NULL`,
         eq(cashierTransactions.status, 'completed'),
         gte(cashierTransactions.createdAt, start),
         lt(cashierTransactions.createdAt, end),
@@ -76,7 +79,7 @@ const attributedRevenueRows = async (tx: DbOrTx, start: Date, end: Date) =>
         sql`NOT EXISTS (SELECT 1 FROM ${payrollAdjustments} WHERE ${payrollAdjustments.sourceTransactionId} = ${cashierTransactions.id})`,
       ),
     )
-    .groupBy(treatmentPlans.doctorId);
+    .groupBy(txDoctorId);
 
 /**
  * Payroll moduli — gibrid baza + komissiya, snapshot run.
