@@ -6,6 +6,7 @@ import {
   avgDailyUsage,
   daysOfSupply,
   isLowStock,
+  usageWindowForItem,
 } from './stock.calc.ts';
 
 describe('isLowStock', () => {
@@ -95,5 +96,15 @@ describe('allocateBatchRemaining (FIFO)', () => {
     expect(
       allocateBatchRemaining(-3, [{ receivedAt: d(1), qtyReceived: 5 }])[0]?.qtyRemaining,
     ).toBe(0);
+  });
+});
+
+describe('usageWindowForItem (FX-68)', () => {
+  const now = Date.UTC(2031, 0, 31);
+  const DAY = 24 * 60 * 60 * 1000;
+  test('yangi item: kamida 1 kun, eski item: 30 kun, oraliq: yosh', () => {
+    expect(usageWindowForItem(new Date(now), now)).toBe(1);
+    expect(usageWindowForItem(new Date(now - 4 * DAY), now)).toBe(4);
+    expect(usageWindowForItem(new Date(now - 200 * DAY), now)).toBe(30);
   });
 });

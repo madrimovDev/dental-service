@@ -68,7 +68,16 @@ const mkItem = (name: string, quantity: string, branchId: string | null) =>
   withTenant(async (tx) => {
     const [i] = await tx
       .insert(stockItems)
-      .values({ tenantId, branchId, name, unit: 'dona', quantity, minThreshold: '1' })
+      // FX-68: oyna item yoshiga bog'liq — «eski» item (>30 kun) deb olinadi.
+      .values({
+        tenantId,
+        branchId,
+        name,
+        unit: 'dona',
+        quantity,
+        minThreshold: '1',
+        createdAt: new Date(Date.now() - 90 * DAY),
+      })
       .returning({ id: stockItems.id });
     return i!.id;
   });

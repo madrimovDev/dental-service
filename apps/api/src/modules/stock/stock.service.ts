@@ -29,6 +29,7 @@ import {
   daysOfSupply,
   isLowStock,
   USAGE_WINDOW_DAYS,
+  usageWindowForItem,
 } from './stock.calc.ts';
 import type {
   CreateBatchInput,
@@ -172,15 +173,26 @@ export const createStockService = (deps: {
   }
 
   /**
-   * Item bo'yicha oxirgi 30 kun SOF sarfi: `out` yig'indisi − `visit_edit_return` (`in`).
+   * Item bo'yicha oxirgi 30 kun SOF sarfi: `out` yig'indisi − vizit qaytarishlari (`in`).
+   * FX-68: qaytarish FAQAT qaytarilayotgan asl chiqim (shu vizit yozuvi + item) ham oyna ichida
+   * bo'lsa ayriladi — 30 kundan eski chiqimni bugun qaytarish oynani manfiy qilmasin.
+   * Vizit yozuvi belgisiz (eski/qo'lda) qaytarish avvalgidek ayriladi.
    * Qo'lda kirim (`in`) va inventarizatsiya (`adjustment`) sarf emas. RLS tenantni filtrlaydi.
    */
   async function netConsumption(c: Context, itemIds?: string[]) {
     const db = getDb(c);
     const since = new Date(Date.now() - USAGE_WINDOW_DAYS * DAY_MS);
+    const sinceIso = since.toISOString();
     const net = sql<string>`coalesce(sum(case
       when ${stockMovements.type} = 'out' then ${stockMovements.quantity}
-      when ${stockMovements.type} = 'in' and ${stockMovements.reason} in ('visit_edit_return', 'visit_cancel_return') then -${stockMovements.quantity}
+      when ${stockMovements.type} = 'in' and ${stockMovements.reason} in ('visit_edit_return', 'visit_cancel_return')
+        and (${stockMovements.sourceVisitNoteId} is null or exists (
+          select 1 from stock_movements o
+          where o.source_visit_note_id = ${stockMovements.sourceVisitNoteId}
+            and o.item_id = ${stockMovements.itemId}
+            and o.type = 'out'
+            and o.created_at >= ${sinceIso}::timestamptz))
+        then -${stockMovements.quantity}
       else 0 end), 0)`;
     const rows = await db
       .select({ itemId: stockMovements.itemId, net })
@@ -195,11 +207,13 @@ export const createStockService = (deps: {
     return new Map(rows.map((r) => [r.itemId, Number(r.net)]));
   }
 
-  const withUsage = <T extends { id: string; quantity: string; minThreshold: string }>(
+  const withUsage = <
+    T extends { id: string; quantity: string; minThreshold: string; createdAt: Date },
+  >(
     item: T,
     consumed: Map<string, number>,
   ) => {
-    const avg = avgDailyUsage(consumed.get(item.id) ?? 0);
+    const avg = avgDailyUsage(consumed.get(item.id) ?? 0, usageWindowForItem(item.createdAt));
     return {
       ...item,
       lowStock: isLowStock(Number(item.quantity), Number(item.minThreshold)),
