@@ -85,16 +85,26 @@ export const runLicenseHeartbeatCheck = async (deps: RunHeartbeatCheckDeps): Pro
       );
       return;
     }
+    // FX-07 (review) — javob SHU litsenziya kaliti uchun bo'lishi shart: boshqa
+    // kalitning imzolangan litsenziyasi joriy `.lic` o'rnini egallamasin.
+    if (fresh.licenseKey !== lic.licenseKey) {
+      deps.log.warn(
+        { clinicId: lic.clinicId },
+        'License heartbeat: response is for a different license key — keeping cached license',
+      );
+      return;
+    }
     // FX-07 — `expiresAt` orqaga ketmaydi. Zaxiradan tiklangan Supervisor
     // uzaytirishdan OLDINGI muddatni yaroqli imzo bilan qaytaradi; uni yozish
     // to'lov qilgan klinikani bloklardi. Muddatni qisqartirish kerak bo'lsa
     // vendor deaktivatsiya (imzolangan `LICENSE_REVOKED`) qiladi.
     const freshExpiresMs = Date.parse(fresh.expiresAt);
     const currentExpiresMs = Date.parse(lic.expiresAt);
+    // Yangi `expiresAt` sana bo'lmasa (NaN) — tekshiruv O'TKAZIB YUBORILMAYDI,
+    // javob rad etiladi (imzolangan, lekin litsenziya bo'lmagan payload).
     if (
-      Number.isFinite(freshExpiresMs) &&
-      Number.isFinite(currentExpiresMs) &&
-      freshExpiresMs < currentExpiresMs
+      !Number.isFinite(freshExpiresMs) ||
+      (Number.isFinite(currentExpiresMs) && freshExpiresMs < currentExpiresMs)
     ) {
       deps.log.warn(
         {
@@ -102,7 +112,7 @@ export const runLicenseHeartbeatCheck = async (deps: RunHeartbeatCheckDeps): Pro
           currentExpiresAt: lic.expiresAt,
           freshExpiresAt: fresh.expiresAt,
         },
-        'License heartbeat: response expiresAt is earlier than the cached license — keeping cached license',
+        'License heartbeat: response expiresAt is missing or earlier than the cached license — keeping cached license',
       );
       return;
     }

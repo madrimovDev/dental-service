@@ -161,11 +161,40 @@ const isLicenseAuthentic = (data: LicenseData, localFingerprint: string): boolea
 
 /**
  * FX-06 (LA-15, X-4) — Supervisor'dan kelgan payload SHU mashina uchun haqiqiymi
- * (imzo + mahalliy fingerprint; muddatdan mustaqil). Heartbeat javobi `.lic`
+ * (litsenziya shakli + imzo + mahalliy fingerprint; muddatdan mustaqil). Heartbeat javobi `.lic`
  * ustiga yozilishidan oldin shu bilan tekshiriladi. Fingerprint hisoblab
  * bo'lmasa (VM/konteyner) — `false` (yozmaslik tomoniga).
  */
+/**
+ * FX-07 (review) — payload aynan LITSENZIYA shaklidami. Bekor qilish bayonoti
+ * (`LicenseRevocation`) ham tekis, shu mashina fingerprint'iga ega va shu kalit
+ * bilan imzolangan — imzo+fingerprint tekshiruvi ikkisini ajratmaydi. Shu
+ * sababli `status` kaliti bo'lgan yoki litsenziya maydonlari yo'q/buzuq payload
+ * `.lic` sifatida qabul qilinmaydi (domen ajratish).
+ */
+const hasLicenseShape = (data: unknown): data is LicenseData => {
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) return false;
+  const d = data as Record<string, unknown>;
+  if ('status' in d) return false;
+  return (
+    typeof d.licenseKey === 'string' &&
+    d.licenseKey.length > 0 &&
+    typeof d.clinicId === 'string' &&
+    Array.isArray(d.modules) &&
+    d.modules.every((m) => typeof m === 'string') &&
+    typeof d.expiresAt === 'string' &&
+    Number.isFinite(Date.parse(d.expiresAt)) &&
+    typeof d.gracePeriodDays === 'number' &&
+    Number.isFinite(d.gracePeriodDays) &&
+    typeof d.issuedAt === 'string' &&
+    Number.isFinite(Date.parse(d.issuedAt)) &&
+    typeof d.fingerprint === 'string' &&
+    typeof d.signature === 'string'
+  );
+};
+
 export const isLicenseAuthenticForThisMachine = async (data: LicenseData): Promise<boolean> => {
+  if (!hasLicenseShape(data)) return false;
   let localFingerprint: string;
   try {
     localFingerprint = await getFingerprint();

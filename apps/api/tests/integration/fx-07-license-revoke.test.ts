@@ -285,3 +285,70 @@ describe('FX-07 — expiresAt regression keeps the current .lic', () => {
     expect(lic?.modules).toEqual(['patients', 'cashier']);
   });
 });
+
+/**
+ * FX-07 (review) — imzolangan, lekin LITSENZIYA shaklida bo'lmagan 200 javobi
+ * `.lic` ustiga yozilmasin. Bekor qilish bayonoti ham tekis, shu mashina
+ * fingerprint'iga ega va shu kalit bilan imzolangan — faqat imzo+fingerprint
+ * tekshiruvi uni "litsenziya" deb qabul qilardi, `expiresAt` yo'qligi (NaN)
+ * regressiya tekshiruvini ham chetlab o'tardi. Natija: qayta yoqilgan,
+ * to'lagan klinika eski (ushlab qolingan) bayonot bilan `expired` holatiga
+ * tushardi (replay himoyasi aylanib o'tiladi).
+ */
+describe('FX-07 — a signed but wrong-shaped 200 heartbeat body keeps the .lic', () => {
+  const expectUnchanged = async (before: unknown) => {
+    expect(await readLicense()).toEqual(before as Awaited<ReturnType<typeof readLicense>>);
+    expect((await buildApp().request('/x')).status).toBe(200);
+  };
+
+  test('old signed revocation (issuedAt before the current .lic) replayed as a 200 body', async () => {
+    await seedLicense();
+    const before = await readLicense();
+    supervisorRespondsOk(
+      signedRevocation({
+        issuedAt: new Date(Date.parse(CURRENT_ISSUED_AT) - 86400000 * 10).toISOString(),
+      }),
+    );
+    await runCheck();
+    await expectUnchanged(before);
+  });
+
+  test('fresh signed revocation served as a 200 body (not via LICENSE_REVOKED)', async () => {
+    await seedLicense();
+    const before = await readLicense();
+    supervisorRespondsOk(signedRevocation());
+    await runCheck();
+    await expectUnchanged(before);
+  });
+
+  test('signed license for another license key', async () => {
+    await seedLicense();
+    const before = await readLicense();
+    const other = licensePayload({
+      licenseKey: 'SOME-OTHER-KEY',
+      expiresAt: new Date(Date.parse(CURRENT_EXPIRES_AT) + 86400000 * 365).toISOString(),
+      issuedAt: new Date().toISOString(),
+    });
+    supervisorRespondsOk({ ...other, signature: signWith(trustedKeys.privateKey, other) });
+    await runCheck();
+    await expectUnchanged(before);
+  });
+
+  test('signed license whose expiresAt is not a date', async () => {
+    await seedLicense();
+    const before = await readLicense();
+    const bad = licensePayload({ expiresAt: 'never', issuedAt: new Date().toISOString() });
+    supervisorRespondsOk({ ...bad, signature: signWith(trustedKeys.privateKey, bad) });
+    await runCheck();
+    await expectUnchanged(before);
+  });
+
+  test('signed license whose modules is not an array', async () => {
+    await seedLicense();
+    const before = await readLicense();
+    const bad = licensePayload({ modules: 'patients', issuedAt: new Date().toISOString() });
+    supervisorRespondsOk({ ...bad, signature: signWith(trustedKeys.privateKey, bad) });
+    await runCheck();
+    await expectUnchanged(before);
+  });
+});

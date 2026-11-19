@@ -155,6 +155,49 @@ describe('runLicenseHeartbeatCheck', () => {
     expect(writeLicense).not.toHaveBeenCalled();
   });
 
+  test('verified heartbeat whose expiresAt is not a date does NOT replace the cached .lic (FX-07 review)', async () => {
+    const { runLicenseHeartbeatCheck } = await import('./license-heartbeat-scheduler');
+    const writeLicense = mock(async () => {});
+    const writeAnchor = mock(async (_ms: number) => {});
+    const { expiresAt: _drop, ...noExpiry } = makeLicense();
+
+    await runLicenseHeartbeatCheck({
+      readLicense: async () => makeLicense(),
+      writeLicense,
+      invalidateLicense: mock(async () => {}),
+      sendHeartbeat: async () => noExpiry as unknown as LicenseData,
+      readAnchor: async () => 0,
+      writeAnchor,
+      verifyLicense: acceptAll,
+      log: fakeLog,
+    });
+
+    expect(writeLicense).not.toHaveBeenCalled();
+    expect(writeAnchor).not.toHaveBeenCalled();
+  });
+
+  test('verified heartbeat for a different licenseKey does NOT replace the cached .lic (FX-07 review)', async () => {
+    const { runLicenseHeartbeatCheck } = await import('./license-heartbeat-scheduler');
+    const writeLicense = mock(async () => {});
+    const other = {
+      ...makeLicense(),
+      licenseKey: 'OTHER-KEY',
+      expiresAt: new Date(Date.parse(EXPIRES_AT) + 86400000 * 365).toISOString(),
+    };
+
+    await runLicenseHeartbeatCheck({
+      readLicense: async () => makeLicense(),
+      writeLicense,
+      invalidateLicense: mock(async () => {}),
+      sendHeartbeat: async () => other,
+      ...noopAnchorDeps,
+      verifyLicense: acceptAll,
+      log: fakeLog,
+    });
+
+    expect(writeLicense).not.toHaveBeenCalled();
+  });
+
   test('sendHeartbeat rejects with FINGERPRINT_MISMATCH -> does NOT invalidate (out of scope, see spec §5)', async () => {
     const { runLicenseHeartbeatCheck } = await import('./license-heartbeat-scheduler');
     const invalidateLicense = mock(async () => {});
