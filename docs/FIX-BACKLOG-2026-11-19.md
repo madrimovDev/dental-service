@@ -164,6 +164,25 @@ Har biri alohida brainstorm → spec → reja. Tartib: qarorlardan keyin.
 | D-11 | Accepted reja ichidagi proposed bosqich bajarilsa — xato yoki avto-accept? | FX-13 |
 | D-12 | Ikki klinikada ishlaydigan doktorning bir vaqtdagi bronlari tenantlararo bloklanadimi (global EXCLUDE)? | FX-02 |
 
+### 4.1 Qabul qilingan standartlar (🛠 2026-11-19, foydalanuvchi «savol so'ramay to'xtamasdan ishla» dedi)
+
+Konservativ variant tanlandi; foydalanuvchi keyin o'zgartirishi mumkin.
+
+| ID | 🛠 Qaror | Sabab |
+|---|---|---|
+| D-1 | Yangi permission `discount.give`. Chegirma (POS'da yoki reja bosqichi narxida) faqat shu ruxsat bilan. Rolga (Doctor ham) rol muharririda yoqiladi; shablonlarda — Tenant Admin, Branch Manager, Receptionist | Bitta mexanizm, rol toggle'i = CF-7 |
+| D-2 | Doimiy chegirma (`patients.default_discount_percent`) POS'da va **yangi yaratiladigan** reja bosqichlarida qo'llanadi (cost'ga snapshot). Mavjud bosqichlarga orqaga qarab tegmaydi | Qarz retroaktiv o'zgarmaydi (CLI-479 invarianti) |
+| D-3 | Komissiya bazasi o'zgarmaydi = `paidAmount` (netto). Chegirma komissiyani kamaytiradi | Mavjud Qaror #16; jim o'zgartirish yo'q |
+| D-4 | Kassa rasmi — tenant sozlamasi, **standart o'chiq**; saqlash 90 kun; kamera ishlamasa to'lov bloklanmaydi (`skipped_reason`) | Shaxsiy ma'lumot, ixtiyoriylik |
+| D-5 | Bulutda oflayn rejim YO'Q: ulanish banneri + «ishonchsiz internet — desktop versiya» tavsiyasi | XL va konflikt xavfi |
+| D-6 | Rentgen — umumiy watch-folder (JPEG/PNG/DCM eksport papkasi), vendor-maxsus drayver yo'q | Apparat noma'lum |
+| D-7 | AI birinchi joyi — vizit yozuvi yordamchisi (erkin matn → tuzilgan qoralama), per-tenant shifrlangan kalit, standart o'chiq, faqat API'dan, audit | Eng kam PHI riski, matn |
+| D-8 | Kassa/xarajat operatsiyalari chaqiruvchining tayinlangan filiallari bilan cheklanadi; owner va tenant-wide tayinlov istisno. Bemor/rejalar tenant-level qoladi (Qaror #29) | IR-06 izchilligi |
+| D-9 | Bosqich yakunlanishi `sign()` ga ko'chadi; vizitda «Bosqich yakunlandi» belgisi (standart: rost); qoralama bosqichni yopmaydi | Qaror #37 (visit-note'siz completed) saqlanadi |
+| D-10 | Bosqichli vizitni vizit yo'li bilan to'lash rad etiladi (409 `visit.linked_to_plan_stage`); kassa «reja bo'yicha to'lash»ga yo'naltiradi | Ikki marta to'lovni yopadi, pul mantig'i o'zgarmaydi |
+| D-11 | Accepted bo'lmagan bosqichni completed qilish 400; UI faqat qabul qilingan bosqichlarni taklif qiladi | Jim qarz qo'shilmaydi |
+| D-12 | EXCLUDE constraint'lar tenant'ga bog'lanadi (`tenant_id WITH =`) | Tenantlararo bloklash/ma'lumot sizishi yo'q |
+
 ## 5. Hali audit qilinmagan (keyingi round)
 
 - **44 ta tekshirilmagan `low` topilma** — `LOGIC-AUDIT-2026-11-19.md` «Tekshirilmagan» jadvali. To'lqinlar tuzatilgach refuter bilan tekshiriladi; ba'zilari X-1/X-3 bilan avtomatik yopiladi (FX-03).
