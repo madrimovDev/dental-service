@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test';
-import { registerSettingsIpc, SET_SERVER_URL_CHANNEL, validateServerUrl } from './settings-ipc.js';
+import {
+  probeServer,
+  registerSettingsIpc,
+  SET_SERVER_URL_CHANNEL,
+  validateServerUrl,
+} from './settings-ipc.js';
 
 class FakeIpcMain {
   handlers = new Map<string, (event: unknown, ...args: unknown[]) => unknown>();
@@ -136,5 +141,29 @@ describe('validateServerUrl (CLI-434)', () => {
     expect(validateServerUrl(undefined).ok).toBe(false);
     expect(validateServerUrl(123).ok).toBe(false);
     expect(validateServerUrl(null).ok).toBe(false);
+  });
+});
+
+// FX-145 — `/api/health` javobidan server identifikatorini o'qish (real HTTP,
+// lokal Bun server — fetch mock'siz).
+describe('FX-145: probeServer', () => {
+  test('serverId qaytaradi; id yo‘q bo‘lsa null; yetib bo‘lmasa null (probe=null)', async () => {
+    let body: unknown = { data: { ok: true, db: 'up', ts: 'x', serverId: 'srv-A' } };
+    const srv = Bun.serve({
+      port: 0,
+      fetch: (req) =>
+        new URL(req.url).pathname === '/api/health'
+          ? Response.json(body)
+          : new Response('nf', { status: 404 }),
+    });
+    try {
+      const url = `http://127.0.0.1:${srv.port}`;
+      expect(await probeServer(url)).toEqual({ serverId: 'srv-A' });
+      body = { data: { ok: true, db: 'up', ts: 'x' } };
+      expect(await probeServer(url)).toEqual({ serverId: null });
+    } finally {
+      srv.stop(true);
+    }
+    expect(await probeServer(`http://127.0.0.1:${srv.port}`)).toBeNull();
   });
 });

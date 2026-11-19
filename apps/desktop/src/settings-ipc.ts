@@ -98,7 +98,11 @@ export const SET_SERVER_URL_CHANNEL = 'dental:set-server-url';
 
 const HEALTH_CHECK_TIMEOUT_MS = 3000;
 
-const defaultCheckConnection = async (serverUrl: string): Promise<boolean> => {
+/**
+ * `GET <serverUrl>/api/health` — 3 s timeout. FX-95: klient startup'ida saqlangan
+ * (TOFU) manzil ham shu bilan tekshiriladi (`client-startup.ts`).
+ */
+export const checkServerConnection = async (serverUrl: string): Promise<boolean> => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS);
   try {
@@ -106,6 +110,35 @@ const defaultCheckConnection = async (serverUrl: string): Promise<boolean> => {
     return res.ok;
   } catch {
     return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
+/**
+ * FX-145 (LC-23) — `/api/health` javobidan server identifikatori
+ * (`data.serverId`, faqat desktop server beradi). Yetib bo'lmasa / javob ok
+ * bo'lmasa `null`; id yo'q bo'lsa `{ serverId: null }`.
+ */
+export const probeServer = async (
+  serverUrl: string,
+): Promise<{ serverId: string | null } | null> => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${serverUrl}/api/health`, { signal: controller.signal });
+    if (!res.ok) return null;
+    let serverId: string | null = null;
+    try {
+      const body = (await res.json()) as { data?: { serverId?: unknown } };
+      const raw = body?.data?.serverId;
+      if (typeof raw === 'string' && raw.length > 0) serverId = raw;
+    } catch {
+      // JSON emas — server javob berdi, lekin identifikatorsiz.
+    }
+    return { serverId };
+  } catch {
+    return null;
   } finally {
     clearTimeout(timeout);
   }
@@ -125,7 +158,7 @@ export const applyServerUrl = async (
     onConnected?: (serverUrl: string) => void;
   },
 ): Promise<SetServerUrlResult> => {
-  const { writeConfig, checkConnection = defaultCheckConnection, onConnected } = deps;
+  const { writeConfig, checkConnection = checkServerConnection, onConnected } = deps;
   const validation = validateServerUrl(raw);
   if (!validation.ok || !validation.url) {
     // CLI-434 — invalid scheme/host: writeConfig is NOT called (no rogue URL

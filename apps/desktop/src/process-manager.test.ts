@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import { EventEmitter } from 'node:events';
-import { rmSync } from 'node:fs';
+import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 // 'electron' va 'node:child_process' mock qilinadi — mock.module BEFORE any
@@ -119,6 +119,17 @@ describe('process-manager', () => {
     expect(spawnCalls[0]?.cmd).toBe(getPostgresCommand());
     expect(spawnCalls[1]?.cmd).toBe(getValkeyCommand());
     expect(spawnCalls[2]?.cmd).toBe(getApiCommand());
+    // FX-96 (LB-05): Valkey AOF bilan, `dir` = dataDir/valkey (oldindan yaratilgan).
+    expect(spawnCalls[1]?.args).toEqual([
+      join('/tmp/dental-pm-test', 'valkey.conf'),
+      '--dir',
+      join('/tmp/dental-pm-test', 'valkey'),
+      '--appendonly',
+      'yes',
+      '--appendfsync',
+      'everysec',
+    ]);
+    expect(existsSync(join('/tmp/dental-pm-test', 'valkey'))).toBe(true);
     expect(spawnCalls[2]?.opts.env).toMatchObject({
       API_PORT: '8080',
       REDIS_URL: 'redis://localhost:6380',
@@ -153,6 +164,20 @@ describe('process-manager', () => {
     // licensing and must NOT be the gate signal; process-manager provides
     // this new flag so requireModuleInDesktop actually activates in prod).
     expect(env.DENTAL_LOCAL_DESKTOP).toBe('true');
+  });
+
+  // FX-145 (LC-23) — API `/api/health` javobida server identifikatori bo'lishi
+  // uchun barqaror `DENTAL_SERVER_ID` (dataDir'da saqlanadi) beriladi.
+  test('FX-145: api env DENTAL_SERVER_ID — barqaror (qayta ishga tushirishda o‘zgarmaydi)', async () => {
+    await startServer(8080);
+    const first = (spawnCalls[2]?.opts.env as Record<string, string>).DENTAL_SERVER_ID;
+    await stopServer();
+    spawnCalls = [];
+    spawnedProcesses = [];
+    await startServer(8080);
+    const second = (spawnCalls[2]?.opts.env as Record<string, string>).DENTAL_SERVER_ID;
+    expect(first).toMatch(/^[0-9a-f-]{36}$/);
+    expect(second).toBe(first);
   });
 
   test('LAB_HUB_URL — desktop config `labHubUrl`dan; default bo‘sh (o‘chiq), tashqi env o‘tmaydi', async () => {

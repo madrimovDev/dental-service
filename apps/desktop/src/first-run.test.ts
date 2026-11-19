@@ -41,6 +41,7 @@ const {
   runFirstSetup,
   runMigrations,
   getOrCreateJwtSecret,
+  getOrCreateServerId,
   getOrCreateDbPassword,
   getOrCreateSuperuserPassword,
 } = await import('./first-run.js');
@@ -200,6 +201,27 @@ describe('getOrCreateJwtSecret', () => {
     const first = getOrCreateJwtSecret();
     const second = getOrCreateJwtSecret();
     expect(second).toBe(first);
+  });
+});
+
+describe('FX-145: getOrCreateServerId', () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'first-run-test-'));
+    process.env.DENTAL_DATA_DIR = tmpDir;
+  });
+
+  afterEach(async () => {
+    delete process.env.DENTAL_DATA_DIR;
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  test('UUID yaratadi, dataDir/server-id.txt ga yozadi, idempotent', () => {
+    const first = getOrCreateServerId();
+    expect(first).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+    expect(existsSync(join(tmpDir, 'server-id.txt'))).toBe(true);
+    expect(getOrCreateServerId()).toBe(first);
   });
 });
 

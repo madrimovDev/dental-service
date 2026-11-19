@@ -34,6 +34,8 @@ export * from './availability';
 export * from './availabilitySlot';
 export * from './backupFile';
 export * from './backupRequested';
+export * from './backupRestoreResult';
+export * from './backupRestoreResultStatus';
 export * from './backupSettings';
 export * from './backupStatus';
 export * from './backupStatusMode';

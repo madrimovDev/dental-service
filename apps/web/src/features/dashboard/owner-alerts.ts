@@ -24,6 +24,8 @@ export interface OwnerAlertInput {
 
 const DAY = 86_400_000;
 const BACKUP_STALE_DAYS = 2;
+/** FX-147: muvaffaqiyatsiz tiklash shu muddat ogohlantiriladi (Sozlamalar banneri bilan bir xil). */
+const RESTORE_FAILED_DAYS = 7;
 const LEVEL_ORDER: Record<OwnerAlertLevel, number> = { critical: 0, warning: 1, info: 2 };
 
 /** «Siz hal qiladigan masalalar» — sof funksiya, darajasi bo'yicha saralangan. */
@@ -39,6 +41,23 @@ export function buildOwnerAlerts(input: OwnerAlertInput): OwnerAlert[] {
         level: 'warning',
         titleKey: 'ownerHome.backupErrorTitle',
         textKey: 'ownerHome.backupText',
+        ctaKey: 'ownerHome.backupCta',
+        href: '/settings',
+      });
+    }
+    // FX-147: tiklash natijasi `lastRestore`da (lastError — faqat zaxira olish xatosi).
+    const r = b.lastRestore;
+    const restoreAt = r?.finishedAt ? Date.parse(r.finishedAt) : Number.NaN;
+    if (
+      r?.status === 'failed' &&
+      Number.isFinite(restoreAt) &&
+      now - restoreAt <= RESTORE_FAILED_DAYS * DAY
+    ) {
+      out.push({
+        id: 'backup',
+        level: r.dbRolledBack === false ? 'critical' : 'warning',
+        titleKey: 'ownerHome.restoreFailedTitle',
+        textKey: 'ownerHome.restoreFailedText',
         ctaKey: 'ownerHome.backupCta',
         href: '/settings',
       });

@@ -65,8 +65,8 @@ export async function processReminderJob(
     const [appt] = await tx.select().from(appointments).where(eq(appointments.id, appointmentId));
     if (!appt) return;
     if (shouldSkipReminder(appt.status)) return;
-    // FX-142 (LC-20): o'tib ketgan (boshlangan) yozilishga eslatma yuborilmaydi.
-    if (appt.startTime.getTime() <= Date.now()) return;
+    // FX-142 (LC-20) + FX-96 review: o'tgan yozilishga eslatma yuborilmaydi (AOF overdue job).
+    if (new Date(appt.startTime).getTime() <= Date.now()) return;
 
     const [patient] = await tx.select().from(patients).where(eq(patients.id, appt.patientId));
     // Til — tenant default tili (Asia/Tashkent SMS lokalizatsiyasi, CLI-186).

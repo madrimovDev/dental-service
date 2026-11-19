@@ -20,8 +20,10 @@ import {
   BACKUP_REQUEST_FILE,
   BACKUP_SETTINGS_FILE,
   BACKUP_STATE_FILE,
+  type BackupRestoreResultDto,
   type BackupStatusDto,
   RESTORE_REQUEST_FILE,
+  RESTORE_RESULT_FILE,
 } from './backup.schema.ts';
 
 export type BackupFailure =
@@ -105,9 +107,32 @@ export const createBackupService = (deps: BackupServiceDeps) => {
     return files.sort((a, b) => (a.name < b.name ? 1 : a.name > b.name ? -1 : 0));
   };
 
+  /** FX-147: `restore-result.json` — yo'q/buzilgan/noma'lum status bo'lsa `null`. */
+  const readRestoreResult = (): BackupRestoreResultDto | null => {
+    const path = dataPath(RESTORE_RESULT_FILE);
+    if (!existsSync(path)) return null;
+    const r = readJson<Record<string, unknown>>(path);
+    if (r.status !== 'running' && r.status !== 'ok' && r.status !== 'failed') return null;
+    const str = (v: unknown): string | null => (typeof v === 'string' ? v : null);
+    return {
+      status: r.status,
+      file: str(r.file),
+      finishedAt: str(r.finishedAt),
+      error: str(r.error),
+      dbRolledBack: typeof r.dbRolledBack === 'boolean' ? r.dbRolledBack : null,
+    };
+  };
+
   const status = (): BackupStatusDto => {
     if (!isDesktop()) {
-      return { mode: 'cloud', folder: null, lastSuccessAt: null, lastError: null, files: [] };
+      return {
+        mode: 'cloud',
+        folder: null,
+        lastSuccessAt: null,
+        lastError: null,
+        files: [],
+        lastRestore: null,
+      };
     }
     const folder = getFolder();
     const state = readJson<{ lastSuccessAt: string | null; lastError: string | null }>(
@@ -119,6 +144,7 @@ export const createBackupService = (deps: BackupServiceDeps) => {
       lastSuccessAt: typeof state.lastSuccessAt === 'string' ? state.lastSuccessAt : null,
       lastError: typeof state.lastError === 'string' ? state.lastError : null,
       files: listFiles(folder),
+      lastRestore: readRestoreResult(),
     };
   };
 
@@ -138,6 +164,13 @@ export const createBackupService = (deps: BackupServiceDeps) => {
   const run = async (c: Context): Promise<BackupResult<{ requested: true }>> => {
     if (!isDesktop()) return { ok: false, code: 'backup.not_available' };
     const path = dataPath(BACKUP_REQUEST_FILE);
+    // FX-90: audit AVVAL — yiqilsa (500 -> rollback) so'rov fayli yozilmaydi va Electron main
+    // izsiz zaxira olmaydi. Fayl yozish yiqilsa ham 500 -> audit rollback bo'ladi.
+    await deps.audit.record(c, {
+      action: 'backup.run_requested',
+      resourceType: 'backup',
+      after: { folder: getFolder() },
+    });
     // Allaqachon navbatda bo'lsa — qayta yozmaymiz (idempotent).
     if (!existsSync(path)) {
       mkdirSync(getDataDir(), { recursive: true });
@@ -146,11 +179,6 @@ export const createBackupService = (deps: BackupServiceDeps) => {
         JSON.stringify({ id: randomUUID(), requestedAt: new Date().toISOString() }),
       );
     }
-    await deps.audit.record(c, {
-      action: 'backup.run_requested',
-      resourceType: 'backup',
-      after: { folder: getFolder() },
-    });
     return { ok: true, value: { requested: true } };
   };
 
@@ -174,14 +202,15 @@ export const createBackupService = (deps: BackupServiceDeps) => {
       return { ok: false, code: 'backup.folder_invalid' };
     }
     const before = getFolder();
-    mkdirSync(getDataDir(), { recursive: true });
-    writeFileSync(dataPath(BACKUP_SETTINGS_FILE), JSON.stringify({ folder }));
+    // FX-90: audit AVVAL, keyin sozlama fayli.
     await deps.audit.record(c, {
       action: 'backup.folder_changed',
       resourceType: 'backup',
       before: { folder: before },
       after: { folder },
     });
+    mkdirSync(getDataDir(), { recursive: true });
+    writeFileSync(dataPath(BACKUP_SETTINGS_FILE), JSON.stringify({ folder }));
     return { ok: true, value: { folder } };
   };
 
@@ -209,6 +238,13 @@ export const createBackupService = (deps: BackupServiceDeps) => {
       return { ok: false, code: 'backup.restore_pending' };
     }
 
+    // FX-90: audit AVVAL — yiqilsa so'rov fayli yozilmaydi, ya'ni izsiz tiklash bo'lmaydi.
+    await deps.audit.record(c, {
+      action: 'backup.restore_requested',
+      resourceType: 'backup',
+      resourceId: null,
+      after: { file: input.file },
+    });
     mkdirSync(getDataDir(), { recursive: true });
     writeFileSync(
       dataPath(RESTORE_REQUEST_FILE),
@@ -219,12 +255,6 @@ export const createBackupService = (deps: BackupServiceDeps) => {
         requestedBy: tenant.userId,
       }),
     );
-    await deps.audit.record(c, {
-      action: 'backup.restore_requested',
-      resourceType: 'backup',
-      resourceId: null,
-      after: { file: input.file },
-    });
     return { ok: true, value: { requested: true } };
   };
 
