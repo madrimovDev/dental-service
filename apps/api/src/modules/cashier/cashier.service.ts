@@ -474,6 +474,10 @@ export const createCashierService = (deps: {
           .where(eq(treatmentStages.id, visit.stageId))
           .limit(1);
         stageServiceId = stage?.serviceId ?? null;
+        // FX-170 review: bosqich xizmati noma'lum (erkin matnli bosqich / xizmat o'chirilgan) —
+        // qaysi xizmat reja allocation'i bilan to'lanishini ajratib bo'lmaydi; eski xulq: vizit
+        // yo'li butunlay yopiq (aks holda reja + vizit = ikki marta to'lov).
+        if (!stageServiceId) throw new VisitLinkedToPlanStageError();
       }
       // Qolgan (hali undirilmagan) miqdor = bajarilgan − faol to'lovlarda undirilgan.
       const remaining = new Map<string, number>();
@@ -787,6 +791,8 @@ export const createCashierService = (deps: {
       isNotNull(visitNotes.signedAt),
       gte(visitNotes.signedAt, windowStart),
       sql`${payableCount} > 0`,
+      // FX-170 review: bosqichli vizitda bosqich xizmati NULL/noma'lum — vizit yo'li yopiq.
+      sql`NOT (${visitNotes.stageId} IS NOT NULL AND ${treatmentStages.serviceId} IS NULL)`,
       or(isNull(appointments.id), eq(appointments.branchId, branchId)),
       // FX-63: faqat faol (qaytarilmagan) to'lovlar hisobga olinadi; qisman undirilgan vizit
       // qolgan xizmatlari bilan ro'yxatda turadi.

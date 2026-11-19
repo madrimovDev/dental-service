@@ -50,6 +50,7 @@ let visitExtra: string; // bosqichli, [stageSvc, anestSvc], appointment A
 let visitStageOnly: string; // bosqichli, [stageSvc]
 let visitBranchA: string; // oddiy, [anestSvc], appointment A
 let visitNoAppt: string; // oddiy, [anestSvc], appointment yo'q
+let visitNullStage: string; // bosqichli (bosqich serviceId NULL), [stageSvc, anestSvc]
 const tok: Record<string, string> = {};
 
 const call = async (who: string, method: 'GET' | 'POST', path: string, body?: unknown) => {
@@ -179,6 +180,19 @@ beforeAll(async () => {
         acceptance: 'accepted',
       })
       .returning();
+    // Erkin matnli (yoki xizmati o'chirilgan) bosqich — serviceId NULL.
+    const [stNull] = await tx
+      .insert(treatmentStages)
+      .values({
+        treatmentPlanId: plan!.id,
+        sequence: 2,
+        serviceId: null,
+        serviceName: 'Erkin bosqich',
+        cost: '500000',
+        status: 'completed',
+        acceptance: 'accepted',
+      })
+      .returning();
 
     let apptSeq = 0;
     const mkAppt = async (branchId: string) => {
@@ -201,6 +215,7 @@ beforeAll(async () => {
       performed: string[];
       staged: boolean;
       branchId: string | null;
+      stageId?: string;
     }) => {
       const [v] = await tx
         .insert(visitNotes)
@@ -209,7 +224,7 @@ beforeAll(async () => {
           patientId,
           doctorId,
           appointmentId: opts.branchId ? await mkAppt(opts.branchId) : null,
-          stageId: opts.staged ? st!.id : null,
+          stageId: opts.stageId ?? (opts.staged ? st!.id : null),
           performedServices: opts.performed,
           signedAt: new Date(),
           signedBy: doctorId,
@@ -221,6 +236,12 @@ beforeAll(async () => {
     visitStageOnly = await mkVisit({ performed: [stageSvc], staged: true, branchId: brA });
     visitBranchA = await mkVisit({ performed: [anestSvc], staged: false, branchId: brA });
     visitNoAppt = await mkVisit({ performed: [anestSvc], staged: false, branchId: null });
+    visitNullStage = await mkVisit({
+      performed: [stageSvc, anestSvc],
+      staged: true,
+      branchId: brA,
+      stageId: stNull!.id,
+    });
   });
 
   const sign = async (sub: string) =>
@@ -310,6 +331,29 @@ describe('FX-170: bosqichli vizitdagi qo‘shimcha xizmatlar', () => {
     expect(r.json.error.code).toBe('visit.linked_to_plan_stage');
     expect((await txRows(visitStageOnly)).length).toBe(0);
     expect(stagePlanId).toBeTruthy();
+  });
+});
+
+describe('FX-170 review: bosqich xizmati NULL bo‘lsa eski xulq (ikki marta to‘lov yo‘q)', () => {
+  test('pending-visits: serviceId NULL bosqichli vizit ro‘yxatda chiqmaydi', async () => {
+    const r = await call('A', 'GET', `/api/cashier/pending-visits?branchId=${brA}`);
+    expect(r.status).toBe(200);
+    const ids = (r.json.data.data as Array<{ visitNoteId: string }>).map((v) => v.visitNoteId);
+    expect(ids).not.toContain(visitNullStage);
+  });
+
+  test('vizit yo‘li bilan to‘lov -> 409 visit.linked_to_plan_stage (har qanday xizmat)', async () => {
+    for (const sid of [stageSvc, anestSvc]) {
+      const r = await call(
+        'A',
+        'POST',
+        '/api/cashier/transactions',
+        payBody(brA, visitNullStage, sid),
+      );
+      expect(r.status).toBe(409);
+      expect(r.json.error.code).toBe('visit.linked_to_plan_stage');
+    }
+    expect((await txRows(visitNullStage)).length).toBe(0);
   });
 });
 
