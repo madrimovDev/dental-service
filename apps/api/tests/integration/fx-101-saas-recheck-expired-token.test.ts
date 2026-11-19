@@ -90,7 +90,10 @@ describe('FX-101 — SaaS recheck muddati o‘tgan access token bilan', () => {
     const phone = `+99893${String(Math.floor(Math.random() * 9_000_000) + 1_000_000)}`;
     const reg = await app.request('/api/auth/register-tenant', {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-forwarded-for': '10.101.0.1' },
+      headers: {
+        'content-type': 'application/json',
+        'x-forwarded-for': `10.101.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250) + 1}`,
+      },
       body: JSON.stringify({
         tenantName: 'FX101 klinika',
         ownerPhone: phone,
