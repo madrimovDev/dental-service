@@ -440,6 +440,69 @@ describe('getActiveModules — anchor advance (CLI-437)', () => {
   });
 });
 
+// FX-160 (LC-39) — modul-gate langarni har so'rovda Date.now() bilan surardi:
+// soat bir marta xato oldinga ketsa (BIOS/CMOS, NTP yo'q), langar o'sha sanaga
+// yopishib, soat tuzatilgandan keyin ham litsenziya qisqarib/bloklanib qolardi.
+// Endi bitta jarayon ichida langar real o'tgan vaqt (monotonik soat) + 7 kunlik
+// sakrashdan oshmaydi. Real `.lic` + real AES langar fayli bilan.
+describe('getActiveModules — anchor forward-jump cap (FX-160)', () => {
+  const DAY = 86400000;
+  const setup = async (file: string) => {
+    process.env.LICENSE_ANCHOR_PATH = join(tmpDir, file);
+    const mod = await import('./license');
+    mod.resetAnchorGateRef();
+    const localFp = await mod.getFingerprint();
+    const payload = {
+      licenseKey: 'K',
+      clinicId: 'c',
+      modules: ['patients'],
+      expiresAt: new Date(Date.now() + 30 * DAY).toISOString(),
+      gracePeriodDays: 0,
+      issuedAt: new Date().toISOString(),
+      fingerprint: localFp,
+    };
+    await mod.writeLicense({ ...payload, signature: signForTest(payload) });
+    return mod;
+  };
+  const withClock = async <T>(offsetMs: number, monoOffsetMs: number, fn: () => Promise<T>) => {
+    const realNow = Date.now;
+    const realMono = performance.now.bind(performance);
+    Date.now = () => realNow() + offsetMs;
+    performance.now = () => realMono() + monoOffsetMs;
+    try {
+      return await fn();
+    } finally {
+      Date.now = realNow;
+      performance.now = realMono;
+    }
+  };
+
+  test('a wrong-forward clock (+25 days) does not drag the anchor beyond +7 days, even over many requests', async () => {
+    const mod = await setup('fx160-jump-anchor.dat');
+    const realMs = Date.now();
+    await mod.getActiveModules(); // jarayon birinchi so'rovi — to'g'ri soat
+    await withClock(25 * DAY, 0, async () => {
+      for (let i = 0; i < 20; i++) expect(await mod.getActiveModules()).toEqual(['patients']);
+    });
+    const anchor = await mod.readAnchor();
+    expect(anchor).toBeLessThan(realMs + 8 * DAY);
+    // Soat tuzatildi: litsenziya 30 - 25 = 5 kunga emas, kamida ~23 kunga qoladi.
+    const st = await mod.getLicenseState();
+    expect(st.daysLeft).toBeGreaterThanOrEqual(22);
+  });
+
+  test('real elapsed time (monotonic clock advances too) still moves the anchor with Date.now (CLI-437 kept)', async () => {
+    const mod = await setup('fx160-elapsed-anchor.dat');
+    await mod.getActiveModules();
+    const target = await withClock(10 * DAY, 10 * DAY, async () => {
+      expect(await mod.getActiveModules()).toEqual(['patients']);
+      return Date.now();
+    });
+    const anchor = await mod.readAnchor();
+    expect(anchor).toBeGreaterThanOrEqual(target - 1000);
+  });
+});
+
 describe('grace cap + license state (P18)', () => {
   const DAY = 86400000;
   const mk = (over: Partial<import('./license').LicenseData> = {}) => ({

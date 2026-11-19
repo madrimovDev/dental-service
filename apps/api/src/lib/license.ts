@@ -387,6 +387,44 @@ export const writeAnchor = async (ms: number): Promise<void> => {
   await writeFile(anchorPath, payload.toString('base64'));
 };
 
+/**
+ * FX-160 (LC-39) — modul-gate bitta jarayon ichida langarni ko'pi bilan
+ * "real o'tgan vaqt + shu sakrash" qadar suradi. Avval har gate so'rovi
+ * `max(anchor, Date.now())` yozardi: soat bir marta xato oldinga ketsa
+ * (CMOS batareya, BIOS'da noto'g'ri yil, NTP yo'q) langar o'sha sanaga
+ * yopishib qolardi va soat tuzatilgandan keyin ham litsenziya o'sha sanagacha
+ * qisqarib/bloklanib turardi. 7 kun — imtiyoz muddati (`MAX_GRACE_DAYS`) bilan
+ * bir xil: xato soatning eng yomon izi klinikani bloklamaydi, faqat imtiyozga
+ * o'tkazadi; o'chiq turgan kompyuterning (dam olish kunlari) qonuniy soat
+ * sakrashi esa to'liq qabul qilinadi. To'liq tiklash — birinchi muvaffaqiyatli
+ * heartbeat (FX-87: langar server `issuedAt`iga o'rnatiladi).
+ */
+const ANCHOR_MAX_FORWARD_JUMP_MS = 7 * DAY_MS;
+
+// Jarayon bo'yicha tayanch nuqta: birinchi gate so'rovidagi langar (yoki
+// `issuedAt`) va o'sha paytdagi monotonik soat. `globalThis`da — fingerprint
+// keshi bilan bir xil sabab (`mock.module` modulning bir necha nusxasi).
+const GATE_REF_KEY = Symbol.for('dental.license.anchorGateRef');
+type GateRefCarrier = { [GATE_REF_KEY]?: { baseMs: number; monoMs: number } };
+
+/** Testlar uchun — jarayon tayanch nuqtasini tozalaydi (qayta ishga tushish simulyatsiyasi). */
+export const resetAnchorGateRef = (): void => {
+  delete (globalThis as GateRefCarrier)[GATE_REF_KEY];
+};
+
+const nextGateAnchorMs = (lic: LicenseData, anchorMs: number): number => {
+  const carrier = globalThis as GateRefCarrier;
+  const monoMs = performance.now();
+  let ref = carrier[GATE_REF_KEY];
+  if (!ref) {
+    const issuedAtMs = Date.parse(lic.issuedAt);
+    ref = { baseMs: Math.max(anchorMs, Number.isFinite(issuedAtMs) ? issuedAtMs : 0), monoMs };
+    carrier[GATE_REF_KEY] = ref;
+  }
+  const ceilingMs = ref.baseMs + Math.max(0, monoMs - ref.monoMs) + ANCHOR_MAX_FORWARD_JUMP_MS;
+  return Math.max(anchorMs, Math.min(Date.now(), ceilingMs));
+};
+
 export const getActiveModules = async (): Promise<string[]> => {
   const lic = await readLicense();
   if (!lic) return [];
@@ -400,12 +438,14 @@ export const getActiveModules = async (): Promise<string[]> => {
   }
   const anchorMs = await readAnchor();
   if (!isLicenseValid(lic, localFingerprint, anchorMs)) return [];
-  // CLI-437 — langarni oldinga suramiz (hech qachon orqaga emas — `max`).
-  // Faylga yozib bo'lmasa ham (masalan disk xatosi) modul ro'yxati baribir
-  // qaytarilsin — langar-advance best-effort telemetriya, muddat tekshiruvi
+  // CLI-437 — langarni oldinga suramiz (hech qachon orqaga emas — `max`),
+  // FX-160 — lekin jarayon ichida real o'tgan vaqt + 7 kundan oshirmay
+  // (`nextGateAnchorMs`). Faylga yozib bo'lmasa ham (masalan disk xatosi) modul
+  // ro'yxati baribir qaytarilsin — langar-advance best-effort, muddat tekshiruvi
   // uchun kritik emas (allaqachon `isLicenseValid` yuqorida o'tdi).
   try {
-    await writeAnchor(Math.max(anchorMs, Date.now()));
+    const nextMs = nextGateAnchorMs(lic, anchorMs);
+    if (nextMs > anchorMs) await writeAnchor(nextMs);
   } catch {
     // no-op — anchor faylga yozilmasa ham modul ro'yxati qaytariladi
   }
