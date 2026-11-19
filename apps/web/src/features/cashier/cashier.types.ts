@@ -25,6 +25,10 @@ export type TransactionVM = {
   receiptNumber: string | null;
   totalAmount: number;
   paidAmount: number;
+  /** FX-108: shu to'lovdan allaqachon qaytarilgan summa (server `refundedAmount`). */
+  refundedAmount: number;
+  /** FX-108: hozir qaytarish mumkin bo'lgan qoldiq = paidAmount − refundedAmount (server `remaining`). */
+  refundableAmount: number;
   discount: number;
   paymentMethod: PaymentMethod;
   /** Faqat `card` uchun; boshqa usullarda null. */

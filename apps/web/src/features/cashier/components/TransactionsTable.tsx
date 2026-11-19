@@ -15,7 +15,7 @@ import {
 import { IconEye, IconReceipt, IconRefresh } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { formatCurrency } from '@/lib/format';
+import { formatCurrency, formatNumber } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { useRefund } from '../cashier.api';
 import { toTransactionVM } from '../cashier.mappers';
@@ -81,7 +81,14 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
                   <Table.Td>
                     <Mono>{tx.receiptNumber ?? '—'}</Mono>
                   </Table.Td>
-                  <Table.Td>{formatCurrency(tx.totalAmount, t)}</Table.Td>
+                  <Table.Td>
+                    {formatCurrency(tx.totalAmount, t)}
+                    {tx.type === 'payment' && tx.paidAmount !== tx.totalAmount && (
+                      <Text size="xs" c="dimmed">
+                        {t('cashier.paid_of_total', { paid: formatNumber(tx.paidAmount) })}
+                      </Text>
+                    )}
+                  </Table.Td>
                   <Table.Td>{t(`cashier.method.${tx.paymentMethod}`)}</Table.Td>
                   <Table.Td>
                     <Badge
@@ -144,9 +151,9 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
               </Group>
               <Group justify="space-between">
                 <Text size="sm" c="dimmed">
-                  {t('cashier.refund_modal.detail_amount')}
+                  {t('cashier.refund_modal.detail_refundable')}
                 </Text>
-                <Text fw={600}>{formatCurrency(selected.totalAmount, t)}</Text>
+                <Text fw={600}>{formatCurrency(selected.refundableAmount, t)}</Text>
               </Group>
               <Group justify="space-between">
                 <Text size="sm" c="dimmed">
@@ -160,11 +167,11 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
             <NumberInput
               label={t('cashier.refund_modal.partial_amount')}
               description={t('cashier.refund_modal.partial_hint')}
-              placeholder={String(selected.paidAmount)}
+              placeholder={String(selected.refundableAmount)}
               value={partialAmount}
               onChange={(v) => setPartialAmount(typeof v === 'number' ? v : '')}
               min={0}
-              max={selected.paidAmount}
+              max={selected.refundableAmount}
               thousandSeparator=" "
             />
           )}

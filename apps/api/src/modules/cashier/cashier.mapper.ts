@@ -11,7 +11,9 @@ import type {
  * - Money `numeric` ustunlar → STRING (Drizzle allaqachon string qaytaradi — wire shape string).
  * - `createdBy` va `fiscalResponse` DROP qilinadi (types-m3 wire shaklida YO'Q).
  */
-export const toCashierTransactionDto = (row: CashierTransaction): CashierTransactionDto => ({
+export const toCashierTransactionDto = (
+  row: CashierTransaction & { refundedAmount?: string },
+): CashierTransactionDto => ({
   id: row.id,
   tenantId: row.tenantId,
   branchId: row.branchId,
@@ -20,6 +22,7 @@ export const toCashierTransactionDto = (row: CashierTransaction): CashierTransac
   receiptNumber: row.receiptNumber ?? null,
   totalAmount: row.totalAmount,
   paidAmount: row.paidAmount,
+  refundedAmount: row.refundedAmount ?? '0',
   discount: row.discount,
   currency: row.currency,
   paymentMethod: row.paymentMethod,
@@ -52,7 +55,7 @@ export const toCashierTransactionItemDto = (
  * `refund` items'siz row qaytaradi — default `[]` (wire shaklida `items` MAJBURIY).
  */
 export const toCashierTransactionWithItemsDto = (
-  row: CashierTransaction,
+  row: CashierTransaction & { refundedAmount?: string },
   items: CashierTransactionItem[] = [],
 ): CashierTransactionWithItemsDto => ({
   ...toCashierTransactionDto(row),

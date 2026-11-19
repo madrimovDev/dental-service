@@ -1387,6 +1387,12 @@
         "unpaid": "To'lanmagan"
       }
     },
+    "paid_of_total": "to'langan: {{paid}}",
+    "refund_done": "Qaytarildi: {{amount}}",
+    "refund_error": {
+      "over_refund": "Qaytariladigan summa qoldig'idan ko'p. Sahifani yangilab, qoldiqni tekshiring.",
+      "non_plan_partial": "Qisman qaytarish faqat reja to'lovlari uchun."
+    },
     "refund_modal": {
       "title": "To'lovni qaytarish",
       "body": "Bu to'lovni qaytarishni tasdiqlaysizmi? Amal qaytarib bo'lmaydi.",
@@ -1394,6 +1400,7 @@
       "cancel": "Bekor qilish",
       "detail_receipt": "Chek raqami",
       "detail_amount": "Summa",
+      "detail_refundable": "Qaytariladigan summa",
       "detail_method": "To'lov usuli",
       "partial_amount": "Qisman summa (ixtiyoriy)",
       "partial_hint": "Bo'sh = to'liq qaytarish. Qisman faqat reja to'lovlari uchun."

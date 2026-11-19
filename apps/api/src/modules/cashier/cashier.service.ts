@@ -29,6 +29,7 @@ import {
 } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { onAfterCommit } from '../../db/after-commit.ts';
+import type { DbOrTx } from '../../db/client.ts';
 import { getDb, withTenant } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import type { PatientMessenger } from '../../lib/telegram/notify.ts';
@@ -297,6 +298,31 @@ export const createCashierService = (deps: {
     return row?.branchId ?? null;
   }
 
+  /**
+   * FX-108 (LB-17): har parent uchun allaqachon qaytarilgan summa (refund qatorlari paidAmount
+   * yig'indisi). UI qoldiq = paidAmount - refundedAmount ni shundan ko'rsatadi (refund()dagi
+   * `remaining` bilan bir xil manba).
+   */
+  async function refundedByParent(db: DbOrTx, ids: string[]): Promise<Map<string, string>> {
+    const out = new Map<string, string>();
+    if (ids.length === 0) return out;
+    const rows = await db
+      .select({
+        parentId: cashierTransactions.parentTransactionId,
+        sum: sql<string>`COALESCE(SUM(${cashierTransactions.paidAmount}), 0)`,
+      })
+      .from(cashierTransactions)
+      .where(
+        and(
+          inArray(cashierTransactions.parentTransactionId, ids),
+          eq(cashierTransactions.type, 'refund'),
+        ),
+      )
+      .groupBy(cashierTransactions.parentTransactionId);
+    for (const r of rows) if (r.parentId) out.set(r.parentId, String(Number(r.sum)));
+    return out;
+  }
+
   /** `branchIds`: X-2 doirasi (null = cheklovsiz); `query.branchId` bilan kesishadi (route tekshirgan). */
   async function list(c: Context, query: ListTransactionsQuery, branchIds: string[] | null = null) {
     const db = getDb(c);
@@ -333,6 +359,11 @@ export const createCashierService = (deps: {
     ]);
 
     const total = totalRows[0]?.total ?? 0;
+    const refunded = await refundedByParent(
+      db,
+      rows.map((r) => r.id),
+    );
+    const data = rows.map((r) => ({ ...r, refundedAmount: refunded.get(r.id) ?? '0' }));
 
     await deps.audit.record(c, {
       action: 'viewed',
@@ -345,7 +376,7 @@ export const createCashierService = (deps: {
       },
     });
 
-    return { data: rows, meta: { page: query.page, pageSize: query.pageSize, total } };
+    return { data, meta: { page: query.page, pageSize: query.pageSize, total } };
   }
 
   async function getById(c: Context, id: string) {
@@ -364,7 +395,8 @@ export const createCashierService = (deps: {
       resourceId: id,
     });
 
-    return { ...tx, items };
+    const refunded = await refundedByParent(db, [id]);
+    return { ...tx, items, refundedAmount: refunded.get(id) ?? '0' };
   }
 
   async function create(c: Context, input: CreateTransactionInput) {
