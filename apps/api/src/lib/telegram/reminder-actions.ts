@@ -1,8 +1,9 @@
-import { appointments, patients, queueTickets } from '@dental/db-schema';
+import { appointments, notifications, patients, queueTickets } from '@dental/db-schema';
 import { and, eq, inArray } from 'drizzle-orm';
 import type { DbOrTx } from '../../db/client.ts';
 import { AppointmentTransitionError } from '../../modules/appointments/appointments.transitions.ts';
 import type { AppointmentsService } from '../../modules/appointments/index.ts';
+import { findRecipientsWithPermission } from '../notify-recipients.ts';
 import { createBotContext } from './bot-context.ts';
 
 /** 24 soatlik eslatma tugmalari: `rm:<action>:<appointmentId>` (≤ 64 bayt). */
@@ -35,6 +36,46 @@ export type ReminderActionResult = {
 };
 
 /**
+ * FX-83: bemor Telegram orqali bekor qilganda xodim (bekor qila oladiganlar + shifokor)
+ * bildirishnoma oladi — bo'shagan slot jimgina yo'qolmasin. Best-effort: savepoint ichida,
+ * xato bekor qilishni orqaga qaytarmaydi.
+ */
+async function notifyStaffPatientCancelled(
+  tx: DbOrTx,
+  tenantId: string,
+  row: { id: string; branchId: string; doctorId: string; patientName: string; startTime: Date },
+): Promise<void> {
+  try {
+    await tx.transaction(async (sp) => {
+      const c = createBotContext(sp, tenantId);
+      const recipients = new Set(
+        await findRecipientsWithPermission(c, 'appointment.cancel', row.branchId),
+      );
+      recipients.add(row.doctorId);
+      const when = new Intl.DateTimeFormat('uz-UZ', {
+        timeZone: 'Asia/Tashkent',
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).format(row.startTime);
+      await sp.insert(notifications).values(
+        [...recipients].map((userId) => ({
+          tenantId,
+          userId,
+          type: 'appointment_cancelled_by_patient',
+          title: `Bemor yozilishni bekor qildi: ${row.patientName}`,
+          body: when,
+        })),
+      );
+    });
+  } catch (err) {
+    console.error('[reminder-actions] xodimga bekor bildirishnomasi yozilmadi:', err);
+  }
+}
+
+/**
  * Eslatma tugmasi bosilganda: FAQAT yozilish egasi (patients.telegram_chat_id
  * === callback chat_id) o'zgartira oladi. Boshlanish vaqti o'tgan yozilish → `already`. Begona chat → `not_owner`, hech narsa
  * o'zgarmaydi. Ikkinchi bosish (allaqachon shu holatda) → `already`.
@@ -50,6 +91,9 @@ export async function handleReminderAction(
       status: appointments.status,
       startTime: appointments.startTime,
       patientId: appointments.patientId,
+      branchId: appointments.branchId,
+      doctorId: appointments.doctorId,
+      patientName: patients.fullName,
       chat: patients.telegramChatId,
     })
     .from(appointments)
@@ -95,7 +139,9 @@ export async function handleReminderAction(
         status: 'cancelled',
         cancellationReason: 'patient_telegram',
       });
-      return { outcome: res.ok ? 'cancelled' : 'unavailable', ...base };
+      if (!res.ok) return { outcome: 'unavailable', ...base };
+      await notifyStaffPatientCancelled(tx, o.tenantId, row);
+      return { outcome: 'cancelled', ...base };
     }
   } catch (err) {
     if (err instanceof AppointmentTransitionError) return { outcome: 'already', ...base };
