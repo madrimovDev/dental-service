@@ -470,6 +470,13 @@
       "when": 1795128100500,
       "tag": "0064_fx116_bm_payroll_backfill",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1795115927189,
+      "tag": "0064_stock_movement_sources",
+      "breakpoints": true
     }
   ]
 }

@@ -14,6 +14,8 @@ export type NotifyPayload = {
   type: string;
   title: string;
   body?: string;
+  /** FX-167: web t() bilan render qilishi uchun tuzilgan parametrlar (title/body — fallback va SMS matni). */
+  params?: Record<string, string | number>;
   /**
    * Berilsa — bemorga ham xabar yuboriladi (`channel` orqali, aks holda
    * `deps.sms`). Nomi tarixiy ("smsTo") — CLI-379/400dan buyon Telegram
@@ -58,6 +60,7 @@ export const createNotificationsService = (deps: { sms: NotificationChannel }) =
         type: payload.type,
         title: payload.title,
         body: payload.body ?? null,
+        params: payload.params ?? null,
       })
       .returning();
 

@@ -312,7 +312,13 @@
   "notifications": {
     "title": "Bildirishnomalar",
     "mark_all_read": "Hammasini o'qilgan deb belgilash",
-    "empty": "Bildirishnomalar yo'q"
+    "empty": "Bildirishnomalar yo'q",
+    "types": {
+      "stock_low_threshold": {
+        "title": "Kam qoldiq: {{itemName}}",
+        "body": "Qoldiq: {{qty}} (min: {{min}})"
+      }
+    }
   },
   "onboarding": {
     "title": "Klinikani sozlash",

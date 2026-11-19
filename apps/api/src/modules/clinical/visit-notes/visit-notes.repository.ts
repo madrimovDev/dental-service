@@ -25,6 +25,8 @@ export const createVisitNotesRepository = () => {
    * FX-156 (LC-34): `FOR UPDATE` — PATCH yon ta'sirlardan (bosqich `in_progress`, ombor) OLDIN
    * qatorni qulflaydi. Parallel `sign()` commit bo'lguncha kutadi va imzolangan holatni ko'radi
    * (READ COMMITTED qayta o'qiydi) → 409 hech qanday yon ta'sirsiz.
+   * FX-67: `SELECT ... FOR UPDATE` — parallel PATCH'lar bir vizit yozuvi ustida ketma-ket
+   * ishlaydi; ikkinchisi birinchisi commit qilgan holatni 'before' sifatida o'qiydi.
    */
   async function findForUpdate(c: Context, id: string) {
     const db = getDb(c);

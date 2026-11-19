@@ -10,8 +10,10 @@ import {
   UnstyledButton,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
+import type { TFunction } from 'i18next';
 import { Bell } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { useMarkAllRead, useMarkRead, useNotifications } from '../notifications.api.ts';
 import type { Notification } from '../notifications.types.ts';
 import classes from './NotificationBell.module.css';
@@ -29,21 +31,45 @@ function formatDate(iso: string, locale: string): string {
   }).format(new Date(iso));
 }
 
+/** FX-167: type bo'yicha lokalizatsiya qilingan matn (params bo'lsa), aks holda serverdagi matn (fallback). */
+function renderText(item: Notification, t: TFunction): { title: string; body: string | null } {
+  if (item.type === 'stock.low_threshold' && item.params) {
+    return {
+      title: t('notifications.types.stock_low_threshold.title', item.params),
+      body: t('notifications.types.stock_low_threshold.body', item.params),
+    };
+  }
+  return { title: item.title, body: item.body };
+}
+
+/** FX-167: type bo'yicha navigatsiya (ombor bildirishnomasi → ombor sahifasi). */
+function targetPath(item: Notification): string | null {
+  return item.type.startsWith('stock.') ? '/stock' : null;
+}
+
 function NotificationRow({
   item,
   locale,
   onRead,
+  onOpen,
 }: {
   item: Notification;
   locale: string;
   onRead: (id: string) => void;
+  onOpen: (path: string) => void;
 }) {
+  const { t } = useTranslation();
   const unread = item.readAt === null;
+  const { title, body } = renderText(item, t);
+  const path = targetPath(item);
   return (
     <UnstyledButton
       className={classes.row}
       data-unread={unread || undefined}
-      onClick={() => unread && onRead(item.id)}
+      onClick={() => {
+        if (unread) onRead(item.id);
+        if (path) onOpen(path);
+      }}
     >
       <span className={classes.iconChip}>
         <Bell size={16} />
@@ -51,13 +77,13 @@ function NotificationRow({
       <span className={classes.content}>
         <Group justify="space-between" wrap="nowrap" gap="xs">
           <Text size="sm" fw={unread ? 600 : 400} lineClamp={1}>
-            {item.title}
+            {title}
           </Text>
           {unread && <span className={classes.unreadDot} />}
         </Group>
-        {item.body && (
+        {body && (
           <Text size="xs" c="dimmed" lineClamp={2}>
-            {item.body}
+            {body}
           </Text>
         )}
         <Text size="xs" c="dimmed">
@@ -70,6 +96,7 @@ function NotificationRow({
 
 export function NotificationBell() {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
   const [opened, { toggle, close }] = useDisclosure(false);
   const { data, isLoading } = useNotifications();
   const markRead = useMarkRead();
@@ -141,6 +168,10 @@ export function NotificationBell() {
                   item={item}
                   locale={i18n.language}
                   onRead={(id) => markRead.mutate(id)}
+                  onOpen={(path) => {
+                    close();
+                    navigate(path);
+                  }}
                 />
               ))}
             </Stack>

@@ -260,7 +260,7 @@ export const appointmentRoutes = (deps: {
     const body = c.req.valid('json');
     let result: Awaited<ReturnType<typeof service.update>>;
     try {
-      result = await service.update(c, id, body);
+      result = await service.update(c, id, body, { returnStock: true });
     } catch (e) {
       // CLI-409: state-machine violation → 400 (invalid_transition / terminal).
       if (e instanceof AppointmentTransitionError) return c.json(fail(e.code, e.message), 400);
@@ -318,7 +318,7 @@ export const appointmentRoutes = (deps: {
     const body = c.req.valid('json');
     let result: Awaited<ReturnType<typeof service.cancel>>;
     try {
-      result = await service.cancel(c, id, body?.reason);
+      result = await service.cancel(c, id, body?.reason, { returnStock: true });
     } catch (e) {
       // CLI-409: completed'ni cancel qilishga urinish → 400 invalid_transition/terminal.
       if (e instanceof AppointmentTransitionError) return c.json(fail(e.code, e.message), 400);

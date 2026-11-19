@@ -21,6 +21,10 @@ export const notificationDtoSchema = z
     type: z.string().openapi({ example: 'appointment.reminder' }),
     title: z.string().openapi({ example: 'Yaqinlashib kelayotgan vizit' }),
     body: z.string().nullable().openapi({ example: null }),
+    params: z
+      .record(z.string(), z.union([z.string(), z.number()]))
+      .nullable()
+      .openapi({ example: { itemName: 'Plomba', qty: 2, min: 5 } }),
     readAt: z.string().nullable().openapi({ example: null }),
     createdAt: z.string().openapi({ example: '2026-06-12T10:00:00.000Z' }),
   })

@@ -68,6 +68,12 @@ export type RecallStageHook = {
  * bir xil bog'liqlik yo'nalishi: treatment-plans → tooth-charts, to'g'ridan import emas).
  * Bosqich 'completed' bo'lganda `toothNumbers` uchun yangi odontogramma snapshot yozadi.
  */
+/** FX-60: plan ekranidan yakunlangan bosqich uchun ombor BOM chiqimi (stock modul DI). */
+export type StageStockHook = (
+  c: Context,
+  stage: { id: string; serviceId: string | null },
+) => Promise<void>;
+
 export type ToothChartStageHook = {
   recordStageCompletion: (
     c: Context,
@@ -146,6 +152,11 @@ export const createTreatmentPlansService = (deps: {
   ownership?: OwnershipValidator;
   /** CLI-488: bosqich 'completed' bo'lganda odontogramma auto-update (tooth-charts DI hook). */
   toothChart?: ToothChartStageHook;
+  /**
+   * FX-60: bosqich plan ekranidan 'completed' bo'lganda stage.serviceId BOM ombor chiqimi
+   * (stock modul DI hook; idempotent + vizit chiqimi bilan dedup stock tomonida).
+   */
+  deductStageStock?: StageStockHook;
 }) => {
   const repo = createTreatmentPlansRepository();
   const ownership = deps.ownership ?? createOwnershipValidator();
@@ -326,8 +337,9 @@ export const createTreatmentPlansService = (deps: {
    * X-3: bosqichni yangilashning YAGONA yo'li (status=completed ham shu yerdan). Plan
    * ekrani (`updateStage`) va vizit yo'li (`completeStage`) shu funksiyaga tushadi:
    * status/acceptance/plan/lab guard'lari + FX-13 acceptance gate + completed-hook'lar
-   * (recall, odontogramma) bir joyda. ⚠️ Ombor chiqimi bu yerda EMAS — vizit yo'li
-   * `performedServices`dan o'zi chiqim qiladi (ikki marta chiqim xavfi).
+   * (recall, odontogramma) bir joyda. Ombor chiqimi: plan yo'li (`source='plan'`) — FX-60
+   * `deductStageStock` hook; vizit yo'li `performedServices`dan o'zi chiqim qiladi (ikki marta
+   * chiqim xavfi — stock tomonida dedup).
    */
   async function applyStageUpdate(
     c: Context,
@@ -438,6 +450,11 @@ export const createTreatmentPlansService = (deps: {
             // CLI-474 (L9): recall'ni davolash rejasi doktoriga biriktir.
             assignedDoctorId: plan.doctorId,
           });
+        }
+        // FX-60: plan ekranidan yakunlash — vizit yo'li BOM'ni `performedServices`dan o'zi
+        // yechadi (source='visit' bu yerda yechmaydi); plan yo'li uchun stage.serviceId.
+        if (source === 'plan' && deps.deductStageStock) {
+          await deps.deductStageStock(c, { id: updated.id, serviceId: updated.serviceId });
         }
         // CLI-488: odontogramma auto-update — bosqichda resultingToothState + toothNumbers
         // bo'lsa yangi tooth_chart snapshot (immutable model; tooth-charts DI hook).

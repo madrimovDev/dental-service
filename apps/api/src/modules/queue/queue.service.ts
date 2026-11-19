@@ -1,4 +1,4 @@
-import { appointments, queueTickets } from '@dental/db-schema';
+import { appointments, queueTickets, visitNotes } from '@dental/db-schema';
 import { and, asc, eq, gte, isNull, lt, max, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
@@ -526,6 +526,9 @@ export const createQueueService = (deps: {
         lt(appointments.startTime, todayStart),
         isNull(queueTickets.id),
         sql`${appointments.status} in ('scheduled','confirmed')`,
+        // FX-45 review: bog'liq vizit yozuvi bor = bemor kelgan (shifokor yozgan).
+        // Uni no_show qilish noto'g'ri strike yozardi — sweep tegmaydi.
+        sql`not exists (select 1 from ${visitNotes} where ${visitNotes.appointmentId} = ${appointments.id})`,
       ];
       if (branchId) apptFilters.push(eq(appointments.branchId, branchId));
 

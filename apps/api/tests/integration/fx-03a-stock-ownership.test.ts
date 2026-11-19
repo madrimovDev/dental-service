@@ -7,6 +7,8 @@
  */
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import {
+  permissions,
+  rolePermissions,
   roles,
   serviceMaterials,
   services,
@@ -17,7 +19,7 @@ import {
   userAssignments,
   users,
 } from '@dental/db-schema';
-import { eq, sql } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import { createApp } from '../../src/app.ts';
 import { createAdminDb, db } from '../../src/db/client.ts';
 import { withTenant } from '../../src/db/scoped.ts';
@@ -67,11 +69,22 @@ beforeAll(async () => {
   tA = await mkTenant('fx03a-a', ownerA);
   tB = await mkTenant('fx03a-b', ownerB);
 
+  // FX-115: ombor doirasi real tayinlov + rol permission'lariga bog'liq.
+  for (const code of ['stock.view', 'stock.manage']) {
+    await db.insert(permissions).values({ code, category: 'stock' }).onConflictDoNothing();
+  }
+  const stockPerms = await db
+    .select({ id: permissions.id })
+    .from(permissions)
+    .where(inArray(permissions.code, ['stock.view', 'stock.manage']));
   await withTenant(tA, async (tx) => {
     const [role] = await tx
       .insert(roles)
       .values({ tenantId: tA, name: 'Stock', isSystem: false })
       .returning({ id: roles.id });
+    await tx
+      .insert(rolePermissions)
+      .values(stockPerms.map((p) => ({ roleId: role!.id, permissionId: p.id })));
     await tx
       .insert(userAssignments)
       .values({ userId: staffA, tenantId: tA, roleId: role!.id, isActive: true });
