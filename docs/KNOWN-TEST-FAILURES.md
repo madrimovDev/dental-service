@@ -51,3 +51,7 @@ Sabab: `license-middleware.test.ts`/`license.test.ts` `./license.ts`ni `mock.mod
 
 To'liq to'plamda (`wf/fx-gate`, 1474 pass / 39 fail) litsenziya/fingerprint mock'lari quyidagi fayllarga oqadi; har fayl alohida jarayonda yashil (2026-11-19 tekshirildi): `tests/integration/fx-06-heartbeat-verify.test.ts` (4), `tests/integration/fx-07-license-revoke.test.ts` (17), `tests/integration/cli-358-module-gating.test.ts` (19 — P18 global gate testlari), `tests/integration/cli-387-license-heartbeat.test.ts` (3 — nomlari FX-07 bilan yangilandi), `src/lib/license.test.ts` (25 — «grace cap + license state (P18)» qo'shildi), `src/lib/license-heartbeat-scheduler.test.ts` (15).
 `tests/integration/lab-hub-sync.test.ts` — lane worktree'da `apps/lab-hub-api/.env` bo'lmasa «Unhandled error» (muhit); `scripts/wf-lane.sh` endi uni nusxalaydi.
+
+## Batch 2 (2026-11-20) — to'liq to'plamda oqish, izolyatsiyada yashil
+To'liq to'plamda (`wf/fx-gate2`) litsenziya `mock.module` oqishi qo'shimcha fayllarga ham tushadi: `src/lib/license-read-transient.test.ts`, `tests/integration/bootstrap-status.test.ts` (batch 1 ro'yxatidagilar bilan birga). Har biri alohida jarayonda yashil (2026-11-20 tekshirildi).
+`apps/web` `ManagerDashboard.test.tsx` «KPI qiymatlarini…» — og'ir yukda 5 s timeout'ga tushadi (beqaror; alohida/yuksiz yashil).
