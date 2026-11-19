@@ -190,7 +190,13 @@ export function VisitNotePage() {
     () =>
       (plansQuery.data ?? []).flatMap((p) =>
         (p.stages ?? [])
-          .filter((s) => s.status !== 'completed' || s.id === note?.stageId)
+          // FX-13 (D-11): faqat qabul qilingan, o'tkazib yuborilmagan bosqichlar taklif
+          // qilinadi (backend proposed/rejected bosqichni yakunlashni 400 bilan rad etadi).
+          .filter(
+            (s) =>
+              s.id === note?.stageId ||
+              (s.status !== 'completed' && s.status !== 'skipped' && s.acceptance === 'accepted'),
+          )
           .map((s) => ({
             value: s.id,
             title: p.title,

@@ -22,6 +22,7 @@ import {
   assertStageMutationAllowedForPlan,
   assertStageStatusTransition,
   StageLabPendingError,
+  StageNotAcceptedError,
   type StageStatus,
 } from './treatment-plans.transitions.ts';
 
@@ -290,7 +291,19 @@ export const createTreatmentPlansService = (deps: {
     return updated;
   }
 
-  async function updateStage(c: Context, stageId: string, input: UpdateStageInput) {
+  /**
+   * X-3: bosqichni yangilashning YAGONA yo'li (status=completed ham shu yerdan). Plan
+   * ekrani (`updateStage`) va vizit yo'li (`completeStage`) shu funksiyaga tushadi:
+   * status/acceptance/plan/lab guard'lari + FX-13 acceptance gate + completed-hook'lar
+   * (recall, odontogramma) bir joyda. ⚠️ Ombor chiqimi bu yerda EMAS — vizit yo'li
+   * `performedServices`dan o'zi chiqim qiladi (ikki marta chiqim xavfi).
+   */
+  async function applyStageUpdate(
+    c: Context,
+    stageId: string,
+    input: UpdateStageInput,
+    source: 'plan' | 'visit',
+  ) {
     // C2 guard: status/acceptance o'tishlarini tekshirish uchun joriy holat kerak.
     const current = await repo.findStage(c, stageId);
     if (!current) return null;
@@ -339,6 +352,15 @@ export const createTreatmentPlansService = (deps: {
       }
     }
 
+    // X-3 + FX-13 (LA-36, D-11): 'completed' faqat EFFEKTIV acceptance 'accepted' bo'lsa
+    // (shu PATCH'dagi yangi acceptance ham hisobga olinadi). Persist'dan OLDIN.
+    if (toStatus === 'completed') {
+      const effectiveAcceptance = input.acceptance ?? current.acceptance;
+      if (effectiveAcceptance !== 'accepted') {
+        throw new StageNotAcceptedError(effectiveAcceptance);
+      }
+    }
+
     // CLI-487: lab-order gate — bosqichni 'completed' qilishda bog'langan lab-order
     // 'delivered' bo'lishi shart. Plan-guard'dan KEYIN, persist'dan OLDIN (completed
     // yozilmaydi). `effectiveLabOrderId` — ayni PATCH'da bog'langan yangi link'ni ham
@@ -361,7 +383,11 @@ export const createTreatmentPlansService = (deps: {
         resourceType: 'treatment_stage',
         resourceId: stageId,
         before: { status: current.status, acceptance: current.acceptance, notes: current.notes },
-        after: { status: input.status, acceptance: input.acceptance },
+        after: {
+          status: input.status,
+          acceptance: input.acceptance,
+          ...(patch.status === 'completed' ? { source } : {}),
+        },
       });
 
       // Bosqich completed → hook'lar (idempotent — completed-o'tish faqat bir marta,
@@ -393,14 +419,22 @@ export const createTreatmentPlansService = (deps: {
     return updated;
   }
 
+  async function updateStage(c: Context, stageId: string, input: UpdateStageInput) {
+    return applyStageUpdate(c, stageId, input, 'plan');
+  }
+
+  /** X-3: bosqichni yakunlash — yagona servis funksiyasi (`source` audit uchun). */
+  async function completeStage(c: Context, stageId: string, opts: { source: 'plan' | 'visit' }) {
+    return applyStageUpdate(c, stageId, { status: 'completed' }, opts.source);
+  }
+
   /**
-   * C5: vizit yozuvi saqlanganda bosqichni 'completed' qilish — C2 guard'ga
-   * bo'ysunadi (skipped→completed RAD). visit-notes service factory DI orqali
-   * chaqiradi (modullar ajratilgan, to'g'ridan import yo'q). updateStage'ni
-   * qayta ishlatadi → recall hook + audit + guard hammasi avtomatik ishlaydi.
+   * C5: vizit yozuvi saqlanganda bosqichni 'completed' qilish — visit-notes service
+   * factory DI orqali chaqiradi (modullar ajratilgan, to'g'ridan import yo'q).
+   * X-3: `completeStage` orqali → acceptance gate + recall + odontogramma + guard'lar.
    */
   async function completeStageForVisit(c: Context, stageId: string) {
-    return updateStage(c, stageId, { status: 'completed' });
+    return completeStage(c, stageId, { source: 'visit' });
   }
 
   /**
@@ -475,6 +509,7 @@ export const createTreatmentPlansService = (deps: {
     updatePlan,
     setConsent,
     updateStage,
+    completeStage,
     completeStageForVisit,
     estimate,
   };

@@ -128,6 +128,20 @@ export class PlanNotActiveError extends InvalidTransitionError {
 }
 
 /**
+ * X-3 + FX-13 (LA-36, D-11): bosqichni 'completed' qilish uchun effektiv acceptance
+ * 'accepted' bo'lishi shart. proposed/rejected bosqich bajarilsa, hisob-kitobda cost=0
+ * bo'lib jim qarzsiz qolardi. InvalidTransitionError SUBKLASSI → routes 400
+ * (`stage.invalid_transition`).
+ */
+export class StageNotAcceptedError extends InvalidTransitionError {
+  constructor(readonly acceptance: StageAcceptance) {
+    super('stage_status', `acceptance:${acceptance}`, 'completed');
+    this.name = 'StageNotAcceptedError';
+    this.message = `Cannot complete stage: acceptance is '${acceptance}', not 'accepted'.`;
+  }
+}
+
+/**
  * CLI-487: bog'langan lab-order hali 'delivered' emas — bosqichni 'completed' qilib
  * bo'lmaydi. InvalidTransitionError SUBKLASSI (PlanLockedError precedenti) →
  * visit-notes/treatment-plans routes'dagi mavjud `instanceof InvalidTransitionError`
