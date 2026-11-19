@@ -7,6 +7,7 @@
  */
 import { beforeAll, beforeEach, describe, expect, test } from 'bun:test';
 import {
+  appointments,
   branches,
   patients,
   recalls,
@@ -139,7 +140,22 @@ describe('B3 recalls CRUD', () => {
     const created = await run(tenantId, (c) =>
       svc.create(c, { patientId, reason: 'manual', dueDate: '2026-06-01' }),
     );
-    const apptId = crypto.randomUUID();
+    // FX-136: bog'lanadigan yozilish haqiqiy va shu bemorniki bo'lishi shart.
+    const apptId = await run(tenantId, async (c) => {
+      const [a] = await (c.get('db') as DbOrTx)
+        .insert(appointments)
+        .values({
+          tenantId,
+          branchId,
+          doctorId: ownerId,
+          patientId,
+          startTime: new Date('2036-03-01T09:00:00+05:00'),
+          endTime: new Date('2036-03-01T09:30:00+05:00'),
+          status: 'scheduled',
+        })
+        .returning({ id: appointments.id });
+      return a!.id;
+    });
     const r = await run(tenantId, (c) =>
       svc.update(c, created!.id, { status: 'scheduled', scheduledAppointmentId: apptId }),
     );
