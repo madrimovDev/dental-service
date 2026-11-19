@@ -526,7 +526,13 @@ describe('aktivatsiya provisioning — idempotentlik', () => {
     };
     expect(freshBody.data.provisioned).toBe(true);
 
-    // Ikkinchi chaqiruv — tenant allaqachon bor → skip.
+    // Ikkinchi chaqiruv — tenant allaqachon bor → skip. Blokda BOSHQA
+    // vaqtinchalik parol (masalan `prepare-reinstall` yangisini yaratgan) —
+    // u qo'llanmaydi, demak `false`. FX-86: aynan shu blok (owner paroli hali
+    // vendor parolining o'zi) qayta kelsa `true` — fx-86-activate-retry-hint.
+    supervisorResponse = buildSupervisorResponse({
+      provisioning: { ownerPassword: 'BoshqaParol99999' },
+    });
     const skipBody = (await (await activate()).json()) as {
       data: { provisioned?: boolean };
     };
