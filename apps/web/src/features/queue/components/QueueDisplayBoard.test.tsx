@@ -9,6 +9,8 @@ const { navigateSpy } = vi.hoisted(() => ({ navigateSpy: vi.fn() }));
 
 // Mutable queue dataset — per-test injectable (mirrors QueueBoard.test pattern).
 let queueData: Array<Record<string, unknown>> = [];
+let queueIsError = false;
+let queueUpdatedAt = Date.now();
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
@@ -29,7 +31,12 @@ vi.mock('../queue.api', () => ({
     },
   }),
   useServices: () => ({ data: [{ id: 's1', nameUz: 'Tozalash' }] }),
-  useQueueToday: () => ({ data: queueData, isLoading: false, isError: false }),
+  useQueueToday: () => ({
+    data: queueData,
+    isLoading: false,
+    isError: queueIsError,
+    dataUpdatedAt: queueUpdatedAt,
+  }),
 }));
 vi.mock('@/stores/auth-store.ts', () => ({
   useAuthStore: () => ({ activeBranchId: 'b1' }),
@@ -58,6 +65,8 @@ describe('QueueDisplayBoard', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     queueData = [];
+    queueIsError = false;
+    queueUpdatedAt = Date.now();
     navigateSpy.mockClear();
   });
 
@@ -71,31 +80,37 @@ describe('QueueDisplayBoard', () => {
     expect(route?.perm).toBe('queue.view');
   });
 
-  it("kabinet showcaselarni in_progress ticketlardan to'ldiradi (≤2)", () => {
+  it("barcha in_progress ticketlarni cheklovsiz va 'Kabinet N' yorlig'isiz ko'rsatadi (FX-125)", () => {
     queueData = [
       ticket({ id: 'ip1', status: 'in_progress', queueNumber: 6, patientId: 'p1' }),
       ticket({ id: 'ip2', status: 'in_progress', queueNumber: 7, patientId: 'p2' }),
       ticket({ id: 'ip3', status: 'in_progress', queueNumber: 8, patientId: 'p3' }),
     ];
     const { container } = renderApp(<QueueDisplayBoard />);
-    const cabinetNumbers = container.querySelectorAll('[class*="cabinetNumber"]');
-    // Faqat 2 kabinet showcase mavjud (3-chi in_progress tashlanadi).
-    expect(cabinetNumbers).toHaveLength(2);
-    expect(cabinetNumbers[0]?.textContent).toBe('A-06');
-    expect(cabinetNumbers[1]?.textContent).toBe('A-07');
+    const calledNumbers = container.querySelectorAll('[class*="cabinetNumber"]');
+    expect([...calledNumbers].map((n) => n.textContent)).toEqual(['A-06', 'A-07', 'A-08']);
+    // Slot-indeksga bog'liq «Kabinet 1/2» yorlig'i yo'q.
+    expect(screen.queryByText(/Kabinet/i)).toBeNull();
     // PII: TV ekranida bemor ismi YO'Q (faqat raqam).
     expect(screen.queryByText('Ali Valiyev')).toBeNull();
     expect(screen.queryByText('Vali Aliyev')).toBeNull();
   });
 
-  it("kabinet bo'sh bo'lsa placeholder ko'rsatadi", () => {
-    queueData = [ticket({ id: 'ip1', status: 'in_progress', queueNumber: 6, patientId: 'p1' })];
+  it("raqam o'rni slotga bog'liq emas: birinchi chaqirilgan tugagach qolganlar sakramaydi", () => {
+    queueData = [
+      ticket({ id: 'ip2', status: 'in_progress', queueNumber: 7, patientId: 'p2' }),
+      ticket({ id: 'ip3', status: 'in_progress', queueNumber: 8, patientId: 'p3' }),
+    ];
     const { container } = renderApp(<QueueDisplayBoard />);
-    const cabinetNumbers = container.querySelectorAll('[class*="cabinetNumber"]');
-    // 2 showcase doim renderlanadi; ikkinchisi placeholder.
-    expect(cabinetNumbers).toHaveLength(2);
-    expect(cabinetNumbers[0]?.textContent).toBe('A-06');
-    expect(cabinetNumbers[1]?.textContent).toBe('—');
+    const calledNumbers = container.querySelectorAll('[class*="cabinetNumber"]');
+    expect([...calledNumbers].map((n) => n.textContent)).toEqual(['A-07', 'A-08']);
+  });
+
+  it("hech kim chaqirilmagan bo'lsa bitta placeholder ko'rsatadi", () => {
+    queueData = [];
+    const { container } = renderApp(<QueueDisplayBoard />);
+    const calledNumbers = container.querySelectorAll('[class*="cabinetNumber"]');
+    expect([...calledNumbers].map((n) => n.textContent)).toEqual(['—']);
   });
 
   it('birinchi 3 waiting ticketdan "keyingi navbatlar" kartalarini chiqaradi', () => {
@@ -125,5 +140,26 @@ describe('QueueDisplayBoard', () => {
     const clock = container.querySelector('[class*="clock"]');
     expect(clock).not.toBeNull();
     expect(clock?.textContent ?? '').toMatch(/\d{1,2}:\d{2}/);
+  });
+
+  it("FX-158: yangi ma'lumotda 'ulanish uzildi' banneri yo'q", () => {
+    queueData = [ticket({ id: 'ip1', status: 'in_progress', queueNumber: 6 })];
+    renderApp(<QueueDisplayBoard />);
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it("FX-158: so'rov xatosida banner chiqadi va raqamlar xiralashadi", () => {
+    queueData = [ticket({ id: 'ip1', status: 'in_progress', queueNumber: 6 })];
+    queueIsError = true;
+    const { container } = renderApp(<QueueDisplayBoard />);
+    expect(screen.getByRole('alert')).toHaveTextContent(/eskirgan/i);
+    expect(container.querySelector('[class*="stale"]')).not.toBeNull();
+  });
+
+  it("FX-158: 30 soniyadan eski ma'lumotda (isError'siz) banner chiqadi", () => {
+    queueData = [ticket({ id: 'ip1', status: 'in_progress', queueNumber: 6 })];
+    queueUpdatedAt = Date.now() - 45_000;
+    renderApp(<QueueDisplayBoard />);
+    expect(screen.getByRole('alert')).toHaveTextContent(/eskirgan/i);
   });
 });

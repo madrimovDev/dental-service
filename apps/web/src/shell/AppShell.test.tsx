@@ -34,4 +34,18 @@ describe('AppShell', () => {
     expect(screen.getByText("Bemorlar ro'yxati")).toBeInTheDocument(); // sidebar (patient.view)
     expect(screen.getByText('SAHIFA TARKIBI')).toBeInTheDocument(); // outlet
   });
+
+  it('FX-158: /queue/board kiosk rejimida — topbar va sidebar yashirin', () => {
+    renderApp(
+      <Routes>
+        <Route element={<AppShell />}>
+          <Route path="/queue/board" element={<div>TV EKRAN</div>} />
+        </Route>
+      </Routes>,
+      { route: '/queue/board' },
+    );
+    expect(screen.getByText('TV EKRAN')).toBeInTheDocument();
+    expect(screen.queryByText('F. Tursunov')).toBeNull();
+    expect(screen.queryByText("Bemorlar ro'yxati")).toBeNull();
+  });
 });

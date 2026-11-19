@@ -25,6 +25,7 @@ vi.mock('../queue.api', () => ({
     ],
   }),
   usePatientsAll: (search?: string) => usePatientsAllSpy(search),
+  useQueuePatientNames: () => new Map([['p1', 'Ali Valiyev']]),
   useServices: () => ({ data: [] }),
   useCreateTicket: () => ({ mutate, isPending: false }),
 }));

@@ -16,6 +16,7 @@ import { createApp } from '../../src/app.ts';
 import { db } from '../../src/db/client.ts';
 import { signAccess } from '../../src/lib/jwt.ts';
 import { provisionTenantInTx } from '../../src/modules/auth/auth.service.ts';
+import { seedRoleForUser } from './fx-m2-helpers.ts';
 
 const templatePerms = (key: string): string[] => {
   const t = ROLE_TEMPLATES.find((x) => x.templateKey === key);
@@ -97,10 +98,10 @@ beforeAll(async () => {
   tenantId = res.tenantId;
   ownerId = res.userId;
   ownerToken = await tokenFor(ownerId, ['@owner']);
-  receptionistToken = await tokenFor(
-    await mkUser('+998900041009', 'Recep'),
-    templatePerms('receptionist'),
-  );
+  // FX-133: yozilish filial doirasi tayinlovlardan o'qiladi — real (tenant-wide) tayinlov.
+  const recepId = await mkUser('+998900041009', 'Recep');
+  await seedRoleForUser(tenantId, recepId, null, templatePerms('receptionist'), 'Recep FX133');
+  receptionistToken = await tokenFor(recepId, templatePerms('receptionist'));
 
   for (const [key, phone, name] of [
     ['doctor', '+998900041001', 'Doc Solo'],

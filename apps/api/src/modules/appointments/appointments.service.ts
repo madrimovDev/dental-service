@@ -279,10 +279,11 @@ export const createAppointmentsService = (deps: {
     return null;
   }
 
-  async function list(c: Context, query: ListAppointmentsQuery) {
+  async function list(c: Context, query: ListAppointmentsQuery, branchIds?: string[]) {
     const db = getDb(c);
     const filters = [];
     if (query.branchId) filters.push(eq(appointments.branchId, query.branchId));
+    else if (branchIds) filters.push(inArray(appointments.branchId, branchIds));
     if (query.doctorId) filters.push(eq(appointments.doctorId, query.doctorId));
     if (query.patientId) filters.push(eq(appointments.patientId, query.patientId));
     if (query.from && query.to) {

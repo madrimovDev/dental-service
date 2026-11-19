@@ -66,6 +66,15 @@ export const createQueueService = (deps: {
       .orderBy(asc(queueTickets.queueNumber));
   }
 
+  /** FX-133: ticket filiali (RLS ostida) — filial doirasi tekshiruvi uchun. */
+  async function getBranchId(c: Context, id: string): Promise<string | null> {
+    const [row] = await getDb(c)
+      .select({ branchId: queueTickets.branchId })
+      .from(queueTickets)
+      .where(eq(queueTickets.id, id));
+    return row?.branchId ?? null;
+  }
+
   async function nextNumber(c: Context, branchId: string): Promise<number> {
     const db = getDb(c);
     const todayStart = tashkentDayStart();
@@ -135,10 +144,14 @@ export const createQueueService = (deps: {
       // patient mosligi + status (cancelled emas) + dublikat-ochiq-tiket rad.
       // Ilgari bular tekshirilmasdi (dedupe faqat candidates query'da, create'da
       // emas edi).
+      // FX-55: yozilishdan check-in qilingan ticket shifokori — yozilish shifokori
+      // (UI queue.manage'siz shifokor uchun «o'zimniki»ni shu bilan ajratadi).
+      let apptDoctorId: string | null = null;
       if (input.appointmentId) {
         const [appt] = await tx
           .select({
             id: appointments.id,
+            doctorId: appointments.doctorId,
             branchId: appointments.branchId,
             patientId: appointments.patientId,
             status: appointments.status,
@@ -147,6 +160,7 @@ export const createQueueService = (deps: {
           .where(eq(appointments.id, input.appointmentId));
 
         if (!appt) throw new QueueValidationError('appointment.not_found');
+        apptDoctorId = appt.doctorId;
         if (appt.branchId !== input.branchId) {
           throw new QueueValidationError('appointment.branch_mismatch');
         }
@@ -172,6 +186,24 @@ export const createQueueService = (deps: {
 
       const todayStart = tashkentDayStart();
 
+      // FX-159: walk-in ticket yozilishdan mustaqil — bir bemorga shu filialda bugun
+      // ikkita ochiq ticket berilardi. Advisory lock ostida tekshiriladi (parallel poyga yo'q).
+      if (input.patientId) {
+        const [patientOpen] = await tx
+          .select({ id: queueTickets.id })
+          .from(queueTickets)
+          .where(
+            and(
+              eq(queueTickets.branchId, input.branchId),
+              eq(queueTickets.patientId, input.patientId),
+              gte(queueTickets.ticketDate, todayStart),
+              sql`${queueTickets.status} in ('waiting','in_progress')`,
+            ),
+          )
+          .limit(1);
+        if (patientOpen) throw new QueueValidationError('queue.duplicate_ticket');
+      }
+
       const [maxRow] = await tx
         .select({ max: max(queueTickets.queueNumber) })
         .from(queueTickets)
@@ -190,6 +222,7 @@ export const createQueueService = (deps: {
           serviceId: input.serviceId ?? null,
           queueNumber,
           appointmentId: input.appointmentId ?? null,
+          doctorId: apptDoctorId,
         })
         .returning();
 
@@ -396,35 +429,45 @@ export const createQueueService = (deps: {
     const todayStart = tashkentDayStart();
     const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
 
-    return db
-      .select({
-        id: appointments.id,
-        tenantId: appointments.tenantId,
-        branchId: appointments.branchId,
-        patientId: appointments.patientId,
-        doctorId: appointments.doctorId,
-        assistantId: appointments.assistantId,
-        startTime: appointments.startTime,
-        endTime: appointments.endTime,
-        status: appointments.status,
-        serviceIds: appointments.serviceIds,
-        notes: appointments.notes,
-        cancellationReason: appointments.cancellationReason,
-        createdAt: appointments.createdAt,
-        updatedAt: appointments.updatedAt,
-      })
-      .from(appointments)
-      .leftJoin(queueTickets, eq(queueTickets.appointmentId, appointments.id))
-      .where(
-        and(
-          eq(appointments.branchId, branchId),
-          gte(appointments.startTime, todayStart),
-          lt(appointments.startTime, todayEnd),
-          isNull(queueTickets.id),
-          sql`${appointments.status} in ('scheduled','confirmed')`,
-        ),
-      )
-      .orderBy(asc(appointments.startTime));
+    return (
+      db
+        .select({
+          id: appointments.id,
+          tenantId: appointments.tenantId,
+          branchId: appointments.branchId,
+          patientId: appointments.patientId,
+          doctorId: appointments.doctorId,
+          assistantId: appointments.assistantId,
+          startTime: appointments.startTime,
+          endTime: appointments.endTime,
+          status: appointments.status,
+          serviceIds: appointments.serviceIds,
+          notes: appointments.notes,
+          cancellationReason: appointments.cancellationReason,
+          createdAt: appointments.createdAt,
+          updatedAt: appointments.updatedAt,
+        })
+        .from(appointments)
+        // FX-124: faqat OCHIQ (waiting/in_progress) ticket yozilishni nomzoddan chiqaradi —
+        // terminal (missed/done) ticket'li, lekin hali scheduled/confirmed yozilish qayta check-in qilinadi.
+        .leftJoin(
+          queueTickets,
+          and(
+            eq(queueTickets.appointmentId, appointments.id),
+            sql`${queueTickets.status} in ('waiting','in_progress')`,
+          ),
+        )
+        .where(
+          and(
+            eq(appointments.branchId, branchId),
+            gte(appointments.startTime, todayStart),
+            lt(appointments.startTime, todayEnd),
+            isNull(queueTickets.id),
+            sql`${appointments.status} in ('scheduled','confirmed')`,
+          ),
+        )
+        .orderBy(asc(appointments.startTime))
+    );
   }
 
   /**
@@ -503,6 +546,7 @@ export const createQueueService = (deps: {
 
   return {
     todayList,
+    getBranchId,
     nextNumber,
     create,
     updateStatus,

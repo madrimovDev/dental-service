@@ -113,7 +113,7 @@
 /* Cabinet showcases */
 .cabinets {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 20px;
 }
 
@@ -276,4 +276,19 @@
   .cabinets {
     grid-template-columns: 1fr;
   }
+}
+
+/* FX-158: ulanish uzilgan/eskirgan ma'lumot */
+.staleBanner {
+  padding: 14px 20px;
+  border-radius: 12px;
+  font-size: 20px;
+  font-weight: 600;
+  background: var(--mantine-color-red-light, #fde8e8);
+  color: var(--mantine-color-red-light-color, #b42318);
+}
+
+.stale {
+  opacity: 0.35;
+  filter: grayscale(1);
 }

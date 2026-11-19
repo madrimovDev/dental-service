@@ -24,6 +24,7 @@ import { createApp } from '../../src/app.ts';
 import { db } from '../../src/db/client.ts';
 import { signAccess } from '../../src/lib/jwt.ts';
 import { exclusionConflictCode } from '../../src/modules/appointments/appointments.service.ts';
+import { seedRoleForUser } from './fx-m2-helpers.ts';
 
 let tenantId: string;
 let doctorId: string;
@@ -84,6 +85,12 @@ beforeAll(async () => {
     patientA = p1!.id;
     patientB = p2!.id;
   });
+  // FX-133: yozilish filial doirasi tayinlovlardan o'qiladi — real (tenant-wide) tayinlov.
+  await seedRoleForUser(tenantId, doctorId, null, [
+    'appointment.create',
+    'service.manage',
+    'payroll.manage',
+  ]);
   // Real cheklangan rol: faqat shu uch ruxsat.
   ({ token } = await signAccess({
     sub: doctorId,

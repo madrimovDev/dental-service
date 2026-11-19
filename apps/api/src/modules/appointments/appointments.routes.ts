@@ -2,6 +2,7 @@ import { fail, ok } from '@dental/core';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { branchIdFromJson, loadBranchScope, requireBranchScope } from '../../lib/branch-scope.ts';
 import { requireModuleInDesktop } from '../../lib/license-middleware.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
@@ -74,7 +75,10 @@ export const appointmentRoutes = (deps: {
     path: '/',
     tags: ['appointments'],
     operationId: 'listAppointments',
-    middleware: [requirePermission('appointment.view')] as const,
+    middleware: [
+      requirePermission('appointment.view'),
+      requireBranchScope('appointment.view', (c) => c.req.query('branchId')),
+    ] as const,
     request: {
       query: listAppointmentsQuery,
     },
@@ -83,7 +87,13 @@ export const appointmentRoutes = (deps: {
 
   app.openapi(listRoute, async (c) => {
     const query = c.req.valid('query');
-    const rows = await service.list(c, query);
+    // FX-133: filial filtri berilmasa — faqat chaqiruvchining filiallari (owner/tenant-wide → hammasi).
+    let branchIds: string[] | undefined;
+    if (!query.branchId) {
+      const scope = await loadBranchScope(c, 'appointment.view');
+      if (scope.kind === 'branches') branchIds = scope.branchIds;
+    }
+    const rows = await service.list(c, query, branchIds);
     return c.json(ok(rows.map(toAppointmentDto)), 200);
   });
 
@@ -94,7 +104,10 @@ export const appointmentRoutes = (deps: {
     path: '/',
     tags: ['appointments'],
     operationId: 'createAppointment',
-    middleware: [requirePermission('appointment.create')] as const,
+    middleware: [
+      requirePermission('appointment.create'),
+      requireBranchScope('appointment.create', branchIdFromJson),
+    ] as const,
     request: {
       body: { content: { 'application/json': { schema: createAppointmentSchema } } },
     },
@@ -155,7 +168,10 @@ export const appointmentRoutes = (deps: {
     path: '/doctors',
     tags: ['appointments'],
     operationId: 'listDoctors',
-    middleware: [requirePermission('appointment.view')] as const,
+    middleware: [
+      requirePermission('appointment.view'),
+      requireBranchScope('appointment.view', (c) => c.req.query('branchId')),
+    ] as const,
     request: { query: z.object({ branchId: z.string().uuid().optional() }) },
     responses: okJson(z.array(doctorListItemDtoSchema), 'List of doctors for booking'),
   });
@@ -190,7 +206,13 @@ export const appointmentRoutes = (deps: {
     path: '/{id}',
     tags: ['appointments'],
     operationId: 'getAppointment',
-    middleware: [requirePermission('appointment.view')] as const,
+    middleware: [
+      requirePermission('appointment.view'),
+      requireBranchScope(
+        'appointment.view',
+        async (c) => (await service.getById(c, c.req.param('id') ?? ''))?.branchId,
+      ),
+    ] as const,
     request: {
       params: appointmentIdParamSchema,
     },
@@ -211,7 +233,13 @@ export const appointmentRoutes = (deps: {
     path: '/{id}',
     tags: ['appointments'],
     operationId: 'updateAppointment',
-    middleware: [requirePermission('appointment.edit')] as const,
+    middleware: [
+      requirePermission('appointment.edit'),
+      requireBranchScope(
+        'appointment.edit',
+        async (c) => (await service.getById(c, c.req.param('id') ?? ''))?.branchId,
+      ),
+    ] as const,
     request: {
       params: appointmentIdParamSchema,
       body: { content: { 'application/json': { schema: updateAppointmentSchema } } },
@@ -266,7 +294,13 @@ export const appointmentRoutes = (deps: {
     path: '/{id}/cancel',
     tags: ['appointments'],
     operationId: 'cancelAppointment',
-    middleware: [requirePermission('appointment.cancel')] as const,
+    middleware: [
+      requirePermission('appointment.cancel'),
+      requireBranchScope(
+        'appointment.cancel',
+        async (c) => (await service.getById(c, c.req.param('id') ?? ''))?.branchId,
+      ),
+    ] as const,
     request: {
       params: appointmentIdParamSchema,
       body: {
