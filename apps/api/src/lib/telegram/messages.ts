@@ -92,6 +92,9 @@ type Dict = {
   }) => string;
   planTotal: (amount: string) => string;
   prescriptionEmpty: string;
+  /** FT-07.3: klinika o'z-o'ziga xizmatni o'chirgan / so'rovlar juda tez. */
+  selfServiceDisabled: string;
+  throttled: string;
 };
 
 const uz: Dict = {
@@ -173,6 +176,9 @@ const uz: Dict = {
     `${{ completed: '✅', in_progress: '🔄', pending: '⏳', skipped: '➖' }[status]} ${name}`,
   planTotal: (amount) => `Jami: ${amount}`,
   prescriptionEmpty: 'Retseptlaringiz yo‘q.',
+  selfServiceDisabled:
+    'Bu ma‘lumotlar botda hozircha mavjud emas. Iltimos, klinikaga murojaat qiling.',
+  throttled: 'Juda ko‘p so‘rov yubordingiz. Iltimos, bir daqiqadan keyin qayta urinib ko‘ring.',
 };
 
 const ru: Dict = {
@@ -251,6 +257,8 @@ const ru: Dict = {
     `${{ completed: '✅', in_progress: '🔄', pending: '⏳', skipped: '➖' }[status]} ${name}`,
   planTotal: (amount) => `Итого: ${amount}`,
   prescriptionEmpty: 'Рецептов нет.',
+  selfServiceDisabled: 'Эти данные в боте сейчас недоступны. Пожалуйста, обратитесь в клинику.',
+  throttled: 'Слишком много запросов. Пожалуйста, повторите через минуту.',
 };
 
 export const botMessages = (lang: BotLang): Dict => (lang === 'ru' ? ru : uz);

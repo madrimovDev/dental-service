@@ -593,6 +593,10 @@
             "type": "integer",
             "example": 3
           },
+          "botSelfServiceEnabled": {
+            "type": "boolean",
+            "example": true
+          },
           "notificationSettings": {
             "$ref": "#/components/schemas/NotificationSettings"
           },
@@ -665,6 +669,7 @@
           "onboardingDismissedAt",
           "maxDiscountPercent",
           "noShowStrikeThreshold",
+          "botSelfServiceEnabled",
           "notificationSettings",
           "integrationSettings",
           "createdAt",
@@ -9723,6 +9728,9 @@
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 50
+                  },
+                  "botSelfServiceEnabled": {
+                    "type": "boolean"
                   },
                   "notificationSettings": {
                     "type": "object",

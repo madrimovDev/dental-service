@@ -5,20 +5,23 @@
 import { beforeAll, describe, expect, test } from 'bun:test';
 import {
   appointments,
+  auditLog,
   branches,
   cashierTransactions,
   patients,
   prescriptions,
+  tenantSettings,
   tenants,
   treatmentPlans,
   treatmentStages,
   users,
 } from '@dental/db-schema';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { db } from '../../src/db/client.ts';
 import { withTenant } from '../../src/db/scoped.ts';
 import { createAuditLogger } from '../../src/lib/audit-logger.ts';
 import { createTelegramFlows } from '../../src/lib/telegram/flows.ts';
+import { botMessages } from '../../src/lib/telegram/messages.ts';
 import { createAppointmentsService } from '../../src/modules/appointments/index.ts';
 import { createPatientsService } from '../../src/modules/patients/patients.service.ts';
 import { createScheduleService } from '../../src/modules/schedule/index.ts';
@@ -328,5 +331,111 @@ describe('FT-07.2 Oxirgi retsept', () => {
   test('ulanmagan chat retsept ko‘ra olmaydi', async () => {
     const r = await text('9999998', '💊 Oxirgi retsept');
     expect(r.text).not.toContain('Amoksitsillin');
+  });
+});
+
+describe('FT-07.3 audit, throttling va tenant sozlamasi', () => {
+  let clock = Date.now();
+  const gFlows = createTelegramFlows({
+    appointments: createAppointmentsService({ audit, schedule }),
+    schedule,
+    patients: createPatientsService({ audit }),
+    audit,
+    now: () => new Date(clock),
+  });
+  const gText = (chatId: string, t: string) =>
+    run((tx) => gFlows.onText(tx, { tenantId, chatId, text: t }));
+  const botAudit = (patientId: string) =>
+    run((tx) =>
+      tx
+        .select({
+          userId: auditLog.userId,
+          tenantId: auditLog.tenantId,
+          action: auditLog.action,
+          after: auditLog.after,
+        })
+        .from(auditLog)
+        .where(
+          and(eq(auditLog.resourceType, 'bot_self_service'), eq(auditLog.resourceId, patientId)),
+        ),
+    );
+  const setEnabled = (v: boolean) =>
+    run(async (tx) => {
+      const [row] = await tx.select({ id: tenantSettings.id }).from(tenantSettings);
+      if (row) await tx.update(tenantSettings).set({ botSelfServiceEnabled: v });
+      else await tx.insert(tenantSettings).values({ tenantId, botSelfServiceEnabled: v });
+    });
+  const buttons = [
+    ['📅 Mening yozilishlarim', 'appointments'],
+    ['💳 Balans', 'balance'],
+    ['🦷 Davolash rejam', 'plan'],
+    ['💊 Oxirgi retsept', 'prescription'],
+  ] as const;
+
+  test('har o‘z-o‘ziga xizmat so‘rovi audit_log’ga yoziladi (user_id=null, actor=telegram)', async () => {
+    const p = await seedPatient('Audit Bemor', '+998907000100', '7100');
+    for (const [label] of buttons) await gText('7100', label);
+    const rows = await botAudit(p);
+    expect(rows.length).toBe(4);
+    for (const r of rows) {
+      expect(r.userId).toBeNull();
+      expect(r.tenantId).toBe(tenantId);
+      expect(r.action).toBe('viewed');
+      expect((r.after as { actor: string }).actor).toBe('telegram');
+    }
+    expect(rows.map((r) => (r.after as { request: string }).request).sort()).toEqual(
+      buttons.map((b) => b[1]).sort(),
+    );
+  });
+
+  test('throttling: chat bo‘yicha daqiqasiga 20 ta so‘rov; boshqa chat va keyingi daqiqa ta’sirlanmaydi', async () => {
+    const p = await seedPatient('Throttle Bemor', '+998907000110', '7110');
+    await seedPatient('Boshqa Chat', '+998907000111', '7111');
+    for (let i = 0; i < 20; i++) {
+      const r = await gText('7110', '💳 Balans');
+      expect(r.text).not.toBe(botMessages('uz').throttled);
+    }
+    const blocked = await gText('7110', '💳 Balans');
+    expect(blocked.text).toBe(botMessages('uz').throttled);
+    expect((await botAudit(p)).length).toBe(20);
+    expect((await gText('7111', '💳 Balans')).text).not.toBe(botMessages('uz').throttled);
+    clock += 61_000;
+    expect((await gText('7110', '💳 Balans')).text).not.toBe(botMessages('uz').throttled);
+  });
+
+  test('bot_self_service_enabled=false: ma‘lumot berilmaydi, audit yozilmaydi; qayta yoqilsa ishlaydi', async () => {
+    const me = await seedPatient('Sozlama Bemor', '+998907000120', '7120');
+    await run((tx) =>
+      tx.insert(prescriptions).values({
+        tenantId,
+        patientId: me,
+        doctorId,
+        issuedDate: inDays(-1),
+        items: [
+          { medicationName: 'YOPIQ-DORI', dosage: '1', frequency: 'kuniga 1', durationDays: 1 },
+        ],
+      }),
+    );
+    await seedAppt(me, inDays(6), 'scheduled');
+    await setEnabled(false);
+    try {
+      for (const [label] of buttons) {
+        const r = await gText('7120', label);
+        expect(r.text).toBe(botMessages('uz').selfServiceDisabled);
+        expect(r.buttons).toBeUndefined();
+      }
+      expect((await botAudit(me)).length).toBe(0);
+    } finally {
+      await setEnabled(true);
+    }
+    const ok = await gText('7120', '💊 Oxirgi retsept');
+    expect(ok.text).toContain('YOPIQ-DORI');
+  });
+
+  test('sozlama standart true (yangi ustun)', async () => {
+    const [s] = await run((tx) =>
+      tx.select({ v: tenantSettings.botSelfServiceEnabled }).from(tenantSettings),
+    );
+    expect(s?.v ?? true).toBe(true);
   });
 });

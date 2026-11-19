@@ -2,6 +2,7 @@ import {
   appointments,
   branches,
   prescriptions,
+  tenantSettings,
   treatmentPlans,
   treatmentStages,
   users,
@@ -9,6 +10,7 @@ import {
 import { and, asc, desc, eq, gt, inArray } from 'drizzle-orm';
 import type { DbOrTx } from '../../db/client.ts';
 import type { PatientsService } from '../../modules/patients/patients.service.ts';
+import type { AuditLogger } from '../audit-logger.ts';
 import { createBotContext } from './bot-context.ts';
 import { type BotLang, botMessages, fmtMoney, fmtWhen } from './messages.ts';
 import { reminderCallbackData } from './reminder-actions.ts';
@@ -17,15 +19,27 @@ import type { BotReply } from './reply.ts';
 /** Bitta xabarda ko'rsatiladigan eng ko'p yozilish (Telegram tugma/matn chegarasi). */
 const MAX_LISTED = 10;
 
+/** FT-07.3: bitta chat uchun daqiqasiga eng ko'p so'rov (sliding window). */
+export const SELF_SERVICE_LIMIT_PER_MIN = 20;
+const WINDOW_MS = 60_000;
+/** Xotira chegarasi: shuncha chat kuzatilsa, eskirgan yozuvlar tozalanadi. */
+const PRUNE_AT = 2000;
+
+export type SelfServiceRequest = 'appointments' | 'balance' | 'plan' | 'prescription';
+
 export type SelfServiceCtx = {
   tx: DbOrTx;
   tenantId: string;
+  /** Throttling/audit uchun Telegram chat. */
+  chatId: string;
   patientId: string;
   lang: BotLang;
 };
 
 export type SelfServiceDeps = {
   patients?: Pick<PatientsService, 'balanceFor'>;
+  /** FT-07.3: har so'rov `audit_log`ga (`user_id=null`, `after.actor='telegram'`). */
+  audit?: Pick<AuditLogger, 'record'>;
   now?: () => Date;
 };
 
@@ -35,6 +49,50 @@ export type SelfServiceDeps = {
  */
 export function createSelfServiceFlow(deps: SelfServiceDeps) {
   const nowDate = () => deps.now?.() ?? new Date();
+
+  // `tenantId:chatId` → so'nggi 60 soniyadagi so'rov vaqtlari (jarayon xotirasida; bot bitta jarayonda).
+  const hits = new Map<string, number[]>();
+
+  /** `true` — ruxsat (so'rov hisobga olindi); `false` — limit oshgan. */
+  function allow(key: string): boolean {
+    const t = nowDate().getTime();
+    if (hits.size >= PRUNE_AT) {
+      for (const [k, v] of hits) if (v.every((x) => t - x >= WINDOW_MS)) hits.delete(k);
+    }
+    const recent = (hits.get(key) ?? []).filter((x) => t - x < WINDOW_MS);
+    if (recent.length >= SELF_SERVICE_LIMIT_PER_MIN) {
+      hits.set(key, recent);
+      return false;
+    }
+    recent.push(t);
+    hits.set(key, recent);
+    return true;
+  }
+
+  /**
+   * Barcha o'z-o'ziga xizmat so'rovlarining umumiy darvozasi: throttling → tenant sozlamasi
+   * (`bot_self_service_enabled`, standart true) → audit (faqat ko'rilgani, tarkibi emas).
+   */
+  async function guarded(
+    ctx: SelfServiceCtx,
+    request: SelfServiceRequest,
+    run: (ctx: SelfServiceCtx) => Promise<BotReply>,
+  ): Promise<BotReply> {
+    const m = botMessages(ctx.lang);
+    if (!allow(`${ctx.tenantId}:${ctx.chatId}`)) return { text: m.throttled };
+    const [s] = await ctx.tx
+      .select({ enabled: tenantSettings.botSelfServiceEnabled })
+      .from(tenantSettings)
+      .limit(1);
+    if (s && !s.enabled) return { text: m.selfServiceDisabled };
+    await deps.audit?.record(createBotContext(ctx.tx, ctx.tenantId), {
+      action: 'viewed',
+      resourceType: 'bot_self_service',
+      resourceId: ctx.patientId,
+      after: { actor: 'telegram', request, patientId: ctx.patientId, chatId: ctx.chatId },
+    });
+    return run(ctx);
+  }
 
   /** Kelajakdagi faol yozilishlar + har biri uchun bekor tugmasi (`rm:no:<id>` — eslatma handler'i). */
   async function myAppointments(ctx: SelfServiceCtx): Promise<BotReply> {
@@ -140,5 +198,10 @@ export function createSelfServiceFlow(deps: SelfServiceDeps) {
     };
   }
 
-  return { myAppointments, balance, myPlan, lastPrescription };
+  return {
+    myAppointments: (ctx: SelfServiceCtx) => guarded(ctx, 'appointments', myAppointments),
+    balance: (ctx: SelfServiceCtx) => guarded(ctx, 'balance', balance),
+    myPlan: (ctx: SelfServiceCtx) => guarded(ctx, 'plan', myPlan),
+    lastPrescription: (ctx: SelfServiceCtx) => guarded(ctx, 'prescription', lastPrescription),
+  };
 }

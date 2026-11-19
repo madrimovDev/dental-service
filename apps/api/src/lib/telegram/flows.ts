@@ -56,7 +56,11 @@ export function createTelegramFlows(deps: FlowDeps) {
     now: deps.now,
   });
   const questionnaire = createQuestionnaireFlow({ now: deps.now });
-  const selfService = createSelfServiceFlow({ patients: deps.patients, now: deps.now });
+  const selfService = createSelfServiceFlow({
+    patients: deps.patients,
+    audit: deps.audit,
+    now: deps.now,
+  });
 
   const selection = deps.selection ?? new Map<string, { patientId: string; expiresAt: number }>();
   const nowMs = () => deps.now?.().getTime() ?? Date.now();
