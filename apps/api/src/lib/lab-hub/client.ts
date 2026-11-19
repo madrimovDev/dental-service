@@ -113,6 +113,8 @@ export type HubLink = {
 
 export type HubChangeEvent = {
   seq: number;
+  /** Yozgan Hub tranzaksiyasi xid'i (FX-93 dedup kaliti); eski Hub yubormasa — 0. */
+  txId?: number;
   caseRef: string;
   labId: string;
   type: string;
@@ -124,7 +126,7 @@ export type HubChangeEvent = {
 };
 
 export type ConnectProof =
-  | { supervisorClinicId: string; licenseKey: string }
+  | { supervisorClinicId: string; licenseKey: string; fingerprint: string }
   | { supervisorClinicId: string; serviceProof: string };
 
 const ref = (r: string) => encodeURIComponent(r);
@@ -197,7 +199,7 @@ export const labHubClient = (fetchImpl?: FetchFn) => ({
       fetchImpl,
     }),
   changes: (key: string, since: string, limit: number) =>
-    json<{ events: HubChangeEvent[]; nextCursor: string }>(
+    json<{ events: HubChangeEvent[]; nextCursor: string; cursorReset?: boolean }>(
       `/v1/clinic/changes?since=${encodeURIComponent(since)}&limit=${limit}`,
       { key, fetchImpl },
     ),

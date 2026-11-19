@@ -32,6 +32,7 @@ import {
   expenses,
   labHubOutbox,
   labHubState,
+  labOrderFiles,
   labOrderMessages,
   labOrders,
   notifications,
@@ -52,9 +53,11 @@ import { hubCaseSchema } from '../../../lab-hub-api/src/modules/clinic/clinic.ro
 import { createApp } from '../../src/app.ts';
 import { db } from '../../src/db/client.ts';
 import { signAccess } from '../../src/lib/jwt.ts';
+import { labHubClient } from '../../src/lib/lab-hub/client.ts';
 import { toHubCase } from '../../src/lib/lab-hub/mapper.ts';
 import { hubKeyOf } from '../../src/lib/lab-hub/state.ts';
 import { flushLabHubOutbox, pollLabHubChanges } from '../../src/lib/lab-hub/sync.ts';
+import { createLocalStorageAdapter } from '../../src/lib/storage.ts';
 
 // ─── Hub (haqiqiy ilova, o'z bazasi) ─────────────────────────────────────────
 const parseEnv = (path: string): Record<string, string> =>
@@ -967,5 +970,339 @@ describe('narx taklifisiz tasdiq', () => {
       tx.select().from(expenses).where(eq(expenses.labOrderId, id)),
     );
     expect(rows).toHaveLength(0);
+  });
+});
+
+// ─── Umumiy klaster xmin'i (boshqa lane'lar) Hub hodisasini qisqa ushlab turishi mumkin ──
+/** Hub joriy kursordan kamida `min` hodisani bera oladimi — kursorni surmasdan tekshiradi. */
+const waitHubEvents = async (min: number) => {
+  for (let i = 0; i < 100; i++) {
+    const [state] = await inTenant((tx) => tx.select().from(labHubState));
+    const res = await labHubClient().changes(await clinicHubKey(), state!.cursor, 200);
+    if (res.events.length >= min) return;
+    await Bun.sleep(50);
+  }
+  throw new Error(`Hub did not expose ${min} event(s)`);
+};
+/** Poll'ni shart bajarilguncha takrorlaydi (hodisa xmin bilan kechiksa ham). */
+const pollUntil = async (ok: () => Promise<boolean>) => {
+  for (let i = 0; i < 100; i++) {
+    await pollLabHubChanges(tenantId);
+    if (await ok()) return;
+    await Bun.sleep(50);
+  }
+  throw new Error('poll condition not reached');
+};
+
+// ─── FX-139: poll ↔ bekor qilish poygasi ─────────────────────────────────────
+describe('FX-139 — poll bekor qilingan buyurtmani qayta tiriltirmaydi', () => {
+  test('bekor qilish tranzaksiyasi poll paytida commit qilinsa, status «cancelled» qoladi', async () => {
+    const id = await createOrder();
+    expect(
+      (await call('doctor', 'POST', `/api/lab-orders/${id}/send-to-hub`, { labId: lab.labId }))
+        .status,
+    ).toBe(200);
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+    const [hc] = await hubCaseByRef(id);
+    const labStatus = async (to: string) => {
+      const r = await hubJson(`/v1/lab/cases/${hc!.id}/status`, {
+        method: 'POST',
+        token: lab.token,
+        body: { to },
+      });
+      expect(r.status).toBe(200);
+    };
+    await labStatus('accepted');
+    await labStatus('in_progress');
+    await pollUntil(async () => (await orderRow(id))?.status === 'in_progress');
+    // Navbatda BITTA hodisa qoladi — u holatni o'zgartiradigan (`ready`).
+    await labStatus('ready');
+    await waitHubEvents(1);
+
+    // Parallel «bekor qilish»: qator yangilangan, lekin commit hali bo'lmagan.
+    let release!: () => void;
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    let cancelStarted!: () => void;
+    const started = new Promise<void>((r) => {
+      cancelStarted = r;
+    });
+    const cancelTx = inTenant(async (tx) => {
+      await tx
+        .update(labOrders)
+        .set({ status: 'cancelled', updatedAt: new Date() })
+        .where(eq(labOrders.id, id));
+      cancelStarted();
+      await gate;
+    });
+    await started;
+
+    const poll = pollLabHubChanges(tenantId);
+    // Poll tranzaksiyasi lab_orders qatori qulfida kutayotganini ko'ramiz (deterministik).
+    const deadline = Date.now() + 10_000;
+    for (;;) {
+      const [w] = (await db.execute(
+        sql`SELECT count(*)::int AS n FROM pg_stat_activity
+             WHERE datname = current_database() AND wait_event_type = 'Lock'`,
+      )) as unknown as { n: number }[];
+      if ((w?.n ?? 0) > 0) break;
+      if (Date.now() > deadline) throw new Error('poll did not block on the lab_orders row lock');
+      await Bun.sleep(20);
+    }
+    release();
+    await cancelTx;
+    await poll;
+
+    const row = await orderRow(id);
+    expect(row?.status).toBe('cancelled');
+    expect(row?.hubStatus).toBe('ready');
+  });
+});
+
+// ─── FX-49: lab qabul qilgan ishga kechikkan tahrir ──────────────────────────
+describe('FX-49 — Hub tahrirni qo‘llamasa (applied:false) «synced» emas', () => {
+  test('poll kelmasdan lab qabul qildi: tahrir push → failed, hubStatus yangilanadi, keyingi tahrir 409', async () => {
+    const id = await createOrder();
+    expect(
+      (await call('doctor', 'POST', `/api/lab-orders/${id}/send-to-hub`, { labId: lab.labId }))
+        .status,
+    ).toBe(200);
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+    expect((await orderRow(id))?.hubSyncStatus).toBe('synced');
+    expect((await orderRow(id))?.hubStatus).toBe('sent');
+
+    // Lab qabul qiladi — klinika hali poll qilmagan (lokal hubStatus = 'sent').
+    const [hc] = await hubCaseByRef(id);
+    const r = await hubJson(`/v1/lab/cases/${hc!.id}/status`, {
+      method: 'POST',
+      token: lab.token,
+      body: { to: 'accepted' },
+    });
+    expect(r.status).toBe(200);
+
+    // Shifokor rangni o'zgartiradi — lokal tekshiruv o'tadi, upsert_case navbatga tushadi.
+    await whileHubDown(async () => {
+      const edit = await call('doctor', 'PATCH', `/api/lab-orders/${id}`, { shade: 'B2' });
+      expect(edit.status).toBe(200);
+    });
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+
+    const row = await orderRow(id);
+    // Hub eski rang bilan ishlaydi — klinika «sinxronlangan» demasligi kerak.
+    expect(row?.hubSyncStatus).not.toBe('synced');
+    expect(row?.hubSyncStatus).toBe('failed');
+    expect(row?.hubStatus).toBe('accepted');
+    const [op] = await inTenant((tx) =>
+      tx
+        .select()
+        .from(labHubOutbox)
+        .where(and(eq(labHubOutbox.labOrderId, id), eq(labHubOutbox.status, 'failed'))),
+    );
+    expect(op?.op).toBe('upsert_case');
+    expect(op?.lastError).toBe('lab_order.locked_by_lab');
+
+    // Keyingi tahrir endi lokal bloklanadi — xabar orqali.
+    const locked = await call('doctor', 'PATCH', `/api/lab-orders/${id}`, { shade: 'C1' });
+    expect(locked.status).toBe(409);
+    expect(((await locked.json()) as { error: { code: string } }).error.code).toBe(
+      'lab_order.locked_by_lab',
+    );
+  });
+});
+
+// ─── FX-79: diskda yo'q fayl FIFO'ni bloklamaydi ─────────────────────────────
+describe('FX-79 — yo‘q fayl (ENOENT) cheksiz qayta urinilmaydi', () => {
+  test('file op «failed» (file.missing), keyingi xabar op baribir yuboriladi', async () => {
+    const id = await createOrder();
+    expect(
+      (await call('doctor', 'POST', `/api/lab-orders/${id}/send-to-hub`, { labId: lab.labId }))
+        .status,
+    ).toBe(200);
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+    expect((await orderRow(id))?.hubSyncStatus).toBe('synced');
+
+    // Fayl qatori bor, lekin diskdan yo'qolgan (tiklash/qo'lda o'chirish).
+    await inTenant(async (tx) => {
+      const [f] = await tx
+        .insert(labOrderFiles)
+        .values({
+          tenantId,
+          labOrderId: id,
+          objectKey: `${tenantId}/lab-orders/${id}/yoq-${crypto.randomUUID()}.pdf`,
+          originalFilename: 'yoq.pdf',
+          contentType: 'application/pdf',
+          sizeBytes: 10,
+        })
+        .returning({ id: labOrderFiles.id });
+      await tx.insert(labHubOutbox).values({
+        tenantId,
+        labOrderId: id,
+        op: 'file',
+        payload: { fileId: f!.id },
+      });
+    });
+    // Undan keyin xabar — FIFO bo'yicha fayl op'idan keyin turadi.
+    await whileHubDown(async () => {
+      const m = await call('doctor', 'POST', `/api/lab-orders/${id}/hub-messages`, {
+        body: 'Rangni tekshiring',
+      });
+      expect(m.status).toBeLessThan(300);
+    });
+
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+
+    const ops = await inTenant((tx) =>
+      tx.select().from(labHubOutbox).where(eq(labHubOutbox.labOrderId, id)),
+    );
+    const fileOp = ops.find((o) => o.op === 'file');
+    expect(fileOp?.status).toBe('failed');
+    expect(fileOp?.lastError).toBe('file.missing');
+    expect(ops.find((o) => o.op === 'message')?.status).toBe('done');
+    const [msg] = await inTenant((tx) =>
+      tx.select().from(labOrderMessages).where(eq(labOrderMessages.labOrderId, id)),
+    );
+    expect(msg?.syncedAt).not.toBeNull();
+  });
+});
+
+// ─── FX-48: doimiy xatoda kutish tozalanadi + «failed» op'larni qayta navbatga qo'yish ──
+describe('FX-48 — failed outbox: narx kutishi tozalanadi, qayta navbat', () => {
+  const sendAccepted = async () => {
+    const id = await createOrder();
+    expect(
+      (await call('doctor', 'POST', `/api/lab-orders/${id}/send-to-hub`, { labId: lab.labId }))
+        .status,
+    ).toBe(200);
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+    const [hc] = await hubCaseByRef(id);
+    const step = async (path: string, body: unknown) => {
+      const r = await hubJson(`/v1/lab/cases/${hc!.id}${path}`, {
+        method: 'POST',
+        token: lab.token,
+        body,
+      });
+      expect(r.status).toBeLessThan(300);
+    };
+    await step('/status', { to: 'accepted' });
+    return { id, step };
+  };
+
+  test('approve_price doimiy 4xx (case.not_found): kutish tozalanadi, qayta tasdiq ishlaydi, bitta xarajat', async () => {
+    const { id, step } = await sendAccepted();
+    await step('/price', { price: 150000 });
+    await pollLabHubChanges(tenantId);
+    const approve = () =>
+      whileHubDown(() =>
+        call('doctor', 'POST', `/api/lab-orders/${id}/approve-price`, { price: '150000.00' }),
+      );
+    expect((await approve()).status).toBe(200);
+    expect((await orderRow(id))?.priceApprovalRequestedPrice).toBe('150000.00');
+
+    // Hub bu ishni topmaydi (masalan, tozalangan) — haqiqiy Hub 404 case.not_found qaytaradi.
+    const missingCase = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      return fetch(
+        url.includes('/approve-price')
+          ? url.replace(`/cases/${id}/`, `/cases/${crypto.randomUUID()}/`)
+          : url,
+        init,
+      );
+    }) as typeof fetch;
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId, { fetchImpl: missingCase });
+
+    const row = await orderRow(id);
+    expect(row?.priceApprovalRequestedAt).toBeNull();
+    expect(row?.priceApprovalRequestedPrice).toBeNull();
+    expect(row?.approvedPrice).toBeNull();
+    expect(await expensesOf(id)).toHaveLength(0);
+    const [op] = await inTenant((tx) =>
+      tx
+        .select()
+        .from(labHubOutbox)
+        .where(and(eq(labHubOutbox.labOrderId, id), eq(labHubOutbox.op, 'approve_price'))),
+    );
+    expect(op?.status).toBe('rejected');
+    expect(op?.lastError).toBe('case.not_found');
+
+    // Foydalanuvchi qayta tasdiqlaydi — yangi op navbatga tushadi, Hub tasdiqlaydi → bitta xarajat.
+    const again = await approve();
+    expect(again.status).toBe(200);
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+    expect((await expensesOf(id)).map((e) => e.amount)).toEqual(['150000.00']);
+    expect((await orderRow(id))?.approvedPrice).toBe('150000.00');
+  });
+
+  test('POST /api/lab-hub/outbox/requeue: Doctor 403; Tenant Admin qayta navbatga qo‘yadi → yuboriladi', async () => {
+    const id = await createOrder();
+    expect(
+      (await call('doctor', 'POST', `/api/lab-orders/${id}/send-to-hub`, { labId: lab.labId }))
+        .status,
+    ).toBe(200);
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+    const objectKey = `${tenantId}/lab-orders/${id}/kech-${crypto.randomUUID()}.pdf`;
+    await inTenant(async (tx) => {
+      const [f] = await tx
+        .insert(labOrderFiles)
+        .values({
+          tenantId,
+          labOrderId: id,
+          objectKey,
+          originalFilename: 'kech.pdf',
+          contentType: 'application/pdf',
+          sizeBytes: 8,
+        })
+        .returning({ id: labOrderFiles.id });
+      await tx
+        .insert(labHubOutbox)
+        .values({ tenantId, labOrderId: id, op: 'file', payload: { fileId: f!.id } });
+    });
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+    const fileOp = async () =>
+      (
+        await inTenant((tx) =>
+          tx
+            .select()
+            .from(labHubOutbox)
+            .where(and(eq(labHubOutbox.labOrderId, id), eq(labHubOutbox.op, 'file'))),
+        )
+      )[0];
+    expect((await fileOp())?.status).toBe('failed');
+    expect((await orderRow(id))?.hubSyncStatus).toBe('failed');
+    const st = await call('doctor', 'GET', '/api/lab-hub/status');
+    expect(
+      ((await st.json()) as { data: { failedOutbox: number } }).data.failedOutbox,
+    ).toBeGreaterThan(0);
+
+    // Fayl tiklandi (zaxiradan) — endi qayta yuborish mumkin.
+    await createLocalStorageAdapter().save(objectKey, Buffer.from('KECH-PDF'));
+
+    expect((await call('doctor', 'POST', '/api/lab-hub/outbox/requeue', {})).status).toBe(403);
+    const res = await call('tenant_admin', 'POST', '/api/lab-hub/outbox/requeue', {
+      labOrderId: id,
+    });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { data: { requeued: number } }).data.requeued).toBe(1);
+
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+    expect((await fileOp())?.status).toBe('done');
+    expect((await orderRow(id))?.hubSyncStatus).toBe('synced');
+    const audits = await inTenant((tx) =>
+      tx.select().from(auditLog).where(eq(auditLog.action, 'outbox_requeued')),
+    );
+    expect(audits).toHaveLength(1);
   });
 });

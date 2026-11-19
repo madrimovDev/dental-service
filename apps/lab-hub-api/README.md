@@ -38,7 +38,7 @@ butunlay bloklanadi (mavjud ishlar ham).
 
 ## `/v1/clinic/changes` kursori (commit-xavfsiz)
 
-`GET /v1/clinic/changes?since=<cursor>&limit=` — kursor shaffof satr `"<tx_id>.<seq>"`
+`GET /v1/clinic/changes?since=<cursor>&limit=` — kursor shaffof satr `"<epoch>:<tx_id>.<seq>"`
 (boshlang'ich `0.0`), javobdagi `nextCursor`ni keyingi so'rovga bering.
 
 - `case_events.seq` (bigserial) **commit tartibida emas**: kichik seq olgan tranzaksiya
@@ -52,14 +52,30 @@ butunlay bloklanadi (mavjud ishlar ham).
 - Narxi: uzoq davom etayotgan yozuvchi tranzaksiya (shu Postgres klasterida) tugagunicha
   yangi hodisalar biroz kechikadi — yo'qolmaydi.
 - Iste'molchi (klinika sinxroni, wave 2) baribir hodisalarni **idempotent** qo'llashi
-  kerak (`seq` bo'yicha dedup): tarmoq uzilib javob yo'qolsa, xuddi shu sahifa qayta keladi.
+  kerak (**`(txId, seq)`** bo'yicha dedup — FX-93): tarmoq uzilib javob yo'qolsa, xuddi shu
+  sahifa qayta keladi. Faqat `seq` yetmaydi: baza shu klasterga zaxiradan tiklansa
+  sequence orqaga qaytadi va yangi hodisa eski `seq`ni oladi (lekin yangi `tx_id`).
+- **Davr (epoch, FX-98):** `tx_id` klaster xid hisoblagichi — `pg_dump`ga tushmaydi. Hub
+  `hub_meta` (bitta qator) da davr UUID'i va klaster `system_identifier`ini saqlaydi; baza
+  boshqa klasterga tiklansa (identifikator mos kelmaydi) boot'da yoki birinchi so'rovda davr
+  yangilanadi. Kursor davri joriy emas yoki kursor `tx_id`si joriy `xmax`dan kichik emas
+  bo'lsa — kursor boshidan (`0.0`) boshlanadi va javobda `cursorReset: true`. Klinika dedup'i
+  allaqachon qo'llangan hodisalarni qayta qo'llamaydi.
+- **Tiklangan qatorlar:** ular eski klaster `tx_id`sini saqlaydi (qayta yozilmaydi — dedup
+  kaliti barqaror). `tx_id >= xmax` qator shu klasterda yozilgan bo'lishi mumkin emas, demak
+  yakunlangan: xmin filtrisiz beriladi, tartib kaliti `(0, seq)` (joriy klaster
+  hodisalaridan oldin). Hisoblagich uni quvib o'tgach kalit `(tx_id, seq)` bo'ladi — faqat
+  kattalashadi, hodisa o'tkazib yuborilmaydi (ko'pi bilan qayta beriladi, dedup tashlaydi).
 
 ## Supervisor bilan aloqa
 
 - Hub → Supervisor: `GET /internal/clinics/:id/verify` (connect va davriy qayta tekshiruv) —
   `{clinicId, name, mode: 'desktop'|'saas', active, expiresAt, licenseMatches}`. Desktop —
   litsenziyalar bo'yicha, SaaS — `clinics.subscription_expires_at` (connect `serviceProof`
-  bilan). Shartnoma `apps/supervisor-api/src/modules/hub/hub-internal.test.ts` seam testida
+  bilan). Desktop connect isboti = litsenziya kaliti + o'rnatma `fingerprint`i (FX-138):
+  `licenseMatches` faqat kalit shu fingerprint'ga hozir bog'langan bo'lsa (`prepare-reinstall`dan
+  keyin yangi o'rnatma) — eski PC o'z kaliti bilan Hub kalitini qayta olib, yangisini uza olmaydi.
+  Shartnoma `apps/supervisor-api/src/modules/hub/hub-internal.test.ts` seam testida
   shu ilovaning `createSupervisorClient`i bilan qulflangan.
 - Supervisor → Hub: vendor renew / deactivate / reactivate'dan keyin best-effort
   `POST /internal/clinics` upsert (faol emas → `expiresAt: null` = darhol blok).

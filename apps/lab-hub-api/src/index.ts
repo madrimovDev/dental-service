@@ -1,6 +1,7 @@
 import { createApp } from './app';
 import { loadConfig } from './config';
 import { createDb } from './db/client';
+import { currentHubEpoch } from './lib/hub-epoch';
 import { verifyKek } from './lib/kek-check';
 import { createKeyring } from './lib/keyring';
 import { createStorage } from './lib/storage';
@@ -27,6 +28,9 @@ try {
   console.error(`[lab-hub] ${(err as Error).message}`);
   process.exit(1);
 }
+// FX-98: boshqa klasterdan tiklangan baza — trafikdan oldin Hub davrini yangilaymiz.
+const { epoch } = await currentHubEpoch(db);
+console.log(`[lab-hub] epoch ${epoch}`);
 const deps = {
   db,
   config,

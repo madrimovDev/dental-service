@@ -39,6 +39,13 @@ export const labHubState = pgTable(
     hubKeyEnc: text('hub_key_enc'),
     /** Shaffof Hub kursori `"<tx_id>.<seq>"` (boshlang'ich `0.0`). */
     cursor: text('cursor').notNull().default('0.0'),
+    /**
+     * FX-98: migratsiya 0068 dan oldingi kursorning `tx_id`si. O'sha paytgacha qo'llangan
+     * hodisalar `(tx_id = 0, seq)` bo'lib saqlangan va ularning hammasida haqiqiy `tx_id`
+     * shu chegaradan oshmaydi (kursor faqat oldinga suriladi). Davr almashib tarix qayta
+     * kelganda `(0, seq)` qatori + `txId <= legacyTxCeiling` = allaqachon qo'llangan.
+     */
+    legacyTxCeiling: bigint('legacy_tx_ceiling', { mode: 'number' }).notNull().default(0),
     /** Oxirgi muvaffaqiyatli katalog javobi — internet yo'q paytda lab tanlash uchun. */
     labsCache: jsonb('labs_cache').$type<LabHubCachedLab[] | null>(),
     connectedAt: timestamp('connected_at', { withTimezone: true }),
@@ -145,9 +152,11 @@ export const labOrderMessages = pgTable(
 export type LabOrderMessage = typeof labOrderMessages.$inferSelect;
 
 /**
- * Qo'llangan Hub hodisalari (`case_events.seq`) — README talabi: hodisalar `seq`
- * bo'yicha idempotent qo'llanadi (tarmoq uzilib bir sahifa qayta kelsa — ikkinchi
- * marta holat/bildirishnoma yaratilmaydi).
+ * Qo'llangan Hub hodisalari — hodisalar `(tx_id, seq)` bo'yicha idempotent qo'llanadi
+ * (tarmoq uzilib bir sahifa qayta kelsa — ikkinchi marta holat/bildirishnoma yaratilmaydi).
+ * FX-93: faqat `seq` emas — Hub bazasi shu klasterga zaxiradan tiklansa sequence orqaga
+ * qaytadi va yangi hodisa eski `seq`ni oladi (lekin yangi, kattaroq `tx_id`). `tx_id = 0` —
+ * migratsiyadan oldingi qatorlar yoki `txId` yubormaydigan eski Hub.
  */
 export const labHubAppliedEvents = pgTable(
   'lab_hub_applied_events',
@@ -155,8 +164,9 @@ export const labHubAppliedEvents = pgTable(
     tenantId: uuid('tenant_id')
       .notNull()
       .references(() => tenants.id, { onDelete: 'cascade' }),
+    txId: bigint('tx_id', { mode: 'number' }).notNull().default(0),
     seq: bigint('seq', { mode: 'number' }).notNull(),
     appliedAt: timestamp('applied_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [primaryKey({ columns: [t.tenantId, t.seq] })],
+  (t) => [primaryKey({ columns: [t.tenantId, t.txId, t.seq] })],
 );

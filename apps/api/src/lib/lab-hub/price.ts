@@ -175,8 +175,10 @@ export const rejectPendingPriceApproval = async (
   const recipients = new Set<string>([order.doctorId]);
   if (order.priceApprovalRequestedBy) recipients.add(order.priceApprovalRequestedBy);
   const ref = order.orderNumber != null ? `#${order.orderNumber}` : '';
-  const title =
-    hubCode === 'price.already_approved'
+  const priceCode = hubCode.startsWith('price.');
+  const title = !priceCode
+    ? 'Narx tasdig‘i laboratoriyaga yetmadi — qayta tasdiqlang'
+    : hubCode === 'price.already_approved'
       ? 'Narx tasdig‘i qabul qilinmadi: ish boshqa narx bilan tasdiqlangan'
       : nextProposed
         ? `Narx tasdiqlanmadi: laboratoriya narxni o'zgartirdi — ${formatSum(nextProposed)}`

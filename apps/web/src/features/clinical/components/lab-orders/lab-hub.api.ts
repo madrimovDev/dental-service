@@ -55,6 +55,16 @@ export function useConnectLabHub() {
   });
 }
 
+/** FX-48: «yuborilmadi» op'larni qayta navbatga — holat (navbat soni) qayta so'raladi. */
+export function useRequeueLabHubOutbox() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.labHub.requeueOutbox(),
+    onError: quiet,
+    onSuccess: () => qc.invalidateQueries({ queryKey: clinicalKeys.labHubStatus() }),
+  });
+}
+
 export function useRequestLabLink() {
   const qc = useQueryClient();
   return useMutation({

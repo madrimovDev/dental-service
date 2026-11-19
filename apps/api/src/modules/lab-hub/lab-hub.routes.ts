@@ -1,8 +1,15 @@
 import { fail, ok } from '@dental/core';
-import { type LabHubCachedLab, labHubOutbox, labHubState } from '@dental/db-schema';
+import {
+  type LabHubCachedLab,
+  labHubAppliedEvents,
+  labHubOutbox,
+  labHubState,
+  labOrders,
+} from '@dental/db-schema';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
-import { count, eq } from 'drizzle-orm';
+import { and, count, eq, inArray, ne } from 'drizzle-orm';
 import type { Context } from 'hono';
+import { onAfterCommit } from '../../db/after-commit.ts';
 import type { Database } from '../../db/client.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
@@ -14,6 +21,7 @@ import {
   readLabHubState,
   resolveConnectProof,
 } from '../../lib/lab-hub/state.ts';
+import { kickLabHubOutbox } from '../../lib/lab-hub/sync.ts';
 import { requireModuleInDesktop } from '../../lib/license-middleware.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
@@ -163,13 +171,23 @@ export const labHubRoutes = (deps: { db: Database; audit: AuditLogger }) => {
         const proof = await resolveConnectProof(db);
         const res = await labHubClient().connect(proof);
         const now = new Date();
+        const [prev] = await db
+          .select({ hubClinicId: labHubState.hubClinicId })
+          .from(labHubState)
+          .limit(1);
+        // FX-97: boshqa Hub klinika qatori (Hub qayta o'rnatilgan / boshqa Hub) — eski kursor va
+        // qo'llangan seq'lar yangi nom fazosida ma'nosiz: kursor `(tx, seq)` yangi hodisalardan
+        // katta bo'lib, ular jimgina o'tkazib yuborilardi. Kursor boshidan, dedup tozalanadi.
+        const namespaceChanged = !!prev && prev.hubClinicId !== res.clinicId;
         const values = {
           hubClinicId: res.clinicId,
           hubKeyEnc: encryptSecret(res.hubKey),
           connectedAt: now,
           lastError: null,
           updatedAt: now,
+          ...(namespaceChanged ? { cursor: '0.0', legacyTxCeiling: 0 } : {}),
         };
+        if (namespaceChanged) await db.delete(labHubAppliedEvents);
         await db
           .insert(labHubState)
           .values({ tenantId, ...values })
@@ -271,6 +289,66 @@ export const labHubRoutes = (deps: { db: Database; audit: AuditLogger }) => {
       } catch (err) {
         return hubErrorResponse(c, err);
       }
+    },
+  );
+
+  // ─── POST /outbox/requeue — «failed» op'larni qayta navbatga (FX-48) ──────────
+  // Doimiy xato bilan to'xtagan op'lar (masalan, fayl diskdan yo'qolgan, keyin tiklangan)
+  // `pending`ga qaytadi va darhol yuboriladi. `approve_price` ATAYLAB qaytarilmaydi: doimiy
+  // xatoda narx kutishi tozalanadi (foydalanuvchi qayta tasdiqlaydi) — eski so'rovni jimgina
+  // qayta yuborish xabarsiz xarajat yozishi mumkin edi.
+  app.openapi(
+    createRoute({
+      method: 'post',
+      path: '/outbox/requeue',
+      tags: ['lab-hub'],
+      operationId: 'requeueLabHubOutbox',
+      middleware: [requirePermission('tenant_settings.edit')] as const,
+      request: {
+        body: {
+          content: {
+            'application/json': {
+              schema: z.object({ labOrderId: z.uuid().optional() }).strict(),
+            },
+          },
+        },
+      },
+      responses: okJson(
+        z.object({ requeued: z.number().int() }),
+        'Failed outbox ops moved back to pending',
+      ),
+    }),
+    async (c) => {
+      const db = getDb(c);
+      const tenantId = c.get('activeTenantId') as string;
+      const { labOrderId } = c.req.valid('json');
+      const now = new Date();
+      const rows = await db
+        .update(labHubOutbox)
+        .set({ status: 'pending', attempts: 0, nextAttemptAt: now, doneAt: null })
+        .where(
+          and(
+            eq(labHubOutbox.status, 'failed'),
+            ne(labHubOutbox.op, 'approve_price'),
+            labOrderId ? eq(labHubOutbox.labOrderId, labOrderId) : undefined,
+          ),
+        )
+        .returning({ labOrderId: labHubOutbox.labOrderId });
+      const orderIds = [...new Set(rows.map((r) => r.labOrderId))];
+      if (orderIds.length > 0) {
+        await db
+          .update(labOrders)
+          .set({ hubSyncStatus: 'pending' })
+          .where(and(inArray(labOrders.id, orderIds), eq(labOrders.hubSyncStatus, 'failed')));
+        await deps.audit.record(c, {
+          action: 'outbox_requeued',
+          resourceType: 'lab_hub',
+          resourceId: labOrderId ?? null,
+          after: { requeued: rows.length, labOrderIds: orderIds },
+        });
+        await onAfterCommit(c, () => kickLabHubOutbox(tenantId));
+      }
+      return c.json(ok({ requeued: rows.length }), 200);
     },
   );
 

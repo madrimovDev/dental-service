@@ -9,7 +9,7 @@ import {
   patients,
   users,
 } from '@dental/db-schema';
-import { and, eq, isNotNull, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
 import type { Database, DbOrTx } from '../../db/client.ts';
 import { withTenant } from '../../db/scoped.ts';
 import {
@@ -34,7 +34,7 @@ import { hubKeyOf, readLabHubState } from './state.ts';
  *    (`seq`) — oldingi op kutayotgan bo'lsa keyingisi olinmaydi. Xatolik: tarmoq/5xx/
  *    «keyinroq o'zgaradi» → backoff bilan qayta; boshqa 4xx → `failed`.
  *  - **Poll (pull):** `GET /v1/clinic/changes?since=<cursor>` — Hub kursori commit-xavfsiz
- *    (README), overlap kerak emas; baribir har hodisa `seq` bo'yicha bir marta qo'llanadi
+ *    (README), overlap kerak emas; baribir har hodisa `(tx_id, seq)` bo'yicha bir marta qo'llanadi
  *    (`lab_hub_applied_events`) — javob yo'qolib sahifa qayta kelsa ham holat/bildirishnoma
  *    ikkilanmaydi. Kursor compare-and-set bilan suriladi (eski sahifa uni orqaga qaytarmaydi).
  */
@@ -117,6 +117,24 @@ const executeOp = async (
           now,
         }),
       );
+      if (!res.created && res.applied === false) {
+        // FX-49: lab ishni allaqachon qabul qilgan (poll hali kelmagan) — Hub tahrirni
+        // qo'llamadi. «synced» yozilmaydi: lokal hubStatus Hub'dagi holatga suriladi (faqat
+        // hali `sent`/bo'sh bo'lsa — poll yangiroq holatni yozgan bo'lsa orqaga qaytarmaymiz),
+        // shunda keyingi tahrir `locked_by_lab` bilan bloklanadi; op `failed` (pastdagi catch).
+        await withTenant(tenantId, (tx) =>
+          tx
+            .update(labOrders)
+            .set({ hubStatus: res.status, updatedAt: now })
+            .where(
+              and(
+                eq(labOrders.id, order.id),
+                or(isNull(labOrders.hubStatus), eq(labOrders.hubStatus, 'sent')),
+              ),
+            ),
+        );
+        throw new LabHubError(409, 'lab_order.locked_by_lab', false);
+      }
       await withTenant(tenantId, (tx) =>
         tx
           .update(labOrders)
@@ -137,7 +155,16 @@ const executeOp = async (
       if (!f) return undefined; // fayl o'chirilgan — yuboriladigan narsa yo'q
       const resolved = createLocalStorageAdapter().resolve(f.objectKey);
       if (!resolved) throw new LabHubError(400, 'file.invalid_key', false);
-      const bytes = await Bun.file(resolved.path).arrayBuffer();
+      // FX-79: diskda yo'q fayl qayta urinishda paydo bo'lmaydi — retryable xato sifatida u
+      // cheksiz takrorlanib, shu buyurtmaning keyingi op'larini (FIFO) bloklardi.
+      const bytes = await Bun.file(resolved.path)
+        .arrayBuffer()
+        .catch((e: unknown) => {
+          if ((e as { code?: string } | null)?.code === 'ENOENT') {
+            throw new LabHubError(404, 'file.missing', false);
+          }
+          throw e;
+        });
       // `clientRef` — barqaror (lokal fayl id'si): javob yo'qolib qayta yuborilsa Hub dublikat yozmaydi.
       await client.uploadFile(
         key,
@@ -278,6 +305,20 @@ export const flushLabHubOutbox = async (
             .update(labHubOutbox)
             .set({ status: 'done', doneAt: now(), lastError: null, attempts: row.attempts + 1 })
             .where(eq(labHubOutbox.id, row.id));
+          // FX-48: qayta navbatga qo'yilgan (yoki keyin yuborilgan) op'lar hal bo'ldi — buyurtmada
+          // ochiq (pending/failed) op qolmagan bo'lsa «sinxronlangan».
+          await tx
+            .update(labOrders)
+            .set({ hubSyncStatus: 'synced' })
+            .where(
+              and(
+                eq(labOrders.id, row.lab_order_id),
+                ne(labOrders.hubSyncStatus, 'synced'),
+                sql`NOT EXISTS (SELECT 1 FROM lab_hub_outbox ob
+                                 WHERE ob.lab_order_id = ${row.lab_order_id}
+                                   AND ob.status IN ('pending', 'failed'))`,
+              ),
+            );
           await tx.update(labHubState).set({ lastPushAt: now(), lastError: null });
         });
         result.sent++;
@@ -285,9 +326,11 @@ export const flushLabHubOutbox = async (
         if (
           row.op === 'approve_price' &&
           err instanceof LabHubError &&
-          PRICE_REJECTED.has(err.code)
+          (PRICE_REJECTED.has(err.code) || !err.retryable)
         ) {
-          // Hub boshqa narxni kutyapti — kutish tozalanadi, ish qayta tasdiqqa.
+          // Hub boshqa narxni kutyapti — kutish tozalanadi, ish qayta tasdiqqa. FX-48: boshqa
+          // doimiy 4xx (case.not_found, validatsiya …) ham — aks holda «kutilmoqda» abadiy
+          // qolardi va takroriy bosish hech narsa yubormasdi; foydalanuvchi qayta tasdiqlaydi.
           await rejectPriceApprovalOp(tenantId, row, err, now());
           result.failed++;
           continue;
@@ -353,6 +396,8 @@ const STATUS_TITLE: Record<string, string> = {
 };
 
 const applyEvent = async (tx: DbOrTx, tenantId: string, ev: HubChangeEvent, now: Date) => {
+  // FX-139: qator qulflanadi — parallel «bekor qilish» commit bo'lsa, poll uning natijasini
+  // ko'radi (`cancelled`) va eski o'qish bo'yicha statusni `ready`/`in_progress`ga qaytarmaydi.
   const [order] = await tx
     .select({
       id: labOrders.id,
@@ -365,7 +410,8 @@ const applyEvent = async (tx: DbOrTx, tenantId: string, ev: HubChangeEvent, now:
       deliveredDate: labOrders.deliveredDate,
     })
     .from(labOrders)
-    .where(eq(labOrders.labHubCaseRef, ev.caseRef));
+    .where(eq(labOrders.labHubCaseRef, ev.caseRef))
+    .for('update');
   if (!order) return;
 
   const ref = order.orderNumber != null ? `#${order.orderNumber}` : '';
@@ -509,12 +555,29 @@ export const pollLabHubChanges = async (
       throw err;
     }
     const since = cursor;
+    if (res.cursorReset) {
+      // FX-98: Hub davri almashdi (boshqa klasterga tiklangan) — kursor boshidan; dedup
+      // `(tx_id, seq)` bo'yicha, shuning uchun allaqachon qo'llangan hodisalar ikkilanmaydi.
+      logger.warn({ tenantId, since }, 'lab-hub cursor reset by Hub (epoch changed)');
+    }
     const applied = await withTenant(tenantId, async (tx) => {
       let n = 0;
       for (const ev of res.events) {
+        const txId = ev.txId ?? 0;
+        // FX-98: migratsiyadan oldin qo'llangan hodisa `(0, seq)` bo'lib saqlangan; davr
+        // almashib u haqiqiy txId bilan qayta kelsa — chegaradan oshmagan txId = o'sha hodisa.
+        // Chegaradan yuqorida `(txId, seq)` kaliti (FX-93: shu klasterda qayta ishlatilgan seq).
+        if (txId > 0 && txId <= state.legacyTxCeiling) {
+          const [legacy] = await tx
+            .select({ seq: labHubAppliedEvents.seq })
+            .from(labHubAppliedEvents)
+            .where(and(eq(labHubAppliedEvents.txId, 0), eq(labHubAppliedEvents.seq, ev.seq)))
+            .limit(1);
+          if (legacy) continue;
+        }
         const [fresh] = await tx
           .insert(labHubAppliedEvents)
-          .values({ tenantId, seq: ev.seq })
+          .values({ tenantId, txId, seq: ev.seq })
           .onConflictDoNothing()
           .returning({ seq: labHubAppliedEvents.seq });
         if (!fresh) continue; // allaqachon qo'llangan (sahifa qayta keldi)

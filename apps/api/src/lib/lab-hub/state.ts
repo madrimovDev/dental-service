@@ -18,14 +18,21 @@ export const isDesktopMode = () => process.env.DENTAL_LOCAL_DESKTOP === 'true';
 
 /**
  * Hub `connect` isboti:
- *  - desktop — `.lic` dagi Supervisor klinika id'si + litsenziya kaliti (Hub Supervisor'dan tekshiradi);
+ *  - desktop — `.lic` dagi Supervisor klinika id'si + litsenziya kaliti + o'rnatma fingerprint'i
+ *    (Hub Supervisor'dan tekshiradi);
  *  - SaaS (L8) — `tenant_settings.supervisor_clinic_id` + `LAB_HUB_SERVICE_TOKEN` xizmat kaliti.
  */
 export const resolveConnectProof = async (tx: DbOrTx): Promise<ConnectProof> => {
   if (isDesktopMode()) {
     const lic = await readLicense();
     if (!lic) throw new LabHubError(400, 'lab_hub.no_license', false);
-    return { supervisorClinicId: lic.clinicId, licenseKey: lic.licenseKey };
+    // FX-138: o'rnatma fingerprint'i — Supervisor uni kalitga hozir bog'langan o'rnatma bilan
+    // solishtiradi (eski PC o'z kaliti bilan yangi o'rnatmaning Hub kalitini almashtira olmaydi).
+    return {
+      supervisorClinicId: lic.clinicId,
+      licenseKey: lic.licenseKey,
+      fingerprint: lic.fingerprint,
+    };
   }
   const token = process.env.LAB_HUB_SERVICE_TOKEN;
   if (!token) throw new LabHubError(400, 'lab_hub.service_token_missing', false);
