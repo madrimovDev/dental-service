@@ -252,3 +252,62 @@ describe('FX-44: vizit tahririda qaytarish ledger (haqiqiy chiqim) bo‘yicha', 
     expect(await qty(item)).toBe(20); // +5 (Y)
   });
 });
+
+describe('FX-45: bekor qilingan yozilish ombor chiqimini qaytaradi (idempotent)', () => {
+  test('qoralama vizit: yozilish bekor -> to‘liq qaytadi; qayta faollashtirib yana bekor -> ikki marta qaytmaydi', async () => {
+    await setQty(item, 10);
+    await setBom(svcX, 2);
+    const appt = await newAppt('in_progress');
+    await newNote([svcX], appt);
+    expect(await qty(item)).toBe(8);
+    const c1 = await call('rec', 'POST', `/api/appointments/${appt}/cancel`, { reason: 'x' });
+    expect(c1.status).toBe(200);
+    expect(await qty(item)).toBe(10);
+    // qayta faollashtirish (ish soati guard'i bu testga aloqasiz — to'g'ridan statusni tiklaymiz)
+    await admin.db
+      .update(appointments)
+      .set({ status: 'scheduled' })
+      .where(eq(appointments.id, appt));
+    const c2 = await call('rec', 'POST', `/api/appointments/${appt}/cancel`, { reason: 'y' });
+    expect(c2.status).toBe(200);
+    expect(await qty(item)).toBe(10);
+  });
+
+  test('imzolangan vizit + no_show: chiqim qaytadi', async () => {
+    await setQty(item, 10);
+    await setBom(svcX, 2);
+    const appt = await newAppt('in_progress');
+    const note = await newNote([svcX, svcX], appt);
+    expect(await qty(item)).toBe(6);
+    const sg = await call('doc', 'POST', `/api/visit-notes/${note}/sign`);
+    expect(sg.status).toBe(200);
+    const r = await call('rec', 'PATCH', `/api/appointments/${appt}`, { status: 'no_show' });
+    expect(r.status).toBe(200);
+    expect(await qty(item)).toBe(10);
+    const rows = await admin.db
+      .select()
+      .from(stockMovements)
+      .where(eq(stockMovements.sourceVisitNoteId, note));
+    expect(rows.filter((m) => m.type === 'in').length).toBeGreaterThan(0);
+  });
+
+  test('vizitsiz yozilishni bekor qilish ombor harakatini yaratmaydi', async () => {
+    await setQty(item, 10);
+    const before = (await admin.db.select().from(stockMovements)).length;
+    const appt = await newAppt('scheduled');
+    expect((await call('rec', 'POST', `/api/appointments/${appt}/cancel`, {})).status).toBe(200);
+    expect(await qty(item)).toBe(10);
+    expect((await admin.db.select().from(stockMovements)).length).toBe(before);
+  });
+
+  test('qo‘lda "in" harakat yozilgan bo‘lsa — bekor qilishda faqat vizit chiqimi qaytadi', async () => {
+    await setQty(item, 10);
+    await setBom(svcX, 2);
+    const appt = await newAppt('in_progress');
+    await newNote([svcX], appt);
+    await call('store', 'POST', '/api/stock/movements', { itemId: item, type: 'in', quantity: 5 });
+    expect(await qty(item)).toBe(13);
+    await call('rec', 'POST', `/api/appointments/${appt}/cancel`, {});
+    expect(await qty(item)).toBe(15);
+  });
+});

@@ -15,6 +15,7 @@ import { CrossEntityError, createOwnershipValidator } from '../../lib/ownership.
 import { assertBranchExists } from '../../lib/ownership-refs.ts';
 import { pgErrorInfo } from '../../lib/pg-error.ts';
 import { reminderDelayMs } from '../../lib/reminder-delay.ts';
+import { createStockService } from '../stock/stock.service.ts';
 import type {
   CreateAppointmentInput,
   ListAppointmentsQuery,
@@ -151,8 +152,13 @@ export const createAppointmentsService = (deps: {
   recall?: RecallAppointmentHook;
   noShowStrike?: NoShowStrikeHook;
   queue?: QueueReverseSyncHook;
+  /** FX-45: yozilish bekor/no_show → bog'liq vizit yozuvlari ombor chiqimini qaytarish. */
+  returnVisitStock?: (c: Context, appointmentId: string) => Promise<void>;
 }) => {
   const ownership = createOwnershipValidator();
+  const returnVisitStock =
+    deps.returnVisitStock ??
+    createStockService({ audit: deps.audit }).returnVisitStockForAppointment;
 
   /**
    * FX-02 (LA-46, X-1): FK constraint RLS'ni chetlab o'tadi — begona tenant bemori /
@@ -521,6 +527,15 @@ export const createAppointmentsService = (deps: {
         before,
         after: updated,
       });
+
+      // FX-45 (LA-41): faolmas holatga (cancelled/no_show) O'TGANDA bog'liq vizit yozuvlari
+      // (imzolangani ham) ombor chiqimi qaytariladi. Idempotent (ledger qoldig'i).
+      if (
+        (input.status === 'cancelled' || input.status === 'no_show') &&
+        before.status !== input.status
+      ) {
+        await returnVisitStock(c, id);
+      }
 
       // B4: yozilish completed'ga O'TGANDA profilaktik recall (transition guard —
       // before.status != completed && yangi == completed; re-PATCH qayta yoqmaydi).

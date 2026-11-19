@@ -43,7 +43,7 @@ import type {
 const DEFAULT_MOVEMENTS_PAGE_SIZE = 50;
 
 /** Vizit avto-chiqimi/qaytarishi ledger sabablari (FX-44/45). */
-const VISIT_RETURN_REASONS = ['visit_edit_return'] as const;
+const VISIT_RETURN_REASONS = ['visit_edit_return', 'visit_cancel_return'] as const;
 const VISIT_LEDGER_REASONS = ['visit_auto', ...VISIT_RETURN_REASONS] as const;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -870,6 +870,32 @@ export const createStockService = (deps: {
     }
   }
 
+  /**
+   * FX-45 (LA-41): yozilish bekor/no_show bo'lganda unga bog'liq BARCHA vizit yozuvlari
+   * (imzolangani ham) uchun hali qaytarilmagan avto-chiqimni qaytaradi. Idempotent:
+   * qaytarish = ledgerdagi (visit_auto `out` − qaytarish `in`) qoldig'i, qayta chaqirish → 0.
+   */
+  async function returnVisitStockForAppointment(c: Context, appointmentId: string) {
+    const db = getDb(c);
+    const notes = await db
+      .select({ id: visitNotes.id })
+      .from(visitNotes)
+      .where(eq(visitNotes.appointmentId, appointmentId));
+    for (const note of notes) {
+      const outstanding = await outstandingByItem(c, note.id, {});
+      for (const row of outstanding) {
+        await postVisitMovement(c, {
+          itemId: row.itemId,
+          type: 'in',
+          quantity: String(row.outstanding),
+          reason: 'visit_cancel_return',
+          sourceVisitNoteId: note.id,
+          sourceServiceId: row.serviceId,
+        });
+      }
+    }
+  }
+
   // ===== Stock batches (qabul + expiry/cost/supplier) — V2-2 =====
 
   /** Item bo'yicha partiyalar (yangi avval). */
@@ -1074,6 +1100,7 @@ export const createStockService = (deps: {
     removeBom,
     deductForServices,
     reconcileForServices,
+    returnVisitStockForAppointment,
     listBatches,
     expiringBatches,
     autoDeductionsToday,
