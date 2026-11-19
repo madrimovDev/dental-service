@@ -1,5 +1,6 @@
 import type {
   SignTreatmentPlanConsentBody,
+  ToothState,
   TreatmentPlanStatus,
   TreatmentPlanWithStages,
   TreatmentStageAcceptance,
@@ -41,6 +42,7 @@ export function PlanCard({
   onUpdateStage,
   onSetAcceptance,
   acceptancePending,
+  onSetResultingState,
   onAcceptAll,
   acceptAllPending,
   onPresentPlan,
@@ -56,6 +58,7 @@ export function PlanCard({
   onUpdateStage: (stageId: string, status: TreatmentStageStatus) => void;
   onSetAcceptance: (stageId: string, acceptance: TreatmentStageAcceptance) => void;
   acceptancePending: boolean;
+  onSetResultingState?: (stageId: string, state: ToothState | null) => void;
   onAcceptAll: (stageIds: string[]) => void;
   acceptAllPending: boolean;
   onPresentPlan: (planId: string) => void;
@@ -250,6 +253,7 @@ export function PlanCard({
                   onUpdateStage={onUpdateStage}
                   onSetAcceptance={onSetAcceptance}
                   acceptancePending={acceptancePending}
+                  onSetResultingState={onSetResultingState}
                 />
               ))}
             </div>

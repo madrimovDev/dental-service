@@ -157,6 +157,17 @@ export function groupToothEntries(entries: ToothEntry[], toothNumber: number): T
   return [...groups.values()];
 }
 
+/**
+ * FX-27 (LA-35): «Rejaga qo'shish»da bosqichning natijaviy tish holati — tashxis holatidan
+ * taxminiy: kariyes → plomba, olib tashlash kerak → yo'q (missing). Boshqa holatlar (toj,
+ * implant, ildiz kanali...) davolanish natijasi emas, shifokor bosqichda o'zi tanlaydi.
+ */
+export function resultingStateForPlan(state: ToothState | undefined): ToothState | undefined {
+  if (state === 'caries') return 'filling';
+  if (state === 'to_extract') return 'missing';
+  return undefined;
+}
+
 export function removeToothGroup(
   entries: ToothEntry[],
   toothNumber: number,

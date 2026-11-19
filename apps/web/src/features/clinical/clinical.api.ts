@@ -39,6 +39,7 @@ import {
   signConsentForm,
   signTreatmentPlanConsent,
   signVisitNote,
+  type ToothState,
   type TreatmentStageAcceptance,
   type TreatmentStageStatus,
   type UpdateTreatmentPlanBodyStatus,
@@ -181,6 +182,21 @@ export function useUpdateStage(patientId: string) {
       void qc.invalidateQueries({ queryKey: clinicalKeys.planEstimate(stage.treatmentPlanId) });
       void qc.invalidateQueries({ queryKey: recallKeys.patient(patientId) });
     },
+  });
+}
+
+/** FX-27: bosqichning natijaviy tish holatini belgilash (`null` — odontogrammaga tegmaydi). */
+export function useUpdateStageResultingState(patientId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      resultingToothState,
+    }: {
+      id: string;
+      resultingToothState: ToothState | null;
+    }) => updateTreatmentStage(id, { resultingToothState }).then((r) => r.data),
+    onSuccess: () => invalidatePlanFinancials(qc, patientId),
   });
 }
 

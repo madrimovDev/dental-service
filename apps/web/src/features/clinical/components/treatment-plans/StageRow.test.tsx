@@ -84,3 +84,44 @@ describe('StageRow acceptance (CLI-224)', () => {
     expect(screen.queryByRole('button', { name: /rad etish/i })).toBeNull();
   });
 });
+
+describe('StageRow resultingToothState (FX-27)', () => {
+  it('tishli tugamagan bosqich: Select natijaviy holatni ko`rsatadi; prop berilmasa Select yo`q', () => {
+    const { unmount } = renderApp(
+      <StageRow
+        stage={stage({ resultingToothState: 'filling' })}
+        canEdit
+        onUpdateStage={vi.fn()}
+        onSetAcceptance={vi.fn()}
+        acceptancePending={false}
+        onSetResultingState={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('textbox', { name: /tish holati/i })).toBeTruthy();
+    unmount();
+    renderApp(
+      <StageRow
+        stage={stage()}
+        canEdit
+        onUpdateStage={vi.fn()}
+        onSetAcceptance={vi.fn()}
+        acceptancePending={false}
+      />,
+    );
+    expect(screen.queryByRole('textbox', { name: /tish holati/i })).toBeNull();
+  });
+
+  it('completed bosqichda natijaviy holat tahriri yashirin', () => {
+    renderApp(
+      <StageRow
+        stage={stage({ status: 'completed', acceptance: 'accepted' })}
+        canEdit
+        onUpdateStage={vi.fn()}
+        onSetAcceptance={vi.fn()}
+        acceptancePending={false}
+        onSetResultingState={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole('textbox', { name: /tish holati/i })).toBeNull();
+  });
+});

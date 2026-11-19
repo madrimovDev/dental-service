@@ -214,6 +214,7 @@ export const createTreatmentPlansService = (deps: {
           estimatedDurationMinutes: s.estimatedDurationMinutes ?? null,
           cost: String(s.cost),
           notes: s.notes ?? null,
+          resultingToothState: s.resultingToothState ?? null,
         })),
     );
 

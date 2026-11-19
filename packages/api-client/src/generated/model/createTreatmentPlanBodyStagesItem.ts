@@ -5,6 +5,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
+import type { CreateTreatmentPlanBodyStagesItemResultingToothState } from './createTreatmentPlanBodyStagesItemResultingToothState';
+
 export type CreateTreatmentPlanBodyStagesItem = {
   serviceId?: string;
   /**
@@ -30,4 +32,5 @@ export type CreateTreatmentPlanBodyStagesItem = {
   cost: number | null;
   /** @maxLength 500 */
   notes?: string;
+  resultingToothState?: CreateTreatmentPlanBodyStagesItemResultingToothState;
 };

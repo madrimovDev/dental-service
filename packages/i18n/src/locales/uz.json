@@ -820,6 +820,8 @@
     "status_in_progress": "Davom etmoqda",
     "status_completed": "Bajarilgan",
     "status_cancelled": "Bekor qilingan",
+    "resulting_state": "Bajarilgach tish holati",
+    "resulting_state_none": "Belgilanmagan",
     "stage_status_pending": "Kutilmoqda",
     "stage_status_in_progress": "Davom etmoqda",
     "stage_status_completed": "Bajarilgan",

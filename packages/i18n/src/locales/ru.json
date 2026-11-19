@@ -820,6 +820,8 @@
     "status_in_progress": "В работе",
     "status_completed": "Завершён",
     "status_cancelled": "Отменён",
+    "resulting_state": "Состояние зуба после лечения",
+    "resulting_state_none": "Не задано",
     "stage_status_pending": "Ожидает",
     "stage_status_in_progress": "В работе",
     "stage_status_completed": "Завершён",

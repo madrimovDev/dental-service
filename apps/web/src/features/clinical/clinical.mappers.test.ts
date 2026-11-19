@@ -27,6 +27,7 @@ import {
   plannedTeethFromPlans,
   planStatusToTone,
   removeToothGroup,
+  resultingStateForPlan,
   stageAcceptanceToTone,
   stageStatusToTone,
   templateBodyForLang,
@@ -630,5 +631,14 @@ describe('diagnosisSearchIndex / normalizeSearch', () => {
 
   it("transliteratsiya qamralmaydi (hujjatlangan cheklov) — 'karies' (y'siz) topmaydi", () => {
     expect(entry.includes(normalizeSearch('karies'))).toBe(false);
+  });
+});
+
+describe('resultingStateForPlan (FX-27)', () => {
+  it('kariyes → plomba, olib tashlash → missing, boshqasi → undefined', () => {
+    expect(resultingStateForPlan('caries')).toBe('filling');
+    expect(resultingStateForPlan('to_extract')).toBe('missing');
+    expect(resultingStateForPlan('crown')).toBeUndefined();
+    expect(resultingStateForPlan(undefined)).toBeUndefined();
   });
 });

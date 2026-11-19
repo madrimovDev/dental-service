@@ -25969,6 +25969,21 @@
                         "notes": {
                           "type": "string",
                           "maxLength": 500
+                        },
+                        "resultingToothState": {
+                          "type": "string",
+                          "enum": [
+                            "healthy",
+                            "caries",
+                            "filling",
+                            "crown",
+                            "implant",
+                            "missing",
+                            "root_canal",
+                            "to_extract",
+                            "temporary",
+                            "veneer"
+                          ]
                         }
                       },
                       "required": [
