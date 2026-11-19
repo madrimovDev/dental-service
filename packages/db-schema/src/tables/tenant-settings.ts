@@ -1,5 +1,14 @@
 import { sql } from 'drizzle-orm';
-import { integer, jsonb, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
+import {
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  unique,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
 import { tenants } from './tenants.ts';
 
 /**
@@ -53,7 +62,15 @@ export const tenantSettings = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [unique('tenant_settings_tenant_unique').on(t.tenantId)],
+  (t) => [
+    unique('tenant_settings_tenant_unique').on(t.tenantId),
+    // FX-25 (CF-1): bir Telegram bot (token prefiksi = bot id) faqat bitta tenantda —
+    // ikki tenant bir xil bot'ni ulasa, ikkita poller 409 Conflict bilan urishardi
+    // va bemor xabarlari boshqa klinikaga tushardi. Platforma darajasida unique.
+    uniqueIndex('tenant_settings_telegram_bot_id_uq')
+      .on(sql`(${t.integrationSettings} -> 'telegram' ->> 'botId')`)
+      .where(sql`${t.integrationSettings} -> 'telegram' ->> 'botId' IS NOT NULL`),
+  ],
 );
 
 export type TenantSettings = typeof tenantSettings.$inferSelect;
