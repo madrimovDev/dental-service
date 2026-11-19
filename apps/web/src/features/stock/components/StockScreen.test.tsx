@@ -90,3 +90,13 @@ describe('StockScreen BOM tabi (FX-163)', () => {
     expect(screen.queryByText('ib')).toBeNull();
   });
 });
+
+describe('StockScreen BOM tabi (FX-164)', () => {
+  it('service.view yo‘q (Nurse): bo‘sh jadval o‘rniga ruxsat tushuntirishi', async () => {
+    perms = ['stock.view', 'stock.manage'];
+    renderApp(<StockScreen />);
+    await openBomTab();
+    expect(await screen.findByText(/Xizmatlar ro'yxatini ko'rish uchun ruxsat/)).toBeTruthy();
+    expect(screen.queryByRole('textbox', { name: 'Xizmat' })).toBeNull();
+  });
+});

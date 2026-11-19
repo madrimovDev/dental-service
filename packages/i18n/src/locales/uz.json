@@ -1523,6 +1523,7 @@
     "select_item": "Tarixni ko'rish uchun mahsulot tanlang",
     "bom_service": "Xizmat",
     "insufficient": "Qoldiq yetarli emas: mavjud {{available}} {{unit}}, so'ralgan {{requested}} {{unit}}",
+    "bom_forbidden": "Xizmatlar ro'yxatini ko'rish uchun ruxsat kerak (xizmatlarni ko'rish). Rahbariyatga murojaat qiling.",
     "bom_empty": "Bu xizmat uchun materiallar belgilanmagan",
     "material": "Material",
     "qty_per_service": "Xizmatga miqdor",

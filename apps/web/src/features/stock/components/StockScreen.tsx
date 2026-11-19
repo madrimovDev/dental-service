@@ -263,7 +263,16 @@ export function StockScreen() {
 
           <Tabs.Panel value="bom">
             <Card withBorder padding="md">
-              <BomPanel services={services.data ?? []} items={allItemVMs} canManage={canManage} />
+              {canViewServices ? (
+                <BomPanel services={services.data ?? []} items={allItemVMs} canManage={canManage} />
+              ) : (
+                // FX-164: xizmatlar ro'yxati service.view talab qiladi — sababini ko'rsatamiz.
+                <StateView
+                  status="forbidden"
+                  title={t('states.forbidden_title')}
+                  description={t('stock.bom_forbidden')}
+                />
+              )}
             </Card>
           </Tabs.Panel>
         </Tabs>
