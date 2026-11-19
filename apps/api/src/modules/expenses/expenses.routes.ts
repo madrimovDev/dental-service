@@ -2,6 +2,11 @@ import { fail, ok } from '@dental/core';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import {
+  BRANCH_FORBIDDEN_CODE,
+  BRANCH_FORBIDDEN_MESSAGE,
+  loadBranchScope,
+} from '../../lib/branch-scope.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
@@ -21,7 +26,7 @@ import {
   updateCategorySchema,
   updateExpenseSchema,
 } from './expenses.schema.ts';
-import { createExpensesService } from './expenses.service.ts';
+import { createExpensesService, ExpenseBranchForbiddenError } from './expenses.service.ts';
 
 /** Standart 404 (kategoriya). */
 const categoryNotFoundResponse = {
@@ -38,6 +43,8 @@ const expenseNotFoundResponse = {
     description: 'Expense not found',
   },
 };
+
+const branchForbidden = () => fail(BRANCH_FORBIDDEN_CODE, BRANCH_FORBIDDEN_MESSAGE);
 
 /**
  * Xarajatlar route'lari — bitta OpenAPIHono app, `/api` ga mount qilinadi.
@@ -168,7 +175,17 @@ export const expensesRoutes = (deps: { db: Database; audit: AuditLogger }) => {
 
   app.openapi(summaryRoute, async (c) => {
     const query = c.req.valid('query');
-    const result = await service.summary(c, query);
+    // FX-106 (D-8): svod chaqiruvchining filiallari bilan cheklanadi.
+    const scope = await loadBranchScope(c, 'expense.view');
+    if (scope.kind === 'none') return c.json(branchForbidden(), 403);
+    let branchIds: string[] | null = null;
+    if (scope.kind === 'branches') {
+      if (query.branchId && !scope.branchIds.includes(query.branchId)) {
+        return c.json(branchForbidden(), 403);
+      }
+      branchIds = scope.branchIds;
+    }
+    const result = await service.summary(c, query, branchIds);
     return c.json(ok(result), 200);
   });
 
@@ -185,7 +202,17 @@ export const expensesRoutes = (deps: { db: Database; audit: AuditLogger }) => {
 
   app.openapi(listRoute, async (c) => {
     const query = c.req.valid('query');
-    const result = await service.list(c, query);
+    // FX-106 (D-8): ro'yxat chaqiruvchining filiallari bilan cheklanadi.
+    const scope = await loadBranchScope(c, 'expense.view');
+    if (scope.kind === 'none') return c.json(branchForbidden(), 403);
+    let branchIds: string[] | null = null;
+    if (scope.kind === 'branches') {
+      if (query.branchId && !scope.branchIds.includes(query.branchId)) {
+        return c.json(branchForbidden(), 403);
+      }
+      branchIds = scope.branchIds;
+    }
+    const result = await service.list(c, query, branchIds);
     return c.json(ok({ data: result.data.map(toExpenseDto), meta: result.meta }), 200);
   });
 
@@ -238,9 +265,15 @@ export const expensesRoutes = (deps: { db: Database; audit: AuditLogger }) => {
 
   app.openapi(getRoute, async (c) => {
     const { id } = c.req.valid('param');
-    const row = await service.getById(c, id);
-    if (!row) return c.json(fail('expense.not_found', 'Expense not found'), 404);
-    return c.json(ok(toExpenseDto(row)), 200);
+    const scope = await loadBranchScope(c, 'expense.view');
+    try {
+      const row = await service.getById(c, id, scope);
+      if (!row) return c.json(fail('expense.not_found', 'Expense not found'), 404);
+      return c.json(ok(toExpenseDto(row)), 200);
+    } catch (e) {
+      if (e instanceof ExpenseBranchForbiddenError) return c.json(branchForbidden(), 403);
+      throw e;
+    }
   });
 
   // ─── PATCH /expenses/{id} — update ───────────────────────────────────────
