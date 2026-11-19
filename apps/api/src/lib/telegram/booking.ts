@@ -87,7 +87,7 @@ export function createBookingFlow(deps: BookingDeps) {
   async function renderDoctors(ctx: BookingCtx, s: BookingSession): Promise<BotReply> {
     const m = botMessages(ctx.lang);
     const c = createBotContext(ctx.tx, ctx.tenantId);
-    s.doctors = await deps.appointments.listDoctors(c);
+    s.doctors = await deps.appointments.listDoctors(c, s.branchId);
     s.step = 'doctor';
     const rows = chunk<BotButton>(
       s.doctors.map((d, i) => ({ text: d.name, data: `${BOOKING_PREFIX}:d:${i}` })),

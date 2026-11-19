@@ -114,6 +114,10 @@ export const appointmentRoutes = (deps: {
       },
       ...notFoundResponse,
       ...conflictResponse,
+      422: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Doctor is not assigned to this branch (schedule.doctor_not_in_branch)',
+      },
     },
   });
 
@@ -130,6 +134,8 @@ export const appointmentRoutes = (deps: {
         result.code === 'schedule.doctor_on_time_off'
       )
         return c.json(fail(result.code, result.code), 409);
+      if (result.code === 'schedule.doctor_not_in_branch')
+        return c.json(fail(result.code, result.code), 422);
       if (isRefNotFound(result.code)) return c.json(fail(result.code, result.code), 404);
       return c.json(fail(result.code, result.code), 400);
     }
@@ -147,11 +153,13 @@ export const appointmentRoutes = (deps: {
     tags: ['appointments'],
     operationId: 'listDoctors',
     middleware: [requirePermission('appointment.view')] as const,
+    request: { query: z.object({ branchId: z.string().uuid().optional() }) },
     responses: okJson(z.array(doctorListItemDtoSchema), 'List of doctors for booking'),
   });
 
   app.openapi(listDoctorsRoute, async (c) => {
-    const rows = await service.listDoctors(c);
+    const { branchId } = c.req.valid('query');
+    const rows = await service.listDoctors(c, branchId);
     return c.json(ok(rows), 200);
   });
 
@@ -209,6 +217,10 @@ export const appointmentRoutes = (deps: {
       ...okJson(appointmentDtoSchema, 'Updated appointment'),
       ...notFoundResponse,
       ...conflictResponse,
+      422: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Doctor is not assigned to this branch (schedule.doctor_not_in_branch)',
+      },
     },
   });
 
@@ -233,6 +245,8 @@ export const appointmentRoutes = (deps: {
         result.code === 'schedule.doctor_on_time_off'
       )
         return c.json(fail(result.code, result.code), 409);
+      if (result.code === 'schedule.doctor_not_in_branch')
+        return c.json(fail(result.code, result.code), 422);
       if (result.code === 'not_found' || isRefNotFound(result.code))
         return c.json(fail(result.code, result.code), 404);
       return c.json(fail(result.code, result.code), 400);

@@ -49,6 +49,8 @@ function conflictMessage(err: unknown, t: (key: string) => string, lang: string)
       return t('appointments.slot_busy');
     case 'schedule.outside_working_hours':
       return t('appointments.outside_working_hours');
+    case 'schedule.doctor_not_in_branch':
+      return t('appointments.doctor_not_in_branch');
     case 'schedule.doctor_on_time_off':
       // TODO i18n key: appointments.doctor_on_time_off (uz.json/ru.json)
       return lang === 'ru' ? 'Доктор в этот день в отпуске' : "Doktor shu kuni ta'tilda";
@@ -78,7 +80,6 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate();
   const { activeBranchId, hasPermission } = useAuthStore();
   const [error, setError] = useState<string | null>(null);
-  const { data: doctors } = useDoctors();
   // CLI-454: bemor qidiruvi serverga debounced uzatiladi (100 ta chegarasiz ro'yxat emas).
   const [patientSearch, setPatientSearch] = useState('');
   const [debouncedPatientSearch] = useDebouncedValue(patientSearch, 300);
@@ -114,6 +115,8 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
     validate: zod4Resolver(wizardSchema),
   });
 
+  // FX-34: tanlangan filialga biriktirilgan shifokorlar.
+  const { data: doctors } = useDoctors(form.values.branchId || undefined);
   const doctorOptions: Option[] = (doctors ?? []).map((d) => ({ value: d.id, label: d.name }));
 
   // slotMinutes = Σ tanlangan xizmatlar davomiyligi (xizmat yo'q → 0 → availability o'chiq).

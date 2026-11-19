@@ -1158,6 +1158,7 @@
     "no_slots": "Bu kun uchun bo'sh vaqt yo'q",
     "work_hours_not_configured": "Filial ish soati sozlanmagan — Sozlamalar → Filiallar",
     "outside_working_hours": "Bu vaqt doktor ish jadvalidan tashqarida",
+    "doctor_not_in_branch": "Bu shifokor tanlangan filialda ishlamaydi",
     "services": "Xizmatlar",
     "notes": "Eslatma",
     "conflict": "Doktor bu vaqtda band",
