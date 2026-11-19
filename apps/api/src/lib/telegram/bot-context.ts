@@ -1,4 +1,5 @@
 import type { Context } from 'hono';
+import { getTxAfterCommit } from '../../db/after-commit.ts';
 import type { DbOrTx } from '../../db/client.ts';
 
 /**
@@ -13,6 +14,8 @@ export function createBotContext(tx: DbOrTx, tenantId: string): Context {
     db: tx,
     activeTenantId: tenantId,
     activeBranchId: null,
+    // FX-75: `onAfterCommit` darhol emas — `withTenant` commit'dan keyin bajaradi.
+    afterCommit: getTxAfterCommit(tx),
   };
   const fake = {
     get: (k: string) => store[k],

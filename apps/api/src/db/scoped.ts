@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import type { Context } from 'hono';
+import { drainTxAfterCommit, dropTxAfterCommit } from './after-commit.ts';
 import type { DbOrTx } from './client.ts';
 import { db } from './client.ts';
 
@@ -44,8 +45,20 @@ export const getDb = (c: Context): DbOrTx => {
  * ```
  */
 export async function withTenant<T>(tenantId: string, fn: (tx: DbOrTx) => Promise<T>): Promise<T> {
-  return db.transaction(async (tx) => {
-    await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);
-    return fn(tx);
-  });
+  let txRef: DbOrTx | undefined;
+  let result: T;
+  try {
+    result = await db.transaction(async (tx) => {
+      txRef = tx;
+      await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);
+      return fn(tx);
+    });
+  } catch (err) {
+    // FX-75: rollback — bot kontekstida ro'yxatga olingan side-effect'lar tashlanadi.
+    if (txRef) dropTxAfterCommit(txRef);
+    throw err;
+  }
+  // FX-75: commit bo'ldi — `createBotContext` orqali `onAfterCommit` qilingan side-effect'lar.
+  await drainTxAfterCommit(txRef as DbOrTx);
+  return result;
 }
