@@ -1147,3 +1147,85 @@ describe('FX-47: rad etilgan ish — boshqa labga qayta yuborish', () => {
     expect(again.status).toBe(409);
   });
 });
+
+describe('FX-80: Hub tasdig‘idan yozilgan «Laboratoriya» xarajati qo‘lda buzilmaydi', () => {
+  const approvedOrder = async () => {
+    const id = await createOrder();
+    expect(
+      (await call('doctor', 'POST', `/api/lab-orders/${id}/send-to-hub`, { labId: lab.labId }))
+        .status,
+    ).toBe(200);
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+    const [hc] = await hubCaseByRef(id);
+    for (const [path, body] of [
+      ['/status', { to: 'accepted' }],
+      ['/price', { price: 410000 }],
+    ] as const) {
+      const r = await hubJson(`/v1/lab/cases/${hc!.id}${path}`, {
+        method: 'POST',
+        token: lab.token,
+        body,
+      });
+      expect(r.status).toBeLessThan(300);
+    }
+    await pollLabHubChanges(tenantId);
+    expect(
+      (await call('doctor', 'POST', `/api/lab-orders/${id}/approve-price`, { price: '410000.00' }))
+        .status,
+    ).toBe(200);
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+    const [exp] = await expensesOf(id);
+    expect(exp?.amount).toBe('410000.00');
+    return { id, expenseId: exp!.id };
+  };
+  const code = async (r: Response) => ((await r.json()) as { error: { code: string } }).error.code;
+
+  test('summa/sana/kategoriya/filial tahriri va o‘chirish → 409; faqat izoh o‘zgaradi', async () => {
+    const { id, expenseId } = await approvedOrder();
+
+    for (const body of [{ amount: 1 }, { date: '2020-01-01' }, { amount: 5, note: 'x' }]) {
+      const r = await call('accountant', 'PATCH', `/api/expenses/${expenseId}`, body);
+      expect(r.status).toBe(409);
+      expect(await code(r)).toBe('expense.lab_order_linked');
+    }
+    const del = await call('accountant', 'DELETE', `/api/expenses/${expenseId}`);
+    expect(del.status).toBe(409);
+    expect(await code(del)).toBe('expense.lab_order_linked');
+
+    const [still] = await expensesOf(id);
+    expect(still?.amount).toBe('410000.00');
+    expect(still?.date).toBe(
+      (await inTenant((tx) => tx.select().from(expenses).where(eq(expenses.id, expenseId))))[0]
+        ?.date,
+    );
+
+    // Hub bilan bog'liq bo'lmagan maydon — izoh — ruxsat; forma qayta yuborgan o'zgarmagan summa ham.
+    const note = await call('accountant', 'PATCH', `/api/expenses/${expenseId}`, {
+      note: 'Hisob-faktura 17',
+      amount: 410000,
+    });
+    expect(note.status).toBe(200);
+    const [after] = await expensesOf(id);
+    expect(after?.note).toBe('Hisob-faktura 17');
+    expect(after?.amount).toBe('410000.00');
+  });
+
+  test('oddiy (labsiz) xarajat avvalgidek tahrirlanadi va o‘chiriladi', async () => {
+    const cat = await call('accountant', 'POST', '/api/expense-categories', { name: 'Ijara FX80' });
+    expect(cat.status).toBe(201);
+    const categoryId = ((await cat.json()) as { data: { id: string } }).data.id;
+    const created = await call('accountant', 'POST', '/api/expenses', {
+      categoryId,
+      amount: 1000,
+      date: '2026-11-01',
+    });
+    expect(created.status).toBe(201);
+    const eid = ((await created.json()) as { data: { id: string } }).data.id;
+    expect(
+      (await call('accountant', 'PATCH', `/api/expenses/${eid}`, { amount: 2000 })).status,
+    ).toBe(200);
+    expect((await call('accountant', 'DELETE', `/api/expenses/${eid}`)).status).toBe(200);
+  });
+});

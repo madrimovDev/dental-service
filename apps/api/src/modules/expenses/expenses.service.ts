@@ -13,6 +13,19 @@ import type {
 } from './expenses.schema.ts';
 
 /**
+ * FX-80: Lab Hub tasdig'idan yozilgan «Laboratoriya» xarajati (`lab_order_id != null`)
+ * `approved_price` bilan bog'langan — summa/sana/kategoriya/filial qo'lda o'zgartirilmaydi va
+ * o'chirilmaydi (kitob Hub bilan uzilib qolardi va qayta yozilmasdi). Faqat izoh (`note`) tahrirlanadi.
+ * Route 409 `expense.lab_order_linked` (`fail()` — 4xx commit) qaytaradi.
+ */
+export class ExpenseLabLinkedError extends Error {
+  constructor() {
+    super('Expense is linked to a lab order — only the note can be edited');
+    this.name = 'ExpenseLabLinkedError';
+  }
+}
+
+/**
  * Xarajatlar moduli — kategoriya CRUD + xarajat CRUD + kategoriya bo'yicha svod.
  *
  * Eslatma: `expenses.date` — naive `date` (kalendar kun, instant emas). Shuning uchun
@@ -203,6 +216,17 @@ export const createExpensesService = (deps: { audit: AuditLogger }) => {
     const [before] = await db.select().from(expenses).where(eq(expenses.id, id));
     if (!before) return null;
 
+    // Forma hamma maydonni qayta yuboradi — faqat haqiqatan o'zgargan maydon bloklanadi.
+    if (
+      before.labOrderId != null &&
+      ((input.categoryId !== undefined && input.categoryId !== before.categoryId) ||
+        (input.branchId !== undefined && input.branchId !== before.branchId) ||
+        (input.amount !== undefined && Number(input.amount) !== Number(before.amount)) ||
+        (input.date !== undefined && input.date !== before.date))
+    ) {
+      throw new ExpenseLabLinkedError();
+    }
+
     const patch = {
       ...(input.categoryId !== undefined ? { categoryId: input.categoryId } : {}),
       ...(input.branchId !== undefined ? { branchId: input.branchId } : {}),
@@ -232,6 +256,7 @@ export const createExpensesService = (deps: { audit: AuditLogger }) => {
     const db = getDb(c);
     const [before] = await db.select().from(expenses).where(eq(expenses.id, id));
     if (!before) return null;
+    if (before.labOrderId != null) throw new ExpenseLabLinkedError();
 
     await db.delete(expenses).where(eq(expenses.id, id));
 

@@ -21,7 +21,7 @@ import {
   updateCategorySchema,
   updateExpenseSchema,
 } from './expenses.schema.ts';
-import { createExpensesService } from './expenses.service.ts';
+import { createExpensesService, ExpenseLabLinkedError } from './expenses.service.ts';
 
 /** Standart 404 (kategoriya). */
 const categoryNotFoundResponse = {
@@ -36,6 +36,14 @@ const expenseNotFoundResponse = {
   404: {
     content: { 'application/json': { schema: errorResponseSchema } },
     description: 'Expense not found',
+  },
+};
+
+/** FX-80: Hub tasdig'idan yozilgan «Laboratoriya» xarajati — PATCH/DELETE 409. */
+const expenseLabLinkedResponse = {
+  409: {
+    content: { 'application/json': { schema: errorResponseSchema } },
+    description: 'Expense is linked to a lab order (FX-80) — only the note is editable',
   },
 };
 
@@ -254,15 +262,26 @@ export const expensesRoutes = (deps: { db: Database; audit: AuditLogger }) => {
       params: expenseIdParamSchema,
       body: { content: { 'application/json': { schema: updateExpenseSchema } } },
     },
-    responses: { ...okJson(expenseDtoSchema, 'Updated expense'), ...expenseNotFoundResponse },
+    responses: {
+      ...okJson(expenseDtoSchema, 'Updated expense'),
+      ...expenseNotFoundResponse,
+      ...expenseLabLinkedResponse,
+    },
   });
 
   app.openapi(updateExpenseRoute, async (c) => {
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const row = await service.update(c, id, body);
-    if (!row) return c.json(fail('expense.not_found', 'Expense not found'), 404);
-    return c.json(ok(toExpenseDto(row)), 200);
+    try {
+      const row = await service.update(c, id, body);
+      if (!row) return c.json(fail('expense.not_found', 'Expense not found'), 404);
+      return c.json(ok(toExpenseDto(row)), 200);
+    } catch (e) {
+      if (e instanceof ExpenseLabLinkedError) {
+        return c.json(fail('expense.lab_order_linked', e.message), 409);
+      }
+      throw e;
+    }
   });
 
   // ─── DELETE /expenses/{id} — delete ──────────────────────────────────────
@@ -276,14 +295,22 @@ export const expensesRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     responses: {
       ...okJson(expenseDeleteResultSchema, 'Expense deleted'),
       ...expenseNotFoundResponse,
+      ...expenseLabLinkedResponse,
     },
   });
 
   app.openapi(deleteExpenseRoute, async (c) => {
     const { id } = c.req.valid('param');
-    const row = await service.remove(c, id);
-    if (!row) return c.json(fail('expense.not_found', 'Expense not found'), 404);
-    return c.json(ok({ deleted: true as const }), 200);
+    try {
+      const row = await service.remove(c, id);
+      if (!row) return c.json(fail('expense.not_found', 'Expense not found'), 404);
+      return c.json(ok({ deleted: true as const }), 200);
+    } catch (e) {
+      if (e instanceof ExpenseLabLinkedError) {
+        return c.json(fail('expense.lab_order_linked', e.message), 409);
+      }
+      throw e;
+    }
   });
 
   return app;
