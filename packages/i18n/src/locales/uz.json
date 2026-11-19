@@ -1482,6 +1482,7 @@
     "tab_items": "Mahsulotlar",
     "tab_bom": "Sarflanish (BOM)",
     "create_item": "Yangi mahsulot",
+    "edit_item": "Materialni tahrirlash",
     "batch": {
       "receive": "Partiya qabul qilish",
       "item": "Mahsulot",

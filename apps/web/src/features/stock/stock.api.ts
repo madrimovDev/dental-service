@@ -12,6 +12,7 @@ import {
   listStockItems,
   listStockMovements,
   removeStockBom,
+  updateStockItem,
 } from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { lookupKeys } from '@/lib/lookup-keys';
@@ -110,6 +111,16 @@ export function useCreateItem() {
   return useMutation({
     mutationFn: (body: Parameters<typeof createStockItem>[0]) =>
       createStockItem(body).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: stockKeys.all }),
+  });
+}
+
+/** Item metadata'sini tahrirlash (name/unit/category/price/minThreshold). Qoldiq o'zgarmaydi. */
+export function useUpdateItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: Parameters<typeof updateStockItem>[1] }) =>
+      updateStockItem(id, body).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: stockKeys.all }),
   });
 }

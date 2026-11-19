@@ -40,6 +40,7 @@ export function StockScreen() {
   const [branchId, setBranchId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [movementItem, setMovementItem] = useState<StockItemVM | null>(null);
+  const [editItem, setEditItem] = useState<StockItemVM | null>(null);
   const [receiveItemId, setReceiveItemId] = useState<string | null>(null);
   const [criticalFirst, setCriticalFirst] = useState(true);
   const [category, setCategory] = useState<string | null>(null);
@@ -103,6 +104,14 @@ export function StockScreen() {
     [i18n.language],
   );
 
+  const openCreateItem = () => {
+    setEditItem(null);
+    openItemForm();
+  };
+  const handleEdit = (item: StockItemVM) => {
+    setEditItem(item);
+    openItemForm();
+  };
   const handleMovement = (item: StockItemVM) => {
     setMovementItem(item);
     openMovement();
@@ -127,7 +136,7 @@ export function StockScreen() {
           actions={
             canManage && (
               <Group gap="sm">
-                <Button onClick={openItemForm}>{t('stock.create_item')}</Button>
+                <Button onClick={openCreateItem}>{t('stock.create_item')}</Button>
                 <Button variant="primary" onClick={() => handleReceive(null)}>
                   {t('stockScreen.receive')}
                 </Button>
@@ -224,6 +233,7 @@ export function StockScreen() {
                           canManage={canManage}
                           onMovement={handleMovement}
                           onReceive={(item) => handleReceive(item.id)}
+                          onEdit={handleEdit}
                         />
                       )}
                     </Stack>
@@ -259,6 +269,7 @@ export function StockScreen() {
         opened={itemFormOpened}
         onClose={closeItemForm}
         branches={branches.data ?? []}
+        item={editItem}
       />
       <MovementFormModal opened={movementOpened} onClose={closeMovement} item={movementItem} />
       <BatchFormModal

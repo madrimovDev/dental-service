@@ -5,6 +5,10 @@ export const itemFormSchema = z.object({
   name: z.string().min(1).max(200),
   unit: z.string().min(1).max(32),
   branchId: z.string().optional(),
+  /** Kategoriya / dona narxi — ixtiyoriy (FX-129). Narx bo'sh = belgilanmagan. */
+  category: z.string().max(100).optional(),
+  price: z.union([z.coerce.number().nonnegative(), z.literal('')]).optional(),
+  /** Faqat yaratishda; tahrirda qoldiq harakat orqali o'zgaradi (CLI-424). */
   quantity: z.coerce.number().nonnegative(),
   minThreshold: z.coerce.number().nonnegative(),
 });

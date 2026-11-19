@@ -1,0 +1,83 @@
+import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { renderApp } from '../../../test-utils';
+import type { StockItemVM } from '../stock.types';
+import { ItemFormModal } from './ItemFormModal';
+
+const updateStockItem = vi.fn();
+const createStockItem = vi.fn();
+vi.mock('@dental/api-client', async (orig) => ({
+  ...(await orig<typeof import('@dental/api-client')>()),
+  updateStockItem: (...a: unknown[]) => updateStockItem(...a),
+  createStockItem: (...a: unknown[]) => createStockItem(...a),
+}));
+
+const item: StockItemVM = {
+  id: 'i1',
+  branchId: null,
+  name: 'Anestetik',
+  unit: 'ml',
+  category: 'Anesteziya',
+  price: 15000,
+  quantity: 120,
+  minThreshold: 5,
+  lowStock: false,
+  stockState: 'ok',
+  avgDailyUsage: 0,
+  daysLeft: null,
+  daysState: 'none',
+};
+
+beforeEach(() => {
+  updateStockItem.mockReset();
+  createStockItem.mockReset();
+  updateStockItem.mockResolvedValue({ data: {} });
+  createStockItem.mockResolvedValue({ data: {} });
+});
+
+describe('ItemFormModal — tahrirlash (FX-129)', () => {
+  it('edit rejimi: kategoriya/narx/minimal qoldiq to‘ldirilgan; saqlash PATCH chaqiradi, quantity yuborilmaydi', async () => {
+    renderApp(<ItemFormModal opened onClose={() => {}} branches={[]} item={item} />);
+    const category = (await screen.findByLabelText(/Kategoriya/)) as HTMLInputElement;
+    expect(category.value).toBe('Anesteziya');
+    expect((screen.getByLabelText(/Narx/) as HTMLInputElement).value).toContain('15');
+    expect((screen.getByLabelText(/Minimal qoldiq/) as HTMLInputElement).value).toBe('5');
+
+    fireEvent.change(category, { target: { value: 'Og‘riqsizlantirish' } });
+    fireEvent.change(screen.getByLabelText(/Minimal qoldiq/), { target: { value: '9' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+
+    await waitFor(() => expect(updateStockItem).toHaveBeenCalledOnce());
+    const [id, body] = updateStockItem.mock.calls[0] as [string, Record<string, unknown>];
+    expect(id).toBe('i1');
+    expect(body).toMatchObject({ category: 'Og‘riqsizlantirish', price: 15000, minThreshold: 9 });
+    expect(body).not.toHaveProperty('quantity');
+    expect(createStockItem).not.toHaveBeenCalled();
+  });
+
+  it('narxni tozalash → price: null yuboriladi', async () => {
+    renderApp(<ItemFormModal opened onClose={() => {}} branches={[]} item={item} />);
+    fireEvent.change(await screen.findByLabelText(/Narx/), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    await waitFor(() => expect(updateStockItem).toHaveBeenCalledOnce());
+    expect(
+      (updateStockItem.mock.calls[0] as [string, Record<string, unknown>])[1].price,
+    ).toBeNull();
+  });
+
+  it('yaratish rejimi: createStockItem (kategoriya/narx bilan), update chaqirilmaydi', async () => {
+    renderApp(<ItemFormModal opened onClose={() => {}} branches={[]} item={null} />);
+    fireEvent.change(await screen.findByLabelText(/Nomi/), { target: { value: 'Bint' } });
+    fireEvent.change(screen.getByLabelText(/Birlik/), { target: { value: 'dona' } });
+    fireEvent.change(screen.getByLabelText(/Kategoriya/), { target: { value: 'Sarflanuvchi' } });
+    fireEvent.change(screen.getByLabelText(/Narx/), { target: { value: '2000' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    await waitFor(() => expect(createStockItem).toHaveBeenCalledOnce());
+    expect(createStockItem.mock.calls[0]?.[0]).toMatchObject({
+      name: 'Bint',
+      category: 'Sarflanuvchi',
+      price: 2000,
+    });
+    expect(updateStockItem).not.toHaveBeenCalled();
+  });
+});
