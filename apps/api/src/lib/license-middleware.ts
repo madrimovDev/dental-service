@@ -72,7 +72,9 @@ export const requireModule = (module: string): MiddlewareHandler => {
  * case fallback: "shubha bo'lsa schedule'ni gate'siz qoldirish").
  */
 export const MODULE_MAP: Record<string, string[]> = {
-  starter: ['patients', 'appointments', 'queue'],
+  // FX-99 (LB-08): 'staff' starter'da ham — usiz owner xodim (shifokor) taklif qila
+  // olmaydi (/api/users/* 403 MODULE_DISABLED) va yozilish oqimi (doctorId) ishlamaydi.
+  starter: ['patients', 'appointments', 'queue', 'staff'],
   standard: ['patients', 'appointments', 'queue', 'cashier', 'reports', 'staff'],
   premium: [
     'patients',

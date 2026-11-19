@@ -242,6 +242,17 @@ describe("Vaqtinchalik parolning sizib chiqishi — endpoint bo'yicha qulf", () 
 // same agreed dictionary (docs/audit-fixes/CLI-433 §2c); if one file's table
 // changes without the other, exactly one of the two guard tests goes red.
 describe('MODULE_MAP — supervisor/api dictionary lockstep (CLI-433)', () => {
+  // FX-99 (LB-08): starter tarifida 'staff' bo'lmasa owner xodim (shifokor)
+  // taklif qila olmaydi → yozilish oqimi ishlamaydi. apps/api guard-testi bilan lockstep.
+  it("starter plan's modules include 'staff' (FX-99)", async () => {
+    const res = await createClinic({ plan: 'starter' });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as any;
+    expect(body.license.modules.sort()).toEqual(
+      ['patients', 'appointments', 'queue', 'staff'].sort(),
+    );
+  });
+
   it("enterprise plan's modules match the agreed cross-app dictionary", async () => {
     const AGREED_ENTERPRISE_MODULES = [
       'patients',

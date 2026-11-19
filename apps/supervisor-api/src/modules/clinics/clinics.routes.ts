@@ -69,7 +69,9 @@ const createClinicSchema = z.object({
 // license-signature.ts precedent), kept in LOCKSTEP BY HAND. If you change
 // this table, update apps/api's MODULE_MAP too (see its guard test).
 const MODULE_MAP: Record<z.infer<typeof createClinicSchema>['plan'], string[]> = {
-  starter: ['patients', 'appointments', 'queue'],
+  // FX-99 (LB-08): 'staff' starter'da ham — usiz owner xodim (shifokor) taklif qila
+  // olmaydi (/api/users/* 403 MODULE_DISABLED) va yozilish oqimi (doctorId) ishlamaydi.
+  starter: ['patients', 'appointments', 'queue', 'staff'],
   standard: ['patients', 'appointments', 'queue', 'cashier', 'reports', 'staff'],
   premium: [
     'patients',
