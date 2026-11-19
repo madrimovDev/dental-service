@@ -71,6 +71,12 @@ export function ActivatePage() {
   const bootstrap = useBootstrapStatus();
   const needsVendor = bootstrap.data?.hasLicense === true && bootstrap.data?.hasTenant === false;
 
+  // LA-01: vendor «qayta o'rnatishga tayyorlash»ni bajargach (Supervisor'da
+  // fingerprint NULL + yangi vaqtinchalik parol) mijoz o'sha mashinada qayta
+  // aktivatsiya qila olishi kerak — server `.lic` bor holatda ham aktivatsiyani
+  // qabul qiladi va tenant bo'sh bo'lsa provisioning qiladi. Forma tugma orqali ochiladi.
+  const [vendorPrepared, setVendorPrepared] = useState(false);
+
   const schema = z.object({
     licenseKey: z.string().min(1, t('validation.required')),
   });
@@ -121,12 +127,15 @@ export function ActivatePage() {
       <Title order={2} ta="center" mb="lg">
         {t('app.name')}
       </Title>
-      {needsVendor ? (
+      {needsVendor && !vendorPrepared ? (
         <Paper withBorder shadow="md" p="xl" radius="md">
           <Title order={3} mb="xs">
             {t('auth.activate.needs_vendor_title')}
           </Title>
           <Text size="sm">{t('auth.activate.needs_vendor_body')}</Text>
+          <Button variant="light" fullWidth mt="md" onClick={() => setVendorPrepared(true)}>
+            {t('auth.activate.vendor_prepared')}
+          </Button>
         </Paper>
       ) : (
         <Paper withBorder shadow="md" p="xl" radius="md">

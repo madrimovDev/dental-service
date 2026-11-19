@@ -159,6 +159,7 @@
       "error_generic": "Litsenziyani faollashtirib bo'lmadi",
       "needs_vendor_title": "Klinika ma'lumotlari topilmadi",
       "needs_vendor_body": "Litsenziya faollashtirilgan, lekin klinika ma'lumotlari bu kompyuterda topilmadi. Ta'minotchiga murojaat qiling — u \"qayta o'rnatishga tayyorlash\"ni bajarib, sizga yangi login va vaqtinchalik parol beradi.",
+      "vendor_prepared": "Ta'minotchi tayyorladi — kalitni kiriting",
       "next_invalid_key": "Kalitni ta'minotchi bergan xabardan qayta nusxalang (tire va harflarga e'tibor bering) va yana urinib ko'ring.",
       "next_fingerprint_mismatch": "Kompyuter almashtirilgan bo'lsa, ta'minotchiga «qayta o'rnatishga tayyorlash»ni bosishni ayting — keyin shu yerda qayta urining.",
       "next_fingerprint_unavailable": "Dasturni oddiy (virtual bo'lmagan) Windows kompyuterda ishga tushiring.",

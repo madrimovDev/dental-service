@@ -1,6 +1,6 @@
 import { fail, ok } from '@dental/core';
-import { auditLog, users } from '@dental/db-schema';
-import { eq, sql } from 'drizzle-orm';
+import { auditLog, refreshTokens, users } from '@dental/db-schema';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { db } from '../db/client.ts';
 import { env } from '../lib/env.ts';
@@ -84,8 +84,17 @@ export const resetOwnerPasswordRoutes = (
       await tx
         .update(users)
         // FU-15: vendor-vositachiligidagi tiklash ham telefon tasdig'ini bekor qiladi.
-        .set({ passwordHash, phoneVerifiedAt: null, updatedAt: now })
+        // FX-05 (LA-19): owner o'zi yangi parol qo'ydi — vaqtinchalik parol
+        // bayrog'i tozalanadi (changePassword precedenti).
+        .set({ passwordHash, mustChangePassword: false, phoneVerifiedAt: null, updatedAt: now })
         .where(eq(users.id, tenant.ownerUserId));
+      // FX-05 (LA-19): owner'ning barcha faol sessiyalari bekor qilinadi —
+      // begona qurilmada qolgan refresh token tiklashdan keyin yashamasin
+      // (changePassword va owner admin-reset bilan bir xil).
+      await tx
+        .update(refreshTokens)
+        .set({ revokedAt: now })
+        .where(and(eq(refreshTokens.userId, tenant.ownerUserId), isNull(refreshTokens.revokedAt)));
       await tx.insert(auditLog).values({
         tenantId: tenant.id,
         userId: null, // pre-auth, vendor-vositachiligida — harakat qiluvchi user yo'q

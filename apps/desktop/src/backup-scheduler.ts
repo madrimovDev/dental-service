@@ -8,7 +8,7 @@
  * - Bir zaxira = `<papka>/dental-YYYYMMDD-HHMMSS/{db.dump, uploads.tar}`; avval
  *   `<nom>.partial` ga yoziladi, muvaffaqiyatdan keyingina nomlanadi — yarim zaxira hech qachon
  *   ro'yxatga/retention'ga kirmaydi.
- * - Retention: oxirgi 14 nusxa; eng yangisi HECH QACHON o'chmaydi.
+ * - Retention: oxirgi 14 nusxa; shu chaqiruvda yaratilgan nusxa HECH QACHON o'chmaydi.
  * - Tiklash: texnik-ish serveri → API to'xtatiladi → tiklashdan OLDIN avtomatik zaxira (retention'siz,
  *   tiklanayotgan nusxa o'chib ketmasin) → `pg_restore` (buzilgan dump bazani o'chirmaydi:
  *   `createPgTools.restore` oldin `--list`) → uploads → migratsiya → API qayta ishga tushadi.
@@ -136,10 +136,14 @@ export const createBackupScheduler = (deps: BackupSchedulerDeps) => {
       .reverse();
   };
 
-  /** Eng yangi `BACKUP_RETENTION` ta saqlanadi; eng yangisi hech qachon o'chmaydi. */
-  const applyRetention = (folder: string): void => {
-    const names = listBackups(folder);
-    for (const stale of names.slice(Math.max(1, BACKUP_RETENTION))) {
+  /**
+   * Eng yangi `BACKUP_RETENTION` ta saqlanadi. Shu chaqiruvda yaratilgan nusxa (`keep`) HECH QACHON
+   * o'chmaydi — soat orqaga ketgan bo'lsa nomi leksikografik eng kichik bo'lishi mumkin (FX-51 / LA-17).
+   */
+  const applyRetention = (folder: string, keep: string): void => {
+    const others = listBackups(folder).filter((n) => n !== keep);
+    const room = Math.max(1, BACKUP_RETENTION) - 1;
+    for (const stale of others.slice(room)) {
       rmSync(join(folder, stale), { recursive: true, force: true });
     }
   };
@@ -162,14 +166,24 @@ export const createBackupScheduler = (deps: BackupSchedulerDeps) => {
         // Shu soniyada allaqachon nusxa bor — yangisi shuning o'zi.
         return { ok: true, name };
       }
+      // Soat orqaga ketgan: yangi nom mavjud eng yangi nomdan kichik (BIOS/CMOS, NTP yo'q).
+      const newestExisting = listBackups(folder)[0];
+      const clockWarning =
+        newestExisting !== undefined && name < newestExisting
+          ? `tizim soati noto'g'ri ko'rinadi: yangi zaxira (${name}) mavjud nusxadan (${newestExisting}) eski. Kompyuter soatini tekshiring.`
+          : null;
       mkdirSync(partial, { recursive: true });
       deps.dump(join(partial, BACKUP_DB_FILE));
       if (!existsSync(join(partial, BACKUP_DB_FILE))) throw new Error('pg_dump fayl yaratmadi');
       deps.archiveUploads(join(partial, BACKUP_UPLOADS_FILE));
       renameSync(partial, join(folder, name));
       // Tiklashdan oldingi zaxirada retention YO'Q: tiklanayotgan eng eski nusxa o'chib ketmasin.
-      if (kind !== 'pre-restore') applyRetention(folder);
-      writeState({ lastSuccessAt: deps.now().toISOString(), lastError: null });
+      if (kind !== 'pre-restore') applyRetention(folder, name);
+      if (!existsSync(join(folder, name, BACKUP_DB_FILE))) {
+        throw new Error('zaxira retention tufayli yo‘qoldi');
+      }
+      writeState({ lastSuccessAt: deps.now().toISOString(), lastError: clockWarning });
+      if (clockWarning) deps.log(clockWarning);
       deps.log(`zaxira olindi (${kind}): ${name}`);
       return { ok: true, name };
     } catch (err) {
@@ -199,7 +213,32 @@ export const createBackupScheduler = (deps: BackupSchedulerDeps) => {
     );
   };
 
-  const performRestore = async (file: unknown): Promise<{ ok: boolean; error?: string }> => {
+  /**
+   * Bazani tiklashdan oldingi nusxaga qaytaradi (+ uning uploads'ini, bo'lsa). FX-52 / LA-18.
+   * `true` = baza qaytarildi. Uploads qaytarilmasa baza baribir qaytgan hisoblanadi (log'ga yoziladi).
+   */
+  const rollbackToPreRestore = (folder: string, preRestore: string): boolean => {
+    const preDir = join(folder, preRestore);
+    try {
+      deps.restoreDb(join(preDir, BACKUP_DB_FILE));
+    } catch (rollbackErr) {
+      deps.log(`pre-restore'ga qaytarib bo'lmadi: ${errMessage(rollbackErr)}`);
+      return false;
+    }
+    const preUploads = join(preDir, BACKUP_UPLOADS_FILE);
+    if (existsSync(preUploads)) {
+      try {
+        deps.extractUploads(preUploads);
+      } catch (uploadsErr) {
+        deps.log(`pre-restore uploads qaytarilmadi: ${errMessage(uploadsErr)}`);
+      }
+    }
+    return true;
+  };
+
+  const performRestore = async (
+    file: unknown,
+  ): Promise<{ ok: boolean; error?: string; dbRolledBack?: boolean }> => {
     const folder = getFolder();
     // Ikkinchi himoya (API allaqachon tekshirgan): faqat zaxira nomi, papka ichida.
     if (typeof file !== 'string' || !BACKUP_NAME_RE.test(file)) {
@@ -213,6 +252,9 @@ export const createBackupScheduler = (deps: BackupSchedulerDeps) => {
     let apiStopped = false;
     let preRestore: string | null = null;
     let stage = 'api_stop';
+    // Baza tiklanayotgan nusxa bilan almashtirilganmi (pg_restore boshlangan)? Shundan keyingi
+    // har qanday xato bazani pre-restore nusxaga qaytarishi shart (FX-52 / LA-18).
+    let dbTouched = false;
     try {
       // Tartib muhim: texnik-ish serveri API bilan BIR XIL portni tinglaydi, shuning uchun
       // avval API to'xtaydi (port bo'shaydi), keyin maintenance ko'tariladi (EADDRINUSE bo'lmasin).
@@ -230,16 +272,11 @@ export const createBackupScheduler = (deps: BackupSchedulerDeps) => {
         deps.restoreDb(dbFile);
       } catch (err) {
         // `--list` tekshiruvi yiqilgan bo'lsa baza TEGILMAGAN. Boshqa xato bazani qayta yaratgandan
-        // keyin bo'lishi mumkin — tiklashdan oldingi nusxaga qaytamiz.
-        if (!errMessage(err).startsWith('pg_restore --list failed')) {
-          try {
-            deps.restoreDb(join(folder, preRestore, BACKUP_DB_FILE));
-          } catch (rollbackErr) {
-            deps.log(`pre-restore'ga qaytarib bo'lmadi: ${errMessage(rollbackErr)}`);
-          }
-        }
+        // keyin bo'lishi mumkin.
+        if (!errMessage(err).startsWith('pg_restore --list failed')) dbTouched = true;
         throw err;
       }
+      dbTouched = true;
       if (existsSync(uploadsFile)) {
         stage = 'restore_uploads';
         deps.extractUploads(uploadsFile);
@@ -248,9 +285,16 @@ export const createBackupScheduler = (deps: BackupSchedulerDeps) => {
       deps.migrate();
       return { ok: true };
     } catch (err) {
-      const error = `${stage}: ${errMessage(err)}`;
+      let error = `${stage}: ${errMessage(err)}`;
+      let dbRolledBack: boolean | undefined;
+      if (dbTouched && preRestore !== null) {
+        dbRolledBack = rollbackToPreRestore(folder, preRestore);
+        error += dbRolledBack
+          ? ` — baza avvalgi holatga qaytarildi (zaxira: ${preRestore})`
+          : ` — baza avvalgi holatga QAYTARILMADI, ma'lumotlar nusxasi: ${preRestore}`;
+      }
       writeState({ lastError: `tiklash muvaffaqiyatsiz (${error})` });
-      return { ok: false, error };
+      return { ok: false, error, ...(dbRolledBack === undefined ? {} : { dbRolledBack }) };
     } finally {
       // Texnik-ish serveri portni bo'shatadi, keyin API qaytadi (API to'xtagan bo'lsa).
       try {
@@ -281,6 +325,7 @@ export const createBackupScheduler = (deps: BackupSchedulerDeps) => {
       status: r.ok ? 'ok' : 'failed',
       file,
       ...(r.error ? { error: r.error } : {}),
+      ...(r.dbRolledBack === undefined ? {} : { dbRolledBack: r.dbRolledBack }),
     });
     if (r.ok) writeState({ lastError: null });
   };

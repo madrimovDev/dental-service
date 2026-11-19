@@ -1,6 +1,7 @@
 import { createFiscalProvider } from '@dental/fiscal';
 import { createNoOpChannel } from '@dental/notifications';
 import { OpenAPIHono } from '@hono/zod-openapi';
+import type { Context } from 'hono';
 import { serveStatic } from 'hono/bun';
 import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
@@ -156,7 +157,15 @@ export const createApp = () => {
   app.route('/api/auth', authRoutes({ db }));
   // Local Desktop litsenziya faollashtirish (CLI-348 qaror 1) — auth yo'q,
   // license-middleware.ts WHITELIST'i bilan bir xil yo'l.
-  app.route('/api/activate', activateRoutes({ db }));
+  // FX-08 (LA-45): faqat Local Desktop'da ulanadi — bulutda 404 (himoya rejim
+  // tekshiruviga tayanadi, konteyner ruxsatlariga emas).
+  const isLocalDesktop = process.env.DENTAL_LOCAL_DESKTOP === 'true';
+  // Bulutda aniq 404 (aks holda auth middleware 401 qaytarardi).
+  const notFoundOutsideDesktop = (c: Context) =>
+    c.json({ error: { code: 'not_found', message: 'Not found' } }, 404);
+  if (isLocalDesktop) app.route('/api/activate', activateRoutes({ db }));
+  else
+    app.all('/api/activate/*', notFoundOutsideDesktop).all('/api/activate', notFoundOutsideDesktop);
   // Pre-auth diagnostika (audit C1): `.lic` bor, lekin lokal bazada tenant
   // yo'q holatini oshkor qiladi — web/desktop login gate'i shunga qaraydi.
   app.route('/api/bootstrap-status', bootstrapStatusRoutes({ db }));
@@ -164,7 +173,13 @@ export const createApp = () => {
   app.route('/api/license', licenseStatusRoutes());
   // Vendor-mediated owner password reset (CLI-226) — auth yo'q (owner login
   // qila olmaydi), license-middleware.ts WHITELIST'i bilan bir xil yo'l.
-  app.route('/api/reset-owner-password', resetOwnerPasswordRoutes());
+  // FX-08 (LA-45): faqat Local Desktop'da (bulutda eng eski tenant owner'i o'zgarib qolmasin).
+  if (isLocalDesktop) app.route('/api/reset-owner-password', resetOwnerPasswordRoutes());
+  else {
+    app
+      .all('/api/reset-owner-password/*', notFoundOutsideDesktop)
+      .all('/api/reset-owner-password', notFoundOutsideDesktop);
+  }
 
   // Observability (CLI-238 / D7): Prometheus metrics. Public text/plain — keep
   // on the internal network / behind edge auth. Localized append-only mount.

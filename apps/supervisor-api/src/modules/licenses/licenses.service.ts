@@ -37,6 +37,37 @@ const buildResponse = (lic: SignableLicense, issuedAt: string) => {
 };
 
 /**
+ * FX-07 (LA-16) — deaktivatsiya qilingan litsenziya uchun IMZOLANGAN bekor
+ * qilish bayonoti. Klient (`apps/api` `isRevocationAuthenticForThisMachine`)
+ * `.lic`ni faqat shu imzo, `status:'revoked'`, o'z `licenseKey`/fingerprint'i
+ * va joriy `.lic`dan eski bo'lmagan `issuedAt` bilan o'chiradi — imzosiz 403
+ * (MITM, HTTP rejim) yoki eski bayonotni qayta yuborish (replay) yetmaydi.
+ *
+ * ⚠️ LOCKSTEP: `apps/api/src/lib/license.ts` dagi `LicenseRevocation` bilan
+ * AYNAN bir xil maydonlar. Payload QAT'IY TEKIS (Qaror #40 — `signLicense`
+ * `assertFlatSignaturePayload` bilan throw qiladi). `status` maydoni imzoni
+ * oddiy litsenziya javobi imzosidan domen bo'yicha ajratadi.
+ *
+ * `fingerprint` — so'rov yuborgan mashinaniki: vendor litsenziyani o'chirgan,
+ * shu kalit bilan ishlayotgan har qanday mashina to'xtashi kerak (masalan
+ * `prepare-reinstall`dan keyin `lic.fingerprint` NULL bo'lsa ham).
+ */
+const buildRevocation = (
+  lic: typeof licenses.$inferSelect,
+  fingerprint: string,
+  issuedAt: string,
+) => {
+  const payload = {
+    status: 'revoked' as const,
+    licenseKey: lic.licenseKey,
+    clinicId: lic.clinicId,
+    fingerprint,
+    issuedAt,
+  };
+  return { ...payload, signature: signLicense(payload, PRIVATE_KEY) };
+};
+
+/**
  * Aktivatsiya javobiga qo'shiladigan provisioning bloki — klinikaning lokal
  * bazasida tenant + owner + filialni birinchi marta yaratish uchun.
  *
@@ -151,8 +182,20 @@ export const createLicenseService = () => ({
     const lic = await db.query.licenses.findFirst({
       where: eq(licenses.licenseKey, licenseKey),
     });
-    if (!lic || !lic.isActive) {
-      throw Object.assign(new Error('INVALID_KEY'), { status: 403 });
+    // FX-07 (LA-16) — «qator yo'q» va «deaktivatsiya» ATAYIN ajratiladi.
+    // Qator yo'qligi deaktivatsiya EMAS: Supervisor bazasi eski zaxiradan
+    // tiklansa, keyingi klinikalarning qatorlari yo'qoladi — ularning `.lic`
+    // fayllari ommaviy o'chib ketmasligi uchun klient `UNKNOWN_KEY`da faqat
+    // log qiladi. Faqat vendorning aniq qarori (`isActive:false`) imzolangan
+    // `LICENSE_REVOKED` beradi.
+    if (!lic) {
+      throw Object.assign(new Error('UNKNOWN_KEY'), { status: 403 });
+    }
+    if (!lic.isActive) {
+      throw Object.assign(new Error('LICENSE_REVOKED'), {
+        status: 403,
+        revocation: buildRevocation(lic, fingerprint, new Date().toISOString()),
+      });
     }
     // CLI-411 — heartbeat NIKAKDA fingerprint bog'lamaydi; faqat allaqachon
     // `activate` (yoki admin `reactivate`) orqali bog'langanini tasdiqlaydi.

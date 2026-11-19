@@ -1,9 +1,14 @@
 /**
  * CLI-387 — proves the DoD end-to-end: an active Local Desktop clinic passes
  * requireModule() gating; once a heartbeat confirms the Supervisor
- * deactivated it (INVALID_KEY), the cached .lic is invalidated and the very
- * next request is blocked — no process restart, no extra signal, because
- * getActiveModules() re-reads the file on every call (see license.ts).
+ * deactivated it, the cached .lic is invalidated and the very next request is
+ * blocked — no process restart, no extra signal, because getActiveModules()
+ * re-reads the file on every call (see license.ts).
+ *
+ * FX-07 (LA-16) — deactivation is now a SIGNED `LICENSE_REVOKED` revocation;
+ * the old unsigned `INVALID_KEY` no longer invalidates the .lic (intentional
+ * behaviour change — see tests/integration/fx-07-license-revoke.test.ts for
+ * the full forged/replayed/other-machine matrix).
  *
  * Hermetic — no Postgres (unlike cli-358-module-gating.test.ts): builds a
  * bare Hono app around requireModule() directly, and uses a REAL signed
@@ -90,7 +95,7 @@ describe('CLI-387 — deactivated clinic gets blocked on next heartbeat', () => 
     globalThis.fetch = originalFetch;
   });
 
-  test('active license passes (200) -> Supervisor heartbeat says INVALID_KEY -> next request 403 LICENSE_NOT_FOUND', async () => {
+  test('active license passes (200) -> Supervisor heartbeat says signed LICENSE_REVOKED -> next request 403 LICENSE_NOT_FOUND', async () => {
     const payload = activeLicensePayload('CLI-387-KEY-1');
     await writeLicense({ ...payload, signature: signForTest(payload) });
 
@@ -101,9 +106,26 @@ describe('CLI-387 — deactivated clinic gets blocked on next heartbeat', () => 
     expect(before.status).toBe(200);
 
     // Supervisor now reports the clinic deactivated (PATCH /:id/deactivate
-    // set isActive:false; licenses.service.ts heartbeat() throws INVALID_KEY).
+    // set isActive:false; licenses.service.ts heartbeat() throws
+    // LICENSE_REVOKED with a signed flat revocation — FX-07).
+    const revocation = {
+      status: 'revoked',
+      licenseKey: payload.licenseKey,
+      clinicId: payload.clinicId,
+      fingerprint: localFingerprint,
+      issuedAt: new Date().toISOString(),
+    };
     globalThis.fetch = mock(
-      async () => new Response(JSON.stringify({ error: { code: 'INVALID_KEY' } }), { status: 403 }),
+      async () =>
+        new Response(
+          JSON.stringify({
+            error: {
+              code: 'LICENSE_REVOKED',
+              revocation: { ...revocation, signature: signForTest(revocation) },
+            },
+          }),
+          { status: 403 },
+        ),
     ) as unknown as typeof fetch;
 
     await runLicenseHeartbeatCheck({
@@ -120,6 +142,28 @@ describe('CLI-387 — deactivated clinic gets blocked on next heartbeat', () => 
     expect(after.status).toBe(403);
     const body = (await after.json()) as { error: { code: string } };
     expect(body.error.code).toBe('LICENSE_NOT_FOUND');
+  });
+
+  test('unsigned INVALID_KEY (old Supervisor / MITM) does NOT invalidate the cached license (FX-07)', async () => {
+    const payload = activeLicensePayload('CLI-387-KEY-3');
+    await writeLicense({ ...payload, signature: signForTest(payload) });
+
+    const app = buildApp();
+    expect((await app.request('/x')).status).toBe(200);
+
+    globalThis.fetch = mock(
+      async () => new Response(JSON.stringify({ error: { code: 'INVALID_KEY' } }), { status: 403 }),
+    ) as unknown as typeof fetch;
+
+    await runLicenseHeartbeatCheck({
+      readLicense,
+      writeLicense,
+      invalidateLicense,
+      sendHeartbeat,
+      log: logger,
+    });
+
+    expect((await app.request('/x')).status).toBe(200);
   });
 
   test('transient network error during heartbeat does NOT invalidate the cached license (offline resilience)', async () => {
