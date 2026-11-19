@@ -70,6 +70,13 @@ describe('handleLicenseBlock (P18)', () => {
     expect(assign).toHaveBeenCalledWith('/activate');
   });
 
+  // FX-161 — `.lic` vaqtincha o'qilmadi (503): aktivatsiyaga qattiq redirect YO'Q.
+  it("503 LICENSE_UNAVAILABLE — /activate'ga yo'naltirmaydi", () => {
+    stubLocation('/patients');
+    expect(handleLicenseBlock(new ApiError('LICENSE_UNAVAILABLE', 'x', 503))).toBe(false);
+    expect(assign).not.toHaveBeenCalled();
+  });
+
   it("maqsad sahifada qayta yo'naltirmaydi; boshqa 403 e'tiborsiz", () => {
     stubLocation('/license-expired');
     expect(handleLicenseBlock(new ApiError('LICENSE_EXPIRED', 'x', 403))).toBe(true);

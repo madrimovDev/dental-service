@@ -122,19 +122,48 @@ export const writeLicense = async (data: LicenseData): Promise<void> => {
   await writeFile(licensePath, payload.toString('base64'));
 };
 
-export const readLicense = async (): Promise<LicenseData | null> => {
+/**
+ * FX-161 (LC-40) — `.lic` o'qish natijasi sababi bilan.
+ *
+ * - `missing` — fayl haqiqatan yo'q (ENOENT): aktivatsiya kerak.
+ * - `unreadable` — fayl BOR, lekin hozir o'qib bo'lmadi (EACCES/EBUSY/EPERM —
+ *   antivirus/zaxira dasturi faylni ushlab turgan, ruxsat vaqtincha buzilgan).
+ *   Bu «litsenziya yo'q» EMAS: gate'lar 503 `LICENSE_UNAVAILABLE` qaytaradi,
+ *   web `/activate`ga qattiq redirect qilmaydi.
+ * - `invalid` — fayl o'qildi, lekin decrypt/JSON bo'lmadi yoki fingerprint
+ *   hisoblanmadi (avvalgidek — qayta aktivatsiya yo'li, `LICENSE_NOT_FOUND`).
+ */
+export type LicenseReadResult =
+  | { kind: 'ok'; data: LicenseData }
+  | { kind: 'missing' }
+  | { kind: 'unreadable' }
+  | { kind: 'invalid' };
+
+export const readLicenseResult = async (): Promise<LicenseReadResult> => {
+  let raw: string;
   try {
-    const raw = await readFile(getLicensePath(), 'utf8');
+    raw = await readFile(getLicensePath(), 'utf8');
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === 'ENOENT'
+      ? { kind: 'missing' }
+      : { kind: 'unreadable' };
+  }
+  try {
     const payload = Buffer.from(raw, 'base64');
     const iv = payload.subarray(0, 16);
     const encrypted = payload.subarray(16);
     const key = await getKey();
     const decipher = createDecipheriv('aes-256-cbc', key, iv);
     const json = Buffer.concat([decipher.update(encrypted), decipher.final()]).toString('utf8');
-    return JSON.parse(json) as LicenseData;
+    return { kind: 'ok', data: JSON.parse(json) as LicenseData };
   } catch {
-    return null;
+    return { kind: 'invalid' };
   }
+};
+
+export const readLicense = async (): Promise<LicenseData | null> => {
+  const r = await readLicenseResult();
+  return r.kind === 'ok' ? r.data : null;
 };
 
 const DAY_MS = 86400000;
