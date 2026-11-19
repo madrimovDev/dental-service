@@ -18,7 +18,7 @@ import {
   prescriptionIdParamSchema,
   updatePrescriptionSchema,
 } from './prescriptions.schema.ts';
-import { createPrescriptionsService } from './prescriptions.service.ts';
+import { AllergyConflictError, createPrescriptionsService } from './prescriptions.service.ts';
 
 /** Standart 404 response — get / patch / delete endpoint'lar uchun. */
 const notFoundResponse = {
@@ -84,6 +84,10 @@ export const prescriptionsRoutes = (deps: { db: Database; audit: AuditLogger }) 
         content: { 'application/json': { schema: errorResponseSchema } },
         description: 'Forbidden',
       },
+      409: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Drug conflicts with a recorded allergy and no reasoned override (FX-22)',
+      },
     },
   });
 
@@ -97,6 +101,9 @@ export const prescriptionsRoutes = (deps: { db: Database; audit: AuditLogger }) 
       // CLI-421: cross-entity ownership mismatch (patientId/doctorId/visitNoteId) → 400.
       if (e instanceof CrossEntityError) {
         return c.json(fail(`ownership.${e.reason}`, e.message), 400);
+      }
+      if (e instanceof AllergyConflictError) {
+        return c.json(fail('prescription.allergy_conflict', e.message, e.conflicts), 409);
       }
       throw e;
     }
@@ -135,7 +142,14 @@ export const prescriptionsRoutes = (deps: { db: Database; audit: AuditLogger }) 
       params: prescriptionIdParamSchema,
       body: { content: { 'application/json': { schema: updatePrescriptionSchema } } },
     },
-    responses: { ...okJson(prescriptionDtoSchema, 'Updated prescription'), ...notFoundResponse },
+    responses: {
+      ...okJson(prescriptionDtoSchema, 'Updated prescription'),
+      ...notFoundResponse,
+      409: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Drug conflicts with a recorded allergy and no reasoned override (FX-22)',
+      },
+    },
   });
 
   app.openapi(updateRoute, async (c) => {
@@ -149,6 +163,9 @@ export const prescriptionsRoutes = (deps: { db: Database; audit: AuditLogger }) 
       // CLI-421: cross-entity ownership mismatch (doctorId/visitNoteId) → 400.
       if (e instanceof CrossEntityError) {
         return c.json(fail(`ownership.${e.reason}`, e.message), 400);
+      }
+      if (e instanceof AllergyConflictError) {
+        return c.json(fail('prescription.allergy_conflict', e.message, e.conflicts), 409);
       }
       throw e;
     }

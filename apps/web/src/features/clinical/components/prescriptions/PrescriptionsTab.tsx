@@ -1,4 +1,4 @@
-import { Mono, StateView } from '@dental/ui';
+import { CriticalActionDialog, Mono, StateView } from '@dental/ui';
 import {
   ActionIcon,
   Box,
@@ -17,11 +17,43 @@ import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
 import { IconPill, IconPlus, IconTrash } from '@tabler/icons-react';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useMedicalRecord } from '@/features/patients/patients.api';
 import { useAuthStore } from '@/stores/auth-store.ts';
+import {
+  firstUnresolvedDrugConflict,
+  isAllergyUnknown,
+  overridesForDrugs,
+  serverAllergyConflict,
+  unknownAllergyOverrides,
+} from '../../allergy-guard';
 import { useCreatePrescription, usePrescriptions } from '../../clinical.api';
 import { toPrescriptionVM } from '../../clinical.mappers';
 import { type PrescriptionFormValues, prescriptionFormSchema } from '../../clinical.schema';
+import type { AllergyOverride } from '../../clinical.types';
+
+const CONFLICT_REASONS = [
+  'benefit_outweighs_risk',
+  'patient_informed',
+  'allergy_not_confirmed',
+  'no_alternative',
+] as const;
+const UNKNOWN_REASONS = [
+  'allergy_checked_verbally',
+  'benefit_outweighs_risk',
+  'patient_informed',
+] as const;
+
+/** FX-22: kritik oyna holati — qaysi sabab bilan, qaysi forma qiymatlari qayta yuboriladi. */
+type Prompt =
+  | { kind: 'unknown'; values: PrescriptionFormValues; overrides: AllergyOverride[] }
+  | {
+      kind: 'conflict';
+      values: PrescriptionFormValues;
+      overrides: AllergyOverride[];
+      conflict: { drug: string; group: string; allergen: string };
+    };
 
 type Props = { patientId: string };
 
@@ -34,6 +66,10 @@ export function PrescriptionsTab({ patientId }: Props) {
 
   const listQuery = usePrescriptions(patientId);
   const createMut = useCreatePrescription(patientId);
+  const medicalQuery = useMedicalRecord(patientId);
+  const [prompt, setPrompt] = useState<Prompt | null>(null);
+  // Noma'lum allergiyada tasdiqlangan sabab (forma yopilguncha/muvaffaqiyatgacha eslab qolinadi).
+  const [unknownAck, setUnknownAck] = useState<string | null>(null);
 
   const form = useForm<PrescriptionFormValues>({
     initialValues: { diagnosis: '', notes: '', items: [] },
@@ -42,8 +78,9 @@ export function PrescriptionsTab({ patientId }: Props) {
 
   if (!canView) return <Text c="dimmed">{t('patients.no_medical_permission')}</Text>;
 
-  const submit = form.onSubmit((values) => {
+  const send = (values: PrescriptionFormValues, overrides: AllergyOverride[]) => {
     if (!user) return;
+    const drugs = values.items.map((i) => i.medicationName);
     createMut.mutate(
       {
         patientId,
@@ -51,15 +88,62 @@ export function PrescriptionsTab({ patientId }: Props) {
         items: values.items,
         diagnosis: values.diagnosis || undefined,
         notes: values.notes || undefined,
+        allergyOverrides: overridesForDrugs(drugs, overrides),
       },
       {
         onSuccess: () => {
           form.reset();
           close();
+          setPrompt(null);
+          setUnknownAck(null);
+        },
+        onError: (e) => {
+          // FX-22: server o'zi ham tekshiradi — bizda ma'lumot yo'q/eskirgan bo'lsa ham oyna chiqadi.
+          const conflict = serverAllergyConflict(e);
+          if (conflict) setPrompt({ kind: 'conflict', values, overrides, conflict });
         },
       },
     );
-  });
+  };
+
+  /** Mijoz tomonidagi qo'riqchi: avval to'qnashuv, so'ng noma'lum allergiya, so'ng yuborish. */
+  const attempt = (
+    values: PrescriptionFormValues,
+    overrides: AllergyOverride[],
+    unknownReason: string | null = unknownAck,
+  ) => {
+    const drugs = values.items.map((i) => i.medicationName);
+    if (isAllergyUnknown(medicalQuery)) {
+      if (!unknownReason) {
+        setPrompt({ kind: 'unknown', values, overrides });
+        return;
+      }
+    } else {
+      const hit = firstUnresolvedDrugConflict(drugs, medicalQuery.data?.allergies, overrides);
+      if (hit) {
+        setPrompt({ kind: 'conflict', values, overrides, conflict: hit.conflict });
+        return;
+      }
+    }
+    send(
+      values,
+      unknownReason ? [...overrides, ...unknownAllergyOverrides(drugs, unknownReason)] : overrides,
+    );
+  };
+
+  const submit = form.onSubmit((values) => attempt(values, []));
+
+  const confirmPrompt = (reason: string | null) => {
+    if (!prompt || !reason) return;
+    setPrompt(null);
+    if (prompt.kind === 'unknown') {
+      setUnknownAck(reason);
+      attempt(prompt.values, prompt.overrides, reason);
+    } else {
+      const { drug, group, allergen } = prompt.conflict;
+      attempt(prompt.values, [...prompt.overrides, { drug, group, allergen, reason }]);
+    }
+  };
 
   return (
     <Stack gap="md">
@@ -280,6 +364,33 @@ export function PrescriptionsTab({ patientId }: Props) {
           </Stack>
         </form>
       </Modal>
+
+      <CriticalActionDialog
+        opened={prompt !== null}
+        title={t(
+          prompt?.kind === 'unknown' ? 'visitNote.allergyUnknownTitle' : 'visitNote.allergyTitle',
+        )}
+        reasons={(prompt?.kind === 'unknown' ? UNKNOWN_REASONS : CONFLICT_REASONS).map((r) => ({
+          value: r,
+          label: t(`visitNote.reason.${r}`),
+        }))}
+        reasonsLabel={t('visitNote.reasonsLabel')}
+        safeLabel={t(
+          prompt?.kind === 'unknown' ? 'visitNote.allergyUnknownSafe' : 'visitNote.allergySafe',
+        )}
+        dangerLabel={t('visitNote.allergyDanger')}
+        onSafe={() => setPrompt(null)}
+        onConfirm={confirmPrompt}
+      >
+        {prompt?.kind === 'conflict'
+          ? t('visitNote.allergyBody', {
+              allergen: prompt.conflict.allergen,
+              drug: prompt.conflict.drug,
+            })
+          : prompt?.kind === 'unknown'
+            ? t('visitNote.allergyUnknownBody')
+            : ''}
+      </CriticalActionDialog>
     </Stack>
   );
 }

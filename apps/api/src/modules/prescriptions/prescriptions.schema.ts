@@ -1,4 +1,5 @@
 import { z } from '@hono/zod-openapi';
+import { allergyOverrideSchema } from '../clinical/visit-notes/visit-notes.schema.ts';
 
 /** Prescription item — `items[]` JSONB array elementi. */
 export const prescriptionItemDtoSchema = z
@@ -66,6 +67,8 @@ export const createPrescriptionSchema = z.object({
   items: z.array(prescriptionItemInputSchema).min(1),
   diagnosis: z.string().max(500).optional(),
   notes: z.string().max(2000).optional(),
+  // FX-22 (LA-34): dori↔allergiya to'qnashuvidan SABAB bilan o'tish (aks holda server 409).
+  allergyOverrides: z.array(allergyOverrideSchema).max(50).optional(),
 });
 
 export type CreatePrescriptionInput = z.infer<typeof createPrescriptionSchema>;

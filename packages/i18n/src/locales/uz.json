@@ -2010,7 +2010,8 @@
       "benefit_outweighs_risk": "Foyda xavfdan ustun",
       "patient_informed": "Bemor xabardor, rozi",
       "allergy_not_confirmed": "Allergiya tasdiqlanmagan",
-      "no_alternative": "Muqobil dori yo‘q"
+      "no_alternative": "Muqobil dori yo‘q",
+      "allergy_checked_verbally": "Allergiya og‘zaki so‘rab tekshirildi"
     },
     "planLink": "Reja bilan bog‘lash",
     "noPlan": "Rejasiz vizit",
@@ -2037,7 +2038,10 @@
     "readOnly": "Faqat ko‘rish",
     "validationEmpty": "Kamida shikoyat, tashxis yoki bajarilgan ishdan birini kiriting",
     "plan": "Reja",
-    "freeNotes": "Qo‘shimcha izoh"
+    "freeNotes": "Qo‘shimcha izoh",
+    "allergyUnknownTitle": "Allergiya ma’lumoti noma’lum",
+    "allergyUnknownBody": "Bemorning allergiya ma’lumoti yuklanmadi yoki ko‘rish ruxsati yo‘q. Dori allergiyaga zid bo‘lishi mumkin — davom etish sababini tanlang.",
+    "allergyUnknownSafe": "Avval tekshiraman"
   },
   "ownerHome": {
     "title": "Siz hal qiladigan masalalar",

@@ -10,6 +10,12 @@ import { useMedicalRecord, usePatient } from '@/features/patients/patients.api';
 import { formatCurrency } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import {
+  isAllergyUnknown,
+  overridesForDrugs,
+  serverAllergyConflict,
+  unknownAllergyOverrides,
+} from '../../allergy-guard';
+import {
   useCreatePrescription,
   useCreateVisitNote,
   useDiagnoses,
@@ -47,6 +53,12 @@ const REASONS = [
   'patient_informed',
   'allergy_not_confirmed',
   'no_alternative',
+] as const;
+// FX-22: allergiya ma'lumoti noma'lum bo'lganda davom etish sabablari.
+const UNKNOWN_REASONS = [
+  'allergy_checked_verbally',
+  'benefit_outweighs_risk',
+  'patient_informed',
 ] as const;
 const NEXT_VISITS: NextVisit[] = ['none', '2w', '6m'];
 const AUTOSAVE_MS = 700;
@@ -98,6 +110,9 @@ export function VisitNotePage() {
     group: string;
   } | null>(null);
   const [busy, setBusy] = useState(false);
+  // FX-22: allergiya noma'lum — shifokor sabab bilan tasdiqlagan (shu sessiya davomida).
+  const [unknownAck, setUnknownAck] = useState<string | null>(null);
+  const [unknownPrompt, setUnknownPrompt] = useState(false);
   const hydrated = useRef(false);
 
   const note = noteQuery.data as VisitNoteView | undefined;
@@ -160,6 +175,8 @@ export function VisitNotePage() {
   const patch = (p: Partial<VisitFormValues>) => setValues((v) => ({ ...v, ...p }));
   const readOnly = signed;
   const allergies = medicalQuery.data?.allergies ?? null;
+  // FX-22 (LA-34): yuklanmoqda / xato / 403 — «allergiya yo'q» emas, NOMA'LUM.
+  const allergyUnknown = isAllergyUnknown(medicalQuery);
 
   // ── tashxis / xizmat / reja opsiyalari ───────────────────────────────────
   const diagnoses = diagnosesQuery.data ?? [];
@@ -245,7 +262,7 @@ export function VisitNotePage() {
   const hasDrugs = rx.some((r) => r.drug.trim() !== '');
   const allergyState = unresolved
     ? 'conflict'
-    : medicalQuery.isError
+    : allergyUnknown
       ? 'unknown'
       : hasDrugs
         ? 'ok'
@@ -277,6 +294,11 @@ export function VisitNotePage() {
       return null;
     }
     const completeRx = rx.filter(isRxRowComplete);
+    // FX-22: allergiya noma'lum + retsept bor — sabab bilan tasdiqlanmaguncha saqlanmaydi/imzolanmaydi.
+    if (completeRx.length > 0 && allergyUnknown && !unknownAck) {
+      setUnknownPrompt(true);
+      return null;
+    }
     const empty =
       !values.subjective &&
       !values.objective &&
@@ -303,7 +325,16 @@ export function VisitNotePage() {
       patientId,
       doctorId: user.id,
       isEdit: !!noteId,
-      overrides,
+      overrides:
+        unknownAck && completeRx.length > 0
+          ? [
+              ...overrides,
+              ...unknownAllergyOverrides(
+                completeRx.map((r) => r.drug.trim()),
+                unknownAck,
+              ),
+            ]
+          : overrides,
     });
     let id = noteId;
     if (id) {
@@ -315,17 +346,32 @@ export function VisitNotePage() {
       setNoteId(id);
     }
     if (completeRx.length > 0) {
-      await createRx.mutateAsync({
-        patientId,
-        doctorId: user.id,
-        visitNoteId: id,
-        items: completeRx.map((r) => ({
-          medicationName: r.drug.trim(),
-          dosage: r.dosage.trim(),
-          frequency: r.frequency.trim(),
-          durationDays: r.days === '' ? undefined : r.days,
-        })),
-      });
+      const drugs = completeRx.map((r) => r.drug.trim());
+      try {
+        await createRx.mutateAsync({
+          patientId,
+          doctorId: user.id,
+          visitNoteId: id,
+          items: completeRx.map((r) => ({
+            medicationName: r.drug.trim(),
+            dosage: r.dosage.trim(),
+            frequency: r.frequency.trim(),
+            durationDays: r.days === '' ? undefined : r.days,
+          })),
+          allergyOverrides: overridesForDrugs(drugs, knownOverrides),
+        });
+      } catch (e) {
+        // FX-22: server allergiyani o'zi tekshiradi (bizda ma'lumot yo'q/eskirgan bo'lsa ham).
+        const c = serverAllergyConflict(e);
+        if (!c) throw e;
+        const index = Math.max(
+          0,
+          rx.findIndex((r) => r.drug.trim() === c.drug),
+        );
+        setConflict({ index, drug: c.drug, allergen: c.allergen, group: c.group });
+        // Vizit yozuvi allaqachon saqlangan (noteId o'rnatilgan) — keyingi urinish tahrir bo'ladi.
+        return null;
+      }
       setRx((rows) => rows.filter((r) => !isRxRowComplete(r)));
     }
     clearDraft(draftKey(patientId, noteId));
@@ -682,6 +728,23 @@ export function VisitNotePage() {
           </Button>
         </div>
       )}
+
+      <CriticalActionDialog
+        opened={unknownPrompt}
+        title={t('visitNote.allergyUnknownTitle')}
+        reasons={UNKNOWN_REASONS.map((r) => ({ value: r, label: t(`visitNote.reason.${r}`) }))}
+        reasonsLabel={t('visitNote.reasonsLabel')}
+        safeLabel={t('visitNote.allergyUnknownSafe')}
+        dangerLabel={t('visitNote.allergyDanger')}
+        onSafe={() => setUnknownPrompt(false)}
+        onConfirm={(reason) => {
+          if (!reason) return;
+          setUnknownAck(reason);
+          setUnknownPrompt(false);
+        }}
+      >
+        {t('visitNote.allergyUnknownBody')}
+      </CriticalActionDialog>
 
       <CriticalActionDialog
         opened={conflict !== null}

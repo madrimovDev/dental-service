@@ -1,3 +1,4 @@
+import { ApiError } from '@dental/api-client';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -12,6 +13,8 @@ let note: Record<string, unknown> | undefined;
 let notes: Array<Record<string, unknown>> = [];
 let allergies: Array<{ substance: string }> | null = [{ substance: 'Penitsillin' }];
 let plans: Array<Record<string, unknown>> = [];
+let medicalState: { isError: boolean; isLoading: boolean } = { isError: false, isLoading: false };
+let rxError: unknown = null;
 
 vi.mock('../../clinical.api', () => ({
   useVisitNote: () => ({ data: note, isLoading: false, isError: false, refetch: vi.fn() }),
@@ -48,14 +51,17 @@ vi.mock('../../clinical.api', () => ({
     isPending: false,
     mutateAsync: (b: unknown) => {
       rxMutate(b);
-      return Promise.resolve({});
+      return rxError ? Promise.reject(rxError) : Promise.resolve({});
     },
   }),
 }));
 
 vi.mock('@/features/patients/patients.api', () => ({
   usePatient: () => ({ data: { fullName: 'Jasur Tursunov' } }),
-  useMedicalRecord: () => ({ data: { allergies }, isError: false }),
+  useMedicalRecord: () => ({
+    data: medicalState.isError ? undefined : { allergies },
+    ...medicalState,
+  }),
 }));
 
 vi.mock('@/stores/auth-store.ts', () => ({
@@ -90,6 +96,8 @@ describe('VisitNotePage — dori ↔ allergiya (UI-D4)', () => {
     notes = [];
     allergies = [{ substance: 'Penitsillin' }];
     plans = [];
+    medicalState = { isError: false, isLoading: false };
+    rxError = null;
   });
 
   it('penitsillin allergiyali bemorga amoksitsillin → kritik oyna; sabab tanlanmaguncha davom etib bo‘lmaydi', () => {
@@ -308,5 +316,63 @@ describe('VisitNotePage — dori ↔ allergiya (UI-D4)', () => {
   it('bog‘lanmagan qoralamada «Rejasiz vizit» tanlanadi', () => {
     mount();
     expect(screen.getByRole('radio', { name: 'Rejasiz vizit' })).toBeEnabled();
+  });
+
+  const fillRx = () => {
+    addDrug('Ibuprofen');
+    fireEvent.change(screen.getByLabelText('Doza'), { target: { value: '200 mg' } });
+    fireEvent.change(screen.getByLabelText('Qanday'), { target: { value: '1×2' } });
+    fireEvent.change(screen.getByLabelText('Shikoyat'), { target: { value: 'og‘riq' } });
+  };
+
+  it('FX-22: allergiya noma‘lum (xato/403) + retsept → kritik oyna, saqlanmaydi; sabab bilan tasdiqlangach audit izi bilan saqlanadi', async () => {
+    medicalState = { isError: true, isLoading: false };
+    mount();
+    fillRx();
+    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    expect(await screen.findByText('Allergiya ma’lumoti noma’lum')).toBeInTheDocument();
+    expect(createMutate).not.toHaveBeenCalled();
+    expect(rxMutate).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Allergiya og‘zaki so‘rab tekshirildi' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Baribir davom etish' }));
+    await waitFor(() => expect(screen.queryByText('Allergiya ma’lumoti noma’lum')).toBeNull());
+    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    await waitFor(() => expect(createMutate).toHaveBeenCalledTimes(1));
+    expect(createMutate.mock.calls[0]?.[0]).toMatchObject({
+      allergyOverrides: [
+        { drug: 'Ibuprofen', group: 'unknown', reason: 'allergy_checked_verbally' },
+      ],
+    });
+    await waitFor(() => expect(rxMutate).toHaveBeenCalledTimes(1));
+  });
+
+  it('FX-22: allergiya yuklanayotganda ham retsept bilan saqlash tasdiqsiz o‘tmaydi', async () => {
+    medicalState = { isError: false, isLoading: true };
+    mount();
+    fillRx();
+    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    expect(await screen.findByText('Allergiya ma’lumoti noma’lum')).toBeInTheDocument();
+    expect(createMutate).not.toHaveBeenCalled();
+  });
+
+  it('FX-22: retseptsiz vizit — allergiya noma‘lum bo‘lsa ham oyna chiqmaydi', async () => {
+    medicalState = { isError: true, isLoading: false };
+    mount();
+    fireEvent.change(screen.getByLabelText('Shikoyat'), { target: { value: 'og‘riq' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    await waitFor(() => expect(createMutate).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText('Allergiya ma’lumoti noma’lum')).toBeNull();
+  });
+
+  it('FX-22: server 409 prescription.allergy_conflict → kritik oyna (mijoz ma‘lumoti bo‘lmasa ham)', async () => {
+    allergies = null;
+    rxError = new ApiError('prescription.allergy_conflict', 'conflict', 409, [
+      { drug: 'Ibuprofen', group: 'nsaid', allergen: 'Aspirin' },
+    ]);
+    mount();
+    fillRx();
+    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    expect(await screen.findByText('Allergiya ogohlantirishi')).toBeInTheDocument();
   });
 });

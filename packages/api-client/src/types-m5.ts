@@ -1,4 +1,4 @@
-import type { PrescriptionItem } from './generated/model/index.ts';
+import type { PrescriptionItem, VisitNoteAllergyOverride } from './generated/model/index.ts';
 
 // ===== Prescriptions — Input types =====
 // PrescriptionItem: from generated (same shape, no re-export needed here — barrel adds it explicitly)
@@ -11,6 +11,8 @@ export type CreatePrescriptionInput = {
   items: PrescriptionItem[];
   diagnosis?: string;
   notes?: string;
+  /** FX-22: dori↔allergiya to'qnashuvidan sabab bilan o'tish (aks holda server 409). */
+  allergyOverrides?: VisitNoteAllergyOverride[];
 };
 
 // ===== Consent — hand type aliases =====

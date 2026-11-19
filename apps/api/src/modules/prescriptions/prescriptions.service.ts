@@ -1,4 +1,9 @@
-import { prescriptions } from '@dental/db-schema';
+import {
+  type DrugAllergyConflict,
+  findDrugAllergyConflicts,
+  overrideCoversConflict,
+} from '@dental/core';
+import { medicalRecords, prescriptions } from '@dental/db-schema';
 import { and, desc, eq } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { onAfterCommit } from '../../db/after-commit.ts';
@@ -8,6 +13,17 @@ import { createOwnershipValidator, type OwnershipValidator } from '../../lib/own
 import type { PatientMessenger } from '../../lib/telegram/notify.ts';
 import type { CreatePrescriptionInput, UpdatePrescriptionInput } from './prescriptions.schema.ts';
 
+/**
+ * FX-22 (LA-34): retsept bemor allergiyasiga zid va sababli override yo'q → route 409
+ * `prescription.allergy_conflict`. Hech narsa yozilmasdan (insert/update'dan OLDIN) otiladi.
+ */
+export class AllergyConflictError extends Error {
+  constructor(readonly conflicts: DrugAllergyConflict[]) {
+    super('Prescription conflicts with a recorded patient allergy');
+    this.name = 'AllergyConflictError';
+  }
+}
+
 export const createPrescriptionsService = (deps: {
   audit: AuditLogger;
   ownership?: OwnershipValidator;
@@ -15,6 +31,36 @@ export const createPrescriptionsService = (deps: {
   messenger?: PatientMessenger;
 }) => {
   const ownership = deps.ownership ?? createOwnershipValidator();
+
+  /**
+   * Server tomonda yagona qoida (web bilan bir xil core funksiya). Allergiyani to'g'ridan
+   * RLS-bound tx'dan o'qiydi — chaqiruvchida `medical_record.view` bo'lishi shart emas
+   * (yozuv bo'lmasa/bo'sh bo'lsa to'qnashuv yo'q).
+   */
+  async function assertNoUnresolvedAllergyConflict(
+    c: Context,
+    patientId: string,
+    items: Array<{ medicationName: string }>,
+    overrides: CreatePrescriptionInput['allergyOverrides'],
+  ) {
+    const [record] = await getDb(c)
+      .select({ allergies: medicalRecords.allergies })
+      .from(medicalRecords)
+      .where(eq(medicalRecords.patientId, patientId));
+    const allergies = record?.allergies;
+    if (!Array.isArray(allergies) || allergies.length === 0) return;
+    const unresolved: DrugAllergyConflict[] = [];
+    for (const item of items) {
+      for (const conflict of findDrugAllergyConflicts(item.medicationName, allergies)) {
+        if (
+          !(overrides ?? []).some((o) => overrideCoversConflict(o, item.medicationName, conflict))
+        )
+          unresolved.push(conflict);
+      }
+    }
+    if (unresolved.length > 0) throw new AllergyConflictError(unresolved);
+  }
+
   async function list(c: Context, patientId?: string) {
     const db = getDb(c);
     const filters = [];
@@ -58,6 +104,12 @@ export const createPrescriptionsService = (deps: {
     await ownership.assertUserExists(c, input.doctorId);
     if (input.visitNoteId)
       await ownership.assertVisitNoteBelongsToPatient(c, input.visitNoteId, input.patientId);
+    await assertNoUnresolvedAllergyConflict(
+      c,
+      input.patientId,
+      input.items,
+      input.allergyOverrides,
+    );
 
     const [row] = await db
       .insert(prescriptions)
@@ -78,7 +130,12 @@ export const createPrescriptionsService = (deps: {
         action: 'created',
         resourceType: 'prescription',
         resourceId: row.id,
-        after: { patientId: input.patientId, itemCount: input.items.length },
+        after: {
+          patientId: input.patientId,
+          itemCount: input.items.length,
+          // FX-22: sabab bilan o'tilgan allergiya to'qnashuvlari (audit izi).
+          ...(input.allergyOverrides?.length ? { allergyOverrides: input.allergyOverrides } : {}),
+        },
       });
       const messenger = deps.messenger;
       if (messenger) {
@@ -106,6 +163,13 @@ export const createPrescriptionsService = (deps: {
     if (input.doctorId) await ownership.assertUserExists(c, input.doctorId);
     if (input.visitNoteId)
       await ownership.assertVisitNoteBelongsToPatient(c, input.visitNoteId, before.patientId);
+    if (input.items)
+      await assertNoUnresolvedAllergyConflict(
+        c,
+        before.patientId,
+        input.items,
+        input.allergyOverrides,
+      );
 
     const patch: Record<string, unknown> = { updatedAt: new Date() };
     if (input.doctorId) patch.doctorId = input.doctorId;
@@ -127,7 +191,9 @@ export const createPrescriptionsService = (deps: {
         resourceType: 'prescription',
         resourceId: id,
         before,
-        after: row,
+        after: input.allergyOverrides?.length
+          ? { ...row, allergyOverrides: input.allergyOverrides }
+          : row,
       });
     }
     return row;
