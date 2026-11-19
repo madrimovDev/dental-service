@@ -64,6 +64,8 @@ export const bookHubConfirmedPrice = async (
 ): Promise<{ booked: boolean; expenseId: string | null }> => {
   const order = await lockOrder(tx, labOrderId);
   if (!order || order.approvedPrice != null) return { booked: false, expenseId: null };
+  // FX-46: bekor qilingan ishga xarajat yozilmaydi (Hub tasdig'i kech kelsa ham).
+  if (order.status === 'cancelled') return { booked: false, expenseId: null };
   const price = Number(hubPrice).toFixed(2);
   const requestedBy = order.priceApprovalRequestedBy ?? null;
 

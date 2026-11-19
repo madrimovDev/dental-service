@@ -196,6 +196,13 @@ export const labHubClient = (fetchImpl?: FetchFn) => ({
       key,
       fetchImpl,
     }),
+  /** FX-46: klinika ishni bekor qildi — Hub'dagi ish ham yopiladi (lab ishlashni to'xtatadi). */
+  cancelCase: (key: string, caseRef: string) =>
+    json<{ status: string; changed: boolean }>(`/v1/clinic/cases/${ref(caseRef)}/cancel`, {
+      method: 'POST',
+      key,
+      fetchImpl,
+    }),
   changes: (key: string, since: string, limit: number) =>
     json<{ events: HubChangeEvent[]; nextCursor: string }>(
       `/v1/clinic/changes?since=${encodeURIComponent(since)}&limit=${limit}`,

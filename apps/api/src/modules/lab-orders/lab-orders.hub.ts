@@ -38,7 +38,13 @@ export const normalizeMoney = (v: string | number): string | null => {
   return n.toFixed(2);
 };
 
-export type LabOrderHubOp = 'upsert_case' | 'file' | 'message' | 'approve_price' | 'delivered';
+export type LabOrderHubOp =
+  | 'upsert_case'
+  | 'file'
+  | 'message'
+  | 'approve_price'
+  | 'delivered'
+  | 'cancel';
 
 /** Outbox'ga qator (biznes tranzaksiyasi ichida) + commit'dan keyin bir marta push urinishi. */
 export const enqueueLabHub = async (
@@ -137,6 +143,8 @@ export const createLabOrdersHubService = (deps: { audit: AuditLogger }) => {
     const order = await lockOrder(db, id);
     if (!order) throw new LabHubOrderError(404, 'lab_order.not_found');
     if (!order.labHubCaseRef) throw new LabHubOrderError(409, 'lab_hub.not_sent');
+    // FX-46: bekor qilingan ishga narx tasdiqlanmaydi (xarajat yozilmaydi).
+    if (order.status === 'cancelled') throw new LabHubOrderError(409, 'lab_order.cancelled');
 
     if (order.approvedPrice != null) {
       if (order.approvedPrice !== shown) {

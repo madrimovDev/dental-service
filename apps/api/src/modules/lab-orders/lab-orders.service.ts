@@ -253,13 +253,23 @@ export const createLabOrdersService = (deps: {
       patch.deliveredDate = input.deliveredDate ? new Date(input.deliveredDate) : null;
     if (input.cost !== undefined) patch.cost = input.cost === null ? null : String(input.cost);
     if (input.notes !== undefined) patch.notes = input.notes;
+    // FX-46: bekor qilinayotgan ishda kutilayotgan narx tasdig'i qolmaydi (Hub'ga yuborilmaydi).
+    const cancelling = input.status === 'cancelled' && before.status !== 'cancelled';
+    if (cancelling && before.labHubCaseRef) {
+      patch.priceApprovalRequestedAt = null;
+      patch.priceApprovalRequestedPrice = null;
+      patch.priceApprovalRequestedBy = null;
+    }
 
     const [row] = await db.update(labOrders).set(patch).where(eq(labOrders.id, id)).returning();
     // Lab Hub: Hub'ga yuborilgan buyurtma — «yetkazildi» Hub'ga ham ketadi; ish hali `sent`
     // holatida bo'lsa (lab qabul qilmagan) tahrir qayta push qilinadi (idempotent PUT).
     if (row?.labHubCaseRef) {
       const ops: { op: LabOrderHubOp }[] = [];
-      if (input.status === 'delivered' && before.status !== 'delivered') {
+      if (cancelling) {
+        // FX-46: Hub'dagi ish ham bekor qilinadi — lab ishlashni davom ettirmasin.
+        ops.push({ op: 'cancel' });
+      } else if (input.status === 'delivered' && before.status !== 'delivered') {
         ops.push({ op: 'delivered' });
       } else if (contentChanged && (row.hubStatus === null || row.hubStatus === 'sent')) {
         ops.push({ op: 'upsert_case' });

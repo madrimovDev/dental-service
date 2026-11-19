@@ -86,7 +86,25 @@ const executeOp = async (
   if (!order?.labHubCaseRef || !order.labHubLabId) return undefined; // buyurtma yo'q / Hub'dan uzilgan
   const caseRef = order.labHubCaseRef;
 
+  // FX-46: bekor qilingan ishga cancel'dan boshqa hech narsa yuborilmaydi (PHI ham, narx ham).
+  if (order.status === 'cancelled' && row.op !== 'cancel') return undefined;
+
   switch (row.op) {
+    case 'cancel': {
+      // Reassign'da eski ref payload'da; oddiy bekor qilishda joriy ref.
+      const target = typeof row.payload.caseRef === 'string' ? row.payload.caseRef : caseRef;
+      try {
+        await client.cancelCase(key, target);
+      } catch (err) {
+        // Hub'da ish (yoki endpoint) yo'q — yopiladigan narsa yo'q, qayta urinishning foydasi yo'q.
+        if (err instanceof LabHubError && err.status === 404) {
+          logger.warn({ tenantId, caseRef: target }, 'lab-hub cancel: case/endpoint not found');
+          return undefined;
+        }
+        throw err;
+      }
+      return undefined;
+    }
     case 'upsert_case': {
       // PHI faqat shu yerda, push paytida va faqat L3 ustunlari o'qiladi (PII ustunlari emas).
       const data = await withTenant(tenantId, async (tx) => {
@@ -421,6 +439,8 @@ const applyEvent = async (tx: DbOrTx, tenantId: string, ev: HubChangeEvent, now:
       // klinika «Tasdiqlash»ni bosgan (kutilmoqda) bo'lsa ham TASHLANMAYDI. Kutilayotgan
       // tasdiq eski narx uchun bo'lsa Hub `price.mismatch` qaytaradi va kutish tozalanadi.
       if (order.approvedPrice != null) return;
+      // FX-46: bekor qilingan ishga yangi taklif yozilmaydi va bildirishnoma yuborilmaydi.
+      if (order.status === 'cancelled') return;
       await tx
         .update(labOrders)
         .set({ proposedPrice: price, updatedAt: now })

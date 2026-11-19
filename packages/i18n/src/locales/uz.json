@@ -2762,6 +2762,7 @@
     "err_lab_hub_link_not_active": "Bu laboratoriya hali ulanishni tasdiqlamagan.",
     "err_link_not_active": "Laboratoriya ulanishni tasdiqlamagan — tasdiqlagach yuboriladi.",
     "err_lab_hub_already_sent": "Buyurtma allaqachon portalga yuborilgan.",
+    "err_lab_order_cancelled": "Bekor qilingan buyurtmaga narx tasdiqlanmaydi.",
     "err_lab_hub_bad_status": "Bu holatdagi buyurtmani portalga yuborib bo'lmaydi.",
     "err_lab_hub_unknown_lab": "Laboratoriya katalogda topilmadi — ro'yxatni yangilang.",
     "err_lab_hub_not_registered": "Klinika hali ta'minotchida ro'yxatdan o'tmagan. Birozdan keyin qayta urining.",

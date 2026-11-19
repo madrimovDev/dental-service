@@ -53,6 +53,7 @@ import { createApp } from '../../src/app.ts';
 import { db } from '../../src/db/client.ts';
 import { signAccess } from '../../src/lib/jwt.ts';
 import { toHubCase } from '../../src/lib/lab-hub/mapper.ts';
+import { bookHubConfirmedPrice } from '../../src/lib/lab-hub/price.ts';
 import { hubKeyOf } from '../../src/lib/lab-hub/state.ts';
 import { flushLabHubOutbox, pollLabHubChanges } from '../../src/lib/lab-hub/sync.ts';
 
@@ -967,5 +968,102 @@ describe('narx taklifisiz tasdiq', () => {
       tx.select().from(expenses).where(eq(expenses.labOrderId, id)),
     );
     expect(rows).toHaveLength(0);
+  });
+});
+
+// ─── FX-46 / FX-47 — bekor qilish va rad etilgan ishni qayta yuborish ─────────
+describe('FX-46: bekor qilingan buyurtma — Hub’ga cancel op, narx/xarajat taqiq', () => {
+  const sendCase = async () => {
+    const id = await createOrder();
+    expect(
+      (await call('doctor', 'POST', `/api/lab-orders/${id}/send-to-hub`, { labId: lab.labId }))
+        .status,
+    ).toBe(200);
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+    const [hc] = await hubCaseByRef(id);
+    const step = async (path: string, body: unknown) => {
+      const r = await hubJson(`/v1/lab/cases/${hc!.id}${path}`, {
+        method: 'POST',
+        token: lab.token,
+        body,
+      });
+      expect(r.status).toBeLessThan(300);
+    };
+    await step('/status', { to: 'accepted' });
+    return { id, step };
+  };
+  const outboxOps = (id: string) =>
+    inTenant((tx) => tx.select().from(labHubOutbox).where(eq(labHubOutbox.labOrderId, id)));
+
+  test('cancelled: cancel op navbatda; narx tasdig‘i 409; xarajat yo‘q; yangi taklif yozilmaydi', async () => {
+    const { id, step } = await sendCase();
+    await step('/price', { price: 120000 });
+    await pollLabHubChanges(tenantId);
+    expect((await orderRow(id))?.proposedPrice).toBe('120000.00');
+
+    const res = await call('doctor', 'PATCH', `/api/lab-orders/${id}`, { status: 'cancelled' });
+    expect(res.status).toBe(200);
+    const ops = await outboxOps(id);
+    expect(ops.filter((o) => o.op === ('cancel' as never))).toHaveLength(1);
+
+    const ap = await call('doctor', 'POST', `/api/lab-orders/${id}/approve-price`, {
+      price: '120000.00',
+    });
+    expect(ap.status).toBe(409);
+    expect(((await ap.json()) as { error: { code: string } }).error.code).toBe(
+      'lab_order.cancelled',
+    );
+    expect(await expensesOf(id)).toHaveLength(0);
+
+    // Lab ish davom ettirib yangi narx taklif qilsa — bekor qilingan buyurtmaga yozilmaydi.
+    await step('/price', { price: 999000 });
+    await pollLabHubChanges(tenantId);
+    expect((await orderRow(id))?.proposedPrice).toBe('120000.00');
+    expect(await expensesOf(id)).toHaveLength(0);
+
+    // Hub'da cancel endpointi bo'lmasa ham op `failed` emas — buyurtma sinxron holati buzilmaydi.
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+    const after = await outboxOps(id);
+    expect(after.find((o) => o.op === ('cancel' as never))?.status).toBe('done');
+    expect((await orderRow(id))?.hubSyncStatus).not.toBe('failed');
+  });
+
+  test('kutilayotgan narx tasdig‘i bekor qilishda tozalanadi va Hub’ga yuborilmaydi', async () => {
+    const { id, step } = await sendCase();
+    await step('/price', { price: 80000 });
+    await pollLabHubChanges(tenantId);
+    const r = await whileHubDown(() =>
+      call('doctor', 'POST', `/api/lab-orders/${id}/approve-price`, { price: '80000.00' }),
+    );
+    expect(r.status).toBe(200);
+    expect((await orderRow(id))?.priceApprovalRequestedAt).not.toBeNull();
+
+    expect(
+      (
+        await whileHubDown(() =>
+          call('doctor', 'PATCH', `/api/lab-orders/${id}`, { status: 'cancelled' }),
+        )
+      ).status,
+    ).toBe(200);
+    expect((await orderRow(id))?.priceApprovalRequestedAt).toBeNull();
+
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+    expect((await hubCaseByRef(id))[0]?.approved_price).toBeNull();
+    expect(await expensesOf(id)).toHaveLength(0);
+    expect((await orderRow(id))?.approvedPrice).toBeNull();
+  });
+
+  test('Hub tasdig‘i keyin kelsa ham (poll price_approved) bekor qilingan ishga xarajat yozilmaydi', async () => {
+    const { id } = await sendCase();
+    await call('doctor', 'PATCH', `/api/lab-orders/${id}`, { status: 'cancelled' });
+    const booked = await inTenant((tx) =>
+      bookHubConfirmedPrice(tx, tenantId, id, '50000.00', new Date()),
+    );
+    expect(booked.booked).toBe(false);
+    expect(await expensesOf(id)).toHaveLength(0);
+    expect((await orderRow(id))?.approvedPrice).toBeNull();
   });
 });

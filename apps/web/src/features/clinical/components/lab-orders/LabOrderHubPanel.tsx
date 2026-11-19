@@ -129,6 +129,8 @@ export function LabOrderHubPanel({
   const pending = !approved && order.priceApprovalPending === true;
   const pendingPrice = order.priceApprovalRequestedPrice ?? proposed;
   const list = messages.data ?? [];
+  // FX-46: bekor qilingan ishga narx tasdiqlanmaydi.
+  const priceLocked = order.status === 'cancelled';
 
   return (
     <section className={classes.card} aria-labelledby="hub-h" data-testid="lab-hub-panel">
@@ -178,7 +180,7 @@ export function LabOrderHubPanel({
               <span>
                 {t('labHubClinic.price_proposed')}: <b>{formatCurrency(Number(proposed), t)}</b>
               </span>
-              {canApprovePrice && (
+              {canApprovePrice && !priceLocked && (
                 <Button
                   loading={approve.isPending}
                   onClick={() =>
