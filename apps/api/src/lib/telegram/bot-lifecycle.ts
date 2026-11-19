@@ -1,3 +1,4 @@
+import type { Telegraf } from 'telegraf';
 import { logger } from '../logger.ts';
 
 /** Telegraf'ning lifecycle uchun kerakli yuzasi (testda soxta bot bilan almashtiriladi). */
@@ -6,6 +7,51 @@ export type LifecycleBot = {
   launch(onLaunch: () => void): Promise<void>;
   stop(reason: string): void;
 };
+
+const cancelledError = () =>
+  Object.assign(new Error('bot launch cancelled'), { name: 'AbortError' });
+
+/**
+ * Haqiqiy Telegraf instansiyasini lifecycle yuzasiga moslaydi. `new Telegraf()`dan DARHOL
+ * keyin (handlerlardan OLDIN) chaqirilishi shart — birinchi middleware shu yerda o'rnatiladi.
+ *
+ * FX-143 (review): Telegraf 4.16.3 `launch()` = getMe → onLaunch → `await deleteWebhook()` →
+ * startPolling. onLaunch o'tgach, deleteWebhook kutilayotgan oynada `this.polling` hali yo'q —
+ * `bot.stop()` `Bot is not running!` otadi va launch keyin startPolling'ga o'tib, hech kim
+ * to'xtata olmaydigan poller qoldirardi (eski token bilan bemorlarga javob berish yoki bir xil
+ * token bilan 409 Conflict). Shuning uchun `stop()` avval `cancelled` belgilaydi:
+ * - `callApi` o'rami: stop polling'dan oldin kelgan bo'lsa `getUpdates` HECH QACHON
+ *   yuborilmaydi — AbortError
+ *   (Telegraf polling uni toza to'xtash deb qabul qiladi, launch resolve bo'ladi);
+ * - birinchi middleware: to'xtatilgan botga kech kelgan update qayta ishlanmaydi.
+ */
+export function telegrafLifecycleBot(bot: Telegraf): LifecycleBot {
+  let cancelled = false;
+  /** stop() polling boshlanishidan OLDIN keldi — keyingi har qanday getUpdates bloklanadi. */
+  let blockPolling = false;
+  const telegram = bot.telegram;
+  const callApi = telegram.callApi.bind(telegram) as (...args: unknown[]) => Promise<unknown>;
+  telegram.callApi = ((method: string, ...rest: unknown[]) => {
+    if (blockPolling && method === 'getUpdates') return Promise.reject(cancelledError());
+    return callApi(method, ...rest);
+  }) as typeof telegram.callApi;
+  bot.use((_ctx, next) => (cancelled ? undefined : next()));
+  return {
+    launch: (onLaunch) => bot.launch({}, onLaunch),
+    stop: (reason) => {
+      cancelled = true;
+      try {
+        bot.stop(reason);
+      } catch (err) {
+        // Polling hali yo'q (getMe/deleteWebhook bosqichi). Oddiy stop'da (polling bor) blok
+        // QO'YILMAYDI — Telegraf `syncUpdateOffset` getUpdates'i offset'ni tasdiqlashi kerak,
+        // aks holda qayta ishlangan update'lar keyingi pollerga qayta yetkaziladi.
+        blockPolling = true;
+        throw err;
+      }
+    },
+  };
+}
 
 type Entry<B extends LifecycleBot> = { bot: B; cancelled: boolean };
 
@@ -19,7 +65,8 @@ type Entry<B extends LifecycleBot> = { bot: B; cancelled: boolean };
  *   otadi — try/catch, ro'yxatdan har holda o'chiriladi. Launch yiqilsa (noto'g'ri token,
  *   tarmoq) o'sha instance ro'yxatdan o'chadi, keyingi reload yangi token bilan ishga tushadi.
  *   Hali launch bo'layotgan (getMe kutilayotgan) bot stop qilinsa — `cancelled` belgilanadi va
- *   `onLaunch`da launch to'xtatiladi (polling umuman boshlanmaydi).
+ *   `onLaunch`da launch to'xtatiladi (polling umuman boshlanmaydi). onLaunch'dan keyingi
+ *   (deleteWebhook) oyna `telegrafLifecycleBot` ichida yopiladi.
  */
 export function createBotLifecycle<B extends LifecycleBot>(opts: {
   create: (tenantId: string, token: string) => B;

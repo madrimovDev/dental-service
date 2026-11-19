@@ -9,7 +9,11 @@ import { expireAndNotifyStaleBookingRequests } from '../modules/booking-requests
 import { decryptSecret } from './crypto.ts';
 import { env } from './env.ts';
 import { logger } from './logger.ts';
-import { createBotLifecycle, type LifecycleBot } from './telegram/bot-lifecycle.ts';
+import {
+  createBotLifecycle,
+  type LifecycleBot,
+  telegrafLifecycleBot,
+} from './telegram/bot-lifecycle.ts';
 import { createBotFlows } from './telegram/deps.ts';
 import type { TelegramFlows } from './telegram/flows.ts';
 import { createPatientMessenger } from './telegram/notify.ts';
@@ -96,6 +100,7 @@ export function startTelegramBotManager(deps: ManagerDeps) {
   /** Telegraf instansiyasini handlerlar bilan quradi (ishga tushirmaydi). */
   const buildBot = (tenantId: string, token: string): LifecycleBot => {
     const bot = new Telegraf(token);
+    const lcBot = telegrafLifecycleBot(bot);
     const run = <T>(fn: (tx: DbOrTx) => Promise<T>) => deps.withTenant(tenantId, fn);
     const send = (ctx: { reply: (t: string, e?: object) => Promise<unknown> }, r: BotReply) =>
       ctx.reply(r.text, toTelegrafExtra(r));
@@ -220,10 +225,7 @@ export function startTelegramBotManager(deps: ManagerDeps) {
       await ctx.answerCbQuery(res.toast);
       if (res.reply) await send(ctx, res.reply);
     });
-    return {
-      launch: (onLaunch) => bot.launch({}, onLaunch),
-      stop: (reason) => bot.stop(reason),
-    };
+    return lcBot;
   };
 
   // FX-40/FX-143: launch/stop/reload per-tenant ketma-ket, stop xatosiga chidamli.
