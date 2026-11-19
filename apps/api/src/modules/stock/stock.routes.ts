@@ -125,9 +125,14 @@ export const stockRoutes = (deps: {
 
   app.openapi(createItemRoute, async (c) => {
     const body = c.req.valid('json');
-    const row = await service.createItem(c, body);
-    if (!row) throw new Error('Stock item creation failed');
-    return c.json(ok(toStockItemDto(row)), 201);
+    try {
+      const row = await service.createItem(c, body);
+      if (!row) throw new Error('Stock item creation failed');
+      return c.json(ok(toStockItemDto(row)), 201);
+    } catch (err) {
+      if (err instanceof CrossEntityError) return c.json(ownershipNotFound(err), 404);
+      throw err;
+    }
   });
 
   const getItemRoute = createRoute({
@@ -163,9 +168,14 @@ export const stockRoutes = (deps: {
   app.openapi(updateItemRoute, async (c) => {
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const item = await service.updateItem(c, id, body);
-    if (!item) return c.json(fail('item.not_found', 'Stock item not found'), 404);
-    return c.json(ok(toStockItemDto(item)), 200);
+    try {
+      const item = await service.updateItem(c, id, body);
+      if (!item) return c.json(fail('item.not_found', 'Stock item not found'), 404);
+      return c.json(ok(toStockItemDto(item)), 200);
+    } catch (err) {
+      if (err instanceof CrossEntityError) return c.json(ownershipNotFound(err), 404);
+      throw err;
+    }
   });
 
   // ===== Movements =====
