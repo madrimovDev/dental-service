@@ -742,7 +742,7 @@ export const createStockService = (deps: {
   async function outstandingByItem(
     c: Context,
     visitNoteId: string,
-    filter: { serviceId?: string },
+    filter: { serviceId?: string; byItem?: boolean },
   ): Promise<
     {
       itemId: string;
@@ -758,10 +758,11 @@ export const createStockService = (deps: {
     const outTotal = sql<string>`coalesce(sum(case
       when ${stockMovements.type} = 'out' then ${stockMovements.quantity} else 0 end), 0)`;
     const outCount = sql<string>`count(*) filter (where ${stockMovements.type} = 'out')`;
+    const byItem = filter.byItem === true;
     const rows = await getDb(c)
       .select({
         itemId: stockMovements.itemId,
-        serviceId: stockMovements.sourceServiceId,
+        serviceId: byItem ? sql<string | null>`null` : stockMovements.sourceServiceId,
         net,
         outTotal,
         outCount,
@@ -774,7 +775,11 @@ export const createStockService = (deps: {
           filter.serviceId ? eq(stockMovements.sourceServiceId, filter.serviceId) : undefined,
         ),
       )
-      .groupBy(stockMovements.itemId, stockMovements.sourceServiceId);
+      .groupBy(
+        ...(byItem
+          ? [stockMovements.itemId]
+          : [stockMovements.itemId, stockMovements.sourceServiceId]),
+      );
     return rows
       .map((r) => ({
         itemId: r.itemId,
@@ -1020,7 +1025,9 @@ export const createStockService = (deps: {
             quantity: bom.qtyPerService,
             reason: 'visit_edit_return',
             sourceVisitNoteId,
-            sourceServiceId: bom.serviceId,
+            // FX-44 review: eski (belgisiz) chiqim qatorlariga mos — xizmat belgisiz yoziladi,
+            // aks holda untagged guruh qoldig'i kamaymaydi va bekor qilish ikki marta qaytaradi.
+            sourceServiceId: null,
           });
         }
       }
@@ -1066,7 +1073,9 @@ export const createStockService = (deps: {
       .where(eq(visitNotes.appointmentId, appointmentId));
     const pending: VisitMovement[] = [];
     for (const note of notes) {
-      const outstanding = await outstandingByItem(c, note.id, {});
+      // FX-44 review: eski (belgisiz) chiqimli vizitda xizmat kesimi ishonchsiz — item bo'yicha.
+      const byItem = await noteHasUntaggedDeduction(c, note.id);
+      const outstanding = await outstandingByItem(c, note.id, { byItem });
       for (const row of outstanding) {
         pending.push({
           itemId: row.itemId,

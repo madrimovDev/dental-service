@@ -390,3 +390,47 @@ describe('FX-45 review: avtomatik no-show sweep ishlatilgan materialni qaytarmay
     expect(await apptStatus(appt)).toBe('no_show');
   });
 });
+
+describe('FX-44 review: eski (belgisiz) chiqimli vizit — tahrir qaytarishidan keyin bekor ikki marta qaytarmaydi', () => {
+  const untag = (note: string) =>
+    admin.db
+      .update(stockMovements)
+      .set({ sourceServiceId: null })
+      .where(eq(stockMovements.sourceVisitNoteId, note));
+
+  test('legacy [X,Y] -> PATCH [X] -> cancel: jami 10 (11 emas)', async () => {
+    await setQty(item, 10);
+    await setBom(svcX, 1);
+    await setBom(svcY, 1);
+    const appt = await newAppt('in_progress');
+    const note = await newNote([svcX, svcY], appt);
+    expect(await qty(item)).toBe(8);
+    await untag(note);
+    const p = await call('doc', 'PATCH', `/api/visit-notes/${note}`, { performedServices: [svcX] });
+    expect(p.status).toBe(200);
+    expect(await qty(item)).toBe(9);
+    const cn = await call('rec', 'POST', `/api/appointments/${appt}/cancel`, { reason: 'x' });
+    expect(cn.status).toBe(200);
+    expect(await qty(item)).toBe(10);
+  });
+
+  test('legacy [X] -> [] -> [X] (belgili) -> [] -> cancel: ortiqcha qaytarish yo‘q', async () => {
+    await setQty(item, 10);
+    await setBom(svcX, 1);
+    await setBom(svcY, null);
+    const appt = await newAppt('in_progress');
+    const note = await newNote([svcX], appt);
+    await untag(note);
+    for (const [ps, q] of [
+      [[], 10],
+      [[svcX], 9],
+      [[], 10],
+    ] as const) {
+      const r = await call('doc', 'PATCH', `/api/visit-notes/${note}`, { performedServices: ps });
+      expect(r.status).toBe(200);
+      expect(await qty(item)).toBe(q);
+    }
+    await call('rec', 'POST', `/api/appointments/${appt}/cancel`, {});
+    expect(await qty(item)).toBe(10);
+  });
+});
