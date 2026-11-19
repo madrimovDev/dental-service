@@ -49,6 +49,7 @@ type Dict = {
   reminderConfirmedReply: string;
   reminderCancelledReply: string;
   reminderAlready: string;
+  reminderUnavailable: string;
   notYours: string;
   notFound: string;
   questions: Record<QuestionnaireKey, string>;
@@ -96,6 +97,7 @@ const uz: Dict = {
   reminderConfirmedReply: '✅ Rahmat! Sizni kutamiz.',
   reminderCancelledReply: 'Yozilish bekor qilindi.',
   reminderAlready: 'Allaqachon qayd etildi.',
+  reminderUnavailable: "Hozir amalni bajarib bo'lmadi. Klinika siz bilan bog'lanadi.",
   notYours: 'Bu amal siz uchun mavjud emas.',
   notFound: 'Yozilish topilmadi.',
   questions: {
@@ -151,6 +153,7 @@ const ru: Dict = {
   reminderConfirmedReply: '✅ Спасибо! Ждём вас.',
   reminderCancelledReply: 'Запись отменена.',
   reminderAlready: 'Уже учтено.',
+  reminderUnavailable: 'Сейчас не удалось выполнить действие. Клиника свяжется с вами.',
   notYours: 'Это действие вам недоступно.',
   notFound: 'Запись не найдена.',
   questions: {

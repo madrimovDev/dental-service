@@ -445,12 +445,14 @@ export const createAppointmentsService = (deps: {
     }
 
     // CLI-409: re-validatsiya triggeri — vaqt/doktor o'zgarganda YOKI yangi holat
-    // active (scheduled/confirmed/in_progress) ga o'tganda (vaqt o'zgarmasa ham).
+    // NOFAOL (cancelled/no_show) dan faolga qaytganda (vaqt o'zgarmasa ham).
     // Bu H5'ni yopadi: cancelled→scheduled band slotga endi conflict topadi.
+    // FX-36 (LA-09): faol→faol (scheduled→confirmed/in_progress) slotni o'zgartirmaydi —
+    // keyin kiritilgan time-off/ish soati o'zgarishi «Kelaman»/navbat sinxronini yiqitmasin.
     const targetStatus = (input.status ?? beforeStatus) as AppointmentStatus;
     const targetActive = isActiveStatus(targetStatus);
     const timeOrDoctorChanged = !!(input.startTime || input.endTime || input.doctorId);
-    if (timeOrDoctorChanged || (targetActive && beforeStatus !== targetStatus)) {
+    if (timeOrDoctorChanged || (targetActive && !isActiveStatus(beforeStatus))) {
       const start = new Date(input.startTime ?? before.startTime);
       const end = new Date(input.endTime ?? before.endTime);
       const doctor = input.doctorId ?? before.doctorId;

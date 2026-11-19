@@ -261,9 +261,11 @@ export const createQueueService = (deps: {
               // bu qadam AppointmentTransitionError beradi, xavfsiz e'tiborsiz
               // qoldiriladi.
               try {
-                await deps.appointments.update(c, before.appointmentId, {
+                const mid = await deps.appointments.update(c, before.appointmentId, {
                   status: 'in_progress',
                 });
+                // FX-36: oraliq {ok:false} jim yutilmaydi.
+                if (!mid.ok) syncError = mid.code;
               } catch (e) {
                 if (!(e instanceof AppointmentTransitionError)) throw e;
               }
@@ -271,10 +273,10 @@ export const createQueueService = (deps: {
             const res = await deps.appointments.update(c, before.appointmentId, {
               status: apptStatus,
             });
-            if (!res.ok) syncError = res.code;
+            if (!res.ok) syncError = syncError ?? res.code;
           } catch (e) {
             if (!(e instanceof AppointmentTransitionError)) throw e;
-            syncError = e.code;
+            syncError = syncError ?? e.code;
           }
         } else {
           // Legacy fallback (app.ts hali appointmentsService'ni ulamaguncha) —
