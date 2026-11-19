@@ -140,10 +140,11 @@ describe("CLI-157 — workspaceBranches (rol-bo'yicha, @owner EMAS)", () => {
     expect(res.branches.some((b) => b.id === branchN2Id)).toBe(false);
   });
 
-  test("branch-siz (null) assignment → allowAllBranches=true, aniq filial yo'q", async () => {
+  test("FX-29: branch-siz (null) assignment → allowAllBranches=true VA klinikaning barcha filiallari (B tenant'niki emas)", async () => {
     const res = await authService.workspaceBranches(staffAllBranchesId, tenantAId);
     expect(res.allowAllBranches).toBe(true);
-    expect(res.branches).toEqual([]);
+    expect(res.branches.map((b) => b.name).sort()).toEqual(['Bosh filial', 'N2 filial']);
+    expect(res.branches.some((b) => b.id === branchBId)).toBe(false);
   });
 
   test("RLS: owner A B-tenant filialini KO'RMAYDI", async () => {

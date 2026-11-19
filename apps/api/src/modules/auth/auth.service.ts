@@ -488,12 +488,20 @@ export const createAuthService = (deps: AuthServiceDeps) => {
       const branchIds = [
         ...new Set(asg.map((a) => a.branchId).filter((b): b is string => b !== null)),
       ];
-      const rows = branchIds.length
+      // FX-29: tenant-wide (branchId=null) tayinlovli xodim — egasi kabi klinikaning barcha
+      // filiallarini ko'radi (aks holda Sidebar filial menyusi chiqmasdi, eng eski filialga qulflanardi).
+      // Aks holda faqat o'z tayinlov filiallari.
+      const rows = allowAllBranches
         ? await tx
             .select({ id: branches.id, name: branches.name })
             .from(branches)
-            .where(and(inArray(branches.id, branchIds), isNull(branches.deletedAt)))
-        : [];
+            .where(isNull(branches.deletedAt))
+        : branchIds.length
+          ? await tx
+              .select({ id: branches.id, name: branches.name })
+              .from(branches)
+              .where(and(inArray(branches.id, branchIds), isNull(branches.deletedAt)))
+          : [];
       return { branches: rows, allowAllBranches };
     });
   }

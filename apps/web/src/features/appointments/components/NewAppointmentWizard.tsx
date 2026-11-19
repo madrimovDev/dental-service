@@ -9,6 +9,7 @@ import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import { useWorkspaceBranches } from '@/features/auth';
 import { usePatients } from '@/features/patients';
 import { useAvailability } from '@/features/schedule/schedule.api';
 import { localDateParam, slotTimeLabel } from '@/features/schedule/schedule.mappers';
@@ -92,9 +93,13 @@ export function NewAppointmentWizard({ onClose }: { onClose: () => void }) {
   const { data: branchesData } = useBranches();
   const createMut = useCreateAppointment();
 
-  // Tenant-wide foydalanuvchi (activeBranchId=null) filialni shu ekranda tanlaydi (CLI-151).
-  const needsBranchSelect = activeBranchId == null;
-  const branchOptions: Option[] = (branchesData ?? []).map((b) => ({ value: b.id, label: b.name }));
+  // Tenant-wide foydalanuvchi (activeBranchId=null yoki allowAllBranches — FX-29) filialni
+  // shu ekranda tanlaydi (CLI-151). Variantlar — RBAC-safe workspace-branches'dan.
+  const { data: workspaceBranches } = useWorkspaceBranches();
+  const needsBranchSelect = activeBranchId == null || workspaceBranches?.allowAllBranches === true;
+  const branchOptions: Option[] = (
+    workspaceBranches?.allowAllBranches ? workspaceBranches.branches : (branchesData ?? [])
+  ).map((b) => ({ value: b.id, label: b.name }));
 
   const patients: Option[] = (patientsData?.items ?? []).map((p) => ({
     value: p.id,
