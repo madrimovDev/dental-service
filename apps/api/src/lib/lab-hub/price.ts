@@ -210,17 +210,20 @@ export const rejectPendingPriceApproval = async (
   if (order.priceApprovalRequestedBy) recipients.add(order.priceApprovalRequestedBy);
   const ref = order.orderNumber != null ? `#${order.orderNumber}` : '';
   const priceCode = hubCode.startsWith('price.');
-  const title = !priceCode
-    ? 'Narx tasdig‘i laboratoriyaga yetmadi — qayta tasdiqlang'
-    : hubCode === 'price.already_approved'
-      ? 'Narx tasdig‘i qabul qilinmadi: ish boshqa narx bilan tasdiqlangan'
-      : hubCode === 'case.rejected'
-        ? 'Narx tasdiqlanmadi: laboratoriya ishni rad etgan'
-        : hubCode === 'case.cancelled'
-          ? 'Narx tasdiqlanmadi: ish bekor qilingan'
-          : nextProposed
-            ? `Narx tasdiqlanmadi: laboratoriya narxni o'zgartirdi — ${formatSum(nextProposed)}`
-            : 'Narx tasdiqlanmadi: laboratoriya taklifni qaytarib oldi';
+  // FX-47 × FX-48: `case.rejected|cancelled` — `price.*` emas, lekin «qayta tasdiqlang» emas
+  // (ish yopiq); shuning uchun umumiy (FX-48 doimiy xato) matnidan OLDIN tekshiriladi.
+  const title =
+    hubCode === 'case.rejected'
+      ? 'Narx tasdiqlanmadi: laboratoriya ishni rad etgan'
+      : hubCode === 'case.cancelled'
+        ? 'Narx tasdiqlanmadi: ish bekor qilingan'
+        : !priceCode
+          ? 'Narx tasdig‘i laboratoriyaga yetmadi — qayta tasdiqlang'
+          : hubCode === 'price.already_approved'
+            ? 'Narx tasdig‘i qabul qilinmadi: ish boshqa narx bilan tasdiqlangan'
+            : nextProposed
+              ? `Narx tasdiqlanmadi: laboratoriya narxni o'zgartirdi — ${formatSum(nextProposed)}`
+              : 'Narx tasdiqlanmadi: laboratoriya taklifni qaytarib oldi';
   for (const userId of recipients) {
     await tx.insert(notifications).values({
       tenantId,

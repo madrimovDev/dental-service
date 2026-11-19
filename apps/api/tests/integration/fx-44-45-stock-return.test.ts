@@ -152,7 +152,8 @@ beforeAll(async () => {
     ] as const) {
       const [role] = await tx
         .insert(roles)
-        .values({ tenantId, name: `R-${key}` })
+        // FX-155: vizit yozuvi muallifi amaliyotchi (is_practitioner) rolda bo'lishi shart.
+        .values({ tenantId, name: `R-${key}`, isPractitioner: key === 'doc' })
         .returning({ id: roles.id });
       await tx
         .insert(rolePermissions)

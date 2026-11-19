@@ -12,6 +12,7 @@ import { db } from '../../src/db/client.ts';
 import { signAccess } from '../../src/lib/jwt.ts';
 import { appointmentRoutes } from '../../src/modules/appointments/appointments.routes.ts';
 import { createAppointmentsService } from '../../src/modules/appointments/appointments.service.ts';
+import { grantTenantWide } from './_grant-scope.ts';
 
 const receptionist = ROLE_TEMPLATES.find((t) => t.templateKey === 'receptionist');
 if (!receptionist) throw new Error('receptionist template not found');
@@ -74,10 +75,6 @@ beforeAll(async () => {
       .insert(roles)
       .values({ tenantId, name: 'Doctor', isPractitioner: true })
       .returning();
-    const [plain] = await tx
-      .insert(roles)
-      .values({ tenantId, name: 'Plain', isPractitioner: false })
-      .returning();
     const now = new Date();
     const a = (userId: string, roleId: string, extra = {}) => ({
       userId,
@@ -91,11 +88,13 @@ beforeAll(async () => {
     await tx
       .insert(userAssignments)
       .values([
-        a(recep, plain!.id),
         a(docActive, doctorRole!.id),
         a(docFuture, doctorRole!.id, { validTo: new Date(now.getTime() + 7 * 86_400_000) }),
         a(docExpired, doctorRole!.id, { validTo: new Date(now.getTime() - 86_400_000) }),
       ]);
+    // FX-133: `/doctors` filial doirasi tayinlovlardan o'qiladi — Registrator'ga real
+    // tenant-wide tayinlov (receptionist permset, is_practitioner=false).
+    await grantTenantWide(tx, tenantId, recep, receptionistPerms);
   });
 
   token = (

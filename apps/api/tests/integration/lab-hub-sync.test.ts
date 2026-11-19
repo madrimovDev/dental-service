@@ -59,6 +59,7 @@ import { bookHubConfirmedPrice } from '../../src/lib/lab-hub/price.ts';
 import { hubKeyOf } from '../../src/lib/lab-hub/state.ts';
 import { flushLabHubOutbox, pollLabHubChanges } from '../../src/lib/lab-hub/sync.ts';
 import { createLocalStorageAdapter } from '../../src/lib/storage.ts';
+import { grantTenantWide } from './_grant-scope.ts';
 
 // ─── Hub (haqiqiy ilova, o'z bazasi) ─────────────────────────────────────────
 const parseEnv = (path: string): Record<string, string> =>
@@ -304,6 +305,11 @@ beforeAll(async () => {
       })
       .returning({ id: patients.id });
     patientId = p!.id;
+    // X-2 / FX-106: filial doirasi JWT emas, tayinlov → rol permission'laridan o'qiladi
+    // (xarajat va h.k.). Testlar shu foydalanuvchi bilan turli shablon permset'li token
+    // ishlatadi — doira uchun barcha shablon kodlari bilan tenant-wide tayinlov.
+    const allTemplatePerms = [...new Set(ROLE_TEMPLATES.flatMap((r) => [...r.permissions]))];
+    await grantTenantWide(tx, tenantId, userId, allTemplatePerms, 'Hub test roli');
   });
 
   lab = await createHubLab();
