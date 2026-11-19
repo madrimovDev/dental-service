@@ -33,6 +33,9 @@ let clock: Date;
 let calls: string[];
 let failDump: boolean;
 let failRestoreOnce: boolean;
+let failExtractOnce: boolean;
+let failMigrate: boolean;
+let failAllRestoresFromDump: boolean;
 
 const makeDeps = (over: Partial<BackupSchedulerDeps> = {}): BackupSchedulerDeps => ({
   now: () => clock,
@@ -50,7 +53,9 @@ const makeDeps = (over: Partial<BackupSchedulerDeps> = {}): BackupSchedulerDeps 
     writeFileSync(file, 'DUMP');
   },
   restoreDb: (file) => {
-    calls.push(`restoreDb:${readFileSync(file, 'utf8')}`);
+    const content = readFileSync(file, 'utf8');
+    calls.push(`restoreDb:${content}`);
+    if (failAllRestoresFromDump && content === 'DUMP') throw new Error('pg_restore failed: disk');
     if (failRestoreOnce) {
       failRestoreOnce = false;
       throw new Error('pg_restore failed: halfway');
@@ -61,8 +66,17 @@ const makeDeps = (over: Partial<BackupSchedulerDeps> = {}): BackupSchedulerDeps 
     writeFileSync(dest, 'TAR');
     return true;
   },
-  extractUploads: () => calls.push('extract'),
-  migrate: () => calls.push('migrate'),
+  extractUploads: () => {
+    calls.push('extract');
+    if (failExtractOnce) {
+      failExtractOnce = false;
+      throw new Error('tar failed: disk full');
+    }
+  },
+  migrate: () => {
+    calls.push('migrate');
+    if (failMigrate) throw new Error('migration 0043 failed');
+  },
   stopApi: async () => {
     calls.push('stopApi');
   },
@@ -96,6 +110,9 @@ beforeEach(() => {
   calls = [];
   failDump = false;
   failRestoreOnce = false;
+  failExtractOnce = false;
+  failMigrate = false;
+  failAllRestoresFromDump = false;
 });
 afterEach(() => rmSync(dataDir, { recursive: true, force: true }));
 
@@ -261,6 +278,60 @@ describe('so‘rov fayllari (poll)', () => {
     expect(restores).toEqual(['restoreDb:TARGET', 'restoreDb:DUMP']); // DUMP = pre-restore nusxa
     expect(calls).not.toContain('migrate');
     expect(calls.slice(-1)).toEqual(['startApi']);
+  });
+
+  const requestRestoreOf = (name: string) =>
+    writeFileSync(join(dataDir, 'restore-request.json'), JSON.stringify({ file: name }));
+  const readResult = () => JSON.parse(readFileSync(join(dataDir, 'restore-result.json'), 'utf8'));
+  const readState = () => JSON.parse(readFileSync(join(dataDir, 'backup-state.json'), 'utf8'));
+
+  test('FX-52: uploads yiqilsa — baza pre-restore nusxaga qaytariladi, natija aniq', async () => {
+    seedBackup('dental-20261001-200000', 'TARGET');
+    requestRestoreOf('dental-20261001-200000');
+    failExtractOnce = true;
+    const s = createBackupScheduler(makeDeps());
+    await s.poll();
+    const restores = calls.filter((c) => c.startsWith('restoreDb'));
+    expect(restores).toEqual(['restoreDb:TARGET', 'restoreDb:DUMP']);
+    expect(calls).not.toContain('migrate');
+    expect(calls.slice(-2)).toEqual(['maint:stop', 'startApi']);
+    const result = readResult();
+    expect(result.status).toBe('failed');
+    expect(result.dbRolledBack).toBe(true);
+    expect(result.error).toContain('restore_uploads');
+    expect(result.error).toContain('baza avvalgi holatga qaytarildi');
+    expect(readState().lastError).toContain('baza avvalgi holatga qaytarildi');
+  });
+
+  test('FX-52: migratsiya yiqilsa — baza pre-restore nusxaga qaytariladi (API eski sxemada yonmaydi)', async () => {
+    seedBackup('dental-20261001-200000', 'TARGET');
+    requestRestoreOf('dental-20261001-200000');
+    failMigrate = true;
+    const s = createBackupScheduler(makeDeps());
+    await s.poll();
+    const restores = calls.filter((c) => c.startsWith('restoreDb'));
+    expect(restores).toEqual(['restoreDb:TARGET', 'restoreDb:DUMP']);
+    // Pre-restore uploads ham qaytariladi (extract 2 marta: tiklanayotgan + pre-restore).
+    expect(calls.filter((c) => c === 'extract').length).toBe(2);
+    const result = readResult();
+    expect(result.status).toBe('failed');
+    expect(result.dbRolledBack).toBe(true);
+    expect(result.error).toContain('migrate');
+    expect(result.error).toContain('baza avvalgi holatga qaytarildi');
+  });
+
+  test('FX-52: qaytarish ham yiqilsa — natijada «baza QAYTARILMADI» aniq aytiladi', async () => {
+    seedBackup('dental-20261001-200000', 'TARGET');
+    requestRestoreOf('dental-20261001-200000');
+    failMigrate = true;
+    failAllRestoresFromDump = true;
+    const s = createBackupScheduler(makeDeps());
+    await s.poll();
+    const result = readResult();
+    expect(result.status).toBe('failed');
+    expect(result.dbRolledBack).toBe(false);
+    expect(result.error).toContain('baza avvalgi holatga QAYTARILMADI');
+    expect(readState().lastError).toContain('QAYTARILMADI');
   });
 
   test('yaroqsiz fayl nomi (../) — hech narsa to‘xtatilmaydi, baza tegilmaydi', async () => {
