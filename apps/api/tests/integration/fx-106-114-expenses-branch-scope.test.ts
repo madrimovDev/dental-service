@@ -196,3 +196,63 @@ describe('FX-106: o‘qish — ro‘yxat, svod, bitta xarajat', () => {
     expect((await call('ghost', 'GET', '/api/expenses/summary')).status).toBe(403);
   });
 });
+
+describe('FX-114: yozish — create/update/remove', () => {
+  test('POST begona filial va tenant-darajali (branchId yo‘q) 403 — yozuv yaratilmaydi', async () => {
+    const before = (await call('owner', 'GET', '/api/expenses')).json.data.meta.total;
+    for (const body of [
+      { branchId: brB, amount: 1000, date: '2026-11-11' },
+      { amount: 1000, date: '2026-11-11' },
+    ]) {
+      const r = await call('mgrA', 'POST', '/api/expenses', body);
+      expect(r.status).toBe(403);
+      expect(r.json.error.code).toBe('branch.forbidden');
+    }
+    expect((await call('owner', 'GET', '/api/expenses')).json.data.meta.total).toBe(before);
+    const ok = await call('mgrA', 'POST', '/api/expenses', {
+      branchId: brA,
+      amount: 1000,
+      date: '2026-11-11',
+    });
+    expect(ok.status).toBe(201);
+    // tozalash: keyingi testlar summani buzmasin
+    expect((await call('mgrA', 'DELETE', `/api/expenses/${ok.json.data.id}`)).status).toBe(200);
+  });
+
+  test('PATCH begona filial xarajati 403 va qiymat o‘zgarmaydi', async () => {
+    const r = await call('mgrA', 'PATCH', `/api/expenses/${expB}`, { amount: 1 });
+    expect(r.status).toBe(403);
+    expect(r.json.error.code).toBe('branch.forbidden');
+    expect(Number((await rowOf(expB))!.amount)).toBe(12000000);
+    const t = await call('mgrA', 'PATCH', `/api/expenses/${expTenant}`, { amount: 1 });
+    expect(t.status).toBe(403);
+    expect(Number((await rowOf(expTenant))!.amount)).toBe(500000);
+  });
+
+  test('PATCH o‘z xarajatini begona filialga ko‘chirish 403; o‘z filialida tahrir 200', async () => {
+    const move = await call('mgrA', 'PATCH', `/api/expenses/${expA}`, { branchId: brB });
+    expect(move.status).toBe(403);
+    expect((await rowOf(expA))!.branchId).toBe(brA);
+    const ok = await call('mgrA', 'PATCH', `/api/expenses/${expA}`, { amount: 150000 });
+    expect(ok.status).toBe(200);
+    await call('mgrA', 'PATCH', `/api/expenses/${expA}`, { amount: 100000 });
+  });
+
+  test('DELETE begona filial / tenant-darajali xarajat 403 va yozuv saqlanadi', async () => {
+    for (const id of [expB, expTenant]) {
+      const r = await call('mgrA', 'DELETE', `/api/expenses/${id}`);
+      expect(r.status).toBe(403);
+      expect(r.json.error.code).toBe('branch.forbidden');
+      expect(await rowOf(id)).not.toBeNull();
+    }
+  });
+
+  test('tenant-wide tayinlov va owner istisno: begona filialni tahrirlay oladi', async () => {
+    expect((await call('mgrAll', 'PATCH', `/api/expenses/${expB}`, { note: 'ok' })).status).toBe(
+      200,
+    );
+    expect(
+      (await call('owner', 'PATCH', `/api/expenses/${expTenant}`, { note: 'ok' })).status,
+    ).toBe(200);
+  });
+});

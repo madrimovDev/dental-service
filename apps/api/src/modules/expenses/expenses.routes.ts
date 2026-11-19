@@ -248,8 +248,14 @@ export const expensesRoutes = (deps: { db: Database; audit: AuditLogger }) => {
 
   app.openapi(createExpenseRoute, async (c) => {
     const body = c.req.valid('json');
-    const row = await service.create(c, body);
-    return c.json(ok(toExpenseDto(row)), 201);
+    const scope = await loadBranchScope(c, 'expense.manage');
+    try {
+      const row = await service.create(c, body, scope);
+      return c.json(ok(toExpenseDto(row)), 201);
+    } catch (e) {
+      if (e instanceof ExpenseBranchForbiddenError) return c.json(branchForbidden(), 403);
+      throw e;
+    }
   });
 
   // ─── GET /expenses/{id} — get by id ──────────────────────────────────────
@@ -293,9 +299,15 @@ export const expensesRoutes = (deps: { db: Database; audit: AuditLogger }) => {
   app.openapi(updateExpenseRoute, async (c) => {
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const row = await service.update(c, id, body);
-    if (!row) return c.json(fail('expense.not_found', 'Expense not found'), 404);
-    return c.json(ok(toExpenseDto(row)), 200);
+    const scope = await loadBranchScope(c, 'expense.manage');
+    try {
+      const row = await service.update(c, id, body, scope);
+      if (!row) return c.json(fail('expense.not_found', 'Expense not found'), 404);
+      return c.json(ok(toExpenseDto(row)), 200);
+    } catch (e) {
+      if (e instanceof ExpenseBranchForbiddenError) return c.json(branchForbidden(), 403);
+      throw e;
+    }
   });
 
   // ─── DELETE /expenses/{id} — delete ──────────────────────────────────────
@@ -314,9 +326,15 @@ export const expensesRoutes = (deps: { db: Database; audit: AuditLogger }) => {
 
   app.openapi(deleteExpenseRoute, async (c) => {
     const { id } = c.req.valid('param');
-    const row = await service.remove(c, id);
-    if (!row) return c.json(fail('expense.not_found', 'Expense not found'), 404);
-    return c.json(ok({ deleted: true as const }), 200);
+    const scope = await loadBranchScope(c, 'expense.manage');
+    try {
+      const row = await service.remove(c, id, scope);
+      if (!row) return c.json(fail('expense.not_found', 'Expense not found'), 404);
+      return c.json(ok({ deleted: true as const }), 200);
+    } catch (e) {
+      if (e instanceof ExpenseBranchForbiddenError) return c.json(branchForbidden(), 403);
+      throw e;
+    }
   });
 
   return app;

@@ -184,7 +184,8 @@ export const createExpensesService = (deps: { audit: AuditLogger }) => {
     return row ?? null;
   }
 
-  async function create(c: Context, input: CreateExpenseInput) {
+  async function create(c: Context, input: CreateExpenseInput, scope?: BranchScope) {
+    if (!rowInScope(scope, input.branchId ?? null)) throw new ExpenseBranchForbiddenError();
     const db = getDb(c);
     const tenantId = c.get('activeTenantId');
     const user = c.get('user');
@@ -219,10 +220,15 @@ export const createExpensesService = (deps: { audit: AuditLogger }) => {
     });
   }
 
-  async function update(c: Context, id: string, input: UpdateExpenseInput) {
+  async function update(c: Context, id: string, input: UpdateExpenseInput, scope?: BranchScope) {
     const db = getDb(c);
     const [before] = await db.select().from(expenses).where(eq(expenses.id, id));
     if (!before) return null;
+    // FX-114 (D-8): eski filial ham, yangi filial ham doirada bo'lsin (ko'chirish/ajratib yuborish ham).
+    if (!rowInScope(scope, before.branchId)) throw new ExpenseBranchForbiddenError();
+    if (input.branchId !== undefined && !rowInScope(scope, input.branchId)) {
+      throw new ExpenseBranchForbiddenError();
+    }
 
     const patch = {
       ...(input.categoryId !== undefined ? { categoryId: input.categoryId } : {}),
@@ -249,10 +255,11 @@ export const createExpensesService = (deps: { audit: AuditLogger }) => {
     return updated;
   }
 
-  async function remove(c: Context, id: string) {
+  async function remove(c: Context, id: string, scope?: BranchScope) {
     const db = getDb(c);
     const [before] = await db.select().from(expenses).where(eq(expenses.id, id));
     if (!before) return null;
+    if (!rowInScope(scope, before.branchId)) throw new ExpenseBranchForbiddenError();
 
     await db.delete(expenses).where(eq(expenses.id, id));
 
