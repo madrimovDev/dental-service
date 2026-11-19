@@ -1645,6 +1645,10 @@
       "stillExpired": "Litsenziya hali ham faol emas",
       "subscriptionTitle": "Obuna muddati tugadi",
       "subscriptionBody": "To'lov qilishingiz kerak, ta'minotchiga murojaat qiling"
+    },
+    "module_disabled": {
+      "title": "Bu bo'lim tarifingizda yo'q",
+      "message": "Bu bo'lim joriy tarifingizga kirmaydi. Tarifni kengaytirish uchun ta'minotchiga murojaat qiling."
     }
   },
   "patientsList": {

@@ -42,7 +42,7 @@ export function ActivePlanCard({
   if (isForbiddenError(plansQuery.error)) {
     return (
       <Block titleId="pc-plan-h" title={t('patientCard.plan.title_empty')}>
-        <ForbiddenState />
+        <ForbiddenState error={plansQuery.error} />
       </Block>
     );
   }

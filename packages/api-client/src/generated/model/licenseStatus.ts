@@ -16,4 +16,6 @@ export interface LicenseStatus {
   /** @nullable */
   daysLeft: number | null;
   mode: LicenseStatusMode;
+  /** @nullable */
+  modules: string[] | null;
 }

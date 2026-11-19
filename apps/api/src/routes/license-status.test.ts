@@ -14,14 +14,40 @@ afterAll(async () => {
 });
 
 describe('GET /api/license/status', () => {
-  test('desktop: state DTO + mode desktop', async () => {
+  test('desktop: state DTO + mode desktop + tarif modullari (FX-127)', async () => {
     const app = licenseStatusRoutes({
       isDesktop: () => true,
       getLicenseState: async () => graceState,
+      getActiveModules: async () => ['patients', 'appointments', 'queue', 'staff'],
     });
     const res = await app.request('/status');
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ success: true, data: { ...graceState, mode: 'desktop' } });
+    expect(await res.json()).toEqual({
+      success: true,
+      data: {
+        ...graceState,
+        mode: 'desktop',
+        modules: ['patients', 'appointments', 'queue', 'staff'],
+      },
+    });
+  });
+
+  test("desktop: yaroqli .lic yo'q (modullar bo'sh) → modules null (FX-127)", async () => {
+    const prev = process.env.LICENSE_PATH;
+    // Haqiqiy getActiveModules — mavjud bo'lmagan .lic yo'li.
+    process.env.LICENSE_PATH = `/tmp/fx-127-no-license-${crypto.randomUUID()}.lic`;
+    try {
+      const app = licenseStatusRoutes({
+        isDesktop: () => true,
+        getLicenseState: async () => graceState,
+      });
+      const res = await app.request('/status');
+      const body = (await res.json()) as { data: { modules: string[] | null } };
+      expect(body.data.modules).toBeNull();
+    } finally {
+      if (prev === undefined) delete process.env.LICENSE_PATH;
+      else process.env.LICENSE_PATH = prev;
+    }
   });
 
   test('cloud: none + mode cloud, state not read', async () => {
@@ -34,7 +60,15 @@ describe('GET /api/license/status', () => {
     const res = await app.request('/status');
     expect(await res.json()).toEqual({
       success: true,
-      data: { state: 'none', expiresAt: null, graceEndsAt: null, daysLeft: null, mode: 'cloud' },
+      // Bulutda modul gate'i yo'q (requireModuleInDesktop no-op) → modules null.
+      data: {
+        state: 'none',
+        expiresAt: null,
+        graceEndsAt: null,
+        daysLeft: null,
+        mode: 'cloud',
+        modules: null,
+      },
     });
   });
 });

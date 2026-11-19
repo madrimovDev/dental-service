@@ -8,7 +8,10 @@ const DEFAULT_PERMS = ['patient.view'];
 let mockPermissions: string[] = [...DEFAULT_PERMS];
 let mockRoleKey: string | null = null;
 let mockRail = false;
-let mockLicense: { data?: { mode: string; state: string }; isError?: boolean } = {
+let mockLicense: {
+  data?: { mode: string; state: string; modules?: string[] | null };
+  isError?: boolean;
+} = {
   data: { mode: 'desktop', state: 'active' },
 };
 
@@ -82,6 +85,21 @@ describe('Sidebar', () => {
     const payroll = screen.getByText('Ish haqi');
     expect(payroll.closest('a')).not.toBeNull(); // <Link> — bosib bo'ladi
     expect(payroll.closest('[aria-disabled="true"]')).toBeNull(); // disabled EMAS
+  });
+
+  // FX-127 (LC-05): tarifda yo'q modul ruxsat bo'lsa ham menyuda ko'rinmaydi.
+  it("desktop starter tarif: Kassa (cashier moduli yo'q) ruxsat bo'lsa ham yashirin", () => {
+    mockPermissions = ['patient.view', 'cashier.view'];
+    mockLicense = {
+      data: {
+        mode: 'desktop',
+        state: 'active',
+        modules: ['patients', 'appointments', 'queue', 'staff'],
+      },
+    };
+    renderApp(<Sidebar />);
+    expect(screen.getByText("Bemorlar ro'yxati")).toBeInTheDocument();
+    expect(screen.queryByText('Kassa')).toBeNull();
   });
 
   it("guruh sarlavhasini ko'rsatadi", () => {

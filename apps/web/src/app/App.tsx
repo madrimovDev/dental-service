@@ -9,7 +9,7 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute.tsx';
 import { ErrorBoundary } from '@/components/ErrorBoundary.tsx';
 import { i18n } from '@/lib/i18n.ts';
 import { queryClient } from '@/lib/query-client.ts';
-import { AppShell, PageLoader, RequirePermission } from '@/shell';
+import { AppShell, PageLoader, RequireModule, RequirePermission } from '@/shell';
 import { protectedRoutes, publicRoutes } from './routes.tsx';
 
 export function App() {
@@ -51,11 +51,14 @@ export function App() {
                       key={r.path}
                       path={r.path}
                       element={
-                        r.perm ? (
-                          <RequirePermission perm={r.perm}>{r.element}</RequirePermission>
-                        ) : (
-                          r.element
-                        )
+                        // FX-127: tarif (desktop .lic) moduli — ruxsatdan oldin.
+                        <RequireModule path={r.path}>
+                          {r.perm ? (
+                            <RequirePermission perm={r.perm}>{r.element}</RequirePermission>
+                          ) : (
+                            r.element
+                          )}
+                        </RequireModule>
                       }
                     />
                   ))}

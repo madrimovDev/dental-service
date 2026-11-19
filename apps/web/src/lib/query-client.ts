@@ -2,6 +2,7 @@ import { ApiError } from '@dental/api-client';
 import { notifications } from '@mantine/notifications';
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';
 import { i18n } from '@/lib/i18n.ts';
+import { isModuleDisabledError } from '@/shell/license-modules.ts';
 
 /**
  * Desktop'da litsenziya bloki:
@@ -38,6 +39,16 @@ export const queryClient = new QueryClient({
       // Mutation o'z onError handleriga ega bo'lsa — global default o'tkazib yuboriladi
       // (ikki marta toast chiqmasligi uchun).
       if (mutation.options.onError) return;
+
+      // FX-127 (LC-05): tarifda yo'q modul — server inglizcha matni o'rniga aniq sabab.
+      if (isModuleDisabledError(error)) {
+        notifications.show({
+          color: 'red',
+          title: i18n.t('license.module_disabled.title'),
+          message: i18n.t('license.module_disabled.message'),
+        });
+        return;
+      }
 
       const fallback = i18n.t('common.error');
       let message = fallback;

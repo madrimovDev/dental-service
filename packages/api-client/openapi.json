@@ -442,6 +442,13 @@
               "desktop",
               "cloud"
             ]
+          },
+          "modules": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -449,7 +456,8 @@
           "expiresAt",
           "graceEndsAt",
           "daysLeft",
-          "mode"
+          "mode",
+          "modules"
         ]
       },
       "PermissionDef": {

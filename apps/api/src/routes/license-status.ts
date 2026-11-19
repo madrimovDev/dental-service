@@ -2,6 +2,7 @@ import { fail, ok } from '@dental/core';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import { db } from '../db/client.ts';
 import {
+  getActiveModules as defaultGetActiveModules,
   getLicenseState as defaultGetLicenseState,
   invalidateLicense,
   type LicenseState,
@@ -29,6 +30,13 @@ export const licenseStatusResponseSchema = z
     graceEndsAt: z.string().nullable(),
     daysLeft: z.number().int().nullable(),
     mode: z.enum(['desktop', 'cloud']),
+    /**
+     * FX-127 (LC-05): tarif modullari (desktop `.lic`) — web menyuni shu bo'yicha
+     * filtrlaydi va `MODULE_DISABLED`ni «tarifingizda yo'q» deb ko'rsatadi.
+     * `null` = tarif cheklamaydi (bulut — modul gate'i yo'q; yoki yaroqli `.lic` yo'q).
+     * `'*'` = barcha modullar (enterprise wildcard).
+     */
+    modules: z.array(z.string()).nullable(),
   })
   .openapi('LicenseStatus');
 
@@ -52,6 +60,8 @@ const NO_LICENSE: LicenseState = {
 export const licenseStatusRoutes = (
   deps: {
     getLicenseState?: () => Promise<LicenseState>;
+    /** FX-127: desktop `.lic` modullari — testda inject. */
+    getActiveModules?: () => Promise<string[]>;
     runHeartbeat?: () => Promise<void>;
     isDesktop?: () => boolean;
     /** L8 (bulut): tenant obuna holati / Supervisor'dan darhol sinxron — testda inject. */
@@ -60,6 +70,12 @@ export const licenseStatusRoutes = (
   } = {},
 ) => {
   const getState = deps.getLicenseState ?? defaultGetLicenseState;
+  const getModules = deps.getActiveModules ?? defaultGetActiveModules;
+  /** Desktop holati + modullar. Bo'sh ro'yxat (yaroqli `.lic` yo'q) → `null`. */
+  const desktopStatus = async () => {
+    const [state, modules] = await Promise.all([getState(), getModules()]);
+    return { ...state, mode: 'desktop' as const, modules: modules.length ? modules : null };
+  };
   const isDesktop = deps.isDesktop ?? (() => process.env.DENTAL_LOCAL_DESKTOP === 'true');
   const getSubState = deps.getSubscriptionState ?? getTenantSubscriptionState;
   const syncSub =
@@ -103,9 +119,9 @@ export const licenseStatusRoutes = (
       // bo'lmasa (login oldidan) eski `none`.
       const tenantId = await tenantIdFromBearer(c);
       const state = tenantId ? await getSubState(tenantId) : NO_LICENSE;
-      return c.json(ok({ ...state, mode: 'cloud' as const }), 200);
+      return c.json(ok({ ...state, mode: 'cloud' as const, modules: null }), 200);
     }
-    return c.json(ok({ ...(await getState()), mode: 'desktop' as const }), 200);
+    return c.json(ok(await desktopStatus()), 200);
   });
 
   const recheckRoute = createRoute({
@@ -138,10 +154,13 @@ export const licenseStatusRoutes = (
         // Supervisor yetib bo'lmaydi — joriy (saqlangan) holat qaytadi.
         logger.warn({ err, tenantId }, 'subscription recheck failed');
       }
-      return c.json(ok({ ...(await getSubState(tenantId)), mode: 'cloud' as const }), 200);
+      return c.json(
+        ok({ ...(await getSubState(tenantId)), mode: 'cloud' as const, modules: null }),
+        200,
+      );
     }
     await runHeartbeat();
-    return c.json(ok({ ...(await getState()), mode: 'desktop' as const }), 200);
+    return c.json(ok(await desktopStatus()), 200);
   });
 
   return app;
