@@ -1,5 +1,6 @@
 import {
   invalidateLicense,
+  isLicenseAuthenticForThisMachine,
   type LicenseData,
   readAnchor,
   readLicense,
@@ -30,6 +31,11 @@ export interface RunHeartbeatCheckDeps {
   // qaraganda ustun).
   readAnchor: () => Promise<number>;
   writeAnchor: (ms: number) => Promise<void>;
+  // FX-06 (LA-15, X-4) — javob `.lic`ga yozilishidan oldin imzo + mahalliy
+  // fingerprint tekshiruvi. Ixtiyoriy, lekin STANDART qiymati haqiqiy tekshiruv
+  // (`isLicenseAuthenticForThisMachine`) — chaqiruvchi uni unutsa ham
+  // tekshirilmagan payload yozilmaydi (xavfsiz default).
+  verifyLicense?: (data: LicenseData) => Promise<boolean>;
   log: HeartbeatLogger;
 }
 
@@ -39,7 +45,9 @@ export interface RunHeartbeatCheckDeps {
  *
  * - `.lic` yo'q (hali faollashtirilmagan YOKI cloud/dev deployment) → no-op.
  * - Muvaffaqiyatli (200) → Supervisor yangi imzolangan `LicenseData` qaytaradi
- *   (activate bilan bir xil shakl) → cache yangilanadi (`writeLicense`).
+ *   (activate bilan bir xil shakl) → imzo + fingerprint tekshiriladi (FX-06) →
+ *   cache yangilanadi (`writeLicense`). Tekshiruvdan o'tmasa — faqat log, eski
+ *   `.lic` va langar tegilmaydi.
  * - `INVALID_KEY` (Supervisor `isActive:false` topdi — deaktivatsiya) →
  *   `.lic` invalidatsiya qilinadi, `getActiveModules()` keyingi chaqiruvda
  *   darhol `[]` qaytaradi (fayl cache qilinmaydi, spec §5).
@@ -53,6 +61,19 @@ export const runLicenseHeartbeatCheck = async (deps: RunHeartbeatCheckDeps): Pro
 
   try {
     const fresh = await deps.sendHeartbeat(lic.licenseKey);
+    // FX-06 — imzosiz/soxta (MITM, HTTP rejim), boshqa juftlik bilan imzolangan
+    // (RSA almashtirildi, FU-54) yoki boshqa mashinaga bog'langan javob yaroqli
+    // eski `.lic`ni almashtirmasin: aks holda klinika muddat tugashini kutmasdan
+    // `LICENSE_NOT_FOUND` blokiga tushadi. Langar ham tegilmaydi — tekshirilmagan
+    // `issuedAt` (masalan kelajakdagi sana) muddatni sun'iy tugatib qo'yardi.
+    const verify = deps.verifyLicense ?? isLicenseAuthenticForThisMachine;
+    if (!(await verify(fresh))) {
+      deps.log.warn(
+        { clinicId: lic.clinicId },
+        'License heartbeat: response failed signature/fingerprint verification — keeping cached license',
+      );
+      return;
+    }
     await deps.writeLicense(fresh);
     // CLI-437 — Supervisor'ning `issuedAt`i ishonchli server-vaqti; langarni
     // shu bilan (va joriy langar/mahalliy vaqt bilan `max`) qayta ko'taramiz —

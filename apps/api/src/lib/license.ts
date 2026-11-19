@@ -159,6 +159,27 @@ const isLicenseAuthentic = (data: LicenseData, localFingerprint: string): boolea
   return Boolean(payload.fingerprint) && payload.fingerprint === localFingerprint;
 };
 
+/**
+ * FX-06 (LA-15, X-4) — Supervisor'dan kelgan payload SHU mashina uchun haqiqiymi
+ * (imzo + mahalliy fingerprint; muddatdan mustaqil). Heartbeat javobi `.lic`
+ * ustiga yozilishidan oldin shu bilan tekshiriladi. Fingerprint hisoblab
+ * bo'lmasa (VM/konteyner) — `false` (yozmaslik tomoniga).
+ */
+export const isLicenseAuthenticForThisMachine = async (data: LicenseData): Promise<boolean> => {
+  let localFingerprint: string;
+  try {
+    localFingerprint = await getFingerprint();
+  } catch {
+    return false;
+  }
+  try {
+    return isLicenseAuthentic(data, localFingerprint);
+  } catch {
+    // Buzuq shakl (masalan `signature` hex emas) — rad.
+    return false;
+  }
+};
+
 /** CLI-437 — `max(Date.now(), anchor, issuedAt)`: soat orqaga surilsa ham muddat tiklanmaydi. */
 const effectiveNowMs = (data: LicenseData, anchorMs: number): number => {
   const issuedAtMs = Date.parse(data.issuedAt);

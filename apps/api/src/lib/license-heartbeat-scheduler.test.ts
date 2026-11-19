@@ -18,6 +18,11 @@ const makeLicense = (): LicenseData => ({
 // monotonic-anchor advance (existing pre-CLI-437 test cases below).
 const noopAnchorDeps = { readAnchor: async () => 0, writeAnchor: mock(async (_ms: number) => {}) };
 
+// FX-06 — fake payloads here are not RSA-signed; tests that exercise the
+// post-verification path stub the verifier (real verification is covered by
+// tests/integration/fx-06-heartbeat-verify.test.ts).
+const acceptAll = async () => true;
+
 describe('runLicenseHeartbeatCheck', () => {
   test('no cached license (not activated yet, or cloud/dev) -> no-op, sendHeartbeat never called', async () => {
     const { runLicenseHeartbeatCheck } = await import('./license-heartbeat-scheduler');
@@ -48,6 +53,7 @@ describe('runLicenseHeartbeatCheck', () => {
       invalidateLicense: mock(async () => {}),
       sendHeartbeat: async () => fresh,
       ...noopAnchorDeps,
+      verifyLicense: acceptAll,
       log: fakeLog,
     });
 
@@ -126,6 +132,28 @@ describe('runLicenseHeartbeatCheck', () => {
     expect(invalidateLicense).not.toHaveBeenCalled();
   });
 
+  test('FX-06: response failing verification -> neither .lic nor anchor written, not invalidated', async () => {
+    const { runLicenseHeartbeatCheck } = await import('./license-heartbeat-scheduler');
+    const writeLicense = mock(async () => {});
+    const writeAnchor = mock(async (_ms: number) => {});
+    const invalidateLicense = mock(async () => {});
+
+    await runLicenseHeartbeatCheck({
+      readLicense: async () => makeLicense(),
+      writeLicense,
+      invalidateLicense,
+      sendHeartbeat: async () => makeLicense(),
+      readAnchor: async () => 0,
+      writeAnchor,
+      verifyLicense: async () => false,
+      log: fakeLog,
+    });
+
+    expect(writeLicense).not.toHaveBeenCalled();
+    expect(writeAnchor).not.toHaveBeenCalled();
+    expect(invalidateLicense).not.toHaveBeenCalled();
+  });
+
   // CLI-437 — successful heartbeat re-anchors the monotonic clock to
   // Supervisor's (trusted) server-time `issuedAt`.
   test('successful heartbeat advances the anchor to the fresh issuedAt (server time)', async () => {
@@ -141,6 +169,7 @@ describe('runLicenseHeartbeatCheck', () => {
       sendHeartbeat: async () => fresh,
       readAnchor: async () => priorAnchorMs,
       writeAnchor,
+      verifyLicense: acceptAll,
       log: fakeLog,
     });
 
