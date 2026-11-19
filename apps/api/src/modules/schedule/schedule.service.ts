@@ -42,20 +42,35 @@ export const createScheduleService = (deps: { audit: AuditLogger }) => {
     }
 
     const before = await repo.listSegments(c, doctorId, input.branchId);
+    // FX-126: bo'sh saqlash «shifokor bu filialda ishlamaydi» — sentinel (is_active=false) qator.
+    // Qator umuman bo'lmasa (hech qachon sozlanmagan) filial ish soati fallback'i amal qiladi.
+    const segmentRows = input.segments.map((s) => ({
+      tenantId,
+      branchId: input.branchId,
+      doctorId,
+      weekday: s.weekday,
+      startMinute: hhmm(s.start),
+      endMinute: hhmm(s.end),
+      effectiveFrom: s.effectiveFrom ?? null,
+      effectiveUntil: s.effectiveUntil ?? null,
+    }));
     const rows = await repo.replaceSegments(
       c,
       doctorId,
       input.branchId,
-      input.segments.map((s) => ({
-        tenantId,
-        branchId: input.branchId,
-        doctorId,
-        weekday: s.weekday,
-        startMinute: hhmm(s.start),
-        endMinute: hhmm(s.end),
-        effectiveFrom: s.effectiveFrom ?? null,
-        effectiveUntil: s.effectiveUntil ?? null,
-      })),
+      segmentRows.length > 0
+        ? segmentRows
+        : [
+            {
+              tenantId,
+              branchId: input.branchId,
+              doctorId,
+              weekday: 0,
+              startMinute: 0,
+              endMinute: 0,
+              isActive: false,
+            },
+          ],
     );
 
     await deps.audit.record(c, {
@@ -136,6 +151,7 @@ export const createScheduleService = (deps: { audit: AuditLogger }) => {
   // ─── Availability ───────────────────────────────────────────────────────
 
   /**
+   * FX-126: jadval qatori bor, lekin faol segment yo'q (sentinel) — doktor shu filialda ISHLAMAYDI.
    * P10: shaxsiy jadvali UMUMAN yo'q doktor filial ish soatida ishlaydi deb hisoblanadi
    * (yangi klinikada darhol bron qilish uchun) — FX-34: faqat shu filialga biriktirilgan bo'lsa. Jadvali bor, lekin shu kun segmenti
    * yo'q doktor — dam olish kuni (avvalgidek).
@@ -143,7 +159,7 @@ export const createScheduleService = (deps: { audit: AuditLogger }) => {
   async function segmentsForDay(c: Context, doctorId: string, branchId: string, weekday: number) {
     const segs = await repo.listActiveSegmentsForDay(c, doctorId, branchId, weekday);
     if (segs.length > 0) return segs;
-    if (await repo.hasAnyActiveSegments(c, doctorId, branchId)) return segs;
+    if (await repo.hasAnyScheduleRows(c, doctorId, branchId)) return segs;
     // FX-34 (LA-08): fallback faqat shu filialga biriktirilgan shifokorga — aks holda
     // boshqa filial shifokori bu filialda «butun kun bo'sh» ko'rinardi.
     if (!(await repo.isDoctorInBranch(c, doctorId, branchId))) return segs;
