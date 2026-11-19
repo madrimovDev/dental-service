@@ -166,6 +166,14 @@ export class VisitItemsMismatchError extends Error {
 }
 
 /** FX-handoff: bitta vizit bir marta to'lanadi (pre-check YOKI unique indeks poygasi) — 409. */
+/** FX-171: vizit to'lovida `branchId` vizit (yozilish) filialiga mos emas — routes 403 `branch.forbidden`. */
+export class VisitBranchMismatchError extends Error {
+  constructor() {
+    super('branchId does not match the visit branch');
+    this.name = 'VisitBranchMismatchError';
+  }
+}
+
 export class VisitAlreadyBilledError extends Error {
   constructor() {
     super('Visit note is already billed');
@@ -432,6 +440,7 @@ export const createCashierService = (deps: {
           signedAt: visitNotes.signedAt,
           performedServices: visitNotes.performedServices,
           stageId: visitNotes.stageId,
+          appointmentId: visitNotes.appointmentId,
         })
         .from(visitNotes)
         .where(eq(visitNotes.id, input.visitNoteId))
@@ -439,15 +448,39 @@ export const createCashierService = (deps: {
         .for('update');
       if (!visit) throw new VisitNoteNotFoundError();
       if (!visit.signedAt) throw new VisitNotSignedError();
-      if (visit.stageId) throw new VisitLinkedToPlanStageError();
       if (input.patientId && input.patientId !== visit.patientId) {
         throw new VisitPatientMismatchError();
+      }
+      // FX-171: vizit filiali = yozilish filiali (yozilishsiz vizit — filiali noma'lum, cheklanmaydi).
+      if (visit.appointmentId) {
+        const [appt] = await db
+          .select({ branchId: appointments.branchId })
+          .from(appointments)
+          .where(eq(appointments.id, visit.appointmentId))
+          .limit(1);
+        if (appt && appt.branchId !== input.branchId) throw new VisitBranchMismatchError();
+      }
+      // FX-170 (D-14): bosqichli vizitda bosqichning O'Z xizmati reja allocation'i bilan
+      // to'lanadi — vizit yo'lida faqat undan BOSHQA xizmatlar (og'riqsizlantirish, rentgen…).
+      let stageServiceId: string | null = null;
+      if (visit.stageId) {
+        const [stage] = await db
+          .select({ serviceId: treatmentStages.serviceId })
+          .from(treatmentStages)
+          .where(eq(treatmentStages.id, visit.stageId))
+          .limit(1);
+        stageServiceId = stage?.serviceId ?? null;
       }
       // Qolgan (hali undirilmagan) miqdor = bajarilgan − faol to'lovlarda undirilgan.
       const remaining = new Map<string, number>();
       for (const sid of visit.performedServices ?? []) {
         remaining.set(sid, (remaining.get(sid) ?? 0) + 1);
       }
+      if (stageServiceId && remaining.has(stageServiceId)) {
+        remaining.set(stageServiceId, (remaining.get(stageServiceId) ?? 0) - 1);
+      }
+      const payableTotal = [...remaining.values()].reduce((a, q) => a + Math.max(0, q), 0);
+      if (visit.stageId && payableTotal === 0) throw new VisitLinkedToPlanStageError();
       const billed = (await billedByService(db, [input.visitNoteId])).get(input.visitNoteId);
       for (const [sid, qty] of billed ?? []) {
         remaining.set(sid, (remaining.get(sid) ?? 0) - qty);
@@ -740,16 +773,20 @@ export const createCashierService = (deps: {
     const pageSize = opts.pageSize ?? 50;
     const windowStart = new Date(Date.now() - days * 86_400_000);
 
+    // FX-170 (D-14): bosqichli vizitda bosqichning o'z xizmati (bitta nusxa) reja allocation'i
+    // bilan to'lanadi — vizit yo'lining to'lanadigan soni undan tashqari xizmatlar.
+    const payableCount = sql`(COALESCE(array_length(${visitNotes.performedServices}, 1), 0)
+      - CASE WHEN ${treatmentStages.serviceId} IS NOT NULL
+              AND ${treatmentStages.serviceId} = ANY(${visitNotes.performedServices}) THEN 1 ELSE 0 END)`;
+
     const where = and(
       isNotNull(visitNotes.signedAt),
-      // FX-12: rejadagi bosqichga bog'langan vizit reja allocation'i orqali to'lanadi.
-      isNull(visitNotes.stageId),
       gte(visitNotes.signedAt, windowStart),
-      sql`COALESCE(array_length(${visitNotes.performedServices}, 1), 0) > 0`,
+      sql`${payableCount} > 0`,
       or(isNull(appointments.id), eq(appointments.branchId, branchId)),
       // FX-63: faqat faol (qaytarilmagan) to'lovlar hisobga olinadi; qisman undirilgan vizit
       // qolgan xizmatlari bilan ro'yxatda turadi.
-      sql`COALESCE(array_length(${visitNotes.performedServices}, 1), 0) > COALESCE((
+      sql`${payableCount} > COALESCE((
         SELECT SUM(i.quantity) FROM cashier_transactions ct
         JOIN cashier_transaction_items i ON i.transaction_id = ct.id
         WHERE ct.visit_note_id = ${visitNotes.id} AND ${ACTIVE_VISIT_PAYMENT_SQL}), 0)`,
@@ -759,6 +796,7 @@ export const createCashierService = (deps: {
       .select({ total: sql<number>`count(*)::int` })
       .from(visitNotes)
       .leftJoin(appointments, eq(appointments.id, visitNotes.appointmentId))
+      .leftJoin(treatmentStages, eq(treatmentStages.id, visitNotes.stageId))
       .where(where);
 
     const rows = await db
@@ -770,11 +808,13 @@ export const createCashierService = (deps: {
         doctorName: users.fullName,
         signedAt: visitNotes.signedAt,
         performed: visitNotes.performedServices,
+        stageServiceId: treatmentStages.serviceId,
       })
       .from(visitNotes)
       .innerJoin(patients, eq(patients.id, visitNotes.patientId))
       .leftJoin(users, eq(users.id, visitNotes.doctorId))
       .leftJoin(appointments, eq(appointments.id, visitNotes.appointmentId))
+      .leftJoin(treatmentStages, eq(treatmentStages.id, visitNotes.stageId))
       .where(where)
       .orderBy(desc(visitNotes.signedAt))
       .limit(pageSize)
@@ -807,6 +847,12 @@ export const createCashierService = (deps: {
     const result: PendingVisitDto[] = rows.map((r) => {
       const qty = new Map<string, number>();
       for (const sid of r.performed ?? []) qty.set(sid, (qty.get(sid) ?? 0) + 1);
+      // FX-170: bosqich xizmati vizit yo'lida emas (reja allocation'i bilan).
+      if (r.stageServiceId && qty.has(r.stageServiceId)) {
+        const left = (qty.get(r.stageServiceId) ?? 0) - 1;
+        if (left > 0) qty.set(r.stageServiceId, left);
+        else qty.delete(r.stageServiceId);
+      }
       // FX-63: qisman undirilgan xizmatlar chiqariladi — faqat qolgani qarz.
       for (const [sid, billedQty] of billedMap.get(r.visitNoteId) ?? []) {
         const left = (qty.get(sid) ?? 0) - billedQty;

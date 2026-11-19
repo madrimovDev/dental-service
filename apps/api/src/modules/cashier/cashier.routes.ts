@@ -46,6 +46,7 @@ import {
   type PayrollAdjustmentHook,
   type PriceLookup,
   VisitAlreadyBilledError,
+  VisitBranchMismatchError,
   VisitItemsMismatchError,
   VisitLinkedToPlanStageError,
   VisitNoteNotFoundError,
@@ -222,6 +223,9 @@ export const cashierRoutes = (deps: {
           ),
           409,
         );
+      }
+      if (e instanceof VisitBranchMismatchError) {
+        return c.json(fail(BRANCH_FORBIDDEN_CODE, BRANCH_FORBIDDEN_MESSAGE), 403);
       }
       if (e instanceof VisitAlreadyBilledError) {
         return c.json(fail('cashier.visit_already_billed', 'Visit note is already billed'), 409);
