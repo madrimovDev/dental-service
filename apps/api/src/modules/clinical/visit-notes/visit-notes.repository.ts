@@ -21,6 +21,16 @@ export const createVisitNotesRepository = () => {
     return note ?? null;
   }
 
+  /**
+   * FX-67: `SELECT ... FOR UPDATE` — parallel PATCH'lar bir vizit yozuvi ustida ketma-ket
+   * ishlaydi; ikkinchisi birinchisi commit qilgan holatni 'before' sifatida o'qiydi.
+   */
+  async function findForUpdate(c: Context, id: string) {
+    const db = getDb(c);
+    const [note] = await db.select().from(visitNotes).where(eq(visitNotes.id, id)).for('update');
+    return note ?? null;
+  }
+
   async function insert(c: Context, values: typeof visitNotes.$inferInsert) {
     const db = getDb(c);
     const [note] = await db.insert(visitNotes).values(values).returning();
@@ -50,5 +60,5 @@ export const createVisitNotesRepository = () => {
     return signed ?? null;
   }
 
-  return { list, find, insert, update, sign };
+  return { list, find, findForUpdate, insert, update, sign };
 };

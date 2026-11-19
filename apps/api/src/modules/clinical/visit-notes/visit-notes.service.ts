@@ -180,7 +180,8 @@ export const createVisitNotesService = (deps: {
   }
 
   async function update(c: Context, id: string, input: UpdateVisitNoteInput) {
-    const before = await repo.find(c, id);
+    // FX-67: qator qulflanadi — reconcile har doim eng so'nggi commit qilingan 'before' ustida.
+    const before = await repo.findForUpdate(c, id);
     if (!before) return null;
     // UI-D4: imzolangan yozuv — hech qanday yon ta'sirdan (stage, stock) OLDIN rad.
     if (before.signedAt) throw new VisitNoteSignedError(id);
