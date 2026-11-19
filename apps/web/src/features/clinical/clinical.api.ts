@@ -60,6 +60,7 @@ import {
 import { cashierKeys } from '@/features/cashier/cashier.keys.ts';
 import { patientKeys } from '@/features/patients/patients.keys.ts';
 import { recallKeys } from '@/features/recalls/recalls.keys.ts';
+import { stockKeys } from '@/features/stock/stock.keys.ts';
 import { api } from '@/lib/api.ts';
 import { lookupKeys } from '@/lib/lookup-keys.ts';
 import { clinicalKeys } from './clinical.keys';
@@ -308,6 +309,8 @@ export function useCreateVisitNote(patientId: string) {
       qc.invalidateQueries({ queryKey: clinicalKeys.visitNotes(patientId) });
       // FX-14: qoralama bosqichni `in_progress` qiladi.
       qc.invalidateQueries({ queryKey: clinicalKeys.plans(patientId) });
+      // FX-166: BOM bo'yicha avto-chiqim ombor qoldig'i va bugungi jurnalni o'zgartiradi.
+      qc.invalidateQueries({ queryKey: stockKeys.all });
     },
   });
 }
@@ -324,6 +327,7 @@ export function useUpdateVisitNote(patientId: string) {
       qc.invalidateQueries({ queryKey: ['clinical', 'visit-note'] });
       // stageId completion / performedServices reconcile plan+stock holatiga ta'sir qiladi.
       qc.invalidateQueries({ queryKey: clinicalKeys.plans(patientId) });
+      qc.invalidateQueries({ queryKey: stockKeys.all }); // FX-166: reconcile qoldiqni o'zgartiradi
     },
   });
 }

@@ -120,4 +120,33 @@ describe('StockItemsTable', () => {
     expect(screen.getByRole('button', { name: 'Tarix' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Kirim' })).toBeNull();
   });
+
+  it('FX-129: «Tahrirlash» tugmasi faqat canManage bo‘lsa, onEdit item bilan chaqiriladi', () => {
+    const onEdit = vi.fn();
+    const it1 = vm({ id: 'e1', name: 'Kompozit' });
+    const { unmount } = renderApp(
+      <StockItemsTable
+        items={[it1]}
+        selectedId={null}
+        onSelect={() => {}}
+        canManage={true}
+        onMovement={() => {}}
+        onEdit={onEdit}
+      />,
+    );
+    screen.getByRole('button', { name: 'Tahrirlash' }).click();
+    expect(onEdit).toHaveBeenCalledWith(it1);
+    unmount();
+    renderApp(
+      <StockItemsTable
+        items={[it1]}
+        selectedId={null}
+        onSelect={() => {}}
+        canManage={false}
+        onMovement={() => {}}
+        onEdit={onEdit}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: 'Tahrirlash' })).toBeNull();
+  });
 });

@@ -13,6 +13,8 @@ export interface StockItemsTableProps {
   canManage: boolean;
   onMovement: (item: StockItemVM) => void;
   onReceive?: (item: StockItemVM) => void;
+  /** Metadata tahriri (nom/birlik/kategoriya/narx/minimal qoldiq) — faqat canManage. */
+  onEdit?: (item: StockItemVM) => void;
 }
 
 /** «Necha kunga yetadi» bar to'lishi uchun 60 kun = 100%. */
@@ -88,6 +90,7 @@ export function StockItemsTable({
   canManage,
   onMovement,
   onReceive,
+  onEdit,
 }: StockItemsTableProps) {
   const { t } = useTranslation();
 
@@ -186,6 +189,17 @@ export function StockItemsTable({
                         }}
                       >
                         {t('stockScreen.actionMovement')}
+                      </Button>
+                    )}
+                    {canManage && onEdit && (
+                      <Button
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEdit(item);
+                        }}
+                      >
+                        {t('common.edit')}
                       </Button>
                     )}
                   </div>

@@ -36,10 +36,12 @@ export function StockScreen() {
   const { t, i18n } = useTranslation();
   const { hasPermission } = useAuthStore();
   const canManage = hasPermission('stock.manage');
+  const canViewServices = hasPermission('service.view');
 
   const [branchId, setBranchId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [movementItem, setMovementItem] = useState<StockItemVM | null>(null);
+  const [editItem, setEditItem] = useState<StockItemVM | null>(null);
   const [receiveItemId, setReceiveItemId] = useState<string | null>(null);
   const [criticalFirst, setCriticalFirst] = useState(true);
   const [category, setCategory] = useState<string | null>(null);
@@ -49,14 +51,17 @@ export function StockScreen() {
   const [batchOpened, { open: openBatch, close: closeBatch }] = useDisclosure(false);
 
   const branches = useBranches();
-  const services = useServices({ enabled: hasPermission('service.view') });
+  const services = useServices({ enabled: canViewServices });
   const items = useStockItems(branchId ?? undefined);
+  // FX-163: BOM materiallari filial filtriga bog'liq emas — filtrsiz to'liq ro'yxat.
+  const allItems = useStockItems();
   const movements = useStockMovements(selectedId);
   const expiring = useExpiringBatches(EXPIRING_WITHIN_DAYS, branchId ?? undefined);
   const autoToday = useAutoDeductionsToday(branchId ?? undefined);
   const bom = useServiceMaterials();
 
   const itemVMs = useMemo(() => (items.data ?? []).map(toStockItemVM), [items.data]);
+  const allItemVMs = useMemo(() => (allItems.data ?? []).map(toStockItemVM), [allItems.data]);
   const selectedItem = useMemo(
     () => itemVMs.find((i) => i.id === selectedId) ?? null,
     [itemVMs, selectedId],
@@ -103,6 +108,14 @@ export function StockScreen() {
     [i18n.language],
   );
 
+  const openCreateItem = () => {
+    setEditItem(null);
+    openItemForm();
+  };
+  const handleEdit = (item: StockItemVM) => {
+    setEditItem(item);
+    openItemForm();
+  };
   const handleMovement = (item: StockItemVM) => {
     setMovementItem(item);
     openMovement();
@@ -127,7 +140,7 @@ export function StockScreen() {
           actions={
             canManage && (
               <Group gap="sm">
-                <Button onClick={openItemForm}>{t('stock.create_item')}</Button>
+                <Button onClick={openCreateItem}>{t('stock.create_item')}</Button>
                 <Button variant="primary" onClick={() => handleReceive(null)}>
                   {t('stockScreen.receive')}
                 </Button>
@@ -224,6 +237,7 @@ export function StockScreen() {
                           canManage={canManage}
                           onMovement={handleMovement}
                           onReceive={(item) => handleReceive(item.id)}
+                          onEdit={handleEdit}
                         />
                       )}
                     </Stack>
@@ -239,7 +253,10 @@ export function StockScreen() {
                   <Card withBorder padding="md">
                     <MovementHistory
                       itemName={selectedItem?.name ?? null}
-                      movements={movements.data ?? []}
+                      movements={movements.data?.pages.flat() ?? []}
+                      hasMore={movements.hasNextPage}
+                      onLoadMore={() => void movements.fetchNextPage()}
+                      loadingMore={movements.isFetchingNextPage}
                     />
                   </Card>
                 </Stack>
@@ -249,7 +266,16 @@ export function StockScreen() {
 
           <Tabs.Panel value="bom">
             <Card withBorder padding="md">
-              <BomPanel services={services.data ?? []} items={itemVMs} canManage={canManage} />
+              {canViewServices ? (
+                <BomPanel services={services.data ?? []} items={allItemVMs} canManage={canManage} />
+              ) : (
+                // FX-164: xizmatlar ro'yxati service.view talab qiladi — sababini ko'rsatamiz.
+                <StateView
+                  status="forbidden"
+                  title={t('states.forbidden_title')}
+                  description={t('stock.bom_forbidden')}
+                />
+              )}
             </Card>
           </Tabs.Panel>
         </Tabs>
@@ -259,6 +285,7 @@ export function StockScreen() {
         opened={itemFormOpened}
         onClose={closeItemForm}
         branches={branches.data ?? []}
+        item={editItem}
       />
       <MovementFormModal opened={movementOpened} onClose={closeMovement} item={movementItem} />
       <BatchFormModal

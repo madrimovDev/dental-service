@@ -12,8 +12,10 @@ import {
   listStockItems,
   listStockMovements,
   removeStockBom,
+  updateStockItem,
 } from '@dental/api-client';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { expensesKeys } from '@/features/expenses/expenses.keys';
 import { lookupKeys } from '@/lib/lookup-keys';
 import { stockKeys } from './stock.keys';
 
@@ -25,11 +27,26 @@ export function useStockItems(branchId?: string) {
   });
 }
 
-/** Tanlangan item bo'yicha harakat tarixi. */
+/** Harakatlar sahifa hajmi — API default'i (`DEFAULT_MOVEMENTS_PAGE_SIZE`) bilan bir xil. */
+export const MOVEMENTS_PAGE_SIZE = 50;
+
+/**
+ * Tanlangan item bo'yicha harakat tarixi — sahifalab («Ko'proq yuklash», FX-168). Oxirgi sahifa
+ * to'liq (`pageSize` ta) bo'lsa — keyingisi bor. Kalit `stockKeys.movements(id)` prefiksida
+ * (harakat yaratilganda invalidate bo'ladi).
+ */
 export function useStockMovements(itemId: string | null) {
-  return useQuery({
-    queryKey: stockKeys.movements(itemId ?? ''),
-    queryFn: () => listStockMovements({ itemId: itemId ?? '' }).then((r) => r.data),
+  return useInfiniteQuery({
+    queryKey: [...stockKeys.movements(itemId ?? ''), 'paged'],
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) =>
+      listStockMovements({
+        itemId: itemId ?? '',
+        page: pageParam,
+        pageSize: MOVEMENTS_PAGE_SIZE,
+      }).then((r) => r.data),
+    getNextPageParam: (lastPage, _pages, lastParam) =>
+      lastPage.length >= MOVEMENTS_PAGE_SIZE ? lastParam + 1 : undefined,
     enabled: !!itemId,
   });
 }
@@ -85,7 +102,11 @@ export function useCreateBatch() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: CreateBatchPayload) => createStockBatch(body).then((r) => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: stockKeys.all }),
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: stockKeys.all });
+      // FX-166: «xarajatga yoz» kirimi xarajat yaratadi — xarajatlar/P&L keshi ham yangilanadi.
+      if (vars.recordAsExpense) void qc.invalidateQueries({ queryKey: expensesKeys.all });
+    },
   });
 }
 
@@ -110,6 +131,16 @@ export function useCreateItem() {
   return useMutation({
     mutationFn: (body: Parameters<typeof createStockItem>[0]) =>
       createStockItem(body).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: stockKeys.all }),
+  });
+}
+
+/** Item metadata'sini tahrirlash (name/unit/category/price/minThreshold). Qoldiq o'zgarmaydi. */
+export function useUpdateItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: Parameters<typeof updateStockItem>[1] }) =>
+      updateStockItem(id, body).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: stockKeys.all }),
   });
 }
