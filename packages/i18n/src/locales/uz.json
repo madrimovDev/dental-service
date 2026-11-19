@@ -1397,7 +1397,9 @@
         "paid": "To'langan",
         "partial": "Qisman",
         "unpaid": "To'lanmagan"
-      }
+      },
+      "cancelled_credit": "Reja bekor qilingan, lekin {{amount}} kredit qolgan. Uni boshqa reja bosqichiga o'tkazing yoki bemorga qaytaring (refund).",
+      "cancelled_tag": "bekor qilingan"
     },
     "refund_modal": {
       "title": "To'lovni qaytarish",
