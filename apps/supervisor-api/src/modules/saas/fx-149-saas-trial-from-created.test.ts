@@ -1,5 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { and, eq } from 'drizzle-orm';
 import { createApp } from '../../app';
+import { db } from '../../db/client';
+import { clinicEvents, clinics } from '../../db/schema';
 import { SAAS_TRIAL_DAYS } from './saas.routes';
 
 /**
@@ -21,7 +24,11 @@ afterAll(() => {
   else process.env.SUPERVISOR_SAAS_TOKEN = prev;
 });
 
-const register = async (tenantId: string, tenantCreatedAt?: string) => {
+const register = async (
+  tenantId: string,
+  tenantCreatedAt?: string,
+  knownSubscriptionExpiresAt?: string,
+) => {
   const res = await app.request('/internal/saas/clinics', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SAAS_TOKEN}` },
@@ -31,6 +38,7 @@ const register = async (tenantId: string, tenantCreatedAt?: string) => {
       ownerFullName: 'Sardor Aliyev',
       ownerPhone: '901114999',
       ...(tenantCreatedAt ? { tenantCreatedAt } : {}),
+      ...(knownSubscriptionExpiresAt ? { knownSubscriptionExpiresAt } : {}),
     }),
   });
   return {
@@ -75,5 +83,54 @@ describe('FX-149 — SaaS sinov muddati tenant yaratilgan sanadan', () => {
     const again = await register(tenantId, new Date(Date.now() - 1 * DAY).toISOString());
     expect(again.status).toBe(200);
     expect(again.body.subscriptionExpiresAt).toBe(first.body.subscriptionExpiresAt);
+  });
+
+  // Review: apps/api qayta ro'yxatda saqlangan (to'langan) muddatni yuboradi — Supervisor
+  // uni klinika muddati qiladi, aks holda keyingi sinxron sinov oxiri bilan ustiga yozardi.
+  it('qayta ro‘yxat + knownSubscriptionExpiresAt (sinovdan kech) — klinika muddati shu, hodisa yoziladi', async () => {
+    const tenantId = crypto.randomUUID();
+    const createdAt = new Date(Date.now() - 200 * DAY);
+    const paidUntil = new Date(Date.now() + 150 * DAY);
+    const r = await register(tenantId, createdAt.toISOString(), paidUntil.toISOString());
+    expect(r.status).toBe(201);
+    expect(expiryMs(r.body)).toBe(paidUntil.getTime());
+
+    const row = await db.query.clinics.findFirst({ where: eq(clinics.saasTenantId, tenantId) });
+    expect(row?.subscriptionExpiresAt?.getTime()).toBe(paidUntil.getTime());
+    const events = await db
+      .select()
+      .from(clinicEvents)
+      .where(and(eq(clinicEvents.clinicId, row!.id), eq(clinicEvents.event, 'saas_reregistered')));
+    expect(events).toHaveLength(1);
+    expect(events[0]?.metadata).toMatchObject({
+      knownSubscriptionExpiresAt: paidUntil.toISOString(),
+      trialExpiresAt: new Date(createdAt.getTime() + SAAS_TRIAL_DAYS * DAY).toISOString(),
+    });
+  });
+
+  it('knownSubscriptionExpiresAt sinovdan oldin — sinov oxiri qoladi (muddat qisqarmaydi)', async () => {
+    const createdAt = new Date(Date.now() - 10 * DAY);
+    const r = await register(
+      crypto.randomUUID(),
+      createdAt.toISOString(),
+      new Date(Date.now() - 5 * DAY).toISOString(),
+    );
+    expect(r.status).toBe(201);
+    expect(expiryMs(r.body)).toBe(createdAt.getTime() + SAAS_TRIAL_DAYS * DAY);
+  });
+
+  it('mavjud klinika: knownSubscriptionExpiresAt muddatni O‘ZGARTIRMAYDI; yaroqsiz sana — 400', async () => {
+    const tenantId = crypto.randomUUID();
+    const first = await register(tenantId, new Date(Date.now() - 5 * DAY).toISOString());
+    const again = await register(
+      tenantId,
+      undefined,
+      new Date(Date.now() + 365 * DAY).toISOString(),
+    );
+    expect(again.status).toBe(200);
+    expect(again.body.subscriptionExpiresAt).toBe(first.body.subscriptionExpiresAt);
+
+    const bad = await register(crypto.randomUUID(), undefined, 'not-a-date');
+    expect(bad.status).toBe(400);
   });
 });

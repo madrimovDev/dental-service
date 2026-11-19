@@ -55,6 +55,15 @@ const registerSchema = z.object({
    * muddati o'tgan klinikaga yangi 30 kun berilmasin. Ixtiyoriy (eski klientlar).
    */
   tenantCreatedAt: z.string().datetime({ offset: true }).optional(),
+  /**
+   * FX-149 (review): apps/api'da saqlangan obuna muddati (ISO) — Supervisor yozuvni
+   * yo'qotgan (masalan, zaxiradan tiklangan baza) va tenant 404'dan keyin qayta
+   * ro'yxatga olinayotganda yuboriladi. FAQAT yangi qator yaratilganda va sinovdan
+   * kech bo'lsa qo'llanadi (to'langan muddat tiklanadi, aks holda keyingi sinxron uni
+   * sinov oxiri bilan ustiga yozardi). Mavjud klinikada e'tiborsiz — muddatni faqat
+   * vendor o'zgartiradi. Ishonch: ichki `SUPERVISOR_SAAS_TOKEN`.
+   */
+  knownSubscriptionExpiresAt: z.string().datetime({ offset: true }).optional(),
 });
 
 const uuidSchema = z.string().uuid();
@@ -89,6 +98,11 @@ export const saasRoutes = () => {
   // qayta boshlanmaydi. 201 = yangi, 200 = mavjud.
   app.post('/clinics', zValidator('json', registerSchema), async (c) => {
     const data = c.req.valid('json');
+    const trialEnd = trialExpiry(data.tenantCreatedAt, Date.now());
+    const known = data.knownSubscriptionExpiresAt
+      ? new Date(data.knownSubscriptionExpiresAt)
+      : null;
+    const restoreKnown = known !== null && known.getTime() > trialEnd.getTime();
     const [inserted] = await db
       .insert(clinics)
       .values({
@@ -99,11 +113,25 @@ export const saasRoutes = () => {
         defaultLanguage: data.defaultLanguage,
         mode: 'saas',
         saasTenantId: data.tenantId,
-        subscriptionExpiresAt: trialExpiry(data.tenantCreatedAt, Date.now()),
+        subscriptionExpiresAt: restoreKnown ? known : trialEnd,
       })
       .onConflictDoNothing({ target: clinics.saasTenantId })
       .returning();
-    if (inserted) return c.json(await toStatus(inserted), 201);
+    if (inserted) {
+      if (known) {
+        // Vendor ko'radi: muddat apps/api'dagi saqlangan qiymatdan tiklandi (yoki yo'q).
+        await db.insert(clinicEvents).values({
+          clinicId: inserted.id,
+          event: 'saas_reregistered',
+          metadata: {
+            trialExpiresAt: trialEnd.toISOString(),
+            knownSubscriptionExpiresAt: known.toISOString(),
+            restored: restoreKnown,
+          },
+        });
+      }
+      return c.json(await toStatus(inserted), 201);
+    }
 
     const existing = await db.query.clinics.findFirst({
       where: eq(clinics.saasTenantId, data.tenantId),

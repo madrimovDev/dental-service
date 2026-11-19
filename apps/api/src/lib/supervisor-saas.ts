@@ -55,6 +55,13 @@ export type SaasRegistration = {
    * shundan hisoblaydi (qayta ro'yxatda yangi 30 kun berilmaydi).
    */
   tenantCreatedAt: string;
+  /**
+   * FX-149 (review): FAQAT 404-tiklash yo'lida — apps/api'da saqlangan obuna muddati
+   * (ISO). Supervisor yangi qatorda uni sinovdan kech bo'lsa klinika muddati qiladi,
+   * shunda to'langan muddat keyingi (oddiy) sinxronda sinov oxiri bilan ustiga
+   * yozilmaydi va vendor ham to'g'ri muddatni ko'radi.
+   */
+  knownSubscriptionExpiresAt?: string;
 };
 
 const call = async (fetchImpl: FetchFn, path: string, init: RequestInit): Promise<Response> =>
@@ -139,6 +146,8 @@ const saveSupervisorState = async (
     // FX-149: Supervisor tenantni yo'qotib (404) qayta ro'yxatga olgan bo'lsa, u bergan
     // muddat (sinov, yaratilgan sanadan) saqlangan, ancha kech (to'langan) muddatni
     // qisqartirmaydi. Vendor to'xtatgan bo'lsa (suspendedAt) — himoya qo'llanmaydi.
+    // Asosiy himoya — `knownSubscriptionExpiresAt` (Supervisor muddatni o'zi saqlaydi);
+    // bu faqat shu maydonni bilmaydigan eski Supervisor uchun bir sikllik zaxira.
     if (opts.keepLaterExpiry && !info.suspendedAt) {
       const [row] = await tx
         .select({ at: tenantSettings.subscriptionExpiresAt })
@@ -278,6 +287,13 @@ export const syncTenantSubscription = async (
       .innerJoin(users, eq(users.id, tenants.ownerUserId))
       .where(eq(tenants.id, tenantId));
     if (!t) return false;
+    // tenant_settings — RLS jadval: o'z tenant kontekstida o'qiladi.
+    const known = await withTenant(tenantId, async (tx) => {
+      const [row] = await tx
+        .select({ at: tenantSettings.subscriptionExpiresAt })
+        .from(tenantSettings);
+      return row?.at ?? null;
+    });
     info = await registerClinicInSupervisor(
       {
         tenantId,
@@ -286,6 +302,7 @@ export const syncTenantSubscription = async (
         ownerPhone: t.ownerPhone ?? '',
         defaultLanguage: t.lang === 'ru' ? 'ru' : 'uz',
         tenantCreatedAt: t.createdAt.toISOString(),
+        ...(known ? { knownSubscriptionExpiresAt: known.toISOString() } : {}),
       },
       fetchImpl,
     );

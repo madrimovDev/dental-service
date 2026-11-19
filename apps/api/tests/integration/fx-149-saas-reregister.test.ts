@@ -26,7 +26,12 @@ const app = createApp();
 
 type StubClinic = { clinicId: string; subscriptionExpiresAt: string };
 const store = new Map<string, StubClinic>();
-const registerBodies: Array<{ tenantId: string; tenantCreatedAt?: string }> = [];
+type RegisterBody = {
+  tenantId: string;
+  tenantCreatedAt?: string;
+  knownSubscriptionExpiresAt?: string;
+};
+const registerBodies: RegisterBody[] = [];
 const stub = Bun.serve({
   port: 0,
   fetch: async (req) => {
@@ -35,15 +40,22 @@ const stub = Bun.serve({
       return Response.json({ error: { code: 'UNAUTHORIZED' } }, { status: 401 });
     }
     if (req.method === 'POST' && url.pathname === '/internal/saas/clinics') {
-      const body = (await req.json()) as { tenantId: string; tenantCreatedAt?: string };
+      const body = (await req.json()) as RegisterBody;
       registerBodies.push(body);
       const existing = store.get(body.tenantId);
       if (existing) return Response.json({ ...existing, mode: 'saas' }, { status: 200 });
       const created = body.tenantCreatedAt ? Date.parse(body.tenantCreatedAt) : Date.now();
       const start = Math.min(created, Date.now());
+      // Supervisor qoidasi: yangi qatorda saqlangan muddat sinovdan kech bo'lsa — shu.
+      const trialEnd = start + TRIAL_DAYS * DAY;
+      const known = body.knownSubscriptionExpiresAt
+        ? Date.parse(body.knownSubscriptionExpiresAt)
+        : Number.NaN;
       const clinic = {
         clinicId: crypto.randomUUID(),
-        subscriptionExpiresAt: new Date(start + TRIAL_DAYS * DAY).toISOString(),
+        subscriptionExpiresAt: new Date(
+          Number.isFinite(known) && known > trialEnd ? known : trialEnd,
+        ).toISOString(),
       };
       store.set(body.tenantId, clinic);
       return Response.json({ ...clinic, mode: 'saas' }, { status: 201 });
@@ -186,6 +198,31 @@ describe('FX-149 — qayta ro‘yxat sinovni qayta boshlamaydi', () => {
     expect(s?.subscriptionExpiresAt?.getTime()).toBe(paidUntil.getTime());
     // Yangi clinicId baribir saqlanadi (keyingi sinxron shu klinikani so'raydi).
     expect(s?.supervisorClinicId).toBe(store.get(tenantId)?.clinicId);
+  });
+
+  // Review: himoya bitta sikl emas — to'langan muddat Supervisor'ga qaytariladi, keyingi
+  // sinxron (Supervisor endi biladi, 404 yo'q) uni sinov oxiri bilan ustiga yozmaydi.
+  test('404 → qayta ro‘yxat → keyingi sinxron: to‘langan muddat ikkala sinxrondan keyin ham saqlanadi', async () => {
+    const tenantId = await registerTenant('lost-paid-twice');
+    await backdateTenant(tenantId, new Date(Date.now() - 200 * DAY));
+    const paidUntil = new Date(Date.now() + 150 * DAY);
+    await setState(tenantId, crypto.randomUUID(), paidUntil);
+    process.env.SUPERVISOR_URL = STUB_URL;
+
+    expect(await syncTenantSubscription(db, tenantId)).toBe(true);
+    const sent = registerBodies.find((b) => b.tenantId === tenantId);
+    expect(sent?.knownSubscriptionExpiresAt).toBe(paidUntil.toISOString());
+    expect((await settingsOf(tenantId))?.subscriptionExpiresAt?.getTime()).toBe(
+      paidUntil.getTime(),
+    );
+
+    // Ikkinchi sinxron (20 soatdan keyin yoki «Qayta tekshirish»): Supervisor biladi.
+    expect(await syncTenantSubscription(db, tenantId)).toBe(true);
+    expect(registerBodies.filter((b) => b.tenantId === tenantId)).toHaveLength(1);
+    expect((await settingsOf(tenantId))?.subscriptionExpiresAt?.getTime()).toBe(
+      paidUntil.getTime(),
+    );
+    expect(store.get(tenantId)?.subscriptionExpiresAt).toBe(paidUntil.toISOString());
   });
 
   test('oddiy sinxron (Supervisor biladi): vendor qisqartirgan muddat QABUL qilinadi', async () => {
