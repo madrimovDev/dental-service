@@ -1,7 +1,7 @@
 /**
  * FX-116 review — mavjud (oldin provisioning qilingan) tenant: tizim Branch Manager roli eski
  * shablon bilan payroll.view/payroll.manage'ga ega. Backfill migratsiyasi
- * (`drizzle/0064_fx116_bm_payroll_backfill.sql`) REAL DB'da qo'llanadi (admin ulanish — migrate
+ * (`drizzle/0068_fx116_bm_payroll_backfill.sql`) REAL DB'da qo'llanadi (admin ulanish — migrate
  * kabi), keyin BM rolining DB'dagi permset'i bilan HAQIQIY HTTP (`createApp()`) payroll
  * endpoint'lari 403. Accountant tizim roli va payroll'li maxsus rol tegilmaydi.
  *
@@ -27,7 +27,7 @@ import { signAccess } from '../../src/lib/jwt.ts';
 import { loadRolePermissionCodes } from '../../src/lib/role-escalation.ts';
 import { provisionTenantInTx } from '../../src/modules/auth/auth.service.ts';
 
-const MIGRATION = join(import.meta.dir, '../../drizzle/0064_fx116_bm_payroll_backfill.sql');
+const MIGRATION = join(import.meta.dir, '../../drizzle/0068_fx116_bm_payroll_backfill.sql');
 const PAYROLL = ['payroll.view', 'payroll.manage'];
 
 let tenantId: string;

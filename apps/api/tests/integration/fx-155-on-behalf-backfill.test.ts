@@ -1,6 +1,6 @@
 /**
  * FX-155 (review) — `medical_record.on_behalf` / `prescription.on_behalf` mavjud
- * tenantlarning tizim Tenant Admin rollariga migratsiya 0063 bilan backfill qilinadi
+ * tenantlarning tizim Tenant Admin rollariga migratsiya 0067 bilan backfill qilinadi
  * (REAL DB, migratsiya SQL fayli superuser ulanishida bevosita bajariladi).
  * Branch Manager'ga QO'SHILMAYDI (konservativ qaror). Idempotent (ikki marta yurgizish xavfsiz).
  *
@@ -19,7 +19,7 @@ const admin = createAdminDb();
 const tenantIds: string[] = [];
 
 const migrationStatements = (): string[] =>
-  readFileSync(new URL('../../drizzle/0063_fx155_on_behalf_backfill.sql', import.meta.url), 'utf8')
+  readFileSync(new URL('../../drizzle/0067_fx155_on_behalf_backfill.sql', import.meta.url), 'utf8')
     .split('--> statement-breakpoint')
     .map((s) =>
       s
@@ -94,7 +94,7 @@ afterAll(async () => {
   await admin.client.end();
 });
 
-describe('FX-155 — on_behalf backfill migratsiyasi (0063)', () => {
+describe('FX-155 — on_behalf backfill migratsiyasi (0067)', () => {
   test("oldingi holat: hech bir rolda on_behalf yo'q", async () => {
     expect(await onBehalfByRole()).toHaveLength(0);
   });

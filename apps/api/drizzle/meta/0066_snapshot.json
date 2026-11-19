@@ -1,6 +1,6 @@
 {
-  "id": "538f1c06-d761-44ef-aeba-ecbec253ae45",
-  "prevId": "5dd372cf-7803-4046-a201-b66824e03e51",
+  "id": "a8da0aa4-c9d8-4300-ae98-0a9a7891c32e",
+  "prevId": "538f1c06-d761-44ef-aeba-ecbec253ae45",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2254,6 +2254,13 @@
           "primaryKey": false,
           "notNull": true
         },
+        "tx_id": {
+          "name": "tx_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
         "seq": {
           "name": "seq",
           "type": "bigint",
@@ -2285,10 +2292,11 @@
         }
       },
       "compositePrimaryKeys": {
-        "lab_hub_applied_events_tenant_id_seq_pk": {
-          "name": "lab_hub_applied_events_tenant_id_seq_pk",
+        "lab_hub_applied_events_tenant_id_tx_id_seq_pk": {
+          "name": "lab_hub_applied_events_tenant_id_tx_id_seq_pk",
           "columns": [
             "tenant_id",
+            "tx_id",
             "seq"
           ]
         }
@@ -2501,6 +2509,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'0.0'"
+        },
+        "legacy_tx_ceiling": {
+          "name": "legacy_tx_ceiling",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
         },
         "labs_cache": {
           "name": "labs_cache",
@@ -3447,6 +3462,12 @@
         "body": {
           "name": "body",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "params": {
+          "name": "params",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },
@@ -7099,6 +7120,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "source_service_id": {
+          "name": "source_service_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_stage_id": {
+          "name": "source_stage_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_by": {
           "name": "created_by",
           "type": "uuid",
@@ -7175,6 +7208,32 @@
           "tableTo": "visit_notes",
           "columnsFrom": [
             "source_visit_note_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "stock_movements_source_service_id_services_id_fk": {
+          "name": "stock_movements_source_service_id_services_id_fk",
+          "tableFrom": "stock_movements",
+          "tableTo": "services",
+          "columnsFrom": [
+            "source_service_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "stock_movements_source_stage_id_treatment_stages_id_fk": {
+          "name": "stock_movements_source_stage_id_treatment_stages_id_fk",
+          "tableFrom": "stock_movements",
+          "tableTo": "treatment_stages",
+          "columnsFrom": [
+            "source_stage_id"
           ],
           "columnsTo": [
             "id"
@@ -7326,7 +7385,24 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "tenant_settings_telegram_bot_id_uq": {
+          "name": "tenant_settings_telegram_bot_id_uq",
+          "columns": [
+            {
+              "expression": "(\"integration_settings\" -> 'telegram' ->> 'botId')",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"tenant_settings\".\"integration_settings\" -> 'telegram' ->> 'botId' IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "tenant_settings_tenant_id_tenants_id_fk": {
           "name": "tenant_settings_tenant_id_tenants_id_fk",
