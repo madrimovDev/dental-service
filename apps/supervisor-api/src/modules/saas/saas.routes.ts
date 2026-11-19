@@ -49,9 +49,22 @@ const registerSchema = z.object({
   ownerPhone: z.string().min(1).max(30),
   contactPhone: z.string().max(30).optional(),
   defaultLanguage: z.enum(['uz', 'ru']).default('uz'),
+  /**
+   * FX-149 (LC-27): tenant `apps/api`da yaratilgan payt (ISO). Sinov muddati shundan
+   * hisoblanadi — Supervisor tenantni yo'qotib (404) qayta ro'yxatga olinganda
+   * muddati o'tgan klinikaga yangi 30 kun berilmasin. Ixtiyoriy (eski klientlar).
+   */
+  tenantCreatedAt: z.string().datetime({ offset: true }).optional(),
 });
 
 const uuidSchema = z.string().uuid();
+
+/** Sinov boshlanishi: `tenantCreatedAt` (kelajakdagi sana hozirgi paytga qisiladi) yoki hozir. */
+const trialExpiry = (tenantCreatedAt: string | undefined, nowMs: number): Date => {
+  const created = tenantCreatedAt ? Date.parse(tenantCreatedAt) : Number.NaN;
+  const start = Number.isFinite(created) ? Math.min(created, nowMs) : nowMs;
+  return new Date(start + SAAS_TRIAL_DAYS * DAY_MS);
+};
 
 const toStatus = async (clinic: typeof clinics.$inferSelect) => {
   // FX-102: vendor to'xtatgan bo'lsa — apps/api imtiyozsiz bloklaydi.
@@ -86,7 +99,7 @@ export const saasRoutes = () => {
         defaultLanguage: data.defaultLanguage,
         mode: 'saas',
         saasTenantId: data.tenantId,
-        subscriptionExpiresAt: new Date(Date.now() + SAAS_TRIAL_DAYS * DAY_MS),
+        subscriptionExpiresAt: trialExpiry(data.tenantCreatedAt, Date.now()),
       })
       .onConflictDoNothing({ target: clinics.saasTenantId })
       .returning();

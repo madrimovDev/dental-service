@@ -141,6 +141,8 @@ export const authRoutes = (deps: { db: Database }) => {
           ownerFullName: body.ownerFullName,
           ownerPhone: body.ownerPhone,
           defaultLanguage: body.defaultLanguage,
+          // FX-149: tenant hozirgina yaratildi (commit'dan keyin) — sinov shundan.
+          tenantCreatedAt: new Date().toISOString(),
         }),
       );
       return c.json(ok(toRegisterTenantDto(result)), 201);

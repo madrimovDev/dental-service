@@ -50,6 +50,11 @@ export type SaasRegistration = {
   ownerFullName: string;
   ownerPhone: string;
   defaultLanguage: 'uz' | 'ru';
+  /**
+   * FX-149 (LC-27): tenant yaratilgan payt (ISO) — Supervisor sinov muddatini
+   * shundan hisoblaydi (qayta ro'yxatda yangi 30 kun berilmaydi).
+   */
+  tenantCreatedAt: string;
 };
 
 const call = async (fetchImpl: FetchFn, path: string, init: RequestInit): Promise<Response> =>
@@ -123,11 +128,26 @@ export const fetchClinicStatus = async (
  * Tenant-scoped (RLS) upsert — qator bo'lmasa yaratadi. `withTenant` ishlatiladi
  * (admin conn shart emas): register-tenant yo'li admin ulanishsiz ham ishlashi kerak.
  */
-const saveSupervisorState = async (tenantId: string, info: SupervisorClinicInfo): Promise<void> => {
-  const subscriptionExpiresAt = effectiveSubscriptionExpiry(info);
+const saveSupervisorState = async (
+  tenantId: string,
+  info: SupervisorClinicInfo,
+  opts: { keepLaterExpiry?: boolean } = {},
+): Promise<void> => {
   const now = new Date();
-  await withTenant(tenantId, (tx) =>
-    tx
+  await withTenant(tenantId, async (tx) => {
+    let subscriptionExpiresAt = effectiveSubscriptionExpiry(info);
+    // FX-149: Supervisor tenantni yo'qotib (404) qayta ro'yxatga olgan bo'lsa, u bergan
+    // muddat (sinov, yaratilgan sanadan) saqlangan, ancha kech (to'langan) muddatni
+    // qisqartirmaydi. Vendor to'xtatgan bo'lsa (suspendedAt) — himoya qo'llanmaydi.
+    if (opts.keepLaterExpiry && !info.suspendedAt) {
+      const [row] = await tx
+        .select({ at: tenantSettings.subscriptionExpiresAt })
+        .from(tenantSettings);
+      if (row?.at && (!subscriptionExpiresAt || row.at > subscriptionExpiresAt)) {
+        subscriptionExpiresAt = row.at;
+      }
+    }
+    await tx
       .insert(tenantSettings)
       .values({
         tenantId,
@@ -143,8 +163,8 @@ const saveSupervisorState = async (tenantId: string, info: SupervisorClinicInfo)
           subscriptionSyncedAt: now,
           updatedAt: now,
         },
-      }),
-  );
+      });
+  });
   invalidateSubscriptionCache(tenantId);
 };
 
@@ -174,6 +194,7 @@ export const runSupervisorSyncCycle = async (deps: SyncDeps): Promise<SyncResult
       tenantId: tenants.id,
       name: tenants.name,
       lang: tenants.defaultLanguage,
+      createdAt: tenants.createdAt,
       ownerName: users.fullName,
       ownerPhone: users.phone,
     })
@@ -192,6 +213,7 @@ export const runSupervisorSyncCycle = async (deps: SyncDeps): Promise<SyncResult
           ownerFullName: t.ownerName ?? t.name,
           ownerPhone: t.ownerPhone ?? '',
           defaultLanguage: t.lang === 'ru' ? 'ru' : 'uz',
+          tenantCreatedAt: t.createdAt.toISOString(),
         },
         f,
       );
@@ -242,11 +264,13 @@ export const syncTenantSubscription = async (
 ): Promise<boolean> => {
   if (!isSaasSupervisorEnabled()) return false;
   let info = await fetchClinicStatus(tenantId, fetchImpl);
+  const reRegistered = !info;
   if (!info) {
     const [t] = await readDb
       .select({
         name: tenants.name,
         lang: tenants.defaultLanguage,
+        createdAt: tenants.createdAt,
         ownerName: users.fullName,
         ownerPhone: users.phone,
       })
@@ -261,11 +285,12 @@ export const syncTenantSubscription = async (
         ownerFullName: t.ownerName ?? t.name,
         ownerPhone: t.ownerPhone ?? '',
         defaultLanguage: t.lang === 'ru' ? 'ru' : 'uz',
+        tenantCreatedAt: t.createdAt.toISOString(),
       },
       fetchImpl,
     );
   }
-  await saveSupervisorState(tenantId, info);
+  await saveSupervisorState(tenantId, info, { keepLaterExpiry: reRegistered });
   return true;
 };
 
