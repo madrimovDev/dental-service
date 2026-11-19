@@ -17530,8 +17530,28 @@
               }
             }
           },
+          "404": {
+            "description": "Appointment not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "409": {
             "description": "Scheduling conflict (doctor busy / patient busy / outside working hours / on time-off)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Doctor is not assigned to this branch (schedule.doctor_not_in_branch)",
             "content": {
               "application/json": {
                 "schema": {
@@ -17549,6 +17569,17 @@
           "appointments"
         ],
         "operationId": "listDoctors",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
         "responses": {
           "200": {
             "description": "List of doctors for booking",
@@ -17910,6 +17941,16 @@
           },
           "409": {
             "description": "Scheduling conflict (doctor busy / patient busy / outside working hours / on time-off)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Doctor is not assigned to this branch (schedule.doctor_not_in_branch)",
             "content": {
               "application/json": {
                 "schema": {
@@ -19111,6 +19152,16 @@
           },
           "403": {
             "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Patient / branch / service not found in this tenant",
             "content": {
               "application/json": {
                 "schema": {

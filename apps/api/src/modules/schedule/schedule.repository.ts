@@ -8,9 +8,10 @@ import {
   roles,
   userAssignments,
 } from '@dental/db-schema';
-import { and, asc, eq, gt, gte, isNotNull, isNull, lt, ne, notExists, or } from 'drizzle-orm';
+import { and, asc, eq, gt, gte, isNull, lt, ne, notExists, or } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
+import { isDoctorInBranch, practitionerAssignmentConditions } from '../../lib/doctor-branch.ts';
 
 /**
  * Schedule data access — Drizzle, getDb(c) (RLS-bound). Biznes mantiqsiz.
@@ -212,10 +213,7 @@ export const createScheduleRepository = () => {
       .innerJoin(roles, eq(roles.id, userAssignments.roleId))
       .where(
         and(
-          eq(userAssignments.isActive, true),
-          isNotNull(userAssignments.acceptedAt),
-          or(isNull(userAssignments.branchId), eq(userAssignments.branchId, branchId)),
-          eq(roles.isPractitioner, true),
+          ...practitionerAssignmentConditions(branchId),
           notExists(
             db
               .select({ one: doctorSchedules.id })
@@ -324,6 +322,7 @@ export const createScheduleRepository = () => {
     listBranchAppointments,
     listBranchOverlappingTimeOff,
     hasOverlappingTimeOff,
+    isDoctorInBranch,
   };
 };
 

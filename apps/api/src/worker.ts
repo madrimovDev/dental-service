@@ -37,6 +37,14 @@ recall.worker.on('failed', (job, err) =>
 );
 await registerRecallScheduler();
 
+// FX-38 (LA-07): kunlik no-show sweep consumer + repeatable scheduler (Toshkent 00:30).
+const { startNoShowWorker, registerNoShowScheduler } = await import('./lib/no-show-sweep.ts');
+const noShow = startNoShowWorker();
+noShow.worker.on('failed', (job, err) =>
+  logger.error({ err, jobId: job?.id }, 'No-show sweep job failed'),
+);
+await registerNoShowScheduler();
+
 // CLI-379: Telegram bot-manager — boots a Telegraf poller per tenant with a
 // saved bot token (admin conn, RLS bypass, same pattern as recall worker) and
 // reloads on tenant token changes via the `telegram:reload` pub/sub channel.
@@ -64,6 +72,7 @@ async function shutdown(signal: string): Promise<void> {
   try {
     await worker.close(); // waits for in-flight jobs, then closes the Redis conn
     await recall.close(); // closes recall worker + admin db pool
+    await noShow.close();
     stopSupervisorSync();
     stopLabHubSync();
     await botManager.stopAll(); // stops all Telegraf pollers + reload sub

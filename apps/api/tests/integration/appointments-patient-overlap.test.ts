@@ -8,7 +8,7 @@
  *   cd apps/api && bun test tests/integration/appointments-patient-overlap.test.ts --env-file=../../.env
  */
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { branches, patients, tenants, users } from '@dental/db-schema';
+import { branches, patients, roles, tenants, userAssignments, users } from '@dental/db-schema';
 import { sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { DbOrTx } from '../../src/db/client.ts';
@@ -74,6 +74,19 @@ beforeAll(async () => {
       .values({ tenantId, fullName: 'Vali Aliyev', phone: '+998901112272' })
       .returning({ id: patients.id });
     otherPatientId = other!.id;
+    // FX-02: doktor shu tenantda faol tayinlovga ega bo'lishi shart (doctorA = owner — istisno).
+    const [role] = await tx
+      .insert(roles)
+      .values({ tenantId, name: 'Doctor', isPractitioner: true })
+      .returning({ id: roles.id });
+    await tx.insert(userAssignments).values({
+      userId: doctorBId,
+      tenantId,
+      roleId: role!.id,
+      branchId: null,
+      isActive: true,
+      acceptedAt: new Date(),
+    });
   });
 });
 

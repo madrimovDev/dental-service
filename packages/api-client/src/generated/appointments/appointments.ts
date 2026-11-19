@@ -15,6 +15,7 @@ import type {
   ListAppointments200,
   ListAppointmentsParams,
   ListDoctors200,
+  ListDoctorsParams,
   UpdateAppointment200,
   UpdateAppointmentBody
 } from '.././model';
@@ -43,10 +44,11 @@ import { customInstance } from '../../mutator';
       );
     }
   export const listDoctors = (
-    
+    params?: ListDoctorsParams,
  ) => {
       return customInstance<ListDoctors200>(
-      {url: `/api/appointments/doctors`, method: 'GET'
+      {url: `/api/appointments/doctors`, method: 'GET',
+        params
     },
       );
     }

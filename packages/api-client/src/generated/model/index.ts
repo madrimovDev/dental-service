@@ -352,6 +352,7 @@ export * from './listConsentTemplatesType';
 export * from './listDiagnoses200';
 export * from './listDiagnosesParams';
 export * from './listDoctors200';
+export * from './listDoctorsParams';
 export * from './listExpenseCategories200';
 export * from './listExpenses200';
 export * from './listExpensesParams';

@@ -428,6 +428,13 @@
       "when": 1794433711609,
       "tag": "0060_lab_hub_price_pending",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1795109727887,
+      "tag": "0061_tenant_scoped_exclude",
+      "breakpoints": true
     }
   ]
 }

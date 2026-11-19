@@ -1159,6 +1159,7 @@
     "no_slots": "Bu kun uchun bo'sh vaqt yo'q",
     "work_hours_not_configured": "Filial ish soati sozlanmagan — Sozlamalar → Filiallar",
     "outside_working_hours": "Bu vaqt doktor ish jadvalidan tashqarida",
+    "doctor_not_in_branch": "Bu shifokor tanlangan filialda ishlamaydi",
     "services": "Xizmatlar",
     "notes": "Eslatma",
     "conflict": "Doktor bu vaqtda band",
@@ -2318,7 +2319,10 @@
     "reason_required": "Sababni kiriting",
     "reschedule": "Boshqa vaqtga ko'chirish",
     "kpi_sub": "tasdiqlash kutmoqda",
-    "confirm_conflict": "Bu vaqt band bo'lib qoldi — so'rov kutishda qoldi"
+    "confirm_conflict": "Bu vaqt band bo'lib qoldi — so'rov kutishda qoldi",
+    "pick_doctor": "Boshqa shifokorni tanlang",
+    "confirm_other_doctor": "Shu shifokor bilan tasdiqlash",
+    "confirm_expired": "So'rov muddati o'tgan — bemorga xabar yuborildi"
   },
   "desktopUpdate": {
     "title": "Yangi versiya tayyor",

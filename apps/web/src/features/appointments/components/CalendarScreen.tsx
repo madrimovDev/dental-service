@@ -100,7 +100,7 @@ export function CalendarScreen() {
     from: rangeStart.toISOString(),
     to: rangeEnd.toISOString(),
   });
-  const { data: doctors } = useDoctors();
+  const { data: doctors } = useDoctors(branchId ?? undefined);
   const { data: servicesData } = useServices({ enabled: hasPermission('service.view') });
   const { data: branchesData } = useBranches();
   const cancelMut = useCancelAppointment();

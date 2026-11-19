@@ -161,6 +161,8 @@ export function createTelegramFlows(deps: FlowDeps) {
           return { reply: { text: m.reminderCancelledReply } };
         case 'already':
           return { reply: null, toast: m.reminderAlready };
+        case 'unavailable':
+          return { reply: { text: m.reminderUnavailable } };
         case 'reschedule': {
           // Eslatma egasi (r.patientId) shu chat'ning bemori — oqim shu bemor nomidan.
           const reply = await booking.start(

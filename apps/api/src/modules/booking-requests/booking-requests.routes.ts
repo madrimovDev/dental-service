@@ -83,7 +83,10 @@ export const bookingRequestRoutes = (deps: {
           200,
         );
       }
-      if (res.code === 'not_found') return c.json(fail(res.code, res.code), 404);
+      // FX-03b: begona doktor/filial/bemor/yordamchi → 404 (so'rov pending qoladi).
+      if (res.code === 'not_found' || res.code.endsWith('.not_found')) {
+        return c.json(fail(res.code, res.code), 404);
+      }
       return c.json(fail(res.code, res.code), res.conflict ? 409 : 400);
     } catch (e) {
       if (e instanceof AppointmentTransitionError) return c.json(fail(e.code, e.message), 400);
