@@ -1,0 +1,1 @@
+ALTER TABLE "visit_notes" ADD COLUMN "completes_stage" boolean DEFAULT true NOT NULL;

@@ -119,6 +119,7 @@ export function VisitNotePage() {
           freeNotes: note.freeNotes ?? '',
           performedServices: note.performedServices ?? [],
           stageId: note.stageId,
+          completesStage: note.completesStage ?? true,
           appointmentId: note.appointmentId,
           nextVisit: note.metadata?.nextVisit ?? null,
         }
@@ -188,21 +189,30 @@ export function VisitNotePage() {
 
   const stageOptions = useMemo(
     () =>
-      (plansQuery.data ?? []).flatMap((p) =>
-        (p.stages ?? [])
-          // FX-13 (D-11): faqat qabul qilingan, o'tkazib yuborilmagan bosqichlar taklif
-          // qilinadi (backend proposed/rejected bosqichni yakunlashni 400 bilan rad etadi).
-          .filter(
-            (s) =>
-              s.id === note?.stageId ||
-              (s.status !== 'completed' && s.status !== 'skipped' && s.acceptance === 'accepted'),
-          )
-          .map((s) => ({
-            value: s.id,
-            title: p.title,
-            label: `${p.title} · ${s.sequence}. ${s.serviceName}`,
-          })),
-      ),
+      (plansQuery.data ?? [])
+        // FX-14 (D-9): faqat qabul qilingan va ishlayotgan reja (draft/presented/cancelled emas);
+        // yozuvning joriy bosqichi rejasi esa doim ko'rinadi.
+        .filter(
+          (p) =>
+            p.status === 'accepted' ||
+            p.status === 'in_progress' ||
+            (p.stages ?? []).some((s) => s.id === note?.stageId),
+        )
+        .flatMap((p) =>
+          (p.stages ?? [])
+            // FX-13 (D-11): faqat qabul qilingan, o'tkazib yuborilmagan bosqichlar taklif
+            // qilinadi (backend proposed/rejected bosqichni yakunlashni 400 bilan rad etadi).
+            .filter(
+              (s) =>
+                s.id === note?.stageId ||
+                (s.status !== 'completed' && s.status !== 'skipped' && s.acceptance === 'accepted'),
+            )
+            .map((s) => ({
+              value: s.id,
+              title: p.title,
+              label: `${p.title} · ${s.sequence}. ${s.serviceName}`,
+            })),
+        ),
     [plansQuery.data, note?.stageId],
   );
 
@@ -612,6 +622,21 @@ export function VisitNotePage() {
                 </label>
               ))}
             </fieldset>
+            {values.stageId && (
+              <label className={classes.radio} data-checked={values.completesStage}>
+                <input
+                  type="checkbox"
+                  name="completesStage"
+                  checked={values.completesStage}
+                  disabled={readOnly}
+                  onChange={(e) => patch({ completesStage: e.currentTarget.checked })}
+                />
+                <span style={{ display: 'flex', flexDirection: 'column' }}>
+                  <b>{t('visitNote.completesStage')}</b>
+                  <span className={classes.hint}>{t('visitNote.completesStageHint')}</span>
+                </span>
+              </label>
+            )}
           </section>
 
           <section className={classes.card} aria-labelledby="vn-next">

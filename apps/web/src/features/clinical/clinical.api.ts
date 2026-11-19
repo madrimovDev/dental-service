@@ -284,7 +284,11 @@ export function useCreateVisitNote(patientId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: CreateVisitNoteInput) => createVisitNote(body).then((r) => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: clinicalKeys.visitNotes(patientId) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: clinicalKeys.visitNotes(patientId) });
+      // FX-14: qoralama bosqichni `in_progress` qiladi.
+      qc.invalidateQueries({ queryKey: clinicalKeys.plans(patientId) });
+    },
   });
 }
 
@@ -330,6 +334,8 @@ export function useSignVisitNote(patientId: string) {
     onSuccess: (_d, id) => {
       qc.invalidateQueries({ queryKey: clinicalKeys.visitNotes(patientId) });
       qc.invalidateQueries({ queryKey: clinicalKeys.visitNote(id) });
+      // FX-14: imzo bosqichni yopadi (recall, odontogramma) — reja/bosqich ro'yxati yangilanadi.
+      qc.invalidateQueries({ queryKey: clinicalKeys.plans(patientId) });
     },
   });
 }

@@ -41,7 +41,10 @@ const recallSpy = {
 const plansService = createTreatmentPlansService({ audit: noopAudit, recall: recallSpy });
 const visitService = createVisitNotesService({
   audit: noopAudit,
-  completeStage: { completeStageForVisit: plansService.completeStageForVisit },
+  completeStage: {
+    completeStageForVisit: plansService.completeStageForVisit,
+    startStageForVisit: plansService.startStageForVisit,
+  },
 });
 
 const ctx = (tx: DbOrTx, tenantId: string): Context =>
@@ -132,7 +135,7 @@ afterAll(async () => {
 });
 
 describe('C5 — visit-note stage linkage', () => {
-  test('stageId bilan vizit → bosqich completed + recall fire', async () => {
+  test('stageId bilan vizit → qoralama in_progress; imzo → completed + recall fire (FX-14)', async () => {
     recallCalls.length = 0;
     await db.transaction(async (tx) => {
       await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
@@ -145,7 +148,17 @@ describe('C5 — visit-note stage linkage', () => {
       });
       expect(note?.stageId).toBe(pendingStageId);
 
-      // Bosqich status='completed' bo'ldi (C2 guard ichida).
+      // FX-14: qoralama bosqichni yopmaydi.
+      const [draftStage] = await tx
+        .select({ status: treatmentStages.status })
+        .from(treatmentStages)
+        .where(eq(treatmentStages.id, pendingStageId));
+      expect(draftStage?.status).toBe('in_progress');
+      expect(recallCalls).not.toContain(pendingStageId);
+
+      // Imzo → bosqich status='completed' (C2 guard ichida).
+      if (!note) throw new Error('create failed');
+      await visitService.sign(ctx(tx, tenantId), note.id);
       const [stage] = await tx
         .select({ status: treatmentStages.status, completedAt: treatmentStages.completedAt })
         .from(treatmentStages)

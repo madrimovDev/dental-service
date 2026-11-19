@@ -428,6 +428,13 @@
       "when": 1794433711609,
       "tag": "0060_lab_hub_price_pending",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1795110388061,
+      "tag": "0062_visit_note_completes_stage",
+      "breakpoints": true
     }
   ]
 }

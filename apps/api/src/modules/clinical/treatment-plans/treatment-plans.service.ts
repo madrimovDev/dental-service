@@ -454,6 +454,20 @@ export const createTreatmentPlansService = (deps: {
   }
 
   /**
+   * FX-14 (LA-33, D-9): vizit QORALAMASI bosqichni faqat boshlaydi (`pending` →
+   * `in_progress`); yopish `sign()`da (`completeStageForVisit`). Allaqachon
+   * `in_progress`/`completed` bosqichga hech narsa qilmaydi (keyingi vizitlar);
+   * `skipped` → applyStageUpdate transition guard 400. Plan-guard (draft/cancelled)
+   * ham shu yerdan o'tadi — qoralama saqlashdayoq xato beradi.
+   */
+  async function startStageForVisit(c: Context, stageId: string) {
+    const current = await repo.findStage(c, stageId);
+    if (!current) return null;
+    if (current.status === 'in_progress' || current.status === 'completed') return current;
+    return applyStageUpdate(c, stageId, { status: 'in_progress' }, 'visit');
+  }
+
+  /**
    * C6 (CLI-223): plan smetasi — computed (saqlanmaydi). Per-stage cost/acceptance/
    * status + totallar. debtEligible YAGONA manbadan (computePlanBalance, C4 predikati)
    * → estimate, cashier va patient balansi hammasi MOS. Allocation filtrlanmaydi.
@@ -527,6 +541,7 @@ export const createTreatmentPlansService = (deps: {
     updateStage,
     completeStage,
     completeStageForVisit,
+    startStageForVisit,
     estimate,
   };
 };

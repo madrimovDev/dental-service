@@ -15,6 +15,7 @@ export interface VisitNote {
   appointmentId: string | null;
   /** @nullable */
   stageId: string | null;
+  completesStage: boolean;
   visitDate: string;
   /** @nullable */
   subjective: string | null;

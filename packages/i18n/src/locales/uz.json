@@ -2009,7 +2009,9 @@
     },
     "planLink": "Reja bilan bog‘lash",
     "noPlan": "Rejasiz vizit",
-    "stageHint": "Bajarildi deb belgilanadi, tish xaritasi yangilanadi",
+    "stageHint": "Imzolanganda bajarildi deb belgilanadi, tish xaritasi yangilanadi",
+    "completesStage": "Bosqich yakunlandi",
+    "completesStageHint": "Belgi olib tashlansa — oraliq vizit: bosqich «jarayonda» qoladi",
     "nextVisit": "Keyingi tashrif",
     "next": {
       "none": "Kerak emas",
