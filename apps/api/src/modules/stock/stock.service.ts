@@ -570,7 +570,7 @@ export const createStockService = (deps: {
    * (tenant-darajali BOM filial itemlarini qamray olmaydi). Mos item yo'q → qator tashlanadi
    * (begona filial ombori kamaytirilmaydi; vizit yozuvi baribir bloklanmaydi).
    */
-  async function resolveBomItems<T extends { itemId: string }>(
+  async function resolveBomItems<T extends { itemId: string; serviceId: string }>(
     c: Context,
     boms: T[],
     visitNoteId: string,
@@ -580,7 +580,7 @@ export const createStockService = (deps: {
   }
 
   /** FX-35 mantiqi (filial berilgan holda) — vizit ham, plan-bosqich yo'li ham shuni ishlatadi. */
-  async function resolveBomItemsForBranch<T extends { itemId: string }>(
+  async function resolveBomItemsForBranch<T extends { itemId: string; serviceId: string }>(
     c: Context,
     boms: T[],
     visitBranch: string | null,
@@ -599,21 +599,38 @@ export const createStockService = (deps: {
     const byId = new Map(items.map((i) => [i.id, i]));
     const norm = (v: string) => v.trim().toLowerCase();
     let siblings: { id: string; name: string; unit: string }[] | undefined;
+    // FX-35 review: bir xizmatda har filialning shu nomli itemiga alohida BOM qatori bo'lishi
+    // mumkin (service→Lidokain(A) va service→Lidokain(B)). Moslashdan keyin (serviceId, itemId)
+    // bo'yicha ko'pi bilan bitta qator: avval vizit filialidagi/tenant-darajali o'z qatorlari,
+    // keyin begona filial qatorining mos itemi — faqat shu juftlik hali yo'q bo'lsa.
+    const key = (serviceId: string, itemId: string) => `${serviceId}:${itemId}`;
+    const seen = new Set<string>();
     const result: T[] = [];
+    const foreign: { bom: T; item: { name: string; unit: string } }[] = [];
     for (const bom of boms) {
       const item = byId.get(bom.itemId);
       if (!item) continue;
       if (item.branchId === null || item.branchId === visitBranch) {
+        const k = key(bom.serviceId, bom.itemId);
+        if (seen.has(k)) continue;
+        seen.add(k);
         result.push(bom);
         continue;
       }
+      foreign.push({ bom, item });
+    }
+    for (const { bom, item } of foreign) {
       siblings ??= await db
         .select({ id: stockItems.id, name: stockItems.name, unit: stockItems.unit })
         .from(stockItems)
         .where(eq(stockItems.branchId, visitBranch))
         .orderBy(asc(stockItems.createdAt));
       const match = siblings.find((s) => norm(s.name) === norm(item.name) && s.unit === item.unit);
-      if (match) result.push({ ...bom, itemId: match.id });
+      if (!match) continue;
+      const k = key(bom.serviceId, match.id);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      result.push({ ...bom, itemId: match.id });
     }
     return result;
   }

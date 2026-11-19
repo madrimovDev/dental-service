@@ -382,3 +382,77 @@ describe('FX-35: BOM avto-chiqimi vizit filialidagi itemdan', () => {
     expect(await qty(itemB)).toBe(8);
   });
 });
+
+describe('FX-35 review: har filial uchun alohida BOM qatori — ikki marta ayirilmaydi', () => {
+  const noopAudit = { record: async () => {} } as unknown as AuditLogger;
+  const stock = createStockService({ audit: noopAudit });
+  const ctx = (tx: DbOrTx, activeBranchId: string | null): Context =>
+    ({
+      get: (k: string) =>
+        k === 'db'
+          ? tx
+          : k === 'accessClaims'
+            ? { perms: ['@owner'], atid: tenantId, sub: docId }
+            : k === 'activeTenantId'
+              ? tenantId
+              : k === 'activeBranchId'
+                ? activeBranchId
+                : k === 'user'
+                  ? { id: docId }
+                  : undefined,
+      req: { header: () => undefined },
+    }) as unknown as Context;
+  const withTx = <T>(fn: (tx: DbOrTx) => Promise<T>): Promise<T> =>
+    db.transaction(async (tx) => {
+      await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
+      return fn(tx);
+    });
+
+  let lidoA: string;
+  let lidoB: string;
+  let svcL: string;
+  let visitL: string;
+  beforeAll(async () => {
+    await withTx(async (tx) => {
+      const [a, b] = await tx
+        .insert(stockItems)
+        .values([
+          { tenantId, branchId: brA, name: 'Lidokain', unit: 'ml', quantity: '10' },
+          { tenantId, branchId: brB, name: 'Lidokain', unit: 'ml', quantity: '10' },
+        ])
+        .returning({ id: stockItems.id });
+      lidoA = a!.id;
+      lidoB = b!.id;
+      const [s] = await tx
+        .insert(services)
+        .values({ tenantId, code: 'L35R', nameUz: 'L' })
+        .returning({ id: services.id });
+      svcL = s!.id;
+      await tx.insert(serviceMaterials).values([
+        { tenantId, serviceId: svcL, itemId: lidoA, qtyPerService: '1' },
+        { tenantId, serviceId: svcL, itemId: lidoB, qtyPerService: '1' },
+      ]);
+      const [p] = await tx
+        .insert(patients)
+        .values({ tenantId, fullName: 'P35R' })
+        .returning({ id: patients.id });
+      const [vn] = await tx
+        .insert(visitNotes)
+        .values({ tenantId, patientId: p!.id, doctorId: docId })
+        .returning({ id: visitNotes.id });
+      visitL = vn!.id;
+    });
+  });
+
+  test('B filial vizit: faqat B itemi 1 marta (A 10, B 9)', async () => {
+    await withTx((tx) => stock.deductForServices(ctx(tx, brB), [svcL], visitL));
+    expect(await qty(lidoA)).toBe(10);
+    expect(await qty(lidoB)).toBe(9);
+  });
+
+  test('A filial vizit: faqat A itemi 1 marta (A 9, B 9)', async () => {
+    await withTx((tx) => stock.deductForServices(ctx(tx, brA), [svcL], visitL));
+    expect(await qty(lidoA)).toBe(9);
+    expect(await qty(lidoB)).toBe(9);
+  });
+});
