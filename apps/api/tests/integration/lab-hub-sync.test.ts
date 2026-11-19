@@ -1067,3 +1067,83 @@ describe('FX-46: bekor qilingan buyurtma — Hub’ga cancel op, narx/xarajat ta
     expect((await orderRow(id))?.approvedPrice).toBeNull();
   });
 });
+
+describe('FX-47: rad etilgan ish — boshqa labga qayta yuborish', () => {
+  let lab2: Awaited<ReturnType<typeof createHubLab>>;
+
+  const linkLab = async (l: typeof lab) => {
+    const req = await call('tenant_admin', 'POST', '/api/lab-hub/links', { labId: l.labId });
+    expect(req.status).toBe(200);
+    const linkId = ((await req.json()) as { data: { link: { id: string } } }).data.link.id;
+    const d = await hubJson(`/v1/lab/links/${linkId}/decision`, {
+      method: 'POST',
+      token: l.token,
+      body: { decision: 'approve' },
+    });
+    expect(d.status).toBe(200);
+    await call('doctor', 'GET', '/api/lab-hub/labs'); // labsCache yangilanadi
+  };
+
+  test('rad etilgach: narx tasdig‘i 409; boshqa labga yuborish → yangi ref, eski holat tozalanadi', async () => {
+    lab2 = await createHubLab();
+    await linkLab(lab2);
+
+    const id = await createOrder();
+    expect(
+      (await call('doctor', 'POST', `/api/lab-orders/${id}/send-to-hub`, { labId: lab.labId }))
+        .status,
+    ).toBe(200);
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+    const [hc] = await hubCaseByRef(id);
+    const step = async (path: string, body: unknown) => {
+      const r = await hubJson(`/v1/lab/cases/${hc!.id}${path}`, {
+        method: 'POST',
+        token: lab.token,
+        body,
+      });
+      expect(r.status).toBeLessThan(300);
+    };
+    await step('/price', { price: 200000 });
+    await step('/status', { to: 'rejected', reason: 'Zirkoniy yo‘q' });
+    await pollLabHubChanges(tenantId);
+    const rejected = await orderRow(id);
+    expect(rejected?.hubStatus).toBe('rejected');
+    expect(rejected?.proposedPrice).toBe('200000.00');
+
+    // Rad etilgan ishga narx tasdig‘i yo‘q.
+    const ap = await call('doctor', 'POST', `/api/lab-orders/${id}/approve-price`, {
+      price: '200000.00',
+    });
+    expect(ap.status).toBe(409);
+    expect(((await ap.json()) as { error: { code: string } }).error.code).toBe('lab_hub.rejected');
+    expect(await expensesOf(id)).toHaveLength(0);
+
+    // Boshqa labga qayta yuborish.
+    const re = await call('doctor', 'POST', `/api/lab-orders/${id}/send-to-hub`, {
+      labId: lab2.labId,
+    });
+    expect(re.status).toBe(200);
+    const row = await orderRow(id);
+    expect(row?.labHubLabId).toBe(lab2.labId);
+    expect(row?.labHubCaseRef).not.toBe(id);
+    expect(row?.hubStatus).not.toBe('rejected'); // kick allaqachon yangi ishni push qilishi mumkin ("sent")
+    expect(row?.hubRejectReason).toBeNull();
+    expect(row?.proposedPrice).toBeNull();
+
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+    const fresh = await hubCaseByRef(row!.labHubCaseRef as string);
+    expect(fresh).toHaveLength(1);
+    expect(fresh[0]?.status).toBe('sent');
+    expect((await orderRow(id))?.hubSyncStatus).toBe('synced');
+    // Eski (rad etilgan) ish Hub’da o‘z joyida — dublikat va aralashish yo‘q.
+    expect((await hubCaseByRef(id))[0]?.status).toBe('rejected');
+
+    // Rad etilmagan (faol) ishni qayta yuborib bo‘lmaydi.
+    const again = await call('doctor', 'POST', `/api/lab-orders/${id}/send-to-hub`, {
+      labId: lab.labId,
+    });
+    expect(again.status).toBe(409);
+  });
+});

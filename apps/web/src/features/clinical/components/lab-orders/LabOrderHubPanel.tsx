@@ -59,7 +59,11 @@ export function LabOrderHubPanel({
   const connected = status.data?.connected === true;
   const canSend =
     !linked && canManage && connected && (order.status === 'draft' || order.status === 'sent');
-  const labs = useLabHubLabs({ enabled: canSend });
+  // FX-47: lab rad etgan ish — boshqa labga qayta yuboriladi.
+  const rejected = linked && order.hubStatus === 'rejected';
+  const canReassign =
+    rejected && canManage && connected && order.status === 'sent' && order.approvedPrice == null;
+  const labs = useLabHubLabs({ enabled: canSend || canReassign });
   const send = useSendToLabHub();
   const approve = useApproveLabPrice(order.id);
   const messages = useLabHubMessages(order.id, linked);
@@ -129,8 +133,11 @@ export function LabOrderHubPanel({
   const pending = !approved && order.priceApprovalPending === true;
   const pendingPrice = order.priceApprovalRequestedPrice ?? proposed;
   const list = messages.data ?? [];
-  // FX-46: bekor qilingan ishga narx tasdiqlanmaydi.
-  const priceLocked = order.status === 'cancelled';
+  // FX-46/47: bekor qilingan yoki rad etilgan ishga narx tasdiqlanmaydi.
+  const priceLocked = order.status === 'cancelled' || hubStatus === 'rejected';
+  const reassignOptions = activeLabs(labs.data?.labs)
+    .filter((l) => l.id !== order.labHubLabId)
+    .map((l) => ({ value: l.id, label: l.name }));
 
   return (
     <section className={classes.card} aria-labelledby="hub-h" data-testid="lab-hub-panel">
@@ -157,6 +164,40 @@ export function LabOrderHubPanel({
           <AlertBanner tier={2} title={t('labHubClinic.reject_reason')}>
             {order.hubRejectReason}
           </AlertBanner>
+        )}
+
+        {canReassign && (
+          <Stack gap="xs" data-testid="lab-hub-reassign">
+            <div className={classes.label}>{t('labHubClinic.reassign_title')}</div>
+            <Select
+              label={t('labHubClinic.choose_lab')}
+              data={reassignOptions}
+              value={labId}
+              onChange={setLabId}
+              allowDeselect={false}
+            />
+            <Group justify="flex-end">
+              <Button
+                disabled={!labId}
+                loading={send.isPending}
+                onClick={() =>
+                  labId &&
+                  send.mutate(
+                    { labOrderId: order.id, labId },
+                    {
+                      onSuccess: () => {
+                        setLabId(null);
+                        notifications.show({ message: t('labHubClinic.sent_toast') });
+                      },
+                      onError: (err) => notifications.show({ color: 'red', message: errText(err) }),
+                    },
+                  )
+                }
+              >
+                {t('labHubClinic.reassign_btn')}
+              </Button>
+            </Group>
+          </Stack>
         )}
 
         <div>

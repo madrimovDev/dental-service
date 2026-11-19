@@ -86,8 +86,10 @@ const executeOp = async (
   if (!order?.labHubCaseRef || !order.labHubLabId) return undefined; // buyurtma yo'q / Hub'dan uzilgan
   const caseRef = order.labHubCaseRef;
 
-  // FX-46: bekor qilingan ishga cancel'dan boshqa hech narsa yuborilmaydi (PHI ham, narx ham).
+  // FX-46/47: bekor qilingan ishga cancel'dan boshqa hech narsa yuborilmaydi (PHI ham, narx ham);
+  // lab rad etgan ishga narx tasdig'i yuborilmaydi.
   if (order.status === 'cancelled' && row.op !== 'cancel') return undefined;
+  if (order.hubStatus === 'rejected' && row.op === 'approve_price') return undefined;
 
   switch (row.op) {
     case 'cancel': {
@@ -400,7 +402,13 @@ const applyEvent = async (tx: DbOrTx, tenantId: string, ev: HubChangeEvent, now:
       const to = String(ev.payload.to ?? '');
       if (!to) return;
       const patch: Partial<typeof labOrders.$inferInsert> = { hubStatus: to, updatedAt: now };
-      if (to === 'rejected') patch.hubRejectReason = String(ev.payload.reason ?? '') || null;
+      if (to === 'rejected') {
+        patch.hubRejectReason = String(ev.payload.reason ?? '') || null;
+        // FX-47: rad etilgan ishda kutilayotgan narx tasdig'i qolmaydi.
+        patch.priceApprovalRequestedAt = null;
+        patch.priceApprovalRequestedPrice = null;
+        patch.priceApprovalRequestedBy = null;
+      }
       const target = HUB_TO_CLINIC[to];
       if (
         to === 'accepted' &&
