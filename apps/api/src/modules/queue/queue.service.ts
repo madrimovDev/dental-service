@@ -450,7 +450,10 @@ export const createQueueService = (deps: {
 
     const filters = [
       lt(queueTickets.ticketDate, todayStart),
-      sql`${queueTickets.status} in ('waiting','in_progress')`,
+      // FX-38 review: faqat 'waiting' — 'in_progress' ticket = bemor kelgan
+      // (qabulda bo'lgan). Uni missed qilish appt'ni in_progress→no_show
+      // sync qilib, kelgan bemorga strike yozardi. in_progress tegilmaydi.
+      eq(queueTickets.status, 'waiting'),
     ];
     if (branchId) filters.push(eq(queueTickets.branchId, branchId));
 

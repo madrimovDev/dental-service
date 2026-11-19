@@ -140,6 +140,64 @@ describe('FX-38 — processNoShowSweep (real DB, cross-tenant)', () => {
     expect(again.swept).toBe(0);
   });
 
+  test("kechagi in_progress ticket (bemor kelgan) — missed/no_show qilinmaydi, strike yo'q", async () => {
+    const now = Date.now();
+    // Alohida bemor — boshqa testlardagi strike sanog'iga aralashmaydi.
+    const patientId = await withTenant(A.tenantId, async (tx) => {
+      const [p] = await tx
+        .insert(patients)
+        .values({ tenantId: A.tenantId, fullName: 'P inprog' })
+        .returning({ id: patients.id });
+      return p!.id;
+    });
+    const start = new Date(now - DAY);
+    const { apptId, ticketId } = await withTenant(A.tenantId, async (tx) => {
+      const [a] = await tx
+        .insert(appointments)
+        .values({
+          tenantId: A.tenantId,
+          branchId: A.branchId,
+          patientId,
+          doctorId: A.ownerId,
+          startTime: start,
+          endTime: new Date(start.getTime() + 30 * 60 * 1000),
+          serviceIds: [],
+          status: 'in_progress',
+        })
+        .returning({ id: appointments.id });
+      const [tk] = await tx
+        .insert(queueTickets)
+        .values({
+          tenantId: A.tenantId,
+          branchId: A.branchId,
+          patientId,
+          appointmentId: a!.id,
+          queueNumber: 7,
+          status: 'in_progress',
+          ticketDate: start,
+        })
+        .returning({ id: queueTickets.id });
+      return { apptId: a!.id, ticketId: tk!.id };
+    });
+
+    const res = await processNoShowSweep({ adminDb: admin.db, withTenant });
+    expect(res.failed).toBe(0);
+
+    expect(await statusOf(A, apptId)).toBe('in_progress');
+    const ticketStatus = await withTenant(A.tenantId, async (tx) => {
+      const [r] = await tx
+        .select({ st: queueTickets.status })
+        .from(queueTickets)
+        .where(eq(queueTickets.id, ticketId));
+      return r?.st;
+    });
+    expect(ticketStatus).toBe('in_progress');
+    const strikes = await withTenant(A.tenantId, (tx) =>
+      tx.select().from(patientNoShowStrikes).where(eq(patientNoShowStrikes.patientId, patientId)),
+    );
+    expect(strikes.length).toBe(0);
+  });
+
   test('bitta tenant yiqilsa boshqalari davom etadi', async () => {
     const now = Date.now();
     const a = await insertAppt(A, new Date(now - 4 * DAY));
