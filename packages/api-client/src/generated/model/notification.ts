@@ -14,8 +14,6 @@ export interface Notification {
   /** @nullable */
   body: string | null;
   /** @nullable */
-  params: { [key: string]: string | number } | null;
-  /** @nullable */
   readAt: string | null;
   createdAt: string;
 }
