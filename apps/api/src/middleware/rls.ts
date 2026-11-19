@@ -1,10 +1,19 @@
 import { sql } from 'drizzle-orm';
-import type { MiddlewareHandler } from 'hono';
+import type { Context, MiddlewareHandler } from 'hono';
 import { type AfterCommitFn, runAfterCommit } from '../db/after-commit.ts';
 import type { Database } from '../db/client.ts';
 
 // Ichki sentinel: tranzaksiyani bekor qiladi, lekin tayyor javobni saqlaydi.
 const ROLLBACK = Symbol('rls-rollback');
+
+/**
+ * FX-04 (LA-05): so'rov uchun ochilgan tenant tranzaksiyasi (kontekst → tenantId).
+ * Bare `/api`ga mount qilingan modullarning `app.use('*', rlsMiddleware)` i
+ * `/api/*`ga oqadi va bitta so'rovda bir necha marta ishlaydi — har biri yangi
+ * tx (alohida pool ulanishi) ochardi. Endi ichki chaqiruv mavjud tx'ni qayta
+ * ishlatadi: bitta so'rov = bitta tenant tx = bitta ulanish.
+ */
+const openTenantTx = new WeakMap<Context, string>();
 
 /**
  * RLS middleware — transaction-per-request + SET LOCAL app.current_tenant_id
@@ -31,6 +40,17 @@ export const rlsMiddleware =
       return;
     }
 
+    // Qayta kirish: shu so'rovda tenant tx allaqachon ochiq.
+    const openTenant = openTenantTx.get(c);
+    if (openTenant !== undefined) {
+      if (openTenant !== tenantId) {
+        // Ichma-ich boshqa tenant — tashqi tx'ning SET LOCAL'i noto'g'ri bo'lardi.
+        throw new Error('rlsMiddleware: nested request with a different tenant');
+      }
+      await next();
+      return;
+    }
+
     // Tenant kontekst: transaction ochib SET LOCAL chaqirish
     let nextError: unknown;
     // P4: side-effect'lar tx ichida ro'yxatga olinadi, commit'dan keyin bajariladi.
@@ -40,11 +60,14 @@ export const rlsMiddleware =
         await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);
         c.set('db', tx);
         c.set('afterCommit', afterCommit);
+        openTenantTx.set(c, tenantId);
         try {
           await next();
         } catch (err) {
           nextError = err;
           throw err; // rollback transaction
+        } finally {
+          openTenantTx.delete(c);
         }
         // Hono `app.onError` xatoni compose ichida yutadi (`await next()` throw
         // qilmaydi) — shuning uchun `c.error` yoki 5xx javobni o'zimiz tekshirib

@@ -1,6 +1,9 @@
 import {
   appointments,
+  branches,
   patients,
+  services,
+  stockItems,
   tenants,
   treatmentPlans,
   treatmentStages,
@@ -36,6 +39,50 @@ export class CrossEntityError extends Error {
 }
 
 export const createOwnershipValidator = () => {
+  /** X-1: branchId RLS ostida shu tenantda mavjudmi (FK RLS'ni chetlab o'tadi). */
+  async function assertBranchExists(c: Context, branchId: string): Promise<void> {
+    const db = getDb(c);
+    const [row] = await db
+      .select({ id: branches.id })
+      .from(branches)
+      .where(eq(branches.id, branchId))
+      .limit(1);
+    if (!row) throw new CrossEntityError('branch', 'not_found');
+  }
+
+  /** X-1: treatmentPlanId RLS ostida shu tenantda mavjudmi. */
+  async function assertTreatmentPlanExists(c: Context, planId: string): Promise<void> {
+    const db = getDb(c);
+    const [row] = await db
+      .select({ id: treatmentPlans.id })
+      .from(treatmentPlans)
+      .where(eq(treatmentPlans.id, planId))
+      .limit(1);
+    if (!row) throw new CrossEntityError('treatment_plan', 'not_found');
+  }
+
+  /** X-1 (FX-03a): ombor itemId RLS ostida shu tenantda mavjudmi. */
+  async function assertStockItemExists(c: Context, itemId: string): Promise<void> {
+    const db = getDb(c);
+    const [row] = await db
+      .select({ id: stockItems.id })
+      .from(stockItems)
+      .where(eq(stockItems.id, itemId))
+      .limit(1);
+    if (!row) throw new CrossEntityError('stock_item', 'not_found');
+  }
+
+  /** X-1 (FX-03a): serviceId RLS ostida shu tenantda mavjudmi. */
+  async function assertServiceExists(c: Context, serviceId: string): Promise<void> {
+    const db = getDb(c);
+    const [row] = await db
+      .select({ id: services.id })
+      .from(services)
+      .where(eq(services.id, serviceId))
+      .limit(1);
+    if (!row) throw new CrossEntityError('service', 'not_found');
+  }
+
   async function assertPatientExists(c: Context, patientId: string): Promise<void> {
     const db = getDb(c);
     const [row] = await db
@@ -124,6 +171,10 @@ export const createOwnershipValidator = () => {
   }
 
   return {
+    assertBranchExists,
+    assertTreatmentPlanExists,
+    assertStockItemExists,
+    assertServiceExists,
     assertPatientExists,
     assertUserExists,
     assertStageBelongsToPatient,

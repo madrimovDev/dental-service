@@ -19584,6 +19584,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "Referenced patient/branch/plan/doctor not found in this clinic",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -22894,6 +22904,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "Referenced stock item / service not found in this clinic",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -23304,6 +23324,16 @@
               }
             }
           },
+          "404": {
+            "description": "Referenced stock item / service not found in this clinic",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "409": {
             "description": "Insufficient stock (negative guard)",
             "content": {
@@ -23477,6 +23507,16 @@
           },
           "403": {
             "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Referenced stock item / service not found in this clinic",
             "content": {
               "application/json": {
                 "schema": {
@@ -23749,6 +23789,16 @@
           },
           "403": {
             "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Referenced stock item / service not found in this clinic",
             "content": {
               "application/json": {
                 "schema": {

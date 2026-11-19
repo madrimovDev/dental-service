@@ -13,6 +13,7 @@ import type { DbOrTx } from '../../db/client.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { findRecipientsWithPermission } from '../../lib/notify-recipients.ts';
+import { CrossEntityError, createOwnershipValidator } from '../../lib/ownership.ts';
 import {
   adjustmentDelta,
   allocateBatchRemaining,
@@ -66,6 +67,8 @@ export const createStockService = (deps: {
   audit: AuditLogger;
   notifications?: NotificationsDep;
 }) => {
+  const ownership = createOwnershipValidator();
+
   /**
    * CLI-453 #5: `wasLow`/`isLow` — chaqiruvchi `isLowStock()` bilan oldindan hisoblab
    * beradi (qoldiq o'zgarganda ESKI/YANGI qoldiqni ESKI/YANGI threshold bilan, yoki
@@ -298,7 +301,8 @@ export const createStockService = (deps: {
         .from(stockItems)
         .where(eq(stockItems.id, input.itemId))
         .for('update');
-      if (!item) throw new Error('Stock item not found');
+      // X-1 (FX-03a): begona/yo'q itemId — routes 404 (RLS bo'sh select).
+      if (!item) throw new CrossEntityError('stock_item', 'not_found');
 
       const oldQty = Number(item.quantity);
       const newQuantity = applyMovement(oldQty, input.type, input.quantity);
@@ -371,6 +375,10 @@ export const createStockService = (deps: {
     const db = getDb(c);
     const tenantId = c.get('activeTenantId');
     if (!tenantId) throw new Error('No tenant context');
+
+    // X-1 (FX-03a): FK RLS'ni chetlab o'tadi — begona serviceId/itemId insertdan OLDIN rad.
+    await ownership.assertServiceExists(c, input.serviceId);
+    await ownership.assertStockItemExists(c, input.itemId);
 
     const [bom] = await db
       .insert(serviceMaterials)
@@ -694,6 +702,9 @@ export const createStockService = (deps: {
     const tenantId = c.get('activeTenantId');
     const user = c.get('user');
     if (!tenantId) throw new Error('No tenant context');
+
+    // X-1 (FX-03a): begona itemId — partiya/harakat yozilmasin.
+    await ownership.assertStockItemExists(c, input.itemId);
 
     return await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);
