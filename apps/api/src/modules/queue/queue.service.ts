@@ -135,10 +135,14 @@ export const createQueueService = (deps: {
       // patient mosligi + status (cancelled emas) + dublikat-ochiq-tiket rad.
       // Ilgari bular tekshirilmasdi (dedupe faqat candidates query'da, create'da
       // emas edi).
+      // FX-55: yozilishdan check-in qilingan ticket shifokori — yozilish shifokori
+      // (UI queue.manage'siz shifokor uchun «o'zimniki»ni shu bilan ajratadi).
+      let apptDoctorId: string | null = null;
       if (input.appointmentId) {
         const [appt] = await tx
           .select({
             id: appointments.id,
+            doctorId: appointments.doctorId,
             branchId: appointments.branchId,
             patientId: appointments.patientId,
             status: appointments.status,
@@ -147,6 +151,7 @@ export const createQueueService = (deps: {
           .where(eq(appointments.id, input.appointmentId));
 
         if (!appt) throw new QueueValidationError('appointment.not_found');
+        apptDoctorId = appt.doctorId;
         if (appt.branchId !== input.branchId) {
           throw new QueueValidationError('appointment.branch_mismatch');
         }
@@ -190,6 +195,7 @@ export const createQueueService = (deps: {
           serviceId: input.serviceId ?? null,
           queueNumber,
           appointmentId: input.appointmentId ?? null,
+          doctorId: apptDoctorId,
         })
         .returning();
 

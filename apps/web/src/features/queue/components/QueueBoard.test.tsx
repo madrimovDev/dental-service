@@ -38,6 +38,7 @@ vi.mock('@/stores/auth-store.ts', () => ({
   useAuthStore: () => ({
     hasPermission: (p: string) => perms === 'all' || perms.includes(p),
     activeBranchId: 'b1',
+    user: { id: 'doc1' },
   }),
 }));
 
@@ -106,10 +107,39 @@ describe('QueueBoard', () => {
 
   it("queue.manage'siz shifokor chaqirsa call-own ishlatiladi (PATCH status emas)", () => {
     perms = ['queue.view'];
-    queueData = [ticket({ id: 'tw', status: 'waiting', queueNumber: 3, patientId: 'p2' })];
+    queueData = [
+      ticket({ id: 'tw', status: 'waiting', queueNumber: 3, patientId: 'p2', doctorId: 'doc1' }),
+    ];
     renderApp(<QueueBoard />);
     fireEvent.click(screen.getByRole('button', { name: /Chaqirish →/ }));
     expect(callOwnMutate).toHaveBeenCalledWith('tw');
     expect(updateMutate).not.toHaveBeenCalled();
+  });
+
+  // FX-55: queue.manage'siz shifokorga boshqa shifokor bemori «keyingi» sifatida ko'rsatilmasin
+  // (call-own 403 qaytaradi) — faqat o'ziga tegishli (ticket.doctorId === user.id) chaqiriladi.
+  it("queue.manage'siz shifokor: 'keyingi' va chaqirish faqat o'z bemori uchun", () => {
+    perms = ['queue.view'];
+    queueData = [
+      ticket({ id: 'other', status: 'waiting', queueNumber: 1, patientId: 'p2', doctorId: 'doc2' }),
+      ticket({ id: 'mine', status: 'waiting', queueNumber: 2, patientId: 'p1', doctorId: 'doc1' }),
+    ];
+    const { container } = renderApp(<QueueBoard />);
+    expect(container.querySelector('[class*="nextNumber"]')?.textContent).toBe('A-02');
+    fireEvent.click(screen.getByRole('button', { name: /Chaqirish →/ }));
+    expect(callOwnMutate).toHaveBeenCalledWith('mine');
+    // Ustun kartalarida ham faqat o'z ticket'i uchun chaqirish tugmasi (1 ta ActionIcon).
+    expect(screen.getAllByRole('button', { name: 'Chaqirish' })).toHaveLength(1);
+  });
+
+  it("queue.manage'siz shifokor: o'z bemori yo'q bo'lsa 'Chaqirish →' ko'rinmaydi", () => {
+    perms = ['queue.view'];
+    queueData = [
+      ticket({ id: 'other', status: 'waiting', queueNumber: 1, patientId: 'p2', doctorId: 'doc2' }),
+      ticket({ id: 'walk', status: 'waiting', queueNumber: 2, patientId: 'p1', doctorId: null }),
+    ];
+    renderApp(<QueueBoard />);
+    expect(screen.queryByRole('button', { name: /Chaqirish →/ })).toBeNull();
+    expect(callOwnMutate).not.toHaveBeenCalled();
   });
 });
