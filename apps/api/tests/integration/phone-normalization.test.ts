@@ -68,7 +68,7 @@ const ctx = (tx: DbOrTx): Context =>
       k === 'db'
         ? tx
         : k === 'accessClaims'
-          ? { perms: ['@owner'] }
+          ? { perms: ['@owner'], sub: ownerId, atid: tenantId }
           : k === 'activeTenantId'
             ? tenantId
             : k === 'user'
