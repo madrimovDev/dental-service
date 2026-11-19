@@ -4,7 +4,7 @@ import type { Context } from 'hono';
 import type { AuditLogger } from '../../../lib/audit-logger.ts';
 import { requireModuleInDesktop } from '../../../lib/license-middleware.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../../lib/openapi.ts';
-import { CrossEntityError } from '../../../lib/ownership.ts';
+import { CrossEntityError, OnBehalfForbiddenError } from '../../../lib/ownership.ts';
 import { createPatientMessenger } from '../../../lib/telegram/notify.ts';
 import { requirePermission } from '../../../middleware/require-permission.ts';
 import { InvalidTransitionError } from '../treatment-plans/treatment-plans.transitions.ts';
@@ -109,6 +109,9 @@ export const visitNotesRoutes = (deps: {
       if (e instanceof CrossEntityError) {
         return c.json(fail(`ownership.${e.reason}`, e.message), 400);
       }
+      if (e instanceof OnBehalfForbiddenError) {
+        return c.json(fail('visit_note.on_behalf_forbidden', e.message), 403);
+      }
       // C5: stageId skipped→completed → guard RAD → 400 (orphan yozuv yaratilmaydi).
       if (e instanceof InvalidTransitionError) {
         return c.json(fail('stage.invalid_transition', e.message), 400);
@@ -183,6 +186,9 @@ export const visitNotesRoutes = (deps: {
       }
       if (e instanceof CrossEntityError) {
         return c.json(fail(`ownership.${e.reason}`, e.message), 400);
+      }
+      if (e instanceof OnBehalfForbiddenError) {
+        return c.json(fail('visit_note.on_behalf_forbidden', e.message), 403);
       }
       if (e instanceof InvalidTransitionError) {
         return c.json(fail('stage.invalid_transition', e.message), 400);

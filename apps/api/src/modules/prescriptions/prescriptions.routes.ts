@@ -4,7 +4,7 @@ import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { requireModuleInDesktop } from '../../lib/license-middleware.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
-import { CrossEntityError } from '../../lib/ownership.ts';
+import { CrossEntityError, OnBehalfForbiddenError } from '../../lib/ownership.ts';
 import { createPatientMessenger } from '../../lib/telegram/notify.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
@@ -103,6 +103,9 @@ export const prescriptionsRoutes = (deps: { db: Database; audit: AuditLogger }) 
       if (e instanceof CrossEntityError) {
         return c.json(fail(`ownership.${e.reason}`, e.message), 400);
       }
+      if (e instanceof OnBehalfForbiddenError) {
+        return c.json(fail('prescription.on_behalf_forbidden', e.message), 403);
+      }
       if (e instanceof AllergyConflictError) {
         return c.json(fail('prescription.allergy_conflict', e.message, e.conflicts), 409);
       }
@@ -167,6 +170,9 @@ export const prescriptionsRoutes = (deps: { db: Database; audit: AuditLogger }) 
       // CLI-421: cross-entity ownership mismatch (doctorId/visitNoteId) → 400.
       if (e instanceof CrossEntityError) {
         return c.json(fail(`ownership.${e.reason}`, e.message), 400);
+      }
+      if (e instanceof OnBehalfForbiddenError) {
+        return c.json(fail('prescription.on_behalf_forbidden', e.message), 403);
       }
       if (e instanceof AllergyConflictError) {
         return c.json(fail('prescription.allergy_conflict', e.message, e.conflicts), 409);

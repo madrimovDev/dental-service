@@ -58,7 +58,7 @@ const ctx = (tx: DbOrTx, tenantId: string): Context =>
         : k === 'activeTenantId'
           ? tenantId
           : k === 'user'
-            ? { id: undefined }
+            ? { id: ownerId }
             : undefined,
   }) as unknown as Context;
 

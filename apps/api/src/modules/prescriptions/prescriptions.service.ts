@@ -116,7 +116,7 @@ export const createPrescriptionsService = (deps: {
     // CLI-421: cross-entity ownership — patientId/doctorId/visitNoteId shu bemorga/tenantga
     // tegishlimi (cross-tenant/mixed UUID → CrossEntityError → routes 400).
     await ownership.assertPatientExists(c, input.patientId);
-    await ownership.assertUserExists(c, input.doctorId);
+    await ownership.assertPractitioner(c, input.doctorId, 'prescription.on_behalf'); // FX-155
     if (input.visitNoteId)
       await ownership.assertVisitNoteBelongsToPatient(c, input.visitNoteId, input.patientId);
     await assertVisitNoteNotSigned(c, input.visitNoteId);
@@ -181,7 +181,9 @@ export const createPrescriptionsService = (deps: {
     // CLI-421: cross-entity ownership — patientId o'zgармаydi (update schema omit
     // qiladi), shu sabab before.patientId'ga nisbatan tekshiramiz. Faqat yuborilgan
     // maydonlar (visit-notes.service.ts::update() bilan bir xil naqsh).
-    if (input.doctorId) await ownership.assertUserExists(c, input.doctorId);
+    // FX-155: muallif faqat o'zgarganda tekshiriladi.
+    if (input.doctorId && input.doctorId !== before.doctorId)
+      await ownership.assertPractitioner(c, input.doctorId, 'prescription.on_behalf');
     if (input.visitNoteId)
       await ownership.assertVisitNoteBelongsToPatient(c, input.visitNoteId, before.patientId);
     if (input.items)

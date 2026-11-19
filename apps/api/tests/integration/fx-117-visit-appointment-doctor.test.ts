@@ -44,7 +44,7 @@ const ctx = (tx: DbOrTx): Context =>
           : k === 'user'
             ? { id: doctorA }
             : k === 'accessClaims'
-              ? { perms: ['visit_note.manage'] }
+              ? { perms: ['visit_note.manage', 'medical_record.on_behalf'] }
               : undefined,
     req: { header: () => undefined },
   }) as unknown as Context;
@@ -79,7 +79,7 @@ beforeAll(async () => {
     // doctorB — haqiqiy aktiv tayinlov (assertUserExists o'tadi; rad faqat yozilish shifokori sabab).
     const [role] = await tx
       .insert(roles)
-      .values({ tenantId, name: 'Doctor (test)' })
+      .values({ tenantId, name: 'Doctor (test)', isPractitioner: true })
       .returning({ id: roles.id });
     await tx.insert(userAssignments).values({ tenantId, userId: doctorB, roleId: role!.id });
     const [p] = await tx
