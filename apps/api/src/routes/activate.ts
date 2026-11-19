@@ -165,9 +165,11 @@ export const activateRoutes = (deps: {
     } catch (err) {
       const code = err instanceof Error ? err.message : 'ACTIVATION_FAILED';
       // FINGERPRINT_UNAVAILABLE — mahalliy muhit muammosi (VM/konteyner);
+      // SUPERVISOR_UNREACHABLE (FX-88) — Supervisor timeout'da javob bermadi;
       // qolgan barcha kodlar (INVALID_KEY, FINGERPRINT_MISMATCH,
       // SUPERVISOR_ERROR) — Supervisor rad etdi, mijoz xatosi.
-      const status = code === 'FINGERPRINT_UNAVAILABLE' ? 500 : 403;
+      const status =
+        code === 'FINGERPRINT_UNAVAILABLE' ? 500 : code === 'SUPERVISOR_UNREACHABLE' ? 504 : 403;
       return c.json(fail(code, "Litsenziyani faollashtirib bo'lmadi"), status);
     }
 

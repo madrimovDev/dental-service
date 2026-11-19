@@ -224,6 +224,8 @@ describe('ActivatePage — xato kodlari oddiy tilda va keyingi qadam bilan', () 
     ['FINGERPRINT_MISMATCH', 'fingerprint_mismatch'],
     ['NOT_ACTIVATED', 'not_activated'],
     ['SUPERVISOR_ERROR', 'supervisor'],
+    // FX-88 — Supervisor javob bermadi (timeout / tarmoq).
+    ['SUPERVISOR_UNREACHABLE', 'supervisor'],
   ];
   for (const [code, key] of codes) {
     it(`${code} — sabab va keyingi qadam ko'rinadi, xom kod emas`, async () => {

@@ -38,12 +38,37 @@ export type ActivateResult = LicenseData & {
   provisioningSignature?: string;
 };
 
-const post = async <T = LicenseData>(path: string, body: object): Promise<T> => {
-  const res = await fetch(`${SUPERVISOR_URL}${path}`, {
+/**
+ * FX-88 — har Supervisor so'rovi uchun timeout. Avval `fetch` signalsiz edi:
+ * javob bermaydigan Supervisor (tarmoq osilgan, proxy javobni ushlab turgan)
+ * «Qayta tekshirish», aktivatsiya va parol tiklashni cheksiz osib qo'yardi.
+ * `SUPERVISOR_TIMEOUT_MS` — faqat test/diagnostika uchun; chaqiruv-vaqtida
+ * o'qiladi (`getLicensePath()` konvensiyasi — import-vaqtida muzlab qolmaydi).
+ */
+const DEFAULT_SUPERVISOR_TIMEOUT_MS = 10_000;
+
+const supervisorTimeoutMs = (): number => {
+  const v = Number(process.env.SUPERVISOR_TIMEOUT_MS);
+  return Number.isFinite(v) && v > 0 ? v : DEFAULT_SUPERVISOR_TIMEOUT_MS;
+};
+
+const supervisorFetch = (path: string, body: object): Promise<Response> =>
+  fetch(`${SUPERVISOR_URL}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(supervisorTimeoutMs()),
   });
+
+const post = async <T = LicenseData>(path: string, body: object): Promise<T> => {
+  let res: Response;
+  try {
+    res = await supervisorFetch(path, body);
+  } catch {
+    // FX-88 — timeout ham, tarmoq xatosi ham bitta oddiy kodga aylanadi (avval
+    // runtime'ning inglizcha matni `code` sifatida mijozga ketardi).
+    throw new Error('SUPERVISOR_UNREACHABLE');
+  }
   const json = (await res.json()) as { error?: { code?: string } };
   if (!res.ok) {
     // FX-07 — xato tanasi (`body`) ham uzatiladi: `LICENSE_REVOKED` imzolangan
@@ -76,15 +101,14 @@ export const sendHeartbeat = async (licenseKey: string): Promise<LicenseData> =>
 export const markProvisioned = async (licenseKey: string, applied: boolean): Promise<void> => {
   try {
     const fingerprint = await getFingerprint();
-    await fetch(`${SUPERVISOR_URL}/v1/provisioned`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    await supervisorFetch(
+      '/v1/provisioned',
       // 🔴 `applied` — provisioning HAQIQATAN qo'llandimi. `false` bo'lsa
       // Supervisor vaqtinchalik parolni SAQLAYDI: u qo'llanmagan, ya'ni vendor
       // `prepare-reinstall` bilan tayyorlagan kredensial hali kerak.
       // Supervisor tomonda maydon ixtiyoriy va default `true` (orqaga moslik).
-      body: JSON.stringify({ licenseKey, fingerprint, applied }),
-    });
+      { licenseKey, fingerprint, applied },
+    );
   } catch {
     // no-op — best-effort
   }
@@ -107,10 +131,10 @@ export const verifyReset = async (resetToken: string): Promise<{ ok: boolean }> 
     return { ok: false };
   }
   try {
-    const res = await fetch(`${SUPERVISOR_URL}/v1/verify-reset`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ licenseKey: lic.licenseKey, fingerprint, resetToken }),
+    const res = await supervisorFetch('/v1/verify-reset', {
+      licenseKey: lic.licenseKey,
+      fingerprint,
+      resetToken,
     });
     const json = (await res.json()) as { ok?: boolean };
     return { ok: json?.ok === true };

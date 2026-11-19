@@ -48,6 +48,8 @@ const ERROR_KEY_MAP: Record<string, string> = {
   FINGERPRINT_UNAVAILABLE: 'fingerprint_unavailable',
   NOT_ACTIVATED: 'not_activated',
   SUPERVISOR_ERROR: 'supervisor',
+  // FX-88 — Supervisor javob bermadi (timeout / tarmoq): «qabul qilmadi yoki javob bermadi».
+  SUPERVISOR_UNREACHABLE: 'supervisor',
 };
 
 export function ActivatePage() {

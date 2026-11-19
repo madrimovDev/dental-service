@@ -15,9 +15,13 @@ import * as realLicense from './license';
 // mavjud testlar uchun o'zgarishsiz sobit fingerprint).
 let fingerprintImpl = async (): Promise<string> => 'abc123fingerprint';
 
+// FX-88 — `verifyReset` `.lic`ni o'qiydi; timeout testi uchun almashtiriladi.
+let readLicenseImpl: typeof realLicense.readLicense = realLicense.readLicense;
+
 mock.module('./license', () => ({
   ...realLicense,
   getFingerprint: async () => fingerprintImpl(),
+  readLicense: async () => readLicenseImpl(),
 }));
 
 describe('activateLicense', () => {
@@ -241,5 +245,84 @@ describe('sendHeartbeat', () => {
       expect.stringContaining('/v1/heartbeat'),
       expect.objectContaining({ method: 'POST' }),
     );
+  });
+});
+
+// FX-88 — Supervisor so'rovlarida timeout. Javob bermaydigan Supervisor
+// «Qayta tekshirish»/aktivatsiya/parol-tiklashni cheksiz osib qo'ymasligi kerak.
+// `fetch` mock'i «kech javob beradigan Supervisor»: `signal` abort bo'lsa rad
+// etadi, aks holda faqat 1 s dan keyin muvaffaqiyatli javob beradi. Timeout
+// bo'lmasa chaqiruv o'sha kech javobni qabul qilib, test yiqiladi.
+describe("Supervisor so'rov timeout (FX-88)", () => {
+  const originalFetch = globalThis.fetch;
+  const originalTimeout = process.env.SUPERVISOR_TIMEOUT_MS;
+
+  const hangingFetch = () =>
+    mock(
+      (_url: string, init?: RequestInit) =>
+        new Promise<Response>((resolve, reject) => {
+          const late = setTimeout(
+            () => resolve(new Response(JSON.stringify({ late: true }), { status: 200 })),
+            1000,
+          );
+          init?.signal?.addEventListener('abort', () => {
+            clearTimeout(late);
+            reject(init.signal?.reason);
+          });
+        }),
+    );
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    if (originalTimeout === undefined) delete process.env.SUPERVISOR_TIMEOUT_MS;
+    else process.env.SUPERVISOR_TIMEOUT_MS = originalTimeout;
+  });
+
+  test('activateLicense javob kelmasa SUPERVISOR_UNREACHABLE bilan tugaydi', async () => {
+    process.env.SUPERVISOR_TIMEOUT_MS = '50';
+    globalThis.fetch = hangingFetch() as unknown as typeof fetch;
+    const { activateLicense } = await import('./license-client');
+    await expect(activateLicense('KEY-1')).rejects.toThrow('SUPERVISOR_UNREACHABLE');
+  });
+
+  test('sendHeartbeat javob kelmasa SUPERVISOR_UNREACHABLE bilan tugaydi', async () => {
+    process.env.SUPERVISOR_TIMEOUT_MS = '50';
+    globalThis.fetch = hangingFetch() as unknown as typeof fetch;
+    const { sendHeartbeat } = await import('./license-client');
+    await expect(sendHeartbeat('KEY-1')).rejects.toThrow('SUPERVISOR_UNREACHABLE');
+  });
+
+  test('tarmoq xatosi ham oddiy SUPERVISOR_UNREACHABLE kodiga aylanadi', async () => {
+    globalThis.fetch = mock(async () => {
+      throw new TypeError('Unable to connect. Is the computer able to access the url?');
+    }) as unknown as typeof fetch;
+    const { activateLicense } = await import('./license-client');
+    await expect(activateLicense('KEY-1')).rejects.toThrow('SUPERVISOR_UNREACHABLE');
+  });
+
+  test('markProvisioned javob kelmasa osilmaydi', async () => {
+    process.env.SUPERVISOR_TIMEOUT_MS = '50';
+    globalThis.fetch = hangingFetch() as unknown as typeof fetch;
+    const { markProvisioned } = await import('./license-client');
+    const started = performance.now();
+    await expect(markProvisioned('KEY-1', true)).resolves.toBeUndefined();
+    // Kech javobni (1 s) kutmasdan timeout'da tugashi kerak.
+    expect(performance.now() - started).toBeLessThan(500);
+  });
+
+  test('verifyReset javob kelmasa osilmaydi va ok:false qaytaradi', async () => {
+    process.env.SUPERVISOR_TIMEOUT_MS = '50';
+    globalThis.fetch = hangingFetch() as unknown as typeof fetch;
+    const { verifyReset } = await import('./license-client');
+    const started = performance.now();
+    readLicenseImpl = async () =>
+      ({ licenseKey: 'KEY-1' }) as Awaited<ReturnType<typeof realLicense.readLicense>>;
+    try {
+      await expect(verifyReset('AAAAA-BBBBB-CCCCC')).resolves.toEqual({ ok: false });
+    } finally {
+      readLicenseImpl = realLicense.readLicense;
+    }
+    expect(globalThis.fetch).toHaveBeenCalled();
+    expect(performance.now() - started).toBeLessThan(500);
   });
 });
