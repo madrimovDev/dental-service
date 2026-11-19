@@ -215,10 +215,15 @@ export const createVisitNotesService = (deps: {
       await ownership.assertStageBelongsToPatient(c, input.stageId, before.patientId);
     if (input.appointmentId)
       await ownership.assertAppointmentBelongsToPatient(c, input.appointmentId, before.patientId);
-    // FX-117: yozilish shifokori == yozuv shifokori (yozilish YOKI shifokor o'zgarganda).
+    // FX-117: yozilish shifokori == yozuv shifokori — faqat yozilish YOKI shifokor HAQIQATAN
+    // o'zgarganda. Web tahrir har PATCH'da ikkalasini ham yuboradi; yozilish keyin boshqa
+    // shifokorga o'tkazilsa ham mavjud qoralama saqlanishi/imzolanishi kerak (review).
+    const appointmentChanged =
+      input.appointmentId !== undefined && input.appointmentId !== before.appointmentId;
+    const doctorChanged = input.doctorId !== undefined && input.doctorId !== before.doctorId;
     const effectiveAppointmentId =
       input.appointmentId !== undefined ? input.appointmentId : before.appointmentId;
-    if (effectiveAppointmentId && (input.appointmentId || input.doctorId)) {
+    if (effectiveAppointmentId && (appointmentChanged || doctorChanged)) {
       await ownership.assertAppointmentDoctor(
         c,
         effectiveAppointmentId,

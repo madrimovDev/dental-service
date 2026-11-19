@@ -16,7 +16,7 @@ import {
   users,
   visitNotes,
 } from '@dental/db-schema';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { DbOrTx } from '../../src/db/client.ts';
 import { db } from '../../src/db/client.ts';
@@ -150,5 +150,39 @@ describe('FX-117 — vizit ↔ yozilish shifokori', () => {
     await expect(
       inTenant((tx) => service.update(ctx(tx), note!.id, { doctorId: doctorB } as never)),
     ).rejects.toBeInstanceOf(CrossEntityError);
+  });
+  test("update (review): yozilish boshqa shifokorga o'tkazilgandan keyin bir xil appointmentId+doctorId bilan PATCH va imzo o'tadi", async () => {
+    const note = await inTenant((tx) =>
+      service.create(ctx(tx), { patientId, doctorId: doctorA, appointmentId: apptA } as never),
+    );
+    // Registrator yozilishni B shifokorga o'tkazdi.
+    await inTenant((tx) =>
+      tx.update(appointments).set({ doctorId: doctorB }).where(eq(appointments.id, apptA)),
+    );
+    try {
+      // Web tahrir har PATCH'da appointmentId + doctorId'ni yuboradi (o'zgarmagan).
+      const saved = await inTenant((tx) =>
+        service.update(ctx(tx), note!.id, {
+          appointmentId: apptA,
+          doctorId: doctorA,
+          subjective: 'saqlandi',
+        } as never),
+      );
+      expect(saved?.subjective).toBe('saqlandi');
+      expect(saved?.appointmentId).toBe(apptA);
+      const signed = await inTenant((tx) => service.sign(ctx(tx), note!.id));
+      expect(signed?.signedAt).toBeTruthy();
+      // Haqiqiy o'zgarish (shifokor almashtirish) hali ham tekshiriladi.
+      const other = await inTenant((tx) =>
+        service.create(ctx(tx), { patientId, doctorId: doctorA, subjective: 'y' } as never),
+      );
+      await expect(
+        inTenant((tx) => service.update(ctx(tx), other!.id, { appointmentId: apptA } as never)),
+      ).rejects.toBeInstanceOf(CrossEntityError);
+    } finally {
+      await inTenant((tx) =>
+        tx.update(appointments).set({ doctorId: doctorA }).where(eq(appointments.id, apptA)),
+      );
+    }
   });
 });
