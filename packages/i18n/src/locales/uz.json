@@ -1306,6 +1306,7 @@
     "title": "Kassa",
     "branch": "Filial",
     "new_payment": "Yangi to'lov",
+    "patient_required": "To'lov uchun avval bemorni tanlang",
     "previous_balance": "Eski balans",
     "add_service": "Xizmat qo'shish",
     "search_service": "Xizmat qidirish yoki kod kiritish…",

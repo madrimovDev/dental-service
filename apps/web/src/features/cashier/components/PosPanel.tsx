@@ -266,7 +266,13 @@ export function PosPanel({
     setCart((prev) => prev.filter((i) => i.service.id !== id));
   };
 
+  // FX-21: erkin POS bemorsiz to'lanmaydi (server ham 400 qaytaradi).
+  const patientMissing = !patientId;
+  const chargeDisabled =
+    cart.length === 0 || netTotal <= 0 || createMut.isPending || patientMissing;
+
   const handleCharge = () => {
+    if (patientMissing) return;
     const payload = buildCreatePayload({
       branchId,
       patientId,
@@ -645,7 +651,7 @@ export function PosPanel({
         <Box style={{ padding: '0 18px 18px' }}>
           <UnstyledButton
             onClick={handleCharge}
-            disabled={cart.length === 0 || netTotal <= 0 || createMut.isPending}
+            disabled={chargeDisabled}
             data-loading={createMut.isPending || undefined}
             style={{
               width: '100%',
@@ -656,11 +662,8 @@ export function PosPanel({
               fontSize: 14.5,
               fontWeight: 700,
               fontFamily: 'var(--font-sans)',
-              opacity: cart.length === 0 || netTotal <= 0 || createMut.isPending ? 0.55 : 1,
-              cursor:
-                cart.length === 0 || netTotal <= 0 || createMut.isPending
-                  ? 'not-allowed'
-                  : 'pointer',
+              opacity: chargeDisabled ? 0.55 : 1,
+              cursor: chargeDisabled ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -674,6 +677,14 @@ export function PosPanel({
             )}
             {t('cashier.charge')}
           </UnstyledButton>
+          {patientMissing && cart.length > 0 && (
+            <Text
+              data-testid="patient-required-hint"
+              style={{ fontSize: 12, color: 'var(--danger)', marginTop: 8 }}
+            >
+              {t('cashier.patient_required')}
+            </Text>
+          )}
         </Box>
       </Card>
 

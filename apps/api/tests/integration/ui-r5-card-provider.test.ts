@@ -180,6 +180,7 @@ describe('UI-R5: card_provider', () => {
   test('schema: cash/transfer + cardProvider rad etiladi, noma’lum sub-tur rad etiladi', () => {
     const base = {
       branchId: crypto.randomUUID(),
+      patientId: crypto.randomUUID(),
       items: [{ serviceId: crypto.randomUUID(), quantity: 1, unitPrice: 1, serviceName: 'X' }],
       paidAmount: 1,
     };

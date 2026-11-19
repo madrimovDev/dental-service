@@ -49,6 +49,12 @@ export const createTransactionSchema = z
     message: 'items yoki allocations talab qilinadi',
     path: ['items'],
   })
+  // FX-21 (CF-20): erkin POS (items) bemorsiz to'lanmaydi — balans/hisobotlar va chek
+  // bemorga bog'lanadi. Vizit to'lovida (visitNoteId) bemor vizitdan olinadi.
+  .refine((v) => v.items.length === 0 || v.visitNoteId !== undefined || v.patientId !== undefined, {
+    message: 'cashier.patient_required',
+    path: ['patientId'],
+  })
   // FX-handoff: vizit to'lovi faqat erkin POS (items) rejimida.
   .refine((v) => v.visitNoteId === undefined || (v.allocations?.length ?? 0) === 0, {
     message: 'visitNoteId allocations bilan birga ishlatilmaydi',
