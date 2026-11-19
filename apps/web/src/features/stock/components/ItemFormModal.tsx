@@ -71,7 +71,11 @@ export function ItemFormModal({ opened, onClose, branches, item }: ItemFormModal
     >
       <form
         onSubmit={form.onSubmit((values) => {
-          const price = values.price === '' || values.price == null ? null : Number(values.price);
+          // FX-129 review: bo'sh narx → `undefined` (maydon yuborilmaydi). API `price`ni
+          // `z.coerce.number().optional()` deb oladi — `null` 0 ga aylanib, narxsiz mahsulotni
+          // tahrirlash narxni jimgina 0 ga yozardi. Narxni tozalash qo'llab-quvvatlanmaydi.
+          const price =
+            values.price === '' || values.price == null ? undefined : Number(values.price);
           if (item) {
             // Tahrir: faqat metadata (qoldiq harakat/partiya orqali o'zgaradi — CLI-424).
             update.mutate(
@@ -81,7 +85,7 @@ export function ItemFormModal({ opened, onClose, branches, item }: ItemFormModal
                   name: values.name,
                   unit: values.unit,
                   category: values.category ?? '',
-                  price,
+                  ...(price !== undefined ? { price } : {}),
                   minThreshold: values.minThreshold,
                 },
               },
@@ -95,7 +99,7 @@ export function ItemFormModal({ opened, onClose, branches, item }: ItemFormModal
               unit: values.unit,
               branchId: values.branchId || undefined,
               category: values.category || undefined,
-              price: price ?? undefined,
+              price,
               quantity: values.quantity,
               minThreshold: values.minThreshold,
             },

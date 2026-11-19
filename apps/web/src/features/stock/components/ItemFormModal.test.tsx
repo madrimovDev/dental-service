@@ -56,14 +56,27 @@ describe('ItemFormModal — tahrirlash (FX-129)', () => {
     expect(createStockItem).not.toHaveBeenCalled();
   });
 
-  it('narxni tozalash → price: null yuboriladi', async () => {
+  // FX-129 review: API updateItemSchema `price`ni `z.coerce.number().optional()` deb oladi —
+  // `null` coerce bilan 0 ga aylanadi. Shuning uchun bo'sh narx tahrirda UMUMAN yuborilmaydi
+  // (narx o'zgarmaydi); narxni tozalab null qilish qo'llab-quvvatlanmaydi.
+  it('narxi yo‘q mahsulotni tahrirlash → price yuborilmaydi (0 ga yozilmaydi)', async () => {
+    renderApp(
+      <ItemFormModal opened onClose={() => {}} branches={[]} item={{ ...item, price: null }} />,
+    );
+    fireEvent.change(await screen.findByLabelText(/Minimal qoldiq/), { target: { value: '7' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    await waitFor(() => expect(updateStockItem).toHaveBeenCalledOnce());
+    const body = (updateStockItem.mock.calls[0] as [string, Record<string, unknown>])[1];
+    expect(body).toMatchObject({ minThreshold: 7 });
+    expect(body).not.toHaveProperty('price');
+  });
+
+  it('narxni tozalash → price yuborilmaydi (null/0 emas)', async () => {
     renderApp(<ItemFormModal opened onClose={() => {}} branches={[]} item={item} />);
     fireEvent.change(await screen.findByLabelText(/Narx/), { target: { value: '' } });
     fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
     await waitFor(() => expect(updateStockItem).toHaveBeenCalledOnce());
-    expect(
-      (updateStockItem.mock.calls[0] as [string, Record<string, unknown>])[1].price,
-    ).toBeNull();
+    expect(updateStockItem.mock.calls[0]?.[1]).not.toHaveProperty('price');
   });
 
   it('yaratish rejimi: createStockItem (kategoriya/narx bilan), update chaqirilmaydi', async () => {
