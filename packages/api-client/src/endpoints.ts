@@ -86,6 +86,12 @@ export const createEndpoints = (api: ApiClient) => ({
   labHub: {
     status: () => api.get<LabHubStatusRecord>('/api/lab-hub/status'),
     connect: () => api.post<{ connected: true; hubClinicId: string }>('/api/lab-hub/connect', {}),
+    /** FX-48: doimiy xato bilan to'xtagan («yuborilmadi») op'larni qayta navbatga qo'yish. */
+    requeueOutbox: (labOrderId?: string) =>
+      api.post<{ requeued: number }>(
+        '/api/lab-hub/outbox/requeue',
+        labOrderId ? { labOrderId } : {},
+      ),
     labs: () => api.get<{ labs: LabHubLabRecord[]; stale: boolean }>('/api/lab-hub/labs'),
     requestLink: (labId: string) =>
       api.post<{ link: { id: string; labId: string; status: string } }>('/api/lab-hub/links', {

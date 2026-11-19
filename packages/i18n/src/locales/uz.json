@@ -2706,6 +2706,8 @@
     "never": "hali bo'lmagan",
     "queue": "Navbat",
     "queue_value": "kutmoqda: {{pending}} · yuborilmadi: {{failed}}",
+    "requeue": "Qayta yuborish",
+    "requeued_toast": "Qayta navbatga qo'yildi: {{count}}",
     "last_error": "Oxirgi xato",
     "catalog_title": "Laboratoriyalar katalogi",
     "catalog_empty": "Katalogda hozircha laboratoriya yo'q",

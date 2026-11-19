@@ -9,6 +9,7 @@ import {
   useLabHubLabs,
   useLabHubStatus,
   useRequestLabLink,
+  useRequeueLabHubOutbox,
 } from '@/features/clinical/components/lab-orders/lab-hub.api';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { SettingsShell } from './SettingsShell';
@@ -60,6 +61,7 @@ export function LabsSettingsScreen() {
     .sort((x, y) => Number(!x.linkStatus) - Number(!y.linkStatus));
   const connect = useConnectLabHub();
   const request = useRequestLabLink();
+  const requeue = useRequeueLabHubOutbox();
 
   const errorText = (err: unknown) => {
     const code = (err as { code?: string } | null)?.code ?? '';
@@ -69,6 +71,13 @@ export function LabsSettingsScreen() {
   const onConnect = () =>
     connect.mutate(undefined, {
       onSuccess: () => notifications.show({ message: t('labHubClinic.connected_toast') }),
+      onError: (err) => notifications.show({ color: 'red', message: errorText(err) }),
+    });
+
+  const onRequeue = () =>
+    requeue.mutate(undefined, {
+      onSuccess: (r) =>
+        notifications.show({ message: t('labHubClinic.requeued_toast', { count: r.requeued }) }),
       onError: (err) => notifications.show({ color: 'red', message: errorText(err) }),
     });
 
@@ -142,6 +151,17 @@ export function LabsSettingsScreen() {
                     pending: s.pendingOutbox,
                     failed: s.failedOutbox,
                   })}
+                  {canEdit && s.failedOutbox > 0 && (
+                    <Button
+                      ml="sm"
+                      size="xs"
+                      variant="light"
+                      onClick={onRequeue}
+                      loading={requeue.isPending}
+                    >
+                      {t('labHubClinic.requeue')}
+                    </Button>
+                  )}
                 </dd>
                 {s.lastError && (
                   <>

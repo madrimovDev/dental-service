@@ -57,6 +57,7 @@ import { labHubClient } from '../../src/lib/lab-hub/client.ts';
 import { toHubCase } from '../../src/lib/lab-hub/mapper.ts';
 import { hubKeyOf } from '../../src/lib/lab-hub/state.ts';
 import { flushLabHubOutbox, pollLabHubChanges } from '../../src/lib/lab-hub/sync.ts';
+import { createLocalStorageAdapter } from '../../src/lib/storage.ts';
 
 // ─── Hub (haqiqiy ilova, o'z bazasi) ─────────────────────────────────────────
 const parseEnv = (path: string): Record<string, string> =>
@@ -1169,5 +1170,139 @@ describe('FX-79 — yo‘q fayl (ENOENT) cheksiz qayta urinilmaydi', () => {
       tx.select().from(labOrderMessages).where(eq(labOrderMessages.labOrderId, id)),
     );
     expect(msg?.syncedAt).not.toBeNull();
+  });
+});
+
+// ─── FX-48: doimiy xatoda kutish tozalanadi + «failed» op'larni qayta navbatga qo'yish ──
+describe('FX-48 — failed outbox: narx kutishi tozalanadi, qayta navbat', () => {
+  const sendAccepted = async () => {
+    const id = await createOrder();
+    expect(
+      (await call('doctor', 'POST', `/api/lab-orders/${id}/send-to-hub`, { labId: lab.labId }))
+        .status,
+    ).toBe(200);
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+    const [hc] = await hubCaseByRef(id);
+    const step = async (path: string, body: unknown) => {
+      const r = await hubJson(`/v1/lab/cases/${hc!.id}${path}`, {
+        method: 'POST',
+        token: lab.token,
+        body,
+      });
+      expect(r.status).toBeLessThan(300);
+    };
+    await step('/status', { to: 'accepted' });
+    return { id, step };
+  };
+
+  test('approve_price doimiy 4xx (case.not_found): kutish tozalanadi, qayta tasdiq ishlaydi, bitta xarajat', async () => {
+    const { id, step } = await sendAccepted();
+    await step('/price', { price: 150000 });
+    await pollLabHubChanges(tenantId);
+    const approve = () =>
+      whileHubDown(() =>
+        call('doctor', 'POST', `/api/lab-orders/${id}/approve-price`, { price: '150000.00' }),
+      );
+    expect((await approve()).status).toBe(200);
+    expect((await orderRow(id))?.priceApprovalRequestedPrice).toBe('150000.00');
+
+    // Hub bu ishni topmaydi (masalan, tozalangan) — haqiqiy Hub 404 case.not_found qaytaradi.
+    const missingCase = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      return fetch(
+        url.includes('/approve-price')
+          ? url.replace(`/cases/${id}/`, `/cases/${crypto.randomUUID()}/`)
+          : url,
+        init,
+      );
+    }) as typeof fetch;
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId, { fetchImpl: missingCase });
+
+    const row = await orderRow(id);
+    expect(row?.priceApprovalRequestedAt).toBeNull();
+    expect(row?.priceApprovalRequestedPrice).toBeNull();
+    expect(row?.approvedPrice).toBeNull();
+    expect(await expensesOf(id)).toHaveLength(0);
+    const [op] = await inTenant((tx) =>
+      tx
+        .select()
+        .from(labHubOutbox)
+        .where(and(eq(labHubOutbox.labOrderId, id), eq(labHubOutbox.op, 'approve_price'))),
+    );
+    expect(op?.status).toBe('rejected');
+    expect(op?.lastError).toBe('case.not_found');
+
+    // Foydalanuvchi qayta tasdiqlaydi — yangi op navbatga tushadi, Hub tasdiqlaydi → bitta xarajat.
+    const again = await approve();
+    expect(again.status).toBe(200);
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+    expect((await expensesOf(id)).map((e) => e.amount)).toEqual(['150000.00']);
+    expect((await orderRow(id))?.approvedPrice).toBe('150000.00');
+  });
+
+  test('POST /api/lab-hub/outbox/requeue: Doctor 403; Tenant Admin qayta navbatga qo‘yadi → yuboriladi', async () => {
+    const id = await createOrder();
+    expect(
+      (await call('doctor', 'POST', `/api/lab-orders/${id}/send-to-hub`, { labId: lab.labId }))
+        .status,
+    ).toBe(200);
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+    const objectKey = `${tenantId}/lab-orders/${id}/kech-${crypto.randomUUID()}.pdf`;
+    await inTenant(async (tx) => {
+      const [f] = await tx
+        .insert(labOrderFiles)
+        .values({
+          tenantId,
+          labOrderId: id,
+          objectKey,
+          originalFilename: 'kech.pdf',
+          contentType: 'application/pdf',
+          sizeBytes: 8,
+        })
+        .returning({ id: labOrderFiles.id });
+      await tx
+        .insert(labHubOutbox)
+        .values({ tenantId, labOrderId: id, op: 'file', payload: { fileId: f!.id } });
+    });
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+    const fileOp = async () =>
+      (
+        await inTenant((tx) =>
+          tx
+            .select()
+            .from(labHubOutbox)
+            .where(and(eq(labHubOutbox.labOrderId, id), eq(labHubOutbox.op, 'file'))),
+        )
+      )[0];
+    expect((await fileOp())?.status).toBe('failed');
+    expect((await orderRow(id))?.hubSyncStatus).toBe('failed');
+    const st = await call('doctor', 'GET', '/api/lab-hub/status');
+    expect(
+      ((await st.json()) as { data: { failedOutbox: number } }).data.failedOutbox,
+    ).toBeGreaterThan(0);
+
+    // Fayl tiklandi (zaxiradan) — endi qayta yuborish mumkin.
+    await createLocalStorageAdapter().save(objectKey, Buffer.from('KECH-PDF'));
+
+    expect((await call('doctor', 'POST', '/api/lab-hub/outbox/requeue', {})).status).toBe(403);
+    const res = await call('tenant_admin', 'POST', '/api/lab-hub/outbox/requeue', {
+      labOrderId: id,
+    });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { data: { requeued: number } }).data.requeued).toBe(1);
+
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+    expect((await fileOp())?.status).toBe('done');
+    expect((await orderRow(id))?.hubSyncStatus).toBe('synced');
+    const audits = await inTenant((tx) =>
+      tx.select().from(auditLog).where(eq(auditLog.action, 'outbox_requeued')),
+    );
+    expect(audits).toHaveLength(1);
   });
 });

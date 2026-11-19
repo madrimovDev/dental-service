@@ -9,7 +9,7 @@ import {
   patients,
   users,
 } from '@dental/db-schema';
-import { and, eq, isNotNull, isNull, or, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
 import type { Database, DbOrTx } from '../../db/client.ts';
 import { withTenant } from '../../db/scoped.ts';
 import {
@@ -304,6 +304,20 @@ export const flushLabHubOutbox = async (
             .update(labHubOutbox)
             .set({ status: 'done', doneAt: now(), lastError: null, attempts: row.attempts + 1 })
             .where(eq(labHubOutbox.id, row.id));
+          // FX-48: qayta navbatga qo'yilgan (yoki keyin yuborilgan) op'lar hal bo'ldi — buyurtmada
+          // ochiq (pending/failed) op qolmagan bo'lsa «sinxronlangan».
+          await tx
+            .update(labOrders)
+            .set({ hubSyncStatus: 'synced' })
+            .where(
+              and(
+                eq(labOrders.id, row.lab_order_id),
+                ne(labOrders.hubSyncStatus, 'synced'),
+                sql`NOT EXISTS (SELECT 1 FROM lab_hub_outbox ob
+                                 WHERE ob.lab_order_id = ${row.lab_order_id}
+                                   AND ob.status IN ('pending', 'failed'))`,
+              ),
+            );
           await tx.update(labHubState).set({ lastPushAt: now(), lastError: null });
         });
         result.sent++;
@@ -311,9 +325,11 @@ export const flushLabHubOutbox = async (
         if (
           row.op === 'approve_price' &&
           err instanceof LabHubError &&
-          PRICE_REJECTED.has(err.code)
+          (PRICE_REJECTED.has(err.code) || !err.retryable)
         ) {
-          // Hub boshqa narxni kutyapti — kutish tozalanadi, ish qayta tasdiqqa.
+          // Hub boshqa narxni kutyapti — kutish tozalanadi, ish qayta tasdiqqa. FX-48: boshqa
+          // doimiy 4xx (case.not_found, validatsiya …) ham — aks holda «kutilmoqda» abadiy
+          // qolardi va takroriy bosish hech narsa yubormasdi; foydalanuvchi qayta tasdiqlaydi.
           await rejectPriceApprovalOp(tenantId, row, err, now());
           result.failed++;
           continue;
