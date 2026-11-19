@@ -298,6 +298,82 @@ describe('runLicenseHeartbeatCheck', () => {
     expect(writtenMs).toBeGreaterThanOrEqual(Date.parse(fresh.issuedAt));
     expect(writtenMs).toBeGreaterThan(priorAnchorMs);
   });
+
+  // FX-87 — soat xato oldinga surilib langar o'sha sanaga ko'tarilgan bo'lsa,
+  // Supervisor'ning yangi (keshdagidan keyingi) imzolangan `issuedAt`i langarni
+  // server vaqtiga TUSHIRADI. Aks holda litsenziya o'sha xato sanagacha bloklanardi.
+  test('FX-87: newer verified heartbeat lowers an anchor that ran ahead of server time to issuedAt', async () => {
+    const { runLicenseHeartbeatCheck } = await import('./license-heartbeat-scheduler');
+    const cached = { ...makeLicense(), issuedAt: new Date(Date.now() - 4 * 3600000).toISOString() };
+    const fresh = { ...makeLicense(), issuedAt: new Date().toISOString() };
+    const writeAnchor = mock(async (_ms: number) => {});
+    const inflatedAnchorMs = Date.now() + 365 * 86400000; // xato BIOS soati izi
+
+    await runLicenseHeartbeatCheck({
+      readLicense: async () => cached,
+      writeLicense: mock(async () => {}),
+      invalidateLicense: mock(async () => {}),
+      sendHeartbeat: async () => fresh,
+      readAnchor: async () => inflatedAnchorMs,
+      writeAnchor,
+      verifyLicense: acceptAll,
+      log: fakeLog,
+    });
+
+    expect(writeAnchor).toHaveBeenCalledTimes(1);
+    expect(writeAnchor.mock.calls[0]?.[0]).toBe(Date.parse(fresh.issuedAt));
+  });
+
+  // FX-87 — langar mahalliy Date.now() bilan emas, faqat server vaqti bilan
+  // ko'tariladi: soat hozir xato oldinda bo'lsa ham heartbeat uni langarga yozmaydi.
+  test('FX-87: heartbeat does not raise the anchor with a wrong local clock (Date.now())', async () => {
+    const { runLicenseHeartbeatCheck } = await import('./license-heartbeat-scheduler');
+    const cached = { ...makeLicense(), issuedAt: new Date(Date.now() - 4 * 3600000).toISOString() };
+    const fresh = { ...makeLicense(), issuedAt: new Date().toISOString() };
+    const writeAnchor = mock(async (_ms: number) => {});
+    const realNow = Date.now;
+    Date.now = () => realNow() + 365 * 86400000;
+    try {
+      await runLicenseHeartbeatCheck({
+        readLicense: async () => cached,
+        writeLicense: mock(async () => {}),
+        invalidateLicense: mock(async () => {}),
+        sendHeartbeat: async () => fresh,
+        readAnchor: async () => 0,
+        writeAnchor,
+        verifyLicense: acceptAll,
+        log: fakeLog,
+      });
+    } finally {
+      Date.now = realNow;
+    }
+
+    expect(writeAnchor.mock.calls[0]?.[0]).toBe(Date.parse(fresh.issuedAt));
+  });
+
+  // FX-87 — takroran yuborilgan (replay) javob keshdagidan yangi bo'lmasa,
+  // langar pasaytirilmaydi: aks holda MITM eski imzolangan javob bilan soatni
+  // orqaga surishga yo'l ochardi.
+  test('FX-87: a response not newer than the cached license does not lower the anchor (replay)', async () => {
+    const { runLicenseHeartbeatCheck } = await import('./license-heartbeat-scheduler');
+    const cached = makeLicense();
+    const fresh = { ...makeLicense(), issuedAt: cached.issuedAt };
+    const writeAnchor = mock(async (_ms: number) => {});
+    const aheadAnchorMs = Date.parse(cached.issuedAt) + 3 * 86400000;
+
+    await runLicenseHeartbeatCheck({
+      readLicense: async () => cached,
+      writeLicense: mock(async () => {}),
+      invalidateLicense: mock(async () => {}),
+      sendHeartbeat: async () => fresh,
+      readAnchor: async () => aheadAnchorMs,
+      writeAnchor,
+      verifyLicense: acceptAll,
+      log: fakeLog,
+    });
+
+    expect(writeAnchor.mock.calls[0]?.[0]).toBe(aheadAnchorMs);
+  });
 });
 
 describe('startLicenseHeartbeatScheduler', () => {
