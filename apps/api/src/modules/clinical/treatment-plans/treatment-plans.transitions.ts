@@ -142,6 +142,33 @@ export class StageNotAcceptedError extends InvalidTransitionError {
 }
 
 /**
+ * FX-15 (LA-32): bajarilgan (completed) bosqichning qabul qilingan (accepted) holatini
+ * rejected/proposed'ga qaytarib bo'lmaydi — aks holda bajarilgan ish qarzi (cost) jimgina
+ * 0 ga tushardi. InvalidTransitionError SUBKLASSI → routes 400.
+ */
+export class CompletedStageAcceptanceLockedError extends InvalidTransitionError {
+  constructor(to: StageAcceptance) {
+    super('stage_acceptance', 'accepted', to);
+    this.name = 'CompletedStageAcceptanceLockedError';
+    this.message = `Cannot change acceptance of a completed stage from 'accepted' to '${to}'.`;
+  }
+}
+
+/**
+ * FX-15 (LA-32): bajarilgan bosqichli rejani bekor qilib bo'lmaydi — cancelled reja
+ * qarz cost'ini 0 qiladi, to'langan summa esa kredit bo'lib qoladi. Reja `completed`
+ * qilinadi (yoki bekor qilishdan oldin bosqichlar hal qilinadi). InvalidTransitionError
+ * SUBKLASSI → routes 400 (`plan.invalid_transition`).
+ */
+export class PlanHasCompletedStagesError extends InvalidTransitionError {
+  constructor(from: PlanStatus) {
+    super('plan', from, 'cancelled');
+    this.name = 'PlanHasCompletedStagesError';
+    this.message = 'Cannot cancel a plan that has completed stages.';
+  }
+}
+
+/**
  * CLI-487: bog'langan lab-order hali 'delivered' emas — bosqichni 'completed' qilib
  * bo'lmaydi. InvalidTransitionError SUBKLASSI (PlanLockedError precedenti) →
  * visit-notes/treatment-plans routes'dagi mavjud `instanceof InvalidTransitionError`

@@ -105,6 +105,18 @@ export const createTreatmentPlansRepository = () => {
     return plan ?? null;
   }
 
+  /** FX-15: rejadagi 'completed' bosqichlar soni (bekor qilish guard'i uchun). */
+  async function countCompletedStages(c: Context, planId: string) {
+    const db = getDb(c);
+    const [row] = await db
+      .select({ n: count() })
+      .from(treatmentStages)
+      .where(
+        and(eq(treatmentStages.treatmentPlanId, planId), eq(treatmentStages.status, 'completed')),
+      );
+    return Number(row?.n ?? 0);
+  }
+
   async function findStage(c: Context, id: string) {
     const db = getDb(c);
     const [stage] = await db.select().from(treatmentStages).where(eq(treatmentStages.id, id));
@@ -189,6 +201,7 @@ export const createTreatmentPlansRepository = () => {
     insertPlanWithStages,
     findPlan,
     findStage,
+    countCompletedStages,
     findConsentForm,
     findLabOrderStatus,
     listStageAllocations,

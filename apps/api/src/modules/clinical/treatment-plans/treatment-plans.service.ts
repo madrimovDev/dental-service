@@ -21,6 +21,8 @@ import {
   assertStageAcceptanceTransition,
   assertStageMutationAllowedForPlan,
   assertStageStatusTransition,
+  CompletedStageAcceptanceLockedError,
+  PlanHasCompletedStagesError,
   StageLabPendingError,
   StageNotAcceptedError,
   type StageStatus,
@@ -230,6 +232,10 @@ export const createTreatmentPlansService = (deps: {
     // C2 guard: plan status o'tishi (draft→presented→accepted→in_progress→completed/cancelled).
     if (input.status && input.status !== before.status) {
       assertPlanTransition(before.status, input.status);
+      // FX-15 (LA-32): bajarilgan bosqichli rejani bekor qilib bo'lmaydi (qarz yo'qolardi).
+      if (input.status === 'cancelled' && (await repo.countCompletedStages(c, id)) > 0) {
+        throw new PlanHasCompletedStagesError(before.status);
+      }
       // C3/CLI-461: presented→accepted KONSENT talab qiladi — linklangan
       // `consentFormId` yo'q BO'LSA yoki (JONLI qayta so'ralganda) endi amaldagi
       // bo'lmasa RAD. Cache'langan `consentSignedAt` EMAS — `setConsent`dan keyin,
@@ -318,6 +324,10 @@ export const createTreatmentPlansService = (deps: {
     }
     if (input.acceptance && input.acceptance !== current.acceptance) {
       assertStageAcceptanceTransition(current.acceptance, input.acceptance);
+      // FX-15 (LA-32): completed + accepted bosqich rejected/proposed'ga qaytarilmaydi.
+      if (current.status === 'completed' && current.acceptance === 'accepted') {
+        throw new CompletedStageAcceptanceLockedError(input.acceptance);
+      }
       patch.acceptance = input.acceptance;
     }
     if (input.notes !== undefined) patch.notes = input.notes;
