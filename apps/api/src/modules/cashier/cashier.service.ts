@@ -172,17 +172,37 @@ export class VisitAlreadyBilledError extends Error {
   }
 }
 
-/** `cashier_tx_visit_note_unique` (23505) — pre-check o'tib ketgan poyga. */
-const isVisitUniqueViolation = (err: unknown): boolean => {
-  const e = err as {
-    code?: string;
-    constraint_name?: string;
-    cause?: { code?: string; constraint_name?: string };
-  } | null;
-  if (!e) return false;
-  const code = e.code ?? e.cause?.code;
-  const name = e.constraint_name ?? e.cause?.constraint_name;
-  return code === '23505' && name === 'cashier_tx_visit_note_unique';
+/**
+ * FX-63: vizit bo'yicha FAOL (qaytarilmagan) to'lovlarda undirilgan xizmat miqdorlari.
+ * Faol = `payment`, `voided` emas va to'liq refund bilan qoplanmagan. To'liq refund
+ * qilingan to'lov vizitni «to'langan» holatda qoldirmaydi (qayta undirish mumkin),
+ * qisman undirish esa faqat o'z xizmatlarini yopadi (qolgani qarz bo'lib turadi).
+ */
+const ACTIVE_VISIT_PAYMENT_SQL = sql`ct.type = 'payment' AND ct.status <> 'voided'
+  AND COALESCE((SELECT SUM(r.paid_amount) FROM cashier_transactions r
+                WHERE r.parent_transaction_id = ct.id AND r.type = 'refund' AND r.status = 'completed'), 0) < ct.paid_amount`;
+
+const billedByService = async (
+  db: ReturnType<typeof getDb>,
+  visitNoteIds: string[],
+): Promise<Map<string, Map<string, number>>> => {
+  const out = new Map<string, Map<string, number>>();
+  if (visitNoteIds.length === 0) return out;
+  const rows = await db.execute<{ visit_note_id: string; service_id: string; qty: string }>(sql`
+    SELECT ct.visit_note_id, i.service_id, SUM(i.quantity)::int AS qty
+    FROM cashier_transactions ct
+    JOIN cashier_transaction_items i ON i.transaction_id = ct.id
+    WHERE ct.visit_note_id IN (${sql.join(
+      visitNoteIds.map((id) => sql`${id}::uuid`),
+      sql`, `,
+    )}) AND ${ACTIVE_VISIT_PAYMENT_SQL}
+    GROUP BY ct.visit_note_id, i.service_id`);
+  for (const r of rows) {
+    const m = out.get(r.visit_note_id) ?? new Map<string, number>();
+    m.set(r.service_id, Number(r.qty));
+    out.set(r.visit_note_id, m);
+  }
+  return out;
 };
 
 /** Asia/Tashkent kalendar kunining boshi (UTC+5, DST yo'q) — `list` bilan izchil. */
@@ -372,6 +392,8 @@ export const createCashierService = (deps: {
     // ichida qolishi va hali to'lanmagan bo'lishi shart. Narxni baribir server hisoblaydi.
     let visitPatientId: string | null = null;
     if (input.visitNoteId) {
+      // FX-63: unique indeks o'rniga qator-qulf — parallel to'lovlar ketma-ket tekshiriladi
+      // (ikkinchisi qulfni kutib, birinchisining undirganini ko'radi).
       const [visit] = await db
         .select({
           patientId: visitNotes.patientId,
@@ -381,30 +403,34 @@ export const createCashierService = (deps: {
         })
         .from(visitNotes)
         .where(eq(visitNotes.id, input.visitNoteId))
-        .limit(1);
+        .limit(1)
+        .for('update');
       if (!visit) throw new VisitNoteNotFoundError();
       if (!visit.signedAt) throw new VisitNotSignedError();
       if (visit.stageId) throw new VisitLinkedToPlanStageError();
       if (input.patientId && input.patientId !== visit.patientId) {
         throw new VisitPatientMismatchError();
       }
-      const allowed = new Map<string, number>();
+      // Qolgan (hali undirilmagan) miqdor = bajarilgan − faol to'lovlarda undirilgan.
+      const remaining = new Map<string, number>();
       for (const sid of visit.performedServices ?? []) {
-        allowed.set(sid, (allowed.get(sid) ?? 0) + 1);
+        remaining.set(sid, (remaining.get(sid) ?? 0) + 1);
+      }
+      const billed = (await billedByService(db, [input.visitNoteId])).get(input.visitNoteId);
+      for (const [sid, qty] of billed ?? []) {
+        remaining.set(sid, (remaining.get(sid) ?? 0) - qty);
+      }
+      const remainingTotal = [...remaining.values()].reduce((a, q) => a + Math.max(0, q), 0);
+      if (remainingTotal === 0 && (visit.performedServices?.length ?? 0) > 0) {
+        throw new VisitAlreadyBilledError();
       }
       const requested = new Map<string, number>();
       for (const i of input.items) {
         requested.set(i.serviceId, (requested.get(i.serviceId) ?? 0) + i.quantity);
       }
       for (const [sid, qty] of requested) {
-        if (qty > (allowed.get(sid) ?? 0)) throw new VisitItemsMismatchError();
+        if (qty > (remaining.get(sid) ?? 0)) throw new VisitItemsMismatchError();
       }
-      const [billed] = await db
-        .select({ id: cashierTransactions.id })
-        .from(cashierTransactions)
-        .where(eq(cashierTransactions.visitNoteId, input.visitNoteId))
-        .limit(1);
-      if (billed) throw new VisitAlreadyBilledError();
       visitPatientId = visit.patientId;
     }
 
@@ -654,15 +680,8 @@ export const createCashierService = (deps: {
         return { ...transaction, items };
       });
 
-    // FX-handoff: parallel ikki to'lov — unique indeks yutqazgani 500 emas, 409.
-    // `db.transaction` so'rov-tx ichida SAVEPOINT: yutqazgan insert rollback bo'ladi,
-    // tashqi tx aborted bo'lib qolmaydi.
-    try {
-      return await runInsert();
-    } catch (e) {
-      if (isVisitUniqueViolation(e)) throw new VisitAlreadyBilledError();
-      throw e;
-    }
+    // FX-63: parallel to'lovlar vizit qatori qulfi bilan ketma-ketlashtirilgan (yuqorida).
+    return await runInsert();
   }
 
   /**
@@ -691,7 +710,12 @@ export const createCashierService = (deps: {
       gte(visitNotes.signedAt, windowStart),
       sql`COALESCE(array_length(${visitNotes.performedServices}, 1), 0) > 0`,
       or(isNull(appointments.id), eq(appointments.branchId, branchId)),
-      sql`NOT EXISTS (SELECT 1 FROM cashier_transactions ct WHERE ct.visit_note_id = ${visitNotes.id})`,
+      // FX-63: faqat faol (qaytarilmagan) to'lovlar hisobga olinadi; qisman undirilgan vizit
+      // qolgan xizmatlari bilan ro'yxatda turadi.
+      sql`COALESCE(array_length(${visitNotes.performedServices}, 1), 0) > COALESCE((
+        SELECT SUM(i.quantity) FROM cashier_transactions ct
+        JOIN cashier_transaction_items i ON i.transaction_id = ct.id
+        WHERE ct.visit_note_id = ${visitNotes.id} AND ${ACTIVE_VISIT_PAYMENT_SQL}), 0)`,
     );
 
     const [{ total } = { total: 0 }] = await db
@@ -738,9 +762,20 @@ export const createCashierService = (deps: {
       );
     }
 
+    const billedMap = await billedByService(
+      db,
+      rows.map((r) => r.visitNoteId),
+    );
+
     const result: PendingVisitDto[] = rows.map((r) => {
       const qty = new Map<string, number>();
       for (const sid of r.performed ?? []) qty.set(sid, (qty.get(sid) ?? 0) + 1);
+      // FX-63: qisman undirilgan xizmatlar chiqariladi — faqat qolgani qarz.
+      for (const [sid, billedQty] of billedMap.get(r.visitNoteId) ?? []) {
+        const left = (qty.get(sid) ?? 0) - billedQty;
+        if (left > 0) qty.set(sid, left);
+        else qty.delete(sid);
+      }
       let totalCents = 0;
       let hasUnpriced = false;
       const lines = [...qty].map(([serviceId, quantity]) => {

@@ -74,8 +74,9 @@ export const cashierTransactions = pgTable(
 
     /**
      * FX-handoff: imzolangan vizit → kassa. Bitta vizit FAQAT BIR MARTA to'lanadi
-     * (quyidagi partial unique indeks). Refund/void qatorlari bu ustunni to'ldirmaydi,
-     * shuning uchun qaytarilgan vizit ham «to'langan» hisoblanadi (qayta hisob-kitob yo'q).
+     * (service'da visit_notes qatori qulfi + faol to'lovlar bo'yicha qolgan miqdor, FX-63).
+     * Refund/void qatorlari bu ustunni to'ldirmaydi; to'liq refund qilingan to'lov vizitni
+     * «to'langan» holatda qoldirmaydi.
      */
     visitNoteId: uuid('visit_note_id').references(() => visitNotes.id, { onDelete: 'set null' }),
 
@@ -97,10 +98,9 @@ export const cashierTransactions = pgTable(
     // Parent bo'yicha qidiruv. V2-4 (CLI-244): qisman refund uchun bitta parentga
     // BIR NECHTA refund ruxsat — unique EMAS (cumulative guard service'da).
     index('cashier_tx_parent_idx').on(t.parentTransactionId),
-    // FX-handoff: bitta vizit bir marta to'lanadi (poyga → 23505 → 409).
-    uniqueIndex('cashier_tx_visit_note_unique')
-      .on(t.visitNoteId)
-      .where(sql`${t.visitNoteId} IS NOT NULL`),
+    // FX-63: unique emas — refund qilingan vizit qayta, qisman undirilgan vizit esa qolgan
+    // xizmatlari uchun yana to'lanadi; poyga visit_notes qator-qulfi bilan service'da.
+    index('cashier_tx_visit_note_idx').on(t.visitNoteId).where(sql`${t.visitNoteId} IS NOT NULL`),
     // UI-R5: sub-tur faqat karta uchun va faqat ma'lum qiymatlar (service+schema ham tekshiradi).
     check(
       'cashier_tx_card_provider_chk',
