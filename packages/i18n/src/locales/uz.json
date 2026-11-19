@@ -2031,6 +2031,7 @@
     "save": "Saqlash",
     "saved": "Vizit yozuvi saqlandi",
     "sign": "Imzolash va kassaga yuborish",
+    "savedRxPending": "Saqlandi. Retsept imzolanganda beriladi va bemorga yuboriladi",
     "signedToast": "Imzolandi",
     "signedBanner": "Imzolangan — endi o‘zgartirib bo‘lmaydi",
     "signedAt": "Imzolangan: {{time}}",

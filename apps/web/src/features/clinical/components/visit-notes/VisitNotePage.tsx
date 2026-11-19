@@ -164,6 +164,11 @@ export function VisitNotePage() {
       notifications.show({ message: t('visitNote.draftRestored'), color: 'teal' });
     } else {
       setValues(fromServer);
+      // FX-123: serverga yozilmagan retsept qatorlari yozuv yangilangandan keyin ham tiklanadi.
+      if (draft && !note?.signedAt && draft.rx.some(isRxRowComplete)) {
+        setRx(draft.rx);
+        setOverrides(draft.overrides);
+      }
     }
   }, [note, visitId]);
 
@@ -295,7 +300,9 @@ export function VisitNotePage() {
   };
 
   // ── saqlash / imzolash ───────────────────────────────────────────────────
-  const persist = async (): Promise<string | null> => {
+  // FX-123 (LC-01): retsept faqat `createRx` (imzolash) yo'lida yaratiladi — «Saqlash»da qatorlar
+  // formada qoladi (tahrir/o'chirish mumkin), bemorga xabar ham imzogacha ketmaydi.
+  const persist = async (opts: { createRx: boolean }): Promise<string | null> => {
     const guard = firstUnresolvedRxConflict(rx, allergies, knownOverrides);
     if (guard) {
       setConflict({
@@ -358,7 +365,7 @@ export function VisitNotePage() {
       id = created.id;
       setNoteId(id);
     }
-    if (completeRx.length > 0) {
+    if (opts.createRx && completeRx.length > 0) {
       const drugs = completeRx.map((r) => r.drug.trim());
       try {
         await createRx.mutateAsync({
@@ -387,6 +394,14 @@ export function VisitNotePage() {
       }
       setRx((rows) => rows.filter((r) => !isRxRowComplete(r)));
     }
+    if (!opts.createRx && completeRx.length > 0) {
+      // Retsept qatorlari hali serverda emas — qoralama saqlanadi (qayta ochilganda tiklanadi).
+      clearDraft(draftKey(patientId, noteId));
+      const savedAt = new Date().toISOString();
+      if (saveDraft(draftKey(patientId, id), { values, rx, overrides, savedAt }))
+        setDraftAt(savedAt);
+      return id;
+    }
     clearDraft(draftKey(patientId, noteId));
     clearDraft(draftKey(patientId, id));
     setDraftAt(null);
@@ -397,9 +412,13 @@ export function VisitNotePage() {
     setBusy(true);
     try {
       const wasNew = !noteId;
-      const id = await persist();
+      const hasPendingRx = rx.some(isRxRowComplete);
+      const id = await persist({ createRx: false });
       if (!id) return;
-      notifications.show({ message: t('visitNote.saved'), color: 'teal' });
+      notifications.show({
+        message: t(hasPendingRx ? 'visitNote.savedRxPending' : 'visitNote.saved'),
+        color: 'teal',
+      });
       if (wasNew) navigate(`/patients/${patientId}/visits/${id}/edit`, { replace: true });
     } finally {
       setBusy(false);
@@ -409,7 +428,7 @@ export function VisitNotePage() {
   const onSign = async () => {
     setBusy(true);
     try {
-      const id = await persist();
+      const id = await persist({ createRx: true });
       if (!id) return;
       await signNote.mutateAsync(id);
       notifications.show({ message: t('visitNote.signedToast'), color: 'teal' });

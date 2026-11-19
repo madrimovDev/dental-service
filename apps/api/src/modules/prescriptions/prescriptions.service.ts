@@ -153,7 +153,10 @@ export const createPrescriptionsService = (deps: {
           ...(input.allergyOverrides?.length ? { allergyOverrides: input.allergyOverrides } : {}),
         },
       });
-      const messenger = deps.messenger;
+      // FX-123 (LC-01): vizitga bog'langan retsept — xabar vizit imzolanganda ketadi
+      // (`visitNotes.sign`); shifokor imzogacha tuzatishi/o'chirishi mumkin. (Imzolangan vizitga
+      // yaratish yuqorida rad etilgan, demak bu yerda bog'langan vizit qoralama.)
+      const messenger = row.visitNoteId ? undefined : deps.messenger;
       if (messenger) {
         await onAfterCommit(c, () =>
           messenger.sendPrescription({

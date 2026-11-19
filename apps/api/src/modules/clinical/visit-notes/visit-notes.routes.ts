@@ -5,6 +5,7 @@ import type { AuditLogger } from '../../../lib/audit-logger.ts';
 import { requireModuleInDesktop } from '../../../lib/license-middleware.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../../lib/openapi.ts';
 import { CrossEntityError } from '../../../lib/ownership.ts';
+import { createPatientMessenger } from '../../../lib/telegram/notify.ts';
 import { requirePermission } from '../../../middleware/require-permission.ts';
 import { InvalidTransitionError } from '../treatment-plans/treatment-plans.transitions.ts';
 import { toVisitNoteDto } from './visit-notes.mapper.ts';
@@ -36,7 +37,7 @@ export const visitNotesRoutes = (deps: {
   reconcileStock?: ReconcileStockHook;
 }) => {
   const app = new OpenAPIHono();
-  const service = createVisitNotesService(deps);
+  const service = createVisitNotesService({ ...deps, messenger: createPatientMessenger() });
 
   // ─── GET /visit-notes — list ─────────────────────────────────────────────
 

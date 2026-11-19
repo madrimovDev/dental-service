@@ -134,7 +134,13 @@ describe('VisitNotePage — dori ↔ allergiya (UI-D4)', () => {
         },
       ],
     });
+    // FX-123: retsept faqat imzolashda yaratiladi, override sababi bilan.
+    expect(rxMutate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /Imzolash va kassaga/ }));
     await waitFor(() => expect(rxMutate).toHaveBeenCalledTimes(1));
+    expect(rxMutate.mock.calls[0]?.[0]).toMatchObject({
+      allergyOverrides: [{ drug: 'Amoksitsillin 500 mg', reason: 'patient_informed' }],
+    });
   });
 
   it('oldingi vizitda tasdiqlangan override — yangi vizitda ham so‘ralmaydi', () => {
@@ -344,6 +350,9 @@ describe('VisitNotePage — dori ↔ allergiya (UI-D4)', () => {
         { drug: 'Ibuprofen', group: 'unknown', reason: 'allergy_checked_verbally' },
       ],
     });
+    // FX-123: «Saqlash» retsept yaratmaydi — faqat imzolashda.
+    expect(rxMutate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /Imzolash va kassaga/ }));
     await waitFor(() => expect(rxMutate).toHaveBeenCalledTimes(1));
   });
 
@@ -372,7 +381,26 @@ describe('VisitNotePage — dori ↔ allergiya (UI-D4)', () => {
     ]);
     mount();
     fillRx();
-    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    fireEvent.click(screen.getByRole('button', { name: /Imzolash va kassaga/ }));
     expect(await screen.findByText('Allergiya ogohlantirishi')).toBeInTheDocument();
+    expect(signMutate).not.toHaveBeenCalled();
+  });
+
+  it('FX-123: «Saqlash» retsept yaratmaydi — qatorlar formada va qoralamada qoladi; imzoda retsept imzodan OLDIN yaratiladi', async () => {
+    allergies = null;
+    mount();
+    fillRx();
+    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    await waitFor(() => expect(createMutate).toHaveBeenCalledTimes(1));
+    expect(rxMutate).not.toHaveBeenCalled();
+    expect(signMutate).not.toHaveBeenCalled();
+    expect(localStorage.getItem('visit-note-draft:p1:n-new')).toContain('Ibuprofen');
+
+    fireEvent.click(screen.getByRole('button', { name: /Imzolash va kassaga/ }));
+    await waitFor(() => expect(signMutate).toHaveBeenCalledTimes(1));
+    expect(rxMutate).toHaveBeenCalledTimes(1);
+    expect(rxMutate.mock.invocationCallOrder[0]).toBeLessThan(
+      signMutate.mock.invocationCallOrder[0] ?? 0,
+    );
   });
 });

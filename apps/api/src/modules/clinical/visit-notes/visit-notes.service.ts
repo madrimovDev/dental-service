@@ -1,7 +1,11 @@
-import type { VisitNoteMetadata } from '@dental/db-schema';
+import { prescriptions, type VisitNoteMetadata } from '@dental/db-schema';
+import { eq } from 'drizzle-orm';
 import type { Context } from 'hono';
+import { onAfterCommit } from '../../../db/after-commit.ts';
+import { getDb } from '../../../db/scoped.ts';
 import type { AuditLogger } from '../../../lib/audit-logger.ts';
 import { createOwnershipValidator, type OwnershipValidator } from '../../../lib/ownership.ts';
+import type { PatientMessenger } from '../../../lib/telegram/notify.ts';
 import { InvalidTransitionError } from '../treatment-plans/treatment-plans.transitions.ts';
 import { createVisitNotesRepository } from './visit-notes.repository.ts';
 import type { CreateVisitNoteInput, UpdateVisitNoteInput } from './visit-notes.schema.ts';
@@ -100,6 +104,8 @@ export const createVisitNotesService = (deps: {
   completeStage?: StageCompleteHook;
   ownership?: OwnershipValidator;
   reconcileStock?: ReconcileStockHook;
+  /** FX-123: imzolanganda vizitga bog'langan retseptlar bemorga yuboriladi (commit'dan keyin). */
+  messenger?: PatientMessenger;
 }) => {
   const repo = createVisitNotesRepository();
   const ownership = deps.ownership ?? createOwnershipValidator();
@@ -282,6 +288,24 @@ export const createVisitNotesService = (deps: {
       resourceId: id,
       after: { signedAt: signed.signedAt?.toISOString() ?? null, signedBy: signed.signedBy },
     });
+    // FX-123 (LC-01): retsept xabari yaratilganda emas, vizit imzolanganda ketadi.
+    const messenger = deps.messenger;
+    if (messenger) {
+      const rxRows = await getDb(c)
+        .select()
+        .from(prescriptions)
+        .where(eq(prescriptions.visitNoteId, id));
+      for (const rx of rxRows) {
+        await onAfterCommit(c, () =>
+          messenger.sendPrescription({
+            tenantId: rx.tenantId,
+            patientId: rx.patientId,
+            issuedAt: rx.issuedDate,
+            items: rx.items,
+          }),
+        );
+      }
+    }
     return signed;
   }
 
