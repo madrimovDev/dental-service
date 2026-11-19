@@ -13,8 +13,10 @@ import {
 import { notifications } from '@mantine/notifications';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { appointmentKeys } from '@/features/appointments/appointments.keys';
+import { usePatientNames } from '@/features/clinical/clinical.api.ts';
 import { i18n } from '@/lib/i18n.ts';
 import { lookupKeys } from '@/lib/lookup-keys';
+import { useAuthStore } from '@/stores/auth-store.ts';
 import { queueKeys } from './queue.keys';
 
 export function useQueueToday(branchId: string | null) {
@@ -96,6 +98,19 @@ export function usePatientsAll(search = '') {
     queryKey: lookupKeys.patientsAll(search),
     queryFn: () => listPatients({ search: search || undefined, pageSize: 100 }).then((r) => r.data),
   });
+}
+
+/**
+ * FX-92: navbat/check-in qatorlaridagi bemor id → ism. Faqat ko'rinayotgan NOYOB id'lar uchun
+ * `getPatient` (cached + deduped) — `listPatients` ning eng yangi 100 bemor chegarasi yo'q.
+ * `patient.view` yo'q rolda so'rov ketmaydi (403 bo'lmasin) → '—' fallback.
+ */
+export function useQueuePatientNames(ids: Array<string | null | undefined>): Map<string, string> {
+  const { hasPermission } = useAuthStore();
+  return usePatientNames(
+    ids.filter((id): id is string => !!id),
+    hasPermission('patient.view'),
+  );
 }
 
 export function useServices(options?: { enabled?: boolean }) {

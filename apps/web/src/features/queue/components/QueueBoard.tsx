@@ -12,7 +12,7 @@ import {
   useCallOwnTicket,
   useCheckInCandidates,
   useCreateTicket,
-  usePatientsAll,
+  useQueuePatientNames,
   useQueueToday,
   useServices,
   useUpdateQueueStatus,
@@ -41,7 +41,6 @@ export function QueueBoard() {
   const [opened, { open, close }] = useDisclosure(false);
 
   const branches = useBranches();
-  const patients = usePatientsAll();
   const services = useServices({ enabled: hasPermission('service.view') });
   const queue = useQueueToday(branchFilter);
   const updateStatus = useUpdateQueueStatus();
@@ -49,15 +48,21 @@ export function QueueBoard() {
   const candidates = useCheckInCandidates(branchFilter, hasPermission('queue.create'));
   const checkInTicket = useCreateTicket();
 
+  const tickets = queue.data ?? [];
+  const notArrived = candidates.data ?? [];
+  // FX-92: ism faqat ko'rinayotgan id'lar bo'yicha (eng yangi 100 bemor chegarasisiz).
+  const patientNameById = useQueuePatientNames([
+    ...tickets.map((tk) => tk.patientId),
+    ...notArrived.map((a) => a.patientId),
+  ]);
   const lookups: QueueLookups = useMemo(
     () => ({
-      patientNameById: new Map((patients.data?.data ?? []).map((p) => [p.id, p.fullName] as const)),
+      patientNameById,
       serviceNameById: new Map((services.data ?? []).map((s) => [s.id, s.nameUz] as const)),
     }),
-    [patients.data, services.data],
+    [patientNameById, services.data],
   );
 
-  const tickets = queue.data ?? [];
   const columns = useMemo(() => groupByStatus(tickets), [tickets]);
   const canManage = hasPermission('queue.manage');
 
@@ -83,7 +88,6 @@ export function QueueBoard() {
     : callOwn.isPending
       ? callOwn.variables
       : undefined;
-  const notArrived = candidates.data ?? [];
 
   const patientName = (id: string | null) => (id ? (lookups.patientNameById.get(id) ?? '—') : '—');
   const serviceName = (id: string | null) =>

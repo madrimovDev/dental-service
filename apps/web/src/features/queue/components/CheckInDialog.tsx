@@ -3,7 +3,13 @@ import { useDebouncedValue } from '@mantine/hooks';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth-store.ts';
-import { useCheckInCandidates, useCreateTicket, usePatientsAll, useServices } from '../queue.api';
+import {
+  useCheckInCandidates,
+  useCreateTicket,
+  usePatientsAll,
+  useQueuePatientNames,
+  useServices,
+} from '../queue.api';
 
 export function CheckInDialog({
   opened,
@@ -18,9 +24,9 @@ export function CheckInDialog({
   const { hasPermission } = useAuthStore();
   // Dialog doim mount qilinadi — ruxsatsiz rolda (queue.create / service.view yo'q) 403 so'rovlari ketmasin.
   const candidates = useCheckInCandidates(branchId, hasPermission('queue.create'));
-  // Yozuvdan check-in tab'idagi bemor-nomi qidiruvi ("Bemor" ustuni) qidiruvdan
-  // mustaqil — cheklanmagan (search='') chaqiruv shu uchun saqlanadi.
-  const patients = usePatientsAll();
+  // FX-92: "Bemor" ustuni — faqat ko'rinayotgan yozilishlarning noyob id'lari bo'yicha
+  // `getPatient` (eng yangi 100 bemor ro'yxatiga bog'liq emas).
+  const patientNames = useQueuePatientNames((candidates.data ?? []).map((a) => a.patientId));
   const services = useServices({ enabled: hasPermission('service.view') });
   const createTicket = useCreateTicket();
 
@@ -63,7 +69,7 @@ export function CheckInDialog({
     );
   };
 
-  const patientName = (id: string) => patients.data?.data.find((p) => p.id === id)?.fullName ?? '—';
+  const patientName = (id: string) => patientNames.get(id) ?? '—';
 
   return (
     <Modal opened={opened} onClose={handleClose} title={t('queue.new_ticket')}>

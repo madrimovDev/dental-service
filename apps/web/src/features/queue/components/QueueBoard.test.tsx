@@ -20,14 +20,12 @@ vi.mock('react-router-dom', async () => {
 
 vi.mock('../queue.api', () => ({
   useBranches: () => ({ data: [{ id: 'b1', name: 'Asosiy' }] }),
-  usePatientsAll: () => ({
-    data: {
-      data: [
-        { id: 'p1', fullName: 'Ali Valiyev' },
-        { id: 'p2', fullName: 'Vali Aliyev' },
-      ],
-    },
-  }),
+  usePatientsAll: () => ({ data: { data: [] } }),
+  useQueuePatientNames: () =>
+    new Map([
+      ['p1', 'Ali Valiyev'],
+      ['p2', 'Vali Aliyev'],
+    ]),
   useServices: () => ({ data: [{ id: 's1', nameUz: 'Tozalash' }] }),
   useQueueToday: () => ({ data: queueData, isLoading: false, isError: false }),
   useCheckInCandidates: () => ({ data: [] }),
