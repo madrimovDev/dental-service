@@ -180,6 +180,10 @@ export const payrollRoutes = (deps: { db: Database; audit: AuditLogger }) => {
         content: { 'application/json': { schema: errorResponseSchema } },
         description: 'Run is not in draft status',
       },
+      409: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Draft snapshot is stale (payments/refunds changed after creation)',
+      },
     },
   });
 
@@ -191,6 +195,15 @@ export const payrollRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     }
     if (error === 'not_draft') {
       return c.json(fail('payroll_run.not_draft', 'Only draft runs can be finalized'), 400);
+    }
+    if (error === 'stale_snapshot') {
+      return c.json(
+        fail(
+          'payroll_run.stale_snapshot',
+          'Payments or refunds changed after this draft was created; delete the draft and create it again',
+        ),
+        409,
+      );
     }
     if (!run) {
       return c.json(fail('payroll_run.not_found', 'Payroll run not found'), 404);
