@@ -19584,6 +19584,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "Referenced patient/branch/plan/doctor not found in this clinic",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }

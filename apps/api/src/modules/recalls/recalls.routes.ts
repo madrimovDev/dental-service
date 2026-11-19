@@ -3,6 +3,7 @@ import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
+import { CrossEntityError } from '../../lib/ownership.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
@@ -109,13 +110,25 @@ export const recallRoutes = (deps: { db: Database; audit: AuditLogger }) => {
         content: { 'application/json': { schema: errorResponseSchema } },
         description: 'Validation error',
       },
+      404: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Referenced patient/branch/plan/doctor not found in this clinic',
+      },
     },
   });
   app.openapi(createRecallRoute, async (c) => {
     const body = c.req.valid('json');
-    const created = await service.create(c, body);
-    if (!created) return c.json(fail('insert.failed', 'insert.failed'), 400);
-    return c.json(ok(toRecallDto(created, shouldMaskPii(c))), 201);
+    try {
+      const created = await service.create(c, body);
+      if (!created) return c.json(fail('insert.failed', 'insert.failed'), 400);
+      return c.json(ok(toRecallDto(created, shouldMaskPii(c))), 201);
+    } catch (e) {
+      // X-1: begona/yo'q FK → 404 (hech narsa yozilmagan — tekshiruv insertdan oldin).
+      if (e instanceof CrossEntityError) {
+        return c.json(fail(`ownership.${e.entity}.${e.reason}`, 'not_found'), 404);
+      }
+      throw e;
+    }
   });
 
   // ─── PATCH /recalls/{id} ───────────────────────────────────────────────────
@@ -134,9 +147,17 @@ export const recallRoutes = (deps: { db: Database; audit: AuditLogger }) => {
   app.openapi(updateRecallRoute, async (c) => {
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const updated = await service.update(c, id, body);
-    if (!updated) return c.json(fail('not_found', 'not_found'), 404);
-    return c.json(ok(toRecallDto(updated, shouldMaskPii(c))), 200);
+    try {
+      const updated = await service.update(c, id, body);
+      if (!updated) return c.json(fail('not_found', 'not_found'), 404);
+      return c.json(ok(toRecallDto(updated, shouldMaskPii(c))), 200);
+    } catch (e) {
+      // X-1: begona FK → 404 (yozishdan oldin tekshirilgan).
+      if (e instanceof CrossEntityError) {
+        return c.json(fail(`ownership.${e.entity}.${e.reason}`, 'not_found'), 404);
+      }
+      throw e;
+    }
   });
 
   // ─── POST /recalls/{id}/contact (mark contacted manually) ──────────────────

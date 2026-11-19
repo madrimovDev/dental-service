@@ -1,5 +1,6 @@
 import {
   appointments,
+  branches,
   patients,
   tenants,
   treatmentPlans,
@@ -36,6 +37,28 @@ export class CrossEntityError extends Error {
 }
 
 export const createOwnershipValidator = () => {
+  /** X-1: branchId RLS ostida shu tenantda mavjudmi (FK RLS'ni chetlab o'tadi). */
+  async function assertBranchExists(c: Context, branchId: string): Promise<void> {
+    const db = getDb(c);
+    const [row] = await db
+      .select({ id: branches.id })
+      .from(branches)
+      .where(eq(branches.id, branchId))
+      .limit(1);
+    if (!row) throw new CrossEntityError('branch', 'not_found');
+  }
+
+  /** X-1: treatmentPlanId RLS ostida shu tenantda mavjudmi. */
+  async function assertTreatmentPlanExists(c: Context, planId: string): Promise<void> {
+    const db = getDb(c);
+    const [row] = await db
+      .select({ id: treatmentPlans.id })
+      .from(treatmentPlans)
+      .where(eq(treatmentPlans.id, planId))
+      .limit(1);
+    if (!row) throw new CrossEntityError('treatment_plan', 'not_found');
+  }
+
   async function assertPatientExists(c: Context, patientId: string): Promise<void> {
     const db = getDb(c);
     const [row] = await db
@@ -124,6 +147,8 @@ export const createOwnershipValidator = () => {
   }
 
   return {
+    assertBranchExists,
+    assertTreatmentPlanExists,
     assertPatientExists,
     assertUserExists,
     assertStageBelongsToPatient,
