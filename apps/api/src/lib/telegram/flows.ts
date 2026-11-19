@@ -10,13 +10,25 @@ import { handleReminderAction, parseReminderCallback } from './reminder-actions.
 import type { BotReply } from './reply.ts';
 
 export const LANG_PREFIX = 'lg';
+/** FX-42 — oilada bemor tanlash tugmasi: `pt:<patientId>` (≤ 64 bayt). */
+export const PATIENT_PREFIX = 'pt';
+const SELECTION_TTL_MS = 24 * 60 * 60_000;
 
 type Linked = { patientId: string; lang: BotLang };
+type ChatPatient = { id: string; name: string };
+/** `linked` — bitta aniq bemor; `choose` — chat'da bir nechta bemor, hali tanlanmagan. */
+type ChatState = {
+  options: ChatPatient[];
+  lang: BotLang;
+  linked: Linked | null;
+};
 
 export type FlowDeps = {
   appointments: Pick<AppointmentsService, 'listDoctors' | 'update'>;
   schedule: Pick<ScheduleService, 'getAvailability'>;
   now?: () => Date;
+  /** Test/DI — chat uchun tanlangan bemor (`tenantId:chatId` → bemor). */
+  selection?: Map<string, { patientId: string; expiresAt: number }>;
 };
 
 export type FlowResult = { reply: BotReply | null; toast?: string };
@@ -34,32 +46,65 @@ export function createTelegramFlows(deps: FlowDeps) {
   });
   const questionnaire = createQuestionnaireFlow({ now: deps.now });
 
-  async function resolveLinked(
+  const selection = deps.selection ?? new Map<string, { patientId: string; expiresAt: number }>();
+  const nowMs = () => deps.now?.().getTime() ?? Date.now();
+  const chatKey = (tenantId: string, chatId: string) => `${tenantId}:${chatId}`;
+
+  /**
+   * FX-42 (LA-21): bir chat'ga bir nechta bemor (oila) bog'lanishi mumkin. Bitta bo'lsa —
+   * o'sha; bir nechta bo'lsa — foydalanuvchi tanlagan (24 soat) bemor, tanlanmagan bo'lsa
+   * `linked = null` (chaqiruvchi tanlash menyusini ko'rsatadi; jim «eng eskisi» olinmaydi).
+   */
+  async function resolveChat(
     tx: DbOrTx,
     tenantId: string,
     chatId: string,
-  ): Promise<Linked | null> {
-    // Bir chat'ga bir nechta bemor bog'lanishi mumkin (oila) — deterministik: eng eskisi.
-    const [p] = await tx
-      .select({ id: patients.id, pref: patients.preferredLanguage })
+  ): Promise<ChatState | null> {
+    const rows = await tx
+      .select({ id: patients.id, name: patients.fullName, pref: patients.preferredLanguage })
       .from(patients)
       .where(eq(patients.telegramChatId, chatId))
-      .orderBy(asc(patients.createdAt))
-      .limit(1);
-    if (!p) return null;
+      .orderBy(asc(patients.createdAt), asc(patients.id));
+    if (rows.length === 0) return null;
     const [t] = await tx
       .select({ lang: tenants.defaultLanguage })
       .from(tenants)
       .where(eq(tenants.id, tenantId))
       .limit(1);
-    return { patientId: p.id, lang: toBotLang(p.pref, toBotLang(t?.lang)) };
+    const tenantLang = toBotLang(t?.lang);
+    const options = rows.map((r) => ({ id: r.id, name: r.name }));
+    const linkedOf = (r: (typeof rows)[number]): Linked => ({
+      patientId: r.id,
+      lang: toBotLang(r.pref, tenantLang),
+    });
+    const first = rows[0] as (typeof rows)[number];
+    if (rows.length === 1) {
+      selection.delete(chatKey(tenantId, chatId));
+      return { options, lang: linkedOf(first).lang, linked: linkedOf(first) };
+    }
+    const sel = selection.get(chatKey(tenantId, chatId));
+    const chosen =
+      sel && sel.expiresAt >= nowMs() ? rows.find((r) => r.id === sel.patientId) : undefined;
+    return {
+      options,
+      lang: linkedOf(chosen ?? first).lang,
+      linked: chosen ? linkedOf(chosen) : null,
+    };
   }
 
-  const menu = (lang: BotLang): BotReply => {
+  const patientPicker = (state: ChatState): BotReply => ({
+    text: botMessages(state.lang).choosePatient,
+    buttons: state.options.map((o) => [{ text: o.name, data: `${PATIENT_PREFIX}:${o.id}` }]),
+  });
+
+  const menu = (lang: BotLang, multi = false): BotReply => {
     const m = botMessages(lang);
     return {
       text: m.menuPrompt,
-      keyboard: [[m.menuBook, m.menuQuestionnaire], [m.menuLang]],
+      keyboard: [
+        [m.menuBook, m.menuQuestionnaire],
+        multi ? [m.menuLang, m.menuPatient] : [m.menuLang],
+      ],
     };
   };
 
@@ -77,16 +122,20 @@ export function createTelegramFlows(deps: FlowDeps) {
 
   /** Bog'langandan keyin menyu (contact handler chaqiradi). */
   async function menuFor(tx: DbOrTx, tenantId: string, chatId: string): Promise<BotReply> {
-    const l = await resolveLinked(tx, tenantId, chatId);
-    return l ? menu(l.lang) : notLinked();
+    const st = await resolveChat(tx, tenantId, chatId);
+    if (!st) return notLinked();
+    if (!st.linked) return patientPicker(st);
+    return menu(st.linked.lang, st.options.length > 1);
   }
 
   async function onCommand(
     tx: DbOrTx,
     a: { tenantId: string; chatId: string; command: 'book' | 'anketa' | 'lang' | 'menu' },
   ): Promise<BotReply> {
-    const l = await resolveLinked(tx, a.tenantId, a.chatId);
-    if (!l) return notLinked();
+    const st = await resolveChat(tx, a.tenantId, a.chatId);
+    if (!st) return notLinked();
+    if (!st.linked) return patientPicker(st);
+    const l = st.linked;
     const ctx = {
       tx,
       tenantId: a.tenantId,
@@ -97,15 +146,18 @@ export function createTelegramFlows(deps: FlowDeps) {
     if (a.command === 'book') return booking.start(ctx);
     if (a.command === 'anketa') return questionnaire.start(ctx);
     if (a.command === 'lang') return langPicker(l.lang);
-    return menu(l.lang);
+    return menu(l.lang, st.options.length > 1);
   }
 
   async function onText(
     tx: DbOrTx,
     a: { tenantId: string; chatId: string; text: string },
   ): Promise<BotReply> {
-    const l = await resolveLinked(tx, a.tenantId, a.chatId);
-    if (!l) return notLinked();
+    const st = await resolveChat(tx, a.tenantId, a.chatId);
+    if (!st) return notLinked();
+    if (!st.linked) return patientPicker(st);
+    const l = st.linked;
+    const multi = st.options.length > 1;
     const ctx = {
       tx,
       tenantId: a.tenantId,
@@ -119,20 +171,56 @@ export function createTelegramFlows(deps: FlowDeps) {
       if (a.text === m.menuBook) return booking.start({ ...ctx, lang });
       if (a.text === m.menuQuestionnaire) return questionnaire.start({ ...ctx, lang });
       if (a.text === m.menuLang) return langPicker(lang);
+      if (multi && a.text === m.menuPatient) return patientPicker({ ...st, lang });
     }
     if (questionnaire.isActive(ctx)) {
       const r = await questionnaire.answer(ctx, a.text);
       if (r) return r;
     }
-    return menu(l.lang);
+    return menu(l.lang, multi);
   }
 
   async function onCallback(
     tx: DbOrTx,
     a: { tenantId: string; chatId: string; data: string },
   ): Promise<FlowResult> {
-    const l = await resolveLinked(tx, a.tenantId, a.chatId);
-    if (!l) return { reply: null, toast: botMessages('uz').notLinked };
+    const st = await resolveChat(tx, a.tenantId, a.chatId);
+    if (!st) return { reply: null, toast: botMessages('uz').notLinked };
+    const multi = st.options.length > 1;
+
+    /** Chat'ning faol bemorini almashtiradi; eski bemorning yarim qolgan oqimlari tozalanadi. */
+    const selectPatient = (patientId: string) => {
+      const k = chatKey(a.tenantId, a.chatId);
+      if (selection.get(k)?.patientId !== patientId) {
+        booking.sessions.delete(k);
+        questionnaire.sessions.delete(k);
+      }
+      selection.set(k, { patientId, expiresAt: nowMs() + SELECTION_TTL_MS });
+    };
+
+    if (a.data.startsWith(`${PATIENT_PREFIX}:`)) {
+      const chosen = st.options.find((o) => `${PATIENT_PREFIX}:${o.id}` === a.data);
+      // Faqat shu chat'ga bog'langan bemor tanlanadi (begona/boshqa oila id'si → rad).
+      if (!chosen) return { reply: null, toast: botMessages(st.lang).notYours };
+      selectPatient(chosen.id);
+      const lang = toBotLang(
+        (
+          await tx
+            .select({ pref: patients.preferredLanguage })
+            .from(patients)
+            .where(eq(patients.id, chosen.id))
+            .limit(1)
+        )[0]?.pref,
+        st.lang,
+      );
+      return { reply: { ...menu(lang, multi), text: botMessages(lang).patientSet(chosen.name) } };
+    }
+
+    const rem = parseReminderCallback(a.data);
+    // Eslatma tugmasi egasi yozilishning O'Z bemori (handleReminderAction chat egaligini
+    // tekshiradi) — faol bemor tanlanmagan bo'lsa ham ishlaydi.
+    const l = st.linked ?? { patientId: (st.options[0] as ChatPatient).id, lang: st.lang };
+    if (!rem && !st.linked) return { reply: patientPicker(st) };
     const m = botMessages(l.lang);
     const ctx = {
       tx,
@@ -142,7 +230,6 @@ export function createTelegramFlows(deps: FlowDeps) {
       lang: l.lang,
     };
 
-    const rem = parseReminderCallback(a.data);
     if (rem) {
       const r = await handleReminderAction(
         tx,
@@ -165,8 +252,10 @@ export function createTelegramFlows(deps: FlowDeps) {
           return { reply: { text: m.reminderUnavailable } };
         case 'reschedule': {
           // Eslatma egasi (r.patientId) shu chat'ning bemori — oqim shu bemor nomidan.
+          const owner = r.patientId ?? l.patientId;
+          if (st.options.some((o) => o.id === owner)) selectPatient(owner);
           const reply = await booking.start(
-            { ...ctx, patientId: r.patientId ?? l.patientId },
+            { ...ctx, patientId: owner },
             { rescheduleOf: r.appointmentId ?? null },
           );
           return { reply };
@@ -189,7 +278,7 @@ export function createTelegramFlows(deps: FlowDeps) {
         .update(patients)
         .set({ preferredLanguage: lang })
         .where(eq(patients.id, l.patientId));
-      return { reply: { ...menu(lang), text: botMessages(lang).langSet } };
+      return { reply: { ...menu(lang, multi), text: botMessages(lang).langSet } };
     }
     return { reply: null };
   }

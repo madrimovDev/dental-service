@@ -57,18 +57,21 @@ export async function linkPatientByContact(
   o: { contactUserId: number | undefined; fromId: number; phone: string; chatId: string },
 ): Promise<LinkOutcome> {
   if (o.contactUserId === undefined || o.contactUserId !== o.fromId) return 'not_own_contact';
-  // CLI-475 B7 — deterministik: eng eski bemor (createdAt asc).
-  const [p] = await tx
+  // FX-42 (LA-21): oilaviy telefon — shu raqamdagi BARCHA bemorlar (ona + bolalar) bir chat'ga
+  // bog'lanadi; har bemor o'z chat_id'sini saqlaydi, shuning uchun eslatma/chek/retsept
+  // har birining o'z yozuvi bo'yicha yetadi. Boshqa chat'ga bog'langanlarga tegilmaydi.
+  const matches = await tx
     .select({ id: patients.id, chat: patients.telegramChatId })
     .from(patients)
     .where(inArray(patients.phone, [o.phone, o.phone.replace(/^\+/, '')]))
-    .orderBy(asc(patients.createdAt))
-    .limit(1);
-  if (!p) return 'not_found';
-  if (p.chat && p.chat !== o.chatId) return 'already_linked';
-  if (!p.chat) {
-    await tx.update(patients).set({ telegramChatId: o.chatId }).where(eq(patients.id, p.id));
+    .orderBy(asc(patients.createdAt));
+  if (matches.length === 0) return 'not_found';
+  const free = matches.filter((p) => !p.chat).map((p) => p.id);
+  const mine = matches.some((p) => p.chat === o.chatId);
+  if (free.length > 0) {
+    await tx.update(patients).set({ telegramChatId: o.chatId }).where(inArray(patients.id, free));
   }
+  if (free.length === 0 && !mine) return 'already_linked';
   return 'linked';
 }
 

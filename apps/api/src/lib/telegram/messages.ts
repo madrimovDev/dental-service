@@ -25,6 +25,9 @@ type Dict = {
   menuBook: string;
   menuQuestionnaire: string;
   menuLang: string;
+  menuPatient: string;
+  choosePatient: string;
+  patientSet: (name: string) => string;
   menuPrompt: string;
   notLinked: string;
   chooseBranch: string;
@@ -71,6 +74,9 @@ const uz: Dict = {
   menuBook: '📅 Yozilish',
   menuQuestionnaire: '📋 Anketa',
   menuLang: '🌐 Til',
+  menuPatient: '👤 Bemor',
+  choosePatient: 'Kimning nomidan davom etamiz?',
+  patientSet: (name) => `✅ Endi ${name} nomidan ishlaymiz.`,
   menuPrompt: 'Kerakli bo‘limni tanlang:',
   notLinked: 'Avval raqamingizni ulashing — /start',
   chooseBranch: 'Qaysi filialga yozilmoqchisiz?',
@@ -130,6 +136,9 @@ const ru: Dict = {
   menuBook: '📅 Записаться',
   menuQuestionnaire: '📋 Анкета',
   menuLang: '🌐 Язык',
+  menuPatient: '👤 Пациент',
+  choosePatient: 'От чьего имени продолжим?',
+  patientSet: (name) => `✅ Теперь действуем от имени: ${name}.`,
   menuPrompt: 'Выберите раздел:',
   notLinked: 'Сначала поделитесь номером — /start',
   chooseBranch: 'В какой филиал хотите записаться?',
