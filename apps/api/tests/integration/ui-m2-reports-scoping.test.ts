@@ -9,7 +9,10 @@ import {
   appointments,
   branches,
   cashierTransactions,
+  expenses,
   patients,
+  payrollLines,
+  payrollRuns,
   permissions,
   rolePermissions,
   roles,
@@ -144,6 +147,26 @@ beforeAll(async () => {
         createdAt: new Date('2026-06-10T07:00:00Z'),
       } as never);
     }
+    // FX-31: xarajat A=5 000, B=7 000, tenant-darajali (filialsiz)=9 000; payroll run (filialga bog'lanmagan)
+    await tx.insert(expenses).values([
+      { tenantId, branchId: brA, amount: '5000', date: '2026-06-11' },
+      { tenantId, branchId: brB, amount: '7000', date: '2026-06-11' },
+      { tenantId, branchId: null, amount: '9000', date: '2026-06-11' },
+    ]);
+    const [run] = await tx
+      .insert(payrollRuns)
+      .values({ tenantId, periodFrom: '2026-06-01', periodTo: '2026-06-30', status: 'finalized' })
+      .returning({ id: payrollRuns.id });
+    await tx.insert(payrollLines).values({
+      tenantId,
+      runId: run!.id,
+      userId: doc,
+      baseSalary: '40000',
+      attributedRevenue: '0',
+      commissionPercent: '0',
+      commissionAmount: '0',
+      total: '40000',
+    });
     // qabullar: A=1, B=2, C=4 (turli soat — doktor to'qnashmasin)
     let hour = 5;
     for (const [branchId, n] of [
@@ -286,6 +309,56 @@ describe('FU-31: /reports/branches faqat report.view filiallari', () => {
   });
   test('tayinlovsiz → 403 (fail-closed)', async () => {
     expect((await list('ghost')).status).toBe(403);
+  });
+});
+
+describe('FX-31: /pnl filial doirasi serverda majburlanadi', () => {
+  test("Branch Manager (A): faqat A tushumi/xarajati, payroll chiqarilmaydi; tenant-darajali xarajat ko'rinmaydi", async () => {
+    const res = await q('pnl', 'bmA');
+    expect(res.status).toBe(200);
+    const d = await data(res);
+    expect(d.revenue).toBe(100_000);
+    expect(d.expenses).toBe(5_000);
+    expect(d.payroll).toBeNull();
+    expect(d.payrollIncluded).toBe(false);
+    expect(d.netProfit).toBe(95_000);
+  });
+
+  test('begona filial (?branchId=B) → 403 report.branch_forbidden', async () => {
+    const res = await q('pnl', 'bmA', `&branchId=${brB}`);
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as any).error.code).toBe('report.branch_forbidden');
+  });
+
+  test("ikki filialli BM: A+B yig'indisi (payroll yo'q); IR-06 aralash tayinlovda B yopiq", async () => {
+    const d = await data(await q('pnl', 'bmAB'));
+    expect(d.revenue).toBe(120_000);
+    expect(d.expenses).toBe(12_000);
+    expect(d.payroll).toBeNull();
+    expect((await q('pnl', 'mixed', `&branchId=${brB}`)).status).toBe(403);
+    expect((await data(await q('pnl', 'mixed'))).expenses).toBe(5_000);
+  });
+
+  test('tayinlovsiz → 403 report.no_branch_access', async () => {
+    const res = await q('pnl', 'ghost');
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as any).error.code).toBe('report.no_branch_access');
+  });
+
+  test.each([
+    'owner',
+    'admin',
+    'acc',
+  ])('%s: butun klinika (tenant-darajali xarajat + payroll) o‘zgarmaydi', async (who) => {
+    const d = await data(await q('pnl', who));
+    expect(d.revenue).toBe(123_000);
+    expect(d.expenses).toBe(21_000);
+    expect(d.payrollFinalized).toBe(40_000);
+    expect(d.payrollIncluded).toBe(true);
+    const b = await data(await q('pnl', who, `&branchId=${brB}`));
+    expect(b.revenue).toBe(20_000);
+    expect(b.expenses).toBe(7_000);
+    expect(b.payroll).toBeNull();
   });
 });
 

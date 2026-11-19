@@ -212,7 +212,8 @@ export const reportsRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     path: '/pnl',
     tags: ['reports'],
     operationId: 'getPnlReport',
-    middleware: [requirePermission('report.view')] as const,
+    // FX-31 (IR-06): filial doirasi serverda; scoped chaqiruvchiga payroll chiqarilmaydi (pnl()).
+    middleware: [requirePermission('report.view'), reportBranchScope()] as const,
     request: { query: reportRangeSchema },
     responses: okJson(pnlReportDtoSchema, 'Profit and loss'),
   });

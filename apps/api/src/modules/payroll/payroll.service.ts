@@ -10,9 +10,11 @@ import {
 } from '@dental/db-schema';
 import { and, desc, eq, gte, inArray, isNull, lt, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
+import type { DbOrTx } from '../../db/client.ts';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { pgErrorInfo } from '../../lib/pg-error.ts';
+import { txDoctorId } from '../../lib/tx-doctor.ts';
 import { computePayrollLine } from './payroll.calc.ts';
 import type { CreateRunInput } from './payroll.schema.ts';
 
@@ -34,6 +36,51 @@ const isExclusionViolation = (err: unknown): boolean => {
   return code === '23P01' || code === '40P01';
 };
 
+/** Asia/Tashkent yarim-ochiq interval [start, end): periodTo'dan keyingi kun 00:00 (CLI-442 #1). */
+const periodBounds = (periodFrom: string, periodTo: string) => {
+  const start = new Date(`${periodFrom}T00:00:00+05:00`);
+  const end = new Date(`${periodTo}T00:00:00+05:00`);
+  end.setUTCDate(end.getUTCDate() + 1);
+  return { start, end };
+};
+
+/**
+ * Davr uchun doktor bo'yicha attributed daromad (signed: refund manfiy). `createRun` snapshot'i
+ * va `finalizeRun` stale-tekshiruvi (FX-18) UCHUN YAGONA manba — ikkalasi bir xil formula,
+ * shuning uchun ular orasidagi har qanday farq = snapshot'dan keyingi o'zgarish.
+ */
+const attributedRevenueRows = async (tx: DbOrTx, start: Date, end: Date) =>
+  tx
+    .select({
+      doctorId: txDoctorId,
+      revenue: sql<string>`COALESCE(SUM(CASE WHEN ${cashierTransactions.type} = 'refund' THEN -${cashierTransactions.paidAmount} ELSE ${cashierTransactions.paidAmount} END), 0)`,
+    })
+    .from(cashierTransactions)
+    .leftJoin(treatmentPlans, eq(cashierTransactions.treatmentPlanId, treatmentPlans.id))
+    .where(
+      and(
+        // FX-19: doktori aniqlanmagan (rejasiz, vizitsiz) tushum komissiyaga kirmaydi.
+        sql`${txDoctorId} IS NOT NULL`,
+        eq(cashierTransactions.status, 'completed'),
+        gte(cashierTransactions.createdAt, start),
+        lt(cashierTransactions.createdAt, end),
+        // CLI-479 (double-clawback fix, Variant A): asl to'lovi FINALIZED davrga
+        // tushgan refund `recordRefundAdjustment` orqali carry-forward
+        // `payroll_adjustment` oladi; agar shu refund qatorining O'ZI joriy ochiq
+        // davrga tushsa (refund "hozir" bo'ladi, asl to'lov o'tmishda), bu revenue
+        // netting uni IKKINCHI marta ayirardi. Invariant: bitta refund FAQAT BIR
+        // marta clawback qilinadi — YOKI jonli netting (o'z davri hali ochiq) YOKI
+        // adjustment (asl davr finalized), ikkovi birga EMAS. Adjustment yo'lini
+        // ustun qo'yamiz: u clawbackni ASL finalized-snapshot komissiya foizida
+        // (aynan to'langan miqdor) hisoblaydi — joriy foiz o'zgargan bo'lsa netting
+        // noto'g'ri chiqadi. `source_transaction_id` = refund tx id, shuning uchun
+        // faqat adjustmentli refund chiqariladi; oddiy to'lov + adjustmentsiz
+        // refund (asl davr ochiq edi) avvalgidek netlanaveradi.
+        sql`NOT EXISTS (SELECT 1 FROM ${payrollAdjustments} WHERE ${payrollAdjustments.sourceTransactionId} = ${cashierTransactions.id})`,
+      ),
+    )
+    .groupBy(txDoctorId);
+
 /**
  * Payroll moduli — gibrid baza + komissiya, snapshot run.
  *
@@ -53,9 +100,7 @@ export const createPayrollService = (deps: { audit: AuditLogger }) => {
     // Asia/Tashkent (UTC+5, DST yo'q) kun chegarasi — cashier/reports bilan izchil.
     // YARIM-OCHIQ interval (CLI-442 #1): `>= start AND < end` (end = periodTo'dan keyingi
     // kun 00:00). Inklyuziv `…23:59:59.999` sub-ms tranzaksiyalarni tushirib qoldirardi.
-    const start = new Date(`${input.periodFrom}T00:00:00+05:00`);
-    const end = new Date(`${input.periodTo}T00:00:00+05:00`);
-    end.setUTCDate(end.getUTCDate() + 1);
+    const { start, end } = periodBounds(input.periodFrom, input.periodTo);
 
     try {
       return await db.transaction(async (tx) => {
@@ -85,34 +130,7 @@ export const createPayrollService = (deps: { audit: AuditLogger }) => {
         if (!run) throw new Error('Payroll run insert failed');
 
         // 2. Plan-linked attributed daromad (signed: refund manfiy), doctorId bo'yicha.
-        const revRows = await tx
-          .select({
-            doctorId: treatmentPlans.doctorId,
-            revenue: sql<string>`COALESCE(SUM(CASE WHEN ${cashierTransactions.type} = 'refund' THEN -${cashierTransactions.paidAmount} ELSE ${cashierTransactions.paidAmount} END), 0)`,
-          })
-          .from(cashierTransactions)
-          .innerJoin(treatmentPlans, eq(cashierTransactions.treatmentPlanId, treatmentPlans.id))
-          .where(
-            and(
-              eq(cashierTransactions.status, 'completed'),
-              gte(cashierTransactions.createdAt, start),
-              lt(cashierTransactions.createdAt, end),
-              // CLI-479 (double-clawback fix, Variant A): asl to'lovi FINALIZED davrga
-              // tushgan refund `recordRefundAdjustment` orqali carry-forward
-              // `payroll_adjustment` oladi; agar shu refund qatorining O'ZI joriy ochiq
-              // davrga tushsa (refund "hozir" bo'ladi, asl to'lov o'tmishda), bu revenue
-              // netting uni IKKINCHI marta ayirardi. Invariant: bitta refund FAQAT BIR
-              // marta clawback qilinadi — YOKI jonli netting (o'z davri hali ochiq) YOKI
-              // adjustment (asl davr finalized), ikkovi birga EMAS. Adjustment yo'lini
-              // ustun qo'yamiz: u clawbackni ASL finalized-snapshot komissiya foizida
-              // (aynan to'langan miqdor) hisoblaydi — joriy foiz o'zgargan bo'lsa netting
-              // noto'g'ri chiqadi. `source_transaction_id` = refund tx id, shuning uchun
-              // faqat adjustmentli refund chiqariladi; oddiy to'lov + adjustmentsiz
-              // refund (asl davr ochiq edi) avvalgidek netlanaveradi.
-              sql`NOT EXISTS (SELECT 1 FROM ${payrollAdjustments} WHERE ${payrollAdjustments.sourceTransactionId} = ${cashierTransactions.id})`,
-            ),
-          )
-          .groupBy(treatmentPlans.doctorId);
+        const revRows = await attributedRevenueRows(tx, start, end);
         const revByDoctor = new Map(revRows.map((r) => [r.doctorId, Number(r.revenue)]));
 
         // 3. Eligible profillar = aktiv ∪ davrda attributed daromadli (CLI-417 M4b).
@@ -364,6 +382,43 @@ export const createPayrollService = (deps: { audit: AuditLogger }) => {
         .for('update');
       if (!run) return { run: null, error: 'not_found' as const };
       if (run.status !== 'draft') return { run: null, error: 'not_draft' as const };
+
+      // FX-18 (LA-28): draft snapshot'i createRun paytida muzlatilgan; undan keyin davr ichida
+      // yozilgan to'lov/refund snapshot'da yo'q. Finalize'da shu davr daromadini QAYTA hisoblab
+      // (createRun bilan bir xil `attributedRevenueRows`) snapshot'ga solishtiramiz: farq bo'lsa
+      // `stale_snapshot` — jim qayta hisoblash EMAS (buxgalter ko'rgan raqam tasdiqsiz o'zgarmasin);
+      // run draft qoladi, `DELETE /runs/{id}` + qayta yaratish yo'li ochiq (deadlock yo'q).
+      const { start, end } = periodBounds(run.periodFrom, run.periodTo);
+      const fresh = await attributedRevenueRows(tx, start, end);
+      const lines = await tx
+        .select({ userId: payrollLines.userId, rev: payrollLines.attributedRevenue })
+        .from(payrollLines)
+        .where(eq(payrollLines.runId, runId));
+      const frozen = new Map(lines.map((l) => [l.userId, Number(l.rev)]));
+      const differs = (a: number, b: number) => Math.abs(a - b) >= 0.005;
+      let stale = lines.some((l) =>
+        differs(
+          Number(fresh.find((r) => r.doctorId === l.userId)?.revenue ?? 0),
+          frozen.get(l.userId) ?? 0,
+        ),
+      );
+      if (!stale) {
+        // Snapshot'da qatori yo'q, lekin profili bor (createRun uni kiritgan bo'lardi) doktor.
+        const missing = fresh
+          .filter(
+            (r): r is { doctorId: string; revenue: string } =>
+              r.doctorId != null && !frozen.has(r.doctorId) && differs(Number(r.revenue), 0),
+          )
+          .map((r) => r.doctorId);
+        if (missing.length > 0) {
+          const withProfile = await tx
+            .select({ userId: staffProfiles.userId })
+            .from(staffProfiles)
+            .where(inArray(staffProfiles.userId, missing));
+          stale = withProfile.length > 0;
+        }
+      }
+      if (stale) return { run: null, error: 'stale_snapshot' as const };
 
       const [updated] = await tx
         .update(payrollRuns)

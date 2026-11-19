@@ -908,10 +908,9 @@ export const createCashierService = (deps: {
 
       // CLI-446 G3: payroll carry-forward hook uchun kerakli maydonlarni tx
       // ichidan tashqariga olib chiqamiz (tx yopilgandan keyin hook chaqiriladi).
-      // Faqat plan-linked tranzaksiyada doktor bor (treatmentPlans.doctorId) —
-      // non-plan savdo payroll attributsiyasiga umuman bog'lanmagan (createRun
-      // ham faqat treatmentPlanId orqali join qiladi), shuning uchun bu yerda
-      // ANIQLASH kifoya, hookni CHAQIRISH emas.
+      // FX-19 (D-13): doktor = COALESCE(plan.doctorId, vizit.doctorId) — createRun/reports
+      // bilan bir xil manba. Ikkalasi ham yo'q (anonim erkin POS) → payroll attributsiyasiga
+      // bog'lanmagan, hook chaqirilmaydi.
       let payrollDoctorId: string | null = null;
       if (original.treatmentPlanId) {
         const [plan] = await tx
@@ -919,6 +918,13 @@ export const createCashierService = (deps: {
           .from(treatmentPlans)
           .where(eq(treatmentPlans.id, original.treatmentPlanId));
         payrollDoctorId = plan?.doctorId ?? null;
+      }
+      if (!payrollDoctorId && original.visitNoteId) {
+        const [visit] = await tx
+          .select({ doctorId: visitNotes.doctorId })
+          .from(visitNotes)
+          .where(eq(visitNotes.id, original.visitNoteId));
+        payrollDoctorId = visit?.doctorId ?? null;
       }
 
       return {
