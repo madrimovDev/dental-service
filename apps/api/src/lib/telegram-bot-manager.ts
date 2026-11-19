@@ -45,7 +45,12 @@ async function readToken(adminDb: Database, tenantId: string): Promise<string | 
   return enc ? decryptSecret(enc) : null;
 }
 
-export type LinkOutcome = 'linked' | 'not_found' | 'not_own_contact' | 'already_linked';
+export type LinkOutcome =
+  | 'linked'
+  | 'not_found'
+  | 'not_own_contact'
+  | 'already_linked'
+  | 'not_private';
 
 /**
  * P8 — kontakt egaligi: faqat foydalanuvchining O'Z kontakti (`contact.user_id`
@@ -54,8 +59,17 @@ export type LinkOutcome = 'linked' | 'not_found' | 'not_own_contact' | 'already_
  */
 export async function linkPatientByContact(
   tx: DbOrTx,
-  o: { contactUserId: number | undefined; fromId: number; phone: string; chatId: string },
+  o: {
+    contactUserId: number | undefined;
+    fromId: number;
+    phone: string;
+    chatId: string;
+    chatType: string | undefined;
+  },
 ): Promise<LinkOutcome> {
+  // FX-84: faqat shaxsiy chat — guruh chat_id'si bemorga yozilsa, eslatma/chek/retsept
+  // (PHI) guruhga ketardi.
+  if (o.chatType !== 'private') return 'not_private';
   if (o.contactUserId === undefined || o.contactUserId !== o.fromId) return 'not_own_contact';
   // FX-42 (LA-21): oilaviy telefon — shu raqamdagi BARCHA bemorlar (ona + bolalar) bir chat'ga
   // bog'lanadi; har bemor o'z chat_id'sini saqlaydi, shuning uchun eslatma/chek/retsept
@@ -168,12 +182,14 @@ export function startTelegramBotManager(deps: ManagerDeps) {
           fromId: ctx.from.id,
           phone,
           chatId,
+          chatType: ctx.chat.type,
         }),
       );
       const replies: Record<LinkOutcome, string> = {
         linked: "✅ Bog'landingiz — endi eslatmalar shu yerga keladi.",
         not_found: '⚠️ Raqamingiz topilmadi. Klinikaga murojaat qiling.',
         not_own_contact: "⚠️ Faqat o'z raqamingizni ulashing.",
+        not_private: '⚠️ Raqamni faqat botning shaxsiy chatida ulashing.',
         already_linked:
           "⚠️ Bu raqam boshqa Telegram hisobiga bog'langan. Klinikaga murojaat qiling.",
       };

@@ -42,7 +42,9 @@ const chatOf = (id: string) =>
   });
 
 const link = (phone: string, chatId: string) =>
-  run((tx) => linkPatientByContact(tx, { contactUserId: 1, fromId: 1, phone, chatId }));
+  run((tx) =>
+    linkPatientByContact(tx, { contactUserId: 1, fromId: 1, phone, chatId, chatType: 'private' }),
+  );
 
 beforeAll(async () => {
   await db.execute(sql`TRUNCATE users, tenants RESTART IDENTITY CASCADE`);
