@@ -175,6 +175,12 @@ export const PERMISSIONS = [
     descriptionUz: 'Tibbiy karta tahrirlash',
     descriptionRu: 'Редактирование медкарты',
   },
+  {
+    code: 'medical_record.on_behalf',
+    category: 'clinical',
+    descriptionUz: 'Boshqa shifokor nomidan vizit yozuvi yaratish',
+    descriptionRu: 'Создавать записи визита от имени другого врача',
+  },
 
   // ===== M3 shell permissions (appointment, queue, cashier, service) =====
   {
@@ -274,6 +280,12 @@ export const PERMISSIONS = [
     category: 'clinical',
     descriptionUz: 'Reseptlarni yaratish/tahrirlash',
     descriptionRu: 'Управление рецептами',
+  },
+  {
+    code: 'prescription.on_behalf',
+    category: 'clinical',
+    descriptionUz: 'Boshqa shifokor nomidan retsept yozish',
+    descriptionRu: 'Выписывать рецепты от имени другого врача',
   },
   {
     code: 'consent.view',

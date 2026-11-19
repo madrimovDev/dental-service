@@ -337,6 +337,17 @@
     "boundary_desc": "Sahifani qayta yuklab ko'ring",
     "reload": "Qayta yuklash"
   },
+  "apiErrors": {
+    "ownership": {
+      "not_practitioner": "Yozuv muallifi shifokor bo'lishi kerak. Shifokorni tanlang yoki shifokor hisobidan kiring."
+    },
+    "prescription": {
+      "on_behalf_forbidden": "Boshqa shifokor nomidan retsept yozishga ruxsatingiz yo'q."
+    },
+    "visit_note": {
+      "on_behalf_forbidden": "Boshqa shifokor nomidan vizit yozuvi yaratishga ruxsatingiz yo'q."
+    }
+  },
   "dashboard": {
     "welcome": "Salom, {{name}}!",
     "your_role": "Sizning rolingiz",
@@ -2056,7 +2067,8 @@
       "benefit_outweighs_risk": "Foyda xavfdan ustun",
       "patient_informed": "Bemor xabardor, rozi",
       "allergy_not_confirmed": "Allergiya tasdiqlanmagan",
-      "no_alternative": "Muqobil dori yo‘q"
+      "no_alternative": "Muqobil dori yo‘q",
+      "allergy_checked_verbally": "Allergiya og‘zaki so‘rab tekshirildi"
     },
     "planLink": "Reja bilan bog‘lash",
     "noPlan": "Rejasiz vizit",
@@ -2076,6 +2088,7 @@
     "save": "Saqlash",
     "saved": "Vizit yozuvi saqlandi",
     "sign": "Imzolash va kassaga yuborish",
+    "savedRxPending": "Saqlandi. Retsept imzolanganda beriladi va bemorga yuboriladi",
     "signedToast": "Imzolandi",
     "signedBanner": "Imzolangan — endi o‘zgartirib bo‘lmaydi",
     "signedAt": "Imzolangan: {{time}}",
@@ -2083,7 +2096,10 @@
     "readOnly": "Faqat ko‘rish",
     "validationEmpty": "Kamida shikoyat, tashxis yoki bajarilgan ishdan birini kiriting",
     "plan": "Reja",
-    "freeNotes": "Qo‘shimcha izoh"
+    "freeNotes": "Qo‘shimcha izoh",
+    "allergyUnknownTitle": "Allergiya ma’lumoti noma’lum",
+    "allergyUnknownBody": "Bemorning allergiya ma’lumoti yuklanmadi yoki ko‘rish ruxsati yo‘q. Dori allergiyaga zid bo‘lishi mumkin — davom etish sababini tanlang.",
+    "allergyUnknownSafe": "Avval tekshiraman"
   },
   "ownerHome": {
     "title": "Siz hal qiladigan masalalar",
@@ -2853,5 +2869,11 @@
     "err_clinic_unauthorized": "Portal kaliti yaroqsiz — qayta ulaning.",
     "lab_name_hint_portal": "Portaldagi laboratoriyani tanlang yoki boshqa lab nomini yozing (portalsiz — holat qo'lda)",
     "catalog_search": "Laboratoriya nomi yoki shahri bo'yicha qidirish"
+  },
+  "clinicalAuthor": {
+    "doctor": "Shifokor",
+    "doctorPlaceholder": "Shifokorni tanlang",
+    "notPractitionerTitle": "Vizit yozuvini faqat shifokor yaratadi",
+    "notPractitionerBody": "Sizning rolingiz shifokor emas va boshqa shifokor nomidan yozish ruxsati yo'q."
   }
 }

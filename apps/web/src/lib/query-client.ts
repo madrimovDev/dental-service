@@ -1,6 +1,7 @@
 import { ApiError } from '@dental/api-client';
 import { notifications } from '@mantine/notifications';
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';
+import { apiErrorMessage } from '@/lib/api-error-message.ts';
 import { i18n } from '@/lib/i18n.ts';
 import { isModuleDisabledError } from '@/shell/license-modules.ts';
 
@@ -50,18 +51,11 @@ export const queryClient = new QueryClient({
         return;
       }
 
-      const fallback = i18n.t('common.error');
-      let message = fallback;
-      if (error instanceof ApiError) {
-        message = error.message || fallback;
-      } else if (error instanceof Error) {
-        message = error.message || fallback;
-      }
-
+      // FX-155 review: ma'lum xato kodlari tarjima qilinadi (xom server matni emas).
       notifications.show({
         color: 'red',
         title: i18n.t('common.error'),
-        message,
+        message: apiErrorMessage(error),
       });
     },
   }),

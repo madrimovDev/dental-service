@@ -36,7 +36,11 @@ describe('buildPendingRows', () => {
       (d) => `${d} kun`,
     );
     expect(rows.map((r) => r.key)).toEqual(['notes', 'plans']);
-    expect(rows[0]).toMatchObject({ title: 'notes:2', text: 'A, B', to: '/patients/p-A' });
+    expect(rows[0]).toMatchObject({
+      title: 'notes:2',
+      text: 'A, B',
+      to: '/patients/p-A/visits/new?appointmentId=A',
+    });
     expect(rows[1]).toMatchObject({ text: '9 kun', to: '/patients/p-C' });
   });
 });

@@ -5,10 +5,16 @@ import { notifications } from '@mantine/notifications';
 import { IconChevronLeft } from '@tabler/icons-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMedicalRecord, usePatient } from '@/features/patients/patients.api';
 import { formatCurrency } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth-store.ts';
+import {
+  isAllergyUnknown,
+  overridesForDrugs,
+  serverAllergyConflict,
+  unknownAllergyOverrides,
+} from '../../allergy-guard';
 import {
   useCreatePrescription,
   useCreateVisitNote,
@@ -26,6 +32,7 @@ import {
 } from '../../clinical.api';
 import { diagnosisSearchIndex, normalizeSearch, toDiagnosisOptions } from '../../clinical.mappers';
 import type { AllergyOverride, NextVisit, VisitNoteView } from '../../clinical.types';
+import { useClinicalAuthor } from '../../clinical-author';
 import classes from './VisitNotePage.module.css';
 import {
   buildVisitNoteBody,
@@ -37,6 +44,7 @@ import {
   loadDraft,
   overrideCoversConflict,
   pendingAllergyConflict,
+  pickAppointmentToLink,
   type RxRow,
   saveDraft,
   type VisitFormValues,
@@ -47,6 +55,12 @@ const REASONS = [
   'patient_informed',
   'allergy_not_confirmed',
   'no_alternative',
+] as const;
+// FX-22: allergiya ma'lumoti noma'lum bo'lganda davom etish sabablari.
+const UNKNOWN_REASONS = [
+  'allergy_checked_verbally',
+  'benefit_outweighs_risk',
+  'patient_informed',
 ] as const;
 const NEXT_VISITS: NextVisit[] = ['none', '2w', '6m'];
 const AUTOSAVE_MS = 700;
@@ -69,6 +83,8 @@ export function VisitNotePage() {
   const lang = i18n.language === 'ru' ? 'ru' : 'uz';
   const navigate = useNavigate();
   const { id: patientId = '', visitId } = useParams<{ id: string; visitId?: string }>();
+  const [searchParams] = useSearchParams();
+  const requestedAppointmentId = searchParams.get('appointmentId');
   const { user, hasPermission, activeBranchId } = useAuthStore();
 
   const patientQuery = usePatient(patientId);
@@ -85,6 +101,10 @@ export function VisitNotePage() {
   const updateNote = useUpdateVisitNote(patientId);
   const signNote = useSignVisitNote(patientId);
   const createRx = useCreatePrescription(patientId);
+  // FX-155 review: muallif shifokor bo'lishi shart (server `assertPractitioner`). Branch Manager /
+  // Tenant Admin o'z nomidan yoza olmaydi; `medical_record.on_behalf` bo'lsa shifokor tanlanadi.
+  const author = useClinicalAuthor('medical_record.on_behalf');
+  const [pickedDoctorId, setPickedDoctorId] = useState<string | null>(null);
 
   const [noteId, setNoteId] = useState<string | null>(visitId ?? null);
   const [values, setValues] = useState<VisitFormValues>(emptyVisitForm);
@@ -98,10 +118,32 @@ export function VisitNotePage() {
     group: string;
   } | null>(null);
   const [busy, setBusy] = useState(false);
+  // FX-22: allergiya noma'lum — shifokor sabab bilan tasdiqlagan (shu sessiya davomida).
+  const [unknownAck, setUnknownAck] = useState<string | null>(null);
+  const [unknownPrompt, setUnknownPrompt] = useState(false);
   const hydrated = useRef(false);
+
+  // FX-117: «Mendan kutilmoqda» bandi — shu yozilish uchun qoralama allaqachon bo'lsa, ikkinchisini
+  // yaratmasdan o'shani ochamiz.
+  useEffect(() => {
+    if (visitId || !requestedAppointmentId) return;
+    const existing = ((notesQuery.data ?? []) as VisitNoteView[]).find(
+      (n) => n.appointmentId === requestedAppointmentId && !n.signedAt,
+    );
+    if (existing) navigate(`/patients/${patientId}/visits/${existing.id}/edit`, { replace: true });
+  }, [visitId, requestedAppointmentId, notesQuery.data, navigate, patientId]);
 
   const note = noteQuery.data as VisitNoteView | undefined;
   const signed = !!note?.signedAt;
+  // Mavjud yozuv — muallif o'zgarmaydi (PATCH doctorId'ni yubormaydi); yangi — tanlangan/o'zi.
+  const authorId = note?.doctorId ?? pickedDoctorId ?? author.defaultDoctorId;
+  // Retsept muallifi: vizit muallifi, agar bu o'zi yoki `prescription.on_behalf` bo'lsa; aks holda
+  // (boshqa shifokorning yozuvini tahrirlayotgan shifokor) — o'zi.
+  const rxAuthorId =
+    authorId && (authorId === user?.id || hasPermission('prescription.on_behalf'))
+      ? authorId
+      : (user?.id ?? null);
+  const authorLabel = author.options.find((o) => o.value === authorId)?.label ?? user?.fullName;
   const key = draftKey(patientId, noteId);
 
   // ── hydrate: server yozuvi yoki saqlanmagan lokal qoralama ───────────────
@@ -136,6 +178,11 @@ export function VisitNotePage() {
       notifications.show({ message: t('visitNote.draftRestored'), color: 'teal' });
     } else {
       setValues(fromServer);
+      // FX-123: serverga yozilmagan retsept qatorlari yozuv yangilangandan keyin ham tiklanadi.
+      if (draft && !note?.signedAt && draft.rx.some(isRxRowComplete)) {
+        setRx(draft.rx);
+        setOverrides(draft.overrides);
+      }
     }
   }, [note, visitId]);
 
@@ -160,6 +207,8 @@ export function VisitNotePage() {
   const patch = (p: Partial<VisitFormValues>) => setValues((v) => ({ ...v, ...p }));
   const readOnly = signed;
   const allergies = medicalQuery.data?.allergies ?? null;
+  // FX-22 (LA-34): yuklanmoqda / xato / 403 — «allergiya yo'q» emas, NOMA'LUM.
+  const allergyUnknown = isAllergyUnknown(medicalQuery);
 
   // ── tashxis / xizmat / reja opsiyalari ───────────────────────────────────
   const diagnoses = diagnosesQuery.data ?? [];
@@ -245,7 +294,7 @@ export function VisitNotePage() {
   const hasDrugs = rx.some((r) => r.drug.trim() !== '');
   const allergyState = unresolved
     ? 'conflict'
-    : medicalQuery.isError
+    : allergyUnknown
       ? 'unknown'
       : hasDrugs
         ? 'ok'
@@ -265,7 +314,9 @@ export function VisitNotePage() {
   };
 
   // ── saqlash / imzolash ───────────────────────────────────────────────────
-  const persist = async (): Promise<string | null> => {
+  // FX-123 (LC-01): retsept faqat `createRx` (imzolash) yo'lida yaratiladi — «Saqlash»da qatorlar
+  // formada qoladi (tahrir/o'chirish mumkin), bemorga xabar ham imzogacha ketmaydi.
+  const persist = async (opts: { createRx: boolean }): Promise<string | null> => {
     const guard = firstUnresolvedRxConflict(rx, allergies, knownOverrides);
     if (guard) {
       setConflict({
@@ -277,6 +328,11 @@ export function VisitNotePage() {
       return null;
     }
     const completeRx = rx.filter(isRxRowComplete);
+    // FX-22: allergiya noma'lum + retsept bor — sabab bilan tasdiqlanmaguncha saqlanmaydi/imzolanmaydi.
+    if (completeRx.length > 0 && allergyUnknown && !unknownAck) {
+      setUnknownPrompt(true);
+      return null;
+    }
     const empty =
       !values.subjective &&
       !values.objective &&
@@ -287,23 +343,32 @@ export function VisitNotePage() {
       notifications.show({ message: t('visitNote.validationEmpty'), color: 'red' });
       return null;
     }
-    if (!user) return null;
-    // Yangi vizit: bugungi yozilish (bekor qilinmagan) bo'lsa avtomatik bog'lanadi.
-    const todayStr = new Date().toDateString();
-    const todayAppt = (apptQuery.data ?? []).find(
-      (a) =>
-        new Date(a.startTime).toDateString() === todayStr &&
-        a.status !== 'cancelled' &&
-        a.status !== 'no_show',
-    );
-    const linked = noteId
-      ? values
-      : { ...values, appointmentId: values.appointmentId ?? todayAppt?.id ?? null };
+    if (!user || !authorId || !rxAuthorId) return null;
+    // Yangi vizit: shifokorning o'z yozilishi (FX-117) — `?appointmentId=` yoki bugungi bo'sh yozilish.
+    const linkedId = noteId
+      ? null
+      : (values.appointmentId ??
+        pickAppointmentToLink({
+          appointments: apptQuery.data ?? [],
+          doctorId: authorId,
+          requestedId: requestedAppointmentId,
+          linkedAppointmentIds: (notesQuery.data ?? []).map((n) => n.appointmentId),
+        }));
+    const linked = noteId ? values : { ...values, appointmentId: linkedId };
     const body = buildVisitNoteBody(linked, {
       patientId,
-      doctorId: user.id,
+      doctorId: authorId,
       isEdit: !!noteId,
-      overrides,
+      overrides:
+        unknownAck && completeRx.length > 0
+          ? [
+              ...overrides,
+              ...unknownAllergyOverrides(
+                completeRx.map((r) => r.drug.trim()),
+                unknownAck,
+              ),
+            ]
+          : overrides,
     });
     let id = noteId;
     if (id) {
@@ -314,19 +379,42 @@ export function VisitNotePage() {
       id = created.id;
       setNoteId(id);
     }
-    if (completeRx.length > 0) {
-      await createRx.mutateAsync({
-        patientId,
-        doctorId: user.id,
-        visitNoteId: id,
-        items: completeRx.map((r) => ({
-          medicationName: r.drug.trim(),
-          dosage: r.dosage.trim(),
-          frequency: r.frequency.trim(),
-          durationDays: r.days === '' ? undefined : r.days,
-        })),
-      });
+    if (opts.createRx && completeRx.length > 0) {
+      const drugs = completeRx.map((r) => r.drug.trim());
+      try {
+        await createRx.mutateAsync({
+          patientId,
+          doctorId: rxAuthorId,
+          visitNoteId: id,
+          items: completeRx.map((r) => ({
+            medicationName: r.drug.trim(),
+            dosage: r.dosage.trim(),
+            frequency: r.frequency.trim(),
+            durationDays: r.days === '' ? undefined : r.days,
+          })),
+          allergyOverrides: overridesForDrugs(drugs, knownOverrides),
+        });
+      } catch (e) {
+        // FX-22: server allergiyani o'zi tekshiradi (bizda ma'lumot yo'q/eskirgan bo'lsa ham).
+        const c = serverAllergyConflict(e);
+        if (!c) throw e;
+        const index = Math.max(
+          0,
+          rx.findIndex((r) => r.drug.trim() === c.drug),
+        );
+        setConflict({ index, drug: c.drug, allergen: c.allergen, group: c.group });
+        // Vizit yozuvi allaqachon saqlangan (noteId o'rnatilgan) — keyingi urinish tahrir bo'ladi.
+        return null;
+      }
       setRx((rows) => rows.filter((r) => !isRxRowComplete(r)));
+    }
+    if (!opts.createRx && completeRx.length > 0) {
+      // Retsept qatorlari hali serverda emas — qoralama saqlanadi (qayta ochilganda tiklanadi).
+      clearDraft(draftKey(patientId, noteId));
+      const savedAt = new Date().toISOString();
+      if (saveDraft(draftKey(patientId, id), { values, rx, overrides, savedAt }))
+        setDraftAt(savedAt);
+      return id;
     }
     clearDraft(draftKey(patientId, noteId));
     clearDraft(draftKey(patientId, id));
@@ -338,9 +426,13 @@ export function VisitNotePage() {
     setBusy(true);
     try {
       const wasNew = !noteId;
-      const id = await persist();
+      const hasPendingRx = rx.some(isRxRowComplete);
+      const id = await persist({ createRx: false });
       if (!id) return;
-      notifications.show({ message: t('visitNote.saved'), color: 'teal' });
+      notifications.show({
+        message: t(hasPendingRx ? 'visitNote.savedRxPending' : 'visitNote.saved'),
+        color: 'teal',
+      });
       if (wasNew) navigate(`/patients/${patientId}/visits/${id}/edit`, { replace: true });
     } finally {
       setBusy(false);
@@ -350,7 +442,7 @@ export function VisitNotePage() {
   const onSign = async () => {
     setBusy(true);
     try {
-      const id = await persist();
+      const id = await persist({ createRx: true });
       if (!id) return;
       await signNote.mutateAsync(id);
       notifications.show({ message: t('visitNote.signedToast'), color: 'teal' });
@@ -376,6 +468,17 @@ export function VisitNotePage() {
     );
   }
 
+  if (!visitId && author.isLoading) return <StateView status="loading" skeleton="detail" />;
+  if (!visitId && !author.canAuthor) {
+    return (
+      <StateView
+        status="forbidden"
+        title={t('clinicalAuthor.notPractitionerTitle')}
+        description={t('clinicalAuthor.notPractitionerBody')}
+      />
+    );
+  }
+
   const patientName = patientQuery.data?.fullName ?? '';
   const pending = busy || createNote.isPending || updateNote.isPending || signNote.isPending;
   const savedRx = (prescriptionsQuery.data ?? []).filter((p) => p.visitNoteId === noteId);
@@ -395,10 +498,23 @@ export function VisitNotePage() {
             {t(visitId ? 'visitNote.titleEdit' : 'visitNote.titleFor', { name: patientName })}
           </h1>
           <span className={classes.sub}>
-            {user?.fullName ? `${user.fullName} · ` : ''}
+            {authorLabel ? `${authorLabel} · ` : ''}
             {new Date(note?.visitDate ?? Date.now()).toLocaleDateString()}
           </span>
         </div>
+        {!visitId && author.showPicker && (
+          <Select
+            label={t('clinicalAuthor.doctor')}
+            placeholder={t('clinicalAuthor.doctorPlaceholder')}
+            data={author.options}
+            value={authorId}
+            onChange={setPickedDoctorId}
+            allowDeselect={false}
+            disabled={readOnly || !!noteId}
+            required
+            w={240}
+          />
+        )}
         <Select
           aria-label={t('visitNote.template')}
           placeholder={t('visitNote.templatePlaceholder')}
@@ -674,14 +790,31 @@ export function VisitNotePage() {
               ? t('visitNote.draftSaved', { time: timeOf(draftAt) })
               : t('visitNote.draftNone')}
           </span>
-          <Button variant="default" size="lg" disabled={pending} onClick={onSave}>
+          <Button variant="default" size="lg" disabled={pending || !authorId} onClick={onSave}>
             {t('visitNote.save')}
           </Button>
-          <Button variant="primary" size="lg" disabled={pending} onClick={onSign}>
+          <Button variant="primary" size="lg" disabled={pending || !authorId} onClick={onSign}>
             {t('visitNote.sign')}
           </Button>
         </div>
       )}
+
+      <CriticalActionDialog
+        opened={unknownPrompt}
+        title={t('visitNote.allergyUnknownTitle')}
+        reasons={UNKNOWN_REASONS.map((r) => ({ value: r, label: t(`visitNote.reason.${r}`) }))}
+        reasonsLabel={t('visitNote.reasonsLabel')}
+        safeLabel={t('visitNote.allergyUnknownSafe')}
+        dangerLabel={t('visitNote.allergyDanger')}
+        onSafe={() => setUnknownPrompt(false)}
+        onConfirm={(reason) => {
+          if (!reason) return;
+          setUnknownAck(reason);
+          setUnknownPrompt(false);
+        }}
+      >
+        {t('visitNote.allergyUnknownBody')}
+      </CriticalActionDialog>
 
       <CriticalActionDialog
         opened={conflict !== null}

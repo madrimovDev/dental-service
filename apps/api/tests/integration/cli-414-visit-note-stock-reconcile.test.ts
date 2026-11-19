@@ -44,7 +44,13 @@ const service = createVisitNotesService({ audit: noopAudit, reconcileStock: reco
 const ctx = (tx: DbOrTx, tenantId: string): Context =>
   ({
     get: (k: string) =>
-      k === 'db' ? tx : k === 'activeTenantId' ? tenantId : k === 'user' ? undefined : undefined,
+      k === 'db'
+        ? tx
+        : k === 'activeTenantId'
+          ? tenantId
+          : k === 'user'
+            ? { id: ownerId }
+            : undefined,
   }) as unknown as Context;
 
 let tenantId: string;

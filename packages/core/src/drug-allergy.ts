@@ -196,3 +196,64 @@ export const findDrugAllergyConflicts = (
   }
   return out;
 };
+
+// ===== override (sabab bilan tasdiqlangan to'qnashuv) — web va server umumiy =====
+export type AllergyOverrideLike = {
+  drug: string;
+  group: string;
+  allergen?: string | null;
+  reason: string;
+};
+
+const FORM_PREFIXES = new Set([
+  'tab',
+  'tabl',
+  'tabs',
+  'tabletka',
+  'sol',
+  'rp',
+  'caps',
+  'kaps',
+  'kapsula',
+  'amp',
+  'susp',
+  'sirop',
+  'syr',
+  'ung',
+  'supp',
+  'inj',
+  'gtt',
+]);
+const DOSE_UNITS = new Set(['mg', 'ml', 'g', 'mkg', 'mcg', 'ed', 'me', 'iu', 'l']);
+
+/**
+ * Dori asosiy nomi: shakl prefiksi («Tab.», «Sol.», «Rp.») va doza («500 mg», «2%»)
+ * olib tashlanadi, qolgan to'liq nom saqlanadi — «Tab. Amoksitsillin 500» ≡
+ * «Амоксициллин», lekin ≠ «Tab. Ibuprofen».
+ */
+export const overrideKey = (drug: string): string => {
+  const tokens = normalizeDrugName(drug)
+    .replace(/[.,;:()/]+/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+  const core = tokens.filter(
+    (tok) => !FORM_PREFIXES.has(tok) && !DOSE_UNITS.has(tok) && !/\d/.test(tok),
+  );
+  return core.join(' ');
+};
+
+/** Override aynan shu dori + shu to'qnashuv (guruh, allergen) uchun va SABAB bilan berilganmi. */
+export const overrideCoversConflict = (
+  o: AllergyOverrideLike,
+  drug: string,
+  conflict: Pick<DrugAllergyConflict, 'group' | 'allergen'>,
+): boolean => {
+  const key = overrideKey(drug);
+  return (
+    key !== '' &&
+    o.reason.trim() !== '' &&
+    overrideKey(o.drug) === key &&
+    o.group === conflict.group &&
+    normalizeDrugName(o.allergen ?? '') === normalizeDrugName(conflict.allergen)
+  );
+};

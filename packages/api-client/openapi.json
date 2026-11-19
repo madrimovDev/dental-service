@@ -5435,6 +5435,37 @@
           "frequency"
         ]
       },
+      "VisitNoteAllergyOverride": {
+        "type": "object",
+        "properties": {
+          "drug": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "group": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
+          },
+          "allergen": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "drug",
+          "group",
+          "allergen",
+          "reason"
+        ]
+      },
       "PrescriptionDeleteResult": {
         "type": "object",
         "properties": {
@@ -7651,37 +7682,6 @@
           }
         },
         "example": null
-      },
-      "VisitNoteAllergyOverride": {
-        "type": "object",
-        "properties": {
-          "drug": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200
-          },
-          "group": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 50
-          },
-          "allergen": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200
-          },
-          "reason": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 100
-          }
-        },
-        "required": [
-          "drug",
-          "group",
-          "allergen",
-          "reason"
-        ]
       },
       "VisitNoteTemplate": {
         "type": "object",
@@ -20265,6 +20265,13 @@
                   "notes": {
                     "type": "string",
                     "maxLength": 2000
+                  },
+                  "allergyOverrides": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/VisitNoteAllergyOverride"
+                    },
+                    "maxItems": 50
                   }
                 },
                 "required": [
@@ -20324,6 +20331,16 @@
           },
           "403": {
             "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Drug conflicts with a recorded allergy and no reasoned override (FX-22)",
             "content": {
               "application/json": {
                 "schema": {
@@ -20499,6 +20516,13 @@
                   "notes": {
                     "type": "string",
                     "maxLength": 2000
+                  },
+                  "allergyOverrides": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/VisitNoteAllergyOverride"
+                    },
+                    "maxItems": 50
                   }
                 }
               }
@@ -20563,6 +20587,16 @@
           },
           "404": {
             "description": "Prescription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Drug conflicts with a recorded allergy and no reasoned override (FX-22)",
             "content": {
               "application/json": {
                 "schema": {

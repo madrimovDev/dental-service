@@ -95,9 +95,20 @@ beforeAll(async () => {
     const own1 = await mkAppt(doctorId, 30, 'completed');
     await mkAppt(doctorId, 28, 'completed');
     await mkAppt(otherDoctorId, 26, 'completed');
-    await tx
-      .insert(visitNotes)
-      .values({ tenantId, patientId, doctorId, appointmentId: own1, subjective: 'x' });
+    // own1: QORALAMA (signedAt NULL) — hali «kutilmoqda» (FX-118); own3: IMZOLANGAN — kutilmaydi.
+    const own3 = await mkAppt(doctorId, 27, 'completed');
+    await tx.insert(visitNotes).values([
+      { tenantId, patientId, doctorId, appointmentId: own1, subjective: 'x' },
+      {
+        tenantId,
+        patientId,
+        doctorId,
+        appointmentId: own3,
+        subjective: 'y',
+        signedAt: new Date(),
+        signedBy: doctorId,
+      },
+    ]);
     // Rasm: boshqa xodim yuklagan (ko'rilmagan) + shifokorning o'zi yuklagan (hisoblanmaydi).
     await tx.insert(patientImages).values([
       {
@@ -169,8 +180,9 @@ describe('GET /api/dashboard/doctor-pending', () => {
     const res = await get(await tokenFor(doctorId, permsFor('doctor'), 'doctor'));
     expect(res.status).toBe(200);
     const { data } = (await res.json()) as { data: Record<string, any> };
-    expect(data.unsignedVisitNotes.count).toBe(1);
-    expect(data.unsignedVisitNotes.items).toHaveLength(1);
+    // own1 (qoralama) + own2 (yozuvsiz); own3 (imzolangan) hisobga kirmaydi.
+    expect(data.unsignedVisitNotes.count).toBe(2);
+    expect(data.unsignedVisitNotes.items).toHaveLength(2);
     expect(data.unsignedVisitNotes.items[0].patientName).toBe('Bemor D1');
     expect(data.unreviewedImages.count).toBe(1);
     expect(data.plansAwaitingResponse.count).toBe(1);

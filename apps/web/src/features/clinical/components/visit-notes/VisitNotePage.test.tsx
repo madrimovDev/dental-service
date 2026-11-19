@@ -1,3 +1,4 @@
+import { ApiError } from '@dental/api-client';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -12,6 +13,8 @@ let note: Record<string, unknown> | undefined;
 let notes: Array<Record<string, unknown>> = [];
 let allergies: Array<{ substance: string }> | null = [{ substance: 'Penitsillin' }];
 let plans: Array<Record<string, unknown>> = [];
+let medicalState: { isError: boolean; isLoading: boolean } = { isError: false, isLoading: false };
+let rxError: unknown = null;
 
 vi.mock('../../clinical.api', () => ({
   useVisitNote: () => ({ data: note, isLoading: false, isError: false, refetch: vi.fn() }),
@@ -48,14 +51,17 @@ vi.mock('../../clinical.api', () => ({
     isPending: false,
     mutateAsync: (b: unknown) => {
       rxMutate(b);
-      return Promise.resolve({});
+      return rxError ? Promise.reject(rxError) : Promise.resolve({});
     },
   }),
 }));
 
 vi.mock('@/features/patients/patients.api', () => ({
   usePatient: () => ({ data: { fullName: 'Jasur Tursunov' } }),
-  useMedicalRecord: () => ({ data: { allergies }, isError: false }),
+  useMedicalRecord: () => ({
+    data: medicalState.isError ? undefined : { allergies },
+    ...medicalState,
+  }),
 }));
 
 vi.mock('@/stores/auth-store.ts', () => ({
@@ -64,6 +70,29 @@ vi.mock('@/stores/auth-store.ts', () => ({
     activeBranchId: 'b1',
     hasPermission: () => true,
   }),
+}));
+
+type Author = {
+  canSelf: boolean;
+  canOnBehalf: boolean;
+  options: { value: string; label: string }[];
+  canAuthor: boolean;
+  showPicker: boolean;
+  defaultDoctorId: string | null;
+  isLoading: boolean;
+};
+const selfAuthor: Author = {
+  canSelf: true,
+  canOnBehalf: false,
+  options: [{ value: 'doc-1', label: 'Dr. Yusupova' }],
+  canAuthor: true,
+  showPicker: false,
+  defaultDoctorId: 'doc-1',
+  isLoading: false,
+};
+let author: Author = selfAuthor;
+vi.mock('../../clinical-author', () => ({
+  useClinicalAuthor: () => author,
 }));
 
 const mount = (route = '/patients/p1/visits/new') =>
@@ -90,6 +119,9 @@ describe('VisitNotePage — dori ↔ allergiya (UI-D4)', () => {
     notes = [];
     allergies = [{ substance: 'Penitsillin' }];
     plans = [];
+    medicalState = { isError: false, isLoading: false };
+    rxError = null;
+    author = selfAuthor;
   });
 
   it('penitsillin allergiyali bemorga amoksitsillin → kritik oyna; sabab tanlanmaguncha davom etib bo‘lmaydi', () => {
@@ -126,7 +158,13 @@ describe('VisitNotePage — dori ↔ allergiya (UI-D4)', () => {
         },
       ],
     });
+    // FX-123: retsept faqat imzolashda yaratiladi, override sababi bilan.
+    expect(rxMutate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /Imzolash va kassaga/ }));
     await waitFor(() => expect(rxMutate).toHaveBeenCalledTimes(1));
+    expect(rxMutate.mock.calls[0]?.[0]).toMatchObject({
+      allergyOverrides: [{ drug: 'Amoksitsillin 500 mg', reason: 'patient_informed' }],
+    });
   });
 
   it('oldingi vizitda tasdiqlangan override — yangi vizitda ham so‘ralmaydi', () => {
@@ -308,5 +346,178 @@ describe('VisitNotePage — dori ↔ allergiya (UI-D4)', () => {
   it('bog‘lanmagan qoralamada «Rejasiz vizit» tanlanadi', () => {
     mount();
     expect(screen.getByRole('radio', { name: 'Rejasiz vizit' })).toBeEnabled();
+  });
+
+  const fillRx = () => {
+    addDrug('Ibuprofen');
+    fireEvent.change(screen.getByLabelText('Doza'), { target: { value: '200 mg' } });
+    fireEvent.change(screen.getByLabelText('Qanday'), { target: { value: '1×2' } });
+    fireEvent.change(screen.getByLabelText('Shikoyat'), { target: { value: 'og‘riq' } });
+  };
+
+  it('FX-22: allergiya noma‘lum (xato/403) + retsept → kritik oyna, saqlanmaydi; sabab bilan tasdiqlangach audit izi bilan saqlanadi', async () => {
+    medicalState = { isError: true, isLoading: false };
+    mount();
+    fillRx();
+    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    expect(await screen.findByText('Allergiya ma’lumoti noma’lum')).toBeInTheDocument();
+    expect(createMutate).not.toHaveBeenCalled();
+    expect(rxMutate).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Allergiya og‘zaki so‘rab tekshirildi' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Baribir davom etish' }));
+    await waitFor(() => expect(screen.queryByText('Allergiya ma’lumoti noma’lum')).toBeNull());
+    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    await waitFor(() => expect(createMutate).toHaveBeenCalledTimes(1));
+    expect(createMutate.mock.calls[0]?.[0]).toMatchObject({
+      allergyOverrides: [
+        { drug: 'Ibuprofen', group: 'unknown', reason: 'allergy_checked_verbally' },
+      ],
+    });
+    // FX-123: «Saqlash» retsept yaratmaydi — faqat imzolashda.
+    expect(rxMutate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /Imzolash va kassaga/ }));
+    await waitFor(() => expect(rxMutate).toHaveBeenCalledTimes(1));
+  });
+
+  it('FX-22: allergiya yuklanayotganda ham retsept bilan saqlash tasdiqsiz o‘tmaydi', async () => {
+    medicalState = { isError: false, isLoading: true };
+    mount();
+    fillRx();
+    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    expect(await screen.findByText('Allergiya ma’lumoti noma’lum')).toBeInTheDocument();
+    expect(createMutate).not.toHaveBeenCalled();
+  });
+
+  it('FX-22: retseptsiz vizit — allergiya noma‘lum bo‘lsa ham oyna chiqmaydi', async () => {
+    medicalState = { isError: true, isLoading: false };
+    mount();
+    fireEvent.change(screen.getByLabelText('Shikoyat'), { target: { value: 'og‘riq' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    await waitFor(() => expect(createMutate).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText('Allergiya ma’lumoti noma’lum')).toBeNull();
+  });
+
+  it('FX-22: server 409 prescription.allergy_conflict → kritik oyna (mijoz ma‘lumoti bo‘lmasa ham)', async () => {
+    allergies = null;
+    rxError = new ApiError('prescription.allergy_conflict', 'conflict', 409, [
+      { drug: 'Ibuprofen', group: 'nsaid', allergen: 'Aspirin' },
+    ]);
+    mount();
+    fillRx();
+    fireEvent.click(screen.getByRole('button', { name: /Imzolash va kassaga/ }));
+    expect(await screen.findByText('Allergiya ogohlantirishi')).toBeInTheDocument();
+    expect(signMutate).not.toHaveBeenCalled();
+  });
+
+  it('FX-123: «Saqlash» retsept yaratmaydi — qatorlar formada va qoralamada qoladi; imzoda retsept imzodan OLDIN yaratiladi', async () => {
+    allergies = null;
+    mount();
+    fillRx();
+    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    await waitFor(() => expect(createMutate).toHaveBeenCalledTimes(1));
+    expect(rxMutate).not.toHaveBeenCalled();
+    expect(signMutate).not.toHaveBeenCalled();
+    expect(localStorage.getItem('visit-note-draft:p1:n-new')).toContain('Ibuprofen');
+
+    fireEvent.click(screen.getByRole('button', { name: /Imzolash va kassaga/ }));
+    await waitFor(() => expect(signMutate).toHaveBeenCalledTimes(1));
+    expect(rxMutate).toHaveBeenCalledTimes(1);
+    expect(rxMutate.mock.invocationCallOrder[0]).toBeLessThan(
+      signMutate.mock.invocationCallOrder[0] ?? 0,
+    );
+  });
+});
+
+describe('VisitNotePage — FX-155 muallif (rol bo‘yicha)', () => {
+  const onBehalf: Author = {
+    canSelf: false,
+    canOnBehalf: true,
+    options: [
+      { value: 'doc-a', label: 'Doc A' },
+      { value: 'doc-b', label: 'Doc B' },
+    ],
+    canAuthor: true,
+    showPicker: true,
+    defaultDoctorId: null,
+    isLoading: false,
+  };
+
+  beforeEach(() => {
+    localStorage.clear();
+    for (const m of [createMutate, updateMutate, signMutate, rxMutate]) m.mockClear();
+    note = undefined;
+    notes = [];
+    allergies = null;
+    plans = [];
+    medicalState = { isError: false, isLoading: false };
+    rxError = null;
+    author = selfAuthor;
+  });
+
+  it('shifokor emas va on_behalf yo‘q (Branch Manager) — yangi vizit o‘rniga tushuntirish, saqlash yo‘q', () => {
+    author = {
+      ...selfAuthor,
+      canSelf: false,
+      options: [],
+      canAuthor: false,
+      defaultDoctorId: null,
+    };
+    mount();
+    expect(screen.getByText('Vizit yozuvini faqat shifokor yaratadi')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Saqlash' })).toBeNull();
+  });
+
+  it('o‘z nomidan shifokor — doctorId = o‘zi', async () => {
+    mount();
+    fireEvent.change(screen.getByLabelText('Shikoyat'), { target: { value: 'og‘riq' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    await waitFor(() => expect(createMutate).toHaveBeenCalledTimes(1));
+    expect(createMutate.mock.calls[0]?.[0]).toMatchObject({ doctorId: 'doc-1' });
+  });
+
+  it('on_behalf (Tenant Admin) — shifokor tanlanmaguncha saqlanmaydi; tanlangan shifokor vizit va retsept muallifi', async () => {
+    author = onBehalf;
+    mount();
+    fireEvent.change(screen.getByLabelText('Shikoyat'), { target: { value: 'og‘riq' } });
+    expect(screen.getByRole('button', { name: 'Saqlash' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('textbox', { name: 'Shifokor' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Doc B' }));
+    addDrug('Paratsetamol');
+    fireEvent.change(screen.getByLabelText('Doza'), { target: { value: '500 mg' } });
+    fireEvent.change(screen.getByLabelText('Qanday'), { target: { value: '1×3' } });
+    fireEvent.click(screen.getByRole('button', { name: /Imzolash va kassaga/ }));
+    await waitFor(() => expect(rxMutate).toHaveBeenCalledTimes(1));
+    expect(createMutate.mock.calls[0]?.[0]).toMatchObject({ doctorId: 'doc-b' });
+    expect(rxMutate.mock.calls[0]?.[0]).toMatchObject({ doctorId: 'doc-b' });
+  });
+
+  it('mavjud yozuvni on_behalf bilan imzolash — retsept muallifi yozuv shifokori', async () => {
+    author = onBehalf;
+    note = {
+      id: 'n1',
+      patientId: 'p1',
+      doctorId: 'doc-x',
+      subjective: 'Shikoyat',
+      objective: null,
+      plan: null,
+      freeNotes: null,
+      assessmentDiagnoses: [],
+      performedServices: [],
+      stageId: null,
+      appointmentId: null,
+      visitDate: '2026-11-11T10:00:00Z',
+      updatedAt: '2026-11-11T10:05:00Z',
+      signedAt: null,
+      metadata: null,
+    };
+    mount('/patients/p1/visits/n1/edit');
+    expect(screen.queryByRole('textbox', { name: 'Shifokor' })).toBeNull();
+    addDrug('Paratsetamol');
+    fireEvent.change(screen.getByLabelText('Doza'), { target: { value: '500 mg' } });
+    fireEvent.change(screen.getByLabelText('Qanday'), { target: { value: '1×3' } });
+    fireEvent.click(screen.getByRole('button', { name: /Imzolash va kassaga/ }));
+    await waitFor(() => expect(rxMutate).toHaveBeenCalledTimes(1));
+    expect(rxMutate.mock.calls[0]?.[0]).toMatchObject({ doctorId: 'doc-x' });
   });
 });

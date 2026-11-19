@@ -4,11 +4,12 @@ import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { requireModuleInDesktop } from '../../lib/license-middleware.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
-import { CrossEntityError } from '../../lib/ownership.ts';
+import { CrossEntityError, OnBehalfForbiddenError } from '../../lib/ownership.ts';
 import { createPatientMessenger } from '../../lib/telegram/notify.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
+import { VisitNoteSignedError } from '../clinical/visit-notes/visit-notes.service.ts';
 import { toPrescriptionDto } from './prescriptions.mapper.ts';
 import {
   createPrescriptionSchema,
@@ -18,7 +19,7 @@ import {
   prescriptionIdParamSchema,
   updatePrescriptionSchema,
 } from './prescriptions.schema.ts';
-import { createPrescriptionsService } from './prescriptions.service.ts';
+import { AllergyConflictError, createPrescriptionsService } from './prescriptions.service.ts';
 
 /** Standart 404 response — get / patch / delete endpoint'lar uchun. */
 const notFoundResponse = {
@@ -84,6 +85,10 @@ export const prescriptionsRoutes = (deps: { db: Database; audit: AuditLogger }) 
         content: { 'application/json': { schema: errorResponseSchema } },
         description: 'Forbidden',
       },
+      409: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Drug conflicts with a recorded allergy and no reasoned override (FX-22)',
+      },
     },
   });
 
@@ -97,6 +102,15 @@ export const prescriptionsRoutes = (deps: { db: Database; audit: AuditLogger }) 
       // CLI-421: cross-entity ownership mismatch (patientId/doctorId/visitNoteId) → 400.
       if (e instanceof CrossEntityError) {
         return c.json(fail(`ownership.${e.reason}`, e.message), 400);
+      }
+      if (e instanceof OnBehalfForbiddenError) {
+        return c.json(fail('prescription.on_behalf_forbidden', e.message), 403);
+      }
+      if (e instanceof AllergyConflictError) {
+        return c.json(fail('prescription.allergy_conflict', e.message, e.conflicts), 409);
+      }
+      if (e instanceof VisitNoteSignedError) {
+        return c.json(fail('visit_note.signed', e.message), 409);
       }
       throw e;
     }
@@ -135,7 +149,14 @@ export const prescriptionsRoutes = (deps: { db: Database; audit: AuditLogger }) 
       params: prescriptionIdParamSchema,
       body: { content: { 'application/json': { schema: updatePrescriptionSchema } } },
     },
-    responses: { ...okJson(prescriptionDtoSchema, 'Updated prescription'), ...notFoundResponse },
+    responses: {
+      ...okJson(prescriptionDtoSchema, 'Updated prescription'),
+      ...notFoundResponse,
+      409: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Drug conflicts with a recorded allergy and no reasoned override (FX-22)',
+      },
+    },
   });
 
   app.openapi(updateRoute, async (c) => {
@@ -149,6 +170,15 @@ export const prescriptionsRoutes = (deps: { db: Database; audit: AuditLogger }) 
       // CLI-421: cross-entity ownership mismatch (doctorId/visitNoteId) → 400.
       if (e instanceof CrossEntityError) {
         return c.json(fail(`ownership.${e.reason}`, e.message), 400);
+      }
+      if (e instanceof OnBehalfForbiddenError) {
+        return c.json(fail('prescription.on_behalf_forbidden', e.message), 403);
+      }
+      if (e instanceof AllergyConflictError) {
+        return c.json(fail('prescription.allergy_conflict', e.message, e.conflicts), 409);
+      }
+      if (e instanceof VisitNoteSignedError) {
+        return c.json(fail('visit_note.signed', e.message), 409);
       }
       throw e;
     }
@@ -168,14 +198,25 @@ export const prescriptionsRoutes = (deps: { db: Database; audit: AuditLogger }) 
     responses: {
       ...okJson(prescriptionDeleteResultSchema, 'Prescription deleted'),
       ...notFoundResponse,
+      409: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Linked visit note is signed (FX-154)',
+      },
     },
   });
 
   app.openapi(deleteRoute, async (c) => {
     const { id } = c.req.valid('param');
-    const row = await service.remove(c, id);
-    if (!row) return c.json(fail('prescription.not_found', 'Not found'), 404);
-    return c.json(ok({ deleted: true as const }), 200);
+    try {
+      const row = await service.remove(c, id);
+      if (!row) return c.json(fail('prescription.not_found', 'Not found'), 404);
+      return c.json(ok({ deleted: true as const }), 200);
+    } catch (e) {
+      if (e instanceof VisitNoteSignedError) {
+        return c.json(fail('visit_note.signed', e.message), 409);
+      }
+      throw e;
+    }
   });
 
   return app;

@@ -60,6 +60,7 @@ export const toMembershipsDto = (userId: string, r: MembershipsResult): Membersh
     branchName: a.branchName ?? null,
     roleId: a.roleId,
     roleName: a.roleName,
+    isPractitioner: a.isPractitioner,
     isOwner: a.isOwner,
   })),
   ownerTenants: r.ownerTenants.map((t) => ({

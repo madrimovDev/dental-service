@@ -5,6 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { UpdatePrescriptionBodyItemsItem } from './updatePrescriptionBodyItemsItem';
+import type { VisitNoteAllergyOverride } from './visitNoteAllergyOverride';
 
 export type UpdatePrescriptionBody = {
   doctorId?: string;
@@ -16,4 +17,6 @@ export type UpdatePrescriptionBody = {
   diagnosis?: string;
   /** @maxLength 2000 */
   notes?: string;
+  /** @maxItems 50 */
+  allergyOverrides?: VisitNoteAllergyOverride[];
 };

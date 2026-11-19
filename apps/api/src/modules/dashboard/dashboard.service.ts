@@ -23,9 +23,10 @@ const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000);
  * Shifokor «mendan kutilmoqda» agregati. Hamma so'rov `doctorId = userId` bilan
  * cheklanadi (boshqa shifokorniki ko'rinmaydi); tenant — RLS.
  *
- * Ta'riflar (hozirgi sxemada «imzolash»/«ko'rildi» holati YO'Q — D4 imzo keyin keladi):
+ * Ta'riflar:
  *  - imzolanmagan vizit yozuvi = shifokorning `in_progress`/`completed` yozilishi
- *    (oxirgi 14 kun), unga bog'langan visit_note hali YO'Q;
+ *    (oxirgi 14 kun), unga bog'langan IMZOLANGAN (`signed_at IS NOT NULL`)
+ *    visit_note hali YO'Q — qoralama yozuv ham «kutilmoqda» (FX-118);
  *  - ko'rilmagan rasm = shifokorning oxirgi 30 kundagi bemorlariga boshqa xodim
  *    yuklagan oxirgi 14 kunlik rasm;
  *  - javob kutayotgan reja = shifokorning `presented` rejasi.
@@ -42,7 +43,7 @@ export const createDashboardService = () => {
       eq(appointments.doctorId, userId),
       inArray(appointments.status, ['in_progress', 'completed']),
       gte(appointments.startTime, daysAgo(NOTE_WINDOW_DAYS)),
-      sql`NOT EXISTS (SELECT 1 FROM ${visitNotes} WHERE ${visitNotes.appointmentId} = ${appointments.id})`,
+      sql`NOT EXISTS (SELECT 1 FROM ${visitNotes} WHERE ${visitNotes.appointmentId} = ${appointments.id} AND ${visitNotes.signedAt} IS NOT NULL)`,
     );
     const [noteCount] = await db.select({ n: count() }).from(appointments).where(noteWhere);
     const noteRows = await db

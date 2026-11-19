@@ -52,6 +52,7 @@ export const ROLE_TEMPLATES = [
       'patient.view_pii',
       'medical_record.view',
       'medical_record.edit',
+      'medical_record.on_behalf',
       'appointment.view',
       'appointment.create',
       'appointment.edit',
@@ -79,6 +80,7 @@ export const ROLE_TEMPLATES = [
       // M5 shell permissions (CLI-412)
       'prescription.view',
       'prescription.manage',
+      'prescription.on_behalf',
       'consent.view',
       'consent.manage',
       'lab_order.view',

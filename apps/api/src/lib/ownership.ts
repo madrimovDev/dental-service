@@ -2,6 +2,7 @@ import {
   appointments,
   branches,
   patients,
+  roles,
   services,
   stockItems,
   tenants,
@@ -13,6 +14,7 @@ import {
 import { and, eq, isNotNull } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../db/scoped.ts';
+import { practitionerAssignmentConditions } from './doctor-branch.ts';
 
 /**
  * CLI-421 — cross-entity ownership validator (in-tenant).
@@ -30,11 +32,22 @@ import { getDb } from '../db/scoped.ts';
 export class CrossEntityError extends Error {
   constructor(
     readonly entity: string,
-    readonly reason: 'not_found' | 'mismatch',
+    readonly reason: 'not_found' | 'mismatch' | 'not_practitioner',
     message?: string,
   ) {
     super(message ?? `Ownership check failed for ${entity}: ${reason}`);
     this.name = 'CrossEntityError';
+  }
+}
+
+/**
+ * FX-155 (LC-33) — yozuv muallifi (`doctorId`) boshqa shifokor bo'lsa, `*.on_behalf` ruxsati
+ * talab qilinadi; yo'q bo'lsa route 403 (`<resource>.on_behalf_forbidden`).
+ */
+export class OnBehalfForbiddenError extends Error {
+  constructor(readonly permission: string) {
+    super(`Recording on behalf of another doctor requires '${permission}'`);
+    this.name = 'OnBehalfForbiddenError';
   }
 }
 
@@ -170,7 +183,76 @@ export const createOwnershipValidator = () => {
     if (row.patientId !== patientId) throw new CrossEntityError('appointment', 'mismatch');
   }
 
+  /**
+   * FX-117 (LB-26): vizit yozuvi faqat shu yozilish shifokorining yozuvi bo'lishi mumkin —
+   * aks holda boshqa shifokorning «Mendan kutilmoqda» bandi yozuvsiz yopilib qoladi.
+   */
+  async function assertAppointmentDoctor(
+    c: Context,
+    appointmentId: string,
+    doctorId: string,
+  ): Promise<void> {
+    const db = getDb(c);
+    const [row] = await db
+      .select({ doctorId: appointments.doctorId })
+      .from(appointments)
+      .where(eq(appointments.id, appointmentId))
+      .limit(1);
+    if (!row) throw new CrossEntityError('appointment', 'not_found');
+    if (row.doctorId !== doctorId) {
+      throw new CrossEntityError(
+        'appointment',
+        'mismatch',
+        'Appointment belongs to a different doctor than the visit note',
+      );
+    }
+  }
+
+  /**
+   * FX-155 (LC-33): klinik yozuv muallifi (`doctorId`) — (1) shu tenantda faol, qabul qilingan
+   * `roles.is_practitioner` tayinlovi bor shifokor (tenant OWNER — implicit superuser istisno),
+   * (2) joriy foydalanuvchi emas bo'lsa — `onBehalfPermission` (yoki `@owner`) shart.
+   */
+  async function assertPractitioner(
+    c: Context,
+    doctorId: string,
+    onBehalfPermission: string,
+  ): Promise<void> {
+    const db = getDb(c);
+    const activeTenantId: string | null | undefined = c.get('activeTenantId');
+    let isOwner = false;
+    if (activeTenantId) {
+      const [tenant] = await db
+        .select({ ownerUserId: tenants.ownerUserId })
+        .from(tenants)
+        .where(eq(tenants.id, activeTenantId));
+      isOwner = tenant?.ownerUserId === doctorId;
+    }
+    if (!isOwner) {
+      const [assignment] = await db
+        .select({ id: userAssignments.id })
+        .from(userAssignments)
+        .innerJoin(roles, eq(roles.id, userAssignments.roleId))
+        .where(and(eq(userAssignments.userId, doctorId), ...practitionerAssignmentConditions(null)))
+        .limit(1);
+      if (!assignment) {
+        // Tayinlov umuman yo'q → 'not_found' (assertUserExists bilan bir xil); bor, lekin
+        // shifokor roli emas → 'not_practitioner'.
+        await assertUserExists(c, doctorId);
+        throw new CrossEntityError('user', 'not_practitioner');
+      }
+    }
+    const currentUserId: string | undefined = c.get('user')?.id;
+    if (doctorId !== currentUserId) {
+      const perms: string[] = c.get('accessClaims')?.perms ?? [];
+      if (!perms.includes('@owner') && !perms.includes(onBehalfPermission)) {
+        throw new OnBehalfForbiddenError(onBehalfPermission);
+      }
+    }
+  }
+
   return {
+    assertPractitioner,
     assertBranchExists,
     assertTreatmentPlanExists,
     assertStockItemExists,
@@ -180,6 +262,7 @@ export const createOwnershipValidator = () => {
     assertStageBelongsToPatient,
     assertVisitNoteBelongsToPatient,
     assertAppointmentBelongsToPatient,
+    assertAppointmentDoctor,
   };
 };
 
