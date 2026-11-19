@@ -1,6 +1,7 @@
 import {
   ApiError,
   type SignTreatmentPlanConsentBody,
+  type ToothState,
   type TreatmentPlanStatus,
   type TreatmentStageAcceptance,
   type TreatmentStageStatus,
@@ -20,6 +21,7 @@ import {
   useUpdatePlanStatus,
   useUpdateStage,
   useUpdateStageAcceptance,
+  useUpdateStageResultingState,
 } from '../../clinical.api';
 import { PlanCard } from './PlanCard';
 import { PlanFormModal } from './PlanFormModal';
@@ -36,12 +38,16 @@ export function TreatmentPlansTab({ patientId }: Props) {
   const createMut = useCreatePlan(patientId);
   const updateStageMut = useUpdateStage(patientId);
   const acceptanceMut = useUpdateStageAcceptance(patientId);
+  const resultingStateMut = useUpdateStageResultingState(patientId);
   const acceptAllMut = useAcceptAllStages(patientId);
   const planStatusMut = useUpdatePlanStatus(patientId);
   const consentMut = useSignPlanConsent(patientId);
 
   const onUpdateStage = (id: string, status: TreatmentStageStatus) =>
     updateStageMut.mutate({ id, status });
+
+  const onSetResultingState = (id: string, resultingToothState: ToothState | null) =>
+    resultingStateMut.mutate({ id, resultingToothState });
 
   const onSetAcceptance = (id: string, acceptance: TreatmentStageAcceptance) =>
     acceptanceMut.mutate({ id, acceptance });
@@ -120,6 +126,7 @@ export function TreatmentPlansTab({ patientId }: Props) {
             onUpdateStage={onUpdateStage}
             onSetAcceptance={onSetAcceptance}
             acceptancePending={acceptanceMut.isPending}
+            onSetResultingState={onSetResultingState}
             onAcceptAll={onAcceptAll}
             acceptAllPending={acceptAllMut.isPending}
             onPresentPlan={onPresentPlan}

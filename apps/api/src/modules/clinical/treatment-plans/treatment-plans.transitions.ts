@@ -128,6 +128,64 @@ export class PlanNotActiveError extends InvalidTransitionError {
 }
 
 /**
+ * X-3 + FX-13 (LA-36, D-11): bosqichni 'completed' qilish uchun effektiv acceptance
+ * 'accepted' bo'lishi shart. proposed/rejected bosqich bajarilsa, hisob-kitobda cost=0
+ * bo'lib jim qarzsiz qolardi. InvalidTransitionError SUBKLASSI → routes 400
+ * (`stage.invalid_transition`).
+ */
+export class StageNotAcceptedError extends InvalidTransitionError {
+  constructor(readonly acceptance: StageAcceptance) {
+    super('stage_status', `acceptance:${acceptance}`, 'completed');
+    this.name = 'StageNotAcceptedError';
+    this.message = `Cannot complete stage: acceptance is '${acceptance}', not 'accepted'.`;
+  }
+}
+
+/**
+ * FX-15 (LA-32): bajarilgan (completed) bosqichning qabul qilingan (accepted) holatini
+ * rejected/proposed'ga qaytarib bo'lmaydi — aks holda bajarilgan ish qarzi (cost) jimgina
+ * 0 ga tushardi. InvalidTransitionError SUBKLASSI → routes 400.
+ */
+export class CompletedStageAcceptanceLockedError extends InvalidTransitionError {
+  constructor(to: StageAcceptance) {
+    super('stage_acceptance', 'accepted', to);
+    this.name = 'CompletedStageAcceptanceLockedError';
+    this.message = `Cannot change acceptance of a completed stage from 'accepted' to '${to}'.`;
+  }
+}
+
+/**
+ * FX-15 (LA-32): bajarilgan bosqichli rejani bekor qilib bo'lmaydi — cancelled reja
+ * qarz cost'ini 0 qiladi, to'langan summa esa kredit bo'lib qoladi. Reja `completed`
+ * qilinadi (yoki bekor qilishdan oldin bosqichlar hal qilinadi). InvalidTransitionError
+ * SUBKLASSI → routes 400 (`plan.invalid_transition`).
+ */
+export class PlanHasCompletedStagesError extends InvalidTransitionError {
+  constructor(from: PlanStatus) {
+    super('plan', from, 'cancelled');
+    this.name = 'PlanHasCompletedStagesError';
+    this.message = 'Cannot cancel a plan that has completed stages.';
+  }
+}
+
+/**
+ * FX-16 (LA-37): bajarilmagan (pending/in_progress) accepted bosqichi bor rejani
+ * 'completed' qilib bo'lmaydi — completed reja bosqich mutatsiyasini qulflaydi, bemor
+ * bajarilmagan ish uchun qaytarib bo'lmas qarzda qolardi. Avval bosqichni bajaring yoki
+ * skipped/rejected qiling. InvalidTransitionError SUBKLASSI → routes 400.
+ */
+export class PlanHasOpenStagesError extends InvalidTransitionError {
+  constructor(
+    from: PlanStatus,
+    readonly openStages: number,
+  ) {
+    super('plan', from, 'completed');
+    this.name = 'PlanHasOpenStagesError';
+    this.message = `Cannot complete plan: ${openStages} accepted stage(s) are not completed or skipped.`;
+  }
+}
+
+/**
  * CLI-487: bog'langan lab-order hali 'delivered' emas — bosqichni 'completed' qilib
  * bo'lmaydi. InvalidTransitionError SUBKLASSI (PlanLockedError precedenti) →
  * visit-notes/treatment-plans routes'dagi mavjud `instanceof InvalidTransitionError`

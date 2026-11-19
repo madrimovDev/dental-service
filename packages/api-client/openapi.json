@@ -7491,6 +7491,10 @@
             "format": "uuid",
             "example": null
           },
+          "completesStage": {
+            "type": "boolean",
+            "example": true
+          },
           "visitDate": {
             "type": "string",
             "example": "2026-06-12T10:00:00.000Z"
@@ -7563,6 +7567,7 @@
           "doctorId",
           "appointmentId",
           "stageId",
+          "completesStage",
           "visitDate",
           "subjective",
           "objective",
@@ -26132,6 +26137,21 @@
                         "notes": {
                           "type": "string",
                           "maxLength": 500
+                        },
+                        "resultingToothState": {
+                          "type": "string",
+                          "enum": [
+                            "healthy",
+                            "caries",
+                            "filling",
+                            "crown",
+                            "implant",
+                            "missing",
+                            "root_canal",
+                            "to_extract",
+                            "temporary",
+                            "veneer"
+                          ]
                         }
                       },
                       "required": [
@@ -26849,6 +26869,9 @@
                     "type": "string",
                     "format": "uuid"
                   },
+                  "completesStage": {
+                    "type": "boolean"
+                  },
                   "visitDate": {
                     "type": "string",
                     "format": "date-time",
@@ -27087,6 +27110,9 @@
                   "stageId": {
                     "type": "string",
                     "format": "uuid"
+                  },
+                  "completesStage": {
+                    "type": "boolean"
                   },
                   "visitDate": {
                     "type": "string",

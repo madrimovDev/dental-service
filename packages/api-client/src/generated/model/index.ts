@@ -150,6 +150,7 @@ export * from './createToothChartBodyStatesItemSurface';
 export * from './createTreatmentPlan201';
 export * from './createTreatmentPlanBody';
 export * from './createTreatmentPlanBodyStagesItem';
+export * from './createTreatmentPlanBodyStagesItemResultingToothState';
 export * from './createVisitNote201';
 export * from './createVisitNoteBody';
 export * from './createVisitNoteBodyNextVisit';

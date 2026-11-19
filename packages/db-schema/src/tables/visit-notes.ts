@@ -44,6 +44,10 @@ export const visitNotes = pgTable(
     // vizit bosqichga bog'lanmaydi.
     stageId: uuid('stage_id').references(() => treatmentStages.id, { onDelete: 'set null' }),
 
+    // FX-14 (LA-33, D-9): bosqichni IMZODA yopadimi. true (default) — imzo bosqichni
+    // `completed` qiladi; false — oraliq vizit (ko'p vizitli bosqich), bosqich `in_progress`.
+    completesStage: boolean('completes_stage').notNull().default(true),
+
     visitDate: timestamp('visit_date', { withTimezone: true }).notNull().defaultNow(),
 
     // SOAP

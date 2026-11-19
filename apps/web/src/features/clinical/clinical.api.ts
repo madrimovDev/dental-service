@@ -39,6 +39,7 @@ import {
   signConsentForm,
   signTreatmentPlanConsent,
   signVisitNote,
+  type ToothState,
   type TreatmentStageAcceptance,
   type TreatmentStageStatus,
   type UpdateTreatmentPlanBodyStatus,
@@ -184,6 +185,21 @@ export function useUpdateStage(patientId: string) {
   });
 }
 
+/** FX-27: bosqichning natijaviy tish holatini belgilash (`null` — odontogrammaga tegmaydi). */
+export function useUpdateStageResultingState(patientId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      resultingToothState,
+    }: {
+      id: string;
+      resultingToothState: ToothState | null;
+    }) => updateTreatmentStage(id, { resultingToothState }).then((r) => r.data),
+    onSuccess: () => invalidatePlanFinancials(qc, patientId),
+  });
+}
+
 // CLI-223/224: smeta (estimate) — bemorga taqdim qilish + balans yakuniy manbasi.
 export function useTreatmentPlanEstimate(planId: string, enabled = true) {
   return useQuery({
@@ -284,7 +300,11 @@ export function useCreateVisitNote(patientId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: CreateVisitNoteInput) => createVisitNote(body).then((r) => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: clinicalKeys.visitNotes(patientId) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: clinicalKeys.visitNotes(patientId) });
+      // FX-14: qoralama bosqichni `in_progress` qiladi.
+      qc.invalidateQueries({ queryKey: clinicalKeys.plans(patientId) });
+    },
   });
 }
 
@@ -330,6 +350,8 @@ export function useSignVisitNote(patientId: string) {
     onSuccess: (_d, id) => {
       qc.invalidateQueries({ queryKey: clinicalKeys.visitNotes(patientId) });
       qc.invalidateQueries({ queryKey: clinicalKeys.visitNote(id) });
+      // FX-14: imzo bosqichni yopadi (recall, odontogramma) — reja/bosqich ro'yxati yangilanadi.
+      qc.invalidateQueries({ queryKey: clinicalKeys.plans(patientId) });
     },
   });
 }

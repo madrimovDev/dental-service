@@ -42,6 +42,9 @@ export const createTreatmentPlanSchema = z.object({
         estimatedDurationMinutes: z.coerce.number().int().positive().optional(),
         cost: z.coerce.number().nonnegative(),
         notes: z.string().max(500).optional(),
+        // FX-27 (LA-35): bosqich 'completed' bo'lganda odontogramma shu holatga o'tadi
+        // (CLI-488 hook; create'da ham berish mumkin — odontogramma `addToPlan` shuni yuboradi).
+        resultingToothState: toothStateSchema.optional(),
       }),
     )
     .default([]),

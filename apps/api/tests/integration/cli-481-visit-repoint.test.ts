@@ -7,7 +7,8 @@
  * (phantom-completed) va uning auto-recall'i orphan bo'ladi. Bitta re-point ikkita
  * completed bosqich + ikkita recall yaratadi.
  *
- * FIX (blok): bir vizit yozuvi allaqachon bir bosqichni `completed` qilgan bo'lsa
+ * FIX (blok): bir vizit yozuvi allaqachon bir bosqichga bog'langan bo'lsa (FX-14 dan keyin
+ * qoralama `in_progress` qiladi, imzo `completed`)
  * (`before.stageId` non-null), uni BOSHQA bosqichga (yoki null'ga) qayta yo'naltirish
  * RAD etiladi (VisitStageRepointError → InvalidTransitionError → routes 400). Eski
  * bosqich legitim `completed` bo'lib qoladi, phantom/orphan yaratilmaydi.
@@ -53,7 +54,10 @@ const recallSpy = {
 const plansService = createTreatmentPlansService({ audit: noopAudit, recall: recallSpy });
 const visitService = createVisitNotesService({
   audit: noopAudit,
-  completeStage: { completeStageForVisit: plansService.completeStageForVisit },
+  completeStage: {
+    completeStageForVisit: plansService.completeStageForVisit,
+    startStageForVisit: plansService.startStageForVisit,
+  },
 });
 
 const ctx = (tx: DbOrTx, tenantId: string): Context =>
@@ -143,7 +147,7 @@ afterAll(async () => {
 describe('CLI-481 — visit re-point blocked (no phantom completed, no orphan recall)', () => {
   let noteId: string;
 
-  test('1) stageId=A bilan vizit → A completed + A-recall fire', async () => {
+  test('1) stageId=A bilan vizit → A in_progress (FX-14: qoralama yopmaydi)', async () => {
     recallCalls.length = 0;
     await db.transaction(async (tx) => {
       await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
@@ -158,7 +162,7 @@ describe('CLI-481 — visit re-point blocked (no phantom completed, no orphan re
       noteId = note.id;
       expect(note.stageId).toBe(stageAId);
     });
-    expect(recallCalls).toContain(stageAId);
+    expect(recallCalls).not.toContain(stageAId);
   });
 
   test('2) shu vizitni stageId=B ga re-point → InvalidTransitionError (blok)', async () => {

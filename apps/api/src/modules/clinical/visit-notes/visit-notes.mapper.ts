@@ -11,6 +11,7 @@ export const toVisitNoteDto = (note: VisitNoteRow): VisitNoteDto => ({
   doctorId: note.doctorId,
   appointmentId: note.appointmentId ?? null,
   stageId: note.stageId ?? null,
+  completesStage: note.completesStage,
   visitDate: note.visitDate.toISOString(),
   subjective: note.subjective ?? null,
   objective: note.objective ?? null,

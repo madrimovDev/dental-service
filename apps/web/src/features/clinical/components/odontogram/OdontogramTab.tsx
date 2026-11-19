@@ -30,7 +30,9 @@ import {
 } from '../../clinical.api';
 import {
   entriesToCreateInput,
+  groupToothEntries,
   plannedTeethFromPlans,
+  resultingStateForPlan,
   toothHistoryRows,
   toToothDisplayMap,
   toToothEntries,
@@ -135,6 +137,7 @@ export function OdontogramTab({ patientId }: Props) {
   const addToPlan = (entries: ToothEntry[], label: string, service?: SuggestedService) => {
     const tooth = selectedTooth;
     if (tooth === null || !user?.id) return;
+    const resultingToothState = resultingStateForPlan(groupToothEntries(entries, tooth)[0]?.state);
     save(entries, () =>
       createPlanMut.mutate(
         {
@@ -148,6 +151,7 @@ export function OdontogramTab({ patientId }: Props) {
               toothNumbers: [tooth],
               estimatedVisits: 1,
               cost: service?.cost ?? 0,
+              ...(resultingToothState ? { resultingToothState } : {}),
             },
           ],
         },

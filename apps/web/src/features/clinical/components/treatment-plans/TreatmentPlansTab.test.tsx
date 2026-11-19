@@ -24,6 +24,8 @@ vi.mock('../../clinical.api', () => ({
   useUpdateStage: () => ({ mutate: vi.fn() }),
   // CLI-224: acceptance/consent/plan-status hook'lari.
   useUpdateStageAcceptance: () => ({ mutate: vi.fn(), isPending: false }),
+  // FX-27: bosqichning resultingToothState tanlovi.
+  useUpdateStageResultingState: () => ({ mutate: vi.fn(), isPending: false }),
   useAcceptAllStages: () => ({ mutate: vi.fn(), isPending: false }),
   useUpdatePlanStatus: () => ({ mutate: planStatusMutate, isPending: false }),
   useSignPlanConsent: () => ({ mutate: vi.fn(), isPending: false }),

@@ -121,7 +121,10 @@ export const clinicalRoutes = (deps: {
     visitNotesRoutes({
       audit: deps.audit,
       deductStock: stockService.deductForServices,
-      completeStage: { completeStageForVisit: treatmentPlansService.completeStageForVisit },
+      completeStage: {
+        completeStageForVisit: treatmentPlansService.completeStageForVisit,
+        startStageForVisit: treatmentPlansService.startStageForVisit,
+      },
       reconcileStock,
     }),
   );
