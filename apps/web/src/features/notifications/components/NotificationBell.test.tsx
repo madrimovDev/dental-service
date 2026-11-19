@@ -1,4 +1,5 @@
 import { fireEvent, screen } from '@testing-library/react';
+import { Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/lib/i18n.ts';
 import { renderApp } from '../../../test-utils';
@@ -10,6 +11,8 @@ type MockNotification = {
   body: string | null;
   readAt: string | null;
   createdAt: string;
+  type?: string;
+  params?: Record<string, string | number> | null;
 };
 
 let mockData: { data: MockNotification[]; unreadCount: number } | undefined;
@@ -17,7 +20,13 @@ const markReadMutate = vi.fn();
 const markAllReadMutate = vi.fn();
 
 vi.mock('../notifications.api.ts', () => ({
-  useNotifications: () => ({ data: mockData, isLoading: false }),
+  useNotifications: () => ({
+    data: mockData && {
+      ...mockData,
+      data: mockData.data.map((n) => ({ type: 'appointment.reminder', params: null, ...n })),
+    },
+    isLoading: false,
+  }),
   useMarkRead: () => ({ mutate: markReadMutate, isPending: false }),
   useMarkAllRead: () => ({ mutate: markAllReadMutate, isPending: false }),
 }));
@@ -196,5 +205,46 @@ describe('NotificationBell — locale-aware sana formatlash', () => {
     fireEvent.click(screen.getByLabelText(i18n.t('shell.notifications')));
     await screen.findByText('Item');
     expect(screen.getByText(expectedFor('ru-RU'))).toBeInTheDocument();
+  });
+});
+
+describe('NotificationBell — FX-167 type + params render va navigatsiya', () => {
+  const lowStock = {
+    id: 'ls-1',
+    type: 'stock.low_threshold',
+    title: 'Kam qoldiq: Plomba',
+    body: 'Qoldiq: 0.5 (min: 1)',
+    params: { itemId: 'i1', itemName: 'Plomba', qty: 0.5, min: 1 },
+    readAt: null,
+    createdAt: '2026-07-01T08:00:00.000Z',
+  };
+
+  it("params bor bo'lsa matn tilga qarab t() bilan render qilinadi (ru)", async () => {
+    await i18n.changeLanguage('ru');
+    mockData = { data: [lowStock], unreadCount: 1 };
+    renderApp(<NotificationBell />);
+    fireEvent.click(screen.getByLabelText(i18n.t('shell.notifications')));
+    expect(await screen.findByText('Низкий остаток: Plomba')).toBeInTheDocument();
+    expect(screen.getByText('Остаток: 0.5 (мин: 1)')).toBeInTheDocument();
+  });
+
+  it("params yo'q (eski yozuv) — serverdagi matn fallback", async () => {
+    mockData = { data: [{ ...lowStock, params: null, title: 'Eski matn' }], unreadCount: 1 };
+    renderApp(<NotificationBell />);
+    fireEvent.click(screen.getByLabelText('Bildirishnomalar'));
+    expect(await screen.findByText('Eski matn')).toBeInTheDocument();
+  });
+
+  it("ombor bildirishnomasi bosilganda /stock ga o'tadi", async () => {
+    mockData = { data: [lowStock], unreadCount: 1 };
+    renderApp(
+      <Routes>
+        <Route path="/" element={<NotificationBell />} />
+        <Route path="/stock" element={<div>OMBOR SAHIFASI</div>} />
+      </Routes>,
+    );
+    fireEvent.click(screen.getByLabelText('Bildirishnomalar'));
+    fireEvent.click((await screen.findByText('Kam qoldiq: Plomba')).closest('button')!);
+    expect(await screen.findByText('OMBOR SAHIFASI')).toBeInTheDocument();
   });
 });

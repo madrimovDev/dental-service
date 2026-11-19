@@ -313,7 +313,13 @@
   "notifications": {
     "title": "Уведомления",
     "mark_all_read": "Отметить все как прочитанные",
-    "empty": "Нет уведомлений"
+    "empty": "Нет уведомлений",
+    "types": {
+      "stock_low_threshold": {
+        "title": "Низкий остаток: {{itemName}}",
+        "body": "Остаток: {{qty}} (мин: {{min}})"
+      }
+    }
   },
   "onboarding": {
     "title": "Настройка клиники",

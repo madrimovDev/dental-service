@@ -9,6 +9,7 @@ export const toNotificationDto = (row: Notification): NotificationDto => ({
   type: row.type,
   title: row.title,
   body: row.body ?? null,
+  params: row.params ?? null,
   readAt: row.readAt ? row.readAt.toISOString() : null,
   createdAt: row.createdAt.toISOString(),
 });

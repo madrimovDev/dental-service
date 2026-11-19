@@ -96,7 +96,13 @@ type NotificationsDep = {
   notifyInTx: (
     tx: DbOrTx,
     tenantId: string,
-    payload: { userId: string; type: string; title: string; body?: string },
+    payload: {
+      userId: string;
+      type: string;
+      title: string;
+      body?: string;
+      params?: Record<string, string | number>;
+    },
   ) => Promise<unknown>;
 };
 
@@ -168,6 +174,7 @@ export const createStockService = (deps: {
         type: 'stock.low_threshold',
         title: `Kam qoldiq: ${item.name}`,
         body: `Qoldiq: ${currentQty} (min: ${threshold})`,
+        params: { itemId: item.id, itemName: item.name, qty: currentQty, min: threshold },
       });
     }
   }

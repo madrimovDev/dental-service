@@ -3450,6 +3450,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "params": {
+          "name": "params",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
         "read_at": {
           "name": "read_at",
           "type": "timestamp with time zone",
