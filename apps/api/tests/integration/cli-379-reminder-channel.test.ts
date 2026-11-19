@@ -102,7 +102,7 @@ const seedTenant = async (slug: string, name: string) => {
   return t!.id;
 };
 
-const day = '2026-12-10';
+const day = '2036-12-10';
 
 /**
  * Bemor + navbat yozuvi (yozilish) — reminder job'i shu yozilishga bog'liq.

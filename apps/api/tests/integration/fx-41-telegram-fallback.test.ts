@@ -98,8 +98,8 @@ const seedAppt = async (tenantId: string, branchId: string, phone: string, chat:
         branchId,
         doctorId: ownerId,
         patientId: p!.id,
-        startTime: new Date(`2026-12-11T${String(h).padStart(2, '0')}:00:00+05:00`),
-        endTime: new Date(`2026-12-11T${String(h).padStart(2, '0')}:30:00+05:00`),
+        startTime: new Date(`2036-12-11T${String(h).padStart(2, '0')}:00:00+05:00`),
+        endTime: new Date(`2036-12-11T${String(h).padStart(2, '0')}:30:00+05:00`),
         status: 'scheduled',
       })
       .returning({ id: appointments.id });
