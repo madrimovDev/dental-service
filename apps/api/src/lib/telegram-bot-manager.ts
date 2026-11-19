@@ -9,6 +9,7 @@ import { expireAndNotifyStaleBookingRequests } from '../modules/booking-requests
 import { decryptSecret } from './crypto.ts';
 import { env } from './env.ts';
 import { logger } from './logger.ts';
+import { createBotLifecycle, type LifecycleBot } from './telegram/bot-lifecycle.ts';
 import { createBotFlows } from './telegram/deps.ts';
 import type { TelegramFlows } from './telegram/flows.ts';
 import { createPatientMessenger } from './telegram/notify.ts';
@@ -90,10 +91,10 @@ export async function linkPatientByContact(
 }
 
 export function startTelegramBotManager(deps: ManagerDeps) {
-  const bots = new Map<string, Telegraf>();
   const flows = deps.flows ?? createBotFlows(deps.adminDb);
 
-  const launch = async (tenantId: string, token: string) => {
+  /** Telegraf instansiyasini handlerlar bilan quradi (ishga tushirmaydi). */
+  const buildBot = (tenantId: string, token: string): LifecycleBot => {
     const bot = new Telegraf(token);
     const run = <T>(fn: (tx: DbOrTx) => Promise<T>) => deps.withTenant(tenantId, fn);
     const send = (ctx: { reply: (t: string, e?: object) => Promise<unknown> }, r: BotReply) =>
@@ -219,31 +220,17 @@ export function startTelegramBotManager(deps: ManagerDeps) {
       await ctx.answerCbQuery(res.toast);
       if (res.reply) await send(ctx, res.reply);
     });
-    // NOTE: `bot.launch()`'s promise does NOT resolve on start — it resolves only
-    // after `bot.stop()` (Telegraf's `Polling.loop()` is a `for await` that runs
-    // until `abortController.abort()`; confirmed against the installed
-    // `telegraf` source, `node_modules/telegraf/lib/polling.js`). `await`-ing it
-    // here would hang `bootAll()`'s per-tenant loop on the first tenant with a
-    // token, and `bots.set(...)` below would never run during normal operation.
-    // Fire-and-forget instead — same API, just not awaited.
-    void bot.launch().catch((err) => logger.error({ err, tenantId }, 'bot launch failed'));
-    bots.set(tenantId, bot);
-    logger.info({ tenantId }, 'Telegram bot launched');
+    return {
+      launch: (onLaunch) => bot.launch({}, onLaunch),
+      stop: (reason) => bot.stop(reason),
+    };
   };
 
-  const stop = async (tenantId: string) => {
-    const bot = bots.get(tenantId);
-    if (bot) {
-      bot.stop('reload');
-      bots.delete(tenantId);
-    }
-  };
+  // FX-40/FX-143: launch/stop/reload per-tenant ketma-ket, stop xatosiga chidamli.
+  const lifecycle = createBotLifecycle({ create: buildBot });
 
-  const reload = async (tenantId: string) => {
-    await stop(tenantId);
-    const token = await readToken(deps.adminDb, tenantId);
-    if (token) await launch(tenantId, token);
-  };
+  const reload = (tenantId: string) =>
+    lifecycle.reload(tenantId, () => readToken(deps.adminDb, tenantId));
 
   // Boot: launch every tenant that currently has a telegram token.
   const bootAll = async () => {
@@ -254,7 +241,8 @@ export function startTelegramBotManager(deps: ManagerDeps) {
     for (const r of rows) {
       try {
         const enc = (r.s as { telegram?: { botTokenEnc?: string } } | null)?.telegram?.botTokenEnc;
-        if (enc) await launch(r.tenantId, decryptSecret(enc));
+        // Token zanjir ichida QAYTA o'qiladi — boot snapshot'i kechikib, orada kelgan yangi token'ni bosmasin.
+        if (enc) await reload(r.tenantId);
       } catch (err) {
         logger.error({ err, tenantId: r.tenantId }, 'bot bootAll: tenant failed, skipping');
       }
@@ -283,9 +271,11 @@ export function startTelegramBotManager(deps: ManagerDeps) {
 
   const stopAll = async () => {
     clearInterval(expiryTimer);
-    for (const [, bot] of bots) bot.stop('shutdown');
-    bots.clear();
-    await sub.quit();
+    try {
+      lifecycle.stopAll();
+    } finally {
+      await sub.quit();
+    }
   };
 
   return { reload, stopAll };
