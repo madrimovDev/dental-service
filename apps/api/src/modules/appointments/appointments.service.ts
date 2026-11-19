@@ -418,7 +418,18 @@ export const createAppointmentsService = (deps: {
     return { ok: true as const, appointment: appt };
   }
 
-  async function update(c: Context, id: string, input: UpdateAppointmentInput) {
+  /**
+   * `opts.returnStock` — FX-45 review: faqat QO'LDA bekor/no_show (HTTP PATCH yoki
+   * /cancel) bog'liq vizit chiqimini qaytaradi. Tizim o'tishlari (no-show sweep,
+   * navbat sinxroni, Telegram bot) bermaydi — ishlatilgan material avtomatik
+   * omborga qaytmasin.
+   */
+  async function update(
+    c: Context,
+    id: string,
+    input: UpdateAppointmentInput,
+    opts: { returnStock?: boolean } = {},
+  ) {
     const db = getDb(c);
     const [before] = await db.select().from(appointments).where(eq(appointments.id, id));
     if (!before) return { ok: false as const, code: 'not_found' };
@@ -530,7 +541,9 @@ export const createAppointmentsService = (deps: {
 
       // FX-45 (LA-41): faolmas holatga (cancelled/no_show) O'TGANDA bog'liq vizit yozuvlari
       // (imzolangani ham) ombor chiqimi qaytariladi. Idempotent (ledger qoldig'i).
+      // Faqat qo'lda o'tishda (opts.returnStock) — sweep/bot ishlatilgan materialni qaytarmaydi.
       if (
+        opts.returnStock &&
         (input.status === 'cancelled' || input.status === 'no_show') &&
         before.status !== input.status
       ) {
@@ -656,8 +669,13 @@ export const createAppointmentsService = (deps: {
     return { ok: true as const, appointment: updated };
   }
 
-  async function cancel(c: Context, id: string, reason?: string) {
-    return update(c, id, { status: 'cancelled', cancellationReason: reason });
+  async function cancel(
+    c: Context,
+    id: string,
+    reason?: string,
+    opts: { returnStock?: boolean } = {},
+  ) {
+    return update(c, id, { status: 'cancelled', cancellationReason: reason }, opts);
   }
 
   /**

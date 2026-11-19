@@ -8,8 +8,10 @@ import { beforeAll, describe, expect, test } from 'bun:test';
 import {
   appointments,
   branches,
+  patientNoShowStrikes,
   patients,
   permissions,
+  queueTickets,
   rolePermissions,
   roles,
   serviceMaterials,
@@ -24,6 +26,7 @@ import { eq, inArray, sql } from 'drizzle-orm';
 import { createApp } from '../../src/app.ts';
 import { createAdminDb, db } from '../../src/db/client.ts';
 import { signAccess } from '../../src/lib/jwt.ts';
+import { processNoShowSweep } from '../../src/lib/no-show-sweep.ts';
 
 const app = createApp();
 const admin = createAdminDb();
@@ -309,5 +312,81 @@ describe('FX-45: bekor qilingan yozilish ombor chiqimini qaytaradi (idempotent)'
     expect(await qty(item)).toBe(13);
     await call('rec', 'POST', `/api/appointments/${appt}/cancel`, {});
     expect(await qty(item)).toBe(15);
+  });
+});
+
+describe('FX-45 review: avtomatik no-show sweep ishlatilgan materialni qaytarmaydi', () => {
+  const pastAppt = async () => {
+    const start = new Date(Date.now() - 26 * 3_600_000 - ++slot * 3_600_000);
+    return (
+      await admin.db
+        .insert(appointments)
+        .values({
+          tenantId,
+          branchId,
+          patientId,
+          doctorId: docId,
+          startTime: start,
+          endTime: new Date(start.getTime() + 1_800_000),
+          status: 'scheduled',
+        } as never)
+        .returning({ id: appointments.id })
+    )[0]!.id;
+  };
+  const apptStatus = async (id: string) =>
+    (await admin.db.select().from(appointments).where(eq(appointments.id, id)))[0]!.status;
+  const strikes = async (id: string) =>
+    (
+      await admin.db
+        .select()
+        .from(patientNoShowStrikes)
+        .where(eq(patientNoShowStrikes.appointmentId, id))
+    ).length;
+
+  test('ticket-siz o‘tgan yozilish + imzolangan vizit: sweep tegmaydi, ombor va strike o‘zgarmaydi', async () => {
+    await setQty(item, 10);
+    await setBom(svcX, 1);
+    const appt = await pastAppt();
+    const note = await newNote([svcX], appt);
+    expect(await qty(item)).toBe(9);
+    expect((await call('doc', 'POST', `/api/visit-notes/${note}/sign`)).status).toBe(200);
+
+    await processNoShowSweep({ adminDb: admin.db });
+
+    expect(await qty(item)).toBe(9);
+    expect(await apptStatus(appt)).toBe('scheduled');
+    expect(await strikes(appt)).toBe(0);
+    const ins = (
+      await admin.db.select().from(stockMovements).where(eq(stockMovements.sourceVisitNoteId, note))
+    ).filter((m) => m.type === 'in');
+    expect(ins.length).toBe(0);
+  });
+
+  test('kechagi waiting ticket sweep orqali no_show bo‘lsa ham (tizim o‘tishi) ombor qaytmaydi', async () => {
+    await setQty(item, 10);
+    await setBom(svcX, 1);
+    const appt = await pastAppt();
+    await admin.db.insert(queueTickets).values({
+      tenantId,
+      branchId,
+      patientId,
+      appointmentId: appt,
+      queueNumber: 1,
+      status: 'waiting',
+      ticketDate: new Date(Date.now() - 26 * 3_600_000),
+    } as never);
+    await newNote([svcX], appt);
+    expect(await qty(item)).toBe(9);
+
+    await processNoShowSweep({ adminDb: admin.db });
+
+    expect(await apptStatus(appt)).toBe('no_show');
+    expect(await qty(item)).toBe(9);
+  });
+
+  test('vizitsiz o‘tgan yozilish baribir no_show bo‘ladi (sweep ishlayveradi)', async () => {
+    const appt = await pastAppt();
+    await processNoShowSweep({ adminDb: admin.db });
+    expect(await apptStatus(appt)).toBe('no_show');
   });
 });
