@@ -23,12 +23,25 @@ export const { db, client } = createDb(config.databaseUrl, 5);
 /** Superuser ulanish — RLS'siz "xom" tekshiruv uchun (bazada ochiq ism yo'qmi). */
 export const adminSql = postgres(process.env.DATABASE_ADMIN_URL!, { max: 2, onnotice: () => {} });
 
-export const supervisorRegistry = new Map<string, ClinicVerification & { licenseKey?: string }>();
+export const supervisorRegistry = new Map<
+  string,
+  ClinicVerification & { licenseKey?: string; fingerprint?: string }
+>();
+/** Isbot so'rovlari (FX-138: fingerprint Supervisor'ga yetib boradimi). */
+export const supervisorCalls: { id: string; licenseKey?: string; fingerprint?: string }[] = [];
 export const fakeSupervisor: SupervisorClient = {
   async verifyClinic(id, opts) {
+    supervisorCalls.push({ id, ...opts });
     const c = supervisorRegistry.get(id);
     if (!c) return null;
-    return { ...c, licenseMatches: !!opts.licenseKey && opts.licenseKey === c.licenseKey };
+    return {
+      ...c,
+      licenseMatches:
+        !!opts.licenseKey &&
+        opts.licenseKey === c.licenseKey &&
+        !!opts.fingerprint &&
+        opts.fingerprint === c.fingerprint,
+    };
   },
 };
 
@@ -110,6 +123,7 @@ export const connectClinic = async (
 ): Promise<ClinicCtx> => {
   const supervisorClinicId = crypto.randomUUID();
   const licenseKey = `K-${crypto.randomUUID()}`;
+  const fingerprint = `fp-${crypto.randomUUID()}`;
   supervisorRegistry.set(supervisorClinicId, {
     clinicId: supervisorClinicId,
     name: `Klinika ${supervisorClinicId.slice(0, 6)}`,
@@ -118,11 +132,12 @@ export const connectClinic = async (
     expiresAt: (over.expiresAt ?? inDays(365)).toISOString(),
     licenseMatches: false,
     licenseKey,
+    fingerprint,
   });
   const res = await app.request('/v1/clinic/connect', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-real-ip': crypto.randomUUID() },
-    body: json({ supervisorClinicId, licenseKey }),
+    body: json({ supervisorClinicId, licenseKey, fingerprint }),
   });
   if (res.status !== 200) throw new Error(`connect ${res.status} ${await res.text()}`);
   const body = (await res.json()) as { clinicId: string; hubKey: string };

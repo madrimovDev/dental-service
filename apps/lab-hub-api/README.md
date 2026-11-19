@@ -67,7 +67,10 @@ butunlay bloklanadi (mavjud ishlar ham).
 - Hub → Supervisor: `GET /internal/clinics/:id/verify` (connect va davriy qayta tekshiruv) —
   `{clinicId, name, mode: 'desktop'|'saas', active, expiresAt, licenseMatches}`. Desktop —
   litsenziyalar bo'yicha, SaaS — `clinics.subscription_expires_at` (connect `serviceProof`
-  bilan). Shartnoma `apps/supervisor-api/src/modules/hub/hub-internal.test.ts` seam testida
+  bilan). Desktop connect isboti = litsenziya kaliti + o'rnatma `fingerprint`i (FX-138):
+  `licenseMatches` faqat kalit shu fingerprint'ga hozir bog'langan bo'lsa (`prepare-reinstall`dan
+  keyin yangi o'rnatma) — eski PC o'z kaliti bilan Hub kalitini qayta olib, yangisini uza olmaydi.
+  Shartnoma `apps/supervisor-api/src/modules/hub/hub-internal.test.ts` seam testida
   shu ilovaning `createSupervisorClient`i bilan qulflangan.
 - Supervisor → Hub: vendor renew / deactivate / reactivate'dan keyin best-effort
   `POST /internal/clinics` upsert (faol emas → `expiresAt: null` = darhol blok).

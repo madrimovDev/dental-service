@@ -126,7 +126,7 @@ export type HubChangeEvent = {
 };
 
 export type ConnectProof =
-  | { supervisorClinicId: string; licenseKey: string }
+  | { supervisorClinicId: string; licenseKey: string; fingerprint: string }
   | { supervisorClinicId: string; serviceProof: string };
 
 const ref = (r: string) => encodeURIComponent(r);

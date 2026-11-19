@@ -85,6 +85,8 @@ const connectSchema = z
   .object({
     supervisorClinicId: z.uuid(),
     licenseKey: z.string().trim().min(1).max(100).optional(),
+    /** FX-138: desktop o'rnatma fingerprint'i — Supervisor uni bog'langan o'rnatma bilan solishtiradi. */
+    fingerprint: z.string().trim().min(1).max(200).optional(),
     serviceProof: z.string().min(1).max(500).optional(),
   })
   .strict()
@@ -140,13 +142,17 @@ export const clinicRoutes = (deps: Deps) => {
       }
       let v: Awaited<ReturnType<typeof deps.supervisor.verifyClinic>>;
       try {
-        v = await deps.supervisor.verifyClinic(b.supervisorClinicId, { licenseKey: b.licenseKey });
+        v = await deps.supervisor.verifyClinic(b.supervisorClinicId, {
+          licenseKey: b.licenseKey,
+          fingerprint: b.fingerprint,
+        });
       } catch {
         throw new ApiError(503, 'supervisor.unavailable');
       }
       if (!v) throw new ApiError(404, 'clinic.unknown');
       if (v.mode !== expectedMode) throw new ApiError(401, 'connect.invalid_proof');
-      if (expectedMode === 'desktop' && !v.licenseMatches) {
+      // FX-138: fingerprint'siz desktop isboti qabul qilinmaydi (eski o'rnatma kaliti bilan).
+      if (expectedMode === 'desktop' && (!b.fingerprint || !v.licenseMatches)) {
         throw new ApiError(401, 'connect.invalid_license');
       }
       const expiresAt = v.expiresAt ? new Date(v.expiresAt) : null;
