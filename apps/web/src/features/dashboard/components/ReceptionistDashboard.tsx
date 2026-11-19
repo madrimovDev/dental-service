@@ -145,6 +145,45 @@ function PatientSearch() {
   );
 }
 
+/**
+ * FX-172: «boshqa shifokor» tanlovi — faqat so'rov FILIALIDA ishlaydigan shifokorlar
+ * (`GET /appointments/doctors?branchId=`); boshqa filial shifokori taklif qilinmaydi.
+ */
+function DoctorPick({
+  branchId,
+  pending,
+  onConfirm,
+}: {
+  branchId: string;
+  pending: boolean;
+  onConfirm: (doctorId: string) => void;
+}) {
+  const { t } = useTranslation();
+  const doctors = useDoctorOptions(branchId);
+  const [picked, setPicked] = useState<string | null>(null);
+  return (
+    <Group gap="xs" mt="xs" align="flex-start" wrap="nowrap">
+      <Select
+        size="xs"
+        style={{ flex: 1 }}
+        aria-label={t('telegramRequests.pick_doctor')}
+        placeholder={t('telegramRequests.pick_doctor')}
+        data={(doctors.data ?? []).map((d) => ({ value: d.id, label: d.name }))}
+        value={picked}
+        onChange={setPicked}
+      />
+      <Button
+        size="xs"
+        disabled={!picked}
+        loading={pending}
+        onClick={() => picked && onConfirm(picked)}
+      >
+        {t('telegramRequests.confirm_other_doctor')}
+      </Button>
+    </Group>
+  );
+}
+
 /** Telegram bron so'rovlari: har qatorda «Tasdiqlash» / «Rad etish» (sabab bilan). */
 function TelegramRequests({
   items,
@@ -156,8 +195,6 @@ function TelegramRequests({
   const { t } = useTranslation();
   const confirm = useConfirmBookingRequest();
   const decline = useDeclineBookingRequest();
-  const doctors = useDoctorOptions();
-  const [pickedDoctor, setPickedDoctor] = useState<string | null>(null);
   const [decliningId, setDecliningId] = useState<string | null>(null);
   const [reason, setReason] = useState('');
   const [reasonError, setReasonError] = useState(false);
@@ -256,27 +293,11 @@ function TelegramRequests({
                 )}
               </Group>
               {canDecide && decliningId !== r.id && needsDoctorPick(r) && (
-                <Group gap="xs" mt="xs" align="flex-start" wrap="nowrap">
-                  <Select
-                    size="xs"
-                    style={{ flex: 1 }}
-                    aria-label={t('telegramRequests.pick_doctor')}
-                    placeholder={t('telegramRequests.pick_doctor')}
-                    data={(doctors.data ?? []).map((d) => ({ value: d.id, label: d.name }))}
-                    value={pickedDoctor}
-                    onChange={setPickedDoctor}
-                  />
-                  <Button
-                    size="xs"
-                    disabled={!pickedDoctor}
-                    loading={confirm.isPending}
-                    onClick={() =>
-                      pickedDoctor && confirm.mutate({ id: r.id, doctorId: pickedDoctor })
-                    }
-                  >
-                    {t('telegramRequests.confirm_other_doctor')}
-                  </Button>
-                </Group>
+                <DoctorPick
+                  branchId={r.branchId}
+                  pending={confirm.isPending}
+                  onConfirm={(doctorId) => confirm.mutate({ id: r.id, doctorId })}
+                />
               )}
               {canDecide && decliningId === r.id && (
                 <Group gap="xs" mt="xs" align="flex-start" wrap="nowrap">

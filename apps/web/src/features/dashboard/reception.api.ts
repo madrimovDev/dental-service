@@ -23,8 +23,8 @@ const localIsoDate = (d = new Date()) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 /** Shifokorlar (id → ism) — filtr + «jadvalsiz shifokor» nomlari. `appointment.view` yetarli. */
-export function useDoctorOptions() {
-  return useDoctors();
+export function useDoctorOptions(branchId?: string) {
+  return useDoctors(branchId);
 }
 
 /**
@@ -108,14 +108,18 @@ export function useConfirmBookingRequest() {
     onError: (e) => {
       const conflict = e instanceof ApiError && e.status === 409;
       const expired = e instanceof ApiError && e.code === 'booking_request.expired';
+      // FX-172: shifokor shu filialda ishlamaydi — «vaqt band» emas, aniq sabab.
+      const notInBranch = e instanceof ApiError && e.code === 'schedule.doctor_not_in_branch';
       notifications.show({
         color: 'red',
         message: i18n.t(
           expired
             ? 'telegramRequests.confirm_expired'
-            : conflict
-              ? 'telegramRequests.confirm_conflict'
-              : 'common.error',
+            : notInBranch
+              ? 'appointments.doctor_not_in_branch'
+              : conflict
+                ? 'telegramRequests.confirm_conflict'
+                : 'common.error',
         ),
       });
       void qc.invalidateQueries({ queryKey: BOOKING_KEY });
