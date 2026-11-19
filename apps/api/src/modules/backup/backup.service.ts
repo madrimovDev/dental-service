@@ -138,6 +138,13 @@ export const createBackupService = (deps: BackupServiceDeps) => {
   const run = async (c: Context): Promise<BackupResult<{ requested: true }>> => {
     if (!isDesktop()) return { ok: false, code: 'backup.not_available' };
     const path = dataPath(BACKUP_REQUEST_FILE);
+    // FX-90: audit AVVAL — yiqilsa (500 -> rollback) so'rov fayli yozilmaydi va Electron main
+    // izsiz zaxira olmaydi. Fayl yozish yiqilsa ham 500 -> audit rollback bo'ladi.
+    await deps.audit.record(c, {
+      action: 'backup.run_requested',
+      resourceType: 'backup',
+      after: { folder: getFolder() },
+    });
     // Allaqachon navbatda bo'lsa — qayta yozmaymiz (idempotent).
     if (!existsSync(path)) {
       mkdirSync(getDataDir(), { recursive: true });
@@ -146,11 +153,6 @@ export const createBackupService = (deps: BackupServiceDeps) => {
         JSON.stringify({ id: randomUUID(), requestedAt: new Date().toISOString() }),
       );
     }
-    await deps.audit.record(c, {
-      action: 'backup.run_requested',
-      resourceType: 'backup',
-      after: { folder: getFolder() },
-    });
     return { ok: true, value: { requested: true } };
   };
 
@@ -174,14 +176,15 @@ export const createBackupService = (deps: BackupServiceDeps) => {
       return { ok: false, code: 'backup.folder_invalid' };
     }
     const before = getFolder();
-    mkdirSync(getDataDir(), { recursive: true });
-    writeFileSync(dataPath(BACKUP_SETTINGS_FILE), JSON.stringify({ folder }));
+    // FX-90: audit AVVAL, keyin sozlama fayli.
     await deps.audit.record(c, {
       action: 'backup.folder_changed',
       resourceType: 'backup',
       before: { folder: before },
       after: { folder },
     });
+    mkdirSync(getDataDir(), { recursive: true });
+    writeFileSync(dataPath(BACKUP_SETTINGS_FILE), JSON.stringify({ folder }));
     return { ok: true, value: { folder } };
   };
 
@@ -209,6 +212,13 @@ export const createBackupService = (deps: BackupServiceDeps) => {
       return { ok: false, code: 'backup.restore_pending' };
     }
 
+    // FX-90: audit AVVAL — yiqilsa so'rov fayli yozilmaydi, ya'ni izsiz tiklash bo'lmaydi.
+    await deps.audit.record(c, {
+      action: 'backup.restore_requested',
+      resourceType: 'backup',
+      resourceId: null,
+      after: { file: input.file },
+    });
     mkdirSync(getDataDir(), { recursive: true });
     writeFileSync(
       dataPath(RESTORE_REQUEST_FILE),
@@ -219,12 +229,6 @@ export const createBackupService = (deps: BackupServiceDeps) => {
         requestedBy: tenant.userId,
       }),
     );
-    await deps.audit.record(c, {
-      action: 'backup.restore_requested',
-      resourceType: 'backup',
-      resourceId: null,
-      after: { file: input.file },
-    });
     return { ok: true, value: { requested: true } };
   };
 
