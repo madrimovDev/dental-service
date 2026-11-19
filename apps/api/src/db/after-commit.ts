@@ -1,5 +1,6 @@
 import type { Context } from 'hono';
 import { logger } from '../lib/logger.ts';
+import type { DbOrTx } from './client.ts';
 
 /** Commit'dan keyin bajariladigan side-effect (Redis/BullMQ, tashqi API). */
 export type AfterCommitFn = () => Promise<void>;
@@ -87,4 +88,33 @@ export const drainTxAfterCommit = async (tx: object): Promise<void> => {
 
 export const dropTxAfterCommit = (tx: object): void => {
   txAfterCommit.delete(tx);
+};
+
+/**
+ * FX-82 seam: postgres-js savepoint (`tx.transaction(sp => …)`) yangi tx obyekti beradi —
+ * `createBotContext(sp)` uchun `getTxAfterCommit(sp)` alohida ro'yxat bo'lib, `withTenant`
+ * faqat tashqi tx ro'yxatini drenaj qiladi → savepoint ichida ro'yxatdan o'tgan effekt
+ * yo'qolardi. Savepoint muvaffaqiyatli tugasa uning ro'yxati ota tx ro'yxatiga ko'chiriladi
+ * (ota commit'dan keyin ishlaydi); savepoint rollback'da tashlanadi.
+ */
+export const promoteTxAfterCommit = (child: object, parent: object): void => {
+  const list = txAfterCommit.get(child);
+  txAfterCommit.delete(child);
+  if (list?.length) getTxAfterCommit(parent).push(...list);
+};
+
+/** `tx.transaction(fn)` (savepoint) + afterCommit ro'yxatini otaga ko'chirish. */
+export const runInSavepoint = async <T>(tx: DbOrTx, fn: (sp: DbOrTx) => Promise<T>): Promise<T> => {
+  let spRef: DbOrTx | undefined;
+  try {
+    const result = await tx.transaction(async (sp) => {
+      spRef = sp;
+      return fn(sp);
+    });
+    if (spRef) promoteTxAfterCommit(spRef, tx);
+    return result;
+  } catch (err) {
+    if (spRef) dropTxAfterCommit(spRef);
+    throw err;
+  }
 };

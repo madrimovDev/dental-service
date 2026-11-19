@@ -2,7 +2,6 @@ import {
   appointments,
   labOrders,
   patients,
-  tenantSettings,
   treatmentPlans,
   treatmentStages,
 } from '@dental/db-schema';
@@ -16,6 +15,7 @@ import { CrossEntityError, createOwnershipValidator } from '../../lib/ownership.
 import { assertBranchExists } from '../../lib/ownership-refs.ts';
 import { pgErrorInfo } from '../../lib/pg-error.ts';
 import { reminderDelayMs } from '../../lib/reminder-delay.ts';
+import { readReminderLeadHours } from '../../lib/reminder-lead-hours.ts';
 import { createStockService } from '../stock/stock.service.ts';
 import type {
   CreateAppointmentInput,
@@ -157,9 +157,14 @@ export const createAppointmentsService = (deps: {
   returnVisitStock?: (c: Context, appointmentId: string) => Promise<void>;
   /** FX-45 review: cancelled/no_show → faol qayta-faollashtirishda qaytarilgan chiqimni qayta ayirish. */
   redeductVisitStock?: (c: Context, appointmentId: string) => Promise<void>;
+  /** FX-45 seam: qayta ayirish qoldiqni chegaradan tushirsa low-stock alert (bo'lmasa jim). */
+  notifications?: Parameters<typeof createStockService>[0]['notifications'];
 }) => {
   const ownership = createOwnershipValidator();
-  const stockService = createStockService({ audit: deps.audit });
+  const stockService = createStockService({
+    audit: deps.audit,
+    notifications: deps.notifications,
+  });
   const returnVisitStock = deps.returnVisitStock ?? stockService.returnVisitStockForAppointment;
   const redeductVisitStock =
     deps.redeductVisitStock ?? stockService.redeductVisitStockForAppointment;
@@ -168,12 +173,8 @@ export const createAppointmentsService = (deps: {
    * FX-39 (LA-23): eslatma `tenant_settings.reminder_lead_hours` soat oldin ketadi
    * (ilgari hardcode 24). RLS tenantni filtrlaydi; qator yo'q → default 24.
    */
-  async function reminderLeadHours(c: Context): Promise<number> {
-    const [row] = await getDb(c)
-      .select({ hours: tenantSettings.reminderLeadHours })
-      .from(tenantSettings)
-      .limit(1);
-    return row?.hours ?? 24;
+  function reminderLeadHours(c: Context): Promise<number> {
+    return readReminderLeadHours(getDb(c));
   }
 
   /**

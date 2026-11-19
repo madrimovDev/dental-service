@@ -1636,6 +1636,68 @@ describe('FX-47: rad etilgan ish — boshqa labga qayta yuborish', () => {
     });
     expect(re.status).toBe(200);
   });
+
+  test('seam (× FX-48/49): eski ref’ning failed op’i ham superseded — qayta yuborilgach «synced», requeue uni tiriltirmaydi', async () => {
+    const id = await createOrder();
+    expect(
+      (await call('doctor', 'POST', `/api/lab-orders/${id}/send-to-hub`, { labId: lab.labId }))
+        .status,
+    ).toBe(200);
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+    const [hc] = await hubCaseByRef(id);
+    const r = await hubJson(`/v1/lab/cases/${hc!.id}/status`, {
+      method: 'POST',
+      token: lab.token,
+      body: { to: 'rejected', reason: 'Material yo‘q' },
+    });
+    expect(r.status).toBeLessThan(300);
+    await pollLabHubChanges(tenantId);
+    expect((await orderRow(id))?.hubStatus).toBe('rejected');
+
+    // Eski ref uchun qayta urinib bo'lmaydigan (failed) op — masalan rad etilgan ishga xabar.
+    const [failedOp] = await inTenant((tx) =>
+      tx
+        .insert(labHubOutbox)
+        .values({
+          tenantId,
+          labOrderId: id,
+          op: 'message',
+          payload: { text: 'eski labga xabar' },
+          status: 'failed',
+          attempts: 1,
+          lastError: 'case.rejected',
+        })
+        .returning({ id: labHubOutbox.id }),
+    );
+    await inTenant((tx) =>
+      tx.update(labOrders).set({ hubSyncStatus: 'failed' }).where(eq(labOrders.id, id)),
+    );
+
+    const re = await call('doctor', 'POST', `/api/lab-orders/${id}/send-to-hub`, {
+      labId: lab2.labId,
+    });
+    expect(re.status).toBe(200);
+    const opAfter = await inTenant((tx) =>
+      tx.select().from(labHubOutbox).where(eq(labHubOutbox.id, failedOp!.id)),
+    );
+    expect(opAfter[0]?.status).toBe('superseded');
+
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+    expect((await orderRow(id))?.hubSyncStatus).toBe('synced');
+
+    // Requeue eski op'ni qayta navbatga qo'ymaydi (u failed emas).
+    const rq = await call('tenant_admin', 'POST', '/api/lab-hub/outbox/requeue', {
+      labOrderId: id,
+    });
+    expect(rq.status).toBe(200);
+    expect(((await rq.json()) as { data: { requeued: number } }).data.requeued).toBe(0);
+    const opFinal = await inTenant((tx) =>
+      tx.select().from(labHubOutbox).where(eq(labHubOutbox.id, failedOp!.id)),
+    );
+    expect(opFinal[0]?.status).toBe('superseded');
+  });
 });
 
 describe('FX-80: Hub tasdig‘idan yozilgan «Laboratoriya» xarajati qo‘lda buzilmaydi', () => {

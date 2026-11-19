@@ -1,5 +1,6 @@
 import { appointments, notifications, patients, queueTickets } from '@dental/db-schema';
 import { and, eq, inArray } from 'drizzle-orm';
+import { runInSavepoint } from '../../db/after-commit.ts';
 import type { DbOrTx } from '../../db/client.ts';
 import { AppointmentTransitionError } from '../../modules/appointments/appointments.transitions.ts';
 import type { AppointmentsService } from '../../modules/appointments/index.ts';
@@ -49,7 +50,7 @@ async function notifyStaffPatientCancelled(
   row: { id: string; branchId: string; doctorId: string; patientName: string; startTime: Date },
 ): Promise<void> {
   try {
-    await tx.transaction(async (sp) => {
+    await runInSavepoint(tx, async (sp) => {
       const c = createBotContext(sp, tenantId);
       const recipients = new Set(
         await findRecipientsWithPermission(c, 'appointment.cancel', row.branchId),
@@ -119,7 +120,7 @@ export async function handleReminderAction(
   // ishlaymiz: xato savepoint'ni qaytaradi, tashqi tx (callback javobi, boshqa yozuvlar)
   // yashaydi. Poyga (holat o'zgargan) — haqiqatan «already»; qolgan xato — `failed`.
   try {
-    return await tx.transaction(async (sp) => {
+    return await runInSavepoint(tx, async (sp) => {
       const c = createBotContext(sp, o.tenantId);
       if (o.action === 'ok') {
         if (row.status === 'confirmed') return { outcome: 'already', ...base } as const;

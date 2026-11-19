@@ -6,7 +6,7 @@ import {
   labOrders,
   users,
 } from '@dental/db-schema';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, inArray } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { onAfterCommit } from '../../db/after-commit.ts';
 import type { DbOrTx } from '../../db/client.ts';
@@ -103,10 +103,14 @@ export const createLabOrdersHubService = (deps: { audit: AuditLogger }) => {
     const oldCaseRef = order.labHubCaseRef;
     if (reassign) {
       // Eski ref'ning kutilayotgan op'lari yangi ishga yuborilmasin (executeOp joriy ref'ni oladi).
+      // FX-47 seam (× FX-48/49): `failed` op'lar ham — aks holda buyurtma hech qachon «synced»
+      // bo'lmaydi va `/outbox/requeue` eski lab xabarini yangi caseRef'ga yuboradi.
       await db
         .update(labHubOutbox)
         .set({ status: 'superseded', doneAt: now })
-        .where(and(eq(labHubOutbox.labOrderId, id), eq(labHubOutbox.status, 'pending')));
+        .where(
+          and(eq(labHubOutbox.labOrderId, id), inArray(labHubOutbox.status, ['pending', 'failed'])),
+        );
     }
     const [row] = await db
       .update(labOrders)
