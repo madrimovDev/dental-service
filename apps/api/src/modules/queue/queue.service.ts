@@ -429,10 +429,9 @@ export const createQueueService = (deps: {
 
   /**
    * A6 (CLI-438): kun oxiri no-show sweep — o'tgan kun(lar)dagi hal qilinmagan
-   * (waiting/in_progress) tiketlarni `missed`ga o'tkazadi. ⚠️ Cron/repeatable
-   * job registratsiyasi (`lib/queue.ts` + `index.ts` — bu agent egaligidan
-   * tashqari) hali ULANMAGAN; bu funksiya + `POST /queue/sweep-no-shows` route
-   * (queue.manage) qo'lda yoki kelajakdagi wiring uchun tayyor. Faqat BUGUNDAN
+   * (waiting/in_progress) tiketlarni `missed`ga o'tkazadi. FX-38: kunlik cron
+   * `lib/no-show-sweep.ts` (Toshkent 00:30, har tenant) shuni chaqiradi; `POST
+   * /queue/sweep-no-shows` (queue.manage) qo'lda trigger sifatida qoladi. Faqat BUGUNDAN
    * OLDINGI tiketlar (bugungi hali kutayotgan tiketlar tegilmaydi — kun hali
    * tugamagan).
    *

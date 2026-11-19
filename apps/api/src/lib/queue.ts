@@ -20,5 +20,15 @@ export const RECALL_QUEUE_NAME = 'recall-scan';
 /** Deterministik repeatable jobId — qayta boot'da takror registratsiya drift qilmaydi. */
 export const RECALL_SCAN_JOB_ID = 'recall-daily-scan';
 
+/**
+ * FX-38 (LA-07): kunlik no-show sweep — payload yo'q repeatable trigger. Manba
+ * haqiqati DB'da (`queue.sweepNoShows` tenant bo'yicha o'tmish hal bo'lmaganlarni topadi).
+ */
+export type NoShowSweepJob = Record<string, never>;
+
+export const NO_SHOW_QUEUE_NAME = 'no-show-sweep';
+export const NO_SHOW_SWEEP_JOB_ID = 'no-show-daily-sweep';
+export const noShowQueue = new Queue<NoShowSweepJob>(NO_SHOW_QUEUE_NAME, { connection });
+
 // Reminder job ID — sof modulda (Redis'siz test qilinadi), shu yerdan qayta eksport.
 export { reminderJobId } from './reminder-job-id.ts';

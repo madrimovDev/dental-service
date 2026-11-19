@@ -253,9 +253,8 @@ export const queueRoutes = (deps: {
   });
 
   // ─── POST /sweep-no-shows — kun oxiri no-show sweep (A6, CLI-438) ────────
-  // ⚠️ Cron/repeatable job registratsiyasi ULANMAGAN (lib/queue.ts + index.ts —
-  // bu agent egaligidan tashqari); bu — qo'lda/kelajakdagi tashqi trigger uchun
-  // manual endpoint (branch manager/admin `queue.manage` bilan).
+  // FX-38: kunlik cron `lib/no-show-sweep.ts` orqali ulangan; bu — qo'lda trigger
+  // (branch manager/admin `queue.manage` bilan).
 
   const sweepNoShowsRoute = createRoute({
     method: 'post',
