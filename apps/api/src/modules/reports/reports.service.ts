@@ -978,15 +978,19 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
    *  - tushum: `revenueTotal` (refund manfiy — `signedPaidAmount`), Tashkent yarim-ochiq oraliq.
    *  - xarajat: `expenses.date` kalendar kuni bo'yicha [from, to]; branchId bo'lsa shu filial.
    *  - ish haqi: davri (`periodTo`) [from, to]ga tushgan payroll run'lar (finalized + draft) jami.
-   *    Payroll filialga bog'lanmagan → branchId berilsa hisobga olinmaydi (`payrollIncluded=false`).
+   *    Payroll filialga bog'lanmagan → branchId berilsa yoki chaqiruvchi filialga cheklangan bo'lsa
+   *    hisobga olinmaydi (`payrollIncluded=false`).
    */
   async function pnl(c: Context, range: ReportRange): Promise<PnlReport> {
     const db = getDb(c);
     const { from, to, branchId } = range;
     const revenueAmount = await revenueTotal(c, range);
+    // FX-31 (IR-06): xarajat va payroll ham revenueTotal bilan bir xil doirada
+    // (`reportBranchScope` → `reportBranchIds`, aks holda so'ralgan `branchId`).
+    const ids = scopeIds(c, branchId);
 
     const expFilters = [between(expenses.date, from, to)];
-    if (branchId) expFilters.push(eq(expenses.branchId, branchId));
+    if (ids) expFilters.push(branchIn(expenses.branchId, ids));
     const [expRow] = await db
       .select({ total: sql<string>`COALESCE(SUM(${expenses.amount}), 0)` })
       .from(expenses)
@@ -996,7 +1000,8 @@ export const createReportsService = (deps: { audit: AuditLogger }) => {
     let payrollFinalized: number | null = null;
     let payrollDraft: number | null = null;
     let payrollRunCount = 0;
-    if (!branchId) {
+    // Payroll filialga bog'lanmagan → filial doirasidagi (scoped yoki ?branchId) so'rovda chiqarilmaydi.
+    if (!ids) {
       const rows = await db
         .select({
           status: payrollRuns.status,
