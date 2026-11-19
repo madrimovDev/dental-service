@@ -2061,6 +2061,7 @@
     "levelInfo": "Информация",
     "kpiDebt": "Долг пациентов",
     "kpiDebtHint": "{{count}} пациентов · {{over}} старше 90 дней",
+    "kpiDebtClinicWide": "Видно только руководителям всей клиники",
     "kpiNoShow": "Неявки",
     "kpiUtil": "Загрузка врачей",
     "backupStaleTitle": "Резервная копия не создавалась {{days}} дн.",

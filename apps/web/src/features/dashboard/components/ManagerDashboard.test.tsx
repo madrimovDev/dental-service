@@ -47,6 +47,7 @@ const managerKpi = {
 vi.mock('../dashboard.api.ts', () => ({
   useDefaultPeriod: () => ({ from: '2026-05-24', to: '2026-06-22' }),
   useManagerKpi: () => managerKpi,
+  useTenantWideReports: () => ({ allowed: true, pending: false, restricted: false }),
   useDebtAging: () => ({
     data: {
       totalDebt: 800_000,

@@ -2061,6 +2061,7 @@
     "levelInfo": "Ma‘lumot",
     "kpiDebt": "Bemorlar qarzi",
     "kpiDebtHint": "{{count}} bemor · {{over}} tasi 90 kundan oshgan",
+    "kpiDebtClinicWide": "Faqat butun klinika rahbarlari ko‘radi",
     "kpiNoShow": "Kelmaganlar",
     "kpiUtil": "Shifokorlar bandligi",
     "backupStaleTitle": "Zaxira nusxa {{days}} kundan beri olinmagan",
