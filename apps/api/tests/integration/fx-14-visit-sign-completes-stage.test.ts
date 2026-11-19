@@ -29,7 +29,11 @@ import {
   InvalidTransitionError,
   StageNotAcceptedError,
 } from '../../src/modules/clinical/treatment-plans/treatment-plans.transitions.ts';
-import { createVisitNotesService } from '../../src/modules/clinical/visit-notes/visit-notes.service.ts';
+import { updateVisitNoteSchema } from '../../src/modules/clinical/visit-notes/visit-notes.schema.ts';
+import {
+  createVisitNotesService,
+  VisitStageRepointError,
+} from '../../src/modules/clinical/visit-notes/visit-notes.service.ts';
 
 const noopAudit = { record: async () => {} } as unknown as AuditLogger;
 const recallCalls: string[] = [];
@@ -237,6 +241,30 @@ describe('FX-14 — qoralama bosqichni yopmaydi, imzo yopadi', () => {
     );
     await expect(sign(note.id)).rejects.toBeInstanceOf(StageNotAcceptedError);
     expect(await noteSigned(note.id)).toBeNull();
+    expect(await stageStatus(stageId)).toBe('in_progress');
+  });
+
+  test('review: bog`langan qoralamani rejasiz qilib bo`lmaydi — null 400 (schema) va service RAD; bosqich saqlanadi', async () => {
+    const stageId = await mkStage({});
+    const note = await draft(stageId);
+    // HTTP qatlami: PATCH { stageId: null } validatsiyadan o'tmaydi (400).
+    expect(updateVisitNoteSchema.safeParse({ stageId: null }).success).toBe(false);
+    // Service qatlami (schema chetlab o'tilsa ham): tozalash = qayta yo'naltirish → RAD.
+    await expect(
+      inTenant((tx) =>
+        visitService.update(ctx(tx), note.id, { stageId: null as unknown as string }),
+      ),
+    ).rejects.toBeInstanceOf(VisitStageRepointError);
+    // completesStage=false — «bu vizit bosqichni yopmaydi» yo'li ishlaydi.
+    await inTenant((tx) => visitService.update(ctx(tx), note.id, { completesStage: false }));
+    const [row] = await inTenant((tx) =>
+      tx
+        .select({ stageId: visitNotes.stageId, completesStage: visitNotes.completesStage })
+        .from(visitNotes)
+        .where(eq(visitNotes.id, note.id)),
+    );
+    expect(row).toEqual({ stageId, completesStage: false });
+    await sign(note.id);
     expect(await stageStatus(stageId)).toBe('in_progress');
   });
 });

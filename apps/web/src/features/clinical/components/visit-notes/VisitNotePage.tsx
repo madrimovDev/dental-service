@@ -127,7 +127,9 @@ export function VisitNotePage() {
     const draft = loadDraft(key);
     const useDraft = draft && !note?.signedAt && (!note || draft.savedAt > note.updatedAt);
     if (useDraft && draft) {
-      setValues(draft.values);
+      // FX-14 review (CLI-481): bog'langan yozuvning bosqichi qayta yo'naltirilmaydi —
+      // eski lokal qoralama (masalan «Rejasiz» tanlangan) server stageId'sini ezmaydi.
+      setValues(note?.stageId ? { ...draft.values, stageId: note.stageId } : draft.values);
       setRx(draft.rx);
       setOverrides(draft.overrides);
       setDraftAt(draft.savedAt);
@@ -597,7 +599,10 @@ export function VisitNotePage() {
                   type="radio"
                   name="stage"
                   checked={values.stageId === null}
-                  disabled={readOnly}
+                  // FX-14 review (CLI-481): bosqichga bog'langan yozuvni «rejasiz» qilib
+                  // bo'lmaydi (server stageId'ni tozalamaydi — imzo baribir bosqichni yopardi).
+                  // Bosqichni yopmaslik uchun «Bosqich yakunlandi» belgisini olib tashlang.
+                  disabled={readOnly || !!note?.stageId}
                   onChange={() => patch({ stageId: null })}
                 />
                 <span>{t('visitNote.noPlan')}</span>
