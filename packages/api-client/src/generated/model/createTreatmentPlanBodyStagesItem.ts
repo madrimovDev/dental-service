@@ -4,7 +4,6 @@
  * Dentdo API
  * OpenAPI spec version: 0.1.0
  */
-
 import type { CreateTreatmentPlanBodyStagesItemResultingToothState } from './createTreatmentPlanBodyStagesItemResultingToothState';
 
 export type CreateTreatmentPlanBodyStagesItem = {

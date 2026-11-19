@@ -24686,6 +24686,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Draft snapshot is stale (payments/refunds changed after creation)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
