@@ -170,6 +170,31 @@ export const createOwnershipValidator = () => {
     if (row.patientId !== patientId) throw new CrossEntityError('appointment', 'mismatch');
   }
 
+  /**
+   * FX-117 (LB-26): vizit yozuvi faqat shu yozilish shifokorining yozuvi bo'lishi mumkin —
+   * aks holda boshqa shifokorning «Mendan kutilmoqda» bandi yozuvsiz yopilib qoladi.
+   */
+  async function assertAppointmentDoctor(
+    c: Context,
+    appointmentId: string,
+    doctorId: string,
+  ): Promise<void> {
+    const db = getDb(c);
+    const [row] = await db
+      .select({ doctorId: appointments.doctorId })
+      .from(appointments)
+      .where(eq(appointments.id, appointmentId))
+      .limit(1);
+    if (!row) throw new CrossEntityError('appointment', 'not_found');
+    if (row.doctorId !== doctorId) {
+      throw new CrossEntityError(
+        'appointment',
+        'mismatch',
+        'Appointment belongs to a different doctor than the visit note',
+      );
+    }
+  }
+
   return {
     assertBranchExists,
     assertTreatmentPlanExists,
@@ -180,6 +205,7 @@ export const createOwnershipValidator = () => {
     assertStageBelongsToPatient,
     assertVisitNoteBelongsToPatient,
     assertAppointmentBelongsToPatient,
+    assertAppointmentDoctor,
   };
 };
 

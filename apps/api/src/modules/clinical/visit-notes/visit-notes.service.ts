@@ -139,8 +139,11 @@ export const createVisitNotesService = (deps: {
     await ownership.assertUserExists(c, input.doctorId);
     if (input.stageId)
       await ownership.assertStageBelongsToPatient(c, input.stageId, input.patientId);
-    if (input.appointmentId)
+    if (input.appointmentId) {
       await ownership.assertAppointmentBelongsToPatient(c, input.appointmentId, input.patientId);
+      // FX-117: yozilish shifokori == yozuv shifokori.
+      await ownership.assertAppointmentDoctor(c, input.appointmentId, input.doctorId);
+    }
 
     // FX-14 (LA-33, D-9): qoralama bosqichni YOPMAYDI — faqat `in_progress` qiladi
     // (skipped/plan-guard xatosi shu yerda → routes 400, orphan yozuv yo'q). Yopish —
@@ -203,6 +206,16 @@ export const createVisitNotesService = (deps: {
       await ownership.assertStageBelongsToPatient(c, input.stageId, before.patientId);
     if (input.appointmentId)
       await ownership.assertAppointmentBelongsToPatient(c, input.appointmentId, before.patientId);
+    // FX-117: yozilish shifokori == yozuv shifokori (yozilish YOKI shifokor o'zgarganda).
+    const effectiveAppointmentId =
+      input.appointmentId !== undefined ? input.appointmentId : before.appointmentId;
+    if (effectiveAppointmentId && (input.appointmentId || input.doctorId)) {
+      await ownership.assertAppointmentDoctor(
+        c,
+        effectiveAppointmentId,
+        input.doctorId ?? before.doctorId,
+      );
+    }
 
     // FX-14: yangi biriktirilgan bosqich `in_progress` bo'ladi (yopilmaydi — imzoda yopiladi).
     if (input.stageId && input.stageId !== before.stageId && deps.completeStage) {
