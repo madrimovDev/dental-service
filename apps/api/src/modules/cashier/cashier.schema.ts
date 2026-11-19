@@ -236,9 +236,13 @@ export const cashierPatientPlanDtoSchema = z
   .openapi('CashierPatientPlan');
 export type CashierPatientPlanDto = z.infer<typeof cashierPatientPlanDtoSchema>;
 
-/** FX-handoff: `GET /pending-visits` — branchId majburiy; «bugun» = Asia/Tashkent kuni. */
+/** FX-handoff: `GET /pending-visits` — branchId majburiy; oxirgi `days` kun (default 30), «bugun» = Asia/Tashkent kuni. */
 export const pendingVisitsQuery = z.object({
   branchId: z.uuid(),
+  /** FX-17: oyna (kun), default 30. */
+  days: z.coerce.number().int().min(1).max(90).default(30),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(50),
 });
 export type PendingVisitsQuery = z.infer<typeof pendingVisitsQuery>;
 
@@ -254,6 +258,8 @@ export const pendingVisitDtoSchema = z
     doctorId: z.uuid(),
     doctorName: z.string().nullable(),
     signedAt: z.string(),
+    /** FX-17: imzolangan kuni bugundan oldin (Asia/Tashkent) — «kechikkan». */
+    overdue: z.boolean(),
     services: z.array(
       z.object({
         serviceId: z.uuid(),
@@ -267,3 +273,15 @@ export const pendingVisitDtoSchema = z
   })
   .openapi('PendingVisit');
 export type PendingVisitDto = z.infer<typeof pendingVisitDtoSchema>;
+
+/** FX-17: sahifalangan kutilayotgan vizitlar — `{ data, meta }`. */
+export const pendingVisitsResponseDtoSchema = z
+  .object({
+    data: z.array(pendingVisitDtoSchema),
+    meta: z.object({
+      page: z.number().int(),
+      pageSize: z.number().int(),
+      total: z.number().int(),
+    }),
+  })
+  .openapi('PendingVisitsResponse');

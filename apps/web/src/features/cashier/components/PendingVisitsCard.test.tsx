@@ -11,6 +11,7 @@ const visit = (over: Partial<PendingVisit> = {}): PendingVisit => ({
   doctorId: 'd1',
   doctorName: 'Karimov',
   signedAt: '2026-11-11T08:00:00Z',
+  overdue: false,
   services: [{ serviceId: 's1', serviceName: 'Konsultatsiya', quantity: 1, unitPrice: '50000' }],
   total: '50000',
   hasUnpriced: false,
@@ -18,6 +19,17 @@ const visit = (over: Partial<PendingVisit> = {}): PendingVisit => ({
 });
 
 describe('PendingVisitsCard', () => {
+  it('FX-17: kechikkan vizit belgilanadi, bugungisi belgilanmaydi', () => {
+    renderApp(
+      <PendingVisitsCard
+        visits={[visit({ visitNoteId: 'old', overdue: true }), visit({ visitNoteId: 'new' })]}
+        activeVisitId={null}
+        onTake={vi.fn()}
+      />,
+    );
+    expect(screen.getAllByTestId('pending-visit-overdue')).toHaveLength(1);
+  });
+
   it('bo‘sh ro‘yxat — bo‘sh holat matni', () => {
     renderApp(<PendingVisitsCard visits={[]} activeVisitId={null} onTake={vi.fn()} />);
     expect(screen.getByText("Imzolangan, to'lanmagan vizit yo'q")).toBeTruthy();

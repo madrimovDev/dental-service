@@ -478,6 +478,8 @@ export * from './payrollRunWithLines';
 export * from './payrollRunWithLinesAllOf';
 export * from './pendingVisit';
 export * from './pendingVisitServicesItem';
+export * from './pendingVisitsResponse';
+export * from './pendingVisitsResponseMeta';
 export * from './periodComparison';
 export * from './periodComparisonPrevious';
 export * from './periodComparisonYoy';

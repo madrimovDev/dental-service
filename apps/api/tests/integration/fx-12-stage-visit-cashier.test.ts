@@ -197,7 +197,7 @@ describe('FX-12: bosqichli vizit kassada', () => {
   test("pending-visits: stageId'li vizit chiqmaydi, oddiy vizit chiqadi", async () => {
     const r = await call('GET', `/api/cashier/pending-visits?branchId=${branchId}`);
     expect(r.status).toBe(200);
-    const ids = (r.json.data as Array<{ visitNoteId: string }>).map((v) => v.visitNoteId);
+    const ids = (r.json.data.data as Array<{ visitNoteId: string }>).map((v) => v.visitNoteId);
     expect(ids).toContain(visitPlain);
     expect(ids).not.toContain(visitStaged);
   });

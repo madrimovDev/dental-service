@@ -7,4 +7,18 @@
 
 export type ListCashierPendingVisitsParams = {
 branchId: string;
+/**
+ * @minimum 1
+ * @maximum 90
+ */
+days?: number;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+pageSize?: number;
 };

@@ -186,6 +186,9 @@ const isVisitUniqueViolation = (err: unknown): boolean => {
 };
 
 /** Asia/Tashkent kalendar kunining boshi (UTC+5, DST yo'q) — `list` bilan izchil. */
+/** FX-17: kassa «kutilayotgan vizit» oynasi (kun). */
+export const PENDING_VISITS_WINDOW_DAYS = 30;
+
 const tashkentDayStart = (now = new Date()): Date => {
   const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tashkent' }).format(now);
   return new Date(`${day}T00:00:00+05:00`);
@@ -668,9 +671,34 @@ export const createCashierService = (deps: {
    * filialda bo'lgan YOKI yozilishga bog'lanmagan (filiali noma'lum) vizitlar. Narx
    * filialning FAOL narxidan (POS bilan bir manba); narxsiz xizmat → `unitPrice: null`.
    */
-  async function listPendingVisits(c: Context, branchId: string): Promise<PendingVisitDto[]> {
+  async function listPendingVisits(
+    c: Context,
+    branchId: string,
+    opts: { days?: number; page?: number; pageSize?: number } = {},
+  ): Promise<{ data: PendingVisitDto[]; meta: { page: number; pageSize: number; total: number } }> {
     const db = getDb(c);
     const dayStart = tashkentDayStart();
+    // FX-17 (LA-38): faqat bugun emas — N kunlik oyna; bugundan oldingilari `overdue`.
+    const days = opts.days ?? PENDING_VISITS_WINDOW_DAYS;
+    const page = opts.page ?? 1;
+    const pageSize = opts.pageSize ?? 50;
+    const windowStart = new Date(Date.now() - days * 86_400_000);
+
+    const where = and(
+      isNotNull(visitNotes.signedAt),
+      // FX-12: rejadagi bosqichga bog'langan vizit reja allocation'i orqali to'lanadi.
+      isNull(visitNotes.stageId),
+      gte(visitNotes.signedAt, windowStart),
+      sql`COALESCE(array_length(${visitNotes.performedServices}, 1), 0) > 0`,
+      or(isNull(appointments.id), eq(appointments.branchId, branchId)),
+      sql`NOT EXISTS (SELECT 1 FROM cashier_transactions ct WHERE ct.visit_note_id = ${visitNotes.id})`,
+    );
+
+    const [{ total } = { total: 0 }] = await db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(visitNotes)
+      .leftJoin(appointments, eq(appointments.id, visitNotes.appointmentId))
+      .where(where);
 
     const rows = await db
       .select({
@@ -686,19 +714,10 @@ export const createCashierService = (deps: {
       .innerJoin(patients, eq(patients.id, visitNotes.patientId))
       .leftJoin(users, eq(users.id, visitNotes.doctorId))
       .leftJoin(appointments, eq(appointments.id, visitNotes.appointmentId))
-      .where(
-        and(
-          isNotNull(visitNotes.signedAt),
-          // FX-12: rejadagi bosqichga bog'langan vizit reja allocation'i orqali to'lanadi.
-          isNull(visitNotes.stageId),
-          gte(visitNotes.signedAt, dayStart),
-          sql`COALESCE(array_length(${visitNotes.performedServices}, 1), 0) > 0`,
-          or(isNull(appointments.id), eq(appointments.branchId, branchId)),
-          sql`NOT EXISTS (SELECT 1 FROM cashier_transactions ct WHERE ct.visit_note_id = ${visitNotes.id})`,
-        ),
-      )
+      .where(where)
       .orderBy(desc(visitNotes.signedAt))
-      .limit(100);
+      .limit(pageSize)
+      .offset((page - 1) * pageSize);
 
     const serviceIds = [...new Set(rows.flatMap((r) => r.performed ?? []))];
     const names = new Map<string, string>();
@@ -742,6 +761,7 @@ export const createCashierService = (deps: {
         doctorId: r.doctorId,
         doctorName: r.doctorName ?? null,
         signedAt: (r.signedAt as Date).toISOString(),
+        overdue: (r.signedAt as Date).getTime() < dayStart.getTime(),
         services: lines,
         total: String(fromCents(totalCents)),
         hasUnpriced,
@@ -752,10 +772,10 @@ export const createCashierService = (deps: {
       action: 'viewed',
       resourceType: 'cashier_pending_visits',
       resourceId: null,
-      after: { branchId, count: result.length },
+      after: { branchId, count: result.length, total },
     });
 
-    return result;
+    return { data: result, meta: { page, pageSize, total } };
   }
 
   /**

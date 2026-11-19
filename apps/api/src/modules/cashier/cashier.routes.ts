@@ -26,8 +26,8 @@ import {
   dailySummaryQuery,
   listTransactionsQuery,
   patientPlansQuery,
-  pendingVisitDtoSchema,
   pendingVisitsQuery,
+  pendingVisitsResponseDtoSchema,
   planBalanceDtoSchema,
   planIdParamSchema,
   refundRequestSchema,
@@ -382,15 +382,18 @@ export const cashierRoutes = (deps: {
     operationId: 'listCashierPendingVisits',
     middleware: [requirePermission('cashier.view')] as const,
     request: { query: pendingVisitsQuery },
-    responses: okJson(z.array(pendingVisitDtoSchema), 'Signed, unbilled visits of today'),
+    responses: okJson(
+      pendingVisitsResponseDtoSchema,
+      'Signed, unbilled visits (last N days, paginated)',
+    ),
   });
 
   app.openapi(pendingVisitsRoute, async (c) => {
-    const { branchId } = c.req.valid('query');
+    const { branchId, days, page, pageSize } = c.req.valid('query');
     if (!(await isBranchAllowed(c, 'cashier.view', branchId))) {
       return c.json(fail(BRANCH_FORBIDDEN_CODE, BRANCH_FORBIDDEN_MESSAGE), 403);
     }
-    const rows = await service.listPendingVisits(c, branchId);
+    const rows = await service.listPendingVisits(c, branchId, { days, page, pageSize });
     return c.json(ok(rows), 200);
   });
 

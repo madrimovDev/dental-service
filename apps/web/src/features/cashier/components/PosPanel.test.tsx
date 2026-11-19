@@ -172,6 +172,7 @@ describe('PosPanel', () => {
       doctorId: 'd1',
       doctorName: 'Karimov',
       signedAt: '2026-11-11T08:00:00Z',
+      overdue: false,
       services: [{ serviceId: 's1', serviceName: 'Plomba', quantity: 2, unitPrice: '50000.00' }],
       total: '100000',
       hasUnpriced: false,

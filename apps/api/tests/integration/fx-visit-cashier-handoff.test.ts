@@ -294,20 +294,26 @@ afterAll(async () => {
 });
 
 describe('FX-handoff: GET /api/cashier/pending-visits', () => {
-  test('real Receptionist: faqat bugungi imzolangan xizmatli vizit, narx + jami serverdan', async () => {
+  test('real Receptionist: imzolangan tolanmagan xizmatli vizit (30 kunlik oyna), narx + jami serverdan', async () => {
     const tok = await token(tenantA, userA, receptionistPerms);
     const r = await call(tok, 'GET', `/api/cashier/pending-visits?branchId=${branchA}`);
     expect(r.status).toBe(200);
-    const ids = (r.json.data as Array<{ visitNoteId: string }>).map((v) => v.visitNoteId);
+    const ids = (r.json.data.data as Array<{ visitNoteId: string }>).map((v) => v.visitNoteId);
     expect(ids).toContain(visitOk);
     expect(ids).toContain(visitMismatch);
     expect(ids).not.toContain(visitUnsigned);
-    expect(ids).not.toContain(visitYesterday);
+    // FX-17: kecha imzolangan to'lanmagan vizit endi ro'yxatda (overdue), yo'qolmaydi.
+    expect(ids).toContain(visitYesterday);
+    expect(
+      (r.json.data.data as Array<{ visitNoteId: string; overdue: boolean }>).find(
+        (x) => x.visitNoteId === visitYesterday,
+      )?.overdue,
+    ).toBe(true);
     expect(ids).not.toContain(visitOtherBranch);
     expect(ids).not.toContain(visitNoServices);
     expect(ids).not.toContain(visitForeign);
     const ok = (
-      r.json.data as Array<{
+      r.json.data.data as Array<{
         visitNoteId: string;
         patientName: string;
         doctorName: string;
@@ -336,7 +342,7 @@ describe('FX-handoff: GET /api/cashier/pending-visits', () => {
     const tok = await token(tenantB, userB, receptionistPerms);
     const r = await call(tok, 'GET', `/api/cashier/pending-visits?branchId=${branchA}`);
     expect(r.status).toBe(200);
-    const ids = (r.json.data as Array<{ visitNoteId: string }>).map((v) => v.visitNoteId);
+    const ids = (r.json.data.data as Array<{ visitNoteId: string }>).map((v) => v.visitNoteId);
     // faqat o'z tenantining (yozilishsiz → filialsiz) vizitlari; A tenantniki yo'q.
     expect(ids).toEqual([visitForeign]);
   });
@@ -408,7 +414,7 @@ describe('FX-handoff: POST /api/cashier/transactions {visitNoteId}', () => {
 
     const list = await call(tok, 'GET', `/api/cashier/pending-visits?branchId=${branchA}`);
     expect(
-      (list.json.data as Array<{ visitNoteId: string }>).map((v) => v.visitNoteId),
+      (list.json.data.data as Array<{ visitNoteId: string }>).map((v) => v.visitNoteId),
     ).not.toContain(visitOk);
 
     const again = await call(tok, 'POST', '/api/cashier/transactions', payBody(visitOk));

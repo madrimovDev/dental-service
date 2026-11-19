@@ -62,6 +62,7 @@ describe('CashierScreen', () => {
       doctorId: 'd1',
       doctorName: 'Karimov',
       signedAt: '2026-11-11T08:00:00Z',
+      overdue: true,
       services: [
         { serviceId: 's1', serviceName: 'Konsultatsiya', quantity: 1, unitPrice: '50000' },
       ],
@@ -71,6 +72,7 @@ describe('CashierScreen', () => {
     try {
       renderApp(<CashierScreen />);
       expect(screen.getByTestId('pending-visits')).toBeTruthy();
+      expect(screen.getByTestId('pending-visit-overdue')).toBeTruthy();
       fireEvent.click(screen.getByText('Kassaga olish'));
       await waitFor(() => expect(screen.getByDisplayValue('Laylo Ismoilova')).toBeTruthy());
       expect(await screen.findByTestId('visit-banner')).toBeTruthy();

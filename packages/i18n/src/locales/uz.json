@@ -2336,6 +2336,7 @@
     "clear": "Vizitni bekor qilish",
     "replace_cart_confirm": "Joriy savat vizit xizmatlari bilan almashtiriladi. Davom etasizmi?",
     "already_billed": "Bu vizit allaqachon to'langan — ro'yxat yangilandi",
+    "overdue": "Kechikkan: {{date}} kuni imzolangan, hali to'lanmagan",
     "linked_to_plan_stage": "Bu vizit davolash rejasi bosqichiga bog'langan — «Reja bo'yicha to'lash» orqali to'lang",
     "reception_title": "{{n}} ta vizit kassada to'lov kutmoqda",
     "reception_text": "Shifokor imzolagan, hali to'lanmagan bugungi vizitlar.",
