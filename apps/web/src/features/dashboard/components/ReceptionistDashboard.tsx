@@ -12,10 +12,7 @@ import { useQueueToday } from '@/features/queue/queue.api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { useTodayRange } from '../dashboard.api.ts';
 import {
-  type BookingRequestRow,
   useBookingRequests,
-  useConfirmBookingRequest,
-  useDeclineBookingRequest,
   useDoctorOptions,
   usePatientNames,
   usePatientSearch,
@@ -33,6 +30,7 @@ import {
 import { AttentionPanel } from './widgets/AttentionPanel.tsx';
 import { QueueCard } from './widgets/QueueCard.tsx';
 import { StatCard } from './widgets/StatCard.tsx';
+import { TelegramRequests } from './widgets/TelegramRequests.tsx';
 import { TodayTable } from './widgets/TodayTable.tsx';
 
 // Off-scale literal (parity): KPI grid gap 14px (4px shkalada yo'q: 12/16).
@@ -140,174 +138,6 @@ function PatientSearch() {
             {t('receptionToday.search_hint')}
           </Text>
         </Box>
-      )}
-    </Box>
-  );
-}
-
-/** Telegram bron so'rovlari: har qatorda «Tasdiqlash» / «Rad etish» (sabab bilan). */
-function TelegramRequests({
-  items,
-  canDecide,
-}: {
-  items: BookingRequestRow[];
-  canDecide: boolean;
-}) {
-  const { t } = useTranslation();
-  const confirm = useConfirmBookingRequest();
-  const decline = useDeclineBookingRequest();
-  const doctors = useDoctorOptions();
-  const [pickedDoctor, setPickedDoctor] = useState<string | null>(null);
-  const [decliningId, setDecliningId] = useState<string | null>(null);
-  const [reason, setReason] = useState('');
-  const [reasonError, setReasonError] = useState(false);
-
-  // FX-24: band slot (409) yoki shifokorsiz so'rov (400) — registrator boshqa shifokor tanlaydi.
-  // Muddati o'tgan / allaqachon hal qilingan so'rovda shifokor tanlash yordam bermaydi.
-  const needsDoctorPick = (r: BookingRequestRow) => {
-    if (!r.doctorId) return true;
-    const err = confirm.error;
-    if (!(err instanceof ApiError) || confirm.variables?.id !== r.id) return false;
-    if (err.code === 'booking_request.expired' || err.code === 'booking_request.not_pending') {
-      return false;
-    }
-    return err.status === 409 || err.code === 'booking_request.doctor_required';
-  };
-
-  const submitDecline = (id: string) => {
-    const trimmed = reason.trim();
-    if (!trimmed) {
-      setReasonError(true);
-      return;
-    }
-    decline.mutate({ id, reason: trimmed });
-    setDecliningId(null);
-    setReason('');
-    setReasonError(false);
-  };
-
-  return (
-    <Box
-      style={{
-        background: 'var(--surface)',
-        border: '1px solid var(--border)',
-        borderRadius: 'var(--radius-card)',
-        padding: 18,
-      }}
-    >
-      <Text fw={700} c="var(--ink)">
-        {t('receptionToday.tg_title')}
-      </Text>
-      {items.length === 0 ? (
-        <Text size="sm" c="var(--ink-3)" mt={4}>
-          {t('telegramRequests.empty')}
-        </Text>
-      ) : (
-        <Stack gap="sm" mt="sm">
-          {items.map((r) => (
-            <Box
-              key={r.id}
-              style={{ borderTop: '1px solid var(--border)', paddingTop: 10 }}
-              data-testid="booking-request"
-            >
-              <Group justify="space-between" align="flex-start" wrap="nowrap">
-                <Box style={{ minWidth: 0 }}>
-                  <Text fw={600} size="sm" c="var(--ink)">
-                    {r.patientName ?? t('receptionToday.patient_unknown')}
-                  </Text>
-                  <Text size="xs" c="var(--ink-3)">
-                    {[
-                      new Date(r.requestedStart).toLocaleString('uz-UZ', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      }),
-                      r.doctorName,
-                      r.branchName,
-                      r.rescheduleOfAppointmentId ? t('telegramRequests.reschedule') : null,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </Text>
-                </Box>
-                {canDecide && decliningId !== r.id && (
-                  <Group gap="xs" wrap="nowrap">
-                    <Button
-                      size="xs"
-                      loading={confirm.isPending}
-                      onClick={() => confirm.mutate({ id: r.id })}
-                    >
-                      {t('telegramRequests.confirm')}
-                    </Button>
-                    <Button
-                      size="xs"
-                      variant="default"
-                      onClick={() => {
-                        setDecliningId(r.id);
-                        setReason('');
-                        setReasonError(false);
-                      }}
-                    >
-                      {t('telegramRequests.decline')}
-                    </Button>
-                  </Group>
-                )}
-              </Group>
-              {canDecide && decliningId !== r.id && needsDoctorPick(r) && (
-                <Group gap="xs" mt="xs" align="flex-start" wrap="nowrap">
-                  <Select
-                    size="xs"
-                    style={{ flex: 1 }}
-                    aria-label={t('telegramRequests.pick_doctor')}
-                    placeholder={t('telegramRequests.pick_doctor')}
-                    data={(doctors.data ?? []).map((d) => ({ value: d.id, label: d.name }))}
-                    value={pickedDoctor}
-                    onChange={setPickedDoctor}
-                  />
-                  <Button
-                    size="xs"
-                    disabled={!pickedDoctor}
-                    loading={confirm.isPending}
-                    onClick={() =>
-                      pickedDoctor && confirm.mutate({ id: r.id, doctorId: pickedDoctor })
-                    }
-                  >
-                    {t('telegramRequests.confirm_other_doctor')}
-                  </Button>
-                </Group>
-              )}
-              {canDecide && decliningId === r.id && (
-                <Group gap="xs" mt="xs" align="flex-start" wrap="nowrap">
-                  <TextInput
-                    size="xs"
-                    style={{ flex: 1 }}
-                    aria-label={t('telegramRequests.reason_label')}
-                    placeholder={t('telegramRequests.reason_label')}
-                    value={reason}
-                    maxLength={300}
-                    error={reasonError ? t('telegramRequests.reason_required') : undefined}
-                    onChange={(e) => {
-                      setReason(e.currentTarget.value);
-                      setReasonError(false);
-                    }}
-                  />
-                  <Button
-                    size="xs"
-                    color="red"
-                    loading={decline.isPending}
-                    onClick={() => submitDecline(r.id)}
-                  >
-                    {t('telegramRequests.decline_submit')}
-                  </Button>
-                  <Button size="xs" variant="subtle" onClick={() => setDecliningId(null)}>
-                    {t('telegramRequests.cancel')}
-                  </Button>
-                </Group>
-              )}
-            </Box>
-          ))}
-        </Stack>
       )}
     </Box>
   );
@@ -555,7 +385,7 @@ export function ReceptionistDashboard() {
             }}
           >
             <Stack gap="md" style={{ minWidth: 0 }}>
-              <TelegramRequests items={tgItems} canDecide={hasPermission('appointment.create')} />
+              <TelegramRequests />
               <TodayTable
                 title={t('receptionToday.next_title')}
                 calendarLabel={t('receptionToday.calendar_link')}

@@ -2326,7 +2326,12 @@
     "confirm_conflict": "Bu vaqt band bo'lib qoldi — so'rov kutishda qoldi",
     "pick_doctor": "Boshqa shifokorni tanlang",
     "confirm_other_doctor": "Shu shifokor bilan tasdiqlash",
-    "confirm_expired": "So'rov muddati o'tgan — bemorga xabar yuborildi"
+    "confirm_expired": "So'rov muddati o'tgan — bemorga xabar yuborildi",
+    "tab_pending": "Kutilmoqda",
+    "tab_expired": "Muddati o'tgan",
+    "empty_expired": "Muddati o'tgan so'rovlar yo'q",
+    "expired_badge": "Muddati o'tgan",
+    "nav_badge": "Telegram bron so'rovlari"
   },
   "desktopUpdate": {
     "title": "Yangi versiya tayyor",

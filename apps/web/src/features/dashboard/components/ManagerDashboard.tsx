@@ -21,6 +21,7 @@ import { OwnerAlertsPanel } from './OwnerAlertsPanel.tsx';
 import { BranchesToday, DoctorsToday } from './OwnerTodaySections.tsx';
 import { MiniList } from './widgets/MiniList.tsx';
 import { StatCard } from './widgets/StatCard.tsx';
+import { TelegramRequests } from './widgets/TelegramRequests.tsx';
 
 const fmtPct = (n: number) => `${Math.round(n * 100)}%`;
 
@@ -185,6 +186,9 @@ export function ManagerDashboard() {
       )}
 
       <OnboardingChecklist />
+
+      {/* FX-23: Telegram bron so'rovlari — faqat appointment.create + kutilayotgani bor bo'lsa. */}
+      <TelegramRequests compact />
 
       {revenue.isLoading ? (
         <StateView status="loading" skeleton="cards" />

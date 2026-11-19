@@ -2,6 +2,9 @@ import { screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderApp } from '../../../test-utils';
 
+// Birinchi test ManagerDashboard'ni sovuq dinamik import qiladi (~4–5 s) — 5 s chegarada beqaror.
+vi.setConfig({ testTimeout: 30_000 });
+
 // --- Mocklar (T4 characterization: re-skin xulqni o'zgartirmaydi) ---
 
 const mockHasPermission = vi.fn((_p: string) => true);
@@ -17,6 +20,9 @@ vi.mock('@/stores/auth-store.ts', () => ({
 vi.mock('./OnboardingChecklist.tsx', () => ({
   OnboardingChecklist: () => null,
 }));
+
+// FX-23: Telegram widget alohida testlanadi (widgets/TelegramRequests.test.tsx) — bu yerda tarmoqqa chiqmasin.
+vi.mock('./widgets/TelegramRequests.tsx', () => ({ TelegramRequests: () => null }));
 
 const managerKpi = {
   revenue: {

@@ -5,6 +5,7 @@ import { Building2, Check, ChevronDown, LogOut } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useBranchSwitch, useWorkspaceBranches } from '@/features/auth';
+import { BookingRequestNavBadge } from '@/features/dashboard/components/BookingRequestNavBadge.tsx';
 import { RecallNavBadge } from '@/features/recalls/components/RecallNavBadge.tsx';
 import { useVertical } from '@/features/settings/settings.api.ts';
 import { useAuthStore } from '@/stores/auth-store.ts';
@@ -298,6 +299,7 @@ export function Sidebar() {
       >
         <Icon />
         <span className={classes.label}>{label}</span>
+        {item.key === 'home' && <BookingRequestNavBadge />}
         {item.key === 'recalls' && <RecallNavBadge />}
       </Link>
     );
