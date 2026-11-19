@@ -218,6 +218,7 @@ function TelegramRequests({
                   <Text size="xs" c="var(--ink-3)">
                     {[
                       new Date(r.requestedStart).toLocaleString('uz-UZ', {
+                        timeZone: 'Asia/Tashkent',
                         day: '2-digit',
                         month: '2-digit',
                         hour: '2-digit',

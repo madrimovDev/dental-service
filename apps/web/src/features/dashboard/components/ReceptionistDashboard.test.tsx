@@ -245,6 +245,21 @@ describe('ReceptionistDashboard (DS1-T5 re-skin characterization)', () => {
     expect(confirmMutate).toHaveBeenCalledWith({ id: 'r1' });
   });
 
+  it('FX-59: so‘rov vaqti brauzer mintaqasidan qat‘i nazar Asia/Tashkent (UTC+5) da ko‘rsatiladi', async () => {
+    const prevTz = process.env.TZ;
+    process.env.TZ = 'America/New_York'; // brauzer klinikadan boshqa mintaqada
+    try {
+      bookingRequests.items = [req('r1')]; // 14:00Z = 19:00 Toshkent
+      bookingRequests.pendingCount = 1;
+      const { ReceptionistDashboard } = await import('./ReceptionistDashboard.tsx');
+      renderApp(<ReceptionistDashboard />);
+      expect(screen.getByText(/22[./]06,? 19:00/)).toBeInTheDocument();
+    } finally {
+      if (prevTz === undefined) delete process.env.TZ;
+      else process.env.TZ = prevTz;
+    }
+  });
+
   it('UI-T2: Rad etish sabab so‘raydi; sababsiz yuborilmaydi', async () => {
     bookingRequests.items = [req('r1')];
     bookingRequests.pendingCount = 1;
