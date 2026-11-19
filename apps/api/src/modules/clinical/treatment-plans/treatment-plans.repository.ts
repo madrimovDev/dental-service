@@ -117,6 +117,22 @@ export const createTreatmentPlansRepository = () => {
     return Number(row?.n ?? 0);
   }
 
+  /** FX-16: rejadagi bajarilmagan (pending/in_progress) lekin accepted bosqichlar soni. */
+  async function countOpenAcceptedStages(c: Context, planId: string) {
+    const db = getDb(c);
+    const [row] = await db
+      .select({ n: count() })
+      .from(treatmentStages)
+      .where(
+        and(
+          eq(treatmentStages.treatmentPlanId, planId),
+          eq(treatmentStages.acceptance, 'accepted'),
+          inArray(treatmentStages.status, ['pending', 'in_progress']),
+        ),
+      );
+    return Number(row?.n ?? 0);
+  }
+
   async function findStage(c: Context, id: string) {
     const db = getDb(c);
     const [stage] = await db.select().from(treatmentStages).where(eq(treatmentStages.id, id));
@@ -202,6 +218,7 @@ export const createTreatmentPlansRepository = () => {
     findPlan,
     findStage,
     countCompletedStages,
+    countOpenAcceptedStages,
     findConsentForm,
     findLabOrderStatus,
     listStageAllocations,

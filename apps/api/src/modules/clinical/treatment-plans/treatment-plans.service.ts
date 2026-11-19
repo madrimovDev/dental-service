@@ -23,6 +23,7 @@ import {
   assertStageStatusTransition,
   CompletedStageAcceptanceLockedError,
   PlanHasCompletedStagesError,
+  PlanHasOpenStagesError,
   StageLabPendingError,
   StageNotAcceptedError,
   type StageStatus,
@@ -235,6 +236,11 @@ export const createTreatmentPlansService = (deps: {
       // FX-15 (LA-32): bajarilgan bosqichli rejani bekor qilib bo'lmaydi (qarz yo'qolardi).
       if (input.status === 'cancelled' && (await repo.countCompletedStages(c, id)) > 0) {
         throw new PlanHasCompletedStagesError(before.status);
+      }
+      // FX-16 (LA-37): bajarilmagan accepted bosqich bilan rejani yakunlab bo'lmaydi.
+      if (input.status === 'completed') {
+        const open = await repo.countOpenAcceptedStages(c, id);
+        if (open > 0) throw new PlanHasOpenStagesError(before.status, open);
       }
       // C3/CLI-461: presented→accepted KONSENT talab qiladi — linklangan
       // `consentFormId` yo'q BO'LSA yoki (JONLI qayta so'ralganda) endi amaldagi

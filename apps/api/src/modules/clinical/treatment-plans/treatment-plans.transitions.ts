@@ -169,6 +169,23 @@ export class PlanHasCompletedStagesError extends InvalidTransitionError {
 }
 
 /**
+ * FX-16 (LA-37): bajarilmagan (pending/in_progress) accepted bosqichi bor rejani
+ * 'completed' qilib bo'lmaydi — completed reja bosqich mutatsiyasini qulflaydi, bemor
+ * bajarilmagan ish uchun qaytarib bo'lmas qarzda qolardi. Avval bosqichni bajaring yoki
+ * skipped/rejected qiling. InvalidTransitionError SUBKLASSI → routes 400.
+ */
+export class PlanHasOpenStagesError extends InvalidTransitionError {
+  constructor(
+    from: PlanStatus,
+    readonly openStages: number,
+  ) {
+    super('plan', from, 'completed');
+    this.name = 'PlanHasOpenStagesError';
+    this.message = `Cannot complete plan: ${openStages} accepted stage(s) are not completed or skipped.`;
+  }
+}
+
+/**
  * CLI-487: bog'langan lab-order hali 'delivered' emas — bosqichni 'completed' qilib
  * bo'lmaydi. InvalidTransitionError SUBKLASSI (PlanLockedError precedenti) →
  * visit-notes/treatment-plans routes'dagi mavjud `instanceof InvalidTransitionError`
