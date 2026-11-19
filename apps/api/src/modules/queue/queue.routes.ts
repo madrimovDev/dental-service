@@ -31,6 +31,9 @@ const notFoundResponse = {
 /** A5 (CLI-438): linked appointment validatsiyasi 400 kodlari — dublikat 409. */
 const conflictQueueCodes = new Set(['queue.duplicate_ticket']);
 
+/** FX-03b (X-1): begona FK → 404. */
+const notFoundQueueCodes = new Set(['patient.not_found', 'branch.not_found', 'service.not_found']);
+
 export const queueRoutes = (deps: {
   db: Database;
   audit: AuditLogger;
@@ -131,6 +134,10 @@ export const queueRoutes = (deps: {
         content: { 'application/json': { schema: errorResponseSchema } },
         description: 'Forbidden',
       },
+      404: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Patient / branch / service not found in this tenant',
+      },
       409: {
         content: { 'application/json': { schema: errorResponseSchema } },
         description: 'Duplicate open ticket for the linked appointment',
@@ -148,6 +155,8 @@ export const queueRoutes = (deps: {
       // status/dublikat. Dublikat 409 (conflict), qolgani 400.
       if (e instanceof QueueValidationError) {
         if (conflictQueueCodes.has(e.code)) return c.json(fail(e.code, e.code), 409);
+        // FX-03b: begona/mavjud bo'lmagan bemor/filial/xizmat → 404.
+        if (notFoundQueueCodes.has(e.code)) return c.json(fail(e.code, e.code), 404);
         return c.json(fail(e.code, e.code), 400);
       }
       throw e;

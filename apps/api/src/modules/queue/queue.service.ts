@@ -3,6 +3,8 @@ import { and, asc, eq, gte, isNull, lt, max, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { CrossEntityError, createOwnershipValidator } from '../../lib/ownership.ts';
+import { assertBranchExists, assertServiceExists } from '../../lib/ownership-refs.ts';
 import { CLINIC_TZ } from '../../lib/sms-templates.ts';
 import type { AppointmentsService } from '../appointments/appointments.service.ts';
 import { AppointmentTransitionError } from '../appointments/appointments.transitions.ts';
@@ -76,10 +78,41 @@ export const createQueueService = (deps: {
     return (row?.max ?? 0) + 1;
   }
 
+  const ownership = createOwnershipValidator();
+
+  /**
+   * FX-03b (X-1): walk-in `branchId`/`patientId`/`serviceId` RLS ostida tekshiriladi
+   * (FK begona tenant ID'sini qabul qilardi). Topilmasa `QueueValidationError('<x>.not_found')`
+   * → routes 404.
+   */
+  async function assertRefs(c: Context, input: CreateQueueTicketInput) {
+    const checks: Array<[string, () => Promise<void>]> = [
+      ['branch', () => assertBranchExists(c, input.branchId)],
+    ];
+    if (input.patientId) {
+      const pid = input.patientId;
+      checks.push(['patient', () => ownership.assertPatientExists(c, pid)]);
+    }
+    if (input.serviceId) {
+      const sid = input.serviceId;
+      checks.push(['service', () => assertServiceExists(c, sid)]);
+    }
+    for (const [entity, run] of checks) {
+      try {
+        await run();
+      } catch (e) {
+        if (e instanceof CrossEntityError) throw new QueueValidationError(`${entity}.not_found`);
+        throw e;
+      }
+    }
+  }
+
   async function create(c: Context, input: CreateQueueTicketInput) {
     const db = getDb(c);
     const tenantId = c.get('activeTenantId');
     if (!tenantId) throw new Error('No tenant context');
+
+    await assertRefs(c, input);
 
     return await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);

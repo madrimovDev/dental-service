@@ -1,6 +1,8 @@
 import type { Context } from 'hono';
 import { onAfterCommit } from '../../db/after-commit.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { CrossEntityError } from '../../lib/ownership.ts';
+import { assertBranchExists } from '../../lib/ownership-refs.ts';
 import { BOOKING_SLOT_MINUTES } from '../../lib/telegram/booking.ts';
 import type { PatientMessenger } from '../../lib/telegram/notify.ts';
 import { AppointmentTransitionError } from '../appointments/appointments.transitions.ts';
@@ -66,6 +68,17 @@ export const createBookingRequestsService = (deps: {
     const doctorId = input.doctorId ?? row.doctorId;
     if (!doctorId) {
       return { ok: false, code: 'booking_request.doctor_required', conflict: false };
+    }
+
+    // FX-03b (X-1): so'rovdagi filial shu tenantniki bo'lishi shart (FK RLS'ni chetlab o'tadi).
+    // Doktor (body yoki so'rov) appointments.create ichida tekshiriladi (`doctor.not_found`).
+    try {
+      await assertBranchExists(c, row.branchId);
+    } catch (e) {
+      if (e instanceof CrossEntityError) {
+        return { ok: false, code: 'branch.not_found', conflict: false };
+      }
+      throw e;
     }
 
     const start = row.requestedStart;
