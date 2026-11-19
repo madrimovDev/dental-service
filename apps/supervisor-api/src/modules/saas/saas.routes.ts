@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { db } from '../../db/client';
 import { clinicEvents, clinics } from '../../db/schema';
 import { normalizePhone } from '../../lib/phone';
+import { getSaasSuspendedAt } from './saas-suspension';
 
 /**
  * L8 (Lab Hub) — SaaS tenantlar ham Supervisor'da klinika sifatida. Bu yerdagi
@@ -52,14 +53,19 @@ const registerSchema = z.object({
 
 const uuidSchema = z.string().uuid();
 
-const toStatus = (clinic: typeof clinics.$inferSelect) => ({
-  clinicId: clinic.id,
-  tenantId: clinic.saasTenantId,
-  mode: 'saas' as const,
-  subscriptionExpiresAt: clinic.subscriptionExpiresAt
-    ? clinic.subscriptionExpiresAt.toISOString()
-    : null,
-});
+const toStatus = async (clinic: typeof clinics.$inferSelect) => {
+  // FX-102: vendor to'xtatgan bo'lsa — apps/api imtiyozsiz bloklaydi.
+  const suspendedAt = await getSaasSuspendedAt(clinic.id);
+  return {
+    clinicId: clinic.id,
+    tenantId: clinic.saasTenantId,
+    mode: 'saas' as const,
+    subscriptionExpiresAt: clinic.subscriptionExpiresAt
+      ? clinic.subscriptionExpiresAt.toISOString()
+      : null,
+    suspendedAt: suspendedAt ? suspendedAt.toISOString() : null,
+  };
+};
 
 export const saasRoutes = () => {
   const app = new Hono();
@@ -84,13 +90,13 @@ export const saasRoutes = () => {
       })
       .onConflictDoNothing({ target: clinics.saasTenantId })
       .returning();
-    if (inserted) return c.json(toStatus(inserted), 201);
+    if (inserted) return c.json(await toStatus(inserted), 201);
 
     const existing = await db.query.clinics.findFirst({
       where: eq(clinics.saasTenantId, data.tenantId),
     });
     if (!existing) return c.json({ error: { code: 'NOT_FOUND' } }, 404);
-    return c.json(toStatus(existing), 200);
+    return c.json(await toStatus(existing), 200);
   });
 
   app.get('/clinics/:tenantId/status', async (c) => {
@@ -100,7 +106,7 @@ export const saasRoutes = () => {
       where: eq(clinics.saasTenantId, parsed.data),
     });
     if (!clinic) return c.json({ error: { code: 'NOT_FOUND' } }, 404);
-    return c.json(toStatus(clinic));
+    return c.json(await toStatus(clinic));
   });
 
   return app;
@@ -116,6 +122,8 @@ export const renewSaasClinic = async (clinicId: string, expiresAt: Date, adminId
   if (expiresAt.getTime() <= Date.now()) {
     throw Object.assign(new Error('EXPIRES_IN_PAST'), { status: 400 });
   }
+  // FX-102: `saas_renewed` hodisasi oldingi `saas_suspended`ni ham yechadi
+  // (`getSaasSuspendedAt` — eng oxirgi hodisa bo'yicha).
   return db.transaction(async (tx) => {
     const [before] = await tx
       .select({ subscriptionExpiresAt: clinics.subscriptionExpiresAt })

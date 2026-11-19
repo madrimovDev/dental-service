@@ -177,8 +177,12 @@ export const ClinicDetailPage = () => {
   const deactivate = useMutation({
     mutationFn: async () => {
       if (!data?.clinic) return;
+      // FX-102: SaaS klinikada litsenziya yo'q — xuddi shu endpoint obunani
+      // to'xtatadi (imtiyozsiz blok); «Muddatni uzaytirish» qayta ochadi.
       const ok = confirm(
-        'Litsenziyani bekor qilishni tasdiqlaysizmi? Klinika xizmatdan foydalana olmay qoladi.',
+        data.clinic.mode === 'saas'
+          ? "Obunani to'xtatishni tasdiqlaysizmi? Klinika imtiyozsiz bloklanadi (muddatni uzaytirish qayta ochadi)."
+          : 'Litsenziyani bekor qilishni tasdiqlaysizmi? Klinika xizmatdan foydalana olmay qoladi.',
       );
       if (!ok) return;
       const res = await authFetch(`/v1/admin/clinics/${data.clinic.id}/deactivate`, {
@@ -228,9 +232,25 @@ export const ClinicDetailPage = () => {
               ? new Date(data.clinic.subscriptionExpiresAt).toLocaleDateString('uz')
               : '—'}
           </Text>
+          <Text c={data.saasSuspendedAt ? 'red' : 'teal'} mt="xs">
+            Holat:{' '}
+            {data.saasSuspendedAt
+              ? `To'xtatilgan (${new Date(data.saasSuspendedAt).toLocaleDateString('uz')})`
+              : 'Faol'}
+          </Text>
           <Group mt="sm">
             <Button size="xs" variant="outline" onClick={() => setRenewOpen(true)}>
               Muddatni uzaytirish
+            </Button>
+            <Button
+              size="xs"
+              variant="outline"
+              color="red"
+              onClick={() => deactivate.mutate()}
+              disabled={Boolean(data.saasSuspendedAt)}
+              loading={deactivate.isPending}
+            >
+              To'xtatish
             </Button>
           </Group>
           <Modal opened={renewOpen} onClose={() => setRenewOpen(false)} title="Muddatni uzaytirish">
@@ -242,7 +262,8 @@ export const ClinicDetailPage = () => {
               mb="md"
             />
             <Text size="sm" c="dimmed" mb="md">
-              Klinika yangi muddatni kunlik sinxronda yoki «Qayta tekshirish»da oladi.
+              Klinika yangi muddatni kunlik sinxronda yoki «Qayta tekshirish»da oladi. To'xtatilgan
+              obuna ham shu bilan qayta ochiladi.
             </Text>
             <Button
               onClick={() => renew.mutate(renewDate)}

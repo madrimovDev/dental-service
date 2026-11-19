@@ -2,6 +2,7 @@ import { tenantSettings, tenants, users } from '@dental/db-schema';
 import { and, eq, isNotNull, isNull, lt, or } from 'drizzle-orm';
 import type { Database } from '../db/client.ts';
 import { withTenant } from '../db/scoped.ts';
+import { MAX_GRACE_DAYS } from './license.ts';
 import { logger } from './logger.ts';
 import { invalidateSubscriptionCache } from './subscription.ts';
 
@@ -36,6 +37,11 @@ export type SupervisorClinicInfo = {
   clinicId: string;
   /** ISO yoki null (Supervisor muddat bermagan). */
   subscriptionExpiresAt: string | null;
+  /**
+   * FX-102 (LB-11): vendor klinikani to'xtatgan payt (ISO) yoki null. Bor bo'lsa
+   * tenant IMTIYOZSIZ bloklanadi (`effectiveSubscriptionExpiry`).
+   */
+  suspendedAt: string | null;
 };
 
 export type SaasRegistration = {
@@ -57,9 +63,38 @@ const call = async (fetchImpl: FetchFn, path: string, init: RequestInit): Promis
   });
 
 const parseInfo = async (res: Response): Promise<SupervisorClinicInfo> => {
-  const body = (await res.json()) as { clinicId?: string; subscriptionExpiresAt?: string | null };
+  const body = (await res.json()) as {
+    clinicId?: string;
+    subscriptionExpiresAt?: string | null;
+    suspendedAt?: string | null;
+  };
   if (!body.clinicId) throw new Error('supervisor: clinicId missing');
-  return { clinicId: body.clinicId, subscriptionExpiresAt: body.subscriptionExpiresAt ?? null };
+  return {
+    clinicId: body.clinicId,
+    subscriptionExpiresAt: body.subscriptionExpiresAt ?? null,
+    suspendedAt: body.suspendedAt ?? null,
+  };
+};
+
+const DAY_MS = 86_400_000;
+
+/**
+ * FX-102 (LB-11): saqlanadigan (samarali) obuna muddati. Vendor to'xtatgan
+ * bo'lsa — `suspendedAt - MAX_GRACE_DAYS - 1 s`, ya'ni `computeSubscriptionState`
+ * imtiyozni ham o'tgan deb hisoblab darhol `expired` beradi (migratsiyasiz:
+ * `subscription_expires_at` — Supervisor holatining keshi). Haqiqiy muddat
+ * Supervisor'da o'zgarmaydi; «Muddatni uzaytirish» to'xtatishni yechadi va
+ * keyingi sinxron haqiqiy muddatni qaytaradi. Deterministik — qayta sinxron
+ * bir xil qiymat yozadi.
+ */
+export const effectiveSubscriptionExpiry = (info: SupervisorClinicInfo): Date | null => {
+  const expiresAt = info.subscriptionExpiresAt ? new Date(info.subscriptionExpiresAt) : null;
+  if (!info.suspendedAt) return expiresAt;
+  // Yaroqsiz sana — fail-closed (hozirgi payt): to'xtatish signali e'tiborsiz qolmasin.
+  const parsed = Date.parse(info.suspendedAt);
+  const at = Number.isFinite(parsed) ? parsed : Date.now();
+  const blocked = new Date(at - MAX_GRACE_DAYS * DAY_MS - 1000);
+  return expiresAt && expiresAt < blocked ? expiresAt : blocked;
 };
 
 /** Idempotent (Supervisor `saas_tenant_id` UNIQUE) — qayta chaqiruv xavfsiz. */
@@ -89,9 +124,7 @@ export const fetchClinicStatus = async (
  * (admin conn shart emas): register-tenant yo'li admin ulanishsiz ham ishlashi kerak.
  */
 const saveSupervisorState = async (tenantId: string, info: SupervisorClinicInfo): Promise<void> => {
-  const subscriptionExpiresAt = info.subscriptionExpiresAt
-    ? new Date(info.subscriptionExpiresAt)
-    : null;
+  const subscriptionExpiresAt = effectiveSubscriptionExpiry(info);
   const now = new Date();
   await withTenant(tenantId, (tx) =>
     tx

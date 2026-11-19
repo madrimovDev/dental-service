@@ -40,6 +40,8 @@ export interface ClinicDetail {
   // klinika aktivatsiya qilgach Supervisor bazasida NULL ga aylanadi.
   clinic: Clinic & { ownerTempPassword?: string | null };
   license: License | null;
+  /** FX-102: SaaS klinikani vendor to'xtatgan payt (ISO) yoki null. Desktop'da yo'q. */
+  saasSuspendedAt?: string | null;
 }
 
 export interface CreateClinicInput {

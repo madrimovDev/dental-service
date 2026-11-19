@@ -574,4 +574,47 @@ describe('ClinicDetailPage', () => {
       ),
     );
   });
+
+  // FX-102 (LB-11): vendor SaaS klinikani to'xtata oladi — SaaS kartasida
+  // «To'xtatish» (tasdiq bilan PATCH deactivate) va holat ko'rinadi.
+  it("SaaS klinika: «To'xtatish» tasdiqlansa PATCH deactivate, to'xtatilgan holat ko'rsatiladi", async () => {
+    vi.stubGlobal(
+      'confirm',
+      vi.fn(() => true),
+    );
+    const saasClinic = {
+      ...clinic,
+      mode: 'saas',
+      ownerFullName: 'Sardor Aliyev',
+      subscriptionExpiresAt: '2026-12-01T00:00:00.000Z',
+    };
+    let suspendedAt: string | null = null;
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === 'PATCH' && url.endsWith('/v1/admin/clinics/c1/deactivate')) {
+        suspendedAt = '2026-11-20T10:00:00.000Z';
+        return jsonResponse({ clinic: saasClinic, suspendedAt });
+      }
+      if (url.endsWith('/v1/admin/clinics/c1')) {
+        return jsonResponse({ clinic: saasClinic, license: null, saasSuspendedAt: suspendedAt });
+      }
+      throw new Error(`unhandled fetch: ${url} ${init?.method ?? 'GET'}`);
+    });
+
+    renderDetail();
+    const card = await screen.findByTestId('saas-card');
+    expect(card).toHaveTextContent('Holat: Faol');
+
+    fireEvent.click(screen.getByRole('button', { name: "To'xtatish" }));
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/v1/admin/clinics/c1/deactivate'),
+        expect.objectContaining({ method: 'PATCH' }),
+      ),
+    );
+    await vi.waitFor(() =>
+      expect(screen.getByTestId('saas-card')).toHaveTextContent("To'xtatilgan"),
+    );
+    expect(screen.getByRole('button', { name: "To'xtatish" })).toBeDisabled();
+  });
 });
