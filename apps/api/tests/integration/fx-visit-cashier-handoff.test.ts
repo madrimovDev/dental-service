@@ -16,13 +16,17 @@ import {
   branches,
   cashierTransactions,
   patients,
+  permissions,
+  rolePermissions,
+  roles,
   servicePrices,
   services,
   tenants,
+  userAssignments,
   users,
   visitNotes,
 } from '@dental/db-schema';
-import { sql } from 'drizzle-orm';
+import { inArray, sql } from 'drizzle-orm';
 
 const { createApp } = await import('../../src/app.ts');
 const { signAccess } = await import('../../src/lib/jwt.ts');
@@ -41,6 +45,34 @@ const withTenant = <T>(tid: string, fn: (tx: typeof db) => Promise<T>): Promise<
     await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tid}'`));
     return fn(tx as unknown as typeof db);
   });
+
+/**
+ * X-2/FX-32: kassa endpoint'lari filial doirasini real `user_assignments` + rol-permission'dan
+ * oladi (JWT'dagi perms yetarli emas) — testdagi sintetik token egasiga haqiqiy kassir tayinlovi.
+ */
+const grantCashierAssignment = async (tid: string, uid: string, branchId: string | null) => {
+  const codes = ['cashier.view', 'cashier.create_transaction', 'cashier.refund', 'cashier.void'];
+  for (const code of codes) {
+    await db.insert(permissions).values({ code, category: 'cashier' }).onConflictDoNothing();
+  }
+  const permRows = await db
+    .select({ id: permissions.id })
+    .from(permissions)
+    .where(inArray(permissions.code, codes));
+  await db.transaction(async (tx) => {
+    await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tid}'`));
+    const [role] = await tx
+      .insert(roles)
+      .values({ tenantId: tid, name: 'Kassir (test)' })
+      .returning({ id: roles.id });
+    await tx
+      .insert(rolePermissions)
+      .values(permRows.map((p) => ({ roleId: role!.id, permissionId: p.id })));
+    await tx
+      .insert(userAssignments)
+      .values({ tenantId: tid, userId: uid, branchId, roleId: role!.id });
+  });
+};
 
 let tenantA: string;
 let tenantB: string;
@@ -251,6 +283,10 @@ beforeAll(async () => {
       .returning();
     visitForeign = v!.id;
   });
+
+  await grantCashierAssignment(tenantA, userA, branchA);
+  // B tenanti xodimi tenant-wide: A tenant filialini so'rasa ham RLS bo'sh ro'yxat beradi (sizish yo'q).
+  await grantCashierAssignment(tenantB, userB, null);
 });
 
 afterAll(async () => {
@@ -258,20 +294,26 @@ afterAll(async () => {
 });
 
 describe('FX-handoff: GET /api/cashier/pending-visits', () => {
-  test('real Receptionist: faqat bugungi imzolangan xizmatli vizit, narx + jami serverdan', async () => {
+  test('real Receptionist: imzolangan tolanmagan xizmatli vizit (30 kunlik oyna), narx + jami serverdan', async () => {
     const tok = await token(tenantA, userA, receptionistPerms);
     const r = await call(tok, 'GET', `/api/cashier/pending-visits?branchId=${branchA}`);
     expect(r.status).toBe(200);
-    const ids = (r.json.data as Array<{ visitNoteId: string }>).map((v) => v.visitNoteId);
+    const ids = (r.json.data.data as Array<{ visitNoteId: string }>).map((v) => v.visitNoteId);
     expect(ids).toContain(visitOk);
     expect(ids).toContain(visitMismatch);
     expect(ids).not.toContain(visitUnsigned);
-    expect(ids).not.toContain(visitYesterday);
+    // FX-17: kecha imzolangan to'lanmagan vizit endi ro'yxatda (overdue), yo'qolmaydi.
+    expect(ids).toContain(visitYesterday);
+    expect(
+      (r.json.data.data as Array<{ visitNoteId: string; overdue: boolean }>).find(
+        (x) => x.visitNoteId === visitYesterday,
+      )?.overdue,
+    ).toBe(true);
     expect(ids).not.toContain(visitOtherBranch);
     expect(ids).not.toContain(visitNoServices);
     expect(ids).not.toContain(visitForeign);
     const ok = (
-      r.json.data as Array<{
+      r.json.data.data as Array<{
         visitNoteId: string;
         patientName: string;
         doctorName: string;
@@ -300,7 +342,7 @@ describe('FX-handoff: GET /api/cashier/pending-visits', () => {
     const tok = await token(tenantB, userB, receptionistPerms);
     const r = await call(tok, 'GET', `/api/cashier/pending-visits?branchId=${branchA}`);
     expect(r.status).toBe(200);
-    const ids = (r.json.data as Array<{ visitNoteId: string }>).map((v) => v.visitNoteId);
+    const ids = (r.json.data.data as Array<{ visitNoteId: string }>).map((v) => v.visitNoteId);
     // faqat o'z tenantining (yozilishsiz → filialsiz) vizitlari; A tenantniki yo'q.
     expect(ids).toEqual([visitForeign]);
   });
@@ -372,7 +414,7 @@ describe('FX-handoff: POST /api/cashier/transactions {visitNoteId}', () => {
 
     const list = await call(tok, 'GET', `/api/cashier/pending-visits?branchId=${branchA}`);
     expect(
-      (list.json.data as Array<{ visitNoteId: string }>).map((v) => v.visitNoteId),
+      (list.json.data.data as Array<{ visitNoteId: string }>).map((v) => v.visitNoteId),
     ).not.toContain(visitOk);
 
     const again = await call(tok, 'POST', '/api/cashier/transactions', payBody(visitOk));

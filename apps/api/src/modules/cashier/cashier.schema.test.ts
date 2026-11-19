@@ -9,6 +9,29 @@ describe('createTransactionSchema', () => {
   it("erkin POS: items bilan o'tadi", () => {
     const r = createTransactionSchema.safeParse({
       branchId,
+      patientId: '55555555-5555-4555-8555-555555555555',
+      items: [{ serviceId, quantity: 1, unitPrice: 50000, serviceName: 'Konsultatsiya' }],
+      paidAmount: 50000,
+      paymentMethod: 'cash',
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it('FX-21: erkin POS patientId siz — RAD etiladi (path patientId)', () => {
+    const r = createTransactionSchema.safeParse({
+      branchId,
+      items: [{ serviceId, quantity: 1, unitPrice: 50000, serviceName: 'Konsultatsiya' }],
+      paidAmount: 50000,
+      paymentMethod: 'cash',
+    });
+    expect(r.success).toBe(false);
+    if (!r.success) expect(r.error.issues.some((i) => i.path[0] === 'patientId')).toBe(true);
+  });
+
+  it('FX-21: vizit to‘lovi (visitNoteId) patientId siz o‘tadi', () => {
+    const r = createTransactionSchema.safeParse({
+      branchId,
+      visitNoteId: '66666666-6666-4666-8666-666666666666',
       items: [{ serviceId, quantity: 1, unitPrice: 50000, serviceName: 'Konsultatsiya' }],
       paidAmount: 50000,
       paymentMethod: 'cash',

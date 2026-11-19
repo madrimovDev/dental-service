@@ -159,6 +159,16 @@ describe('PosPanel', () => {
     );
   });
 
+  it('FX-21: bemor tanlanmagan bo‘lsa «To‘lovni qabul qilish» o‘chiq + izoh, mutate chaqirilmaydi', async () => {
+    renderApp(<PosPanel branchId="b1" patientId={null} />);
+    fireEvent.click(await screen.findByText('Plomba'));
+    await screen.findByTestId('patient-required-hint');
+    const btn = screen.getByText("To'lovni qabul qilish").closest('button') as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+    fireEvent.click(btn);
+    expect(mutate).not.toHaveBeenCalled();
+  });
+
   it('fiskal chek holati ko‘rinadi: NoOp → «Yuborilmagan»', () => {
     renderApp(<PosPanel branchId="b1" patientId={null} />);
     expect(screen.getByTestId('fiscal-state').textContent).toContain('Yuborilmagan');
@@ -172,6 +182,7 @@ describe('PosPanel', () => {
       doctorId: 'd1',
       doctorName: 'Karimov',
       signedAt: '2026-11-11T08:00:00Z',
+      overdue: false,
       services: [{ serviceId: 's1', serviceName: 'Plomba', quantity: 2, unitPrice: '50000.00' }],
       total: '100000',
       hasUnpriced: false,

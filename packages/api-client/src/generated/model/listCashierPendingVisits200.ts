@@ -4,9 +4,9 @@
  * Dentdo API
  * OpenAPI spec version: 0.1.0
  */
-import type { PendingVisit } from './pendingVisit';
+import type { PendingVisitsResponse } from './pendingVisitsResponse';
 
 export type ListCashierPendingVisits200 = {
   success: boolean;
-  data: PendingVisit[];
+  data: PendingVisitsResponse;
 };

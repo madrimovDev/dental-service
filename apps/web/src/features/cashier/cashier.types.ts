@@ -80,6 +80,8 @@ export type PendingVisit = {
   doctorId: string;
   doctorName: string | null;
   signedAt: string;
+  /** FX-17: imzolangan kuni bugundan oldin — «kechikkan». */
+  overdue: boolean;
   services: Array<{
     serviceId: string;
     serviceName: string;

@@ -169,7 +169,7 @@ export function useAllTransactions() {
 }
 
 /**
- * Bugun imzolangan, hali to'lanmagan vizitlar (`GET /cashier/pending-visits`, `cashier.view`).
+ * Oxirgi 30 kunda imzolangan, hali to'lanmagan vizitlar (`GET /cashier/pending-visits`, `cashier.view`).
  * TODO(integratsiya): `generate:contract`dan keyin generated `listCashierPendingVisits`ga
  * almashtiring (bu lane generate qilmaydi). Kassa/«Bugun» ochiq turganda 30 s da yangilanadi.
  */
@@ -178,8 +178,9 @@ export function usePendingVisits(branchId: string | null) {
   return useQuery({
     queryKey: cashierKeys.pendingVisits(branchId ?? ''),
     queryFn: () =>
-      listCashierPendingVisits({ branchId: branchId as string }).then(
-        (r) => r.data as unknown as PendingVisit[],
+      // FX-17: oxirgi 30 kun, bitta sahifa 100 tagacha (eng yangilari oldin).
+      listCashierPendingVisits({ branchId: branchId as string, pageSize: 100 }).then(
+        (r) => (r.data as unknown as { data: PendingVisit[] }).data,
       ),
     enabled: !!branchId && hasPermission('cashier.view'),
     refetchInterval: 30_000,

@@ -2932,6 +2932,40 @@
           "status"
         ]
       },
+      "PendingVisitsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PendingVisit"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer"
+              },
+              "pageSize": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "page",
+              "pageSize",
+              "total"
+            ]
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
       "PendingVisit": {
         "type": "object",
         "properties": {
@@ -2956,6 +2990,9 @@
           },
           "signedAt": {
             "type": "string"
+          },
+          "overdue": {
+            "type": "boolean"
           },
           "services": {
             "type": "array",
@@ -2999,6 +3036,7 @@
           "doctorId",
           "doctorName",
           "signedAt",
+          "overdue",
           "services",
           "total",
           "hasUnpriced"
@@ -16017,11 +16055,43 @@
             "required": true,
             "name": "branchId",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 90,
+              "default": 30
+            },
+            "required": false,
+            "name": "days",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            },
+            "required": false,
+            "name": "pageSize",
+            "in": "query"
           }
         ],
         "responses": {
           "200": {
-            "description": "Signed, unbilled visits of today",
+            "description": "Signed, unbilled visits (last N days, paginated)",
             "content": {
               "application/json": {
                 "schema": {
@@ -16034,10 +16104,7 @@
                       ]
                     },
                     "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/PendingVisit"
-                      }
+                      "$ref": "#/components/schemas/PendingVisitsResponse"
                     }
                   },
                   "required": [

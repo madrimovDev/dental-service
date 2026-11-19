@@ -14,6 +14,7 @@ export interface PendingVisit {
   /** @nullable */
   doctorName: string | null;
   signedAt: string;
+  overdue: boolean;
   services: PendingVisitServicesItem[];
   total: string;
   hasUnpriced: boolean;
