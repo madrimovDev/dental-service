@@ -36,6 +36,7 @@ export function StockScreen() {
   const { t, i18n } = useTranslation();
   const { hasPermission } = useAuthStore();
   const canManage = hasPermission('stock.manage');
+  const canViewServices = hasPermission('service.view');
 
   const [branchId, setBranchId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -50,14 +51,17 @@ export function StockScreen() {
   const [batchOpened, { open: openBatch, close: closeBatch }] = useDisclosure(false);
 
   const branches = useBranches();
-  const services = useServices({ enabled: hasPermission('service.view') });
+  const services = useServices({ enabled: canViewServices });
   const items = useStockItems(branchId ?? undefined);
+  // FX-163: BOM materiallari filial filtriga bog'liq emas — filtrsiz to'liq ro'yxat.
+  const allItems = useStockItems();
   const movements = useStockMovements(selectedId);
   const expiring = useExpiringBatches(EXPIRING_WITHIN_DAYS, branchId ?? undefined);
   const autoToday = useAutoDeductionsToday(branchId ?? undefined);
   const bom = useServiceMaterials();
 
   const itemVMs = useMemo(() => (items.data ?? []).map(toStockItemVM), [items.data]);
+  const allItemVMs = useMemo(() => (allItems.data ?? []).map(toStockItemVM), [allItems.data]);
   const selectedItem = useMemo(
     () => itemVMs.find((i) => i.id === selectedId) ?? null,
     [itemVMs, selectedId],
@@ -259,7 +263,7 @@ export function StockScreen() {
 
           <Tabs.Panel value="bom">
             <Card withBorder padding="md">
-              <BomPanel services={services.data ?? []} items={itemVMs} canManage={canManage} />
+              <BomPanel services={services.data ?? []} items={allItemVMs} canManage={canManage} />
             </Card>
           </Tabs.Panel>
         </Tabs>
