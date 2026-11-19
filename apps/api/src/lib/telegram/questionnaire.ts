@@ -1,4 +1,5 @@
-import { medicalRecords } from '@dental/db-schema';
+import { auditLog, medicalRecords } from '@dental/db-schema';
+import { eq } from 'drizzle-orm';
 import type { DbOrTx } from '../../db/client.ts';
 import {
   type BotLang,
@@ -39,7 +40,16 @@ export async function saveQuestionnaireDraft(
   o: { tenantId: string; patientId: string; answers: Record<string, string>; now?: Date },
 ): Promise<void> {
   const at = o.now ?? new Date();
-  await tx
+  const [prev] = await tx
+    .select({
+      id: medicalRecords.id,
+      answers: medicalRecords.questionnaireAnswers,
+      at: medicalRecords.questionnaireAt,
+    })
+    .from(medicalRecords)
+    .where(eq(medicalRecords.patientId, o.patientId));
+
+  const [row] = await tx
     .insert(medicalRecords)
     .values({
       tenantId: o.tenantId,
@@ -50,7 +60,23 @@ export async function saveQuestionnaireDraft(
     .onConflictDoUpdate({
       target: medicalRecords.patientId,
       set: { questionnaireAnswers: o.answers, questionnaireAt: at },
+    })
+    .returning({ id: medicalRecords.id });
+
+  // FX-28: qayta topshirishda eski javoblar jimgina yo'qolmasin — tibbiy karta tarixi
+  // (audit_log-backed, V2-7) before/after bilan ko'rsatadi. Birinchi topshirish ham yoziladi.
+  if (row) {
+    await tx.insert(auditLog).values({
+      tenantId: o.tenantId,
+      userId: null,
+      action: 'updated',
+      resourceType: 'medical_record',
+      resourceId: row.id,
+      before: { questionnaireAnswers: prev?.answers ?? null, questionnaireAt: prev?.at ?? null },
+      after: { questionnaireAnswers: o.answers, questionnaireAt: at },
+      userAgent: 'telegram-bot',
     });
+  }
 }
 
 export function createQuestionnaireFlow(
