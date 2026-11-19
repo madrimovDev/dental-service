@@ -2,6 +2,8 @@ import {
   appointments,
   branches,
   patients,
+  services,
+  stockItems,
   tenants,
   treatmentPlans,
   treatmentStages,
@@ -57,6 +59,28 @@ export const createOwnershipValidator = () => {
       .where(eq(treatmentPlans.id, planId))
       .limit(1);
     if (!row) throw new CrossEntityError('treatment_plan', 'not_found');
+  }
+
+  /** X-1 (FX-03a): ombor itemId RLS ostida shu tenantda mavjudmi. */
+  async function assertStockItemExists(c: Context, itemId: string): Promise<void> {
+    const db = getDb(c);
+    const [row] = await db
+      .select({ id: stockItems.id })
+      .from(stockItems)
+      .where(eq(stockItems.id, itemId))
+      .limit(1);
+    if (!row) throw new CrossEntityError('stock_item', 'not_found');
+  }
+
+  /** X-1 (FX-03a): serviceId RLS ostida shu tenantda mavjudmi. */
+  async function assertServiceExists(c: Context, serviceId: string): Promise<void> {
+    const db = getDb(c);
+    const [row] = await db
+      .select({ id: services.id })
+      .from(services)
+      .where(eq(services.id, serviceId))
+      .limit(1);
+    if (!row) throw new CrossEntityError('service', 'not_found');
   }
 
   async function assertPatientExists(c: Context, patientId: string): Promise<void> {
@@ -149,6 +173,8 @@ export const createOwnershipValidator = () => {
   return {
     assertBranchExists,
     assertTreatmentPlanExists,
+    assertStockItemExists,
+    assertServiceExists,
     assertPatientExists,
     assertUserExists,
     assertStageBelongsToPatient,

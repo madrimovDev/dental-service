@@ -3,6 +3,7 @@ import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
+import { CrossEntityError } from '../../lib/ownership.ts';
 import { authMiddleware } from '../../middleware/auth.ts';
 import { requirePermission } from '../../middleware/require-permission.ts';
 import { rlsMiddleware } from '../../middleware/rls.ts';
@@ -66,7 +67,15 @@ const createdResponses = <T extends z.ZodTypeAny>(schema: T, description: string
     content: { 'application/json': { schema: errorResponseSchema } },
     description: 'Forbidden',
   },
+  404: {
+    content: { 'application/json': { schema: errorResponseSchema } },
+    description: 'Referenced stock item / service not found in this clinic',
+  },
 });
+
+/** X-1: begona/yo'q FK → 404 (yozishdan oldin tekshirilgan, hech narsa yozilmagan). */
+const ownershipNotFound = (e: CrossEntityError) =>
+  fail(`ownership.${e.entity}.${e.reason}`, 'not_found');
 
 /**
  * Ombor routes:
@@ -201,6 +210,7 @@ export const stockRoutes = (deps: {
       if (!movement) throw new Error('Stock movement creation failed');
       return c.json(ok(toStockMovementDto(movement)), 201);
     } catch (err) {
+      if (err instanceof CrossEntityError) return c.json(ownershipNotFound(err), 404);
       if (err instanceof InsufficientStockError) {
         return c.json(
           fail('stock.insufficient', 'Insufficient stock for this movement', {
@@ -245,9 +255,14 @@ export const stockRoutes = (deps: {
 
   app.openapi(createBomRoute, async (c) => {
     const body = c.req.valid('json');
-    const bom = await service.createBom(c, body);
-    if (!bom) throw new Error('BOM creation failed');
-    return c.json(ok(toServiceMaterialDto(bom)), 201);
+    try {
+      const bom = await service.createBom(c, body);
+      if (!bom) throw new Error('BOM creation failed');
+      return c.json(ok(toServiceMaterialDto(bom)), 201);
+    } catch (err) {
+      if (err instanceof CrossEntityError) return c.json(ownershipNotFound(err), 404);
+      throw err;
+    }
   });
 
   const removeBomRoute = createRoute({
@@ -343,9 +358,14 @@ export const stockRoutes = (deps: {
         return c.json(fail('permission.denied', 'Permission required: expense.manage'), 403);
       }
     }
-    const batch = await service.createBatch(c, body);
-    if (!batch) throw new Error('Batch creation failed');
-    return c.json(ok(toStockBatchDto(batch)), 201);
+    try {
+      const batch = await service.createBatch(c, body);
+      if (!batch) throw new Error('Batch creation failed');
+      return c.json(ok(toStockBatchDto(batch)), 201);
+    } catch (err) {
+      if (err instanceof CrossEntityError) return c.json(ownershipNotFound(err), 404);
+      throw err;
+    }
   });
 
   return app;
