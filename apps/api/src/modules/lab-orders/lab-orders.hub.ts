@@ -44,7 +44,8 @@ export type LabOrderHubOp =
   | 'message'
   | 'approve_price'
   | 'delivered'
-  | 'cancel';
+  | 'cancel'
+  | 'remake';
 
 /** Outbox'ga qator (biznes tranzaksiyasi ichida) + commit'dan keyin bir marta push urinishi. */
 export const enqueueLabHub = async (
@@ -156,6 +157,51 @@ export const createLabOrdersHubService = (deps: { audit: AuditLogger }) => {
         ...(reassign ? { labHubLabId: order.labHubLabId, hubStatus: order.hubStatus } : {}),
       },
       after: { status: 'sent', labHubLabId: lab.id, labName: lab.name, files: files.length },
+    });
+    return row;
+  }
+
+  /**
+   * FX-78: tayyor/yetkazilgan ishni qayta ishlashga qaytarish. Hub holati (`hub_status`) `ready`
+   * yoki `delivered` bo'lishi shart; klinika holati lab qayta qabul qilganda (poll) `in_progress`ga
+   * qaytadi. Tasdiqlangan narx va xarajat TEGILMAYDI (qayta ishlash — bepul). Takroriy bosish —
+   * kutilayotgan remake op bo'lsa yoki Hub allaqachon `remake`da bo'lsa idempotent (yangi op yo'q).
+   */
+  async function requestRemake(c: Context, id: string, reason?: string) {
+    const db = getDb(c);
+    const tenantId = c.get('activeTenantId') as string;
+    const order = await lockOrder(db, id);
+    if (!order) throw new LabHubOrderError(404, 'lab_order.not_found');
+    if (!order.labHubCaseRef) throw new LabHubOrderError(409, 'lab_hub.not_sent');
+    if (order.status === 'cancelled') throw new LabHubOrderError(409, 'lab_order.cancelled');
+    if (order.hubStatus === 'remake') return order;
+    if (order.hubStatus !== 'ready' && order.hubStatus !== 'delivered') {
+      throw new LabHubOrderError(409, 'lab_hub.not_remakable', { hubStatus: order.hubStatus });
+    }
+    const [pending] = await db
+      .select({ id: labHubOutbox.id })
+      .from(labHubOutbox)
+      .where(
+        and(
+          eq(labHubOutbox.labOrderId, id),
+          eq(labHubOutbox.op, 'remake'),
+          eq(labHubOutbox.status, 'pending'),
+        ),
+      );
+    if (pending) return order;
+
+    const [row] = await db
+      .update(labOrders)
+      .set({ hubSyncStatus: 'pending', updatedAt: new Date() })
+      .where(eq(labOrders.id, id))
+      .returning();
+    await enqueueLabHub(c, db, tenantId, id, [{ op: 'remake', payload: reason ? { reason } : {} }]);
+    await deps.audit.record(c, {
+      action: 'remake_requested',
+      resourceType: 'lab_order',
+      resourceId: id,
+      before: { status: order.status, hubStatus: order.hubStatus },
+      after: { hubStatus: 'remake', reasonLength: reason?.length ?? 0 },
     });
     return row;
   }
@@ -367,5 +413,5 @@ export const createLabOrdersHubService = (deps: { audit: AuditLogger }) => {
     return row;
   }
 
-  return { sendToHub, approvePrice, downloadHubFile, listMessages, postMessage };
+  return { sendToHub, requestRemake, approvePrice, downloadHubFile, listMessages, postMessage };
 };

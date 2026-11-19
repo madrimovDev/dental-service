@@ -78,6 +78,19 @@ export function useSendToLabHub() {
   });
 }
 
+/** FX-78: tayyor/yetkazilgan ishni qayta ishlashga qaytarish. */
+export function useRequestLabRemake(labOrderId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (reason?: string) => api.labHub.requestRemake<LabOrderWire>(labOrderId, reason),
+    onError: quiet,
+    onSuccess: (order) => {
+      qc.invalidateQueries({ queryKey: clinicalKeys.labOrder(labOrderId) });
+      qc.invalidateQueries({ queryKey: clinicalKeys.labOrders(order.patientId) });
+    },
+  });
+}
+
 /**
  * Narx tasdig'i — ekranda ko'rsatilgan narx yuboriladi (TOCTOU: lab poll orasida narxni
  * o'zgartirgan bo'lsa server 409 `price.changed` qaytaradi, xarajat yozilmaydi). Xatoda ham

@@ -28,6 +28,7 @@ import {
   labOrderIdParamSchema,
   labOrderListResponseDtoSchema,
   listLabOrdersQuerySchema,
+  remakeLabOrderSchema,
   sendToHubSchema,
   updateLabOrderSchema,
 } from './lab-orders.schema.ts';
@@ -331,6 +332,32 @@ export const labOrdersRoutes = (deps: { db: Database; audit: AuditLogger }) => {
     const { labId } = c.req.valid('json');
     try {
       const row = await hub.sendToHub(c, id, labId);
+      if (!row) return c.json(fail('lab_order.not_found', 'Not found'), 404);
+      return c.json(ok(toLabOrderDto(row)), 200);
+    } catch (e) {
+      const r = hubFail(e);
+      return c.json(r.body, r.status);
+    }
+  });
+
+  const remakeRoute = createRoute({
+    method: 'post',
+    path: '/{id}/remake',
+    tags: ['lab-orders'],
+    operationId: 'requestLabOrderRemake',
+    middleware: [requirePermission('lab_order.manage'), requireFeature('labOrders')] as const,
+    request: {
+      params: labOrderIdParamSchema,
+      body: { content: { 'application/json': { schema: remakeLabOrderSchema } }, required: true },
+    },
+    responses: { ...okJson(labOrderDtoSchema, 'Remake queued for Lab Hub'), ...hubErrorResponses },
+  });
+
+  app.openapi(remakeRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const { reason } = c.req.valid('json');
+    try {
+      const row = await hub.requestRemake(c, id, reason);
       if (!row) return c.json(fail('lab_order.not_found', 'Not found'), 404);
       return c.json(ok(toLabOrderDto(row)), 200);
     } catch (e) {

@@ -1229,3 +1229,117 @@ describe('FX-80: Hub tasdig‘idan yozilgan «Laboratoriya» xarajati qo‘lda b
     expect((await call('accountant', 'DELETE', `/api/expenses/${eid}`)).status).toBe(200);
   });
 });
+
+describe('FX-78: klinika tayyor/yetkazilgan ishni qayta ishlashga qaytaradi (remake)', () => {
+  const sendCase = async () => {
+    const id = await createOrder();
+    expect(
+      (await call('doctor', 'POST', `/api/lab-orders/${id}/send-to-hub`, { labId: lab.labId }))
+        .status,
+    ).toBe(200);
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+    const [hc] = await hubCaseByRef(id);
+    const step = async (path: string, body: unknown) => {
+      const r = await hubJson(`/v1/lab/cases/${hc!.id}${path}`, {
+        method: 'POST',
+        token: lab.token,
+        body,
+      });
+      expect(r.status).toBeLessThan(300);
+    };
+    await step('/status', { to: 'accepted' });
+    return { id, step, hubId: hc!.id };
+  };
+  const remake = (id: string, body: unknown = { reason: 'Rang mos emas' }, role = 'doctor') =>
+    call(role, 'POST', `/api/lab-orders/${id}/remake`, body);
+  const code = async (r: Response) => ((await r.json()) as { error: { code: string } }).error.code;
+
+  test('ready/delivered → remake op → Hub remake + sabab xabari; lab qabul qilsa «jarayonda»; narx/xarajat tegilmaydi', async () => {
+    const { id, step, hubId } = await sendCase();
+    // Hali tayyor emas — qayta ishlash so'rab bo'lmaydi.
+    const early = await remake(id);
+    expect(early.status).toBe(409);
+    expect(await code(early)).toBe('lab_hub.not_remakable');
+
+    await step('/price', { price: 275000 });
+    await step('/status', { to: 'in_progress' });
+    await step('/status', { to: 'ready' });
+    await pollLabHubChanges(tenantId);
+    expect((await orderRow(id))?.hubStatus).toBe('ready');
+    expect(
+      (await call('doctor', 'POST', `/api/lab-orders/${id}/approve-price`, { price: '275000.00' }))
+        .status,
+    ).toBe(200);
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+    expect(await expensesOf(id)).toHaveLength(1);
+    expect(
+      (await call('doctor', 'PATCH', `/api/lab-orders/${id}`, { status: 'delivered' })).status,
+    ).toBe(200);
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+    await pollLabHubChanges(tenantId);
+    expect((await orderRow(id))?.status).toBe('delivered');
+
+    // Ruxsat: lab_order.manage yo'q (Nurse) → 403; sababsiz ham mumkin; sabab uzunligi cheklangan.
+    expect((await remake(id, { reason: 'x' }, 'nurse')).status).toBe(403);
+    expect((await remake(id, { reason: 'x'.repeat(2001) })).status).toBe(400);
+
+    const res = await remake(id);
+    expect(res.status).toBe(200);
+    const ops = await inTenant((tx) =>
+      tx.select().from(labHubOutbox).where(eq(labHubOutbox.labOrderId, id)),
+    );
+    expect(ops.filter((o) => o.op === 'remake')).toHaveLength(1);
+    // Takroriy bosish — yangi op yo'q (idempotent).
+    expect((await remake(id)).status).toBe(200);
+    expect(
+      (
+        await inTenant((tx) =>
+          tx.select().from(labHubOutbox).where(eq(labHubOutbox.labOrderId, id)),
+        )
+      ).filter((o) => o.op === 'remake'),
+    ).toHaveLength(1);
+
+    await releaseOutbox();
+    await flushLabHubOutbox(tenantId);
+    expect((await hubCaseByRef(id))[0]?.status).toBe('remake');
+    const hubMsgs =
+      (await hubAdmin`SELECT author FROM case_messages WHERE case_id = ${hubId}`) as unknown as {
+        author: string;
+      }[];
+    expect(hubMsgs.filter((m) => m.author === 'clinic').length).toBeGreaterThanOrEqual(1);
+
+    await pollLabHubChanges(tenantId);
+    expect((await orderRow(id))?.hubStatus).toBe('remake');
+    // Qayta ishlash so'ralgan ishni yana so'rab bo'lmaydi.
+    expect((await remake(id)).status).toBe(200);
+
+    await step('/status', { to: 'accepted' });
+    await pollLabHubChanges(tenantId);
+    const row = await orderRow(id);
+    expect(row?.status).toBe('in_progress');
+    expect(row?.hubStatus).toBe('accepted');
+    expect(row?.deliveredDate).toBeNull();
+    // Tasdiqlangan narx va xarajat o'zgarmaydi.
+    expect(row?.approvedPrice).toBe('275000.00');
+    const exps = await expensesOf(id);
+    expect(exps).toHaveLength(1);
+    expect(exps[0]?.amount).toBe('275000.00');
+  });
+
+  test('Hub’ga yuborilmagan / bekor qilingan ishga remake 409', async () => {
+    const local = await createOrder();
+    const r1 = await remake(local);
+    expect(r1.status).toBe(409);
+    expect(await code(r1)).toBe('lab_hub.not_sent');
+
+    const { id } = await sendCase();
+    expect(
+      (await call('doctor', 'PATCH', `/api/lab-orders/${id}`, { status: 'cancelled' })).status,
+    ).toBe(200);
+    const r2 = await remake(id);
+    expect(r2.status).toBe(409);
+  });
+});

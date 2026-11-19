@@ -84,6 +84,7 @@ vi.mock('./lab-hub.api', () => ({
     ],
   }),
   usePostLabHubMessage: () => ({ mutate: postMutate, isPending: false }),
+  useRequestLabRemake: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 vi.mock('@/features/patients/patients.api', () => ({
   usePatient: (id: string) => {
@@ -227,6 +228,18 @@ describe('LabOrderDetailPage', () => {
     );
     expect(screen.queryByRole('button', { name: 'Tasdiqlash' })).not.toBeInTheDocument();
     expect(screen.queryByText(/«Laboratoriya» xarajati/)).not.toBeInTheDocument();
+  });
+
+  it("FX-78: faqat Hub ready/delivered ishda «Qayta ishlashni so'rash» (manage kerak)", () => {
+    orderOver.current = { labHubLabId: 'hl1', hubStatus: 'ready' };
+    renderPage();
+    expect(screen.getByTestId('lab-hub-remake')).toBeInTheDocument();
+  });
+
+  it("FX-78: lab hali ishlayotgan (accepted) ishda remake bloki yo'q", () => {
+    orderOver.current = { labHubLabId: 'hl1', hubStatus: 'accepted' };
+    renderPage();
+    expect(screen.queryByTestId('lab-hub-remake')).not.toBeInTheDocument();
   });
 
   it('lab fayli xabarida «Yuklab olish» — proxy manzil bilan', () => {

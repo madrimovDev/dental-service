@@ -9,7 +9,7 @@ import {
   patients,
   users,
 } from '@dental/db-schema';
-import { and, eq, isNotNull, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import type { Database, DbOrTx } from '../../db/client.ts';
 import { withTenant } from '../../db/scoped.ts';
 import {
@@ -105,6 +105,25 @@ const executeOp = async (
         }
         throw err;
       }
+      return undefined;
+    }
+    case 'remake': {
+      // FX-78: Hub holati `remake` bo'ladi; sabab Hub'da klinika xabari sifatida yoziladi.
+      await client.remakeCase(
+        key,
+        caseRef,
+        typeof row.payload.reason === 'string' ? row.payload.reason : null,
+      );
+      // Hub 2xx — holat `remake` (takroriy so'rov idempotent bo'lsin; poll aks-sadosi ham shuni yozadi).
+      // Poll lab'ning keyingi holatini allaqachon qo'llagan bo'lsa (ready/delivered emas) tegilmaydi.
+      await withTenant(tenantId, (tx) =>
+        tx
+          .update(labOrders)
+          .set({ hubStatus: 'remake', hubSyncStatus: 'synced' })
+          .where(
+            and(eq(labOrders.id, order.id), inArray(labOrders.hubStatus, ['ready', 'delivered'])),
+          ),
+      );
       return undefined;
     }
     case 'upsert_case': {

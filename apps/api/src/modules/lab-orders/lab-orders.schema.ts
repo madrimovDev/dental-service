@@ -187,6 +187,11 @@ export const labOrderFileDeleteSchema = z
 
 export const sendToHubSchema = z.object({ labId: z.uuid() }).strict();
 
+/** FX-78: tayyor/yetkazilgan ishni qayta ishlashga qaytarish — sabab ixtiyoriy (Hub'da xabar bo'ladi). */
+export const remakeLabOrderSchema = z
+  .object({ reason: z.string().trim().min(1).max(2000).optional() })
+  .strict();
+
 /**
  * Foydalanuvchi ekranda ko'rgan narx (`proposedPrice` satri, masalan `"350000.00"`).
  * Server qulflangan qatordagi taklif bilan solishtiradi — farq bo'lsa 409 `price.changed`.

@@ -203,6 +203,14 @@ export const labHubClient = (fetchImpl?: FetchFn) => ({
       key,
       fetchImpl,
     }),
+  /** FX-78: klinika tayyor/yetkazilgan ishni qayta ishlashga qaytardi (Hub: ready|delivered → remake). */
+  remakeCase: (key: string, caseRef: string, reason?: string | null) =>
+    json<{ status: string; changed: boolean }>(`/v1/clinic/cases/${ref(caseRef)}/remake`, {
+      method: 'POST',
+      key,
+      json: reason ? { reason } : {},
+      fetchImpl,
+    }),
   changes: (key: string, since: string, limit: number) =>
     json<{ events: HubChangeEvent[]; nextCursor: string }>(
       `/v1/clinic/changes?since=${encodeURIComponent(since)}&limit=${limit}`,

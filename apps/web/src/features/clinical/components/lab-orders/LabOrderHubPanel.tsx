@@ -14,6 +14,7 @@ import {
   useLabHubMessages,
   useLabHubStatus,
   usePostLabHubMessage,
+  useRequestLabRemake,
   useSendToLabHub,
 } from './lab-hub.api';
 import type { LabOrderWire } from './lab-order.helpers';
@@ -68,6 +69,8 @@ export function LabOrderHubPanel({
   const approve = useApproveLabPrice(order.id);
   const messages = useLabHubMessages(order.id, linked);
   const post = usePostLabHubMessage(order.id);
+  const remake = useRequestLabRemake(order.id);
+  const [remakeReason, setRemakeReason] = useState('');
   const [labId, setLabId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
 
@@ -134,6 +137,11 @@ export function LabOrderHubPanel({
   const pendingPrice = order.priceApprovalRequestedPrice ?? proposed;
   const list = messages.data ?? [];
   // FX-46/47: bekor qilingan yoki rad etilgan ishga narx tasdiqlanmaydi.
+  // FX-78: tayyor/yetkazilgan ishni qayta ishlashga qaytarish.
+  const canRemake =
+    canManage &&
+    order.status !== 'cancelled' &&
+    (hubStatus === 'ready' || hubStatus === 'delivered');
   const priceLocked = order.status === 'cancelled' || hubStatus === 'rejected';
   const reassignOptions = activeLabs(labs.data?.labs)
     .filter((l) => l.id !== order.labHubLabId)
@@ -195,6 +203,39 @@ export function LabOrderHubPanel({
                 }
               >
                 {t('labHubClinic.reassign_btn')}
+              </Button>
+            </Group>
+          </Stack>
+        )}
+
+        {canRemake && (
+          <Stack gap="xs" data-testid="lab-hub-remake">
+            <div className={classes.label}>{t('labHubClinic.remake_title')}</div>
+            <div className={classes.hint}>{t('labHubClinic.remake_hint')}</div>
+            <Textarea
+              aria-label={t('labHubClinic.remake_reason')}
+              placeholder={t('labHubClinic.remake_reason')}
+              autosize
+              minRows={2}
+              maxLength={2000}
+              value={remakeReason}
+              onChange={(e) => setRemakeReason(e.currentTarget.value)}
+            />
+            <Group justify="flex-end">
+              <Button
+                variant="default"
+                loading={remake.isPending}
+                onClick={() =>
+                  remake.mutate(remakeReason.trim() || undefined, {
+                    onSuccess: () => {
+                      setRemakeReason('');
+                      notifications.show({ message: t('labHubClinic.remake_toast') });
+                    },
+                    onError: (err) => notifications.show({ color: 'red', message: errText(err) }),
+                  })
+                }
+              >
+                {t('labHubClinic.remake_btn')}
               </Button>
             </Group>
           </Stack>
