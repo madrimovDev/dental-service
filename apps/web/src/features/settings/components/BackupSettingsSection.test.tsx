@@ -178,5 +178,25 @@ describe('BackupSettingsSection', () => {
       expect(screen.getByRole('status')).toHaveTextContent('Tiklash boshlandi');
       expect(screen.getByRole('button', { name: /^Tiklash —/ })).toBeDisabled();
     });
+
+    it('to‘xtab qolgan tiklash (desktop startup «interrupted» deb yozgan): tugmalar faol, «qaytarilmadi» banneri', () => {
+      hoisted.status = desktopStatus({
+        ...fresh,
+        lastRestore: {
+          status: 'failed',
+          file: 'dental-20261110-200000',
+          finishedAt: daysAgo(0),
+          error: "interrupted: tiklash kutilmaganda to'xtadi",
+          dbRolledBack: false,
+        },
+      });
+      renderApp(<BackupSettingsSection />);
+      expect(screen.queryByText(/Tiklash boshlandi/)).not.toBeInTheDocument();
+      const alert = screen.getByRole('alert');
+      expect(alert).toHaveTextContent('Tiklash muvaffaqiyatsiz');
+      expect(alert).toHaveTextContent('qaytarib bo‘lmadi');
+      expect(alert).toHaveTextContent('interrupted');
+      expect(screen.getByRole('button', { name: /^Tiklash —/ })).toBeEnabled();
+    });
   });
 });

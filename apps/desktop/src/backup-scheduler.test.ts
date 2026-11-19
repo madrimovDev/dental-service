@@ -349,6 +349,76 @@ describe('so‘rov fayllari (poll)', () => {
 });
 
 describe('start/stop taymerlari', () => {
+  // FX-147 review: tiklash vaqtida elektr/Windows o'chsa yoki tray'dan chiqilsa `running` abadiy
+  // qolib ketardi → web'dagi barcha «Tiklash» tugmalari bloklanardi (yagona tiklash yo'li).
+  test('start: eskirgan `running` natija `failed: interrupted` ga qayta yoziladi', () => {
+    writeFileSync(
+      join(dataDir, 'restore-result.json'),
+      JSON.stringify({ status: 'running', file: 'dental-20261110-200000', finishedAt: 'x' }),
+    );
+    const s = createBackupScheduler(makeDeps());
+    s.start();
+    const result = JSON.parse(readFileSync(join(dataDir, 'restore-result.json'), 'utf8'));
+    expect(result.status).toBe('failed');
+    expect(result.file).toBe('dental-20261110-200000');
+    expect(result.error).toStartWith('interrupted');
+    expect(result.dbRolledBack).toBe(false);
+    expect(result.finishedAt).toBe(clock.toISOString());
+    s.stop();
+  });
+
+  test('start: tugallangan natija (ok/failed) va natija yo‘qligi tegilmaydi', () => {
+    const okResult = { status: 'ok', file: 'dental-20261110-200000', finishedAt: 'x' };
+    writeFileSync(join(dataDir, 'restore-result.json'), JSON.stringify(okResult));
+    const s = createBackupScheduler(makeDeps());
+    s.start();
+    s.stop();
+    expect(JSON.parse(readFileSync(join(dataDir, 'restore-result.json'), 'utf8'))).toEqual(
+      okResult,
+    );
+
+    rmSync(join(dataDir, 'restore-result.json'));
+    const s2 = createBackupScheduler(makeDeps());
+    s2.start();
+    s2.stop();
+    expect(existsSync(join(dataDir, 'restore-result.json'))).toBe(false);
+  });
+
+  test('start: shu jarayonda tiklash ketayotgan bo‘lsa (stop→start) `running` tegilmaydi', async () => {
+    seedBackup('dental-20261110-200000');
+    writeFileSync(
+      join(dataDir, 'restore-request.json'),
+      JSON.stringify({ file: 'dental-20261110-200000' }),
+    );
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    const s = createBackupScheduler(
+      makeDeps({
+        stopApi: async () => {
+          await gate;
+        },
+      }),
+    );
+    const p = s.poll();
+    await Promise.resolve();
+    expect(JSON.parse(readFileSync(join(dataDir, 'restore-result.json'), 'utf8')).status).toBe(
+      'running',
+    );
+    s.stop();
+    s.start();
+    expect(JSON.parse(readFileSync(join(dataDir, 'restore-result.json'), 'utf8')).status).toBe(
+      'running',
+    );
+    release();
+    await p;
+    s.stop();
+    expect(JSON.parse(readFileSync(join(dataDir, 'restore-result.json'), 'utf8')).status).toBe(
+      'ok',
+    );
+  });
+
   test('start: keyingi 20:00 gacha setTimeout + 2 s polling; stop ikkalasini tozalaydi', () => {
     clock = new Date(2026, 10, 11, 18, 0, 0);
     const delays: number[] = [];
