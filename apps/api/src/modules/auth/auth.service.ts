@@ -206,6 +206,17 @@ export async function provisionTenantInTx(
   return { userId: user.id, tenantId: tenant.id, slug: tenant.slug, branchId: branch.id };
 }
 
+/**
+ * Bir foydalanuvchining bir nechta tayinlovi orasida birlamchisini tanlash tartibi (FX-71):
+ * klinika miqyosidagi (branchId=null) avval, so'ng eng eski, so'ng id — fizik qator
+ * tartibiga bog'liq bo'lmasin.
+ */
+const assignmentPriorityOrder = () => [
+  sql`(${userAssignments.branchId} IS NOT NULL)`,
+  asc(userAssignments.createdAt),
+  asc(userAssignments.id),
+];
+
 type ContextPermissions = {
   perms: string[];
   /** Aktiv kontekstdagi birlamchi rol templateKey'i; owner / no-assignment / custom rol → null. */
@@ -252,7 +263,10 @@ async function buildPermissionsForContext(
           or(isNull(userAssignments.validTo), gt(userAssignments.validTo, now)),
           branchFilter,
         ),
-      );
+      )
+      // FX-71/FX-25r: ko'p tayinlovda birlamchi rol deterministik — avval klinika miqyosidagi
+      // (branchId=null), so'ng eng eski, so'ng id.
+      .orderBy(...assignmentPriorityOrder());
 
     if (assignments.length === 0) return { perms: [], roleKey: null };
 
@@ -763,7 +777,9 @@ export const createAuthService = (deps: AuthServiceDeps) => {
               or(isNull(userAssignments.validTo), gt(userAssignments.validTo, now)),
               ...(branchFilter ? [branchFilter] : []),
             ),
-          );
+          )
+          .orderBy(...assignmentPriorityOrder())
+          .limit(1);
 
         if (!assignment) return { code: 'auth.no_workspace_access' as const };
         assignedBranchId = assignment.branchId ?? null;
