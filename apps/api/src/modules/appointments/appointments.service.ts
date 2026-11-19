@@ -12,6 +12,7 @@ import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
 import { isDoctorInBranch, listPractitioners } from '../../lib/doctor-branch.ts';
 import { CrossEntityError, createOwnershipValidator } from '../../lib/ownership.ts';
+import { assertBranchExists } from '../../lib/ownership-refs.ts';
 import { pgErrorInfo } from '../../lib/pg-error.ts';
 import { reminderDelayMs } from '../../lib/reminder-delay.ts';
 import type {
@@ -325,6 +326,16 @@ export const createAppointmentsService = (deps: {
       assistantId: input.assistantId,
     });
     if (refsError) return { ok: false as const, code: refsError };
+
+    // Review (X-1): body `branchId` ham RLS ostida tekshiriladi — FK begona tenant filialini
+    // qabul qilardi, isDoctorInBranch esa owner / tenant-wide doktor uchun har qanday
+    // filialga true qaytaradi (B filiali o'chirilsa A yozilishi CASCADE bilan o'chardi).
+    try {
+      await assertBranchExists(c, input.branchId);
+    } catch (e) {
+      if (e instanceof CrossEntityError) return { ok: false as const, code: 'branch.not_found' };
+      throw e;
+    }
 
     // FX-34 (LA-08): doktor shu filialda ishlashi shart.
     if (!(await isDoctorInBranch(c, input.doctorId, input.branchId))) {

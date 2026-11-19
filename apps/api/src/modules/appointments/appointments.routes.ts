@@ -43,9 +43,12 @@ const conflictResponse = {
   },
 };
 
-/** FX-02: begona/mavjud bo'lmagan bemor/doktor/yordamchi → 404. */
+/** FX-02: begona/mavjud bo'lmagan bemor/doktor/yordamchi/filial → 404. */
 const isRefNotFound = (code: string) =>
-  code === 'patient.not_found' || code === 'doctor.not_found' || code === 'assistant.not_found';
+  code === 'patient.not_found' ||
+  code === 'doctor.not_found' ||
+  code === 'assistant.not_found' ||
+  code === 'branch.not_found';
 
 export const appointmentRoutes = (deps: {
   db: Database;

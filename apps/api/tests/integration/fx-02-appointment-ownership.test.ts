@@ -20,7 +20,7 @@ import {
   userAssignments,
   users,
 } from '@dental/db-schema';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { db } from '../../src/db/client.ts';
 import { signAccess } from '../../src/lib/jwt.ts';
 import { appointmentRoutes } from '../../src/modules/appointments/appointments.routes.ts';
@@ -205,6 +205,28 @@ describe('FX-02 — create egalik (Receptionist, real route + RLS)', () => {
     expect(((await res.json()) as { error: { code: string } }).error.code).toBe(
       'assistant.not_found',
     );
+  });
+
+  // Review (X-1): body `branchId` RLS ostida tekshirilmasdi — isDoctorInBranch owner va
+  // tenant-wide (branch_id NULL) doktor uchun HAR QANDAY filialga true qaytaradi, natijada
+  // A tenantida B filialiga bog'langan yozilish yaratilardi (B filialni o'chirsa — CASCADE).
+  test.each([
+    ['owner-doktor', () => ownerA, '07:00', '08:00'],
+    ['tenant-wide doktor', () => sharedDoctor, '08:00', '09:00'],
+  ] as const)('begona tenant filiali (%s) → 404 branch.not_found, yozuv yaratilmaydi', async (_l, doc, from, to) => {
+    const res = await call(tokenA, 'POST', '/', {
+      branchId: branchB,
+      patientId: patientA,
+      doctorId: doc(),
+      serviceIds: [],
+      ...slot(from, to, '2026-12-12'),
+    });
+    expect(res.status).toBe(404);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe('branch.not_found');
+    const rows = await withTenant(tenantA, async (tx) =>
+      tx.select().from(appointments).where(eq(appointments.branchId, branchB)),
+    );
+    expect(rows.length).toBe(0);
   });
 
   test('o`z tenant doktor+bemor → 201', async () => {
