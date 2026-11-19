@@ -145,7 +145,7 @@ describe('FX-23b — bot bron so‘rovi: xodim bildirishnomasi + audit', () => {
       const r3 = await flows.onCallback(tx, { tenantId, chatId: CHAT, data: anyDoc!.data });
       const day = r3.reply?.buttons?.flat().find((x) => x.data === 'bk:t:2');
       const r4 = await flows.onCallback(tx, { tenantId, chatId: CHAT, data: day!.data });
-      const slot = r4.reply?.buttons?.flat().find((x) => x.data === 'bk:s:0');
+      const slot = r4.reply?.buttons?.flat().find((x) => x.data.startsWith('bk:s:0:'));
       expect(slot).toBeDefined();
       const r5 = await flows.onCallback(tx, { tenantId, chatId: CHAT, data: slot!.data });
       expect(r5.reply?.text).toBeTruthy();
