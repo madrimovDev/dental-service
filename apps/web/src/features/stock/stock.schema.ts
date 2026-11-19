@@ -4,7 +4,8 @@ import { z } from 'zod';
 export const itemFormSchema = z.object({
   name: z.string().min(1).max(200),
   unit: z.string().min(1).max(32),
-  branchId: z.string().optional(),
+  // FX-165: Mantine Select tozalanganda `null` beradi — `undefined` ham, `null` ham ruxsat.
+  branchId: z.string().nullish(),
   /** Kategoriya / dona narxi — ixtiyoriy (FX-129). Narx bo'sh = belgilanmagan. */
   category: z.string().max(100).optional(),
   price: z.union([z.coerce.number().nonnegative(), z.literal('')]).optional(),

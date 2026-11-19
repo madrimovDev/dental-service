@@ -1,3 +1,4 @@
+import type { Branch } from '@dental/api-client';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderApp } from '../../../test-utils';
@@ -79,5 +80,28 @@ describe('ItemFormModal — tahrirlash (FX-129)', () => {
       price: 2000,
     });
     expect(updateStockItem).not.toHaveBeenCalled();
+  });
+
+  // FX-165: filial tanlanib, keyin tozalansa Mantine Select `null` beradi — zod `undefined`ni
+  // kutardi (string|undefined), validatsiya jimgina yiqilib, «Saqlash» hech narsa qilmasdi.
+  it('tanlangan filialni tozalash → validatsiya o‘tadi, branchId yuborilmaydi', async () => {
+    const branches = [{ id: 'b1', name: 'Markaz' }] as unknown as Branch[];
+    renderApp(<ItemFormModal opened onClose={() => {}} branches={branches} item={null} />);
+    fireEvent.change(await screen.findByLabelText(/Nomi/), { target: { value: 'Bint' } });
+    fireEvent.change(screen.getByLabelText(/Birlik/), { target: { value: 'dona' } });
+    const branchInput = screen.getByRole('textbox', { name: 'Filial' });
+    fireEvent.click(branchInput);
+    fireEvent.click(await screen.findByRole('option', { name: 'Markaz' }));
+    await waitFor(() => expect((branchInput as HTMLInputElement).value).toBe('Markaz'));
+    const clear = branchInput
+      .closest('.mantine-Select-root')
+      ?.querySelector('.mantine-InputClearButton-root');
+    expect(clear).not.toBeNull();
+    fireEvent.click(clear as Element);
+    await waitFor(() => expect((branchInput as HTMLInputElement).value).toBe(''));
+    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    await waitFor(() => expect(createStockItem).toHaveBeenCalledOnce());
+    expect(createStockItem.mock.calls[0]?.[0]).toMatchObject({ name: 'Bint', unit: 'dona' });
+    expect(createStockItem.mock.calls[0]?.[0].branchId).toBeUndefined();
   });
 });
