@@ -1,3 +1,4 @@
+import type { MembershipsResponse } from '@dental/api-client/generated/model/membershipsResponse';
 import { useDoctors } from '@/features/appointments/appointments.api';
 import { useMe } from '@/features/auth/auth.api';
 import { useAuthStore } from '@/stores/auth-store.ts';
@@ -31,17 +32,21 @@ export type ClinicalAuthor = {
   isLoading: boolean;
 };
 
+type MeAssignment = MembershipsResponse['assignments'][number];
+/** Generatsiya qilingan `/auth/me` shaklining tekshiruvga kerakli qismi (testlar qisman obyekt beradi). */
 type MeLike = {
-  assignments?: { tenantId: string; isPractitioner?: boolean }[];
-  ownerTenants?: { tenantId: string }[];
+  assignments?: (Pick<MeAssignment, 'tenantId'> & Partial<Pick<MeAssignment, 'isPractitioner'>>)[];
+  ownerTenants?: Pick<MembershipsResponse['ownerTenants'][number], 'tenantId'>[];
 };
 
 /** Joriy tenantda shifokor belgili faol tayinlov yoki tenant egasi. Noaniq bo'lsa — yo'q. */
-export function isSelfPractitioner(me: unknown, activeTenantId: string | null): boolean {
+export function isSelfPractitioner(
+  me: MeLike | null | undefined,
+  activeTenantId: string | null,
+): boolean {
   if (!activeTenantId || !me) return false;
-  const m = me as MeLike;
-  if ((m.ownerTenants ?? []).some((t) => t.tenantId === activeTenantId)) return true;
-  return (m.assignments ?? []).some(
+  if ((me.ownerTenants ?? []).some((t) => t.tenantId === activeTenantId)) return true;
+  return (me.assignments ?? []).some(
     (a) => a.tenantId === activeTenantId && a.isPractitioner === true,
   );
 }

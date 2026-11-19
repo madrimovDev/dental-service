@@ -62,6 +62,7 @@ function tx(over: Partial<CashierTransaction> = {}): CashierTransaction {
     visitNoteId: null,
     totalAmount: '120000',
     paidAmount: '120000',
+    refundedAmount: '0',
     discount: '0',
     currency: 'UZS',
     paymentMethod: 'cash',

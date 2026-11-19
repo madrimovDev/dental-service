@@ -15,5 +15,6 @@ export type MembershipsResponseAssignmentsItem = {
   branchName: string | null;
   roleId: string;
   roleName: string;
+  isPractitioner: boolean;
   isOwner: boolean;
 };

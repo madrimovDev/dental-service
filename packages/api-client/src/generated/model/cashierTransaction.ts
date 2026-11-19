@@ -21,6 +21,7 @@ export interface CashierTransaction {
   receiptNumber: string | null;
   totalAmount: string;
   paidAmount: string;
+  refundedAmount: string;
   discount: string;
   currency: string;
   paymentMethod: CashierTransactionPaymentMethod;

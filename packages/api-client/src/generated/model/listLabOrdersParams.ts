@@ -5,6 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ListLabOrdersStatus } from './listLabOrdersStatus';
+import type { ListLabOrdersActiveOnly } from './listLabOrdersActiveOnly';
 
 export type ListLabOrdersParams = {
 /**
@@ -15,6 +16,10 @@ patientId?: string;
  * Filter by order status
  */
 status?: ListLabOrdersStatus;
+/**
+ * Only active orders (not delivered/cancelled), most urgent first
+ */
+activeOnly?: ListLabOrdersActiveOnly;
 /**
  * @minimum 0
  * @exclusiveMinimum

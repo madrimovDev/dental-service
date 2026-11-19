@@ -8,4 +8,5 @@ import type { ListBookingRequestsStatus } from './listBookingRequestsStatus';
 
 export type ListBookingRequestsParams = {
 status?: ListBookingRequestsStatus;
+branchId?: string;
 };

@@ -9,7 +9,9 @@ import type {
   GetLabHubStatus200,
   ListLabHubLabs200,
   RequestLabHubLink200,
-  RequestLabHubLinkBody
+  RequestLabHubLinkBody,
+  RequeueLabHubOutbox200,
+  RequeueLabHubOutboxBody
 } from '.././model';
 
 import { customInstance } from '../../mutator';
@@ -50,7 +52,18 @@ import { customInstance } from '../../mutator';
     },
       );
     }
+  export const requeueLabHubOutbox = (
+    requeueLabHubOutboxBody: RequeueLabHubOutboxBody,
+ ) => {
+      return customInstance<RequeueLabHubOutbox200>(
+      {url: `/api/lab-hub/outbox/requeue`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: requeueLabHubOutboxBody
+    },
+      );
+    }
   export type GetLabHubStatusResult = NonNullable<Awaited<ReturnType<typeof getLabHubStatus>>>
 export type ConnectLabHubResult = NonNullable<Awaited<ReturnType<typeof connectLabHub>>>
 export type ListLabHubLabsResult = NonNullable<Awaited<ReturnType<typeof listLabHubLabs>>>
 export type RequestLabHubLinkResult = NonNullable<Awaited<ReturnType<typeof requestLabHubLink>>>
+export type RequeueLabHubOutboxResult = NonNullable<Awaited<ReturnType<typeof requeueLabHubOutbox>>>
