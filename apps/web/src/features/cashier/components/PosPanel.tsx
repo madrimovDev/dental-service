@@ -32,6 +32,7 @@ import { useTranslation } from 'react-i18next';
 import { BalanceBadge } from '@/components/BalanceBadge';
 import { usePatientBalance } from '@/features/patients/patients.api';
 import { formatCurrency } from '@/lib/format';
+import { useAuthStore } from '@/stores/auth-store';
 import { fetchServicePrices, useCreateTransaction, useServices } from '../cashier.api';
 import { cashierKeys } from '../cashier.keys';
 import {
@@ -157,6 +158,8 @@ export function PosPanel({
   const servicesQuery = useServices();
   const createMut = useCreateTransaction();
   const balanceQuery = usePatientBalance(patientId ?? '');
+  // FT-04 (D-1): chegirma faqat `discount.give` bilan (server 403 `discount.forbidden`).
+  const canDiscount = useAuthStore((s) => s.hasPermission('discount.give'));
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState('');
@@ -170,7 +173,7 @@ export function PosPanel({
 
   // Foiz → so'm chegirma. gross = savat jami (chegirmasiz) = computeNetTotal(cart, 0).
   const gross = computeNetTotal(cart, 0);
-  const discAmt = Math.round((gross * discountPct) / 100);
+  const discAmt = canDiscount ? Math.round((gross * discountPct) / 100) : 0;
   const netTotal = computeNetTotal(cart, discAmt);
   // Naqdda qaytim, qarz qoldig'i (sof hisob — mappers.computeTender).
   const tender = computeTender(
@@ -422,42 +425,44 @@ export function PosPanel({
           </Text>
         </Group>
 
-        {/* Chegirma percent pillari */}
-        <Group
-          justify="space-between"
-          align="center"
-          style={{ padding: '12px 18px', borderTop: '1px solid var(--border)' }}
-        >
-          <Text size="sm" style={{ color: 'var(--ink-2)' }}>
-            {t('cashier.discount')}
-          </Text>
-          <Group gap={6}>
-            {DISCOUNT_PCTS.map((pct) => {
-              const active = pct === discountPct;
-              return (
-                <UnstyledButton
-                  key={pct}
-                  onClick={() => setDiscountPct(pct)}
-                  style={{
-                    minWidth: 40,
-                    height: 30,
-                    padding: '0 10px',
-                    borderRadius: 8,
-                    textAlign: 'center',
-                    fontSize: 13,
-                    fontWeight: 600,
-                    fontFamily: 'var(--font-mono)',
-                    border: active ? '1px solid var(--primary)' : '1px solid var(--border)',
-                    background: active ? 'var(--primary)' : 'var(--surface)',
-                    color: active ? 'var(--on-primary)' : 'var(--ink-2)',
-                  }}
-                >
-                  {`${pct}%`}
-                </UnstyledButton>
-              );
-            })}
+        {/* Chegirma percent pillari — faqat `discount.give` bilan */}
+        {canDiscount && (
+          <Group
+            justify="space-between"
+            align="center"
+            style={{ padding: '12px 18px', borderTop: '1px solid var(--border)' }}
+          >
+            <Text size="sm" style={{ color: 'var(--ink-2)' }}>
+              {t('cashier.discount')}
+            </Text>
+            <Group gap={6}>
+              {DISCOUNT_PCTS.map((pct) => {
+                const active = pct === discountPct;
+                return (
+                  <UnstyledButton
+                    key={pct}
+                    onClick={() => setDiscountPct(pct)}
+                    style={{
+                      minWidth: 40,
+                      height: 30,
+                      padding: '0 10px',
+                      borderRadius: 8,
+                      textAlign: 'center',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      fontFamily: 'var(--font-mono)',
+                      border: active ? '1px solid var(--primary)' : '1px solid var(--border)',
+                      background: active ? 'var(--primary)' : 'var(--surface)',
+                      color: active ? 'var(--on-primary)' : 'var(--ink-2)',
+                    }}
+                  >
+                    {`${pct}%`}
+                  </UnstyledButton>
+                );
+              })}
+            </Group>
           </Group>
-        </Group>
+        )}
 
         {/* Jami to'lov */}
         <Group

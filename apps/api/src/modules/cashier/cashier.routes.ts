@@ -156,6 +156,17 @@ export const cashierRoutes = (deps: {
     if (!(await isBranchAllowed(c, 'cashier.create_transaction', body.branchId))) {
       return c.json(fail(BRANCH_FORBIDDEN_CODE, BRANCH_FORBIDDEN_MESSAGE), 403);
     }
+    // FT-04 (D-1): chegirma faqat `discount.give` bilan (maydon-darajasidagi gate —
+    // `cashier.create_transaction` o'zi chegirma berish huquqini bermaydi).
+    if (body.discount > 0) {
+      const perms = c.get('accessClaims')?.perms ?? [];
+      if (!perms.includes('@owner') && !perms.includes('discount.give')) {
+        return c.json(
+          fail('discount.forbidden', "Chegirma berish uchun ruxsat yo'q (discount.give)"),
+          403,
+        );
+      }
+    }
     try {
       const tx = await service.create(c, body);
       return c.json(ok(toCashierTransactionWithItemsDto(tx, tx.items)), 201);

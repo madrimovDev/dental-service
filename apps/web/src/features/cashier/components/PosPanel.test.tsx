@@ -1,5 +1,6 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useAuthStore } from '@/stores/auth-store';
 import { renderApp } from '../../../test-utils';
 import { PosPanel } from './PosPanel';
 
@@ -45,6 +46,25 @@ vi.mock('./ReceiptModal', () => ({
 describe('PosPanel', () => {
   beforeEach(() => {
     mutate.mockClear();
+    // Receptionist shabloni kabi: kassa + chegirma huquqi.
+    useAuthStore.setState({
+      permissions: ['cashier.view', 'cashier.create_transaction', 'discount.give'],
+    });
+  });
+
+  it("FT-04: discount.give'siz kassirda chegirma pillari ko'rinmaydi, discount=0", async () => {
+    useAuthStore.setState({ permissions: ['cashier.view', 'cashier.create_transaction'] });
+    renderApp(<PosPanel branchId="b1" patientId="pat1" />);
+
+    fireEvent.click(await screen.findByText('Plomba'));
+    await screen.findByDisplayValue("50 000 so'm");
+
+    expect(screen.queryByText('10%')).toBeNull();
+    fireEvent.click(screen.getByText("To'lovni qabul qilish"));
+    expect(mutate).toHaveBeenCalledWith(
+      expect.objectContaining({ discount: 0 }),
+      expect.anything(),
+    );
   });
 
   it('xizmat pill bosilganda narx avto-to‘ldiriladi (50000)', async () => {
