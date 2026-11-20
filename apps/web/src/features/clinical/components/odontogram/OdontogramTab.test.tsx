@@ -38,6 +38,7 @@ const SERVICES = [
 ];
 const createPlanMutate = vi.fn();
 const addStagesMutate = vi.fn();
+const recordMutate = vi.fn();
 const searches: Array<string | undefined> = [];
 
 vi.mock('../../clinical.api', () => ({
@@ -51,6 +52,7 @@ vi.mock('../../clinical.api', () => ({
   useTreatmentPlans: () => ({ data: mockPlans }),
   useCreatePlan: () => ({ mutate: createPlanMutate, isPending: false }),
   useAddPlanStages: () => ({ mutate: addStagesMutate, isPending: false }),
+  useRecordCompletedWork: () => ({ mutate: recordMutate, isPending: false }),
   useServiceCatalog: () => ({ data: SERVICES }),
   usePatientToothImages: () => ({ data: [], isLoading: false, isError: false }),
   useVisitNotes: () => ({ data: [], isLoading: false }),
@@ -93,6 +95,7 @@ describe('OdontogramTab', () => {
     mutate.mockClear();
     createPlanMutate.mockClear();
     addStagesMutate.mockClear();
+    recordMutate.mockClear();
     searches.length = 0;
     mockChart = null;
     mockHistory = [];
@@ -234,6 +237,7 @@ describe('OdontogramTab', () => {
     fireEvent.click(screen.getByText('11'));
     expect(screen.queryByRole('button', { name: "Tashxis qo'shish" })).toBeNull();
     expect(screen.queryByRole('button', { name: /Snapshot saqlash/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Bajarilgan ishni yozish/i })).toBeNull();
   });
 
   it('CLI-191: eski snapshot tanlanganda read-only (Save paneli yo‘q)', () => {
@@ -486,6 +490,80 @@ describe('OdontogramTab', () => {
       expect(states).toContainEqual(expect.objectContaining({ toothNumber: 36, state: 'caries' }));
       expect(states).toContainEqual(expect.objectContaining({ toothNumber: 37, state: 'caries' }));
     });
+  });
+});
+
+describe('OdontogramTab — «Bajarilgan ishni yozish» ToothPanel’da (FT-01 2-rejim)', () => {
+  const tooth = (n: number) => screen.getByRole('button', { name: new RegExp(`^${n} — `) });
+  const pickOtherService = async (name: string) => {
+    fireEvent.click(screen.getByRole('textbox', { name: 'Boshqa xizmat tanlash' }));
+    fireEvent.click(await screen.findByRole('option', { name }));
+  };
+  beforeEach(() => {
+    mutate.mockReset();
+    createPlanMutate.mockClear();
+    addStagesMutate.mockClear();
+    recordMutate.mockClear();
+    mockChart = {
+      isPrimaryDentition: false,
+      states: [{ toothNumber: 36, surface: 'whole', state: 'caries', diagnosisId: 'dx-2' }],
+    };
+    mockHistory = [];
+    mockPermissions = true;
+    mockPlans = [
+      {
+        id: 'pl-cur',
+        title: 'Asosiy reja',
+        status: 'accepted',
+        createdAt: '2026-03-01T00:00:00Z',
+        stages: [],
+      },
+    ];
+  });
+
+  it('xizmatsiz tugma o‘chiq; xizmat tanlansa darhol bajarilgan bosqich yuboriladi (planId’siz — server shifokor rejasini tanlaydi)', async () => {
+    renderApp(<OdontogramTab patientId="p1" />);
+    fireEvent.click(tooth(36));
+    const btn = screen.getByRole('button', { name: /Bajarilgan ishni yozish/i });
+    expect(btn).toBeDisabled();
+    const radio = await screen.findByRole('radio', { name: /Ildiz kanalini davolash/ });
+    await waitFor(() => expect(radio).toHaveTextContent('1 800 000'));
+    fireEvent.click(radio);
+    await waitFor(() => expect(btn).toBeEnabled());
+    fireEvent.click(btn);
+    expect(addStagesMutate).not.toHaveBeenCalled();
+    expect(createPlanMutate).not.toHaveBeenCalled();
+    expect(mutate).not.toHaveBeenCalled();
+    expect(recordMutate).toHaveBeenCalledTimes(1);
+    const body = recordMutate.mock.calls[0]?.[0];
+    expect(body.planId).toBeUndefined();
+    expect(body.items).toEqual([
+      expect.objectContaining({
+        serviceId: 'sv-2',
+        serviceName: 'Ildiz kanalini davolash',
+        cost: 1800000,
+        toothNumbers: [36],
+        resultingToothState: 'filling',
+      }),
+    ]);
+  });
+
+  it('ko‘p tish — har tishga alohida bajarilgan bosqich; yangi tashxis avval snapshot qilinadi', async () => {
+    mutate.mockImplementation((_b: unknown, opts?: { onSuccess?: () => void }) =>
+      opts?.onSuccess?.(),
+    );
+    renderApp(<OdontogramTab patientId="p1" />);
+    fireEvent.click(tooth(16));
+    fireEvent.click(tooth(17), { shiftKey: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Kariyes' }));
+    await pickOtherService('Plomba (kompozit)');
+    const btn = screen.getByRole('button', { name: /Bajarilgan ishni yozish/i });
+    await waitFor(() => expect(btn).toBeEnabled());
+    fireEvent.click(btn);
+    expect(mutate).toHaveBeenCalledTimes(1);
+    const items = recordMutate.mock.calls[0]?.[0].items;
+    expect(items.map((i: { toothNumbers: number[] }) => i.toothNumbers)).toEqual([[16], [17]]);
+    expect(items[0]).toMatchObject({ serviceId: 'sv-1', cost: 450000 });
   });
 });
 

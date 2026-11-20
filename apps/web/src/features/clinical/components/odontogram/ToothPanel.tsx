@@ -74,6 +74,16 @@ export type AddToPlanRequest = {
   singleStage: boolean;
 };
 
+/**
+ * FT-01 2-rejim «Bajarilgan ishni yozish» (CF-12) tanlovi: xizmat shart. Reja serverda
+ * tanlanadi — joriy shifokorning joriy rejasi yoki avto «Bajarilgan ishlar» rejasi.
+ */
+export type RecordCompletedRequest = {
+  service: SuggestedService;
+  resultingToothState: ToothState | null;
+  singleStage: boolean;
+};
+
 /** 5 yuza (FDI: M medial, O okklyuzion/chaynov, D distal, B bukkal/lunj, L lingual/til). */
 const FACES: Array<Exclude<ToothSurface, 'whole' | 'I'>> = ['M', 'O', 'D', 'B', 'L'];
 
@@ -121,6 +131,11 @@ type Props = {
    * snapshot saqlanadi), aks holda `null` (o'zgarmagan holat qayta snapshot qilinmaydi).
    */
   onAddToPlan: (entries: ToothEntry[] | null, req: AddToPlanRequest) => void;
+  /**
+   * FT-01 2-rejim: darhol bajarilgan bosqich (`POST /treatment-plans/completed-work`).
+   * `entries` — `onAddToPlan` bilan bir xil (yangi tashxis bo'lsa avval snapshot).
+   */
+  onRecordCompleted?: (entries: ToothEntry[] | null, req: RecordCompletedRequest) => void;
 };
 
 export function ToothPanel({
@@ -139,6 +154,7 @@ export function ToothPanel({
   saving,
   onSaveOnly,
   onAddToPlan,
+  onRecordCompleted,
 }: Props) {
   const { t } = useTranslation();
   const [surfaces, setSurfaces] = useState<ToothSurface[]>([]);
@@ -573,6 +589,25 @@ export function ToothPanel({
                     </Button>
                   )}
                 </Group>
+                {canAddToPlan && onRecordCompleted && (
+                  <Button
+                    variant="default"
+                    loading={saving}
+                    disabled={service === null}
+                    onClick={() => {
+                      if (!service) return;
+                      const next = canAdd ? applyPending() : null;
+                      onRecordCompleted(next, {
+                        service,
+                        resultingToothState: resultingState,
+                        singleStage: teeth.length > 1 && singleStage,
+                      });
+                    }}
+                    styles={btnStyles}
+                  >
+                    {t('odontogram.record_completed')}
+                  </Button>
+                )}
               </Stack>
             )}
           </>

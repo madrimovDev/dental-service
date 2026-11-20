@@ -26,6 +26,7 @@ import {
   useCreateToothChart,
   useDiagnoses,
   useLatestToothChart,
+  useRecordCompletedWork,
   useToothChartHistory,
   useTreatmentPlans,
 } from '../../clinical.api';
@@ -39,7 +40,7 @@ import {
 } from '../../clinical.mappers';
 import type { ToothEntry } from '../../clinical.types';
 import { Odontogram } from './Odontogram';
-import { type AddToPlanRequest, ToothPanel } from './ToothPanel';
+import { type AddToPlanRequest, type RecordCompletedRequest, ToothPanel } from './ToothPanel';
 
 type Props = { patientId: string };
 type View = 'current' | 'plan' | 'history';
@@ -75,6 +76,7 @@ export function OdontogramTab({ patientId }: Props) {
   const createMut = useCreateToothChart(patientId);
   const createPlanMut = useCreatePlan(patientId);
   const addStagesMut = useAddPlanStages(patientId);
+  const recordMut = useRecordCompletedWork(patientId);
 
   const [view, setView] = useState<View>('current');
   const [chairMode, setChairMode] = useState<boolean>(readChairMode);
@@ -175,6 +177,36 @@ export function OdontogramTab({ patientId }: Props) {
         { onSuccess: done },
       );
     };
+    if (entries) save(entries, run);
+    else run();
+  };
+
+  /**
+   * FT-01 2-rejim «Bajarilgan ishni yozish» (CF-12): tish(lar) + xizmat → darhol bajarilgan
+   * bosqich. `planId` yuborilmaydi — server joriy shifokorning joriy rejasini (yoki avto
+   * «Bajarilgan ishlar» rejasini) tanlaydi (komissiya shifokorga, D-13). Narx serverda filial
+   * narxidan; odontogramma/recall/reja qarzi server tomonida (X-3).
+   */
+  const recordCompleted = (entries: ToothEntry[] | null, req: RecordCompletedRequest) => {
+    const teeth = selectedTeeth;
+    if (teeth.length === 0) return;
+    const toItem = (toothNumbers: number[]) => ({
+      serviceId: req.service.id,
+      serviceName: req.service.name,
+      toothNumbers,
+      estimatedVisits: 1,
+      cost: req.service.cost ?? 0,
+      ...(req.resultingToothState ? { resultingToothState: req.resultingToothState } : {}),
+    });
+    const items = req.singleStage ? [toItem([...teeth])] : teeth.map((n) => toItem([n]));
+    const run = () =>
+      recordMut.mutate(
+        { items },
+        {
+          onSuccess: () =>
+            notifications.show({ color: 'teal', message: t('odontogram.completed_recorded') }),
+        },
+      );
     if (entries) save(entries, run);
     else run();
   };
@@ -323,9 +355,15 @@ export function OdontogramTab({ patientId }: Props) {
             canEdit={editing}
             canAddToPlan={Boolean(user?.id)}
             currentPlan={currentPlan}
-            saving={createMut.isPending || createPlanMut.isPending || addStagesMut.isPending}
+            saving={
+              createMut.isPending ||
+              createPlanMut.isPending ||
+              addStagesMut.isPending ||
+              recordMut.isPending
+            }
             onSaveOnly={(entries) => save(entries)}
             onAddToPlan={addToPlan}
+            onRecordCompleted={recordCompleted}
           />
         )}
       </Box>

@@ -2078,7 +2078,9 @@
     "suggest_title": "Davolash taklifi",
     "suggest_none": "Mos xizmat topilmadi — katalogdan tanlang",
     "suggest_other": "Boshqa xizmat tanlash",
-    "suggest_no_price": "narx yo'q"
+    "suggest_no_price": "narx yo'q",
+    "record_completed": "Bajarilgan ishni yozish",
+    "completed_recorded": "Bajarilgan ish yozildi"
   },
   "visitNote": {
     "title": "Vizit yozuvi",

@@ -2078,7 +2078,9 @@
     "suggest_title": "Предлагаемое лечение",
     "suggest_none": "Подходящих услуг нет — выберите из каталога",
     "suggest_other": "Выбрать другую услугу",
-    "suggest_no_price": "нет цены"
+    "suggest_no_price": "нет цены",
+    "record_completed": "Записать выполненную работу",
+    "completed_recorded": "Выполненная работа записана"
   },
   "visitNote": {
     "title": "Запись о визите",
