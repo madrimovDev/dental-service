@@ -137,6 +137,26 @@ export const createTreatmentPlansRepository = () => {
     return stage;
   }
 
+  /**
+   * FT-01: reja `totalCost`/`totalVisits` = bosqichlar yig'indisi (createPlan bilan bir xil
+   * qoida — barcha bosqichlar). Avval reja `FOR UPDATE` qulflanadi: parallel tahrirlarda
+   * keyingi UPDATE yangi snapshot oladi (READ COMMITTED) va eskirgan yig'indi yozilmaydi.
+   */
+  async function recomputePlanTotals(c: Context, planId: string) {
+    const db = getDb(c);
+    await lockPlan(c, planId);
+    const [updated] = await db
+      .update(treatmentPlans)
+      .set({
+        totalCost: sql`(SELECT COALESCE(SUM(${treatmentStages.cost}), 0) FROM ${treatmentStages} WHERE ${treatmentStages.treatmentPlanId} = ${planId})`,
+        totalVisits: sql`(SELECT COALESCE(SUM(${treatmentStages.estimatedVisits}), 0)::int FROM ${treatmentStages} WHERE ${treatmentStages.treatmentPlanId} = ${planId})`,
+        updatedAt: new Date(),
+      })
+      .where(eq(treatmentPlans.id, planId))
+      .returning();
+    return updated ?? null;
+  }
+
   /** FX-15: rejadagi 'completed' bosqichlar soni (bekor qilish guard'i uchun). */
   async function countCompletedStages(c: Context, planId: string) {
     const db = getDb(c);
@@ -262,6 +282,7 @@ export const createTreatmentPlansRepository = () => {
     lockPlan,
     nextStageSequence,
     insertStage,
+    recomputePlanTotals,
     findStage,
     countCompletedStages,
     countOpenAcceptedStages,

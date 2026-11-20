@@ -400,3 +400,42 @@ describe('FT-01.1 — PATCH /treatment-stages/{id} bosqich tahriri', () => {
     expect(Number((await readStage(stage.id)).cost)).toBe(100000);
   });
 });
+
+describe('FT-01.1 — reja totalCost/totalVisits bosqichlar yig‘indisidan', () => {
+  test('bosqich qo‘shilganda va narx tahrirlanganda totalCost qayta hisoblanadi', async () => {
+    const plan = await createPlan([{ serviceName: 'Ko‘rik', cost: 50000, estimatedVisits: 1 }]);
+    expect(Number(plan.totalCost)).toBe(50000);
+
+    const add = await call(tokens.doctor as string, 'POST', `/treatment-plans/${plan.id}/stages`, {
+      serviceName: 'Kanal 46',
+      toothNumbers: [46],
+      cost: 300000,
+      estimatedVisits: 2,
+    });
+    expect(add.status).toBe(201);
+    const added = ((await add.json()) as { data: StageDto }).data;
+    let after = await getPlan(plan.id);
+    expect(Number(after.totalCost)).toBe(350000);
+    expect(after.totalVisits).toBe(3);
+
+    const res = await call(tokens.doctor as string, 'PATCH', `/treatment-stages/${added.id}`, {
+      cost: 280000,
+    });
+    expect(res.status).toBe(200);
+    after = await getPlan(plan.id);
+    expect(Number(after.totalCost)).toBe(330000);
+  });
+
+  test('stage.locked (rad) bo‘lsa totalCost o‘zgarmaydi', async () => {
+    const plan = await createPlan([{ serviceName: 'Kanal', cost: 300000 }]);
+    const stage = plan.stages[0]!;
+    await inTenant((tx) =>
+      tx.update(treatmentStages).set({ status: 'skipped' }).where(eq(treatmentStages.id, stage.id)),
+    );
+    const res = await call(tokens.doctor as string, 'PATCH', `/treatment-stages/${stage.id}`, {
+      cost: 1,
+    });
+    expect(res.status).toBe(409);
+    expect(Number((await getPlan(plan.id)).totalCost)).toBe(300000);
+  });
+});

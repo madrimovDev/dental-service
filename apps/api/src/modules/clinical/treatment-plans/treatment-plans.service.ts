@@ -326,6 +326,8 @@ export const createTreatmentPlansService = (deps: {
       notes: input.notes ?? null,
       resultingToothState: input.resultingToothState ?? null,
     });
+    // FT-01: reja totalCost/totalVisits qotib qolmasin — bosqichlar yig'indisidan.
+    await repo.recomputePlanTotals(c, planId);
 
     await deps.audit.record(c, {
       action: 'created',
@@ -545,6 +547,10 @@ export const createTreatmentPlansService = (deps: {
     }
 
     const updated = await repo.updateStage(c, stageId, patch);
+    // FT-01: narx o'zgardi → reja totalCost bosqichlar yig'indisidan qayta hisoblanadi.
+    if (updated && 'cost' in content) {
+      await repo.recomputePlanTotals(c, current.treatmentPlanId);
+    }
     if (updated) {
       // CLI-439 B9c: audit'ga `before` (joriy holat, mutatsiyadan oldin) ham yozamiz —
       // avval faqat `after` bor edi, stage tarixini tiklab bo'lmasdi.
