@@ -2709,6 +2709,19 @@
           "discount": {
             "type": "string"
           },
+          "discountPercent": {
+            "type": "string",
+            "nullable": true
+          },
+          "discountReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "discountGrantedBy": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
           "currency": {
             "type": "string"
           },
@@ -2787,6 +2800,9 @@
           "paidAmount",
           "refundedAmount",
           "discount",
+          "discountPercent",
+          "discountReason",
+          "discountGrantedBy",
           "currency",
           "paymentMethod",
           "cardProvider",
@@ -15727,6 +15743,10 @@
                     "nullable": true,
                     "minimum": 0,
                     "default": 0
+                  },
+                  "discountReason": {
+                    "type": "string",
+                    "maxLength": 500
                   },
                   "paidAmount": {
                     "type": "number",

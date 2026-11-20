@@ -20,6 +20,8 @@ export const createTransactionSchema = z
       )
       .default([]),
     discount: z.coerce.number().nonnegative().default(0),
+    /** FT-04: chegirma sababi (ixtiyoriy) — faqat `discount > 0` bo'lsa saqlanadi. */
+    discountReason: z.string().trim().max(500).optional(),
     paidAmount: z.coerce.number().nonnegative(),
     paymentMethod: z.enum(['cash', 'card', 'transfer', 'other']),
     // UI-R5: faqat `card` uchun (aks holda 400 — quyidagi refine). Berilmasa null.
@@ -127,6 +129,11 @@ export const cashierTransactionDtoSchema = z
     /** FX-108: shu to'lovdan allaqachon qaytarilgan summa (qoldiq = paidAmount - refundedAmount). */
     refundedAmount: z.string(),
     discount: z.string(),
+    /** FT-04: chegirma foizi (serverda hisoblangan, 2 xona); chegirmasiz — null. */
+    discountPercent: z.string().nullable(),
+    discountReason: z.string().nullable(),
+    /** FT-04: chegirmani bergan foydalanuvchi (`discount.give` egasi). */
+    discountGrantedBy: z.uuid().nullable(),
     currency: z.string(),
     paymentMethod: paymentMethodSchema,
     cardProvider: cardProviderSchema.nullable(),

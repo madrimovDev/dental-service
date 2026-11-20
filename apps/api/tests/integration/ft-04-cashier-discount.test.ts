@@ -182,3 +182,37 @@ describe('FT-04.2 — discount > 0 faqat discount.give bilan', () => {
     expect(Number(r.json.data.totalAmount)).toBe(180_000);
   });
 });
+
+describe('FT-04.2 — tranzaksiyada discount_percent / reason / granted_by', () => {
+  test('chegirma bilan: foiz serverda hisoblanadi, sabab va kim bergani saqlanadi', async () => {
+    const r = await call(
+      'reception',
+      'POST',
+      '/api/cashier/transactions',
+      payBody(30_000, { discountReason: '  Doimiy mijoz  ' }),
+    );
+    expect(r.status).toBe(201);
+    expect(r.json.data.discountPercent).toBe('15.00'); // 30 000 / 200 000
+    expect(r.json.data.discountReason).toBe('Doimiy mijoz');
+    expect(r.json.data.discountGrantedBy).toBe(receptionUserId);
+
+    const got = await call('reception', 'GET', `/api/cashier/transactions/${r.json.data.id}`);
+    expect(got.status).toBe(200);
+    expect(got.json.data.discountPercent).toBe('15.00');
+    expect(got.json.data.discountReason).toBe('Doimiy mijoz');
+    expect(got.json.data.discountGrantedBy).toBe(receptionUserId);
+  });
+
+  test('chegirmasiz: foiz/sabab/kim — null (sabab yuborilsa ham saqlanmaydi)', async () => {
+    const r = await call(
+      'reception',
+      'POST',
+      '/api/cashier/transactions',
+      payBody(0, { discountReason: 'keraksiz' }),
+    );
+    expect(r.status).toBe(201);
+    expect(r.json.data.discountPercent).toBeNull();
+    expect(r.json.data.discountReason).toBeNull();
+    expect(r.json.data.discountGrantedBy).toBeNull();
+  });
+});

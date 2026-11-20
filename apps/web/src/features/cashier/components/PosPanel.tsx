@@ -164,6 +164,7 @@ export function PosPanel({
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState('');
   const [discountPct, setDiscountPct] = useState<DiscountPct>(0);
+  const [discountReason, setDiscountReason] = useState('');
   const [paidAmount, setPaidAmount] = useState<number | ''>('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [cardProvider, setCardProvider] = useState<CardProvider>('terminal');
@@ -281,6 +282,7 @@ export function PosPanel({
       patientId,
       cart,
       discount: discAmt,
+      discountReason: discAmt > 0 ? discountReason : '',
       // Bemor ortiqcha bergan bo'lsa ham serverga net yoziladi (qaytim kassada qoladi).
       paidAmount: tender.paid,
       paymentMethod,
@@ -322,6 +324,7 @@ export function PosPanel({
         setCart([]);
         setSearch('');
         setDiscountPct(0);
+        setDiscountReason('');
         setPaidAmount('');
         setCardProvider('terminal');
         setNotes('');
@@ -462,6 +465,18 @@ export function PosPanel({
               })}
             </Group>
           </Group>
+        )}
+        {canDiscount && discountPct > 0 && (
+          <div style={{ padding: '0 18px 12px' }}>
+            <TextInput
+              size="md"
+              label={t('cashier.discount_reason')}
+              placeholder={t('cashier.discount_reason_placeholder')}
+              value={discountReason}
+              maxLength={500}
+              onChange={(e) => setDiscountReason(e.currentTarget.value)}
+            />
+          </div>
         )}
 
         {/* Jami to'lov */}

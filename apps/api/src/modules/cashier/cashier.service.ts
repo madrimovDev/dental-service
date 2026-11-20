@@ -565,6 +565,16 @@ export const createCashierService = (deps: {
       resolvedItems.length > 0 ? itemsGrossCents - discountCents : toCents(input.paidAmount);
     const netTotal = fromCents(netTotalCents);
 
+    // FT-04 (D-1): chegirma snapshot'i — faqat erkin POS'da `discount > 0` bo'lsa. Foiz
+    // serverda (client yubormaydi) 2 xonagacha yaxlitlanadi; kim bergani = chaqiruvchi
+    // (`discount.give` route'da tekshirilgan). Chegirmasiz — hammasi null.
+    const hasDiscount = resolvedItems.length > 0 && discountCents > 0;
+    const discountPercent = hasDiscount
+      ? (Math.round((discountCents * 10_000) / itemsGrossCents) / 100).toFixed(2)
+      : null;
+    const discountReason = hasDiscount ? input.discountReason || null : null;
+    const discountGrantedBy = hasDiscount ? (user?.id ?? null) : null;
+
     // CLI-459: allocation yig'indisi paidAmount'ga AYNAN TENG bo'lishi shart
     // (avval bir-tomonlama edi — kam bo'lishi jim o'tar edi, "ko'rinmas" pul).
     if (input.allocations && input.allocations.length > 0) {
@@ -640,6 +650,9 @@ export const createCashierService = (deps: {
             totalAmount: String(netTotal),
             paidAmount: String(input.paidAmount),
             discount: String(input.discount),
+            discountPercent,
+            discountReason,
+            discountGrantedBy,
             paymentMethod: input.paymentMethod,
             cardProvider: input.paymentMethod === 'card' ? (input.cardProvider ?? null) : null,
             notes: input.notes ?? null,

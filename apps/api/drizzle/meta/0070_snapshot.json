@@ -957,6 +957,24 @@
           "notNull": true,
           "default": "'0'"
         },
+        "discount_percent": {
+          "name": "discount_percent",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "discount_reason": {
+          "name": "discount_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "discount_granted_by": {
+          "name": "discount_granted_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "currency": {
           "name": "currency",
           "type": "text",
@@ -1217,6 +1235,19 @@
           "tableTo": "treatment_plans",
           "columnsFrom": [
             "treatment_plan_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "cashier_transactions_discount_granted_by_users_id_fk": {
+          "name": "cashier_transactions_discount_granted_by_users_id_fk",
+          "tableFrom": "cashier_transactions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "discount_granted_by"
           ],
           "columnsTo": [
             "id"

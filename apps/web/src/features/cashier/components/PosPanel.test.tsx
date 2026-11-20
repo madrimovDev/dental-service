@@ -116,6 +116,25 @@ describe('PosPanel', () => {
     );
   });
 
+  it('FT-04: chegirma tanlanganda sabab maydoni chiqadi va payloadga discountReason tushadi', async () => {
+    renderApp(<PosPanel branchId="b1" patientId="pat1" />);
+
+    fireEvent.click(await screen.findByText('Plomba'));
+    await screen.findByDisplayValue("50 000 so'm");
+
+    expect(screen.queryByLabelText('Chegirma sababi')).toBeNull();
+    fireEvent.click(screen.getByText('10%'));
+    fireEvent.change(screen.getByLabelText('Chegirma sababi'), {
+      target: { value: 'Doimiy mijoz' },
+    });
+    fireEvent.click(screen.getByText("To'lovni qabul qilish"));
+
+    expect(mutate).toHaveBeenCalledWith(
+      expect.objectContaining({ discount: 5000, discountReason: 'Doimiy mijoz' }),
+      expect.anything(),
+    );
+  });
+
   it('to‘lov toggle "Karta" → payload paymentMethod:card', async () => {
     renderApp(<PosPanel branchId="b1" patientId="pat1" />);
 
