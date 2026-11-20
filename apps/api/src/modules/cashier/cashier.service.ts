@@ -36,7 +36,11 @@ import { onAfterCommit } from '../../db/after-commit.ts';
 import type { DbOrTx } from '../../db/client.ts';
 import { getDb, withTenant } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
-import { canGiveDiscount, capDiscountPercent, readMaxDiscountPercent } from '../../lib/discount.ts';
+import {
+  canGiveDiscountAtBranch,
+  capDiscountPercent,
+  readMaxDiscountPercent,
+} from '../../lib/discount.ts';
 import type { PatientMessenger } from '../../lib/telegram/notify.ts';
 import {
   computePlanBalance,
@@ -577,7 +581,11 @@ export const createCashierService = (deps: {
         }
       }
       if (autoCents !== null && autoCents === discountCents) discountSource = 'patient_default';
-      else if (!canGiveDiscount(c)) throw new DiscountForbiddenError();
+      // Verifier MAJOR: `discount.give` maqsad filial doirasida (faqat JWT emas) — erkin POS
+      // va reja to'lovi (allocations) uchun bir xil.
+      else if (!(await canGiveDiscountAtBranch(c, input.branchId))) {
+        throw new DiscountForbiddenError();
+      }
     }
 
     // CLI-444: discount itemsGross'dan katta bo'lsa jim clamp o'rniga RAD etiladi

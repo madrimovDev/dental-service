@@ -27,6 +27,7 @@ import type { DbOrTx } from '../../src/db/client.ts';
 import { db } from '../../src/db/client.ts';
 import type { AuditLogger } from '../../src/lib/audit-logger.ts';
 import { createCashierService } from '../../src/modules/cashier/cashier.service.ts';
+import { grantTenantWide } from './_grant-scope.ts';
 
 const noopAudit = { record: async () => {} } as unknown as AuditLogger;
 const KASSIR_PERMS = ['cashier.view', 'cashier.create_transaction', 'discount.give'];
@@ -66,6 +67,8 @@ beforeAll(async () => {
       .values({ tenantId, name: 'Asosiy' })
       .returning({ id: branches.id });
     branchId = br!.id;
+    // Verifier MAJOR: discount.give filial doirasi `user_assignments`dan (JWT emas).
+    await grantTenantWide(tx as never, tenantId, userId, KASSIR_PERMS, 'Kassir');
     const [pt] = await tx
       .insert(patients)
       .values({ tenantId, fullName: 'Bemor Fiskal' })
@@ -123,7 +126,7 @@ const ctx = (tx: DbOrTx): Context =>
       k === 'db'
         ? tx
         : k === 'accessClaims'
-          ? { perms: KASSIR_PERMS }
+          ? { sub: userId, atid: tenantId, perms: KASSIR_PERMS }
           : k === 'activeTenantId'
             ? tenantId
             : k === 'user'

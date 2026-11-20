@@ -1,12 +1,23 @@
 import { tenantSettings } from '@dental/db-schema';
 import type { Context } from 'hono';
 import type { DbOrTx } from '../db/client.ts';
+import { loadBranchScope, scopeAllows } from './branch-scope.ts';
 
 /** FT-04 (D-1): chegirma berish huquqi — `discount.give` yoki tenant owner (`@owner`). */
 export const canGiveDiscount = (c: Context): boolean => {
   const perms = c.get('accessClaims')?.perms ?? [];
   return perms.includes('@owner') || perms.includes('discount.give');
 };
+
+/**
+ * FT-04 (verifier MAJOR): kassa chegirmasi — `discount.give` MAQSAD filial (`branchId`)
+ * doirasida (X-2 naqshi, refund'dagi `loadBranchScope(c,'cashier.refund')` kabi). JWT
+ * (faol workspace) huquqi yetarli emas: A'da chegirma huquqi bo'lgan xodim B nomidan
+ * chegirma bera olmaydi va aksincha, workspace B faol bo'lsa ham A'da bera oladi.
+ * Owner / tenant-wide tayinlov → har doim. `rlsMiddleware`dan keyin (tx-bound db).
+ */
+export const canGiveDiscountAtBranch = async (c: Context, branchId: string): Promise<boolean> =>
+  scopeAllows(await loadBranchScope(c, 'discount.give'), branchId);
 
 export const DISCOUNT_FORBIDDEN_CODE = 'discount.forbidden';
 export const DISCOUNT_FORBIDDEN_MESSAGE = "Chegirma berish uchun ruxsat yo'q (discount.give)";
