@@ -45,6 +45,16 @@ noShow.worker.on('failed', (job, err) =>
 );
 await registerNoShowScheduler();
 
+// FT-06.3: kassa rasmi 90 kunlik retention consumer + repeatable scheduler (Toshkent 03:00).
+const { startCashierPhotoRetentionWorker, registerCashierPhotoRetentionScheduler } = await import(
+  './lib/cashier-photo-retention.ts'
+);
+const cashierPhoto = startCashierPhotoRetentionWorker();
+cashierPhoto.worker.on('failed', (job, err) =>
+  logger.error({ err, jobId: job?.id }, 'Cashier photo retention job failed'),
+);
+await registerCashierPhotoRetentionScheduler();
+
 // CLI-379: Telegram bot-manager — boots a Telegraf poller per tenant with a
 // saved bot token (admin conn, RLS bypass, same pattern as recall worker) and
 // reloads on tenant token changes via the `telegram:reload` pub/sub channel.
@@ -73,6 +83,7 @@ async function shutdown(signal: string): Promise<void> {
     await worker.close(); // waits for in-flight jobs, then closes the Redis conn
     await recall.close(); // closes recall worker + admin db pool
     await noShow.close();
+    await cashierPhoto.close();
     stopSupervisorSync();
     stopLabHubSync();
     await botManager.stopAll(); // stops all Telegraf pollers + reload sub
