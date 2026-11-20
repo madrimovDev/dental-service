@@ -185,6 +185,17 @@ export const createTreatmentPlansService = (deps: {
     return plan;
   };
 
+  /**
+   * FT-04.3 (D-2): YANGI bosqich narxi snapshot'i — bemorning samarali doimiy chegirmasi
+   * (`min(pct, tenant max_discount_percent)`) bilan `{ cost (netto), listPrice, discountPercent }`.
+   * ⚠️ Seam (FT-01): har yangi bosqich yo'li (addStage, «bajarilgan ish», PATCH cost/serviceId
+   * qayta hisobi) shu orqali o'tishi SHART — aks holda bosqich brutto narxda, snapshot'siz qoladi.
+   */
+  async function newStagePricer(c: Context, patientId: string) {
+    const pct = await repo.findPatientEffectiveDiscount(c, patientId);
+    return { pct, apply: (price: number) => applyDefaultDiscount(price, pct) };
+  }
+
   async function createPlan(c: Context, input: CreateTreatmentPlanInput) {
     const tenantId = c.get('activeTenantId');
     if (!tenantId) throw new Error('No tenant context');
@@ -218,10 +229,11 @@ export const createTreatmentPlansService = (deps: {
     // `cost` netto (qarz/overpay guard shundan), `listPrice`/`discountPercent` saqlanadi.
     // Katalog va erkin bosqichga bir xil qo'llanadi. Avtomatik (bemor sozlamasi) — plan
     // yaratuvchidan `discount.give` talab qilinmaydi; doimiy chegirmani faqat `discount.give`
-    // egasi qo'yadi (patients route gate'i).
-    const defaultPct = await repo.findPatientDefaultDiscount(c, input.patientId);
+    // egasi qo'yadi (patients route gate'i). Review: foiz tenant chegarasi
+    // (`max_discount_percent`) bilan cheklanadi — `min(pct, max)`.
+    const { pct: defaultPct, apply } = await newStagePricer(c, input.patientId);
     const resolvedStages = pricedStages.map((s) => {
-      const d = applyDefaultDiscount(s.cost, defaultPct);
+      const d = apply(s.cost);
       return { ...s, cost: d.cost, listPrice: d.listPrice, discountPercent: d.discountPercent };
     });
 

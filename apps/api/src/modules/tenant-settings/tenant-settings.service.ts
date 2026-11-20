@@ -1,5 +1,5 @@
 import { patients, tenantSettings } from '@dental/db-schema';
-import { isNotNull, sql } from 'drizzle-orm';
+import { gt, isNotNull, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import IORedis from 'ioredis';
 import { onAfterCommit } from '../../db/after-commit.ts';
@@ -172,13 +172,30 @@ export const createTenantSettingsService = (deps: { audit: AuditLogger }) => {
         .where(isNotNull(patients.telegramChatId));
     }
 
+    // FT-04.3 (review): chegara saqlanganda — undan oshgan bemor doimiy chegirmalari chegaraga
+    // tushiriladi (0 → chegirma olib tashlanadi). Invariant `default_discount_percent ≤ max`:
+    // aks holda reja bosqichi/POS chegarani aylanib o'tardi yoki discount.give'siz kassir bu
+    // bemorga sota olmasdi. Tushirilgan bemorlar soni tenant_settings audit'iga yoziladi
+    // (FX-41 bulk update precedenti). Faqat chegaradan oshganlar o'zgaradi (idempotent).
+    let clampedPatients = 0;
+    if (input.maxDiscountPercent !== undefined) {
+      const cap = input.maxDiscountPercent;
+      const clamped = await db
+        .update(patients)
+        .set({ defaultDiscountPercent: cap > 0 ? cap.toFixed(2) : null, updatedAt: new Date() })
+        .where(gt(patients.defaultDiscountPercent, cap.toFixed(2)))
+        .returning({ id: patients.id });
+      clampedPatients = clamped.length;
+    }
+
     if (updated) {
       await deps.audit.record(c, {
         action: 'updated',
         resourceType: 'tenant_settings',
         resourceId: updated.id,
         before,
-        after: updated,
+        after:
+          clampedPatients > 0 ? { ...updated, clampedPatientDiscounts: clampedPatients } : updated,
       });
     }
 

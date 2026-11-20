@@ -26,6 +26,7 @@ import {
   roles,
   servicePrices,
   services,
+  tenantSettings,
   tenants,
   treatmentPlans,
   treatmentStages,
@@ -475,5 +476,167 @@ describe("FT-04.3 — POS: bemorning doimiy chegirmasi discount.give'siz kassird
         .where(eq(auditLog.resourceId, r.json.data.id)),
     );
     expect(rows[0]?.after).toMatchObject({ discountSource: 'manual' });
+  });
+});
+
+describe('FT-04.3 (review) — doimiy chegirma tenant chegarasi (max_discount_percent) bilan', () => {
+  /** Tenant Admin shablon permset'i (`tenant_settings.edit`) — chegarani faqat u o'zgartiradi. */
+  const ADMIN_PERMS = [
+    ...(ROLE_TEMPLATES.find((t) => t.templateKey === 'tenant_admin')?.permissions ?? []),
+  ] as string[];
+  let capPatientId: string;
+
+  const setCap = (max: number) =>
+    inTenant(async (tx) => {
+      await tx
+        .insert(tenantSettings)
+        .values({ tenantId, maxDiscountPercent: max })
+        .onConflictDoUpdate({ target: tenantSettings.tenantId, set: { maxDiscountPercent: max } });
+    });
+
+  beforeAll(async () => {
+    expect(ADMIN_PERMS).toContain('tenant_settings.edit');
+    expect(ADMIN_PERMS).not.toContain('@owner');
+    const [admin] = await db
+      .insert(users)
+      .values({ phone: '+998900075206', passwordHash: 'x', fullName: 'Admin' })
+      .returning({ id: users.id });
+    for (const code of ADMIN_PERMS) {
+      await db
+        .insert(permissions)
+        .values({ code, category: code.split('.')[0] ?? 'x' })
+        .onConflictDoNothing();
+    }
+    const adminPermRows = await db
+      .select({ id: permissions.id })
+      .from(permissions)
+      .where(inArray(permissions.code, ADMIN_PERMS));
+    await inTenant(async (tx) => {
+      const [role] = await tx
+        .insert(roles)
+        .values({ tenantId, name: 'Tenant Admin', isSystem: true, templateKey: 'tenant_admin' })
+        .returning({ id: roles.id });
+      await tx
+        .insert(rolePermissions)
+        .values(adminPermRows.map((p) => ({ roleId: role!.id, permissionId: p.id })));
+      await tx
+        .insert(userAssignments)
+        .values({ tenantId, userId: admin!.id, branchId, roleId: role!.id });
+      const [pt] = await tx
+        .insert(patients)
+        .values({ tenantId, fullName: 'Bemor Chegara' })
+        .returning({ id: patients.id });
+      capPatientId = pt!.id;
+    });
+    tok.admin = (
+      await signAccess({
+        sub: admin!.id,
+        atid: tenantId,
+        abid: branchId,
+        perms: ADMIN_PERMS,
+        roleKey: null,
+        lang: 'uz',
+      })
+    ).token;
+    await setCap(10);
+  });
+
+  test("Receptionist: chegara 10 → PATCH 100 (va 15) → 400 patient.discount_exceeds_max, o'zgarmaydi", async () => {
+    for (const v of [100, 15, 10.01]) {
+      const r = await call('reception', 'PATCH', `/api/patients/${capPatientId}`, {
+        defaultDiscountPercent: v,
+      });
+      expect(r.status).toBe(400);
+      expect(r.json.error.code).toBe('patient.discount_exceeds_max');
+    }
+    expect(await patientDiscount(capPatientId)).toBeNull();
+  });
+
+  test('Receptionist: chegara 10 → yaratishda 50 → 400, bemor yaratilmaydi', async () => {
+    const r = await call('reception', 'POST', '/api/patients', {
+      fullName: 'Chegaradan Oshgan',
+      defaultDiscountPercent: 50,
+    });
+    expect(r.status).toBe(400);
+    expect(r.json.error.code).toBe('patient.discount_exceeds_max');
+    const rows = await inTenant((tx) =>
+      tx
+        .select({ id: patients.id })
+        .from(patients)
+        .where(eq(patients.fullName, 'Chegaradan Oshgan')),
+    );
+    expect(rows).toHaveLength(0);
+  });
+
+  test('Receptionist: chegara 10 → PATCH 10 → 200 (chegarada ruxsat)', async () => {
+    const r = await call('reception', 'PATCH', `/api/patients/${capPatientId}`, {
+      defaultDiscountPercent: 10,
+    });
+    expect(r.status).toBe(200);
+    expect(await patientDiscount(capPatientId)).toBe('10.00');
+  });
+
+  test('Bosqich snapshot: bemor 25% (chegara pasaytirilishidan oldingi qiymat), chegara 10 → cost ≥ narx × 0.9', async () => {
+    // Chegaradan oshgan holatni to'g'ridan-to'g'ri yaratamiz (masalan, eski ma'lumot / poyga).
+    await inTenant((tx) =>
+      tx
+        .update(patients)
+        .set({ defaultDiscountPercent: '25.00' })
+        .where(eq(patients.id, capPatientId)),
+    );
+    const r = await call('doctor', 'POST', '/api/treatment-plans', {
+      patientId: capPatientId,
+      doctorId: doctorUserId,
+      title: 'Reja chegara',
+      stages: [{ serviceId: svcId, serviceName: 'Plomba', cost: 1, estimatedVisits: 1 }],
+    });
+    expect(r.status).toBe(201);
+    expect(r.json.data.stages[0].cost).toBe('180000.00');
+    expect(r.json.data.stages[0].listPrice).toBe('200000.00');
+    expect(r.json.data.stages[0].discountPercent).toBe('10.00');
+    expect(Number(r.json.data.totalCost)).toBe(180_000);
+  });
+
+  test("POS: bemor 25%, chegara 10, kassir (discount.give'siz) — chegaradagi avto chegirma (20 000) → 201", async () => {
+    const r = await call('kassir', 'POST', '/api/cashier/transactions', {
+      branchId,
+      patientId: capPatientId,
+      items: [{ serviceId: svcId, quantity: 1, unitPrice: 1, serviceName: 'Plomba' }],
+      discount: 20_000,
+      paidAmount: 180_000,
+      paymentMethod: 'cash',
+    });
+    expect(r.status).toBe(201);
+    expect(r.json.data.discountPercent).toBe('10.00');
+  });
+
+  test('Tenant Admin: chegarani 5 ga tushiradi → chegaradan oshgan bemor chegirmalari 5.00 ga tushadi', async () => {
+    await setCap(100);
+    await inTenant((tx) =>
+      tx
+        .update(patients)
+        .set({ defaultDiscountPercent: '25.00' })
+        .where(eq(patients.id, capPatientId)),
+    );
+    const r = await call('admin', 'PATCH', '/api/tenant-settings', { maxDiscountPercent: 5 });
+    expect(r.status).toBe(200);
+    expect(r.json.data.maxDiscountPercent).toBe(5);
+    expect(await patientDiscount(capPatientId)).toBe('5.00');
+    // Chegaradan past bemor chegirmasi o'zgarmaydi; chegara 0 → chegirma olib tashlanadi.
+    await inTenant((tx) =>
+      tx
+        .update(patients)
+        .set({ defaultDiscountPercent: '3.00' })
+        .where(eq(patients.id, capPatientId)),
+    );
+    expect(
+      (await call('admin', 'PATCH', '/api/tenant-settings', { maxDiscountPercent: 4 })).status,
+    ).toBe(200);
+    expect(await patientDiscount(capPatientId)).toBe('3.00');
+    expect(
+      (await call('admin', 'PATCH', '/api/tenant-settings', { maxDiscountPercent: 0 })).status,
+    ).toBe(200);
+    expect(await patientDiscount(capPatientId)).toBeNull();
+    await setCap(100);
   });
 });

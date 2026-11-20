@@ -6,6 +6,7 @@ import {
   canGiveDiscount,
   DISCOUNT_FORBIDDEN_CODE,
   DISCOUNT_FORBIDDEN_MESSAGE,
+  PatientDiscountExceedsMaxError,
 } from '../../lib/discount.ts';
 import { requireModuleInDesktop } from '../../lib/license-middleware.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
@@ -162,8 +163,16 @@ export const patientRoutes = (deps: {
     if (body.defaultDiscountPercent !== undefined && !canGiveDiscount(c)) {
       return c.json(fail(DISCOUNT_FORBIDDEN_CODE, DISCOUNT_FORBIDDEN_MESSAGE), 403);
     }
-    const row = await service.create(c, body);
-    return c.json(ok(toPatientDto(row)), 201);
+    try {
+      const row = await service.create(c, body);
+      return c.json(ok(toPatientDto(row)), 201);
+    } catch (e) {
+      // FT-04.3 (review): doimiy chegirma tenant chegarasidan oshdi — hech narsa yozilmagan.
+      if (e instanceof PatientDiscountExceedsMaxError) {
+        return c.json(fail(e.code, e.message, { maxPercent: e.maxPercent }), 400);
+      }
+      throw e;
+    }
   });
 
   // ─── POST /import — Excel/CSV'dan ommaviy import (FU-24) ──────────────────
@@ -271,7 +280,16 @@ export const patientRoutes = (deps: {
     if (body.defaultDiscountPercent !== undefined && !canGiveDiscount(c)) {
       return c.json(fail(DISCOUNT_FORBIDDEN_CODE, DISCOUNT_FORBIDDEN_MESSAGE), 403);
     }
-    const row = await service.update(c, id, body);
+    let row: Awaited<ReturnType<typeof service.update>>;
+    try {
+      row = await service.update(c, id, body);
+    } catch (e) {
+      // FT-04.3 (review): doimiy chegirma tenant chegarasidan oshdi — yozuvdan oldin rad.
+      if (e instanceof PatientDiscountExceedsMaxError) {
+        return c.json(fail(e.code, e.message, { maxPercent: e.maxPercent }), 400);
+      }
+      throw e;
+    }
     if (!row) return c.json(fail('patient.not_found', 'Patient not found'), 404);
     return c.json(ok(toPatientDto(row)), 200);
   });

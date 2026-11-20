@@ -6,7 +6,6 @@ import {
   expenses,
   patients,
   services,
-  tenantSettings,
   treatmentPlans,
   treatmentStagePayments,
   treatmentStages,
@@ -37,7 +36,7 @@ import { onAfterCommit } from '../../db/after-commit.ts';
 import type { DbOrTx } from '../../db/client.ts';
 import { getDb, withTenant } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
-import { canGiveDiscount } from '../../lib/discount.ts';
+import { canGiveDiscount, capDiscountPercent, readMaxDiscountPercent } from '../../lib/discount.ts';
 import type { PatientMessenger } from '../../lib/telegram/notify.ts';
 import {
   computePlanBalance,
@@ -558,6 +557,10 @@ export const createCashierService = (deps: {
     // summa aynan `round(itemsGross × pct/100)` bo'lsa (web POS bilan bir xil formula). Boshqa
     // summa yoki reja to'lovi — 403. Yozuvdan OLDIN (hech narsa yaratilmaydi).
     let discountSource: 'manual' | 'patient_default' = 'manual';
+    // CLI-444: tenant-configurable maksimal foiz (`tenant_settings.max_discount_percent`,
+    // default 100 = cheklovsiz) — faqat erkin POS rejimida ma'noli. FT-04.3 (review):
+    // bemorning avto chegirmasi ham shu chegara bilan cheklanadi (`min(pct, max)`).
+    const maxPct = resolvedItems.length > 0 ? await readMaxDiscountPercent(db) : 100;
     if (discountCents > 0) {
       const pid = visitPatientId ?? input.patientId ?? null;
       let autoCents: number | null = null;
@@ -567,7 +570,8 @@ export const createCashierService = (deps: {
           .from(patients)
           .where(eq(patients.id, pid))
           .limit(1);
-        const bp = pt?.pct != null ? Math.round(Number(pt.pct) * 100) : 0;
+        const effective = capDiscountPercent(pt?.pct ?? null, maxPct);
+        const bp = effective != null ? Math.round(Number(effective) * 100) : 0;
         if (bp > 0) {
           autoCents = toCents(Math.round((fromCents(itemsGrossCents) * bp) / 10_000));
         }
@@ -583,21 +587,12 @@ export const createCashierService = (deps: {
       throw new DiscountExceedsTotalError();
     }
 
-    // CLI-444: chegirma tenant-configurable maksimal foizdan oshmasligi
-    // (`tenant_settings.max_discount_percent`, default 100 = cheklovsiz). Yuqoridagi
-    // `> itemsGross` (100%) chekidan KEYIN — default holatda o'sha chek oldin otiladi,
-    // shuning uchun bu faqat maxPct < 100 uchun faollashadi (backward-compatible).
-    // Faqat erkin POS rejimida ma'noli. Butun-son arifmetikasi — float yaxlitlashsiz.
+    // CLI-444: chegirma `maxPct`dan oshmasligi. Yuqoridagi `> itemsGross` (100%) chekidan
+    // KEYIN — default holatda o'sha chek oldin otiladi, shuning uchun bu faqat maxPct < 100
+    // uchun faollashadi (backward-compatible). Butun-son arifmetikasi — float yaxlitlashsiz.
     // Faqat Tenant Admin/Owner (`tenant_settings.edit`) limitni o'zgartiradi — kassir emas.
-    if (resolvedItems.length > 0) {
-      const [settingsRow] = await db
-        .select({ maxDiscountPercent: tenantSettings.maxDiscountPercent })
-        .from(tenantSettings)
-        .limit(1);
-      const maxPct = settingsRow?.maxDiscountPercent ?? 100;
-      if (discountCents * 100 > itemsGrossCents * maxPct) {
-        throw new DiscountExceedsMaxError(maxPct);
-      }
+    if (resolvedItems.length > 0 && discountCents * 100 > itemsGrossCents * maxPct) {
+      throw new DiscountExceedsMaxError(maxPct);
     }
 
     // Erkin POS: jami − chegirma (endi manfiy bo'lmasligi kafolatlangan — yuqoridagi guard).
