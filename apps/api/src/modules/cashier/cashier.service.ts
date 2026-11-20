@@ -750,7 +750,15 @@ export const createCashierService = (deps: {
           action: 'created',
           resourceType: 'cashier_transaction',
           resourceId: transaction.id,
-          after: { receiptNumber, totalAmount: netTotal, items: input.items.length },
+          after: {
+            receiptNumber,
+            totalAmount: netTotal,
+            items: input.items.length,
+            // FT-04: chegirma auditda (summa, foiz, sabab; kim — audit userId).
+            ...(hasDiscount
+              ? { discount: fromCents(discountCents), discountPercent, discountReason }
+              : {}),
+          },
         });
 
         // UI-T2: bog'langan (Telegram) bemorga chek xulosasi — commit'dan KEYIN.

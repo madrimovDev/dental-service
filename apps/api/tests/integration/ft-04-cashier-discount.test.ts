@@ -11,6 +11,7 @@
 import { beforeAll, describe, expect, test } from 'bun:test';
 import { ROLE_TEMPLATES } from '@dental/core';
 import {
+  auditLog,
   branches,
   cashierTransactions,
   patients,
@@ -23,7 +24,7 @@ import {
   userAssignments,
   users,
 } from '@dental/db-schema';
-import { inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { createApp } from '../../src/app.ts';
 import { db } from '../../src/db/client.ts';
 import { signAccess } from '../../src/lib/jwt.ts';
@@ -214,5 +215,49 @@ describe('FT-04.2 — tranzaksiyada discount_percent / reason / granted_by', () 
     expect(r.json.data.discountPercent).toBeNull();
     expect(r.json.data.discountReason).toBeNull();
     expect(r.json.data.discountGrantedBy).toBeNull();
+  });
+});
+
+describe("FT-04.2 — chegirma audit_log'ga yoziladi", () => {
+  const auditAfter = (txId: string) =>
+    db.transaction(async (tx) => {
+      await tx.execute(sql.raw(`SET LOCAL app.current_tenant_id = '${tenantId}'`));
+      const rows = await tx
+        .select({ after: auditLog.after, userId: auditLog.userId })
+        .from(auditLog)
+        .where(
+          and(
+            eq(auditLog.action, 'created'),
+            eq(auditLog.resourceType, 'cashier_transaction'),
+            eq(auditLog.resourceId, txId),
+          ),
+        );
+      return rows;
+    });
+
+  test("summa, foiz va sabab audit after'ida", async () => {
+    const r = await call(
+      'reception',
+      'POST',
+      '/api/cashier/transactions',
+      payBody(50_000, { discountReason: 'Xodim qarindoshi' }),
+    );
+    expect(r.status).toBe(201);
+    const rows = await auditAfter(r.json.data.id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.userId).toBe(receptionUserId);
+    expect(rows[0]?.after).toMatchObject({
+      discount: 50_000,
+      discountPercent: '25.00',
+      discountReason: 'Xodim qarindoshi',
+    });
+  });
+
+  test("chegirmasiz to'lovda audit chegirma maydonlarisiz", async () => {
+    const r = await call('reception', 'POST', '/api/cashier/transactions', payBody(0));
+    expect(r.status).toBe(201);
+    const rows = await auditAfter(r.json.data.id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.after).not.toHaveProperty('discountPercent');
   });
 });
