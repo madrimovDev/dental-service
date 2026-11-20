@@ -1,9 +1,12 @@
 import {
   ApiError,
+  type CashierPhoto,
   createCashierTransaction,
   getCashierDailySummary,
+  getCashierPhotoSettings,
   getCashierPlanBalance,
   getCashierTransaction,
+  getCashierTransactionPhoto,
   getService,
   listBranches,
   listCashierPatientPlans,
@@ -18,6 +21,7 @@ import { notifications } from '@mantine/notifications';
 import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { patientKeys } from '@/features/patients/patients.keys';
 import { serviceKeys } from '@/features/services/services.keys';
+import { api } from '@/lib/api';
 import { formatCurrency } from '@/lib/format';
 import { i18n } from '@/lib/i18n.ts';
 import { lookupKeys } from '@/lib/lookup-keys';
@@ -212,5 +216,75 @@ export function usePendingVisits(branchId: string | null) {
       ),
     enabled: !!branchId && hasPermission('cashier.view'),
     refetchInterval: 30_000,
+  });
+}
+
+/** Kassa rasmi o'tkazib yuborilish sababi (server enum'i). */
+export type CashierPhotoSkipReason = 'permission_denied' | 'no_camera' | 'user_skipped' | 'error';
+
+/**
+ * FT-06.3 (D-4): tenant `cashierPhotoEnabled` (`GET /cashier/photo-settings`, `cashier.view`).
+ * Faqat to'lov qabul qila oladigan rolda so'raladi; xato bo'lsa — o'chiq deb hisoblanadi.
+ */
+export function useCashierPhotoSettings() {
+  const { hasPermission } = useAuthStore();
+  return useQuery({
+    queryKey: cashierKeys.photoSettings(),
+    queryFn: () => getCashierPhotoSettings().then((r) => r.data),
+    enabled: hasPermission('cashier.create_transaction'),
+    staleTime: 60_000,
+  });
+}
+
+/**
+ * FT-06.3: to'lovdan keyingi rasm (multipart `file`) YOKI `skippedReason`. To'lov allaqachon
+ * saqlangan — bu qadam uni hech qachon bloklamaydi/qaytarmaydi; xato faqat toast.
+ */
+export function useUploadCashierPhoto() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      transactionId,
+      file,
+      skippedReason,
+    }: {
+      transactionId: string;
+      file?: File;
+      skippedReason?: CashierPhotoSkipReason;
+    }) => {
+      const fd = new FormData();
+      if (file) fd.append('file', file);
+      else fd.append('skippedReason', skippedReason ?? 'user_skipped');
+      return api.cashierPhotos.upload(transactionId, fd);
+    },
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: cashierKeys.photo(vars.transactionId) });
+    },
+    onError: (error) => {
+      if (handleLicenseBlock(error)) return;
+      notifications.show({
+        color: 'red',
+        title: i18n.t('common.error'),
+        message: i18n.t('cashier.photo.failed'),
+      });
+    },
+  });
+}
+
+/** FT-06.3: to'lov rasmi (`cashier.photo.view`). 404 = rasm yo'q → `null`. */
+export function useCashierTransactionPhoto(transactionId: string | null) {
+  const { hasPermission } = useAuthStore();
+  return useQuery({
+    queryKey: cashierKeys.photo(transactionId ?? ''),
+    queryFn: async (): Promise<CashierPhoto | null> => {
+      try {
+        return (await getCashierTransactionPhoto(transactionId ?? '')).data;
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 404) return null;
+        throw e;
+      }
+    },
+    enabled: !!transactionId && hasPermission('cashier.photo.view'),
+    retry: false,
   });
 }

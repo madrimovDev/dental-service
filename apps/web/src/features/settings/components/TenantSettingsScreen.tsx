@@ -10,6 +10,7 @@ import {
   PasswordInput,
   Select,
   Stack,
+  Switch,
   Text,
   TextInput,
   Title,
@@ -82,6 +83,7 @@ export function TenantSettingsScreen() {
       currency: 'UZS',
       reminderLeadHours: 24,
       maxDiscountPercent: 100,
+      cashierPhotoEnabled: false,
     },
     validate: zod4Resolver(tenantSettingsSchema),
   });
@@ -109,6 +111,7 @@ export function TenantSettingsScreen() {
         currency: settings.data.currency ?? 'UZS',
         reminderLeadHours: settings.data.reminderLeadHours ?? 24,
         maxDiscountPercent: settings.data.maxDiscountPercent ?? 100,
+        cashierPhotoEnabled: settings.data.cashierPhotoEnabled ?? false,
       });
     }
   }, [settings.data]);
@@ -297,6 +300,17 @@ export function TenantSettingsScreen() {
                   disabled={!canEditSettings}
                   styles={INPUT_STYLES}
                   {...settingsForm.getInputProps('maxDiscountPercent')}
+                />
+
+                {/* FT-06.3 (D-4): kassa rasmi — to'lovdan keyin to'lovchining yuz rasmi. */}
+                <Switch
+                  style={{ gridColumn: 'span 2' }}
+                  size="md"
+                  label={t('tenant_settings.cashier_photo_enabled')}
+                  description={t('tenant_settings.cashier_photo_enabled_hint')}
+                  disabled={!canEditSettings}
+                  styles={{ body: { minHeight: 44, alignItems: 'center' } }}
+                  {...settingsForm.getInputProps('cashierPhotoEnabled', { type: 'checkbox' })}
                 />
               </div>
             )}

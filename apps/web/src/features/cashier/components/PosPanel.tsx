@@ -32,7 +32,12 @@ import { useTranslation } from 'react-i18next';
 import { BalanceBadge } from '@/components/BalanceBadge';
 import { usePatientBalance } from '@/features/patients/patients.api';
 import { formatCurrency } from '@/lib/format';
-import { fetchServicePrices, useCreateTransaction, useServices } from '../cashier.api';
+import {
+  fetchServicePrices,
+  useCashierPhotoSettings,
+  useCreateTransaction,
+  useServices,
+} from '../cashier.api';
 import { cashierKeys } from '../cashier.keys';
 import {
   buildCreatePayload,
@@ -49,6 +54,7 @@ import {
   type TransactionVM,
 } from '../cashier.types';
 import { CartTable } from './CartTable';
+import { CashierPhotoStep } from './CashierPhotoStep';
 import { ReceiptModal } from './ReceiptModal';
 
 export interface PosPanelProps {
@@ -167,6 +173,9 @@ export function PosPanel({
   const [notes, setNotes] = useState('');
   const [receipt, setReceipt] = useState<ReceiptSnapshot | null>(null);
   const [visitNoteId, setVisitNoteId] = useState<string | null>(null);
+  // FT-06.3: to'lovdan keyingi rasm qadami (sozlama yoqilgan bo'lsa); chek undan keyin ochiladi.
+  const photoSettings = useCashierPhotoSettings();
+  const [photoTxId, setPhotoTxId] = useState<string | null>(null);
 
   // Foiz → so'm chegirma. gross = savat jami (chegirmasiz) = computeNetTotal(cart, 0).
   const gross = computeNetTotal(cart, 0);
@@ -310,6 +319,7 @@ export function PosPanel({
         onVisitDone?.();
         // Server tranzaksiyasi → VM (chek manbasi). data yo'q bo'lsa modal ochilmaydi.
         if (data) {
+          if (photoSettings.data?.enabled && data.type === 'payment') setPhotoTxId(data.id);
           setReceipt({
             transaction: toTransactionVM(data),
             cart: cartSnapshot,
@@ -688,7 +698,9 @@ export function PosPanel({
         </Box>
       </Card>
 
-      {receipt && (
+      <CashierPhotoStep transactionId={photoTxId} onDone={() => setPhotoTxId(null)} />
+
+      {receipt && !photoTxId && (
         <ReceiptModal
           opened
           onClose={() => setReceipt(null)}

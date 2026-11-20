@@ -438,6 +438,8 @@
     "reminder_lead_hours": "Eslatma oldindan (soat)",
     "max_discount_percent": "Maksimal chegirma foizi",
     "max_discount_percent_hint": "Kassada bitta xizmatga beriladigan eng yuqori chegirma. 100% = cheklovsiz. Faqat klinika administratori o'zgartira oladi.",
+    "cashier_photo_enabled": "To'lovchi rasmi (kassa)",
+    "cashier_photo_enabled_hint": "To'lovdan keyin to'lovni tasdiqlash uchun to'lovchining yuz rasmi olinadi. Rasm 90 kun saqlanadi, keyin avtomatik o'chiriladi.",
     "subscription": {
       "trial": "Sinov",
       "active": "Faol",
@@ -1358,6 +1360,26 @@
     "save_first": "Narx qo'shish uchun avval xizmatni saqlang"
   },
   "cashier": {
+    "photo": {
+      "title": "To'lovchi rasmi",
+      "hint": "To'lovni tasdiqlash uchun to'lovchining yuz rasmini oling. Rasm 90 kun saqlanadi.",
+      "skip": "O'tkazib yuborish",
+      "saved": "Rasm saqlandi",
+      "failed": "Rasmni saqlab bo'lmadi. To'lov saqlangan.",
+      "unavailable": "Kamera ishlamadi — to'lov rasmsiz saqlandi.",
+      "view": "Rasm",
+      "view_title": "To'lov rasmi",
+      "not_found": "Bu to'lov uchun rasm yo'q.",
+      "load_error": "Rasmni yuklab bo'lmadi.",
+      "alt": "To'lovchi rasmi",
+      "skipped": "Rasm olinmagan: {{reason}}",
+      "reason": {
+        "permission_denied": "kameraga ruxsat berilmadi",
+        "no_camera": "kamera topilmadi",
+        "user_skipped": "kassir o'tkazib yubordi",
+        "error": "kamera xatosi"
+      }
+    },
     "title": "Kassa",
     "branch": "Filial",
     "new_payment": "Yangi to'lov",
