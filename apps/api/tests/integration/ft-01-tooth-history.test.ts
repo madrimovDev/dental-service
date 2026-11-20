@@ -245,3 +245,70 @@ describe('FT-01.4 — rasm tishlari FDI validatori', () => {
     expect(row?.toothNumbers).toEqual([11]);
   });
 });
+
+type VisitNoteDto = { id: string; toothNumbers: number[] | null };
+
+describe('FT-01.4 — visit_notes.tooth_numbers (0069)', () => {
+  test('Doctor: yaratish toothNumbers [16, 85] → saqlanadi va DTO’da qaytadi', async () => {
+    expect(templatePerms('doctor')).toContain('medical_record.edit');
+    const res = await call(tokens.doctor as string, 'POST', '/visit-notes', {
+      patientId,
+      doctorId: ids.doctor,
+      subjective: 'Og‘riq',
+      toothNumbers: [16, 85],
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { data: VisitNoteDto };
+    expect(body.data.toothNumbers).toEqual([16, 85]);
+    const [row] = await inTenant((tx) =>
+      tx.select().from(visitNotes).where(eq(visitNotes.id, body.data.id)),
+    );
+    expect(row?.toothNumbers).toEqual([16, 85]);
+  });
+
+  test('tishsiz yaratish → toothNumbers null', async () => {
+    const res = await call(tokens.doctor as string, 'POST', '/visit-notes', {
+      patientId,
+      doctorId: ids.doctor,
+    });
+    expect(res.status).toBe(201);
+    expect(((await res.json()) as { data: VisitNoteDto }).data.toothNumbers).toBeNull();
+  });
+
+  test('yaratish toothNumbers [19] (FDI emas) → 400', async () => {
+    const res = await call(tokens.doctor as string, 'POST', '/visit-notes', {
+      patientId,
+      doctorId: ids.doctor,
+      toothNumbers: [19],
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test('PATCH toothNumbers [11] → yangilanadi; [49] → 400', async () => {
+    const created = await call(tokens.doctor as string, 'POST', '/visit-notes', {
+      patientId,
+      doctorId: ids.doctor,
+      toothNumbers: [16],
+    });
+    const id = ((await created.json()) as { data: VisitNoteDto }).data.id;
+    const ok = await call(tokens.doctor as string, 'PATCH', `/visit-notes/${id}`, {
+      toothNumbers: [11],
+    });
+    expect(ok.status).toBe(200);
+    expect(((await ok.json()) as { data: VisitNoteDto }).data.toothNumbers).toEqual([11]);
+    const bad = await call(tokens.doctor as string, 'PATCH', `/visit-notes/${id}`, {
+      toothNumbers: [49],
+    });
+    expect(bad.status).toBe(400);
+  });
+
+  test('Receptionist (medical_record.edit yo‘q) → 403', async () => {
+    expect(templatePerms('receptionist')).not.toContain('medical_record.edit');
+    const res = await call(tokens.receptionist as string, 'POST', '/visit-notes', {
+      patientId,
+      doctorId: ids.doctor,
+      toothNumbers: [16],
+    });
+    expect(res.status).toBe(403);
+  });
+});

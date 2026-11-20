@@ -1,4 +1,5 @@
 import { z } from '@hono/zod-openapi';
+import { isValidFdi } from '../tooth-charts/tooth-charts.schema.ts';
 
 /** UI-D4: dori ↔ allergiya ogohlantirishidan sabab bilan o'tilgan (shu bemorda qayta so'ralmaydi). */
 export const allergyOverrideSchema = z
@@ -36,6 +37,12 @@ export const createVisitNoteSchema = z.object({
   plan: z.string().max(5000).optional(),
   performedServices: z.array(z.uuid()).default([]),
   freeNotes: z.string().max(5000).optional(),
+  // FT-01.4 (CF-10): vizitda ishlangan tish(lar), FDI. PATCH'da `null` — tozalash.
+  toothNumbers: z
+    .array(z.coerce.number().int().refine(isValidFdi, { message: 'Invalid FDI tooth number' }))
+    .max(52)
+    .nullable()
+    .optional(),
   // UI-D4: `metadata`ga yoziladi (update'da mavjud kalitlar bilan birlashtiriladi, ezilmaydi).
   allergyOverrides: z.array(allergyOverrideSchema).max(50).optional(),
   nextVisit: nextVisitSchema.optional(),
@@ -69,6 +76,10 @@ export const visitNoteDtoSchema = z
     plan: z.string().nullable().openapi({ example: null }),
     performedServices: z.array(z.uuid()).nullable().openapi({ example: [] }),
     freeNotes: z.string().nullable().openapi({ example: null }),
+    toothNumbers: z
+      .array(z.number().int())
+      .nullable()
+      .openapi({ example: [16] }),
     signedAt: z.string().nullable().openapi({ example: null }),
     signedBy: z.uuid().nullable().openapi({ example: null }),
     metadata: visitNoteMetadataSchema.nullable().openapi({ example: null }),
