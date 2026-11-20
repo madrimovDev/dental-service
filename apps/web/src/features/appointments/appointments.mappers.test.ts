@@ -3,8 +3,10 @@ import { describe, expect, it } from 'vitest';
 import {
   assignLanes,
   dropStartMinute,
+  gridFromWorkHours,
   groupByDay,
   instantFromDayMinute,
+  isOutsideWorkHours,
   localMinutes,
   newAppointmentHref,
   toSlotPosition,
@@ -94,5 +96,84 @@ describe('sudrab ko‘chirish matematikasi', () => {
     expect(newAppointmentHref({ dateKey: '2026-06-10', startMinute: 480 })).toBe(
       '/appointments/new?date=2026-06-10&time=08%3A00',
     );
+  });
+
+  // FT-05.2: grid soatlari filial ish vaqtidan (min boshlanish − 1 soat, max tugash + 1 soat).
+  describe('gridFromWorkHours', () => {
+    const wh = {
+      mon: { open: '09:00', close: '18:00' },
+      tue: { open: '10:30', close: '17:30' },
+      sun: null,
+    };
+
+    it('min open − 1 soat .. max close + 1 soat (butun soatga)', () => {
+      const g = gridFromWorkHours([wh]);
+      expect(g.dayStartHour).toBe(8);
+      expect(g.dayEndHour).toBe(19);
+      expect(g.pxPerMin).toBe(GRID.pxPerMin);
+      expect(g.stepMin).toBe(GRID.stepMin);
+    });
+
+    it('yarim soatli tugash yuqoriga yaxlitlanadi (17:30 + 1 soat → 19)', () => {
+      const g = gridFromWorkHours([{ mon: { open: '09:00', close: '17:30' } }]);
+      expect(g.dayEndHour).toBe(19);
+    });
+
+    it("ko'p filial (filial tanlanmagan) — birlashma", () => {
+      const g = gridFromWorkHours([
+        { mon: { open: '09:00', close: '18:00' } },
+        { mon: { open: '07:00', close: '21:00' } },
+      ]);
+      expect([g.dayStartHour, g.dayEndHour]).toEqual([6, 22]);
+    });
+
+    it('0..24 chegarasiga qisiladi', () => {
+      const g = gridFromWorkHours([{ mon: { open: '00:30', close: '23:30' } }]);
+      expect([g.dayStartHour, g.dayEndHour]).toEqual([0, 24]);
+    });
+
+    it("ish soati yo'q/null/bo'sh — standart GRID", () => {
+      for (const w of [[], [null], [{}], [{ mon: null }]]) {
+        const g = gridFromWorkHours(w);
+        expect([g.dayStartHour, g.dayEndHour]).toEqual([GRID.dayStartHour, GRID.dayEndHour]);
+      }
+    });
+
+    it("ish soatidan tashqaridagi yozilish ham ko'rinadigan oynaga kiradi", () => {
+      const g = gridFromWorkHours(
+        [wh],
+        [appt('2026-06-10T17:15:00Z', '2026-06-10T17:45:00Z', 'late')], // 22:15–22:45 Tashkent
+      );
+      expect(g.dayEndHour).toBe(23);
+      const early = gridFromWorkHours([wh], [appt('2026-06-10T01:00:00Z', '2026-06-10T01:30:00Z')]); // 06:00
+      expect(early.dayStartHour).toBe(6);
+    });
+  });
+
+  describe('isOutsideWorkHours', () => {
+    const wh = { wed: { open: '09:00', close: '18:00' }, thu: null };
+    // 2026-06-10 — chorshanba
+    it('ish vaqti ichida — false; oldin/keyin — true', () => {
+      expect(isOutsideWorkHours(appt('2026-06-10T05:00:00Z', '2026-06-10T05:30:00Z'), wh)).toBe(
+        false,
+      );
+      expect(isOutsideWorkHours(appt('2026-06-10T02:00:00Z', '2026-06-10T02:30:00Z'), wh)).toBe(
+        true,
+      ); // 07:00
+      expect(isOutsideWorkHours(appt('2026-06-10T12:45:00Z', '2026-06-10T13:15:00Z'), wh)).toBe(
+        true,
+      ); // 17:45–18:15
+    });
+    it('yopiq kun (null) — true; ish soati sozlanmagan — false', () => {
+      expect(isOutsideWorkHours(appt('2026-06-11T05:00:00Z', '2026-06-11T05:30:00Z'), wh)).toBe(
+        true,
+      );
+      expect(isOutsideWorkHours(appt('2026-06-11T05:00:00Z', '2026-06-11T05:30:00Z'), null)).toBe(
+        false,
+      );
+      expect(isOutsideWorkHours(appt('2026-06-11T05:00:00Z', '2026-06-11T05:30:00Z'), {})).toBe(
+        false,
+      );
+    });
   });
 });

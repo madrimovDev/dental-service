@@ -274,3 +274,24 @@ button.gridLine:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* FT-05.2: filial ish vaqtidan tashqari yozilish — kesik chegara + belgi */
+.slot[data-outside-hours="true"] {
+  border-style: dashed;
+  border-left-style: solid;
+  border-color: var(--warning);
+}
+
+.slotOutside {
+  display: inline-block;
+  align-self: flex-start;
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-bold);
+  color: var(--ink-2);
+  background: var(--warning-bg, var(--surface-2));
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-pill);
+  padding: 0 6px;
+  margin-bottom: 2px;
+  white-space: nowrap;
+}

@@ -1,9 +1,11 @@
 import type {
   Appointment,
+  BranchWorkHours,
   CalendarEvent,
   DayColumn,
   Doctor,
   DoctorColumn,
+  GridConfig,
 } from './appointments.types';
 import { GRID } from './appointments.types';
 
@@ -62,7 +64,7 @@ export function localTimeLabel(iso: string): string {
 type Laned<T> = T & { lane: number; laneCount: number };
 
 /** Pozitsiya (top/height px) — lane'siz (lane assignLanes'dan). */
-export function toSlotPosition(startMin: number, endMin: number, grid = GRID) {
+export function toSlotPosition(startMin: number, endMin: number, grid: GridConfig = GRID) {
   const dayStart = grid.dayStartHour * 60;
   const top = (startMin - dayStart) * grid.pxPerMin;
   const height = Math.max((endMin - startMin) * grid.pxPerMin, grid.pxPerMin * 10);
@@ -117,7 +119,7 @@ export function assignLanes<T extends { startMin: number; endMin: number }>(
 }
 
 /** Appointment[] → bir doktor uchun CalendarEvent[] (pozitsiya + lane). */
-export function toDoctorEvents(appts: Appointment[], grid = GRID): CalendarEvent[] {
+export function toDoctorEvents(appts: Appointment[], grid: GridConfig = GRID): CalendarEvent[] {
   const base = appts.map((a) => ({
     appointment: a,
     doctorId: a.doctorId,
@@ -135,7 +137,7 @@ export function toDoctorEvents(appts: Appointment[], grid = GRID): CalendarEvent
 export function groupByDoctor(
   appts: Appointment[],
   doctors: Doctor[],
-  grid = GRID,
+  grid: GridConfig = GRID,
 ): DoctorColumn[] {
   return doctors.map((doctor) => ({
     doctor,
@@ -147,7 +149,11 @@ export function groupByDoctor(
 }
 
 /** Week view: kun (local sana) bo'yicha ustunlar. `dayKeys` — YYYY-MM-DD (Asia/Tashkent) ro'yxati. */
-export function groupByDay(appts: Appointment[], dayKeys: string[], grid = GRID): DayColumn[] {
+export function groupByDay(
+  appts: Appointment[],
+  dayKeys: string[],
+  grid: GridConfig = GRID,
+): DayColumn[] {
   return dayKeys.map((dateKey) => ({
     dateKey,
     events: toDoctorEvents(
@@ -170,7 +176,7 @@ export function dropStartMinute(
   bodyTop: number,
   grabOffsetPx: number,
   durationMin: number,
-  grid = GRID,
+  grid: GridConfig = GRID,
 ): number {
   const raw = (clientY - bodyTop - grabOffsetPx) / grid.pxPerMin + grid.dayStartHour * 60;
   const snapped = Math.round(raw / DRAG_SNAP_MIN) * DRAG_SNAP_MIN;
@@ -194,7 +200,7 @@ export function minuteLabel(minute: number): string {
 }
 
 /** Grid yarim soatlik qatori indeksi → kun boshidan boshlanish daqiqasi (Tashkent). */
-export function cellStartMinute(rowIndex: number, grid = GRID): number {
+export function cellStartMinute(rowIndex: number, grid: GridConfig = GRID): number {
   return grid.dayStartHour * 60 + rowIndex * grid.stepMin;
 }
 
@@ -214,4 +220,79 @@ export function newAppointmentHref(p: {
   q.set('date', p.dateKey);
   q.set('time', minuteLabel(p.startMinute));
   return `/appointments/new?${q.toString()}`;
+}
+
+const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
+
+/** `{open,close}` ("HH:mm") yoki null (yopiq/noto'g'ri qiymat). */
+function readHours(v: unknown): { open: number; close: number } | null {
+  if (v == null || typeof v !== 'object') return null;
+  const { open, close } = v as { open?: unknown; close?: unknown };
+  if (typeof open !== 'string' || typeof close !== 'string') return null;
+  const o = hhmmToMinutes(open);
+  const c = hhmmToMinutes(close);
+  return Number.isFinite(o) && Number.isFinite(c) ? { open: o, close: c } : null;
+}
+
+function hhmmToMinutes(hhmm: string): number {
+  const [h, m] = hhmm.split(':').map(Number);
+  return (h ?? 0) * 60 + (m ?? 0);
+}
+
+/**
+ * FT-05.2: grid oynasi filial ish vaqtidan — min boshlanish − 1 soat .. max tugash + 1 soat
+ * (butun soatga, 0..24 ga qisiladi). `workHoursList` — bir yoki bir necha filial (filial
+ * tanlanmagan bo'lsa birlashma). Hech qayerda ochiq kun yo'q → standart `base`.
+ * `appts` — oyna tashqarisidagi yozilishlar ham ko'rinishi uchun oyna ularni qamraydi.
+ */
+export function gridFromWorkHours(
+  workHoursList: ReadonlyArray<BranchWorkHours | undefined>,
+  appts: ReadonlyArray<Appointment> = [],
+  base: GridConfig = GRID,
+): GridConfig {
+  let minOpen = Number.POSITIVE_INFINITY;
+  let maxClose = Number.NEGATIVE_INFINITY;
+  for (const wh of workHoursList) {
+    if (!wh) continue;
+    for (const raw of Object.values(wh)) {
+      const entry = readHours(raw);
+      if (!entry || entry.close <= entry.open) continue;
+      minOpen = Math.min(minOpen, entry.open);
+      maxClose = Math.max(maxClose, entry.close);
+    }
+  }
+  let start = base.dayStartHour;
+  let end = base.dayEndHour;
+  if (Number.isFinite(minOpen) && Number.isFinite(maxClose)) {
+    start = Math.max(0, Math.floor(minOpen / 60) - 1);
+    end = Math.min(24, Math.ceil(maxClose / 60) + 1);
+  }
+  for (const a of appts) {
+    const s = localMinutes(a.startTime);
+    let e = localMinutes(a.endTime);
+    if (e <= s) e = 24 * 60; // yarim tundan oshgan
+    start = Math.min(start, Math.floor(s / 60));
+    end = Math.max(end, Math.min(24, Math.ceil(e / 60)));
+  }
+  return { ...base, dayStartHour: start, dayEndHour: Math.max(end, start + 1) };
+}
+
+/**
+ * FT-05.2: yozilish filial ish vaqtidan tashqarida (yopiq kun yoki oldin/keyin) — «soatdan tashqari»
+ * belgisi uchun. Ish soati sozlanmagan (null / ochiq kun yo'q) → `false` (belgi chiqmaydi).
+ */
+export function isOutsideWorkHours(
+  appt: Pick<Appointment, 'startTime' | 'endTime'>,
+  workHours: BranchWorkHours | undefined,
+): boolean {
+  if (!workHours) return false;
+  const anyOpen = Object.values(workHours).some((e) => readHours(e) != null);
+  if (!anyOpen) return false;
+  const weekday = new Date(`${localDateKey(appt.startTime)}T00:00:00Z`).getUTCDay();
+  const entry = readHours(workHours[WEEKDAY_KEYS[weekday] ?? '']);
+  if (!entry) return true;
+  const s = localMinutes(appt.startTime);
+  let e = localMinutes(appt.endTime);
+  if (e <= s) e = 24 * 60;
+  return s < entry.open || e > entry.close;
 }

@@ -1788,6 +1788,7 @@
   },
   "calendar": {
     "new_appt_at": "{{doctor}} — {{time}}: yangi yozilish",
+    "outside_hours": "Soatdan tashqari",
     "panel_title": "Tanlangan yozilish",
     "panel_close": "Yopish",
     "next_step": "Keyingi qadam",

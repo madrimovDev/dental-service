@@ -74,4 +74,42 @@ describe('CalendarGrid', () => {
     );
     expect(screen.queryByRole('button', { name: /09:30/ })).not.toBeInTheDocument();
   });
+
+  // FT-05.2: grid soatlari `grid` prop'dan (filial ish vaqti).
+  it('soat belgilari va katak vaqtlari `grid` oynasidan', () => {
+    const onCellClick = vi.fn();
+    renderApp(
+      <CalendarGrid
+        appointments={[]}
+        doctors={doctors}
+        patientName={() => 'X'}
+        onCellClick={onCellClick}
+        grid={{ dayStartHour: 6, dayEndHour: 22, stepMin: 30, pxPerMin: 88 / 60 }}
+      />,
+    );
+    expect(screen.getByText('06:00')).toBeInTheDocument();
+    expect(screen.getByText('21:00')).toBeInTheDocument();
+    expect(screen.queryByText('22:00')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Dr\. Ali.*06:30/ }));
+    expect(onCellClick).toHaveBeenCalledWith({ doctorId: 'd1', startMinute: 390 });
+  });
+
+  it('ish soatidan tashqari yozilishda «soatdan tashqari» belgi chiqadi', () => {
+    renderApp(
+      <CalendarGrid
+        appointments={appts}
+        doctors={doctors}
+        patientName={() => 'Bemor X'}
+        outsideHoursIds={new Set(['a1'])}
+      />,
+    );
+    expect(screen.getByText('Soatdan tashqari')).toBeInTheDocument();
+  });
+
+  it('belgi faqat tashqaridagi yozilishda', () => {
+    renderApp(
+      <CalendarGrid appointments={appts} doctors={doctors} patientName={() => 'Bemor X'} />,
+    );
+    expect(screen.queryByText('Soatdan tashqari')).not.toBeInTheDocument();
+  });
 });

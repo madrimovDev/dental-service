@@ -12,6 +12,7 @@ import {
   type CalendarEvent,
   type Doctor,
   GRID,
+  type GridConfig,
   toneForIndex,
   toneVars,
 } from '../appointments.types';
@@ -33,14 +34,16 @@ function initials(name: string): string {
 
 /** Yarim soatlik grid chiziqlari (hour opacity 1, half .4) — 88px/soat zichlik. */
 function GridLines({
+  grid,
   cellLabel,
   onCell,
 }: {
+  grid: GridConfig;
   /** FT-05.1: bor bo'lsa har katak tugma (klaviatura/AT uchun aria-label). */
   cellLabel?: (startMinute: number) => string;
   onCell?: (startMinute: number) => void;
 }) {
-  const rows = (GRID.dayEndHour - GRID.dayStartHour) * 2; // 30-daq qadam
+  const rows = (grid.dayEndHour - grid.dayStartHour) * 2; // 30-daq qadam
   return (
     <>
       {Array.from({ length: rows }, (_, i) =>
@@ -52,8 +55,8 @@ function GridLines({
             tabIndex={-1}
             className={classes.gridLine}
             data-half={i % 2 === 1}
-            aria-label={cellLabel?.(cellStartMinute(i))}
-            onClick={() => onCell(cellStartMinute(i))}
+            aria-label={cellLabel?.(cellStartMinute(i, grid))}
+            onClick={() => onCell(cellStartMinute(i, grid))}
           />
         ) : (
           // biome-ignore lint/suspicious/noArrayIndexKey: statik fiksir grid panjarasi
@@ -74,6 +77,8 @@ export function CalendarGrid({
   canMove = false,
   onMove,
   onCellClick,
+  grid = GRID,
+  outsideHoursIds,
 }: {
   appointments: Appointment[];
   doctors: Doctor[];
@@ -92,14 +97,18 @@ export function CalendarGrid({
   onMove?: (appointment: Appointment, doctorId: string, startMinute: number) => void;
   /** FT-05.1: `appointment.create` — bo'sh katakka bosish (jadvalsiz doktorda yo'q). */
   onCellClick?: (cell: { doctorId: string; startMinute: number }) => void;
+  /** FT-05.2: filial ish vaqtidan hisoblangan oyna (standart — `GRID`). */
+  grid?: GridConfig;
+  /** FT-05.2: filial ish vaqtidan tashqari yozilishlar — «soatdan tashqari» belgisi. */
+  outsideHoursIds?: ReadonlySet<string>;
 }) {
   const dragRef = useRef<{ event: CalendarEvent; grab: number } | null>(null);
   const { t } = useTranslation();
-  const cols = groupByDoctor(appointments, doctors);
+  const cols = groupByDoctor(appointments, doctors, grid);
   const noSchedule = (doctorId: string) => unscheduledDoctorIds?.has(doctorId) ?? false;
   const hours = Array.from(
-    { length: GRID.dayEndHour - GRID.dayStartHour },
-    (_, i) => GRID.dayStartHour + i,
+    { length: grid.dayEndHour - grid.dayStartHour },
+    (_, i) => grid.dayStartHour + i,
   );
 
   return (
@@ -161,6 +170,7 @@ export function CalendarGrid({
                             e.currentTarget.getBoundingClientRect().top,
                             d.grab,
                             dur,
+                            grid,
                           ),
                         );
                       }
@@ -169,6 +179,7 @@ export function CalendarGrid({
                 className={`${classes.colBody} ${noSchedule(col.doctor.id) ? classes.colNoSchedule : ''}`}
               >
                 <GridLines
+                  grid={grid}
                   onCell={
                     onCellClick && !noSchedule(col.doctor.id) && col.doctor.id
                       ? (startMinute) => onCellClick({ doctorId: col.doctor.id, startMinute })
@@ -189,7 +200,7 @@ export function CalendarGrid({
                     </Link>
                   </div>
                 )}
-                <CurrentTimeLine showBadge={index === 0} />
+                <CurrentTimeLine showBadge={index === 0} grid={grid} />
                 {col.events.map((e) => (
                   <AppointmentSlot
                     key={e.appointment.id}
@@ -198,6 +209,7 @@ export function CalendarGrid({
                     tone={tone}
                     onClick={onSlotClick}
                     selected={selectedId === e.appointment.id}
+                    outsideHours={outsideHoursIds?.has(e.appointment.id)}
                     draggable={canMove && MOVABLE.has(e.appointment.status)}
                     onDragStartSlot={(ev, grab) => {
                       dragRef.current = { event: ev, grab };

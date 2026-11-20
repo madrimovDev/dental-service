@@ -30,12 +30,27 @@ export type CalendarEvent = {
 export type DoctorColumn = { doctor: Doctor; events: CalendarEvent[] };
 export type DayColumn = { dateKey: string; events: CalendarEvent[] };
 
-export const GRID = {
+/** Grid oynasi (soat) + zichlik. FT-05.2: oyna filial ish vaqtidan hisoblanadi (`gridFromWorkHours`). */
+export type GridConfig = {
+  dayStartHour: number;
+  dayEndHour: number;
+  stepMin: number;
+  pxPerMin: number;
+};
+
+/** Standart oyna — filialda ish vaqti sozlanmagan bo'lsa. */
+export const GRID: GridConfig = {
   dayStartHour: 8,
-  dayEndHour: 20, // SAQLANADI (ds12 §DS4) — 18 post-18:00 yozilishlarni yashiradi
+  dayEndHour: 20,
   stepMin: 30,
   pxPerMin: 88 / 60, // Dental OS zichlik: 88px / 1 soat (oldin 40px / 30 daqiqa)
-} as const;
+};
+
+/**
+ * Filial `workHours` JSONB: kalit 'sun'..'sat', {open,close} "HH:mm" yoki null = yopiq.
+ * Generated model qiymatlarni `unknown` deb beradi — mapper `readHours` bilan tekshirib o'qiydi.
+ */
+export type BranchWorkHours = Record<string, unknown> | null;
 
 /**
  * Ustun tone-cycling (Dental OS). Har ustun (doktor yoki kun) indeksidan barqaror

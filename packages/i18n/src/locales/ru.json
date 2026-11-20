@@ -1788,6 +1788,7 @@
   },
   "calendar": {
     "new_appt_at": "{{doctor}} — {{time}}: новая запись",
+    "outside_hours": "Вне рабочих часов",
     "panel_title": "Выбранная запись",
     "panel_close": "Закрыть",
     "next_step": "Следующий шаг",

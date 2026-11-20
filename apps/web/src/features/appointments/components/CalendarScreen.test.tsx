@@ -12,6 +12,7 @@ const hoisted = vi.hoisted(() => ({
   cancelMutate: vi.fn(),
   appts: [] as unknown[],
   availability: undefined as unknown,
+  branches: [] as unknown[],
 }));
 
 vi.mock('../appointments.api', () => ({
@@ -35,7 +36,7 @@ vi.mock('../appointments.api', () => ({
     ],
   }),
   useServices: () => ({ data: [] }),
-  useBranches: () => ({ data: [] }),
+  useBranches: () => ({ data: hoisted.branches }),
   useCancelAppointment: () => ({ mutate: hoisted.cancelMutate }),
   useUpdateAppointmentStatus: () => ({ mutate: hoisted.statusMutate }),
   useMoveAppointment: () => ({ mutate: hoisted.moveMutate }),
@@ -79,6 +80,7 @@ beforeEach(() => {
   hoisted.moveMutate.mockReset();
   hoisted.appts = [appt()];
   hoisted.availability = undefined;
+  hoisted.branches = [];
 });
 
 afterEach(() => {
@@ -91,6 +93,43 @@ function LocationProbe() {
 }
 
 describe('CalendarScreen', () => {
+  // FT-05.2: grid soatlari filial ish vaqtidan (min open − 1 .. max close + 1) + «soatdan tashqari» belgi.
+  const everyDay = (open: string, close: string) =>
+    Object.fromEntries(
+      ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => [d, { open, close }]),
+    );
+
+  it('grid soatlari filial ish vaqtidan: 10:00–16:00 → 09:00..16:00 belgilari', () => {
+    hoisted.branches = [{ id: 'b1', name: 'Asosiy', workHours: everyDay('10:00', '16:00') }];
+    renderApp(<CalendarScreen />);
+    expect(screen.getByText('09:00')).toBeInTheDocument();
+    expect(screen.getByText('16:00')).toBeInTheDocument();
+    expect(screen.queryByText('08:00')).not.toBeInTheDocument();
+    expect(screen.queryByText('17:00')).not.toBeInTheDocument();
+  });
+
+  it('ish soati sozlanmagan filialda standart 08:00–20:00', () => {
+    hoisted.branches = [{ id: 'b1', name: 'Asosiy', workHours: null }];
+    renderApp(<CalendarScreen />);
+    expect(screen.getByText('08:00')).toBeInTheDocument();
+    expect(screen.getByText('19:00')).toBeInTheDocument();
+    expect(screen.queryByText('20:00')).not.toBeInTheDocument();
+  });
+
+  it('ish vaqtidan tashqari yozilish belgilanadi va oyna uni qamraydi', () => {
+    hoisted.branches = [{ id: 'b1', name: 'Asosiy', workHours: everyDay('09:00', '18:00') }];
+    hoisted.appts = [appt({ startTime: todayAt(21), endTime: todayAt(22) })];
+    renderApp(<CalendarScreen />);
+    expect(screen.getByText('Soatdan tashqari')).toBeInTheDocument();
+    expect(screen.getByText('21:00', { selector: 'div' })).toBeInTheDocument();
+  });
+
+  it('ish vaqti ichidagi yozilishda belgi yo‘q', () => {
+    hoisted.branches = [{ id: 'b1', name: 'Asosiy', workHours: everyDay('09:00', '18:00') }];
+    renderApp(<CalendarScreen />);
+    expect(screen.queryByText('Soatdan tashqari')).not.toBeInTheDocument();
+  });
+
   it("sarlavha va kun/hafta toggle ko'rsatadi", () => {
     renderApp(<CalendarScreen />);
     expect(screen.getByText('Kun')).toBeInTheDocument();

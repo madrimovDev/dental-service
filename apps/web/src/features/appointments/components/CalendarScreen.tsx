@@ -21,7 +21,9 @@ import {
 } from '../appointments.api';
 import {
   addDaysToDateKey,
+  gridFromWorkHours,
   instantFromDayMinute,
+  isOutsideWorkHours,
   localDateKey,
   localMinutes,
   mondayOfWeek,
@@ -193,6 +195,32 @@ export function CalendarScreen() {
       return changed ? next : prev;
     });
   }, [appts]);
+
+  // FT-05.2: grid oynasi filial ish vaqtidan (filial tanlanmagan — barcha filiallar birlashmasi);
+  // oyna tashqarisidagi yozilishlar ham ko'rinadi va «soatdan tashqari» belgisi oladi.
+  const workHoursByBranch = useMemo(
+    () => new Map((branchesData ?? []).map((b) => [b.id, b.workHours ?? null])),
+    [branchesData],
+  );
+  const grid = useMemo(
+    () =>
+      gridFromWorkHours(
+        branchId != null
+          ? [workHoursByBranch.get(branchId) ?? null]
+          : [...workHoursByBranch.values()],
+        apptList,
+      ),
+    [branchId, workHoursByBranch, apptList],
+  );
+  const outsideHoursIds = useMemo(
+    () =>
+      new Set(
+        apptList
+          .filter((a) => isOutsideWorkHours(a, workHoursByBranch.get(a.branchId)))
+          .map((a) => a.id),
+      ),
+    [apptList, workHoursByBranch],
+  );
 
   // Jadvalsiz ustun (P10): `schedule.view` bor va ma'lumot kelgan bo'lsagina bilinadi.
   const unscheduledDoctorIds = useMemo(() => {
@@ -466,6 +494,8 @@ export function CalendarScreen() {
               onSlotClick={openDetail}
               selectedId={selectedId}
               unscheduledDoctorIds={unscheduledDoctorIds}
+              grid={grid}
+              outsideHoursIds={outsideHoursIds}
               canMove={hasPermission('appointment.edit')}
               onMove={moveAppointment}
               onCellClick={
@@ -479,6 +509,8 @@ export function CalendarScreen() {
             <WeekGrid
               appointments={apptList}
               dayKeys={dayKeys}
+              grid={grid}
+              outsideHoursIds={outsideHoursIds}
               patientName={patientName}
               onSlotClick={openDetail}
               selectedId={selectedId}

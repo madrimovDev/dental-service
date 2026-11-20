@@ -2,19 +2,27 @@ import { useTranslation } from 'react-i18next';
 import { formatDayMonth, formatWeekday } from '@/lib/format';
 import { cellStartMinute, groupByDay, minuteLabel } from '../appointments.mappers';
 import type { Appointment } from '../appointments.types';
-import { type CalendarEvent, GRID, toneForIndex, toneVars } from '../appointments.types';
+import {
+  type CalendarEvent,
+  GRID,
+  type GridConfig,
+  toneForIndex,
+  toneVars,
+} from '../appointments.types';
 import { AppointmentSlot } from './AppointmentSlot';
 import classes from './CalendarGrid.module.css';
 
 /** Yarim soatlik grid chiziqlari (hour opacity 1, half .4) — CalendarGrid bilan bir xil. */
 function GridLines({
+  grid,
   cellLabel,
   onCell,
 }: {
+  grid: GridConfig;
   cellLabel?: (startMinute: number) => string;
   onCell?: (startMinute: number) => void;
 }) {
-  const rows = (GRID.dayEndHour - GRID.dayStartHour) * 2;
+  const rows = (grid.dayEndHour - grid.dayStartHour) * 2;
   return (
     <>
       {Array.from({ length: rows }, (_, i) =>
@@ -26,8 +34,8 @@ function GridLines({
             tabIndex={-1}
             className={classes.gridLine}
             data-half={i % 2 === 1}
-            aria-label={cellLabel?.(cellStartMinute(i))}
-            onClick={() => onCell(cellStartMinute(i))}
+            aria-label={cellLabel?.(cellStartMinute(i, grid))}
+            onClick={() => onCell(cellStartMinute(i, grid))}
           />
         ) : (
           // biome-ignore lint/suspicious/noArrayIndexKey: statik fiksir grid panjarasi
@@ -46,6 +54,8 @@ export function WeekGrid({
   onSlotClick,
   selectedId,
   onCellClick,
+  grid = GRID,
+  outsideHoursIds,
 }: {
   appointments: Appointment[];
   dayKeys: string[];
@@ -54,12 +64,16 @@ export function WeekGrid({
   selectedId?: string | null;
   /** FT-05.1: `appointment.create` — bo'sh katakka bosish (kun + boshlanish daqiqasi). */
   onCellClick?: (cell: { dateKey: string; startMinute: number }) => void;
+  /** FT-05.2: filial ish vaqtidan hisoblangan oyna (standart — `GRID`). */
+  grid?: GridConfig;
+  /** FT-05.2: filial ish vaqtidan tashqari yozilishlar — «soatdan tashqari» belgisi. */
+  outsideHoursIds?: ReadonlySet<string>;
 }) {
   const { t, i18n } = useTranslation();
-  const cols = groupByDay(appointments, dayKeys);
+  const cols = groupByDay(appointments, dayKeys, grid);
   const hours = Array.from(
-    { length: GRID.dayEndHour - GRID.dayStartHour },
-    (_, i) => GRID.dayStartHour + i,
+    { length: grid.dayEndHour - grid.dayStartHour },
+    (_, i) => grid.dayStartHour + i,
   );
 
   return (
@@ -95,6 +109,7 @@ export function WeekGrid({
               </div>
               <div className={classes.colBody}>
                 <GridLines
+                  grid={grid}
                   onCell={
                     onCellClick
                       ? (startMinute) => onCellClick({ dateKey: col.dateKey, startMinute })
@@ -115,6 +130,7 @@ export function WeekGrid({
                     tone={tone}
                     onClick={onSlotClick}
                     selected={selectedId === e.appointment.id}
+                    outsideHours={outsideHoursIds?.has(e.appointment.id)}
                   />
                 ))}
               </div>

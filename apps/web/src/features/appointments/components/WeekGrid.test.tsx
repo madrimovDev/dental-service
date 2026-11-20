@@ -25,4 +25,19 @@ describe('WeekGrid', () => {
     renderApp(<WeekGrid appointments={[]} dayKeys={['2026-06-08']} patientName={() => 'X'} />);
     expect(screen.queryByRole('button', { name: /10:00/ })).not.toBeInTheDocument();
   });
+
+  it('hafta ko‘rinishi ham `grid` oynasidan soat belgilarini oladi', () => {
+    renderApp(
+      <WeekGrid
+        appointments={[]}
+        dayKeys={['2026-06-08']}
+        patientName={() => 'X'}
+        grid={{ dayStartHour: 7, dayEndHour: 19, stepMin: 30, pxPerMin: 88 / 60 }}
+      />,
+    );
+    expect(screen.getByText('07:00')).toBeInTheDocument();
+    expect(screen.getByText('18:00')).toBeInTheDocument();
+    expect(screen.queryByText('19:00')).not.toBeInTheDocument();
+    expect(screen.queryByText('08:00')).toBeInTheDocument();
+  });
 });

@@ -13,6 +13,7 @@ export function AppointmentSlot({
   selected = false,
   draggable = false,
   onDragStartSlot,
+  outsideHours = false,
 }: {
   event: CalendarEvent;
   patientName: (patientId: string) => string;
@@ -22,6 +23,8 @@ export function AppointmentSlot({
   /** Sudrab ko'chirish mumkin (appointment.edit + faol yozilish). */
   draggable?: boolean;
   onDragStartSlot?: (event: CalendarEvent, grabOffsetPx: number) => void;
+  /** FT-05.2: filial ish vaqtidan tashqari yozilish — ko'rinadigan belgi. */
+  outsideHours?: boolean;
 }) {
   const { t } = useTranslation();
   const { pos, appointment, startMin, endMin } = event;
@@ -35,6 +38,7 @@ export function AppointmentSlot({
       className={classes.slot}
       data-status={appointment.status}
       data-selected={selected}
+      data-outside-hours={outsideHours || undefined}
       aria-pressed={selected}
       draggable={draggable || undefined}
       data-draggable={draggable || undefined}
@@ -65,6 +69,9 @@ export function AppointmentSlot({
         </span>
         <StatusIndicator status={appointment.status} size={9} />
       </span>
+      {outsideHours ? (
+        <span className={classes.slotOutside}>{t('calendar.outside_hours')}</span>
+      ) : null}
       <span className={classes.slotPatient}>{patientName(appointment.patientId)}</span>
       {pos.height > 44 && serviceCount > 0 ? (
         <span className={classes.slotService}>
