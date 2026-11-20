@@ -1,5 +1,5 @@
 /**
- * FT-06.3 — `cashier_transaction_photos` (migratsiya 0071) REAL DB:
+ * FT-06.3 — `cashier_transaction_photos` (migratsiya 0072) REAL DB:
  *  - RLS: boshqa tenant qatorini ko'rmaydi / yoza olmaydi (WITH CHECK), cheklangan `dental_app` rol;
  *  - CHECK: `object_key` ham `skipped_reason` ham NULL bo'lolmaydi; bitta to'lovga bitta yozuv;
  *  - `tenant_settings.cashier_photo_enabled` standart `false`;
@@ -145,7 +145,7 @@ describe('cashier_transaction_photos — RLS + CHECK + UNIQUE (real DB, dental_a
   });
 });
 
-describe('0071 backfill — cashier.photo.view', () => {
+describe('0072 backfill — cashier.photo.view', () => {
   test('faqat tizim Tenant Admin roliga qo‘shiladi, boshqa rolga YO‘Q', async () => {
     const [admRole] = await admin.db
       .insert(roles)
@@ -161,7 +161,7 @@ describe('0071 backfill — cashier.photo.view', () => {
       .returning({ id: roles.id });
 
     const migration = readFileSync(
-      join(import.meta.dir, '..', '..', 'drizzle', '0071_ft06_cashier_photos.sql'),
+      join(import.meta.dir, '..', '..', 'drizzle', '0072_ft06_cashier_photos.sql'),
       'utf8',
     );
     // Faqat backfill qismi (permission INSERT + role_permissions INSERT) — jadval DDL qayta yurmaydi.
