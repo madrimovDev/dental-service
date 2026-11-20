@@ -202,3 +202,30 @@ describe('PlanCard — FT-01.5 bitta asosiy tugma + «…» menyu', () => {
     expect(screen.queryByRole('button', { name: 'Boshqa amallar' })).not.toBeInTheDocument();
   });
 });
+
+describe('PlanCard — bosqich jadvali sarlavhasi', () => {
+  it('«Tishlar» qisqa sarlavha (nowrap ustun) — uzun «Tish raqamlari» narx ustuniga tegmaydi', () => {
+    renderApp(
+      <PlanCard
+        plan={plan({
+          stages: [
+            {
+              id: 's1',
+              sequence: 1,
+              serviceName: 'A',
+              cost: '1',
+              status: 'pending',
+              acceptance: 'proposed',
+              toothNumbers: [],
+            } as never,
+          ],
+        })}
+        canEdit
+        {...noopHandlers}
+      />,
+    );
+    const head = screen.getByText('Tishlar');
+    expect(head.className).toContain('colTeeth');
+    expect(screen.queryByText('Tish raqamlari')).toBeNull();
+  });
+});

@@ -4,6 +4,7 @@
  * Dentdo API
  * OpenAPI spec version: 0.1.0
  */
+import type { CashierTransactionPhotoStatus } from './cashierTransactionPhotoStatus';
 import type { CashierTransactionPaymentMethod } from './cashierTransactionPaymentMethod';
 import type { CashierTransactionCardProvider } from './cashierTransactionCardProvider';
 import type { CashierTransactionType } from './cashierTransactionType';
@@ -15,6 +16,10 @@ export interface CashierTransaction {
   branchId: string;
   /** @nullable */
   patientId: string | null;
+  /** @nullable */
+  patientName: string | null;
+  /** @nullable */
+  photoStatus: CashierTransactionPhotoStatus;
   /** @nullable */
   treatmentPlanId: string | null;
   /** @nullable */

@@ -2716,6 +2716,19 @@
             "nullable": true,
             "format": "uuid"
           },
+          "patientName": {
+            "type": "string",
+            "nullable": true
+          },
+          "photoStatus": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "photo",
+              "skipped",
+              null
+            ]
+          },
           "treatmentPlanId": {
             "type": "string",
             "nullable": true,
@@ -2822,6 +2835,8 @@
           "tenantId",
           "branchId",
           "patientId",
+          "patientName",
+          "photoStatus",
           "treatmentPlanId",
           "receiptNumber",
           "totalAmount",

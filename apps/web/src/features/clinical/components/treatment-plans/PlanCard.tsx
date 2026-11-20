@@ -309,7 +309,7 @@ export function PlanCard({
             <div className={classes.tableHead}>
               <span className={classes.colNum}>#</span>
               <span>{t('treatment_plan.stages')}</span>
-              <span>{t('treatment_plan.tooth_numbers')}</span>
+              <span className={classes.colTeeth}>{t('treatment_plan.tooth_numbers_short')}</span>
               <span className={classes.colCost}>{t('treatment_plan.cost')}</span>
               <span className={classes.colStatus}>{t('treatment_plan.status')}</span>
             </div>

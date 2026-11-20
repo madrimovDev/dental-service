@@ -72,6 +72,7 @@ export * from './cashierTransaction';
 export * from './cashierTransactionCardProvider';
 export * from './cashierTransactionItem';
 export * from './cashierTransactionPaymentMethod';
+export * from './cashierTransactionPhotoStatus';
 export * from './cashierTransactionStatus';
 export * from './cashierTransactionType';
 export * from './cashierTransactionWithItems';

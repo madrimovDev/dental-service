@@ -26,6 +26,7 @@ const {
   branches,
   cashierTransactionPhotos,
   cashierTransactions,
+  patients,
   permissions,
   rolePermissions,
   roles,
@@ -360,6 +361,37 @@ describe('FT-06.3 kassa rasmi', () => {
         ),
     );
     expect(viewed).toHaveLength(1);
+  });
+
+  test('GET /cashier/transactions: photoStatus faqat cashier.photo.view egasiga; patientName qo‘shiladi', async () => {
+    const [pt] = await withTenant(tA, (tx) =>
+      tx.insert(patients).values({ tenantId: tA, fullName: 'Ali Valiyev' }).returning({
+        id: patients.id,
+      }),
+    );
+    await withTenant(tA, (tx) =>
+      tx
+        .update(cashierTransactions)
+        .set({ patientId: pt?.id ?? null })
+        .where(eq(cashierTransactions.id, txPay)),
+    );
+    type Row = { id: string; photoStatus: string | null; patientName: string | null };
+    const list = async (who: string) => {
+      const res = await get(who, '/api/cashier/transactions?pageSize=50');
+      expect(res.status).toBe(200);
+      const rows = ((await res.json()) as { data: { data: Row[] } }).data.data;
+      return new Map(rows.map((r) => [r.id, r]));
+    };
+    const adminRows = await list('admin');
+    expect(adminRows.get(txPay)?.photoStatus).toBe('photo');
+    expect(adminRows.get(txOtherBranch)?.photoStatus).toBe('skipped');
+    expect(adminRows.get(txRefund)?.photoStatus).toBeNull();
+    expect(adminRows.get(txPay)?.patientName).toBe('Ali Valiyev');
+    expect(adminRows.get(txOtherBranch)?.patientName).toBeNull();
+    // Receptionist (cashier.view bor, cashier.photo.view yo'q) — maydon null.
+    const recRows = await list('reception');
+    expect(recRows.get(txPay)?.photoStatus).toBeNull();
+    expect(recRows.get(txPay)?.patientName).toBe('Ali Valiyev');
   });
 
   test('rasmsiz tranzaksiya → 404', async () => {

@@ -875,6 +875,7 @@
     "add_stage": "Bosqich qo'shish",
     "service_name": "Xizmat nomi",
     "tooth_numbers": "Tish raqamlari",
+    "tooth_numbers_short": "Tishlar",
     "tooth_numbers_hint": "Vergul bilan ajrating, masalan: 11, 12, 36",
     "estimated_visits": "Tashriflar soni",
     "duration_minutes": "Davomiyligi (daqiqa)",

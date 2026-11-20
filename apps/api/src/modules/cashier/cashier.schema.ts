@@ -122,6 +122,10 @@ export const cashierTransactionDtoSchema = z
     tenantId: z.uuid(),
     branchId: z.uuid(),
     patientId: z.uuid().nullable(),
+    /** Faqat ro'yxatda (join); boshqa endpointlarda null. */
+    patientName: z.string().nullable(),
+    /** Faqat ro'yxatda va `cashier.photo.view` egasiga: 'photo' | 'skipped'; aks holda null. */
+    photoStatus: z.enum(['photo', 'skipped']).nullable(),
     treatmentPlanId: z.uuid().nullable(),
     receiptNumber: z.string().nullable(),
     totalAmount: z.string(),

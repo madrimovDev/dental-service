@@ -78,6 +78,12 @@
   text-align: center;
 }
 
+.colTeeth {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .colCost,
 .colStatus {
   text-align: right;

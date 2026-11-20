@@ -64,7 +64,7 @@ export function TransactionsScreen() {
                 <Table.Td>
                   {tx.patientId ? (
                     <Anchor component={Link} to={`/patients/${tx.patientId}`} size="sm">
-                      {t('common.view')}
+                      {tx.patientName ?? t('common.view')}
                     </Anchor>
                   ) : (
                     '—'
@@ -75,7 +75,7 @@ export function TransactionsScreen() {
                 <Table.Td>{t(`cashier.method.${tx.paymentMethod}`)}</Table.Td>
                 {canViewPhoto && (
                   <Table.Td>
-                    {tx.type === 'payment' && (
+                    {tx.type === 'payment' && tx.photoStatus && (
                       <ActionIcon
                         variant="subtle"
                         color="teal"
