@@ -35,7 +35,7 @@ import { useAuthStore } from '@/stores/auth-store.ts';
 import { useConsentForms } from '../../clinical.api';
 import { toConsentFormVM, toPlanCardVM } from '../../clinical.mappers';
 import { ConsentSignForm } from '../consent/ConsentSignForm';
-import { EstimateView } from './EstimateView';
+import { EstimatePanel } from './EstimateView';
 import { StageRow } from './StageRow';
 import classes from './TreatmentPlansTab.module.css';
 
@@ -105,6 +105,7 @@ export function PlanCard({
 }) {
   const { t } = useTranslation();
   const vm = toPlanCardVM(plan);
+  // FT-01.5: smeta o'ng panelda yig'iladi (modal emas); ochilgunicha so'rov yo'q.
   const [estimateOpened, estimate] = useDisclosure(false);
   const [consentOpened, consent] = useDisclosure(false);
   const [selectedConsentFormId, setSelectedConsentFormId] = useState<string | null>(null);
@@ -248,14 +249,6 @@ export function PlanCard({
               {totalStages} {t('treatment_plan.stages')}
             </div>
           </div>
-          <Button
-            size="compact-xs"
-            variant="light"
-            leftSection={<IconReceipt2 size={14} />}
-            onClick={estimate.open}
-          >
-            {t('treatment_plan.estimate_open')}
-          </Button>
         </div>
 
         <div className={classes.headChips}>
@@ -360,9 +353,19 @@ export function PlanCard({
             · <Mono>{progressPct}%</Mono>
           </div>
         </div>
-      </aside>
 
-      <EstimateView planId={plan.id} opened={estimateOpened} onClose={estimate.close} />
+        {/* FT-01.5 (spec §3): smeta/taqdimot — modal emas, shu panelning o'zida. */}
+        <Button
+          size="sm"
+          variant="light"
+          leftSection={<IconReceipt2 size={16} />}
+          aria-expanded={estimateOpened}
+          onClick={estimate.toggle}
+        >
+          {t(estimateOpened ? 'treatment_plan.estimate_hide' : 'treatment_plan.estimate_open')}
+        </Button>
+        {estimateOpened && <EstimatePanel planId={plan.id} />}
+      </aside>
 
       <Modal opened={consentOpened} onClose={closeConsent} title={t(consentActionKey)}>
         <Stack gap="md">
