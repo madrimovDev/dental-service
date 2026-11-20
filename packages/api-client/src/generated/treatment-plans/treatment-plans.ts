@@ -13,6 +13,8 @@ import type {
   GetTreatmentPlanEstimate200,
   ListTreatmentPlans200,
   ListTreatmentPlansParams,
+  RecordCompletedWork201,
+  RecordCompletedWorkBody,
   SignTreatmentPlanConsent200,
   SignTreatmentPlanConsentBody,
   UpdateTreatmentPlan200,
@@ -74,6 +76,16 @@ import { customInstance } from '../../mutator';
     },
       );
     }
+  export const recordCompletedWork = (
+    recordCompletedWorkBody: RecordCompletedWorkBody,
+ ) => {
+      return customInstance<RecordCompletedWork201>(
+      {url: `/api/treatment-plans/completed-work`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: recordCompletedWorkBody
+    },
+      );
+    }
   export const getTreatmentPlanEstimate = (
     id: string,
  ) => {
@@ -109,6 +121,7 @@ export type CreateTreatmentPlanResult = NonNullable<Awaited<ReturnType<typeof cr
 export type GetTreatmentPlanResult = NonNullable<Awaited<ReturnType<typeof getTreatmentPlan>>>
 export type UpdateTreatmentPlanResult = NonNullable<Awaited<ReturnType<typeof updateTreatmentPlan>>>
 export type AddTreatmentStageResult = NonNullable<Awaited<ReturnType<typeof addTreatmentStage>>>
+export type RecordCompletedWorkResult = NonNullable<Awaited<ReturnType<typeof recordCompletedWork>>>
 export type GetTreatmentPlanEstimateResult = NonNullable<Awaited<ReturnType<typeof getTreatmentPlanEstimate>>>
 export type SignTreatmentPlanConsentResult = NonNullable<Awaited<ReturnType<typeof signTreatmentPlanConsent>>>
 export type UpdateTreatmentStageResult = NonNullable<Awaited<ReturnType<typeof updateTreatmentStage>>>
