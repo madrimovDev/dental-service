@@ -193,6 +193,7 @@ export type {
 // Generated model types — appointments, services, queue, notifications, schedule
 // QueueTicketStatus re-exported under both names for backward compatibility
 export type {
+  AddTreatmentStageBody,
   AllergyEntry,
   Appointment,
   AppointmentStatsReport,
@@ -803,6 +804,7 @@ export {
 } from './generated/tooth-charts/tooth-charts.ts';
 // Generated (orval) — treatment-plans
 export type {
+  AddTreatmentStageResult,
   CreateTreatmentPlanResult,
   GetTreatmentPlanEstimateResult,
   GetTreatmentPlanResult,
@@ -813,6 +815,7 @@ export type {
   UpdateTreatmentStageResult,
 } from './generated/treatment-plans/treatment-plans.ts';
 export {
+  addTreatmentStage,
   createTreatmentPlan,
   getTreatmentPlan,
   getTreatmentPlanEstimate,

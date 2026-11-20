@@ -194,6 +194,29 @@ export function toToothDisplayMap(entries: ToothEntry[]): Map<number, ToothDispl
   return out;
 }
 
+/** FT-01.3: bosqich qo'shsa bo'ladigan reja holatlari (`completed|cancelled` → 409 plan.locked). */
+const PLAN_OPEN_STATUSES: readonly TreatmentPlanStatus[] = [
+  'draft',
+  'presented',
+  'accepted',
+  'in_progress',
+];
+
+/**
+ * FT-01.3 «Joriy reja»: bemorning eng so'nggi (`createdAt`) ochiq rejasi
+ * (`draft|presented|accepted|in_progress`); yo'q bo'lsa `null` — «Yangi reja».
+ */
+export function currentOpenPlan<P extends Pick<TreatmentPlan, 'id' | 'status' | 'createdAt'>>(
+  plans: P[] | undefined,
+): P | null {
+  let best: P | null = null;
+  for (const p of plans ?? []) {
+    if (!PLAN_OPEN_STATUSES.includes(p.status)) continue;
+    if (!best || p.createdAt > best.createdAt) best = p;
+  }
+  return best;
+}
+
 /** Davolash rejalaridagi faol (bajarilmagan) bosqichlarning tishlari — «Reja» ko'rinishi. */
 export function plannedTeethFromPlans(
   plans: Array<Pick<TreatmentPlan, 'status'> & { stages?: TreatmentStage[] }> | undefined,

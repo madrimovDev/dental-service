@@ -1,6 +1,22 @@
-import type { Diagnosis, ToothState, ToothSurface } from '@dental/api-client';
+import type {
+  Diagnosis,
+  ToothState,
+  ToothSurface,
+  TreatmentPlan,
+  TreatmentPlanStatus,
+} from '@dental/api-client';
 import { Mono } from '@dental/ui';
-import { Box, Button, Group, Paper, Stack, Text, UnstyledButton } from '@mantine/core';
+import {
+  Box,
+  Button,
+  Group,
+  Paper,
+  SegmentedControl,
+  Select,
+  Stack,
+  Text,
+  UnstyledButton,
+} from '@mantine/core';
 import { IconX } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,6 +25,7 @@ import {
   dxName,
   groupToothEntries,
   removeToothGroup,
+  resultingStateForPlan,
   suggestedStateForDiagnosis,
 } from '../../clinical.mappers';
 import type { ToothEntry, ToothHistoryRow } from '../../clinical.types';
@@ -28,6 +45,30 @@ const TOOTH_STATE_OPTIONS: ToothState[] = [
   'temporary',
   'veneer',
 ];
+
+/** Bosqich bajarilgach tish holati (StageRow bilan bir xil ro'yxat). */
+const RESULT_STATES: ToothState[] = [
+  'filling',
+  'crown',
+  'root_canal',
+  'implant',
+  'veneer',
+  'missing',
+  'healthy',
+  'temporary',
+];
+const NO_RESULT = '__none__';
+
+export type PlanTarget = 'current' | 'new';
+
+/** «Rejaga qo'shish» tanlovi (FT-01.3). */
+export type AddToPlanRequest = {
+  /** Diagramma/stage nomi uchun zaxira (xizmat tanlanmagan bo'lsa). */
+  label: string;
+  service?: SuggestedService;
+  resultingToothState: ToothState | null;
+  target: PlanTarget;
+};
 
 /** 5 yuza (FDI: M medial, O okklyuzion/chaynov, D distal, B bukkal/lunj, L lingual/til). */
 const FACES: Array<Exclude<ToothSurface, 'whole' | 'I'>> = ['M', 'O', 'D', 'B', 'L'];
@@ -60,11 +101,16 @@ type Props = {
   chair: boolean;
   canEdit: boolean;
   canAddToPlan: boolean;
+  /** FT-01.3: bemorning eng so'nggi ochiq rejasi («Joriy reja»); yo'q → faqat «Yangi reja». */
+  currentPlan: (Pick<TreatmentPlan, 'id' | 'title'> & { status: TreatmentPlanStatus }) | null;
   saving: boolean;
   /** Joriy tahrirni snapshot sifatida saqlash. */
   onSaveOnly: (entries: ToothEntry[]) => void;
-  /** Tashxisni rejaga qo'shish (saqlash + qoralama reja). */
-  onAddToPlan: (entries: ToothEntry[], label: string, service?: SuggestedService) => void;
+  /**
+   * Rejaga qo'shish. `entries` — yangi tashxis qo'shilgan bo'lsa yangilangan draft (avval
+   * snapshot saqlanadi), aks holda `null` (o'zgarmagan holat qayta snapshot qilinmaydi).
+   */
+  onAddToPlan: (entries: ToothEntry[] | null, req: AddToPlanRequest) => void;
 };
 
 export function ToothPanel({
@@ -77,6 +123,7 @@ export function ToothPanel({
   chair,
   canEdit,
   canAddToPlan,
+  currentPlan,
   saving,
   onSaveOnly,
   onAddToPlan,
@@ -86,6 +133,9 @@ export function ToothPanel({
   const [state, setState] = useState<ToothState>('healthy');
   const [diagnosis, setDiagnosis] = useState<Diagnosis | null>(null);
   const [service, setService] = useState<SuggestedService | null>(null);
+  // undefined = tashxisdan avtomatik (caries → filling ...), null = «Belgilanmagan».
+  const [resultOverride, setResultOverride] = useState<ToothState | null | undefined>(undefined);
+  const [targetPick, setTargetPick] = useState<PlanTarget>('current');
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: tish almashganda tanlov tozalanadi
   useEffect(() => {
@@ -93,11 +143,19 @@ export function ToothPanel({
     setState('healthy');
     setDiagnosis(null);
     setService(null);
+    setResultOverride(undefined);
   }, [tooth]);
 
   const minH = chair ? 'var(--tap-chair)' : 'var(--tap-min)';
   const groups = groupToothEntries(entries, tooth);
   const canAdd = diagnosis !== null || state !== 'healthy';
+  const target: PlanTarget = currentPlan ? targetPick : 'new';
+  const resultingState =
+    resultOverride !== undefined
+      ? resultOverride
+      : (resultingStateForPlan(canAdd ? state : groups[0]?.state) ?? null);
+  // Rejaga: tashxis/holat yoki xizmat bo'lsa kifoya (tish → xizmat → reja).
+  const canPlan = canAdd || groups.length > 0 || service !== null;
   // Uzun matnli tugma (ru) ikki qatorga o'raladi, qirqilmaydi.
   const btnStyles = {
     root: { height: 'auto', minHeight: minH, padding: '8px 12px' },
@@ -318,16 +376,60 @@ export function ToothPanel({
         </Box>
 
         {canEdit && canAddToPlan && (
-          <TreatmentSuggestions
-            diagnosis={
-              diagnosis ??
-              (groups[0]?.diagnosisId ? (diagnosisById.get(groups[0].diagnosisId) ?? null) : null)
-            }
-            lang={lang}
-            chair={chair}
-            value={service}
-            onChange={setService}
-          />
+          <Stack gap={8}>
+            <TreatmentSuggestions
+              diagnosis={
+                diagnosis ??
+                (groups[0]?.diagnosisId ? (diagnosisById.get(groups[0].diagnosisId) ?? null) : null)
+              }
+              lang={lang}
+              chair={chair}
+              value={service}
+              onChange={setService}
+            />
+            <Select
+              label={t('treatment_plan.resulting_state')}
+              aria-label={t('treatment_plan.resulting_state')}
+              value={resultingState ?? NO_RESULT}
+              onChange={(v) => setResultOverride(!v || v === NO_RESULT ? null : (v as ToothState))}
+              data={[
+                { value: NO_RESULT, label: t('treatment_plan.resulting_state_none') },
+                ...RESULT_STATES.map((s) => ({ value: s, label: t(`tooth_chart.states.${s}`) })),
+              ]}
+              allowDeselect={false}
+              comboboxProps={{ withinPortal: true }}
+              styles={{ input: { minHeight: minH } }}
+            />
+            {currentPlan && (
+              <Box>
+                <Text style={sectionLabel}>{t('odontogram.target_label')}</Text>
+                <SegmentedControl
+                  fullWidth
+                  value={target}
+                  onChange={(v) => setTargetPick(v as PlanTarget)}
+                  aria-label={t('odontogram.target_label')}
+                  data={[
+                    { value: 'current', label: t('odontogram.target_current') },
+                    { value: 'new', label: t('odontogram.target_new') },
+                  ]}
+                  styles={{
+                    control: { minHeight: minH },
+                    label: {
+                      minHeight: minH,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    },
+                  }}
+                />
+                {target === 'current' && (
+                  <Text style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 6 }}>
+                    {currentPlan.title} · {t(`treatment_plan.status_${currentPlan.status}`)}
+                  </Text>
+                )}
+              </Box>
+            )}
+          </Stack>
         )}
 
         {canEdit && (
@@ -348,13 +450,18 @@ export function ToothPanel({
               {canAddToPlan && (
                 <Button
                   loading={saving}
-                  disabled={!canAdd && groups.length === 0}
+                  disabled={!canPlan}
                   onClick={() => {
-                    const next = canAdd ? applyPending() : entries;
-                    const first = groupLabel(
-                      groupToothEntries(next, tooth)[0] ?? { state, diagnosisId: null },
+                    const next = canAdd ? applyPending() : null;
+                    const label = groupLabel(
+                      groupToothEntries(next ?? entries, tooth)[0] ?? { state, diagnosisId: null },
                     );
-                    onAddToPlan(next, first, service ?? undefined);
+                    onAddToPlan(next, {
+                      label,
+                      service: service ?? undefined,
+                      resultingToothState: resultingState,
+                      target,
+                    });
                   }}
                   styles={btnStyles}
                 >

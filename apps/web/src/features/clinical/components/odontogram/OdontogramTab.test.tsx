@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderApp } from '../../../../test-utils';
 import { OdontogramTab } from './OdontogramTab';
@@ -37,6 +37,7 @@ const SERVICES = [
   },
 ];
 const createPlanMutate = vi.fn();
+const addStagesMutate = vi.fn();
 const searches: Array<string | undefined> = [];
 
 vi.mock('../../clinical.api', () => ({
@@ -49,6 +50,7 @@ vi.mock('../../clinical.api', () => ({
   useCreateToothChart: () => ({ mutate, isPending: false }),
   useTreatmentPlans: () => ({ data: mockPlans }),
   useCreatePlan: () => ({ mutate: createPlanMutate, isPending: false }),
+  useAddPlanStages: () => ({ mutate: addStagesMutate, isPending: false }),
   useServiceCatalog: () => ({ data: SERVICES }),
   fetchServicePrices: async (_qc: unknown, id: string) => ({
     id,
@@ -87,6 +89,7 @@ describe('OdontogramTab', () => {
   beforeEach(() => {
     mutate.mockClear();
     createPlanMutate.mockClear();
+    addStagesMutate.mockClear();
     searches.length = 0;
     mockChart = null;
     mockHistory = [];
@@ -275,6 +278,119 @@ describe('OdontogramTab', () => {
       serviceName: 'Ildiz kanalini davolash',
       cost: 1800000,
       toothNumbers: [36],
+    });
+  });
+
+  describe('FT-01.3: tish → xizmat → joriy/yangi reja', () => {
+    const PULPIT_CHART = {
+      isPrimaryDentition: false,
+      states: [{ toothNumber: 36, surface: 'whole', state: 'caries', diagnosisId: 'dx-2' }],
+    };
+    const PLANS = [
+      {
+        id: 'pl-done',
+        title: 'Eski reja',
+        status: 'completed',
+        createdAt: '2026-04-01T00:00:00Z',
+        stages: [],
+      },
+      {
+        id: 'pl-cur',
+        title: 'Asosiy reja',
+        status: 'accepted',
+        createdAt: '2026-03-01T00:00:00Z',
+        stages: [],
+      },
+      {
+        id: 'pl-draft',
+        title: 'Qoralama',
+        status: 'draft',
+        createdAt: '2026-02-01T00:00:00Z',
+        stages: [],
+      },
+      {
+        id: 'pl-cancel',
+        title: 'Bekor',
+        status: 'cancelled',
+        createdAt: '2026-05-01T00:00:00Z',
+        stages: [],
+      },
+    ];
+
+    it("joriy reja (eng so'nggi faol) standart: 3 bosishda bosqich mavjud rejaga qo'shiladi", async () => {
+      mockChart = PULPIT_CHART;
+      mockPlans = PLANS;
+      renderApp(<OdontogramTab patientId="p1" />);
+      fireEvent.click(screen.getByText('36')); // 1
+      expect(screen.getByText(/Asosiy reja/)).toBeInTheDocument();
+      const radio = await screen.findByRole('radio', { name: /Ildiz kanalini davolash/ });
+      await waitFor(() => expect(radio).toHaveTextContent('1 800 000'));
+      fireEvent.click(radio); // 2
+      fireEvent.click(screen.getByRole('button', { name: /Rejaga qo'shish/i })); // 3
+      expect(createPlanMutate).not.toHaveBeenCalled();
+      // o'zgarmagan tashxis qayta snapshot qilinmaydi
+      expect(mutate).not.toHaveBeenCalled();
+      expect(addStagesMutate).toHaveBeenCalledTimes(1);
+      const arg = addStagesMutate.mock.calls[0]?.[0];
+      expect(arg.planId).toBe('pl-cur');
+      expect(arg.stages).toHaveLength(1);
+      expect(arg.stages[0]).toMatchObject({
+        serviceId: 'sv-2',
+        serviceName: 'Ildiz kanalini davolash',
+        cost: 1800000,
+        toothNumbers: [36],
+        resultingToothState: 'filling',
+      });
+    });
+
+    it('«Yangi reja» tanlansa yangi reja yaratiladi (joriy rejaga tegilmaydi)', async () => {
+      mockChart = PULPIT_CHART;
+      mockPlans = PLANS;
+      renderApp(<OdontogramTab patientId="p1" />);
+      fireEvent.click(screen.getByText('36'));
+      fireEvent.click(await screen.findByRole('radio', { name: /Ildiz kanalini davolash/ }));
+      fireEvent.click(screen.getByRole('radio', { name: 'Yangi reja' }));
+      fireEvent.click(screen.getByRole('button', { name: /Rejaga qo'shish/i }));
+      expect(addStagesMutate).not.toHaveBeenCalled();
+      expect(createPlanMutate).toHaveBeenCalledTimes(1);
+      expect(createPlanMutate.mock.calls[0]?.[0]).toMatchObject({
+        patientId: 'p1',
+        doctorId: 'u1',
+        stages: [expect.objectContaining({ serviceId: 'sv-2', toothNumbers: [36] })],
+      });
+    });
+
+    it("faol reja yo'q (completed/cancelled) — yangi reja; tashxissiz ham katalogdan xizmat tanlab qo'shiladi", async () => {
+      mockChart = { isPrimaryDentition: false, states: [] };
+      mockPlans = PLANS.filter((p) => p.status === 'completed' || p.status === 'cancelled');
+      renderApp(<OdontogramTab patientId="p1" />);
+      fireEvent.click(screen.getByText('11'));
+      expect(screen.queryByRole('radio', { name: 'Joriy reja' })).toBeNull();
+      const add = screen.getByRole('button', { name: /Rejaga qo'shish/i });
+      expect(add).toBeDisabled();
+      fireEvent.click(screen.getByRole('textbox', { name: 'Boshqa xizmat tanlash' }));
+      fireEvent.click(await screen.findByRole('option', { name: 'Plomba (kompozit)' }));
+      await waitFor(() => expect(add).toBeEnabled());
+      fireEvent.click(add);
+      expect(mutate).not.toHaveBeenCalled();
+      expect(createPlanMutate.mock.calls[0]?.[0].stages[0]).toMatchObject({
+        serviceId: 'sv-1',
+        serviceName: 'Plomba (kompozit)',
+        cost: 450000,
+        toothNumbers: [11],
+      });
+    });
+
+    it('natijaviy tish holati tanlanadi va bosqichga tushadi', async () => {
+      mockChart = PULPIT_CHART;
+      mockPlans = PLANS;
+      renderApp(<OdontogramTab patientId="p1" />);
+      fireEvent.click(screen.getByText('36'));
+      fireEvent.click(await screen.findByRole('radio', { name: /Ildiz kanalini davolash/ }));
+      fireEvent.click(screen.getByRole('textbox', { name: 'Bajarilgach tish holati' }));
+      fireEvent.click(await screen.findByRole('option', { name: 'Tojcha' }));
+      fireEvent.click(screen.getByRole('button', { name: /Rejaga qo'shish/i }));
+      expect(addStagesMutate.mock.calls[0]?.[0].stages[0].resultingToothState).toBe('crown');
     });
   });
 });

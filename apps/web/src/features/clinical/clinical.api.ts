@@ -1,4 +1,6 @@
 import {
+  type AddTreatmentStageBody,
+  addTreatmentStage,
   type CreateLabOrderInput,
   type CreatePrescriptionInput,
   type CreateTemplateInput,
@@ -154,6 +156,28 @@ export function useCreatePlan(patientId: string) {
   return useMutation({
     mutationFn: (body: CreateTreatmentPlanInput) => createTreatmentPlan(body).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: clinicalKeys.plans(patientId) }),
+  });
+}
+
+/**
+ * FT-01.3 (CF-11): odontogrammadan joriy rejaga bosqich(lar) qo'shish —
+ * `POST /treatment-plans/{id}/stages`. Bir nechta tish = bir nechta bosqich, KETMA-KET
+ * yuboriladi (backend reja qatorini qulflaydi; `sequence` tartibi tanlov tartibiga mos).
+ * Reja summasi va smetasi o'zgaradi — reja/balans/kassa va smeta keshlari yangilanadi.
+ */
+export function useAddPlanStages(patientId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ planId, stages }: { planId: string; stages: AddTreatmentStageBody[] }) => {
+      const out = [];
+      for (const stage of stages) out.push((await addTreatmentStage(planId, stage)).data);
+      return out;
+    },
+    // Qisman muvaffaqiyatda ham (2-bosqichda xato) qo'shilganlari ko'rinsin.
+    onSettled: (_d, _e, { planId }) => {
+      invalidatePlanFinancials(qc, patientId);
+      void qc.invalidateQueries({ queryKey: clinicalKeys.planEstimate(planId) });
+    },
   });
 }
 
