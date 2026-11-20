@@ -593,6 +593,10 @@
             "type": "integer",
             "example": 3
           },
+          "cashierPhotoEnabled": {
+            "type": "boolean",
+            "example": false
+          },
           "notificationSettings": {
             "$ref": "#/components/schemas/NotificationSettings"
           },
@@ -665,6 +669,7 @@
           "onboardingDismissedAt",
           "maxDiscountPercent",
           "noShowStrikeThreshold",
+          "cashierPhotoEnabled",
           "notificationSettings",
           "integrationSettings",
           "createdAt",
@@ -3142,6 +3147,64 @@
           "services",
           "total",
           "hasUnpriced"
+        ]
+      },
+      "CashierPhotoSettings": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "example": false
+          }
+        },
+        "required": [
+          "enabled"
+        ]
+      },
+      "CashierPhoto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "transactionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "url": {
+            "type": "string",
+            "nullable": true,
+            "example": "/uploads/tenants%2F…"
+          },
+          "skippedReason": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "permission_denied",
+              "no_camera",
+              "user_skipped",
+              "error",
+              null
+            ]
+          },
+          "capturedBy": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "capturedAt": {
+            "type": "string",
+            "example": "2026-11-20T10:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "transactionId",
+          "url",
+          "skippedReason",
+          "capturedBy",
+          "capturedAt"
         ]
       },
       "ReportBranches": {
@@ -9736,6 +9799,9 @@
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 50
+                  },
+                  "cashierPhotoEnabled": {
+                    "type": "boolean"
                   },
                   "notificationSettings": {
                     "type": "object",
@@ -16486,6 +16552,157 @@
           },
           "403": {
             "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cashier/photo-settings": {
+      "get": {
+        "tags": [
+          "cashier"
+        ],
+        "operationId": "getCashierPhotoSettings",
+        "responses": {
+          "200": {
+            "description": "Cashier photo capture setting",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CashierPhotoSettings"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cashier/transactions/{id}/photo": {
+      "get": {
+        "tags": [
+          "cashier"
+        ],
+        "operationId": "getCashierTransactionPhoto",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cashier transaction photo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CashierPhoto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Transaction not found",
             "content": {
               "application/json": {
                 "schema": {
