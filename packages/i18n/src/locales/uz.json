@@ -1249,6 +1249,7 @@
     "price_branch": "filial narxi",
     "price_partial": "ba'zi xizmatlarga narx belgilanmagan",
     "moved": "{{name}} — {{doctor}}, {{time}} ga ko'chirildi",
+    "resized": "{{name}} — tugash {{time}} ga o'zgartirildi",
     "move_failed": "Ko'chirib bo'lmadi — yozilish joyiga qaytarildi",
     "move_action": "Ko'chirish",
     "move_time": "Yangi vaqt (shu kun)",
@@ -1821,6 +1822,8 @@
     "patient_unknown": "Bemor"
   },
   "calendar": {
+    "new_appt_at": "{{doctor}} — {{time}}: yangi yozilish",
+    "outside_hours": "Soatdan tashqari",
     "panel_title": "Tanlangan yozilish",
     "panel_close": "Yopish",
     "next_step": "Keyingi qadam",
@@ -1845,7 +1848,12 @@
     "no_schedule_title": "Bu kunga ish jadvali yo'q",
     "no_schedule_text": "Jadvalsiz bu shifokorga yozib bo'lmaydi.",
     "no_schedule_link": "Jadvalni ko'rish →",
-    "no_schedule_badge": "Jadval yo'q"
+    "no_schedule_badge": "Jadval yo'q",
+    "zoom": "Kattalashtirish",
+    "zoom_compact": "Kichik",
+    "zoom_normal": "Oddiy",
+    "zoom_comfortable": "Katta",
+    "rail_open": "Panel"
   },
   "booking": {
     "title": "Yangi yozilish",

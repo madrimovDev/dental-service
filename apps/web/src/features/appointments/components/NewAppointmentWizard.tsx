@@ -69,6 +69,13 @@ function localMinute(iso: string): number {
   return (h ?? 0) * 60 + (m ?? 0);
 }
 
+/** `?date=YYYY-MM-DD` → klinika-local kun (tush vaqti — `localDateParam` TZ chetiga chiqmaydi). */
+function parseDateKey(key: string | undefined): Date | null {
+  if (!key || !/^\d{4}-\d{2}-\d{2}$/.test(key)) return null;
+  const d = new Date(`${key}T12:00:00+05:00`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 type SlotCell = { start: string; end: string; reason: UnavailableSlot['reason'] | null };
 
 /**
@@ -79,10 +86,19 @@ type SlotCell = { start: string; end: string; reason: UnavailableSlot['reason'] 
 export function NewAppointmentWizard({
   onClose,
   initialPatientId,
+  initialDoctorId,
+  initialBranchId,
+  initialDate,
+  initialTime,
 }: {
   onClose: () => void;
   /** FX-110: «Yozish» tugmalari uzatgan bemor (`?patientId=`) — oldindan tanlanadi. */
   initialPatientId?: string;
+  /** FT-05.1: kalendar katagidan — shifokor, filial, sana (YYYY-MM-DD), vaqt (HH:MM). */
+  initialDoctorId?: string;
+  initialBranchId?: string;
+  initialDate?: string;
+  initialTime?: string;
 }) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
@@ -121,11 +137,11 @@ export function NewAppointmentWizard({
 
   const form = useForm<WizardValues>({
     initialValues: {
-      branchId: activeBranchId ?? '',
+      branchId: initialBranchId ?? activeBranchId ?? '',
       patientId: initialPatientId ?? '',
-      doctorId: '',
+      doctorId: initialDoctorId ?? '',
       serviceIds: [],
-      date: new Date(),
+      date: parseDateKey(initialDate) ?? new Date(),
       startTime: null,
       endTime: null,
       notes: '',
@@ -185,6 +201,25 @@ export function NewAppointmentWizard({
       form.setFieldValue('endTime', null);
     }
   }, [basis]);
+
+  // FT-05.1: kalendardan kelgan vaqt (HH:MM) — xizmat tanlanib slotlar kelgach mos slot
+  // avtomatik tanlanadi; foydalanuvchi boshqa slot tanlasa ustuvorlik undan.
+  const [preferredTime, setPreferredTime] = useState<string | null>(
+    initialTime && /^\d{2}:\d{2}$/.test(initialTime) ? initialTime : null,
+  );
+  const pickedStart = form.values.startTime;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `form` har renderda yangi obyekt; faqat quyidagi qiymatlar kerak
+  useEffect(() => {
+    if (preferredTime == null || pickedStart != null) return;
+    const match = freeSlots.find(
+      (s) =>
+        slotTimeLabel(s.start) === preferredTime && localDateParam(new Date(s.start)) === dateParam,
+    );
+    if (match) {
+      form.setFieldValue('startTime', match.start);
+      form.setFieldValue('endTime', match.end);
+    }
+  }, [freeSlots, preferredTime, pickedStart, dateParam]);
 
   const cells: SlotCell[] = useMemo(() => {
     const all: SlotCell[] = [
@@ -265,6 +300,7 @@ export function NewAppointmentWizard({
         className={styles.slot}
         aria-pressed={form.values.startTime === c.start}
         onClick={() => {
+          setPreferredTime(null);
           form.setFieldValue('startTime', c.start);
           form.setFieldValue('endTime', c.end);
         }}

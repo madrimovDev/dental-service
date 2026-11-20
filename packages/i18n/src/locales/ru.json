@@ -1249,6 +1249,7 @@
     "price_branch": "цена филиала",
     "price_partial": "для части услуг цена не задана",
     "moved": "{{name}} — {{doctor}}, перенесено на {{time}}",
+    "resized": "{{name}} — окончание изменено на {{time}}",
     "move_failed": "Не удалось перенести — запись возвращена на место",
     "move_action": "Перенести",
     "move_time": "Новое время (этот день)",
@@ -1821,6 +1822,8 @@
     "patient_unknown": "Пациент"
   },
   "calendar": {
+    "new_appt_at": "{{doctor}} — {{time}}: новая запись",
+    "outside_hours": "Вне рабочих часов",
     "panel_title": "Выбранная запись",
     "panel_close": "Закрыть",
     "next_step": "Следующий шаг",
@@ -1845,7 +1848,12 @@
     "no_schedule_title": "На этот день графика нет",
     "no_schedule_text": "Без графика записать к этому врачу нельзя.",
     "no_schedule_link": "Открыть график →",
-    "no_schedule_badge": "Нет графика"
+    "no_schedule_badge": "Нет графика",
+    "zoom": "Масштаб",
+    "zoom_compact": "Мелко",
+    "zoom_normal": "Обычно",
+    "zoom_comfortable": "Крупно",
+    "rail_open": "Панель"
   },
   "booking": {
     "title": "Новая запись",
