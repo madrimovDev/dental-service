@@ -345,19 +345,34 @@
   },
   "apiErrors": {
     "ownership": {
-      "not_practitioner": "Yozuv muallifi shifokor bo'lishi kerak. Shifokorni tanlang yoki shifokor hisobidan kiring."
+      "not_practitioner": "Yozuv muallifi shifokor bo'lishi kerak. Shifokorni tanlang yoki shifokor hisobidan kiring.",
+      "not_found": "Tanlangan yozuv topilmadi. Sahifani yangilab, qayta urinib ko'ring.",
+      "mismatch": "Tanlangan yozuvlar bir-biriga mos emas (boshqa bemor yoki shifokorga tegishli)."
     },
     "prescription": {
       "on_behalf_forbidden": "Boshqa shifokor nomidan retsept yozishga ruxsatingiz yo'q."
     },
     "visit_note": {
-      "on_behalf_forbidden": "Boshqa shifokor nomidan vizit yozuvi yaratishga ruxsatingiz yo'q."
+      "on_behalf_forbidden": "Boshqa shifokor nomidan vizit yozuvi yaratishga ruxsatingiz yo'q.",
+      "signed": "Vizit yozuvi imzolangan — unga endi ish bog'lab bo'lmaydi.",
+      "stage_linked": "Vizit yozuvi allaqachon boshqa bosqichga bog'langan."
     },
     "discount": {
       "forbidden": "Chegirma berishga ruxsatingiz yo'q (bu filialda «Chegirma bera oladi» huquqi kerak)."
     },
     "patient": {
       "discount_exceeds_max": "Doimiy chegirma klinika belgilagan chegaradan ({{maxPercent}}%) oshmasligi kerak."
+    },
+    "plan": {
+      "locked": "Reja yakunlangan yoki bekor qilingan — unga bosqich qo'shib ham, tahrirlab ham bo'lmaydi.",
+      "not_active": "Reja hali qabul qilinmagan. Bajarilgan ishni yozish uchun avval rejani qabul qiling.",
+      "doctor_mismatch": "Bu reja boshqa shifokorga tegishli. Ishni o'z rejangizga yozing yoki shifokor nomidan yozish huquqi kerak."
+    },
+    "stage": {
+      "locked": "Bu bosqichni o'zgartirib bo'lmaydi: u boshlangan yoki unga to'lov taqsimlangan."
+    },
+    "medical_record": {
+      "on_behalf_forbidden": "Boshqa shifokor nomidan tibbiy yozuv kiritishga ruxsatingiz yo'q."
     }
   },
   "dashboard": {
@@ -868,10 +883,10 @@
     "no_stages": "Bosqich qo'shing",
     "save": "Rejani saqlash",
     "status_draft": "Qoralama",
-    "status_presented": "Taqdim qilingan",
-    "status_accepted": "Qabul qilingan",
-    "status_in_progress": "Davom etmoqda",
-    "status_completed": "Bajarilgan",
+    "status_presented": "Bemorga ko'rsatildi",
+    "status_accepted": "Bemor rozi",
+    "status_in_progress": "Davolanmoqda",
+    "status_completed": "Tugadi",
     "status_cancelled": "Bekor qilingan",
     "resulting_state": "Bajarilgach tish holati",
     "resulting_state_none": "Belgilanmagan",
@@ -891,12 +906,12 @@
     "accept_all": "Hammasini qabul qilish",
     "accept_all_result": "{{accepted}} ta bosqich qabul qilindi",
     "accept_all_partial": "{{rejected}} ta bosqichni qabul qilib bo'lmadi",
-    "present": "Bemorga taqdim qilish",
-    "accept_plan": "Rejani tasdiqlash",
-    "start_execution": "Ijroni boshlash",
+    "present": "Bemorga ko'rsatish",
+    "accept_plan": "Bemor rozi bo'ldi",
+    "start_execution": "Davolashni boshlash",
     "complete_plan": "Rejani yakunlash",
     "estimate": "Smeta",
-    "estimate_open": "Smeta / taqdim qilish",
+    "estimate_open": "Smetani ko'rsatish",
     "estimate_empty": "Bosqichlar yo'q",
     "estimate_paid": "To'langan",
     "estimate_debt_eligible": "Qarzga kiradi",
@@ -922,7 +937,9 @@
       "empty": "Davolash rejalari topilmadi",
       "col_patient": "Bemor",
       "col_updated": "Yangilangan"
-    }
+    },
+    "more_actions": "Boshqa amallar",
+    "estimate_hide": "Smetani yashirish"
   },
   "visit_note": {
     "title": "Vizit yozuvlari",
@@ -2058,7 +2075,27 @@
     "suggest_title": "Davolash taklifi",
     "suggest_none": "Mos xizmat topilmadi — katalogdan tanlang",
     "suggest_other": "Boshqa xizmat tanlash",
-    "suggest_no_price": "narx yo'q"
+    "suggest_no_price": "narx yo'q",
+    "selected_teeth": "Tishlar: {{list}}",
+    "multi_hint": "Bir nechta tish: Shift + bosish yoki uzun bosish",
+    "plan_title_multi": "Davolash: tishlar {{list}}",
+    "target_label": "Qaysi rejaga",
+    "target_current": "Joriy reja",
+    "target_new": "Yangi reja",
+    "single_stage": "Bitta bosqich (barcha tishlar uchun)",
+    "panel_tabs": "Tish bo'limlari",
+    "tab_tooth": "Tish",
+    "tab_history": "Tish tarixi",
+    "history_states": "Holat o'zgarishlari",
+    "history_stages": "Davolash bosqichlari",
+    "history_visits": "Vizitlar",
+    "history_images": "Rasmlar",
+    "history_none": "Hozircha yo'q",
+    "upload_image": "Rasm yuklash",
+    "visit_draft": "qoralama",
+    "visit_no_text": "Matnsiz yozuv",
+    "record_completed": "Bajarilgan ishni yozish",
+    "completed_recorded": "Bajarilgan ish yozildi"
   },
   "visitNote": {
     "title": "Vizit yozuvi",
@@ -2135,7 +2172,22 @@
     "freeNotes": "Qo‘shimcha izoh",
     "allergyUnknownTitle": "Allergiya ma’lumoti noma’lum",
     "allergyUnknownBody": "Bemorning allergiya ma’lumoti yuklanmadi yoki ko‘rish ruxsati yo‘q. Dori allergiyaga zid bo‘lishi mumkin — davom etish sababini tanlang.",
-    "allergyUnknownSafe": "Avval tekshiraman"
+    "allergyUnknownSafe": "Avval tekshiraman",
+    "teeth": "Tishlar",
+    "completedWork": {
+      "title": "Bajarilgan ishni yozish",
+      "hint": "Xizmat darhol bajarilgan bosqich sifatida joriy rejaga (yoki «Bajarilgan ishlar» rejasiga) yoziladi va shu vizitga bog'lanadi: odontogramma yangilanadi, summa reja qarziga tushadi (kassada «reja bo'yicha» to'lanadi).",
+      "saveFirst": "Avval vizit yozuvini saqlang.",
+      "service": "Xizmat",
+      "servicePlaceholder": "Xizmatni tanlang",
+      "teeth": "Tish(lar)",
+      "teethPlaceholder": "FDI raqami",
+      "permanent": "Doimiy tishlar",
+      "primary": "Sut tishlari",
+      "resultingState": "Tish holati (keyin)",
+      "submit": "Yozish",
+      "done": "Bajarilgan ish yozildi"
+    }
   },
   "ownerHome": {
     "title": "Siz hal qiladigan masalalar",

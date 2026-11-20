@@ -3,14 +3,17 @@ import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import type { AuditLogger } from '../../../lib/audit-logger.ts';
 import { requireModuleInDesktop } from '../../../lib/license-middleware.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../../lib/openapi.ts';
-import { CrossEntityError } from '../../../lib/ownership.ts';
+import { CrossEntityError, OnBehalfForbiddenError } from '../../../lib/ownership.ts';
 import { requirePermission } from '../../../middleware/require-permission.ts';
 import { toPlanDto, toPlanWithStagesDto, toStageDto } from './treatment-plans.mapper.ts';
 import {
+  completedWorkDtoSchema,
   consentSchema,
+  createStageSchema,
   createTreatmentPlanSchema,
   listPlansQuerySchema,
   planIdParamSchema,
+  recordCompletedWorkSchema,
   stageIdParamSchema,
   treatmentPlanDtoSchema,
   treatmentPlanEstimateDtoSchema,
@@ -26,10 +29,15 @@ import {
   ConsentLockedError,
   ConsentRequiredError,
   createTreatmentPlansService,
+  PlanDoctorMismatchError,
+  PlanNotActiveForWorkError,
+  PlanStagesLockedError,
   type PriceLookup,
   type RecallStageHook,
+  StageLockedError,
   type StageStockHook,
   type ToothChartStageHook,
+  VisitNoteNotLinkableError,
 } from './treatment-plans.service.ts';
 import { InvalidTransitionError } from './treatment-plans.transitions.ts';
 
@@ -162,6 +170,128 @@ export const treatmentPlansRoutes = (deps: {
     const plan = await service.getPlan(c, id);
     if (!plan) return c.json(fail('plan.not_found', 'Plan not found'), 404);
     return c.json(ok(toPlanWithStagesDto(plan)), 200);
+  });
+
+  // ─── POST /treatment-plans/{id}/stages — FT-01 bosqich qo'shish ──────────────
+
+  const addStageRoute = createRoute({
+    method: 'post',
+    path: '/treatment-plans/{id}/stages',
+    tags: ['treatment-plans'],
+    operationId: 'addTreatmentStage',
+    middleware: [
+      requireModuleInDesktop('clinical'),
+      requirePermission('medical_record.edit'),
+    ] as const,
+    request: {
+      params: planIdParamSchema,
+      body: { content: { 'application/json': { schema: createStageSchema } } },
+    },
+    responses: {
+      201: {
+        content: { 'application/json': { schema: apiResponseSchema(treatmentStageDtoSchema) } },
+        description: 'Stage added to the plan (pending, proposed)',
+      },
+      400: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Validation error or invalid service reference',
+      },
+      409: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Plan is completed or cancelled',
+      },
+      ...planNotFound,
+    },
+  });
+
+  app.openapi(addStageRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const body = c.req.valid('json');
+    try {
+      const stage = await service.addStage(c, id, body);
+      if (!stage) return c.json(fail('plan.not_found', 'Plan not found'), 404);
+      return c.json(ok(toStageDto(stage)), 201);
+    } catch (e) {
+      if (e instanceof PlanStagesLockedError) {
+        return c.json(fail('plan.locked', e.message), 409);
+      }
+      if (e instanceof CrossEntityError) {
+        return c.json(fail(`ownership.${e.reason}`, e.message), 400);
+      }
+      throw e;
+    }
+  });
+
+  // ─── POST /treatment-plans/completed-work — FT-01.2 «Bajarilgan ishni yozish» ──
+
+  const completedWorkRoute = createRoute({
+    method: 'post',
+    path: '/treatment-plans/completed-work',
+    tags: ['treatment-plans'],
+    operationId: 'recordCompletedWork',
+    middleware: [
+      requireModuleInDesktop('clinical'),
+      requirePermission('medical_record.edit'),
+    ] as const,
+    request: {
+      body: { content: { 'application/json': { schema: recordCompletedWorkSchema } } },
+    },
+    responses: {
+      201: {
+        content: { 'application/json': { schema: apiResponseSchema(completedWorkDtoSchema) } },
+        description:
+          'Completed stage(s) recorded on the current plan (or an auto «Bajarilgan ishlar» plan)',
+      },
+      400: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Validation error or invalid patient/plan/service reference',
+      },
+      403: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Forbidden (incl. recording on behalf of another doctor)',
+      },
+      409: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description:
+          'Plan is not active (draft/presented) or is completed/cancelled; visit note is signed or already linked to a stage',
+      },
+    },
+  });
+
+  app.openapi(completedWorkRoute, async (c) => {
+    const body = c.req.valid('json');
+    try {
+      const result = await service.recordCompletedWork(c, body);
+      return c.json(
+        ok({
+          planId: result.planId,
+          planCreated: result.planCreated,
+          stages: result.stages.map(toStageDto),
+        }),
+        201,
+      );
+    } catch (e) {
+      // Faqat INSERT'dan OLDIN otiladigan xatolar ushlanadi (4xx COMMIT — yarim yozuv yo'q).
+      if (e instanceof PlanStagesLockedError) {
+        return c.json(fail('plan.locked', e.message), 409);
+      }
+      if (e instanceof PlanNotActiveForWorkError) {
+        return c.json(fail('plan.not_active', e.message), 409);
+      }
+      if (e instanceof PlanDoctorMismatchError) {
+        return c.json(fail('plan.doctor_mismatch', e.message), 409);
+      }
+      if (e instanceof VisitNoteNotLinkableError) {
+        return c.json(fail(`visit_note.${e.reason}`, e.message), 409);
+      }
+      if (e instanceof OnBehalfForbiddenError) {
+        return c.json(fail('medical_record.on_behalf_forbidden', e.message), 403);
+      }
+      if (e instanceof CrossEntityError) {
+        return c.json(fail(`ownership.${e.reason}`, e.message), 400);
+      }
+      throw e;
+    }
   });
 
   // ─── GET /treatment-plans/{id}/estimate — C6 computed smeta ────────────────
@@ -305,6 +435,10 @@ export const treatmentPlansRoutes = (deps: {
         content: { 'application/json': { schema: errorResponseSchema } },
         description: 'Invalid stage transition',
       },
+      409: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Stage content locked (not pending or has payment allocations)',
+      },
       ...stageNotFound,
     },
   });
@@ -319,6 +453,9 @@ export const treatmentPlansRoutes = (deps: {
     } catch (e) {
       if (e instanceof InvalidTransitionError) {
         return c.json(fail('stage.invalid_transition', e.message), 400);
+      }
+      if (e instanceof StageLockedError) {
+        return c.json(fail('stage.locked', e.message), 409);
       }
       // CLI-487: lab-order linkage cross-entity mismatch → 400 (noto'g'ri havola).
       if (e instanceof CrossEntityError) {

@@ -33,6 +33,7 @@ import {
 import { diagnosisSearchIndex, normalizeSearch, toDiagnosisOptions } from '../../clinical.mappers';
 import type { AllergyOverride, NextVisit, VisitNoteView } from '../../clinical.types';
 import { useClinicalAuthor } from '../../clinical-author';
+import { CompletedWorkForm, PERMANENT_TEETH, PRIMARY_TEETH } from './CompletedWorkForm';
 import classes from './VisitNotePage.module.css';
 import {
   buildVisitNoteBody,
@@ -164,6 +165,7 @@ export function VisitNotePage() {
           completesStage: note.completesStage ?? true,
           appointmentId: note.appointmentId,
           nextVisit: note.metadata?.nextVisit ?? null,
+          toothNumbers: note.toothNumbers ?? [],
         }
       : emptyVisitForm();
     const draft = loadDraft(key);
@@ -591,6 +593,21 @@ export function VisitNotePage() {
               onChange={(v) => patch({ assessmentDiagnoses: v })}
               nothingFoundMessage={t('visitNote.noDiagnosis')}
             />
+            {/* FT-01.4 (CF-10): vizitda ishlangan tish(lar) — tish tarixida shu vizit ko'rinadi. */}
+            <MultiSelect
+              mt="sm"
+              label={t('visitNote.teeth')}
+              placeholder={t('visitNote.completedWork.teethPlaceholder')}
+              searchable
+              clearable
+              data={[
+                { group: t('visitNote.completedWork.permanent'), items: PERMANENT_TEETH },
+                { group: t('visitNote.completedWork.primary'), items: PRIMARY_TEETH },
+              ]}
+              disabled={readOnly}
+              value={values.toothNumbers.map(String)}
+              onChange={(v) => patch({ toothNumbers: v.map(Number).sort((a, b) => a - b) })}
+            />
           </section>
 
           <section className={classes.cardFlush} aria-labelledby="vn-sv">
@@ -758,6 +775,20 @@ export function VisitNotePage() {
                 </span>
               </label>
             )}
+            {/* FT-01.2 (CF-12): rejasiz vizitda bajarilgan ishni darhol bosqich sifatida yozish. */}
+            {!readOnly &&
+              !note?.stageId &&
+              values.stageId === null &&
+              hasPermission('medical_record.edit') && (
+                <CompletedWorkForm
+                  patientId={patientId}
+                  visitNoteId={noteId}
+                  serviceOptions={serviceOptions}
+                  branchId={activeBranchId}
+                  disabled={pending}
+                  onRecorded={(stageId) => patch({ stageId, completesStage: true })}
+                />
+              )}
           </section>
 
           <section className={classes.card} aria-labelledby="vn-next">

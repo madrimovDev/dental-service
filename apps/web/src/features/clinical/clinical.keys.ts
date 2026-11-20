@@ -40,6 +40,9 @@ export const clinicalKeys = {
   // C — images
   images: (patientId: string, visitNoteId?: string) =>
     ['clinical', 'images', patientId, visitNoteId ?? 'all'] as const,
+  // FT-01.4: tish tarixi — `['clinical','images',patientId]` prefiksi ostida (yuklash/o'chirish invalidatsiyasi).
+  toothImages: (patientId: string, tooth: number) =>
+    ['clinical', 'images', patientId, 'tooth', tooth] as const,
   // standalone aggregate views (patientId yo'q)
   allPlans: () => ['clinical', 'plans-all'] as const,
   allLabOrders: () => ['clinical', 'lab-orders-all'] as const,

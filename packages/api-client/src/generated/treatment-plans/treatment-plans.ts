@@ -5,12 +5,16 @@
  * OpenAPI spec version: 0.1.0
  */
 import type {
+  AddTreatmentStage201,
+  AddTreatmentStageBody,
   CreateTreatmentPlan201,
   CreateTreatmentPlanBody,
   GetTreatmentPlan200,
   GetTreatmentPlanEstimate200,
   ListTreatmentPlans200,
   ListTreatmentPlansParams,
+  RecordCompletedWork201,
+  RecordCompletedWorkBody,
   SignTreatmentPlanConsent200,
   SignTreatmentPlanConsentBody,
   UpdateTreatmentPlan200,
@@ -61,6 +65,27 @@ import { customInstance } from '../../mutator';
     },
       );
     }
+  export const addTreatmentStage = (
+    id: string,
+    addTreatmentStageBody: AddTreatmentStageBody,
+ ) => {
+      return customInstance<AddTreatmentStage201>(
+      {url: `/api/treatment-plans/${id}/stages`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: addTreatmentStageBody
+    },
+      );
+    }
+  export const recordCompletedWork = (
+    recordCompletedWorkBody: RecordCompletedWorkBody,
+ ) => {
+      return customInstance<RecordCompletedWork201>(
+      {url: `/api/treatment-plans/completed-work`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: recordCompletedWorkBody
+    },
+      );
+    }
   export const getTreatmentPlanEstimate = (
     id: string,
  ) => {
@@ -95,6 +120,8 @@ import { customInstance } from '../../mutator';
 export type CreateTreatmentPlanResult = NonNullable<Awaited<ReturnType<typeof createTreatmentPlan>>>
 export type GetTreatmentPlanResult = NonNullable<Awaited<ReturnType<typeof getTreatmentPlan>>>
 export type UpdateTreatmentPlanResult = NonNullable<Awaited<ReturnType<typeof updateTreatmentPlan>>>
+export type AddTreatmentStageResult = NonNullable<Awaited<ReturnType<typeof addTreatmentStage>>>
+export type RecordCompletedWorkResult = NonNullable<Awaited<ReturnType<typeof recordCompletedWork>>>
 export type GetTreatmentPlanEstimateResult = NonNullable<Awaited<ReturnType<typeof getTreatmentPlanEstimate>>>
 export type SignTreatmentPlanConsentResult = NonNullable<Awaited<ReturnType<typeof signTreatmentPlanConsent>>>
 export type UpdateTreatmentStageResult = NonNullable<Awaited<ReturnType<typeof updateTreatmentStage>>>

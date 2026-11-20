@@ -9,6 +9,8 @@ const createMutate = vi.fn();
 const updateMutate = vi.fn();
 const signMutate = vi.fn();
 const rxMutate = vi.fn();
+const recordMutate = vi.fn();
+let catalog: Array<Record<string, unknown>> = [];
 let note: Record<string, unknown> | undefined;
 let notes: Array<Record<string, unknown>> = [];
 let allergies: Array<{ substance: string }> | null = [{ substance: 'Penitsillin' }];
@@ -20,7 +22,7 @@ vi.mock('../../clinical.api', () => ({
   useVisitNote: () => ({ data: note, isLoading: false, isError: false, refetch: vi.fn() }),
   useVisitNotes: () => ({ data: notes }),
   useDiagnoses: () => ({ data: [] }),
-  useServiceCatalog: () => ({ data: [] }),
+  useServiceCatalog: () => ({ data: catalog }),
   useTreatmentPlans: () => ({ data: plans }),
   usePatientAppointments: () => ({ data: [] }),
   useVisitNoteTemplates: () => ({ data: [] }),
@@ -45,6 +47,13 @@ vi.mock('../../clinical.api', () => ({
     mutateAsync: (id: string) => {
       signMutate(id);
       return Promise.resolve({});
+    },
+  }),
+  useRecordCompletedWork: () => ({
+    isPending: false,
+    mutateAsync: (b: unknown) => {
+      recordMutate(b);
+      return Promise.resolve({ planId: 'pl-auto', planCreated: true, stages: [{ id: 'st-new' }] });
     },
   }),
   useCreatePrescription: () => ({
@@ -295,6 +304,36 @@ describe('VisitNotePage — dori ↔ allergiya (UI-D4)', () => {
     });
   });
 
+  it('FT-01.4: yozuvdagi tishlar formada ko‘rinadi va saqlashda yuboriladi', async () => {
+    note = {
+      id: 'n1',
+      patientId: 'p1',
+      subjective: 'Shikoyat',
+      objective: null,
+      plan: null,
+      freeNotes: null,
+      assessmentDiagnoses: [],
+      performedServices: [],
+      stageId: null,
+      completesStage: true,
+      appointmentId: null,
+      toothNumbers: [16, 85],
+      visitDate: '2026-11-11T10:00:00Z',
+      updatedAt: '2026-11-11T10:05:00Z',
+      signedAt: null,
+      metadata: null,
+    };
+    mount('/patients/p1/visits/n1/edit');
+    const teeth = screen.getByRole('textbox', { name: 'Tishlar' });
+    expect(teeth).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    await waitFor(() => expect(updateMutate).toHaveBeenCalledTimes(1));
+    expect(updateMutate.mock.calls[0]?.[0]).toMatchObject({
+      id: 'n1',
+      body: { toothNumbers: [16, 85] },
+    });
+  });
+
   it('FX-14 review: eski lokal qoralama («Rejasiz») bog‘langan yozuv bosqichini ezmaydi', () => {
     plans = [
       {
@@ -519,5 +558,81 @@ describe('VisitNotePage — FX-155 muallif (rol bo‘yicha)', () => {
     fireEvent.click(screen.getByRole('button', { name: /Imzolash va kassaga/ }));
     await waitFor(() => expect(rxMutate).toHaveBeenCalledTimes(1));
     expect(rxMutate.mock.calls[0]?.[0]).toMatchObject({ doctorId: 'doc-x' });
+  });
+});
+
+describe('VisitNotePage — «Bajarilgan ishni yozish» (FT-01.2)', () => {
+  const draftNote = (extra: Record<string, unknown> = {}) => ({
+    id: 'n1',
+    patientId: 'p1',
+    doctorId: 'doc-1',
+    subjective: 'Shikoyat',
+    objective: null,
+    plan: null,
+    freeNotes: null,
+    assessmentDiagnoses: [],
+    performedServices: [],
+    stageId: null,
+    completesStage: true,
+    appointmentId: null,
+    visitDate: '2026-11-11T10:00:00Z',
+    updatedAt: '2026-11-11T10:05:00Z',
+    signedAt: null,
+    metadata: null,
+    ...extra,
+  });
+
+  beforeEach(() => {
+    localStorage.clear();
+    for (const m of [createMutate, updateMutate, signMutate, rxMutate, recordMutate]) m.mockClear();
+    note = undefined;
+    notes = [];
+    allergies = null;
+    plans = [];
+    catalog = [{ id: 'svc-1', code: 'PL', nameUz: 'Plomba', nameRu: 'Пломба', isActive: true }];
+    medicalState = { isError: false, isLoading: false };
+    rxError = null;
+    author = selfAuthor;
+  });
+
+  it('saqlanmagan yangi vizit — tugma o‘chiq, avval saqlash so‘raladi', () => {
+    mount();
+    expect(screen.getByRole('button', { name: 'Bajarilgan ishni yozish' })).toBeDisabled();
+    expect(screen.getByText('Avval vizit yozuvini saqlang.')).toBeInTheDocument();
+  });
+
+  it('qoralama vizit: xizmat tanlab yozish → vizitga bog‘lanadi, keyingi saqlash shu bosqich bilan', async () => {
+    note = draftNote();
+    mount('/patients/p1/visits/n1/edit');
+    fireEvent.click(screen.getByRole('button', { name: 'Bajarilgan ishni yozish' }));
+    fireEvent.click(screen.getByRole('textbox', { name: /^Xizmat/ }));
+    fireEvent.click(await screen.findByRole('option', { name: 'PL — Plomba' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Yozish' }));
+
+    await waitFor(() => expect(recordMutate).toHaveBeenCalledTimes(1));
+    expect(recordMutate.mock.calls[0]?.[0]).toEqual({
+      visitNoteId: 'n1',
+      items: [{ serviceId: 'svc-1', serviceName: 'PL — Plomba', cost: 0 }],
+    });
+
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Bajarilgan ishni yozish' })).toBeNull(),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    await waitFor(() => expect(updateMutate).toHaveBeenCalledTimes(1));
+    expect(updateMutate.mock.calls[0]?.[0]).toMatchObject({
+      id: 'n1',
+      body: { stageId: 'st-new' },
+    });
+  });
+
+  it('bosqichga bog‘langan yoki imzolangan vizitda tugma yo‘q', () => {
+    note = draftNote({ stageId: 's1' });
+    const { unmount } = mount('/patients/p1/visits/n1/edit');
+    expect(screen.queryByRole('button', { name: 'Bajarilgan ishni yozish' })).toBeNull();
+    unmount();
+    note = draftNote({ signedAt: '2026-11-11T10:06:00Z' });
+    mount('/patients/p1/visits/n1/edit');
+    expect(screen.queryByRole('button', { name: 'Bajarilgan ishni yozish' })).toBeNull();
   });
 });

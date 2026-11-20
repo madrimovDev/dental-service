@@ -172,6 +172,7 @@ export const createVisitNotesService = (deps: {
       plan: input.plan ?? null,
       performedServices: input.performedServices,
       freeNotes: input.freeNotes ?? null,
+      toothNumbers: input.toothNumbers?.length ? input.toothNumbers : null,
       metadata: mergeVisitNoteMetadata(null, input) ?? null,
     });
 
@@ -249,6 +250,8 @@ export const createVisitNotesService = (deps: {
     if (input.plan !== undefined) patch.plan = input.plan;
     if (input.performedServices) patch.performedServices = input.performedServices;
     if (input.freeNotes !== undefined) patch.freeNotes = input.freeNotes;
+    if (input.toothNumbers !== undefined)
+      patch.toothNumbers = input.toothNumbers?.length ? input.toothNumbers : null;
     const mergedMeta = mergeVisitNoteMetadata(before.metadata, input);
     if (mergedMeta !== undefined) patch.metadata = mergedMeta;
 

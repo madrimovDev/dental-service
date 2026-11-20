@@ -193,6 +193,7 @@ export type {
 // Generated model types — appointments, services, queue, notifications, schedule
 // QueueTicketStatus re-exported under both names for backward compatibility
 export type {
+  AddTreatmentStageBody,
   AllergyEntry,
   Appointment,
   AppointmentStatsReport,
@@ -391,6 +392,8 @@ export type {
   RecallDtoReason,
   RecallDtoSource,
   RecallSummary,
+  RecordCompletedWorkBody,
+  RecordCompletedWorkBodyItemsItem,
   ResetPasswordResponse,
   ResetUserPassword200,
   RevenueReport,
@@ -438,6 +441,7 @@ export type {
   ToothStateEntrySurface,
   TransferTenantOwnership200,
   TransferTenantOwnershipBody,
+  TreatmentCompletedWork,
   TreatmentPlan,
   TreatmentPlanEstimate,
   TreatmentPlanEstimateStage,
@@ -800,19 +804,23 @@ export {
 } from './generated/tooth-charts/tooth-charts.ts';
 // Generated (orval) — treatment-plans
 export type {
+  AddTreatmentStageResult,
   CreateTreatmentPlanResult,
   GetTreatmentPlanEstimateResult,
   GetTreatmentPlanResult,
   ListTreatmentPlansResult,
+  RecordCompletedWorkResult,
   SignTreatmentPlanConsentResult,
   UpdateTreatmentPlanResult,
   UpdateTreatmentStageResult,
 } from './generated/treatment-plans/treatment-plans.ts';
 export {
+  addTreatmentStage,
   createTreatmentPlan,
   getTreatmentPlan,
   getTreatmentPlanEstimate,
   listTreatmentPlans,
+  recordCompletedWork,
   signTreatmentPlanConsent,
   updateTreatmentPlan,
   updateTreatmentStage,

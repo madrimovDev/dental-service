@@ -94,8 +94,8 @@ export const patientImagesRoutes = (deps: { db: Database; audit: AuditLogger }) 
   });
 
   app.openapi(listRoute, async (c) => {
-    const { visitNoteId } = c.req.valid('query');
-    const rows = await service.list(c, c.req.valid('param').patientId, visitNoteId);
+    const { visitNoteId, tooth } = c.req.valid('query');
+    const rows = await service.list(c, c.req.valid('param').patientId, visitNoteId, tooth);
     return c.json(ok(rows.map(toPatientImageDto)), 200);
   });
 

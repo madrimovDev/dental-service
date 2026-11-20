@@ -37,6 +37,7 @@ import type {
   ToothEntry,
   ToothEntryGroup,
   ToothHistoryRow,
+  ToothStageRow,
   ToothStateMap,
   VisitNoteVM,
 } from './clinical.types';
@@ -194,6 +195,29 @@ export function toToothDisplayMap(entries: ToothEntry[]): Map<number, ToothDispl
   return out;
 }
 
+/** FT-01.3: bosqich qo'shsa bo'ladigan reja holatlari (`completed|cancelled` → 409 plan.locked). */
+const PLAN_OPEN_STATUSES: readonly TreatmentPlanStatus[] = [
+  'draft',
+  'presented',
+  'accepted',
+  'in_progress',
+];
+
+/**
+ * FT-01.3 «Joriy reja»: bemorning eng so'nggi (`createdAt`) ochiq rejasi
+ * (`draft|presented|accepted|in_progress`); yo'q bo'lsa `null` — «Yangi reja».
+ */
+export function currentOpenPlan<P extends Pick<TreatmentPlan, 'id' | 'status' | 'createdAt'>>(
+  plans: P[] | undefined,
+): P | null {
+  let best: P | null = null;
+  for (const p of plans ?? []) {
+    if (!PLAN_OPEN_STATUSES.includes(p.status)) continue;
+    if (!best || p.createdAt > best.createdAt) best = p;
+  }
+  return best;
+}
+
 /** Davolash rejalaridagi faol (bajarilmagan) bosqichlarning tishlari — «Reja» ko'rinishi. */
 export function plannedTeethFromPlans(
   plans: Array<Pick<TreatmentPlan, 'status'> & { stages?: TreatmentStage[] }> | undefined,
@@ -227,6 +251,59 @@ export function toothHistoryRows(
     }
   }
   return rows;
+}
+
+/**
+ * FT-01.4 (CF-10): «Tarix» — barcha rejalardagi shu tishli bosqichlar (bekor qilingan reja ham —
+ * tarix), sana bo'yicha yangisi birinchi. Sana: `completedAt`, bo'lmasa reja yaratilgan sana.
+ */
+export function toothStageRows(
+  plans:
+    | Array<
+        Pick<TreatmentPlan, 'id' | 'title' | 'status' | 'createdAt'> & {
+          stages?: Array<
+            Pick<
+              TreatmentStage,
+              'id' | 'serviceName' | 'toothNumbers' | 'status' | 'completedAt' | 'cost'
+            >
+          >;
+        }
+      >
+    | undefined,
+  toothNumber: number,
+): ToothStageRow[] {
+  const rows: ToothStageRow[] = [];
+  for (const plan of plans ?? []) {
+    for (const st of plan.stages ?? []) {
+      if (!(st.toothNumbers ?? []).includes(toothNumber)) continue;
+      rows.push({
+        stageId: st.id,
+        planId: plan.id,
+        planTitle: plan.title,
+        planStatus: plan.status,
+        serviceName: st.serviceName,
+        status: st.status,
+        date: st.completedAt ?? plan.createdAt,
+        cost: st.cost,
+      });
+    }
+  }
+  return rows.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+}
+
+/**
+ * FT-01.4: shu tishli vizit yozuvlari — o'z `toothNumbers`ida tish bor YOKI shu tishli bosqichga
+ * bog'langan (`stageId`). Yangisi birinchi.
+ */
+export function toothVisitNotes<
+  N extends Pick<VisitNote, 'id' | 'toothNumbers' | 'stageId' | 'visitDate'>,
+>(notes: N[] | undefined, toothNumber: number, stages: Pick<ToothStageRow, 'stageId'>[]): N[] {
+  const stageIds = new Set(stages.map((s) => s.stageId));
+  return (notes ?? [])
+    .filter(
+      (n) => (n.toothNumbers ?? []).includes(toothNumber) || (n.stageId && stageIds.has(n.stageId)),
+    )
+    .sort((a, b) => (a.visitDate < b.visitDate ? 1 : a.visitDate > b.visitDate ? -1 : 0));
 }
 
 /** ICD-10 kodidan tish holati taklifi (K02/K04 → kariyes, K08.1–K08.2 → yo'q); aks holda `null`. */

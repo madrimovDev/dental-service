@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { uploadImageMetadataSchema } from './patient-images.schema.ts';
+import { updateImageMetadataSchema, uploadImageMetadataSchema } from './patient-images.schema.ts';
 
 /**
  * CLI-422 — uploadImageMetadataSchema safeParse (SOF, DB'siz ishga tushiriladi).
@@ -55,27 +55,37 @@ describe('CLI-422 — uploadImageMetadataSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('toothNumbers string form: filters NaN/non-positive, keeps valid FDI', () => {
+  // FT-01.4: FDI validatori — yaroqsiz raqam endi jim tashlanmaydi, 400 (rasm noto'g'ri tishga
+  // bog'lanib qolmasin). Bo'sh segmentlar (oxirgi vergul, bo'sh joy) e'tiborsiz.
+  it('toothNumbers string form: valid FDI list (bo‘sh segmentlar e‘tiborsiz)', () => {
     const result = uploadImageMetadataSchema.safeParse({
       ...validBase,
-      toothNumbers: '11,foo,21,-5,0,3.5',
+      toothNumbers: ' 11, 21 ,, 85,',
     });
     expect(result.success).toBe(true);
-    if (result.success) {
-      // 3.5 → Number('3.5')=3.5 not integer → filtered; -5,0 not positive → filtered.
-      expect(result.data.toothNumbers).toEqual([11, 21]);
+    if (result.success) expect(result.data.toothNumbers).toEqual([11, 21, 85]);
+  });
+
+  it('toothNumbers string form: NaN / FDI emas → rad', () => {
+    for (const bad of ['11,foo', '11,19', '3.5', '-5', '0', '99']) {
+      const result = uploadImageMetadataSchema.safeParse({ ...validBase, toothNumbers: bad });
+      expect(result.success).toBe(false);
     }
   });
 
-  it('toothNumbers array form: filters non-integer/non-positive', () => {
-    const result = uploadImageMetadataSchema.safeParse({
-      ...validBase,
-      toothNumbers: [11, -1, 0, 21],
-    });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.toothNumbers).toEqual([11, 21]);
-    }
+  it('toothNumbers array form: FDI emas → rad, FDI → qabul', () => {
+    expect(
+      uploadImageMetadataSchema.safeParse({ ...validBase, toothNumbers: [11, 29] }).success,
+    ).toBe(false);
+    const ok = uploadImageMetadataSchema.safeParse({ ...validBase, toothNumbers: [11, 21] });
+    expect(ok.success).toBe(true);
+    if (ok.success) expect(ok.data.toothNumbers).toEqual([11, 21]);
+  });
+
+  it('updateImageMetadataSchema: FDI emas → rad, null → qabul', () => {
+    expect(updateImageMetadataSchema.safeParse({ toothNumbers: [56] }).success).toBe(false);
+    expect(updateImageMetadataSchema.safeParse({ toothNumbers: [55] }).success).toBe(true);
+    expect(updateImageMetadataSchema.safeParse({ toothNumbers: null }).success).toBe(true);
   });
 
   it('rejects invalid type enum', () => {
