@@ -334,6 +334,15 @@ Konservativ variant tanlandi; foydalanuvchi keyin o'zgartirishi mumkin.
 | D-15 | `medical_record.on_behalf`/`prescription.on_behalf` faqat Tenant Admin shabloniga (backfill 0067); Branch Manager'ga berilmaydi | Eng kam imtiyoz (FX-155) |
 | D-16 | Kechikkan (overdue) eslatma job'i: yozilish hali oldinda bo'lsa kech ham yuboriladi; o'tgan yozilishga yuborilmaydi | Restartdan keyin foydali eslatma saqlanadi, noto'g'risi yo'q (FX-96) |
 | D-17 | Navbat chiptasini qo'lda `missed`/`cancelled` qilish omborni qaytarmaydi (faqat yozilish route'lari) | Avvalgi xulq saqlandi (FX-45) |
+| D-18 | Odontogrammadan rejaga qo'shish va «Bajarilgan ishni yozish» — `medical_record.edit` (shifokor); Registrator shabloniga klinik tahrir qo'shilmadi | Klinik huquqni kengaytirmaslik (FT-01) |
+| D-19 | Bajarilgan ish: «joriy reja» = shu shifokorning `accepted`/`in_progress` rejasi (boshqa shifokor rejasi 409 `plan.doctor_mismatch`); yo'q bo'lsa avto «Bajarilgan ishlar YYYY-MM» (`in_progress`, rozilik gate'siz); vizitga faqat 1 ta ish bog'lanadi; vizit bilan bosqich darhol `completed` | Ikki marta billingsiz, oddiy (FT-01.2) |
+| D-20 | «Bemor rozi bo'ldi» reja `accepted` bo'lgandan keyin `proposed` bosqichlarni ham qabul qiladi, `rejected` tegilmaydi | FT-01.5 |
+| D-21 | Bemor doimiy chegirmasi `max_discount_percent` dan oshmaydi (400); cap pasaytirilsa yuqori bemor foizlari cap'ga tushiriladi (0 → null); chegirma sababi ixtiyoriy | FT-04 |
+| D-22 | `discount.give` POS'da maqsad filial bo'yicha (X-2, `loadBranchScope`); bemor doimiy foizi (tenant darajasi) — tenant bo'yicha | FT-04 |
+| D-23 | Qisman to'lovda fiskal summa = to'langan summa, qatorlar netto (Soliq qisman chek protokoli jonli spec'ga bog'liq) | FT-04.4 |
+| D-24 | Kassa yuz rasmi: standart o'chiq, 90 kun; uploads papkasi yo'q bo'lsa retention o'chirmaydi | FT-06 |
+| D-25 | Bot o'z-o'ziga xizmat: bekor qilish bitta bosish (eslatma tugmasi bilan bir xil), throttling 20/daq jarayon xotirasida | FT-07 |
+| D-26 | Kalendar hafta ko'rinishida grid soatlari butun hafta uchun umumiy; ish vaqtidan tashqaridagi yozilish ko'rinishi uchun oyna kengayadi | FT-05 |
 | D-13 | Vizit orqali POS to'lovi (rejasiz davolash) vizit doktoriga komissiya manbai bo'ladi (`COALESCE(plan.doctor_id, visit_note.doctor_id)`), baza `paidAmount` | Rejasiz ish uchun doktor haqi yo'qolmasin (LA-29) |
 
 ## 5. Hali audit qilinmagan (keyingi round)
