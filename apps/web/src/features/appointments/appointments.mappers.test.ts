@@ -6,6 +6,7 @@ import {
   groupByDay,
   instantFromDayMinute,
   localMinutes,
+  newAppointmentHref,
   toSlotPosition,
 } from './appointments.mappers';
 import { GRID } from './appointments.types';
@@ -79,5 +80,19 @@ describe('sudrab ko‘chirish matematikasi', () => {
 
   it('Tashkent kun+daqiqa → UTC instant (UTC+5)', () => {
     expect(instantFromDayMinute('2026-06-10', 10 * 60 + 30)).toBe('2026-06-10T05:30:00.000Z');
+  });
+
+  it("FT-05.1: newAppointmentHref bo'sh qiymatlarni tushiradi, vaqtni HH:MM qiladi", () => {
+    expect(
+      newAppointmentHref({
+        doctorId: 'd1',
+        branchId: 'b1',
+        dateKey: '2026-06-10',
+        startMinute: 570,
+      }),
+    ).toBe('/appointments/new?doctorId=d1&branchId=b1&date=2026-06-10&time=09%3A30');
+    expect(newAppointmentHref({ dateKey: '2026-06-10', startMinute: 480 })).toBe(
+      '/appointments/new?date=2026-06-10&time=08%3A00',
+    );
   });
 });

@@ -1787,6 +1787,7 @@
     "patient_unknown": "Bemor"
   },
   "calendar": {
+    "new_appt_at": "{{doctor}} — {{time}}: yangi yozilish",
     "panel_title": "Tanlangan yozilish",
     "panel_close": "Yopish",
     "next_step": "Keyingi qadam",

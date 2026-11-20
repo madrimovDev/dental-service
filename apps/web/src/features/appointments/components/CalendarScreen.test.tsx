@@ -1,5 +1,6 @@
 import { ApiError } from '@dental/api-client';
 import { act, createEvent, fireEvent, screen } from '@testing-library/react';
+import { useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderApp } from '../../../test-utils';
 import { CalendarScreen } from './CalendarScreen';
@@ -83,6 +84,11 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
 });
+
+function LocationProbe() {
+  const loc = useLocation();
+  return <div data-testid="loc">{loc.pathname + loc.search}</div>;
+}
 
 describe('CalendarScreen', () => {
   it("sarlavha va kun/hafta toggle ko'rsatadi", () => {
@@ -275,5 +281,56 @@ describe('CalendarScreen', () => {
       expect(new Date(body.startTime).getUTCMinutes()).toBe(30);
       expect(body.doctorId).toBeUndefined();
     });
+  });
+
+  // FT-05.1: bo'sh katak → /appointments/new (doktor, sana, vaqt, filial oldindan to'ldirilgan).
+  it("bo'sh katak bosilsa yangi yozilishga doktor/sana/vaqt bilan o'tadi (appointment.create)", () => {
+    hoisted.perms.add('appointment.create');
+    renderApp(
+      <>
+        <CalendarScreen />
+        <LocationProbe />
+      </>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Dr\. Vali.*11:30/ }));
+    const loc = screen.getByTestId('loc').textContent ?? '';
+    const url = new URL(loc, 'http://x');
+    expect(url.pathname).toBe('/appointments/new');
+    expect(url.searchParams.get('doctorId')).toBe('d2');
+    expect(url.searchParams.get('time')).toBe('11:30');
+    expect(url.searchParams.get('branchId')).toBe('b1');
+    expect(url.searchParams.get('date')).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("appointment.create yo'q — katak tugmalari chiqmaydi", () => {
+    renderApp(<CalendarScreen />);
+    expect(screen.queryByRole('button', { name: /11:30/ })).not.toBeInTheDocument();
+  });
+
+  it("«Bo'sh vaqtlar» slot chip bosilsa yangi yozilishga o'tadi", () => {
+    hoisted.perms.add('appointment.create');
+    hoisted.perms.add('schedule.view');
+    hoisted.availability = {
+      branchId: 'b1',
+      date: 'x',
+      slotMinutes: 30,
+      doctors: [
+        {
+          doctorId: 'd1',
+          slots: [{ start: '2026-06-27T04:30:00.000Z', end: '', startMinute: 570, endMinute: 600 }],
+        },
+      ],
+    };
+    renderApp(
+      <>
+        <CalendarScreen />
+        <LocationProbe />
+      </>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '09:30' }));
+    const url = new URL(screen.getByTestId('loc').textContent ?? '', 'http://x');
+    expect(url.pathname).toBe('/appointments/new');
+    expect(url.searchParams.get('doctorId')).toBe('d1');
+    expect(url.searchParams.get('time')).toBe('09:30');
   });
 });

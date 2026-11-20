@@ -25,6 +25,7 @@ import {
   localDateKey,
   localMinutes,
   mondayOfWeek,
+  newAppointmentHref,
 } from '../appointments.mappers';
 import type { Appointment, AppointmentStatus, CalendarEvent } from '../appointments.types';
 import { AppointmentPanel } from './AppointmentPanel';
@@ -62,6 +63,8 @@ export function CalendarScreen() {
   const [date, setDate] = useState(() => new Date());
   const navigate = useNavigate();
   const open = () => navigate('/appointments/new');
+  /** FT-05.1: bo'sh katak / bo'sh slot → yangi yozilish (doktor, filial, sana, vaqt oldindan). */
+  const canCreate = hasPermission('appointment.create');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingAction | null>(null);
   const pendingRef = useRef<PendingAction | null>(null);
@@ -77,6 +80,9 @@ export function CalendarScreen() {
   // shu kalitdan `fullDayRangeToInstants` (Tashkent +05:00 anchor, schedule.mappers)
   // orqali hisoblanadi — brauzer TZ `setHours(0,0,0,0)` ENDI ishlatilmaydi.
   const pivotKey = useMemo(() => localDateKey(date.toISOString()), [date]);
+
+  const openNew = (p: { doctorId?: string | null; dateKey: string; startMinute: number }) =>
+    navigate(newAppointmentHref({ ...p, branchId }));
 
   const { rangeStart, rangeEnd, dayKeys } = useMemo(() => {
     if (view === 'week') {
@@ -351,7 +357,7 @@ export function CalendarScreen() {
   return (
     <div>
       <Group justify="flex-end" gap="xs" mb="md">
-        {hasPermission('appointment.create') && (
+        {canCreate && (
           <Button variant="primary" onClick={open}>
             {t('appointments.create')}
           </Button>
@@ -462,6 +468,12 @@ export function CalendarScreen() {
               unscheduledDoctorIds={unscheduledDoctorIds}
               canMove={hasPermission('appointment.edit')}
               onMove={moveAppointment}
+              onCellClick={
+                canCreate
+                  ? ({ doctorId, startMinute }) =>
+                      openNew({ doctorId, dateKey: pivotKey, startMinute })
+                  : undefined
+              }
             />
           ) : (
             <WeekGrid
@@ -470,6 +482,11 @@ export function CalendarScreen() {
               patientName={patientName}
               onSlotClick={openDetail}
               selectedId={selectedId}
+              onCellClick={
+                canCreate
+                  ? ({ dateKey, startMinute }) => openNew({ dateKey, startMinute })
+                  : undefined
+              }
             />
           )}
         </div>
@@ -503,7 +520,17 @@ export function CalendarScreen() {
           {/* DS12: jonli "Bo'sh slot" kartasi — faqat `schedule.view` ruxsati
               bo'lganda render (cheklangan rollarda 403 oldini olish, CLI-153). */}
           {hasPermission('schedule.view') && (
-            <FreeSlotsCard branchId={branchId} date={pivotKey} enabled />
+            <FreeSlotsCard
+              branchId={branchId}
+              date={pivotKey}
+              enabled
+              onPick={
+                canCreate
+                  ? ({ doctorId, startMinute }) =>
+                      openNew({ doctorId, dateKey: pivotKey, startMinute })
+                  : undefined
+              }
+            />
           )}
           <WaitlistCard appts={apptList} />
         </div>

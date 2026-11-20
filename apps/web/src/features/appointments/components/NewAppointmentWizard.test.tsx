@@ -130,6 +130,41 @@ describe('NewAppointmentWizard', () => {
     expect(screen.getByText('+998901112233')).toBeInTheDocument();
   });
 
+  // FT-05.1: kalendar katagi (`?doctorId&date&time`) shifokor, sana va vaqtni oldindan to'ldiradi;
+  // xizmat tanlangach (davomiylik ma'lum bo'lgach) mos bo'sh slot avtomatik tanlanadi.
+  it('initialDoctorId/Date/Time — shifokor tanlangan, xizmatdan keyin slot avtomatik tanlanadi', async () => {
+    renderApp(
+      <NewAppointmentWizard
+        onClose={vi.fn()}
+        initialDoctorId="d1"
+        initialDate="2026-06-20"
+        initialTime="09:30"
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Dr. Ali' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('20.06.2026')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Tekshiruv/ }));
+    const slot = await screen.findByRole('button', { name: '09:30' });
+    await waitFor(() => expect(slot).toHaveAttribute('aria-pressed', 'true'));
+    expect(screen.getByRole('button', { name: '09:00' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it("initialTime bo'sh slotlarda yo'q bo'lsa hech narsa tanlanmaydi", async () => {
+    renderApp(
+      <NewAppointmentWizard
+        onClose={vi.fn()}
+        initialDoctorId="d1"
+        initialDate="2026-06-20"
+        initialTime="15:00"
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Tekshiruv/ }));
+    expect(await screen.findByRole('button', { name: '09:30' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+  });
+
   it("initialPatientId yo'q — bemor maydoni bo'sh", () => {
     renderApp(<NewAppointmentWizard onClose={vi.fn()} />);
     expect(screen.getByPlaceholderText('Bemor')).toHaveValue('');

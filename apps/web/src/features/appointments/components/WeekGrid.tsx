@@ -1,20 +1,39 @@
 import { useTranslation } from 'react-i18next';
 import { formatDayMonth, formatWeekday } from '@/lib/format';
-import { groupByDay } from '../appointments.mappers';
+import { cellStartMinute, groupByDay, minuteLabel } from '../appointments.mappers';
 import type { Appointment } from '../appointments.types';
 import { type CalendarEvent, GRID, toneForIndex, toneVars } from '../appointments.types';
 import { AppointmentSlot } from './AppointmentSlot';
 import classes from './CalendarGrid.module.css';
 
 /** Yarim soatlik grid chiziqlari (hour opacity 1, half .4) — CalendarGrid bilan bir xil. */
-function GridLines() {
+function GridLines({
+  cellLabel,
+  onCell,
+}: {
+  cellLabel?: (startMinute: number) => string;
+  onCell?: (startMinute: number) => void;
+}) {
   const rows = (GRID.dayEndHour - GRID.dayStartHour) * 2;
   return (
     <>
-      {Array.from({ length: rows }, (_, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: statik fiksir grid panjarasi
-        <div key={i} className={classes.gridLine} data-half={i % 2 === 1} />
-      ))}
+      {Array.from({ length: rows }, (_, i) =>
+        onCell ? (
+          <button
+            // biome-ignore lint/suspicious/noArrayIndexKey: statik fiksir grid panjarasi
+            key={i}
+            type="button"
+            tabIndex={-1}
+            className={classes.gridLine}
+            data-half={i % 2 === 1}
+            aria-label={cellLabel?.(cellStartMinute(i))}
+            onClick={() => onCell(cellStartMinute(i))}
+          />
+        ) : (
+          // biome-ignore lint/suspicious/noArrayIndexKey: statik fiksir grid panjarasi
+          <div key={i} className={classes.gridLine} data-half={i % 2 === 1} />
+        ),
+      )}
     </>
   );
 }
@@ -26,14 +45,17 @@ export function WeekGrid({
   patientName,
   onSlotClick,
   selectedId,
+  onCellClick,
 }: {
   appointments: Appointment[];
   dayKeys: string[];
   patientName: (patientId: string) => string;
   onSlotClick?: (event: CalendarEvent) => void;
   selectedId?: string | null;
+  /** FT-05.1: `appointment.create` — bo'sh katakka bosish (kun + boshlanish daqiqasi). */
+  onCellClick?: (cell: { dateKey: string; startMinute: number }) => void;
 }) {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const cols = groupByDay(appointments, dayKeys);
   const hours = Array.from(
     { length: GRID.dayEndHour - GRID.dayStartHour },
@@ -72,7 +94,19 @@ export function WeekGrid({
                 <span className={classes.colCount}>{col.events.length}</span>
               </div>
               <div className={classes.colBody}>
-                <GridLines />
+                <GridLines
+                  onCell={
+                    onCellClick
+                      ? (startMinute) => onCellClick({ dateKey: col.dateKey, startMinute })
+                      : undefined
+                  }
+                  cellLabel={(m) =>
+                    t('calendar.new_appt_at', {
+                      doctor: formatWeekday(day, i18n.language, 'short', 'Asia/Tashkent'),
+                      time: minuteLabel(m),
+                    })
+                  }
+                />
                 {col.events.map((e) => (
                   <AppointmentSlot
                     key={e.appointment.id}

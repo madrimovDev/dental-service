@@ -185,3 +185,33 @@ export function instantFromDayMinute(dateKey: string, minute: number): string {
   const mm = String(minute % 60).padStart(2, '0');
   return new Date(`${dateKey}T${hh}:${mm}:00+05:00`).toISOString();
 }
+
+/** Kun boshidan daqiqa → 'HH:MM'. */
+export function minuteLabel(minute: number): string {
+  const hh = String(Math.floor(minute / 60)).padStart(2, '0');
+  const mm = String(minute % 60).padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
+/** Grid yarim soatlik qatori indeksi → kun boshidan boshlanish daqiqasi (Tashkent). */
+export function cellStartMinute(rowIndex: number, grid = GRID): number {
+  return grid.dayStartHour * 60 + rowIndex * grid.stepMin;
+}
+
+/**
+ * FT-05.1: bo'sh katak / bo'sh slot → `/appointments/new` — doktor, filial, sana (YYYY-MM-DD,
+ * Tashkent) va vaqt (HH:MM) oldindan to'ldiriladi. Bo'sh qiymatlar URL'ga qo'yilmaydi.
+ */
+export function newAppointmentHref(p: {
+  doctorId?: string | null;
+  branchId?: string | null;
+  dateKey: string;
+  startMinute: number;
+}): string {
+  const q = new URLSearchParams();
+  if (p.doctorId) q.set('doctorId', p.doctorId);
+  if (p.branchId) q.set('branchId', p.branchId);
+  q.set('date', p.dateKey);
+  q.set('time', minuteLabel(p.startMinute));
+  return `/appointments/new?${q.toString()}`;
+}

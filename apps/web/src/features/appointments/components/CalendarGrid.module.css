@@ -141,6 +141,24 @@
   opacity: 0.4;
 }
 
+/* FT-05.1: bosiladigan bo'sh katak (appointment.create) — tugma, 44px = 30 daqiqa */
+button.gridLine {
+  display: block;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+button.gridLine:hover,
+button.gridLine:focus-visible {
+  background: var(--primary-soft);
+  opacity: 1;
+}
+
 /* ── appointment slot ── */
 .slot {
   position: absolute;
