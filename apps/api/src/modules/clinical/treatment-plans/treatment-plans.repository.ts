@@ -4,8 +4,9 @@ import {
   treatmentPlans,
   treatmentStagePayments,
   treatmentStages,
+  visitNotes,
 } from '@dental/db-schema';
-import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../../db/scoped.ts';
 import type { ListPlansQuery } from './treatment-plans.schema.ts';
@@ -147,6 +148,46 @@ export const createTreatmentPlansRepository = () => {
       .limit(1)
       .for('update');
     return plan ?? null;
+  }
+
+  /**
+   * FT-01.2: «bajarilgan ish» bog'lanadigan vizit yozuvini `FOR UPDATE` bilan o'qiydi
+   * (parallel imzo/bog'lash bilan poyga yo'q). `findConsentForm` precedenti — boshqa domen
+   * jadvali to'g'ridan, biznes mantiqsiz. RLS → boshqa tenantniki null.
+   */
+  async function lockVisitNote(c: Context, id: string) {
+    const db = getDb(c);
+    const [row] = await db
+      .select({
+        id: visitNotes.id,
+        patientId: visitNotes.patientId,
+        stageId: visitNotes.stageId,
+        signedAt: visitNotes.signedAt,
+      })
+      .from(visitNotes)
+      .where(eq(visitNotes.id, id))
+      .for('update');
+    return row ?? null;
+  }
+
+  /**
+   * FT-01.2: vizit yozuvini bosqichga bog'laydi — faqat imzolanmagan va hali bosqichsiz
+   * bo'lsa (shartli UPDATE; 0 qator → null).
+   */
+  async function linkVisitNoteStage(c: Context, visitNoteId: string, stageId: string) {
+    const db = getDb(c);
+    const [row] = await db
+      .update(visitNotes)
+      .set({ stageId, updatedAt: new Date() })
+      .where(
+        and(
+          eq(visitNotes.id, visitNoteId),
+          isNull(visitNotes.stageId),
+          isNull(visitNotes.signedAt),
+        ),
+      )
+      .returning({ id: visitNotes.id });
+    return row ?? null;
   }
 
   /** FT-01: rejadagi keyingi bosqich tartib raqami (max(sequence) + 1). */
@@ -312,6 +353,8 @@ export const createTreatmentPlansRepository = () => {
     lockPlan,
     lockPatientCompletedWork,
     lockLatestActivePlan,
+    lockVisitNote,
+    linkVisitNoteStage,
     nextStageSequence,
     insertStage,
     recomputePlanTotals,

@@ -36,6 +36,7 @@ import {
   StageLockedError,
   type StageStockHook,
   type ToothChartStageHook,
+  VisitNoteNotLinkableError,
 } from './treatment-plans.service.ts';
 import { InvalidTransitionError } from './treatment-plans.transitions.ts';
 
@@ -250,7 +251,8 @@ export const treatmentPlansRoutes = (deps: {
       },
       409: {
         content: { 'application/json': { schema: errorResponseSchema } },
-        description: 'Plan is not active (draft/presented) or is completed/cancelled',
+        description:
+          'Plan is not active (draft/presented) or is completed/cancelled; visit note is signed or already linked to a stage',
       },
     },
   });
@@ -274,6 +276,9 @@ export const treatmentPlansRoutes = (deps: {
       }
       if (e instanceof PlanNotActiveForWorkError) {
         return c.json(fail('plan.not_active', e.message), 409);
+      }
+      if (e instanceof VisitNoteNotLinkableError) {
+        return c.json(fail(`visit_note.${e.reason}`, e.message), 409);
       }
       if (e instanceof OnBehalfForbiddenError) {
         return c.json(fail('medical_record.on_behalf_forbidden', e.message), 403);

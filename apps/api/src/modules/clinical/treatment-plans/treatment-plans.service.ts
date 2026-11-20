@@ -186,6 +186,22 @@ export class PlanNotActiveForWorkError extends Error {
   }
 }
 
+/**
+ * FT-01.2: «bajarilgan ish» bog'lanadigan vizit yozuvi allaqachon imzolangan (o'zgarmaydi,
+ * UI-D4) yoki boshqa bosqichga bog'langan (CLI-481 — qayta yo'naltirish yo'q). Routes 409
+ * (`visit_note.signed` / `visit_note.stage_linked`). Hech narsa yozilmaydi.
+ */
+export class VisitNoteNotLinkableError extends Error {
+  constructor(readonly reason: 'signed' | 'stage_linked') {
+    super(
+      reason === 'signed'
+        ? 'Visit note is signed and can no longer be linked to a stage'
+        : 'Visit note is already linked to a treatment stage',
+    );
+    this.name = 'VisitNoteNotLinkableError';
+  }
+}
+
 /** FT-01.2: avto-reja sarlavhasi — Toshkent vaqti bo'yicha joriy oy (`YYYY-MM`). */
 export const completedWorkPlanTitle = (now: Date = new Date()) => {
   const ym = new Intl.DateTimeFormat('en-CA', {
@@ -391,6 +407,17 @@ export const createTreatmentPlansService = (deps: {
 
     await repo.lockPatientCompletedWork(c, input.patientId);
 
+    // Vizit bog'lash (ixtiyoriy): shu bemorniki, imzolanmagan, bosqichsiz — INSERT'dan OLDIN.
+    if (input.visitNoteId) {
+      const note = await repo.lockVisitNote(c, input.visitNoteId);
+      if (!note) throw new CrossEntityError('visit_note', 'not_found');
+      if (note.patientId !== input.patientId) {
+        throw new CrossEntityError('visit_note', 'mismatch');
+      }
+      if (note.signedAt) throw new VisitNoteNotLinkableError('signed');
+      if (note.stageId) throw new VisitNoteNotLinkableError('stage_linked');
+    }
+
     let plan: Awaited<ReturnType<typeof repo.lockPlan>>;
     if (input.planId) {
       plan = await repo.lockPlan(c, input.planId);
@@ -471,6 +498,19 @@ export const createTreatmentPlansService = (deps: {
           completedWork: true,
         },
       });
+      // Vizit bog'lanishi yakunlashdan OLDIN — BOM dedup (deductForStage) vizit allaqachon
+      // yechgan shu xizmatni ko'rsin; imzo (`sign`) keyin bosqichni idempotent o'tkazadi.
+      if (input.visitNoteId) {
+        const linked = await repo.linkVisitNoteStage(c, input.visitNoteId, inserted.id);
+        if (!linked) throw new Error(`Visit note ${input.visitNoteId} could not be linked`);
+        await deps.audit.record(c, {
+          action: 'updated',
+          resourceType: 'visit_note',
+          resourceId: input.visitNoteId,
+          before: { stageId: null },
+          after: { stageId: inserted.id, completedWork: true },
+        });
+      }
       // X-3: yagona yakunlash yo'li (guard'lar + recall + odontogramma + BOM).
       const completed = await completeStage(c, inserted.id, { source: 'plan' });
       if (!completed || completed.status !== 'completed') {

@@ -387,3 +387,95 @@ describe('FT-01.2 — POST /treatment-plans/completed-work', () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe('FT-01.2 — vizit yozuviga bog‘lash (visitNoteId)', () => {
+  test('qoralama vizit → note.stageId = yangi bosqich; imzo idempotent (ikkinchi snapshot yo‘q)', async () => {
+    const patientId = await newPatient('Bemor V1');
+    const noteId = await insertVisitNote(patientId, { performedServices: [] });
+    const res = await record({ patientId, visitNoteId: noteId, items: [filling16()] });
+    expect(res.status).toBe(201);
+    const dto = ((await res.json()) as { data: CompletedWorkDto }).data;
+    const stage = dto.stages[0]!;
+    expect(stage.status).toBe('completed');
+    expect((await readVisitNote(noteId)).stageId).toBe(stage.id);
+
+    const charts = await countCharts(patientId);
+    const sign = await call(tokens.doctor as string, 'POST', `/visit-notes/${noteId}/sign`);
+    expect(sign.status).toBe(200);
+    expect(await countCharts(patientId)).toBe(charts);
+    const rc = await inTenant((tx) =>
+      tx.select().from(recalls).where(eq(recalls.sourceStageId, stage.id)),
+    );
+    expect(rc.length).toBe(1);
+  });
+
+  test('vizit shu xizmat BOM’ini allaqachon yechgan bo‘lsa — bosqich qayta yechmaydi (dedup)', async () => {
+    const patientId = await newPatient('Bemor V2');
+    const noteId = await insertVisitNote(patientId, { performedServices: [serviceId] });
+    await inTenant((tx) =>
+      tx.insert(stockMovements).values({
+        tenantId,
+        itemId: stockItemId,
+        type: 'out',
+        quantity: '2',
+        reason: 'visit_auto',
+        sourceVisitNoteId: noteId,
+        sourceServiceId: serviceId,
+      }),
+    );
+    const res = await record({ patientId, visitNoteId: noteId, items: [filling16()] });
+    expect(res.status).toBe(201);
+    const stage = ((await res.json()) as { data: CompletedWorkDto }).data.stages[0]!;
+    const mv = await inTenant((tx) =>
+      tx.select().from(stockMovements).where(eq(stockMovements.sourceStageId, stage.id)),
+    );
+    expect(mv.length).toBe(0);
+  });
+
+  test('imzolangan vizit → 409 visit_note.signed, reja/bosqich yaratilmaydi', async () => {
+    const patientId = await newPatient('Bemor V3');
+    const noteId = await insertVisitNote(patientId, { signedAt: new Date() });
+    const res = await record({ patientId, visitNoteId: noteId, items: [filling16()] });
+    expect(res.status).toBe(409);
+    expect(await errCode(res)).toBe('visit_note.signed');
+    expect((await patientPlans(patientId)).length).toBe(0);
+  });
+
+  test('vizit allaqachon bosqichga bog‘langan → 409 visit_note.stage_linked', async () => {
+    const patientId = await newPatient('Bemor V4');
+    const first = await insertVisitNote(patientId);
+    const ok1 = await record({ patientId, visitNoteId: first, items: [filling16()] });
+    expect(ok1.status).toBe(201);
+    const res = await record({
+      patientId,
+      visitNoteId: first,
+      items: [{ serviceName: 'Tozalash', cost: 1000 }],
+    });
+    expect(res.status).toBe(409);
+    expect(await errCode(res)).toBe('visit_note.stage_linked');
+    const [plan] = await patientPlans(patientId);
+    expect((await planStages(plan!.id)).length).toBe(1);
+  });
+
+  test('vizit bilan bir nechta xizmat → 400 (vizit bitta bosqichga bog‘lanadi)', async () => {
+    const patientId = await newPatient('Bemor V5');
+    const noteId = await insertVisitNote(patientId);
+    const res = await record({
+      patientId,
+      visitNoteId: noteId,
+      items: [filling16(), { serviceName: 'Tozalash', cost: 1000 }],
+    });
+    expect(res.status).toBe(400);
+    expect((await patientPlans(patientId)).length).toBe(0);
+  });
+
+  test('boshqa bemorning vizit yozuvi → 400 ownership.mismatch', async () => {
+    const p1 = await newPatient('Bemor V6a');
+    const p2 = await newPatient('Bemor V6b');
+    const noteId = await insertVisitNote(p2);
+    const res = await record({ patientId: p1, visitNoteId: noteId, items: [filling16()] });
+    expect(res.status).toBe(400);
+    expect(await errCode(res)).toBe('ownership.mismatch');
+    expect((await readVisitNote(noteId)).stageId).toBeNull();
+  });
+});
