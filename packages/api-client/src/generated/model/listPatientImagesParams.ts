@@ -7,4 +7,5 @@
 
 export type ListPatientImagesParams = {
 visitNoteId?: string;
+tooth?: number;
 };

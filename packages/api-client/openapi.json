@@ -7711,6 +7711,16 @@
             "nullable": true,
             "example": null
           },
+          "toothNumbers": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "integer"
+            },
+            "example": [
+              16
+            ]
+          },
           "signedAt": {
             "type": "string",
             "nullable": true,
@@ -7749,6 +7759,7 @@
           "plan",
           "performedServices",
           "freeNotes",
+          "toothNumbers",
           "signedAt",
           "signedBy",
           "metadata",
@@ -27985,6 +27996,14 @@
                     "type": "string",
                     "maxLength": 5000
                   },
+                  "toothNumbers": {
+                    "type": "array",
+                    "nullable": true,
+                    "items": {
+                      "type": "integer"
+                    },
+                    "maxItems": 52
+                  },
                   "allergyOverrides": {
                     "type": "array",
                     "items": {
@@ -28224,6 +28243,14 @@
                   "freeNotes": {
                     "type": "string",
                     "maxLength": 5000
+                  },
+                  "toothNumbers": {
+                    "type": "array",
+                    "nullable": true,
+                    "items": {
+                      "type": "integer"
+                    },
+                    "maxItems": 52
                   },
                   "allergyOverrides": {
                     "type": "array",
@@ -29148,6 +29175,15 @@
             "required": false,
             "name": "visitNoteId",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "example": 16
+            },
+            "required": false,
+            "name": "tooth",
+            "in": "query"
           }
         ],
         "responses": {
@@ -29346,8 +29382,7 @@
                     "type": "array",
                     "nullable": true,
                     "items": {
-                      "type": "integer",
-                      "nullable": true
+                      "type": "integer"
                     }
                   },
                   "takenDate": {

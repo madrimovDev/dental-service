@@ -24,6 +24,11 @@ export type CreateVisitNoteBody = {
   performedServices?: string[];
   /** @maxLength 5000 */
   freeNotes?: string;
+  /**
+   * @maxItems 52
+   * @nullable
+   */
+  toothNumbers?: number[] | null;
   /** @maxItems 50 */
   allergyOverrides?: VisitNoteAllergyOverride[];
   nextVisit?: CreateVisitNoteBodyNextVisit;
