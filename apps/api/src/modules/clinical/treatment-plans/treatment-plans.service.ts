@@ -754,6 +754,26 @@ export const createTreatmentPlansService = (deps: {
         },
       });
 
+      // FT-01.5 (spec §3): «Bemor rozi» (accepted) reja birinchi bosqich boshlanganda
+      // (yoki darhol bajarilganda) avtomatik «Davolanmoqda» (in_progress) ga o'tadi —
+      // alohida «Ijroni boshlash» qadami shart emas. accepted→in_progress jadvalda ruxsat.
+      if (
+        plan &&
+        plan.status === 'accepted' &&
+        (patch.status === 'in_progress' || patch.status === 'completed')
+      ) {
+        const started = await repo.updatePlan(c, plan.id, { status: 'in_progress' });
+        if (started) {
+          await deps.audit.record(c, {
+            action: 'updated',
+            resourceType: 'treatment_plan',
+            resourceId: plan.id,
+            before: { status: plan.status },
+            after: { status: started.status, autoStarted: true, stageId },
+          });
+        }
+      }
+
       // Bosqich completed → hook'lar (idempotent — completed-o'tish faqat bir marta,
       // qayta PATCH yuqorida erta qaytadi). Guard cancelled/completed planda avval
       // otilgani uchun bu yerga faqat ruxsat etilgan plan holatida yetiladi.
