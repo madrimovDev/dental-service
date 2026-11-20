@@ -54,7 +54,10 @@ const ctx = (tx: DbOrTx): Context =>
           ? tenantId
           : k === 'user'
             ? { id: userId }
-            : undefined,
+            : // FT-04 (D-1): chegirma `discount.give` bilan — bu test chegara mantig'ini sinaydi.
+              k === 'accessClaims'
+              ? { perms: ['cashier.create_transaction', 'discount.give'] }
+              : undefined,
     req: { header: () => undefined },
   }) as unknown as Context;
 
