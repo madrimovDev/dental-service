@@ -33,6 +33,7 @@ import {
 import { diagnosisSearchIndex, normalizeSearch, toDiagnosisOptions } from '../../clinical.mappers';
 import type { AllergyOverride, NextVisit, VisitNoteView } from '../../clinical.types';
 import { useClinicalAuthor } from '../../clinical-author';
+import { CompletedWorkForm } from './CompletedWorkForm';
 import classes from './VisitNotePage.module.css';
 import {
   buildVisitNoteBody,
@@ -758,6 +759,20 @@ export function VisitNotePage() {
                 </span>
               </label>
             )}
+            {/* FT-01.2 (CF-12): rejasiz vizitda bajarilgan ishni darhol bosqich sifatida yozish. */}
+            {!readOnly &&
+              !note?.stageId &&
+              values.stageId === null &&
+              hasPermission('medical_record.edit') && (
+                <CompletedWorkForm
+                  patientId={patientId}
+                  visitNoteId={noteId}
+                  serviceOptions={serviceOptions}
+                  branchId={activeBranchId}
+                  disabled={pending}
+                  onRecorded={(stageId) => patch({ stageId, completesStage: true })}
+                />
+              )}
           </section>
 
           <section className={classes.card} aria-labelledby="vn-next">

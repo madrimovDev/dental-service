@@ -33,6 +33,8 @@ import {
   listTreatmentPlans,
   listVisitNotes,
   listVisitNoteTemplates,
+  type RecordCompletedWorkBody,
+  recordCompletedWork,
   type ServiceWithPrices,
   type SignFormInput,
   type SignTreatmentPlanConsentBody,
@@ -191,6 +193,30 @@ export function useUpdateStage(patientId: string) {
       // eski qoralamadan saqlash shu snapshot'ni last-write-wins bilan ustiga yozadi.
       void qc.invalidateQueries({ queryKey: clinicalKeys.toothChartLatest(patientId) });
       void qc.invalidateQueries({ queryKey: clinicalKeys.toothCharts(patientId) });
+    },
+  });
+}
+
+/**
+ * FT-01.2 (CF-12) «Bajarilgan ishni yozish»: darhol `completed` bosqich (joriy yoki avto
+ * «Bajarilgan ishlar» rejasi). Backend odontogramma snapshot + recall + reja qarzini
+ * yaratadi — reja/balans/kassa, odontogramma, recall va (bog'langan bo'lsa) vizit keshlari
+ * yangilanadi.
+ */
+export function useRecordCompletedWork(patientId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Omit<RecordCompletedWorkBody, 'patientId'>) =>
+      recordCompletedWork({ ...body, patientId }).then((r) => r.data),
+    onSuccess: (_d, body) => {
+      invalidatePlanFinancials(qc, patientId);
+      void qc.invalidateQueries({ queryKey: recallKeys.patient(patientId) });
+      void qc.invalidateQueries({ queryKey: clinicalKeys.toothChartLatest(patientId) });
+      void qc.invalidateQueries({ queryKey: clinicalKeys.toothCharts(patientId) });
+      if (body.visitNoteId) {
+        void qc.invalidateQueries({ queryKey: clinicalKeys.visitNote(body.visitNoteId) });
+        void qc.invalidateQueries({ queryKey: clinicalKeys.visitNotes(patientId) });
+      }
     },
   });
 }

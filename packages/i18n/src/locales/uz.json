@@ -2120,7 +2120,21 @@
     "freeNotes": "Qo‘shimcha izoh",
     "allergyUnknownTitle": "Allergiya ma’lumoti noma’lum",
     "allergyUnknownBody": "Bemorning allergiya ma’lumoti yuklanmadi yoki ko‘rish ruxsati yo‘q. Dori allergiyaga zid bo‘lishi mumkin — davom etish sababini tanlang.",
-    "allergyUnknownSafe": "Avval tekshiraman"
+    "allergyUnknownSafe": "Avval tekshiraman",
+    "completedWork": {
+      "title": "Bajarilgan ishni yozish",
+      "hint": "Xizmat darhol bajarilgan bosqich sifatida joriy rejaga (yoki «Bajarilgan ishlar» rejasiga) yoziladi va shu vizitga bog'lanadi: odontogramma yangilanadi, summa reja qarziga tushadi (kassada «reja bo'yicha» to'lanadi).",
+      "saveFirst": "Avval vizit yozuvini saqlang.",
+      "service": "Xizmat",
+      "servicePlaceholder": "Xizmatni tanlang",
+      "teeth": "Tish(lar)",
+      "teethPlaceholder": "FDI raqami",
+      "permanent": "Doimiy tishlar",
+      "primary": "Sut tishlari",
+      "resultingState": "Tish holati (keyin)",
+      "submit": "Yozish",
+      "done": "Bajarilgan ish yozildi"
+    }
   },
   "ownerHome": {
     "title": "Siz hal qiladigan masalalar",
