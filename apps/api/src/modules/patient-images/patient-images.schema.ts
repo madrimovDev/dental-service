@@ -1,4 +1,5 @@
 import { z } from '@hono/zod-openapi';
+import { isValidFdi } from '../clinical/tooth-charts/tooth-charts.schema.ts';
 
 export const imageType = z.enum([
   'xray_panoramic',
@@ -96,10 +97,16 @@ export const patientImageDeleteSchema = z.object({ deleted: z.literal(true) });
 export const patientImageIdParamSchema = z.object({ id: z.uuid() });
 export const patientImagesByPatientParamSchema = z.object({ patientId: z.uuid() });
 
-/** List query — ixtiyoriy vizit bo'yicha filtr (V2-6). */
+/** List query — ixtiyoriy vizit (V2-6) va tish (FT-01.4, FDI) bo'yicha filtr. */
 export const patientImagesListQuerySchema = z.object({
   visitNoteId: z
     .uuid()
     .optional()
     .openapi({ param: { name: 'visitNoteId', in: 'query' } }),
+  tooth: z.coerce
+    .number()
+    .int()
+    .refine(isValidFdi, { message: 'Invalid FDI tooth number' })
+    .optional()
+    .openapi({ param: { name: 'tooth', in: 'query' }, example: 16 }),
 });
