@@ -393,4 +393,95 @@ describe('OdontogramTab', () => {
       expect(addStagesMutate.mock.calls[0]?.[0].stages[0].resultingToothState).toBe('crown');
     });
   });
+
+  describe("FT-01.3: ko'p tish tanlash (Shift / uzun bosish)", () => {
+    const CUR = [
+      {
+        id: 'pl-cur',
+        title: 'Asosiy reja',
+        status: 'draft',
+        createdAt: '2026-03-01T00:00:00Z',
+        stages: [],
+      },
+    ];
+    const tooth = (n: number) => screen.getByRole('button', { name: new RegExp(`^${n} — `) });
+    const pickOtherService = async (name: string) => {
+      fireEvent.click(screen.getByRole('textbox', { name: 'Boshqa xizmat tanlash' }));
+      fireEvent.click(await screen.findByRole('option', { name }));
+    };
+
+    it("Shift+bosish tishni tanlovga qo'shadi; har tishga alohida bosqich (filial narxi)", async () => {
+      mockChart = { isPrimaryDentition: false, states: [] };
+      mockPlans = CUR;
+      renderApp(<OdontogramTab patientId="p1" />);
+      fireEvent.click(tooth(16));
+      fireEvent.click(tooth(17), { shiftKey: true });
+      expect(tooth(16)).toHaveAttribute('aria-pressed', 'true');
+      expect(tooth(17)).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByLabelText('Tishlar: 16, 17')).toBeInTheDocument();
+      await pickOtherService('Plomba (kompozit)');
+      const add = screen.getByRole('button', { name: /Rejaga qo'shish/i });
+      await waitFor(() => expect(add).toBeEnabled());
+      fireEvent.click(add);
+      const arg = addStagesMutate.mock.calls[0]?.[0];
+      expect(arg.planId).toBe('pl-cur');
+      expect(arg.stages.map((st: { toothNumbers: number[] }) => st.toothNumbers)).toEqual([
+        [16],
+        [17],
+      ]);
+      expect(arg.stages[1]).toMatchObject({ serviceId: 'sv-1', cost: 450000 });
+    });
+
+    it("«Bitta bosqich» — barcha tanlangan tishlar bitta bosqichda (ko'prik)", async () => {
+      mockChart = { isPrimaryDentition: false, states: [] };
+      mockPlans = [];
+      renderApp(<OdontogramTab patientId="p1" />);
+      fireEvent.click(tooth(26));
+      fireEvent.click(tooth(24), { shiftKey: true });
+      await pickOtherService('Plomba (kompozit)');
+      fireEvent.click(screen.getByRole('checkbox', { name: /Bitta bosqich/ }));
+      const add = screen.getByRole('button', { name: /Rejaga qo'shish/i });
+      await waitFor(() => expect(add).toBeEnabled());
+      fireEvent.click(add);
+      const body = createPlanMutate.mock.calls[0]?.[0];
+      expect(body.stages).toHaveLength(1);
+      expect(body.stages[0].toothNumbers).toEqual([24, 26]);
+      expect(body.title).toContain('24, 26');
+    });
+
+    it('Shift bilan tanlangan tishni qayta bosish uni olib tashlaydi; oddiy bosish bitta tishga qaytaradi', () => {
+      renderApp(<OdontogramTab patientId="p1" />);
+      fireEvent.click(tooth(16));
+      fireEvent.click(tooth(17), { shiftKey: true });
+      fireEvent.click(tooth(18), { shiftKey: true });
+      fireEvent.click(tooth(17), { shiftKey: true });
+      expect(tooth(17)).toHaveAttribute('aria-pressed', 'false');
+      expect(screen.getByLabelText('Tishlar: 16, 18')).toBeInTheDocument();
+      fireEvent.click(tooth(21));
+      expect(tooth(16)).toHaveAttribute('aria-pressed', 'false');
+      expect(screen.getByLabelText('Tish 21')).toBeInTheDocument();
+    });
+
+    it("uzun bosish (planshet) tishni tanlovga qo'shadi, keyingi click tanlovni buzmaydi", async () => {
+      renderApp(<OdontogramTab patientId="p1" />);
+      fireEvent.click(tooth(16));
+      fireEvent.pointerDown(tooth(46));
+      await new Promise((r) => setTimeout(r, 650));
+      fireEvent.pointerUp(tooth(46));
+      fireEvent.click(tooth(46));
+      expect(tooth(16)).toHaveAttribute('aria-pressed', 'true');
+      expect(tooth(46)).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    it("ko'p tishda tanlangan holat har bir tishga qo'llanadi va snapshot'ga tushadi", () => {
+      renderApp(<OdontogramTab patientId="p1" />);
+      fireEvent.click(tooth(36));
+      fireEvent.click(tooth(37), { shiftKey: true });
+      fireEvent.click(screen.getByRole('button', { name: 'Kariyes' }));
+      fireEvent.click(screen.getByRole('button', { name: /Faqat tashxisni saqlash/ }));
+      const states = mutate.mock.calls[0]?.[0].states;
+      expect(states).toContainEqual(expect.objectContaining({ toothNumber: 36, state: 'caries' }));
+      expect(states).toContainEqual(expect.objectContaining({ toothNumber: 37, state: 'caries' }));
+    });
+  });
 });

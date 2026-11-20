@@ -79,7 +79,9 @@ export function OdontogramTab({ patientId }: Props) {
   const [view, setView] = useState<View>('current');
   const [chairMode, setChairMode] = useState<boolean>(readChairMode);
   const [isPrimary, setIsPrimary] = useState(false);
-  const [selectedTooth, setSelectedTooth] = useState<number | null>(null);
+  // FT-01.3: tanlangan tish(lar), o'sish tartibida (Shift/⌘ yoki uzun bosish — ko'p tanlash).
+  const [selectedTeeth, setSelectedTeeth] = useState<number[]>([]);
+  const selectedTooth = selectedTeeth.length === 1 ? (selectedTeeth[0] ?? null) : null;
   const [draft, setDraft] = useState<ToothEntry[]>([]);
   const [draftNotes, setDraftNotes] = useState('');
   // CLI-191: tarix — tanlangan eski snapshot id (null = hozirgi/tahrirlash rejimi).
@@ -141,29 +143,34 @@ export function OdontogramTab({ patientId }: Props) {
    * Yangi tashxis qo'shilgan bo'lsa (`entries`), avval snapshot saqlanadi.
    */
   const addToPlan = (entries: ToothEntry[] | null, req: AddToPlanRequest) => {
-    const tooth = selectedTooth;
-    if (tooth === null || !user?.id) return;
-    const stage = {
+    const teeth = selectedTeeth;
+    if (teeth.length === 0 || !user?.id) return;
+    const toStage = (toothNumbers: number[]) => ({
       serviceName: req.service?.name ?? req.label,
       ...(req.service ? { serviceId: req.service.id } : {}),
-      toothNumbers: [tooth],
+      toothNumbers,
       estimatedVisits: 1,
       cost: req.service?.cost ?? 0,
       ...(req.resultingToothState ? { resultingToothState: req.resultingToothState } : {}),
-    };
+    });
+    // 🛠 Standart: har tishga alohida bosqich (narx tish boshiga); «Bitta bosqich» — ko'prik va h.k.
+    const stages = req.singleStage ? [toStage([...teeth])] : teeth.map((n) => toStage([n]));
     const done = () =>
       notifications.show({ color: 'teal', message: t('odontogram.added_to_plan') });
     const run = () => {
       if (req.target === 'current' && currentPlan) {
-        addStagesMut.mutate({ planId: currentPlan.id, stages: [stage] }, { onSuccess: done });
+        addStagesMut.mutate({ planId: currentPlan.id, stages }, { onSuccess: done });
         return;
       }
       createPlanMut.mutate(
         {
           patientId,
           doctorId: user.id,
-          title: t('odontogram.plan_title', { n: tooth }),
-          stages: [stage],
+          title:
+            teeth.length === 1
+              ? t('odontogram.plan_title', { n: teeth[0] })
+              : t('odontogram.plan_title_multi', { list: teeth.join(', ') }),
+          stages,
         },
         { onSuccess: done },
       );
@@ -210,7 +217,7 @@ export function OdontogramTab({ patientId }: Props) {
               // FX-122: bu faqat ko'rinish to'plami bayrog'i — draft saqlanadi, aks holda
               // saqlash boshqa to'plamdagi barcha tish holatlarini snapshot'dan o'chirardi.
               setIsPrimary(e.currentTarget.checked);
-              setSelectedTooth(null);
+              setSelectedTeeth([]);
             }}
             disabled={!editing}
           />
@@ -289,16 +296,22 @@ export function OdontogramTab({ patientId }: Props) {
             plannedTeeth={view === 'history' ? undefined : plannedTeeth}
             chairMode={chairMode}
             isPrimaryDentition={isReadOnly ? viewingSnapshot.isPrimaryDentition : isPrimary}
-            selectedTooth={isReadOnly ? null : selectedTooth}
-            onSelectTooth={(n) => {
-              if (!isReadOnly) setSelectedTooth(n);
+            selectedTeeth={isReadOnly ? [] : selectedTeeth}
+            onSelectTooth={(n, additive) => {
+              if (isReadOnly) return;
+              setSelectedTeeth((cur) => {
+                if (!additive) return [n];
+                return cur.includes(n)
+                  ? cur.filter((x) => x !== n)
+                  : [...cur, n].sort((a, b) => a - b);
+              });
             }}
           />
         </Paper>
 
-        {selectedTooth !== null && !isReadOnly && (
+        {selectedTeeth.length > 0 && !isReadOnly && (
           <ToothPanel
-            tooth={selectedTooth}
+            teeth={selectedTeeth}
             entries={draft}
             onEntriesChange={setDraft}
             diagnosisById={diagnosisById}

@@ -51,8 +51,10 @@ type Props = {
   /** Kreslo yoni rejimi: kattaroq katak + bosish zonasi ≥ --tap-chair. */
   chairMode?: boolean;
   isPrimaryDentition?: boolean;
-  selectedTooth: number | null;
-  onSelectTooth: (n: number) => void;
+  /** Tanlangan tish(lar) — FT-01.3 ko'p tanlash. */
+  selectedTeeth: readonly number[];
+  /** `additive` — Shift/Ctrl/⌘+bosish yoki uzun bosish: tanlovga qo'shish/olib tashlash. */
+  onSelectTooth: (n: number, additive: boolean) => void;
 };
 
 export function Odontogram({
@@ -60,7 +62,7 @@ export function Odontogram({
   plannedTeeth,
   chairMode = false,
   isPrimaryDentition = false,
-  selectedTooth,
+  selectedTeeth,
   onSelectTooth,
 }: Props) {
   const { t } = useTranslation();
@@ -103,8 +105,9 @@ export function Odontogram({
                 number={n}
                 state={state}
                 surfaceStates={display?.surfaceStates}
-                selected={selectedTooth === n}
-                onClick={() => onSelectTooth(n)}
+                selected={selectedTeeth.includes(n)}
+                onClick={(e) => onSelectTooth(n, e.shiftKey || e.ctrlKey || e.metaKey)}
+                onLongPress={() => onSelectTooth(n, true)}
                 planned={planned}
                 chair={chairMode}
                 size={chairMode ? 44 : 36}
