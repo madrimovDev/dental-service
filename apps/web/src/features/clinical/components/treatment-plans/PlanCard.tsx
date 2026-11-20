@@ -264,6 +264,7 @@ export function PlanCard({
             {primaryAction && (
               <Button
                 size="sm"
+                h={44}
                 color="teal"
                 data-plan-primary="true"
                 leftSection={primaryAction.icon}
@@ -277,7 +278,7 @@ export function PlanCard({
               <Menu position="bottom-end" withinPortal>
                 <Menu.Target>
                   <ActionIcon
-                    size={36}
+                    size={44}
                     variant="default"
                     aria-label={t('treatment_plan.more_actions')}
                     title={t('treatment_plan.more_actions')}
@@ -357,6 +358,7 @@ export function PlanCard({
         {/* FT-01.5 (spec §3): smeta/taqdimot — modal emas, shu panelning o'zida. */}
         <Button
           size="sm"
+          h={44}
           variant="light"
           leftSection={<IconReceipt2 size={16} />}
           aria-expanded={estimateOpened}
