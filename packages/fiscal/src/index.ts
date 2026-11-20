@@ -3,11 +3,32 @@
 // Business kod faqat `FiscalProvider` interfeysiga bog'liq — implementatsiya almashsa
 // o'zgarmaydi.
 
-/** Fiskal chek uchun to'lov ma'lumoti (cashier'dan keladi). */
+/**
+ * Fiskal chek qatori (FT-04.4). `amount` — NETTO (chegirma qatorlarga taqsimlangan):
+ * `amount = grossAmount − discount`. Erkin POS'da xizmat qatori; reja to'lovida bosqich
+ * allocation'i (`stageId`, `quantity = 1`, chegirma bosqich `cost`ida allaqachon snapshot).
+ */
+export type FiscalItem = {
+  name: string;
+  serviceId: string | null;
+  stageId: string | null;
+  quantity: number;
+  unitPrice: number;
+  grossAmount: number;
+  discount: number;
+  amount: number;
+};
+
+/**
+ * Fiskal chek uchun to'lov ma'lumoti (cashier'dan keladi). `amount` = haqiqatda olingan
+ * summa (paidAmount, CLI-449); to'liq to'lovda `amount = Σ items.amount`. `discount` —
+ * chekdagi jami chegirma (Σ items.discount).
+ */
 export type FiscalPayment = {
   id: string;
   amount: number;
-  items: unknown[];
+  discount?: number;
+  items: FiscalItem[];
 };
 
 /** Fiskal provider natijasi. `fiscalId` null = soliqqa yuborilmagan. */
@@ -64,6 +85,7 @@ export const createSoliqFiscalProvider = (config: SoliqConfig): FiscalProvider =
           fiscalId: config.fiscalId,
           paymentId: payment.id,
           amount: payment.amount,
+          discount: payment.discount ?? 0,
           items: payment.items,
         }),
         signal: AbortSignal.timeout(config.timeoutMs ?? SOLIQ_DEFAULT_TIMEOUT_MS),

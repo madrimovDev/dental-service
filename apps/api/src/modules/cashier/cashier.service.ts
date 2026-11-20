@@ -13,7 +13,12 @@ import {
   users,
   visitNotes,
 } from '@dental/db-schema';
-import { createNoOpFiscalProvider, type FiscalProvider } from '@dental/fiscal';
+import {
+  createNoOpFiscalProvider,
+  type FiscalItem,
+  type FiscalPayment,
+  type FiscalProvider,
+} from '@dental/fiscal';
 import {
   and,
   between,
@@ -36,6 +41,7 @@ import { canGiveDiscount } from '../../lib/discount.ts';
 import type { PatientMessenger } from '../../lib/telegram/notify.ts';
 import {
   computePlanBalance,
+  distributeDiscountCents,
   distributeRefundNegations,
   fromCents,
   toCents,
@@ -761,10 +767,64 @@ export const createCashierService = (deps: {
         // osilib qolmasin; tx rollback bo'lsa chek soliqqa ketib qolmasin). Commit'dan keyin
         // yuboriladi, natija alohida tenant-tx'da yoziladi. CLI-449: paidAmount (haqiqatda
         // olingan naqd) — totalAmount (nominal) EMAS.
-        const fiscalPayment = {
+        // FT-04.4 (LA fiskal low): items NETTO — chegirma qatorlarga proporsional taqsimlanadi
+        // (Σ items.amount = netTotal = to'liq to'lovda paidAmount). Reja to'lovida items =
+        // bosqich allocation'lari (chegirma bosqich `cost`ida snapshot, bu yerda 0).
+        let fiscalItems: FiscalItem[];
+        if (resolvedItems.length > 0) {
+          const grossCents = resolvedItems.map((i) => toCents(i.unitPrice) * i.quantity);
+          const lineDiscounts = distributeDiscountCents(grossCents, discountCents);
+          fiscalItems = resolvedItems.map((i, idx) => {
+            const g = grossCents[idx] as number;
+            const dsc = lineDiscounts[idx] as number;
+            return {
+              name: i.serviceName,
+              serviceId: i.serviceId,
+              stageId: null,
+              quantity: i.quantity,
+              unitPrice: i.unitPrice,
+              grossAmount: fromCents(g),
+              discount: fromCents(dsc),
+              amount: fromCents(g - dsc),
+            };
+          });
+        } else if (input.allocations && input.allocations.length > 0) {
+          const stageRows = await tx
+            .select({
+              id: treatmentStages.id,
+              serviceId: treatmentStages.serviceId,
+              serviceName: treatmentStages.serviceName,
+            })
+            .from(treatmentStages)
+            .where(
+              inArray(
+                treatmentStages.id,
+                input.allocations.map((a) => a.stageId),
+              ),
+            );
+          const byId = new Map(stageRows.map((r) => [r.id, r]));
+          fiscalItems = input.allocations.map((a) => {
+            const st = byId.get(a.stageId);
+            const amt = fromCents(toCents(a.amount));
+            return {
+              name: st?.serviceName ?? '',
+              serviceId: st?.serviceId ?? null,
+              stageId: a.stageId,
+              quantity: 1,
+              unitPrice: amt,
+              grossAmount: amt,
+              discount: 0,
+              amount: amt,
+            };
+          });
+        } else {
+          fiscalItems = [];
+        }
+        const fiscalPayment: FiscalPayment = {
           id: transaction.id,
           amount: Number(transaction.paidAmount),
-          items: items,
+          discount: hasDiscount ? fromCents(discountCents) : 0,
+          items: fiscalItems,
         };
         await onAfterCommit(c, async () => {
           const fiscalResult = await fiscal.createReceipt(fiscalPayment);
