@@ -233,7 +233,12 @@ describe('FT-07.2 Davolash rejam', () => {
     title: string,
     status: 'draft' | 'in_progress' | 'cancelled',
     total: string,
-    stages: { name: string; status: 'pending' | 'completed'; cost: string }[],
+    stages: {
+      name: string;
+      status: 'pending' | 'completed';
+      cost: string;
+      acceptance?: 'proposed' | 'accepted' | 'rejected';
+    }[],
   ) =>
     run(async (tx) => {
       const [pl] = await tx
@@ -248,6 +253,7 @@ describe('FT-07.2 Davolash rejam', () => {
           serviceName: s.name,
           cost: s.cost,
           status: s.status,
+          acceptance: s.acceptance ?? 'proposed',
         });
       }
       return pl!.id;
@@ -270,6 +276,22 @@ describe('FT-07.2 Davolash rejam', () => {
     expect(r.text).toContain('✅');
     expect(r.text.replace(/\s/g, ' ')).toContain('900 000');
     expect(r.text).not.toContain('SIRI');
+  });
+
+  test("rad etilgan bosqich ro'yxatda yo'q, jami faqat ko'rsatilgan bosqichlar summasi", async () => {
+    const me = await seedPatient('Rad Bemor', '+998907000064', '7064');
+    await seedPlan(me, 'Implant rejasi', 'in_progress', '1700000', [
+      { name: 'Plomba', status: 'completed', cost: '300000', acceptance: 'accepted' },
+      { name: 'Implant RADETILGAN', status: 'pending', cost: '1200000', acceptance: 'rejected' },
+      { name: 'Gigiyena', status: 'pending', cost: '200000' },
+    ]);
+    const r = await text('7064', '🦷 Davolash rejam');
+    expect(r.text).toContain('Plomba');
+    expect(r.text).toContain('Gigiyena');
+    expect(r.text).not.toContain('RADETILGAN');
+    const flat = r.text.replace(/\s/g, ' ');
+    expect(flat).toContain('500 000');
+    expect(flat).not.toContain('1 700 000');
   });
 
   test("reja yo'q bo'lsa aniq xabar; ruscha tugma ishlaydi", async () => {

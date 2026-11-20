@@ -7,7 +7,7 @@ import {
   treatmentStages,
   users,
 } from '@dental/db-schema';
-import { and, asc, desc, eq, gt, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, ne } from 'drizzle-orm';
 import type { DbOrTx } from '../../db/client.ts';
 import type { PatientsService } from '../../modules/patients/patients.service.ts';
 import type { AuditLogger } from '../audit-logger.ts';
@@ -145,7 +145,9 @@ export function createSelfServiceFlow(deps: SelfServiceDeps) {
   /**
    * Eng so'nggi FAOL reja (taqdim etilgan/qabul qilingan/jarayonda): nomi, bosqichlar
    * nomi+holati, umumiy summa. Qoralama va bekor/yakunlangan rejalar ko'rsatilmaydi;
-   * bosqich narxi/izohi/odontogramma yo'q.
+   * bosqich narxi/izohi/odontogramma yo'q. Bemor rad etgan (`acceptance='rejected'`)
+   * bosqichlar ko'rsatilmaydi va jami — `plan.totalCost` emas, ko'rsatilgan bosqichlar
+   * `cost` yig'indisi (rad etilgan bosqich summasi bemorga «qarz» bo'lib ko'rinmasin).
    */
   async function myPlan(ctx: SelfServiceCtx): Promise<BotReply> {
     const m = botMessages(ctx.lang);
@@ -153,7 +155,6 @@ export function createSelfServiceFlow(deps: SelfServiceDeps) {
       .select({
         id: treatmentPlans.id,
         title: treatmentPlans.title,
-        total: treatmentPlans.totalCost,
       })
       .from(treatmentPlans)
       .where(
@@ -166,12 +167,23 @@ export function createSelfServiceFlow(deps: SelfServiceDeps) {
       .limit(1);
     if (!plan) return { text: m.planEmpty };
     const stages = await ctx.tx
-      .select({ name: treatmentStages.serviceName, status: treatmentStages.status })
+      .select({
+        name: treatmentStages.serviceName,
+        status: treatmentStages.status,
+        cost: treatmentStages.cost,
+      })
       .from(treatmentStages)
-      .where(eq(treatmentStages.treatmentPlanId, plan.id))
+      .where(
+        and(
+          eq(treatmentStages.treatmentPlanId, plan.id),
+          ne(treatmentStages.acceptance, 'rejected'),
+        ),
+      )
       .orderBy(asc(treatmentStages.sequence));
     const lines = [m.planTitle(plan.title), ...stages.map((s) => m.planStage(s))];
-    lines.push(m.planTotal(fmtMoney(plan.total, ctx.lang)));
+    // numeric(14,2) — tiyinlarda yig'iladi (float xatosiz).
+    const totalCents = stages.reduce((sum, s) => sum + Math.round(Number(s.cost) * 100), 0);
+    lines.push(m.planTotal(fmtMoney(totalCents / 100, ctx.lang)));
     return { text: lines.join('\n') };
   }
 
