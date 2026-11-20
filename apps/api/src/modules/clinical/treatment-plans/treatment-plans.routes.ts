@@ -3,15 +3,17 @@ import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import type { AuditLogger } from '../../../lib/audit-logger.ts';
 import { requireModuleInDesktop } from '../../../lib/license-middleware.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../../lib/openapi.ts';
-import { CrossEntityError } from '../../../lib/ownership.ts';
+import { CrossEntityError, OnBehalfForbiddenError } from '../../../lib/ownership.ts';
 import { requirePermission } from '../../../middleware/require-permission.ts';
 import { toPlanDto, toPlanWithStagesDto, toStageDto } from './treatment-plans.mapper.ts';
 import {
+  completedWorkDtoSchema,
   consentSchema,
   createStageSchema,
   createTreatmentPlanSchema,
   listPlansQuerySchema,
   planIdParamSchema,
+  recordCompletedWorkSchema,
   stageIdParamSchema,
   treatmentPlanDtoSchema,
   treatmentPlanEstimateDtoSchema,
@@ -27,6 +29,7 @@ import {
   ConsentLockedError,
   ConsentRequiredError,
   createTreatmentPlansService,
+  PlanNotActiveForWorkError,
   PlanStagesLockedError,
   type PriceLookup,
   type RecallStageHook,
@@ -209,6 +212,71 @@ export const treatmentPlansRoutes = (deps: {
     } catch (e) {
       if (e instanceof PlanStagesLockedError) {
         return c.json(fail('plan.locked', e.message), 409);
+      }
+      if (e instanceof CrossEntityError) {
+        return c.json(fail(`ownership.${e.reason}`, e.message), 400);
+      }
+      throw e;
+    }
+  });
+
+  // ─── POST /treatment-plans/completed-work — FT-01.2 «Bajarilgan ishni yozish» ──
+
+  const completedWorkRoute = createRoute({
+    method: 'post',
+    path: '/treatment-plans/completed-work',
+    tags: ['treatment-plans'],
+    operationId: 'recordCompletedWork',
+    middleware: [
+      requireModuleInDesktop('clinical'),
+      requirePermission('medical_record.edit'),
+    ] as const,
+    request: {
+      body: { content: { 'application/json': { schema: recordCompletedWorkSchema } } },
+    },
+    responses: {
+      201: {
+        content: { 'application/json': { schema: apiResponseSchema(completedWorkDtoSchema) } },
+        description:
+          'Completed stage(s) recorded on the current plan (or an auto «Bajarilgan ishlar» plan)',
+      },
+      400: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Validation error or invalid patient/plan/service reference',
+      },
+      403: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Forbidden (incl. recording on behalf of another doctor)',
+      },
+      409: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Plan is not active (draft/presented) or is completed/cancelled',
+      },
+    },
+  });
+
+  app.openapi(completedWorkRoute, async (c) => {
+    const body = c.req.valid('json');
+    try {
+      const result = await service.recordCompletedWork(c, body);
+      return c.json(
+        ok({
+          planId: result.planId,
+          planCreated: result.planCreated,
+          stages: result.stages.map(toStageDto),
+        }),
+        201,
+      );
+    } catch (e) {
+      // Faqat INSERT'dan OLDIN otiladigan xatolar ushlanadi (4xx COMMIT — yarim yozuv yo'q).
+      if (e instanceof PlanStagesLockedError) {
+        return c.json(fail('plan.locked', e.message), 409);
+      }
+      if (e instanceof PlanNotActiveForWorkError) {
+        return c.json(fail('plan.not_active', e.message), 409);
+      }
+      if (e instanceof OnBehalfForbiddenError) {
+        return c.json(fail('medical_record.on_behalf_forbidden', e.message), 403);
       }
       if (e instanceof CrossEntityError) {
         return c.json(fail(`ownership.${e.reason}`, e.message), 400);

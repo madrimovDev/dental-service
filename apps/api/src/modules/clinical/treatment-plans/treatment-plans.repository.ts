@@ -119,6 +119,36 @@ export const createTreatmentPlansRepository = () => {
     return plan ?? null;
   }
 
+  /**
+   * FT-01.2: bemor bo'yicha tranzaksiya-darajali advisory qulf — bir bemorga parallel
+   * «bajarilgan ish» yozuvlari ikkita avto-reja yaratmasin (commit/rollback'da bo'shaydi).
+   */
+  async function lockPatientCompletedWork(c: Context, patientId: string) {
+    const db = getDb(c);
+    await db.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`completed-work:${patientId}`}))`);
+  }
+
+  /**
+   * FT-01.2: bemorning eng so'nggi faol (`accepted|in_progress`) rejasi, `FOR UPDATE` bilan
+   * («Bajarilgan ishni yozish» joriy rejasi). Bosqich faqat shu holatlarda yakunlanadi.
+   */
+  async function lockLatestActivePlan(c: Context, patientId: string) {
+    const db = getDb(c);
+    const [plan] = await db
+      .select()
+      .from(treatmentPlans)
+      .where(
+        and(
+          eq(treatmentPlans.patientId, patientId),
+          inArray(treatmentPlans.status, ['accepted', 'in_progress']),
+        ),
+      )
+      .orderBy(desc(treatmentPlans.createdAt))
+      .limit(1)
+      .for('update');
+    return plan ?? null;
+  }
+
   /** FT-01: rejadagi keyingi bosqich tartib raqami (max(sequence) + 1). */
   async function nextStageSequence(c: Context, planId: string) {
     const db = getDb(c);
@@ -280,6 +310,8 @@ export const createTreatmentPlansRepository = () => {
     insertPlanWithStages,
     findPlan,
     lockPlan,
+    lockPatientCompletedWork,
+    lockLatestActivePlan,
     nextStageSequence,
     insertStage,
     recomputePlanTotals,

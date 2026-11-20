@@ -52,6 +52,31 @@ export const createTreatmentPlanSchema = z.object({
 });
 export type CreateTreatmentPlanInput = z.infer<typeof createTreatmentPlanSchema>;
 
+/**
+ * FT-01.2 (CF-12) — «Bajarilgan ishni yozish» 2-rejim. Har xizmat darhol
+ * `acceptance=accepted, status=completed` bosqich bo'lib X-3 yakunlash yo'lidan o'tadi
+ * (odontogramma, recall, BOM chiqimi) va reja qarziga tushadi.
+ *   - `planId` berilsa — shu reja (`accepted|in_progress` bo'lishi shart);
+ *   - berilmasa — bemorning eng so'nggi `accepted|in_progress` rejasi, u ham yo'q bo'lsa
+ *     avtomatik «Bajarilgan ishlar YYYY-MM» rejasi (`in_progress`, shifokor — `doctorId`
+ *     yoki joriy foydalanuvchi).
+ *   - `visitNoteId` — imzolanmagan, bosqichsiz vizit yozuviga bog'lanadi (`stageId`);
+ *     vizit bitta bosqichga bog'lanadi → bu holatda faqat bitta xizmat.
+ */
+export const recordCompletedWorkSchema = z
+  .object({
+    patientId: z.uuid(),
+    planId: z.uuid().optional(),
+    doctorId: z.uuid().optional(),
+    visitNoteId: z.uuid().optional(),
+    items: z.array(createStageSchema).min(1).max(20),
+  })
+  .refine((v) => !v.visitNoteId || v.items.length === 1, {
+    message: 'A visit note links to a single stage — send exactly one item with visitNoteId',
+    path: ['items'],
+  });
+export type RecordCompletedWorkInput = z.infer<typeof recordCompletedWorkSchema>;
+
 export const updateTreatmentPlanSchema = z.object({
   title: z.string().min(2).max(200).optional(),
   notes: z.string().max(2000).optional(),
@@ -255,3 +280,14 @@ export const treatmentPlanEstimateDtoSchema = z
   })
   .openapi('TreatmentPlanEstimate');
 export type TreatmentPlanEstimateDto = z.infer<typeof treatmentPlanEstimateDtoSchema>;
+
+/** FT-01.2 — `POST /treatment-plans/completed-work` javobi. */
+export const completedWorkDtoSchema = z
+  .object({
+    planId: z.uuid(),
+    /** `true` — avtomatik «Bajarilgan ishlar YYYY-MM» rejasi shu so'rovda yaratildi. */
+    planCreated: z.boolean(),
+    stages: z.array(treatmentStageDtoSchema),
+  })
+  .openapi('TreatmentCompletedWork');
+export type CompletedWorkDto = z.infer<typeof completedWorkDtoSchema>;

@@ -14,6 +14,7 @@ import type {
   CreateStageInput,
   CreateTreatmentPlanInput,
   ListPlansQuery,
+  RecordCompletedWorkInput,
   UpdateStageInput,
   UpdateTreatmentPlanInput,
 } from './treatment-plans.schema.ts';
@@ -172,6 +173,30 @@ export class StageLockedError extends Error {
     this.name = 'StageLockedError';
   }
 }
+
+/**
+ * FT-01.2: «Bajarilgan ishni yozish» uchun tanlangan reja hali ishga tushmagan
+ * (`draft|presented`) — bu holatda bosqichni yakunlab bo'lmaydi (CLI-415 guard). Routes 409
+ * (`plan.not_active`). Bosqich yozilmaydi.
+ */
+export class PlanNotActiveForWorkError extends Error {
+  constructor(readonly planStatus: string) {
+    super(`Cannot record completed work on a ${planStatus} plan — accept the plan first`);
+    this.name = 'PlanNotActiveForWorkError';
+  }
+}
+
+/** FT-01.2: avto-reja sarlavhasi — Toshkent vaqti bo'yicha joriy oy (`YYYY-MM`). */
+export const completedWorkPlanTitle = (now: Date = new Date()) => {
+  const ym = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Tashkent',
+    year: 'numeric',
+    month: '2-digit',
+  }).format(now);
+  return `Bajarilgan ishlar ${ym}`;
+};
+
+const ACTIVE_WORK_PLAN_STATUSES = ['accepted', 'in_progress'] as const;
 
 const sameTeeth = (a: readonly number[] | null, b: readonly number[] | null) => {
   const x = a ?? [];
@@ -342,6 +367,120 @@ export const createTreatmentPlansService = (deps: {
       },
     });
     return stage;
+  }
+
+  /**
+   * FT-01.2 (CF-12) — «Bajarilgan ishni yozish» 2-rejim. Har xizmat uchun darhol
+   * `acceptance=accepted` bosqich yoziladi va X-3 yagona yakunlash yo'li (`completeStage`,
+   * `source='plan'`) orqali `completed` bo'ladi → odontogramma snapshot, recall, BOM chiqimi
+   * (vizit chiqimi bilan stock tomonida dedup). Bosqich reja qarziga tushadi (C4 predikati:
+   * accepted ∧ completed ∧ reja `accepted|in_progress`).
+   *
+   * Barcha rad etuvchi tekshiruvlar (bemor, reja, xizmatlar, shifokor) INSERT'dan OLDIN —
+   * 4xx `fail()` javobi tranzaksiyani COMMIT qiladi, yarim yozuv qolmasin. Insert'dan keyingi
+   * kutilmagan xato throw bo'ladi (route ushlamaydi) → 500 → rollback.
+   */
+  async function recordCompletedWork(c: Context, input: RecordCompletedWorkInput) {
+    const tenantId = c.get('activeTenantId');
+    if (!tenantId) throw new Error('No tenant context');
+
+    await ownership.assertPatientExists(c, input.patientId);
+    for (const item of input.items) {
+      if (item.serviceId) await ownership.assertServiceExists(c, item.serviceId);
+    }
+
+    await repo.lockPatientCompletedWork(c, input.patientId);
+
+    let plan: Awaited<ReturnType<typeof repo.lockPlan>>;
+    if (input.planId) {
+      plan = await repo.lockPlan(c, input.planId);
+      if (!plan) throw new CrossEntityError('treatment_plan', 'not_found');
+      if (plan.patientId !== input.patientId) {
+        throw new CrossEntityError('treatment_plan', 'mismatch');
+      }
+      if ((PLAN_STAGES_LOCKED_STATUSES as readonly string[]).includes(plan.status)) {
+        throw new PlanStagesLockedError(plan.status);
+      }
+      if (!(ACTIVE_WORK_PLAN_STATUSES as readonly string[]).includes(plan.status)) {
+        throw new PlanNotActiveForWorkError(plan.status);
+      }
+    } else {
+      plan = await repo.lockLatestActivePlan(c, input.patientId);
+    }
+
+    let planCreated = false;
+    if (!plan) {
+      // Avto-reja shifokori — komissiya manbai (D-13 COALESCE(plan.doctor_id, …)): boshqa
+      // shifokor nomidan yozish `medical_record.on_behalf` talab qiladi (FX-155 naqshi).
+      const doctorId = input.doctorId ?? c.get('user')?.id;
+      if (!doctorId) throw new Error('No user context');
+      await ownership.assertPractitioner(c, doctorId, 'medical_record.on_behalf');
+      const created = await repo.insertPlanWithStages(
+        c,
+        tenantId,
+        {
+          tenantId,
+          patientId: input.patientId,
+          doctorId,
+          title: completedWorkPlanTitle(),
+          status: 'in_progress',
+          totalCost: '0',
+          totalVisits: 0,
+          notes: null,
+        },
+        () => [],
+      );
+      const { stages: _none, ...planRow } = created;
+      plan = planRow;
+      planCreated = true;
+    }
+
+    const activeBranchId = c.get('activeBranchId');
+    const stages = [];
+    for (const item of input.items) {
+      let cost = item.cost;
+      if (item.serviceId && activeBranchId && deps.priceLookup) {
+        const price = await deps.priceLookup.getActivePrice(c, item.serviceId, activeBranchId);
+        if (price) cost = Number(price.price);
+      }
+      const sequence = await repo.nextStageSequence(c, plan.id);
+      const inserted = await repo.insertStage(c, {
+        treatmentPlanId: plan.id,
+        sequence,
+        serviceId: item.serviceId ?? null,
+        serviceName: item.serviceName,
+        toothNumbers: item.toothNumbers ?? null,
+        estimatedVisits: item.estimatedVisits,
+        estimatedDurationMinutes: item.estimatedDurationMinutes ?? null,
+        cost: String(cost),
+        notes: item.notes ?? null,
+        resultingToothState: item.resultingToothState ?? null,
+        acceptance: 'accepted',
+      });
+      await deps.audit.record(c, {
+        action: 'created',
+        resourceType: 'treatment_stage',
+        resourceId: inserted.id,
+        after: {
+          treatmentPlanId: plan.id,
+          sequence,
+          serviceId: inserted.serviceId,
+          cost: inserted.cost,
+          toothNumbers: inserted.toothNumbers,
+          acceptance: 'accepted',
+          completedWork: true,
+        },
+      });
+      // X-3: yagona yakunlash yo'li (guard'lar + recall + odontogramma + BOM).
+      const completed = await completeStage(c, inserted.id, { source: 'plan' });
+      if (!completed || completed.status !== 'completed') {
+        throw new Error(`Completed-work stage ${inserted.id} was not completed`);
+      }
+      stages.push(completed);
+    }
+    await repo.recomputePlanTotals(c, plan.id);
+
+    return { planId: plan.id, planCreated, stages };
   }
 
   async function updatePlan(c: Context, id: string, input: UpdateTreatmentPlanInput) {
@@ -711,6 +850,7 @@ export const createTreatmentPlansService = (deps: {
     getPlan,
     createPlan,
     addStage,
+    recordCompletedWork,
     updatePlan,
     setConsent,
     updateStage,
