@@ -875,6 +875,7 @@
     "add_stage": "Добавить этап",
     "service_name": "Название услуги",
     "tooth_numbers": "Номера зубов",
+    "tooth_numbers_short": "Зубы",
     "tooth_numbers_hint": "Через запятую, пример: 11, 12, 36",
     "estimated_visits": "Кол-во визитов",
     "duration_minutes": "Длительность (мин)",
