@@ -505,6 +505,13 @@
       "when": 1795200000100,
       "tag": "0071_ft07_bot_self_service",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1795200000200,
+      "tag": "0072_ft06_cashier_photos",
+      "breakpoints": true
     }
   ]
 }

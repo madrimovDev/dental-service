@@ -19,6 +19,8 @@ vi.mock('../cashier.api', () => ({
     ],
   }),
   useCreateTransaction: () => ({ mutate, isPending: false }),
+  useCashierPhotoSettings: () => ({ data: { enabled: false } }),
+  useUploadCashierPhoto: () => ({ mutate: vi.fn(), isPending: false }),
   // Narx avto-to'ldirish: s1 → b1 da 50000.
   fetchServicePrices: vi.fn(async () => ({
     id: 's1',

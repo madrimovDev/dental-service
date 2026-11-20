@@ -1,5 +1,5 @@
 import type { ApiClient } from './client.ts';
-import type { LabOrder, PatientImage } from './generated/model/index.ts';
+import type { CashierPhoto, LabOrder, PatientImage } from './generated/model/index.ts';
 
 /**
  * Lab buyurtma fayli (UI-D5, `lab_order_files`). Kontrakt generatsiyasigacha qo'lda tip;
@@ -138,6 +138,12 @@ export const createEndpoints = (api: ApiClient) => ({
     listFiles: (id: string) => api.get<LabOrderFileRecord[]>(`/api/lab-orders/${id}/files`),
     deleteFile: (id: string, fileId: string) =>
       api.delete<{ deleted: true }>(`/api/lab-orders/${id}/files/${fileId}`),
+  },
+  // FT-06.3: kassa rasmi — multipart (`file`) YOKI `skippedReason` (orval multipart'ni
+  // qo'llamaydi → hand). O'qish/sozlama generated (`getCashierTransactionPhoto`, `getCashierPhotoSettings`).
+  cashierPhotos: {
+    upload: (transactionId: string, form: FormData) =>
+      api.upload<CashierPhoto>(`/api/cashier/transactions/${transactionId}/photo`, form),
   },
   // patient-images READ + JSON mutatsiya generated client'ga ko'chdi (CLI-145).
   // FAQAT multipart upload hand qoladi — generated orval mutator multipart'ni qo'llamaydi.

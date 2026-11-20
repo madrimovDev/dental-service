@@ -263,6 +263,12 @@ export const PERMISSIONS = [
     descriptionRu: 'Может предоставлять скидку',
   },
   {
+    code: 'cashier.photo.view',
+    category: 'cashier',
+    descriptionUz: "Kassada olingan to'lov rasmlarini ko'rish",
+    descriptionRu: 'Просмотр фото платежей, сделанных на кассе',
+  },
+  {
     code: 'report.view',
     category: 'report',
     descriptionUz: "Hisobotlarni ko'rish",

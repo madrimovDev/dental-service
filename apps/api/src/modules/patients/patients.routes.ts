@@ -50,6 +50,7 @@ import {
   phoneCheckResultSchema,
   relativeParamSchema,
   relativeRemoveResultSchema,
+  setPatientPhotoSchema,
   updateMedicalRecordSchema,
   updatePatientSchema,
 } from './patients.schema.ts';
@@ -292,6 +293,43 @@ export const patientRoutes = (deps: {
     }
     if (!row) return c.json(fail('patient.not_found', 'Patient not found'), 404);
     return c.json(ok(toPatientDto(row)), 200);
+  });
+
+  // ─── PATCH /{id}/photo — bemor avatari (FT-06.2) ─────────────────────────
+
+  const setPhotoRoute = createRoute({
+    method: 'patch',
+    path: '/{id}/photo',
+    tags: ['patients'],
+    operationId: 'setPatientPhoto',
+    middleware: [requirePermission('patient.edit')] as const,
+    request: {
+      params: patientIdParamSchema,
+      body: { content: { 'application/json': { schema: setPatientPhotoSchema } } },
+    },
+    responses: {
+      ...okJson(patientDtoSchema, 'Patient with updated photo'),
+      ...patientNotFound,
+      400: {
+        content: { 'application/json': { schema: errorResponseSchema } },
+        description: 'Image is not a face_photo of this patient',
+      },
+    },
+  });
+
+  app.openapi(setPhotoRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const { imageId } = c.req.valid('json');
+    try {
+      const row = await service.setPhoto(c, id, imageId);
+      if (!row) return c.json(fail('patient.not_found', 'Patient not found'), 404);
+      return c.json(ok(toPatientDto(row)), 200);
+    } catch (e) {
+      if (e instanceof CrossEntityError) {
+        return c.json(fail(`ownership.${e.reason}`, e.message), 400);
+      }
+      throw e;
+    }
   });
 
   // ─── DELETE /{id} — archive (soft delete) ────────────────────────────────

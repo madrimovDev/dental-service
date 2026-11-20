@@ -115,6 +115,8 @@ services:
     command: ['bun', 'run', 'src/worker.ts']
     environment:
       NODE_ENV: production
+      # FT-06.3: kassa rasmi retention'i fayllarni shu yerdan o'chiradi — api bilan BIR XIL papka.
+      UPLOADS_DIR: /data/uploads
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
       # L8: Supervisor sinxron job'i cross-tenant (RLS bypass) o'qiydi.
       DATABASE_ADMIN_URL: ${DATABASE_ADMIN_URL:-}
@@ -130,6 +132,8 @@ services:
       # Lab Hub (W2): klinika → laboratoriya portali (bo'sh = o'chiq). Xizmat kaliti = Hub SAAS_HUB_TOKEN.
       LAB_HUB_URL: ${LAB_HUB_URL:-}
       LAB_HUB_SERVICE_TOKEN: ${LAB_HUB_SERVICE_TOKEN:-}
+    volumes:
+      - uploads_data:/data/uploads
     depends_on:
       postgres:
         condition: service_healthy

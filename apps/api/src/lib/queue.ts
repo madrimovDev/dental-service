@@ -30,5 +30,17 @@ export const NO_SHOW_QUEUE_NAME = 'no-show-sweep';
 export const NO_SHOW_SWEEP_JOB_ID = 'no-show-daily-sweep';
 export const noShowQueue = new Queue<NoShowSweepJob>(NO_SHOW_QUEUE_NAME, { connection });
 
+/**
+ * FT-06.3: kassa rasmi retention — kunlik repeatable trigger (payload yo'q). Manba haqiqati
+ * DB'da (`captured_at` < now - 90 kun).
+ */
+export type CashierPhotoRetentionJob = Record<string, never>;
+
+export const CASHIER_PHOTO_QUEUE_NAME = 'cashier-photo-retention';
+export const CASHIER_PHOTO_RETENTION_JOB_ID = 'cashier-photo-daily-retention';
+export const cashierPhotoQueue = new Queue<CashierPhotoRetentionJob>(CASHIER_PHOTO_QUEUE_NAME, {
+  connection,
+});
+
 // Reminder job ID — sof modulda (Redis'siz test qilinadi), shu yerdan qayta eksport.
 export { reminderJobId } from './reminder-job-id.ts';

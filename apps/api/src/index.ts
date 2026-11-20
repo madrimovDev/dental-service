@@ -19,7 +19,12 @@ if (process.argv[2] === 'migrate') {
   const { env } = await import('./lib/env.ts');
   const { startLicenseHeartbeatScheduler } = await import('./lib/license-heartbeat-scheduler.ts');
   const { logger } = await import('./lib/logger.ts');
-  const { noShowQueue, recallQueue, reminderQueue } = await import('./lib/queue.ts');
+  const { cashierPhotoQueue, noShowQueue, recallQueue, reminderQueue } = await import(
+    './lib/queue.ts'
+  );
+  const { registerCashierPhotoRetentionScheduler, startCashierPhotoRetentionWorker } = await import(
+    './lib/cashier-photo-retention.ts'
+  );
   const { registerNoShowScheduler, startNoShowWorker } = await import('./lib/no-show-sweep.ts');
   const { registerRecallScheduler } = await import('./lib/recall-scheduler.ts');
   const { startRecallWorker } = await import('./lib/recall-worker.ts');
@@ -65,6 +70,11 @@ if (process.argv[2] === 'migrate') {
   const inProcessNoShow =
     env.NODE_ENV !== 'test' && env.RUN_REMINDER_WORKER ? startNoShowWorker() : null;
   if (inProcessNoShow) await registerNoShowScheduler();
+
+  // FT-06.3: kassa rasmi 90 kunlik retention — xuddi shu gating (prod'da worker.ts egalik qiladi).
+  const inProcessCashierPhoto =
+    env.NODE_ENV !== 'test' && env.RUN_REMINDER_WORKER ? startCashierPhotoRetentionWorker() : null;
+  if (inProcessCashierPhoto) await registerCashierPhotoRetentionScheduler();
 
   // CLI-379: Telegram bot-manager — same gating as the reminder/recall workers
   // above. Desktop/dev (RUN_REMINDER_WORKER=true, the default) boot it here,
@@ -131,6 +141,7 @@ if (process.argv[2] === 'migrate') {
       if (inProcessWorker) await inProcessWorker.close();
       if (inProcessRecall) await inProcessRecall.close();
       if (inProcessNoShow) await inProcessNoShow.close();
+      if (inProcessCashierPhoto) await inProcessCashierPhoto.close();
       if (inProcessBotManager) await inProcessBotManager.stopAll();
       if (messagingAdmin) await messagingAdmin.client.end({ timeout: 5 });
       stopLicenseHeartbeat?.();
@@ -139,6 +150,7 @@ if (process.argv[2] === 'migrate') {
       await reminderQueue.close();
       await recallQueue.close();
       await noShowQueue.close();
+      await cashierPhotoQueue.close();
       await closeRedisPub(); // CLI-475 B5 — telegram:reload publish ulanishini yopadi
       await dbClient.end({ timeout: 5 });
     } catch (err) {

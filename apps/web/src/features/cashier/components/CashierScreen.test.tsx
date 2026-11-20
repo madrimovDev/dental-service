@@ -23,6 +23,9 @@ vi.mock('../cashier.api', () => ({
   usePlanBalance: () => ({ data: null }),
   useRefund: () => ({ mutate: vi.fn(), isPending: false }),
   fetchServicePrices: vi.fn(),
+  useCashierPhotoSettings: () => ({ data: { enabled: false } }),
+  useUploadCashierPhoto: () => ({ mutate: vi.fn(), isPending: false }),
+  useCashierTransactionPhoto: () => ({ data: undefined, isLoading: false, isError: false }),
 }));
 
 vi.mock('@/stores/auth-store.ts', () => ({

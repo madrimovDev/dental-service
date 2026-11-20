@@ -92,7 +92,9 @@ export { listCashierPendingVisits } from './generated/cashier/cashier';
 export type {
   CreateCashierTransactionResult,
   GetCashierDailySummaryResult,
+  GetCashierPhotoSettingsResult,
   GetCashierPlanBalanceResult,
+  GetCashierTransactionPhotoResult,
   GetCashierTransactionResult,
   ListCashierPatientPlansResult,
   ListCashierTransactionsResult,
@@ -101,8 +103,10 @@ export type {
 export {
   createCashierTransaction,
   getCashierDailySummary,
+  getCashierPhotoSettings,
   getCashierPlanBalance,
   getCashierTransaction,
+  getCashierTransactionPhoto,
   listCashierPatientPlans,
   listCashierTransactions,
   refundCashierTransaction,
@@ -215,6 +219,9 @@ export type {
   CancelAppointmentBody,
   CashierPatientPlan,
   CashierPatientPlanStatus,
+  CashierPhoto,
+  CashierPhotoSettings,
+  CashierPhotoSkippedReason,
   CashierTransaction,
   CashierTransactionPaymentMethod as PaymentMethod,
   CashierTransactionStatus as TransactionStatus,
@@ -564,6 +571,7 @@ export type {
   ListPatientsResult,
   RemovePatientEmergencyContactResult,
   RemovePatientRelativeResult,
+  SetPatientPhotoResult,
   UpdateMedicalRecordResult,
   UpdatePatientResult,
 } from './generated/patients/patients.ts';
@@ -583,6 +591,7 @@ export {
   listPatients,
   removePatientEmergencyContact,
   removePatientRelative,
+  setPatientPhoto,
   updateMedicalRecord,
   updatePatient,
 } from './generated/patients/patients.ts';

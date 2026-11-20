@@ -1,0 +1,50 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  color: var(--text);
+}
+.stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 4 / 3;
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.media {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.media[data-mirrored] {
+  transform: scaleX(-1);
+}
+.message {
+  margin: 0;
+  padding: 16px;
+  text-align: center;
+  color: var(--text-2);
+}
+.overlay {
+  position: absolute;
+  inset: auto 0 12px 0;
+  margin: 0;
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.actions > button {
+  min-height: 44px;
+}

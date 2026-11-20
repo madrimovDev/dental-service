@@ -18,6 +18,7 @@ export interface TenantSettings {
   maxDiscountPercent: number;
   noShowStrikeThreshold: number;
   botSelfServiceEnabled: boolean;
+  cashierPhotoEnabled: boolean;
   notificationSettings: NotificationSettings;
   integrationSettings: TenantSettingsIntegrationSettings;
   createdAt: string;

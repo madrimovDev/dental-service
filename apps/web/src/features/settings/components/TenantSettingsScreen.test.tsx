@@ -56,6 +56,19 @@ describe('TenantSettingsScreen', () => {
     expect(updateMutate).toHaveBeenCalled();
   });
 
+  it('FT-06.3: kassa rasmi switch (standart o‘chiq) yoqilsa cashierPhotoEnabled=true saqlanadi', () => {
+    updateSettingsMutate.mockClear();
+    renderApp(<TenantSettingsScreen />);
+    const sw = screen.getByRole('switch') as HTMLInputElement;
+    expect(screen.getByText("To'lovchi rasmi (kassa)")).toBeInTheDocument();
+    expect(sw.checked).toBe(false);
+    fireEvent.click(sw);
+    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    expect(updateSettingsMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ cashierPhotoEnabled: true }),
+    );
+  });
+
   it("preserve guard: currency, reminder va transfer karta hali render bo'ladi (#33)", () => {
     renderApp(<TenantSettingsScreen />);
     expect(screen.getByDisplayValue('UZS')).toBeInTheDocument();

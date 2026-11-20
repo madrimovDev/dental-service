@@ -1,9 +1,13 @@
 import { PageHead, StateView } from '@dental/ui';
-import { Anchor, Stack, Table } from '@mantine/core';
+import { ActionIcon, Anchor, Stack, Table } from '@mantine/core';
+import { IconCamera } from '@tabler/icons-react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { formatCurrency } from '@/lib/format';
+import { useAuthStore } from '@/stores/auth-store.ts';
 import { useAllTransactions } from '../cashier.api';
+import { TransactionPhotoModal } from './TransactionPhotoModal';
 
 const fmtDate = (iso: string) => {
   const d = new Date(iso);
@@ -14,6 +18,10 @@ const fmtDate = (iso: string) => {
 export function TransactionsScreen() {
   const { t } = useTranslation();
   const { data, isLoading, isError, refetch } = useAllTransactions();
+  const { hasPermission } = useAuthStore();
+  // FT-06.3: to'lov rasmi faqat `cashier.photo.view`.
+  const canViewPhoto = hasPermission('cashier.photo.view');
+  const [photoId, setPhotoId] = useState<string | null>(null);
 
   if (isLoading) return <StateView status="loading" skeleton="table" />;
   if (isError)
@@ -46,6 +54,7 @@ export function TransactionsScreen() {
               <Table.Th>{t('cashier.transactionType')}</Table.Th>
               <Table.Th>{t('cashier.amount')}</Table.Th>
               <Table.Th>{t('cashier.paymentMethod')}</Table.Th>
+              {canViewPhoto && <Table.Th />}
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
@@ -64,10 +73,30 @@ export function TransactionsScreen() {
                 <Table.Td>{t(`cashier.type.${tx.type}`)}</Table.Td>
                 <Table.Td>{formatCurrency(Number(tx.totalAmount), t)}</Table.Td>
                 <Table.Td>{t(`cashier.method.${tx.paymentMethod}`)}</Table.Td>
+                {canViewPhoto && (
+                  <Table.Td>
+                    {tx.type === 'payment' && (
+                      <ActionIcon
+                        variant="subtle"
+                        color="teal"
+                        size={44}
+                        data-testid={`photo-view-${tx.id}`}
+                        aria-label={t('cashier.photo.view')}
+                        title={t('cashier.photo.view')}
+                        onClick={() => setPhotoId(tx.id)}
+                      >
+                        <IconCamera size={16} />
+                      </ActionIcon>
+                    )}
+                  </Table.Td>
+                )}
               </Table.Tr>
             ))}
           </Table.Tbody>
         </Table>
+      )}
+      {canViewPhoto && (
+        <TransactionPhotoModal transactionId={photoId} onClose={() => setPhotoId(null)} />
       )}
     </Stack>
   );

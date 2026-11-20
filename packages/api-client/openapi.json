@@ -597,6 +597,10 @@
             "type": "boolean",
             "example": true
           },
+          "cashierPhotoEnabled": {
+            "type": "boolean",
+            "example": false
+          },
           "notificationSettings": {
             "$ref": "#/components/schemas/NotificationSettings"
           },
@@ -670,6 +674,7 @@
           "maxDiscountPercent",
           "noShowStrikeThreshold",
           "botSelfServiceEnabled",
+          "cashierPhotoEnabled",
           "notificationSettings",
           "integrationSettings",
           "createdAt",
@@ -1838,6 +1843,19 @@
           "balance",
           "planDebt",
           "nonPlanBalance"
+        ]
+      },
+      "SetPatientPhotoInput": {
+        "type": "object",
+        "properties": {
+          "imageId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "imageId"
         ]
       },
       "PatientArchiveResult": {
@@ -3155,6 +3173,64 @@
           "services",
           "total",
           "hasUnpriced"
+        ]
+      },
+      "CashierPhotoSettings": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "example": false
+          }
+        },
+        "required": [
+          "enabled"
+        ]
+      },
+      "CashierPhoto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "transactionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "url": {
+            "type": "string",
+            "nullable": true,
+            "example": "/uploads/tenants%2F…"
+          },
+          "skippedReason": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "permission_denied",
+              "no_camera",
+              "user_skipped",
+              "error",
+              null
+            ]
+          },
+          "capturedBy": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "capturedAt": {
+            "type": "string",
+            "example": "2026-11-20T10:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "transactionId",
+          "url",
+          "skippedReason",
+          "capturedBy",
+          "capturedAt"
         ]
       },
       "ReportBranches": {
@@ -9809,6 +9885,9 @@
                   "botSelfServiceEnabled": {
                     "type": "boolean"
                   },
+                  "cashierPhotoEnabled": {
+                    "type": "boolean"
+                  },
                   "notificationSettings": {
                     "type": "object",
                     "properties": {
@@ -13339,6 +13418,101 @@
         }
       }
     },
+    "/api/patients/{id}/photo": {
+      "patch": {
+        "tags": [
+          "patients"
+        ],
+        "operationId": "setPatientPhoto",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPatientPhotoInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Patient with updated photo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Patient"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Image is not a face_photo of this patient",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Patient not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/patients/{id}/telegram-link": {
       "delete": {
         "tags": [
@@ -16479,6 +16653,157 @@
           },
           "403": {
             "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cashier/photo-settings": {
+      "get": {
+        "tags": [
+          "cashier"
+        ],
+        "operationId": "getCashierPhotoSettings",
+        "responses": {
+          "200": {
+            "description": "Cashier photo capture setting",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CashierPhotoSettings"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cashier/transactions/{id}/photo": {
+      "get": {
+        "tags": [
+          "cashier"
+        ],
+        "operationId": "getCashierTransactionPhoto",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cashier transaction photo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CashierPhoto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Transaction not found",
             "content": {
               "application/json": {
                 "schema": {

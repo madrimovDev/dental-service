@@ -47,6 +47,7 @@ export const uploadsRoutes = (
 
   const requireImageView = requirePermission('patient_image.view');
   const requireLabView = requirePermission('lab_order.view');
+  const requireCashierPhotoView = requirePermission('cashier.photo.view');
 
   app.get(
     '/:key{.+}',
@@ -58,9 +59,11 @@ export const uploadsRoutes = (
         const [prefix, keyTenantId, kind] = resolved.relKey.split(sep);
         if (prefix === 'tenants' && keyTenantId === c.get('activeTenantId')) {
           // UI-D5: prefiks bo'yicha permission — `patients/` → patient_image.view,
-          // `lab-orders/` → lab_order.view; boshqa prefiks (o'z tenanti ichida ham) → 403.
+          // `lab-orders/` → lab_order.view, `cashier-photos/` → cashier.photo.view (FT-06.3); boshqa prefiks (o'z tenanti ichida ham) → 403.
           if (kind === 'patients') return requireImageView(c, next);
           if (kind === 'lab-orders') return requireLabView(c, next);
+          // FT-06.3: kassa rasmi — `cashier-photos/` → cashier.photo.view (faqat owner/Tenant Admin).
+          if (kind === 'cashier-photos') return requireCashierPhotoView(c, next);
           return c.json(fail('permission.denied', 'Forbidden'), 403);
         }
       }
@@ -96,7 +99,12 @@ export const uploadsRoutes = (
       const objectId = basename(resolved.relKey).split('.')[0] ?? '';
       await deps.audit.record(c, {
         action: 'viewed',
-        resourceType: kind === 'lab-orders' ? 'lab_order_file' : 'patient_image',
+        resourceType:
+          kind === 'lab-orders'
+            ? 'lab_order_file'
+            : kind === 'cashier-photos'
+              ? 'cashier_transaction_photo'
+              : 'patient_image',
         resourceId: UUID_RE.test(objectId) ? objectId : null,
         after: { key: resolved.relKey },
       });

@@ -1,6 +1,7 @@
 export * from './AlertBanner';
 export * from './Avatar';
 export * from './Button';
+export * from './CameraCapture';
 export * from './Card';
 export * from './ConnectionStatus';
 export * from './CriticalActionDialog';

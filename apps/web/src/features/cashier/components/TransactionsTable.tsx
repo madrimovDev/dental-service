@@ -12,7 +12,7 @@ import {
   Text,
   Title,
 } from '@mantine/core';
-import { IconEye, IconReceipt, IconRefresh } from '@tabler/icons-react';
+import { IconCamera, IconEye, IconReceipt, IconRefresh } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatCurrency, formatNumber } from '@/lib/format';
@@ -20,6 +20,7 @@ import { useAuthStore } from '@/stores/auth-store.ts';
 import { useRefund } from '../cashier.api';
 import { toTransactionVM } from '../cashier.mappers';
 import { ReceiptModal } from './ReceiptModal';
+import { TransactionPhotoModal } from './TransactionPhotoModal';
 
 export interface TransactionsTableProps {
   transactions: CashierTransaction[];
@@ -32,8 +33,11 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [partialAmount, setPartialAmount] = useState<number | ''>('');
   const [receiptId, setReceiptId] = useState<string | null>(null);
+  const [photoId, setPhotoId] = useState<string | null>(null);
 
   const canRefund = hasPermission('cashier.refund');
+  // FT-06.3: to'lov rasmi faqat `cashier.photo.view` (owner, Tenant Admin).
+  const canViewPhoto = hasPermission('cashier.photo.view');
   const vms = transactions.map(toTransactionVM);
   const selected = vms.find((v) => v.id === confirmId);
   const receiptVm = vms.find((v) => v.id === receiptId);
@@ -114,6 +118,19 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
                       >
                         <IconEye size={14} />
                       </ActionIcon>
+                      {canViewPhoto && tx.type === 'payment' && (
+                        <ActionIcon
+                          variant="subtle"
+                          color="teal"
+                          size={44}
+                          data-testid={`photo-view-${tx.id}`}
+                          aria-label={t('cashier.photo.view')}
+                          title={t('cashier.photo.view')}
+                          onClick={() => setPhotoId(tx.id)}
+                        >
+                          <IconCamera size={16} />
+                        </ActionIcon>
+                      )}
                       {canRefund && tx.refundable && (
                         <ActionIcon
                           variant="subtle"
@@ -185,6 +202,10 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
           </Group>
         </Stack>
       </Modal>
+
+      {canViewPhoto && (
+        <TransactionPhotoModal transactionId={photoId} onClose={() => setPhotoId(null)} />
+      )}
 
       {receiptVm && (
         <ReceiptModal

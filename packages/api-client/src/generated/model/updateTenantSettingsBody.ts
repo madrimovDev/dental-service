@@ -34,6 +34,7 @@ export type UpdateTenantSettingsBody = {
    */
   noShowStrikeThreshold?: number;
   botSelfServiceEnabled?: boolean;
+  cashierPhotoEnabled?: boolean;
   notificationSettings?: UpdateTenantSettingsBodyNotificationSettings;
   /** @nullable */
   telegram?: UpdateTenantSettingsBodyTelegram;

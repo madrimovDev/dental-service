@@ -42,6 +42,9 @@ export const tenantSettings = pgTable(
     // FT-07: Telegram bot'da bemor «o'z ma'lumotlari» (yozilish/balans/reja/retsept) menyusi.
     // Standart yoqilgan; klinika o'chirsa bot shu tugmalarga ma'lumot bermaydi.
     botSelfServiceEnabled: boolean('bot_self_service_enabled').notNull().default(true),
+    // FT-06.3 (D-4): to'lovdan keyin kassada avtomatik rasm olish. Standart O'CHIQ — klinika
+    // o'zi yoqadi (maxfiylik); ko'rish `cashier.photo.view`, 90 kun retention.
+    cashierPhotoEnabled: boolean('cashier_photo_enabled').notNull().default(false),
     onboardingDismissedAt: timestamp('onboarding_dismissed_at', { withTimezone: true }),
     // Recall subsystem (RFC-0011): default interval (oy), klinika vaqt zonasi va
     // recall SMS yuborish soati (klinika-local). Scheduler shu sozlamalarga amal qiladi.

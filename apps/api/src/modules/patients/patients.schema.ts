@@ -81,6 +81,14 @@ export const createPatientSchema = z.object({
 export type CreatePatientInput = z.infer<typeof createPatientSchema>;
 
 export const updatePatientSchema = createPatientSchema.partial();
+
+/**
+ * FT-06.2: bemor avatari. `imageId` — shu bemorning `face_photo` turidagi `patient_images`
+ * qatori (avval multipart `POST /patient-images` bilan yuklanadi); `null` — avatarni olib tashlash.
+ */
+export const setPatientPhotoSchema = z
+  .object({ imageId: z.uuid().nullable() })
+  .openapi('SetPatientPhotoInput');
 export type UpdatePatientInput = z.infer<typeof updatePatientSchema>;
 
 export const updateMedicalRecordSchema = z.object({
