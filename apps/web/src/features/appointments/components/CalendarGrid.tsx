@@ -1,12 +1,6 @@
-import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import {
-  cellStartMinute,
-  dropStartMinute,
-  groupByDoctor,
-  minuteLabel,
-} from '../appointments.mappers';
+import { cellStartMinute, groupByDoctor, minuteLabel } from '../appointments.mappers';
 import type { Appointment } from '../appointments.types';
 import {
   type CalendarEvent,
@@ -76,6 +70,7 @@ export function CalendarGrid({
   unscheduledDoctorIds,
   canMove = false,
   onMove,
+  onResize,
   onCellClick,
   grid = GRID,
   outsideHoursIds,
@@ -93,8 +88,10 @@ export function CalendarGrid({
   unscheduledDoctorIds?: ReadonlySet<string> | null;
   /** `appointment.edit` — faol yozilishlarni sudrab ko'chirish mumkin. */
   canMove?: boolean;
-  /** Yozilish `doctorId` ustuniga, kun boshidan `startMinute` ga tushirildi. */
+  /** Yozilish `doctorId` ustuniga, kun boshidan `startMinute` ga tushirildi (pointer drag, touch ham). */
   onMove?: (appointment: Appointment, doctorId: string, startMinute: number) => void;
+  /** FT-05.3: pastki chetdan cho'zildi — yangi tugash daqiqasi (15 daqiqa qadam). */
+  onResize?: (appointment: Appointment, endMinute: number) => void;
   /** FT-05.1: `appointment.create` — bo'sh katakka bosish (jadvalsiz doktorda yo'q). */
   onCellClick?: (cell: { doctorId: string; startMinute: number }) => void;
   /** FT-05.2: filial ish vaqtidan hisoblangan oyna (standart — `GRID`). */
@@ -102,7 +99,6 @@ export function CalendarGrid({
   /** FT-05.2: filial ish vaqtidan tashqari yozilishlar — «soatdan tashqari» belgisi. */
   outsideHoursIds?: ReadonlySet<string>;
 }) {
-  const dragRef = useRef<{ event: CalendarEvent; grab: number } | null>(null);
   const { t } = useTranslation();
   const cols = groupByDoctor(appointments, doctors, grid);
   const noSchedule = (doctorId: string) => unscheduledDoctorIds?.has(doctorId) ?? false;
@@ -112,7 +108,7 @@ export function CalendarGrid({
   );
 
   return (
-    <div className={classes.grid}>
+    <div className={classes.grid} data-cal-grid>
       <div className={classes.times}>
         <div className={classes.timesHead} />
         {hours.map((h) => (
@@ -145,37 +141,8 @@ export function CalendarGrid({
                 </span>
                 <span className={classes.colCount}>{col.events.length}</span>
               </div>
-              {/* biome-ignore lint/a11y/noStaticElementInteractions: drop zone; klaviatura alternativasi — AppointmentPanel «Ko'chirish» */}
               <div
-                onDragOver={
-                  canMove
-                    ? (e) => {
-                        if (dragRef.current) e.preventDefault();
-                      }
-                    : undefined
-                }
-                onDrop={
-                  canMove
-                    ? (e) => {
-                        const d = dragRef.current;
-                        dragRef.current = null;
-                        if (!d) return;
-                        e.preventDefault();
-                        const dur = d.event.endMin - d.event.startMin;
-                        onMove?.(
-                          d.event.appointment,
-                          col.doctor.id,
-                          dropStartMinute(
-                            e.clientY,
-                            e.currentTarget.getBoundingClientRect().top,
-                            d.grab,
-                            dur,
-                            grid,
-                          ),
-                        );
-                      }
-                    : undefined
-                }
+                data-drop-col={col.doctor.id}
                 className={`${classes.colBody} ${noSchedule(col.doctor.id) ? classes.colNoSchedule : ''}`}
               >
                 <GridLines
@@ -210,10 +177,12 @@ export function CalendarGrid({
                     onClick={onSlotClick}
                     selected={selectedId === e.appointment.id}
                     outsideHours={outsideHoursIds?.has(e.appointment.id)}
+                    grid={grid}
                     draggable={canMove && MOVABLE.has(e.appointment.status)}
-                    onDragStartSlot={(ev, grab) => {
-                      dragRef.current = { event: ev, grab };
-                    }}
+                    onMoveGesture={(ev, target) =>
+                      onMove?.(ev.appointment, target.colKey, target.startMinute)
+                    }
+                    onResizeGesture={(ev, endMinute) => onResize?.(ev.appointment, endMinute)}
                   />
                 ))}
               </div>

@@ -10,6 +10,7 @@ import {
   toneVars,
 } from '../appointments.types';
 import { AppointmentSlot } from './AppointmentSlot';
+import { MOVABLE } from './CalendarGrid';
 import classes from './CalendarGrid.module.css';
 
 /** Yarim soatlik grid chiziqlari (hour opacity 1, half .4) — CalendarGrid bilan bir xil. */
@@ -54,6 +55,9 @@ export function WeekGrid({
   onSlotClick,
   selectedId,
   onCellClick,
+  canMove = false,
+  onMove,
+  onResize,
   grid = GRID,
   outsideHoursIds,
 }: {
@@ -64,6 +68,10 @@ export function WeekGrid({
   selectedId?: string | null;
   /** FT-05.1: `appointment.create` — bo'sh katakka bosish (kun + boshlanish daqiqasi). */
   onCellClick?: (cell: { dateKey: string; startMinute: number }) => void;
+  /** FT-05.3: `appointment.edit` — faol yozilishni boshqa kun/vaqtga sudrash, pastidan cho'zish. */
+  canMove?: boolean;
+  onMove?: (appointment: Appointment, dateKey: string, startMinute: number) => void;
+  onResize?: (appointment: Appointment, endMinute: number) => void;
   /** FT-05.2: filial ish vaqtidan hisoblangan oyna (standart — `GRID`). */
   grid?: GridConfig;
   /** FT-05.2: filial ish vaqtidan tashqari yozilishlar — «soatdan tashqari» belgisi. */
@@ -77,7 +85,7 @@ export function WeekGrid({
   );
 
   return (
-    <div className={classes.grid}>
+    <div className={classes.grid} data-cal-grid>
       <div className={classes.times}>
         <div className={classes.timesHead} />
         {hours.map((h) => (
@@ -107,7 +115,7 @@ export function WeekGrid({
                 </span>
                 <span className={classes.colCount}>{col.events.length}</span>
               </div>
-              <div className={classes.colBody}>
+              <div className={classes.colBody} data-drop-col={col.dateKey}>
                 <GridLines
                   grid={grid}
                   onCell={
@@ -131,6 +139,12 @@ export function WeekGrid({
                     onClick={onSlotClick}
                     selected={selectedId === e.appointment.id}
                     outsideHours={outsideHoursIds?.has(e.appointment.id)}
+                    grid={grid}
+                    draggable={canMove && MOVABLE.has(e.appointment.status)}
+                    onMoveGesture={(ev, target) =>
+                      onMove?.(ev.appointment, target.colKey, target.startMinute)
+                    }
+                    onResizeGesture={(ev, endMinute) => onResize?.(ev.appointment, endMinute)}
                   />
                 ))}
               </div>

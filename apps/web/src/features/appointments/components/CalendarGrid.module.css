@@ -179,9 +179,48 @@ button.gridLine:focus-visible {
   color: var(--ink);
 }
 
-/* sudrab ko'chirish mumkin */
+/* sudrab ko'chirish mumkin (FT-05.3: pointer events — touch-action:none, planshet ham) */
 .slot[data-draggable="true"] {
   cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.slot[data-dragging="true"] {
+  cursor: grabbing;
+  z-index: 4;
+  opacity: 0.85;
+  box-shadow: var(--shadow-md, var(--shadow-sm));
+}
+
+/* pastki chetdan cho'zib davomiylikni o'zgartirish (15 daqiqa qadam) */
+.resizeHandle {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 8px;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.resizeHandle::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  width: 24px;
+  height: 3px;
+  margin-left: -12px;
+  border-radius: 2px;
+  background: var(--tone, var(--ink-3));
+  opacity: 0.45;
+}
+
+@media (pointer: coarse) {
+  .resizeHandle {
+    height: 18px;
+  }
 }
 
 /* tanlangan yozilish — qalin ink halqa (kanvas: box-shadow 3px ink) */

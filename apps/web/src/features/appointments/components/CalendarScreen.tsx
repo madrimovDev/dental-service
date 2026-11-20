@@ -26,6 +26,7 @@ import {
   isOutsideWorkHours,
   localDateKey,
   localMinutes,
+  minuteLabel,
   mondayOfWeek,
   newAppointmentHref,
 } from '../appointments.mappers';
@@ -187,7 +188,11 @@ export function CalendarScreen() {
       let changed = false;
       for (const a of appts ?? []) {
         const mv = next[a.id];
-        if (mv && new Date(a.startTime).getTime() === new Date(mv.startTime).getTime()) {
+        if (
+          mv &&
+          new Date(a.startTime).getTime() === new Date(mv.startTime).getTime() &&
+          new Date(a.endTime).getTime() === new Date(mv.endTime).getTime()
+        ) {
           delete next[a.id];
           changed = true;
         }
@@ -330,18 +335,28 @@ export function CalendarScreen() {
    * Sudrab (yoki panel orqali) ko'chirish: joy darhol yangilanadi, `UndoToast` tugagach
    * PATCH ketadi. Server 409 qaytarsa yozilish joyiga qaytadi va xabar chiqadi.
    */
-  const moveAppointment = (appt: Appointment, doctorId: string, startMinute: number) => {
+  const moveAppointment = (
+    appt: Appointment,
+    doctorId: string,
+    startMinute: number,
+    dateKey: string = pivotKey,
+  ) => {
     const durationMs = new Date(appt.endTime).getTime() - new Date(appt.startTime).getTime();
-    const startTime = instantFromDayMinute(pivotKey, startMinute);
+    const startTime = instantFromDayMinute(dateKey, startMinute);
     const endTime = new Date(new Date(startTime).getTime() + durationMs).toISOString();
     const sameSpot =
       doctorId === appt.doctorId &&
       localMinutes(appt.startTime) === startMinute &&
-      localDateKey(appt.startTime) === pivotKey;
+      localDateKey(appt.startTime) === dateKey;
     if (sameSpot) return;
     flushPending();
     setMoves((prev) => ({ ...prev, [appt.id]: { startTime, endTime, doctorId } }));
-    const hh = `${String(Math.floor(startMinute / 60)).padStart(2, '0')}:${String(startMinute % 60).padStart(2, '0')}`;
+    const hh = minuteLabel(startMinute);
+    // Boshqa kunga (hafta ko'rinishi) ko'chirilsa — kun ham ko'rsatiladi.
+    const timeLabel =
+      dateKey === localDateKey(appt.startTime)
+        ? hh
+        : `${dateKey.slice(8, 10)}.${dateKey.slice(5, 7)} ${hh}`;
     const action: PendingAction = {
       key: `${appt.id}:move:${startTime}:${doctorId}`,
       id: appt.id,
@@ -349,7 +364,7 @@ export function CalendarScreen() {
       label: t('appointments.moved', {
         name: patientName(appt.patientId),
         doctor: doctorNameMap.get(doctorId) ?? '',
-        time: hh,
+        time: timeLabel,
       }),
       commit: () =>
         moveMut.mutate(
@@ -359,6 +374,41 @@ export function CalendarScreen() {
             endTime,
             ...(doctorId !== appt.doctorId ? { doctorId } : {}),
           },
+          {
+            onError: (err) => {
+              clearOverride(appt.id);
+              notifications.show({ color: 'red', message: moveErrorMessage(err) });
+            },
+          },
+        ),
+    };
+    pendingRef.current = action;
+    setPending(action);
+  };
+
+  /**
+   * FT-05.3: pastki chetdan cho'zib davomiylikni o'zgartirish — boshlanish o'zgarmaydi,
+   * tugash yangi daqiqaga (15 daqiqa qadam). Ko'chirish bilan bir xil UndoToast + 409 yo'li.
+   */
+  const resizeAppointment = (appt: Appointment, endMinute: number) => {
+    const endTime = instantFromDayMinute(localDateKey(appt.startTime), endMinute);
+    if (new Date(endTime).getTime() === new Date(appt.endTime).getTime()) return;
+    flushPending();
+    setMoves((prev) => ({
+      ...prev,
+      [appt.id]: { startTime: appt.startTime, endTime, doctorId: appt.doctorId },
+    }));
+    const action: PendingAction = {
+      key: `${appt.id}:resize:${endTime}`,
+      id: appt.id,
+      status: appt.status,
+      label: t('appointments.resized', {
+        name: patientName(appt.patientId),
+        time: minuteLabel(endMinute),
+      }),
+      commit: () =>
+        moveMut.mutate(
+          { id: appt.id, startTime: appt.startTime, endTime },
           {
             onError: (err) => {
               clearOverride(appt.id);
@@ -497,7 +547,8 @@ export function CalendarScreen() {
               grid={grid}
               outsideHoursIds={outsideHoursIds}
               canMove={hasPermission('appointment.edit')}
-              onMove={moveAppointment}
+              onMove={(appt, doctorId, startMinute) => moveAppointment(appt, doctorId, startMinute)}
+              onResize={resizeAppointment}
               onCellClick={
                 canCreate
                   ? ({ doctorId, startMinute }) =>
@@ -514,6 +565,11 @@ export function CalendarScreen() {
               patientName={patientName}
               onSlotClick={openDetail}
               selectedId={selectedId}
+              canMove={hasPermission('appointment.edit')}
+              onMove={(appt, dateKey, startMinute) =>
+                moveAppointment(appt, appt.doctorId, startMinute, dateKey)
+              }
+              onResize={resizeAppointment}
               onCellClick={
                 canCreate
                   ? ({ dateKey, startMinute }) => openNew({ dateKey, startMinute })

@@ -1219,6 +1219,7 @@
     "price_branch": "filial narxi",
     "price_partial": "ba'zi xizmatlarga narx belgilanmagan",
     "moved": "{{name}} — {{doctor}}, {{time}} ga ko'chirildi",
+    "resized": "{{name}} — tugash {{time}} ga o'zgartirildi",
     "move_failed": "Ko'chirib bo'lmadi — yozilish joyiga qaytarildi",
     "move_action": "Ko'chirish",
     "move_time": "Yangi vaqt (shu kun)",

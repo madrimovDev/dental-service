@@ -185,6 +185,38 @@ export function dropStartMinute(
   return Math.min(Math.max(snapped, min), Math.max(max, min));
 }
 
+/**
+ * FT-05.3: slot pastki chetini cho'zish — pointer Y → yangi TUGASH daqiqasi.
+ * `DRAG_SNAP_MIN` qadamga yaxlitlanadi; kamida `startMin + DRAG_SNAP_MIN`, kun oxirigacha.
+ */
+export function resizeEndMinute(
+  clientY: number,
+  bodyTop: number,
+  startMin: number,
+  grid: GridConfig = GRID,
+): number {
+  const raw = (clientY - bodyTop) / grid.pxPerMin + grid.dayStartHour * 60;
+  const snapped = Math.round(raw / DRAG_SNAP_MIN) * DRAG_SNAP_MIN;
+  const min = startMin + DRAG_SNAP_MIN;
+  const max = Math.max(grid.dayEndHour * 60, min);
+  return Math.min(Math.max(snapped, min), max);
+}
+
+/**
+ * FT-05.3: pointer X qaysi ustunda (doktor/kun). Ustun ichida bo'lmasa — eng yaqin chet
+ * ustun (kalendar chetidan tashqariga tortilsa ham yozilish yo'qolmaydi). Ustun yo'q → -1.
+ */
+export function pickColumnIndex(
+  clientX: number,
+  rects: ReadonlyArray<{ left: number; right: number }>,
+): number {
+  if (rects.length === 0) return -1;
+  const inside = rects.findIndex((r) => clientX >= r.left && clientX < r.right);
+  if (inside >= 0) return inside;
+  const first = rects[0];
+  return first && clientX < first.left ? 0 : rects.length - 1;
+}
+
 /** Tashkent kun kaliti + kun boshidan daqiqa → UTC ISO instant (Tashkent = UTC+5, DST yo'q). */
 export function instantFromDayMinute(dateKey: string, minute: number): string {
   const hh = String(Math.floor(minute / 60)).padStart(2, '0');

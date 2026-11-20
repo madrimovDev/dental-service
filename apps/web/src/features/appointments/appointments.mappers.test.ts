@@ -9,6 +9,8 @@ import {
   isOutsideWorkHours,
   localMinutes,
   newAppointmentHref,
+  pickColumnIndex,
+  resizeEndMinute,
   toSlotPosition,
 } from './appointments.mappers';
 import { GRID } from './appointments.types';
@@ -175,5 +177,34 @@ describe('sudrab ko‘chirish matematikasi', () => {
         false,
       );
     });
+  });
+});
+
+describe('FT-05.3 pointer drag/resize yordamchilari', () => {
+  it('resizeEndMinute: pastki chet 15 daqiqa qadamga yaxlitlanadi, kamida start+15, kun oxirigacha', () => {
+    // 88 px/soat: 11:00 = (11-8)*88 = 264px
+    expect(resizeEndMinute(264, 0, 10 * 60)).toBe(11 * 60);
+    // 11:10 → 11:15
+    expect(resizeEndMinute(264 + (10 * 88) / 60, 0, 10 * 60)).toBe(11 * 60 + 15);
+    // start ustidan yuqoriga tortilsa — kamida 15 daqiqa
+    expect(resizeEndMinute(0, 0, 10 * 60)).toBe(10 * 60 + 15);
+    // kun oxiridan keyin qisiladi
+    expect(resizeEndMinute(99999, 0, 10 * 60)).toBe(20 * 60);
+    // body top hisobga olinadi
+    expect(resizeEndMinute(1264, 1000, 10 * 60)).toBe(11 * 60);
+  });
+
+  it('pickColumnIndex: x qaysi ustun ichida bo‘lsa shu, tashqarida — eng yaqin chet', () => {
+    const rects = [
+      { left: 0, right: 100 },
+      { left: 100, right: 200 },
+      { left: 200, right: 300 },
+    ];
+    expect(pickColumnIndex(50, rects)).toBe(0);
+    expect(pickColumnIndex(100, rects)).toBe(1);
+    expect(pickColumnIndex(299, rects)).toBe(2);
+    expect(pickColumnIndex(-30, rects)).toBe(0);
+    expect(pickColumnIndex(900, rects)).toBe(2);
+    expect(pickColumnIndex(10, [])).toBe(-1);
   });
 });
