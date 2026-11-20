@@ -399,6 +399,8 @@ export const createTreatmentPlansService = (deps: {
       const price = await deps.priceLookup.getActivePrice(c, input.serviceId, activeBranchId);
       if (price) cost = Number(price.price);
     }
+    // FW-1 seam (FT-04.3 × FT-01): bemorning doimiy chegirmasi createPlan bilan bir xil.
+    const priced = (await newStagePricer(c, plan.patientId)).apply(cost);
 
     const sequence = await repo.nextStageSequence(c, planId);
     const stage = await repo.insertStage(c, {
@@ -409,7 +411,9 @@ export const createTreatmentPlansService = (deps: {
       toothNumbers: input.toothNumbers ?? null,
       estimatedVisits: input.estimatedVisits,
       estimatedDurationMinutes: input.estimatedDurationMinutes ?? null,
-      cost: String(cost),
+      cost: String(priced.cost),
+      listPrice: priced.listPrice,
+      discountPercent: priced.discountPercent,
       notes: input.notes ?? null,
       resultingToothState: input.resultingToothState ?? null,
     });
@@ -425,6 +429,9 @@ export const createTreatmentPlansService = (deps: {
         sequence,
         serviceId: stage.serviceId,
         cost: stage.cost,
+        ...(stage.discountPercent != null
+          ? { listPrice: stage.listPrice, discountPercent: stage.discountPercent }
+          : {}),
         toothNumbers: stage.toothNumbers,
       },
     });
@@ -521,6 +528,8 @@ export const createTreatmentPlansService = (deps: {
     }
 
     const activeBranchId = c.get('activeBranchId');
+    // FW-1 seam (FT-04.3 × FT-01): bemorning doimiy chegirmasi createPlan bilan bir xil.
+    const { apply: applyPatientDiscount } = await newStagePricer(c, input.patientId);
     const stages = [];
     for (const item of input.items) {
       let cost = item.cost;
@@ -528,6 +537,7 @@ export const createTreatmentPlansService = (deps: {
         const price = await deps.priceLookup.getActivePrice(c, item.serviceId, activeBranchId);
         if (price) cost = Number(price.price);
       }
+      const priced = applyPatientDiscount(cost);
       const sequence = await repo.nextStageSequence(c, plan.id);
       const inserted = await repo.insertStage(c, {
         treatmentPlanId: plan.id,
@@ -537,7 +547,9 @@ export const createTreatmentPlansService = (deps: {
         toothNumbers: item.toothNumbers ?? null,
         estimatedVisits: item.estimatedVisits,
         estimatedDurationMinutes: item.estimatedDurationMinutes ?? null,
-        cost: String(cost),
+        cost: String(priced.cost),
+        listPrice: priced.listPrice,
+        discountPercent: priced.discountPercent,
         notes: item.notes ?? null,
         resultingToothState: item.resultingToothState ?? null,
         acceptance: 'accepted',
@@ -551,6 +563,9 @@ export const createTreatmentPlansService = (deps: {
           sequence,
           serviceId: inserted.serviceId,
           cost: inserted.cost,
+          ...(inserted.discountPercent != null
+            ? { listPrice: inserted.listPrice, discountPercent: inserted.discountPercent }
+            : {}),
           toothNumbers: inserted.toothNumbers,
           acceptance: 'accepted',
           completedWork: true,
@@ -718,17 +733,37 @@ export const createTreatmentPlansService = (deps: {
       if (input.serviceId) await ownership.assertServiceExists(c, input.serviceId);
       content.serviceId = input.serviceId;
     }
-    if (input.cost !== undefined || 'serviceId' in content) {
+    // FW-1 seam (FT-04.3 × FT-01): `cost` — chegirmagacha (list) narx; bosqich `cost`i
+    // bemorning joriy doimiy chegirmasi bilan netto, `listPrice`/`discountPercent` qayta
+    // snapshot. Joriy qiymatni (netto yoki list) qayta yuborish — o'zgarish emas (ikki
+    // marta chegirma / retroaktiv qayta narxlash bo'lmasin).
+    const currentList =
+      current.listPrice != null ? Number(current.listPrice) : Number(current.cost);
+    const costChanged =
+      input.cost !== undefined && input.cost !== Number(current.cost) && input.cost !== currentList;
+    if (costChanged || 'serviceId' in content) {
       const effectiveServiceId =
         input.serviceId !== undefined ? input.serviceId : current.serviceId;
-      let cost = input.cost ?? Number(current.cost);
+      let base = costChanged ? (input.cost as number) : currentList;
       // CLI-443: xizmatli bosqich narxi filial narxidan (createPlan/addStage bilan bir xil).
       const activeBranchId = c.get('activeBranchId');
       if (effectiveServiceId && activeBranchId && deps.priceLookup) {
         const price = await deps.priceLookup.getActivePrice(c, effectiveServiceId, activeBranchId);
-        if (price) cost = Number(price.price);
+        if (price) base = Number(price.price);
       }
-      if (cost !== Number(current.cost)) content.cost = String(cost);
+      const stagePlan = await repo.findPlan(c, current.treatmentPlanId);
+      const priced = stagePlan
+        ? (await newStagePricer(c, stagePlan.patientId)).apply(base)
+        : applyDefaultDiscount(base, null);
+      if (
+        priced.cost !== Number(current.cost) ||
+        priced.listPrice !== (current.listPrice ?? null) ||
+        priced.discountPercent !== (current.discountPercent ?? null)
+      ) {
+        content.cost = String(priced.cost);
+        content.listPrice = priced.listPrice;
+        content.discountPercent = priced.discountPercent;
+      }
     }
     if (Object.keys(content).length > 0) {
       const hasAllocations = await repo.hasStageAllocations(c, stageId);
@@ -801,7 +836,13 @@ export const createTreatmentPlansService = (deps: {
           notes: current.notes,
           ...('serviceId' in content ? { serviceId: current.serviceId } : {}),
           ...('serviceName' in content ? { serviceName: current.serviceName } : {}),
-          ...('cost' in content ? { cost: current.cost } : {}),
+          ...('cost' in content
+            ? {
+                cost: current.cost,
+                listPrice: current.listPrice,
+                discountPercent: current.discountPercent,
+              }
+            : {}),
           ...('toothNumbers' in content ? { toothNumbers: current.toothNumbers } : {}),
         },
         after: {
