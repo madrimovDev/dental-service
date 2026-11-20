@@ -327,6 +327,13 @@ Uchta xulq testda ajablantirmasligi uchun:
 - [ ] Zaxira 2 kundan ortiq olinmasa Rahbar sahifasida ogohlantirish.
 
 
+## 4d. FT-06 (2026-11-20) — kamera
+
+- [ ] **Server PC** (localhost): bemor kartasi → «Rasm qo'yish» → brauzer kamerani ochadi, surat olinadi va avatar yangilanadi; mikrofon so'ralmaydi.
+- [ ] **Klient PC** (`http://<server-IP>:8080`): xuddi shu oqim kamera bilan ishlaydi («qo'llab-quvvatlanmaydi» chiqmasligi kerak — `unsafely-treat-insecure-origin-as-secure` switch'i saqlangan `serverUrl` origin'i uchun).
+- [ ] Klient birinchi marta server topib ulanganda (yoki server IP o'zgarganda) kamera faqat ilovani **qayta ochgandan keyin** ishlaydi — qayta ochib tekshiring.
+- [ ] Kamera yo'q / Windows maxfiylik sozlamasida kamera o'chiq → fayl yuklash varianti ko'rinadi, ilova yiqilmaydi.
+
 | Muammo | Yechim |
 |---|---|
 | SmartScreen ogohlantirishi | Imzosiz installer (CLI-376) — «Run anyway» |

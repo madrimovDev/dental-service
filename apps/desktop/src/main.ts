@@ -63,7 +63,10 @@ import {
 } from './discovery.js';
 import { isFirstRun, runFirstSetup, runMigrations } from './first-run.js';
 import { fetchBootstrapStatus, licenseGatedUrl, resolveStartupUrl } from './license-status.js';
-import { installMediaPermissionHandlers } from './media-permissions.js';
+import {
+  insecureOriginToTreatAsSecure,
+  installMediaPermissionHandlers,
+} from './media-permissions.js';
 import {
   createPgTools,
   createStateStore,
@@ -276,6 +279,18 @@ const chooseServerUrl = async (servers: DiscoveredServer[]): Promise<string | nu
 if (process.platform === 'linux' && !app.isPackaged) {
   app.commandLine.appendSwitch('class', 'dental-service-dev'); // X11/XWayland WM_CLASS
   app.commandLine.appendSwitch('wayland-app-id', 'dental-service-dev'); // Wayland app_id
+}
+
+// FT-06.1 — klient LAN `http://<IP>:8080` secure context emas → kamera
+// (`navigator.mediaDevices`) umuman yo'q bo'lardi. Saqlangan serverUrl
+// origin'ini secure deb belgilaymiz; switch faqat `ready`dan oldin ta'sir
+// qiladi — manzil keyin (TOFU/discovery) o'zgarsa, kamera qayta ochilgandan
+// keyin ishlaydi. Media ruxsati baribir faqat shu origin + asosiy oyna uchun.
+{
+  const cameraOrigin = insecureOriginToTreatAsSecure(readConfig());
+  if (cameraOrigin) {
+    app.commandLine.appendSwitch('unsafely-treat-insecure-origin-as-secure', cameraOrigin);
+  }
 }
 
 // Single-instance qulfi — ikkinchi nusxa jim chiqadi, birinchi nusxaning

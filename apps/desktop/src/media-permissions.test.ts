@@ -1,5 +1,6 @@
 import { describe, expect, mock, test } from 'bun:test';
 import {
+  insecureOriginToTreatAsSecure,
   installMediaPermissionHandlers,
   isAllowedMediaCheck,
   isAllowedMediaRequest,
@@ -175,5 +176,39 @@ describe('installMediaPermissionHandlers', () => {
     expect(check(mainContents, 'media', 'http://192.168.1.10:8080', { mediaType: 'audio' })).toBe(
       false,
     );
+  });
+});
+
+describe("insecureOriginToTreatAsSecure — klient LAN http origin'i secure context", () => {
+  test("klient + LAN http serverUrl → origin (yo'lsiz)", () => {
+    expect(
+      insecureOriginToTreatAsSecure({ role: 'client', serverUrl: 'http://192.168.1.10:8080/x' }),
+    ).toBe('http://192.168.1.10:8080');
+  });
+  test('klient + https — kerak emas (null)', () => {
+    expect(
+      insecureOriginToTreatAsSecure({ role: 'client', serverUrl: 'https://clinic.local:8443' }),
+    ).toBeNull();
+  });
+  test('klient + localhost/127.0.0.1 — allaqachon secure (null)', () => {
+    expect(
+      insecureOriginToTreatAsSecure({ role: 'client', serverUrl: 'http://localhost:8080' }),
+    ).toBeNull();
+    expect(
+      insecureOriginToTreatAsSecure({ role: 'client', serverUrl: 'http://127.0.0.1:8080' }),
+    ).toBeNull();
+  });
+  test("server roli / serverUrl yo'q / yaroqsiz — null", () => {
+    expect(
+      insecureOriginToTreatAsSecure({ role: 'server', serverUrl: 'http://192.168.1.10:8080' }),
+    ).toBeNull();
+    expect(insecureOriginToTreatAsSecure({ role: 'client', serverUrl: null })).toBeNull();
+    expect(insecureOriginToTreatAsSecure({ role: 'client', serverUrl: 'not a url' })).toBeNull();
+    expect(insecureOriginToTreatAsSecure({ role: 'client', serverUrl: 'file:///x' })).toBeNull();
+  });
+  test("origin'ga vergul/bo'shliq tushmaydi (switch qiymati ro'yxat ajratuvchisi)", () => {
+    expect(
+      insecureOriginToTreatAsSecure({ role: 'client', serverUrl: 'http://a,b.example:80' }),
+    ).toBeNull();
   });
 });
