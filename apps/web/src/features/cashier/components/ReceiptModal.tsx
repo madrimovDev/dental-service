@@ -30,6 +30,9 @@ export interface ReceiptModalProps {
  * POS charge (Task B) `toTransactionVM(data)` + savat uzatadi; tarix
  * (TransactionsTable) faqat VM uzatadi (satrlarsiz — data-gap).
  */
+/** Chegirma foizi: 2 xonagacha, ortiqcha nolsiz (12,5 / 15). */
+const pctFmt = new Intl.NumberFormat('uz-UZ', { maximumFractionDigits: 2 });
+
 export function ReceiptModal({
   opened,
   onClose,
@@ -69,7 +72,12 @@ export function ReceiptModal({
     lines.length > 0
       ? lines.reduce((sum, l) => sum + l.amount, 0)
       : transaction.totalAmount + transaction.discount;
-  const discountPct = subtotal > 0 ? Math.round((transaction.discount / subtotal) * 100) : 0;
+  // FT-04: foiz va sabab — serverdagi snapshot (to'lov vaqtida hisoblangan); eski
+  // tranzaksiyalarda (snapshot yo'q) savatdan qayta hisoblanadi.
+  const serverPct = detail?.discountPercent != null ? Number(detail.discountPercent) : null;
+  const discountPct =
+    serverPct ?? (subtotal > 0 ? Math.round((transaction.discount / subtotal) * 10_000) / 100 : 0);
+  const discountReason = detail?.discountReason ?? null;
 
   const sans = "'Hanken Grotesk', sans-serif";
   const mono = "'JetBrains Mono', monospace";
@@ -238,11 +246,26 @@ export function ReceiptModal({
             }}
           >
             <span>
-              {t('cashier.discount')} · {formatNumber(discountPct)}%
+              {t('cashier.receipt_modal.discount_line', { pct: pctFmt.format(discountPct) })}
             </span>
             <span style={{ fontFamily: mono, color: item }}>
               −{formatCurrency(transaction.discount, t)}
             </span>
+          </div>
+        )}
+        {transaction.discount > 0 && discountReason && (
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              gap: 12,
+              color: muted,
+              fontSize: 12,
+              marginBottom: 6,
+            }}
+          >
+            <span>{t('cashier.discount_reason')}</span>
+            <span style={{ color: item, textAlign: 'right' }}>{discountReason}</span>
           </div>
         )}
         <div

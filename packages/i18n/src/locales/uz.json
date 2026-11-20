@@ -1399,6 +1399,7 @@
     "cash_out": "Naqd chiqim (refund)",
     "noop_fiscal": "Fiskal hujjat keyinroq Soliqqa yuboriladi",
     "receipt_modal": {
+      "discount_line": "Chegirma ({{pct}}%)",
       "print": "Chop etish",
       "close": "Yopish",
       "total": "Jami",
