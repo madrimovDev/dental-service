@@ -224,3 +224,13 @@ describe('FT-06 seam: /uploads bemor avatari (Receptionist)', () => {
     expect((await get('reception', xrayKey)).status).toBe(403);
   });
 });
+
+describe('FT-06 seam: /uploads kassa rasmi filial doirasi', () => {
+  test('cashier.photo.view faqat A filialida → A rasmi 200', async () => {
+    expect((await get('photoA', photoKeyA)).status).toBe(200);
+  });
+
+  test('cashier.photo.view faqat A filialida → B rasmi 403', async () => {
+    expect((await get('photoA', photoKeyB)).status).toBe(403);
+  });
+});

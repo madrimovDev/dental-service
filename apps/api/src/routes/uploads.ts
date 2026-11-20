@@ -1,11 +1,17 @@
 import { basename, sep } from 'node:path';
 import { fail } from '@dental/core';
-import { patients } from '@dental/db-schema';
+import { cashierTransactionPhotos, cashierTransactions, patients } from '@dental/db-schema';
 import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import type { Database } from '../db/client.ts';
 import { getDb } from '../db/scoped.ts';
 import type { AuditLogger } from '../lib/audit-logger.ts';
+import {
+  BRANCH_FORBIDDEN_CODE,
+  BRANCH_FORBIDDEN_MESSAGE,
+  loadBranchScope,
+  scopeAllows,
+} from '../lib/branch-scope.ts';
 import type { StorageAdapter } from '../lib/storage.ts';
 import { authMiddleware } from '../middleware/auth.ts';
 import { requirePermission } from '../middleware/require-permission.ts';
@@ -86,8 +92,27 @@ export const uploadsRoutes = (
             return requireImageView(c, next);
           }
           if (kind === 'lab-orders') return requireLabView(c, next);
-          // FT-06.3: kassa rasmi — `cashier-photos/` → cashier.photo.view (faqat owner/Tenant Admin).
-          if (kind === 'cashier-photos') return requireCashierPhotoView(c, next);
+          // FT-06.3: kassa rasmi — `cashier-photos/` → cashier.photo.view (faqat owner/Tenant Admin)
+          // + FT-06 seam: tranzaksiya filiali chaqiruvchining `cashier.photo.view` doirasida bo'lishi shart.
+          if (kind === 'cashier-photos') {
+            const denied = await requireCashierPhotoView(c, async () => {});
+            if (denied) return denied;
+            const [row] = await getDb(c)
+              .select({ branchId: cashierTransactions.branchId })
+              .from(cashierTransactionPhotos)
+              .innerJoin(
+                cashierTransactions,
+                eq(cashierTransactions.id, cashierTransactionPhotos.transactionId),
+              )
+              .where(eq(cashierTransactionPhotos.objectKey, canonicalKey))
+              .limit(1);
+            // Ro'yxatga olinmagan fayl — mavjud emas (oshkor qilmaslik).
+            if (!row) return c.json(fail('NOT_FOUND', 'File not found'), 404);
+            if (!scopeAllows(await loadBranchScope(c, 'cashier.photo.view'), row.branchId)) {
+              return c.json(fail(BRANCH_FORBIDDEN_CODE, BRANCH_FORBIDDEN_MESSAGE), 403);
+            }
+            return next();
+          }
           return c.json(fail('permission.denied', 'Forbidden'), 403);
         }
       }
