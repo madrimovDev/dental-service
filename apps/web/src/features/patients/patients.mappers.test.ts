@@ -19,6 +19,7 @@ const base: Patient = {
   insurance: null,
   insuranceStatus: 'none',
   allowEmergencyRecall: false,
+  defaultDiscountPercent: null,
   archivedAt: null,
   createdAt: '2026-01-01',
   updatedAt: '2026-01-01',

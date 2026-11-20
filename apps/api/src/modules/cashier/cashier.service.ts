@@ -6,14 +6,18 @@ import {
   expenses,
   patients,
   services,
-  tenantSettings,
   treatmentPlans,
   treatmentStagePayments,
   treatmentStages,
   users,
   visitNotes,
 } from '@dental/db-schema';
-import { createNoOpFiscalProvider, type FiscalProvider } from '@dental/fiscal';
+import {
+  createNoOpFiscalProvider,
+  type FiscalItem,
+  type FiscalPayment,
+  type FiscalProvider,
+} from '@dental/fiscal';
 import {
   and,
   between,
@@ -32,9 +36,15 @@ import { onAfterCommit } from '../../db/after-commit.ts';
 import type { DbOrTx } from '../../db/client.ts';
 import { getDb, withTenant } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import {
+  canGiveDiscountAtBranch,
+  capDiscountPercent,
+  readMaxDiscountPercent,
+} from '../../lib/discount.ts';
 import type { PatientMessenger } from '../../lib/telegram/notify.ts';
 import {
   computePlanBalance,
+  distributeDiscountCents,
   distributeRefundNegations,
   fromCents,
   toCents,
@@ -240,6 +250,17 @@ export class DiscountExceedsTotalError extends Error {
  * `cashier.discount_exceeds_max` ga aylantiradi. `DiscountExceedsTotalError`dan
  * qat'iyroq — u itemsGross (100%) chegarasi, bu esa tenant limiti (masalan 30%).
  */
+/**
+ * FT-04 (D-1/D-2): `discount > 0`, lekin chaqiruvchida `discount.give` yo'q va summa bemorning
+ * doimiy chegirmasiga (avtomatik) aynan teng emas — routes 403 `discount.forbidden`.
+ */
+export class DiscountForbiddenError extends Error {
+  constructor() {
+    super('Discount requires discount.give');
+    this.name = 'DiscountForbiddenError';
+  }
+}
+
 export class DiscountExceedsMaxError extends Error {
   constructor(public readonly maxPercent: number) {
     super(`Discount exceeds max ${maxPercent}%`);
@@ -535,6 +556,38 @@ export const createCashierService = (deps: {
     );
     const discountCents = toCents(input.discount);
 
+    // FT-04 (D-1/D-2): chegirma faqat `discount.give` bilan — YAGONA istisno: erkin POS'da
+    // bemorning doimiy chegirmasi (`patients.default_discount_percent`) avtomatik qo'llanadi,
+    // summa aynan `round(itemsGross × pct/100)` bo'lsa (web POS bilan bir xil formula). Boshqa
+    // summa yoki reja to'lovi — 403. Yozuvdan OLDIN (hech narsa yaratilmaydi).
+    let discountSource: 'manual' | 'patient_default' = 'manual';
+    // CLI-444: tenant-configurable maksimal foiz (`tenant_settings.max_discount_percent`,
+    // default 100 = cheklovsiz) — faqat erkin POS rejimida ma'noli. FT-04.3 (review):
+    // bemorning avto chegirmasi ham shu chegara bilan cheklanadi (`min(pct, max)`).
+    const maxPct = resolvedItems.length > 0 ? await readMaxDiscountPercent(db) : 100;
+    if (discountCents > 0) {
+      const pid = visitPatientId ?? input.patientId ?? null;
+      let autoCents: number | null = null;
+      if (resolvedItems.length > 0 && pid) {
+        const [pt] = await db
+          .select({ pct: patients.defaultDiscountPercent })
+          .from(patients)
+          .where(eq(patients.id, pid))
+          .limit(1);
+        const effective = capDiscountPercent(pt?.pct ?? null, maxPct);
+        const bp = effective != null ? Math.round(Number(effective) * 100) : 0;
+        if (bp > 0) {
+          autoCents = toCents(Math.round((fromCents(itemsGrossCents) * bp) / 10_000));
+        }
+      }
+      if (autoCents !== null && autoCents === discountCents) discountSource = 'patient_default';
+      // Verifier MAJOR: `discount.give` maqsad filial doirasida (faqat JWT emas) — erkin POS
+      // va reja to'lovi (allocations) uchun bir xil.
+      else if (!(await canGiveDiscountAtBranch(c, input.branchId))) {
+        throw new DiscountForbiddenError();
+      }
+    }
+
     // CLI-444: discount itemsGross'dan katta bo'lsa jim clamp o'rniga RAD etiladi
     // (routes 400 `cashier.discount_exceeds_total`). Faqat erkin POS (items bor)
     // rejimida ma'noli — plan-billing (allocations) discount'dan mustaqil.
@@ -542,21 +595,12 @@ export const createCashierService = (deps: {
       throw new DiscountExceedsTotalError();
     }
 
-    // CLI-444: chegirma tenant-configurable maksimal foizdan oshmasligi
-    // (`tenant_settings.max_discount_percent`, default 100 = cheklovsiz). Yuqoridagi
-    // `> itemsGross` (100%) chekidan KEYIN — default holatda o'sha chek oldin otiladi,
-    // shuning uchun bu faqat maxPct < 100 uchun faollashadi (backward-compatible).
-    // Faqat erkin POS rejimida ma'noli. Butun-son arifmetikasi — float yaxlitlashsiz.
+    // CLI-444: chegirma `maxPct`dan oshmasligi. Yuqoridagi `> itemsGross` (100%) chekidan
+    // KEYIN — default holatda o'sha chek oldin otiladi, shuning uchun bu faqat maxPct < 100
+    // uchun faollashadi (backward-compatible). Butun-son arifmetikasi — float yaxlitlashsiz.
     // Faqat Tenant Admin/Owner (`tenant_settings.edit`) limitni o'zgartiradi — kassir emas.
-    if (resolvedItems.length > 0) {
-      const [settingsRow] = await db
-        .select({ maxDiscountPercent: tenantSettings.maxDiscountPercent })
-        .from(tenantSettings)
-        .limit(1);
-      const maxPct = settingsRow?.maxDiscountPercent ?? 100;
-      if (discountCents * 100 > itemsGrossCents * maxPct) {
-        throw new DiscountExceedsMaxError(maxPct);
-      }
+    if (resolvedItems.length > 0 && discountCents * 100 > itemsGrossCents * maxPct) {
+      throw new DiscountExceedsMaxError(maxPct);
     }
 
     // Erkin POS: jami − chegirma (endi manfiy bo'lmasligi kafolatlangan — yuqoridagi guard).
@@ -564,6 +608,16 @@ export const createCashierService = (deps: {
     const netTotalCents =
       resolvedItems.length > 0 ? itemsGrossCents - discountCents : toCents(input.paidAmount);
     const netTotal = fromCents(netTotalCents);
+
+    // FT-04 (D-1): chegirma snapshot'i — faqat erkin POS'da `discount > 0` bo'lsa. Foiz
+    // serverda (client yubormaydi) 2 xonagacha yaxlitlanadi; kim bergani = chaqiruvchi
+    // (`discount.give` route'da tekshirilgan). Chegirmasiz — hammasi null.
+    const hasDiscount = resolvedItems.length > 0 && discountCents > 0;
+    const discountPercent = hasDiscount
+      ? (Math.round((discountCents * 10_000) / itemsGrossCents) / 100).toFixed(2)
+      : null;
+    const discountReason = hasDiscount ? input.discountReason || null : null;
+    const discountGrantedBy = hasDiscount ? (user?.id ?? null) : null;
 
     // CLI-459: allocation yig'indisi paidAmount'ga AYNAN TENG bo'lishi shart
     // (avval bir-tomonlama edi — kam bo'lishi jim o'tar edi, "ko'rinmas" pul).
@@ -640,6 +694,9 @@ export const createCashierService = (deps: {
             totalAmount: String(netTotal),
             paidAmount: String(input.paidAmount),
             discount: String(input.discount),
+            discountPercent,
+            discountReason,
+            discountGrantedBy,
             paymentMethod: input.paymentMethod,
             cardProvider: input.paymentMethod === 'card' ? (input.cardProvider ?? null) : null,
             notes: input.notes ?? null,
@@ -713,10 +770,64 @@ export const createCashierService = (deps: {
         // osilib qolmasin; tx rollback bo'lsa chek soliqqa ketib qolmasin). Commit'dan keyin
         // yuboriladi, natija alohida tenant-tx'da yoziladi. CLI-449: paidAmount (haqiqatda
         // olingan naqd) — totalAmount (nominal) EMAS.
-        const fiscalPayment = {
+        // FT-04.4 (LA fiskal low): items NETTO — chegirma qatorlarga proporsional taqsimlanadi
+        // (Σ items.amount = netTotal = to'liq to'lovda paidAmount). Reja to'lovida items =
+        // bosqich allocation'lari (chegirma bosqich `cost`ida snapshot, bu yerda 0).
+        let fiscalItems: FiscalItem[];
+        if (resolvedItems.length > 0) {
+          const grossCents = resolvedItems.map((i) => toCents(i.unitPrice) * i.quantity);
+          const lineDiscounts = distributeDiscountCents(grossCents, discountCents);
+          fiscalItems = resolvedItems.map((i, idx) => {
+            const g = grossCents[idx] as number;
+            const dsc = lineDiscounts[idx] as number;
+            return {
+              name: i.serviceName,
+              serviceId: i.serviceId,
+              stageId: null,
+              quantity: i.quantity,
+              unitPrice: i.unitPrice,
+              grossAmount: fromCents(g),
+              discount: fromCents(dsc),
+              amount: fromCents(g - dsc),
+            };
+          });
+        } else if (input.allocations && input.allocations.length > 0) {
+          const stageRows = await tx
+            .select({
+              id: treatmentStages.id,
+              serviceId: treatmentStages.serviceId,
+              serviceName: treatmentStages.serviceName,
+            })
+            .from(treatmentStages)
+            .where(
+              inArray(
+                treatmentStages.id,
+                input.allocations.map((a) => a.stageId),
+              ),
+            );
+          const byId = new Map(stageRows.map((r) => [r.id, r]));
+          fiscalItems = input.allocations.map((a) => {
+            const st = byId.get(a.stageId);
+            const amt = fromCents(toCents(a.amount));
+            return {
+              name: st?.serviceName ?? '',
+              serviceId: st?.serviceId ?? null,
+              stageId: a.stageId,
+              quantity: 1,
+              unitPrice: amt,
+              grossAmount: amt,
+              discount: 0,
+              amount: amt,
+            };
+          });
+        } else {
+          fiscalItems = [];
+        }
+        const fiscalPayment: FiscalPayment = {
           id: transaction.id,
           amount: Number(transaction.paidAmount),
-          items: items,
+          discount: hasDiscount ? fromCents(discountCents) : 0,
+          items: fiscalItems,
         };
         await onAfterCommit(c, async () => {
           const fiscalResult = await fiscal.createReceipt(fiscalPayment);
@@ -737,7 +848,20 @@ export const createCashierService = (deps: {
           action: 'created',
           resourceType: 'cashier_transaction',
           resourceId: transaction.id,
-          after: { receiptNumber, totalAmount: netTotal, items: input.items.length },
+          after: {
+            receiptNumber,
+            totalAmount: netTotal,
+            items: input.items.length,
+            // FT-04: chegirma auditda (summa, foiz, sabab; kim — audit userId).
+            ...(hasDiscount
+              ? {
+                  discount: fromCents(discountCents),
+                  discountPercent,
+                  discountReason,
+                  discountSource,
+                }
+              : {}),
+          },
         });
 
         // UI-T2: bog'langan (Telegram) bemorga chek xulosasi — commit'dan KEYIN.

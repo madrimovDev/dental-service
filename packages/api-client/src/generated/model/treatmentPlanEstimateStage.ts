@@ -12,6 +12,10 @@ export interface TreatmentPlanEstimateStage {
   serviceName: string;
   /** Stage list cost (xom) */
   cost: number;
+  /** @nullable */
+  listPrice: number | null;
+  /** @nullable */
+  discountPercent: number | null;
   status: TreatmentPlanEstimateStageStatus;
   acceptance: TreatmentPlanEstimateStageAcceptance;
   paid: number;

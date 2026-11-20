@@ -6,7 +6,7 @@ import type { PatientDetail } from '../patients.types';
 
 type HeaderPatient = Pick<
   PatientDetail,
-  'fullName' | 'phone' | 'age' | 'genderLabel' | 'tags' | 'source'
+  'fullName' | 'phone' | 'age' | 'genderLabel' | 'tags' | 'source' | 'defaultDiscountPercent'
 >;
 
 function initials(fullName: string): string {
@@ -115,6 +115,22 @@ export function PatientHeaderCard({
                 }}
               >
                 {tag}
+              </span>
+            )}
+            {/* FT-04.3: doimiy chegirma belgisi (kassada va yangi reja bosqichlarida qo'llanadi). */}
+            {patient.defaultDiscountPercent != null && patient.defaultDiscountPercent > 0 && (
+              <span
+                data-testid="patient-discount-badge"
+                style={{
+                  background: 'var(--success-soft)',
+                  borderRadius: 99,
+                  color: 'var(--success)',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  padding: '3px 10px',
+                }}
+              >
+                {t('patients.discount_badge', { pct: patient.defaultDiscountPercent })}
               </span>
             )}
           </div>

@@ -1697,6 +1697,10 @@
           "allowEmergencyRecall": {
             "type": "boolean"
           },
+          "defaultDiscountPercent": {
+            "type": "string",
+            "nullable": true
+          },
           "archivedAt": {
             "type": "string",
             "nullable": true
@@ -1725,6 +1729,7 @@
           "insurance",
           "insuranceStatus",
           "allowEmergencyRecall",
+          "defaultDiscountPercent",
           "archivedAt",
           "createdAt",
           "updatedAt"
@@ -2709,6 +2714,19 @@
           "discount": {
             "type": "string"
           },
+          "discountPercent": {
+            "type": "string",
+            "nullable": true
+          },
+          "discountReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "discountGrantedBy": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
           "currency": {
             "type": "string"
           },
@@ -2787,6 +2805,9 @@
           "paidAmount",
           "refundedAmount",
           "discount",
+          "discountPercent",
+          "discountReason",
+          "discountGrantedBy",
           "currency",
           "paymentMethod",
           "cardProvider",
@@ -7343,6 +7364,16 @@
             "type": "string",
             "example": "150000.00"
           },
+          "listPrice": {
+            "type": "string",
+            "nullable": true,
+            "example": "200000.00"
+          },
+          "discountPercent": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -7407,6 +7438,8 @@
           "estimatedVisits",
           "estimatedDurationMinutes",
           "cost",
+          "listPrice",
+          "discountPercent",
           "status",
           "acceptance",
           "notes",
@@ -7576,6 +7609,14 @@
             "example": 150000,
             "description": "Stage list cost (xom)"
           },
+          "listPrice": {
+            "type": "number",
+            "nullable": true
+          },
+          "discountPercent": {
+            "type": "number",
+            "nullable": true
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -7605,6 +7646,8 @@
           "stageId",
           "serviceName",
           "cost",
+          "listPrice",
+          "discountPercent",
           "status",
           "acceptance",
           "paid",
@@ -12522,6 +12565,12 @@
                   },
                   "allowEmergencyRecall": {
                     "type": "boolean"
+                  },
+                  "defaultDiscountPercent": {
+                    "type": "number",
+                    "nullable": true,
+                    "minimum": 0,
+                    "maximum": 100
                   }
                 },
                 "required": [
@@ -13007,6 +13056,12 @@
                   },
                   "allowEmergencyRecall": {
                     "type": "boolean"
+                  },
+                  "defaultDiscountPercent": {
+                    "type": "number",
+                    "nullable": true,
+                    "minimum": 0,
+                    "maximum": 100
                   }
                 }
               }
@@ -15727,6 +15782,10 @@
                     "nullable": true,
                     "minimum": 0,
                     "default": 0
+                  },
+                  "discountReason": {
+                    "type": "string",
+                    "maxLength": 500
                   },
                   "paidAmount": {
                     "type": "number",

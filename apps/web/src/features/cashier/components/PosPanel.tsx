@@ -30,8 +30,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BalanceBadge } from '@/components/BalanceBadge';
-import { usePatientBalance } from '@/features/patients/patients.api';
+import { usePatient, usePatientBalance } from '@/features/patients/patients.api';
+import { apiErrorMessage } from '@/lib/api-error-message';
 import { formatCurrency } from '@/lib/format';
+import { useAuthStore } from '@/stores/auth-store';
 import { fetchServicePrices, useCreateTransaction, useServices } from '../cashier.api';
 import { cashierKeys } from '../cashier.keys';
 import {
@@ -103,8 +105,14 @@ function ServicePill({
 }
 
 /** Discount foiz pillari (so'm emas — call-site so'mga aylantiradi, mapper o'zgarmaydi). */
-const DISCOUNT_PCTS = [0, 5, 10, 15] as const;
-type DiscountPct = (typeof DISCOUNT_PCTS)[number];
+const DISCOUNT_PCTS: readonly number[] = [0, 5, 10, 15];
+
+/**
+ * FT-04.3: foiz → so'm chegirma — server `cashier.service` bilan AYNAN bir xil formula
+ * (bemorning doimiy chegirmasi `discount.give`siz faqat shu summada qabul qilinadi).
+ */
+const discountAmount = (gross: number, pct: number) =>
+  Math.round((gross * Math.round(pct * 100)) / 10_000);
 
 /** To'lov usuli toggle tugmalari (3 ta; `other` enum saqlanadi lekin toggle'da yo'q). */
 const PAYMENT_OPTIONS: ReadonlyArray<{
@@ -157,10 +165,19 @@ export function PosPanel({
   const servicesQuery = useServices();
   const createMut = useCreateTransaction();
   const balanceQuery = usePatientBalance(patientId ?? '');
+  // FT-04 (D-1): chegirma faqat `discount.give` bilan (server 403 `discount.forbidden`).
+  const canDiscount = useAuthStore((s) => s.hasPermission('discount.give'));
+  // FT-04.3 (D-2): bemorning doimiy chegirmasi — tanlanganda avtomatik qo'llanadi.
+  const patientQuery = usePatient(patientId ?? '');
+  const patientDefaultPct =
+    patientId && patientQuery.data?.id === patientId
+      ? (patientQuery.data.defaultDiscountPercent ?? 0)
+      : 0;
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState('');
-  const [discountPct, setDiscountPct] = useState<DiscountPct>(0);
+  const [discountPct, setDiscountPct] = useState<number>(0);
+  const [discountReason, setDiscountReason] = useState('');
   const [paidAmount, setPaidAmount] = useState<number | ''>('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [cardProvider, setCardProvider] = useState<CardProvider>('terminal');
@@ -170,7 +187,17 @@ export function PosPanel({
 
   // Foiz → so'm chegirma. gross = savat jami (chegirmasiz) = computeNetTotal(cart, 0).
   const gross = computeNetTotal(cart, 0);
-  const discAmt = Math.round((gross * discountPct) / 100);
+  // `discount.give`siz — faqat bemorning doimiy chegirmasi (o'zgartirib bo'lmaydi).
+  const effectivePct = canDiscount ? discountPct : patientDefaultPct;
+  const discAmt = discountAmount(gross, effectivePct);
+  const discountPills = DISCOUNT_PCTS.includes(patientDefaultPct)
+    ? DISCOUNT_PCTS
+    : [...DISCOUNT_PCTS, patientDefaultPct].sort((a, b) => a - b);
+
+  // Bemor (yoki uning chegirmasi) o'zgarganda — doimiy chegirma oldindan tanlanadi.
+  useEffect(() => {
+    setDiscountPct(patientDefaultPct);
+  }, [patientDefaultPct]);
   const netTotal = computeNetTotal(cart, discAmt);
   // Naqdda qaytim, qarz qoldig'i (sof hisob — mappers.computeTender).
   const tender = computeTender(
@@ -209,7 +236,7 @@ export function PosPanel({
       })),
     );
     setVisitNoteId(visit.visitNoteId);
-    setDiscountPct(0);
+    setDiscountPct(patientDefaultPct);
     setPaidAmount('');
   }, [visit]);
 
@@ -278,6 +305,7 @@ export function PosPanel({
       patientId,
       cart,
       discount: discAmt,
+      discountReason: discAmt > 0 ? discountReason : '',
       // Bemor ortiqcha bergan bo'lsa ham serverga net yoziladi (qaytim kassada qoladi).
       paidAmount: tender.paid,
       paymentMethod,
@@ -302,8 +330,9 @@ export function PosPanel({
           clearVisit();
           return;
         }
-        // Per-mutation onError global toast'ni o'chiradi — umumiy xatoni o'zimiz ko'rsatamiz.
-        notifications.show({ color: 'red', message: t('common.error') });
+        // Per-mutation onError global toast'ni o'chiradi — umumiy xatoni o'zimiz ko'rsatamiz
+        // (FT-04: `apiErrors.<code>` tarjimasi bo'lsa — masalan `discount.forbidden` — o'shani).
+        notifications.show({ color: 'red', message: apiErrorMessage(e) });
       },
       onSuccess: (data: CashierTransaction) => {
         setVisitNoteId(null);
@@ -318,7 +347,8 @@ export function PosPanel({
         }
         setCart([]);
         setSearch('');
-        setDiscountPct(0);
+        setDiscountPct(patientDefaultPct);
+        setDiscountReason('');
         setPaidAmount('');
         setCardProvider('terminal');
         setNotes('');
@@ -422,42 +452,76 @@ export function PosPanel({
           </Text>
         </Group>
 
-        {/* Chegirma percent pillari */}
-        <Group
-          justify="space-between"
-          align="center"
-          style={{ padding: '12px 18px', borderTop: '1px solid var(--border)' }}
-        >
-          <Text size="sm" style={{ color: 'var(--ink-2)' }}>
-            {t('cashier.discount')}
-          </Text>
-          <Group gap={6}>
-            {DISCOUNT_PCTS.map((pct) => {
-              const active = pct === discountPct;
-              return (
-                <UnstyledButton
-                  key={pct}
-                  onClick={() => setDiscountPct(pct)}
-                  style={{
-                    minWidth: 40,
-                    height: 30,
-                    padding: '0 10px',
-                    borderRadius: 8,
-                    textAlign: 'center',
-                    fontSize: 13,
-                    fontWeight: 600,
-                    fontFamily: 'var(--font-mono)',
-                    border: active ? '1px solid var(--primary)' : '1px solid var(--border)',
-                    background: active ? 'var(--primary)' : 'var(--surface)',
-                    color: active ? 'var(--on-primary)' : 'var(--ink-2)',
-                  }}
-                >
-                  {`${pct}%`}
-                </UnstyledButton>
-              );
-            })}
+        {/* Chegirma percent pillari — faqat `discount.give` bilan */}
+        {canDiscount && (
+          <Group
+            justify="space-between"
+            align="center"
+            style={{ padding: '12px 18px', borderTop: '1px solid var(--border)' }}
+          >
+            <Text size="sm" style={{ color: 'var(--ink-2)' }}>
+              {t('cashier.discount')}
+            </Text>
+            <Group gap={6}>
+              {discountPills.map((pct) => {
+                const active = pct === discountPct;
+                return (
+                  <UnstyledButton
+                    key={pct}
+                    onClick={() => setDiscountPct(pct)}
+                    style={{
+                      minWidth: 40,
+                      height: 30,
+                      padding: '0 10px',
+                      borderRadius: 8,
+                      textAlign: 'center',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      fontFamily: 'var(--font-mono)',
+                      border: active ? '1px solid var(--primary)' : '1px solid var(--border)',
+                      background: active ? 'var(--primary)' : 'var(--surface)',
+                      color: active ? 'var(--on-primary)' : 'var(--ink-2)',
+                    }}
+                  >
+                    {`${pct}%`}
+                  </UnstyledButton>
+                );
+              })}
+            </Group>
           </Group>
-        </Group>
+        )}
+        {/* FT-04.3: discount.give'siz — bemorning doimiy chegirmasi faqat ko'rinadi. */}
+        {!canDiscount && patientDefaultPct > 0 && (
+          <Group
+            justify="space-between"
+            align="center"
+            style={{ padding: '12px 18px', borderTop: '1px solid var(--border)' }}
+          >
+            <Text size="sm" style={{ color: 'var(--ink-2)' }}>
+              {t('cashier.patient_discount')}
+            </Text>
+            <Text
+              size="sm"
+              fw={600}
+              data-testid="pos-patient-discount"
+              style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink)' }}
+            >
+              {`${patientDefaultPct}% · −${formatCurrency(discAmt, t)}`}
+            </Text>
+          </Group>
+        )}
+        {canDiscount && discountPct > 0 && (
+          <div style={{ padding: '0 18px 12px' }}>
+            <TextInput
+              size="md"
+              label={t('cashier.discount_reason')}
+              placeholder={t('cashier.discount_reason_placeholder')}
+              value={discountReason}
+              maxLength={500}
+              onChange={(e) => setDiscountReason(e.currentTarget.value)}
+            />
+          </div>
+        )}
 
         {/* Jami to'lov */}
         <Group

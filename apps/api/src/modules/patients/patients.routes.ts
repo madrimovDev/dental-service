@@ -2,6 +2,12 @@ import { fail, ok } from '@dental/core';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { Database } from '../../db/client.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import {
+  canGiveDiscount,
+  DISCOUNT_FORBIDDEN_CODE,
+  DISCOUNT_FORBIDDEN_MESSAGE,
+  PatientDiscountExceedsMaxError,
+} from '../../lib/discount.ts';
 import { requireModuleInDesktop } from '../../lib/license-middleware.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
 import { CrossEntityError } from '../../lib/ownership.ts';
@@ -153,8 +159,20 @@ export const patientRoutes = (deps: {
 
   app.openapi(createPatientRoute, async (c) => {
     const body = c.req.valid('json');
-    const row = await service.create(c, body);
-    return c.json(ok(toPatientDto(row)), 201);
+    // FT-04.3 (D-2): doimiy chegirma faqat `discount.give` bilan (maydon-darajasidagi gate).
+    if (body.defaultDiscountPercent !== undefined && !canGiveDiscount(c)) {
+      return c.json(fail(DISCOUNT_FORBIDDEN_CODE, DISCOUNT_FORBIDDEN_MESSAGE), 403);
+    }
+    try {
+      const row = await service.create(c, body);
+      return c.json(ok(toPatientDto(row)), 201);
+    } catch (e) {
+      // FT-04.3 (review): doimiy chegirma tenant chegarasidan oshdi — hech narsa yozilmagan.
+      if (e instanceof PatientDiscountExceedsMaxError) {
+        return c.json(fail(e.code, e.message, { maxPercent: e.maxPercent }), 400);
+      }
+      throw e;
+    }
   });
 
   // ─── POST /import — Excel/CSV'dan ommaviy import (FU-24) ──────────────────
@@ -258,7 +276,20 @@ export const patientRoutes = (deps: {
   app.openapi(updateRoute, async (c) => {
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const row = await service.update(c, id, body);
+    // FT-04.3 (D-2): `patient.edit` + `discount.give` (tozalash — `null` — ham).
+    if (body.defaultDiscountPercent !== undefined && !canGiveDiscount(c)) {
+      return c.json(fail(DISCOUNT_FORBIDDEN_CODE, DISCOUNT_FORBIDDEN_MESSAGE), 403);
+    }
+    let row: Awaited<ReturnType<typeof service.update>>;
+    try {
+      row = await service.update(c, id, body);
+    } catch (e) {
+      // FT-04.3 (review): doimiy chegirma tenant chegarasidan oshdi — yozuvdan oldin rad.
+      if (e instanceof PatientDiscountExceedsMaxError) {
+        return c.json(fail(e.code, e.message, { maxPercent: e.maxPercent }), 400);
+      }
+      throw e;
+    }
     if (!row) return c.json(fail('patient.not_found', 'Patient not found'), 404);
     return c.json(ok(toPatientDto(row)), 200);
   });

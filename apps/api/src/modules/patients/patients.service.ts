@@ -17,6 +17,7 @@ import { and, count, desc, eq, gte, inArray, isNotNull, isNull, ne, or, sql } fr
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { PatientDiscountExceedsMaxError, readMaxDiscountPercent } from '../../lib/discount.ts';
 import { createOwnershipValidator, type OwnershipValidator } from '../../lib/ownership.ts';
 import type { NonPlanTransactionRow } from './patients.balance.ts';
 import { computeNonPlanRemainder, computePatientBalance } from './patients.balance.ts';
@@ -405,10 +406,22 @@ export const createPatientsService = (deps: {
     return hasPii ? row : maskPii(row);
   }
 
+  /**
+   * FT-04.3 (review): doimiy chegirma tenant chegarasidan (`max_discount_percent`, CLI-444 —
+   * owner kassirlarni shu bilan cheklaydi) oshmasligi kerak. Yozuvdan OLDIN; `null` (tozalash)
+   * har doim ruxsat.
+   */
+  async function assertDefaultDiscountWithinMax(c: Context, pct: number | null | undefined) {
+    if (pct == null || pct <= 0) return;
+    const maxPct = await readMaxDiscountPercent(getDb(c));
+    if (pct > maxPct) throw new PatientDiscountExceedsMaxError(maxPct);
+  }
+
   async function create(c: Context, input: CreatePatientInput) {
     const db = getDb(c);
     const tenantId = c.get('activeTenantId');
     if (!tenantId) throw new Error('No tenant context');
+    await assertDefaultDiscountWithinMax(c, input.defaultDiscountPercent);
 
     return await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);
@@ -431,6 +444,8 @@ export const createPatientsService = (deps: {
           source: input.source ?? null,
           insurance: input.insurance ?? null,
           allowEmergencyRecall: input.allowEmergencyRecall ?? false,
+          defaultDiscountPercent:
+            input.defaultDiscountPercent == null ? null : input.defaultDiscountPercent.toFixed(2),
         })
         .returning();
 
@@ -457,6 +472,7 @@ export const createPatientsService = (deps: {
     const db = getDb(c);
     const [before] = await db.select().from(patients).where(eq(patients.id, id));
     if (!before) return null;
+    await assertDefaultDiscountWithinMax(c, input.defaultDiscountPercent);
 
     // CLI-455: explicit patch — kalit yo'q (`undefined`) bo'lsa ustunga tegmaydi,
     // `null` bo'lsa ustunni tozalaydi. Zod schema `.nullable()` bo'lgani uchun
@@ -484,6 +500,9 @@ export const createPatientsService = (deps: {
     if (input.insurance !== undefined) patch.insurance = input.insurance;
     if (input.allowEmergencyRecall !== undefined)
       patch.allowEmergencyRecall = input.allowEmergencyRecall;
+    if (input.defaultDiscountPercent !== undefined)
+      patch.defaultDiscountPercent =
+        input.defaultDiscountPercent === null ? null : input.defaultDiscountPercent.toFixed(2);
 
     const [updated] = await db.update(patients).set(patch).where(eq(patients.id, id)).returning();
 

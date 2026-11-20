@@ -59,6 +59,16 @@ export const cashierTransactions = pgTable(
     totalAmount: numeric('total_amount', { precision: 14, scale: 2 }).notNull(),
     paidAmount: numeric('paid_amount', { precision: 14, scale: 2 }).notNull(),
     discount: numeric('discount', { precision: 14, scale: 2 }).notNull().default('0'),
+    /**
+     * FT-04 (D-1): chegirma snapshot'i — faqat `discount > 0` bo'lganda. Foiz serverda
+     * `discount / itemsGross × 100` (2 xona) hisoblanadi; kim bergani = chaqiruvchi
+     * (`discount.give` egasi). To'lovdan keyin tahrirlanmaydi (CLI-479 invarianti).
+     */
+    discountPercent: numeric('discount_percent', { precision: 5, scale: 2 }),
+    discountReason: text('discount_reason'),
+    discountGrantedBy: uuid('discount_granted_by').references(() => users.id, {
+      onDelete: 'set null',
+    }),
     currency: text('currency').notNull().default('UZS'),
 
     paymentMethod: paymentMethodEnum('payment_method').notNull(),

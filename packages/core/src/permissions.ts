@@ -255,6 +255,13 @@ export const PERMISSIONS = [
     descriptionUz: "To'lovni qaytarish",
     descriptionRu: 'Возврат платежа',
   },
+  // FT-04 (D-1): chegirma (POS'da yoki reja bosqichi narxida) faqat shu ruxsat bilan.
+  {
+    code: 'discount.give',
+    category: 'cashier',
+    descriptionUz: 'Chegirma bera oladi',
+    descriptionRu: 'Может предоставлять скидку',
+  },
   {
     code: 'report.view',
     category: 'report',

@@ -31,4 +31,16 @@ describe('PatientHeaderCard', () => {
     renderApp(<PatientHeaderCard patient={patient} />);
     expect(screen.queryByText(/so'm/)).not.toBeInTheDocument();
   });
+
+  it("FT-04.3: doimiy chegirma bo'lsa sarlavhada «Chegirma 10%» belgisi", () => {
+    renderApp(<PatientHeaderCard patient={{ ...patient, defaultDiscountPercent: 10 }} />);
+    expect(screen.getByTestId('patient-discount-badge')).toHaveTextContent('Chegirma 10%');
+  });
+
+  it("FT-04.3: chegirma yo'q (null/0) — belgi ko'rinmaydi", () => {
+    renderApp(<PatientHeaderCard patient={{ ...patient, defaultDiscountPercent: null }} />);
+    expect(screen.queryByTestId('patient-discount-badge')).not.toBeInTheDocument();
+    renderApp(<PatientHeaderCard patient={{ ...patient, defaultDiscountPercent: 0 }} />);
+    expect(screen.queryByTestId('patient-discount-badge')).not.toBeInTheDocument();
+  });
 });

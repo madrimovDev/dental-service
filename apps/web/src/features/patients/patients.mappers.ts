@@ -74,6 +74,8 @@ export function toPatientDetail(p: Patient, t: TFn): PatientDetail {
     source: p.source,
     insurance: p.insurance,
     insuranceStatus: p.insuranceStatus,
+    defaultDiscountPercent:
+      p.defaultDiscountPercent != null ? Number(p.defaultDiscountPercent) : null,
     archived: p.archivedAt != null,
   };
 }

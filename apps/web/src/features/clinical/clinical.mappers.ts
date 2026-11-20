@@ -333,6 +333,12 @@ function toEstimateStageVM(stage: TreatmentPlanEstimate['stages'][number]): Esti
     id: stage.stageId,
     serviceName: stage.serviceName,
     costText: formatNumber(stage.cost),
+    listPriceText:
+      stage.discountPercent != null && stage.discountPercent > 0 && stage.listPrice != null
+        ? formatNumber(stage.listPrice)
+        : null,
+    discountPercent:
+      stage.discountPercent != null && stage.discountPercent > 0 ? stage.discountPercent : null,
     statusLabelKey: `treatment_plan.stage_status_${stage.status}`,
     statusTone: STAGE_TONE[stage.status],
     acceptanceLabelKey: `treatment_plan.acceptance_${stage.acceptance}`,

@@ -10,6 +10,7 @@ import {
   loadBranchScope,
   scopeAllows,
 } from '../../lib/branch-scope.ts';
+import { DISCOUNT_FORBIDDEN_CODE, DISCOUNT_FORBIDDEN_MESSAGE } from '../../lib/discount.ts';
 import { requireModuleInDesktop } from '../../lib/license-middleware.ts';
 import { apiResponseSchema, errorResponseSchema, okJson } from '../../lib/openapi.ts';
 import { createPatientMessenger } from '../../lib/telegram/notify.ts';
@@ -40,6 +41,7 @@ import {
   createCashierService,
   DiscountExceedsMaxError,
   DiscountExceedsTotalError,
+  DiscountForbiddenError,
   ItemsPlanNotAllowedError,
   NoActivePriceError,
   PatientNotFoundError,
@@ -156,10 +158,16 @@ export const cashierRoutes = (deps: {
     if (!(await isBranchAllowed(c, 'cashier.create_transaction', body.branchId))) {
       return c.json(fail(BRANCH_FORBIDDEN_CODE, BRANCH_FORBIDDEN_MESSAGE), 403);
     }
+    // FT-04 (D-1): chegirma faqat `discount.give` bilan (maydon-darajasidagi gate —
+    // `cashier.create_transaction` o'zi chegirma berish huquqini bermaydi). Service'da:
+    // bemorning doimiy chegirmasi (D-2) avtomatik summasi — istisno (DiscountForbiddenError).
     try {
       const tx = await service.create(c, body);
       return c.json(ok(toCashierTransactionWithItemsDto(tx, tx.items)), 201);
     } catch (e) {
+      if (e instanceof DiscountForbiddenError) {
+        return c.json(fail(DISCOUNT_FORBIDDEN_CODE, DISCOUNT_FORBIDDEN_MESSAGE), 403);
+      }
       if (e instanceof AllocationExceedError) {
         return c.json(fail('allocations.exceed', 'Allocation sum exceeds paid amount'), 400);
       }

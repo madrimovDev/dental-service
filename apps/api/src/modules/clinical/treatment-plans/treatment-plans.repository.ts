@@ -1,6 +1,7 @@
 import {
   consentForms,
   labOrders,
+  patients,
   treatmentPlans,
   treatmentStagePayments,
   treatmentStages,
@@ -8,6 +9,7 @@ import {
 import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../../db/scoped.ts';
+import { capDiscountPercent, readMaxDiscountPercent } from '../../../lib/discount.ts';
 import type { ListPlansQuery } from './treatment-plans.schema.ts';
 
 export const createTreatmentPlansRepository = () => {
@@ -211,7 +213,31 @@ export const createTreatmentPlansRepository = () => {
     return updated ?? null;
   }
 
+  /** FT-04.3 (D-2): bemorning doimiy chegirma foizi ('10.00') yoki null (RLS-bound). */
+  async function findPatientDefaultDiscount(c: Context, patientId: string) {
+    const db = getDb(c);
+    const [row] = await db
+      .select({ pct: patients.defaultDiscountPercent })
+      .from(patients)
+      .where(eq(patients.id, patientId))
+      .limit(1);
+    return row?.pct ?? null;
+  }
+
+  /**
+   * FT-04.3 (review): bosqich snapshot'i uchun bemorning SAMARALI doimiy chegirmasi —
+   * `min(patients.default_discount_percent, tenant_settings.max_discount_percent)` (RLS-bound).
+   * Chegara bemor chegirmasidan keyin pasaytirilgan bo'lsa ham owner chegarasi aylanib o'tilmaydi.
+   */
+  async function findPatientEffectiveDiscount(c: Context, patientId: string) {
+    const pct = await findPatientDefaultDiscount(c, patientId);
+    if (pct == null) return null;
+    return capDiscountPercent(pct, await readMaxDiscountPercent(getDb(c)));
+  }
+
   return {
+    findPatientDefaultDiscount,
+    findPatientEffectiveDiscount,
     listPlans,
     getPlanWithStages,
     insertPlanWithStages,

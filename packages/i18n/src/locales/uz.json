@@ -352,6 +352,12 @@
     },
     "visit_note": {
       "on_behalf_forbidden": "Boshqa shifokor nomidan vizit yozuvi yaratishga ruxsatingiz yo'q."
+    },
+    "discount": {
+      "forbidden": "Chegirma berishga ruxsatingiz yo'q (bu filialda «Chegirma bera oladi» huquqi kerak)."
+    },
+    "patient": {
+      "discount_exceeds_max": "Doimiy chegirma klinika belgilagan chegaradan ({{maxPercent}}%) oshmasligi kerak."
     }
   },
   "dashboard": {
@@ -526,7 +532,8 @@
       "user": "Xodimlar",
       "tenant": "Klinika",
       "report": "Hisobotlar",
-      "audit": "Audit"
+      "audit": "Audit",
+      "discount": "Chegirma"
     },
     "nav_services": "Xizmatlar va narxlar",
     "nav_license": "Litsenziya",
@@ -611,6 +618,7 @@
     "system_template": "Tizim shabloni"
   },
   "patients": {
+    "discount_badge": "Chegirma {{pct}}%",
     "title": "Bemorlar",
     "create": "Yangi bemor",
     "count": "{{count}} ta bemor",
@@ -736,6 +744,8 @@
       "insurance_active": "Sug'urta faol",
       "allow_emergency_recall": "Favqulodda aloqaga eslatma yuborishga ruxsat",
       "allow_emergency_recall_hint": "Bemor telefoni bo'lmasa, eslatma/chaqiruv SMS'i favqulodda aloqa raqamiga yuboriladi",
+      "default_discount": "Doimiy chegirma (%)",
+      "default_discount_hint": "Bemor tanlanganda kassada va yangi reja bosqichlarida avtomatik qo'llanadi",
       "insurance_provider_required": "Sug'urta ma'lumotlarini to'ldirsangiz, kompaniya nomi ham kiritilishi shart",
       "insurance_policy_required": "Sug'urta kompaniyasi va polis raqami — ikkalasi ham to'ldirilishi shart",
       "coverage_dental": "Stomatologik",
@@ -835,6 +845,7 @@
     "select": "Tanlang"
   },
   "treatment_plan": {
+    "stage_discount": "chegirma {{pct}}%",
     "title": "Davolash rejasi",
     "create": "Yangi reja",
     "edit": "Tahrirlash",
@@ -1368,6 +1379,9 @@
     "current_receipt": "Joriy chek",
     "subtotal": "Oraliq jami",
     "discount": "Chegirma",
+    "patient_discount": "Bemor chegirmasi",
+    "discount_reason": "Chegirma sababi",
+    "discount_reason_placeholder": "Masalan: doimiy mijoz, xodim qarindoshi",
     "payment_method": "To'lov turi",
     "method": {
       "cash": "Naqd pul",
@@ -1396,6 +1410,7 @@
     "cash_out": "Naqd chiqim (refund)",
     "noop_fiscal": "Fiskal hujjat keyinroq Soliqqa yuboriladi",
     "receipt_modal": {
+      "discount_line": "Chegirma ({{pct}}%)",
       "print": "Chop etish",
       "close": "Yopish",
       "total": "Jami",

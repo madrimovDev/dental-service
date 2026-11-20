@@ -146,6 +146,10 @@ export const treatmentStageDtoSchema = z
     estimatedVisits: z.number().int().openapi({ example: 1 }),
     estimatedDurationMinutes: z.number().int().nullable().openapi({ example: 30 }),
     cost: z.string().openapi({ example: '150000.00' }),
+    /** FT-04.3: chegirmagacha narx snapshot'i (eski bosqichlarda null). `cost` = netto. */
+    listPrice: z.string().nullable().openapi({ example: '200000.00' }),
+    /** FT-04.3: yaratish paytidagi bemor doimiy chegirmasi ('10.00'); yo'q — null. */
+    discountPercent: z.string().nullable().openapi({ example: null }),
     status: treatmentStageStatusEnum.openapi({ example: 'pending' }),
     acceptance: treatmentStageAcceptanceEnum.openapi({ example: 'proposed' }),
     notes: z.string().nullable().openapi({ example: null }),
@@ -213,6 +217,10 @@ export const estimateStageDtoSchema = z
     stageId: z.uuid(),
     serviceName: z.string(),
     cost: z.number().openapi({ example: 150000, description: 'Stage list cost (xom)' }),
+    /** FT-04.3: chegirmagacha narx (snapshot; eski bosqichlarda null). */
+    listPrice: z.number().nullable(),
+    /** FT-04.3: bosqich chegirma foizi (snapshot; yo'q — null). */
+    discountPercent: z.number().nullable(),
     status: treatmentStageStatusEnum,
     acceptance: treatmentStageAcceptanceEnum,
     paid: z.number().openapi({ example: 0 }),

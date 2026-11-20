@@ -36,4 +36,28 @@ describe('PermissionBuilder', () => {
     expect(next.has('patient.view')).toBe(false);
     expect(next.has('cashier.refund')).toBe(true);
   });
+
+  it("FT-04.1: discount.give — «Chegirma» guruhida «Chegirma bera oladi» toggle'i", () => {
+    const onChange = vi.fn();
+    const discount: PermissionDef = {
+      id: 'discount.give',
+      code: 'discount.give',
+      category: 'cashier',
+      descriptionUz: 'Chegirma bera oladi',
+      descriptionRu: 'Может предоставлять скидку',
+    };
+    renderApp(
+      <PermissionBuilder
+        permissions={[...perms, discount]}
+        selected={new Set()}
+        onChange={onChange}
+      />,
+    );
+    expect(screen.getByText('Chegirma')).toBeInTheDocument();
+    const toggle = screen.getByRole('switch', { name: 'Chegirma bera oladi' });
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    fireEvent.click(toggle);
+    const next = onChange.mock.calls[0]?.[0] as Set<string>;
+    expect([...next]).toEqual(['discount.give']);
+  });
 });

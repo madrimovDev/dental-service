@@ -54,7 +54,11 @@ const ctx = (tx: DbOrTx): Context =>
           ? tenantId
           : k === 'user'
             ? { id: userId }
-            : undefined,
+            : // FT-04: bu test chegara mantig'ini sinaydi; userId — tenant owner'i (haqiqiy
+              // JWT'da `@owner`), shuning uchun `discount.give` filial doirasi = hammasi.
+              k === 'accessClaims'
+              ? { sub: userId, atid: tenantId, perms: ['@owner'] }
+              : undefined,
     req: { header: () => undefined },
   }) as unknown as Context;
 

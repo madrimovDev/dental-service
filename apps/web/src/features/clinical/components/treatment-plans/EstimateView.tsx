@@ -61,7 +61,16 @@ function EstimateBody({ data }: { data: ReturnType<typeof toEstimateVM> }) {
             {data.stages.map((s) => (
               <Table.Tr key={s.id}>
                 <Table.Td>{s.serviceName}</Table.Td>
-                <Table.Td>{s.costText}</Table.Td>
+                <Table.Td>
+                  {s.costText}
+                  {/* FT-04.3: bosqich chegirmasi smetada — list narx (chizilgan) va foiz. */}
+                  {s.listPriceText && s.discountPercent != null && (
+                    <Text size="xs" c="dimmed" data-testid="estimate-stage-discount">
+                      <del>{s.listPriceText}</del>{' '}
+                      {t('treatment_plan.stage_discount', { pct: s.discountPercent })}
+                    </Text>
+                  )}
+                </Table.Td>
                 <Table.Td>
                   <StatusPill status={s.statusTone}>{t(s.statusLabelKey)}</StatusPill>
                 </Table.Td>

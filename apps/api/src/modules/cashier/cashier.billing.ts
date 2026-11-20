@@ -48,6 +48,36 @@ export function distributeRefundNegations(
 }
 
 /**
+ * FT-04.4: chek chegirmasini qatorlarga PROPORSIONAL taqsimlash (sentlarda, eng katta
+ * qoldiq usuli). Σ natija AYNAN `discountCents`; har qator ulushi ≤ o'z bruttosi
+ * (`discountCents ≤ Σ gross` bo'lsa). Fiskal items netto bo'lishi uchun.
+ *
+ * @returns har qator uchun chegirma (sentlarda, butun son).
+ */
+export function distributeDiscountCents(grossCents: number[], discountCents: number): number[] {
+  const total = grossCents.reduce((s, g) => s + g, 0);
+  if (grossCents.length === 0 || discountCents <= 0 || total <= 0) return grossCents.map(() => 0);
+  // BigInt: gross × discount sentlarda 2⁵³ dan oshishi mumkin (aniq butun bo'linish kerak).
+  const t = BigInt(total);
+  const d = BigInt(discountCents);
+  const shares = grossCents.map((g) => {
+    const exact = BigInt(g) * d;
+    return { floor: Number(exact / t), rem: Number(exact % t) };
+  });
+  let residue = discountCents - shares.reduce((s, x) => s + x.floor, 0);
+  const order = shares
+    .map((x, i) => ({ i, rem: x.rem }))
+    .sort((a, b) => b.rem - a.rem || a.i - b.i);
+  const out = shares.map((x) => x.floor);
+  for (const { i } of order) {
+    if (residue <= 0) break;
+    out[i] = (out[i] as number) + 1;
+    residue -= 1;
+  }
+  return out;
+}
+
+/**
  * Qarzga KIRMAYDIGAN bosqich EXECUTION statuslari (Qaror #24).
  * Faqat `status` o'qiga tegishli (acceptance ALOHIDA o'qda — pastga qarang).
  * `Set<string>` — enum bilan ham, kelajakdagi statuslar bilan ham xavfsiz taqqoslash.

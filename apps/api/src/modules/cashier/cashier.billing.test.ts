@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import {
   computePlanBalance,
+  distributeDiscountCents,
   distributeRefundNegations,
   fromCents,
   toCents,
@@ -258,5 +259,25 @@ describe('computePlanBalance', () => {
     ];
     const r = computePlanBalance(withAcc, []); // planStatus berilmagan
     expect(r.totalCost).toBe(100000);
+  });
+});
+
+describe('distributeDiscountCents (FT-04.4)', () => {
+  it('Σ = chegirma, proporsional, eng katta qoldiq', () => {
+    // 3 teng qator, 100 sent → 34/33/33
+    expect(distributeDiscountCents([1000, 1000, 1000], 100)).toEqual([34, 33, 33]);
+  });
+  it("chegirma 0 yoki bo'sh qatorlar → nollar", () => {
+    expect(distributeDiscountCents([500, 700], 0)).toEqual([0, 0]);
+    expect(distributeDiscountCents([], 50)).toEqual([]);
+  });
+  it('100% chegirma — har qator to‘liq bruttosigacha', () => {
+    expect(distributeDiscountCents([12345, 1, 99999], 112345)).toEqual([12345, 1, 99999]);
+  });
+  it('katta summalar (2^53 dan oshadigan ko‘paytma) aniq', () => {
+    const gross = [9_999_999_999_00, 1_00];
+    const out = distributeDiscountCents(gross, 5_000_000_000_00);
+    expect(out[0]! + out[1]!).toBe(5_000_000_000_00);
+    expect(out[1]).toBe(50);
   });
 });
