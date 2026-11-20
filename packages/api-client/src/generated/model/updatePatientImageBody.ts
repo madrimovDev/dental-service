@@ -19,7 +19,7 @@ export type UpdatePatientImageBody = {
    */
   description?: string | null;
   /** @nullable */
-  toothNumbers?: (number | null)[] | null;
+  toothNumbers?: number[] | null;
   /** @nullable */
   takenDate?: string | null;
 };

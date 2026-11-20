@@ -43,7 +43,7 @@
  */
 import { appendFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { app, BrowserWindow, dialog, ipcMain, Notification, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Notification, session, shell } from 'electron';
 import electronUpdater from 'electron-updater';
 import { setupAutoUpdater, type UpdateState } from './auto-updater.js';
 import { createBackupScheduler, resolveDefaultBackupFolder } from './backup-scheduler.js';
@@ -63,6 +63,10 @@ import {
 } from './discovery.js';
 import { isFirstRun, runFirstSetup, runMigrations } from './first-run.js';
 import { fetchBootstrapStatus, licenseGatedUrl, resolveStartupUrl } from './license-status.js';
+import {
+  insecureOriginToTreatAsSecure,
+  installMediaPermissionHandlers,
+} from './media-permissions.js';
 import {
   createPgTools,
   createStateStore,
@@ -277,6 +281,18 @@ if (process.platform === 'linux' && !app.isPackaged) {
   app.commandLine.appendSwitch('wayland-app-id', 'dental-service-dev'); // Wayland app_id
 }
 
+// FT-06.1 — klient LAN `http://<IP>:8080` secure context emas → kamera
+// (`navigator.mediaDevices`) umuman yo'q bo'lardi. Saqlangan serverUrl
+// origin'ini secure deb belgilaymiz; switch faqat `ready`dan oldin ta'sir
+// qiladi — manzil keyin (TOFU/discovery) o'zgarsa, kamera qayta ochilgandan
+// keyin ishlaydi. Media ruxsati baribir faqat shu origin + asosiy oyna uchun.
+{
+  const cameraOrigin = insecureOriginToTreatAsSecure(readConfig());
+  if (cameraOrigin) {
+    app.commandLine.appendSwitch('unsafely-treat-insecure-origin-as-secure', cameraOrigin);
+  }
+}
+
 // Single-instance qulfi — ikkinchi nusxa jim chiqadi, birinchi nusxaning
 // oynasi ko'rsatiladi/fokuslanadi (spec: 2026-07-06-desktop-single-instance).
 // Server rejimida ayniqsa muhim: ikkinchi instans avval postgres/valkey
@@ -297,6 +313,13 @@ app.whenReady().then(async () => {
   if (!isPrimaryInstance) return; // ikkinchi nusxa — quit() allaqachon chaqirilgan
 
   app.dock?.hide(); // macOS: dock'da ko'rsatmaydi — faqat tray
+
+  // FT-06 — kamera: faqat asosiy oynaning ilova origin'i uchun `media` (video),
+  // qolgan barcha brauzer ruxsatlari rad etiladi (media-permissions.ts).
+  installMediaPermissionHandlers(session.defaultSession, {
+    isMainContents: (wc) => mainWindow !== null && wc === mainWindow.webContents,
+    getAppUrl: () => lastOpenedUrl,
+  });
 
   if (isDevWrapMode()) {
     await openDevWindow();

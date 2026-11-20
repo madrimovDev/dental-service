@@ -17,6 +17,8 @@ export interface TenantSettings {
   onboardingDismissedAt: string | null;
   maxDiscountPercent: number;
   noShowStrikeThreshold: number;
+  botSelfServiceEnabled: boolean;
+  cashierPhotoEnabled: boolean;
   notificationSettings: NotificationSettings;
   integrationSettings: TenantSettingsIntegrationSettings;
   createdAt: string;

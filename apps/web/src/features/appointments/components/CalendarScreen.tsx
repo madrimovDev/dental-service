@@ -1,6 +1,7 @@
 import { ApiError } from '@dental/api-client';
 import { Button, IconButton, StateView, StatusPill, Tabs, UndoToast } from '@dental/ui';
-import { Group, Select } from '@mantine/core';
+import { Drawer, Group, Select, UnstyledButton } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { ChevronRight } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -21,10 +22,19 @@ import {
 } from '../appointments.api';
 import {
   addDaysToDateKey,
+  CALENDAR_ZOOMS,
+  type CalendarZoom,
+  gridFromWorkHours,
+  gridWithZoom,
   instantFromDayMinute,
+  isOutsideWorkHours,
   localDateKey,
   localMinutes,
+  minuteLabel,
   mondayOfWeek,
+  newAppointmentHref,
+  readStoredZoom,
+  ZOOM_STORAGE_KEY,
 } from '../appointments.mappers';
 import type { Appointment, AppointmentStatus, CalendarEvent } from '../appointments.types';
 import { AppointmentPanel } from './AppointmentPanel';
@@ -62,7 +72,24 @@ export function CalendarScreen() {
   const [date, setDate] = useState(() => new Date());
   const navigate = useNavigate();
   const open = () => navigate('/appointments/new');
+  /** FT-05.1: bo'sh katak / bo'sh slot → yangi yozilish (doktor, filial, sana, vaqt oldindan). */
+  const canCreate = hasPermission('appointment.create');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  /** FT-05.4: zoom 3 daraja (slot balandligi), `localStorage`da. */
+  const [zoom, setZoom] = useState<CalendarZoom>(() =>
+    readStoredZoom(typeof window === 'undefined' ? undefined : window.localStorage),
+  );
+  const changeZoom = (z: CalendarZoom) => {
+    setZoom(z);
+    try {
+      window.localStorage.setItem(ZOOM_STORAGE_KEY, z);
+    } catch {
+      // saqlash imkoni yo'q (private rejim) — daraja faqat shu sessiyada
+    }
+  };
+  /** FT-05.4: planshet (<1024px) — o'ng panel drawer'ga, doktor ustunlari gorizontal scroll. */
+  const isTablet = useMediaQuery('(max-width: 1023px)') ?? false;
+  const [railOpen, setRailOpen] = useState(false);
   const [pending, setPending] = useState<PendingAction | null>(null);
   const pendingRef = useRef<PendingAction | null>(null);
   /** Kutilayotgan (UndoToast) yoki yuborilgan, hali refetch bo'lmagan holatlar — optimistik ko'rinish. */
@@ -77,6 +104,9 @@ export function CalendarScreen() {
   // shu kalitdan `fullDayRangeToInstants` (Tashkent +05:00 anchor, schedule.mappers)
   // orqali hisoblanadi — brauzer TZ `setHours(0,0,0,0)` ENDI ishlatilmaydi.
   const pivotKey = useMemo(() => localDateKey(date.toISOString()), [date]);
+
+  const openNew = (p: { doctorId?: string | null; dateKey: string; startMinute: number }) =>
+    navigate(newAppointmentHref({ ...p, branchId }));
 
   const { rangeStart, rangeEnd, dayKeys } = useMemo(() => {
     if (view === 'week') {
@@ -179,7 +209,11 @@ export function CalendarScreen() {
       let changed = false;
       for (const a of appts ?? []) {
         const mv = next[a.id];
-        if (mv && new Date(a.startTime).getTime() === new Date(mv.startTime).getTime()) {
+        if (
+          mv &&
+          new Date(a.startTime).getTime() === new Date(mv.startTime).getTime() &&
+          new Date(a.endTime).getTime() === new Date(mv.endTime).getTime()
+        ) {
           delete next[a.id];
           changed = true;
         }
@@ -187,6 +221,35 @@ export function CalendarScreen() {
       return changed ? next : prev;
     });
   }, [appts]);
+
+  // FT-05.2: grid oynasi filial ish vaqtidan (filial tanlanmagan — barcha filiallar birlashmasi);
+  // oyna tashqarisidagi yozilishlar ham ko'rinadi va «soatdan tashqari» belgisi oladi.
+  const workHoursByBranch = useMemo(
+    () => new Map((branchesData ?? []).map((b) => [b.id, b.workHours ?? null])),
+    [branchesData],
+  );
+  const grid = useMemo(
+    () =>
+      gridWithZoom(
+        gridFromWorkHours(
+          branchId != null
+            ? [workHoursByBranch.get(branchId) ?? null]
+            : [...workHoursByBranch.values()],
+          apptList,
+        ),
+        zoom,
+      ),
+    [branchId, workHoursByBranch, apptList, zoom],
+  );
+  const outsideHoursIds = useMemo(
+    () =>
+      new Set(
+        apptList
+          .filter((a) => isOutsideWorkHours(a, workHoursByBranch.get(a.branchId)))
+          .map((a) => a.id),
+      ),
+    [apptList, workHoursByBranch],
+  );
 
   // Jadvalsiz ustun (P10): `schedule.view` bor va ma'lumot kelgan bo'lsagina bilinadi.
   const unscheduledDoctorIds = useMemo(() => {
@@ -214,8 +277,15 @@ export function CalendarScreen() {
     });
   };
 
-  const openDetail = (event: CalendarEvent) => setSelectedId(event.appointment.id);
+  const openDetail = (event: CalendarEvent) => {
+    setSelectedId(event.appointment.id);
+    if (isTablet) setRailOpen(true);
+  };
   const closeDetail = () => setSelectedId(null);
+  const closeRail = () => {
+    setRailOpen(false);
+    setSelectedId(null);
+  };
 
   const selected = selectedId == null ? null : (apptList.find((a) => a.id === selectedId) ?? null);
 
@@ -296,18 +366,28 @@ export function CalendarScreen() {
    * Sudrab (yoki panel orqali) ko'chirish: joy darhol yangilanadi, `UndoToast` tugagach
    * PATCH ketadi. Server 409 qaytarsa yozilish joyiga qaytadi va xabar chiqadi.
    */
-  const moveAppointment = (appt: Appointment, doctorId: string, startMinute: number) => {
+  const moveAppointment = (
+    appt: Appointment,
+    doctorId: string,
+    startMinute: number,
+    dateKey: string = pivotKey,
+  ) => {
     const durationMs = new Date(appt.endTime).getTime() - new Date(appt.startTime).getTime();
-    const startTime = instantFromDayMinute(pivotKey, startMinute);
+    const startTime = instantFromDayMinute(dateKey, startMinute);
     const endTime = new Date(new Date(startTime).getTime() + durationMs).toISOString();
     const sameSpot =
       doctorId === appt.doctorId &&
       localMinutes(appt.startTime) === startMinute &&
-      localDateKey(appt.startTime) === pivotKey;
+      localDateKey(appt.startTime) === dateKey;
     if (sameSpot) return;
     flushPending();
     setMoves((prev) => ({ ...prev, [appt.id]: { startTime, endTime, doctorId } }));
-    const hh = `${String(Math.floor(startMinute / 60)).padStart(2, '0')}:${String(startMinute % 60).padStart(2, '0')}`;
+    const hh = minuteLabel(startMinute);
+    // Boshqa kunga (hafta ko'rinishi) ko'chirilsa — kun ham ko'rsatiladi.
+    const timeLabel =
+      dateKey === localDateKey(appt.startTime)
+        ? hh
+        : `${dateKey.slice(8, 10)}.${dateKey.slice(5, 7)} ${hh}`;
     const action: PendingAction = {
       key: `${appt.id}:move:${startTime}:${doctorId}`,
       id: appt.id,
@@ -315,7 +395,7 @@ export function CalendarScreen() {
       label: t('appointments.moved', {
         name: patientName(appt.patientId),
         doctor: doctorNameMap.get(doctorId) ?? '',
-        time: hh,
+        time: timeLabel,
       }),
       commit: () =>
         moveMut.mutate(
@@ -325,6 +405,41 @@ export function CalendarScreen() {
             endTime,
             ...(doctorId !== appt.doctorId ? { doctorId } : {}),
           },
+          {
+            onError: (err) => {
+              clearOverride(appt.id);
+              notifications.show({ color: 'red', message: moveErrorMessage(err) });
+            },
+          },
+        ),
+    };
+    pendingRef.current = action;
+    setPending(action);
+  };
+
+  /**
+   * FT-05.3: pastki chetdan cho'zib davomiylikni o'zgartirish — boshlanish o'zgarmaydi,
+   * tugash yangi daqiqaga (15 daqiqa qadam). Ko'chirish bilan bir xil UndoToast + 409 yo'li.
+   */
+  const resizeAppointment = (appt: Appointment, endMinute: number) => {
+    const endTime = instantFromDayMinute(localDateKey(appt.startTime), endMinute);
+    if (new Date(endTime).getTime() === new Date(appt.endTime).getTime()) return;
+    flushPending();
+    setMoves((prev) => ({
+      ...prev,
+      [appt.id]: { startTime: appt.startTime, endTime, doctorId: appt.doctorId },
+    }));
+    const action: PendingAction = {
+      key: `${appt.id}:resize:${endTime}`,
+      id: appt.id,
+      status: appt.status,
+      label: t('appointments.resized', {
+        name: patientName(appt.patientId),
+        time: minuteLabel(endMinute),
+      }),
+      commit: () =>
+        moveMut.mutate(
+          { id: appt.id, startTime: appt.startTime, endTime },
           {
             onError: (err) => {
               clearOverride(appt.id);
@@ -348,10 +463,55 @@ export function CalendarScreen() {
   const changeStatus = (appt: Appointment, to: AppointmentStatus) =>
     statusMut.mutate({ id: appt.id, status: to });
 
+  const rail = (
+    <div data-testid="calendar-rail" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {selected != null && (
+        <AppointmentPanel
+          appointment={selected}
+          patientName={patientName(selected.patientId)}
+          doctorName={doctorNameMap.get(selected.doctorId) ?? '—'}
+          serviceNames={(selected.serviceIds ?? []).map((id) => serviceNameMap.get(id) ?? id)}
+          canEdit={hasPermission('appointment.edit')}
+          canCancel={hasPermission('appointment.cancel')}
+          canOpenPatient={hasPermission('patient.view')}
+          onStatus={(to) => changeStatus(selected, to)}
+          onNoShow={() => markNoShow(selected)}
+          onCancel={() => markCancelled(selected)}
+          onClose={closeDetail}
+          doctors={doctors ?? []}
+          onMove={(doctorId, hhmm) => {
+            const [h, m] = hhmm.split(':').map(Number);
+            moveAppointment(selected, doctorId, (h ?? 0) * 60 + (m ?? 0));
+          }}
+        />
+      )}
+      <DayStatsCard
+        appts={apptList}
+        isToday={isToday(pivotKey)}
+        dayLabel={formatDayMonth(date, i18n.language)}
+      />
+      {/* DS12: jonli "Bo'sh slot" kartasi — faqat `schedule.view` ruxsati
+          bo'lganda render (cheklangan rollarda 403 oldini olish, CLI-153). */}
+      {hasPermission('schedule.view') && (
+        <FreeSlotsCard
+          branchId={branchId}
+          date={pivotKey}
+          enabled
+          onPick={
+            canCreate
+              ? ({ doctorId, startMinute }) => openNew({ doctorId, dateKey: pivotKey, startMinute })
+              : undefined
+          }
+        />
+      )}
+      <WaitlistCard appts={apptList} />
+    </div>
+  );
+
   return (
     <div>
       <Group justify="flex-end" gap="xs" mb="md">
-        {hasPermission('appointment.create') && (
+        {canCreate && (
           <Button variant="primary" onClick={open}>
             {t('appointments.create')}
           </Button>
@@ -407,7 +567,50 @@ export function CalendarScreen() {
           </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            marginLeft: 'auto',
+            flexWrap: 'wrap',
+          }}
+        >
+          {/* biome-ignore lint/a11y/useSemanticElements: fieldset brauzer chegarasini qo'shadi — toolbar guruhi */}
+          <div
+            role="group"
+            aria-label={t('calendar.zoom')}
+            style={{
+              display: 'flex',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-md)',
+              overflow: 'hidden',
+            }}
+          >
+            {CALENDAR_ZOOMS.map((z) => (
+              <UnstyledButton
+                key={z}
+                aria-pressed={zoom === z}
+                onClick={() => changeZoom(z)}
+                style={{
+                  minHeight: 44,
+                  minWidth: 44,
+                  padding: '0 12px',
+                  fontSize: 'var(--text-xs)',
+                  fontWeight: zoom === z ? 700 : 500,
+                  background: zoom === z ? 'var(--primary-soft)' : 'var(--surface)',
+                  color: zoom === z ? 'var(--ink)' : 'var(--ink-2)',
+                }}
+              >
+                {t(`calendar.zoom_${z}`)}
+              </UnstyledButton>
+            ))}
+          </div>
+          {isTablet && (
+            <Button variant="default" onClick={() => setRailOpen(true)}>
+              {t('calendar.rail_open')}
+            </Button>
+          )}
           <Tabs
             value={view}
             onChange={(v) => setView(v as 'day' | 'week')}
@@ -437,7 +640,7 @@ export function CalendarScreen() {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1fr) 296px',
+          gridTemplateColumns: isTablet ? 'minmax(0, 1fr)' : 'minmax(0, 1fr) 296px',
           gap: 16,
           marginTop: 16,
         }}
@@ -460,54 +663,55 @@ export function CalendarScreen() {
               onSlotClick={openDetail}
               selectedId={selectedId}
               unscheduledDoctorIds={unscheduledDoctorIds}
+              grid={grid}
+              outsideHoursIds={outsideHoursIds}
               canMove={hasPermission('appointment.edit')}
-              onMove={moveAppointment}
+              onMove={(appt, doctorId, startMinute) => moveAppointment(appt, doctorId, startMinute)}
+              onResize={resizeAppointment}
+              onCellClick={
+                canCreate
+                  ? ({ doctorId, startMinute }) =>
+                      openNew({ doctorId, dateKey: pivotKey, startMinute })
+                  : undefined
+              }
             />
           ) : (
             <WeekGrid
               appointments={apptList}
               dayKeys={dayKeys}
+              grid={grid}
+              outsideHoursIds={outsideHoursIds}
               patientName={patientName}
               onSlotClick={openDetail}
               selectedId={selectedId}
+              canMove={hasPermission('appointment.edit')}
+              onMove={(appt, dateKey, startMinute) =>
+                moveAppointment(appt, appt.doctorId, startMinute, dateKey)
+              }
+              onResize={resizeAppointment}
+              onCellClick={
+                canCreate
+                  ? ({ dateKey, startMinute }) => openNew({ dateKey, startMinute })
+                  : undefined
+              }
             />
           )}
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {selected != null && (
-            <AppointmentPanel
-              appointment={selected}
-              patientName={patientName(selected.patientId)}
-              doctorName={doctorNameMap.get(selected.doctorId) ?? '—'}
-              serviceNames={(selected.serviceIds ?? []).map((id) => serviceNameMap.get(id) ?? id)}
-              canEdit={hasPermission('appointment.edit')}
-              canCancel={hasPermission('appointment.cancel')}
-              canOpenPatient={hasPermission('patient.view')}
-              onStatus={(to) => changeStatus(selected, to)}
-              onNoShow={() => markNoShow(selected)}
-              onCancel={() => markCancelled(selected)}
-              onClose={closeDetail}
-              doctors={doctors ?? []}
-              onMove={(doctorId, hhmm) => {
-                const [h, m] = hhmm.split(':').map(Number);
-                moveAppointment(selected, doctorId, (h ?? 0) * 60 + (m ?? 0));
-              }}
-            />
-          )}
-          <DayStatsCard
-            appts={apptList}
-            isToday={isToday(pivotKey)}
-            dayLabel={formatDayMonth(date, i18n.language)}
-          />
-          {/* DS12: jonli "Bo'sh slot" kartasi — faqat `schedule.view` ruxsati
-              bo'lganda render (cheklangan rollarda 403 oldini olish, CLI-153). */}
-          {hasPermission('schedule.view') && (
-            <FreeSlotsCard branchId={branchId} date={pivotKey} enabled />
-          )}
-          <WaitlistCard appts={apptList} />
-        </div>
+        {isTablet ? null : rail}
       </div>
+
+      {isTablet && (
+        <Drawer
+          opened={railOpen}
+          onClose={closeRail}
+          position="right"
+          size={340}
+          title={t('calendar.panel_title')}
+        >
+          {rail}
+        </Drawer>
+      )}
 
       {pending != null && (
         <UndoToast

@@ -1,4 +1,6 @@
 import {
+  type AddTreatmentStageBody,
+  addTreatmentStage,
   type CreateLabOrderInput,
   type CreatePrescriptionInput,
   type CreateTemplateInput,
@@ -33,6 +35,8 @@ import {
   listTreatmentPlans,
   listVisitNotes,
   listVisitNoteTemplates,
+  type RecordCompletedWorkBody,
+  recordCompletedWork,
   type ServiceWithPrices,
   type SignFormInput,
   type SignTreatmentPlanConsentBody,
@@ -155,6 +159,28 @@ export function useCreatePlan(patientId: string) {
   });
 }
 
+/**
+ * FT-01.3 (CF-11): odontogrammadan joriy rejaga bosqich(lar) qo'shish —
+ * `POST /treatment-plans/{id}/stages`. Bir nechta tish = bir nechta bosqich, KETMA-KET
+ * yuboriladi (backend reja qatorini qulflaydi; `sequence` tartibi tanlov tartibiga mos).
+ * Reja summasi va smetasi o'zgaradi — reja/balans/kassa va smeta keshlari yangilanadi.
+ */
+export function useAddPlanStages(patientId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ planId, stages }: { planId: string; stages: AddTreatmentStageBody[] }) => {
+      const out = [];
+      for (const stage of stages) out.push((await addTreatmentStage(planId, stage)).data);
+      return out;
+    },
+    // Qisman muvaffaqiyatda ham (2-bosqichda xato) qo'shilganlari ko'rinsin.
+    onSettled: (_d, _e, { planId }) => {
+      invalidatePlanFinancials(qc, patientId);
+      void qc.invalidateQueries({ queryKey: clinicalKeys.planEstimate(planId) });
+    },
+  });
+}
+
 // CLI-188: davolash reja bosqichi uchun xizmat katalogi (lookup — cache bo'lishiladi).
 export function useServiceCatalog(enabled = true) {
   return useQuery({
@@ -191,6 +217,30 @@ export function useUpdateStage(patientId: string) {
       // eski qoralamadan saqlash shu snapshot'ni last-write-wins bilan ustiga yozadi.
       void qc.invalidateQueries({ queryKey: clinicalKeys.toothChartLatest(patientId) });
       void qc.invalidateQueries({ queryKey: clinicalKeys.toothCharts(patientId) });
+    },
+  });
+}
+
+/**
+ * FT-01.2 (CF-12) «Bajarilgan ishni yozish»: darhol `completed` bosqich (joriy yoki avto
+ * «Bajarilgan ishlar» rejasi). Backend odontogramma snapshot + recall + reja qarzini
+ * yaratadi — reja/balans/kassa, odontogramma, recall va (bog'langan bo'lsa) vizit keshlari
+ * yangilanadi.
+ */
+export function useRecordCompletedWork(patientId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Omit<RecordCompletedWorkBody, 'patientId'>) =>
+      recordCompletedWork({ ...body, patientId }).then((r) => r.data),
+    onSuccess: (_d, body) => {
+      invalidatePlanFinancials(qc, patientId);
+      void qc.invalidateQueries({ queryKey: recallKeys.patient(patientId) });
+      void qc.invalidateQueries({ queryKey: clinicalKeys.toothChartLatest(patientId) });
+      void qc.invalidateQueries({ queryKey: clinicalKeys.toothCharts(patientId) });
+      if (body.visitNoteId) {
+        void qc.invalidateQueries({ queryKey: clinicalKeys.visitNote(body.visitNoteId) });
+        void qc.invalidateQueries({ queryKey: clinicalKeys.visitNotes(patientId) });
+      }
     },
   });
 }
@@ -526,6 +576,15 @@ export function usePatientImages(patientId: string, visitNoteId?: string) {
     queryKey: clinicalKeys.images(patientId, visitNoteId),
     queryFn: () =>
       listPatientImages(patientId, visitNoteId ? { visitNoteId } : undefined).then((r) => r.data),
+  });
+}
+
+/** FT-01.4 (CF-10): tish tarixi — `GET /patients/{id}/images?tooth=NN`. */
+export function usePatientToothImages(patientId: string, tooth: number, enabled = true) {
+  return useQuery({
+    enabled,
+    queryKey: clinicalKeys.toothImages(patientId, tooth),
+    queryFn: () => listPatientImages(patientId, { tooth }).then((r) => r.data),
   });
 }
 

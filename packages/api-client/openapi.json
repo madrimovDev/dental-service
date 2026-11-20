@@ -593,6 +593,14 @@
             "type": "integer",
             "example": 3
           },
+          "botSelfServiceEnabled": {
+            "type": "boolean",
+            "example": true
+          },
+          "cashierPhotoEnabled": {
+            "type": "boolean",
+            "example": false
+          },
           "notificationSettings": {
             "$ref": "#/components/schemas/NotificationSettings"
           },
@@ -665,6 +673,8 @@
           "onboardingDismissedAt",
           "maxDiscountPercent",
           "noShowStrikeThreshold",
+          "botSelfServiceEnabled",
+          "cashierPhotoEnabled",
           "notificationSettings",
           "integrationSettings",
           "createdAt",
@@ -1697,6 +1707,10 @@
           "allowEmergencyRecall": {
             "type": "boolean"
           },
+          "defaultDiscountPercent": {
+            "type": "string",
+            "nullable": true
+          },
           "archivedAt": {
             "type": "string",
             "nullable": true
@@ -1725,6 +1739,7 @@
           "insurance",
           "insuranceStatus",
           "allowEmergencyRecall",
+          "defaultDiscountPercent",
           "archivedAt",
           "createdAt",
           "updatedAt"
@@ -1828,6 +1843,19 @@
           "balance",
           "planDebt",
           "nonPlanBalance"
+        ]
+      },
+      "SetPatientPhotoInput": {
+        "type": "object",
+        "properties": {
+          "imageId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "imageId"
         ]
       },
       "PatientArchiveResult": {
@@ -2709,6 +2737,19 @@
           "discount": {
             "type": "string"
           },
+          "discountPercent": {
+            "type": "string",
+            "nullable": true
+          },
+          "discountReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "discountGrantedBy": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
           "currency": {
             "type": "string"
           },
@@ -2787,6 +2828,9 @@
           "paidAmount",
           "refundedAmount",
           "discount",
+          "discountPercent",
+          "discountReason",
+          "discountGrantedBy",
           "currency",
           "paymentMethod",
           "cardProvider",
@@ -3129,6 +3173,64 @@
           "services",
           "total",
           "hasUnpriced"
+        ]
+      },
+      "CashierPhotoSettings": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "example": false
+          }
+        },
+        "required": [
+          "enabled"
+        ]
+      },
+      "CashierPhoto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "transactionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "url": {
+            "type": "string",
+            "nullable": true,
+            "example": "/uploads/tenants%2F…"
+          },
+          "skippedReason": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "permission_denied",
+              "no_camera",
+              "user_skipped",
+              "error",
+              null
+            ]
+          },
+          "capturedBy": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "capturedAt": {
+            "type": "string",
+            "example": "2026-11-20T10:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "transactionId",
+          "url",
+          "skippedReason",
+          "capturedBy",
+          "capturedAt"
         ]
       },
       "ReportBranches": {
@@ -7343,6 +7445,16 @@
             "type": "string",
             "example": "150000.00"
           },
+          "listPrice": {
+            "type": "string",
+            "nullable": true,
+            "example": "200000.00"
+          },
+          "discountPercent": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -7407,6 +7519,8 @@
           "estimatedVisits",
           "estimatedDurationMinutes",
           "cost",
+          "listPrice",
+          "discountPercent",
           "status",
           "acceptance",
           "notes",
@@ -7505,6 +7619,29 @@
           "updatedAt"
         ]
       },
+      "TreatmentCompletedWork": {
+        "type": "object",
+        "properties": {
+          "planId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "planCreated": {
+            "type": "boolean"
+          },
+          "stages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TreatmentStage"
+            }
+          }
+        },
+        "required": [
+          "planId",
+          "planCreated",
+          "stages"
+        ]
+      },
       "TreatmentPlanEstimate": {
         "type": "object",
         "properties": {
@@ -7576,6 +7713,14 @@
             "example": 150000,
             "description": "Stage list cost (xom)"
           },
+          "listPrice": {
+            "type": "number",
+            "nullable": true
+          },
+          "discountPercent": {
+            "type": "number",
+            "nullable": true
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -7605,6 +7750,8 @@
           "stageId",
           "serviceName",
           "cost",
+          "listPrice",
+          "discountPercent",
           "status",
           "acceptance",
           "paid",
@@ -7688,6 +7835,16 @@
             "nullable": true,
             "example": null
           },
+          "toothNumbers": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "integer"
+            },
+            "example": [
+              16
+            ]
+          },
           "signedAt": {
             "type": "string",
             "nullable": true,
@@ -7726,6 +7883,7 @@
           "plan",
           "performedServices",
           "freeNotes",
+          "toothNumbers",
           "signedAt",
           "signedBy",
           "metadata",
@@ -9723,6 +9881,12 @@
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 50
+                  },
+                  "botSelfServiceEnabled": {
+                    "type": "boolean"
+                  },
+                  "cashierPhotoEnabled": {
+                    "type": "boolean"
                   },
                   "notificationSettings": {
                     "type": "object",
@@ -12522,6 +12686,12 @@
                   },
                   "allowEmergencyRecall": {
                     "type": "boolean"
+                  },
+                  "defaultDiscountPercent": {
+                    "type": "number",
+                    "nullable": true,
+                    "minimum": 0,
+                    "maximum": 100
                   }
                 },
                 "required": [
@@ -13007,6 +13177,12 @@
                   },
                   "allowEmergencyRecall": {
                     "type": "boolean"
+                  },
+                  "defaultDiscountPercent": {
+                    "type": "number",
+                    "nullable": true,
+                    "minimum": 0,
+                    "maximum": 100
                   }
                 }
               }
@@ -13231,6 +13407,101 @@
           },
           "403": {
             "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/patients/{id}/photo": {
+      "patch": {
+        "tags": [
+          "patients"
+        ],
+        "operationId": "setPatientPhoto",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPatientPhotoInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Patient with updated photo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Patient"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Image is not a face_photo of this patient",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Patient not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -15728,6 +15999,10 @@
                     "minimum": 0,
                     "default": 0
                   },
+                  "discountReason": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
                   "paidAmount": {
                     "type": "number",
                     "nullable": true,
@@ -16378,6 +16653,157 @@
           },
           "403": {
             "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cashier/photo-settings": {
+      "get": {
+        "tags": [
+          "cashier"
+        ],
+        "operationId": "getCashierPhotoSettings",
+        "responses": {
+          "200": {
+            "description": "Cashier photo capture setting",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CashierPhotoSettings"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cashier/transactions/{id}/photo": {
+      "get": {
+        "tags": [
+          "cashier"
+        ],
+        "operationId": "getCashierTransactionPhoto",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cashier transaction photo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CashierPhoto"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Transaction not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -27142,6 +27568,307 @@
         }
       }
     },
+    "/api/treatment-plans/{id}/stages": {
+      "post": {
+        "tags": [
+          "treatment-plans"
+        ],
+        "operationId": "addTreatmentStage",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "serviceId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "serviceName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "toothNumbers": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "estimatedVisits": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": true,
+                    "default": 1
+                  },
+                  "estimatedDurationMinutes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": true
+                  },
+                  "cost": {
+                    "type": "number",
+                    "nullable": true,
+                    "minimum": 0
+                  },
+                  "notes": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "resultingToothState": {
+                    "type": "string",
+                    "enum": [
+                      "healthy",
+                      "caries",
+                      "filling",
+                      "crown",
+                      "implant",
+                      "missing",
+                      "root_canal",
+                      "to_extract",
+                      "temporary",
+                      "veneer"
+                    ]
+                  }
+                },
+                "required": [
+                  "serviceName",
+                  "cost"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Stage added to the plan (pending, proposed)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/TreatmentStage"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error or invalid service reference",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Treatment plan not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Plan is completed or cancelled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/treatment-plans/completed-work": {
+      "post": {
+        "tags": [
+          "treatment-plans"
+        ],
+        "operationId": "recordCompletedWork",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "patientId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "planId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "doctorId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "visitNoteId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "serviceId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "serviceName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "toothNumbers": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer"
+                          }
+                        },
+                        "estimatedVisits": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": true,
+                          "default": 1
+                        },
+                        "estimatedDurationMinutes": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": true
+                        },
+                        "cost": {
+                          "type": "number",
+                          "nullable": true,
+                          "minimum": 0
+                        },
+                        "notes": {
+                          "type": "string",
+                          "maxLength": 500
+                        },
+                        "resultingToothState": {
+                          "type": "string",
+                          "enum": [
+                            "healthy",
+                            "caries",
+                            "filling",
+                            "crown",
+                            "implant",
+                            "missing",
+                            "root_canal",
+                            "to_extract",
+                            "temporary",
+                            "veneer"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "serviceName",
+                        "cost"
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 20
+                  }
+                },
+                "required": [
+                  "patientId",
+                  "items"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Completed stage(s) recorded on the current plan (or an auto «Bajarilgan ishlar» plan)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/TreatmentCompletedWork"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error or invalid patient/plan/service reference",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (incl. recording on behalf of another doctor)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Plan is not active (draft/presented) or is completed/cancelled; visit note is signed or already linked to a stage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/treatment-plans/{id}/estimate": {
       "get": {
         "tags": [
@@ -27408,6 +28135,27 @@
                       "veneer",
                       null
                     ]
+                  },
+                  "serviceId": {
+                    "type": "string",
+                    "nullable": true,
+                    "format": "uuid"
+                  },
+                  "serviceName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "cost": {
+                    "type": "number",
+                    "nullable": true,
+                    "minimum": 0
+                  },
+                  "toothNumbers": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
                   }
                 }
               }
@@ -27472,6 +28220,16 @@
           },
           "404": {
             "description": "Treatment stage not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stage content locked (not pending or has payment allocations)",
             "content": {
               "application/json": {
                 "schema": {
@@ -27629,6 +28387,14 @@
                   "freeNotes": {
                     "type": "string",
                     "maxLength": 5000
+                  },
+                  "toothNumbers": {
+                    "type": "array",
+                    "nullable": true,
+                    "items": {
+                      "type": "integer"
+                    },
+                    "maxItems": 52
                   },
                   "allergyOverrides": {
                     "type": "array",
@@ -27869,6 +28635,14 @@
                   "freeNotes": {
                     "type": "string",
                     "maxLength": 5000
+                  },
+                  "toothNumbers": {
+                    "type": "array",
+                    "nullable": true,
+                    "items": {
+                      "type": "integer"
+                    },
+                    "maxItems": 52
                   },
                   "allergyOverrides": {
                     "type": "array",
@@ -28793,6 +29567,15 @@
             "required": false,
             "name": "visitNoteId",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "example": 16
+            },
+            "required": false,
+            "name": "tooth",
+            "in": "query"
           }
         ],
         "responses": {
@@ -28991,8 +29774,7 @@
                     "type": "array",
                     "nullable": true,
                     "items": {
-                      "type": "integer",
-                      "nullable": true
+                      "type": "integer"
                     }
                   },
                   "takenDate": {

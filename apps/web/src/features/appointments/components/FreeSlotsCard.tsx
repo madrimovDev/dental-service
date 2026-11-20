@@ -44,12 +44,18 @@ export function FreeSlotsCard({
   branchId,
   date,
   enabled,
+  onPick,
 }: {
   branchId: string | null;
   /** Tanlangan kun (YYYY-MM-DD, local). */
   date: string;
   /** Chaqiruvchi `schedule.view` ruxsatiga egami. */
   enabled: boolean;
+  /**
+   * FT-05.1: slot chip bosiladi → yangi yozilish. `doctorId` — shu vaqtda bo'sh yagona doktor
+   * (bir nechta bo'lsa `null`: tanlovni foydalanuvchiga qoldiramiz).
+   */
+  onPick?: (slot: { startMinute: number; doctorId: string | null }) => void;
 }) {
   const { t } = useTranslation();
   const { data, isLoading, isError, refetch, isFetching } = useBranchAvailability({
@@ -60,16 +66,28 @@ export function FreeSlotsCard({
 
   // Doktorlar bo'yicha bo'sh slot boshlanishlarini birlashtirib, daqiqa bo'yicha
   // dedupe + tartib (bir vaqtda bir nechta doktor bo'sh bo'lishi mumkin).
-  const slotLabels = useMemo(() => {
-    const byMinute = new Map<number, string>();
+  const slotItems = useMemo(() => {
+    const byMinute = new Map<number, { label: string; doctorIds: string[] }>();
     for (const doctor of data?.doctors ?? []) {
       for (const slot of doctor.slots) {
-        if (!byMinute.has(slot.startMinute)) {
-          byMinute.set(slot.startMinute, localTimeLabel(slot.start));
+        const cur = byMinute.get(slot.startMinute);
+        if (!cur) {
+          byMinute.set(slot.startMinute, {
+            label: localTimeLabel(slot.start),
+            doctorIds: [doctor.doctorId],
+          });
+        } else if (!cur.doctorIds.includes(doctor.doctorId)) {
+          cur.doctorIds.push(doctor.doctorId);
         }
       }
     }
-    return [...byMinute.entries()].sort((a, b) => a[0] - b[0]).map(([, label]) => label);
+    return [...byMinute.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([startMinute, v]) => ({
+        startMinute,
+        label: v.label,
+        doctorId: v.doctorIds.length === 1 ? (v.doctorIds[0] ?? null) : null,
+      }));
   }, [data]);
 
   const renderBody = () => {
@@ -97,7 +115,7 @@ export function FreeSlotsCard({
         </div>
       );
     }
-    if (slotLabels.length === 0) {
+    if (slotItems.length === 0) {
       return (
         <div data-testid="free-slots-empty" style={emptyBoxStyle}>
           {t('appointments.no_slots')}
@@ -106,23 +124,33 @@ export function FreeSlotsCard({
     }
     return (
       <div data-testid="free-slots-list" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-        {slotLabels.map((label) => (
-          <span
-            key={label}
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 12,
-              fontWeight: 600,
-              color: 'var(--ink)',
-              padding: '4px 8px',
-              background: 'var(--surface-2)',
-              border: '1px solid var(--border)',
-              borderRadius: 8,
-            }}
-          >
-            {label}
-          </span>
-        ))}
+        {slotItems.map(({ label, startMinute, doctorId }) => {
+          const chipStyle: React.CSSProperties = {
+            fontFamily: 'var(--font-mono)',
+            fontSize: 12,
+            fontWeight: 600,
+            color: 'var(--ink)',
+            padding: '4px 8px',
+            background: 'var(--surface-2)',
+            border: '1px solid var(--border)',
+            borderRadius: 8,
+          };
+          return onPick ? (
+            <button
+              key={label}
+              type="button"
+              aria-label={label}
+              style={{ ...chipStyle, cursor: 'pointer', minHeight: 44, minWidth: 44 }}
+              onClick={() => onPick({ startMinute, doctorId })}
+            >
+              {label}
+            </button>
+          ) : (
+            <span key={label} style={chipStyle}>
+              {label}
+            </span>
+          );
+        })}
       </div>
     );
   };
@@ -140,7 +168,7 @@ export function FreeSlotsCard({
         >
           {t('appointments.free_slots')}
         </span>
-        {!isLoading && !isError && branchId != null && slotLabels.length > 0 && (
+        {!isLoading && !isError && branchId != null && slotItems.length > 0 && (
           <span
             data-testid="free-slots-count"
             style={{
@@ -151,7 +179,7 @@ export function FreeSlotsCard({
               opacity: isFetching ? 0.5 : 1,
             }}
           >
-            {slotLabels.length}
+            {slotItems.length}
           </span>
         )}
       </div>

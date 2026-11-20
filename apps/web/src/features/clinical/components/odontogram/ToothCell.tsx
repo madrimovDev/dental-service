@@ -1,5 +1,6 @@
 import type { ToothState, ToothSurface } from '@dental/api-client';
 import { UnstyledButton } from '@mantine/core';
+import { type MouseEvent, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import classes from './ToothCell.module.css';
 
@@ -57,6 +58,8 @@ const SURFACE_PATHS: Record<Exclude<ToothSurface, 'whole'>, string> = {
   I: 'M12 12 L24 12 L24 24 L12 24 Z',
 };
 
+const LONG_PRESS_MS = 500;
+
 const SURFACE_ORDER: Array<Exclude<ToothSurface, 'whole' | 'I'>> = ['B', 'D', 'L', 'M', 'O'];
 
 type Props = {
@@ -65,7 +68,9 @@ type Props = {
   /** Tanlangan tish surface→state map (markerli tish uchun). Yo'q bo'lsa whole=state. */
   surfaceStates?: Partial<Record<ToothSurface, ToothState>>;
   selected: boolean;
-  onClick: () => void;
+  onClick: (e: MouseEvent<HTMLButtonElement>) => void;
+  /** FT-01.3: uzun bosish (~500ms, planshet) — tishni ko'p tanlovga qo'shish/olish. */
+  onLongPress?: () => void;
   /** Detail panel uchun katta render (px). @default 36 */
   size?: number;
   /** Faqat ko'rsatuv — bosish/tanlash o'chiriladi. */
@@ -82,6 +87,7 @@ export function ToothCell({
   surfaceStates,
   selected,
   onClick,
+  onLongPress,
   size = 36,
   readOnly = false,
   planned = false,
@@ -89,6 +95,20 @@ export function ToothCell({
 }: Props) {
   const { t } = useTranslation();
   const stateLabel = t(`tooth_chart.states.${state}`);
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Uzun bosishdan keyingi brauzer click'i tanlovni qayta almashtirmasin.
+  const swallowClick = useRef(false);
+  const cancelPress = () => {
+    if (pressTimer.current) clearTimeout(pressTimer.current);
+    pressTimer.current = null;
+  };
+  // Unmount'da kutilayotgan uzun bosish taymeri bekor qilinadi.
+  useEffect(
+    () => () => {
+      if (pressTimer.current) clearTimeout(pressTimer.current);
+    },
+    [],
+  );
 
   // Har yuza uchun fill: surfaceStates bo'lsa undan, aks holda butun tish = state.
   const fillFor = (surf: Exclude<ToothSurface, 'whole'>): string => {
@@ -160,7 +180,33 @@ export function ToothCell({
   return (
     <UnstyledButton
       type="button"
-      onClick={onClick}
+      onClick={(e) => {
+        if (swallowClick.current) {
+          swallowClick.current = false;
+          return;
+        }
+        onClick(e);
+      }}
+      onPointerDown={
+        onLongPress
+          ? (e) => {
+              // Sichqonchada sekin bosish ko'p tanlovni yoqmasin (u yerda Shift/⌘ bor).
+              if (e.pointerType === 'mouse') return;
+              cancelPress();
+              swallowClick.current = false;
+              pressTimer.current = setTimeout(() => {
+                pressTimer.current = null;
+                swallowClick.current = true;
+                onLongPress();
+              }, LONG_PRESS_MS);
+            }
+          : undefined
+      }
+      onPointerUp={onLongPress ? cancelPress : undefined}
+      onPointerLeave={onLongPress ? cancelPress : undefined}
+      onPointerCancel={onLongPress ? cancelPress : undefined}
+      // Uzun bosishda mobil kontekst menyusi ochilmasin.
+      onContextMenu={onLongPress ? (e) => e.preventDefault() : undefined}
       className={classes.cell}
       // Holat faqat rang bilan emas — aria-label'da raqam + holat nomi (WCAG 1.4.1)
       aria-label={`${number} — ${stateLabel}`}

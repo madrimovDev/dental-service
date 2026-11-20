@@ -48,6 +48,24 @@ describe('PatientCard', () => {
     permsHolder.current = [];
   });
 
+  it("FT-06.2: «Rasm qo'yish» faqat patient.edit + patient_image.upload bilan", () => {
+    medicalHolder.current = null;
+    const view = () =>
+      renderApp(
+        <Routes>
+          <Route path="/patients/:id" element={<PatientCard />} />
+        </Routes>,
+        { route: '/patients/p1' },
+      );
+    permsHolder.current = ['patient.edit'];
+    const first = view();
+    expect(screen.queryByRole('button', { name: /Rasm qo'yish/i })).not.toBeInTheDocument();
+    first.unmount();
+    permsHolder.current = ['patient.edit', 'patient_image.upload'];
+    view();
+    expect(screen.getByRole('button', { name: /Rasm qo'yish/i })).toBeInTheDocument();
+  });
+
   it("bemor ismi + tablarni ko'rsatadi", () => {
     medicalHolder.current = null;
     renderApp(

@@ -37,6 +37,8 @@ import {
   toLabOrderListRowVM,
   toLabOrderVM,
   toothHistoryRows,
+  toothStageRows,
+  toothVisitNotes,
   toPatientImageVM,
   toPlanCardVM,
   toPlanListRowVM,
@@ -235,6 +237,8 @@ function stage(over: Partial<TreatmentStage> = {}): TreatmentStage {
     estimatedVisits: 1,
     estimatedDurationMinutes: null,
     cost: '150000',
+    listPrice: null,
+    discountPercent: null,
     status: 'pending',
     acceptance: 'proposed',
     notes: null,
@@ -349,6 +353,8 @@ describe('toEstimateVM', () => {
           stageId: 's1',
           serviceName: 'Plomba',
           cost: 500000,
+          listPrice: null,
+          discountPercent: null,
           status: 'pending',
           acceptance: 'accepted',
           paid: 200000,
@@ -358,6 +364,8 @@ describe('toEstimateVM', () => {
           stageId: 's2',
           serviceName: 'Tozalash',
           cost: 150000,
+          listPrice: null,
+          discountPercent: null,
           status: 'skipped',
           acceptance: 'accepted',
           paid: 0,
@@ -380,6 +388,22 @@ describe('toEstimateVM', () => {
     expect(s1?.acceptanceTone).toBe('success');
     expect(s1?.debtEligible).toBe(true);
     expect(s2?.debtEligible).toBe(false);
+  });
+
+  it("FT-04.3: chegirmali bosqich — list narx va foiz smetada; chegirmasiz — yo'q", () => {
+    const base = estimate();
+    const vm = toEstimateVM({
+      ...base,
+      stages: [
+        { ...base.stages[0]!, cost: 180000, listPrice: 200000, discountPercent: 10 },
+        { ...base.stages[1]!, listPrice: 150000, discountPercent: null },
+      ],
+    });
+    expect(vm.stages[0]?.costText).toBe(formatNumber(180000));
+    expect(vm.stages[0]?.listPriceText).toBe(formatNumber(200000));
+    expect(vm.stages[0]?.discountPercent).toBe(10);
+    expect(vm.stages[1]?.listPriceText).toBeNull();
+    expect(vm.stages[1]?.discountPercent).toBeNull();
   });
 
   it('totals are independent subtotals; balance is authoritative', () => {
@@ -640,5 +664,90 @@ describe('resultingStateForPlan (FX-27)', () => {
     expect(resultingStateForPlan('to_extract')).toBe('missing');
     expect(resultingStateForPlan('crown')).toBeUndefined();
     expect(resultingStateForPlan(undefined)).toBeUndefined();
+  });
+});
+
+// ---- FT-01.4 (CF-10): tish tarixi — bosqichlar va vizitlar ----
+describe('tish tarixi (FT-01.4)', () => {
+  const plans = [
+    {
+      id: 'p1',
+      title: 'Reja A',
+      status: 'in_progress',
+      createdAt: '2026-01-01T00:00:00Z',
+      stages: [
+        {
+          id: 's1',
+          serviceName: 'Plomba',
+          toothNumbers: [16],
+          status: 'completed',
+          completedAt: '2026-02-01T00:00:00Z',
+          cost: '250000.00',
+        },
+        {
+          id: 's2',
+          serviceName: 'Toj',
+          toothNumbers: [16, 17],
+          status: 'pending',
+          completedAt: null,
+          cost: '900000.00',
+        },
+        {
+          id: 's3',
+          serviceName: 'Boshqa',
+          toothNumbers: [26],
+          status: 'pending',
+          completedAt: null,
+          cost: '1.00',
+        },
+      ],
+    },
+    {
+      id: 'p2',
+      title: 'Reja B',
+      status: 'cancelled',
+      createdAt: '2026-03-01T00:00:00Z',
+      stages: [
+        {
+          id: 's4',
+          serviceName: 'Olib tashlash',
+          toothNumbers: [16],
+          status: 'skipped',
+          completedAt: null,
+          cost: '100000.00',
+        },
+      ],
+    },
+  ] as never;
+
+  it('toothStageRows: faqat shu tishli bosqichlar, reja nomi/holati, sana (yangisi birinchi)', () => {
+    const rows = toothStageRows(plans, 16);
+    expect(rows.map((r) => r.stageId)).toEqual(['s4', 's1', 's2']);
+    expect(rows.find((r) => r.stageId === 's1')).toEqual({
+      stageId: 's1',
+      planId: 'p1',
+      planTitle: 'Reja A',
+      planStatus: 'in_progress',
+      serviceName: 'Plomba',
+      status: 'completed',
+      date: '2026-02-01T00:00:00Z',
+      cost: '250000.00',
+    });
+    // Bajarilmagan bosqich sanasi — reja yaratilgan sana.
+    expect(rows.find((r) => r.stageId === 's2')?.date).toBe('2026-01-01T00:00:00Z');
+    expect(toothStageRows(plans, 48)).toEqual([]);
+    expect(toothStageRows(undefined, 16)).toEqual([]);
+  });
+
+  it('toothVisitNotes: o‘z tooth_numbers YOKI shu tishli bosqichga bog‘langan vizitlar', () => {
+    const notes = [
+      { id: 'v1', toothNumbers: [16], stageId: null, visitDate: '2026-02-03T00:00:00Z' },
+      { id: 'v2', toothNumbers: null, stageId: 's1', visitDate: '2026-02-01T00:00:00Z' },
+      { id: 'v3', toothNumbers: [26], stageId: 's3', visitDate: '2026-02-05T00:00:00Z' },
+      { id: 'v4', toothNumbers: null, stageId: null, visitDate: '2026-02-06T00:00:00Z' },
+    ] as never;
+    const rows = toothVisitNotes(notes, 16, toothStageRows(plans, 16));
+    expect(rows.map((n) => n.id)).toEqual(['v1', 'v2']);
+    expect(toothVisitNotes(undefined, 16, [])).toEqual([]);
   });
 });

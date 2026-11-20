@@ -85,6 +85,10 @@ export const updateSettingsSchema = z.object({
   maxDiscountPercent: z.number().int().min(0).max(100).optional(),
   // CLI-474 (L7): no-show strike chegarasi (0 = o'chiq).
   noShowStrikeThreshold: z.number().int().min(0).max(50).optional(),
+  // FT-07: Telegram bot'da bemor o'z ma'lumotlari menyusi (standart yoqilgan).
+  botSelfServiceEnabled: z.boolean().optional(),
+  // FT-06.3 (D-4): to'lovdan keyin kassada avtomatik rasm olish (standart o'chiq).
+  cashierPhotoEnabled: z.boolean().optional(),
   notificationSettings: updateNotificationSettingsSchema.optional(),
   // CLI-379/400: xom kredensiallar — service AES bilan shifrlab saqlaydi.
   // `null` → integration o'chiriladi.
@@ -111,6 +115,8 @@ export const tenantSettingsDtoSchema = z
     onboardingDismissedAt: z.string().nullable().openapi({ example: null }),
     maxDiscountPercent: z.number().int().openapi({ example: 100 }),
     noShowStrikeThreshold: z.number().int().openapi({ example: 3 }),
+    botSelfServiceEnabled: z.boolean().openapi({ example: true }),
+    cashierPhotoEnabled: z.boolean().openapi({ example: false }),
     notificationSettings: notificationSettingsDtoSchema,
     integrationSettings: integrationSettingsDtoSchema,
     createdAt: z.string().openapi({ example: '2026-06-12T10:00:00.000Z' }),

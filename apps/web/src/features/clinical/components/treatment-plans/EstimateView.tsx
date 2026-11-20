@@ -1,78 +1,72 @@
 import { Mono, StateView, StatusPill } from '@dental/ui';
-import { Divider, Group, Modal, Stack, Table, Text } from '@mantine/core';
+import { Divider, Group, Stack, Text } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { formatCurrency } from '@/lib/format.ts';
 import { useTreatmentPlanEstimate } from '../../clinical.api';
 import { toEstimateVM } from '../../clinical.mappers';
 
 /**
- * CLI-223/224: smeta — "bemorga taqdim qilish" yuzasi. Modal ichida (har doim mount EMAS):
- * paid/balans matnlari faqat ochilganda render bo'ladi (TreatmentPlansTab regression cheklovi).
+ * CLI-223/224: smeta — "bemorga taqdim qilish" yuzasi.
+ * FT-01.5 (spec §3): modal EMAS — plan kartasining o'ng panelida yig'iladigan bo'lim.
+ * Faqat ochilganda mount bo'ladi va so'rov yuboradi (lazy): paid/balans matnlari
+ * yopiq holatda render bo'lmaydi (TreatmentPlansTab regression cheklovi).
  */
-export function EstimateView({
-  planId,
-  opened,
-  onClose,
-}: {
-  planId: string;
-  opened: boolean;
-  onClose: () => void;
-}) {
+export function EstimatePanel({ planId }: { planId: string }) {
   const { t } = useTranslation();
-  // enabled=opened — modal yopiq bo'lsa so'rov yuborilmaydi (lazy).
-  const estimateQuery = useTreatmentPlanEstimate(planId, opened);
+  const estimateQuery = useTreatmentPlanEstimate(planId, true);
 
-  return (
-    <Modal opened={opened} onClose={onClose} title={t('treatment_plan.estimate')} size="lg">
-      {estimateQuery.isError ? (
-        <StateView
-          status="error"
-          title={t('states.error_title')}
-          retryLabel={t('states.retry')}
-          onRetry={() => estimateQuery.refetch()}
-        />
-      ) : estimateQuery.isLoading || !estimateQuery.data ? (
-        <StateView status="loading" skeleton="table" />
-      ) : (
-        <EstimateBody data={toEstimateVM(estimateQuery.data)} />
-      )}
-    </Modal>
-  );
+  if (estimateQuery.isError) {
+    return (
+      <StateView
+        status="error"
+        title={t('states.error_title')}
+        retryLabel={t('states.retry')}
+        onRetry={() => estimateQuery.refetch()}
+      />
+    );
+  }
+  if (estimateQuery.isLoading || !estimateQuery.data) {
+    return <StateView status="loading" skeleton="table" />;
+  }
+  return <EstimateBody data={toEstimateVM(estimateQuery.data)} />;
 }
 
 function EstimateBody({ data }: { data: ReturnType<typeof toEstimateVM> }) {
   const { t } = useTranslation();
   return (
-    <Stack gap="md">
+    <Stack gap="sm">
       {data.stages.length === 0 ? (
-        <Text c="dimmed">{t('treatment_plan.estimate_empty')}</Text>
+        <Text c="dimmed" size="sm">
+          {t('treatment_plan.estimate_empty')}
+        </Text>
       ) : (
-        <Table>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>{t('treatment_plan.service_name')}</Table.Th>
-              <Table.Th>{t('treatment_plan.cost')}</Table.Th>
-              <Table.Th>{t('treatment_plan.status')}</Table.Th>
-              <Table.Th>{t('treatment_plan.acceptance')}</Table.Th>
-              <Table.Th>{t('treatment_plan.estimate_paid')}</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {data.stages.map((s) => (
-              <Table.Tr key={s.id}>
-                <Table.Td>{s.serviceName}</Table.Td>
-                <Table.Td>{s.costText}</Table.Td>
-                <Table.Td>
-                  <StatusPill status={s.statusTone}>{t(s.statusLabelKey)}</StatusPill>
-                </Table.Td>
-                <Table.Td>
-                  <StatusPill status={s.acceptanceTone}>{t(s.acceptanceLabelKey)}</StatusPill>
-                </Table.Td>
-                <Table.Td>{s.paidText}</Table.Td>
-              </Table.Tr>
-            ))}
-          </Table.Tbody>
-        </Table>
+        <Stack gap={8}>
+          {data.stages.map((s) => (
+            <Stack key={s.id} gap={2}>
+              <Group justify="space-between" wrap="nowrap" gap="xs">
+                <Text size="sm" fw={500} truncate>
+                  {s.serviceName}
+                </Text>
+                <Text size="sm">
+                  <Mono>{s.costText}</Mono>
+                </Text>
+              </Group>
+              {/* FT-04.3: bosqich chegirmasi smetada — list narx (chizilgan) va foiz. */}
+              {s.listPriceText && s.discountPercent != null && (
+                <Text size="xs" c="dimmed" ta="right" data-testid="estimate-stage-discount">
+                  <del>{s.listPriceText}</del>{' '}
+                  {t('treatment_plan.stage_discount', { pct: s.discountPercent })}
+                </Text>
+              )}
+              <Group justify="space-between" wrap="nowrap" gap="xs">
+                <StatusPill status={s.acceptanceTone}>{t(s.acceptanceLabelKey)}</StatusPill>
+                <Text size="xs" c="dimmed">
+                  {t('treatment_plan.estimate_paid')}: <Mono>{s.paidText}</Mono>
+                </Text>
+              </Group>
+            </Stack>
+          ))}
+        </Stack>
       )}
 
       <Divider />
@@ -85,8 +79,10 @@ function EstimateBody({ data }: { data: ReturnType<typeof toEstimateVM> }) {
         <TotalRow label={t('treatment_plan.total_paid')} value={data.totalPaidText} />
         <Divider my={4} />
         <Group justify="space-between">
-          <Text fw={700}>{t('treatment_plan.balance')}</Text>
-          <Text fw={700} c={data.balance > 0 ? 'var(--danger)' : undefined}>
+          <Text fw={700} size="sm">
+            {t('treatment_plan.balance')}
+          </Text>
+          <Text fw={700} size="sm" c={data.balance > 0 ? 'var(--danger)' : undefined}>
             <Mono>{formatCurrency(data.balance, t)}</Mono>
           </Text>
         </Group>
@@ -98,9 +94,11 @@ function EstimateBody({ data }: { data: ReturnType<typeof toEstimateVM> }) {
 function TotalRow({ label, value }: { label: string; value: string }) {
   const { t } = useTranslation();
   return (
-    <Group justify="space-between">
-      <Text c="dimmed">{label}</Text>
-      <Text>
+    <Group justify="space-between" wrap="nowrap" gap="xs">
+      <Text c="dimmed" size="sm">
+        {label}
+      </Text>
+      <Text size="sm">
         <Mono>
           {value} {t('common.currency')}
         </Mono>

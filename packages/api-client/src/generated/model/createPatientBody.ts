@@ -49,4 +49,10 @@ export type CreatePatientBody = {
   /** @nullable */
   insurance?: CreatePatientBodyInsurance;
   allowEmergencyRecall?: boolean;
+  /**
+   * @minimum 0
+   * @maximum 100
+   * @nullable
+   */
+  defaultDiscountPercent?: number | null;
 };

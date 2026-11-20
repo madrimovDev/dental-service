@@ -23,6 +23,7 @@ const dataResult = { data: rawPatient, isLoading: false, isError: false, refetch
 let rawResult: any = dataResult;
 let canEdit = true;
 let canPii = true;
+let canDiscount = false;
 
 vi.mock('../../patients.api', () => ({
   usePatientRaw: () => rawResult,
@@ -35,7 +36,13 @@ vi.mock('../../patients.api', () => ({
 vi.mock('@/stores/auth-store.ts', () => ({
   useAuthStore: () => ({
     hasPermission: (code: string) =>
-      code === 'patient.edit' ? canEdit : code === 'patient.view_pii' ? canPii : false,
+      code === 'patient.edit'
+        ? canEdit
+        : code === 'patient.view_pii'
+          ? canPii
+          : code === 'discount.give'
+            ? canDiscount
+            : false,
   }),
 }));
 
@@ -198,5 +205,45 @@ describe('GeneralTab — edit forma telefon validatsiyasi (L13 regression guard)
     const phoneInput = screen.getByLabelText('Telefon') as HTMLInputElement;
     expect(phoneInput).toHaveAttribute('aria-invalid', 'true');
     expect(updateMutate).not.toHaveBeenCalled();
+  });
+});
+
+describe('GeneralTab — FT-04.3 doimiy chegirma (discount.give)', () => {
+  beforeEach(() => {
+    canEdit = true;
+    canPii = true;
+    updateMutate.mockClear();
+  });
+  afterEach(() => {
+    canDiscount = false;
+  });
+
+  it("discount.give'siz: chegirma maydoni yo'q va PATCH'ga defaultDiscountPercent ketmaydi", () => {
+    canDiscount = false;
+    rawResult = { ...dataResult, data: { ...rawPatient, defaultDiscountPercent: '10.00' } };
+    renderApp(<GeneralTab patient={patientDetail} />);
+    expect(screen.queryByLabelText('Doimiy chegirma (%)')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    const body = updateMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(Object.hasOwn(body, 'defaultDiscountPercent')).toBe(false);
+  });
+
+  it('discount.give bilan: o‘zgarmasa yuborilmaydi, o‘zgarsa son, bo‘shatilsa null', () => {
+    canDiscount = true;
+    rawResult = { ...dataResult, data: { ...rawPatient, defaultDiscountPercent: '10.00' } };
+    renderApp(<GeneralTab patient={patientDetail} />);
+    const input = screen.getByLabelText('Doimiy chegirma (%)') as HTMLInputElement;
+    expect(input.value).toBe('10%');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    expect(updateMutate.mock.calls[0]?.[0]).toMatchObject({ defaultDiscountPercent: undefined });
+
+    fireEvent.change(input, { target: { value: '15' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    expect(updateMutate.mock.calls[1]?.[0]).toMatchObject({ defaultDiscountPercent: 15 });
+
+    fireEvent.change(input, { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    expect(updateMutate.mock.calls[2]?.[0]).toMatchObject({ defaultDiscountPercent: null });
   });
 });

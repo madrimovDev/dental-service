@@ -92,7 +92,9 @@ export { listCashierPendingVisits } from './generated/cashier/cashier';
 export type {
   CreateCashierTransactionResult,
   GetCashierDailySummaryResult,
+  GetCashierPhotoSettingsResult,
   GetCashierPlanBalanceResult,
+  GetCashierTransactionPhotoResult,
   GetCashierTransactionResult,
   ListCashierPatientPlansResult,
   ListCashierTransactionsResult,
@@ -101,8 +103,10 @@ export type {
 export {
   createCashierTransaction,
   getCashierDailySummary,
+  getCashierPhotoSettings,
   getCashierPlanBalance,
   getCashierTransaction,
+  getCashierTransactionPhoto,
   listCashierPatientPlans,
   listCashierTransactions,
   refundCashierTransaction,
@@ -193,6 +197,7 @@ export type {
 // Generated model types — appointments, services, queue, notifications, schedule
 // QueueTicketStatus re-exported under both names for backward compatibility
 export type {
+  AddTreatmentStageBody,
   AllergyEntry,
   Appointment,
   AppointmentStatsReport,
@@ -214,6 +219,9 @@ export type {
   CancelAppointmentBody,
   CashierPatientPlan,
   CashierPatientPlanStatus,
+  CashierPhoto,
+  CashierPhotoSettings,
+  CashierPhotoSkippedReason,
   CashierTransaction,
   CashierTransactionPaymentMethod as PaymentMethod,
   CashierTransactionStatus as TransactionStatus,
@@ -391,6 +399,8 @@ export type {
   RecallDtoReason,
   RecallDtoSource,
   RecallSummary,
+  RecordCompletedWorkBody,
+  RecordCompletedWorkBodyItemsItem,
   ResetPasswordResponse,
   ResetUserPassword200,
   RevenueReport,
@@ -438,6 +448,7 @@ export type {
   ToothStateEntrySurface,
   TransferTenantOwnership200,
   TransferTenantOwnershipBody,
+  TreatmentCompletedWork,
   TreatmentPlan,
   TreatmentPlanEstimate,
   TreatmentPlanEstimateStage,
@@ -560,6 +571,7 @@ export type {
   ListPatientsResult,
   RemovePatientEmergencyContactResult,
   RemovePatientRelativeResult,
+  SetPatientPhotoResult,
   UpdateMedicalRecordResult,
   UpdatePatientResult,
 } from './generated/patients/patients.ts';
@@ -579,6 +591,7 @@ export {
   listPatients,
   removePatientEmergencyContact,
   removePatientRelative,
+  setPatientPhoto,
   updateMedicalRecord,
   updatePatient,
 } from './generated/patients/patients.ts';
@@ -800,19 +813,23 @@ export {
 } from './generated/tooth-charts/tooth-charts.ts';
 // Generated (orval) — treatment-plans
 export type {
+  AddTreatmentStageResult,
   CreateTreatmentPlanResult,
   GetTreatmentPlanEstimateResult,
   GetTreatmentPlanResult,
   ListTreatmentPlansResult,
+  RecordCompletedWorkResult,
   SignTreatmentPlanConsentResult,
   UpdateTreatmentPlanResult,
   UpdateTreatmentStageResult,
 } from './generated/treatment-plans/treatment-plans.ts';
 export {
+  addTreatmentStage,
   createTreatmentPlan,
   getTreatmentPlan,
   getTreatmentPlanEstimate,
   listTreatmentPlans,
+  recordCompletedWork,
   signTreatmentPlanConsent,
   updateTreatmentPlan,
   updateTreatmentStage,

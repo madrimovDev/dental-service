@@ -1,11 +1,12 @@
 import { AlertBanner, Button, Card, Input, PhoneInput, Select } from '@dental/ui';
-import { Checkbox, TagsInput, Textarea } from '@mantine/core';
+import { Checkbox, NumberInput, TagsInput, Textarea } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { ChevronLeft, Phone, Users } from 'lucide-react';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '@/stores/auth-store';
 import { useCreatePatient, usePhoneCheck } from '../patients.api';
 import { type PatientFormValues, patientFormSchema } from '../patients.schema';
 import classes from './PatientNewScreen.module.css';
@@ -24,6 +25,10 @@ export function PatientNewScreen() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const createMut = useCreatePatient();
+  // FT-04.3 (D-2): doimiy chegirma — faqat `discount.give` bilan (tahrir formasi bilan bir xil;
+  // server maydon-gate'i 403 `discount.forbidden`). Huquqsiz kalit umuman yuborilmaydi.
+  const canDiscount = useAuthStore((s) => s.hasPermission('discount.give'));
+  const [discountPct, setDiscountPct] = useState<number | ''>('');
 
   const form = useForm<PatientFormValues>({
     initialValues: {
@@ -83,6 +88,9 @@ export function PatientNewScreen() {
         source: values.source || undefined,
         insurance,
         allowEmergencyRecall: values.allowEmergencyRecall,
+        ...(canDiscount && typeof discountPct === 'number' && discountPct > 0
+          ? { defaultDiscountPercent: discountPct }
+          : {}),
       },
       { onSuccess: (p) => navigate(`/patients/${p.id}`) },
     );
@@ -340,6 +348,19 @@ export function PatientNewScreen() {
                   form.setFieldValue('allowEmergencyRecall', e.currentTarget.checked)
                 }
               />
+              {canDiscount && (
+                <NumberInput
+                  mt="md"
+                  label={t('patients.form.default_discount')}
+                  description={t('patients.form.default_discount_hint')}
+                  min={0}
+                  max={100}
+                  decimalScale={2}
+                  suffix="%"
+                  value={discountPct}
+                  onChange={(v) => setDiscountPct(typeof v === 'number' ? v : '')}
+                />
+              )}
             </div>
           </Card>
         </div>

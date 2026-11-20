@@ -1,5 +1,14 @@
 import { sql } from 'drizzle-orm';
-import { boolean, index, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from 'drizzle-orm/pg-core';
 import { appointments } from './appointments.ts';
 import { patients } from './patients.ts';
 import { tenants } from './tenants.ts';
@@ -60,6 +69,10 @@ export const visitNotes = pgTable(
     performedServices: uuid('performed_services').array(),
 
     freeNotes: text('free_notes'),
+
+    // FT-01.4 (CF-10): vizitda ishlangan tish(lar) — FDI raqamlari (ixtiyoriy). Tish tarixi
+    // shu ustun YOKI bog'langan bosqichning `tooth_numbers`i orqali vizitni topadi.
+    toothNumbers: integer('tooth_numbers').array(),
 
     // UI-D4: imzolash. NULL = qoralama (tahrirlanadi); NOT NULL = imzolangan (PATCH → 409).
     signedAt: timestamp('signed_at', { withTimezone: true }),

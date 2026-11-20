@@ -27,6 +27,8 @@ import type {
   ListPatientsParams,
   RemovePatientEmergencyContact200,
   RemovePatientRelative200,
+  SetPatientPhoto200,
+  SetPatientPhotoInput,
   UnlinkPatientTelegram200,
   UpdateMedicalRecord200,
   UpdateMedicalRecordBody,
@@ -108,6 +110,17 @@ import { customInstance } from '../../mutator';
  ) => {
       return customInstance<GetPatientBalance200>(
       {url: `/api/patients/${id}/balance`, method: 'GET'
+    },
+      );
+    }
+  export const setPatientPhoto = (
+    id: string,
+    setPatientPhotoInput: SetPatientPhotoInput,
+ ) => {
+      return customInstance<SetPatientPhoto200>(
+      {url: `/api/patients/${id}/photo`, method: 'PATCH',
+      headers: {'Content-Type': 'application/json', },
+      data: setPatientPhotoInput
     },
       );
     }
@@ -218,6 +231,7 @@ export type GetPatientResult = NonNullable<Awaited<ReturnType<typeof getPatient>
 export type UpdatePatientResult = NonNullable<Awaited<ReturnType<typeof updatePatient>>>
 export type ArchivePatientResult = NonNullable<Awaited<ReturnType<typeof archivePatient>>>
 export type GetPatientBalanceResult = NonNullable<Awaited<ReturnType<typeof getPatientBalance>>>
+export type SetPatientPhotoResult = NonNullable<Awaited<ReturnType<typeof setPatientPhoto>>>
 export type UnlinkPatientTelegramResult = NonNullable<Awaited<ReturnType<typeof unlinkPatientTelegram>>>
 export type GetMedicalRecordResult = NonNullable<Awaited<ReturnType<typeof getMedicalRecord>>>
 export type UpdateMedicalRecordResult = NonNullable<Awaited<ReturnType<typeof updateMedicalRecord>>>

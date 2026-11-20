@@ -10,4 +10,7 @@ export const cashierKeys = {
   pendingVisits: (branchId: string) => ['cashier', 'pending-visits', branchId] as const,
   detail: (id: string) => ['cashier', 'transaction', id] as const,
   allTransactions: () => ['cashier', 'transactions-all'] as const,
+  // FT-06.3: kassa rasmi.
+  photoSettings: () => ['cashier', 'photo-settings'] as const,
+  photo: (transactionId: string) => ['cashier', 'photo', transactionId] as const,
 };

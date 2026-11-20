@@ -1,13 +1,16 @@
 import {
   consentForms,
   labOrders,
+  patients,
   treatmentPlans,
   treatmentStagePayments,
   treatmentStages,
+  visitNotes,
 } from '@dental/db-schema';
-import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { getDb } from '../../../db/scoped.ts';
+import { capDiscountPercent, readMaxDiscountPercent } from '../../../lib/discount.ts';
 import type { ListPlansQuery } from './treatment-plans.schema.ts';
 
 export const createTreatmentPlansRepository = () => {
@@ -105,6 +108,132 @@ export const createTreatmentPlansRepository = () => {
     return plan ?? null;
   }
 
+  /**
+   * FT-01: rejani `FOR UPDATE` bilan qulflab o'qiydi (RLS tranzaksiyasi ichida) — parallel
+   * bosqich qo'shishlar bir xil `sequence` olmasin va totalCost qayta hisobi ketma-ket bo'lsin.
+   */
+  async function lockPlan(c: Context, id: string) {
+    const db = getDb(c);
+    const [plan] = await db
+      .select()
+      .from(treatmentPlans)
+      .where(eq(treatmentPlans.id, id))
+      .for('update');
+    return plan ?? null;
+  }
+
+  /**
+   * FT-01.2: bemor bo'yicha tranzaksiya-darajali advisory qulf — bir bemorga parallel
+   * «bajarilgan ish» yozuvlari ikkita avto-reja yaratmasin (commit/rollback'da bo'shaydi).
+   */
+  async function lockPatientCompletedWork(c: Context, patientId: string) {
+    const db = getDb(c);
+    await db.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`completed-work:${patientId}`}))`);
+  }
+
+  /**
+   * FT-01.2: bemorning SHU SHIFOKORGA tegishli eng so'nggi faol (`accepted|in_progress`)
+   * rejasi, `FOR UPDATE` bilan («Bajarilgan ishni yozish» joriy rejasi). Shifokor filtri
+   * shart (FT-01 review): payroll komissiyasi `plan.doctor_id` bo'yicha (D-13) — A ning ishi
+   * B ning rejasiga tushsa, komissiya B ga ketardi.
+   */
+  async function lockLatestActivePlan(c: Context, patientId: string, doctorId: string) {
+    const db = getDb(c);
+    const [plan] = await db
+      .select()
+      .from(treatmentPlans)
+      .where(
+        and(
+          eq(treatmentPlans.patientId, patientId),
+          eq(treatmentPlans.doctorId, doctorId),
+          inArray(treatmentPlans.status, ['accepted', 'in_progress']),
+        ),
+      )
+      .orderBy(desc(treatmentPlans.createdAt))
+      .limit(1)
+      .for('update');
+    return plan ?? null;
+  }
+
+  /**
+   * FT-01.2: «bajarilgan ish» bog'lanadigan vizit yozuvini `FOR UPDATE` bilan o'qiydi
+   * (parallel imzo/bog'lash bilan poyga yo'q). `findConsentForm` precedenti — boshqa domen
+   * jadvali to'g'ridan, biznes mantiqsiz. RLS → boshqa tenantniki null.
+   */
+  async function lockVisitNote(c: Context, id: string) {
+    const db = getDb(c);
+    const [row] = await db
+      .select({
+        id: visitNotes.id,
+        patientId: visitNotes.patientId,
+        doctorId: visitNotes.doctorId,
+        stageId: visitNotes.stageId,
+        signedAt: visitNotes.signedAt,
+      })
+      .from(visitNotes)
+      .where(eq(visitNotes.id, id))
+      .for('update');
+    return row ?? null;
+  }
+
+  /**
+   * FT-01.2: vizit yozuvini bosqichga bog'laydi — faqat imzolanmagan va hali bosqichsiz
+   * bo'lsa (shartli UPDATE; 0 qator → null).
+   */
+  async function linkVisitNoteStage(c: Context, visitNoteId: string, stageId: string) {
+    const db = getDb(c);
+    const [row] = await db
+      .update(visitNotes)
+      .set({ stageId, updatedAt: new Date() })
+      .where(
+        and(
+          eq(visitNotes.id, visitNoteId),
+          isNull(visitNotes.stageId),
+          isNull(visitNotes.signedAt),
+        ),
+      )
+      .returning({ id: visitNotes.id });
+    return row ?? null;
+  }
+
+  /** FT-01: rejadagi keyingi bosqich tartib raqami (max(sequence) + 1). */
+  async function nextStageSequence(c: Context, planId: string) {
+    const db = getDb(c);
+    const [row] = await db
+      .select({ max: sql<number | null>`max(${treatmentStages.sequence})` })
+      .from(treatmentStages)
+      .where(eq(treatmentStages.treatmentPlanId, planId));
+    return Number(row?.max ?? 0) + 1;
+  }
+
+  /** FT-01: bitta bosqich qo'shish. */
+  async function insertStage(c: Context, values: typeof treatmentStages.$inferInsert) {
+    const db = getDb(c);
+    const [stage] = await db.insert(treatmentStages).values(values).returning();
+    if (!stage) throw new Error('Stage insert failed');
+    return stage;
+  }
+
+  /**
+   * FT-01: reja `totalCost`/`totalVisits` = bosqichlar yig'indisi (createPlan bilan bir xil
+   * qoida — barcha bosqichlar). Avval reja `FOR UPDATE` qulflanadi: parallel tahrirlarda
+   * keyingi UPDATE yangi snapshot oladi (READ COMMITTED) va eskirgan yig'indi yozilmaydi.
+   */
+  async function recomputePlanTotals(c: Context, planId: string) {
+    const db = getDb(c);
+    await lockPlan(c, planId);
+    const [updated] = await db
+      .update(treatmentPlans)
+      .set({
+        totalCost: sql`(SELECT COALESCE(SUM(${treatmentStages.cost}), 0) FROM ${treatmentStages} WHERE ${treatmentStages.treatmentPlanId} = ${planId})`,
+        totalVisits: sql`(SELECT COALESCE(SUM(${treatmentStages.estimatedVisits}), 0)::int FROM ${treatmentStages} WHERE ${treatmentStages.treatmentPlanId} = ${planId})`,
+        updatedAt: new Date(),
+      })
+      .where(eq(treatmentPlans.id, planId))
+      .returning();
+    return updated ?? null;
+  }
+
   /** FX-15: rejadagi 'completed' bosqichlar soni (bekor qilish guard'i uchun). */
   async function countCompletedStages(c: Context, planId: string) {
     const db = getDb(c);
@@ -170,6 +299,17 @@ export const createTreatmentPlansRepository = () => {
     return row ?? null;
   }
 
+  /** FT-01: bosqichga kamida bitta to'lov allocation'i bormi (kontent tahriri qulfi). */
+  async function hasStageAllocations(c: Context, stageId: string) {
+    const db = getDb(c);
+    const [row] = await db
+      .select({ id: treatmentStagePayments.id })
+      .from(treatmentStagePayments)
+      .where(eq(treatmentStagePayments.stageId, stageId))
+      .limit(1);
+    return !!row;
+  }
+
   /** C6: estimate uchun plan bosqichlariga tegishli allocation'lar (RLS filtrlaydi). */
   async function listStageAllocations(c: Context, planId: string) {
     const db = getDb(c);
@@ -211,17 +351,50 @@ export const createTreatmentPlansRepository = () => {
     return updated ?? null;
   }
 
+  /** FT-04.3 (D-2): bemorning doimiy chegirma foizi ('10.00') yoki null (RLS-bound). */
+  async function findPatientDefaultDiscount(c: Context, patientId: string) {
+    const db = getDb(c);
+    const [row] = await db
+      .select({ pct: patients.defaultDiscountPercent })
+      .from(patients)
+      .where(eq(patients.id, patientId))
+      .limit(1);
+    return row?.pct ?? null;
+  }
+
+  /**
+   * FT-04.3 (review): bosqich snapshot'i uchun bemorning SAMARALI doimiy chegirmasi —
+   * `min(patients.default_discount_percent, tenant_settings.max_discount_percent)` (RLS-bound).
+   * Chegara bemor chegirmasidan keyin pasaytirilgan bo'lsa ham owner chegarasi aylanib o'tilmaydi.
+   */
+  async function findPatientEffectiveDiscount(c: Context, patientId: string) {
+    const pct = await findPatientDefaultDiscount(c, patientId);
+    if (pct == null) return null;
+    return capDiscountPercent(pct, await readMaxDiscountPercent(getDb(c)));
+  }
+
   return {
+    findPatientDefaultDiscount,
+    findPatientEffectiveDiscount,
     listPlans,
     getPlanWithStages,
     insertPlanWithStages,
     findPlan,
+    lockPlan,
+    lockPatientCompletedWork,
+    lockLatestActivePlan,
+    lockVisitNote,
+    linkVisitNoteStage,
+    nextStageSequence,
+    insertStage,
+    recomputePlanTotals,
     findStage,
     countCompletedStages,
     countOpenAcceptedStages,
     findConsentForm,
     findLabOrderStatus,
     listStageAllocations,
+    hasStageAllocations,
     updatePlan,
     updateStage,
   };

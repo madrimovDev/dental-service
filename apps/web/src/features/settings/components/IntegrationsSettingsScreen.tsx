@@ -6,6 +6,7 @@ import {
   Loader,
   PasswordInput,
   Stack,
+  Switch,
   Text,
   TextInput,
   Title,
@@ -168,9 +169,11 @@ function CredentialCard({
 function TelegramCard({
   status,
   canEdit,
+  botSelfServiceEnabled,
 }: {
   status: TenantSettings['integrationSettings']['telegram'];
   canEdit: boolean;
+  botSelfServiceEnabled: boolean;
 }) {
   const { t } = useTranslation();
   const update = useUpdateTenantSettings();
@@ -212,6 +215,14 @@ function TelegramCard({
         placeholder={t('settings.integration_telegram_bot_token_placeholder')}
         disabled={!canEdit}
         {...form.getInputProps('botToken')}
+      />
+      <Switch
+        data-testid="bot-self-service-switch"
+        label={t('settings.bot_self_service_label')}
+        description={t('settings.bot_self_service_help')}
+        checked={botSelfServiceEnabled}
+        disabled={!canEdit || update.isPending}
+        onChange={(e) => update.mutate({ botSelfServiceEnabled: e.currentTarget.checked })}
       />
     </CredentialCard>
   );
@@ -319,7 +330,11 @@ export function IntegrationsSettingsScreen() {
               gap: 14,
             }}
           >
-            <TelegramCard status={integrations.telegram} canEdit={canEdit} />
+            <TelegramCard
+              status={integrations.telegram}
+              canEdit={canEdit}
+              botSelfServiceEnabled={settings.data?.botSelfServiceEnabled ?? false}
+            />
             <EskizCard status={integrations.sms} canEdit={canEdit} />
           </div>
 

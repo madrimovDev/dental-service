@@ -1,20 +1,49 @@
+import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatDayMonth, formatWeekday } from '@/lib/format';
-import { groupByDay } from '../appointments.mappers';
+import { cellStartMinute, groupByDay, minuteLabel } from '../appointments.mappers';
 import type { Appointment } from '../appointments.types';
-import { type CalendarEvent, GRID, toneForIndex, toneVars } from '../appointments.types';
+import {
+  type CalendarEvent,
+  GRID,
+  type GridConfig,
+  toneForIndex,
+  toneVars,
+} from '../appointments.types';
 import { AppointmentSlot } from './AppointmentSlot';
+import { MOVABLE } from './CalendarGrid';
 import classes from './CalendarGrid.module.css';
 
 /** Yarim soatlik grid chiziqlari (hour opacity 1, half .4) — CalendarGrid bilan bir xil. */
-function GridLines() {
-  const rows = (GRID.dayEndHour - GRID.dayStartHour) * 2;
+function GridLines({
+  grid,
+  cellLabel,
+  onCell,
+}: {
+  grid: GridConfig;
+  cellLabel?: (startMinute: number) => string;
+  onCell?: (startMinute: number) => void;
+}) {
+  const rows = (grid.dayEndHour - grid.dayStartHour) * 2;
   return (
     <>
-      {Array.from({ length: rows }, (_, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: statik fiksir grid panjarasi
-        <div key={i} className={classes.gridLine} data-half={i % 2 === 1} />
-      ))}
+      {Array.from({ length: rows }, (_, i) =>
+        onCell ? (
+          <button
+            // biome-ignore lint/suspicious/noArrayIndexKey: statik fiksir grid panjarasi
+            key={i}
+            type="button"
+            tabIndex={-1}
+            className={classes.gridLine}
+            data-half={i % 2 === 1}
+            aria-label={cellLabel?.(cellStartMinute(i, grid))}
+            onClick={() => onCell(cellStartMinute(i, grid))}
+          />
+        ) : (
+          // biome-ignore lint/suspicious/noArrayIndexKey: statik fiksir grid panjarasi
+          <div key={i} className={classes.gridLine} data-half={i % 2 === 1} />
+        ),
+      )}
     </>
   );
 }
@@ -26,22 +55,47 @@ export function WeekGrid({
   patientName,
   onSlotClick,
   selectedId,
+  onCellClick,
+  canMove = false,
+  onMove,
+  onResize,
+  grid = GRID,
+  outsideHoursIds,
 }: {
   appointments: Appointment[];
   dayKeys: string[];
   patientName: (patientId: string) => string;
   onSlotClick?: (event: CalendarEvent) => void;
   selectedId?: string | null;
+  /** FT-05.1: `appointment.create` — bo'sh katakka bosish (kun + boshlanish daqiqasi). */
+  onCellClick?: (cell: { dateKey: string; startMinute: number }) => void;
+  /** FT-05.3: `appointment.edit` — faol yozilishni boshqa kun/vaqtga sudrash, pastidan cho'zish. */
+  canMove?: boolean;
+  onMove?: (appointment: Appointment, dateKey: string, startMinute: number) => void;
+  onResize?: (appointment: Appointment, endMinute: number) => void;
+  /** FT-05.2: filial ish vaqtidan hisoblangan oyna (standart — `GRID`). */
+  grid?: GridConfig;
+  /** FT-05.2: filial ish vaqtidan tashqari yozilishlar — «soatdan tashqari» belgisi. */
+  outsideHoursIds?: ReadonlySet<string>;
 }) {
-  const { i18n } = useTranslation();
-  const cols = groupByDay(appointments, dayKeys);
+  const { t, i18n } = useTranslation();
+  const cols = groupByDay(appointments, dayKeys, grid);
   const hours = Array.from(
-    { length: GRID.dayEndHour - GRID.dayStartHour },
-    (_, i) => GRID.dayStartHour + i,
+    { length: grid.dayEndHour - grid.dayStartHour },
+    (_, i) => grid.dayStartHour + i,
   );
 
   return (
-    <div className={classes.grid}>
+    <div
+      className={classes.grid}
+      data-cal-grid
+      style={
+        {
+          '--cal-hour': `${grid.pxPerMin * 60}px`,
+          '--cal-row': `${grid.pxPerMin * grid.stepMin}px`,
+        } as CSSProperties
+      }
+    >
       <div className={classes.times}>
         <div className={classes.timesHead} />
         {hours.map((h) => (
@@ -71,8 +125,21 @@ export function WeekGrid({
                 </span>
                 <span className={classes.colCount}>{col.events.length}</span>
               </div>
-              <div className={classes.colBody}>
-                <GridLines />
+              <div className={classes.colBody} data-drop-col={col.dateKey}>
+                <GridLines
+                  grid={grid}
+                  onCell={
+                    onCellClick
+                      ? (startMinute) => onCellClick({ dateKey: col.dateKey, startMinute })
+                      : undefined
+                  }
+                  cellLabel={(m) =>
+                    t('calendar.new_appt_at', {
+                      doctor: formatWeekday(day, i18n.language, 'short', 'Asia/Tashkent'),
+                      time: minuteLabel(m),
+                    })
+                  }
+                />
                 {col.events.map((e) => (
                   <AppointmentSlot
                     key={e.appointment.id}
@@ -81,6 +148,13 @@ export function WeekGrid({
                     tone={tone}
                     onClick={onSlotClick}
                     selected={selectedId === e.appointment.id}
+                    outsideHours={outsideHoursIds?.has(e.appointment.id)}
+                    grid={grid}
+                    draggable={canMove && MOVABLE.has(e.appointment.status)}
+                    onMoveGesture={(ev, target) =>
+                      onMove?.(ev.appointment, target.colKey, target.startMinute)
+                    }
+                    onResizeGesture={(ev, endMinute) => onResize?.(ev.appointment, endMinute)}
                   />
                 ))}
               </div>

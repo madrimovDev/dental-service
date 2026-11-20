@@ -49,6 +49,19 @@ export type ToothHistoryRow = {
   surfaces: ToothSurface[];
 };
 
+/** FT-01.4 (CF-10): «Tarix» tabi — shu tishli bosqich (reja nomi, holat, sana, narx). */
+export type ToothStageRow = {
+  stageId: string;
+  planId: string;
+  planTitle: string;
+  planStatus: TreatmentPlanStatus;
+  serviceName: string;
+  status: TreatmentStageStatus;
+  /** Bajarilgan sana, aks holda reja yaratilgan sana (ISO). */
+  date: string;
+  cost: string;
+};
+
 // ===== A: Treatment plan =====
 export type PlanCardVM = {
   id: string;
@@ -107,6 +120,10 @@ export type EstimateStageVM = {
   id: string;
   serviceName: string;
   costText: string;
+  /** FT-04.3: chegirmagacha narx — faqat bosqichda chegirma bo'lsa (aks holda null). */
+  listPriceText: string | null;
+  /** FT-04.3: bosqich chegirma foizi (snapshot); yo'q — null. */
+  discountPercent: number | null;
   statusLabelKey: string;
   statusTone: Tone;
   acceptanceLabelKey: string;

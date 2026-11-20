@@ -23,10 +23,13 @@ export function ImageUploadModal({
   opened,
   onClose,
   patientId,
+  defaultToothNumbers,
 }: {
   opened: boolean;
   onClose: () => void;
   patientId: string;
+  /** FT-01.4: tish tarixidan ochilganda tish(lar) oldindan to'ldiriladi. */
+  defaultToothNumbers?: readonly number[];
 }) {
   const { t, i18n } = useTranslation();
   const [file, setFile] = useState<File | null>(null);
@@ -44,7 +47,7 @@ export function ImageUploadModal({
       type: 'intraoral_photo',
       title: '',
       description: '',
-      toothNumbersText: '',
+      toothNumbersText: defaultToothNumbers?.join(', ') ?? '',
       takenDate: '',
     },
     validate: zod4Resolver(uploadImageFormSchema),

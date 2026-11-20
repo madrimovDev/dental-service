@@ -21,10 +21,46 @@ vi.mock('../cashier.api', () => ({
     },
     isError: false,
   }),
+  useCashierTransactionPhoto: (id: string | null) => ({
+    data: id ? (photoById[id] ?? null) : undefined,
+    isLoading: false,
+    isError: false,
+  }),
 }));
 
+const photoById: Record<string, unknown> = {
+  tx1: {
+    id: 'ph1',
+    transactionId: 'tx1',
+    url: '/uploads/tenants%2Ft%2Fcashier-photos%2Ftx1%2Fa.jpg',
+    skippedReason: null,
+    capturedBy: 'u1',
+    capturedAt: '2026-11-20T05:00:00Z',
+  },
+  tx3: {
+    id: 'ph3',
+    transactionId: 'tx3',
+    url: null,
+    skippedReason: 'permission_denied',
+    capturedBy: 'u1',
+    capturedAt: '2026-11-20T05:00:00Z',
+  },
+};
+
+// FT-06.3: `cashier.photo.view` alohida boshqariladi (qolgan ruxsatlar — bor).
+let canViewPhoto = true;
 vi.mock('@/stores/auth-store.ts', () => ({
-  useAuthStore: () => ({ hasPermission: () => true }),
+  useAuthStore: () => ({
+    hasPermission: (code: string) => (code === 'cashier.photo.view' ? canViewPhoto : true),
+  }),
+}));
+
+vi.mock('@/hooks/useAuthedObjectUrl', () => ({
+  useAuthedObjectUrl: (url: string | null) => ({
+    src: url ? `blob:${url}` : null,
+    isLoading: false,
+    isError: false,
+  }),
 }));
 
 function tx(over: Partial<CashierTransaction> = {}): CashierTransaction {
@@ -41,6 +77,9 @@ function tx(over: Partial<CashierTransaction> = {}): CashierTransaction {
     paidAmount: '120000',
     refundedAmount: '0',
     discount: '0',
+    discountPercent: null,
+    discountReason: null,
+    discountGrantedBy: null,
     currency: 'UZS',
     paymentMethod: 'cash',
     type: 'payment',
@@ -56,7 +95,39 @@ function tx(over: Partial<CashierTransaction> = {}): CashierTransaction {
 }
 
 describe('TransactionsTable', () => {
-  beforeEach(() => refundMutate.mockClear());
+  beforeEach(() => {
+    refundMutate.mockClear();
+    canViewPhoto = true;
+  });
+
+  it('FT-06.3: cashier.photo.view yo‘q → «Rasm» tugmasi ko‘rinmaydi', () => {
+    canViewPhoto = false;
+    renderApp(<TransactionsTable transactions={[tx()]} />);
+    expect(screen.queryByTestId('photo-view-tx1')).toBeNull();
+    expect(screen.queryByLabelText('Rasm')).toBeNull();
+  });
+
+  it('FT-06.3: cashier.photo.view bor → rasm authed blob orqali ko‘rinadi', async () => {
+    renderApp(<TransactionsTable transactions={[tx()]} />);
+    fireEvent.click(screen.getByTestId('photo-view-tx1'));
+    const dialog = await screen.findByRole('dialog');
+    const img = within(dialog).getByRole('img', { name: "To'lovchi rasmi" }) as HTMLImageElement;
+    expect(img.getAttribute('src')).toBe(
+      'blob:/uploads/tenants%2Ft%2Fcashier-photos%2Ftx1%2Fa.jpg',
+    );
+  });
+
+  it('FT-06.3: rasm olinmagan bo‘lsa — sababi; refund qatorida tugma yo‘q', async () => {
+    renderApp(
+      <TransactionsTable transactions={[tx({ id: 'tx3' }), tx({ id: 'tx4', type: 'refund' })]} />,
+    );
+    expect(screen.queryByTestId('photo-view-tx4')).toBeNull();
+    fireEvent.click(screen.getByTestId('photo-view-tx3'));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByTestId('cashier-photo-skipped').textContent).toContain(
+      'kameraga ruxsat berilmadi',
+    );
+  });
 
   it('refund modal: tasdiqlash → useRefund.mutate(tx.id)', async () => {
     renderApp(<TransactionsTable transactions={[tx()]} />);

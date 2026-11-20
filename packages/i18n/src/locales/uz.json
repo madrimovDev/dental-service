@@ -345,13 +345,34 @@
   },
   "apiErrors": {
     "ownership": {
-      "not_practitioner": "Yozuv muallifi shifokor bo'lishi kerak. Shifokorni tanlang yoki shifokor hisobidan kiring."
+      "not_practitioner": "Yozuv muallifi shifokor bo'lishi kerak. Shifokorni tanlang yoki shifokor hisobidan kiring.",
+      "not_found": "Tanlangan yozuv topilmadi. Sahifani yangilab, qayta urinib ko'ring.",
+      "mismatch": "Tanlangan yozuvlar bir-biriga mos emas (boshqa bemor yoki shifokorga tegishli)."
     },
     "prescription": {
       "on_behalf_forbidden": "Boshqa shifokor nomidan retsept yozishga ruxsatingiz yo'q."
     },
     "visit_note": {
-      "on_behalf_forbidden": "Boshqa shifokor nomidan vizit yozuvi yaratishga ruxsatingiz yo'q."
+      "on_behalf_forbidden": "Boshqa shifokor nomidan vizit yozuvi yaratishga ruxsatingiz yo'q.",
+      "signed": "Vizit yozuvi imzolangan — unga endi ish bog'lab bo'lmaydi.",
+      "stage_linked": "Vizit yozuvi allaqachon boshqa bosqichga bog'langan."
+    },
+    "discount": {
+      "forbidden": "Chegirma berishga ruxsatingiz yo'q (bu filialda «Chegirma bera oladi» huquqi kerak)."
+    },
+    "patient": {
+      "discount_exceeds_max": "Doimiy chegirma klinika belgilagan chegaradan ({{maxPercent}}%) oshmasligi kerak."
+    },
+    "plan": {
+      "locked": "Reja yakunlangan yoki bekor qilingan — unga bosqich qo'shib ham, tahrirlab ham bo'lmaydi.",
+      "not_active": "Reja hali qabul qilinmagan. Bajarilgan ishni yozish uchun avval rejani qabul qiling.",
+      "doctor_mismatch": "Bu reja boshqa shifokorga tegishli. Ishni o'z rejangizga yozing yoki shifokor nomidan yozish huquqi kerak."
+    },
+    "stage": {
+      "locked": "Bu bosqichni o'zgartirib bo'lmaydi: u boshlangan yoki unga to'lov taqsimlangan."
+    },
+    "medical_record": {
+      "on_behalf_forbidden": "Boshqa shifokor nomidan tibbiy yozuv kiritishga ruxsatingiz yo'q."
     }
   },
   "dashboard": {
@@ -438,6 +459,8 @@
     "reminder_lead_hours": "Eslatma oldindan (soat)",
     "max_discount_percent": "Maksimal chegirma foizi",
     "max_discount_percent_hint": "Kassada bitta xizmatga beriladigan eng yuqori chegirma. 100% = cheklovsiz. Faqat klinika administratori o'zgartira oladi.",
+    "cashier_photo_enabled": "To'lovchi rasmi (kassa)",
+    "cashier_photo_enabled_hint": "To'lovdan keyin to'lovni tasdiqlash uchun to'lovchining yuz rasmi olinadi. Rasm 90 kun saqlanadi, keyin avtomatik o'chiriladi.",
     "subscription": {
       "trial": "Sinov",
       "active": "Faol",
@@ -472,6 +495,8 @@
     "transfer_confirm": "Egalik boshqa xodimga o'tkaziladi. Bu amalni qaytarib bo'lmaydi. Davom etasizmi?",
     "transfer_hint": "Egalikni o'tkazsangiz — superuser huquqlari yangi egaga o'tadi.",
     "nav_notify": "Bildirishnomalar",
+    "bot_self_service_label": "Bemor botda o'z ma'lumotlarini ko'rsin",
+    "bot_self_service_help": "Bemorlar botda o'z yozilishlari, balansi, davolash rejasi va oxirgi retseptini ko'ra oladi",
     "nav_integrations": "Integratsiyalar",
     "role_users": "{{count}} foydalanuvchi",
     "role_perm_count": "{{desc}} · {{count}} ruxsat",
@@ -526,7 +551,8 @@
       "user": "Xodimlar",
       "tenant": "Klinika",
       "report": "Hisobotlar",
-      "audit": "Audit"
+      "audit": "Audit",
+      "discount": "Chegirma"
     },
     "nav_services": "Xizmatlar va narxlar",
     "nav_license": "Litsenziya",
@@ -611,6 +637,7 @@
     "system_template": "Tizim shabloni"
   },
   "patients": {
+    "discount_badge": "Chegirma {{pct}}%",
     "title": "Bemorlar",
     "create": "Yangi bemor",
     "count": "{{count}} ta bemor",
@@ -736,6 +763,8 @@
       "insurance_active": "Sug'urta faol",
       "allow_emergency_recall": "Favqulodda aloqaga eslatma yuborishga ruxsat",
       "allow_emergency_recall_hint": "Bemor telefoni bo'lmasa, eslatma/chaqiruv SMS'i favqulodda aloqa raqamiga yuboriladi",
+      "default_discount": "Doimiy chegirma (%)",
+      "default_discount_hint": "Bemor tanlanganda kassada va yangi reja bosqichlarida avtomatik qo'llanadi",
       "insurance_provider_required": "Sug'urta ma'lumotlarini to'ldirsangiz, kompaniya nomi ham kiritilishi shart",
       "insurance_policy_required": "Sug'urta kompaniyasi va polis raqami — ikkalasi ham to'ldirilishi shart",
       "coverage_dental": "Stomatologik",
@@ -835,6 +864,7 @@
     "select": "Tanlang"
   },
   "treatment_plan": {
+    "stage_discount": "chegirma {{pct}}%",
     "title": "Davolash rejasi",
     "create": "Yangi reja",
     "edit": "Tahrirlash",
@@ -857,10 +887,10 @@
     "no_stages": "Bosqich qo'shing",
     "save": "Rejani saqlash",
     "status_draft": "Qoralama",
-    "status_presented": "Taqdim qilingan",
-    "status_accepted": "Qabul qilingan",
-    "status_in_progress": "Davom etmoqda",
-    "status_completed": "Bajarilgan",
+    "status_presented": "Bemorga ko'rsatildi",
+    "status_accepted": "Bemor rozi",
+    "status_in_progress": "Davolanmoqda",
+    "status_completed": "Tugadi",
     "status_cancelled": "Bekor qilingan",
     "resulting_state": "Bajarilgach tish holati",
     "resulting_state_none": "Belgilanmagan",
@@ -880,12 +910,12 @@
     "accept_all": "Hammasini qabul qilish",
     "accept_all_result": "{{accepted}} ta bosqich qabul qilindi",
     "accept_all_partial": "{{rejected}} ta bosqichni qabul qilib bo'lmadi",
-    "present": "Bemorga taqdim qilish",
-    "accept_plan": "Rejani tasdiqlash",
-    "start_execution": "Ijroni boshlash",
+    "present": "Bemorga ko'rsatish",
+    "accept_plan": "Bemor rozi bo'ldi",
+    "start_execution": "Davolashni boshlash",
     "complete_plan": "Rejani yakunlash",
     "estimate": "Smeta",
-    "estimate_open": "Smeta / taqdim qilish",
+    "estimate_open": "Smetani ko'rsatish",
     "estimate_empty": "Bosqichlar yo'q",
     "estimate_paid": "To'langan",
     "estimate_debt_eligible": "Qarzga kiradi",
@@ -911,7 +941,9 @@
       "empty": "Davolash rejalari topilmadi",
       "col_patient": "Bemor",
       "col_updated": "Yangilangan"
-    }
+    },
+    "more_actions": "Boshqa amallar",
+    "estimate_hide": "Smetani yashirish"
   },
   "visit_note": {
     "title": "Vizit yozuvlari",
@@ -1219,6 +1251,7 @@
     "price_branch": "filial narxi",
     "price_partial": "ba'zi xizmatlarga narx belgilanmagan",
     "moved": "{{name}} — {{doctor}}, {{time}} ga ko'chirildi",
+    "resized": "{{name}} — tugash {{time}} ga o'zgartirildi",
     "move_failed": "Ko'chirib bo'lmadi — yozilish joyiga qaytarildi",
     "move_action": "Ko'chirish",
     "move_time": "Yangi vaqt (shu kun)",
@@ -1358,6 +1391,26 @@
     "save_first": "Narx qo'shish uchun avval xizmatni saqlang"
   },
   "cashier": {
+    "photo": {
+      "title": "To'lovchi rasmi",
+      "hint": "To'lovni tasdiqlash uchun to'lovchining yuz rasmini oling. Rasm 90 kun saqlanadi.",
+      "skip": "O'tkazib yuborish",
+      "saved": "Rasm saqlandi",
+      "failed": "Rasmni saqlab bo'lmadi. To'lov saqlangan.",
+      "unavailable": "Kamera ishlamadi — to'lov rasmsiz saqlandi.",
+      "view": "Rasm",
+      "view_title": "To'lov rasmi",
+      "not_found": "Bu to'lov uchun rasm yo'q.",
+      "load_error": "Rasmni yuklab bo'lmadi.",
+      "alt": "To'lovchi rasmi",
+      "skipped": "Rasm olinmagan: {{reason}}",
+      "reason": {
+        "permission_denied": "kameraga ruxsat berilmadi",
+        "no_camera": "kamera topilmadi",
+        "user_skipped": "kassir o'tkazib yubordi",
+        "error": "kamera xatosi"
+      }
+    },
     "title": "Kassa",
     "branch": "Filial",
     "new_payment": "Yangi to'lov",
@@ -1368,6 +1421,9 @@
     "current_receipt": "Joriy chek",
     "subtotal": "Oraliq jami",
     "discount": "Chegirma",
+    "patient_discount": "Bemor chegirmasi",
+    "discount_reason": "Chegirma sababi",
+    "discount_reason_placeholder": "Masalan: doimiy mijoz, xodim qarindoshi",
     "payment_method": "To'lov turi",
     "method": {
       "cash": "Naqd pul",
@@ -1396,6 +1452,7 @@
     "cash_out": "Naqd chiqim (refund)",
     "noop_fiscal": "Fiskal hujjat keyinroq Soliqqa yuboriladi",
     "receipt_modal": {
+      "discount_line": "Chegirma ({{pct}}%)",
       "print": "Chop etish",
       "close": "Yopish",
       "total": "Jami",
@@ -1787,6 +1844,8 @@
     "patient_unknown": "Bemor"
   },
   "calendar": {
+    "new_appt_at": "{{doctor}} — {{time}}: yangi yozilish",
+    "outside_hours": "Soatdan tashqari",
     "panel_title": "Tanlangan yozilish",
     "panel_close": "Yopish",
     "next_step": "Keyingi qadam",
@@ -1811,7 +1870,12 @@
     "no_schedule_title": "Bu kunga ish jadvali yo'q",
     "no_schedule_text": "Jadvalsiz bu shifokorga yozib bo'lmaydi.",
     "no_schedule_link": "Jadvalni ko'rish →",
-    "no_schedule_badge": "Jadval yo'q"
+    "no_schedule_badge": "Jadval yo'q",
+    "zoom": "Kattalashtirish",
+    "zoom_compact": "Kichik",
+    "zoom_normal": "Oddiy",
+    "zoom_comfortable": "Katta",
+    "rail_open": "Panel"
   },
   "booking": {
     "title": "Yangi yozilish",
@@ -1944,7 +2008,28 @@
       "other": "Boshqa"
     }
   },
+  "camera": {
+    "capture": "Suratga olish",
+    "retake": "Qayta olish",
+    "use": "Ishlatish",
+    "switch": "Kamerani almashtirish",
+    "upload": "Fayl yuklash",
+    "cancel": "Bekor qilish",
+    "starting": "Kamera ishga tushmoqda...",
+    "denied": "Kameradan foydalanishga ruxsat berilmadi. Ruxsat bering yoki fayl yuklang.",
+    "not_found": "Kamera topilmadi. Fayl yuklang.",
+    "unsupported": "Bu qurilmada kamera qo'llab-quvvatlanmaydi. Fayl yuklang.",
+    "failed": "Kamerani ochib bo'lmadi. Fayl yuklang.",
+    "preview_alt": "Olingan rasm",
+    "video_label": "Kamera ko'rinishi"
+  },
   "patientCard": {
+    "photo_add": "Rasm qo'yish",
+    "photo_change": "Rasmni almashtirish",
+    "photo_remove": "Rasmni olib tashlash",
+    "photo_title": "Bemor rasmi",
+    "photo_saved": "Bemor rasmi saqlandi",
+    "photo_failed": "Rasmni saqlab bo'lmadi",
     "section": {
       "overview": "Umumiy",
       "treatment": "Davolash",
@@ -2043,7 +2128,27 @@
     "suggest_title": "Davolash taklifi",
     "suggest_none": "Mos xizmat topilmadi — katalogdan tanlang",
     "suggest_other": "Boshqa xizmat tanlash",
-    "suggest_no_price": "narx yo'q"
+    "suggest_no_price": "narx yo'q",
+    "selected_teeth": "Tishlar: {{list}}",
+    "multi_hint": "Bir nechta tish: Shift + bosish yoki uzun bosish",
+    "plan_title_multi": "Davolash: tishlar {{list}}",
+    "target_label": "Qaysi rejaga",
+    "target_current": "Joriy reja",
+    "target_new": "Yangi reja",
+    "single_stage": "Bitta bosqich (barcha tishlar uchun)",
+    "panel_tabs": "Tish bo'limlari",
+    "tab_tooth": "Tish",
+    "tab_history": "Tish tarixi",
+    "history_states": "Holat o'zgarishlari",
+    "history_stages": "Davolash bosqichlari",
+    "history_visits": "Vizitlar",
+    "history_images": "Rasmlar",
+    "history_none": "Hozircha yo'q",
+    "upload_image": "Rasm yuklash",
+    "visit_draft": "qoralama",
+    "visit_no_text": "Matnsiz yozuv",
+    "record_completed": "Bajarilgan ishni yozish",
+    "completed_recorded": "Bajarilgan ish yozildi"
   },
   "visitNote": {
     "title": "Vizit yozuvi",
@@ -2120,7 +2225,22 @@
     "freeNotes": "Qo‘shimcha izoh",
     "allergyUnknownTitle": "Allergiya ma’lumoti noma’lum",
     "allergyUnknownBody": "Bemorning allergiya ma’lumoti yuklanmadi yoki ko‘rish ruxsati yo‘q. Dori allergiyaga zid bo‘lishi mumkin — davom etish sababini tanlang.",
-    "allergyUnknownSafe": "Avval tekshiraman"
+    "allergyUnknownSafe": "Avval tekshiraman",
+    "teeth": "Tishlar",
+    "completedWork": {
+      "title": "Bajarilgan ishni yozish",
+      "hint": "Xizmat darhol bajarilgan bosqich sifatida joriy rejaga (yoki «Bajarilgan ishlar» rejasiga) yoziladi va shu vizitga bog'lanadi: odontogramma yangilanadi, summa reja qarziga tushadi (kassada «reja bo'yicha» to'lanadi).",
+      "saveFirst": "Avval vizit yozuvini saqlang.",
+      "service": "Xizmat",
+      "servicePlaceholder": "Xizmatni tanlang",
+      "teeth": "Tish(lar)",
+      "teethPlaceholder": "FDI raqami",
+      "permanent": "Doimiy tishlar",
+      "primary": "Sut tishlari",
+      "resultingState": "Tish holati (keyin)",
+      "submit": "Yozish",
+      "done": "Bajarilgan ish yozildi"
+    }
   },
   "ownerHome": {
     "title": "Siz hal qiladigan masalalar",

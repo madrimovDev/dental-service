@@ -49,4 +49,10 @@ export type UpdatePatientBody = {
   /** @nullable */
   insurance?: UpdatePatientBodyInsurance;
   allowEmergencyRecall?: boolean;
+  /**
+   * @minimum 0
+   * @maximum 100
+   * @nullable
+   */
+  defaultDiscountPercent?: number | null;
 };

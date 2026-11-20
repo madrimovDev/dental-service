@@ -1,5 +1,5 @@
 import { patientImages, visitNotes } from '@dental/db-schema';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, arrayContains, desc, eq, type SQL } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { onAfterCommit } from '../../db/after-commit.ts';
 import { getDb } from '../../db/scoped.ts';
@@ -47,23 +47,28 @@ export const createPatientImagesService = (deps: {
 }) => {
   const ownership = deps.ownership ?? createOwnershipValidator();
 
-  async function list(c: Context, patientId: string, visitNoteId?: string) {
+  /** `tooth` (FT-01.4, CF-10): tish tarixi — `tooth_numbers @> ARRAY[tooth]`. */
+  async function list(c: Context, patientId: string, visitNoteId?: string, tooth?: number) {
     const db = getDb(c);
+    const filters: SQL[] = [eq(patientImages.patientId, patientId)];
+    if (visitNoteId) filters.push(eq(patientImages.visitNoteId, visitNoteId));
+    if (tooth !== undefined) filters.push(arrayContains(patientImages.toothNumbers, [tooth]));
     const rows = await db
       .select()
       .from(patientImages)
-      .where(
-        visitNoteId
-          ? and(eq(patientImages.patientId, patientId), eq(patientImages.visitNoteId, visitNoteId))
-          : eq(patientImages.patientId, patientId),
-      )
+      .where(and(...filters))
       .orderBy(desc(patientImages.createdAt));
 
     await deps.audit.record(c, {
       action: 'viewed',
       resourceType: 'patient_image',
       resourceId: patientId,
-      after: { patientId, visitNoteId: visitNoteId ?? null, count: rows.length },
+      after: {
+        patientId,
+        visitNoteId: visitNoteId ?? null,
+        tooth: tooth ?? null,
+        count: rows.length,
+      },
     });
 
     // Sign URLs for client preview

@@ -17,4 +17,17 @@ export type UpdateTreatmentStageBody = {
   labOrderId?: string | null;
   /** @nullable */
   resultingToothState?: UpdateTreatmentStageBodyResultingToothState;
+  /** @nullable */
+  serviceId?: string | null;
+  /**
+   * @minLength 1
+   * @maxLength 200
+   */
+  serviceName?: string;
+  /**
+   * @minimum 0
+   * @nullable
+   */
+  cost?: number | null;
+  toothNumbers?: number[];
 };

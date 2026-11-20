@@ -1,12 +1,13 @@
-import { useRef } from 'react';
+import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { dropStartMinute, groupByDoctor } from '../appointments.mappers';
+import { cellStartMinute, groupByDoctor, minuteLabel } from '../appointments.mappers';
 import type { Appointment } from '../appointments.types';
 import {
   type CalendarEvent,
   type Doctor,
   GRID,
+  type GridConfig,
   toneForIndex,
   toneVars,
 } from '../appointments.types';
@@ -27,14 +28,36 @@ function initials(name: string): string {
 }
 
 /** Yarim soatlik grid chiziqlari (hour opacity 1, half .4) — 88px/soat zichlik. */
-function GridLines() {
-  const rows = (GRID.dayEndHour - GRID.dayStartHour) * 2; // 30-daq qadam
+function GridLines({
+  grid,
+  cellLabel,
+  onCell,
+}: {
+  grid: GridConfig;
+  /** FT-05.1: bor bo'lsa har katak tugma (klaviatura/AT uchun aria-label). */
+  cellLabel?: (startMinute: number) => string;
+  onCell?: (startMinute: number) => void;
+}) {
+  const rows = (grid.dayEndHour - grid.dayStartHour) * 2; // 30-daq qadam
   return (
     <>
-      {Array.from({ length: rows }, (_, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: statik fiksir grid panjarasi
-        <div key={i} className={classes.gridLine} data-half={i % 2 === 1} />
-      ))}
+      {Array.from({ length: rows }, (_, i) =>
+        onCell ? (
+          <button
+            // biome-ignore lint/suspicious/noArrayIndexKey: statik fiksir grid panjarasi
+            key={i}
+            type="button"
+            tabIndex={-1}
+            className={classes.gridLine}
+            data-half={i % 2 === 1}
+            aria-label={cellLabel?.(cellStartMinute(i, grid))}
+            onClick={() => onCell(cellStartMinute(i, grid))}
+          />
+        ) : (
+          // biome-ignore lint/suspicious/noArrayIndexKey: statik fiksir grid panjarasi
+          <div key={i} className={classes.gridLine} data-half={i % 2 === 1} />
+        ),
+      )}
     </>
   );
 }
@@ -48,6 +71,10 @@ export function CalendarGrid({
   unscheduledDoctorIds,
   canMove = false,
   onMove,
+  onResize,
+  onCellClick,
+  grid = GRID,
+  outsideHoursIds,
 }: {
   appointments: Appointment[];
   doctors: Doctor[];
@@ -62,20 +89,36 @@ export function CalendarGrid({
   unscheduledDoctorIds?: ReadonlySet<string> | null;
   /** `appointment.edit` — faol yozilishlarni sudrab ko'chirish mumkin. */
   canMove?: boolean;
-  /** Yozilish `doctorId` ustuniga, kun boshidan `startMinute` ga tushirildi. */
+  /** Yozilish `doctorId` ustuniga, kun boshidan `startMinute` ga tushirildi (pointer drag, touch ham). */
   onMove?: (appointment: Appointment, doctorId: string, startMinute: number) => void;
+  /** FT-05.3: pastki chetdan cho'zildi — yangi tugash daqiqasi (15 daqiqa qadam). */
+  onResize?: (appointment: Appointment, endMinute: number) => void;
+  /** FT-05.1: `appointment.create` — bo'sh katakka bosish (jadvalsiz doktorda yo'q). */
+  onCellClick?: (cell: { doctorId: string; startMinute: number }) => void;
+  /** FT-05.2: filial ish vaqtidan hisoblangan oyna (standart — `GRID`). */
+  grid?: GridConfig;
+  /** FT-05.2: filial ish vaqtidan tashqari yozilishlar — «soatdan tashqari» belgisi. */
+  outsideHoursIds?: ReadonlySet<string>;
 }) {
-  const dragRef = useRef<{ event: CalendarEvent; grab: number } | null>(null);
   const { t } = useTranslation();
-  const cols = groupByDoctor(appointments, doctors);
+  const cols = groupByDoctor(appointments, doctors, grid);
   const noSchedule = (doctorId: string) => unscheduledDoctorIds?.has(doctorId) ?? false;
   const hours = Array.from(
-    { length: GRID.dayEndHour - GRID.dayStartHour },
-    (_, i) => GRID.dayStartHour + i,
+    { length: grid.dayEndHour - grid.dayStartHour },
+    (_, i) => grid.dayStartHour + i,
   );
 
   return (
-    <div className={classes.grid}>
+    <div
+      className={classes.grid}
+      data-cal-grid
+      style={
+        {
+          '--cal-hour': `${grid.pxPerMin * 60}px`,
+          '--cal-row': `${grid.pxPerMin * grid.stepMin}px`,
+        } as CSSProperties
+      }
+    >
       <div className={classes.times}>
         <div className={classes.timesHead} />
         {hours.map((h) => (
@@ -108,39 +151,21 @@ export function CalendarGrid({
                 </span>
                 <span className={classes.colCount}>{col.events.length}</span>
               </div>
-              {/* biome-ignore lint/a11y/noStaticElementInteractions: drop zone; klaviatura alternativasi — AppointmentPanel «Ko'chirish» */}
               <div
-                onDragOver={
-                  canMove
-                    ? (e) => {
-                        if (dragRef.current) e.preventDefault();
-                      }
-                    : undefined
-                }
-                onDrop={
-                  canMove
-                    ? (e) => {
-                        const d = dragRef.current;
-                        dragRef.current = null;
-                        if (!d) return;
-                        e.preventDefault();
-                        const dur = d.event.endMin - d.event.startMin;
-                        onMove?.(
-                          d.event.appointment,
-                          col.doctor.id,
-                          dropStartMinute(
-                            e.clientY,
-                            e.currentTarget.getBoundingClientRect().top,
-                            d.grab,
-                            dur,
-                          ),
-                        );
-                      }
-                    : undefined
-                }
+                data-drop-col={col.doctor.id}
                 className={`${classes.colBody} ${noSchedule(col.doctor.id) ? classes.colNoSchedule : ''}`}
               >
-                <GridLines />
+                <GridLines
+                  grid={grid}
+                  onCell={
+                    onCellClick && !noSchedule(col.doctor.id) && col.doctor.id
+                      ? (startMinute) => onCellClick({ doctorId: col.doctor.id, startMinute })
+                      : undefined
+                  }
+                  cellLabel={(m) =>
+                    t('calendar.new_appt_at', { doctor: col.doctor.name, time: minuteLabel(m) })
+                  }
+                />
                 {noSchedule(col.doctor.id) && col.events.length === 0 && (
                   <div className={classes.noScheduleNote} role="note">
                     <span className={classes.noScheduleTitle}>
@@ -152,7 +177,7 @@ export function CalendarGrid({
                     </Link>
                   </div>
                 )}
-                <CurrentTimeLine showBadge={index === 0} />
+                <CurrentTimeLine showBadge={index === 0} grid={grid} />
                 {col.events.map((e) => (
                   <AppointmentSlot
                     key={e.appointment.id}
@@ -161,10 +186,13 @@ export function CalendarGrid({
                     tone={tone}
                     onClick={onSlotClick}
                     selected={selectedId === e.appointment.id}
+                    outsideHours={outsideHoursIds?.has(e.appointment.id)}
+                    grid={grid}
                     draggable={canMove && MOVABLE.has(e.appointment.status)}
-                    onDragStartSlot={(ev, grab) => {
-                      dragRef.current = { event: ev, grab };
-                    }}
+                    onMoveGesture={(ev, target) =>
+                      onMove?.(ev.appointment, target.colKey, target.startMinute)
+                    }
+                    onResizeGesture={(ev, endMinute) => onResize?.(ev.appointment, endMinute)}
                   />
                 ))}
               </div>

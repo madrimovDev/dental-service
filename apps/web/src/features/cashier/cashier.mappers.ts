@@ -107,6 +107,8 @@ export type CreatePayload = {
   patientId?: string;
   items: Array<{ serviceId: string; serviceName: string; quantity: number; unitPrice: number }>;
   discount: number;
+  /** FT-04: chegirma sababi — faqat chegirma bo'lsa (bo'sh → yuborilmaydi). */
+  discountReason?: string;
   paidAmount: number;
   paymentMethod: PaymentMethod;
   /** Faqat `card` uchun (backend boshqa usulda 400 qaytaradi). */
@@ -120,6 +122,7 @@ export function buildCreatePayload(input: {
   patientId: string | null;
   cart: CartItem[];
   discount: number;
+  discountReason?: string;
   paidAmount: number | null;
   paymentMethod: PaymentMethod;
   cardProvider?: CardProvider | null;
@@ -136,6 +139,8 @@ export function buildCreatePayload(input: {
       unitPrice: i.unitPrice,
     })),
     discount: input.discount,
+    discountReason:
+      input.discount > 0 && input.discountReason?.trim() ? input.discountReason.trim() : undefined,
     paidAmount: input.paidAmount ?? netTotal,
     paymentMethod: input.paymentMethod,
     cardProvider: input.paymentMethod === 'card' ? (input.cardProvider ?? undefined) : undefined,

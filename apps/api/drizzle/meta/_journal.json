@@ -484,6 +484,34 @@
       "when": 1795128100500,
       "tag": "0068_fx116_bm_payroll_backfill",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1795135234473,
+      "tag": "0069_ft01_visit_note_teeth",
+      "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "7",
+      "when": 1795200000000,
+      "tag": "0070_ft04_discount",
+      "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1795200000100,
+      "tag": "0071_ft07_bot_self_service",
+      "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1795200000200,
+      "tag": "0072_ft06_cashier_photos",
+      "breakpoints": true
     }
   ]
 }

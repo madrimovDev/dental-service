@@ -1,8 +1,17 @@
 import { basename, sep } from 'node:path';
 import { fail } from '@dental/core';
+import { cashierTransactionPhotos, cashierTransactions, patients } from '@dental/db-schema';
+import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import type { Database } from '../db/client.ts';
+import { getDb } from '../db/scoped.ts';
 import type { AuditLogger } from '../lib/audit-logger.ts';
+import {
+  BRANCH_FORBIDDEN_CODE,
+  BRANCH_FORBIDDEN_MESSAGE,
+  loadBranchScope,
+  scopeAllows,
+} from '../lib/branch-scope.ts';
 import type { StorageAdapter } from '../lib/storage.ts';
 import { authMiddleware } from '../middleware/auth.ts';
 import { requirePermission } from '../middleware/require-permission.ts';
@@ -47,6 +56,7 @@ export const uploadsRoutes = (
 
   const requireImageView = requirePermission('patient_image.view');
   const requireLabView = requirePermission('lab_order.view');
+  const requireCashierPhotoView = requirePermission('cashier.photo.view');
 
   app.get(
     '/:key{.+}',
@@ -58,9 +68,51 @@ export const uploadsRoutes = (
         const [prefix, keyTenantId, kind] = resolved.relKey.split(sep);
         if (prefix === 'tenants' && keyTenantId === c.get('activeTenantId')) {
           // UI-D5: prefiks bo'yicha permission — `patients/` → patient_image.view,
-          // `lab-orders/` → lab_order.view; boshqa prefiks (o'z tenanti ichida ham) → 403.
-          if (kind === 'patients') return requireImageView(c, next);
+          // `lab-orders/` → lab_order.view, `cashier-photos/` → cashier.photo.view (FT-06.3); boshqa prefiks (o'z tenanti ichida ham) → 403.
+          // `/` bilan birlashtirilgan kanonik key — DB'dagi object_key / photo_url bilan solishtirish uchun.
+          const canonicalKey = resolved.relKey.split(sep).join('/');
+          if (kind === 'patients') {
+            // FT-06 seam: bemor avatari — `patient.view` bor va key biror bemorning JORIY
+            // `photo_url`iga teng bo'lsa (RLS ostida) `patient_image.view`siz ham ochiq
+            // (Receptionist avatarni ko'radi). Boshqa bemor rasmlari — `patient_image.view`.
+            const claims = c.get('accessClaims');
+            const perms = claims?.perms ?? [];
+            if (
+              !perms.includes('@owner') &&
+              !perms.includes('patient_image.view') &&
+              perms.includes('patient.view')
+            ) {
+              const [avatar] = await getDb(c)
+                .select({ id: patients.id })
+                .from(patients)
+                .where(eq(patients.photoUrl, storage.serveUrl(canonicalKey)))
+                .limit(1);
+              if (avatar) return next();
+            }
+            return requireImageView(c, next);
+          }
           if (kind === 'lab-orders') return requireLabView(c, next);
+          // FT-06.3: kassa rasmi — `cashier-photos/` → cashier.photo.view (faqat owner/Tenant Admin)
+          // + FT-06 seam: tranzaksiya filiali chaqiruvchining `cashier.photo.view` doirasida bo'lishi shart.
+          if (kind === 'cashier-photos') {
+            const denied = await requireCashierPhotoView(c, async () => {});
+            if (denied) return denied;
+            const [row] = await getDb(c)
+              .select({ branchId: cashierTransactions.branchId })
+              .from(cashierTransactionPhotos)
+              .innerJoin(
+                cashierTransactions,
+                eq(cashierTransactions.id, cashierTransactionPhotos.transactionId),
+              )
+              .where(eq(cashierTransactionPhotos.objectKey, canonicalKey))
+              .limit(1);
+            // Ro'yxatga olinmagan fayl — mavjud emas (oshkor qilmaslik).
+            if (!row) return c.json(fail('NOT_FOUND', 'File not found'), 404);
+            if (!scopeAllows(await loadBranchScope(c, 'cashier.photo.view'), row.branchId)) {
+              return c.json(fail(BRANCH_FORBIDDEN_CODE, BRANCH_FORBIDDEN_MESSAGE), 403);
+            }
+            return next();
+          }
           return c.json(fail('permission.denied', 'Forbidden'), 403);
         }
       }
@@ -96,7 +148,12 @@ export const uploadsRoutes = (
       const objectId = basename(resolved.relKey).split('.')[0] ?? '';
       await deps.audit.record(c, {
         action: 'viewed',
-        resourceType: kind === 'lab-orders' ? 'lab_order_file' : 'patient_image',
+        resourceType:
+          kind === 'lab-orders'
+            ? 'lab_order_file'
+            : kind === 'cashier-photos'
+              ? 'cashier_transaction_photo'
+              : 'patient_image',
         resourceId: UUID_RE.test(objectId) ? objectId : null,
         after: { key: resolved.relKey },
       });

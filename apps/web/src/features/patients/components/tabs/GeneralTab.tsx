@@ -1,5 +1,14 @@
 import { Button, Card, Input, Mono, Select, StateView } from '@dental/ui';
-import { Badge, Checkbox, Group, SimpleGrid, Stack, Text, Textarea } from '@mantine/core';
+import {
+  Badge,
+  Checkbox,
+  Group,
+  NumberInput,
+  SimpleGrid,
+  Stack,
+  Text,
+  Textarea,
+} from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { useEffect } from 'react';
@@ -139,6 +148,8 @@ function GeneralEditForm({ patientId }: { patientId: string }) {
   const { t } = useTranslation();
   const { hasPermission } = useAuthStore();
   const canEditPii = hasPermission('patient.view_pii');
+  // FT-04.3 (D-2): doimiy chegirma — patient.edit + discount.give (server 403 discount.forbidden).
+  const canDiscount = hasPermission('discount.give');
   const rawQuery = usePatientRaw(patientId);
   const updateMut = useUpdatePatient(patientId);
 
@@ -153,6 +164,7 @@ function GeneralEditForm({ patientId }: { patientId: string }) {
       address: '',
       notes: '',
       allowEmergencyRecall: false,
+      defaultDiscountPercent: '' as number | '',
     },
     // PT-04: maskalangan PII maydonlari formatga mos kelmaydi — ular tahrirlanmaydi,
     // shuning uchun validatsiya xatosi ham bloklamasligi kerak.
@@ -177,6 +189,8 @@ function GeneralEditForm({ patientId }: { patientId: string }) {
         address: p.address ?? '',
         notes: p.notes ?? '',
         allowEmergencyRecall: p.allowEmergencyRecall,
+        defaultDiscountPercent:
+          p.defaultDiscountPercent != null ? Number(p.defaultDiscountPercent) : '',
       });
     }
   }, [rawQuery.data]);
@@ -217,6 +231,13 @@ function GeneralEditForm({ patientId }: { patientId: string }) {
   const piiChanged = (current: string, prev: string | null | undefined) =>
     canEditPii ? changed(current, prev) : undefined;
 
+  const originalDiscount =
+    original.defaultDiscountPercent != null ? Number(original.defaultDiscountPercent) : null;
+  const discountChanged = (current: number | '') => {
+    const next = current === '' ? null : current;
+    return next === originalDiscount ? undefined : next;
+  };
+
   const submit = form.onSubmit((values) =>
     updateMut.mutate({
       fullName: values.fullName,
@@ -228,6 +249,10 @@ function GeneralEditForm({ patientId }: { patientId: string }) {
       address: piiChanged(values.address, original.address),
       notes: changed(values.notes, original.notes),
       allowEmergencyRecall: values.allowEmergencyRecall,
+      // `discount.give`siz kalit umuman yuborilmaydi (server maydon-gate'i 403 beradi).
+      ...(canDiscount
+        ? { defaultDiscountPercent: discountChanged(values.defaultDiscountPercent) }
+        : {}),
     }),
   );
 
@@ -317,6 +342,20 @@ function GeneralEditForm({ patientId }: { patientId: string }) {
             checked={form.values.allowEmergencyRecall}
             onChange={(e) => form.setFieldValue('allowEmergencyRecall', e.currentTarget.checked)}
           />
+          {canDiscount && (
+            <NumberInput
+              label={t('patients.form.default_discount')}
+              description={t('patients.form.default_discount_hint')}
+              min={0}
+              max={100}
+              decimalScale={2}
+              suffix="%"
+              value={form.values.defaultDiscountPercent}
+              onChange={(v) =>
+                form.setFieldValue('defaultDiscountPercent', typeof v === 'number' ? v : '')
+              }
+            />
+          )}
           <Group justify="flex-end">
             <Button type="submit" variant="primary" disabled={updateMut.isPending}>
               {t('common.save')}

@@ -50,6 +50,8 @@ vi.mock('../cashier.api', () => ({
     data: { id: 'tx9', fiscalReceiptId: null, cardProvider: 'click', visitNoteId: null, items: [] },
     isError: false,
   }),
+  useCashierPhotoSettings: () => ({ data: { enabled: false } }),
+  useUploadCashierPhoto: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 describe('PlanBillingPanel', () => {

@@ -121,6 +121,11 @@ export const treatmentStages = pgTable(
     resultingToothState: toothStateEnum('resulting_tooth_state'),
     estimatedVisits: integer('estimated_visits').notNull().default(1),
     estimatedDurationMinutes: integer('estimated_duration_minutes'),
+    // FT-04.3 (D-2): yaratish paytidagi snapshot — `listPrice` chegirmagacha narx,
+    // `discountPercent` bemorning doimiy chegirmasi. `cost` = netto (qarz/overpay guard shundan).
+    // Eski (FT-04'gacha) bosqichlarda ikkalasi NULL; retroaktiv qayta hisoblanmaydi.
+    listPrice: numeric('list_price', { precision: 14, scale: 2 }),
+    discountPercent: numeric('discount_percent', { precision: 5, scale: 2 }),
     cost: numeric('cost', { precision: 14, scale: 2 }).notNull(),
     status: treatmentStageStatusEnum('status').notNull().default('pending'),
     acceptance: treatmentStageAcceptanceEnum('acceptance').notNull().default('proposed'),

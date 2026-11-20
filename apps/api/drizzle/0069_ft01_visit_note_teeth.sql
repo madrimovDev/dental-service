@@ -1,0 +1,1 @@
+ALTER TABLE "visit_notes" ADD COLUMN "tooth_numbers" integer[];

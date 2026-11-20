@@ -1,6 +1,7 @@
 import type { ToothStateValue } from '@dental/db-schema';
 import type { Context } from 'hono';
 import type { AuditLogger } from '../../../lib/audit-logger.ts';
+import { applyDefaultDiscount } from '../../../lib/discount.ts';
 import {
   CrossEntityError,
   createOwnershipValidator,
@@ -11,8 +12,10 @@ import { computePlanBalance } from '../../cashier/cashier.billing.ts';
 import { createTreatmentPlansRepository } from './treatment-plans.repository.ts';
 import type {
   ConsentInput,
+  CreateStageInput,
   CreateTreatmentPlanInput,
   ListPlansQuery,
+  RecordCompletedWorkInput,
   UpdateStageInput,
   UpdateTreatmentPlanInput,
 } from './treatment-plans.schema.ts';
@@ -142,6 +145,97 @@ export class ConsentLockedError extends Error {
   }
 }
 
+/**
+ * FT-01: yakunlangan/bekor qilingan rejaga bosqich qo'shib bo'lmaydi. Routes 409
+ * (`plan.locked`).
+ */
+export class PlanStagesLockedError extends Error {
+  constructor(readonly planStatus: string) {
+    super(`Cannot add stages to a ${planStatus} plan`);
+    this.name = 'PlanStagesLockedError';
+  }
+}
+
+/**
+ * FT-01: bosqich kontenti (serviceId/serviceName/cost/toothNumbers) faqat `pending` va
+ * to'lov allocation'i yo'q bo'lsa tahrirlanadi — boshlangan/to'langan ish narxi jimgina
+ * o'zgarmasin. Routes 409 (`stage.locked`).
+ */
+export class StageLockedError extends Error {
+  constructor(
+    readonly stageStatus: string,
+    readonly hasAllocations: boolean,
+  ) {
+    super(
+      hasAllocations
+        ? 'Stage has payment allocations — its content cannot be edited'
+        : `Stage is ${stageStatus} — only pending stages can be edited`,
+    );
+    this.name = 'StageLockedError';
+  }
+}
+
+/**
+ * FT-01.2: «Bajarilgan ishni yozish» uchun tanlangan reja hali ishga tushmagan
+ * (`draft|presented`) — bu holatda bosqichni yakunlab bo'lmaydi (CLI-415 guard). Routes 409
+ * (`plan.not_active`). Bosqich yozilmaydi.
+ */
+export class PlanNotActiveForWorkError extends Error {
+  constructor(readonly planStatus: string) {
+    super(`Cannot record completed work on a ${planStatus} plan — accept the plan first`);
+    this.name = 'PlanNotActiveForWorkError';
+  }
+}
+
+/**
+ * FT-01 review: «bajarilgan ish» uchun aniq berilgan `planId` boshqa shifokorniki — bosqich
+ * shu rejaga (va `plan.doctor_id` komissiyasiga, D-13) tushardi. Routes 409
+ * (`plan.doctor_mismatch`). Boshqa shifokor nomidan yozish — `doctorId` +
+ * `medical_record.on_behalf`.
+ */
+export class PlanDoctorMismatchError extends Error {
+  constructor() {
+    super('The plan belongs to another doctor — pass doctorId (on_behalf) to record work on it');
+    this.name = 'PlanDoctorMismatchError';
+  }
+}
+
+/**
+ * FT-01.2: «bajarilgan ish» bog'lanadigan vizit yozuvi allaqachon imzolangan (o'zgarmaydi,
+ * UI-D4) yoki boshqa bosqichga bog'langan (CLI-481 — qayta yo'naltirish yo'q). Routes 409
+ * (`visit_note.signed` / `visit_note.stage_linked`). Hech narsa yozilmaydi.
+ */
+export class VisitNoteNotLinkableError extends Error {
+  constructor(readonly reason: 'signed' | 'stage_linked') {
+    super(
+      reason === 'signed'
+        ? 'Visit note is signed and can no longer be linked to a stage'
+        : 'Visit note is already linked to a treatment stage',
+    );
+    this.name = 'VisitNoteNotLinkableError';
+  }
+}
+
+/** FT-01.2: avto-reja sarlavhasi — Toshkent vaqti bo'yicha joriy oy (`YYYY-MM`). */
+export const completedWorkPlanTitle = (now: Date = new Date()) => {
+  const ym = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Tashkent',
+    year: 'numeric',
+    month: '2-digit',
+  }).format(now);
+  return `Bajarilgan ishlar ${ym}`;
+};
+
+const ACTIVE_WORK_PLAN_STATUSES = ['accepted', 'in_progress'] as const;
+
+const sameTeeth = (a: readonly number[] | null, b: readonly number[] | null) => {
+  const x = a ?? [];
+  const y = b ?? [];
+  return x.length === y.length && x.every((n, i) => n === y[i]);
+};
+
+const PLAN_STAGES_LOCKED_STATUSES = ['completed', 'cancelled'] as const;
+
 const CONSENT_LOCKED_STATUSES = ['in_progress', 'completed', 'cancelled'] as const;
 
 export const createTreatmentPlansService = (deps: {
@@ -184,6 +278,17 @@ export const createTreatmentPlansService = (deps: {
     return plan;
   };
 
+  /**
+   * FT-04.3 (D-2): YANGI bosqich narxi snapshot'i — bemorning samarali doimiy chegirmasi
+   * (`min(pct, tenant max_discount_percent)`) bilan `{ cost (netto), listPrice, discountPercent }`.
+   * ⚠️ Seam (FT-01): har yangi bosqich yo'li (addStage, «bajarilgan ish», PATCH cost/serviceId
+   * qayta hisobi) shu orqali o'tishi SHART — aks holda bosqich brutto narxda, snapshot'siz qoladi.
+   */
+  async function newStagePricer(c: Context, patientId: string) {
+    const pct = await repo.findPatientEffectiveDiscount(c, patientId);
+    return { pct, apply: (price: number) => applyDefaultDiscount(price, pct) };
+  }
+
   async function createPlan(c: Context, input: CreateTreatmentPlanInput) {
     const tenantId = c.get('activeTenantId');
     if (!tenantId) throw new Error('No tenant context');
@@ -205,13 +310,25 @@ export const createTreatmentPlansService = (deps: {
     // `cost`i saqlanadi (qattiq validatsiya YO'Q — bunday bosqichlar qasddan
     // narxsiz/moslashuvchan; faqat POS (CLI-443 cashier qismi) qattiq 400 beradi).
     const activeBranchId = c.get('activeBranchId');
-    const resolvedStages = await Promise.all(
+    const pricedStages = await Promise.all(
       input.stages.map(async (s) => {
         if (!s.serviceId || !activeBranchId || !deps.priceLookup) return s;
         const price = await deps.priceLookup.getActivePrice(c, s.serviceId, activeBranchId);
         return price ? { ...s, cost: Number(price.price) } : s;
       }),
     );
+
+    // FT-04.3 (D-2): bemorning doimiy chegirmasi YANGI bosqich narxiga snapshot qilinadi —
+    // `cost` netto (qarz/overpay guard shundan), `listPrice`/`discountPercent` saqlanadi.
+    // Katalog va erkin bosqichga bir xil qo'llanadi. Avtomatik (bemor sozlamasi) — plan
+    // yaratuvchidan `discount.give` talab qilinmaydi; doimiy chegirmani faqat `discount.give`
+    // egasi qo'yadi (patients route gate'i). Review: foiz tenant chegarasi
+    // (`max_discount_percent`) bilan cheklanadi — `min(pct, max)`.
+    const { pct: defaultPct, apply } = await newStagePricer(c, input.patientId);
+    const resolvedStages = pricedStages.map((s) => {
+      const d = apply(s.cost);
+      return { ...s, cost: d.cost, listPrice: d.listPrice, discountPercent: d.discountPercent };
+    });
 
     const totalCost = resolvedStages.reduce((sum, s) => sum + s.cost, 0);
     const totalVisits = resolvedStages.reduce((sum, s) => sum + s.estimatedVisits, 0);
@@ -238,6 +355,8 @@ export const createTreatmentPlansService = (deps: {
           estimatedVisits: s.estimatedVisits,
           estimatedDurationMinutes: s.estimatedDurationMinutes ?? null,
           cost: String(s.cost),
+          listPrice: s.listPrice,
+          discountPercent: s.discountPercent,
           notes: s.notes ?? null,
           resultingToothState: s.resultingToothState ?? null,
         })),
@@ -247,9 +366,234 @@ export const createTreatmentPlansService = (deps: {
       action: 'created',
       resourceType: 'treatment_plan',
       resourceId: plan.id,
-      after: { totalCost, totalVisits, stages: input.stages.length },
+      after: {
+        totalCost,
+        totalVisits,
+        stages: input.stages.length,
+        ...(defaultPct != null && Number(defaultPct) > 0
+          ? { defaultDiscountPercent: defaultPct }
+          : {}),
+      },
     });
     return plan;
+  }
+
+  /**
+   * FT-01 (CF-11): mavjud rejaga bitta bosqich qo'shish (odontogramma «Joriy rejaga
+   * qo'shish»). Reja `FOR UPDATE` bilan qulflanadi → `sequence` = max + 1 poygasiz.
+   * Yakunlangan/bekor qilingan reja → `PlanStagesLockedError` (409). Narx `createPlan`
+   * bilan bir xil (CLI-443): serviceId + filialda faol narx → server narxi.
+   * Yangi bosqich doim `pending` + `proposed` (qarzga faqat qabul qilingandan keyin tushadi).
+   */
+  async function addStage(c: Context, planId: string, input: CreateStageInput) {
+    const plan = await repo.lockPlan(c, planId);
+    if (!plan) return null;
+    if ((PLAN_STAGES_LOCKED_STATUSES as readonly string[]).includes(plan.status)) {
+      throw new PlanStagesLockedError(plan.status);
+    }
+    if (input.serviceId) await ownership.assertServiceExists(c, input.serviceId);
+
+    let cost = input.cost;
+    const activeBranchId = c.get('activeBranchId');
+    if (input.serviceId && activeBranchId && deps.priceLookup) {
+      const price = await deps.priceLookup.getActivePrice(c, input.serviceId, activeBranchId);
+      if (price) cost = Number(price.price);
+    }
+    // FW-1 seam (FT-04.3 × FT-01): bemorning doimiy chegirmasi createPlan bilan bir xil.
+    const priced = (await newStagePricer(c, plan.patientId)).apply(cost);
+
+    const sequence = await repo.nextStageSequence(c, planId);
+    const stage = await repo.insertStage(c, {
+      treatmentPlanId: planId,
+      sequence,
+      serviceId: input.serviceId ?? null,
+      serviceName: input.serviceName,
+      toothNumbers: input.toothNumbers ?? null,
+      estimatedVisits: input.estimatedVisits,
+      estimatedDurationMinutes: input.estimatedDurationMinutes ?? null,
+      cost: String(priced.cost),
+      listPrice: priced.listPrice,
+      discountPercent: priced.discountPercent,
+      notes: input.notes ?? null,
+      resultingToothState: input.resultingToothState ?? null,
+    });
+    // FT-01: reja totalCost/totalVisits qotib qolmasin — bosqichlar yig'indisidan.
+    await repo.recomputePlanTotals(c, planId);
+
+    await deps.audit.record(c, {
+      action: 'created',
+      resourceType: 'treatment_stage',
+      resourceId: stage.id,
+      after: {
+        treatmentPlanId: planId,
+        sequence,
+        serviceId: stage.serviceId,
+        cost: stage.cost,
+        ...(stage.discountPercent != null
+          ? { listPrice: stage.listPrice, discountPercent: stage.discountPercent }
+          : {}),
+        toothNumbers: stage.toothNumbers,
+      },
+    });
+    return stage;
+  }
+
+  /**
+   * FT-01.2 (CF-12) — «Bajarilgan ishni yozish» 2-rejim. Har xizmat uchun darhol
+   * `acceptance=accepted` bosqich yoziladi va X-3 yagona yakunlash yo'li (`completeStage`,
+   * `source='plan'`) orqali `completed` bo'ladi → odontogramma snapshot, recall, BOM chiqimi
+   * (vizit chiqimi bilan stock tomonida dedup). Bosqich reja qarziga tushadi (C4 predikati:
+   * accepted ∧ completed ∧ reja `accepted|in_progress`).
+   *
+   * Barcha rad etuvchi tekshiruvlar (bemor, reja, xizmatlar, shifokor) INSERT'dan OLDIN —
+   * 4xx `fail()` javobi tranzaksiyani COMMIT qiladi, yarim yozuv qolmasin. Insert'dan keyingi
+   * kutilmagan xato throw bo'ladi (route ushlamaydi) → 500 → rollback.
+   */
+  async function recordCompletedWork(c: Context, input: RecordCompletedWorkInput) {
+    const tenantId = c.get('activeTenantId');
+    if (!tenantId) throw new Error('No tenant context');
+
+    await ownership.assertPatientExists(c, input.patientId);
+    for (const item of input.items) {
+      if (item.serviceId) await ownership.assertServiceExists(c, item.serviceId);
+    }
+
+    await repo.lockPatientCompletedWork(c, input.patientId);
+
+    // Vizit bog'lash (ixtiyoriy): shu bemorniki, imzolanmagan, bosqichsiz — INSERT'dan OLDIN.
+    let noteDoctorId: string | null = null;
+    if (input.visitNoteId) {
+      const note = await repo.lockVisitNote(c, input.visitNoteId);
+      if (!note) throw new CrossEntityError('visit_note', 'not_found');
+      if (note.patientId !== input.patientId) {
+        throw new CrossEntityError('visit_note', 'mismatch');
+      }
+      if (note.signedAt) throw new VisitNoteNotLinkableError('signed');
+      if (note.stageId) throw new VisitNoteNotLinkableError('stage_linked');
+      noteDoctorId = note.doctorId;
+    }
+
+    // Ishni bajargan shifokor — komissiya manbai (D-13 COALESCE(plan.doctor_id, …)).
+    // Ustuvorlik: `doctorId` ?? vizit yozuvi shifokori ?? joriy foydalanuvchi. Vizit
+    // shifokori allaqachon vizit yaratilishida tekshirilgan (FX-155); aks holda boshqa
+    // shifokor nomidan yozish `medical_record.on_behalf` talab qiladi.
+    if (input.doctorId && noteDoctorId && input.doctorId !== noteDoctorId) {
+      throw new CrossEntityError('visit_note', 'mismatch');
+    }
+    const doctorId = input.doctorId ?? noteDoctorId ?? c.get('user')?.id;
+    if (!doctorId) throw new Error('No user context');
+    if (input.doctorId || !noteDoctorId) {
+      await ownership.assertPractitioner(c, doctorId, 'medical_record.on_behalf');
+    }
+
+    let plan: Awaited<ReturnType<typeof repo.lockPlan>>;
+    if (input.planId) {
+      plan = await repo.lockPlan(c, input.planId);
+      if (!plan) throw new CrossEntityError('treatment_plan', 'not_found');
+      if (plan.patientId !== input.patientId) {
+        throw new CrossEntityError('treatment_plan', 'mismatch');
+      }
+      if ((PLAN_STAGES_LOCKED_STATUSES as readonly string[]).includes(plan.status)) {
+        throw new PlanStagesLockedError(plan.status);
+      }
+      if (!(ACTIVE_WORK_PLAN_STATUSES as readonly string[]).includes(plan.status)) {
+        throw new PlanNotActiveForWorkError(plan.status);
+      }
+      if (plan.doctorId !== doctorId) throw new PlanDoctorMismatchError();
+    } else {
+      // Shu shifokorning joriy rejasi (boshqa shifokor rejasiga tushmaydi — FT-01 review).
+      plan = await repo.lockLatestActivePlan(c, input.patientId, doctorId);
+    }
+
+    let planCreated = false;
+    if (!plan) {
+      const created = await repo.insertPlanWithStages(
+        c,
+        tenantId,
+        {
+          tenantId,
+          patientId: input.patientId,
+          doctorId,
+          title: completedWorkPlanTitle(),
+          status: 'in_progress',
+          totalCost: '0',
+          totalVisits: 0,
+          notes: null,
+        },
+        () => [],
+      );
+      const { stages: _none, ...planRow } = created;
+      plan = planRow;
+      planCreated = true;
+    }
+
+    const activeBranchId = c.get('activeBranchId');
+    // FW-1 seam (FT-04.3 × FT-01): bemorning doimiy chegirmasi createPlan bilan bir xil.
+    const { apply: applyPatientDiscount } = await newStagePricer(c, input.patientId);
+    const stages = [];
+    for (const item of input.items) {
+      let cost = item.cost;
+      if (item.serviceId && activeBranchId && deps.priceLookup) {
+        const price = await deps.priceLookup.getActivePrice(c, item.serviceId, activeBranchId);
+        if (price) cost = Number(price.price);
+      }
+      const priced = applyPatientDiscount(cost);
+      const sequence = await repo.nextStageSequence(c, plan.id);
+      const inserted = await repo.insertStage(c, {
+        treatmentPlanId: plan.id,
+        sequence,
+        serviceId: item.serviceId ?? null,
+        serviceName: item.serviceName,
+        toothNumbers: item.toothNumbers ?? null,
+        estimatedVisits: item.estimatedVisits,
+        estimatedDurationMinutes: item.estimatedDurationMinutes ?? null,
+        cost: String(priced.cost),
+        listPrice: priced.listPrice,
+        discountPercent: priced.discountPercent,
+        notes: item.notes ?? null,
+        resultingToothState: item.resultingToothState ?? null,
+        acceptance: 'accepted',
+      });
+      await deps.audit.record(c, {
+        action: 'created',
+        resourceType: 'treatment_stage',
+        resourceId: inserted.id,
+        after: {
+          treatmentPlanId: plan.id,
+          sequence,
+          serviceId: inserted.serviceId,
+          cost: inserted.cost,
+          ...(inserted.discountPercent != null
+            ? { listPrice: inserted.listPrice, discountPercent: inserted.discountPercent }
+            : {}),
+          toothNumbers: inserted.toothNumbers,
+          acceptance: 'accepted',
+          completedWork: true,
+        },
+      });
+      // Vizit bog'lanishi yakunlashdan OLDIN — BOM dedup (deductForStage) vizit allaqachon
+      // yechgan shu xizmatni ko'rsin; imzo (`sign`) keyin bosqichni idempotent o'tkazadi.
+      if (input.visitNoteId) {
+        const linked = await repo.linkVisitNoteStage(c, input.visitNoteId, inserted.id);
+        if (!linked) throw new Error(`Visit note ${input.visitNoteId} could not be linked`);
+        await deps.audit.record(c, {
+          action: 'updated',
+          resourceType: 'visit_note',
+          resourceId: input.visitNoteId,
+          before: { stageId: null },
+          after: { stageId: inserted.id, completedWork: true },
+        });
+      }
+      // X-3: yagona yakunlash yo'li (guard'lar + recall + odontogramma + BOM).
+      const completed = await completeStage(c, inserted.id, { source: 'plan' });
+      if (!completed || completed.status !== 'completed') {
+        throw new Error(`Completed-work stage ${inserted.id} was not completed`);
+      }
+      stages.push(completed);
+    }
+    await repo.recomputePlanTotals(c, plan.id);
+
+    return { planId: plan.id, planCreated, stages };
   }
 
   async function updatePlan(c: Context, id: string, input: UpdateTreatmentPlanInput) {
@@ -376,6 +720,59 @@ export const createTreatmentPlansService = (deps: {
     }
     if (input.labOrderId !== undefined) patch.labOrderId = input.labOrderId;
 
+    // FT-01: kontent tahriri (serviceId/serviceName/cost/toothNumbers). Faqat haqiqatda
+    // o'zgargan maydonlar hisobga olinadi (bir xil qiymatni qayta yuborish qulfga urilmaydi).
+    const content: Record<string, unknown> = {};
+    if (input.serviceName !== undefined && input.serviceName !== current.serviceName) {
+      content.serviceName = input.serviceName;
+    }
+    if (input.toothNumbers !== undefined && !sameTeeth(input.toothNumbers, current.toothNumbers)) {
+      content.toothNumbers = input.toothNumbers;
+    }
+    if (input.serviceId !== undefined && input.serviceId !== current.serviceId) {
+      if (input.serviceId) await ownership.assertServiceExists(c, input.serviceId);
+      content.serviceId = input.serviceId;
+    }
+    // FW-1 seam (FT-04.3 × FT-01): `cost` — chegirmagacha (list) narx; bosqich `cost`i
+    // bemorning joriy doimiy chegirmasi bilan netto, `listPrice`/`discountPercent` qayta
+    // snapshot. Joriy qiymatni (netto yoki list) qayta yuborish — o'zgarish emas (ikki
+    // marta chegirma / retroaktiv qayta narxlash bo'lmasin).
+    const currentList =
+      current.listPrice != null ? Number(current.listPrice) : Number(current.cost);
+    const costChanged =
+      input.cost !== undefined && input.cost !== Number(current.cost) && input.cost !== currentList;
+    if (costChanged || 'serviceId' in content) {
+      const effectiveServiceId =
+        input.serviceId !== undefined ? input.serviceId : current.serviceId;
+      let base = costChanged ? (input.cost as number) : currentList;
+      // CLI-443: xizmatli bosqich narxi filial narxidan (createPlan/addStage bilan bir xil).
+      const activeBranchId = c.get('activeBranchId');
+      if (effectiveServiceId && activeBranchId && deps.priceLookup) {
+        const price = await deps.priceLookup.getActivePrice(c, effectiveServiceId, activeBranchId);
+        if (price) base = Number(price.price);
+      }
+      const stagePlan = await repo.findPlan(c, current.treatmentPlanId);
+      const priced = stagePlan
+        ? (await newStagePricer(c, stagePlan.patientId)).apply(base)
+        : applyDefaultDiscount(base, null);
+      if (
+        priced.cost !== Number(current.cost) ||
+        priced.listPrice !== (current.listPrice ?? null) ||
+        priced.discountPercent !== (current.discountPercent ?? null)
+      ) {
+        content.cost = String(priced.cost);
+        content.listPrice = priced.listPrice;
+        content.discountPercent = priced.discountPercent;
+      }
+    }
+    if (Object.keys(content).length > 0) {
+      const hasAllocations = await repo.hasStageAllocations(c, stageId);
+      if (current.status !== 'pending' || hasAllocations) {
+        throw new StageLockedError(current.status, hasAllocations);
+      }
+      Object.assign(patch, content);
+    }
+
     // Hech narsa o'zgarmadi (idempotent yoki bo'sh PATCH) — plan fetch/guard'dan
     // OLDIN erta qaytamiz (no-op arzon qoladi; guard'ga yetmaydi — xavfsiz).
     if (Object.keys(patch).length === 0) return current;
@@ -422,6 +819,10 @@ export const createTreatmentPlansService = (deps: {
     }
 
     const updated = await repo.updateStage(c, stageId, patch);
+    // FT-01: narx o'zgardi → reja totalCost bosqichlar yig'indisidan qayta hisoblanadi.
+    if (updated && 'cost' in content) {
+      await repo.recomputePlanTotals(c, current.treatmentPlanId);
+    }
     if (updated) {
       // CLI-439 B9c: audit'ga `before` (joriy holat, mutatsiyadan oldin) ham yozamiz —
       // avval faqat `after` bor edi, stage tarixini tiklab bo'lmasdi.
@@ -429,13 +830,48 @@ export const createTreatmentPlansService = (deps: {
         action: 'updated',
         resourceType: 'treatment_stage',
         resourceId: stageId,
-        before: { status: current.status, acceptance: current.acceptance, notes: current.notes },
+        before: {
+          status: current.status,
+          acceptance: current.acceptance,
+          notes: current.notes,
+          ...('serviceId' in content ? { serviceId: current.serviceId } : {}),
+          ...('serviceName' in content ? { serviceName: current.serviceName } : {}),
+          ...('cost' in content
+            ? {
+                cost: current.cost,
+                listPrice: current.listPrice,
+                discountPercent: current.discountPercent,
+              }
+            : {}),
+          ...('toothNumbers' in content ? { toothNumbers: current.toothNumbers } : {}),
+        },
         after: {
           status: input.status,
           acceptance: input.acceptance,
+          ...content,
           ...(patch.status === 'completed' ? { source } : {}),
         },
       });
+
+      // FT-01.5 (spec §3): «Bemor rozi» (accepted) reja birinchi bosqich boshlanganda
+      // (yoki darhol bajarilganda) avtomatik «Davolanmoqda» (in_progress) ga o'tadi —
+      // alohida «Ijroni boshlash» qadami shart emas. accepted→in_progress jadvalda ruxsat.
+      if (
+        plan &&
+        plan.status === 'accepted' &&
+        (patch.status === 'in_progress' || patch.status === 'completed')
+      ) {
+        const started = await repo.updatePlan(c, plan.id, { status: 'in_progress' });
+        if (started) {
+          await deps.audit.record(c, {
+            action: 'updated',
+            resourceType: 'treatment_plan',
+            resourceId: plan.id,
+            before: { status: plan.status },
+            after: { status: started.status, autoStarted: true, stageId },
+          });
+        }
+      }
 
       // Bosqich completed → hook'lar (idempotent — completed-o'tish faqat bir marta,
       // qayta PATCH yuqorida erta qaytadi). Guard cancelled/completed planda avval
@@ -535,6 +971,9 @@ export const createTreatmentPlansService = (deps: {
         stageId: s.id,
         serviceName: s.serviceName,
         cost: Number(s.cost),
+        // FT-04.3: chegirma snapshot'i (eski bosqichlarda null).
+        listPrice: s.listPrice != null ? Number(s.listPrice) : null,
+        discountPercent: s.discountPercent != null ? Number(s.discountPercent) : null,
         status: s.status,
         acceptance: s.acceptance,
         paid: b?.paid ?? 0,
@@ -572,6 +1011,8 @@ export const createTreatmentPlansService = (deps: {
     listPlans,
     getPlan,
     createPlan,
+    addStage,
+    recordCompletedWork,
     updatePlan,
     setConsent,
     updateStage,

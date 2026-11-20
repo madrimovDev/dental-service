@@ -23,6 +23,12 @@ export interface CashierTransaction {
   paidAmount: string;
   refundedAmount: string;
   discount: string;
+  /** @nullable */
+  discountPercent: string | null;
+  /** @nullable */
+  discountReason: string | null;
+  /** @nullable */
+  discountGrantedBy: string | null;
   currency: string;
   paymentMethod: CashierTransactionPaymentMethod;
   /** @nullable */

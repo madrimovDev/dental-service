@@ -21,26 +21,26 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import {
+  useAddPlanStages,
   useCreatePlan,
   useCreateToothChart,
   useDiagnoses,
   useLatestToothChart,
+  useRecordCompletedWork,
   useToothChartHistory,
   useTreatmentPlans,
 } from '../../clinical.api';
 import {
+  currentOpenPlan,
   entriesToCreateInput,
-  groupToothEntries,
   plannedTeethFromPlans,
-  resultingStateForPlan,
   toothHistoryRows,
   toToothDisplayMap,
   toToothEntries,
 } from '../../clinical.mappers';
 import type { ToothEntry } from '../../clinical.types';
 import { Odontogram } from './Odontogram';
-import { ToothPanel } from './ToothPanel';
-import type { SuggestedService } from './TreatmentSuggestions';
+import { type AddToPlanRequest, type RecordCompletedRequest, ToothPanel } from './ToothPanel';
 
 type Props = { patientId: string };
 type View = 'current' | 'plan' | 'history';
@@ -75,11 +75,15 @@ export function OdontogramTab({ patientId }: Props) {
   const plansQuery = useTreatmentPlans(patientId);
   const createMut = useCreateToothChart(patientId);
   const createPlanMut = useCreatePlan(patientId);
+  const addStagesMut = useAddPlanStages(patientId);
+  const recordMut = useRecordCompletedWork(patientId);
 
   const [view, setView] = useState<View>('current');
   const [chairMode, setChairMode] = useState<boolean>(readChairMode);
   const [isPrimary, setIsPrimary] = useState(false);
-  const [selectedTooth, setSelectedTooth] = useState<number | null>(null);
+  // FT-01.3: tanlangan tish(lar), o'sish tartibida (Shift/⌘ yoki uzun bosish — ko'p tanlash).
+  const [selectedTeeth, setSelectedTeeth] = useState<number[]>([]);
+  const selectedTooth = selectedTeeth.length === 1 ? (selectedTeeth[0] ?? null) : null;
   const [draft, setDraft] = useState<ToothEntry[]>([]);
   const [draftNotes, setDraftNotes] = useState('');
   // CLI-191: tarix — tanlangan eski snapshot id (null = hozirgi/tahrirlash rejimi).
@@ -109,6 +113,7 @@ export function OdontogramTab({ patientId }: Props) {
   );
 
   const plannedTeeth = useMemo(() => plannedTeethFromPlans(plansQuery.data), [plansQuery.data]);
+  const currentPlan = useMemo(() => currentOpenPlan(plansQuery.data), [plansQuery.data]);
 
   const toothHistory = useMemo(
     () => (selectedTooth === null ? [] : toothHistoryRows(historyQuery.data, selectedTooth)),
@@ -134,33 +139,76 @@ export function OdontogramTab({ patientId }: Props) {
     );
   };
 
-  const addToPlan = (entries: ToothEntry[], label: string, service?: SuggestedService) => {
-    const tooth = selectedTooth;
-    if (tooth === null || !user?.id) return;
-    const resultingToothState = resultingStateForPlan(groupToothEntries(entries, tooth)[0]?.state);
-    save(entries, () =>
+  /**
+   * FT-01.3: tish → xizmat → joriy (eng so'nggi ochiq) yoki yangi reja. Narx serverda filial
+   * narxidan qayta hisoblanadi (CLI-443) — client `cost` faqat narxsiz xizmat uchun zaxira.
+   * Yangi tashxis qo'shilgan bo'lsa (`entries`), avval snapshot saqlanadi.
+   */
+  const addToPlan = (entries: ToothEntry[] | null, req: AddToPlanRequest) => {
+    const teeth = selectedTeeth;
+    if (teeth.length === 0 || !user?.id) return;
+    const toStage = (toothNumbers: number[]) => ({
+      serviceName: req.service?.name ?? req.label,
+      ...(req.service ? { serviceId: req.service.id } : {}),
+      toothNumbers,
+      estimatedVisits: 1,
+      cost: req.service?.cost ?? 0,
+      ...(req.resultingToothState ? { resultingToothState: req.resultingToothState } : {}),
+    });
+    // 🛠 Standart: har tishga alohida bosqich (narx tish boshiga); «Bitta bosqich» — ko'prik va h.k.
+    const stages = req.singleStage ? [toStage([...teeth])] : teeth.map((n) => toStage([n]));
+    const done = () =>
+      notifications.show({ color: 'teal', message: t('odontogram.added_to_plan') });
+    const run = () => {
+      if (req.target === 'current' && currentPlan) {
+        addStagesMut.mutate({ planId: currentPlan.id, stages }, { onSuccess: done });
+        return;
+      }
       createPlanMut.mutate(
         {
           patientId,
           doctorId: user.id,
-          title: t('odontogram.plan_title', { n: tooth }),
-          stages: [
-            {
-              serviceName: service?.name ?? label,
-              ...(service ? { serviceId: service.id } : {}),
-              toothNumbers: [tooth],
-              estimatedVisits: 1,
-              cost: service?.cost ?? 0,
-              ...(resultingToothState ? { resultingToothState } : {}),
-            },
-          ],
+          title:
+            teeth.length === 1
+              ? t('odontogram.plan_title', { n: teeth[0] })
+              : t('odontogram.plan_title_multi', { list: teeth.join(', ') }),
+          stages,
         },
+        { onSuccess: done },
+      );
+    };
+    if (entries) save(entries, run);
+    else run();
+  };
+
+  /**
+   * FT-01 2-rejim «Bajarilgan ishni yozish» (CF-12): tish(lar) + xizmat → darhol bajarilgan
+   * bosqich. `planId` yuborilmaydi — server joriy shifokorning joriy rejasini (yoki avto
+   * «Bajarilgan ishlar» rejasini) tanlaydi (komissiya shifokorga, D-13). Narx serverda filial
+   * narxidan; odontogramma/recall/reja qarzi server tomonida (X-3).
+   */
+  const recordCompleted = (entries: ToothEntry[] | null, req: RecordCompletedRequest) => {
+    const teeth = selectedTeeth;
+    if (teeth.length === 0) return;
+    const toItem = (toothNumbers: number[]) => ({
+      serviceId: req.service.id,
+      serviceName: req.service.name,
+      toothNumbers,
+      estimatedVisits: 1,
+      cost: req.service.cost ?? 0,
+      ...(req.resultingToothState ? { resultingToothState: req.resultingToothState } : {}),
+    });
+    const items = req.singleStage ? [toItem([...teeth])] : teeth.map((n) => toItem([n]));
+    const run = () =>
+      recordMut.mutate(
+        { items },
         {
           onSuccess: () =>
-            notifications.show({ color: 'teal', message: t('odontogram.added_to_plan') }),
+            notifications.show({ color: 'teal', message: t('odontogram.completed_recorded') }),
         },
-      ),
-    );
+      );
+    if (entries) save(entries, run);
+    else run();
   };
 
   const changeView = (next: string) => {
@@ -201,7 +249,7 @@ export function OdontogramTab({ patientId }: Props) {
               // FX-122: bu faqat ko'rinish to'plami bayrog'i — draft saqlanadi, aks holda
               // saqlash boshqa to'plamdagi barcha tish holatlarini snapshot'dan o'chirardi.
               setIsPrimary(e.currentTarget.checked);
-              setSelectedTooth(null);
+              setSelectedTeeth([]);
             }}
             disabled={!editing}
           />
@@ -280,27 +328,42 @@ export function OdontogramTab({ patientId }: Props) {
             plannedTeeth={view === 'history' ? undefined : plannedTeeth}
             chairMode={chairMode}
             isPrimaryDentition={isReadOnly ? viewingSnapshot.isPrimaryDentition : isPrimary}
-            selectedTooth={isReadOnly ? null : selectedTooth}
-            onSelectTooth={(n) => {
-              if (!isReadOnly) setSelectedTooth(n);
+            selectedTeeth={isReadOnly ? [] : selectedTeeth}
+            onSelectTooth={(n, additive) => {
+              if (isReadOnly) return;
+              setSelectedTeeth((cur) => {
+                if (!additive) return [n];
+                return cur.includes(n)
+                  ? cur.filter((x) => x !== n)
+                  : [...cur, n].sort((a, b) => a - b);
+              });
             }}
           />
         </Paper>
 
-        {selectedTooth !== null && !isReadOnly && (
+        {selectedTeeth.length > 0 && !isReadOnly && (
           <ToothPanel
-            tooth={selectedTooth}
+            patientId={patientId}
+            teeth={selectedTeeth}
             entries={draft}
             onEntriesChange={setDraft}
             diagnosisById={diagnosisById}
             history={toothHistory}
+            plans={plansQuery.data}
             lang={lang}
             chair={chairMode}
             canEdit={editing}
             canAddToPlan={Boolean(user?.id)}
-            saving={createMut.isPending || createPlanMut.isPending}
+            currentPlan={currentPlan}
+            saving={
+              createMut.isPending ||
+              createPlanMut.isPending ||
+              addStagesMut.isPending ||
+              recordMut.isPending
+            }
             onSaveOnly={(entries) => save(entries)}
             onAddToPlan={addToPlan}
+            onRecordCompleted={recordCompleted}
           />
         )}
       </Box>

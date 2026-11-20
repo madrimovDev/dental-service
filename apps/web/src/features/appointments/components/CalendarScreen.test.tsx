@@ -1,5 +1,6 @@
 import { ApiError } from '@dental/api-client';
 import { act, createEvent, fireEvent, screen } from '@testing-library/react';
+import { useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderApp } from '../../../test-utils';
 import { CalendarScreen } from './CalendarScreen';
@@ -11,6 +12,7 @@ const hoisted = vi.hoisted(() => ({
   cancelMutate: vi.fn(),
   appts: [] as unknown[],
   availability: undefined as unknown,
+  branches: [] as unknown[],
 }));
 
 vi.mock('../appointments.api', () => ({
@@ -34,7 +36,7 @@ vi.mock('../appointments.api', () => ({
     ],
   }),
   useServices: () => ({ data: [] }),
-  useBranches: () => ({ data: [] }),
+  useBranches: () => ({ data: hoisted.branches }),
   useCancelAppointment: () => ({ mutate: hoisted.cancelMutate }),
   useUpdateAppointmentStatus: () => ({ mutate: hoisted.statusMutate }),
   useMoveAppointment: () => ({ mutate: hoisted.moveMutate }),
@@ -72,19 +74,63 @@ const appt = (over: Record<string, unknown> = {}) => ({
 });
 
 beforeEach(() => {
+  window.localStorage.clear();
   hoisted.perms = new Set(['appointment.view', 'appointment.edit', 'appointment.cancel']);
   hoisted.statusMutate.mockReset();
   hoisted.cancelMutate.mockReset();
   hoisted.moveMutate.mockReset();
   hoisted.appts = [appt()];
   hoisted.availability = undefined;
+  hoisted.branches = [];
 });
 
 afterEach(() => {
   vi.useRealTimers();
 });
 
+function LocationProbe() {
+  const loc = useLocation();
+  return <div data-testid="loc">{loc.pathname + loc.search}</div>;
+}
+
 describe('CalendarScreen', () => {
+  // FT-05.2: grid soatlari filial ish vaqtidan (min open − 1 .. max close + 1) + «soatdan tashqari» belgi.
+  const everyDay = (open: string, close: string) =>
+    Object.fromEntries(
+      ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => [d, { open, close }]),
+    );
+
+  it('grid soatlari filial ish vaqtidan: 10:00–16:00 → 09:00..16:00 belgilari', () => {
+    hoisted.branches = [{ id: 'b1', name: 'Asosiy', workHours: everyDay('10:00', '16:00') }];
+    renderApp(<CalendarScreen />);
+    expect(screen.getByText('09:00')).toBeInTheDocument();
+    expect(screen.getByText('16:00')).toBeInTheDocument();
+    expect(screen.queryByText('08:00')).not.toBeInTheDocument();
+    expect(screen.queryByText('17:00')).not.toBeInTheDocument();
+  });
+
+  it('ish soati sozlanmagan filialda standart 08:00–20:00', () => {
+    hoisted.branches = [{ id: 'b1', name: 'Asosiy', workHours: null }];
+    renderApp(<CalendarScreen />);
+    expect(screen.getByText('08:00')).toBeInTheDocument();
+    expect(screen.getByText('19:00')).toBeInTheDocument();
+    expect(screen.queryByText('20:00')).not.toBeInTheDocument();
+  });
+
+  it('ish vaqtidan tashqari yozilish belgilanadi va oyna uni qamraydi', () => {
+    hoisted.branches = [{ id: 'b1', name: 'Asosiy', workHours: everyDay('09:00', '18:00') }];
+    hoisted.appts = [appt({ startTime: todayAt(21), endTime: todayAt(22) })];
+    renderApp(<CalendarScreen />);
+    expect(screen.getByText('Soatdan tashqari')).toBeInTheDocument();
+    expect(screen.getByText('21:00', { selector: 'div' })).toBeInTheDocument();
+  });
+
+  it('ish vaqti ichidagi yozilishda belgi yo‘q', () => {
+    hoisted.branches = [{ id: 'b1', name: 'Asosiy', workHours: everyDay('09:00', '18:00') }];
+    renderApp(<CalendarScreen />);
+    expect(screen.queryByText('Soatdan tashqari')).not.toBeInTheDocument();
+  });
+
   it("sarlavha va kun/hafta toggle ko'rsatadi", () => {
     renderApp(<CalendarScreen />);
     expect(screen.getByText('Kun')).toBeInTheDocument();
@@ -189,30 +235,60 @@ describe('CalendarScreen', () => {
   });
 
   describe('ko‘chirish (drag + klaviatura)', () => {
-    const dt = () => ({ setData: vi.fn(), effectAllowed: '' });
-    // jsdom'da DragEvent yo'q — clientY/dataTransfer'ni qo'lda biriktiramiz.
-    const drag = (
-      type: 'dragStart' | 'drop',
+    const colBodies = (c: HTMLElement) =>
+      Array.from(c.querySelectorAll<HTMLElement>('[data-drop-col]'));
+    // jsdom'da layout yo'q: ustun tanalarining to'rtburchagini 200px kenglikda qo'lda beramiz.
+    const layout = (c: HTMLElement) => {
+      colBodies(c).forEach((el, i) => {
+        el.getBoundingClientRect = () =>
+          ({
+            left: i * 200,
+            right: i * 200 + 200,
+            top: 0,
+            bottom: 1056,
+            width: 200,
+            height: 1056,
+          }) as DOMRect;
+      });
+    };
+    // 10:00 = (10-8) soat × 88px = 176
+    const slotOf = (c: HTMLElement) => {
+      layout(c);
+      const slot = screen.getByText('Dilnoza Rahimova').closest('button') as HTMLElement;
+      slot.getBoundingClientRect = () => ({ top: 176, left: 0, right: 200 }) as DOMRect;
+      return slot;
+    };
+    // PointerEvent init (clientX/Y, pointerType) jsdom'da yo'qolishi mumkin — qo'lda biriktiramiz.
+    const pointer = (
+      type: 'pointerDown' | 'pointerMove' | 'pointerUp' | 'pointerCancel',
       el: Element,
-      clientY: number,
-      dataTransfer = dt(),
+      x: number,
+      y: number,
+      pointerType = 'touch',
     ) => {
-      const ev = createEvent[type](el);
-      Object.defineProperty(ev, 'clientY', { value: clientY });
-      Object.defineProperty(ev, 'dataTransfer', { value: dataTransfer });
+      const ev = createEvent[type](el, { bubbles: true });
+      Object.defineProperties(ev, {
+        clientX: { value: x },
+        clientY: { value: y },
+        pointerId: { value: 1 },
+        pointerType: { value: pointerType },
+        button: { value: 0 },
+      });
       fireEvent(el, ev);
     };
-    const colBodies = (c: HTMLElement) =>
-      Array.from(c.querySelectorAll<HTMLElement>('[class*="colBody"]'));
+    const dragTo = (slot: HTMLElement, fromY: number, x: number, y: number, kind = 'touch') => {
+      pointer('pointerDown', slot, 50, fromY, kind);
+      pointer('pointerMove', slot, x, y, kind);
+      pointer('pointerUp', slot, x, y, kind);
+    };
 
-    it('sudrab boshqa shifokor ustuniga tushirilsa: darhol ko‘chadi, 10 s dan keyin PATCH (vaqt+shifokor)', () => {
+    it('pointer drag (touch) boshqa shifokor ustuniga: darhol ko‘chadi, 10 s dan keyin PATCH (vaqt+shifokor)', () => {
       vi.useFakeTimers();
       const { container } = renderApp(<CalendarScreen />);
-      const slot = screen.getByText('Dilnoza Rahimova').closest('button') as HTMLElement;
-      expect(slot).toHaveAttribute('draggable', 'true');
-      drag('dragStart', slot, 0);
-      // 12:00 = (12-8) soat × 88 px
-      drag('drop', colBodies(container)[1] as HTMLElement, 4 * 88);
+      const slot = slotOf(container);
+      expect(slot).toHaveAttribute('data-draggable', 'true');
+      // 12:00 = 4 soat × 88 px; ikkinchi ustun (x 200..400)
+      dragTo(slot, 176, 250, 4 * 88);
       expect(screen.getByText(/Dilnoza Rahimova — Dr\. Vali, 12:00/)).toBeInTheDocument();
       expect(hoisted.moveMutate).not.toHaveBeenCalled();
       act(() => {
@@ -225,12 +301,54 @@ describe('CalendarScreen', () => {
       expect(new Date(body.endTime).getUTCHours()).toBe(8);
     });
 
+    it('oddiy bosish (harakatsiz) drag emas — detal paneli ochiladi; drag‘dan keyingi click paneli ochmaydi', () => {
+      vi.useFakeTimers();
+      const { container } = renderApp(<CalendarScreen />);
+      const slot = slotOf(container);
+      pointer('pointerDown', slot, 50, 180, 'mouse');
+      pointer('pointerUp', slot, 50, 180, 'mouse');
+      fireEvent.click(slot);
+      expect(hoisted.moveMutate).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: "Ko'chirish" })).toBeInTheDocument();
+
+      // drag → brauzer chiqargan click yutiladi (panel yopiq qoladi)
+      fireEvent.click(screen.getByRole('button', { name: /Yopish|Close/ }));
+      dragTo(slot, 176, 50, 3 * 88, 'mouse');
+      fireEvent.click(slot);
+      expect(screen.queryByRole('button', { name: "Ko'chirish" })).not.toBeInTheDocument();
+    });
+
+    it('pastki chetdan cho‘zish: boshlanish o‘zgarmaydi, tugash 15 daqiqa qadam, UndoToast keyin PATCH', () => {
+      vi.useFakeTimers();
+      const { container } = renderApp(<CalendarScreen />);
+      const slot = slotOf(container);
+      const handle = slot.querySelector('[data-resize-handle]') as HTMLElement;
+      expect(handle).not.toBeNull();
+      // 11:00 gacha edi; 11:40 → 11:45 ga yaxlitlanadi: (11:40-08:00)=220min*88/60
+      const y = (220 * 88) / 60;
+      pointer('pointerDown', handle, 50, 176 + 88);
+      pointer('pointerMove', handle, 50, y);
+      pointer('pointerUp', handle, 50, y);
+      expect(screen.getByText(/Dilnoza Rahimova — tugash 11:45/)).toBeInTheDocument();
+      act(() => {
+        vi.advanceTimersByTime(10_500);
+      });
+      expect(hoisted.moveMutate).toHaveBeenCalledTimes(1);
+      const body = hoisted.moveMutate.mock.calls[0]?.[0];
+      expect(body.id).toBe('a1');
+      expect(body.doctorId).toBeUndefined();
+      expect(new Date(body.startTime).toISOString()).toBe(
+        hoisted.appts[0] && (hoisted.appts[0] as { startTime: string }).startTime,
+      );
+      expect(new Date(body.endTime).getUTCHours()).toBe(6); // 11:45 Tashkent = 06:45Z
+      expect(new Date(body.endTime).getUTCMinutes()).toBe(45);
+    });
+
     it('«Qaytarish» — PATCH yuborilmaydi; server 409 qaytarsa yozilish joyiga qaytadi', () => {
       vi.useFakeTimers();
       const { container } = renderApp(<CalendarScreen />);
-      const slot = screen.getByText('Dilnoza Rahimova').closest('button') as HTMLElement;
-      drag('dragStart', slot, 0);
-      drag('drop', colBodies(container)[0] as HTMLElement, 4 * 88);
+      const slot = slotOf(container);
+      dragTo(slot, 176, 50, 4 * 88);
       fireEvent.click(screen.getByRole('button', { name: /Qaytarish/ }));
       act(() => {
         vi.advanceTimersByTime(20_000);
@@ -241,8 +359,7 @@ describe('CalendarScreen', () => {
       hoisted.moveMutate.mockImplementation((_b, opts) =>
         opts.onError(new ApiError('conflict.doctor_busy', 'x', 409)),
       );
-      drag('dragStart', slot, 0);
-      drag('drop', colBodies(container)[0] as HTMLElement, 4 * 88);
+      dragTo(slot, 176, 50, 4 * 88);
       act(() => {
         vi.advanceTimersByTime(10_500);
       });
@@ -250,12 +367,36 @@ describe('CalendarScreen', () => {
       expect(screen.queryByText(/12:00 ga/)).not.toBeInTheDocument();
     });
 
-    it('appointment.edit yo‘q → sudrab bo‘lmaydi; faol bo‘lmagan holat → draggable emas', () => {
+    it('appointment.edit yo‘q → sudrab bo‘lmaydi (handle ham yo‘q); faol bo‘lmagan holat → draggable emas', () => {
       hoisted.perms = new Set(['appointment.view']);
-      renderApp(<CalendarScreen />);
-      expect(screen.getByText('Dilnoza Rahimova').closest('button')).not.toHaveAttribute(
-        'draggable',
-      );
+      const { container } = renderApp(<CalendarScreen />);
+      const slot = screen.getByText('Dilnoza Rahimova').closest('button') as HTMLElement;
+      expect(slot).not.toHaveAttribute('data-draggable');
+      expect(slot.querySelector('[data-resize-handle]')).toBeNull();
+      layout(container);
+      dragTo(slot, 176, 250, 4 * 88);
+      expect(hoisted.moveMutate).not.toHaveBeenCalled();
+    });
+
+    it('hafta ko‘rinishida drag: boshqa kunga ko‘chadi (shifokor o‘zgarmaydi), PATCH sana+vaqt', () => {
+      vi.useFakeTimers();
+      const { container } = renderApp(<CalendarScreen />);
+      fireEvent.click(screen.getByRole('tab', { name: /Hafta/ }));
+      layout(container);
+      const slot = screen.getByText('Dilnoza Rahimova').closest('button') as HTMLElement;
+      slot.getBoundingClientRect = () => ({ top: 176, left: 0, right: 200 }) as DOMRect;
+      const bodies = colBodies(container);
+      expect(bodies).toHaveLength(7);
+      // 4-ustun (x 600..800) = dushanbadan 3 kun keyin; 09:30
+      const targetKey = bodies[3]?.dataset.dropCol as string;
+      dragTo(slot, 176, 650, 1.5 * 88);
+      act(() => {
+        vi.advanceTimersByTime(10_500);
+      });
+      expect(hoisted.moveMutate).toHaveBeenCalledTimes(1);
+      const body = hoisted.moveMutate.mock.calls[0]?.[0];
+      expect(body.doctorId).toBeUndefined();
+      expect(body.startTime).toBe(new Date(`${targetKey}T09:30:00+05:00`).toISOString());
     });
 
     it('klaviatura alternativasi: panelda «Ko‘chirish» → vaqt + shifokor', () => {
@@ -274,6 +415,126 @@ describe('CalendarScreen', () => {
       expect(new Date(body.startTime).getUTCHours()).toBe(10);
       expect(new Date(body.startTime).getUTCMinutes()).toBe(30);
       expect(body.doctorId).toBeUndefined();
+    });
+  });
+
+  // FT-05.1: bo'sh katak → /appointments/new (doktor, sana, vaqt, filial oldindan to'ldirilgan).
+  it("bo'sh katak bosilsa yangi yozilishga doktor/sana/vaqt bilan o'tadi (appointment.create)", () => {
+    hoisted.perms.add('appointment.create');
+    renderApp(
+      <>
+        <CalendarScreen />
+        <LocationProbe />
+      </>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Dr\. Vali.*11:30/ }));
+    const loc = screen.getByTestId('loc').textContent ?? '';
+    const url = new URL(loc, 'http://x');
+    expect(url.pathname).toBe('/appointments/new');
+    expect(url.searchParams.get('doctorId')).toBe('d2');
+    expect(url.searchParams.get('time')).toBe('11:30');
+    expect(url.searchParams.get('branchId')).toBe('b1');
+    expect(url.searchParams.get('date')).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("appointment.create yo'q — katak tugmalari chiqmaydi", () => {
+    renderApp(<CalendarScreen />);
+    expect(screen.queryByRole('button', { name: /11:30/ })).not.toBeInTheDocument();
+  });
+
+  it("«Bo'sh vaqtlar» slot chip bosilsa yangi yozilishga o'tadi", () => {
+    hoisted.perms.add('appointment.create');
+    hoisted.perms.add('schedule.view');
+    hoisted.availability = {
+      branchId: 'b1',
+      date: 'x',
+      slotMinutes: 30,
+      doctors: [
+        {
+          doctorId: 'd1',
+          slots: [{ start: '2026-06-27T04:30:00.000Z', end: '', startMinute: 570, endMinute: 600 }],
+        },
+      ],
+    };
+    renderApp(
+      <>
+        <CalendarScreen />
+        <LocationProbe />
+      </>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '09:30' }));
+    const url = new URL(screen.getByTestId('loc').textContent ?? '', 'http://x');
+    expect(url.pathname).toBe('/appointments/new');
+    expect(url.searchParams.get('doctorId')).toBe('d1');
+    expect(url.searchParams.get('time')).toBe('09:30');
+  });
+
+  // FT-05.4: zoom 3 daraja (localStorage) + planshet (<1024px) rail drawer'ga.
+  it('zoom: 3 daraja slot balandligini o‘zgartiradi va localStorage’da saqlanadi', () => {
+    const { unmount } = renderApp(<CalendarScreen />);
+    const hourPx = () =>
+      Number.parseFloat(
+        (document.querySelector('[data-cal-grid]') as HTMLElement).style.getPropertyValue(
+          '--cal-hour',
+        ),
+      );
+    const normal = hourPx();
+    expect(normal).toBeCloseTo(88, 0);
+    fireEvent.click(screen.getByRole('button', { name: 'Katta' }));
+    expect(hourPx()).toBeGreaterThan(normal);
+    expect(window.localStorage.getItem('calendar.zoom')).toBe('comfortable');
+    // slot balandligi ham mos o'zgardi (1 soat × zichlik)
+    const slot = screen.getByText('Dilnoza Rahimova').closest('button') as HTMLElement;
+    expect(Number.parseFloat(slot.style.height)).toBeCloseTo(hourPx(), 0);
+    unmount();
+    // qayta ochilganda saqlangan daraja
+    renderApp(<CalendarScreen />);
+    expect(hourPx()).toBeGreaterThan(normal);
+    fireEvent.click(screen.getByRole('button', { name: 'Kichik' }));
+    expect(hourPx()).toBeLessThan(normal);
+    expect(window.localStorage.getItem('calendar.zoom')).toBe('compact');
+  });
+
+  describe('planshet (<1024px)', () => {
+    const origMatchMedia = window.matchMedia;
+    afterEach(() => {
+      window.matchMedia = origMatchMedia;
+    });
+    const setTablet = (tablet: boolean) => {
+      window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+        matches: tablet && query.includes('max-width: 1023'),
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })) as unknown as typeof window.matchMedia;
+    };
+
+    it('keng ekranda o‘ng panel yonida (drawer tugmasi yo‘q)', () => {
+      setTablet(false);
+      renderApp(<CalendarScreen />);
+      expect(screen.getByTestId('calendar-rail')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Panel' })).not.toBeInTheDocument();
+    });
+
+    it('planshetda panel drawer’ga ko‘chadi: tugma bilan ochiladi', async () => {
+      setTablet(true);
+      renderApp(<CalendarScreen />);
+      expect(screen.queryByTestId('calendar-rail')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Panel' }));
+      const rail = await screen.findByTestId('calendar-rail');
+      expect(screen.getByRole('dialog')).toContainElement(rail);
+    });
+
+    it('planshetda yozilish bosilsa tafsilot drawer’da ochiladi', async () => {
+      setTablet(true);
+      renderApp(<CalendarScreen />);
+      fireEvent.click(screen.getByText('Dilnoza Rahimova'));
+      const panel = await screen.findByTestId('appointment-panel');
+      expect(screen.getByRole('dialog')).toContainElement(panel);
     });
   });
 });

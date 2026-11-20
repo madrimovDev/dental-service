@@ -32,6 +32,8 @@ export type VisitFormValues = {
   completesStage: boolean;
   appointmentId: string | null;
   nextVisit: NextVisit | null;
+  /** FT-01.4: vizitda ishlangan tish(lar), FDI. */
+  toothNumbers: number[];
 };
 
 export const emptyVisitForm = (): VisitFormValues => ({
@@ -45,6 +47,7 @@ export const emptyVisitForm = (): VisitFormValues => ({
   completesStage: true,
   appointmentId: null,
   nextVisit: null,
+  toothNumbers: [],
 });
 
 export type VisitNoteBody = CreateVisitNoteInput & {
@@ -75,6 +78,8 @@ export const buildVisitNoteBody = (
   completesStage: v.stageId ? v.completesStage : undefined,
   allergyOverrides: ctx.overrides.length > 0 ? ctx.overrides : undefined,
   nextVisit: v.nextVisit ?? undefined,
+  // Tahrirda bo'sh massiv ham yuboriladi (tishlarni tozalash), yaratishda bo'sh — yuborilmaydi.
+  toothNumbers: ctx.isEdit || v.toothNumbers.length > 0 ? v.toothNumbers : undefined,
 });
 
 // ===== yozilishga bog'lash (FX-117) =====

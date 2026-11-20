@@ -36,4 +36,13 @@ describe('CurrentTimeLine — window + offset (Dental OS spec §6.1)', () => {
     const { queryByTestId } = render(<CurrentTimeLine />);
     expect(queryByTestId('now-line')).toBeNull();
   });
+
+  it('`grid` oynasi bo‘yicha: 21:00 kengaytirilgan oynada ko‘rinadi, top grid boshidan', () => {
+    freezeUtc('2026-06-10T16:00:00Z'); // 21:00 Tashkent
+    const { getByTestId } = render(
+      <CurrentTimeLine grid={{ dayStartHour: 7, dayEndHour: 22, stepMin: 30, pxPerMin: 2 }} />,
+    );
+    // (1260 - 420) * 2
+    expect((getByTestId('now-line') as HTMLElement).style.top).toBe('1680px');
+  });
 });

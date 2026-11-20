@@ -18,12 +18,14 @@ import {
   listPatients,
   removePatientEmergencyContact,
   removePatientRelative,
+  setPatientPhoto,
   updateMedicalRecord,
   updatePatient,
   waiveNoShowStrike,
 } from '@dental/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { api } from '@/lib/api';
 import {
   chunk,
   IMPORT_CHUNK_SIZE,
@@ -101,6 +103,34 @@ export function useUpdatePatient(id: string) {
       qc.invalidateQueries({ queryKey: patientKeys.detail(id) });
       qc.invalidateQueries({ queryKey: patientKeys.raw(id) });
       qc.invalidateQueries({ queryKey: patientKeys.all });
+    },
+  });
+}
+
+/**
+ * FT-06.2: bemor avatari. `file` berilsa — avval `face_photo` sifatida yuklanadi
+ * (`POST /patient-images`, multipart), keyin `PATCH /patients/{id}/photo` bilan avatar
+ * qilinadi; `null` — avatarni olib tashlash (rasm galereyada qoladi).
+ */
+export function useSetPatientPhoto(patientId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (file: File | null) => {
+      let imageId: string | null = null;
+      if (file) {
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('patientId', patientId);
+        fd.append('type', 'face_photo');
+        const uploaded = await api.patientImages.upload(fd);
+        imageId = uploaded.id;
+      }
+      return setPatientPhoto(patientId, { imageId }).then((r) => r.data);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: patientKeys.detail(patientId) });
+      qc.invalidateQueries({ queryKey: patientKeys.raw(patientId) });
+      qc.invalidateQueries({ queryKey: ['clinical', 'images', patientId] });
     },
   });
 }

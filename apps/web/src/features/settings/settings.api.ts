@@ -32,6 +32,7 @@ import {
 } from '@dental/api-client';
 import type { Vertical } from '@dental/core';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { cashierKeys } from '@/features/cashier/cashier.keys';
 import { settingsKeys } from './settings.keys';
 
 // --- Roles ---
@@ -287,6 +288,8 @@ export function useUpdateTenantSettings() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: settingsKeys.tenantSettings() });
       qc.invalidateQueries({ queryKey: settingsKeys.tenantVertical() });
+      // FT-06.3: kassa rasmi sozlamasi (`GET /cashier/photo-settings`) ham shu yozuvdan.
+      qc.invalidateQueries({ queryKey: cashierKeys.photoSettings() });
     },
   });
 }

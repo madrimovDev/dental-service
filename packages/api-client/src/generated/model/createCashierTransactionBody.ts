@@ -18,6 +18,8 @@ export type CreateCashierTransactionBody = {
    * @nullable
    */
   discount?: number | null;
+  /** @maxLength 500 */
+  discountReason?: string;
   /**
    * @minimum 0
    * @nullable

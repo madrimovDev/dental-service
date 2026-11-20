@@ -1,0 +1,1 @@
+ALTER TABLE "tenant_settings" ADD COLUMN "bot_self_service_enabled" boolean DEFAULT true NOT NULL;

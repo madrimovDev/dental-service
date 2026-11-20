@@ -21,6 +21,10 @@ export interface TreatmentStage {
   /** @nullable */
   estimatedDurationMinutes: number | null;
   cost: string;
+  /** @nullable */
+  listPrice: string | null;
+  /** @nullable */
+  discountPercent: string | null;
   status: TreatmentStageStatus;
   acceptance: TreatmentStageAcceptance;
   /** @nullable */

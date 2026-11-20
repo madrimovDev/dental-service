@@ -21,7 +21,7 @@
 }
 
 .timeLabel {
-  height: 88px; /* 1 soat × 88px/soat zichlik */
+  height: var(--cal-hour, 88px); /* 1 soat × zoom zichligi (FT-05.4) */
   font-family: var(--font-mono);
   font-feature-settings: var(--num);
   font-size: var(--text-2xs);
@@ -132,13 +132,31 @@
 
 /* per-30-min grid line: solid var(--border); hour opacity 1, half-hour .4 */
 .gridLine {
-  height: 44px; /* 30 daqiqa × 88px/soat */
+  height: var(--cal-row, 44px); /* 30 daqiqa × zoom zichligi (FT-05.4) */
   border-bottom: 1px solid var(--border);
   box-sizing: border-box;
 }
 
 .gridLine[data-half="true"] {
   opacity: 0.4;
+}
+
+/* FT-05.1: bosiladigan bo'sh katak (appointment.create) — tugma, 44px = 30 daqiqa */
+button.gridLine {
+  display: block;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+button.gridLine:hover,
+button.gridLine:focus-visible {
+  background: var(--primary-soft);
+  opacity: 1;
 }
 
 /* ── appointment slot ── */
@@ -161,9 +179,48 @@
   color: var(--ink);
 }
 
-/* sudrab ko'chirish mumkin */
+/* sudrab ko'chirish mumkin (FT-05.3: pointer events — touch-action:none, planshet ham) */
 .slot[data-draggable="true"] {
   cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.slot[data-dragging="true"] {
+  cursor: grabbing;
+  z-index: 4;
+  opacity: 0.85;
+  box-shadow: var(--shadow-md, var(--shadow-sm));
+}
+
+/* pastki chetdan cho'zib davomiylikni o'zgartirish (15 daqiqa qadam) */
+.resizeHandle {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 8px;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.resizeHandle::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  width: 24px;
+  height: 3px;
+  margin-left: -12px;
+  border-radius: 2px;
+  background: var(--tone, var(--ink-3));
+  opacity: 0.45;
+}
+
+@media (pointer: coarse) {
+  .resizeHandle {
+    height: 18px;
+  }
 }
 
 /* tanlangan yozilish — qalin ink halqa (kanvas: box-shadow 3px ink) */
@@ -255,4 +312,25 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* FT-05.2: filial ish vaqtidan tashqari yozilish — kesik chegara + belgi */
+.slot[data-outside-hours="true"] {
+  border-style: dashed;
+  border-left-style: solid;
+  border-color: var(--warning);
+}
+
+.slotOutside {
+  display: inline-block;
+  align-self: flex-start;
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-bold);
+  color: var(--ink-2);
+  background: var(--warning-bg, var(--surface-2));
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-pill);
+  padding: 0 6px;
+  margin-bottom: 2px;
+  white-space: nowrap;
 }

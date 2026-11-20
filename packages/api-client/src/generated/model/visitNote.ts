@@ -30,6 +30,8 @@ export interface VisitNote {
   /** @nullable */
   freeNotes: string | null;
   /** @nullable */
+  toothNumbers: number[] | null;
+  /** @nullable */
   signedAt: string | null;
   /** @nullable */
   signedBy: string | null;

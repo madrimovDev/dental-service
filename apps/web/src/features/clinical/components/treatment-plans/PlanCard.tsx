@@ -7,24 +7,35 @@ import type {
   TreatmentStageStatus,
 } from '@dental/api-client';
 import { Mono, StatusPill } from '@dental/ui';
-import { Button, Divider, Group, Modal, Select, Stack, Text } from '@mantine/core';
+import {
+  ActionIcon,
+  Button,
+  Divider,
+  Group,
+  Menu,
+  Modal,
+  Select,
+  Stack,
+  Text,
+} from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import {
   IconBan,
   IconCheck,
   IconCircleCheck,
+  IconDots,
   IconFileText,
   IconPlayerPlay,
   IconReceipt2,
   IconWritingSign,
 } from '@tabler/icons-react';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth-store.ts';
 import { useConsentForms } from '../../clinical.api';
 import { toConsentFormVM, toPlanCardVM } from '../../clinical.mappers';
 import { ConsentSignForm } from '../consent/ConsentSignForm';
-import { EstimateView } from './EstimateView';
+import { EstimatePanel } from './EstimateView';
 import { StageRow } from './StageRow';
 import classes from './TreatmentPlansTab.module.css';
 
@@ -45,6 +56,15 @@ const CONSENT_LOCKED_PLAN_STATUSES: readonly TreatmentPlanStatus[] = [
   'completed',
   'cancelled',
 ];
+
+type PlanAction = {
+  key: string;
+  labelKey: string;
+  icon: ReactNode;
+  onClick: () => void;
+  pending?: boolean;
+  danger?: boolean;
+};
 
 export function PlanCard({
   plan,
@@ -72,7 +92,9 @@ export function PlanCard({
   onAcceptAll: (stageIds: string[]) => void;
   acceptAllPending: boolean;
   onPresentPlan: (planId: string) => void;
-  onAcceptPlan: (planId: string) => void;
+  // FT-01.5: «Bemor rozi bo'ldi» — rejani qabul qiladi va hali taklif holatidagi
+  // bosqichlarni ham qabul qiladi (rad etilganlar o'zgarmaydi).
+  onAcceptPlan: (planId: string, proposedStageIds: string[]) => void;
   // B4: accepted→in_progress/cancelled, in_progress→completed/cancelled va h.k.
   // (present/accept'dan farqli — bularga maxsus xato-xabar kerak emas, default
   // global toast — CLI-165 — yetarli).
@@ -83,6 +105,7 @@ export function PlanCard({
 }) {
   const { t } = useTranslation();
   const vm = toPlanCardVM(plan);
+  // FT-01.5: smeta o'ng panelda yig'iladi (modal emas); ochilgunicha so'rov yo'q.
   const [estimateOpened, estimate] = useDisclosure(false);
   const [consentOpened, consent] = useDisclosure(false);
   const [selectedConsentFormId, setSelectedConsentFormId] = useState<string | null>(null);
@@ -99,6 +122,83 @@ export function PlanCard({
     ? 'treatment_plan.renew_consent'
     : 'treatment_plan.sign_consent';
   const canCancelPlan = CANCELLABLE_PLAN_STATUSES.includes(plan.status);
+
+  // FT-01.5 (spec §3): keyingi qadam — soddalashtirilgan oqim Qoralama → Bemorga
+  // ko'rsatildi → (rozilik inline) Bemor rozi → Davolanmoqda → Tugadi. Backend o'tish
+  // jadvaliga mos (`treatment-plans.transitions.ts`); accepted reja birinchi bosqich
+  // boshlanganda o'zi in_progress bo'ladi, tugma esa qo'lda boshlash uchun qoladi.
+  const consentAction: PlanAction = {
+    key: 'consent',
+    labelKey: consentActionKey,
+    icon: <IconWritingSign size={14} />,
+    onClick: consent.open,
+  };
+  const primaryAction: PlanAction | null =
+    plan.status === 'draft'
+      ? {
+          key: 'present',
+          labelKey: 'treatment_plan.present',
+          icon: <IconFileText size={16} />,
+          pending: planStatusPending,
+          onClick: () => onPresentPlan(plan.id),
+        }
+      : plan.status === 'presented'
+        ? // Consent gating (proaktiv): rozilik bo'lmasa keyingi qadam — imzolash (backend
+          // ham presented→accepted'ni rozilikisiz 400 qaytaradi).
+          hasConsent
+          ? {
+              key: 'accept',
+              labelKey: 'treatment_plan.accept_plan',
+              icon: <IconCheck size={16} />,
+              pending: planStatusPending || acceptAllPending,
+              onClick: () => onAcceptPlan(plan.id, proposedStageIds),
+            }
+          : { ...consentAction, icon: <IconWritingSign size={16} /> }
+        : plan.status === 'accepted'
+          ? {
+              key: 'start',
+              labelKey: 'treatment_plan.start_execution',
+              icon: <IconPlayerPlay size={16} />,
+              pending: planStatusPending,
+              onClick: () => onSetPlanStatus(plan.id, 'in_progress'),
+            }
+          : plan.status === 'in_progress'
+            ? {
+                key: 'complete',
+                labelKey: 'treatment_plan.complete_plan',
+                icon: <IconCircleCheck size={16} />,
+                pending: planStatusPending,
+                onClick: () => onSetPlanStatus(plan.id, 'completed'),
+              }
+            : null;
+
+  const isTerminal = plan.status === 'completed' || plan.status === 'cancelled';
+  const menuActions: PlanAction[] = [];
+  if (!isTerminal && proposedStageIds.length > 0) {
+    menuActions.push({
+      key: 'accept_all',
+      labelKey: 'treatment_plan.accept_all',
+      icon: <IconCheck size={14} />,
+      pending: acceptAllPending,
+      onClick: () => onAcceptAll(proposedStageIds),
+    });
+  }
+  // FX-26 review: `hasConsent` faqat bog'langanini bildiradi, forma muddati o'tishi
+  // mumkin — draft/presented/accepted'da qayta bog'lash doim mavjud (asosiy tugma
+  // bo'lmasa — menyuda).
+  if (!CONSENT_LOCKED_PLAN_STATUSES.includes(plan.status) && primaryAction?.key !== 'consent') {
+    menuActions.push(consentAction);
+  }
+  if (canCancelPlan) {
+    menuActions.push({
+      key: 'cancel',
+      labelKey: 'common.cancel',
+      icon: <IconBan size={14} />,
+      danger: true,
+      pending: planStatusPending,
+      onClick: () => onSetPlanStatus(plan.id, 'cancelled'),
+    });
+  }
 
   // Yil — plan.createdAt'dan (vizual sarlavha uchun; yangi data YO'Q).
   const year = plan.createdAt ? new Date(plan.createdAt).getFullYear() : null;
@@ -149,14 +249,6 @@ export function PlanCard({
               {totalStages} {t('treatment_plan.stages')}
             </div>
           </div>
-          <Button
-            size="compact-xs"
-            variant="light"
-            leftSection={<IconReceipt2 size={14} />}
-            onClick={estimate.open}
-          >
-            {t('treatment_plan.estimate_open')}
-          </Button>
         </div>
 
         <div className={classes.headChips}>
@@ -166,97 +258,48 @@ export function PlanCard({
           )}
         </div>
 
-        {canEdit && (
+        {/* FT-01.5 (spec §3): BITTA asosiy tugma (keyingi qadam) + «…» menyu (qolgan amallar). */}
+        {canEdit && (primaryAction || menuActions.length > 0) && (
           <div className={classes.actions}>
-            {proposedStageIds.length > 0 && (
+            {primaryAction && (
               <Button
-                size="compact-sm"
-                variant="light"
+                size="sm"
+                h={44}
                 color="teal"
-                leftSection={<IconCheck size={14} />}
-                loading={acceptAllPending}
-                onClick={() => onAcceptAll(proposedStageIds)}
+                data-plan-primary="true"
+                leftSection={primaryAction.icon}
+                loading={primaryAction.pending}
+                onClick={primaryAction.onClick}
               >
-                {t('treatment_plan.accept_all')}
+                {t(primaryAction.labelKey)}
               </Button>
             )}
-            {plan.status === 'draft' && (
-              <Button
-                size="compact-sm"
-                variant="default"
-                leftSection={<IconFileText size={14} />}
-                loading={planStatusPending}
-                onClick={() => onPresentPlan(plan.id)}
-              >
-                {t('treatment_plan.present')}
-              </Button>
-            )}
-            {/* FX-26 review: `hasConsent` faqat bog'langanini bildiradi, bog'langan forma
-                hali amaldami — yo'q (muddati o'tishi mumkin; backend `updatePlan` shunda
-                ConsentRequiredError beradi). Shuning uchun draft/presented/accepted'da
-                (backend `setConsent` qayta bog'lashga ruxsat beradi) tugma doim ko'rinadi:
-                bog'lanmagan bo'lsa «imzolash», bog'langan bo'lsa «yangilash». */}
-            {!CONSENT_LOCKED_PLAN_STATUSES.includes(plan.status) && (
-              <Button
-                size="compact-sm"
-                variant="default"
-                leftSection={<IconWritingSign size={14} />}
-                onClick={consent.open}
-              >
-                {t(consentActionKey)}
-              </Button>
-            )}
-            {plan.status === 'presented' && (
-              <Button
-                size="compact-sm"
-                color="teal"
-                leftSection={<IconCheck size={14} />}
-                // Consent gating (proaktiv): tugma rozilik bo'lmasa o'chiq; backend ham 400 qaytaradi.
-                disabled={!hasConsent}
-                loading={planStatusPending}
-                onClick={() => onAcceptPlan(plan.id)}
-              >
-                {t('treatment_plan.accept_plan')}
-              </Button>
-            )}
-            {/* B4 (CLI-439): accepted→in_progress — avval UI'da yo'q edi, plan "accepted"da
-                qotib qolardi. */}
-            {plan.status === 'accepted' && (
-              <Button
-                size="compact-sm"
-                variant="default"
-                leftSection={<IconPlayerPlay size={14} />}
-                loading={planStatusPending}
-                onClick={() => onSetPlanStatus(plan.id, 'in_progress')}
-              >
-                {t('treatment_plan.start_execution')}
-              </Button>
-            )}
-            {/* B4: in_progress→completed. */}
-            {plan.status === 'in_progress' && (
-              <Button
-                size="compact-sm"
-                color="teal"
-                leftSection={<IconCircleCheck size={14} />}
-                loading={planStatusPending}
-                onClick={() => onSetPlanStatus(plan.id, 'completed')}
-              >
-                {t('treatment_plan.complete_plan')}
-              </Button>
-            )}
-            {/* B4: backend transition jadvaliga mos — cancel istalgan terminal
-                bo'lmagan statusdan (draft/presented/accepted/in_progress). */}
-            {canCancelPlan && (
-              <Button
-                size="compact-sm"
-                variant="subtle"
-                color="red"
-                leftSection={<IconBan size={14} />}
-                loading={planStatusPending}
-                onClick={() => onSetPlanStatus(plan.id, 'cancelled')}
-              >
-                {t('common.cancel')}
-              </Button>
+            {menuActions.length > 0 && (
+              <Menu position="bottom-end" withinPortal>
+                <Menu.Target>
+                  <ActionIcon
+                    size={44}
+                    variant="default"
+                    aria-label={t('treatment_plan.more_actions')}
+                    title={t('treatment_plan.more_actions')}
+                  >
+                    <IconDots size={18} />
+                  </ActionIcon>
+                </Menu.Target>
+                <Menu.Dropdown>
+                  {menuActions.map((a) => (
+                    <Menu.Item
+                      key={a.key}
+                      leftSection={a.icon}
+                      color={a.danger ? 'red' : undefined}
+                      disabled={a.pending}
+                      onClick={a.onClick}
+                    >
+                      {t(a.labelKey)}
+                    </Menu.Item>
+                  ))}
+                </Menu.Dropdown>
+              </Menu>
             )}
           </div>
         )}
@@ -311,9 +354,20 @@ export function PlanCard({
             · <Mono>{progressPct}%</Mono>
           </div>
         </div>
-      </aside>
 
-      <EstimateView planId={plan.id} opened={estimateOpened} onClose={estimate.close} />
+        {/* FT-01.5 (spec §3): smeta/taqdimot — modal emas, shu panelning o'zida. */}
+        <Button
+          size="sm"
+          h={44}
+          variant="light"
+          leftSection={<IconReceipt2 size={16} />}
+          aria-expanded={estimateOpened}
+          onClick={estimate.toggle}
+        >
+          {t(estimateOpened ? 'treatment_plan.estimate_hide' : 'treatment_plan.estimate_open')}
+        </Button>
+        {estimateOpened && <EstimatePanel planId={plan.id} />}
+      </aside>
 
       <Modal opened={consentOpened} onClose={closeConsent} title={t(consentActionKey)}>
         <Stack gap="md">

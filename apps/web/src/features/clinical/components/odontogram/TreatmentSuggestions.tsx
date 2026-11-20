@@ -70,7 +70,8 @@ export function TreatmentSuggestions({ diagnosis, lang, chair, value, onChange }
   });
   const priceOf = (i: number): number | null => prices[i]?.data ?? null;
 
-  if (!canViewServices || !diagnosis) return null;
+  // FT-01.3: tashxissiz ham xizmat katalogdan tanlanadi (tish → xizmat → reja).
+  if (!canViewServices) return null;
   const minH = chair ? 'var(--tap-chair)' : 'var(--tap-min)';
 
   const pick = (s: Service, cost: number | null) =>
@@ -83,7 +84,11 @@ export function TreatmentSuggestions({ diagnosis, lang, chair, value, onChange }
     >
       <Text style={sectionLabel}>{t('odontogram.suggest_title')}</Text>
       {shown.length === 0 ? (
-        <Text style={{ fontSize: 13, color: 'var(--ink-3)' }}>{t('odontogram.suggest_none')}</Text>
+        diagnosis && (
+          <Text style={{ fontSize: 13, color: 'var(--ink-3)' }}>
+            {t('odontogram.suggest_none')}
+          </Text>
+        )
       ) : (
         <Box role="radiogroup" aria-label={t('odontogram.suggest_title')}>
           {shown.map((s, i) => {
@@ -131,7 +136,7 @@ export function TreatmentSuggestions({ diagnosis, lang, chair, value, onChange }
         </Box>
       )}
       <Select
-        mt={8}
+        mt={shown.length === 0 && !diagnosis ? 0 : 8}
         searchable
         clearable
         size="xs"

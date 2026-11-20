@@ -5,6 +5,7 @@ import {
   cashierTransactions,
   medicalRecords,
   patientEmergencyContacts,
+  patientImages,
   patientRelatives,
   patients,
   tenantSettings,
@@ -17,7 +18,13 @@ import { and, count, desc, eq, gte, inArray, isNotNull, isNull, ne, or, sql } fr
 import type { Context } from 'hono';
 import { getDb } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
-import { createOwnershipValidator, type OwnershipValidator } from '../../lib/ownership.ts';
+import { PatientDiscountExceedsMaxError, readMaxDiscountPercent } from '../../lib/discount.ts';
+import {
+  CrossEntityError,
+  createOwnershipValidator,
+  type OwnershipValidator,
+} from '../../lib/ownership.ts';
+import { presignedGetUrl } from '../../lib/s3.ts';
 import type { NonPlanTransactionRow } from './patients.balance.ts';
 import { computeNonPlanRemainder, computePatientBalance } from './patients.balance.ts';
 import { parseImportRow } from './patients.import.ts';
@@ -405,10 +412,22 @@ export const createPatientsService = (deps: {
     return hasPii ? row : maskPii(row);
   }
 
+  /**
+   * FT-04.3 (review): doimiy chegirma tenant chegarasidan (`max_discount_percent`, CLI-444 —
+   * owner kassirlarni shu bilan cheklaydi) oshmasligi kerak. Yozuvdan OLDIN; `null` (tozalash)
+   * har doim ruxsat.
+   */
+  async function assertDefaultDiscountWithinMax(c: Context, pct: number | null | undefined) {
+    if (pct == null || pct <= 0) return;
+    const maxPct = await readMaxDiscountPercent(getDb(c));
+    if (pct > maxPct) throw new PatientDiscountExceedsMaxError(maxPct);
+  }
+
   async function create(c: Context, input: CreatePatientInput) {
     const db = getDb(c);
     const tenantId = c.get('activeTenantId');
     if (!tenantId) throw new Error('No tenant context');
+    await assertDefaultDiscountWithinMax(c, input.defaultDiscountPercent);
 
     return await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);
@@ -431,6 +450,8 @@ export const createPatientsService = (deps: {
           source: input.source ?? null,
           insurance: input.insurance ?? null,
           allowEmergencyRecall: input.allowEmergencyRecall ?? false,
+          defaultDiscountPercent:
+            input.defaultDiscountPercent == null ? null : input.defaultDiscountPercent.toFixed(2),
         })
         .returning();
 
@@ -457,6 +478,7 @@ export const createPatientsService = (deps: {
     const db = getDb(c);
     const [before] = await db.select().from(patients).where(eq(patients.id, id));
     if (!before) return null;
+    await assertDefaultDiscountWithinMax(c, input.defaultDiscountPercent);
 
     // CLI-455: explicit patch — kalit yo'q (`undefined`) bo'lsa ustunga tegmaydi,
     // `null` bo'lsa ustunni tozalaydi. Zod schema `.nullable()` bo'lgani uchun
@@ -484,6 +506,9 @@ export const createPatientsService = (deps: {
     if (input.insurance !== undefined) patch.insurance = input.insurance;
     if (input.allowEmergencyRecall !== undefined)
       patch.allowEmergencyRecall = input.allowEmergencyRecall;
+    if (input.defaultDiscountPercent !== undefined)
+      patch.defaultDiscountPercent =
+        input.defaultDiscountPercent === null ? null : input.defaultDiscountPercent.toFixed(2);
 
     const [updated] = await db.update(patients).set(patch).where(eq(patients.id, id)).returning();
 
@@ -500,6 +525,54 @@ export const createPatientsService = (deps: {
     // PT-01: javob findById/list bilan bir xil maskalash qoidasiga bo'ysunadi
     // (audit yozuvi esa HAQIQIY qiymat bilan yuqorida yozildi).
     return updated && !userHasPiiAccess(c) ? maskPii(updated) : updated;
+  }
+
+  /**
+   * FT-06.2: bemor avatari. `imageId` — SHU bemorning `face_photo` qatori bo'lishi shart
+   * (RLS bo'yicha boshqa tenant rasmi ko'rinmaydi → `not_found`; boshqa bemor / boshqa tur →
+   * `mismatch`; ikkalasi CrossEntityError → route 400). `photo_url` — barqaror `/uploads/...`
+   * serve URL (o'qish `patient_image.view` bilan uploads route'da himoyalangan). `null` —
+   * avatar olib tashlanadi, rasm qatori `patient_images`da qoladi. Bemor yo'q → null.
+   */
+  async function setPhoto(c: Context, id: string, imageId: string | null) {
+    const db = getDb(c);
+    const [before] = await db.select().from(patients).where(eq(patients.id, id));
+    if (!before) return null;
+
+    let photoUrl: string | null = null;
+    if (imageId) {
+      const [img] = await db
+        .select({
+          id: patientImages.id,
+          patientId: patientImages.patientId,
+          type: patientImages.type,
+          objectKey: patientImages.objectKey,
+        })
+        .from(patientImages)
+        .where(eq(patientImages.id, imageId));
+      if (!img) throw new CrossEntityError('patient_image', 'not_found');
+      if (img.patientId !== id)
+        throw new CrossEntityError('patient_image', 'mismatch', 'Image belongs to another patient');
+      if (img.type !== 'face_photo')
+        throw new CrossEntityError('patient_image', 'mismatch', 'Image type must be face_photo');
+      photoUrl = await presignedGetUrl(img.objectKey);
+    }
+
+    const [updated] = await db
+      .update(patients)
+      .set({ photoUrl, updatedAt: new Date() })
+      .where(eq(patients.id, id))
+      .returning();
+    if (!updated) return null;
+
+    await deps.audit.record(c, {
+      action: 'photo_updated',
+      resourceType: 'patient',
+      resourceId: id,
+      before: { photoUrl: before.photoUrl },
+      after: { photoUrl, imageId },
+    });
+    return userHasPiiAccess(c) ? updated : maskPii(updated);
   }
 
   /**
@@ -1071,6 +1144,7 @@ export const createPatientsService = (deps: {
     update,
     archive,
     unlinkTelegram,
+    setPhoto,
     getMedicalRecord,
     updateMedicalRecord,
     confirmMedicalRecord,

@@ -49,6 +49,8 @@ export const tenantSettingsSchema = z.object({
   reminderLeadHours: z.number().int().min(0).max(168),
   // CLI-444: kassa erkin POS chegirmasining maksimal foizi (0–100, 100 = cheklovsiz).
   maxDiscountPercent: z.number().int().min(0).max(100),
+  // FT-06.3 (D-4): to'lovdan keyin to'lovchining yuz rasmi (standart o'chiq, 90 kun saqlanadi).
+  cashierPhotoEnabled: z.boolean(),
 });
 export type TenantSettingsFormValues = z.infer<typeof tenantSettingsSchema>;
 

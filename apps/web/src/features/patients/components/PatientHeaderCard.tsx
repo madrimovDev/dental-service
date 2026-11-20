@@ -1,13 +1,14 @@
 import type { AllergyEntry } from '@dental/api-client';
 import { AlertBanner, Button, Mono } from '@dental/ui';
 import { useTranslation } from 'react-i18next';
+import { useAuthedObjectUrl } from '@/hooks/useAuthedObjectUrl';
 import { formatCurrency } from '@/lib/format';
 import type { PatientDetail } from '../patients.types';
 
 type HeaderPatient = Pick<
   PatientDetail,
-  'fullName' | 'phone' | 'age' | 'genderLabel' | 'tags' | 'source'
->;
+  'fullName' | 'phone' | 'age' | 'genderLabel' | 'tags' | 'source' | 'defaultDiscountPercent'
+> & { photoUrl?: string | null };
 
 function initials(fullName: string): string {
   const parts = fullName.trim().split(/\s+/).filter(Boolean);
@@ -26,6 +27,8 @@ export interface PatientHeaderCardProps {
   allergies?: Pick<AllergyEntry, 'substance' | 'severity'>[] | undefined;
   /** "To'lov qabul qilish" tugmasi — mavjud xulq (faqat ko'rinish + ixtiyoriy navigatsiya). */
   onCollectPayment?: () => void;
+  /** FT-06.2: «Rasm qo'yish» — berilsa avatar tagida tugma ko'rinadi (`patient.edit` + `patient_image.upload`). */
+  onChangePhoto?: () => void;
 }
 
 export function PatientHeaderCard({
@@ -33,8 +36,11 @@ export function PatientHeaderCard({
   balance,
   allergies,
   onCollectPayment,
+  onChangePhoto,
 }: PatientHeaderCardProps) {
   const { t } = useTranslation();
+  // `<img>` Bearer yubormaydi (P11) — blob orqali; 403/404'da bosh harflarga qaytadi.
+  const { src: photoSrc } = useAuthedObjectUrl(patient.photoUrl ?? null);
 
   const ageGender = [
     patient.age != null ? String(patient.age) : null,
@@ -72,22 +78,58 @@ export function PatientHeaderCard({
         }}
       >
         <div
-          aria-hidden
           style={{
             alignItems: 'center',
-            background: 'var(--primary-tint)',
-            borderRadius: 99,
-            color: 'var(--primary-strong)',
             display: 'flex',
             flex: '0 0 auto',
-            fontSize: 20,
-            fontWeight: 700,
-            height: 56,
-            justifyContent: 'center',
-            width: 56,
+            flexDirection: 'column',
+            gap: 6,
           }}
         >
-          {initials(patient.fullName)}
+          <div
+            data-testid="patient-avatar"
+            style={{
+              alignItems: 'center',
+              background: 'var(--primary-tint)',
+              borderRadius: 99,
+              color: 'var(--primary-strong)',
+              display: 'flex',
+              fontSize: 20,
+              fontWeight: 700,
+              height: 56,
+              justifyContent: 'center',
+              overflow: 'hidden',
+              width: 56,
+            }}
+          >
+            {photoSrc ? (
+              <img
+                src={photoSrc}
+                alt={patient.fullName}
+                style={{ height: '100%', objectFit: 'cover', width: '100%' }}
+              />
+            ) : (
+              <span aria-hidden>{initials(patient.fullName)}</span>
+            )}
+          </div>
+          {onChangePhoto && (
+            <button
+              type="button"
+              onClick={onChangePhoto}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--primary)',
+                cursor: 'pointer',
+                fontSize: 12,
+                fontWeight: 600,
+                minHeight: 44,
+                padding: '0 6px',
+              }}
+            >
+              {patient.photoUrl ? t('patientCard.photo_change') : t('patientCard.photo_add')}
+            </button>
+          )}
         </div>
 
         <div style={{ flex: '1 1 auto', minWidth: 0 }}>
@@ -115,6 +157,22 @@ export function PatientHeaderCard({
                 }}
               >
                 {tag}
+              </span>
+            )}
+            {/* FT-04.3: doimiy chegirma belgisi (kassada va yangi reja bosqichlarida qo'llanadi). */}
+            {patient.defaultDiscountPercent != null && patient.defaultDiscountPercent > 0 && (
+              <span
+                data-testid="patient-discount-badge"
+                style={{
+                  background: 'var(--success-soft)',
+                  borderRadius: 99,
+                  color: 'var(--success)',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  padding: '3px 10px',
+                }}
+              >
+                {t('patients.discount_badge', { pct: patient.defaultDiscountPercent })}
               </span>
             )}
           </div>

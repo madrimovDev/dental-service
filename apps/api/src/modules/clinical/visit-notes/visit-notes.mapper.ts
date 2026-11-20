@@ -19,6 +19,7 @@ export const toVisitNoteDto = (note: VisitNoteRow): VisitNoteDto => ({
   plan: note.plan ?? null,
   performedServices: note.performedServices ?? null,
   freeNotes: note.freeNotes ?? null,
+  toothNumbers: note.toothNumbers ?? null,
   signedAt: note.signedAt ? note.signedAt.toISOString() : null,
   signedBy: note.signedBy ?? null,
   metadata: note.metadata ?? null,
