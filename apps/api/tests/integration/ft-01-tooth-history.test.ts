@@ -195,3 +195,53 @@ describe('FT-01.4 — GET /patients/{id}/images?tooth=NN', () => {
     expect(res.status).toBe(403);
   });
 });
+
+const upload = (token: string, toothNumbers: string) => {
+  const fd = new FormData();
+  fd.append('file', new File([new Uint8Array([1, 2, 3])], 'x.jpg', { type: 'image/jpeg' }));
+  fd.append('patientId', patientId);
+  fd.append('type', 'xray_periapical');
+  fd.append('toothNumbers', toothNumbers);
+  return createApp().request('/api/patient-images', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}`, 'x-real-ip': randomIp() },
+    body: fd,
+  });
+};
+
+const imageCount = async () =>
+  (
+    await inTenant((tx) =>
+      tx.select().from(patientImages).where(eq(patientImages.patientId, patientId)),
+    )
+  ).length;
+
+describe('FT-01.4 — rasm tishlari FDI validatori', () => {
+  test('yuklash: «16, 19» (19 FDI emas) → 400 image.invalid_metadata, rasm yozilmaydi', async () => {
+    expect(templatePerms('doctor')).toContain('patient_image.upload');
+    const before = await imageCount();
+    const res = await upload(tokens.doctor as string, '16, 19');
+    expect(res.status).toBe(400);
+    expect(await errCode(res)).toBe('image.invalid_metadata');
+    expect(await imageCount()).toBe(before);
+  });
+
+  test('yuklash: «16, 17» → 201, tishlar saqlanadi', async () => {
+    const res = await upload(tokens.doctor as string, '16, 17');
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { data: ImageDto };
+    expect(body.data.toothNumbers).toEqual([16, 17]);
+  });
+
+  test('tahrir: toothNumbers [99] → 400, o‘zgarmaydi', async () => {
+    const id = await insertImage('patch.jpg', [11]);
+    const res = await call(tokens.doctor as string, 'PATCH', `/patient-images/${id}`, {
+      toothNumbers: [99],
+    });
+    expect(res.status).toBe(400);
+    const [row] = await inTenant((tx) =>
+      tx.select().from(patientImages).where(eq(patientImages.id, id)),
+    );
+    expect(row?.toothNumbers).toEqual([11]);
+  });
+});

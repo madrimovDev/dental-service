@@ -12,25 +12,32 @@ export const imageType = z.enum([
   'other',
 ]);
 
+/** FDI (ISO 3950) tish raqami — doimiy 11–48, sut 51–85 (`isValidFdi`). */
+const fdiToothSchema = z.coerce
+  .number()
+  .int()
+  .refine(isValidFdi, { message: 'Invalid FDI tooth number' });
+
 export const uploadImageMetadataSchema = z.object({
   patientId: z.uuid(),
   type: imageType,
   visitNoteId: z.uuid().optional(),
   title: z.string().max(200).optional(),
   description: z.string().max(2000).optional(),
-  // CLI-422: FDI musbat-butun filtri schema'da (`.filter` mavjud xulqni saqlaydi —
-  // qat'iy 400 emas, NaN/nomusbat qiymatlar tashlanadi).
+  // FT-01.4: FDI validatori (CLI-422 jim filtri o'rniga) — yaroqsiz raqam (NaN, 19, 99 ...)
+  // butun so'rovni rad etadi (400), rasm noto'g'ri tishga bog'lanib qolmaydi. Multipart'da
+  // vergul bilan ajratilgan matn; bo'sh segmentlar (oxirgi vergul) e'tiborsiz.
   toothNumbers: z
-    .union([z.string(), z.array(z.coerce.number())])
-    .transform((v) => {
-      if (Array.isArray(v)) {
-        return v.map(Number).filter((n) => Number.isInteger(n) && n > 0);
-      }
-      return v
-        .split(',')
-        .map((s) => Number(s.trim()))
-        .filter((n) => Number.isInteger(n) && n > 0);
-    })
+    .union([z.string(), z.array(z.unknown())])
+    .transform((v) =>
+      Array.isArray(v)
+        ? v
+        : v
+            .split(',')
+            .map((s) => s.trim())
+            .filter((s) => s !== ''),
+    )
+    .pipe(z.array(fdiToothSchema))
     .optional(),
   takenDate: z.iso.datetime().optional(),
 });
@@ -40,7 +47,7 @@ export const updateImageMetadataSchema = z.object({
   type: imageType.optional(),
   title: z.string().max(200).nullable().optional(),
   description: z.string().max(2000).nullable().optional(),
-  toothNumbers: z.array(z.coerce.number().int()).nullable().optional(),
+  toothNumbers: z.array(fdiToothSchema).nullable().optional(),
   takenDate: z.iso.datetime().nullable().optional(),
 });
 export type UpdateImageMetadataInput = z.infer<typeof updateImageMetadataSchema>;
