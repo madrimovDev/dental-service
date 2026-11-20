@@ -1,7 +1,10 @@
 import { basename, sep } from 'node:path';
 import { fail } from '@dental/core';
+import { patients } from '@dental/db-schema';
+import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import type { Database } from '../db/client.ts';
+import { getDb } from '../db/scoped.ts';
 import type { AuditLogger } from '../lib/audit-logger.ts';
 import type { StorageAdapter } from '../lib/storage.ts';
 import { authMiddleware } from '../middleware/auth.ts';
@@ -60,7 +63,28 @@ export const uploadsRoutes = (
         if (prefix === 'tenants' && keyTenantId === c.get('activeTenantId')) {
           // UI-D5: prefiks bo'yicha permission — `patients/` → patient_image.view,
           // `lab-orders/` → lab_order.view, `cashier-photos/` → cashier.photo.view (FT-06.3); boshqa prefiks (o'z tenanti ichida ham) → 403.
-          if (kind === 'patients') return requireImageView(c, next);
+          // `/` bilan birlashtirilgan kanonik key — DB'dagi object_key / photo_url bilan solishtirish uchun.
+          const canonicalKey = resolved.relKey.split(sep).join('/');
+          if (kind === 'patients') {
+            // FT-06 seam: bemor avatari — `patient.view` bor va key biror bemorning JORIY
+            // `photo_url`iga teng bo'lsa (RLS ostida) `patient_image.view`siz ham ochiq
+            // (Receptionist avatarni ko'radi). Boshqa bemor rasmlari — `patient_image.view`.
+            const claims = c.get('accessClaims');
+            const perms = claims?.perms ?? [];
+            if (
+              !perms.includes('@owner') &&
+              !perms.includes('patient_image.view') &&
+              perms.includes('patient.view')
+            ) {
+              const [avatar] = await getDb(c)
+                .select({ id: patients.id })
+                .from(patients)
+                .where(eq(patients.photoUrl, storage.serveUrl(canonicalKey)))
+                .limit(1);
+              if (avatar) return next();
+            }
+            return requireImageView(c, next);
+          }
           if (kind === 'lab-orders') return requireLabView(c, next);
           // FT-06.3: kassa rasmi — `cashier-photos/` → cashier.photo.view (faqat owner/Tenant Admin).
           if (kind === 'cashier-photos') return requireCashierPhotoView(c, next);
