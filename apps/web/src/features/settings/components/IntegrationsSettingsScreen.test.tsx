@@ -115,4 +115,15 @@ describe('IntegrationsSettingsScreen', () => {
     fireEvent.click(screen.getByTestId('bot-self-service-switch'));
     expect(updateSettingsMutate).toHaveBeenCalledWith({ botSelfServiceEnabled: true });
   });
+
+  it('Telegram token bo‘sh: «Saqlash» o‘chiq, xato matni chiqmaydi, mutate chaqirilmaydi', () => {
+    updateSettingsMutate.mockClear();
+    renderApp(<IntegrationsSettingsScreen />);
+    const card = screen.getByTestId('telegram-integration-card');
+    const save = within(card).getByRole('button', { name: t('common.save') }) as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    fireEvent.click(save);
+    expect(updateSettingsMutate).not.toHaveBeenCalled();
+    expect(within(card).queryByText(/20/)).toBeNull();
+  });
 });

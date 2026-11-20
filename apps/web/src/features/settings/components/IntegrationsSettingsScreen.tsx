@@ -96,6 +96,7 @@ function CredentialCard({
   configured,
   hint,
   disabled,
+  saveDisabled = false,
   testing,
   saving,
   onTest,
@@ -109,6 +110,8 @@ function CredentialCard({
   configured: boolean;
   hint: string | null;
   disabled: boolean;
+  /** Faqat «Saqlash»ni o'chiradi (masalan, o'zgartiriladigan narsa yo'q). */
+  saveDisabled?: boolean;
   testing: boolean;
   saving: boolean;
   onTest: () => void;
@@ -157,7 +160,7 @@ function CredentialCard({
           >
             {t('settings.integration_test_button')}
           </Button>
-          <Button size="xs" loading={saving} disabled={disabled} onClick={onSave}>
+          <Button size="xs" loading={saving} disabled={disabled || saveDisabled} onClick={onSave}>
             {t('common.save')}
           </Button>
         </Group>
@@ -191,8 +194,11 @@ function TelegramCard({
     );
   };
 
+  // Bo'sh token maydoni = saqlangan token o'zgarmaydi (validatsiya xatosi yo'q, saqlash o'chiq).
+  const tokenEmpty = form.values.botToken.trim() === '';
+
   const handleSave = () => {
-    if (form.validate().hasErrors) return;
+    if (tokenEmpty || form.validate().hasErrors) return;
     update.mutate({ telegram: { botToken: form.values.botToken } });
   };
 
@@ -205,6 +211,7 @@ function TelegramCard({
       configured={status.configured}
       hint={status.hint}
       disabled={!canEdit}
+      saveDisabled={tokenEmpty}
       testing={test.isPending}
       saving={update.isPending}
       onTest={handleTest}
