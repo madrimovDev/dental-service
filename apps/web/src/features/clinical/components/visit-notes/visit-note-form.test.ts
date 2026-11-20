@@ -43,6 +43,30 @@ describe('buildVisitNoteBody', () => {
   });
 });
 
+describe('buildVisitNoteBody — FT-01.4 toothNumbers', () => {
+  const ctx = { patientId: 'p1', doctorId: 'u1', isEdit: false, overrides: [] };
+
+  it('yaratish: tishlar tanaga tushadi, bo‘sh bo‘lsa yuborilmaydi', () => {
+    const v = { ...emptyVisitForm(), toothNumbers: [16, 17] };
+    expect(buildVisitNoteBody(v, ctx).toothNumbers).toEqual([16, 17]);
+    expect(buildVisitNoteBody(emptyVisitForm(), ctx).toothNumbers).toBeUndefined();
+  });
+
+  it('tahrir: bo‘sh massiv YUBORILADI (tishlarni tozalash)', () => {
+    expect(buildVisitNoteBody(emptyVisitForm(), { ...ctx, isEdit: true }).toothNumbers).toEqual([]);
+  });
+
+  it('eski qoralama (toothNumbers yo‘q) → bo‘sh massiv bilan tiklanadi', () => {
+    const key = draftKey('p-old', null);
+    localStorage.setItem(
+      key,
+      JSON.stringify({ values: { subjective: 'x' }, rx: [], overrides: [], savedAt: 'now' }),
+    );
+    expect(loadDraft(key)?.values.toothNumbers).toEqual([]);
+    clearDraft(key);
+  });
+});
+
 describe('buildVisitNoteBody — FX-14 completesStage', () => {
   const ctx = { patientId: 'p1', doctorId: 'u1', isEdit: false, overrides: [] };
 

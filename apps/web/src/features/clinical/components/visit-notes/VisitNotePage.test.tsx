@@ -304,6 +304,36 @@ describe('VisitNotePage — dori ↔ allergiya (UI-D4)', () => {
     });
   });
 
+  it('FT-01.4: yozuvdagi tishlar formada ko‘rinadi va saqlashda yuboriladi', async () => {
+    note = {
+      id: 'n1',
+      patientId: 'p1',
+      subjective: 'Shikoyat',
+      objective: null,
+      plan: null,
+      freeNotes: null,
+      assessmentDiagnoses: [],
+      performedServices: [],
+      stageId: null,
+      completesStage: true,
+      appointmentId: null,
+      toothNumbers: [16, 85],
+      visitDate: '2026-11-11T10:00:00Z',
+      updatedAt: '2026-11-11T10:05:00Z',
+      signedAt: null,
+      metadata: null,
+    };
+    mount('/patients/p1/visits/n1/edit');
+    const teeth = screen.getByRole('textbox', { name: 'Tishlar' });
+    expect(teeth).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Saqlash' }));
+    await waitFor(() => expect(updateMutate).toHaveBeenCalledTimes(1));
+    expect(updateMutate.mock.calls[0]?.[0]).toMatchObject({
+      id: 'n1',
+      body: { toothNumbers: [16, 85] },
+    });
+  });
+
   it('FX-14 review: eski lokal qoralama («Rejasiz») bog‘langan yozuv bosqichini ezmaydi', () => {
     plans = [
       {

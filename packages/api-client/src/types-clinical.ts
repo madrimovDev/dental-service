@@ -66,6 +66,8 @@ export type CreateVisitNoteInput = {
   // FX-14 (D-9): imzo bosqichni yopadimi (default true; false — oraliq vizit).
   completesStage?: boolean;
   freeNotes?: string;
+  // FT-01.4 (CF-10): vizitda ishlangan tish(lar), FDI. Tahrirda `[]` — tozalash.
+  toothNumbers?: number[];
 };
 
 // CLI-447: vizit yozuvini tahrirlash — patientId'siz Partial (backend

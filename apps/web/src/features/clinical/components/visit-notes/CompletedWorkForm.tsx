@@ -7,11 +7,11 @@ import { useTranslation } from 'react-i18next';
 import { useRecordCompletedWork, useServicePrices } from '../../clinical.api';
 
 /** FDI doimiy tishlar (11–18, 21–28, 31–38, 41–48) — backend `isValidFdi` bilan mos. */
-const PERMANENT_TEETH = [1, 2, 3, 4].flatMap((q) =>
+export const PERMANENT_TEETH = [1, 2, 3, 4].flatMap((q) =>
   Array.from({ length: 8 }, (_, i) => String(q * 10 + i + 1)),
 );
 /** FDI sut tishlari (51–55, 61–65, 71–75, 81–85). */
-const PRIMARY_TEETH = [5, 6, 7, 8].flatMap((q) =>
+export const PRIMARY_TEETH = [5, 6, 7, 8].flatMap((q) =>
   Array.from({ length: 5 }, (_, i) => String(q * 10 + i + 1)),
 );
 
