@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  boolean,
   integer,
   jsonb,
   pgTable,
@@ -38,6 +39,9 @@ export const tenantSettings = pgTable(
     // CLI-474 (L7): bemor faol no-show strike soni shu chegaraga yetsa "flagged"
     // (kartada rozetka + yozilishda ogohlantirish). Default 3; 0 = tizim o'chiq.
     noShowStrikeThreshold: integer('no_show_strike_threshold').notNull().default(3),
+    // FT-07: Telegram bot'da bemor «o'z ma'lumotlari» (yozilish/balans/reja/retsept) menyusi.
+    // Standart yoqilgan; klinika o'chirsa bot shu tugmalarga ma'lumot bermaydi.
+    botSelfServiceEnabled: boolean('bot_self_service_enabled').notNull().default(true),
     onboardingDismissedAt: timestamp('onboarding_dismissed_at', { withTimezone: true }),
     // Recall subsystem (RFC-0011): default interval (oy), klinika vaqt zonasi va
     // recall SMS yuborish soati (klinika-local). Scheduler shu sozlamalarga amal qiladi.

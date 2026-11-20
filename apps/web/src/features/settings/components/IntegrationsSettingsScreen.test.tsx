@@ -16,7 +16,10 @@ vi.mock('../settings.navData', () => ({
   useSettingsNavData: () => ({ pills: {}, showLicense: false, showBackup: false }),
 }));
 vi.mock('../settings.api', () => ({
-  useTenantSettings: () => ({ isLoading: false, data: { integrationSettings } }),
+  useTenantSettings: () => ({
+    isLoading: false,
+    data: { integrationSettings, botSelfServiceEnabled: false },
+  }),
   useUpdateTenantSettings: () => ({ mutate: updateSettingsMutate, isPending: false }),
   useTestIntegration: () => ({ mutate: testMutate, isPending: false }),
 }));
@@ -104,5 +107,12 @@ describe('IntegrationsSettingsScreen', () => {
       },
       expect.objectContaining({ onSuccess: expect.any(Function) }),
     );
+  });
+
+  it('bot self-service switch yoqilganda mutate({botSelfServiceEnabled:true}) chaqiradi', () => {
+    updateSettingsMutate.mockClear();
+    renderApp(<IntegrationsSettingsScreen />);
+    fireEvent.click(screen.getByTestId('bot-self-service-switch'));
+    expect(updateSettingsMutate).toHaveBeenCalledWith({ botSelfServiceEnabled: true });
   });
 });

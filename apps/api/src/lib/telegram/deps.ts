@@ -3,6 +3,7 @@ import type { Database } from '../../db/client.ts';
 import { createAppointmentsService } from '../../modules/appointments/index.ts';
 import { createNoShowStrikesService } from '../../modules/no-show-strikes/index.ts';
 import { createNotificationsService } from '../../modules/notifications/index.ts';
+import { createPatientsService } from '../../modules/patients/patients.service.ts';
 import { createRecallsService } from '../../modules/recalls/index.ts';
 import { createScheduleService } from '../../modules/schedule/index.ts';
 import { createAuditLogger } from '../audit-logger.ts';
@@ -35,5 +36,6 @@ export function createBotFlows(adminDb: Database) {
   });
   // In-app bildirishnoma uchun kanal kerak emas (smsTo berilmaydi) — NoOp.
   const notifications = createNotificationsService({ sms: createNoOpChannel() });
-  return createTelegramFlows({ appointments, schedule, audit, notifications });
+  const patients = createPatientsService({ audit });
+  return createTelegramFlows({ appointments, schedule, audit, notifications, patients });
 }

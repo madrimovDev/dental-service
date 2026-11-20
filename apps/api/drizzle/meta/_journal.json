@@ -498,6 +498,13 @@
       "when": 1795200000000,
       "tag": "0070_ft04_discount",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1795200000100,
+      "tag": "0071_ft07_bot_self_service",
+      "breakpoints": true
     }
   ]
 }

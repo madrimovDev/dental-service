@@ -493,6 +493,8 @@
     "transfer_confirm": "Egalik boshqa xodimga o'tkaziladi. Bu amalni qaytarib bo'lmaydi. Davom etasizmi?",
     "transfer_hint": "Egalikni o'tkazsangiz — superuser huquqlari yangi egaga o'tadi.",
     "nav_notify": "Bildirishnomalar",
+    "bot_self_service_label": "Bemor botda o'z ma'lumotlarini ko'rsin",
+    "bot_self_service_help": "Bemorlar botda o'z yozilishlari, balansi, davolash rejasi va oxirgi retseptini ko'ra oladi",
     "nav_integrations": "Integratsiyalar",
     "role_users": "{{count}} foydalanuvchi",
     "role_perm_count": "{{desc}} · {{count}} ruxsat",

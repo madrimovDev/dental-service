@@ -3,6 +3,7 @@ import { and, asc, eq, isNull } from 'drizzle-orm';
 import type { DbOrTx } from '../../db/client.ts';
 import type { AppointmentsService } from '../../modules/appointments/index.ts';
 import type { NotificationsService } from '../../modules/notifications/index.ts';
+import type { PatientsService } from '../../modules/patients/patients.service.ts';
 import type { ScheduleService } from '../../modules/schedule/index.ts';
 import type { AuditLogger } from '../audit-logger.ts';
 import { BOOKING_PREFIX, createBookingFlow } from './booking.ts';
@@ -10,6 +11,7 @@ import { type BotLang, botMessages, toBotLang } from './messages.ts';
 import { createQuestionnaireFlow, QUESTIONNAIRE_PREFIX } from './questionnaire.ts';
 import { handleReminderAction, parseReminderCallback } from './reminder-actions.ts';
 import type { BotReply } from './reply.ts';
+import { createSelfServiceFlow } from './self-service.ts';
 
 export const LANG_PREFIX = 'lg';
 /** FX-42 — oilada bemor tanlash tugmasi: `pt:<patientId>` (≤ 64 bayt). */
@@ -31,6 +33,8 @@ export type FlowDeps = {
   /** FX-23b: bron so'rovi auditi va xodim bildirishnomasi (ixtiyoriy). */
   audit?: Pick<AuditLogger, 'record'>;
   notifications?: Pick<NotificationsService, 'notifyInTx'>;
+  /** FT-07: «Balans» (`balanceFor`). Berilmasa balans oqimi o'chiq (nol ko'rsatadi). */
+  patients?: Pick<PatientsService, 'balanceFor'>;
   now?: () => Date;
   /** Test/DI — chat uchun tanlangan bemor (`tenantId:chatId` → bemor). */
   selection?: Map<string, { patientId: string; expiresAt: number }>;
@@ -52,6 +56,11 @@ export function createTelegramFlows(deps: FlowDeps) {
     now: deps.now,
   });
   const questionnaire = createQuestionnaireFlow({ now: deps.now });
+  const selfService = createSelfServiceFlow({
+    patients: deps.patients,
+    audit: deps.audit,
+    now: deps.now,
+  });
 
   const selection = deps.selection ?? new Map<string, { patientId: string; expiresAt: number }>();
   const nowMs = () => deps.now?.().getTime() ?? Date.now();
@@ -111,6 +120,8 @@ export function createTelegramFlows(deps: FlowDeps) {
       text: m.menuPrompt,
       keyboard: [
         [m.menuBook, m.menuQuestionnaire],
+        [m.menuMyAppointments, m.menuBalance],
+        [m.menuPlan, m.menuPrescription],
         multi ? [m.menuLang, m.menuPatient] : [m.menuLang],
       ],
     };
@@ -178,6 +189,10 @@ export function createTelegramFlows(deps: FlowDeps) {
       const m = botMessages(lang);
       if (a.text === m.menuBook) return booking.start({ ...ctx, lang });
       if (a.text === m.menuQuestionnaire) return questionnaire.start({ ...ctx, lang });
+      if (a.text === m.menuMyAppointments) return selfService.myAppointments({ ...ctx, lang });
+      if (a.text === m.menuBalance) return selfService.balance({ ...ctx, lang });
+      if (a.text === m.menuPlan) return selfService.myPlan({ ...ctx, lang });
+      if (a.text === m.menuPrescription) return selfService.lastPrescription({ ...ctx, lang });
       if (a.text === m.menuLang) return langPicker(lang);
       if (multi && a.text === m.menuPatient) return patientPicker({ ...st, lang });
     }
