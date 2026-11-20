@@ -479,3 +479,173 @@ describe('FT-01.2 — vizit yozuviga bog‘lash (visitNoteId)', () => {
     expect((await readVisitNote(noteId)).stageId).toBeNull();
   });
 });
+
+/**
+ * FT-01 review (atribusiya): joriy reja SHIFOKOR bo'yicha tanlanadi — payroll komissiyasi
+ * `plan.doctor_id` bo'yicha (D-13), shuning uchun A shifokorning ishi B ning rejasiga
+ * (va komissiyasiga) tushmasligi kerak. Shifokor = `doctorId` ?? vizit yozuvi shifokori ??
+ * joriy foydalanuvchi. Ikki REAL Doctor shabloni + Tenant Admin (`medical_record.on_behalf`).
+ */
+describe('FT-01 review — ikki shifokor: joriy reja shifokor bo‘yicha', () => {
+  const addUser = async (key: string, phone: string, templateKey: string) => {
+    const [u] = await db
+      .insert(users)
+      .values({ phone, passwordHash: 'x', fullName: key })
+      .returning({ id: users.id });
+    if (!u) throw new Error('user insert failed');
+    ids[key] = u.id;
+    await inTenant(async (tx) => {
+      const [r] = await tx
+        .select({ id: roles.id })
+        .from(roles)
+        .where(eq(roles.templateKey, templateKey));
+      if (!r) throw new Error(`role ${templateKey} not seeded`);
+      await tx.insert(userAssignments).values({
+        userId: u.id,
+        tenantId,
+        branchId,
+        roleId: r.id,
+        isActive: true,
+        acceptedAt: new Date(),
+      });
+    });
+    tokens[key] = (
+      await signAccess({
+        sub: u.id,
+        atid: tenantId,
+        abid: branchId,
+        perms: templatePerms(templateKey),
+        roleKey: templateKey,
+        lang: 'uz',
+      })
+    ).token;
+  };
+
+  beforeAll(async () => {
+    await addUser('doctorB', '+998900202011', 'doctor');
+    await addUser('admin', '+998900202012', 'tenant_admin');
+  });
+
+  const planOf = (patientId: string, doctorId: string, status = 'in_progress') =>
+    inTenant(async (tx) => {
+      const [p] = await tx
+        .insert(treatmentPlans)
+        .values({
+          tenantId,
+          patientId,
+          doctorId,
+          title: `Reja ${status}`,
+          status: status as 'draft',
+        })
+        .returning({ id: treatmentPlans.id });
+      return p!.id;
+    });
+
+  const planDoctor = async (planId: string) => {
+    const [p] = await inTenant((tx) =>
+      tx.select().from(treatmentPlans).where(eq(treatmentPlans.id, planId)),
+    );
+    return p!.doctorId;
+  };
+
+  test('B ning faol rejasi bor bemorga A o‘z vizitida yozadi → A nomiga avto-reja, B rejasi tegilmaydi', async () => {
+    const patientId = await newPatient('Bemor 2D-1');
+    const planB = await planOf(patientId, ids.doctorB as string);
+    const noteA = await insertVisitNote(patientId, { performedServices: [serviceId] });
+    const res = await record({ patientId, visitNoteId: noteA, items: [filling16()] });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { data: CompletedWorkDto };
+    expect(body.data.planId).not.toBe(planB);
+    expect(body.data.planCreated).toBe(true);
+    expect(await planDoctor(body.data.planId)).toBe(ids.doctor as string);
+    expect((await planStages(planB)).length).toBe(0);
+  });
+
+  test('doctorId=A aniq berilsa ham B rejasi tanlanmaydi', async () => {
+    const patientId = await newPatient('Bemor 2D-2');
+    const planB = await planOf(patientId, ids.doctorB as string);
+    const res = await record({ patientId, doctorId: ids.doctor, items: [filling16()] });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { data: CompletedWorkDto };
+    expect(body.data.planId).not.toBe(planB);
+    expect(await planDoctor(body.data.planId)).toBe(ids.doctor as string);
+  });
+
+  test('A ning eski rejasi + B ning yangiroq rejasi → A ning ishi A rejasiga', async () => {
+    const patientId = await newPatient('Bemor 2D-3');
+    const planA = await planOf(patientId, ids.doctor as string, 'accepted');
+    await planOf(patientId, ids.doctorB as string);
+    const res = await record({ patientId, items: [filling16()] });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { data: CompletedWorkDto };
+    expect(body.data.planId).toBe(planA);
+    expect(body.data.planCreated).toBe(false);
+  });
+
+  test('A ning avto-rejasi ochiq turganda B yozgan ish A rejasiga tushmaydi', async () => {
+    const patientId = await newPatient('Bemor 2D-4');
+    const first = await record({ patientId, items: [filling16()] });
+    const planA = ((await first.json()) as { data: CompletedWorkDto }).data.planId;
+    const res = await record({ patientId, items: [filling16()] }, tokens.doctorB as string);
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { data: CompletedWorkDto };
+    expect(body.data.planId).not.toBe(planA);
+    expect(await planDoctor(body.data.planId)).toBe(ids.doctorB as string);
+    expect((await planStages(planA)).length).toBe(1);
+  });
+
+  test('aniq planId boshqa shifokorniki → 409 plan.doctor_mismatch, bosqich yozilmaydi', async () => {
+    const patientId = await newPatient('Bemor 2D-5');
+    const planB = await planOf(patientId, ids.doctorB as string);
+    const res = await record({ patientId, planId: planB, items: [filling16()] });
+    expect(res.status).toBe(409);
+    expect(await errCode(res)).toBe('plan.doctor_mismatch');
+    expect((await planStages(planB)).length).toBe(0);
+    expect((await patientPlans(patientId)).length).toBe(1);
+  });
+
+  test('B nomidan (doctorId=B) yozish — Doctor 403, Tenant Admin (on_behalf) B rejasiga', async () => {
+    const patientId = await newPatient('Bemor 2D-6');
+    const planB = await planOf(patientId, ids.doctorB as string);
+    const denied = await record({
+      patientId,
+      planId: planB,
+      doctorId: ids.doctorB,
+      items: [filling16()],
+    });
+    expect(denied.status).toBe(403);
+    expect((await planStages(planB)).length).toBe(0);
+    const ok = await record(
+      { patientId, planId: planB, doctorId: ids.doctorB, items: [filling16()] },
+      tokens.admin as string,
+    );
+    expect(ok.status).toBe(201);
+    expect(((await ok.json()) as { data: CompletedWorkDto }).data.planId).toBe(planB);
+  });
+
+  test('vizit shifokori A, doctorId=B → 400 ownership.mismatch, vizit bog‘lanmaydi', async () => {
+    const patientId = await newPatient('Bemor 2D-7');
+    const noteA = await insertVisitNote(patientId);
+    const res = await record(
+      { patientId, visitNoteId: noteA, doctorId: ids.doctorB, items: [filling16()] },
+      tokens.admin as string,
+    );
+    expect(res.status).toBe(400);
+    expect(await errCode(res)).toBe('ownership.mismatch');
+    expect((await readVisitNote(noteA)).stageId).toBeNull();
+    expect((await patientPlans(patientId)).length).toBe(0);
+  });
+
+  test('assistent (Tenant Admin) A ning vizitiga yozadi → reja shifokori A (vizitdan)', async () => {
+    const patientId = await newPatient('Bemor 2D-8');
+    await planOf(patientId, ids.doctorB as string);
+    const noteA = await insertVisitNote(patientId);
+    const res = await record(
+      { patientId, visitNoteId: noteA, items: [filling16()] },
+      tokens.admin as string,
+    );
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { data: CompletedWorkDto };
+    expect(await planDoctor(body.data.planId)).toBe(ids.doctor as string);
+  });
+});

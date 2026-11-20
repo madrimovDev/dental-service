@@ -130,10 +130,12 @@ export const createTreatmentPlansRepository = () => {
   }
 
   /**
-   * FT-01.2: bemorning eng so'nggi faol (`accepted|in_progress`) rejasi, `FOR UPDATE` bilan
-   * («Bajarilgan ishni yozish» joriy rejasi). Bosqich faqat shu holatlarda yakunlanadi.
+   * FT-01.2: bemorning SHU SHIFOKORGA tegishli eng so'nggi faol (`accepted|in_progress`)
+   * rejasi, `FOR UPDATE` bilan («Bajarilgan ishni yozish» joriy rejasi). Shifokor filtri
+   * shart (FT-01 review): payroll komissiyasi `plan.doctor_id` bo'yicha (D-13) — A ning ishi
+   * B ning rejasiga tushsa, komissiya B ga ketardi.
    */
-  async function lockLatestActivePlan(c: Context, patientId: string) {
+  async function lockLatestActivePlan(c: Context, patientId: string, doctorId: string) {
     const db = getDb(c);
     const [plan] = await db
       .select()
@@ -141,6 +143,7 @@ export const createTreatmentPlansRepository = () => {
       .where(
         and(
           eq(treatmentPlans.patientId, patientId),
+          eq(treatmentPlans.doctorId, doctorId),
           inArray(treatmentPlans.status, ['accepted', 'in_progress']),
         ),
       )
@@ -161,6 +164,7 @@ export const createTreatmentPlansRepository = () => {
       .select({
         id: visitNotes.id,
         patientId: visitNotes.patientId,
+        doctorId: visitNotes.doctorId,
         stageId: visitNotes.stageId,
         signedAt: visitNotes.signedAt,
       })

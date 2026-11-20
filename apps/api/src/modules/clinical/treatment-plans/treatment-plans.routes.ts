@@ -29,6 +29,7 @@ import {
   ConsentLockedError,
   ConsentRequiredError,
   createTreatmentPlansService,
+  PlanDoctorMismatchError,
   PlanNotActiveForWorkError,
   PlanStagesLockedError,
   type PriceLookup,
@@ -276,6 +277,9 @@ export const treatmentPlansRoutes = (deps: {
       }
       if (e instanceof PlanNotActiveForWorkError) {
         return c.json(fail('plan.not_active', e.message), 409);
+      }
+      if (e instanceof PlanDoctorMismatchError) {
+        return c.json(fail('plan.doctor_mismatch', e.message), 409);
       }
       if (e instanceof VisitNoteNotLinkableError) {
         return c.json(fail(`visit_note.${e.reason}`, e.message), 409);

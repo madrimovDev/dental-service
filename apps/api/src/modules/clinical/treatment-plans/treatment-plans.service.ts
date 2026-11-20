@@ -187,6 +187,19 @@ export class PlanNotActiveForWorkError extends Error {
 }
 
 /**
+ * FT-01 review: «bajarilgan ish» uchun aniq berilgan `planId` boshqa shifokorniki — bosqich
+ * shu rejaga (va `plan.doctor_id` komissiyasiga, D-13) tushardi. Routes 409
+ * (`plan.doctor_mismatch`). Boshqa shifokor nomidan yozish — `doctorId` +
+ * `medical_record.on_behalf`.
+ */
+export class PlanDoctorMismatchError extends Error {
+  constructor() {
+    super('The plan belongs to another doctor — pass doctorId (on_behalf) to record work on it');
+    this.name = 'PlanDoctorMismatchError';
+  }
+}
+
+/**
  * FT-01.2: «bajarilgan ish» bog'lanadigan vizit yozuvi allaqachon imzolangan (o'zgarmaydi,
  * UI-D4) yoki boshqa bosqichga bog'langan (CLI-481 — qayta yo'naltirish yo'q). Routes 409
  * (`visit_note.signed` / `visit_note.stage_linked`). Hech narsa yozilmaydi.
@@ -408,6 +421,7 @@ export const createTreatmentPlansService = (deps: {
     await repo.lockPatientCompletedWork(c, input.patientId);
 
     // Vizit bog'lash (ixtiyoriy): shu bemorniki, imzolanmagan, bosqichsiz — INSERT'dan OLDIN.
+    let noteDoctorId: string | null = null;
     if (input.visitNoteId) {
       const note = await repo.lockVisitNote(c, input.visitNoteId);
       if (!note) throw new CrossEntityError('visit_note', 'not_found');
@@ -416,6 +430,20 @@ export const createTreatmentPlansService = (deps: {
       }
       if (note.signedAt) throw new VisitNoteNotLinkableError('signed');
       if (note.stageId) throw new VisitNoteNotLinkableError('stage_linked');
+      noteDoctorId = note.doctorId;
+    }
+
+    // Ishni bajargan shifokor — komissiya manbai (D-13 COALESCE(plan.doctor_id, …)).
+    // Ustuvorlik: `doctorId` ?? vizit yozuvi shifokori ?? joriy foydalanuvchi. Vizit
+    // shifokori allaqachon vizit yaratilishida tekshirilgan (FX-155); aks holda boshqa
+    // shifokor nomidan yozish `medical_record.on_behalf` talab qiladi.
+    if (input.doctorId && noteDoctorId && input.doctorId !== noteDoctorId) {
+      throw new CrossEntityError('visit_note', 'mismatch');
+    }
+    const doctorId = input.doctorId ?? noteDoctorId ?? c.get('user')?.id;
+    if (!doctorId) throw new Error('No user context');
+    if (input.doctorId || !noteDoctorId) {
+      await ownership.assertPractitioner(c, doctorId, 'medical_record.on_behalf');
     }
 
     let plan: Awaited<ReturnType<typeof repo.lockPlan>>;
@@ -431,17 +459,14 @@ export const createTreatmentPlansService = (deps: {
       if (!(ACTIVE_WORK_PLAN_STATUSES as readonly string[]).includes(plan.status)) {
         throw new PlanNotActiveForWorkError(plan.status);
       }
+      if (plan.doctorId !== doctorId) throw new PlanDoctorMismatchError();
     } else {
-      plan = await repo.lockLatestActivePlan(c, input.patientId);
+      // Shu shifokorning joriy rejasi (boshqa shifokor rejasiga tushmaydi — FT-01 review).
+      plan = await repo.lockLatestActivePlan(c, input.patientId, doctorId);
     }
 
     let planCreated = false;
     if (!plan) {
-      // Avto-reja shifokori — komissiya manbai (D-13 COALESCE(plan.doctor_id, …)): boshqa
-      // shifokor nomidan yozish `medical_record.on_behalf` talab qiladi (FX-155 naqshi).
-      const doctorId = input.doctorId ?? c.get('user')?.id;
-      if (!doctorId) throw new Error('No user context');
-      await ownership.assertPractitioner(c, doctorId, 'medical_record.on_behalf');
       const created = await repo.insertPlanWithStages(
         c,
         tenantId,

@@ -56,10 +56,12 @@ export type CreateTreatmentPlanInput = z.infer<typeof createTreatmentPlanSchema>
  * FT-01.2 (CF-12) — «Bajarilgan ishni yozish» 2-rejim. Har xizmat darhol
  * `acceptance=accepted, status=completed` bosqich bo'lib X-3 yakunlash yo'lidan o'tadi
  * (odontogramma, recall, BOM chiqimi) va reja qarziga tushadi.
- *   - `planId` berilsa — shu reja (`accepted|in_progress` bo'lishi shart);
- *   - berilmasa — bemorning eng so'nggi `accepted|in_progress` rejasi, u ham yo'q bo'lsa
- *     avtomatik «Bajarilgan ishlar YYYY-MM» rejasi (`in_progress`, shifokor — `doctorId`
- *     yoki joriy foydalanuvchi).
+ *   - shifokor = `doctorId` ?? vizit yozuvi shifokori ?? joriy foydalanuvchi (komissiya
+ *     manbai, D-13; boshqa shifokor nomidan — `medical_record.on_behalf`);
+ *   - `planId` berilsa — shu reja (`accepted|in_progress` va shu shifokorniki bo'lishi shart,
+ *     aks holda 409 `plan.doctor_mismatch`);
+ *   - berilmasa — shu shifokorning eng so'nggi `accepted|in_progress` rejasi, u ham yo'q
+ *     bo'lsa shu shifokor nomiga avtomatik «Bajarilgan ishlar YYYY-MM» rejasi (`in_progress`).
  *   - `visitNoteId` — imzolanmagan, bosqichsiz vizit yozuviga bog'lanadi (`stageId`);
  *     vizit bitta bosqichga bog'lanadi → bu holatda faqat bitta xizmat.
  */
