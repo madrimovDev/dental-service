@@ -8,6 +8,7 @@ import { useMedicalRecord, usePatient, usePatientBalance } from '../patients.api
 import { filterPatientTabs, type PatientTabDef } from '../visible-tabs';
 import { PatientOverview } from './overview/PatientOverview';
 import { PatientHeaderCard } from './PatientHeaderCard';
+import { PatientPhotoModal } from './PatientPhotoModal';
 
 const GeneralTab = lazy(() => import('./tabs/GeneralTab').then((m) => ({ default: m.GeneralTab })));
 const MedicalTab = lazy(() => import('./tabs/MedicalTab').then((m) => ({ default: m.MedicalTab })));
@@ -119,6 +120,8 @@ export function PatientCard() {
   const { t } = useTranslation();
   const { id = '' } = useParams();
   const { hasPermission } = useAuthStore();
+  const [photoOpen, setPhotoOpen] = useState(false);
+  const canChangePhoto = hasPermission('patient.edit') && hasPermission('patient_image.upload');
   const [section, setSection] = useState('overview');
   const [sub, setSub] = useState<Record<string, string>>({});
   const { data: patient } = usePatient(id);
@@ -193,7 +196,14 @@ export function PatientCard() {
     <div>
       {patient && (
         <div style={{ marginBottom: 16 }}>
-          <PatientHeaderCard patient={patient} allergies={medical?.allergies ?? undefined} />
+          <PatientHeaderCard
+            patient={patient}
+            allergies={medical?.allergies ?? undefined}
+            onChangePhoto={canChangePhoto ? () => setPhotoOpen(true) : undefined}
+          />
+          {photoOpen && (
+            <PatientPhotoModal opened onClose={() => setPhotoOpen(false)} patientId={id} />
+          )}
         </div>
       )}
 

@@ -560,6 +560,7 @@ export type {
   ListPatientsResult,
   RemovePatientEmergencyContactResult,
   RemovePatientRelativeResult,
+  SetPatientPhotoResult,
   UpdateMedicalRecordResult,
   UpdatePatientResult,
 } from './generated/patients/patients.ts';
@@ -579,6 +580,7 @@ export {
   listPatients,
   removePatientEmergencyContact,
   removePatientRelative,
+  setPatientPhoto,
   updateMedicalRecord,
   updatePatient,
 } from './generated/patients/patients.ts';

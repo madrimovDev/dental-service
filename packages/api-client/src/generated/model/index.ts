@@ -565,6 +565,8 @@ export * from './serviceMaterial';
 export * from './servicePrice';
 export * from './serviceWithPrices';
 export * from './serviceWithPricesAllOf';
+export * from './setPatientPhoto200';
+export * from './setPatientPhotoInput';
 export * from './setRolePermissions200';
 export * from './setRolePermissionsBody';
 export * from './setServicePrice201';

@@ -75,5 +75,6 @@ export function toPatientDetail(p: Patient, t: TFn): PatientDetail {
     insurance: p.insurance,
     insuranceStatus: p.insuranceStatus,
     archived: p.archivedAt != null,
+    photoUrl: p.photoUrl ?? null,
   };
 }

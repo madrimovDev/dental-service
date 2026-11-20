@@ -55,6 +55,8 @@ export type PatientDetail = {
   insurance: Patient['insurance'];
   insuranceStatus: Patient['insuranceStatus'];
   archived: boolean;
+  /** FT-06.2: avatar (`/uploads/...` serve URL; `useAuthedObjectUrl` bilan olinadi). */
+  photoUrl?: string | null;
 };
 
 /**
