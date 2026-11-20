@@ -98,6 +98,7 @@ export const toTenantSettingsDto = (row: TenantSettings): TenantSettingsDto => (
   onboardingDismissedAt: row.onboardingDismissedAt ? row.onboardingDismissedAt.toISOString() : null,
   maxDiscountPercent: row.maxDiscountPercent,
   noShowStrikeThreshold: row.noShowStrikeThreshold,
+  cashierPhotoEnabled: row.cashierPhotoEnabled,
   notificationSettings: toNotificationSettingsDto(row.notificationSettings),
   integrationSettings: toIntegrationDto(row.integrationSettings as Record<string, unknown> | null),
   createdAt: row.createdAt.toISOString(),

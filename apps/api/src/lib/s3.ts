@@ -41,6 +41,21 @@ export function labOrderFileKey(args: {
 }
 
 /**
+ * Kassa rasmi key (FT-06.3):
+ *   tenants/{tenantId}/cashier-photos/{transactionId}/{photoId}.{ext}
+ * `/uploads` route shu prefiks (`cashier-photos`) bo'yicha `cashier.photo.view` talab qiladi.
+ */
+export function cashierPhotoKey(args: {
+  tenantId: string;
+  transactionId: string;
+  photoId: string;
+  ext: string;
+}): string {
+  const ext = args.ext.replace(/^\./, '').toLowerCase();
+  return `tenants/${args.tenantId}/cashier-photos/${args.transactionId}/${args.photoId}.${ext}`;
+}
+
+/**
  * Fayl URL — avval MinIO presigned (short-lived) URL edi, endi local
  * filesystem'dagi `/uploads/:key` route'ga relative path
  * (`storage.serveUrl`). Frontend `<img src>` shu path'ni to'g'ridan ishlatadi.

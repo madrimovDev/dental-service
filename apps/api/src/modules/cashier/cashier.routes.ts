@@ -53,6 +53,14 @@ import {
   VisitNotSignedError,
   VisitPatientMismatchError,
 } from './cashier.service.ts';
+import {
+  CASHIER_PHOTO_CONTENT_TYPES,
+  CASHIER_PHOTO_MAX_BYTES,
+  cashierPhotoDtoSchema,
+  cashierPhotoSettingsDtoSchema,
+  skippedReasonSchema,
+} from './cashier-photos.schema.ts';
+import { createCashierPhotosService } from './cashier-photos.service.ts';
 
 /** Standart 404 — get by id uchun. */
 const notFoundResponse = {
@@ -83,6 +91,8 @@ export const cashierRoutes = (deps: {
     payrollAdjustment: deps.payrollAdjustment,
     messenger: createPatientMessenger(),
   });
+
+  const photos = createCashierPhotosService({ audit: deps.audit });
 
   // ─── GET /transactions — list (paginated) ────────────────────────────────
 
@@ -399,6 +409,109 @@ export const cashierRoutes = (deps: {
     }
     const rows = await service.listPendingVisits(c, branchId, { days, page, pageSize });
     return c.json(ok(rows), 200);
+  });
+
+  // ─── FT-06.3 (D-4): kassa rasmi ──────────────────────────────────────────
+
+  // Kassir kamera oqimini boshlashdan oldin so'raydi (`tenant_settings.view`siz — tor endpoint,
+  // CLI-154/155 precedenti): sozlama o'chiq bo'lsa kamera so'ralmaydi.
+  const photoSettingsRoute = createRoute({
+    method: 'get',
+    path: '/photo-settings',
+    tags: ['cashier'],
+    operationId: 'getCashierPhotoSettings',
+    middleware: [requirePermission('cashier.view')] as const,
+    responses: okJson(cashierPhotoSettingsDtoSchema, 'Cashier photo capture setting'),
+  });
+
+  app.openapi(photoSettingsRoute, async (c) => {
+    return c.json(ok({ enabled: await photos.isEnabled(c) }), 200);
+  });
+
+  // POST /transactions/{id}/photo — multipart (`file`) YOKI `skippedReason`. Hand route
+  // (patient-images upload bilan bir xil: orval multipart'ni qo'llamaydi → OpenAPI'ga kirmaydi).
+  app.post(
+    '/transactions/:id/photo',
+    requirePermission('cashier.create_transaction'),
+    async (c) => {
+      const id = c.req.param('id');
+      if (!z.uuid().safeParse(id).success) {
+        return c.json(fail('cashier_photo.invalid_id', 'Invalid transaction id'), 400);
+      }
+      const form = await c.req.formData().catch(() => null);
+      if (!form) return c.json(fail('cashier_photo.invalid_body', 'Multipart body required'), 400);
+
+      const file = form.get('file');
+      const skipped = form.get('skippedReason');
+      let input: Parameters<typeof photos.save>[2];
+      if (file instanceof File) {
+        const ext = CASHIER_PHOTO_CONTENT_TYPES[file.type];
+        if (!ext) {
+          return c.json(fail('cashier_photo.unsupported_type', 'Unsupported content type'), 415);
+        }
+        if (file.size > CASHIER_PHOTO_MAX_BYTES) {
+          return c.json(fail('cashier_photo.too_large', 'File too large'), 413);
+        }
+        input = { kind: 'file', body: await file.arrayBuffer(), contentType: file.type, ext };
+      } else {
+        const parsed = skippedReasonSchema.safeParse(skipped);
+        if (!parsed.success) {
+          return c.json(
+            fail('cashier_photo.invalid_body', '`file` or valid `skippedReason` required'),
+            400,
+          );
+        }
+        input = { kind: 'skipped', reason: parsed.data };
+      }
+
+      // Filial doirasi (X-2/FX-32): to'lov filiali chaqiruvchining doirasida bo'lishi shart.
+      const txBranch = await service.getBranchId(c, id);
+      if (
+        txBranch &&
+        !scopeAllows(await loadBranchScope(c, 'cashier.create_transaction'), txBranch)
+      ) {
+        return c.json(fail(BRANCH_FORBIDDEN_CODE, BRANCH_FORBIDDEN_MESSAGE), 403);
+      }
+
+      const res = await photos.save(c, id, input);
+      if (!res.ok) {
+        if (res.reason === 'tx_not_found') {
+          return c.json(fail('transaction.not_found', 'Transaction not found'), 404);
+        }
+        const msg =
+          res.reason === 'disabled'
+            ? 'Cashier photo capture is disabled for this clinic'
+            : res.reason === 'not_payment'
+              ? 'Photo can only be attached to a payment'
+              : 'Photo already recorded for this transaction';
+        return c.json(fail(`cashier_photo.${res.reason}`, msg), 409);
+      }
+      return c.json(ok(res.photo), 201);
+    },
+  );
+
+  const getPhotoRoute = createRoute({
+    method: 'get',
+    path: '/transactions/{id}/photo',
+    tags: ['cashier'],
+    operationId: 'getCashierTransactionPhoto',
+    middleware: [requirePermission('cashier.photo.view')] as const,
+    request: { params: transactionIdParamSchema },
+    responses: {
+      ...okJson(cashierPhotoDtoSchema, 'Cashier transaction photo'),
+      ...notFoundResponse,
+    },
+  });
+
+  app.openapi(getPhotoRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const txBranch = await service.getBranchId(c, id);
+    if (txBranch && !scopeAllows(await loadBranchScope(c, 'cashier.photo.view'), txBranch)) {
+      return c.json(fail(BRANCH_FORBIDDEN_CODE, BRANCH_FORBIDDEN_MESSAGE), 403);
+    }
+    const photo = await photos.getByTransaction(c, id);
+    if (!photo) return c.json(fail('cashier_photo.not_found', 'Photo not found'), 404);
+    return c.json(ok(photo), 200);
   });
 
   return app;
