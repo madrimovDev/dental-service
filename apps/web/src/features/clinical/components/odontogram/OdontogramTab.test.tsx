@@ -52,6 +52,9 @@ vi.mock('../../clinical.api', () => ({
   useCreatePlan: () => ({ mutate: createPlanMutate, isPending: false }),
   useAddPlanStages: () => ({ mutate: addStagesMutate, isPending: false }),
   useServiceCatalog: () => ({ data: SERVICES }),
+  usePatientToothImages: () => ({ data: [], isLoading: false, isError: false }),
+  useVisitNotes: () => ({ data: [], isLoading: false }),
+  useUploadPatientImage: () => ({ mutate: vi.fn(), isPending: false }),
   fetchServicePrices: async (_qc: unknown, id: string) => ({
     id,
     prices: [
@@ -483,5 +486,40 @@ describe('OdontogramTab', () => {
       expect(states).toContainEqual(expect.objectContaining({ toothNumber: 36, state: 'caries' }));
       expect(states).toContainEqual(expect.objectContaining({ toothNumber: 37, state: 'caries' }));
     });
+  });
+});
+
+describe('OdontogramTab — tish tarixi tabi (FT-01.4)', () => {
+  beforeEach(() => {
+    mockChart = null;
+    mockHistory = [];
+    mockPermissions = true;
+    mockPlans = [
+      {
+        id: 'pl-1',
+        title: 'Reja 16',
+        status: 'in_progress',
+        createdAt: '2026-01-01T00:00:00Z',
+        stages: [
+          {
+            id: 'st-1',
+            serviceName: 'Plomba 16-tish',
+            toothNumbers: [16],
+            status: 'completed',
+            completedAt: '2026-02-01T00:00:00Z',
+            cost: '250000.00',
+          },
+        ],
+      },
+    ];
+  });
+
+  it('tish tanlanib «Tish tarixi» tabi ochilsa shu tishli bosqich ko‘rinadi, tahrir boshqaruvlari yashirinadi', () => {
+    renderApp(<OdontogramTab patientId="p1" />);
+    fireEvent.click(screen.getByText('16'));
+    expect(screen.queryByText('Plomba 16-tish')).toBeNull();
+    fireEvent.click(screen.getByRole('radio', { name: /Tish tarixi/i }));
+    expect(screen.getByText('Plomba 16-tish')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Rejaga qo'shish/i })).toBeNull();
   });
 });

@@ -19,7 +19,7 @@ import {
   UnstyledButton,
 } from '@mantine/core';
 import { IconX } from '@tabler/icons-react';
-import { useEffect, useRef, useState } from 'react';
+import { type ComponentProps, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   addToothEntries,
@@ -32,6 +32,7 @@ import {
 import type { ToothEntry, ToothHistoryRow } from '../../clinical.types';
 import { DiagnosisPicker } from './DiagnosisPicker';
 import { STATUS, statusFill } from './ToothCell';
+import { ToothHistoryTab } from './ToothHistoryTab';
 import { type SuggestedService, TreatmentSuggestions } from './TreatmentSuggestions';
 
 const TOOTH_STATE_OPTIONS: ToothState[] = [
@@ -93,7 +94,10 @@ function quadrantKey(n: number): 'upper_right' | 'upper_left' | 'lower_right' | 
   return 'lower_left';
 }
 
+type PanelTab = 'tooth' | 'history';
+
 type Props = {
+  patientId: string;
   /** Tanlangan tish(lar), o'sish tartibida (FT-01.3 ko'p tanlash). */
   teeth: readonly number[];
   entries: ToothEntry[];
@@ -101,6 +105,8 @@ type Props = {
   /** Tashxis id → nom (chiplar uchun). */
   diagnosisById: Map<string, Diagnosis>;
   history: ToothHistoryRow[];
+  /** FT-01.4: «Tish tarixi» tabi uchun bemor rejalari (bosqichlar nested). */
+  plans: ComponentProps<typeof ToothHistoryTab>['plans'];
   lang: 'uz' | 'ru';
   chair: boolean;
   canEdit: boolean;
@@ -118,11 +124,13 @@ type Props = {
 };
 
 export function ToothPanel({
+  patientId,
   teeth,
   entries,
   onEntriesChange,
   diagnosisById,
   history,
+  plans,
   lang,
   chair,
   canEdit,
@@ -141,6 +149,8 @@ export function ToothPanel({
   const [resultOverride, setResultOverride] = useState<ToothState | null | undefined>(undefined);
   const [targetPick, setTargetPick] = useState<PlanTarget>('current');
   const [singleStage, setSingleStage] = useState(false);
+  // FT-01.4: «Tish» (tahrir/ko'rish) yoki «Tish tarixi» — tish almashtirilganda saqlanadi.
+  const [tab, setTab] = useState<PanelTab>('tooth');
 
   // Bitta tish: chiplar, kvadrant, tarix shu tish bo'yicha; ko'p tishda — faqat umumiy tanlov.
   const tooth = teeth.length === 1 ? (teeth[0] ?? null) : null;
@@ -250,298 +260,322 @@ export function ToothPanel({
           </Text>
         )}
 
-        {canEdit && (
-          <>
-            <Box>
-              <Text style={sectionLabel}>{t('odontogram.surfaces')}</Text>
-              <Group gap={8} wrap="wrap" role="group" aria-label={t('odontogram.surfaces')}>
-                {[...FACES, 'whole' as const].map((s) => {
-                  const active = surfaces.includes(s);
-                  return (
-                    <UnstyledButton
-                      key={s}
-                      type="button"
-                      aria-pressed={active}
-                      aria-label={t(`tooth_chart.surfaces.${s}`)}
-                      onClick={() => toggleSurface(s)}
-                      style={{
-                        minHeight: minH,
-                        minWidth: minH,
-                        padding: '0 12px',
-                        borderRadius: 8,
-                        fontSize: 14,
-                        fontWeight: 600,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 6,
-                        background: active ? 'var(--primary-soft)' : 'var(--surface-2)',
-                        border: active ? '1.5px solid var(--primary)' : '1px solid var(--border)',
-                        color: active ? 'var(--primary)' : 'var(--ink)',
-                      }}
-                    >
-                      {s === 'whole' ? (
-                        t('tooth_chart.surfaces.whole')
-                      ) : (
-                        <>
-                          <Mono>
-                            <Text span style={{ fontWeight: 700 }}>
-                              {s}
-                            </Text>
-                          </Mono>
-                          <Text span style={{ fontWeight: 500 }}>
-                            {t(`odontogram.face.${s}`)}
-                          </Text>
-                        </>
-                      )}
-                    </UnstyledButton>
-                  );
-                })}
-              </Group>
-            </Box>
-
-            <Box>
-              <Text style={sectionLabel}>{t('odontogram.state')}</Text>
-              <Group gap={8} wrap="wrap" role="group" aria-label={t('odontogram.state')}>
-                {TOOTH_STATE_OPTIONS.map((s) => {
-                  const active = state === s;
-                  return (
-                    <UnstyledButton
-                      key={s}
-                      type="button"
-                      aria-pressed={active}
-                      aria-label={t(`tooth_chart.states.${s}`)}
-                      onClick={() => setState(s)}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 7,
-                        minHeight: minH,
-                        padding: '0 10px',
-                        borderRadius: 8,
-                        fontSize: 13,
-                        background: active ? 'var(--primary-soft)' : 'var(--surface-2)',
-                        border: active ? '1.5px solid var(--primary)' : '1px solid var(--border)',
-                        color: 'var(--ink)',
-                      }}
-                    >
-                      <Box
-                        style={{
-                          width: 13,
-                          height: 13,
-                          borderRadius: 3,
-                          flexShrink: 0,
-                          background: statusFill(s),
-                          border:
-                            STATUS[s].fill === 'empty'
-                              ? '1.5px solid var(--border-strong)'
-                              : '1px solid var(--border)',
-                        }}
-                      />
-                      {t(`tooth_chart.states.${s}`)}
-                    </UnstyledButton>
-                  );
-                })}
-              </Group>
-            </Box>
-
-            <DiagnosisPicker
-              selected={diagnosis}
-              onSelect={pickDiagnosis}
-              lang={lang}
-              chair={chair}
-            />
-          </>
+        {tooth !== null && (
+          <SegmentedControl
+            fullWidth
+            value={tab}
+            onChange={(v) => setTab(v as PanelTab)}
+            aria-label={t('odontogram.panel_tabs')}
+            data={[
+              { value: 'tooth', label: t('odontogram.tab_tooth') },
+              { value: 'history', label: t('odontogram.tab_history') },
+            ]}
+            styles={{
+              control: { minHeight: minH },
+              label: {
+                minHeight: minH,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              },
+            }}
+          />
         )}
 
-        {tooth !== null && (
-          <Box>
-            <Text style={sectionLabel}>{t('odontogram.tooth_diagnoses')}</Text>
-            {groups.length === 0 ? (
-              <Text style={{ fontSize: 13, color: 'var(--ink-3)' }}>
-                {t('odontogram.tooth_diagnoses_empty')}
-              </Text>
-            ) : (
-              <Group gap={8} wrap="wrap">
-                {groups.map((g) => (
-                  <Group
-                    key={g.key}
-                    gap={6}
-                    wrap="nowrap"
-                    data-testid="tooth-dx-chip"
-                    style={{
-                      padding: '4px 6px 4px 12px',
-                      borderRadius: 99,
-                      background: 'var(--surface-2)',
-                      border: '1px solid var(--border)',
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: 'var(--ink)',
-                    }}
-                  >
-                    <Text span style={{ fontSize: 13, fontWeight: 600 }}>
-                      {groupLabel(g)} · {surfaceText(g.surfaces)}
-                    </Text>
-                    {canEdit && (
-                      <UnstyledButton
-                        type="button"
-                        aria-label={t('odontogram.remove_diagnosis', { name: groupLabel(g) })}
-                        onClick={() => onEntriesChange(removeToothGroup(entries, tooth, g.key))}
+        {tooth !== null && tab === 'history' ? (
+          <ToothHistoryTab
+            patientId={patientId}
+            tooth={tooth}
+            snapshots={history}
+            plans={plans}
+            diagnosisById={diagnosisById}
+            lang={lang}
+            chair={chair}
+          />
+        ) : (
+          <>
+            {canEdit && (
+              <>
+                <Box>
+                  <Text style={sectionLabel}>{t('odontogram.surfaces')}</Text>
+                  <Group gap={8} wrap="wrap" role="group" aria-label={t('odontogram.surfaces')}>
+                    {[...FACES, 'whole' as const].map((s) => {
+                      const active = surfaces.includes(s);
+                      return (
+                        <UnstyledButton
+                          key={s}
+                          type="button"
+                          aria-pressed={active}
+                          aria-label={t(`tooth_chart.surfaces.${s}`)}
+                          onClick={() => toggleSurface(s)}
+                          style={{
+                            minHeight: minH,
+                            minWidth: minH,
+                            padding: '0 12px',
+                            borderRadius: 8,
+                            fontSize: 14,
+                            fontWeight: 600,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            background: active ? 'var(--primary-soft)' : 'var(--surface-2)',
+                            border: active
+                              ? '1.5px solid var(--primary)'
+                              : '1px solid var(--border)',
+                            color: active ? 'var(--primary)' : 'var(--ink)',
+                          }}
+                        >
+                          {s === 'whole' ? (
+                            t('tooth_chart.surfaces.whole')
+                          ) : (
+                            <>
+                              <Mono>
+                                <Text span style={{ fontWeight: 700 }}>
+                                  {s}
+                                </Text>
+                              </Mono>
+                              <Text span style={{ fontWeight: 500 }}>
+                                {t(`odontogram.face.${s}`)}
+                              </Text>
+                            </>
+                          )}
+                        </UnstyledButton>
+                      );
+                    })}
+                  </Group>
+                </Box>
+
+                <Box>
+                  <Text style={sectionLabel}>{t('odontogram.state')}</Text>
+                  <Group gap={8} wrap="wrap" role="group" aria-label={t('odontogram.state')}>
+                    {TOOTH_STATE_OPTIONS.map((s) => {
+                      const active = state === s;
+                      return (
+                        <UnstyledButton
+                          key={s}
+                          type="button"
+                          aria-pressed={active}
+                          aria-label={t(`tooth_chart.states.${s}`)}
+                          onClick={() => setState(s)}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 7,
+                            minHeight: minH,
+                            padding: '0 10px',
+                            borderRadius: 8,
+                            fontSize: 13,
+                            background: active ? 'var(--primary-soft)' : 'var(--surface-2)',
+                            border: active
+                              ? '1.5px solid var(--primary)'
+                              : '1px solid var(--border)',
+                            color: 'var(--ink)',
+                          }}
+                        >
+                          <Box
+                            style={{
+                              width: 13,
+                              height: 13,
+                              borderRadius: 3,
+                              flexShrink: 0,
+                              background: statusFill(s),
+                              border:
+                                STATUS[s].fill === 'empty'
+                                  ? '1.5px solid var(--border-strong)'
+                                  : '1px solid var(--border)',
+                            }}
+                          />
+                          {t(`tooth_chart.states.${s}`)}
+                        </UnstyledButton>
+                      );
+                    })}
+                  </Group>
+                </Box>
+
+                <DiagnosisPicker
+                  selected={diagnosis}
+                  onSelect={pickDiagnosis}
+                  lang={lang}
+                  chair={chair}
+                />
+              </>
+            )}
+
+            {tooth !== null && (
+              <Box>
+                <Text style={sectionLabel}>{t('odontogram.tooth_diagnoses')}</Text>
+                {groups.length === 0 ? (
+                  <Text style={{ fontSize: 13, color: 'var(--ink-3)' }}>
+                    {t('odontogram.tooth_diagnoses_empty')}
+                  </Text>
+                ) : (
+                  <Group gap={8} wrap="wrap">
+                    {groups.map((g) => (
+                      <Group
+                        key={g.key}
+                        gap={6}
+                        wrap="nowrap"
+                        data-testid="tooth-dx-chip"
                         style={{
-                          width: 28,
-                          height: 28,
+                          padding: '4px 6px 4px 12px',
                           borderRadius: 99,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          background: 'var(--surface)',
-                          color: 'var(--ink-2)',
+                          background: 'var(--surface-2)',
+                          border: '1px solid var(--border)',
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: 'var(--ink)',
                         }}
                       >
-                        <IconX size={14} />
-                      </UnstyledButton>
-                    )}
+                        <Text span style={{ fontSize: 13, fontWeight: 600 }}>
+                          {groupLabel(g)} · {surfaceText(g.surfaces)}
+                        </Text>
+                        {canEdit && (
+                          <UnstyledButton
+                            type="button"
+                            aria-label={t('odontogram.remove_diagnosis', { name: groupLabel(g) })}
+                            onClick={() => onEntriesChange(removeToothGroup(entries, tooth, g.key))}
+                            style={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: 99,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              background: 'var(--surface)',
+                              color: 'var(--ink-2)',
+                            }}
+                          >
+                            <IconX size={14} />
+                          </UnstyledButton>
+                        )}
+                      </Group>
+                    ))}
                   </Group>
-                ))}
-              </Group>
-            )}
-          </Box>
-        )}
-
-        {canEdit && canAddToPlan && (
-          <Stack gap={8}>
-            <TreatmentSuggestions
-              diagnosis={
-                diagnosis ??
-                (groups[0]?.diagnosisId ? (diagnosisById.get(groups[0].diagnosisId) ?? null) : null)
-              }
-              lang={lang}
-              chair={chair}
-              value={service}
-              onChange={setService}
-            />
-            <Select
-              label={t('treatment_plan.resulting_state')}
-              aria-label={t('treatment_plan.resulting_state')}
-              value={resultingState ?? NO_RESULT}
-              onChange={(v) => setResultOverride(!v || v === NO_RESULT ? null : (v as ToothState))}
-              data={[
-                { value: NO_RESULT, label: t('treatment_plan.resulting_state_none') },
-                ...RESULT_STATES.map((s) => ({ value: s, label: t(`tooth_chart.states.${s}`) })),
-              ]}
-              allowDeselect={false}
-              comboboxProps={{ withinPortal: true }}
-              styles={{ input: { minHeight: minH } }}
-            />
-            {teeth.length > 1 && (
-              <Checkbox
-                label={t('odontogram.single_stage')}
-                checked={singleStage}
-                onChange={(e) => setSingleStage(e.currentTarget.checked)}
-                styles={{ body: { alignItems: 'center', minHeight: minH } }}
-              />
-            )}
-            {currentPlan && (
-              <Box>
-                <Text style={sectionLabel}>{t('odontogram.target_label')}</Text>
-                <SegmentedControl
-                  fullWidth
-                  value={target}
-                  onChange={(v) => setTargetPick(v as PlanTarget)}
-                  aria-label={t('odontogram.target_label')}
-                  data={[
-                    { value: 'current', label: t('odontogram.target_current') },
-                    { value: 'new', label: t('odontogram.target_new') },
-                  ]}
-                  styles={{
-                    control: { minHeight: minH },
-                    label: {
-                      minHeight: minH,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    },
-                  }}
-                />
-                {target === 'current' && (
-                  <Text style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 6 }}>
-                    {currentPlan.title} · {t(`treatment_plan.status_${currentPlan.status}`)}
-                  </Text>
                 )}
               </Box>
             )}
-          </Stack>
-        )}
 
-        {canEdit && (
-          <Stack gap={8}>
-            <Button variant="light" disabled={!canAdd} onClick={applyPending} styles={btnStyles}>
-              {t('odontogram.add_diagnosis')}
-            </Button>
-            <Group gap={8} grow wrap="nowrap">
-              <Button
-                variant="default"
-                loading={saving}
-                disabled={!canAdd && groups.length === 0}
-                onClick={() => onSaveOnly(canAdd ? applyPending() : entries)}
-                styles={btnStyles}
-              >
-                {t('odontogram.save_only')}
-              </Button>
-              {canAddToPlan && (
-                <Button
-                  loading={saving}
-                  disabled={!canPlan}
-                  onClick={() => {
-                    // Nom (xizmatsiz bosqich uchun): yangi tashxis/holat, aks holda tishdagi birinchisi.
-                    const label = groupLabel(
-                      canAdd
-                        ? { state, diagnosisId: diagnosis?.id ?? null }
-                        : (groups[0] ?? { state, diagnosisId: null }),
-                    );
-                    const next = canAdd ? applyPending() : null;
-                    onAddToPlan(next, {
-                      label,
-                      service: service ?? undefined,
-                      resultingToothState: resultingState,
-                      target,
-                      singleStage: teeth.length > 1 && singleStage,
-                    });
-                  }}
-                  styles={btnStyles}
-                >
-                  {t('odontogram.add_to_plan')}
-                </Button>
-              )}
-            </Group>
-          </Stack>
-        )}
-
-        {tooth !== null && (
-          <Box>
-            <Text style={sectionLabel}>{t('odontogram.tooth_history', { n: tooth })}</Text>
-            {history.length === 0 ? (
-              <Text style={{ fontSize: 13, color: 'var(--ink-3)' }}>
-                {t('odontogram.history_empty')}
-              </Text>
-            ) : (
-              <Stack gap={4}>
-                {history.slice(0, 6).map((h) => (
-                  <Group key={`${h.chartId}:${h.state}:${h.diagnosisId}`} gap={10} wrap="nowrap">
-                    <Mono>
-                      <Text span style={{ fontSize: 12, color: 'var(--ink-3)' }}>
-                        {new Date(h.createdAt).toLocaleDateString(
-                          lang === 'ru' ? 'ru-RU' : 'uz-UZ',
-                        )}
+            {canEdit && canAddToPlan && (
+              <Stack gap={8}>
+                <TreatmentSuggestions
+                  diagnosis={
+                    diagnosis ??
+                    (groups[0]?.diagnosisId
+                      ? (diagnosisById.get(groups[0].diagnosisId) ?? null)
+                      : null)
+                  }
+                  lang={lang}
+                  chair={chair}
+                  value={service}
+                  onChange={setService}
+                />
+                <Select
+                  label={t('treatment_plan.resulting_state')}
+                  aria-label={t('treatment_plan.resulting_state')}
+                  value={resultingState ?? NO_RESULT}
+                  onChange={(v) =>
+                    setResultOverride(!v || v === NO_RESULT ? null : (v as ToothState))
+                  }
+                  data={[
+                    { value: NO_RESULT, label: t('treatment_plan.resulting_state_none') },
+                    ...RESULT_STATES.map((s) => ({
+                      value: s,
+                      label: t(`tooth_chart.states.${s}`),
+                    })),
+                  ]}
+                  allowDeselect={false}
+                  comboboxProps={{ withinPortal: true }}
+                  styles={{ input: { minHeight: minH } }}
+                />
+                {teeth.length > 1 && (
+                  <Checkbox
+                    label={t('odontogram.single_stage')}
+                    checked={singleStage}
+                    onChange={(e) => setSingleStage(e.currentTarget.checked)}
+                    styles={{ body: { alignItems: 'center', minHeight: minH } }}
+                  />
+                )}
+                {currentPlan && (
+                  <Box>
+                    <Text style={sectionLabel}>{t('odontogram.target_label')}</Text>
+                    <SegmentedControl
+                      fullWidth
+                      value={target}
+                      onChange={(v) => setTargetPick(v as PlanTarget)}
+                      aria-label={t('odontogram.target_label')}
+                      data={[
+                        { value: 'current', label: t('odontogram.target_current') },
+                        { value: 'new', label: t('odontogram.target_new') },
+                      ]}
+                      styles={{
+                        control: { minHeight: minH },
+                        label: {
+                          minHeight: minH,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        },
+                      }}
+                    />
+                    {target === 'current' && (
+                      <Text style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 6 }}>
+                        {currentPlan.title} · {t(`treatment_plan.status_${currentPlan.status}`)}
                       </Text>
-                    </Mono>
-                    <Text style={{ fontSize: 13, color: 'var(--ink)' }}>
-                      {groupLabel(h)} · {surfaceText(h.surfaces)}
-                    </Text>
-                  </Group>
-                ))}
+                    )}
+                  </Box>
+                )}
               </Stack>
             )}
-          </Box>
+
+            {canEdit && (
+              <Stack gap={8}>
+                <Button
+                  variant="light"
+                  disabled={!canAdd}
+                  onClick={applyPending}
+                  styles={btnStyles}
+                >
+                  {t('odontogram.add_diagnosis')}
+                </Button>
+                <Group gap={8} grow wrap="nowrap">
+                  <Button
+                    variant="default"
+                    loading={saving}
+                    disabled={!canAdd && groups.length === 0}
+                    onClick={() => onSaveOnly(canAdd ? applyPending() : entries)}
+                    styles={btnStyles}
+                  >
+                    {t('odontogram.save_only')}
+                  </Button>
+                  {canAddToPlan && (
+                    <Button
+                      loading={saving}
+                      disabled={!canPlan}
+                      onClick={() => {
+                        // Nom (xizmatsiz bosqich uchun): yangi tashxis/holat, aks holda tishdagi birinchisi.
+                        const label = groupLabel(
+                          canAdd
+                            ? { state, diagnosisId: diagnosis?.id ?? null }
+                            : (groups[0] ?? { state, diagnosisId: null }),
+                        );
+                        const next = canAdd ? applyPending() : null;
+                        onAddToPlan(next, {
+                          label,
+                          service: service ?? undefined,
+                          resultingToothState: resultingState,
+                          target,
+                          singleStage: teeth.length > 1 && singleStage,
+                        });
+                      }}
+                      styles={btnStyles}
+                    >
+                      {t('odontogram.add_to_plan')}
+                    </Button>
+                  )}
+                </Group>
+              </Stack>
+            )}
+          </>
         )}
       </Stack>
     </Paper>

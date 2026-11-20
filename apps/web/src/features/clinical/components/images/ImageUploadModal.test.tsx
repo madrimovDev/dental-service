@@ -25,3 +25,20 @@ describe('ImageUploadModal', () => {
     expect(fd.get('type')).toBe('intraoral_photo');
   });
 });
+
+describe('ImageUploadModal — tish oldindan to‘ldirilgan (FT-01.4)', () => {
+  it('defaultToothNumbers → tish maydoni to‘ldirilgan va FormData’da yuboriladi', () => {
+    uploadMutate.mockClear();
+    renderApp(
+      <ImageUploadModal opened onClose={vi.fn()} patientId="p1" defaultToothNumbers={[16, 17]} />,
+    );
+    expect(screen.getByDisplayValue('16, 17')).toBeTruthy();
+    const fileInput = document.querySelector('input[type=file]') as HTMLInputElement;
+    fireEvent.change(fileInput, {
+      target: { files: [new File(['x'], 'rentgen.png', { type: 'image/png' })] },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Yuklash' }));
+    const fd = uploadMutate.mock.calls[0]?.[0] as FormData;
+    expect(fd.get('toothNumbers')).toBe('16, 17');
+  });
+});

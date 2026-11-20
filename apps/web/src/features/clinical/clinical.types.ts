@@ -49,6 +49,19 @@ export type ToothHistoryRow = {
   surfaces: ToothSurface[];
 };
 
+/** FT-01.4 (CF-10): «Tarix» tabi — shu tishli bosqich (reja nomi, holat, sana, narx). */
+export type ToothStageRow = {
+  stageId: string;
+  planId: string;
+  planTitle: string;
+  planStatus: TreatmentPlanStatus;
+  serviceName: string;
+  status: TreatmentStageStatus;
+  /** Bajarilgan sana, aks holda reja yaratilgan sana (ISO). */
+  date: string;
+  cost: string;
+};
+
 // ===== A: Treatment plan =====
 export type PlanCardVM = {
   id: string;

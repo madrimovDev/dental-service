@@ -579,6 +579,15 @@ export function usePatientImages(patientId: string, visitNoteId?: string) {
   });
 }
 
+/** FT-01.4 (CF-10): tish tarixi — `GET /patients/{id}/images?tooth=NN`. */
+export function usePatientToothImages(patientId: string, tooth: number, enabled = true) {
+  return useQuery({
+    enabled,
+    queryKey: clinicalKeys.toothImages(patientId, tooth),
+    queryFn: () => listPatientImages(patientId, { tooth }).then((r) => r.data),
+  });
+}
+
 export function useUploadPatientImage(patientId: string) {
   const qc = useQueryClient();
   return useMutation({

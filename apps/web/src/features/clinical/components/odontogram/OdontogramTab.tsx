@@ -311,11 +311,13 @@ export function OdontogramTab({ patientId }: Props) {
 
         {selectedTeeth.length > 0 && !isReadOnly && (
           <ToothPanel
+            patientId={patientId}
             teeth={selectedTeeth}
             entries={draft}
             onEntriesChange={setDraft}
             diagnosisById={diagnosisById}
             history={toothHistory}
+            plans={plansQuery.data}
             lang={lang}
             chair={chairMode}
             canEdit={editing}
