@@ -282,13 +282,13 @@ Har biri alohida brainstorm → spec → reja. Tartib: qarorlardan keyin.
 
 | ID | Manba | Feature | Oldin shart | Hajm |
 |---|---|---|---|---|
-| FT-01 | CF-9, 11, 12, 10 | **Davolash rejasi epiki:** odontogramma — asosiy kirish nuqtasi (tish → xizmat → joriy rejaga qo'shish, `POST /treatment-plans/{id}/stages`); bosqich tahriri; «bajarilgan ishni yozish» (2-rejim: darhol completed ad-hoc bosqich); soddalashtirilgan holatlar (Qoralama → Rozi → Davolanmoqda → Tugadi); tish tarixi paneli (holat + rasm `?tooth=` + bosqich + vizit); FDI tekshiruvi | FX-13…16, FX-27 | L |
+| FT-01 | CF-9, 11, 12, 10 | **Davolash rejasi epiki:** odontogramma — asosiy kirish nuqtasi (tish → xizmat → joriy rejaga qo'shish, `POST /treatment-plans/{id}/stages`); bosqich tahriri; «bajarilgan ishni yozish» (2-rejim: darhol completed ad-hoc bosqich); soddalashtirilgan holatlar (Qoralama → Rozi → Davolanmoqda → Tugadi); tish tarixi paneli (holat + rasm `?tooth=` + bosqich + vizit); FDI tekshiruvi | FX-13…16, FX-27 | L — **qilindi (FW-1, `c54e142a`)** |
 | FT-02 | CF-14 | Rozilik soddalashtirish: shablon → o'qish → imzo; tur/sarlavha/muddat «Qo'shimcha» ostida; shablon tahriri; chop etish | FX-26 | M |
 | FT-03 | CF-3b | Shartnoma + pechat + imzo: `contract` shablon turi, o'zgaruvchilar, canvas imzo, sozlamalarda pechat rasmi, A4 print. FT-02 bilan «Hujjatlar» moduli | FT-02 | L |
-| FT-04 | CF-6, 7, 8 💰👤 | Chegirma: `discount.give` (+rol bo'yicha max %), tranzaksiyada `discount_percent/reason/granted_by`, `patients.default_discount_percent`, reja bosqichida `stage.cost`ga snapshot, chegirma auditda, chekda; fiskal items netto | Qarorlar D-1…D-3; FX-21 | M–L |
-| FT-05 | CF-2a | Kalendar: bo'sh katak → oldindan to'ldirilgan yozilish; bosiladigan bo'sh slot; soatlar filial ish vaqtidan; touch drag + resize; zoom; planshet layout | — | M–L |
-| FT-06 | CF-2b, CF-4 👤 | Kamera komponenti (`getUserMedia` + Electron `setPermissionRequestHandler` faqat `media`): bemor avatari (`face_photo` → `photo_url` yozish yo'li) va kassada to'lov rasmi (`cashier_transaction_photos`, `skipped_reason`) | FX-21; D-4 | M |
-| FT-07 | CF-3a | Bot'da bemor o'z ma'lumotlari: «Mening yozilishlarim», «Balans»; keyin reja xulosasi va oxirgi retsept; o'qishlar auditda; throttling | FX-42, FX-41 | M |
+| FT-04 | CF-6, 7, 8 💰👤 | Chegirma: `discount.give` (+rol bo'yicha max %), tranzaksiyada `discount_percent/reason/granted_by`, `patients.default_discount_percent`, reja bosqichida `stage.cost`ga snapshot, chegirma auditda, chekda; fiskal items netto | Qarorlar D-1…D-3; FX-21 | M–L — **qilindi (FW-1)**; rol bo'yicha max % yo'q (faqat tenant `max_discount_percent`, D-21…D-23) |
+| FT-05 | CF-2a | Kalendar: bo'sh katak → oldindan to'ldirilgan yozilish; bosiladigan bo'sh slot; soatlar filial ish vaqtidan; touch drag + resize; zoom; planshet layout | — | M–L — **qilindi (FW-1)** |
+| FT-06 | CF-2b, CF-4 👤 | Kamera komponenti (`getUserMedia` + Electron `setPermissionRequestHandler` faqat `media`): bemor avatari (`face_photo` → `photo_url` yozish yo'li) va kassada to'lov rasmi (`cashier_transaction_photos`, `skipped_reason`) | FX-21; D-4 | M — **qilindi (FW-1)**; 🪟 Windows'da kamera (runbook §4d) tekshirilmagan |
+| FT-07 | CF-3a | Bot'da bemor o'z ma'lumotlari: «Mening yozilishlarim», «Balans»; keyin reja xulosasi va oxirgi retsept; o'qishlar auditda; throttling | FX-42, FX-41 | M — **qilindi (FW-1)** |
 | FT-08 | CF-17 | PWA: manifest, statik shell SW (API keshlanmaydi), responsive kalendar/bemorlar/kassa | FT-05 | L |
 | FT-09 | CF-15 👤 | Rentgen: desktop watch-folder → `/patient-images`; `.dcm`ni kengaytma bo'yicha qabul qilish | D-6 | M |
 | FT-10 | CF-16 👤 | Gemini Flash: faqat API'dan, tenant opt-in, PHI minimallashtirish; birinchi joy — D-7 | D-7 | M |
