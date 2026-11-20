@@ -4283,6 +4283,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "default_discount_percent": {
+          "name": "default_discount_percent",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "archived_at": {
           "name": "archived_at",
           "type": "timestamp with time zone",

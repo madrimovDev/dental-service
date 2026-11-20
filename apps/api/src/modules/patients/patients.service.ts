@@ -431,6 +431,8 @@ export const createPatientsService = (deps: {
           source: input.source ?? null,
           insurance: input.insurance ?? null,
           allowEmergencyRecall: input.allowEmergencyRecall ?? false,
+          defaultDiscountPercent:
+            input.defaultDiscountPercent == null ? null : input.defaultDiscountPercent.toFixed(2),
         })
         .returning();
 
@@ -484,6 +486,9 @@ export const createPatientsService = (deps: {
     if (input.insurance !== undefined) patch.insurance = input.insurance;
     if (input.allowEmergencyRecall !== undefined)
       patch.allowEmergencyRecall = input.allowEmergencyRecall;
+    if (input.defaultDiscountPercent !== undefined)
+      patch.defaultDiscountPercent =
+        input.defaultDiscountPercent === null ? null : input.defaultDiscountPercent.toFixed(2);
 
     const [updated] = await db.update(patients).set(patch).where(eq(patients.id, id)).returning();
 

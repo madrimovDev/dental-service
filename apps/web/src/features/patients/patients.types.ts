@@ -54,6 +54,8 @@ export type PatientDetail = {
   source: string | null;
   insurance: Patient['insurance'];
   insuranceStatus: Patient['insuranceStatus'];
+  /** FT-04.3: doimiy chegirma foizi (son); yo'q — null. */
+  defaultDiscountPercent?: number | null;
   archived: boolean;
 };
 

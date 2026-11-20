@@ -28,3 +28,8 @@ DO $$ BEGIN
 EXCEPTION
  WHEN duplicate_object THEN null;
 END $$;
+--> statement-breakpoint
+-- FT-04.3 (D-2): bemorning doimiy chegirmasi (foiz). POS'da va YANGI yaratiladigan reja
+-- bosqichlarida qo'llanadi; mavjud bosqichlarga retroaktiv tegmaydi. Tahrir: patient.edit +
+-- discount.give. NULL = chegirma yo'q.
+ALTER TABLE "patients" ADD COLUMN IF NOT EXISTS "default_discount_percent" numeric(5, 2);

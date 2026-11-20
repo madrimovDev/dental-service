@@ -4,6 +4,7 @@ import {
   date,
   index,
   jsonb,
+  numeric,
   pgEnum,
   pgTable,
   text,
@@ -67,6 +68,10 @@ export const patients = pgTable(
       expiryDate?: string;
       isActive?: boolean;
     } | null>(),
+
+    // FT-04.3 (D-2): doimiy chegirma foizi — POS'da avtomatik va YANGI reja bosqichlarida
+    // `cost`ga snapshot. NULL = chegirma yo'q. Tahrir: patient.edit + discount.give.
+    defaultDiscountPercent: numeric('default_discount_percent', { precision: 5, scale: 2 }),
 
     archivedAt: timestamp('archived_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

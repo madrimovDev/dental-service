@@ -74,6 +74,9 @@ export const createPatientSchema = z.object({
   // CLI-474 (L8): bemor rozi bo'lsagina telefoni yo'qligida recall/reminder SMS'i
   // favqulodda aloqaga fallback qilinadi (opt-in maxfiylik roziligi).
   allowEmergencyRecall: z.boolean().optional(),
+  // FT-04.3 (D-2): doimiy chegirma foizi (0–100, 2 xona); `null` — tozalash. Kalit
+  // berilsa route `discount.give` talab qiladi (403 `discount.forbidden`).
+  defaultDiscountPercent: z.number().min(0).max(100).nullable().optional(),
 });
 export type CreatePatientInput = z.infer<typeof createPatientSchema>;
 
@@ -182,6 +185,8 @@ export const patientDtoSchema = z
     insuranceStatus: z.enum(['active', 'expired', 'inactive', 'none']),
     /** CLI-474 (L8): favqulodda aloqaga recall/reminder fallback roziligi. */
     allowEmergencyRecall: z.boolean(),
+    /** FT-04.3: doimiy chegirma foizi ('10.00'); yo'q — null. */
+    defaultDiscountPercent: z.string().nullable(),
     archivedAt: z.string().nullable(),
     createdAt: z.string(),
     updatedAt: z.string(),

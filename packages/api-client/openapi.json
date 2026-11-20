@@ -1697,6 +1697,10 @@
           "allowEmergencyRecall": {
             "type": "boolean"
           },
+          "defaultDiscountPercent": {
+            "type": "string",
+            "nullable": true
+          },
           "archivedAt": {
             "type": "string",
             "nullable": true
@@ -1725,6 +1729,7 @@
           "insurance",
           "insuranceStatus",
           "allowEmergencyRecall",
+          "defaultDiscountPercent",
           "archivedAt",
           "createdAt",
           "updatedAt"
@@ -12538,6 +12543,12 @@
                   },
                   "allowEmergencyRecall": {
                     "type": "boolean"
+                  },
+                  "defaultDiscountPercent": {
+                    "type": "number",
+                    "nullable": true,
+                    "minimum": 0,
+                    "maximum": 100
                   }
                 },
                 "required": [
@@ -13023,6 +13034,12 @@
                   },
                   "allowEmergencyRecall": {
                     "type": "boolean"
+                  },
+                  "defaultDiscountPercent": {
+                    "type": "number",
+                    "nullable": true,
+                    "minimum": 0,
+                    "maximum": 100
                   }
                 }
               }
