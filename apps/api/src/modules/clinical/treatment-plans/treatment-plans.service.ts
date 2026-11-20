@@ -1,6 +1,7 @@
 import type { ToothStateValue } from '@dental/db-schema';
 import type { Context } from 'hono';
 import type { AuditLogger } from '../../../lib/audit-logger.ts';
+import { applyDefaultDiscount } from '../../../lib/discount.ts';
 import {
   CrossEntityError,
   createOwnershipValidator,
@@ -205,13 +206,24 @@ export const createTreatmentPlansService = (deps: {
     // `cost`i saqlanadi (qattiq validatsiya YO'Q — bunday bosqichlar qasddan
     // narxsiz/moslashuvchan; faqat POS (CLI-443 cashier qismi) qattiq 400 beradi).
     const activeBranchId = c.get('activeBranchId');
-    const resolvedStages = await Promise.all(
+    const pricedStages = await Promise.all(
       input.stages.map(async (s) => {
         if (!s.serviceId || !activeBranchId || !deps.priceLookup) return s;
         const price = await deps.priceLookup.getActivePrice(c, s.serviceId, activeBranchId);
         return price ? { ...s, cost: Number(price.price) } : s;
       }),
     );
+
+    // FT-04.3 (D-2): bemorning doimiy chegirmasi YANGI bosqich narxiga snapshot qilinadi —
+    // `cost` netto (qarz/overpay guard shundan), `listPrice`/`discountPercent` saqlanadi.
+    // Katalog va erkin bosqichga bir xil qo'llanadi. Avtomatik (bemor sozlamasi) — plan
+    // yaratuvchidan `discount.give` talab qilinmaydi; doimiy chegirmani faqat `discount.give`
+    // egasi qo'yadi (patients route gate'i).
+    const defaultPct = await repo.findPatientDefaultDiscount(c, input.patientId);
+    const resolvedStages = pricedStages.map((s) => {
+      const d = applyDefaultDiscount(s.cost, defaultPct);
+      return { ...s, cost: d.cost, listPrice: d.listPrice, discountPercent: d.discountPercent };
+    });
 
     const totalCost = resolvedStages.reduce((sum, s) => sum + s.cost, 0);
     const totalVisits = resolvedStages.reduce((sum, s) => sum + s.estimatedVisits, 0);
@@ -238,6 +250,8 @@ export const createTreatmentPlansService = (deps: {
           estimatedVisits: s.estimatedVisits,
           estimatedDurationMinutes: s.estimatedDurationMinutes ?? null,
           cost: String(s.cost),
+          listPrice: s.listPrice,
+          discountPercent: s.discountPercent,
           notes: s.notes ?? null,
           resultingToothState: s.resultingToothState ?? null,
         })),
@@ -247,7 +261,14 @@ export const createTreatmentPlansService = (deps: {
       action: 'created',
       resourceType: 'treatment_plan',
       resourceId: plan.id,
-      after: { totalCost, totalVisits, stages: input.stages.length },
+      after: {
+        totalCost,
+        totalVisits,
+        stages: input.stages.length,
+        ...(defaultPct != null && Number(defaultPct) > 0
+          ? { defaultDiscountPercent: defaultPct }
+          : {}),
+      },
     });
     return plan;
   }
@@ -535,6 +556,9 @@ export const createTreatmentPlansService = (deps: {
         stageId: s.id,
         serviceName: s.serviceName,
         cost: Number(s.cost),
+        // FT-04.3: chegirma snapshot'i (eski bosqichlarda null).
+        listPrice: s.listPrice != null ? Number(s.listPrice) : null,
+        discountPercent: s.discountPercent != null ? Number(s.discountPercent) : null,
         status: s.status,
         acceptance: s.acceptance,
         paid: b?.paid ?? 0,

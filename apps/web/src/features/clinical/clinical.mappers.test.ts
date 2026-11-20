@@ -235,6 +235,8 @@ function stage(over: Partial<TreatmentStage> = {}): TreatmentStage {
     estimatedVisits: 1,
     estimatedDurationMinutes: null,
     cost: '150000',
+    listPrice: null,
+    discountPercent: null,
     status: 'pending',
     acceptance: 'proposed',
     notes: null,
@@ -349,6 +351,8 @@ describe('toEstimateVM', () => {
           stageId: 's1',
           serviceName: 'Plomba',
           cost: 500000,
+          listPrice: null,
+          discountPercent: null,
           status: 'pending',
           acceptance: 'accepted',
           paid: 200000,
@@ -358,6 +362,8 @@ describe('toEstimateVM', () => {
           stageId: 's2',
           serviceName: 'Tozalash',
           cost: 150000,
+          listPrice: null,
+          discountPercent: null,
           status: 'skipped',
           acceptance: 'accepted',
           paid: 0,
@@ -380,6 +386,22 @@ describe('toEstimateVM', () => {
     expect(s1?.acceptanceTone).toBe('success');
     expect(s1?.debtEligible).toBe(true);
     expect(s2?.debtEligible).toBe(false);
+  });
+
+  it("FT-04.3: chegirmali bosqich — list narx va foiz smetada; chegirmasiz — yo'q", () => {
+    const base = estimate();
+    const vm = toEstimateVM({
+      ...base,
+      stages: [
+        { ...base.stages[0]!, cost: 180000, listPrice: 200000, discountPercent: 10 },
+        { ...base.stages[1]!, listPrice: 150000, discountPercent: null },
+      ],
+    });
+    expect(vm.stages[0]?.costText).toBe(formatNumber(180000));
+    expect(vm.stages[0]?.listPriceText).toBe(formatNumber(200000));
+    expect(vm.stages[0]?.discountPercent).toBe(10);
+    expect(vm.stages[1]?.listPriceText).toBeNull();
+    expect(vm.stages[1]?.discountPercent).toBeNull();
   });
 
   it('totals are independent subtotals; balance is authoritative', () => {

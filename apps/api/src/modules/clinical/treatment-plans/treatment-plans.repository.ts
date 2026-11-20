@@ -1,6 +1,7 @@
 import {
   consentForms,
   labOrders,
+  patients,
   treatmentPlans,
   treatmentStagePayments,
   treatmentStages,
@@ -211,7 +212,19 @@ export const createTreatmentPlansRepository = () => {
     return updated ?? null;
   }
 
+  /** FT-04.3 (D-2): bemorning doimiy chegirma foizi ('10.00') yoki null (RLS-bound). */
+  async function findPatientDefaultDiscount(c: Context, patientId: string) {
+    const db = getDb(c);
+    const [row] = await db
+      .select({ pct: patients.defaultDiscountPercent })
+      .from(patients)
+      .where(eq(patients.id, patientId))
+      .limit(1);
+    return row?.pct ?? null;
+  }
+
   return {
+    findPatientDefaultDiscount,
     listPlans,
     getPlanWithStages,
     insertPlanWithStages,

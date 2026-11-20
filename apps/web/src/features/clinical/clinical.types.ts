@@ -107,6 +107,10 @@ export type EstimateStageVM = {
   id: string;
   serviceName: string;
   costText: string;
+  /** FT-04.3: chegirmagacha narx — faqat bosqichda chegirma bo'lsa (aks holda null). */
+  listPriceText: string | null;
+  /** FT-04.3: bosqich chegirma foizi (snapshot); yo'q — null. */
+  discountPercent: number | null;
   statusLabelKey: string;
   statusTone: Tone;
   acceptanceLabelKey: string;

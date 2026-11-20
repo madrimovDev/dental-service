@@ -839,6 +839,7 @@
     "select": "Выберите"
   },
   "treatment_plan": {
+    "stage_discount": "скидка {{pct}}%",
     "title": "План лечения",
     "create": "Новый план",
     "edit": "Редактировать",

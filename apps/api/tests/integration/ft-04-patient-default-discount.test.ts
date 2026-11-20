@@ -22,7 +22,11 @@ import {
   permissions,
   rolePermissions,
   roles,
+  servicePrices,
+  services,
   tenants,
+  treatmentPlans,
+  treatmentStages,
   userAssignments,
   users,
 } from '@dental/db-schema';
@@ -36,12 +40,18 @@ const REG_PERMS = ['patient.view', 'patient.create', 'patient.edit', 'patient.vi
 const RECEPTION_PERMS = [
   ...(ROLE_TEMPLATES.find((t) => t.templateKey === 'receptionist')?.permissions ?? []),
 ] as string[];
+/** Doktor shablon permset'i — `discount.give` YO'Q (D-2: snapshot avtomatik). */
+const DOCTOR_PERMS = [
+  ...(ROLE_TEMPLATES.find((t) => t.templateKey === 'doctor')?.permissions ?? []),
+] as string[];
 
 const app = createApp();
 
 let tenantId: string;
 let branchId: string;
 let patientId: string;
+let svcId: string;
+let doctorUserId: string;
 const tok: Record<string, string> = {};
 
 // biome-ignore lint/suspicious/noExplicitAny: test javob shakli
@@ -108,8 +118,9 @@ beforeAll(async () => {
   const owner = await mk('+998900075201');
   const reg = await mk('+998900075202');
   const reception = await mk('+998900075203');
+  doctorUserId = await mk('+998900075204');
 
-  for (const code of [...new Set([...REG_PERMS, ...RECEPTION_PERMS])]) {
+  for (const code of [...new Set([...REG_PERMS, ...RECEPTION_PERMS, ...DOCTOR_PERMS])]) {
     await db
       .insert(permissions)
       .values({ code, category: code.split('.')[0] ?? 'x' })
@@ -119,6 +130,7 @@ beforeAll(async () => {
     db.select({ id: permissions.id }).from(permissions).where(inArray(permissions.code, codes));
   const regPermRows = await permIds(REG_PERMS);
   const receptionPermRows = await permIds(RECEPTION_PERMS);
+  const doctorPermRows = await permIds(DOCTOR_PERMS);
 
   tenantId = (
     await db
@@ -147,10 +159,24 @@ beforeAll(async () => {
     await tx
       .insert(rolePermissions)
       .values(receptionPermRows.map((p) => ({ roleId: recRole!.id, permissionId: p.id })));
+    const [docRole] = await tx
+      .insert(roles)
+      .values({ tenantId, name: 'Doctor', isSystem: true, templateKey: 'doctor' })
+      .returning({ id: roles.id });
+    await tx
+      .insert(rolePermissions)
+      .values(doctorPermRows.map((p) => ({ roleId: docRole!.id, permissionId: p.id })));
     await tx.insert(userAssignments).values([
       { tenantId, userId: reg, branchId, roleId: regRole!.id },
       { tenantId, userId: reception, branchId, roleId: recRole!.id },
+      { tenantId, userId: doctorUserId, branchId, roleId: docRole!.id },
     ]);
+    const [svc] = await tx
+      .insert(services)
+      .values({ tenantId, code: 'FT043-S', nameUz: 'Plomba' })
+      .returning({ id: services.id });
+    svcId = svc!.id;
+    await tx.insert(servicePrices).values({ serviceId: svcId, branchId, price: '200000' });
     const [pt] = await tx
       .insert(patients)
       .values({ tenantId, fullName: 'Bemor Doimiy' })
@@ -171,8 +197,11 @@ beforeAll(async () => {
     ).token;
   expect(RECEPTION_PERMS).toContain('discount.give');
   expect(RECEPTION_PERMS).not.toContain('@owner');
+  expect(DOCTOR_PERMS).toContain('medical_record.edit');
+  expect(DOCTOR_PERMS).not.toContain('discount.give');
   tok.reg = await sign(reg, REG_PERMS);
   tok.reception = await sign(reception, RECEPTION_PERMS);
+  tok.doctor = await sign(doctorUserId, DOCTOR_PERMS);
 });
 
 describe('FT-04.3 — patients.default_discount_percent tahriri (patient.edit + discount.give)', () => {
@@ -245,6 +274,105 @@ describe('FT-04.3 — patients.default_discount_percent tahriri (patient.edit + 
     expect(r.status).toBe(200);
     expect(r.json.data.defaultDiscountPercent).toBeNull();
     // keyingi testlar uchun qayta 10%
+    await call('reception', 'PATCH', `/api/patients/${patientId}`, { defaultDiscountPercent: 10 });
+  });
+});
+
+describe('FT-04.3 — yangi reja bosqichi: cost snapshot (list_price, discount_percent)', () => {
+  /** Katalog xizmati (server narxi 200 000) + erkin bosqich (client cost 55 555). */
+  const planBody = (pid: string) => ({
+    patientId: pid,
+    doctorId: doctorUserId,
+    title: 'Reja FT-04.3',
+    stages: [
+      { serviceId: svcId, serviceName: 'Plomba', cost: 1, estimatedVisits: 1 },
+      { serviceName: 'Erkin ish', cost: 55_555, estimatedVisits: 1 },
+    ],
+  });
+
+  const stagesOf = (planId: string) =>
+    inTenant((tx) =>
+      tx
+        .select({
+          cost: treatmentStages.cost,
+          listPrice: treatmentStages.listPrice,
+          discountPercent: treatmentStages.discountPercent,
+        })
+        .from(treatmentStages)
+        .where(eq(treatmentStages.treatmentPlanId, planId))
+        .orderBy(treatmentStages.sequence),
+    );
+
+  let planId: string;
+
+  test("Doktor (discount.give'siz), bemor 10%: cost netto, list_price va foiz snapshot", async () => {
+    expect(await patientDiscount(patientId)).toBe('10.00');
+    const r = await call('doctor', 'POST', '/api/treatment-plans', planBody(patientId));
+    expect(r.status).toBe(201);
+    planId = r.json.data.id;
+    // 200 000 × 0.9 = 180 000; 55 555 × 0.9 = 49 999.5 → round = 50 000.
+    expect(Number(r.json.data.totalCost)).toBe(230_000);
+    expect(r.json.data.stages.map((s: { cost: string }) => s.cost)).toEqual([
+      '180000.00',
+      '50000.00',
+    ]);
+    expect(r.json.data.stages[0].listPrice).toBe('200000.00');
+    expect(r.json.data.stages[0].discountPercent).toBe('10.00');
+    expect(await stagesOf(planId)).toEqual([
+      { cost: '180000.00', listPrice: '200000.00', discountPercent: '10.00' },
+      { cost: '50000.00', listPrice: '55555.00', discountPercent: '10.00' },
+    ]);
+  });
+
+  test('smeta: bosqich narxi netto, list narx va chegirma foizi ko‘rinadi', async () => {
+    const r = await call('doctor', 'GET', `/api/treatment-plans/${planId}/estimate`);
+    expect(r.status).toBe(200);
+    expect(r.json.data.totalCost).toBe(230_000);
+    expect(r.json.data.stages[0]).toMatchObject({
+      cost: 180_000,
+      listPrice: 200_000,
+      discountPercent: 10,
+    });
+  });
+
+  test('qabul qilingan reja → bemor qarzi netto (230 000, brutto 255 555 emas)', async () => {
+    await inTenant(async (tx) => {
+      await tx
+        .update(treatmentPlans)
+        .set({ status: 'accepted' })
+        .where(eq(treatmentPlans.id, planId));
+      await tx
+        .update(treatmentStages)
+        .set({ acceptance: 'accepted' })
+        .where(eq(treatmentStages.treatmentPlanId, planId));
+    });
+    const r = await call('reception', 'GET', `/api/patients/${patientId}/balance`);
+    expect(r.status).toBe(200);
+    expect(r.json.data.planDebt).toBe(230_000);
+  });
+
+  test('chegirmasiz bemor: cost = narx, discount_percent null, list_price saqlanadi', async () => {
+    const created = await call('reception', 'POST', '/api/patients', { fullName: 'Bemor Oddiy' });
+    expect(created.status).toBe(201);
+    const r = await call('doctor', 'POST', '/api/treatment-plans', planBody(created.json.data.id));
+    expect(r.status).toBe(201);
+    expect(await stagesOf(r.json.data.id)).toEqual([
+      { cost: '200000.00', listPrice: '200000.00', discountPercent: null },
+      { cost: '55555.00', listPrice: '55555.00', discountPercent: null },
+    ]);
+  });
+
+  test("D-2: chegirma o'zgarsa mavjud bosqichlar retroaktiv o'zgarmaydi", async () => {
+    const r = await call('reception', 'PATCH', `/api/patients/${patientId}`, {
+      defaultDiscountPercent: 25,
+    });
+    expect(r.status).toBe(200);
+    expect(await stagesOf(planId)).toEqual([
+      { cost: '180000.00', listPrice: '200000.00', discountPercent: '10.00' },
+      { cost: '50000.00', listPrice: '55555.00', discountPercent: '10.00' },
+    ]);
+    const bal = await call('reception', 'GET', `/api/patients/${patientId}/balance`);
+    expect(bal.json.data.planDebt).toBe(230_000);
     await call('reception', 'PATCH', `/api/patients/${patientId}`, { defaultDiscountPercent: 10 });
   });
 });

@@ -839,6 +839,7 @@
     "select": "Tanlang"
   },
   "treatment_plan": {
+    "stage_discount": "chegirma {{pct}}%",
     "title": "Davolash rejasi",
     "create": "Yangi reja",
     "edit": "Tahrirlash",

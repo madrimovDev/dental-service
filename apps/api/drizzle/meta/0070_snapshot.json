@@ -8109,6 +8109,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "list_price": {
+          "name": "list_price",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "discount_percent": {
+          "name": "discount_percent",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "cost": {
           "name": "cost",
           "type": "numeric(14, 2)",

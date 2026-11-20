@@ -33,3 +33,9 @@ END $$;
 -- bosqichlarida qo'llanadi; mavjud bosqichlarga retroaktiv tegmaydi. Tahrir: patient.edit +
 -- discount.give. NULL = chegirma yo'q.
 ALTER TABLE "patients" ADD COLUMN IF NOT EXISTS "default_discount_percent" numeric(5, 2);
+--> statement-breakpoint
+-- FT-04.3 (D-2): reja bosqichi narx snapshot'i — `list_price` (chegirmagacha narx) va
+-- `discount_percent` (bemorning doimiy chegirmasi yaratish paytida). `cost` = netto (qarz
+-- shundan). Faqat YANGI bosqichlarda to'ldiriladi; eski qatorlar NULL (retroaktiv emas).
+ALTER TABLE "treatment_stages" ADD COLUMN IF NOT EXISTS "list_price" numeric(14, 2);--> statement-breakpoint
+ALTER TABLE "treatment_stages" ADD COLUMN IF NOT EXISTS "discount_percent" numeric(5, 2);

@@ -19,6 +19,8 @@ export const toStageDto = (row: StageRow): TreatmentStageDto => ({
   estimatedVisits: row.estimatedVisits,
   estimatedDurationMinutes: row.estimatedDurationMinutes ?? null,
   cost: row.cost,
+  listPrice: row.listPrice ?? null,
+  discountPercent: row.discountPercent ?? null,
   status: row.status,
   acceptance: row.acceptance,
   notes: row.notes ?? null,
