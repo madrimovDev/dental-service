@@ -71,10 +71,17 @@ export function TreatmentPlansTab({ patientId }: Props) {
 
   const onPresentPlan = (id: string) => planStatusMut.mutate({ id, status: 'presented' });
 
-  const onAcceptPlan = (id: string) =>
+  // FT-01.5: «Bemor rozi bo'ldi» — avval reja qabul qilinadi (rozilik gate'i shu yerda;
+  // rad etilsa bosqichlar o'zgarmaydi), keyin hali taklif holatidagi bosqichlar ham
+  // qabul qilinadi (alohida «Hammasini qabul qilish» qadami birlashtirildi). Rad
+  // etilgan bosqichlarga tegilmaydi.
+  const onAcceptPlan = (id: string, proposedStageIds: string[]) =>
     planStatusMut.mutate(
       { id, status: 'accepted' },
       {
+        onSuccess: () => {
+          if (proposedStageIds.length > 0) onAcceptAll(proposedStageIds);
+        },
         // Consent-required 400'ni aniq xabar bilan ko'rsatamiz (global toast generik — CLI-165).
         onError: (err) => {
           const message =

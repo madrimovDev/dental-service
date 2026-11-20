@@ -17,6 +17,7 @@ const BASE_PLAN = {
 // biome-ignore lint/suspicious/noExplicitAny: test mock — plan shape yengil
 const mockPlans = vi.hoisted(() => ({ data: [] as any[] }));
 const planStatusMutate = vi.hoisted(() => vi.fn());
+const acceptAllMutate = vi.hoisted(() => vi.fn());
 
 vi.mock('../../clinical.api', () => ({
   useTreatmentPlans: () => ({ data: mockPlans.data, isLoading: false }),
@@ -26,7 +27,7 @@ vi.mock('../../clinical.api', () => ({
   useUpdateStageAcceptance: () => ({ mutate: vi.fn(), isPending: false }),
   // FX-27: bosqichning resultingToothState tanlovi.
   useUpdateStageResultingState: () => ({ mutate: vi.fn(), isPending: false }),
-  useAcceptAllStages: () => ({ mutate: vi.fn(), isPending: false }),
+  useAcceptAllStages: () => ({ mutate: acceptAllMutate, isPending: false }),
   useUpdatePlanStatus: () => ({ mutate: planStatusMutate, isPending: false }),
   useSignPlanConsent: () => ({ mutate: vi.fn(), isPending: false }),
   // CLI-461: PlanCard konsent tanlagichi — bemorning amaldagi consent-formlarini o'qiydi.
@@ -49,6 +50,7 @@ describe('TreatmentPlansTab', () => {
   afterEach(() => {
     mockPlans.data = [BASE_PLAN];
     planStatusMutate.mockReset();
+    acceptAllMutate.mockReset();
   });
 
   it("plan ro'yxatini render qiladi (smeta ko'rinadi)", () => {
@@ -76,12 +78,13 @@ describe('TreatmentPlansTab', () => {
   });
 
   // B4 (CLI-439): "accepted" plan avval `in_progress`/`completed`/`cancelled`ga UI'дан
-  // o'tkazib bo'lmasdi. Endi "Ijroni boshlash" tugmasi ko'rinadi va `useUpdatePlanStatus`
+  // o'tkazib bo'lmasdi. Endi "Davolashni boshlash" tugmasi ko'rinadi va `useUpdatePlanStatus`
   // to'g'ri statusni chaqiradi.
-  it("B4: 'accepted' plan — 'Ijroni boshlash' tugmasi in_progress'ga o'tkazadi", () => {
+  // FT-01.5: matn «Davolashni boshlash» (soddalashtirilgan atamalar).
+  it("B4: 'accepted' plan — 'Davolashni boshlash' tugmasi in_progress'ga o'tkazadi", () => {
     mockPlans.data = [{ ...BASE_PLAN, status: 'accepted' }];
     renderApp(<TreatmentPlansTab patientId="p1" />);
-    const startBtn = screen.getByRole('button', { name: 'Ijroni boshlash' });
+    const startBtn = screen.getByRole('button', { name: 'Davolashni boshlash' });
     fireEvent.click(startBtn);
     expect(planStatusMutate).toHaveBeenCalledWith({ id: 'pl1', status: 'in_progress' });
   });
@@ -94,10 +97,12 @@ describe('TreatmentPlansTab', () => {
     expect(planStatusMutate).toHaveBeenCalledWith({ id: 'pl1', status: 'completed' });
   });
 
-  it("B4: 'accepted'/'in_progress' planda bekor qilish tugmasi bor — cancelled'ga o'tkazadi", () => {
+  // FT-01.5: bekor qilish endi «…» (Boshqa amallar) menyusida.
+  it("B4: 'accepted'/'in_progress' planda bekor qilish bandi bor — cancelled'ga o'tkazadi", async () => {
     mockPlans.data = [{ ...BASE_PLAN, status: 'accepted' }];
     renderApp(<TreatmentPlansTab patientId="p1" />);
-    const cancelBtn = screen.getByRole('button', { name: 'Bekor qilish' });
+    fireEvent.click(screen.getByRole('button', { name: 'Boshqa amallar' }));
+    const cancelBtn = await screen.findByRole('menuitem', { name: 'Bekor qilish' });
     fireEvent.click(cancelBtn);
     expect(planStatusMutate).toHaveBeenCalledWith({ id: 'pl1', status: 'cancelled' });
   });
@@ -105,8 +110,79 @@ describe('TreatmentPlansTab', () => {
   it("B4: terminal ('completed'/'cancelled') planda lifecycle tugmalari yo'q", () => {
     mockPlans.data = [{ ...BASE_PLAN, status: 'completed' }];
     renderApp(<TreatmentPlansTab patientId="p1" />);
-    expect(screen.queryByRole('button', { name: 'Ijroni boshlash' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Davolashni boshlash' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Rejani yakunlash' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Bekor qilish' })).not.toBeInTheDocument();
+  });
+});
+
+// FT-01.5: «Bemor rozi bo'ldi» — reja qabul qilingach taklif bosqichlari ham qabul qilinadi.
+describe("TreatmentPlansTab — FT-01.5 «Bemor rozi bo'ldi»", () => {
+  afterEach(() => {
+    planStatusMutate.mockReset();
+    acceptAllMutate.mockReset();
+  });
+
+  it('avval reja accepted, muvaffaqiyatdan keyin taklif bosqichlari qabul qilinadi', () => {
+    mockPlans.data = [
+      {
+        ...BASE_PLAN,
+        status: 'presented',
+        consentFormId: 'cf1',
+        stages: [
+          {
+            id: 's1',
+            sequence: 1,
+            serviceName: 'A',
+            cost: '1',
+            status: 'pending',
+            acceptance: 'proposed',
+            toothNumbers: [],
+          },
+          {
+            id: 's2',
+            sequence: 2,
+            serviceName: 'B',
+            cost: '1',
+            status: 'pending',
+            acceptance: 'rejected',
+            toothNumbers: [],
+          },
+        ],
+      },
+    ];
+    planStatusMutate.mockImplementation((_vars, opts) => opts?.onSuccess?.());
+    renderApp(<TreatmentPlansTab patientId="p1" />);
+    fireEvent.click(screen.getByRole('button', { name: "Bemor rozi bo'ldi" }));
+    expect(planStatusMutate).toHaveBeenCalledWith(
+      { id: 'pl1', status: 'accepted' },
+      expect.anything(),
+    );
+    expect(acceptAllMutate).toHaveBeenCalledWith(['s1'], expect.anything());
+  });
+
+  it("rozilik gate'i rad etsa bosqichlarga tegilmaydi", () => {
+    mockPlans.data = [
+      {
+        ...BASE_PLAN,
+        status: 'presented',
+        consentFormId: 'cf1',
+        stages: [
+          {
+            id: 's1',
+            sequence: 1,
+            serviceName: 'A',
+            cost: '1',
+            status: 'pending',
+            acceptance: 'proposed',
+            toothNumbers: [],
+          },
+        ],
+      },
+    ];
+    planStatusMutate.mockImplementation((_vars, opts) => opts?.onError?.(new Error('x')));
+    renderApp(<TreatmentPlansTab patientId="p1" />);
+    fireEvent.click(screen.getByRole('button', { name: "Bemor rozi bo'ldi" }));
+    expect(acceptAllMutate).not.toHaveBeenCalled();
   });
 });
