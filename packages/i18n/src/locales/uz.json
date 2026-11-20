@@ -352,6 +352,12 @@
     },
     "visit_note": {
       "on_behalf_forbidden": "Boshqa shifokor nomidan vizit yozuvi yaratishga ruxsatingiz yo'q."
+    },
+    "discount": {
+      "forbidden": "Chegirma berishga ruxsatingiz yo'q (bu filialda «Chegirma bera oladi» huquqi kerak)."
+    },
+    "patient": {
+      "discount_exceeds_max": "Doimiy chegirma klinika belgilagan chegaradan ({{maxPercent}}%) oshmasligi kerak."
     }
   },
   "dashboard": {

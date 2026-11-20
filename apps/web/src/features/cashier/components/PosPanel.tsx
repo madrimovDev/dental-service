@@ -31,6 +31,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BalanceBadge } from '@/components/BalanceBadge';
 import { usePatient, usePatientBalance } from '@/features/patients/patients.api';
+import { apiErrorMessage } from '@/lib/api-error-message';
 import { formatCurrency } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth-store';
 import { fetchServicePrices, useCreateTransaction, useServices } from '../cashier.api';
@@ -329,8 +330,9 @@ export function PosPanel({
           clearVisit();
           return;
         }
-        // Per-mutation onError global toast'ni o'chiradi — umumiy xatoni o'zimiz ko'rsatamiz.
-        notifications.show({ color: 'red', message: t('common.error') });
+        // Per-mutation onError global toast'ni o'chiradi — umumiy xatoni o'zimiz ko'rsatamiz
+        // (FT-04: `apiErrors.<code>` tarjimasi bo'lsa — masalan `discount.forbidden` — o'shani).
+        notifications.show({ color: 'red', message: apiErrorMessage(e) });
       },
       onSuccess: (data: CashierTransaction) => {
         setVisitNoteId(null);

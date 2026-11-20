@@ -11,7 +11,14 @@ export function apiErrorMessage(error: unknown): string {
   const fallback = i18n.t('common.error');
   if (error instanceof ApiError) {
     const key = `apiErrors.${error.code}`;
-    if (error.code && typeof i18n.exists === 'function' && i18n.exists(key)) return i18n.t(key);
+    if (error.code && typeof i18n.exists === 'function' && i18n.exists(key)) {
+      // FT-04: `details` (masalan `{ maxPercent }`) — interpolatsiya parametrlari.
+      const params =
+        error.details && typeof error.details === 'object'
+          ? (error.details as Record<string, unknown>)
+          : undefined;
+      return i18n.t(key, params);
+    }
     return error.message || fallback;
   }
   if (error instanceof Error) return error.message || fallback;
