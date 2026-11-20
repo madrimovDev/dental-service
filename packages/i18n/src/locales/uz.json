@@ -345,13 +345,28 @@
   },
   "apiErrors": {
     "ownership": {
-      "not_practitioner": "Yozuv muallifi shifokor bo'lishi kerak. Shifokorni tanlang yoki shifokor hisobidan kiring."
+      "not_practitioner": "Yozuv muallifi shifokor bo'lishi kerak. Shifokorni tanlang yoki shifokor hisobidan kiring.",
+      "not_found": "Tanlangan yozuv topilmadi. Sahifani yangilab, qayta urinib ko'ring.",
+      "mismatch": "Tanlangan yozuvlar bir-biriga mos emas (boshqa bemor yoki shifokorga tegishli)."
     },
     "prescription": {
       "on_behalf_forbidden": "Boshqa shifokor nomidan retsept yozishga ruxsatingiz yo'q."
     },
     "visit_note": {
-      "on_behalf_forbidden": "Boshqa shifokor nomidan vizit yozuvi yaratishga ruxsatingiz yo'q."
+      "on_behalf_forbidden": "Boshqa shifokor nomidan vizit yozuvi yaratishga ruxsatingiz yo'q.",
+      "signed": "Vizit yozuvi imzolangan — unga endi ish bog'lab bo'lmaydi.",
+      "stage_linked": "Vizit yozuvi allaqachon boshqa bosqichga bog'langan."
+    },
+    "plan": {
+      "locked": "Reja yakunlangan yoki bekor qilingan — unga bosqich qo'shib ham, tahrirlab ham bo'lmaydi.",
+      "not_active": "Reja hali qabul qilinmagan. Bajarilgan ishni yozish uchun avval rejani qabul qiling.",
+      "doctor_mismatch": "Bu reja boshqa shifokorga tegishli. Ishni o'z rejangizga yozing yoki shifokor nomidan yozish huquqi kerak."
+    },
+    "stage": {
+      "locked": "Bu bosqichni o'zgartirib bo'lmaydi: u boshlangan yoki unga to'lov taqsimlangan."
+    },
+    "medical_record": {
+      "on_behalf_forbidden": "Boshqa shifokor nomidan tibbiy yozuv kiritishga ruxsatingiz yo'q."
     }
   },
   "dashboard": {
