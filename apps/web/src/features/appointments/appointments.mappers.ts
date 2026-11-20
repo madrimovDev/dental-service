@@ -328,3 +328,28 @@ export function isOutsideWorkHours(
   if (e <= s) e = 24 * 60;
   return s < entry.open || e > entry.close;
 }
+
+/** FT-05.4: zoom darajalari — slot balandligi (px / 1 soat). Oddiy = standart `GRID` zichligi (88). */
+export type CalendarZoom = 'compact' | 'normal' | 'comfortable';
+export const CALENDAR_ZOOMS: readonly CalendarZoom[] = ['compact', 'normal', 'comfortable'];
+const ZOOM_PX_PER_HOUR: Record<CalendarZoom, number> = {
+  compact: 60,
+  normal: 88,
+  comfortable: 128,
+};
+export const ZOOM_STORAGE_KEY = 'calendar.zoom';
+
+/** Grid oynasi o'zgarmaydi — faqat vertikal zichlik (`pxPerMin`). */
+export function gridWithZoom(grid: GridConfig, zoom: CalendarZoom): GridConfig {
+  return { ...grid, pxPerMin: ZOOM_PX_PER_HOUR[zoom] / 60 };
+}
+
+/** `localStorage`dan saqlangan zoom; yo'q/noto'g'ri/ruxsat yo'q → 'normal'. */
+export function readStoredZoom(storage: Pick<Storage, 'getItem'> | undefined): CalendarZoom {
+  try {
+    const v = storage?.getItem(ZOOM_STORAGE_KEY);
+    return CALENDAR_ZOOMS.find((z) => z === v) ?? 'normal';
+  } catch {
+    return 'normal';
+  }
+}

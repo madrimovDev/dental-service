@@ -1814,7 +1814,12 @@
     "no_schedule_title": "На этот день графика нет",
     "no_schedule_text": "Без графика записать к этому врачу нельзя.",
     "no_schedule_link": "Открыть график →",
-    "no_schedule_badge": "Нет графика"
+    "no_schedule_badge": "Нет графика",
+    "zoom": "Масштаб",
+    "zoom_compact": "Мелко",
+    "zoom_normal": "Обычно",
+    "zoom_comfortable": "Крупно",
+    "rail_open": "Панель"
   },
   "booking": {
     "title": "Новая запись",

@@ -21,7 +21,7 @@
 }
 
 .timeLabel {
-  height: 88px; /* 1 soat × 88px/soat zichlik */
+  height: var(--cal-hour, 88px); /* 1 soat × zoom zichligi (FT-05.4) */
   font-family: var(--font-mono);
   font-feature-settings: var(--num);
   font-size: var(--text-2xs);
@@ -132,7 +132,7 @@
 
 /* per-30-min grid line: solid var(--border); hour opacity 1, half-hour .4 */
 .gridLine {
-  height: 44px; /* 30 daqiqa × 88px/soat */
+  height: var(--cal-row, 44px); /* 30 daqiqa × zoom zichligi (FT-05.4) */
   border-bottom: 1px solid var(--border);
   box-sizing: border-box;
 }

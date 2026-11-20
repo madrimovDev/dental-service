@@ -74,6 +74,7 @@ const appt = (over: Record<string, unknown> = {}) => ({
 });
 
 beforeEach(() => {
+  window.localStorage.clear();
   hoisted.perms = new Set(['appointment.view', 'appointment.edit', 'appointment.cancel']);
   hoisted.statusMutate.mockReset();
   hoisted.cancelMutate.mockReset();
@@ -466,5 +467,74 @@ describe('CalendarScreen', () => {
     expect(url.pathname).toBe('/appointments/new');
     expect(url.searchParams.get('doctorId')).toBe('d1');
     expect(url.searchParams.get('time')).toBe('09:30');
+  });
+
+  // FT-05.4: zoom 3 daraja (localStorage) + planshet (<1024px) rail drawer'ga.
+  it('zoom: 3 daraja slot balandligini o‘zgartiradi va localStorage’da saqlanadi', () => {
+    const { unmount } = renderApp(<CalendarScreen />);
+    const hourPx = () =>
+      Number.parseFloat(
+        (document.querySelector('[data-cal-grid]') as HTMLElement).style.getPropertyValue(
+          '--cal-hour',
+        ),
+      );
+    const normal = hourPx();
+    expect(normal).toBeCloseTo(88, 0);
+    fireEvent.click(screen.getByRole('button', { name: 'Katta' }));
+    expect(hourPx()).toBeGreaterThan(normal);
+    expect(window.localStorage.getItem('calendar.zoom')).toBe('comfortable');
+    // slot balandligi ham mos o'zgardi (1 soat × zichlik)
+    const slot = screen.getByText('Dilnoza Rahimova').closest('button') as HTMLElement;
+    expect(Number.parseFloat(slot.style.height)).toBeCloseTo(hourPx(), 0);
+    unmount();
+    // qayta ochilganda saqlangan daraja
+    renderApp(<CalendarScreen />);
+    expect(hourPx()).toBeGreaterThan(normal);
+    fireEvent.click(screen.getByRole('button', { name: 'Kichik' }));
+    expect(hourPx()).toBeLessThan(normal);
+    expect(window.localStorage.getItem('calendar.zoom')).toBe('compact');
+  });
+
+  describe('planshet (<1024px)', () => {
+    const origMatchMedia = window.matchMedia;
+    afterEach(() => {
+      window.matchMedia = origMatchMedia;
+    });
+    const setTablet = (tablet: boolean) => {
+      window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+        matches: tablet && query.includes('max-width: 1023'),
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })) as unknown as typeof window.matchMedia;
+    };
+
+    it('keng ekranda o‘ng panel yonida (drawer tugmasi yo‘q)', () => {
+      setTablet(false);
+      renderApp(<CalendarScreen />);
+      expect(screen.getByTestId('calendar-rail')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Panel' })).not.toBeInTheDocument();
+    });
+
+    it('planshetda panel drawer’ga ko‘chadi: tugma bilan ochiladi', async () => {
+      setTablet(true);
+      renderApp(<CalendarScreen />);
+      expect(screen.queryByTestId('calendar-rail')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Panel' }));
+      const rail = await screen.findByTestId('calendar-rail');
+      expect(screen.getByRole('dialog')).toContainElement(rail);
+    });
+
+    it('planshetda yozilish bosilsa tafsilot drawer’da ochiladi', async () => {
+      setTablet(true);
+      renderApp(<CalendarScreen />);
+      fireEvent.click(screen.getByText('Dilnoza Rahimova'));
+      const panel = await screen.findByTestId('appointment-panel');
+      expect(screen.getByRole('dialog')).toContainElement(panel);
+    });
   });
 });

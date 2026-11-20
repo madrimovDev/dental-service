@@ -4,14 +4,17 @@ import {
   assignLanes,
   dropStartMinute,
   gridFromWorkHours,
+  gridWithZoom,
   groupByDay,
   instantFromDayMinute,
   isOutsideWorkHours,
   localMinutes,
   newAppointmentHref,
   pickColumnIndex,
+  readStoredZoom,
   resizeEndMinute,
   toSlotPosition,
+  ZOOM_STORAGE_KEY,
 } from './appointments.mappers';
 import { GRID } from './appointments.types';
 
@@ -206,5 +209,34 @@ describe('FT-05.3 pointer drag/resize yordamchilari', () => {
     expect(pickColumnIndex(-30, rects)).toBe(0);
     expect(pickColumnIndex(900, rects)).toBe(2);
     expect(pickColumnIndex(10, [])).toBe(-1);
+  });
+});
+
+describe('FT-05.4 zoom (slot balandligi)', () => {
+  it('gridWithZoom: 3 daraja — kichik < oddiy (standart zichlik) < katta', () => {
+    const c = gridWithZoom(GRID, 'compact').pxPerMin;
+    const n = gridWithZoom(GRID, 'normal').pxPerMin;
+    const l = gridWithZoom(GRID, 'comfortable').pxPerMin;
+    expect(c).toBeLessThan(n);
+    expect(n).toBe(GRID.pxPerMin);
+    expect(l).toBeGreaterThan(n);
+    // oyna (soatlar) o'zgarmaydi
+    expect(gridWithZoom(GRID, 'compact').dayStartHour).toBe(GRID.dayStartHour);
+  });
+
+  it("readStoredZoom: noto'g'ri/yo'q qiymat → 'normal'; yaroqli qiymat qaytadi", () => {
+    const mk = (v: string | null) => ({ getItem: () => v }) as unknown as Storage;
+    expect(ZOOM_STORAGE_KEY).toBe('calendar.zoom');
+    expect(readStoredZoom(mk(null))).toBe('normal');
+    expect(readStoredZoom(mk('huge'))).toBe('normal');
+    expect(readStoredZoom(mk('compact'))).toBe('compact');
+    expect(readStoredZoom(mk('comfortable'))).toBe('comfortable');
+    expect(
+      readStoredZoom({
+        getItem: () => {
+          throw new Error('denied');
+        },
+      } as unknown as Storage),
+    ).toBe('normal');
   });
 });

@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { cellStartMinute, groupByDoctor, minuteLabel } from '../appointments.mappers';
@@ -108,7 +109,16 @@ export function CalendarGrid({
   );
 
   return (
-    <div className={classes.grid} data-cal-grid>
+    <div
+      className={classes.grid}
+      data-cal-grid
+      style={
+        {
+          '--cal-hour': `${grid.pxPerMin * 60}px`,
+          '--cal-row': `${grid.pxPerMin * grid.stepMin}px`,
+        } as CSSProperties
+      }
+    >
       <div className={classes.times}>
         <div className={classes.timesHead} />
         {hours.map((h) => (

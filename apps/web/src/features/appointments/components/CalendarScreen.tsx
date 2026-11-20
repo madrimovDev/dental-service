@@ -1,6 +1,7 @@
 import { ApiError } from '@dental/api-client';
 import { Button, IconButton, StateView, StatusPill, Tabs, UndoToast } from '@dental/ui';
-import { Group, Select } from '@mantine/core';
+import { Drawer, Group, Select, UnstyledButton } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { ChevronRight } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -21,7 +22,10 @@ import {
 } from '../appointments.api';
 import {
   addDaysToDateKey,
+  CALENDAR_ZOOMS,
+  type CalendarZoom,
   gridFromWorkHours,
+  gridWithZoom,
   instantFromDayMinute,
   isOutsideWorkHours,
   localDateKey,
@@ -29,6 +33,8 @@ import {
   minuteLabel,
   mondayOfWeek,
   newAppointmentHref,
+  readStoredZoom,
+  ZOOM_STORAGE_KEY,
 } from '../appointments.mappers';
 import type { Appointment, AppointmentStatus, CalendarEvent } from '../appointments.types';
 import { AppointmentPanel } from './AppointmentPanel';
@@ -69,6 +75,21 @@ export function CalendarScreen() {
   /** FT-05.1: bo'sh katak / bo'sh slot → yangi yozilish (doktor, filial, sana, vaqt oldindan). */
   const canCreate = hasPermission('appointment.create');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  /** FT-05.4: zoom 3 daraja (slot balandligi), `localStorage`da. */
+  const [zoom, setZoom] = useState<CalendarZoom>(() =>
+    readStoredZoom(typeof window === 'undefined' ? undefined : window.localStorage),
+  );
+  const changeZoom = (z: CalendarZoom) => {
+    setZoom(z);
+    try {
+      window.localStorage.setItem(ZOOM_STORAGE_KEY, z);
+    } catch {
+      // saqlash imkoni yo'q (private rejim) — daraja faqat shu sessiyada
+    }
+  };
+  /** FT-05.4: planshet (<1024px) — o'ng panel drawer'ga, doktor ustunlari gorizontal scroll. */
+  const isTablet = useMediaQuery('(max-width: 1023px)') ?? false;
+  const [railOpen, setRailOpen] = useState(false);
   const [pending, setPending] = useState<PendingAction | null>(null);
   const pendingRef = useRef<PendingAction | null>(null);
   /** Kutilayotgan (UndoToast) yoki yuborilgan, hali refetch bo'lmagan holatlar — optimistik ko'rinish. */
@@ -209,13 +230,16 @@ export function CalendarScreen() {
   );
   const grid = useMemo(
     () =>
-      gridFromWorkHours(
-        branchId != null
-          ? [workHoursByBranch.get(branchId) ?? null]
-          : [...workHoursByBranch.values()],
-        apptList,
+      gridWithZoom(
+        gridFromWorkHours(
+          branchId != null
+            ? [workHoursByBranch.get(branchId) ?? null]
+            : [...workHoursByBranch.values()],
+          apptList,
+        ),
+        zoom,
       ),
-    [branchId, workHoursByBranch, apptList],
+    [branchId, workHoursByBranch, apptList, zoom],
   );
   const outsideHoursIds = useMemo(
     () =>
@@ -253,8 +277,15 @@ export function CalendarScreen() {
     });
   };
 
-  const openDetail = (event: CalendarEvent) => setSelectedId(event.appointment.id);
+  const openDetail = (event: CalendarEvent) => {
+    setSelectedId(event.appointment.id);
+    if (isTablet) setRailOpen(true);
+  };
   const closeDetail = () => setSelectedId(null);
+  const closeRail = () => {
+    setRailOpen(false);
+    setSelectedId(null);
+  };
 
   const selected = selectedId == null ? null : (apptList.find((a) => a.id === selectedId) ?? null);
 
@@ -432,6 +463,51 @@ export function CalendarScreen() {
   const changeStatus = (appt: Appointment, to: AppointmentStatus) =>
     statusMut.mutate({ id: appt.id, status: to });
 
+  const rail = (
+    <div data-testid="calendar-rail" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {selected != null && (
+        <AppointmentPanel
+          appointment={selected}
+          patientName={patientName(selected.patientId)}
+          doctorName={doctorNameMap.get(selected.doctorId) ?? '—'}
+          serviceNames={(selected.serviceIds ?? []).map((id) => serviceNameMap.get(id) ?? id)}
+          canEdit={hasPermission('appointment.edit')}
+          canCancel={hasPermission('appointment.cancel')}
+          canOpenPatient={hasPermission('patient.view')}
+          onStatus={(to) => changeStatus(selected, to)}
+          onNoShow={() => markNoShow(selected)}
+          onCancel={() => markCancelled(selected)}
+          onClose={closeDetail}
+          doctors={doctors ?? []}
+          onMove={(doctorId, hhmm) => {
+            const [h, m] = hhmm.split(':').map(Number);
+            moveAppointment(selected, doctorId, (h ?? 0) * 60 + (m ?? 0));
+          }}
+        />
+      )}
+      <DayStatsCard
+        appts={apptList}
+        isToday={isToday(pivotKey)}
+        dayLabel={formatDayMonth(date, i18n.language)}
+      />
+      {/* DS12: jonli "Bo'sh slot" kartasi — faqat `schedule.view` ruxsati
+          bo'lganda render (cheklangan rollarda 403 oldini olish, CLI-153). */}
+      {hasPermission('schedule.view') && (
+        <FreeSlotsCard
+          branchId={branchId}
+          date={pivotKey}
+          enabled
+          onPick={
+            canCreate
+              ? ({ doctorId, startMinute }) => openNew({ doctorId, dateKey: pivotKey, startMinute })
+              : undefined
+          }
+        />
+      )}
+      <WaitlistCard appts={apptList} />
+    </div>
+  );
+
   return (
     <div>
       <Group justify="flex-end" gap="xs" mb="md">
@@ -491,7 +567,50 @@ export function CalendarScreen() {
           </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            marginLeft: 'auto',
+            flexWrap: 'wrap',
+          }}
+        >
+          {/* biome-ignore lint/a11y/useSemanticElements: fieldset brauzer chegarasini qo'shadi — toolbar guruhi */}
+          <div
+            role="group"
+            aria-label={t('calendar.zoom')}
+            style={{
+              display: 'flex',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-md)',
+              overflow: 'hidden',
+            }}
+          >
+            {CALENDAR_ZOOMS.map((z) => (
+              <UnstyledButton
+                key={z}
+                aria-pressed={zoom === z}
+                onClick={() => changeZoom(z)}
+                style={{
+                  minHeight: 44,
+                  minWidth: 44,
+                  padding: '0 12px',
+                  fontSize: 'var(--text-xs)',
+                  fontWeight: zoom === z ? 700 : 500,
+                  background: zoom === z ? 'var(--primary-soft)' : 'var(--surface)',
+                  color: zoom === z ? 'var(--ink)' : 'var(--ink-2)',
+                }}
+              >
+                {t(`calendar.zoom_${z}`)}
+              </UnstyledButton>
+            ))}
+          </div>
+          {isTablet && (
+            <Button variant="default" onClick={() => setRailOpen(true)}>
+              {t('calendar.rail_open')}
+            </Button>
+          )}
           <Tabs
             value={view}
             onChange={(v) => setView(v as 'day' | 'week')}
@@ -521,7 +640,7 @@ export function CalendarScreen() {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1fr) 296px',
+          gridTemplateColumns: isTablet ? 'minmax(0, 1fr)' : 'minmax(0, 1fr) 296px',
           gap: 16,
           marginTop: 16,
         }}
@@ -579,50 +698,20 @@ export function CalendarScreen() {
           )}
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {selected != null && (
-            <AppointmentPanel
-              appointment={selected}
-              patientName={patientName(selected.patientId)}
-              doctorName={doctorNameMap.get(selected.doctorId) ?? '—'}
-              serviceNames={(selected.serviceIds ?? []).map((id) => serviceNameMap.get(id) ?? id)}
-              canEdit={hasPermission('appointment.edit')}
-              canCancel={hasPermission('appointment.cancel')}
-              canOpenPatient={hasPermission('patient.view')}
-              onStatus={(to) => changeStatus(selected, to)}
-              onNoShow={() => markNoShow(selected)}
-              onCancel={() => markCancelled(selected)}
-              onClose={closeDetail}
-              doctors={doctors ?? []}
-              onMove={(doctorId, hhmm) => {
-                const [h, m] = hhmm.split(':').map(Number);
-                moveAppointment(selected, doctorId, (h ?? 0) * 60 + (m ?? 0));
-              }}
-            />
-          )}
-          <DayStatsCard
-            appts={apptList}
-            isToday={isToday(pivotKey)}
-            dayLabel={formatDayMonth(date, i18n.language)}
-          />
-          {/* DS12: jonli "Bo'sh slot" kartasi — faqat `schedule.view` ruxsati
-              bo'lganda render (cheklangan rollarda 403 oldini olish, CLI-153). */}
-          {hasPermission('schedule.view') && (
-            <FreeSlotsCard
-              branchId={branchId}
-              date={pivotKey}
-              enabled
-              onPick={
-                canCreate
-                  ? ({ doctorId, startMinute }) =>
-                      openNew({ doctorId, dateKey: pivotKey, startMinute })
-                  : undefined
-              }
-            />
-          )}
-          <WaitlistCard appts={apptList} />
-        </div>
+        {isTablet ? null : rail}
       </div>
+
+      {isTablet && (
+        <Drawer
+          opened={railOpen}
+          onClose={closeRail}
+          position="right"
+          size={340}
+          title={t('calendar.panel_title')}
+        >
+          {rail}
+        </Drawer>
+      )}
 
       {pending != null && (
         <UndoToast

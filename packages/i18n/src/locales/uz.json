@@ -1814,7 +1814,12 @@
     "no_schedule_title": "Bu kunga ish jadvali yo'q",
     "no_schedule_text": "Jadvalsiz bu shifokorga yozib bo'lmaydi.",
     "no_schedule_link": "Jadvalni ko'rish →",
-    "no_schedule_badge": "Jadval yo'q"
+    "no_schedule_badge": "Jadval yo'q",
+    "zoom": "Kattalashtirish",
+    "zoom_compact": "Kichik",
+    "zoom_normal": "Oddiy",
+    "zoom_comfortable": "Katta",
+    "rail_open": "Panel"
   },
   "booking": {
     "title": "Yangi yozilish",
