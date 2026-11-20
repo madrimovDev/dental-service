@@ -2,6 +2,7 @@
  * FT-06.3 — kassa rasmi 90 kunlik retention (REAL DB + REAL fayl-tizimi + REAL Redis/BullMQ).
  *  - 90 kundan eski qator + fayl o'chadi; yangi (89 kun) ikkalasi saqlanadi;
  *  - rasmsiz (skipped) eski qator ham o'chadi; fayli allaqachon yo'q eski qator ham o'chadi;
+ *  - uploads papkasining o'zi yo'q bo'lsa (worker'ga volume ulanmagan) — sweep o'tkazib yuboriladi, qatorlar SAQLANADI;
  *  - fayl o'chirish xato bersa qator SAQLANADI (keyingi kun qayta uriniladi), boshqa qatorlar davom etadi;
  *  - cross-tenant: ikkala tenant qatorlari bitta sweep'da tozalanadi (admin ulanish);
  *  - scheduler (real Redis) idempotent: bitta repeatable job, Toshkent 03:00.
@@ -119,7 +120,7 @@ describe('FT-06.3 retention sweep', () => {
     ]);
 
     const res = await processCashierPhotoRetention({ adminDb: admin.db, storage, now });
-    expect(res).toEqual({ deleted: 4, failed: 0 });
+    expect(res).toEqual({ deleted: 4, failed: 0, skipped: false });
 
     const left = await rows();
     expect(left.map((r) => r.transactionId).sort()).toEqual([a1, b2].sort());
@@ -131,6 +132,7 @@ describe('FT-06.3 retention sweep', () => {
     expect(await processCashierPhotoRetention({ adminDb: admin.db, storage, now })).toEqual({
       deleted: 0,
       failed: 0,
+      skipped: false,
     });
   });
 
@@ -154,12 +156,32 @@ describe('FT-06.3 retention sweep', () => {
       },
     };
     const res = await processCashierPhotoRetention({ adminDb: admin.db, storage: failing, now });
-    expect(res).toEqual({ deleted: 1, failed: 1 });
+    expect(res).toEqual({ deleted: 1, failed: 1, skipped: false });
     const ids = (await rows()).map((r) => r.transactionId);
     expect(ids).toContain(b3);
     expect(ids).not.toContain(b4);
     expect(await storage.exists(locked)).toBe(true);
     expect(await storage.exists(fine)).toBe(false);
+  });
+});
+
+describe('FT-06.3 retention — uploads papkasi yo‘q', () => {
+  test('base dir mavjud bo‘lmasa qatorlar SAQLANADI (fayl yo‘q deb o‘chirilmaydi)', async () => {
+    const t1 = tenantIds[0] as string;
+    const a2 = txIds[1] as string;
+    const key = keyOf(t1, a2, 'novol');
+    await admin.db
+      .insert(cashierTransactionPhotos)
+      .values({ tenantId: t1, transactionId: a2, objectKey: key, capturedAt: ago(200) });
+    const missing = createLocalStorageAdapter(join(dir, 'does-not-exist'));
+    const res = await processCashierPhotoRetention({ adminDb: admin.db, storage: missing, now });
+    expect(res).toEqual({ deleted: 0, failed: 0, skipped: true });
+    expect((await rows()).map((r) => r.objectKey)).toContain(key);
+
+    // Papka mavjud bo'lganda (faqat shu fayl yo'q) — dizayn bo'yicha qator o'chadi.
+    const res2 = await processCashierPhotoRetention({ adminDb: admin.db, storage, now });
+    expect(res2.skipped).toBe(false);
+    expect((await rows()).map((r) => r.objectKey)).not.toContain(key);
   });
 });
 

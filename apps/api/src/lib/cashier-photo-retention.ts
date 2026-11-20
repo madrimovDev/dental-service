@@ -1,3 +1,4 @@
+import { stat } from 'node:fs/promises';
 import { cashierTransactionPhotos } from '@dental/db-schema';
 import { Worker } from 'bullmq';
 import { eq, lt } from 'drizzle-orm';
@@ -43,7 +44,12 @@ export type CashierPhotoRetentionDeps = {
   now?: Date;
   retentionDays?: number;
 };
-export type CashierPhotoRetentionResult = { deleted: number; failed: number };
+export type CashierPhotoRetentionResult = {
+  deleted: number;
+  failed: number;
+  /** Uploads papkasi topilmadi — hech narsa o'chirilmadi. */
+  skipped: boolean;
+};
 
 /**
  * `captured_at` < now - retentionDays bo'lgan qatorlarni o'chiradi: AVVAL fayl (yo'q bo'lsa —
@@ -63,7 +69,26 @@ export async function processCashierPhotoRetention(
     .from(cashierTransactionPhotos)
     .where(lt(cashierTransactionPhotos.capturedAt, cutoff));
 
-  const result: CashierPhotoRetentionResult = { deleted: 0, failed: 0 };
+  const result: CashierPhotoRetentionResult = { deleted: 0, failed: 0, skipped: false };
+  if (stale.length === 0) return result;
+
+  // Uploads papkasining o'zi yo'q bo'lsa (masalan, worker'ga volume ulanmagan / UPLOADS_DIR
+  // noto'g'ri) — har fayl `exists()=false` bo'lib qator o'chib, haqiqiy JPEG abadiy qolardi.
+  // Shu holatda sweep TO'XTATILADI: qatorlar saqlanadi, xato log'ga yoziladi.
+  const basePath = storage.resolve('.')?.path;
+  const baseOk = basePath
+    ? await stat(basePath)
+        .then((s) => s.isDirectory())
+        .catch(() => false)
+    : false;
+  if (!baseOk) {
+    logger.error(
+      { basePath, stale: stale.length },
+      'Cashier photo retention skipped: uploads base dir does not exist (UPLOADS_DIR/volume?)',
+    );
+    return { ...result, skipped: true };
+  }
+
   for (const row of stale) {
     try {
       if (row.objectKey && (await storage.exists(row.objectKey))) {
