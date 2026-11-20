@@ -65,6 +65,7 @@ export const ROLE_TEMPLATES = [
       'cashier.view',
       'cashier.create_transaction',
       'cashier.refund',
+      'cashier.photo.view',
       'report.view',
       'salary.view',
       'expense.view',

@@ -484,6 +484,13 @@
       "when": 1795128100500,
       "tag": "0068_fx116_bm_payroll_backfill",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1795133045220,
+      "tag": "0071_ft06_cashier_photos",
+      "breakpoints": true
     }
   ]
 }

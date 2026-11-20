@@ -165,3 +165,25 @@ describe('FX-116 — payroll.* tenant-wide', () => {
     expect(permsFor(key)).toContain('payroll.manage');
   });
 });
+
+/** FT-06.3 (D-4) — kassa rasmi: faqat Tenant Admin (owner implicit) ko'radi. */
+describe('cashier.photo.view — rol matritsasi', () => {
+  test('tenant_admin — bor', () => {
+    expect(permsFor('tenant_admin')).toContain('cashier.photo.view');
+  });
+  test.each([
+    'branch_manager',
+    'doctor',
+    'doctor_assistant',
+    'nurse',
+    'receptionist',
+    'accountant',
+    'technician',
+  ])('%s — YO‘Q', (key) => {
+    expect(permsFor(key)).not.toContain('cashier.photo.view');
+  });
+  test('katalogda bor', async () => {
+    const { PERMISSIONS } = await import('./permissions.ts');
+    expect(PERMISSIONS.map((p) => p.code)).toContain('cashier.photo.view');
+  });
+});
