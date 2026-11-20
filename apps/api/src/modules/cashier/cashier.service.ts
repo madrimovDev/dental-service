@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import {
   appointments,
   cashierTransactionItems,
+  cashierTransactionPhotos,
   cashierTransactions,
   expenses,
   patients,
@@ -357,7 +358,12 @@ export const createCashierService = (deps: {
   }
 
   /** `branchIds`: X-2 doirasi (null = cheklovsiz); `query.branchId` bilan kesishadi (route tekshirgan). */
-  async function list(c: Context, query: ListTransactionsQuery, branchIds: string[] | null = null) {
+  async function list(
+    c: Context,
+    query: ListTransactionsQuery,
+    branchIds: string[] | null = null,
+    opts: { withPhotoStatus?: boolean } = {},
+  ) {
     const db = getDb(c);
     const offset = (query.page - 1) * query.pageSize;
 
@@ -396,7 +402,39 @@ export const createCashierService = (deps: {
       db,
       rows.map((r) => r.id),
     );
-    const data = rows.map((r) => ({ ...r, refundedAmount: refunded.get(r.id) ?? '0' }));
+    // Bemor ismi (ro'yxatda link matni) — bitta IN-query. `fullName` PII emas (faqat telefon maskalanadi).
+    const patientIds = [...new Set(rows.map((r) => r.patientId).filter((x): x is string => !!x))];
+    const names = new Map<string, string>();
+    if (patientIds.length > 0) {
+      const ps = await db
+        .select({ id: patients.id, fullName: patients.fullName })
+        .from(patients)
+        .where(inArray(patients.id, patientIds));
+      for (const p of ps) names.set(p.id, p.fullName);
+    }
+    // FT-06: rasm holati (faqat `cashier.photo.view` egasiga) — bitta IN-query, N+1 yo'q.
+    const photoStatus = new Map<string, 'photo' | 'skipped'>();
+    if (opts.withPhotoStatus && rows.length > 0) {
+      const ph = await db
+        .select({
+          transactionId: cashierTransactionPhotos.transactionId,
+          objectKey: cashierTransactionPhotos.objectKey,
+        })
+        .from(cashierTransactionPhotos)
+        .where(
+          inArray(
+            cashierTransactionPhotos.transactionId,
+            rows.map((r) => r.id),
+          ),
+        );
+      for (const p of ph) photoStatus.set(p.transactionId, p.objectKey ? 'photo' : 'skipped');
+    }
+    const data = rows.map((r) => ({
+      ...r,
+      refundedAmount: refunded.get(r.id) ?? '0',
+      patientName: r.patientId ? (names.get(r.patientId) ?? null) : null,
+      photoStatus: opts.withPhotoStatus ? (photoStatus.get(r.id) ?? null) : null,
+    }));
 
     await deps.audit.record(c, {
       action: 'viewed',

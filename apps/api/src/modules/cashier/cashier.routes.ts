@@ -121,7 +121,10 @@ export const cashierRoutes = (deps: {
       }
       branchIds = query.branchId ? [query.branchId] : scope.branchIds;
     }
-    const result = await service.list(c, query, branchIds);
+    const claims = c.get('accessClaims');
+    const canPhoto =
+      !!claims && (claims.perms.includes('@owner') || claims.perms.includes('cashier.photo.view'));
+    const result = await service.list(c, query, branchIds, { withPhotoStatus: canPhoto });
     return c.json(ok({ data: result.data.map(toCashierTransactionDto), meta: result.meta }), 200);
   });
 

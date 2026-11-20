@@ -45,6 +45,8 @@ const paidTx: CashierTransaction = {
   tenantId: 't',
   branchId: 'b1',
   patientId: 'pat1',
+  patientName: null,
+  photoStatus: null,
   treatmentPlanId: null,
   receiptNumber: 'R-001',
   cardProvider: null,

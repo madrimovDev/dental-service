@@ -69,6 +69,8 @@ function tx(over: Partial<CashierTransaction> = {}): CashierTransaction {
     tenantId: 't',
     branchId: 'b1',
     patientId: null,
+    patientName: null,
+    photoStatus: 'photo',
     treatmentPlanId: null,
     receiptNumber: 'R-001',
     cardProvider: null,
@@ -107,6 +109,11 @@ describe('TransactionsTable', () => {
     expect(screen.queryByLabelText('Rasm')).toBeNull();
   });
 
+  it('«Rasm» tugmasi photoStatus null (rasmsiz) to‘lovda ko‘rinmaydi', () => {
+    renderApp(<TransactionsTable transactions={[tx({ id: 'tx9', photoStatus: null })]} />);
+    expect(screen.queryByTestId('photo-view-tx9')).toBeNull();
+  });
+
   it('FT-06.3: cashier.photo.view bor → rasm authed blob orqali ko‘rinadi', async () => {
     renderApp(<TransactionsTable transactions={[tx()]} />);
     fireEvent.click(screen.getByTestId('photo-view-tx1'));
@@ -119,7 +126,12 @@ describe('TransactionsTable', () => {
 
   it('FT-06.3: rasm olinmagan bo‘lsa — sababi; refund qatorida tugma yo‘q', async () => {
     renderApp(
-      <TransactionsTable transactions={[tx({ id: 'tx3' }), tx({ id: 'tx4', type: 'refund' })]} />,
+      <TransactionsTable
+        transactions={[
+          tx({ id: 'tx3', photoStatus: 'skipped' }),
+          tx({ id: 'tx4', type: 'refund' }),
+        ]}
+      />,
     );
     expect(screen.queryByTestId('photo-view-tx4')).toBeNull();
     fireEvent.click(screen.getByTestId('photo-view-tx3'));

@@ -39,6 +39,8 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
   // FT-06.3: to'lov rasmi faqat `cashier.photo.view` (owner, Tenant Admin).
   const canViewPhoto = hasPermission('cashier.photo.view');
   const vms = transactions.map(toTransactionVM);
+  // Rasm tugmasi faqat rasm/sabab yozuvi bor to'lovlarda (API `photoStatus`).
+  const photoById = new Map(transactions.map((x) => [x.id, x.photoStatus ?? null] as const));
   const selected = vms.find((v) => v.id === confirmId);
   const receiptVm = vms.find((v) => v.id === receiptId);
 
@@ -118,7 +120,7 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
                       >
                         <IconEye size={14} />
                       </ActionIcon>
-                      {canViewPhoto && tx.type === 'payment' && (
+                      {canViewPhoto && tx.type === 'payment' && photoById.get(tx.id) && (
                         <ActionIcon
                           variant="subtle"
                           color="teal"

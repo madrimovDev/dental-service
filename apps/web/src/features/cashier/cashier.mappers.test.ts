@@ -56,6 +56,8 @@ function tx(over: Partial<CashierTransaction> = {}): CashierTransaction {
     tenantId: 't',
     branchId: 'b1',
     patientId: null,
+    patientName: null,
+    photoStatus: null,
     treatmentPlanId: null,
     receiptNumber: 'R-001',
     cardProvider: null,

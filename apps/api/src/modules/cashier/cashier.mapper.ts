@@ -12,12 +12,18 @@ import type {
  * - `createdBy` va `fiscalResponse` DROP qilinadi (types-m3 wire shaklida YO'Q).
  */
 export const toCashierTransactionDto = (
-  row: CashierTransaction & { refundedAmount?: string },
+  row: CashierTransaction & {
+    refundedAmount?: string;
+    patientName?: string | null;
+    photoStatus?: 'photo' | 'skipped' | null;
+  },
 ): CashierTransactionDto => ({
   id: row.id,
   tenantId: row.tenantId,
   branchId: row.branchId,
   patientId: row.patientId ?? null,
+  patientName: row.patientName ?? null,
+  photoStatus: row.photoStatus ?? null,
   treatmentPlanId: row.treatmentPlanId ?? null,
   receiptNumber: row.receiptNumber ?? null,
   totalAmount: row.totalAmount,
