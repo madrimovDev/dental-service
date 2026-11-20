@@ -81,3 +81,17 @@ describe('PlanCard — B4 lifecycle tugmalari i18n orqali (L2)', () => {
     expect(screen.getByRole('button', { name: '__COMPLETE_OVERRIDE__' })).toBeInTheDocument();
   });
 });
+
+// FT-01.5 (spec §3): soddalashtirilgan holat nomlari (DB enum o'zgarmaydi, faqat UI).
+describe('PlanCard — FT-01.5 soddalashtirilgan holatlar', () => {
+  it.each([
+    ['draft', 'Qoralama'],
+    ['presented', "Bemorga ko'rsatildi"],
+    ['accepted', 'Bemor rozi'],
+    ['in_progress', 'Davolanmoqda'],
+    ['completed', 'Tugadi'],
+  ] as const)('%s → «%s»', (status, label) => {
+    renderApp(<PlanCard plan={plan({ status })} canEdit={false} {...noopHandlers} />);
+    expect(screen.getByText(label)).toBeInTheDocument();
+  });
+});
