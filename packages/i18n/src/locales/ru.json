@@ -1373,6 +1373,7 @@
     "current_receipt": "Текущий чек",
     "subtotal": "Промежуточный итог",
     "discount": "Скидка",
+    "patient_discount": "Скидка пациента",
     "discount_reason": "Причина скидки",
     "discount_reason_placeholder": "Например: постоянный клиент, родственник сотрудника",
     "payment_method": "Способ оплаты",

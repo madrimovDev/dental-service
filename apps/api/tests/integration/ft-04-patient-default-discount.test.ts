@@ -17,7 +17,9 @@ import { beforeAll, describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { ROLE_TEMPLATES } from '@dental/core';
 import {
+  auditLog,
   branches,
+  cashierTransactions,
   patients,
   permissions,
   rolePermissions,
@@ -40,6 +42,8 @@ const REG_PERMS = ['patient.view', 'patient.create', 'patient.edit', 'patient.vi
 const RECEPTION_PERMS = [
   ...(ROLE_TEMPLATES.find((t) => t.templateKey === 'receptionist')?.permissions ?? []),
 ] as string[];
+/** Kassir (chegirmasiz): faqat kassa — `discount.give` YO'Q. */
+const KASSIR_PERMS = ['cashier.view', 'cashier.create_transaction'];
 /** Doktor shablon permset'i — `discount.give` YO'Q (D-2: snapshot avtomatik). */
 const DOCTOR_PERMS = [
   ...(ROLE_TEMPLATES.find((t) => t.templateKey === 'doctor')?.permissions ?? []),
@@ -119,8 +123,11 @@ beforeAll(async () => {
   const reg = await mk('+998900075202');
   const reception = await mk('+998900075203');
   doctorUserId = await mk('+998900075204');
+  const kassir = await mk('+998900075205');
 
-  for (const code of [...new Set([...REG_PERMS, ...RECEPTION_PERMS, ...DOCTOR_PERMS])]) {
+  for (const code of [
+    ...new Set([...REG_PERMS, ...RECEPTION_PERMS, ...DOCTOR_PERMS, ...KASSIR_PERMS]),
+  ]) {
     await db
       .insert(permissions)
       .values({ code, category: code.split('.')[0] ?? 'x' })
@@ -131,6 +138,7 @@ beforeAll(async () => {
   const regPermRows = await permIds(REG_PERMS);
   const receptionPermRows = await permIds(RECEPTION_PERMS);
   const doctorPermRows = await permIds(DOCTOR_PERMS);
+  const kassirPermRows = await permIds(KASSIR_PERMS);
 
   tenantId = (
     await db
@@ -166,10 +174,18 @@ beforeAll(async () => {
     await tx
       .insert(rolePermissions)
       .values(doctorPermRows.map((p) => ({ roleId: docRole!.id, permissionId: p.id })));
+    const [kassirRole] = await tx
+      .insert(roles)
+      .values({ tenantId, name: 'Kassir (chegirmasiz)' })
+      .returning({ id: roles.id });
+    await tx
+      .insert(rolePermissions)
+      .values(kassirPermRows.map((p) => ({ roleId: kassirRole!.id, permissionId: p.id })));
     await tx.insert(userAssignments).values([
       { tenantId, userId: reg, branchId, roleId: regRole!.id },
       { tenantId, userId: reception, branchId, roleId: recRole!.id },
       { tenantId, userId: doctorUserId, branchId, roleId: docRole!.id },
+      { tenantId, userId: kassir, branchId, roleId: kassirRole!.id },
     ]);
     const [svc] = await tx
       .insert(services)
@@ -202,6 +218,7 @@ beforeAll(async () => {
   tok.reg = await sign(reg, REG_PERMS);
   tok.reception = await sign(reception, RECEPTION_PERMS);
   tok.doctor = await sign(doctorUserId, DOCTOR_PERMS);
+  tok.kassir = await sign(kassir, KASSIR_PERMS);
 });
 
 describe('FT-04.3 — patients.default_discount_percent tahriri (patient.edit + discount.give)', () => {
@@ -374,5 +391,89 @@ describe('FT-04.3 — yangi reja bosqichi: cost snapshot (list_price, discount_p
     const bal = await call('reception', 'GET', `/api/patients/${patientId}/balance`);
     expect(bal.json.data.planDebt).toBe(230_000);
     await call('reception', 'PATCH', `/api/patients/${patientId}`, { defaultDiscountPercent: 10 });
+  });
+});
+
+describe("FT-04.3 — POS: bemorning doimiy chegirmasi discount.give'siz kassirda ham", () => {
+  /** Xizmat narxi 200 000 (server narxi; client unitPrice e'tiborsiz — CLI-443). */
+  const payBody = (pid: string, discount: number, extra: Record<string, unknown> = {}) => ({
+    branchId,
+    patientId: pid,
+    items: [{ serviceId: svcId, quantity: 1, unitPrice: 1, serviceName: 'Plomba' }],
+    discount,
+    paidAmount: 200_000 - discount,
+    paymentMethod: 'cash',
+    ...extra,
+  });
+  const txCount = () =>
+    inTenant(
+      async (tx) =>
+        (await tx.select({ id: cashierTransactions.id }).from(cashierTransactions)).length,
+    );
+
+  let plainPatientId: string;
+  beforeAll(async () => {
+    expect(await patientDiscount(patientId)).toBe('10.00');
+    const created = await call('reception', 'POST', '/api/patients', {
+      fullName: 'Bemor POS Oddiy',
+    });
+    plainPatientId = created.json.data.id;
+  });
+
+  test('Kassir: bemor 10% → aynan 20 000 chegirma → 201, foiz 10.00, audit manbasi patient_default', async () => {
+    const r = await call('kassir', 'POST', '/api/cashier/transactions', payBody(patientId, 20_000));
+    expect(r.status).toBe(201);
+    expect(Number(r.json.data.totalAmount)).toBe(180_000);
+    expect(r.json.data.discountPercent).toBe('10.00');
+    const rows = await inTenant((tx) =>
+      tx
+        .select({ after: auditLog.after })
+        .from(auditLog)
+        .where(eq(auditLog.resourceId, r.json.data.id)),
+    );
+    expect(rows[0]?.after).toMatchObject({
+      discount: 20_000,
+      discountPercent: '10.00',
+      discountSource: 'patient_default',
+    });
+  });
+
+  test("Kassir: bemor 10%, lekin boshqa summa (30 000) → 403 discount.forbidden, yozuv yo'q", async () => {
+    const before = await txCount();
+    const r = await call('kassir', 'POST', '/api/cashier/transactions', payBody(patientId, 30_000));
+    expect(r.status).toBe(403);
+    expect(r.json.error.code).toBe('discount.forbidden');
+    expect(await txCount()).toBe(before);
+  });
+
+  test('Kassir: chegirmasiz bemorga chegirma → 403 (FT-04.2 gate saqlanadi)', async () => {
+    const before = await txCount();
+    const r = await call(
+      'kassir',
+      'POST',
+      '/api/cashier/transactions',
+      payBody(plainPatientId, 20_000),
+    );
+    expect(r.status).toBe(403);
+    expect(r.json.error.code).toBe('discount.forbidden');
+    expect(await txCount()).toBe(before);
+  });
+
+  test('Receptionist (discount.give): bemor 10% bo‘lsa ham boshqa summa → 201, manba manual', async () => {
+    const r = await call(
+      'reception',
+      'POST',
+      '/api/cashier/transactions',
+      payBody(patientId, 30_000),
+    );
+    expect(r.status).toBe(201);
+    expect(r.json.data.discountPercent).toBe('15.00');
+    const rows = await inTenant((tx) =>
+      tx
+        .select({ after: auditLog.after })
+        .from(auditLog)
+        .where(eq(auditLog.resourceId, r.json.data.id)),
+    );
+    expect(rows[0]?.after).toMatchObject({ discountSource: 'manual' });
   });
 });

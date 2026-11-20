@@ -32,6 +32,7 @@ import { onAfterCommit } from '../../db/after-commit.ts';
 import type { DbOrTx } from '../../db/client.ts';
 import { getDb, withTenant } from '../../db/scoped.ts';
 import type { AuditLogger } from '../../lib/audit-logger.ts';
+import { canGiveDiscount } from '../../lib/discount.ts';
 import type { PatientMessenger } from '../../lib/telegram/notify.ts';
 import {
   computePlanBalance,
@@ -240,6 +241,17 @@ export class DiscountExceedsTotalError extends Error {
  * `cashier.discount_exceeds_max` ga aylantiradi. `DiscountExceedsTotalError`dan
  * qat'iyroq — u itemsGross (100%) chegarasi, bu esa tenant limiti (masalan 30%).
  */
+/**
+ * FT-04 (D-1/D-2): `discount > 0`, lekin chaqiruvchida `discount.give` yo'q va summa bemorning
+ * doimiy chegirmasiga (avtomatik) aynan teng emas — routes 403 `discount.forbidden`.
+ */
+export class DiscountForbiddenError extends Error {
+  constructor() {
+    super('Discount requires discount.give');
+    this.name = 'DiscountForbiddenError';
+  }
+}
+
 export class DiscountExceedsMaxError extends Error {
   constructor(public readonly maxPercent: number) {
     super(`Discount exceeds max ${maxPercent}%`);
@@ -535,6 +547,29 @@ export const createCashierService = (deps: {
     );
     const discountCents = toCents(input.discount);
 
+    // FT-04 (D-1/D-2): chegirma faqat `discount.give` bilan — YAGONA istisno: erkin POS'da
+    // bemorning doimiy chegirmasi (`patients.default_discount_percent`) avtomatik qo'llanadi,
+    // summa aynan `round(itemsGross × pct/100)` bo'lsa (web POS bilan bir xil formula). Boshqa
+    // summa yoki reja to'lovi — 403. Yozuvdan OLDIN (hech narsa yaratilmaydi).
+    let discountSource: 'manual' | 'patient_default' = 'manual';
+    if (discountCents > 0) {
+      const pid = visitPatientId ?? input.patientId ?? null;
+      let autoCents: number | null = null;
+      if (resolvedItems.length > 0 && pid) {
+        const [pt] = await db
+          .select({ pct: patients.defaultDiscountPercent })
+          .from(patients)
+          .where(eq(patients.id, pid))
+          .limit(1);
+        const bp = pt?.pct != null ? Math.round(Number(pt.pct) * 100) : 0;
+        if (bp > 0) {
+          autoCents = toCents(Math.round((fromCents(itemsGrossCents) * bp) / 10_000));
+        }
+      }
+      if (autoCents !== null && autoCents === discountCents) discountSource = 'patient_default';
+      else if (!canGiveDiscount(c)) throw new DiscountForbiddenError();
+    }
+
     // CLI-444: discount itemsGross'dan katta bo'lsa jim clamp o'rniga RAD etiladi
     // (routes 400 `cashier.discount_exceeds_total`). Faqat erkin POS (items bor)
     // rejimida ma'noli — plan-billing (allocations) discount'dan mustaqil.
@@ -756,7 +791,12 @@ export const createCashierService = (deps: {
             items: input.items.length,
             // FT-04: chegirma auditda (summa, foiz, sabab; kim — audit userId).
             ...(hasDiscount
-              ? { discount: fromCents(discountCents), discountPercent, discountReason }
+              ? {
+                  discount: fromCents(discountCents),
+                  discountPercent,
+                  discountReason,
+                  discountSource,
+                }
               : {}),
           },
         });

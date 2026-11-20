@@ -37,6 +37,15 @@ vi.mock('../cashier.api', () => ({
   })),
 }));
 
+// FT-04.3: bemorning doimiy chegirmasi (usePatient) — test boshqaradi.
+let patientDiscount: number | null = null;
+vi.mock('@/features/patients/patients.api', () => ({
+  usePatientBalance: () => ({ data: undefined }),
+  usePatient: (id: string) => ({
+    data: id ? { id, fullName: 'Bemor', defaultDiscountPercent: patientDiscount } : undefined,
+  }),
+}));
+
 // Task D'ning ReceiptModal'i (net-new) hali landed bo'lmasligi mumkin —
 // import disjoint qoladi; bu test uni stublaydi (B uni faqat import qiladi, tahrirlamaydi).
 vi.mock('./ReceiptModal', () => ({
@@ -46,6 +55,7 @@ vi.mock('./ReceiptModal', () => ({
 describe('PosPanel', () => {
   beforeEach(() => {
     mutate.mockClear();
+    patientDiscount = null;
     // Receptionist shabloni kabi: kassa + chegirma huquqi.
     useAuthStore.setState({
       permissions: ['cashier.view', 'cashier.create_transaction', 'discount.give'],
@@ -62,6 +72,46 @@ describe('PosPanel', () => {
     expect(screen.queryByText('10%')).toBeNull();
     fireEvent.click(screen.getByText("To'lovni qabul qilish"));
     expect(mutate).toHaveBeenCalledWith(
+      expect.objectContaining({ discount: 0 }),
+      expect.anything(),
+    );
+  });
+
+  it("FT-04.3: discount.give'siz kassir — bemor 10% avtomatik qo'llanadi, pillar yo'q", async () => {
+    useAuthStore.setState({ permissions: ['cashier.view', 'cashier.create_transaction'] });
+    patientDiscount = 10;
+    renderApp(<PosPanel branchId="b1" patientId="pat1" />);
+
+    fireEvent.click(await screen.findByText('Plomba'));
+    await screen.findByDisplayValue("50 000 so'm");
+
+    expect(screen.getByTestId('pos-patient-discount')).toHaveTextContent('10%');
+    expect(screen.queryByText('15%')).toBeNull();
+    fireEvent.click(screen.getByText("To'lovni qabul qilish"));
+    expect(mutate).toHaveBeenCalledWith(
+      expect.objectContaining({ discount: 5000 }),
+      expect.anything(),
+    );
+  });
+
+  it('FT-04.3: discount.give bilan — bemor 7.5% oldindan tanlangan, kassir o‘zgartira oladi', async () => {
+    patientDiscount = 7.5;
+    renderApp(<PosPanel branchId="b1" patientId="pat1" />);
+
+    fireEvent.click(await screen.findByText('Plomba'));
+    await screen.findByDisplayValue("50 000 so'm");
+
+    // 50 000 × 7.5% = 3 750 (bemor chegirmasi pili ham ko'rinadi).
+    expect(screen.getByText('7.5%')).toBeInTheDocument();
+    fireEvent.click(screen.getByText("To'lovni qabul qilish"));
+    expect(mutate).toHaveBeenLastCalledWith(
+      expect.objectContaining({ discount: 3750 }),
+      expect.anything(),
+    );
+
+    fireEvent.click(screen.getByText('0%'));
+    fireEvent.click(screen.getByText("To'lovni qabul qilish"));
+    expect(mutate).toHaveBeenLastCalledWith(
       expect.objectContaining({ discount: 0 }),
       expect.anything(),
     );

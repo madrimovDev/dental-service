@@ -30,7 +30,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BalanceBadge } from '@/components/BalanceBadge';
-import { usePatientBalance } from '@/features/patients/patients.api';
+import { usePatient, usePatientBalance } from '@/features/patients/patients.api';
 import { formatCurrency } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth-store';
 import { fetchServicePrices, useCreateTransaction, useServices } from '../cashier.api';
@@ -104,8 +104,14 @@ function ServicePill({
 }
 
 /** Discount foiz pillari (so'm emas — call-site so'mga aylantiradi, mapper o'zgarmaydi). */
-const DISCOUNT_PCTS = [0, 5, 10, 15] as const;
-type DiscountPct = (typeof DISCOUNT_PCTS)[number];
+const DISCOUNT_PCTS: readonly number[] = [0, 5, 10, 15];
+
+/**
+ * FT-04.3: foiz → so'm chegirma — server `cashier.service` bilan AYNAN bir xil formula
+ * (bemorning doimiy chegirmasi `discount.give`siz faqat shu summada qabul qilinadi).
+ */
+const discountAmount = (gross: number, pct: number) =>
+  Math.round((gross * Math.round(pct * 100)) / 10_000);
 
 /** To'lov usuli toggle tugmalari (3 ta; `other` enum saqlanadi lekin toggle'da yo'q). */
 const PAYMENT_OPTIONS: ReadonlyArray<{
@@ -160,10 +166,16 @@ export function PosPanel({
   const balanceQuery = usePatientBalance(patientId ?? '');
   // FT-04 (D-1): chegirma faqat `discount.give` bilan (server 403 `discount.forbidden`).
   const canDiscount = useAuthStore((s) => s.hasPermission('discount.give'));
+  // FT-04.3 (D-2): bemorning doimiy chegirmasi — tanlanganda avtomatik qo'llanadi.
+  const patientQuery = usePatient(patientId ?? '');
+  const patientDefaultPct =
+    patientId && patientQuery.data?.id === patientId
+      ? (patientQuery.data.defaultDiscountPercent ?? 0)
+      : 0;
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState('');
-  const [discountPct, setDiscountPct] = useState<DiscountPct>(0);
+  const [discountPct, setDiscountPct] = useState<number>(0);
   const [discountReason, setDiscountReason] = useState('');
   const [paidAmount, setPaidAmount] = useState<number | ''>('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
@@ -174,7 +186,17 @@ export function PosPanel({
 
   // Foiz → so'm chegirma. gross = savat jami (chegirmasiz) = computeNetTotal(cart, 0).
   const gross = computeNetTotal(cart, 0);
-  const discAmt = canDiscount ? Math.round((gross * discountPct) / 100) : 0;
+  // `discount.give`siz — faqat bemorning doimiy chegirmasi (o'zgartirib bo'lmaydi).
+  const effectivePct = canDiscount ? discountPct : patientDefaultPct;
+  const discAmt = discountAmount(gross, effectivePct);
+  const discountPills = DISCOUNT_PCTS.includes(patientDefaultPct)
+    ? DISCOUNT_PCTS
+    : [...DISCOUNT_PCTS, patientDefaultPct].sort((a, b) => a - b);
+
+  // Bemor (yoki uning chegirmasi) o'zgarganda — doimiy chegirma oldindan tanlanadi.
+  useEffect(() => {
+    setDiscountPct(patientDefaultPct);
+  }, [patientDefaultPct]);
   const netTotal = computeNetTotal(cart, discAmt);
   // Naqdda qaytim, qarz qoldig'i (sof hisob — mappers.computeTender).
   const tender = computeTender(
@@ -213,7 +235,7 @@ export function PosPanel({
       })),
     );
     setVisitNoteId(visit.visitNoteId);
-    setDiscountPct(0);
+    setDiscountPct(patientDefaultPct);
     setPaidAmount('');
   }, [visit]);
 
@@ -323,7 +345,7 @@ export function PosPanel({
         }
         setCart([]);
         setSearch('');
-        setDiscountPct(0);
+        setDiscountPct(patientDefaultPct);
         setDiscountReason('');
         setPaidAmount('');
         setCardProvider('terminal');
@@ -439,7 +461,7 @@ export function PosPanel({
               {t('cashier.discount')}
             </Text>
             <Group gap={6}>
-              {DISCOUNT_PCTS.map((pct) => {
+              {discountPills.map((pct) => {
                 const active = pct === discountPct;
                 return (
                   <UnstyledButton
@@ -464,6 +486,26 @@ export function PosPanel({
                 );
               })}
             </Group>
+          </Group>
+        )}
+        {/* FT-04.3: discount.give'siz — bemorning doimiy chegirmasi faqat ko'rinadi. */}
+        {!canDiscount && patientDefaultPct > 0 && (
+          <Group
+            justify="space-between"
+            align="center"
+            style={{ padding: '12px 18px', borderTop: '1px solid var(--border)' }}
+          >
+            <Text size="sm" style={{ color: 'var(--ink-2)' }}>
+              {t('cashier.patient_discount')}
+            </Text>
+            <Text
+              size="sm"
+              fw={600}
+              data-testid="pos-patient-discount"
+              style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink)' }}
+            >
+              {`${patientDefaultPct}% · −${formatCurrency(discAmt, t)}`}
+            </Text>
           </Group>
         )}
         {canDiscount && discountPct > 0 && (
